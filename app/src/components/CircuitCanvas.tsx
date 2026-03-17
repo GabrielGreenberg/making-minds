@@ -1414,7 +1414,6 @@ export function CircuitCanvas() {
   const homework = useStore((s) => s.homework);
   const currentProblemIndex = useStore((s) => s.currentProblemIndex);
   const selectedTool = useStore((s) => s.selectedTool);
-  const setSelectedTool = useStore((s) => s.setSelectedTool);
   const textElements = useStore((s) => s.textElements);
   const comments = useStore((s) => s.comments);
   const showComments = useStore((s) => s.showComments);
@@ -1873,8 +1872,6 @@ export function CircuitCanvas() {
         const newBoxY = canvasPos.y - drag.moveBoxOffsetY!;
         const box = state.boxes.find((b) => b.id === drag.moveBoxId);
         if (box) {
-          const dx = newBoxX - box.x;
-          const dy = newBoxY - box.y;
           state.updateBox(drag.moveBoxId, { x: newBoxX, y: newBoxY });
           // Move all components inside the box by the same delta
           if (drag.moveBoxCompOffsets) {

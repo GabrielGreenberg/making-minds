@@ -165,12 +165,12 @@ export function DataTable() {
                 </tr>
               </thead>
               <tbody>
-                {ccInputRows.map((inBits, i) => {
+                {(ccInputRows as number[][]).map((inBits: number[], i: number) => {
                   const key = inputKey(inBits);
                   const outBits = evaluatedRows.get(key);
                   return (
                     <tr key={i}>
-                      {inBits.map((b, j) => (
+                      {inBits.map((b: number, j: number) => (
                         <td key={`i${j}`} className={b === 1 ? 'val-1' : ''}>
                           <span className="mono-value">{b}</span>
                         </td>
