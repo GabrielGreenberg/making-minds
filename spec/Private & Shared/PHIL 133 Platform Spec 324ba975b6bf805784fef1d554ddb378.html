@@ -1,0 +1,729 @@
+<html><head><meta http-equiv="Content-Type" content="text/html; charset=utf-8"/><title>PHIL 133 Platform Spec</title><style>
+/* cspell:disable-file */
+/* webkit printing magic: print all background colors */
+html {
+	-webkit-print-color-adjust: exact;
+}
+* {
+	box-sizing: border-box;
+	-webkit-print-color-adjust: exact;
+}
+
+html,
+body {
+	margin: 0;
+	padding: 0;
+}
+@media only screen {
+	body {
+		margin: 2em auto;
+		max-width: 900px;
+		color: rgb(55, 53, 47);
+	}
+}
+
+body {
+	line-height: 1.5;
+	white-space: pre-wrap;
+}
+
+a,
+a.visited {
+	color: inherit;
+	text-decoration: underline;
+}
+
+.pdf-relative-link-path {
+	font-size: 80%;
+	color: #444;
+}
+
+h1,
+h2,
+h3 {
+	letter-spacing: -0.01em;
+	line-height: 1.2;
+	font-weight: 600;
+	margin-bottom: 0;
+}
+
+/* Override strong tags inside headings to maintain consistent weight */
+h1 strong,
+h2 strong,
+h3 strong {
+	font-weight: 600;
+}
+
+.page-title {
+	font-size: 2.5rem;
+	font-weight: 700;
+	margin-top: 0;
+	margin-bottom: 0.75em;
+}
+
+h1 {
+	font-size: 1.875rem;
+	margin-top: 1.875rem;
+}
+
+h2 {
+	font-size: 1.5rem;
+	margin-top: 1.5rem;
+}
+
+h3 {
+	font-size: 1.25rem;
+	margin-top: 1.25rem;
+}
+
+.source {
+	border: 1px solid #ddd;
+	border-radius: 3px;
+	padding: 1.5em;
+	word-break: break-all;
+}
+
+.callout {
+	border-radius: 10px;
+	padding: 1rem;
+}
+
+figure {
+	margin: 1.25em 0;
+	page-break-inside: avoid;
+}
+
+figcaption {
+	opacity: 0.5;
+	font-size: 85%;
+	margin-top: 0.5em;
+}
+
+mark {
+	background-color: transparent;
+}
+
+.indented {
+	padding-left: 1.5em;
+}
+
+hr {
+	background: transparent;
+	display: block;
+	width: 100%;
+	height: 1px;
+	visibility: visible;
+	border: none;
+	border-bottom: 1px solid rgba(55, 53, 47, 0.09);
+}
+
+img {
+	max-width: 100%;
+}
+
+@media only print {
+	img {
+		max-height: 100vh;
+		object-fit: contain;
+	}
+}
+
+@page {
+	margin: 1in;
+}
+
+.collection-content {
+	font-size: 0.875rem;
+}
+
+.collection-content td {
+	white-space: pre-wrap;
+	word-break: break-word;
+}
+
+.column-list {
+	display: flex;
+	justify-content: space-between;
+}
+
+.column {
+	padding: 0 1em;
+}
+
+.column:first-child {
+	padding-left: 0;
+}
+
+.column:last-child {
+	padding-right: 0;
+}
+
+.table_of_contents-item {
+	display: block;
+	font-size: 0.875rem;
+	line-height: 1.3;
+	padding: 0.125rem;
+}
+
+.table_of_contents-indent-1 {
+	margin-left: 1.5rem;
+}
+
+.table_of_contents-indent-2 {
+	margin-left: 3rem;
+}
+
+.table_of_contents-indent-3 {
+	margin-left: 4.5rem;
+}
+
+.table_of_contents-link {
+	text-decoration: none;
+	opacity: 0.7;
+	border-bottom: 1px solid rgba(55, 53, 47, 0.18);
+}
+
+table,
+th,
+td {
+	border: 1px solid rgba(55, 53, 47, 0.09);
+	border-collapse: collapse;
+}
+
+table {
+	border-left: none;
+	border-right: none;
+}
+
+th,
+td {
+	font-weight: normal;
+	padding: 0.25em 0.5em;
+	line-height: 1.5;
+	min-height: 1.5em;
+	text-align: left;
+}
+
+th {
+	color: rgba(55, 53, 47, 0.6);
+}
+
+ol,
+ul {
+	margin: 0;
+	margin-block-start: 0.6em;
+	margin-block-end: 0.6em;
+}
+
+li > ol:first-child,
+li > ul:first-child {
+	margin-block-start: 0.6em;
+}
+
+ul > li {
+	list-style: disc;
+}
+
+ul.to-do-list {
+	padding-inline-start: 0;
+}
+
+ul.to-do-list > li {
+	list-style: none;
+}
+
+.to-do-children-checked {
+	text-decoration: line-through;
+	opacity: 0.375;
+}
+
+ul.toggle > li {
+	list-style: none;
+}
+
+ul {
+	padding-inline-start: 1.7em;
+}
+
+ul > li {
+	padding-left: 0.1em;
+}
+
+ol {
+	padding-inline-start: 1.6em;
+}
+
+ol > li {
+	padding-left: 0.2em;
+}
+
+.mono ol {
+	padding-inline-start: 2em;
+}
+
+.mono ol > li {
+	text-indent: -0.4em;
+}
+
+.toggle {
+	padding-inline-start: 0em;
+	list-style-type: none;
+}
+
+/* Indent toggle children */
+.toggle > li > details {
+	padding-left: 1.7em;
+}
+
+.toggle > li > details > summary {
+	margin-left: -1.1em;
+}
+
+.selected-value {
+	display: inline-block;
+	padding: 0 0.5em;
+	background: rgba(206, 205, 202, 0.5);
+	border-radius: 3px;
+	margin-right: 0.5em;
+	margin-top: 0.3em;
+	margin-bottom: 0.3em;
+	white-space: nowrap;
+}
+
+.collection-title {
+	display: inline-block;
+	margin-right: 1em;
+}
+
+.page-description {
+	margin-bottom: 2em;
+}
+
+.simple-table {
+	margin-top: 1em;
+	font-size: 0.875rem;
+	empty-cells: show;
+}
+.simple-table td {
+	height: 29px;
+	min-width: 120px;
+}
+
+.simple-table th {
+	height: 29px;
+	min-width: 120px;
+}
+
+.simple-table-header-color {
+	background: rgb(247, 246, 243);
+	color: black;
+}
+.simple-table-header {
+	font-weight: 500;
+}
+
+time {
+	opacity: 0.5;
+}
+
+.icon {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	max-width: 1.2em;
+	max-height: 1.2em;
+	text-decoration: none;
+	vertical-align: text-bottom;
+	margin-right: 0.5em;
+}
+
+img.icon {
+	border-radius: 3px;
+}
+
+.callout img.notion-static-icon {
+	width: 1em;
+	height: 1em;
+}
+
+.callout p {
+	margin: 0;
+}
+
+.callout h1,
+.callout h2,
+.callout h3 {
+	margin: 0 0 0.6rem;
+}
+
+.user-icon {
+	width: 1.5em;
+	height: 1.5em;
+	border-radius: 100%;
+	margin-right: 0.5rem;
+}
+
+.user-icon-inner {
+	font-size: 0.8em;
+}
+
+.text-icon {
+	border: 1px solid #000;
+	text-align: center;
+}
+
+.page-cover-image {
+	display: block;
+	object-fit: cover;
+	width: 100%;
+	max-height: 30vh;
+}
+
+.page-header-icon {
+	font-size: 3rem;
+	margin-bottom: 1rem;
+}
+
+.page-header-icon-with-cover {
+	margin-top: -0.72em;
+	margin-left: 0.07em;
+}
+
+.page-header-icon img {
+	border-radius: 3px;
+}
+
+.link-to-page {
+	margin: 1em 0;
+	padding: 0;
+	border: none;
+	font-weight: 500;
+}
+
+p > .user {
+	opacity: 0.5;
+}
+
+td > .user,
+td > time {
+	white-space: nowrap;
+}
+
+input[type="checkbox"] {
+	transform: scale(1.5);
+	margin-right: 0.6em;
+	vertical-align: middle;
+}
+
+p {
+	margin-top: 0.5em;
+	margin-bottom: 0.5em;
+}
+
+.image {
+	border: none;
+	margin: 1.5em 0;
+	padding: 0;
+	border-radius: 0;
+	text-align: center;
+}
+
+.code,
+code {
+	background: rgba(135, 131, 120, 0.15);
+	border-radius: 3px;
+	padding: 0.2em 0.4em;
+	border-radius: 3px;
+	font-size: 85%;
+	tab-size: 2;
+}
+
+code {
+	color: #eb5757;
+}
+
+.code {
+	padding: 1.5em 1em;
+}
+
+.code-wrap {
+	white-space: pre-wrap;
+	word-break: break-all;
+}
+
+.code > code {
+	background: none;
+	padding: 0;
+	font-size: 100%;
+	color: inherit;
+}
+
+blockquote {
+	font-size: 1em;
+	margin: 1em 0;
+	padding-left: 1em;
+	border-left: 3px solid rgb(55, 53, 47);
+}
+
+blockquote.quote-large {
+	font-size: 1.25em;
+}
+
+.bookmark {
+	text-decoration: none;
+	max-height: 8em;
+	padding: 0;
+	display: flex;
+	width: 100%;
+	align-items: stretch;
+}
+
+.bookmark-title {
+	font-size: 0.85em;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	height: 1.75em;
+	white-space: nowrap;
+}
+
+.bookmark-text {
+	display: flex;
+	flex-direction: column;
+}
+
+.bookmark-info {
+	flex: 4 1 180px;
+	padding: 12px 14px 14px;
+	display: flex;
+	flex-direction: column;
+	justify-content: space-between;
+}
+
+.bookmark-image {
+	width: 33%;
+	flex: 1 1 180px;
+	display: block;
+	position: relative;
+	object-fit: cover;
+	border-radius: 1px;
+}
+
+.bookmark-description {
+	color: rgba(55, 53, 47, 0.6);
+	font-size: 0.75em;
+	overflow: hidden;
+	max-height: 4.5em;
+	word-break: break-word;
+}
+
+.bookmark-href {
+	font-size: 0.75em;
+	margin-top: 0.25em;
+}
+
+.sans { font-family: ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI Variable Display", "Segoe UI", Helvetica, "Apple Color Emoji", "Noto Sans Arabic", "Noto Sans Hebrew", Arial, sans-serif, "Segoe UI Emoji", "Segoe UI Symbol"; }
+.code { font-family: "SFMono-Regular", Menlo, Consolas, "PT Mono", "Liberation Mono", Courier, monospace; }
+.serif { font-family: Lyon-Text, Georgia, ui-serif, serif; }
+.mono { font-family: iawriter-mono, Nitti, Menlo, Courier, monospace; }
+.pdf .sans { font-family: Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI Variable Display", "Segoe UI", Helvetica, "Apple Color Emoji", "Noto Sans Arabic", "Noto Sans Hebrew", Arial, sans-serif, "Segoe UI Emoji", "Segoe UI Symbol", 'Twemoji', 'Noto Color Emoji', 'Noto Sans CJK JP'; }
+.pdf:lang(zh-CN) .sans { font-family: Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI Variable Display", "Segoe UI", Helvetica, "Apple Color Emoji", "Noto Sans Arabic", "Noto Sans Hebrew", Arial, sans-serif, "Segoe UI Emoji", "Segoe UI Symbol", 'Twemoji', 'Noto Color Emoji', 'Noto Sans CJK SC'; }
+.pdf:lang(zh-TW) .sans { font-family: Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI Variable Display", "Segoe UI", Helvetica, "Apple Color Emoji", "Noto Sans Arabic", "Noto Sans Hebrew", Arial, sans-serif, "Segoe UI Emoji", "Segoe UI Symbol", 'Twemoji', 'Noto Color Emoji', 'Noto Sans CJK TC'; }
+.pdf:lang(ko-KR) .sans { font-family: Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI Variable Display", "Segoe UI", Helvetica, "Apple Color Emoji", "Noto Sans Arabic", "Noto Sans Hebrew", Arial, sans-serif, "Segoe UI Emoji", "Segoe UI Symbol", 'Twemoji', 'Noto Color Emoji', 'Noto Sans CJK KR'; }
+.pdf .code { font-family: Source Code Pro, "SFMono-Regular", Menlo, Consolas, "PT Mono", "Liberation Mono", Courier, monospace, 'Twemoji', 'Noto Color Emoji', 'Noto Sans Mono CJK JP'; }
+.pdf:lang(zh-CN) .code { font-family: Source Code Pro, "SFMono-Regular", Menlo, Consolas, "PT Mono", "Liberation Mono", Courier, monospace, 'Twemoji', 'Noto Color Emoji', 'Noto Sans Mono CJK SC'; }
+.pdf:lang(zh-TW) .code { font-family: Source Code Pro, "SFMono-Regular", Menlo, Consolas, "PT Mono", "Liberation Mono", Courier, monospace, 'Twemoji', 'Noto Color Emoji', 'Noto Sans Mono CJK TC'; }
+.pdf:lang(ko-KR) .code { font-family: Source Code Pro, "SFMono-Regular", Menlo, Consolas, "PT Mono", "Liberation Mono", Courier, monospace, 'Twemoji', 'Noto Color Emoji', 'Noto Sans Mono CJK KR'; }
+.pdf .serif { font-family: PT Serif, Lyon-Text, Georgia, ui-serif, serif, 'Twemoji', 'Noto Color Emoji', 'Noto Serif CJK JP'; }
+.pdf:lang(zh-CN) .serif { font-family: PT Serif, Lyon-Text, Georgia, ui-serif, serif, 'Twemoji', 'Noto Color Emoji', 'Noto Serif CJK SC'; }
+.pdf:lang(zh-TW) .serif { font-family: PT Serif, Lyon-Text, Georgia, ui-serif, serif, 'Twemoji', 'Noto Color Emoji', 'Noto Serif CJK TC'; }
+.pdf:lang(ko-KR) .serif { font-family: PT Serif, Lyon-Text, Georgia, ui-serif, serif, 'Twemoji', 'Noto Color Emoji', 'Noto Serif CJK KR'; }
+.pdf .mono { font-family: PT Mono, iawriter-mono, Nitti, Menlo, Courier, monospace, 'Twemoji', 'Noto Color Emoji', 'Noto Sans Mono CJK JP'; }
+.pdf:lang(zh-CN) .mono { font-family: PT Mono, iawriter-mono, Nitti, Menlo, Courier, monospace, 'Twemoji', 'Noto Color Emoji', 'Noto Sans Mono CJK SC'; }
+.pdf:lang(zh-TW) .mono { font-family: PT Mono, iawriter-mono, Nitti, Menlo, Courier, monospace, 'Twemoji', 'Noto Color Emoji', 'Noto Sans Mono CJK TC'; }
+.pdf:lang(ko-KR) .mono { font-family: PT Mono, iawriter-mono, Nitti, Menlo, Courier, monospace, 'Twemoji', 'Noto Color Emoji', 'Noto Sans Mono CJK KR'; }
+.highlight-default {
+	color: rgba(44, 44, 43, 1);
+}
+.highlight-gray {
+	color: rgba(125, 122, 117, 1);
+	fill: rgba(125, 122, 117, 1);
+}
+.highlight-brown {
+	color: rgba(159, 118, 90, 1);
+	fill: rgba(159, 118, 90, 1);
+}
+.highlight-orange {
+	color: rgba(210, 123, 45, 1);
+	fill: rgba(210, 123, 45, 1);
+}
+.highlight-yellow {
+	color: rgba(203, 148, 52, 1);
+	fill: rgba(203, 148, 52, 1);
+}
+.highlight-teal {
+	color: rgba(80, 148, 110, 1);
+	fill: rgba(80, 148, 110, 1);
+}
+.highlight-blue {
+	color: rgba(56, 125, 201, 1);
+	fill: rgba(56, 125, 201, 1);
+}
+.highlight-purple {
+	color: rgba(154, 107, 180, 1);
+	fill: rgba(154, 107, 180, 1);
+}
+.highlight-pink {
+	color: rgba(193, 76, 138, 1);
+	fill: rgba(193, 76, 138, 1);
+}
+.highlight-red {
+	color: rgba(207, 81, 72, 1);
+	fill: rgba(207, 81, 72, 1);
+}
+.highlight-default_background {
+	color: rgba(44, 44, 43, 1);
+}
+.highlight-gray_background {
+	background: rgba(42, 28, 0, 0.07);
+}
+.highlight-brown_background {
+	background: rgba(139, 46, 0, 0.086);
+}
+.highlight-orange_background {
+	background: rgba(224, 101, 1, 0.129);
+}
+.highlight-yellow_background {
+	background: rgba(211, 168, 0, 0.137);
+}
+.highlight-teal_background {
+	background: rgba(0, 100, 45, 0.09);
+}
+.highlight-blue_background {
+	background: rgba(0, 124, 215, 0.094);
+}
+.highlight-purple_background {
+	background: rgba(102, 0, 178, 0.078);
+}
+.highlight-pink_background {
+	background: rgba(197, 0, 93, 0.086);
+}
+.highlight-red_background {
+	background: rgba(223, 22, 0, 0.094);
+}
+.block-color-default {
+	color: inherit;
+	fill: inherit;
+}
+.block-color-gray {
+	color: rgba(125, 122, 117, 1);
+	fill: rgba(125, 122, 117, 1);
+}
+.block-color-brown {
+	color: rgba(159, 118, 90, 1);
+	fill: rgba(159, 118, 90, 1);
+}
+.block-color-orange {
+	color: rgba(210, 123, 45, 1);
+	fill: rgba(210, 123, 45, 1);
+}
+.block-color-yellow {
+	color: rgba(203, 148, 52, 1);
+	fill: rgba(203, 148, 52, 1);
+}
+.block-color-teal {
+	color: rgba(80, 148, 110, 1);
+	fill: rgba(80, 148, 110, 1);
+}
+.block-color-blue {
+	color: rgba(56, 125, 201, 1);
+	fill: rgba(56, 125, 201, 1);
+}
+.block-color-purple {
+	color: rgba(154, 107, 180, 1);
+	fill: rgba(154, 107, 180, 1);
+}
+.block-color-pink {
+	color: rgba(193, 76, 138, 1);
+	fill: rgba(193, 76, 138, 1);
+}
+.block-color-red {
+	color: rgba(207, 81, 72, 1);
+	fill: rgba(207, 81, 72, 1);
+}
+.block-color-default_background {
+	color: inherit;
+	fill: inherit;
+}
+.block-color-gray_background {
+	background: rgba(240, 239, 237, 1);
+}
+.block-color-brown_background {
+	background: rgba(245, 237, 233, 1);
+}
+.block-color-orange_background {
+	background: rgba(251, 235, 222, 1);
+}
+.block-color-yellow_background {
+	background: rgba(249, 243, 220, 1);
+}
+.block-color-teal_background {
+	background: rgba(232, 241, 236, 1);
+}
+.block-color-blue_background {
+	background: rgba(229, 242, 252, 1);
+}
+.block-color-purple_background {
+	background: rgba(243, 235, 249, 1);
+}
+.block-color-pink_background {
+	background: rgba(250, 233, 241, 1);
+}
+.block-color-red_background {
+	background: rgba(252, 233, 231, 1);
+}
+.select-value-color-default { background-color: rgba(42, 28, 0, 0.07); }
+.select-value-color-gray { background-color: rgba(28, 19, 1, 0.11); }
+.select-value-color-brown { background-color: rgba(127, 51, 0, 0.156); }
+.select-value-color-orange { background-color: rgba(196, 88, 0, 0.203); }
+.select-value-color-yellow { background-color: rgba(209, 156, 0, 0.282); }
+.select-value-color-green { background-color: rgba(0, 96, 38, 0.156); }
+.select-value-color-blue { background-color: rgba(0, 118, 217, 0.203); }
+.select-value-color-purple { background-color: rgba(92, 0, 163, 0.141); }
+.select-value-color-pink { background-color: rgba(183, 0, 78, 0.152); }
+.select-value-color-red { background-color: rgba(206, 24, 0, 0.164); }
+
+.checkbox {
+	display: inline-flex;
+	vertical-align: text-bottom;
+	width: 16;
+	height: 16;
+	background-size: 16px;
+	margin-left: 2px;
+	margin-right: 5px;
+}
+
+.checkbox-on {
+	background-image: url("data:image/svg+xml;charset=UTF-8,%3Csvg%20width%3D%2216%22%20height%3D%2216%22%20viewBox%3D%220%200%2016%2016%22%20fill%3D%22none%22%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%3E%0A%3Crect%20width%3D%2216%22%20height%3D%2216%22%20fill%3D%22%2358A9D7%22%2F%3E%0A%3Cpath%20d%3D%22M6.71429%2012.2852L14%204.9995L12.7143%203.71436L6.71429%209.71378L3.28571%206.2831L2%207.57092L6.71429%2012.2852Z%22%20fill%3D%22white%22%2F%3E%0A%3C%2Fsvg%3E");
+}
+
+.checkbox-off {
+	background-image: url("data:image/svg+xml;charset=UTF-8,%3Csvg%20width%3D%2216%22%20height%3D%2216%22%20viewBox%3D%220%200%2016%2016%22%20fill%3D%22none%22%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%3E%0A%3Crect%20x%3D%220.75%22%20y%3D%220.75%22%20width%3D%2214.5%22%20height%3D%2214.5%22%20fill%3D%22white%22%20stroke%3D%22%2336352F%22%20stroke-width%3D%221.5%22%2F%3E%0A%3C%2Fsvg%3E");
+}
+	
+</style></head><body><article id="324ba975-b6bf-8057-84fe-f1d554ddb378" class="page sans"><header><h1 class="page-title" dir="auto">PHIL 133 Platform Spec</h1><p class="page-description" dir="auto"></p><table class="properties"><tbody><tr class="property-row property-row-multi_select"><th><span class="icon property-icon"><img src="https://www.notion.so/icons/list_gray.svg" style="width:14px;height:14px;display:block"/></span>Tags</th><td></td></tr><tr class="property-row property-row-created_time"><th><span class="icon property-icon"><img src="https://www.notion.so/icons/clock_gray.svg" style="width:14px;height:14px;display:block"/></span>Created time</th><td><time>@March 14, 2026 7:58 PM</time></td></tr><tr class="property-row property-row-last_edited_time"><th><span class="icon property-icon"><img src="https://www.notion.so/icons/clock_gray.svg" style="width:14px;height:14px;display:block"/></span>Last edited time</th><td><time>@March 14, 2026 8:02 PM</time></td></tr><tr class="property-row property-row-multi_select"><th><span class="icon property-icon"><img src="https://www.notion.so/icons/list_gray.svg" style="width:14px;height:14px;display:block"/></span>Status</th><td></td></tr></tbody></table></header><div class="page-body"><div style="display:contents" dir="auto"><h1 id="324ba975-b6bf-8048-919f-d2a4dc759886" class="">1. Application Navigation </h1></div><div style="display:contents" dir="auto"><h2 id="324ba975-b6bf-80a9-9b79-d524d7752636" class="">1.1 Application Layout</h2></div><div style="display:contents" dir="auto"><ul id="324ba975-b6bf-809c-ba55-e42c70161325" class="bulleted-list"><li style="list-style-type:disc">Top menu bar<div style="display:contents" dir="auto"><p id="324ba975-b6bf-80f4-ad06-e313a5b56415" class="">Application layout includes:</p></div><div style="display:contents" dir="auto"><ul id="324ba975-b6bf-80e7-be0c-cf5a3f5819e8" class="bulleted-list"><li style="list-style-type:circle">File</li></ul></div><div style="display:contents" dir="auto"><ul id="324ba975-b6bf-8002-a3b7-ef29d6deac84" class="bulleted-list"><li style="list-style-type:circle">Edit</li></ul></div><div style="display:contents" dir="auto"><ul id="324ba975-b6bf-8003-b0e5-ce3e618dc4c1" class="bulleted-list"><li style="list-style-type:circle">View</li></ul></div></li></ul></div><div style="display:contents" dir="auto"><ul id="324ba975-b6bf-80fe-b396-c74ac1bbfb65" class="bulleted-list"><li style="list-style-type:disc">Left component library</li></ul></div><div style="display:contents" dir="auto"><ul id="324ba975-b6bf-80d0-80b1-eb21cbfc3632" class="bulleted-list"><li style="list-style-type:disc">Workspace canvas</li></ul></div><div style="display:contents" dir="auto"><ul id="324ba975-b6bf-8082-ae53-ca8dd554319a" class="bulleted-list"><li style="list-style-type:disc">Simulation panel</li></ul></div><div style="display:contents" dir="auto"><ul id="324ba975-b6bf-80de-96a1-d0c6680ee9b4" class="bulleted-list"><li style="list-style-type:disc">Properties panel</li></ul></div><div style="display:contents" dir="auto"><p id="324ba975-b6bf-8005-8de3-d657d7e3879f" class="">
+</p></div><div style="display:contents" dir="auto"><p id="324ba975-b6bf-8059-9298-e9f89691a63e" class=""><em><strong><span style="border-bottom:0.05em solid">Mockup of Overall Layout (CC)</span></strong></em></p></div><div style="display:contents" dir="ltr"><figure id="324ba975-b6bf-8087-bfb1-fbef619908a9" class="image"><a href="PHIL%20133%20Platform%20Spec/Mock_Ups-3_3.jpg"><img style="width:2157px" src="PHIL%20133%20Platform%20Spec/Mock_Ups-3_3.jpg"/></a></figure></div><div style="display:contents" dir="auto"><p id="324ba975-b6bf-80c5-a172-c58f94f665e0" class="">
+</p></div><div style="display:contents" dir="auto"><p id="324ba975-b6bf-802f-860e-ed20f6e2d4ed" class=""><em><strong><span style="border-bottom:0.05em solid">Mockup of Overall Layout (SC)</span></strong></em></p></div><div style="display:contents" dir="ltr"><figure id="324ba975-b6bf-8006-bf59-d6ffdeff230a" class="image"><a href="PHIL%20133%20Platform%20Spec/Mock_Ups-4_4.jpg"><img style="width:2157px" src="PHIL%20133%20Platform%20Spec/Mock_Ups-4_4.jpg"/></a></figure></div><div style="display:contents" dir="auto"><p id="324ba975-b6bf-809a-bc05-ee65b6c57aed" class="">
+</p></div><div style="display:contents" dir="auto"><h2 id="324ba975-b6bf-801f-b1db-fee1602f9a05" class="">1.2 Menu System</h2></div><div style="display:contents" dir="auto"><p id="324ba975-b6bf-80ea-9bcd-d9e8a71821c5" class="">File Menu:</p></div><div style="display:contents" dir="auto"><ul id="324ba975-b6bf-80cb-8bf4-fa494a8c4933" class="bulleted-list"><li style="list-style-type:disc">New Project</li></ul></div><div style="display:contents" dir="auto"><ul id="324ba975-b6bf-809f-a828-e7fda19282d8" class="bulleted-list"><li style="list-style-type:disc">Open File (using JSON upload)</li></ul></div><div style="display:contents" dir="auto"><ul id="324ba975-b6bf-80be-be2a-e124402d3fb6" class="bulleted-list"><li style="list-style-type:disc">Save</li></ul></div><div style="display:contents" dir="auto"><ul id="324ba975-b6bf-80ae-9357-f76e4d14dab0" class="bulleted-list"><li style="list-style-type:disc">Save as</li></ul></div><div style="display:contents" dir="auto"><ul id="324ba975-b6bf-80e1-82f8-eec45e875991" class="bulleted-list"><li style="list-style-type:disc">Import<div style="display:contents" dir="auto"><ul id="324ba975-b6bf-8090-9a85-d583a34026ba" class="bulleted-list"><li style="list-style-type:circle">Build (circuit, FSM, turbot)</li></ul></div><div style="display:contents" dir="auto"><ul id="324ba975-b6bf-8043-a772-f28f56a793f3" class="bulleted-list"><li style="list-style-type:circle">Worksheet (homework file)</li></ul></div></li></ul></div><div style="display:contents" dir="auto"><ul id="324ba975-b6bf-80b0-96ad-e56fcb141001" class="bulleted-list"><li style="list-style-type:disc">Export<div style="display:contents" dir="auto"><ul id="324ba975-b6bf-807a-80c5-d1ba1610664a" class="bulleted-list"><li style="list-style-type:circle">Build</li></ul></div><div style="display:contents" dir="auto"><ul id="324ba975-b6bf-80ac-80f6-c9e9e04afce5" class="bulleted-list"><li style="list-style-type:circle">Worksheet</li></ul></div></li></ul></div><div style="display:contents" dir="auto"><p id="324ba975-b6bf-8065-aa23-c2714c5b7996" class="">Edit Menu:</p></div><div style="display:contents" dir="auto"><ul id="324ba975-b6bf-800b-be62-eab56e76587f" class="bulleted-list"><li style="list-style-type:disc">Undo</li></ul></div><div style="display:contents" dir="auto"><ul id="324ba975-b6bf-802a-acaa-dc1424ad2a0e" class="bulleted-list"><li style="list-style-type:disc">Redo</li></ul></div><div style="display:contents" dir="auto"><ul id="324ba975-b6bf-8053-99bf-f32f7ca25fd6" class="bulleted-list"><li style="list-style-type:disc">Copy</li></ul></div><div style="display:contents" dir="auto"><ul id="324ba975-b6bf-80a7-9377-ffa2ccbc153d" class="bulleted-list"><li style="list-style-type:disc">Paste</li></ul></div><div style="display:contents" dir="auto"><ul id="324ba975-b6bf-80f6-8a29-f8884098df45" class="bulleted-list"><li style="list-style-type:disc">Delete</li></ul></div><div style="display:contents" dir="auto"><ul id="324ba975-b6bf-8090-aad2-fa105bfbeab5" class="bulleted-list"><li style="list-style-type:disc">Select All</li></ul></div><div style="display:contents" dir="auto"><p id="324ba975-b6bf-80d8-b0d9-e76af9789080" class="">View Menu:</p></div><div style="display:contents" dir="auto"><ul id="324ba975-b6bf-8002-9966-de2296a67823" class="bulleted-list"><li style="list-style-type:disc">Zoom in/out</li></ul></div><div style="display:contents" dir="auto"><ul id="324ba975-b6bf-80e4-91a5-e5f643499b74" class="bulleted-list"><li style="list-style-type:disc">Reset zoom</li></ul></div><div style="display:contents" dir="auto"><ul id="324ba975-b6bf-801b-b9ca-db0e0a0aca11" class="bulleted-list"><li style="list-style-type:disc">Toggle grid</li></ul></div><div style="display:contents" dir="auto"><p id="324ba975-b6bf-8081-94fd-c3d0f30202e9" class="">Table Menu</p></div><div style="display:contents" dir="auto"><ul id="324ba975-b6bf-8014-85e8-c76b7efe1b68" class="bulleted-list"><li style="list-style-type:disc">Representational system<div style="display:contents" dir="auto"><ul id="324ba975-b6bf-80cc-8c4c-c0722e932d0d" class="bulleted-list"><li style="list-style-type:circle">Tally or Binary</li></ul></div></li></ul></div><div style="display:contents" dir="auto"><ul id="324ba975-b6bf-8031-918c-eb3fd89aa6ef" class="bulleted-list"><li style="list-style-type:disc">Input/output table (I/O)</li></ul></div><div style="display:contents" dir="auto"><ul id="324ba975-b6bf-807d-b0cf-c5473f2cb0db" class="bulleted-list"><li style="list-style-type:disc">Argument/value table (A/V)</li></ul></div><div style="display:contents" dir="auto"><ul id="324ba975-b6bf-8078-9f66-fa4fd670ea9a" class="bulleted-list"><li style="list-style-type:disc">Local inputs</li></ul></div><div style="display:contents" dir="auto"><ul id="324ba975-b6bf-80a8-ae1e-e9e6fc818c50" class="bulleted-list"><li style="list-style-type:disc">Global inputs</li></ul></div><div style="display:contents" dir="auto"><p id="324ba975-b6bf-8009-931b-fa4c7ce81cc4" class="">Homework Menu</p></div><div style="display:contents" dir="auto"><ul id="324ba975-b6bf-80e7-a127-d682ce0c0505" class="bulleted-list"><li style="list-style-type:disc">Appears once a homework file is imported, labelled the same as said file</li></ul></div><div style="display:contents" dir="auto"><ul id="324ba975-b6bf-808b-a51d-e684b92dc429" class="bulleted-list"><li style="list-style-type:disc">Automatically generates a separate workspace for each problem<div style="display:contents" dir="auto"><ul id="324ba975-b6bf-80c4-bf28-f63ad12b28ac" class="bulleted-list"><li style="list-style-type:circle">Each workspace includes the problem written out</li></ul></div></li></ul></div><div style="display:contents" dir="auto"><p id="324ba975-b6bf-8085-b364-ee42f35fa5d9" class="">
+</p></div><div style="display:contents" dir="auto"><p id="324ba975-b6bf-8019-83e7-f800298f1568" class=""><em><strong><span style="border-bottom:0.05em solid">Mockup of Homework Menu</span></strong></em></p></div><div style="display:contents" dir="ltr"><figure id="324ba975-b6bf-80cb-8ed2-c7880f3847f9" class="image"><a href="PHIL%20133%20Platform%20Spec/Mock_Ups-6_4.jpg"><img style="width:2157px" src="PHIL%20133%20Platform%20Spec/Mock_Ups-6_4.jpg"/></a></figure></div><div style="display:contents" dir="auto"><p id="324ba975-b6bf-8001-b075-debe7e906ea4" class="">
+</p></div><div style="display:contents" dir="auto"><h2 id="324ba975-b6bf-80f5-976a-ed2fd398947f" class="">1.3 Simulation Panel</h2></div><div style="display:contents" dir="auto"><ul id="324ba975-b6bf-8048-be9c-e440c6dd24a6" class="bulleted-list"><li style="list-style-type:disc">Run</li></ul></div><div style="display:contents" dir="auto"><ul id="324ba975-b6bf-803e-8a58-c2a679ec7e5d" class="bulleted-list"><li style="list-style-type:disc">Pause</li></ul></div><div style="display:contents" dir="auto"><ul id="324ba975-b6bf-8029-9aae-d88abc054084" class="bulleted-list"><li style="list-style-type:disc">Step</li></ul></div><div style="display:contents" dir="auto"><ul id="324ba975-b6bf-802e-976a-d1d16e4634cf" class="bulleted-list"><li style="list-style-type:disc">Reset </li></ul></div><div style="display:contents" dir="auto"><ul id="324ba975-b6bf-80db-becf-f17985eda982" class="bulleted-list"><li style="list-style-type:disc">Global Reset</li></ul></div><div style="display:contents" dir="auto"><h2 id="324ba975-b6bf-8030-8630-cca20b943e07" class="">1.4 JSON File Model</h2></div><div style="display:contents" dir="auto"><p id="324ba975-b6bf-802d-8708-c5f413443f8e" class="">Projects will possess the following characteristics:</p></div><div style="display:contents" dir="auto"><ul id="324ba975-b6bf-8098-b561-dfbdcc197fb8" class="bulleted-list"><li style="list-style-type:disc">Circuit data</li></ul></div><div style="display:contents" dir="auto"><ul id="324ba975-b6bf-80a0-9334-fa5fe94ac6da" class="bulleted-list"><li style="list-style-type:disc">Metadata<div style="display:contents" dir="auto"><ul id="324ba975-b6bf-8091-9e16-f7f140c255fa" class="bulleted-list"><li style="list-style-type:circle">title, author, date </li></ul></div></li></ul></div><div style="display:contents" dir="auto"><p id="324ba975-b6bf-808c-8342-d8cb2f9d3471" class="">Circuit structures are serialized into JSON formats so enable exporting and sharing of files. They include all relevant:</p></div><div style="display:contents" dir="auto"><ul id="324ba975-b6bf-80a4-865a-e6364a9ef7a7" class="bulleted-list"><li style="list-style-type:disc">component data</li></ul></div><div style="display:contents" dir="auto"><ul id="324ba975-b6bf-807e-99bb-fdae4c37de59" class="bulleted-list"><li style="list-style-type:disc">position data</li></ul></div><div style="display:contents" dir="auto"><ul id="324ba975-b6bf-80ff-ab8a-cb434be576da" class="bulleted-list"><li style="list-style-type:disc">connection data</li></ul></div><div style="display:contents" dir="auto"><ul id="324ba975-b6bf-8070-a9e9-c9ee0900e18c" class="bulleted-list"><li style="list-style-type:disc">parameters</li></ul></div><div style="display:contents" dir="auto"><p id="324ba975-b6bf-8068-a7e8-fd0e3a86c9c3" class="">JSON format is suggestive, if needed, data can be added/reorganized to whatever is most convenient</p></div><div style="display:contents" dir="auto"><h2 id="324ba975-b6bf-80d1-afd2-f48eb6d7dfe5" class="">1.5 Save/Load Data</h2></div><div style="display:contents" dir="auto"><p id="324ba975-b6bf-8027-ba62-db4be8a9ba5a" class="">Save Flow:</p></div><div style="display:contents" dir="auto"><ul id="324ba975-b6bf-8071-b570-f4ffb271b61a" class="bulleted-list"><li style="list-style-type:disc">Select save</li></ul></div><div style="display:contents" dir="auto"><ul id="324ba975-b6bf-8003-9e10-cdff30256851" class="bulleted-list"><li style="list-style-type:disc">Project serialized into JSON</li></ul></div><div style="display:contents" dir="auto"><ul id="324ba975-b6bf-80c4-9b0f-c8338a625705" class="bulleted-list"><li style="list-style-type:disc">File locally saved</li></ul></div><div style="display:contents" dir="auto"><ul id="324ba975-b6bf-80de-b507-cad66a805646" class="bulleted-list"><li style="list-style-type:disc">Success message</li></ul></div><div style="display:contents" dir="auto"><p id="324ba975-b6bf-806d-9b89-de6ecadb5e7b" class="">Load Flow:</p></div><div style="display:contents" dir="auto"><ul id="324ba975-b6bf-80a6-bf18-fc457ee426f1" class="bulleted-list"><li style="list-style-type:disc">Select open</li></ul></div><div style="display:contents" dir="auto"><ul id="324ba975-b6bf-8011-b2b1-e07b26228f29" class="bulleted-list"><li style="list-style-type:disc">JSON file uploaded</li></ul></div><div style="display:contents" dir="auto"><ul id="324ba975-b6bf-800e-b18d-d3e05d51203a" class="bulleted-list"><li style="list-style-type:disc">Circuit data is verified</li></ul></div><div style="display:contents" dir="auto"><ul id="324ba975-b6bf-803e-903d-ccc759b71962" class="bulleted-list"><li style="list-style-type:disc">Circuit is reconstructed in workspace</li></ul></div><div style="display:contents" dir="auto"><ul id="324ba975-b6bf-800e-a3af-d49b5e4d93a9" class="bulleted-list"><li style="list-style-type:disc">UI refreshes</li></ul></div><div style="display:contents" dir="auto"><h2 id="324ba975-b6bf-80a3-90bc-ee60ccf22bdc" class="">1.6 Project State</h2></div><div style="display:contents" dir="auto"><ul id="324ba975-b6bf-8099-ae61-e01020d7c498" class="bulleted-list"><li style="list-style-type:disc">Error message sent when program closed without saving. </li></ul></div><div style="display:contents" dir="auto"><ul id="324ba975-b6bf-8050-af86-fb6622f717ab" class="bulleted-list"><li style="list-style-type:disc">Error message sent when uploaded file is invalid JSON</li></ul></div><div style="display:contents" dir="auto"><p id="324ba975-b6bf-8050-9876-eb87bf701062" class="">
+</p></div><div style="display:contents" dir="auto"><p id="324ba975-b6bf-8071-8b50-e9cd4f86f7a3" class=""><em><strong><span style="border-bottom:0.05em solid">Mockup of expanded menu and error message</span></strong></em></p></div><div style="display:contents" dir="ltr"><figure id="324ba975-b6bf-8092-a791-fd1d491a580f" class="image"><a href="PHIL%20133%20Platform%20Spec/Mock_Ups-6_2.jpg"><img style="width:2157px" src="PHIL%20133%20Platform%20Spec/Mock_Ups-6_2.jpg"/></a></figure></div><div style="display:contents" dir="auto"><h1 id="324ba975-b6bf-807e-b09f-e05e1678e39d" class="">2. Foundation</h1></div><div style="display:contents" dir="auto"><h2 id="324ba975-b6bf-8028-864a-c49c3b430d45" class="">2.1 Workspace</h2></div><div style="display:contents" dir="auto"><p id="324ba975-b6bf-804a-ab9c-f4cf2797db4e" class="">Editor contains two-dimensional workspace to build circuits, Finite State Machines, Turbots, Turing Machines. System provides visual editor for allowing students to drag-and-drop interaction.</p></div><div style="display:contents" dir="auto"><p id="324ba975-b6bf-8056-a448-fa8b71214115" class="">Users select elements from the component palette and place them in the workspace canvas. Each component becomes an independent instance that can be moved, connect, and deleted. </p></div><div style="display:contents" dir="auto"><h3 id="324ba975-b6bf-801d-bd05-e990d9ca840b" class="">Features</h3></div><div style="display:contents" dir="auto"><ul id="324ba975-b6bf-80f1-a441-cb0a4f84a7b1" class="bulleted-list"><li style="list-style-type:disc">Infinite or large scrollable canvas</li></ul></div><div style="display:contents" dir="auto"><ul id="324ba975-b6bf-80e0-8b5c-e3b3855d87a0" class="bulleted-list"><li style="list-style-type:disc">Zoom in/out functionality</li></ul></div><div style="display:contents" dir="auto"><ul id="324ba975-b6bf-8004-aec9-e4d43689f37b" class="bulleted-list"><li style="list-style-type:disc">Pan navigation via mouse drag or trackpad</li></ul></div><div style="display:contents" dir="auto"><ul id="324ba975-b6bf-8077-8df3-f6d83200fdb7" class="bulleted-list"><li style="list-style-type:disc">Background grid visual</li></ul></div><div style="display:contents" dir="auto"><ul id="324ba975-b6bf-804a-85e9-ec8e4ffb3a2d" class="bulleted-list"><li style="list-style-type:disc">Snap-to alignment for components</li></ul></div><div style="display:contents" dir="auto"><h2 id="324ba975-b6bf-800d-a461-cc86a565dd6e" class="">2.2 Selection Editing</h2></div><div style="display:contents" dir="auto"><p id="324ba975-b6bf-8057-9007-d87dcc331ef3" class="">Users can utilize traditional editing tools to manipulate component and links</p></div><div style="display:contents" dir="auto"><h3 id="324ba975-b6bf-80cb-bdae-c2e02e7579f8" class="">Editing Functionality</h3></div><div style="display:contents" dir="auto"><ul id="324ba975-b6bf-80da-8379-dec8780689be" class="bulleted-list"><li style="list-style-type:disc">Single select</li></ul></div><div style="display:contents" dir="auto"><ul id="324ba975-b6bf-8000-8eba-fd36982bd209" class="bulleted-list"><li style="list-style-type:disc">Multi select</li></ul></div><div style="display:contents" dir="auto"><ul id="324ba975-b6bf-8033-8efc-fd786b013ad2" class="bulleted-list"><li style="list-style-type:disc">Box select</li></ul></div><div style="display:contents" dir="auto"><ul id="324ba975-b6bf-8056-88c5-c355fdd62e50" class="bulleted-list"><li style="list-style-type:disc">Movement</li></ul></div><div style="display:contents" dir="auto"><ul id="324ba975-b6bf-808d-a81c-d28ba7fecb20" class="bulleted-list"><li style="list-style-type:disc">Copy/Paste</li></ul></div><div style="display:contents" dir="auto"><ul id="324ba975-b6bf-809e-ae22-f734b12a55a0" class="bulleted-list"><li style="list-style-type:disc">Delete</li></ul></div><div style="display:contents" dir="auto"><ul id="324ba975-b6bf-80ee-b99b-ce938f35fc41" class="bulleted-list"><li style="list-style-type:disc">Undo/Redo<div style="display:contents" dir="auto"><ul id="324ba975-b6bf-803d-8214-ebbcf6ee7e0c" class="bulleted-list"><li style="list-style-type:circle">Component creation</li></ul></div><div style="display:contents" dir="auto"><ul id="324ba975-b6bf-80be-b18d-eb673256ae2f" class="bulleted-list"><li style="list-style-type:circle">Movement</li></ul></div><div style="display:contents" dir="auto"><ul id="324ba975-b6bf-80e6-ad77-da46b9511cb6" class="bulleted-list"><li style="list-style-type:circle">Wiring</li></ul></div><div style="display:contents" dir="auto"><ul id="324ba975-b6bf-803c-ae0a-f47f0cf8abfa" class="bulleted-list"><li style="list-style-type:circle">Deletion</li></ul></div><div style="display:contents" dir="auto"><ul id="324ba975-b6bf-8037-9087-d2e9428e85bd" class="bulleted-list"><li style="list-style-type:circle">Parameter Changes </li></ul></div></li></ul></div><div style="display:contents" dir="auto"><h1 id="324ba975-b6bf-809a-98ad-c645f062f42a" class="">3. Component Library</h1></div><div style="display:contents" dir="auto"><h2 id="324ba975-b6bf-8085-976c-cd89cde71bb4" class="">3.1 Inputs and Outputs</h2></div><div style="display:contents" dir="auto"><ul id="324ba975-b6bf-80c0-a735-eb9fa4b07829" class="bulleted-list"><li style="list-style-type:disc">Inputs and Outputs<div style="display:contents" dir="auto"><ul id="324ba975-b6bf-800d-bb92-c7f96fba98a6" class="bulleted-list"><li style="list-style-type:circle">User controlled</li></ul></div><div style="display:contents" dir="auto"><ul id="324ba975-b6bf-8069-a4d2-e64802574ff9" class="bulleted-list"><li style="list-style-type:circle">Boolean values </li></ul></div><div style="display:contents" dir="auto"><ul id="324ba975-b6bf-80cf-822c-dfde732cb81f" class="bulleted-list"><li style="list-style-type:circle">Combinatorial Circuits (CCs)<div style="display:contents" dir="auto"><ul id="324ba975-b6bf-802a-a35a-ed8ce569ce30" class="bulleted-list"><li style="list-style-type:square">Input/output table</li></ul></div></li></ul></div><div style="display:contents" dir="auto"><ul id="324ba975-b6bf-80ea-8f4d-c693647d8d79" class="bulleted-list"><li style="list-style-type:circle">Sequential Circuits (SCs) and Finite State Machines (FSMs)<div style="display:contents" dir="auto"><ul id="324ba975-b6bf-805a-835d-d28ade613709" class="bulleted-list"><li style="list-style-type:square">Input/output table with time increments</li></ul></div></li></ul></div><div style="display:contents" dir="auto"><ul id="324ba975-b6bf-8087-8719-d1ed5f9e2e52" class="bulleted-list"><li style="list-style-type:circle">Turing Machines<div style="display:contents" dir="auto"><ul id="324ba975-b6bf-80ac-abf2-cd2e8669cdc9" class="bulleted-list"><li style="list-style-type:square">Input/output tapes</li></ul></div></li></ul></div></li></ul></div><div style="display:contents" dir="auto"><p id="324ba975-b6bf-8005-871a-e1c2826bdc84" class="">Input can be inserted into circuit either through the designated text boxes directly in the workspace, or inputted into the input/output or argument/value table.</p></div><div style="display:contents" dir="auto"><ul id="324ba975-b6bf-80f2-9d9d-f16c3b8cbe70" class="bulleted-list"><li style="list-style-type:disc">Typing an input into either of these fields will automatically populate the other</li></ul></div><div style="display:contents" dir="auto"><p id="324ba975-b6bf-805a-925e-e2a8e2b746c7" class="">Input boxes are automatically labelled depending on their vertical component (higher up, the lower the value).</p></div><div style="display:contents" dir="auto"><ul id="324ba975-b6bf-8042-91bf-ed86f7cb6cbf" class="bulleted-list"><li style="list-style-type:disc">the labelling of an input box does NOT change after being created<div style="display:contents" dir="auto"><ul id="324ba975-b6bf-80fb-9510-f980a73778c7" class="bulleted-list"><li style="list-style-type:circle">if any lower input box is moved to be higher than other, this does not alter either labels  </li></ul></div></li></ul></div><div style="display:contents" dir="auto"><p id="324ba975-b6bf-80d7-b11e-f0553492ef00" class="">Outputs are labelled and dealt with identically to inputs</p></div><div style="display:contents" dir="auto"><h2 id="324ba975-b6bf-80eb-b665-f27208417ef1" class="">3.2 Initial Components</h2></div><div style="display:contents" dir="auto"><ul id="324ba975-b6bf-80a8-9e29-c4b52a4cbe25" class="bulleted-list"><li style="list-style-type:disc">Basic Logic Gates<div style="display:contents" dir="auto"><ul id="324ba975-b6bf-800e-ae65-ca5741d78b62" class="bulleted-list"><li style="list-style-type:circle">NOT</li></ul></div><div style="display:contents" dir="auto"><ul id="324ba975-b6bf-80f5-8d5a-cd73db4c6b67" class="bulleted-list"><li style="list-style-type:circle">AND</li></ul></div><div style="display:contents" dir="auto"><ul id="324ba975-b6bf-800f-bbf9-e6cb4ee9dc0a" class="bulleted-list"><li style="list-style-type:circle">OR</li></ul></div></li></ul></div><div style="display:contents" dir="auto"><p id="324ba975-b6bf-809c-8521-c3f3f50983d7" class="">Each logic gate contains:</p></div><div style="display:contents" dir="auto"><ul id="324ba975-b6bf-80f2-b6a1-c83e91e8422f" class="bulleted-list"><li style="list-style-type:disc">Defined input ports</li></ul></div><div style="display:contents" dir="auto"><ul id="324ba975-b6bf-8000-9c4a-c1dc0ef0bbc4" class="bulleted-list"><li style="list-style-type:disc">One output port</li></ul></div><div style="display:contents" dir="auto"><ul id="324ba975-b6bf-80f3-80bc-efa5eddf9f31" class="bulleted-list"><li style="list-style-type:disc">Logical evaluation functionality </li></ul></div><div style="display:contents" dir="auto"><h2 id="324ba975-b6bf-8051-b786-eb5cc92d9114" class="">3.3 Additional Components</h2></div><div style="display:contents" dir="auto"><ul id="324ba975-b6bf-8064-ae6f-c6f7a6f99cfd" class="bulleted-list"><li style="list-style-type:disc">MEMORY</li></ul></div><div style="display:contents" dir="auto"><ul id="324ba975-b6bf-80e1-aea2-c1c05fab08f3" class="bulleted-list"><li style="list-style-type:disc">State blocks</li></ul></div><div style="display:contents" dir="auto"><ul id="324ba975-b6bf-8072-9186-c21ed259953a" class="bulleted-list"><li style="list-style-type:disc">Turbot</li></ul></div><div style="display:contents" dir="auto"><ul id="324ba975-b6bf-8071-9b5f-fb992ad34d9e" class="bulleted-list"><li style="list-style-type:disc">Turing Machine </li></ul></div><div style="display:contents" dir="auto"><h1 id="324ba975-b6bf-802e-8288-e288857c141e" class="">4. Drag and Drop Functionality</h1></div><div style="display:contents" dir="auto"><h2 id="324ba975-b6bf-806d-b775-e12d4b371776" class="">4.1 Component Creation</h2></div><div style="display:contents" dir="auto"><p id="324ba975-b6bf-8096-bb12-d3e70148a002" class="">When component is dragged from library onto canvas a new component instance is created with the following properties:</p></div><div style="display:contents" dir="auto"><ul id="324ba975-b6bf-8043-9ed5-cb1d6855be8c" class="bulleted-list"><li style="list-style-type:disc">Component type</li></ul></div><div style="display:contents" dir="auto"><ul id="324ba975-b6bf-80e4-ac7c-e9560aebf355" class="bulleted-list"><li style="list-style-type:disc">Workspace position</li></ul></div><div style="display:contents" dir="auto"><ul id="324ba975-b6bf-809a-b2ff-f9edc0691554" class="bulleted-list"><li style="list-style-type:disc">Input/Output ports</li></ul></div><div style="display:contents" dir="auto"><ul id="324ba975-b6bf-8036-8568-da1ef12cca15" class="bulleted-list"><li style="list-style-type:disc">Unique identifier</li></ul></div><div style="display:contents" dir="auto"><p id="324ba975-b6bf-80a0-b476-dd22a4b75892" class="">A component can also be placed by selecting it in the library, and then selecting where it should be placed in the workspace. </p></div><div style="display:contents" dir="auto"><h2 id="324ba975-b6bf-8086-a160-c608c7d557d0" class="">4.2 Movement</h2></div><div style="display:contents" dir="auto"><p id="324ba975-b6bf-8070-98c5-e5b042ec308a" class="">Moving a component around preserves:</p></div><div style="display:contents" dir="auto"><ul id="324ba975-b6bf-80f9-b529-f8adf50b6e2f" class="bulleted-list"><li style="list-style-type:disc">Type</li></ul></div><div style="display:contents" dir="auto"><ul id="324ba975-b6bf-80e0-a079-cf2ce14d186d" class="bulleted-list"><li style="list-style-type:disc">Identifier</li></ul></div><div style="display:contents" dir="auto"><ul id="324ba975-b6bf-80c0-a98d-c4fb59601194" class="bulleted-list"><li style="list-style-type:disc">Preexisting wiring </li></ul></div><div style="display:contents" dir="auto"><h2 id="324ba975-b6bf-8086-bcdb-cceca04b0494" class="">4.3 Ports</h2></div><div style="display:contents" dir="auto"><p id="324ba975-b6bf-80a6-8e4e-cffb9d772b50" class="">Each component will have visible connection ports, representing the valid connection points for single flows. Input ports receive signal, while output signals send signals</p></div><div style="display:contents" dir="auto"><h1 id="324ba975-b6bf-80c2-9b9e-db88b57784a8" class="">5. Circuit Functionality</h1></div><div style="display:contents" dir="auto"><h2 id="324ba975-b6bf-80dc-bf7f-c49182793c62" class="">5.1 Wiring System</h2></div><div style="display:contents" dir="auto"><p id="324ba975-b6bf-801d-bc16-cbaf8cefdfc2" class="">Users can create links between components to build circuits. Links adhere to the following rules:</p></div><div style="display:contents" dir="auto"><ul id="324ba975-b6bf-809f-aa57-f0ef742501b8" class="bulleted-list"><li style="list-style-type:disc">Connections are only allowed from an output port to an Input port</li></ul></div><div style="display:contents" dir="auto"><ul id="324ba975-b6bf-803d-9caa-f87511dad303" class="bulleted-list"><li style="list-style-type:disc">One Output port may connect to multiple Input ports</li></ul></div><div style="display:contents" dir="auto"><ul id="324ba975-b6bf-8089-801f-cf728a455c7f" class="bulleted-list"><li style="list-style-type:disc">Invalid connections are not allowed visually</li></ul></div><div style="display:contents" dir="auto"><ul id="324ba975-b6bf-800e-ac8b-ef94479f347d" class="bulleted-list"><li style="list-style-type:disc">Can only consist of straight lines<div style="display:contents" dir="auto"><ul id="324ba975-b6bf-80b6-b8ec-f873497039be" class="bulleted-list"><li style="list-style-type:circle">Horizontal and vertical lines follow grid lines</li></ul></div><div style="display:contents" dir="auto"><ul id="324ba975-b6bf-808a-8a24-f94aa56c8d29" class="bulleted-list"><li style="list-style-type:circle">Diagonal lines begin and end at grid vertices</li></ul></div></li></ul></div><div style="display:contents" dir="auto"><ul id="324ba975-b6bf-80de-a350-dbe7fca6c195" class="bulleted-list"><li style="list-style-type:disc">When wires cross, a “bump” is created to indicate correct pathways</li></ul></div><div style="display:contents" dir="auto"><ul id="324ba975-b6bf-80d6-99ed-c93954fcf542" class="bulleted-list"><li style="list-style-type:disc">Values propagate through wires by colour<div style="display:contents" dir="auto"><ul id="324ba975-b6bf-8080-9c0b-d4275b2356cb" class="bulleted-list"><li style="list-style-type:circle">Black indicates “0”</li></ul></div><div style="display:contents" dir="auto"><ul id="324ba975-b6bf-802d-9f62-e8b865cd433d" class="bulleted-list"><li style="list-style-type:circle">Red indicates “1”</li></ul></div></li></ul></div><div style="display:contents" dir="auto"><p id="324ba975-b6bf-80e1-b3fb-f19cd080f927" class="">
+</p></div><div style="display:contents" dir="auto"><p id="324ba975-b6bf-80e5-ba9c-e6e422bfd0c1" class=""><em><strong><span style="border-bottom:0.05em solid">Mockup of Wire Functionality</span></strong></em></p></div><div style="display:contents" dir="ltr"><figure id="324ba975-b6bf-80f9-9fe1-f88e0806471c" class="image"><a href="PHIL%20133%20Platform%20Spec/Mock_Ups-5_4.jpg"><img style="width:2157px" src="PHIL%20133%20Platform%20Spec/Mock_Ups-5_4.jpg"/></a></figure></div><div style="display:contents" dir="auto"><h2 id="324ba975-b6bf-8039-a46c-da05ba6f8955" class="">5.2 Basic Logic Gate Evaluation</h2></div><div style="display:contents" dir="auto"><p id="324ba975-b6bf-80ef-8656-d6cb5e23a73f" class="">Each logic gate must evaluate outputs depending on their respective truth table</p></div><div style="display:contents" dir="auto"><p id="324ba975-b6bf-8077-8380-ebdc3bf57546" class="">Whenever and input is changed:</p></div><div style="display:contents" dir="auto"><ul id="324ba975-b6bf-80f3-90b8-cde2af12bb5a" class="bulleted-list"><li style="list-style-type:disc">connected gates recompute outputs</li></ul></div><div style="display:contents" dir="auto"><ul id="324ba975-b6bf-8054-93ca-c3c486511d8a" class="bulleted-list"><li style="list-style-type:disc">signals propgate through links</li></ul></div><div style="display:contents" dir="auto"><ul id="324ba975-b6bf-80cb-8110-f4e5a90036ee" class="bulleted-list"><li style="list-style-type:disc">output values update visually </li></ul></div><div style="display:contents" dir="auto"><h1 id="324ba975-b6bf-8099-9f56-e83c6abadace" class="">6. Combinatorial Circuits</h1></div><div style="display:contents" dir="auto"><p id="324ba975-b6bf-8096-9651-d4851f7a923e" class="">Outputs are evaluated directly from the inputs, without any internal memory. </p></div><div style="display:contents" dir="auto"><p id="324ba975-b6bf-80f3-80ba-c1d1691f931d" class="">Simulator evaluates combinational circuits by recomputing gate outputs whenever inputs are changed. </p></div><div style="display:contents" dir="auto"><h1 id="324ba975-b6bf-800e-ae0b-f5a65d3cabff" class="">7. Sequential Circuits</h1></div><div style="display:contents" dir="auto"><p id="324ba975-b6bf-80f8-9b9c-ef47eccc5bbb" class="">Introduce the additional component MEM block </p></div><div style="display:contents" dir="auto"><h2 id="324ba975-b6bf-8036-a4c0-f944cc9699e2" class="">7.1 Time Model</h2></div><div style="display:contents" dir="auto"><ul id="324ba975-b6bf-8048-adff-f4a8b137ea1a" class="bulleted-list"><li style="list-style-type:disc">Maintains a discrete time step</li></ul></div><div style="display:contents" dir="auto"><ul id="324ba975-b6bf-80b2-aabb-f950ec3d6591" class="bulleted-list"><li style="list-style-type:disc">Each time step represents a clock cycle </li></ul></div><div style="display:contents" dir="auto"><h2 id="324ba975-b6bf-808c-a46b-d97c07024c7f" class="">7.2 Visualization</h2></div><div style="display:contents" dir="auto"><ul id="324ba975-b6bf-8000-a791-cb923289aa06" class="bulleted-list"><li style="list-style-type:disc">Inputs and outputs tracked using input/output table with time step</li></ul></div><div style="display:contents" dir="auto"><ul id="324ba975-b6bf-8037-b281-d8d4b5ae8899" class="bulleted-list"><li style="list-style-type:disc">Time step tracker display </li></ul></div><div style="display:contents" dir="auto"><h1 id="324ba975-b6bf-8094-8f1d-d872700a07ca" class="">8. Finite State Machines</h1></div><div style="display:contents" dir="auto"><p id="324ba975-b6bf-80ff-91de-e15798755c70" class="">States are represented as computational blocks, with arrows notating state changes </p></div><div style="display:contents" dir="auto"><p id="324ba975-b6bf-80f8-8dde-ebd6e0f23fac" class="">Each FSM will contain:</p></div><div style="display:contents" dir="auto"><ul id="324ba975-b6bf-8003-8296-c72d61adbee7" class="bulleted-list"><li style="list-style-type:disc">Set of states represented by state blocks<div style="display:contents" dir="auto"><ul id="324ba975-b6bf-8022-beed-c443077b7c20" class="bulleted-list"><li style="list-style-type:circle">Can be labeled</li></ul></div></li></ul></div><div style="display:contents" dir="auto"><ul id="324ba975-b6bf-806e-8505-d66a8d4d5f32" class="bulleted-list"><li style="list-style-type:disc">Transition Rules</li></ul></div><div style="display:contents" dir="auto"><ul id="324ba975-b6bf-80a5-aa84-db072a107b80" class="bulleted-list"><li style="list-style-type:disc">Inputs/outputs</li></ul></div><div style="display:contents" dir="auto"><p id="324ba975-b6bf-80dd-95e3-fa67d3d907f9" class="">Simulation displays:</p></div><div style="display:contents" dir="auto"><ul id="324ba975-b6bf-80d1-99a6-e6677b113575" class="bulleted-list"><li style="list-style-type:disc">current state</li></ul></div><div style="display:contents" dir="auto"><ul id="324ba975-b6bf-8052-9219-d8277a4b8cae" class="bulleted-list"><li style="list-style-type:disc">execution of the FSM </li></ul></div><div style="display:contents" dir="auto"><p id="324ba975-b6bf-809a-8b83-ccd432fda2f2" class="">
+</p></div><div style="display:contents" dir="auto"><p id="324ba975-b6bf-8087-866a-c2be60596c82" class=""><em><strong><span style="border-bottom:0.05em solid">Mockup of FSM</span></strong></em></p></div><div style="display:contents" dir="ltr"><figure id="324ba975-b6bf-80c1-bc0b-c790fbdf20ce" class="image"><a href="PHIL%20133%20Platform%20Spec/Mock_Ups-9.jpg"><img style="width:2157px" src="PHIL%20133%20Platform%20Spec/Mock_Ups-9.jpg"/></a></figure></div><div style="display:contents" dir="auto"><p id="324ba975-b6bf-80fe-84ea-c416c413ca2f" class="">
+</p></div><div style="display:contents" dir="auto"><h1 id="324ba975-b6bf-80bc-820d-e62df85f6ee7" class="">9. Turing Machines</h1></div><div style="display:contents" dir="auto"><p id="324ba975-b6bf-80ec-89cb-d2538ac38b34" class="">Turing machines should consist of:</p></div><div style="display:contents" dir="auto"><ul id="324ba975-b6bf-802c-9196-e1aebfad14ec" class="bulleted-list"><li style="list-style-type:disc">Read/write head</li></ul></div><div style="display:contents" dir="auto"><ul id="324ba975-b6bf-806b-a7b7-cb378901e3c1" class="bulleted-list"><li style="list-style-type:disc">Internal circuitry</li></ul></div><div style="display:contents" dir="auto"><ul id="324ba975-b6bf-8035-86e7-ed1cec17b812" class="bulleted-list"><li style="list-style-type:disc">Infinite tape representation</li></ul></div><div style="display:contents" dir="auto"><p id="324ba975-b6bf-8004-ab97-f8c28ec7d0ac" class="">Should also have different types of execution</p></div><div style="display:contents" dir="auto"><ul id="324ba975-b6bf-80db-bab5-f0af6f5ed5ac" class="bulleted-list"><li style="list-style-type:disc">Step-by-step execution</li></ul></div><div style="display:contents" dir="auto"><ul id="324ba975-b6bf-80b6-ad48-cf88d23cb987" class="bulleted-list"><li style="list-style-type:disc">Continuous run</li></ul></div><div style="display:contents" dir="auto"><p id="324ba975-b6bf-8003-a061-cfaebf3c9d43" class="">
+</p></div><div style="display:contents" dir="auto"><p id="324ba975-b6bf-802e-9ab5-e39e0b2b5f58" class=""><em><strong><span style="border-bottom:0.05em solid">Mockup of Turing machine</span></strong></em></p></div><div style="display:contents" dir="ltr"><figure id="324ba975-b6bf-80ba-b958-f1aed591a7ea" class="image"><a href="PHIL%20133%20Platform%20Spec/Mock_Ups-6.jpg"><img style="width:2157px" src="PHIL%20133%20Platform%20Spec/Mock_Ups-6.jpg"/></a></figure></div><div style="display:contents" dir="auto"><h1 id="324ba975-b6bf-8066-a4a0-e23aeb8c0cdd" class="">10. Turbots</h1></div><div style="display:contents" dir="auto"><h2 id="324ba975-b6bf-80fd-9845-caaf5f68a1d1" class="">10.1 Arena</h2></div><div style="display:contents" dir="auto"><p id="324ba975-b6bf-80a2-8283-df1382562126" class="">The working space for turbots will allow for the placement of the following additional components:</p></div><div style="display:contents" dir="auto"><ul id="324ba975-b6bf-806a-a319-c1359f182cb3" class="bulleted-list"><li style="list-style-type:disc"> Turbot <div style="display:contents" dir="auto"><ul id="324ba975-b6bf-8067-a42a-d0ca33379ba4" class="bulleted-list"><li style="list-style-type:circle">can be oriented in any four of the cardinal directions</li></ul></div></li></ul></div><div style="display:contents" dir="auto"><ul id="324ba975-b6bf-8053-b1c9-ccc73bd8e7ae" class="bulleted-list"><li style="list-style-type:disc">Blocks<div style="display:contents" dir="auto"><ul id="324ba975-b6bf-8031-8e95-f8c5c68265f3" class="bulleted-list"><li style="list-style-type:circle">Used to restrict movement</li></ul></div><div style="display:contents" dir="auto"><ul id="324ba975-b6bf-80ce-af40-f366599520f2" class="bulleted-list"><li style="list-style-type:circle">Functionally a way to restrict from an infinite arena to a finite arena</li></ul></div></li></ul></div><div style="display:contents" dir="auto"><ul id="324ba975-b6bf-8061-b0ff-ed7b8e80aae7" class="bulleted-list"><li style="list-style-type:disc">Food </li></ul></div><div style="display:contents" dir="auto"><h2 id="324ba975-b6bf-8087-a4f8-f9a6f863edfa" class="">10.2 Internal Circuitry</h2></div><div style="display:contents" dir="auto"><p id="324ba975-b6bf-80ed-b613-d655db24ff72" class="">Turbots can contain any of the above types of circuitry.</p></div><div style="display:contents" dir="auto"><ul id="324ba975-b6bf-8019-808f-c4356bddfc31" class="bulleted-list"><li style="list-style-type:disc">Linked workspace between the turbot and its internal circuitry that dictates its behaviour</li></ul></div><div style="display:contents" dir="auto"><p id="324ba975-b6bf-80f3-a343-c9dea13f1e87" class="">
+</p></div><div style="display:contents" dir="auto"><p id="324ba975-b6bf-804c-8353-ea565ca9c77a" class=""><em><strong><span style="border-bottom:0.05em solid">Mockup of turbot</span></strong></em></p></div><div style="display:contents" dir="ltr"><figure id="324ba975-b6bf-80d1-b39e-f931518f6382" class="image"><a href="PHIL%20133%20Platform%20Spec/Mock_Ups-10.jpg"><img style="width:2157px" src="PHIL%20133%20Platform%20Spec/Mock_Ups-10.jpg"/></a></figure></div><div style="display:contents" dir="auto"><p id="324ba975-b6bf-80e6-8cbd-cc81c1828669" class="">
+</p></div><div style="display:contents" dir="auto"><h1 id="324ba975-b6bf-802e-a7d7-f94809a54562" class="">11. Evaluation</h1></div><div style="display:contents" dir="auto"><h2 id="324ba975-b6bf-80e3-a370-e804aaf304a1" class="">11.1 Back-end Instructor Evaluation</h2></div><div style="display:contents" dir="auto"><p id="324ba975-b6bf-8079-89f2-f1e3aedc7e3b" class="">Platform should support automatic grading of circuits through submission of files. Evaluation portion of platform should be inaccessible to students.</p></div><div style="display:contents" dir="auto"><h2 id="324ba975-b6bf-80ac-b73c-c68ed14ef295" class="">11.2 CCs and PCs Evaluation</h2></div><div style="display:contents" dir="auto"><ul id="324ba975-b6bf-8061-9aeb-e440189af938" class="bulleted-list"><li style="list-style-type:disc">Compares generated outputs with expected outputs<div style="display:contents" dir="auto"><ul id="324ba975-b6bf-8093-81f3-cbfc932d57d4" class="bulleted-list"><li style="list-style-type:circle">depending on truth tables</li></ul></div></li></ul></div><div style="display:contents" dir="auto"><ul id="324ba975-b6bf-8094-b107-c23ce81b8412" class="bulleted-list"><li style="list-style-type:disc">Sequential circuits require checking outputs across all time steps</li></ul></div><div style="display:contents" dir="auto"><h2 id="324ba975-b6bf-804f-b0bd-e2972e8030a3" class="">11.3 FSMs, Turbots, and Turing Machine Evaluation</h2></div><div style="display:contents" dir="auto"><ul id="324ba975-b6bf-80b6-986f-f790f18457f8" class="bulleted-list"><li style="list-style-type:disc">Compares expected states and outputs across time steps</li></ul></div><div style="display:contents" dir="auto"><p id="324ba975-b6bf-80cc-90ac-f46ec556d8b5" class="">
+</p></div><div style="display:contents" dir="auto"><p id="324ba975-b6bf-80a2-ab17-ecb5108478e4" class="">
+</p></div><div style="display:contents" dir="auto"><p id="324ba975-b6bf-80b3-9647-e4e98d1c2e1c" class="">
+</p></div><div style="display:contents" dir="auto"><p id="324ba975-b6bf-8009-be4e-cbfb567b12bf" class="">
+</p></div></div></article><span class="sans" style="font-size:14px;padding-top:2em"></span></body></html>

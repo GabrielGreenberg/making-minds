@@ -1,0 +1,189 @@
+// Core types for the Making Minds platform
+
+export type BuildMode = 'CC' | 'SC' | 'FSM' | 'turbot' | 'TM';
+export type RepSystem = 'tally' | 'binary';
+export type DisplayMode = 'IO' | 'AV';
+export type Scope = 'local' | 'global';
+
+export interface Port {
+  id: string;
+  label: string;
+  side: 'left' | 'right';
+  index: number; // vertical order on that side
+}
+
+export type ComponentType =
+  | 'INPUT'
+  | 'OUTPUT'
+  | 'NOT'
+  | 'AND'
+  | 'OR'
+  | 'XOR'
+  | 'HA'
+  | 'MEM'
+  | 'BOXED';
+
+export interface CircuitComponent {
+  id: string;
+  type: ComponentType;
+  x: number;
+  y: number;
+  label: string;
+  ports: Port[];
+  value?: number; // current output value for inputs
+  inputValues?: number[]; // for inputs: the value (0 or 1)
+  storedValue?: number; // for MEM blocks
+  rotation?: number; // 0, 90, 180, 270 degrees clockwise
+  boxedCircuitId?: string; // for BOXED type
+  internalCircuit?: CircuitData; // for BOXED type - the encapsulated circuit
+}
+
+export interface Wire {
+  id: string;
+  sourceComponentId: string;
+  sourcePortId: string;
+  targetComponentId: string;
+  targetPortId: string;
+  value: number; // 0 or 1
+  waypoints?: { x: number; y: number }[];
+  manualSegments?: WireManualSegment[]; // manual overrides for wire segments
+}
+
+// Manual wire segment override: which segment index was moved to what position
+export interface WireManualSegment {
+  segmentIndex: number; // index into the computed path segments
+  offset: number; // displacement from computed position
+  axis: 'x' | 'y'; // which axis was shifted
+}
+
+export interface CircuitData {
+  components: CircuitComponent[];
+  wires: Wire[];
+}
+
+export interface ProjectData {
+  metadata: {
+    title: string;
+    author: string;
+    date: string;
+    buildType: BuildMode;
+  };
+  circuit: CircuitData;
+  repSystem: RepSystem;
+}
+
+export interface HomeworkProblem {
+  id: number;
+  text: string;
+  type: BuildMode;
+  representation: RepSystem;
+  allowed_components?: ComponentType[];
+  test_vectors?: {
+    input_sequence: number[];
+    expected_output: number[];
+  }[];
+  grading_mode?: 'exhaustive' | 'test_vectors';
+  notes?: string;
+}
+
+export interface HomeworkData {
+  title: string;
+  problems: HomeworkProblem[];
+}
+
+// ─── Text annotations ───────────────────────────────────────────
+
+export interface TextElement {
+  id: string;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  text: string;
+  fontSize: number;
+  fontColor: string;
+  bold: boolean;
+  italic: boolean;
+}
+
+// ─── Comments ───────────────────────────────────────────────────
+
+export interface CommentElement {
+  id: string;
+  targetId: string; // component or wire ID this comment is attached to
+  text: string;
+  x: number; // offset from target
+  y: number;
+}
+
+// ─── Boxing (redesigned) ────────────────────────────────────────
+
+export interface BoxDefinition {
+  id: string;
+  name: string;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  componentIds: string[]; // IDs of components inside the box
+  inputPortIds: string[]; // wire endpoints crossing boundary inward
+  outputPortIds: string[]; // wire endpoints crossing boundary outward
+}
+
+// ─── Problem Set Mode ───────────────────────────────────────────
+
+export interface ProblemPage {
+  id: string;
+  label: string; // e.g., "Problem 1", "Problem 2a"
+  statement: string; // problem text
+  buildMode: BuildMode;
+}
+
+export interface ProblemSetData {
+  title: string;
+  pages: ProblemPage[];
+}
+
+// Port definitions for each component type
+export function getPortsForType(type: ComponentType): Port[] {
+  switch (type) {
+    case 'INPUT':
+      return [{ id: 'out', label: '', side: 'right', index: 0 }];
+    case 'OUTPUT':
+      return [{ id: 'in', label: '', side: 'left', index: 0 }];
+    case 'NOT':
+      return [
+        { id: 'in', label: '', side: 'left', index: 0 },
+        { id: 'out', label: '', side: 'right', index: 0 },
+      ];
+    case 'AND':
+    case 'OR':
+    case 'XOR':
+      return [
+        { id: 'in1', label: '', side: 'left', index: 0 },
+        { id: 'in2', label: '', side: 'left', index: 1 },
+        { id: 'out', label: '', side: 'right', index: 0 },
+      ];
+    case 'HA':
+      return [
+        { id: 'in1', label: 'A', side: 'left', index: 0 },
+        { id: 'in2', label: 'B', side: 'left', index: 1 },
+        { id: 'sum', label: 'S', side: 'right', index: 0 },
+        { id: 'carry', label: 'C', side: 'right', index: 1 },
+      ];
+    case 'MEM':
+      return [
+        { id: 'mout', label: 'M_OUT', side: 'left', index: 0 },
+        { id: 'min', label: 'M_IN', side: 'right', index: 0 },
+      ];
+    default:
+      return [];
+  }
+}
+
+// Component dimensions
+export const GRID_SIZE = 20;
+export const COMP_WIDTH = 80;
+export const COMP_HEIGHT = 60;
+export const PORT_RADIUS = 3.5;
+export const INPUT_OUTPUT_SIZE = 40;
