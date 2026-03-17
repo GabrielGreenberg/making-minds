@@ -289,9 +289,6 @@ function computeWirePath(
   const isBlockedVertical = (x: number, y1: number, y2: number): boolean =>
     segBlockedBy(obstacleBounds, true, x, y1, y2);
 
-  const isBlockedHorizontal = (y: number, x1: number, x2: number): boolean =>
-    segBlockedBy(obstacleBounds, false, y, x1, x2);
-
   /** Check if ANY segment in a path passes through a component.
    *  i=1 (near source stub): excludes only source, still checks target.
    *  i=len-3 (near target stub): excludes only target, still checks source.
