@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { useStore } from '../store';
 import type { BuildMode, ProblemSetData } from '../types';
+import { saveToFile, openFile } from '../fileHandle';
 
 export function MenuBar() {
   const [openMenu, setOpenMenu] = useState<string | null>(null);
@@ -14,24 +15,12 @@ export function MenuBar() {
     deleteSelected,
     copySelected,
     paste,
-    zoom,
-    setZoom,
-    showGrid,
-    setShowGrid,
-    showComments,
-    setShowComments,
     exportProject,
     importProject,
     loadHomework,
     loadProblemSet,
     homework,
     problemSet,
-    repSystem,
-    setRepSystem,
-    displayMode,
-    setDisplayMode,
-    scope,
-    setScope,
     importBoxedCircuit,
   } = useStore();
 
@@ -61,27 +50,15 @@ export function MenuBar() {
 
   const handleSave = () => {
     const json = exportProject();
-    const blob = new Blob([json], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'circuit.json';
-    a.click();
-    URL.revokeObjectURL(url);
+    saveToFile(json);
     setOpenMenu(null);
   };
 
-  const handleOpen = () => {
-    const input = document.createElement('input');
-    input.type = 'file';
-    input.accept = '.json';
-    input.onchange = (e) => {
-      const file = (e.target as HTMLInputElement).files?.[0];
-      if (file) {
-        file.text().then((text) => importProject(text));
-      }
-    };
-    input.click();
+  const handleOpen = async () => {
+    const text = await openFile();
+    if (text) {
+      importProject(text);
+    }
     setOpenMenu(null);
   };
 
@@ -256,85 +233,6 @@ export function MenuBar() {
             </div>
             <div className="menu-dropdown-item" onClick={() => { deleteSelected(); setOpenMenu(null); }}>
               Delete <span style={{ color: '#999', fontSize: 11 }}>⌫</span>
-            </div>
-          </div>
-        )}
-      </div>
-
-      {/* View */}
-      <div
-        className="menu-item"
-        onClick={() => setOpenMenu(openMenu === 'view' ? null : 'view')}
-      >
-        View
-        {openMenu === 'view' && (
-          <div className="menu-dropdown">
-            <div className="menu-dropdown-item" onClick={() => { setZoom(zoom + 0.1); setOpenMenu(null); }}>
-              Zoom In
-            </div>
-            <div className="menu-dropdown-item" onClick={() => { setZoom(zoom - 0.1); setOpenMenu(null); }}>
-              Zoom Out
-            </div>
-            <div className="menu-dropdown-item" onClick={() => { setZoom(1); setOpenMenu(null); }}>
-              Reset Zoom
-            </div>
-            <div className="menu-separator" />
-            <div className="menu-dropdown-item" onClick={() => { setShowGrid(!showGrid); setOpenMenu(null); }}>
-              {showGrid ? '✓ ' : '  '}Toggle Grid
-            </div>
-            <div className="menu-separator" />
-            <div className="menu-dropdown-item" onClick={() => { setShowComments(!showComments); setOpenMenu(null); }}>
-              {showComments ? '✓ ' : '  '}Show Comments
-            </div>
-          </div>
-        )}
-      </div>
-
-      {/* Table */}
-      <div
-        className="menu-item"
-        onClick={() => setOpenMenu(openMenu === 'table' ? null : 'table')}
-      >
-        Table
-        {openMenu === 'table' && (
-          <div className="menu-dropdown">
-            <div
-              className="menu-dropdown-item"
-              onClick={() => { setRepSystem('tally'); setOpenMenu(null); }}
-            >
-              {repSystem === 'tally' ? '● ' : '○ '}Tally (T)
-            </div>
-            <div
-              className="menu-dropdown-item"
-              onClick={() => { setRepSystem('binary'); setOpenMenu(null); }}
-            >
-              {repSystem === 'binary' ? '● ' : '○ '}Binary (B)
-            </div>
-            <div className="menu-separator" />
-            <div
-              className="menu-dropdown-item"
-              onClick={() => { setDisplayMode('IO'); setOpenMenu(null); }}
-            >
-              {displayMode === 'IO' ? '● ' : '○ '}I/O Table
-            </div>
-            <div
-              className="menu-dropdown-item"
-              onClick={() => { setDisplayMode('AV'); setOpenMenu(null); }}
-            >
-              {displayMode === 'AV' ? '● ' : '○ '}A/V Table
-            </div>
-            <div className="menu-separator" />
-            <div
-              className="menu-dropdown-item"
-              onClick={() => { setScope('local'); setOpenMenu(null); }}
-            >
-              {scope === 'local' ? '● ' : '○ '}Local
-            </div>
-            <div
-              className="menu-dropdown-item"
-              onClick={() => { setScope('global'); setOpenMenu(null); }}
-            >
-              {scope === 'global' ? '● ' : '○ '}Global
             </div>
           </div>
         )}

@@ -24,46 +24,46 @@ function GateIcon({ type }: { type: ComponentType }) {
   switch (type) {
     case 'AND':
       return (
-        <svg viewBox="0 0 56 40">
+        <svg viewBox="-2 -2 60 44">
           <path
             d="M8,4 L28,4 Q48,4 48,20 Q48,36 28,36 L8,36 Z"
             fill="none"
             stroke="#333"
-            strokeWidth="2"
+            strokeWidth="1.5"
           />
           <circle cx="6" cy="14" r="2.5" fill="#555" />
           <circle cx="6" cy="26" r="2.5" fill="#555" />
           <circle cx="50" cy="20" r="2.5" fill="#555" />
-          <text x="24" y="24" textAnchor="middle" fontSize="12" fontWeight="600" fill="#333">{'\u2227'}</text>
+          <text x="26" y="24" textAnchor="middle" fontSize="14" fontWeight="700" fill="#333">{'\u2227'}</text>
         </svg>
       );
     case 'OR':
       return (
-        <svg viewBox="0 0 56 40">
+        <svg viewBox="-2 -2 60 44">
           <path
             d="M8,4 Q18,4 28,4 Q48,4 50,20 Q48,36 28,36 Q18,36 8,36 Q18,20 8,4 Z"
             fill="none"
             stroke="#333"
-            strokeWidth="2"
+            strokeWidth="1.5"
           />
           <circle cx="10" cy="14" r="2.5" fill="#555" />
           <circle cx="10" cy="26" r="2.5" fill="#555" />
           <circle cx="50" cy="20" r="2.5" fill="#555" />
-          <text x="28" y="24" textAnchor="middle" fontSize="12" fontWeight="600" fill="#333">{'\u2228'}</text>
+          <text x="28" y="24" textAnchor="middle" fontSize="14" fontWeight="700" fill="#333">{'\u2228'}</text>
         </svg>
       );
     case 'NOT':
       return (
-        <svg viewBox="0 0 56 40">
+        <svg viewBox="-2 -2 60 44">
           <polygon
             points="8,4 48,20 8,36"
             fill="none"
             stroke="#333"
-            strokeWidth="2"
+            strokeWidth="1.5"
           />
           <circle cx="6" cy="20" r="2.5" fill="#555" />
           <circle cx="50" cy="20" r="2.5" fill="#555" />
-          <text x="20" y="24" textAnchor="middle" fontSize="12" fontWeight="600" fill="#333">{'\u00AC'}</text>
+          <text x="20" y="24" textAnchor="middle" fontSize="14" fontWeight="700" fill="#333">{'\u00AC'}</text>
         </svg>
       );
     case 'INPUT':
@@ -78,9 +78,9 @@ function GateIcon({ type }: { type: ComponentType }) {
     case 'OUTPUT':
       return (
         <svg viewBox="0 0 56 40">
-          <line x1="8" y1="20" x2="18" y2="20" stroke="#333" strokeWidth="2" />
-          <circle cx="6" cy="20" r="2.5" fill="#555" />
           <circle cx="34" cy="20" r="14" fill="none" stroke="#333" strokeWidth="2" />
+          <line x1="6" y1="20" x2="20" y2="20" stroke="#333" strokeWidth="2" />
+          <circle cx="6" cy="20" r="2.5" fill="#555" />
           <text x="34" y="24" textAnchor="middle" fontSize="9" fontWeight="500" fill="#333">OUT</text>
         </svg>
       );
@@ -104,7 +104,7 @@ function GateIcon({ type }: { type: ComponentType }) {
 }
 
 const MACHINE_TYPES: { mode: BuildMode; label: string }[] = [
-  { mode: 'CC', label: 'Circuits' },
+  { mode: 'CC', label: 'Combinatorial Circuit' },
   { mode: 'SC', label: 'Sequential Circuits' },
   { mode: 'FSM', label: 'Finite State Machines' },
   { mode: 'TM', label: 'Turing Machines' },
@@ -154,7 +154,7 @@ export function ComponentLibrary() {
             checked={turboEnabled}
             onChange={(e) => setTurboEnabled(e.target.checked)}
           />
-          <span className="turbo-label">Turbo</span>
+          <span className="turbo-label">turbo</span>
         </label>
       </div>
 
@@ -204,7 +204,7 @@ export function ComponentLibrary() {
               strokeWidth="2"
               strokeDasharray="4,3"
             />
-            <text x="28" y="24" textAnchor="middle" fontSize="8" fontWeight="500" fill="#333">New Box</text>
+            <text x="28" y="26" textAnchor="middle" fontSize="20" fontWeight="400" fill="#555">+</text>
           </svg>
           <span className="library-item-label">New Box</span>
         </div>
@@ -257,7 +257,6 @@ export function ComponentLibrary() {
                   })}
                   <text x="28" y="24" textAnchor="middle" fontSize="8" fontWeight="600" fill="#333">{box.name}</text>
                 </svg>
-                <span className="library-item-label">{box.name}</span>
               </div>
             );
           })}
@@ -279,7 +278,6 @@ export function ComponentLibrary() {
               }}
             >
               <GateIcon type="BOXED" />
-              <span className="library-item-label">{b.name}</span>
             </div>
           ))}
         </div>

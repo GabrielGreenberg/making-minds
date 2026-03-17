@@ -1,8 +1,7 @@
-import { useState } from 'react';
 import { useStore } from '../store';
+import { saveToFile, openFile } from '../fileHandle';
 
 export function SimulationToolbar() {
-  const [showResetConfirm, setShowResetConfirm] = useState(false);
   const showWireValues = useStore((s) => s.showWireValues);
   const setShowWireValues = useStore((s) => s.setShowWireValues);
   const snapToAlign = useStore((s) => s.snapToAlign);
@@ -29,30 +28,29 @@ export function SimulationToolbar() {
     }
   };
 
-  const handleGlobalReset = () => {
-    setShowResetConfirm(true);
+
+  const handleOpen = async () => {
+    const text = await openFile();
+    if (text) {
+      useStore.getState().importProject(text);
+    }
   };
 
-  const confirmGlobalReset = () => {
-    const state = useStore.getState();
-    for (const comp of state.components) {
-      if (comp.type === 'INPUT') {
-        state.setInputValue(comp.id, 0);
-      }
-    }
-    useStore.setState({
-      components: useStore.getState().components.map((c) =>
-        c.type === 'MEM' ? { ...c, storedValue: 0 } : c
-      ),
-      tableRows: [],
-    });
-    useStore.getState().evaluateCircuit();
-    setShowResetConfirm(false);
+  const handleSave = () => {
+    const json = useStore.getState().exportProject();
+    saveToFile(json);
   };
 
   return (
     <>
       <div className="simulation-toolbar">
+        <button className="toolbar-btn" onClick={handleOpen} title="Open circuit file">
+          Open
+        </button>
+        <button className="toolbar-btn" onClick={handleSave} title="Save circuit to file">
+          Save
+        </button>
+        <div className="toolbar-separator" />
         <button className="toolbar-btn" onClick={handleRun} title="Evaluate current inputs and add to table">
           <span className="toolbar-icon">{'\u25B6'}</span> Run
         </button>
@@ -62,13 +60,6 @@ export function SimulationToolbar() {
         <div className="toolbar-separator" />
         <button className="toolbar-btn" onClick={handleReset} title="Reset all inputs to 0">
           Reset
-        </button>
-        <button
-          className="toolbar-btn toolbar-btn-danger"
-          onClick={handleGlobalReset}
-          title="Reset all inputs, memory, and table"
-        >
-          Global Reset
         </button>
         <div className="toolbar-separator" />
         <button
@@ -115,24 +106,6 @@ export function SimulationToolbar() {
         </button>
       </div>
 
-      {showResetConfirm && (
-        <div className="modal-overlay" onClick={() => setShowResetConfirm(false)}>
-          <div className="modal-dialog" onClick={(e) => e.stopPropagation()}>
-            <div className="modal-title">Global Reset</div>
-            <div className="modal-body">
-              This will reset all inputs, memory blocks, and clear the results table. Continue?
-            </div>
-            <div className="modal-actions">
-              <button className="modal-btn" onClick={() => setShowResetConfirm(false)}>
-                Cancel
-              </button>
-              <button className="modal-btn modal-btn-danger" onClick={confirmGlobalReset}>
-                Reset Everything
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </>
   );
 }

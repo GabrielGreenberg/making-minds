@@ -183,7 +183,7 @@ export function getPortsForType(type: ComponentType): Port[] {
 
 // Component dimensions
 export const GRID_SIZE = 20;
-export const COMP_WIDTH = 80;
-export const COMP_HEIGHT = 60;
+export const COMP_WIDTH = 75;
+export const COMP_HEIGHT = 70;
 export const PORT_RADIUS = 3.5;
 export const INPUT_OUTPUT_SIZE = 40;

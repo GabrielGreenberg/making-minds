@@ -41,7 +41,7 @@ function EditableTabTitle({
         onChange={(e) => setEditValue(e.target.value)}
         onBlur={commit}
         onKeyDown={(e) => {
-          if (e.key === 'Enter') commit();
+          if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
           if (e.key === 'Escape') {
             setEditValue(title);
             setEditing(false);
