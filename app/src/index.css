@@ -223,6 +223,12 @@ html, body, #root {
   font-family: inherit;
 }
 
+.toolbar-btn:disabled {
+  opacity: 0.35;
+  cursor: default;
+  pointer-events: none;
+}
+
 .toolbar-btn:hover {
   background: #e0e0e0;
 }
@@ -557,6 +563,14 @@ html, body, #root {
 .data-table td.val-1 {
   color: var(--wire-1);
   font-weight: 600;
+}
+
+.data-table tr.row-active td {
+  background: #e3f2fd;
+}
+
+.data-table .row-play-btn:hover {
+  color: var(--accent) !important;
 }
 
 /* Monospace only for actual values */

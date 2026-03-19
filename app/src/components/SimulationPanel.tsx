@@ -8,6 +8,8 @@ export function SimulationToolbar() {
   const setSnapToAlign = useStore((s) => s.setSnapToAlign);
   const selectedTool = useStore((s) => s.selectedTool);
   const setSelectedTool = useStore((s) => s.setSelectedTool);
+  const buildMode = useStore((s) => s.buildMode);
+  const isCC = buildMode === 'CC';
 
   const handleRun = () => {
     const state = useStore.getState();
@@ -51,10 +53,20 @@ export function SimulationToolbar() {
           Save
         </button>
         <div className="toolbar-separator" />
-        <button className="toolbar-btn" onClick={handleRun} title="Evaluate current inputs and add to table">
+        <button
+          className="toolbar-btn"
+          onClick={handleRun}
+          title={isCC ? 'Not needed for combinatorial circuits' : 'Evaluate current inputs and add to table'}
+          disabled={isCC}
+        >
           <span className="toolbar-icon">{'\u25B6'}</span> Run
         </button>
-        <button className="toolbar-btn" onClick={handleStep} title="Evaluate circuit without adding to table">
+        <button
+          className="toolbar-btn"
+          onClick={handleStep}
+          title={isCC ? 'Not needed for combinatorial circuits' : 'Evaluate circuit without adding to table'}
+          disabled={isCC}
+        >
           <span className="toolbar-icon">{'\u23ED'}</span> Step
         </button>
         <div className="toolbar-separator" />

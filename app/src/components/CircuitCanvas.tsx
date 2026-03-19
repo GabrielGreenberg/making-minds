@@ -102,9 +102,15 @@ const PORT_HIT_RADIUS = 20;
 
 // ─── Wire routing ────────────────────────────────────────────────
 
+interface UsedRange {
+  coord: number;  // the X or Y coordinate of the segment
+  min: number;    // start of the range on the perpendicular axis
+  max: number;    // end of the range on the perpendicular axis
+}
+
 interface UsedSegments {
-  verticalXs: Set<number>;
-  horizontalYs: Set<number>;
+  verticalXs: UsedRange[];
+  horizontalYs: UsedRange[];
   /** Tracked wire segments for offset avoidance (reset per source group) */
   segments: { x1: number; y1: number; x2: number; y2: number }[];
   /** ALL wire segments ever computed — never reset — used for crossing detection */
@@ -183,7 +189,7 @@ function computeWirePath(
   to: { x: number; y: number },
   allComponents: CircuitComponent[],
   sourceCompId: string,
-  targetCompId: string,
+  _targetCompId: string,
   used: UsedSegments,
   sourceComp?: CircuitComponent,
   targetComp?: CircuitComponent,
@@ -204,34 +210,40 @@ function computeWirePath(
   // Use proximity check (within MIN_SEP) to avoid near-overlapping parallel segments.
   const MIN_SEP = OFFSET_STEP - 2; // minimum separation between parallel segments
 
-  const isXTaken = (x: number): boolean => {
-    for (const usedX of used.verticalXs) {
-      if (Math.abs(x - usedX) < MIN_SEP) return true;
+  /** Check if a vertical segment at x spanning rangeMin→rangeMax overlaps an existing one */
+  const isXTaken = (x: number, rangeMin: number, rangeMax: number): boolean => {
+    const rMin = Math.min(rangeMin, rangeMax);
+    const rMax = Math.max(rangeMin, rangeMax);
+    for (const ur of used.verticalXs) {
+      if (Math.abs(x - ur.coord) < MIN_SEP && rMax > ur.min - MIN_SEP && rMin < ur.max + MIN_SEP) return true;
     }
     return false;
   };
 
-  const isYTaken = (y: number): boolean => {
-    for (const usedY of used.horizontalYs) {
-      if (Math.abs(y - usedY) < MIN_SEP) return true;
+  /** Check if a horizontal segment at y spanning rangeMin→rangeMax overlaps an existing one */
+  const isYTaken = (y: number, rangeMin: number, rangeMax: number): boolean => {
+    const rMin = Math.min(rangeMin, rangeMax);
+    const rMax = Math.max(rangeMin, rangeMax);
+    for (const ur of used.horizontalYs) {
+      if (Math.abs(y - ur.coord) < MIN_SEP && rMax > ur.min - MIN_SEP && rMin < ur.max + MIN_SEP) return true;
     }
     return false;
   };
 
-  const findAvailableX = (candidateX: number): number => {
+  const findAvailableX = (candidateX: number, rangeMin: number, rangeMax: number): number => {
     let tryX = candidateX;
     let tries = 0;
-    while (isXTaken(tryX) && tries < 20) {
+    while (isXTaken(tryX, rangeMin, rangeMax) && tries < 20) {
       tries++;
       tryX = candidateX + (tries % 2 === 1 ? 1 : -1) * Math.ceil(tries / 2) * OFFSET_STEP;
     }
     return tryX;
   };
 
-  const findAvailableY = (candidateY: number): number => {
+  const findAvailableY = (candidateY: number, rangeMin: number, rangeMax: number): number => {
     let tryY = candidateY;
     let tries = 0;
-    while (isYTaken(tryY) && tries < 20) {
+    while (isYTaken(tryY, rangeMin, rangeMax) && tries < 20) {
       tries++;
       tryY = candidateY + (tries % 2 === 1 ? 1 : -1) * Math.ceil(tries / 2) * OFFSET_STEP;
     }
@@ -240,78 +252,67 @@ function computeWirePath(
 
   const MARGIN = 5;
 
-  // Precompute rotation-aware bounding boxes for obstacle components
-  const obstacles = allComponents.filter(
-    (c) => c.id !== sourceCompId && c.id !== targetCompId
-  );
-  const obstacleBounds = obstacles.map((c) => getCompBounds(c));
-
-  // Full bounds including source and target — used for middle segments
-  // so wires never cut through ANY component (including the ones they connect to)
+  // Full bounds including source and target — used for most segments
   const allCompBounds = allComponents.map((c) => getCompBounds(c));
 
-  // Bounds excluding only source (for stub-adjacent near source — must still avoid target)
+  // Bounds excluding only source (for the stub-departure segment i=1)
   const boundsExclSource = allComponents
     .filter((c) => c.id !== sourceCompId)
     .map((c) => getCompBounds(c));
-  // Bounds excluding only target (for stub-adjacent near target — must still avoid source)
-  const boundsExclTarget = allComponents
-    .filter((c) => c.id !== targetCompId)
-    .map((c) => getCompBounds(c));
 
-  const segBlockedBy = (
+  /** Check if a vertical segment at x spanning y1→y2 is blocked by any bounds */
+  const isSegBlockedV = (
     bounds: { left: number; top: number; right: number; bottom: number }[],
-    isVert: boolean,
     x: number, y1: number, y2: number
   ): boolean => {
-    if (isVert) {
-      const minY = Math.min(y1, y2);
-      const maxY = Math.max(y1, y2);
-      return bounds.some((b) => (
-        x > b.left - MARGIN &&
-        x < b.right + MARGIN &&
-        maxY > b.top - MARGIN &&
-        minY < b.bottom + MARGIN
-      ));
-    } else {
-      // horizontal: x=y param, y1=x1, y2=x2
-      const minX = Math.min(y1, y2);
-      const maxX = Math.max(y1, y2);
-      return bounds.some((b) => (
-        x > b.top - MARGIN &&
-        x < b.bottom + MARGIN &&
-        maxX > b.left - MARGIN &&
-        minX < b.right + MARGIN
-      ));
-    }
+    const minY = Math.min(y1, y2);
+    const maxY = Math.max(y1, y2);
+    return bounds.some((b) => (
+      x > b.left - MARGIN &&
+      x < b.right + MARGIN &&
+      maxY > b.top - MARGIN &&
+      minY < b.bottom + MARGIN
+    ));
   };
 
-  const isBlockedVertical = (x: number, y1: number, y2: number): boolean =>
-    segBlockedBy(obstacleBounds, true, x, y1, y2);
+  /** Check if a horizontal segment at y spanning x1→x2 is blocked by any bounds */
+  const isSegBlockedH = (
+    bounds: { left: number; top: number; right: number; bottom: number }[],
+    y: number, x1: number, x2: number
+  ): boolean => {
+    const minX = Math.min(x1, x2);
+    const maxX = Math.max(x1, x2);
+    return bounds.some((b) => (
+      y > b.top - MARGIN &&
+      y < b.bottom + MARGIN &&
+      maxX > b.left - MARGIN &&
+      minX < b.right + MARGIN
+    ));
+  };
 
-  /** Check if ANY segment in a path passes through a component.
-   *  i=1 (near source stub): excludes only source, still checks target.
-   *  i=len-3 (near target stub): excludes only target, still checks source.
-   *  Middle segments: check against ALL components. */
+  /** Check if a vertical segment passes through ANY component (including source/target) */
+  const isBlockedVertical = (x: number, y1: number, y2: number): boolean =>
+    isSegBlockedV(allCompBounds, x, y1, y2);
+
+  /** Check if ANY routable segment in a path passes through a component.
+   *  i=0 (port→stub) and i=len-2 (stub→port) are skipped — they inherently
+   *  overlap their own component.
+   *  i=1 (stub→first routing point) excludes only source — it departs the
+   *  source component and cannot avoid overlapping its bounding box.
+   *  ALL other segments check ALL components — including i=len-3 which
+   *  approaches the target. This is critical for 180°-rotated targets where
+   *  the approach segment would otherwise pass through the gate body. */
   const isPathBlocked = (path: { x: number; y: number }[]): boolean => {
-    // Skip i=0 (source port→stub) and i=len-2 (target stub→port)
     for (let i = 1; i < path.length - 2; i++) {
       const a = path[i], b = path[i + 1];
       const isVert = Math.abs(a.x - b.x) < 1;
       const isHoriz = Math.abs(a.y - b.y) < 1;
 
-      // Pick bounds: stub-adjacent segments exclude only their own component
-      let bounds: { left: number; top: number; right: number; bottom: number }[];
-      if (i === 1) {
-        bounds = boundsExclSource; // near source: exclude source, still check target
-      } else if (i === path.length - 3) {
-        bounds = boundsExclTarget; // near target: exclude target, still check source
-      } else {
-        bounds = allCompBounds; // middle: check everything
-      }
+      // Only i=1 gets source exclusion (departing source stub)
+      const bounds = i === 1 ? boundsExclSource : allCompBounds;
 
-      if (isVert && segBlockedBy(bounds, true, a.x, a.y, b.y)) return true;
-      if (isHoriz && segBlockedBy(bounds, false, a.y, a.x, b.x)) return true;
+      if (isVert && isSegBlockedV(bounds, a.x, a.y, b.y)) return true;
+      if (isHoriz && isSegBlockedH(bounds, a.y, a.x, b.x)) return true;
     }
     return false;
   };
@@ -323,12 +324,32 @@ function computeWirePath(
   const srcHoriz = Math.abs(srcDir.dx) >= Math.abs(srcDir.dy);
   const tgtHoriz = Math.abs(tgtDir.dx) >= Math.abs(tgtDir.dy);
 
+  /** Helper: register a path's key coordinates for overlap tracking */
+  const trackUsedCoords = (path: { x: number; y: number }[]) => {
+    for (let i = 0; i < path.length - 1; i++) {
+      const a = path[i], b = path[i + 1];
+      const isVert = Math.abs(a.x - b.x) < 1;
+      const isHoriz = Math.abs(a.y - b.y) < 1;
+      if (isVert) {
+        used.verticalXs.push({ coord: Math.round(a.x), min: Math.min(a.y, b.y), max: Math.max(a.y, b.y) });
+      } else if (isHoriz) {
+        used.horizontalYs.push({ coord: Math.round(a.y), min: Math.min(a.x, b.x), max: Math.max(a.x, b.x) });
+      }
+    }
+  };
+
+  /** Helper: accept a path — track segments + coords and return it */
+  const acceptPath = (path: { x: number; y: number }[]) => {
+    trackUsedCoords(path);
+    trackPathSegments(path, used);
+    return path;
+  };
+
   // ── Straight line: both stubs horizontal, same Y, source left of target ──
   if (srcHoriz && tgtHoriz && Math.abs(sf.y - st.y) < 1 && sf.x < st.x) {
     const straight = [from, sf, st, to];
     if (!isPathBlocked(straight)) {
-      trackPathSegments(straight, used);
-      return straight;
+      return acceptPath(straight);
     }
     // Straight line blocked — fall through to L-path or detour
   }
@@ -339,138 +360,91 @@ function computeWirePath(
     let bestPath: { x: number; y: number }[] | null = null;
     for (const frac of fracs) {
       let midX = sf.x + (st.x - sf.x) * frac;
-      midX = findAvailableX(midX);
+      midX = findAvailableX(midX, Math.min(sf.y, st.y), Math.max(sf.y, st.y));
 
       const candidate = [from, sf, { x: midX, y: sf.y }, { x: midX, y: st.y }, st, to];
-      // Reject if ANY segment passes through a component
       if (isPathBlocked(candidate)) continue;
-      // Prefer a path that doesn't cross existing wires
       if (!pathCrossesExisting(candidate, used.allSegments)) {
-        used.verticalXs.add(Math.round(midX));
-        used.horizontalYs.add(Math.round(sf.y));
-        used.horizontalYs.add(Math.round(st.y));
-        trackPathSegments(candidate, used);
-        return candidate;
+        return acceptPath(candidate);
       }
       if (!bestPath) bestPath = candidate;
     }
-    // Fall back to best non-blocked, non-crossing candidate if all cross wires
     if (bestPath) {
-      const midX = bestPath[2].x;
-      used.verticalXs.add(Math.round(midX));
-      used.horizontalYs.add(Math.round(sf.y));
-      used.horizontalYs.add(Math.round(st.y));
-      trackPathSegments(bestPath, used);
-      return bestPath;
+      return acceptPath(bestPath);
     }
   }
 
   // ── Target stub is vertical (rotated component) ──
-  // Route: horizontal from source → vertical to align with target x → horizontal to target x → vertical stub into port
   if (!tgtHoriz) {
-    // Target stub goes up (dy<0) or down (dy>0)
     const tgtGoesUp = tgtDir.dy < 0;
-    // Place the horizontal run at a Y that's beyond the stub (above if stub goes up, below if down)
-    let runY = tgtGoesUp
-      ? Math.min(sf.y, st.y) - GAP
-      : Math.max(sf.y, st.y) + GAP;
-    runY = findAvailableY(runY);
+    // Try both directions: preferred first (away from stub), then alternate
+    const runYOptions = [
+      tgtGoesUp ? Math.min(sf.y, st.y) - GAP : Math.max(sf.y, st.y) + GAP,
+      tgtGoesUp ? Math.max(sf.y, st.y) + GAP : Math.min(sf.y, st.y) - GAP,
+    ];
 
-    // Choose midX: prefer a vertical close to halfway between source and target x
-    const midXCandidate = sf.x + (st.x - sf.x) * 0.5;
-    let midX = findAvailableX(midXCandidate);
-    if (isBlockedVertical(midX, sf.y, runY)) {
-      // Try other positions
-      for (const frac of [0.3, 0.7, 0.2, 0.8]) {
-        midX = findAvailableX(sf.x + (st.x - sf.x) * frac);
-        if (!isBlockedVertical(midX, sf.y, runY)) break;
+    for (const baseRunY of runYOptions) {
+      let runY = findAvailableY(baseRunY, Math.min(sf.x, st.x), Math.max(sf.x, st.x));
+
+      const midXCandidate = sf.x + (st.x - sf.x) * 0.5;
+      let midX = findAvailableX(midXCandidate, Math.min(sf.y, runY), Math.max(sf.y, runY));
+      if (isBlockedVertical(midX, sf.y, runY)) {
+        for (const frac of [0.3, 0.7, 0.2, 0.8]) {
+          midX = findAvailableX(sf.x + (st.x - sf.x) * frac, Math.min(sf.y, runY), Math.max(sf.y, runY));
+          if (!isBlockedVertical(midX, sf.y, runY)) break;
+        }
+      }
+
+      const candidate = [
+        from, sf,
+        { x: midX, y: sf.y },
+        { x: midX, y: runY },
+        { x: st.x, y: runY },
+        st, to,
+      ];
+      if (!isPathBlocked(candidate) && !pathCrossesExisting(candidate, used.allSegments)) {
+        return acceptPath(candidate);
       }
     }
-
-    // Path: from → sf → {midX, sf.y} → {midX, runY} → {st.x, runY} → st → to
-    const candidate = [
-      from, sf,
-      { x: midX, y: sf.y },
-      { x: midX, y: runY },
-      { x: st.x, y: runY },
-      st, to,
-    ];
-    if (!isPathBlocked(candidate) && !pathCrossesExisting(candidate, used.allSegments)) {
-      used.verticalXs.add(Math.round(midX));
-      used.horizontalYs.add(Math.round(sf.y));
-      used.horizontalYs.add(Math.round(runY));
-      trackPathSegments(candidate, used);
-      return candidate;
-    }
-    // Try the other direction (above vs below)
-    runY = tgtGoesUp
-      ? Math.max(sf.y, st.y) + GAP
-      : Math.min(sf.y, st.y) - GAP;
-    runY = findAvailableY(runY);
-    const candidate2 = [
-      from, sf,
-      { x: midX, y: sf.y },
-      { x: midX, y: runY },
-      { x: st.x, y: runY },
-      st, to,
-    ];
-    if (!isPathBlocked(candidate2) && !pathCrossesExisting(candidate2, used.allSegments)) {
-      used.verticalXs.add(Math.round(midX));
-      used.horizontalYs.add(Math.round(sf.y));
-      used.horizontalYs.add(Math.round(runY));
-      trackPathSegments(candidate2, used);
-      return candidate2;
-    }
-    // Fall back to first non-blocked candidate, or first candidate
-    const fallback = !isPathBlocked(candidate) ? candidate : candidate2;
-    used.verticalXs.add(Math.round(midX));
-    used.horizontalYs.add(Math.round(sf.y));
-    used.horizontalYs.add(Math.round(fallback[4].y));
-    trackPathSegments(fallback, used);
-    return fallback;
+    // Don't hard-fallback — fall through to detour routing
   }
 
   // ── Source stub is vertical (rotated source component) ──
   if (!srcHoriz) {
     const srcGoesUp = srcDir.dy < 0;
-    let runY = srcGoesUp
-      ? Math.min(sf.y, st.y) - GAP
-      : Math.max(sf.y, st.y) + GAP;
-    runY = findAvailableY(runY);
-
-    // Path: from → sf → {sf.x, runY} → {midX, runY} → {midX, st.y} → st → to
-    const midXCandidate = sf.x + (st.x - sf.x) * 0.5;
-    let midX = findAvailableX(midXCandidate);
-
-    const candidate = [
-      from, sf,
-      { x: sf.x, y: runY },
-      { x: midX, y: runY },
-      { x: midX, y: st.y },
-      st, to,
+    const runYOptions = [
+      srcGoesUp ? Math.min(sf.y, st.y) - GAP : Math.max(sf.y, st.y) + GAP,
+      srcGoesUp ? Math.max(sf.y, st.y) + GAP : Math.min(sf.y, st.y) - GAP,
     ];
-    if (!isPathBlocked(candidate) && !pathCrossesExisting(candidate, used.allSegments)) {
-      used.verticalXs.add(Math.round(midX));
-      used.horizontalYs.add(Math.round(runY));
-      used.horizontalYs.add(Math.round(st.y));
-      trackPathSegments(candidate, used);
-      return candidate;
+
+    for (const baseRunY of runYOptions) {
+      let runY = findAvailableY(baseRunY, Math.min(sf.x, st.x), Math.max(sf.x, st.x));
+
+      const midXCandidate = sf.x + (st.x - sf.x) * 0.5;
+      let midX = findAvailableX(midXCandidate, Math.min(runY, st.y), Math.max(runY, st.y));
+
+      const candidate = [
+        from, sf,
+        { x: sf.x, y: runY },
+        { x: midX, y: runY },
+        { x: midX, y: st.y },
+        st, to,
+      ];
+      if (!isPathBlocked(candidate) && !pathCrossesExisting(candidate, used.allSegments)) {
+        return acceptPath(candidate);
+      }
     }
-    // Fall back
-    used.verticalXs.add(Math.round(midX));
-    trackPathSegments(candidate, used);
-    return candidate;
+    // Don't hard-fallback — fall through to detour routing
   }
 
-  const allBounds = allComponents.map((c) => getCompBounds(c));
-
-  const maxBottom = Math.max(...allBounds.map((b) => b.bottom), sf.y, st.y);
-  const minTop = Math.min(...allBounds.map((b) => b.top), sf.y, st.y);
+  // ── Detour routing: go around all obstacles ──
+  const maxBottom = Math.max(...allCompBounds.map((b) => b.bottom), sf.y, st.y);
+  const minTop = Math.min(...allCompBounds.map((b) => b.top), sf.y, st.y);
 
   const leftX = Math.min(sf.x, st.x);
   const rightX = Math.max(sf.x, st.x);
 
-  const relevantBounds = allBounds.filter(
+  const relevantBounds = allCompBounds.filter(
     (b) => b.right > leftX - GAP && b.left < rightX + GAP
   );
   const relevantBottom = relevantBounds.length > 0
@@ -483,22 +457,21 @@ function computeWirePath(
   const belowY = relevantBottom + GAP;
   const aboveY = relevantTop - GAP;
 
-  // Try both detour directions (below first if closer, then above)
   const avgY = (sf.y + st.y) / 2;
   const preferBelow = Math.abs(belowY - avgY) < Math.abs(aboveY - avgY);
   const detourOptions = preferBelow ? [belowY, aboveY] : [aboveY, belowY];
 
   for (const baseDetourY of detourOptions) {
-    let detourY = findAvailableY(baseDetourY);
+    let detourY = findAvailableY(baseDetourY, leftX, rightX);
 
-    let exitX = findAvailableX(Math.max(sf.x, rightX) + GAP);
+    let exitX = findAvailableX(Math.max(sf.x, rightX) + GAP, Math.min(sf.y, detourY), Math.max(sf.y, detourY));
     let exitTries = 0;
     while (isBlockedVertical(exitX, sf.y, detourY) && exitTries < 20) {
       exitX += OFFSET_STEP;
       exitTries++;
     }
 
-    let entryX = findAvailableX(Math.min(st.x, leftX) - GAP);
+    let entryX = findAvailableX(Math.min(st.x, leftX) - GAP, Math.min(st.y, detourY), Math.max(st.y, detourY));
     let entryTries = 0;
     while (isBlockedVertical(entryX, st.y, detourY) && entryTries < 20) {
       entryX -= OFFSET_STEP;
@@ -515,23 +488,16 @@ function computeWirePath(
     ];
 
     if (!isPathBlocked(detourPath)) {
-      used.verticalXs.add(Math.round(exitX));
-      used.verticalXs.add(Math.round(entryX));
-      used.horizontalYs.add(Math.round(detourY));
-      trackPathSegments(detourPath, used);
-      return detourPath;
+      return acceptPath(detourPath);
     }
   }
 
-  // Last resort: use first detour direction even if blocked (shouldn't happen often)
-  let detourY = findAvailableY(detourOptions[0]);
-  let exitX = findAvailableX(Math.max(sf.x, rightX) + GAP);
+  // Last resort: use first detour direction even if blocked
+  let detourY = findAvailableY(detourOptions[0], leftX, rightX);
+  let exitX = findAvailableX(Math.max(sf.x, rightX) + GAP, Math.min(sf.y, detourY), Math.max(sf.y, detourY));
   while (isBlockedVertical(exitX, sf.y, detourY)) exitX += OFFSET_STEP;
-  let entryX = findAvailableX(Math.min(st.x, leftX) - GAP);
+  let entryX = findAvailableX(Math.min(st.x, leftX) - GAP, Math.min(st.y, detourY), Math.max(st.y, detourY));
   while (isBlockedVertical(entryX, st.y, detourY)) entryX -= OFFSET_STEP;
-  used.verticalXs.add(Math.round(exitX));
-  used.verticalXs.add(Math.round(entryX));
-  used.horizontalYs.add(Math.round(detourY));
   const detourPath = [
     from, sf,
     { x: exitX, y: sf.y },
@@ -540,8 +506,7 @@ function computeWirePath(
     { x: entryX, y: st.y },
     st, to,
   ];
-  trackPathSegments(detourPath, used);
-  return detourPath;
+  return acceptPath(detourPath);
 }
 
 /** Apply manual segment overrides to a computed wire path, maintaining connectivity.
@@ -772,6 +737,7 @@ interface DragInfo {
   // tracking
   hasMoved?: boolean;
   pointerId?: number;
+  clickedInputToggle?: boolean;
 }
 
 // ─── Component rendering ─────────────────────────────────────────
@@ -793,9 +759,28 @@ function CircuitComponentView({
 
   const renderGateBody = () => {
     switch (comp.type) {
-      case 'INPUT':
+      case 'INPUT': {
+        const toggleW = 14;
+        const toggleH = 20;
+        const strokeW = isSelected ? 2.5 : 1.5;
+        const toggleX = comp.x - toggleW - strokeW / 2;
+        const toggleY = comp.y + h / 2 - toggleH / 2;
+        const val = comp.value ?? 0;
         return (
           <g>
+            {/* Toggle tab on the left – rendered first so main rect covers the seam */}
+            <rect
+              x={toggleX}
+              y={toggleY}
+              width={toggleW}
+              height={toggleH}
+              rx={3}
+              fill={val ? '#e53935' : '#999'}
+              stroke={isSelected ? '#2a7fff' : '#555'}
+              strokeWidth={1}
+              data-input-toggle={comp.id}
+              style={{ cursor: 'pointer' }}
+            />
             <rect
               x={comp.x}
               y={comp.y}
@@ -804,8 +789,21 @@ function CircuitComponentView({
               rx={3}
               fill={isSelected ? '#e3f2fd' : 'white'}
               stroke={isSelected ? '#2a7fff' : '#333'}
-              strokeWidth={isSelected ? 2.5 : 1.5}
+              strokeWidth={strokeW}
             />
+            <text
+              x={toggleX + toggleW / 2}
+              y={toggleY + toggleH / 2 + 4}
+              textAnchor="middle"
+              fontSize="10"
+              fontFamily="monospace"
+              fontWeight="600"
+              fill="white"
+              pointerEvents="none"
+              transform={counterRotateLabel()}
+            >
+              {val}
+            </text>
             <text
               x={comp.x + w / 2}
               y={comp.y - 4}
@@ -824,21 +822,24 @@ function CircuitComponentView({
               fontSize="14"
               fontFamily="monospace"
               fontWeight="600"
-              fill={comp.value ? '#e53935' : '#333'}
+              fill={val ? '#e53935' : '#333'}
               transform={counterRotateLabel()}
             >
-              {comp.value ?? 0}
+              {val}
             </text>
           </g>
         );
+      }
 
       case 'OUTPUT':
         return (
           <g>
-            <circle
-              cx={comp.x + w / 2}
-              cy={comp.y + h / 2}
-              r={w / 2}
+            <rect
+              x={comp.x}
+              y={comp.y}
+              width={w}
+              height={h}
+              rx={3}
               fill={isSelected ? '#e3f2fd' : 'white'}
               stroke={isSelected ? '#2a7fff' : '#333'}
               strokeWidth={isSelected ? 2.5 : 1.5}
@@ -2513,12 +2514,7 @@ export function CircuitCanvas() {
           }
         }
 
-        if (!drag.hasMoved && drag.componentId) {
-          const comp = state.components.find((c) => c.id === drag.componentId);
-          if (comp && comp.type === 'INPUT') {
-            state.setInputValue(comp.id, comp.value === 0 ? 1 : 0);
-          }
-        }
+        // Input toggle is handled on pointer-down, not here
       }
     };
   });
@@ -2859,6 +2855,15 @@ export function CircuitCanvas() {
         const comp = state.components.find((c) => c.id === hit.compId);
         if (!comp) return;
 
+        // Toggle input value immediately without selecting or starting a drag
+        const targetEl = e.target as Element;
+        if (targetEl?.getAttribute?.('data-input-toggle') != null) {
+          if (comp.type === 'INPUT') {
+            state.setInputValue(comp.id, comp.value === 0 ? 1 : 0);
+          }
+          return;
+        }
+
         if (e.shiftKey) {
           useStore.getState().rotateComponent(hit.compId);
           return;
@@ -2899,6 +2904,7 @@ export function CircuitCanvas() {
           shiftKey: e.shiftKey,
           hasMoved: false,
           pointerId: e.pointerId,
+          clickedInputToggle: false,
         };
 
         svgRef.current?.setPointerCapture(e.pointerId);
@@ -3072,8 +3078,8 @@ export function CircuitCanvas() {
   // ─── Compute all wire paths ────────────────────────────────────
   const wireData = useMemo(() => {
     const used: UsedSegments = {
-      verticalXs: new Set<number>(),
-      horizontalYs: new Set<number>(),
+      verticalXs: [],
+      horizontalYs: [],
       segments: [],
       allSegments: [],
     };
@@ -3092,13 +3098,13 @@ export function CircuitCanvas() {
       // share paths (don't offset each other), while wires from DIFFERENT
       // source ports are separated by the offsets accumulated from prior groups.
       // NOTE: allSegments is NEVER reset — crossing detection works across ALL wires.
-      const snapshotX = new Set(used.verticalXs);
-      const snapshotY = new Set(used.horizontalYs);
+      const snapshotX = [...used.verticalXs];
+      const snapshotY = [...used.horizontalYs];
       const snapshotSegs = [...used.segments];
       for (const wire of group) {
         // Reset offset tracking to snapshot so same-source wires don't offset each other
-        used.verticalXs = new Set(snapshotX);
-        used.horizontalYs = new Set(snapshotY);
+        used.verticalXs = [...snapshotX];
+        used.horizontalYs = [...snapshotY];
         used.segments = [...snapshotSegs];
         // allSegments is NOT reset — crossing detection always sees all prior wires
 

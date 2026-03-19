@@ -1,11 +1,17 @@
 import { useMemo } from 'react';
 import { useStore } from '../store';
 
-function bitsToTally(bits: number[]): number {
+/** Valid tally: n 1's followed by m 0's (n≥0, m≥0). Returns count or null. */
+function bitsToTally(bits: number[]): number | null {
+  let seenZero = false;
   let count = 0;
-  for (let i = bits.length - 1; i >= 0; i--) {
-    if (bits[i] === 1) count++;
-    else break;
+  for (const b of bits) {
+    if (b === 1) {
+      if (seenZero) return null; // 1 after a 0 → invalid
+      count++;
+    } else {
+      seenZero = true;
+    }
   }
   return count;
 }
@@ -33,9 +39,12 @@ export function DataTable() {
 
   const hasMem = components.some((c) => c.type === 'MEM');
 
-  const interpret = (bits: number[]): number => {
-    if (repSystem === 'tally') return bitsToTally(bits);
-    return bitsToBinary(bits);
+  const interpret = (bits: number[]): string => {
+    if (repSystem === 'tally') {
+      const t = bitsToTally(bits);
+      return t != null ? String(t) : '/';
+    }
+    return String(bitsToBinary(bits));
   };
 
   const inputs = components
@@ -53,6 +62,17 @@ export function DataTable() {
       const numB = parseInt(b.label.replace('OUT', ''));
       return numA - numB;
     });
+
+  // Current input bits on the canvas (for highlighting the active row)
+  const currentInputKey = inputKey(inputs.map((c) => c.value ?? 0));
+
+  // Set all input toggles to match a row's input bits
+  const activateRow = (inBits: number[]) => {
+    const state = useStore.getState();
+    inputs.forEach((inp, i) => {
+      state.setInputValue(inp.id, inBits[i] ?? 0);
+    });
+  };
 
   // Build lookup of which input combinations have been evaluated
   const evaluatedRows = useMemo(() => {
@@ -116,6 +136,29 @@ export function DataTable() {
         : [])
     : tableRows;
 
+  /** Small play-triangle button for a row */
+  const playBtn = (inBits: number[], isActive: boolean) => (
+    <td
+      className="row-play-btn"
+      style={{
+        width: 18,
+        padding: '2px 0',
+        cursor: isActive ? 'default' : 'pointer',
+        color: isActive ? 'var(--accent)' : '#aaa',
+        border: 'none',
+        background: 'transparent',
+        fontSize: 9,
+        textAlign: 'center',
+      }}
+      onClick={() => {
+        if (!isActive) activateRow(inBits);
+      }}
+      title={isActive ? 'Current row' : 'Load this input combination'}
+    >
+      ▶
+    </td>
+  );
+
   return (
     <div className="data-table-panel">
       <div className="table-header">
@@ -156,6 +199,7 @@ export function DataTable() {
             <table className="data-table">
               <thead>
                 <tr>
+                  <th style={{ width: 18, border: 'none', background: 'transparent' }} />
                   {inputs.map((inp) => (
                     <th key={inp.id}>{inp.label}</th>
                   ))}
@@ -168,8 +212,10 @@ export function DataTable() {
                 {(ccInputRows as number[][]).map((inBits: number[], i: number) => {
                   const key = inputKey(inBits);
                   const outBits = evaluatedRows.get(key);
+                  const isActive = key === currentInputKey;
                   return (
-                    <tr key={i}>
+                    <tr key={i} className={isActive ? 'row-active' : ''}>
+                      {playBtn(inBits, isActive)}
                       {inBits.map((b: number, j: number) => (
                         <td key={`i${j}`} className={b === 1 ? 'val-1' : ''}>
                           <span className="mono-value">{b}</span>
@@ -191,6 +237,7 @@ export function DataTable() {
             <table className="data-table">
               <thead>
                 <tr>
+                  <th style={{ width: 18, border: 'none', background: 'transparent' }} />
                   {inputs.map((inp) => (
                     <th key={inp.id}>{inp.label}</th>
                   ))}
@@ -200,20 +247,25 @@ export function DataTable() {
                 </tr>
               </thead>
               <tbody>
-                {tableRows.map((row, i) => (
-                  <tr key={i}>
-                    {row.inputBits.map((b, j) => (
-                      <td key={`i${j}`} className={b === 1 ? 'val-1' : ''}>
-                        <span className="mono-value">{b}</span>
-                      </td>
-                    ))}
-                    {row.outputBits.map((b, j) => (
-                      <td key={`o${j}`} className={b === 1 ? 'val-1' : ''}>
-                        <span className="mono-value">{b}</span>
-                      </td>
-                    ))}
-                  </tr>
-                ))}
+                {tableRows.map((row, i) => {
+                  const key = inputKey(row.inputBits);
+                  const isActive = key === currentInputKey;
+                  return (
+                    <tr key={i} className={isActive ? 'row-active' : ''}>
+                      {playBtn(row.inputBits, isActive)}
+                      {row.inputBits.map((b, j) => (
+                        <td key={`i${j}`} className={b === 1 ? 'val-1' : ''}>
+                          <span className="mono-value">{b}</span>
+                        </td>
+                      ))}
+                      {row.outputBits.map((b, j) => (
+                        <td key={`o${j}`} className={b === 1 ? 'val-1' : ''}>
+                          <span className="mono-value">{b}</span>
+                        </td>
+                      ))}
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           ) : !isCC ? (

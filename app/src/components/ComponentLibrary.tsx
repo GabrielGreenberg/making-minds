@@ -78,10 +78,10 @@ function GateIcon({ type }: { type: ComponentType }) {
     case 'OUTPUT':
       return (
         <svg viewBox="0 0 56 40">
-          <circle cx="34" cy="20" r="14" fill="none" stroke="#333" strokeWidth="2" />
-          <line x1="6" y1="20" x2="20" y2="20" stroke="#333" strokeWidth="2" />
+          <rect x="16" y="10" width="28" height="20" rx="2" fill="none" stroke="#333" strokeWidth="2" />
+          <line x1="6" y1="20" x2="16" y2="20" stroke="#333" strokeWidth="2" />
           <circle cx="6" cy="20" r="2.5" fill="#555" />
-          <text x="34" y="24" textAnchor="middle" fontSize="9" fontWeight="500" fill="#333">OUT</text>
+          <text x="30" y="24" textAnchor="middle" fontSize="9" fontWeight="500" fill="#333">OUT</text>
         </svg>
       );
     case 'MEM':

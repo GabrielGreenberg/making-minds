@@ -610,14 +610,51 @@ export const useStore = create<AppState>()((set, get) => ({
       }
     }
 
-    set({
+    const updates: Record<string, unknown> = {
       components: updatedComponents,
       wires: wires.map((w) => ({
         ...w,
         value: newWireValues.get(w.id) ?? 0,
       })),
       wireValues: newWireValues,
-    });
+    };
+
+    // CC mode: auto-populate the I/O table with the current input→output row
+    if (state.buildMode === 'CC') {
+      const inputs = updatedComponents
+        .filter((c) => c.type === 'INPUT')
+        .sort((a, b) => {
+          const numA = parseInt(a.label.replace('IN', ''));
+          const numB = parseInt(b.label.replace('IN', ''));
+          return numA - numB;
+        });
+      const outputs = updatedComponents
+        .filter((c) => c.type === 'OUTPUT')
+        .sort((a, b) => {
+          const numA = parseInt(a.label.replace('OUT', ''));
+          const numB = parseInt(b.label.replace('OUT', ''));
+          return numA - numB;
+        });
+
+      if (inputs.length > 0 && outputs.length > 0) {
+        const inputBits = inputs.map((c) => c.value ?? 0);
+        const outputBits = outputs.map((c) => c.value ?? 0);
+        const key = inputBits.join(',');
+
+        // Upsert: replace existing row for this input combo, or append
+        const existing = state.tableRows;
+        const idx = existing.findIndex((r) => r.inputBits.join(',') === key);
+        if (idx >= 0) {
+          const newRows = [...existing];
+          newRows[idx] = { inputBits, outputBits };
+          updates.tableRows = newRows;
+        } else {
+          updates.tableRows = [...existing, { inputBits, outputBits }];
+        }
+      }
+    }
+
+    set(updates as any);
   },
 
   // Undo/Redo
@@ -1276,11 +1313,32 @@ export const useStore = create<AppState>()((set, get) => ({
     if (!state.clipboard) return;
     state.pushHistory();
 
+    // Compute next available label numbers from existing components
+    let nextIn = state.nextInputNum;
+    let nextOut = state.nextOutputNum;
+    for (const c of state.components) {
+      if (c.type === 'INPUT') {
+        const n = parseInt(c.label.replace('IN', '')) || 0;
+        if (n >= nextIn) nextIn = n + 1;
+      } else if (c.type === 'OUTPUT') {
+        const n = parseInt(c.label.replace('OUT', '')) || 0;
+        if (n >= nextOut) nextOut = n + 1;
+      }
+    }
+
     const idMap = new Map<string, string>();
     const newComps = state.clipboard.components.map((c) => {
       const newId = uuid();
       idMap.set(c.id, newId);
-      return { ...c, id: newId, x: c.x + 40, y: c.y + 40 };
+      let label = c.label;
+      if (c.type === 'INPUT') {
+        label = `IN${nextIn}`;
+        nextIn++;
+      } else if (c.type === 'OUTPUT') {
+        label = `OUT${nextOut}`;
+        nextOut++;
+      }
+      return { ...c, id: newId, x: c.x + 40, y: c.y + 40, label };
     });
     const newWires = state.clipboard.wires.map((w) => ({
       ...w,
@@ -1293,6 +1351,8 @@ export const useStore = create<AppState>()((set, get) => ({
       components: [...state.components, ...newComps],
       wires: [...state.wires, ...newWires],
       selectedIds: newComps.map((c) => c.id),
+      nextInputNum: nextIn,
+      nextOutputNum: nextOut,
     });
     setTimeout(() => get().evaluateCircuit(), 0);
   },
