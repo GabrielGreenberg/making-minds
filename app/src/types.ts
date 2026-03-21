@@ -33,6 +33,7 @@ export interface CircuitComponent {
   value?: number; // current output value for inputs
   inputValues?: number[]; // for inputs: the value (0 or 1)
   storedValue?: number; // for MEM blocks
+  memDirection?: 'left-to-right' | 'right-to-left'; // for MEM: undefined = undecided
   rotation?: number; // 0, 90, 180, 270 degrees clockwise
   boxedCircuitId?: string; // for BOXED type
   internalCircuit?: CircuitData; // for BOXED type - the encapsulated circuit
@@ -187,3 +188,29 @@ export const COMP_WIDTH = 75;
 export const COMP_HEIGHT = 70;
 export const PORT_RADIUS = 3.5;
 export const INPUT_OUTPUT_SIZE = 40;
+
+// ─── MEM direction helpers ──────────────────────────────────────────
+// Port IDs are fixed (mout=left, min=right) for backward compatibility.
+// These helpers map them to semantic roles based on memDirection.
+
+/** Port ID that acts as signal source (outputs stored value) */
+export function getMemOutputPortId(comp: CircuitComponent): string {
+  return comp.memDirection === 'left-to-right' ? 'min' : 'mout';
+}
+
+/** Port ID that acts as signal sink (receives value to store) */
+export function getMemInputPortId(comp: CircuitComponent): string {
+  return comp.memDirection === 'left-to-right' ? 'mout' : 'min';
+}
+
+/** True if this port can initiate a wire (act as source). Undecided: both can. */
+export function isMemSourcePort(comp: CircuitComponent, portId: string): boolean {
+  if (!comp.memDirection) return true;
+  return portId === getMemOutputPortId(comp);
+}
+
+/** True if this port can receive a wire (act as target). Undecided: both can. */
+export function isMemSinkPort(comp: CircuitComponent, portId: string): boolean {
+  if (!comp.memDirection) return true;
+  return portId === getMemInputPortId(comp);
+}

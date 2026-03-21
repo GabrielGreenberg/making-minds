@@ -207,6 +207,14 @@ html, body, #root {
   flex-shrink: 0;
 }
 
+.autosave-indicator {
+  margin-left: auto;
+  font-size: 11px;
+  color: #999;
+  white-space: nowrap;
+  padding-right: 4px;
+}
+
 .toolbar-btn {
   display: flex;
   align-items: center;
@@ -467,8 +475,52 @@ html, body, #root {
   background: var(--panel-bg);
   border-left: 1px solid var(--menu-border);
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
   flex-shrink: 0;
+  overflow: visible;
+  position: relative;
+}
+
+.panel-resize-handle {
+  width: 0;
+  cursor: col-resize;
+  flex-shrink: 0;
+  position: absolute;
+  top: 0;
+  left: -4px;
+  bottom: 0;
+  width: 9px;
+  z-index: 20;
+}
+.panel-resize-handle::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 6px;
+  height: 28px;
+  background: #e8e8e8;
+  border: 1px solid #d0d0d0;
+  border-radius: 4px;
+}
+.panel-resize-handle:hover,
+.panel-resize-handle:active {
+  background: rgba(42, 127, 255, 0.08);
+}
+.panel-resize-handle:hover::after,
+.panel-resize-handle:active::after {
+  background: var(--accent);
+}
+
+.data-table-panel > .table-header,
+.data-table-panel > .data-table-content {
+  /* Let the content fill remaining space after the handle */
+}
+.data-table-panel-inner {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
   overflow: hidden;
 }
 
@@ -578,6 +630,65 @@ html, body, #root {
   font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
 }
 
+/* ── Sequential Circuit Table ── */
+.sc-table {
+  border-collapse: collapse;
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.sc-table th,
+.sc-table td {
+  padding: 3px 6px;
+  text-align: center;
+  min-width: 28px;
+}
+
+.sc-table th {
+  font-weight: 500;
+  color: #888;
+  font-size: 10px;
+}
+
+.sc-label-col {
+  position: sticky;
+  right: 0;
+  background: #fafafa;
+  font-weight: 600;
+  font-size: 10px;
+  color: #666;
+  border-left: 1.5px solid #ddd !important;
+  min-width: 36px;
+  text-align: left;
+  padding-left: 6px;
+}
+
+.sc-current-step {
+  background: rgba(74, 144, 226, 0.08) !important;
+}
+
+.sc-input-row {
+  border-bottom: none;
+}
+
+.sc-output-row {
+  border-top: 1.5px solid #ccc;
+}
+
+.sc-input-cell {
+  cursor: text;
+}
+
+.sc-input-field {
+  font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+  font-size: 11px;
+  outline: none;
+}
+
+.sc-input-field:focus {
+  background: rgba(74, 144, 226, 0.1) !important;
+}
+
 /* ── Modal / Dialog ── */
 .modal-overlay {
   position: fixed;
@@ -680,7 +791,6 @@ html, body, #root {
   flex-direction: column;
   gap: 4px;
   padding-bottom: 6px;
-  border-bottom: 1px solid #e0e0e0;
   margin-bottom: 2px;
 }
 

@@ -7,16 +7,12 @@ interface LibraryEntry {
   section: string;
 }
 
-const CC_ITEMS: LibraryEntry[] = [
+const LIBRARY_ITEMS: LibraryEntry[] = [
   { type: 'INPUT', label: 'Input', section: 'I/O' },
   { type: 'OUTPUT', label: 'Output', section: 'I/O' },
   { type: 'AND', label: 'AND', section: 'Gates' },
   { type: 'OR', label: 'OR', section: 'Gates' },
   { type: 'NOT', label: 'NOT', section: 'Gates' },
-];
-
-const SC_ITEMS: LibraryEntry[] = [
-  ...CC_ITEMS,
   { type: 'MEM', label: 'MEM', section: 'Memory' },
 ];
 
@@ -104,23 +100,20 @@ function GateIcon({ type }: { type: ComponentType }) {
 }
 
 const MACHINE_TYPES: { mode: BuildMode; label: string }[] = [
-  { mode: 'CC', label: 'Combinatorial Circuit' },
-  { mode: 'SC', label: 'Sequential Circuits' },
-  { mode: 'FSM', label: 'Finite State Machines' },
-  { mode: 'TM', label: 'Turing Machines' },
+  { mode: 'CC', label: 'Circuit' },
+  { mode: 'FSM', label: 'Finite State Machine' },
+  { mode: 'TM', label: 'Turing Machine' },
 ];
 
 export function ComponentLibrary() {
   const buildMode = useStore((s) => s.buildMode);
   const setBuildMode = useStore((s) => s.setBuildMode);
-  const turboEnabled = useStore((s) => s.turboEnabled);
-  const setTurboEnabled = useStore((s) => s.setTurboEnabled);
   const boxedLibrary = useStore((s) => s.boxedLibrary);
   const confirmedBoxLibrary = useStore((s) => s.confirmedBoxLibrary);
   const selectedTool = useStore((s) => s.selectedTool);
   const setSelectedTool = useStore((s) => s.setSelectedTool);
 
-  const items = buildMode === 'SC' ? SC_ITEMS : CC_ITEMS;
+  const items = LIBRARY_ITEMS;
 
   // Group by section
   const sections = new Map<string, LibraryEntry[]>();
@@ -148,14 +141,6 @@ export function ComponentLibrary() {
             <option key={mt.mode} value={mt.mode}>{mt.label}</option>
           ))}
         </select>
-        <label className="turbo-toggle">
-          <input
-            type="checkbox"
-            checked={turboEnabled}
-            onChange={(e) => setTurboEnabled(e.target.checked)}
-          />
-          <span className="turbo-label">turbo</span>
-        </label>
       </div>
 
       {/* Component sections */}

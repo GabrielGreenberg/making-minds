@@ -17,6 +17,9 @@ import type {
 } from './types';
 import {
   getPortsForType,
+  getMemOutputPortId,
+  getMemInputPortId,
+  isMemSinkPort,
   GRID_SIZE,
 } from './types';
 
@@ -29,6 +32,9 @@ interface HistoryEntry {
 }
 
 interface AppState {
+  // Auto-save status
+  autoSaveStatus: 'saved' | 'unsaved' | 'saving';
+
   // Build mode
   buildMode: BuildMode;
   setBuildMode: (mode: BuildMode) => void;
@@ -52,6 +58,7 @@ interface AppState {
   // Counters for labeling
   nextInputNum: number;
   nextOutputNum: number;
+  nextMemNum: number;
 
   // Component operations
   addComponent: (type: ComponentType, x: number, y: number) => void;
@@ -59,7 +66,7 @@ interface AppState {
   moveComponentRaw: (id: string, x: number, y: number) => void;
   snapComponentToGrid: (id: string) => void;
   removeComponent: (id: string) => void;
-  setInputValue: (id: string, value: number) => void;
+  setInputValue: (id: string, value: number | undefined) => void;
 
   // Wire operations
   addWire: (
@@ -167,10 +174,23 @@ interface AppState {
   moveComponentsBatch: (moves: Map<string, { x: number; y: number }>) => void;
   snapComponentsToGrid: (ids: string[]) => void;
 
-  // Table rows (step-by-step execution model)
+  // Table rows (step-by-step execution model for CC)
   tableRows: { inputBits: number[]; outputBits: number[] }[];
   addTableRow: () => void;
   clearTableRows: () => void;
+
+  // Sequential circuit state
+  scTimeStep: number; // current time step (starts at 1)
+  scHistory: { t: number; inputBits: number[]; outputBits: number[]; memValues: number[] }[];
+  scInputSequence: number[][]; // per-input arrays of bits across time steps
+  scRunning: boolean;
+  scRunIntervalId: number | null;
+  scStep: () => void; // advance one clock cycle
+  scRun: () => void; // start continuous execution
+  scPause: () => void; // pause continuous execution
+  scReset: () => void; // reset to t=1, preserve circuit structure and input sequence
+  scGlobalReset: () => void; // reset to t=1, clear all inputs and memory
+  setScInputBit: (inputIndex: number, timeStep: number, value: number) => void;
 
   // Selected tool (click-to-place mode)
   selectedTool: ComponentType | 'TEXT' | 'COMMENT' | 'NEW_BOX' | null;
@@ -203,7 +223,10 @@ function snapToGrid(val: number): number {
   return Math.round(val / GRID_SIZE) * GRID_SIZE;
 }
 
-// Topological sort for circuit evaluation
+// Topological sort for circuit evaluation.
+// For MEM blocks: treat mout as a source (like INPUT) and ignore wires
+// feeding into min for sorting purposes, since MEM creates feedback loops
+// that are resolved by the clock cycle.
 function topologicalSort(
   components: CircuitComponent[],
   wires: Wire[]
@@ -218,11 +241,13 @@ function topologicalSort(
     adjList.set(c.id, []);
   }
 
-  // Build graph from wires
+  // Build graph from wires, skipping wires into MEM min ports (feedback)
   for (const w of wires) {
     const targetComp = compMap.get(w.targetComponentId);
     const sourceComp = compMap.get(w.sourceComponentId);
     if (sourceComp && targetComp) {
+      // Skip wires going INTO MEM's input port — these are feedback connections
+      if (targetComp.type === 'MEM' && w.targetPortId === getMemInputPortId(targetComp)) continue;
       inDegree.set(
         w.targetComponentId,
         (inDegree.get(w.targetComponentId) || 0) + 1
@@ -232,7 +257,7 @@ function topologicalSort(
     }
   }
 
-  // BFS from nodes with in-degree 0 (INPUTs will naturally have 0)
+  // BFS from nodes with in-degree 0 (INPUTs and MEM blocks will naturally have 0)
   const queue: string[] = [];
   for (const [id, deg] of inDegree) {
     if (deg === 0) queue.push(id);
@@ -348,9 +373,102 @@ function evaluateBoxedCircuit(comp: CircuitComponent | undefined, externalInputs
   return outputComps.map((oc) => portValues.get(`${oc.id}:in`) ?? 0);
 }
 
+// ─── MEM direction auto-resolution ──────────────────────────────────
+// Infer memDirection from wiring context. Cascades through MEM chains.
+function resolveMemDirections(
+  components: CircuitComponent[],
+  wires: Wire[]
+): CircuitComponent[] {
+  const compMap = new Map(components.map((c) => [c.id, c]));
+  // Track resolved directions (only for MEMs that were undecided)
+  const resolved = new Map<string, 'left-to-right' | 'right-to-left'>();
+
+  // Helper: is this port on a component a known signal source?
+  function isKnownSource(comp: CircuitComponent, portId: string): boolean {
+    if (comp.type !== 'MEM') {
+      // Non-MEM: right-side ports are always sources
+      const port = comp.ports.find((p) => p.id === portId);
+      return port?.side === 'right';
+    }
+    // MEM with resolved or explicit direction
+    const dir = comp.memDirection ?? resolved.get(comp.id);
+    if (!dir) return false;
+    const outputPortId = dir === 'left-to-right' ? 'min' : 'mout';
+    return portId === outputPortId;
+  }
+
+  // Helper: is this port on a component a known signal sink?
+  function isKnownSink(comp: CircuitComponent, portId: string): boolean {
+    if (comp.type !== 'MEM') {
+      const port = comp.ports.find((p) => p.id === portId);
+      return port?.side === 'left';
+    }
+    const dir = comp.memDirection ?? resolved.get(comp.id);
+    if (!dir) return false;
+    const inputPortId = dir === 'left-to-right' ? 'mout' : 'min';
+    return portId === inputPortId;
+  }
+
+  let changed = true;
+  while (changed) {
+    changed = false;
+    for (const comp of components) {
+      if (comp.type !== 'MEM') continue;
+      if (comp.memDirection || resolved.has(comp.id)) continue;
+
+      let inferred: 'left-to-right' | 'right-to-left' | null = null;
+
+      for (const wire of wires) {
+        if (inferred) break;
+
+        // Wire targets this MEM's left port (mout) from a known source → left is input
+        if (wire.targetComponentId === comp.id && wire.targetPortId === 'mout') {
+          const source = compMap.get(wire.sourceComponentId);
+          if (source && isKnownSource(source, wire.sourcePortId)) {
+            inferred = 'left-to-right';
+          }
+        }
+        // Wire targets this MEM's right port (min) from a known source → right is input
+        if (wire.targetComponentId === comp.id && wire.targetPortId === 'min') {
+          const source = compMap.get(wire.sourceComponentId);
+          if (source && isKnownSource(source, wire.sourcePortId)) {
+            inferred = 'right-to-left';
+          }
+        }
+        // Wire from this MEM's left port (mout) to a known sink → left is output
+        if (wire.sourceComponentId === comp.id && wire.sourcePortId === 'mout') {
+          const target = compMap.get(wire.targetComponentId);
+          if (target && isKnownSink(target, wire.targetPortId)) {
+            inferred = 'right-to-left';
+          }
+        }
+        // Wire from this MEM's right port (min) to a known sink → right is output
+        if (wire.sourceComponentId === comp.id && wire.sourcePortId === 'min') {
+          const target = compMap.get(wire.targetComponentId);
+          if (target && isKnownSink(target, wire.targetPortId)) {
+            inferred = 'left-to-right';
+          }
+        }
+      }
+
+      if (inferred) {
+        resolved.set(comp.id, inferred);
+        changed = true; // may cascade to adjacent MEMs
+      }
+    }
+  }
+
+  if (resolved.size === 0) return components;
+  return components.map((c) =>
+    resolved.has(c.id) ? { ...c, memDirection: resolved.get(c.id) } : c
+  );
+}
+
 const defaultTabId = 'tab-1';
 
 export const useStore = create<AppState>()((set, get) => ({
+  autoSaveStatus: 'saved' as const,
+
   buildMode: 'CC',
   setBuildMode: (mode) => set({ buildMode: mode }),
 
@@ -368,6 +486,7 @@ export const useStore = create<AppState>()((set, get) => ({
   wires: [],
   nextInputNum: 1,
   nextOutputNum: 1,
+  nextMemNum: 1,
 
   addComponent: (type, x, y) => {
     const state = get();
@@ -377,6 +496,7 @@ export const useStore = create<AppState>()((set, get) => ({
     let label = '';
     let nextInputNum = state.nextInputNum;
     let nextOutputNum = state.nextOutputNum;
+    let nextMemNum = state.nextMemNum;
 
     if (type === 'INPUT') {
       label = `IN${nextInputNum}`;
@@ -385,7 +505,8 @@ export const useStore = create<AppState>()((set, get) => ({
       label = `OUT${nextOutputNum}`;
       nextOutputNum++;
     } else if (type === 'MEM') {
-      label = 'M';
+      label = `M${nextMemNum}`;
+      nextMemNum++;
     } else {
       label = type;
     }
@@ -397,8 +518,8 @@ export const useStore = create<AppState>()((set, get) => ({
       y: sy,
       label,
       ports: getPortsForType(type),
-      value: 0,
-      inputValues: type === 'INPUT' ? [0] : undefined,
+      value: type === 'INPUT' ? undefined : 0,
+      inputValues: type === 'INPUT' ? [undefined as unknown as number] : undefined,
       storedValue: type === 'MEM' ? 0 : undefined,
     };
 
@@ -406,6 +527,7 @@ export const useStore = create<AppState>()((set, get) => ({
       components: [...state.components, comp],
       nextInputNum,
       nextOutputNum,
+      nextMemNum,
     });
     // Evaluate after adding
     setTimeout(() => get().evaluateCircuit(), 0);
@@ -445,12 +567,18 @@ export const useStore = create<AppState>()((set, get) => ({
   removeComponent: (id) => {
     const state = get();
     state.pushHistory();
+    const newWires = state.wires.filter(
+      (w) => w.sourceComponentId !== id && w.targetComponentId !== id
+    );
+    // Reset MEM directions and re-resolve with remaining wires
+    const remainingComps = state.components.filter((c) => c.id !== id);
+    const resetComps = remainingComps.map((c) =>
+      c.type === 'MEM' ? { ...c, memDirection: undefined } : c
+    );
+    const resolvedComps = resolveMemDirections(resetComps, newWires);
     set({
-      components: state.components.filter((c) => c.id !== id),
-      wires: state.wires.filter(
-        (w) => w.sourceComponentId !== id && w.targetComponentId !== id
-      ),
-      // Also remove comments targeting this component
+      components: resolvedComps,
+      wires: newWires,
       comments: state.comments.filter((c) => c.targetId !== id),
     });
     setTimeout(() => get().evaluateCircuit(), 0);
@@ -486,16 +614,24 @@ export const useStore = create<AppState>()((set, get) => ({
       targetPortId: targetPortId,
       value: 0,
     };
-    set({ wires: [...state.wires, wire] });
+    const newWires = [...state.wires, wire];
+    const resolvedComponents = resolveMemDirections(state.components, newWires);
+    set({ wires: newWires, components: resolvedComponents });
     setTimeout(() => get().evaluateCircuit(), 0);
   },
 
   removeWire: (id) => {
     const state = get();
     state.pushHistory();
+    const newWires = state.wires.filter((w) => w.id !== id);
+    // Reset all MEM directions, then re-resolve from remaining wires
+    const resetComponents = state.components.map((c) =>
+      c.type === 'MEM' ? { ...c, memDirection: undefined } : c
+    );
+    const resolvedComponents = resolveMemDirections(resetComponents, newWires);
     set({
-      wires: state.wires.filter((w) => w.id !== id),
-      // Also remove comments targeting this wire
+      wires: newWires,
+      components: resolvedComponents,
       comments: state.comments.filter((c) => c.targetId !== id),
     });
     setTimeout(() => get().evaluateCircuit(), 0);
@@ -539,14 +675,13 @@ export const useStore = create<AppState>()((set, get) => ({
     if (components.length === 0) return;
 
     const sorted = topologicalSort(components, wires);
-    const portValues = new Map<string, number>(); // "compId:portId" -> value
+    const portValues = new Map<string, number | undefined>(); // "compId:portId" -> value
     const newWireValues = new Map<string, number>();
 
-    // Set input values
+    // Set input values (undefined = blank/unset)
     for (const comp of sorted) {
       if (comp.type === 'INPUT') {
-        const val = comp.value ?? 0;
-        portValues.set(`${comp.id}:out`, val);
+        portValues.set(`${comp.id}:out`, comp.value);
       }
     }
 
@@ -554,30 +689,51 @@ export const useStore = create<AppState>()((set, get) => ({
     for (const comp of sorted) {
       if (comp.type === 'INPUT') continue;
 
+      // MEM blocks: output their stored value via the output port
+      if (comp.type === 'MEM') {
+        portValues.set(`${comp.id}:${getMemOutputPortId(comp)}`, comp.storedValue ?? 0);
+        continue;
+      }
+
       // Gather inputs from wires
       const inputPorts = comp.ports.filter((p) => p.side === 'left');
-      const inputVals: number[] = [];
+      const inputVals: (number | undefined)[] = [];
+      let hasUndefined = false;
       for (const port of inputPorts) {
         const incomingWire = wires.find(
           (w) => w.targetComponentId === comp.id && w.targetPortId === port.id
         );
         if (incomingWire) {
-          const srcVal =
-            portValues.get(
-              `${incomingWire.sourceComponentId}:${incomingWire.sourcePortId}`
-            ) ?? 0;
+          const srcVal = portValues.get(
+            `${incomingWire.sourceComponentId}:${incomingWire.sourcePortId}`
+          );
           inputVals.push(srcVal);
-          newWireValues.set(incomingWire.id, srcVal);
+          if (srcVal != null) {
+            newWireValues.set(incomingWire.id, srcVal);
+          }
+          if (srcVal == null) hasUndefined = true;
         } else {
-          inputVals.push(0);
+          inputVals.push(undefined);
+          hasUndefined = true;
         }
       }
 
-      // Evaluate
+      // Evaluate — if any input is undefined, output is undefined
       if (comp.type === 'OUTPUT') {
-        portValues.set(`${comp.id}:in`, inputVals[0] ?? 0);
+        const hasIncomingWire = wires.some(
+          (w) => w.targetComponentId === comp.id && w.targetPortId === 'in'
+        );
+        if (hasIncomingWire) {
+          portValues.set(`${comp.id}:in`, hasUndefined ? undefined : (inputVals[0] ?? 0));
+        }
+      } else if (hasUndefined) {
+        // Gate with undefined input → undefined output
+        const outputPorts = comp.ports.filter((p) => p.side === 'right');
+        for (const op of outputPorts) {
+          portValues.set(`${comp.id}:${op.id}`, undefined);
+        }
       } else {
-        const outputs = evaluateGate(comp.type, inputVals, comp);
+        const outputs = evaluateGate(comp.type, inputVals as number[], comp);
         const outputPorts = comp.ports.filter((p) => p.side === 'right');
         for (let i = 0; i < outputPorts.length; i++) {
           portValues.set(`${comp.id}:${outputPorts[i].id}`, outputs[i] ?? 0);
@@ -588,13 +744,15 @@ export const useStore = create<AppState>()((set, get) => ({
     // Update components with computed values
     const updatedComponents = components.map((c) => {
       if (c.type === 'OUTPUT') {
-        const val = portValues.get(`${c.id}:in`) ?? 0;
+        const val = portValues.has(`${c.id}:in`)
+          ? portValues.get(`${c.id}:in`)
+          : undefined;
         return { ...c, value: val };
       }
       if (c.type !== 'INPUT') {
         const outputPort = c.ports.find((p) => p.side === 'right');
         if (outputPort) {
-          const val = portValues.get(`${c.id}:${outputPort.id}`) ?? 0;
+          const val = portValues.get(`${c.id}:${outputPort.id}`);
           return { ...c, value: val };
         }
       }
@@ -604,9 +762,11 @@ export const useStore = create<AppState>()((set, get) => ({
     // Also update wire values for wires coming from INPUTs
     for (const w of wires) {
       if (!newWireValues.has(w.id)) {
-        const srcVal =
-          portValues.get(`${w.sourceComponentId}:${w.sourcePortId}`) ?? 0;
-        newWireValues.set(w.id, srcVal);
+        const srcVal = portValues.get(`${w.sourceComponentId}:${w.sourcePortId}`);
+        if (srcVal != null) {
+          newWireValues.set(w.id, srcVal);
+        }
+        // If srcVal is undefined, don't add to newWireValues — wire stays unset
       }
     }
 
@@ -614,7 +774,8 @@ export const useStore = create<AppState>()((set, get) => ({
       components: updatedComponents,
       wires: wires.map((w) => ({
         ...w,
-        value: newWireValues.get(w.id) ?? 0,
+        // Use -1 as sentinel for "undefined/blank" since Wire.value is number
+        value: newWireValues.has(w.id) ? newWireValues.get(w.id)! : -1,
       })),
       wireValues: newWireValues,
     };
@@ -636,9 +797,10 @@ export const useStore = create<AppState>()((set, get) => ({
           return numA - numB;
         });
 
-      if (inputs.length > 0 && outputs.length > 0) {
-        const inputBits = inputs.map((c) => c.value ?? 0);
-        const outputBits = outputs.map((c) => c.value ?? 0);
+      const allInputsSet = inputs.every((c) => c.value != null);
+      if (inputs.length > 0 && outputs.length > 0 && allInputsSet) {
+        const inputBits = inputs.map((c) => c.value!);
+        const outputBits = outputs.map((c) => c.value != null ? c.value : 0);
         const key = inputBits.join(',');
 
         // Upsert: replace existing row for this input combo, or append
@@ -743,6 +905,7 @@ export const useStore = create<AppState>()((set, get) => ({
       wires: [],
       nextInputNum: 1,
       nextOutputNum: 1,
+      nextMemNum: 1,
     });
   },
   switchProblem: (index) => {
@@ -784,6 +947,7 @@ export const useStore = create<AppState>()((set, get) => ({
       boxes: [],
       nextInputNum: 1,
       nextOutputNum: 1,
+      nextMemNum: 1,
       buildMode: ps.pages[0]?.buildMode || 'CC',
     });
   },
@@ -828,6 +992,7 @@ export const useStore = create<AppState>()((set, get) => ({
       boxes: [],
       nextInputNum: 1,
       nextOutputNum: 1,
+      nextMemNum: 1,
     });
   },
 
@@ -859,9 +1024,12 @@ export const useStore = create<AppState>()((set, get) => ({
     try {
       const data = JSON.parse(json);
       if (data.circuit) {
+        const importedComponents = data.circuit.components || [];
+        const importedWires = data.circuit.wires || [];
+        const resolvedComponents = resolveMemDirections(importedComponents, importedWires);
         set({
-          components: data.circuit.components || [],
-          wires: data.circuit.wires || [],
+          components: resolvedComponents,
+          wires: importedWires,
           textElements: data.textElements || [],
           comments: data.comments || [],
           boxes: data.boxes || [],
@@ -1035,11 +1203,17 @@ export const useStore = create<AppState>()((set, get) => ({
     );
 
     // ── Textbook Rule 1: No loops ──
-    // Check for cycles among inside components using internal wires
+    // Check for cycles among inside components using internal wires.
+    // MEM blocks break feedback loops (like in topological sort), so skip
+    // wires feeding into a MEM's input port.
     {
+      const compMap = new Map(insideComps.map((c) => [c.id, c]));
       const adj = new Map<string, string[]>();
       for (const c of insideComps) adj.set(c.id, []);
       for (const w of internalWires) {
+        // Skip wires into MEM input ports — MEM breaks the cycle
+        const targetComp = compMap.get(w.targetComponentId);
+        if (targetComp?.type === 'MEM' && isMemSinkPort(targetComp, w.targetPortId)) continue;
         const list = adj.get(w.sourceComponentId);
         if (list) list.push(w.targetComponentId);
       }
@@ -1277,9 +1451,16 @@ export const useStore = create<AppState>()((set, get) => ({
         .map((w) => w.id)
     );
 
+    const newWires = state.wires.filter((w) => !wireIdsToRemove.has(w.id) && !idsToRemove.has(w.id));
+    const remainingComps = state.components.filter((c) => !idsToRemove.has(c.id));
+    // Reset MEM directions and re-resolve with remaining wires
+    const resetComps = remainingComps.map((c) =>
+      c.type === 'MEM' ? { ...c, memDirection: undefined } : c
+    );
+    const resolvedComps = resolveMemDirections(resetComps, newWires);
     set({
-      components: state.components.filter((c) => !idsToRemove.has(c.id)),
-      wires: state.wires.filter((w) => !wireIdsToRemove.has(w.id) && !idsToRemove.has(w.id)),
+      components: resolvedComps,
+      wires: newWires,
       textElements: state.textElements.filter((t) => !idsToRemove.has(t.id)),
       comments: state.comments.filter((c) => !idsToRemove.has(c.id) && !idsToRemove.has(c.targetId)),
       boxes: state.boxes.filter((b) => !idsToRemove.has(b.id)),
@@ -1316,6 +1497,7 @@ export const useStore = create<AppState>()((set, get) => ({
     // Compute next available label numbers from existing components
     let nextIn = state.nextInputNum;
     let nextOut = state.nextOutputNum;
+    let nextMem = state.nextMemNum;
     for (const c of state.components) {
       if (c.type === 'INPUT') {
         const n = parseInt(c.label.replace('IN', '')) || 0;
@@ -1323,6 +1505,9 @@ export const useStore = create<AppState>()((set, get) => ({
       } else if (c.type === 'OUTPUT') {
         const n = parseInt(c.label.replace('OUT', '')) || 0;
         if (n >= nextOut) nextOut = n + 1;
+      } else if (c.type === 'MEM') {
+        const n = parseInt(c.label.replace('M', '')) || 0;
+        if (n >= nextMem) nextMem = n + 1;
       }
     }
 
@@ -1337,6 +1522,9 @@ export const useStore = create<AppState>()((set, get) => ({
       } else if (c.type === 'OUTPUT') {
         label = `OUT${nextOut}`;
         nextOut++;
+      } else if (c.type === 'MEM') {
+        label = `M${nextMem}`;
+        nextMem++;
       }
       return { ...c, id: newId, x: c.x + 40, y: c.y + 40, label };
     });
@@ -1353,6 +1541,7 @@ export const useStore = create<AppState>()((set, get) => ({
       selectedIds: newComps.map((c) => c.id),
       nextInputNum: nextIn,
       nextOutputNum: nextOut,
+      nextMemNum: nextMem,
     });
     setTimeout(() => get().evaluateCircuit(), 0);
   },
@@ -1386,6 +1575,7 @@ export const useStore = create<AppState>()((set, get) => ({
       buildMode,
       nextInputNum: 1,
       nextOutputNum: 1,
+      nextMemNum: 1,
     });
   },
 
@@ -1516,6 +1706,233 @@ export const useStore = create<AppState>()((set, get) => ({
     set({ tableRows: [] });
   },
 
+  // Sequential circuit state
+  scTimeStep: 1,
+  scHistory: [],
+  scInputSequence: [],
+  scRunning: false,
+  scRunIntervalId: null,
+
+  scStep: () => {
+    const state = get();
+    const { components, wires, scTimeStep, scHistory, scInputSequence } = state;
+
+    // Gather sorted inputs, outputs, MEM blocks
+    const inputs = components
+      .filter((c) => c.type === 'INPUT')
+      .sort((a, b) => {
+        const numA = parseInt(a.label.replace('IN', ''));
+        const numB = parseInt(b.label.replace('IN', ''));
+        return numA - numB;
+      });
+    const outputs = components
+      .filter((c) => c.type === 'OUTPUT')
+      .sort((a, b) => {
+        const numA = parseInt(a.label.replace('OUT', ''));
+        const numB = parseInt(b.label.replace('OUT', ''));
+        return numA - numB;
+      });
+    const mems = components.filter((c) => c.type === 'MEM');
+
+    // Set input values from the input sequence for this time step
+    const tIdx = scTimeStep - 1; // 0-based index
+    const updatedComps = components.map((c) => {
+      if (c.type === 'INPUT') {
+        const inputIdx = inputs.indexOf(c);
+        if (inputIdx >= 0 && scInputSequence[inputIdx] && scInputSequence[inputIdx][tIdx] !== undefined) {
+          return { ...c, value: scInputSequence[inputIdx][tIdx], inputValues: [scInputSequence[inputIdx][tIdx]] };
+        }
+      }
+      return c;
+    });
+
+    // Step 1: Read M_OUT from all MEM blocks (current stored values)
+    // Step 2: Evaluate combinational logic
+    // For topological sort, treat MEM as having only an output (mout).
+    // MEM's min port is a sink that receives the new value.
+    const sorted = topologicalSort(updatedComps, wires);
+    const portValues = new Map<string, number>();
+
+    // Set MEM block M_OUT values from stored values
+    for (const comp of updatedComps) {
+      if (comp.type === 'MEM') {
+        portValues.set(`${comp.id}:${getMemOutputPortId(comp)}`, comp.storedValue ?? 0);
+      }
+    }
+
+    // Set input values
+    for (const comp of sorted) {
+      if (comp.type === 'INPUT') {
+        const idx = inputs.findIndex((inp) => inp.id === comp.id);
+        const val = idx >= 0 && scInputSequence[idx] && scInputSequence[idx][tIdx] !== undefined
+          ? scInputSequence[idx][tIdx]
+          : (comp.value ?? 0);
+        portValues.set(`${comp.id}:out`, val);
+      }
+    }
+
+    // Propagate through sorted components
+    for (const comp of sorted) {
+      if (comp.type === 'INPUT' || comp.type === 'MEM') continue;
+
+      const inputPorts = comp.ports.filter((p) => p.side === 'left');
+      const inputVals: number[] = [];
+      for (const port of inputPorts) {
+        const incomingWire = wires.find(
+          (w) => w.targetComponentId === comp.id && w.targetPortId === port.id
+        );
+        if (incomingWire) {
+          const srcVal = portValues.get(
+            `${incomingWire.sourceComponentId}:${incomingWire.sourcePortId}`
+          ) ?? 0;
+          inputVals.push(srcVal);
+        } else {
+          inputVals.push(0);
+        }
+      }
+
+      if (comp.type === 'OUTPUT') {
+        portValues.set(`${comp.id}:in`, inputVals[0] ?? 0);
+      } else {
+        const evalOutputs = evaluateGate(comp.type, inputVals, comp);
+        const outputPorts = comp.ports.filter((p) => p.side === 'right');
+        for (let i = 0; i < outputPorts.length; i++) {
+          portValues.set(`${comp.id}:${outputPorts[i].id}`, evalOutputs[i] ?? 0);
+        }
+      }
+    }
+
+    // Step 3: Determine M_IN values and write into MEM blocks for next cycle
+    const newComponents = updatedComps.map((c) => {
+      if (c.type === 'MEM') {
+        // Find the wire feeding into M_IN (input port based on direction)
+        const minWire = wires.find(
+          (w) => w.targetComponentId === c.id && w.targetPortId === getMemInputPortId(c)
+        );
+        const newStoredValue = minWire
+          ? (portValues.get(`${minWire.sourceComponentId}:${minWire.sourcePortId}`) ?? 0)
+          : 0;
+        return { ...c, storedValue: newStoredValue };
+      }
+      if (c.type === 'OUTPUT') {
+        return { ...c, value: portValues.get(`${c.id}:in`) ?? 0 };
+      }
+      if (c.type !== 'INPUT') {
+        const outputPort = c.ports.find((p) => p.side === 'right');
+        if (outputPort) {
+          return { ...c, value: portValues.get(`${c.id}:${outputPort.id}`) ?? 0 };
+        }
+      }
+      return c;
+    });
+
+    // Update wire values
+    const newWireValues = new Map<string, number>();
+    for (const w of wires) {
+      const srcVal = portValues.get(`${w.sourceComponentId}:${w.sourcePortId}`) ?? 0;
+      newWireValues.set(w.id, srcVal);
+    }
+
+    // Build history entry
+    const inputBits = inputs.map((inp) => {
+      const idx = inputs.indexOf(inp);
+      return idx >= 0 && scInputSequence[idx] && scInputSequence[idx][tIdx] !== undefined
+        ? scInputSequence[idx][tIdx]
+        : (inp.value ?? 0);
+    });
+    const outputBits = outputs.map((o) => portValues.get(`${o.id}:in`) ?? 0);
+    const memValues = mems.map((m) => m.storedValue ?? 0); // values BEFORE this step
+
+    const newHistory = [...scHistory, { t: scTimeStep, inputBits, outputBits, memValues }];
+
+    set({
+      components: newComponents,
+      wires: wires.map((w) => ({ ...w, value: newWireValues.get(w.id) ?? 0 })),
+      wireValues: newWireValues,
+      scTimeStep: scTimeStep + 1,
+      scHistory: newHistory,
+    });
+  },
+
+  scRun: () => {
+    const state = get();
+    if (state.scRunning) return;
+    const intervalId = window.setInterval(() => {
+      const s = get();
+      // Stop if we've consumed all input
+      const maxLen = Math.max(...s.scInputSequence.map((seq) => seq.length), 0);
+      if (s.scTimeStep > maxLen && maxLen > 0) {
+        s.scPause();
+        return;
+      }
+      s.scStep();
+    }, 300);
+    set({ scRunning: true, scRunIntervalId: intervalId });
+  },
+
+  scPause: () => {
+    const state = get();
+    if (state.scRunIntervalId !== null) {
+      window.clearInterval(state.scRunIntervalId);
+    }
+    set({ scRunning: false, scRunIntervalId: null });
+  },
+
+  scReset: () => {
+    const state = get();
+    if (state.scRunIntervalId !== null) {
+      window.clearInterval(state.scRunIntervalId);
+    }
+    // Reset MEM blocks to 0, keep input sequence
+    set({
+      scTimeStep: 1,
+      scHistory: [],
+      scRunning: false,
+      scRunIntervalId: null,
+      components: state.components.map((c) =>
+        c.type === 'MEM' ? { ...c, storedValue: 0 } : c
+      ),
+    });
+  },
+
+  scGlobalReset: () => {
+    const state = get();
+    if (state.scRunIntervalId !== null) {
+      window.clearInterval(state.scRunIntervalId);
+    }
+    // Reset everything: MEM to 0, inputs to 0, clear input sequence
+    set({
+      scTimeStep: 1,
+      scHistory: [],
+      scInputSequence: [],
+      scRunning: false,
+      scRunIntervalId: null,
+      components: state.components.map((c) => {
+        if (c.type === 'MEM') return { ...c, storedValue: 0 };
+        if (c.type === 'INPUT') return { ...c, value: undefined, inputValues: [undefined as unknown as number] };
+        return c;
+      }),
+    });
+  },
+
+  setScInputBit: (inputIndex, timeStep, value) => {
+    set((state) => {
+      const newSeq = [...state.scInputSequence];
+      // Ensure the array for this input exists
+      while (newSeq.length <= inputIndex) {
+        newSeq.push([]);
+      }
+      // Ensure the array is long enough for this time step
+      const arr = [...newSeq[inputIndex]];
+      while (arr.length < timeStep) {
+        arr.push(0);
+      }
+      arr[timeStep - 1] = value;
+      newSeq[inputIndex] = arr;
+      return { scInputSequence: newSeq };
+    });
+  },
+
   // Selected tool (click-to-place mode)
   selectedTool: null,
   setSelectedTool: (t) => set({ selectedTool: t }),
@@ -1607,3 +2024,95 @@ if (typeof window !== 'undefined') {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   (window as any).__store = useStore;
 }
+
+// ─── Auto-save to localStorage ─────────────────────────────────────
+const AUTO_SAVE_KEY = 'making-minds-autosave';
+const AUTO_SAVE_DELAY = 1500; // ms debounce
+
+let autoSaveTimer: ReturnType<typeof setTimeout> | null = null;
+
+function getAutoSaveData() {
+  const s = useStore.getState();
+  return {
+    buildMode: s.buildMode,
+    repSystem: s.repSystem,
+    components: s.components,
+    wires: s.wires,
+    textElements: s.textElements,
+    comments: s.comments,
+    boxes: s.boxes,
+    nextInputNum: s.nextInputNum,
+    nextOutputNum: s.nextOutputNum,
+    nextMemNum: s.nextMemNum,
+    tabs: s.tabs,
+    activeTabId: s.activeTabId,
+    tabCircuits: Object.fromEntries(s.tabCircuits),
+  };
+}
+
+function performAutoSave() {
+  try {
+    useStore.setState({ autoSaveStatus: 'saving' });
+    const data = getAutoSaveData();
+    localStorage.setItem(AUTO_SAVE_KEY, JSON.stringify(data));
+    useStore.setState({ autoSaveStatus: 'saved' });
+  } catch {
+    // localStorage full or unavailable — silent fail
+    useStore.setState({ autoSaveStatus: 'saved' });
+  }
+}
+
+// Subscribe to state changes that should trigger auto-save
+useStore.subscribe((state, prev) => {
+  // Only auto-save when circuit data actually changes
+  if (
+    state.components === prev.components &&
+    state.wires === prev.wires &&
+    state.textElements === prev.textElements &&
+    state.comments === prev.comments &&
+    state.boxes === prev.boxes &&
+    state.tabs === prev.tabs &&
+    state.activeTabId === prev.activeTabId &&
+    state.buildMode === prev.buildMode &&
+    state.tabCircuits === prev.tabCircuits
+  ) return;
+
+  useStore.setState({ autoSaveStatus: 'unsaved' });
+  if (autoSaveTimer) clearTimeout(autoSaveTimer);
+  autoSaveTimer = setTimeout(performAutoSave, AUTO_SAVE_DELAY);
+});
+
+// Load from localStorage on startup
+function loadAutoSave() {
+  try {
+    const raw = localStorage.getItem(AUTO_SAVE_KEY);
+    if (!raw) return;
+    const data = JSON.parse(raw);
+    const tabCircuits = new Map<string, { components: CircuitComponent[]; wires: Wire[]; textElements: TextElement[]; comments: CommentElement[]; boxes: BoxDefinition[] }>();
+    if (data.tabCircuits) {
+      for (const [k, v] of Object.entries(data.tabCircuits)) {
+        tabCircuits.set(k, v as { components: CircuitComponent[]; wires: Wire[]; textElements: TextElement[]; comments: CommentElement[]; boxes: BoxDefinition[] });
+      }
+    }
+    useStore.setState({
+      buildMode: data.buildMode || 'CC',
+      repSystem: data.repSystem || 'binary',
+      components: data.components || [],
+      wires: data.wires || [],
+      textElements: data.textElements || [],
+      comments: data.comments || [],
+      boxes: data.boxes || [],
+      nextInputNum: data.nextInputNum || 1,
+      nextOutputNum: data.nextOutputNum || 1,
+      nextMemNum: data.nextMemNum || 1,
+      tabs: data.tabs || [{ id: 'tab-1', name: 'Circuit 1' }],
+      activeTabId: data.activeTabId || 'tab-1',
+      ...(tabCircuits.size > 0 ? { tabCircuits } : {}),
+    });
+    setTimeout(() => useStore.getState().evaluateCircuit(), 0);
+  } catch {
+    // Corrupted data — ignore
+  }
+}
+
+loadAutoSave();

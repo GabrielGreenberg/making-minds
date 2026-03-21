@@ -9,27 +9,37 @@ export function SimulationToolbar() {
   const selectedTool = useStore((s) => s.selectedTool);
   const setSelectedTool = useStore((s) => s.setSelectedTool);
   const buildMode = useStore((s) => s.buildMode);
-  const isCC = buildMode === 'CC';
-
-  const handleRun = () => {
-    const state = useStore.getState();
-    state.evaluateCircuit();
-    state.addTableRow();
-  };
+  const scTimeStep = useStore((s) => s.scTimeStep);
+  const components = useStore((s) => s.components);
+  const hasMem = components.some((c) => c.type === 'MEM');
+  const isSC = buildMode === 'SC' || hasMem;
+  const autoSaveStatus = useStore((s) => s.autoSaveStatus);
 
   const handleStep = () => {
-    useStore.getState().evaluateCircuit();
+    const state = useStore.getState();
+    if (isSC) {
+      state.scStep();
+    } else {
+      state.evaluateCircuit();
+    }
   };
 
   const handleReset = () => {
     const state = useStore.getState();
-    for (const comp of state.components) {
-      if (comp.type === 'INPUT') {
-        state.setInputValue(comp.id, 0);
+    if (isSC) {
+      state.scReset();
+    } else {
+      for (const comp of state.components) {
+        if (comp.type === 'INPUT') {
+          state.setInputValue(comp.id, undefined);
+        }
       }
     }
   };
 
+  const handleGlobalReset = () => {
+    useStore.getState().scGlobalReset();
+  };
 
   const handleOpen = async () => {
     const text = await openFile();
@@ -53,26 +63,31 @@ export function SimulationToolbar() {
           Save
         </button>
         <div className="toolbar-separator" />
-        <button
-          className="toolbar-btn"
-          onClick={handleRun}
-          title={isCC ? 'Not needed for combinatorial circuits' : 'Evaluate current inputs and add to table'}
-          disabled={isCC}
-        >
-          <span className="toolbar-icon">{'\u25B6'}</span> Run
-        </button>
+
         <button
           className="toolbar-btn"
           onClick={handleStep}
-          title={isCC ? 'Not needed for combinatorial circuits' : 'Evaluate circuit without adding to table'}
-          disabled={isCC}
+          title={isSC ? 'Advance one clock cycle' : 'Evaluate circuit'}
         >
-          <span className="toolbar-icon">{'\u23ED'}</span> Step
+          <span className="toolbar-icon">{'\u25B6'}</span> Step
         </button>
         <div className="toolbar-separator" />
-        <button className="toolbar-btn" onClick={handleReset} title="Reset all inputs to 0">
+
+        <button className="toolbar-btn" onClick={handleReset} title={isSC ? 'Reset to t=1, preserve input sequence' : 'Reset all inputs to 0'}>
           Reset
         </button>
+        {isSC && (
+          <button className="toolbar-btn" onClick={handleGlobalReset} title="Reset to t=1 and clear all inputs and memory">
+            Global Reset
+          </button>
+        )}
+
+        {isSC && (
+          <span style={{ fontSize: 12, color: '#ccc', marginLeft: 8, alignSelf: 'center' }}>
+            t = {scTimeStep}
+          </span>
+        )}
+
         <div className="toolbar-separator" />
         <button
           className="toolbar-btn"
@@ -116,6 +131,12 @@ export function SimulationToolbar() {
         >
           Comment
         </button>
+        <span
+          className="autosave-indicator"
+          title={autoSaveStatus === 'saved' ? 'All changes saved' : autoSaveStatus === 'saving' ? 'Saving...' : 'Unsaved changes'}
+        >
+          {autoSaveStatus === 'saved' ? '\u2713 Saved' : autoSaveStatus === 'saving' ? 'Saving...' : '\u2022 Unsaved'}
+        </span>
       </div>
 
     </>
