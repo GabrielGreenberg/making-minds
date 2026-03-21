@@ -31,7 +31,7 @@ export interface CircuitComponent {
   label: string;
   ports: Port[];
   value?: number; // current output value for inputs
-  inputValues?: number[]; // for inputs: the value (0 or 1)
+  inputValues?: (number | undefined)[]; // for inputs: the value (0 or 1), undefined = blank
   storedValue?: number; // for MEM blocks
   memDirection?: 'left-to-right' | 'right-to-left'; // for MEM: undefined = undecided
   rotation?: number; // 0, 90, 180, 270 degrees clockwise
