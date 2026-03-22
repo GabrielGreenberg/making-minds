@@ -1,6 +1,5 @@
 import { useMemo, useState, useCallback, useRef, useEffect } from 'react';
 import { useStore } from '../store';
-import type { CircuitComponent } from '../types';
 
 /** Valid tally: consecutive 1's from the left, then 0's. Returns count or null. */
 function bitsToTally(bits: number[]): number | null {
@@ -25,24 +24,6 @@ function bitsToBinary(bits: number[]): number {
   return val;
 }
 
-/** Convert tally numeral to bit array: n ones followed by zeros */
-function tallyToBits(numeral: number, numBits: number): number[] {
-  const bits = new Array(numBits).fill(0);
-  for (let i = 0; i < Math.min(numeral, numBits); i++) {
-    bits[i] = 1;
-  }
-  return bits;
-}
-
-/** Convert binary numeral to bit array (MSB first) */
-function binaryToBitArray(numeral: number, numBits: number): number[] {
-  const bits = new Array(numBits).fill(0);
-  for (let i = 0; i < numBits; i++) {
-    bits[numBits - 1 - i] = (numeral >> i) & 1;
-  }
-  return bits;
-}
-
 /** Key for an input combination, e.g. "0,1,0" */
 function inputKey(bits: number[]): string {
   return bits.join(',');
@@ -58,9 +39,6 @@ export function DataTable() {
 
   // SC state
   const scHistory = useStore((s) => s.scHistory);
-  const scInputSequence = useStore((s) => s.scInputSequence);
-  const scTimeStep = useStore((s) => s.scTimeStep);
-  const setScInputBit = useStore((s) => s.setScInputBit);
   const scGlobalSequences = useStore((s) => s.scGlobalSequences);
   const setScGlobalSequenceInput = useStore((s) => s.setScGlobalSequenceInput);
   const loadScGlobalSequence = useStore((s) => s.loadScGlobalSequence);
@@ -85,7 +63,6 @@ export function DataTable() {
 
   // Flash animation: increment counter each step to trigger CSS animation re-run
   const [flashCounter, setFlashCounter] = useState(0);
-  const prevInputKeyRef = useRef<string>('');
   // Track scHistory length to detect steps
   const prevHistLenRef = useRef(0);
 
@@ -228,33 +205,6 @@ export function DataTable() {
     [outputs, wires]
   );
 
-  // SC Global I/O: rows for the global numeral table
-  const scGlobalIORows = useMemo(() => {
-    if (!isSC) return [];
-    const maxInputLen = Math.max(...scInputSequence.map((s) => s.length), 0);
-    const maxT = Math.max(scHistory.length, maxInputLen, scTimeStep);
-    const rows: { t: number; inBits: number[]; outBits: number[] | undefined; evaluated: boolean }[] = [];
-    for (let t = 1; t <= maxT; t++) {
-      const histEntry = scHistory.find((h) => h.t === t);
-      const inBits = histEntry
-        ? histEntry.inputBits
-        : inputs.map((_, idx) => scInputSequence[idx]?.[t - 1] ?? 0);
-      const outBits = histEntry ? histEntry.outputBits : undefined;
-      rows.push({ t, inBits, outBits, evaluated: !!histEntry });
-    }
-    return rows;
-  }, [isSC, scHistory, scInputSequence, scTimeStep, inputs]);
-
-  // SC: set all input bits for a time step from a numeral
-  const setInputNumeral = useCallback((t: number, numeral: number) => {
-    const bits = repSystem === 'tally'
-      ? tallyToBits(numeral, inputs.length)
-      : binaryToBitArray(numeral, inputs.length);
-    bits.forEach((bit, idx) => {
-      setScInputBit(idx, t, bit);
-    });
-  }, [repSystem, inputs.length, setScInputBit]);
-
   // Current input bits on the canvas (for highlighting the active row)
   // For SC: use the latest history entry's input+mem combo (pre-step values)
   // so the highlight matches what was just evaluated
@@ -367,7 +317,6 @@ export function DataTable() {
     if (isSC) {
       // Build from global sequences that have outputs
       const rows: { inputBits: number[]; outputBits: number[] }[] = [];
-      const state = useStore.getState();
       for (let si = 0; si < scGlobalSequences.length; si++) {
         const seq = scGlobalSequences[si];
         const isActiveSeq = activeGlobalIndex === si;
@@ -626,8 +575,6 @@ export function DataTable() {
                         .map((h) => h.outputBits.join(''))
                         .join('')
                     : seq.outputStr;
-                  const hasInput = seq.inputStr.length > 0;
-                  const hasOutput = outputStr != null && outputStr.length > 0;
                   // Traditional arrow: line + arrowhead pointing left
                   const seqArrow = (
                     <svg width="12" height="10" viewBox="0 0 12 10" style={{ flexShrink: 0, marginLeft: 2 }}>

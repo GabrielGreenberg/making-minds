@@ -9,7 +9,6 @@ export function SimulationToolbar() {
   const selectedTool = useStore((s) => s.selectedTool);
   const setSelectedTool = useStore((s) => s.setSelectedTool);
   const buildMode = useStore((s) => s.buildMode);
-  const scTimeStep = useStore((s) => s.scTimeStep);
   const components = useStore((s) => s.components);
   const hasMem = components.some((c) => c.type === 'MEM');
   const isSC = buildMode === 'SC' || hasMem;
@@ -35,10 +34,6 @@ export function SimulationToolbar() {
         }
       }
     }
-  };
-
-  const handleGlobalReset = () => {
-    useStore.getState().scGlobalReset();
   };
 
   const handleOpen = async () => {
