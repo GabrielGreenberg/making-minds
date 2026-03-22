@@ -67,6 +67,7 @@ interface AppState {
   snapComponentToGrid: (id: string) => void;
   removeComponent: (id: string) => void;
   setInputValue: (id: string, value: number | undefined) => void;
+  setMemStoredValue: (id: string, value: number) => void;
 
   // Wire operations
   addWire: (
@@ -175,7 +176,7 @@ interface AppState {
   snapComponentsToGrid: (ids: string[]) => void;
 
   // Table rows (step-by-step execution model for CC)
-  tableRows: { inputBits: number[]; outputBits: number[] }[];
+  tableRows: { inputBits: number[]; memBits?: number[]; outputBits: number[] }[];
   addTableRow: () => void;
   clearTableRows: () => void;
 
@@ -191,6 +192,12 @@ interface AppState {
   scReset: () => void; // reset to t=1, preserve circuit structure and input sequence
   scGlobalReset: () => void; // reset to t=1, clear all inputs and memory
   setScInputBit: (inputIndex: number, timeStep: number, value: number) => void;
+
+  // Global I/O sequences (each entry = one run with input string and output string)
+  scGlobalSequences: { inputStr: string; outputStr: string }[];
+  setScGlobalSequenceInput: (index: number, value: string) => void;
+  loadScGlobalSequence: (index: number) => void;
+  recordScGlobalSequenceOutput: () => void;
 
   // Selected tool (click-to-place mode)
   selectedTool: ComponentType | 'TEXT' | 'COMMENT' | 'NEW_BOX' | null;
@@ -494,19 +501,23 @@ export const useStore = create<AppState>()((set, get) => ({
     const sx = snapToGrid(x);
     const sy = snapToGrid(y);
     let label = '';
-    let nextInputNum = state.nextInputNum;
-    let nextOutputNum = state.nextOutputNum;
-    let nextMemNum = state.nextMemNum;
 
+    // Compute next available number from existing components on canvas
     if (type === 'INPUT') {
-      label = `IN${nextInputNum}`;
-      nextInputNum++;
+      const existing = state.components.filter((c) => c.type === 'INPUT');
+      const usedNums = existing.map((c) => parseInt(c.label.replace('IN', '')) || 0);
+      const next = usedNums.length === 0 ? 1 : Math.max(...usedNums) + 1;
+      label = `IN${next}`;
     } else if (type === 'OUTPUT') {
-      label = `OUT${nextOutputNum}`;
-      nextOutputNum++;
+      const existing = state.components.filter((c) => c.type === 'OUTPUT');
+      const usedNums = existing.map((c) => parseInt(c.label.replace('OUT', '')) || 0);
+      const next = usedNums.length === 0 ? 1 : Math.max(...usedNums) + 1;
+      label = `OUT${next}`;
     } else if (type === 'MEM') {
-      label = `M${nextMemNum}`;
-      nextMemNum++;
+      const existing = state.components.filter((c) => c.type === 'MEM');
+      const usedNums = existing.map((c) => parseInt(c.label.replace('M', '')) || 0);
+      const next = usedNums.length === 0 ? 1 : Math.max(...usedNums) + 1;
+      label = `M${next}`;
     } else {
       label = type;
     }
@@ -525,9 +536,6 @@ export const useStore = create<AppState>()((set, get) => ({
 
     set({
       components: [...state.components, comp],
-      nextInputNum,
-      nextOutputNum,
-      nextMemNum,
     });
     // Evaluate after adding
     setTimeout(() => get().evaluateCircuit(), 0);
@@ -588,6 +596,15 @@ export const useStore = create<AppState>()((set, get) => ({
     set((state) => ({
       components: state.components.map((c) =>
         c.id === id ? { ...c, value, inputValues: [value] } : c
+      ),
+    }));
+    setTimeout(() => get().evaluateCircuit(), 0);
+  },
+
+  setMemStoredValue: (id, value) => {
+    set((state) => ({
+      components: state.components.map((c) =>
+        c.id === id ? { ...c, storedValue: value } : c
       ),
     }));
     setTimeout(() => get().evaluateCircuit(), 0);
@@ -781,7 +798,9 @@ export const useStore = create<AppState>()((set, get) => ({
     };
 
     // CC mode: auto-populate the I/O table with the current input→output row
-    if (state.buildMode === 'CC') {
+    // Auto-populate the I/O table with the current input→output row
+    const hasMem = updatedComponents.some((c) => c.type === 'MEM');
+    if (state.buildMode === 'CC' || hasMem) {
       const inputs = updatedComponents
         .filter((c) => c.type === 'INPUT')
         .sort((a, b) => {
@@ -796,22 +815,30 @@ export const useStore = create<AppState>()((set, get) => ({
           const numB = parseInt(b.label.replace('OUT', ''));
           return numA - numB;
         });
+      const mems = updatedComponents
+        .filter((c) => c.type === 'MEM')
+        .sort((a, b) => {
+          const numA = parseInt(a.label.replace('M', ''));
+          const numB = parseInt(b.label.replace('M', ''));
+          return numA - numB;
+        });
 
       const allInputsSet = inputs.every((c) => c.value != null);
       if (inputs.length > 0 && outputs.length > 0 && allInputsSet) {
         const inputBits = inputs.map((c) => c.value!);
+        const memBits = mems.map((c) => c.storedValue ?? 0);
         const outputBits = outputs.map((c) => c.value != null ? c.value : 0);
-        const key = inputBits.join(',');
+        const key = [...inputBits, ...memBits].join(',');
 
-        // Upsert: replace existing row for this input combo, or append
+        // Upsert: replace existing row for this input+mem combo, or append
         const existing = state.tableRows;
-        const idx = existing.findIndex((r) => r.inputBits.join(',') === key);
+        const idx = existing.findIndex((r) => [...r.inputBits, ...(r.memBits || [])].join(',') === key);
         if (idx >= 0) {
           const newRows = [...existing];
-          newRows[idx] = { inputBits, outputBits };
+          newRows[idx] = { inputBits, memBits: mems.length > 0 ? memBits : undefined, outputBits };
           updates.tableRows = newRows;
         } else {
-          updates.tableRows = [...existing, { inputBits, outputBits }];
+          updates.tableRows = [...existing, { inputBits, memBits: mems.length > 0 ? memBits : undefined, outputBits }];
         }
       }
     }
@@ -903,9 +930,6 @@ export const useStore = create<AppState>()((set, get) => ({
       problemCircuits,
       components: [],
       wires: [],
-      nextInputNum: 1,
-      nextOutputNum: 1,
-      nextMemNum: 1,
     });
   },
   switchProblem: (index) => {
@@ -945,9 +969,6 @@ export const useStore = create<AppState>()((set, get) => ({
       textElements: [],
       comments: [],
       boxes: [],
-      nextInputNum: 1,
-      nextOutputNum: 1,
-      nextMemNum: 1,
       buildMode: ps.pages[0]?.buildMode || 'CC',
     });
   },
@@ -990,9 +1011,6 @@ export const useStore = create<AppState>()((set, get) => ({
       textElements: [],
       comments: [],
       boxes: [],
-      nextInputNum: 1,
-      nextOutputNum: 1,
-      nextMemNum: 1,
     });
   },
 
@@ -1494,22 +1512,13 @@ export const useStore = create<AppState>()((set, get) => ({
     if (!state.clipboard) return;
     state.pushHistory();
 
-    // Compute next available label numbers from existing components
-    let nextIn = state.nextInputNum;
-    let nextOut = state.nextOutputNum;
-    let nextMem = state.nextMemNum;
-    for (const c of state.components) {
-      if (c.type === 'INPUT') {
-        const n = parseInt(c.label.replace('IN', '')) || 0;
-        if (n >= nextIn) nextIn = n + 1;
-      } else if (c.type === 'OUTPUT') {
-        const n = parseInt(c.label.replace('OUT', '')) || 0;
-        if (n >= nextOut) nextOut = n + 1;
-      } else if (c.type === 'MEM') {
-        const n = parseInt(c.label.replace('M', '')) || 0;
-        if (n >= nextMem) nextMem = n + 1;
-      }
-    }
+    // Compute next available label numbers from existing components on canvas
+    const inNums = state.components.filter((c) => c.type === 'INPUT').map((c) => parseInt(c.label.replace('IN', '')) || 0);
+    const outNums = state.components.filter((c) => c.type === 'OUTPUT').map((c) => parseInt(c.label.replace('OUT', '')) || 0);
+    const memNums = state.components.filter((c) => c.type === 'MEM').map((c) => parseInt(c.label.replace('M', '')) || 0);
+    let nextIn = inNums.length === 0 ? 1 : Math.max(...inNums) + 1;
+    let nextOut = outNums.length === 0 ? 1 : Math.max(...outNums) + 1;
+    let nextMem = memNums.length === 0 ? 1 : Math.max(...memNums) + 1;
 
     const idMap = new Map<string, string>();
     const newComps = state.clipboard.components.map((c) => {
@@ -1539,9 +1548,6 @@ export const useStore = create<AppState>()((set, get) => ({
       components: [...state.components, ...newComps],
       wires: [...state.wires, ...newWires],
       selectedIds: newComps.map((c) => c.id),
-      nextInputNum: nextIn,
-      nextOutputNum: nextOut,
-      nextMemNum: nextMem,
     });
     setTimeout(() => get().evaluateCircuit(), 0);
   },
@@ -1573,9 +1579,6 @@ export const useStore = create<AppState>()((set, get) => ({
       comments: [],
       boxes: [],
       buildMode,
-      nextInputNum: 1,
-      nextOutputNum: 1,
-      nextMemNum: 1,
     });
   },
 
@@ -1712,6 +1715,7 @@ export const useStore = create<AppState>()((set, get) => ({
   scInputSequence: [],
   scRunning: false,
   scRunIntervalId: null,
+  scGlobalSequences: [],
 
   scStep: () => {
     const state = get();
@@ -1845,13 +1849,51 @@ export const useStore = create<AppState>()((set, get) => ({
 
     const newHistory = [...scHistory, { t: scTimeStep, inputBits, outputBits, memValues }];
 
+    // Also update the local I/O tableRows for this input+mem→output combo
+    const memBits = memValues; // values BEFORE step = what determined the output
+    const localKey = [...inputBits, ...memBits].join(',');
+    const existingRows = state.tableRows;
+    const localIdx = existingRows.findIndex((r) => [...r.inputBits, ...(r.memBits || [])].join(',') === localKey);
+    let newTableRows = existingRows;
+    if (localIdx >= 0) {
+      newTableRows = [...existingRows];
+      newTableRows[localIdx] = { inputBits, memBits: mems.length > 0 ? memBits : undefined, outputBits };
+    } else {
+      newTableRows = [...existingRows, { inputBits, memBits: mems.length > 0 ? memBits : undefined, outputBits }];
+    }
+
     set({
       components: newComponents,
       wires: wires.map((w) => ({ ...w, value: newWireValues.get(w.id) ?? 0 })),
       wireValues: newWireValues,
       scTimeStep: scTimeStep + 1,
       scHistory: newHistory,
+      tableRows: newTableRows,
     });
+
+    // Update matching global sequence output
+    const updState = get();
+    const numInputs = inputs.length;
+    // Build currentInputStr reversed: earliest time step → rightmost position
+    let currentInputStr = '';
+    const maxSeqLen = Math.max(...updState.scInputSequence.map((s) => s.length), 0);
+    for (let t = maxSeqLen - 1; t >= 0; t--) {
+      for (let ii = 0; ii < numInputs; ii++) {
+        currentInputStr += String(updState.scInputSequence[ii]?.[t] ?? 0);
+      }
+    }
+    // Build output string right-to-left: earliest output → rightmost position
+    const outputStr = newHistory
+      .slice()
+      .sort((a, b) => b.t - a.t)
+      .map((h) => h.outputBits.join(''))
+      .join('');
+    const seqIdx = updState.scGlobalSequences.findIndex((s) => s.inputStr === currentInputStr);
+    if (seqIdx >= 0) {
+      const seqs = [...updState.scGlobalSequences];
+      seqs[seqIdx] = { ...seqs[seqIdx], outputStr };
+      set({ scGlobalSequences: seqs });
+    }
   },
 
   scRun: () => {
@@ -1883,16 +1925,20 @@ export const useStore = create<AppState>()((set, get) => ({
     if (state.scRunIntervalId !== null) {
       window.clearInterval(state.scRunIntervalId);
     }
-    // Reset MEM blocks to 0, keep input sequence
+    // Reset MEM blocks to 0 and inputs to undefined, keep input sequence
     set({
       scTimeStep: 1,
       scHistory: [],
       scRunning: false,
       scRunIntervalId: null,
-      components: state.components.map((c) =>
-        c.type === 'MEM' ? { ...c, storedValue: 0 } : c
-      ),
+      tableRows: [],
+      components: state.components.map((c) => {
+        if (c.type === 'MEM') return { ...c, storedValue: 0 };
+        if (c.type === 'INPUT') return { ...c, value: undefined, inputValues: [undefined as unknown as number] };
+        return c;
+      }),
     });
+    setTimeout(() => get().evaluateCircuit(), 0);
   },
 
   scGlobalReset: () => {
@@ -1907,12 +1953,15 @@ export const useStore = create<AppState>()((set, get) => ({
       scInputSequence: [],
       scRunning: false,
       scRunIntervalId: null,
+      tableRows: [],
+      scGlobalSequences: [],
       components: state.components.map((c) => {
         if (c.type === 'MEM') return { ...c, storedValue: 0 };
         if (c.type === 'INPUT') return { ...c, value: undefined, inputValues: [undefined as unknown as number] };
         return c;
       }),
     });
+    setTimeout(() => get().evaluateCircuit(), 0);
   },
 
   setScInputBit: (inputIndex, timeStep, value) => {
@@ -1931,6 +1980,94 @@ export const useStore = create<AppState>()((set, get) => ({
       newSeq[inputIndex] = arr;
       return { scInputSequence: newSeq };
     });
+  },
+
+  setScGlobalSequenceInput: (index, value) => {
+    set((state) => {
+      const seqs = [...state.scGlobalSequences];
+      while (seqs.length <= index) seqs.push({ inputStr: '', outputStr: '' });
+      seqs[index] = { ...seqs[index], inputStr: value };
+      return { scGlobalSequences: seqs };
+    });
+  },
+
+  loadScGlobalSequence: (index) => {
+    const state = get();
+    const seq = state.scGlobalSequences[index];
+    if (!seq || seq.inputStr.length === 0) return;
+
+    // Reset circuit state first
+    if (state.scRunIntervalId !== null) {
+      window.clearInterval(state.scRunIntervalId);
+    }
+
+    // Parse the input string into per-input sequences
+    // For a single input: "0110" → scInputSequence[0] = [0,1,1,0]
+    // For multiple inputs: each char is a time step, bits split across inputs
+    const inputs = state.components
+      .filter((c) => c.type === 'INPUT')
+      .sort((a, b) => parseInt(a.label.replace('IN', '')) - parseInt(b.label.replace('IN', '')));
+    const numInputs = inputs.length;
+    const chars = seq.inputStr.replace(/[^01]/g, '');
+    const stepsCount = numInputs > 0 ? Math.floor(chars.length / numInputs) : 0;
+
+    const newSeq: number[][] = [];
+    for (let i = 0; i < numInputs; i++) {
+      newSeq.push([]);
+    }
+    // Read right-to-left: rightmost character is first time step
+    for (let t = 0; t < stepsCount; t++) {
+      const srcT = stepsCount - 1 - t; // reverse: last char group → first step
+      for (let i = 0; i < numInputs; i++) {
+        newSeq[i].push(parseInt(chars[srcT * numInputs + i]) || 0);
+      }
+    }
+
+    set({
+      scTimeStep: 1,
+      scHistory: [],
+      scRunning: false,
+      scRunIntervalId: null,
+      scInputSequence: newSeq,
+      components: state.components.map((c) => {
+        if (c.type === 'MEM') return { ...c, storedValue: 0 };
+        if (c.type === 'INPUT') return { ...c, value: undefined, inputValues: [undefined as unknown as number] };
+        return c;
+      }),
+    });
+    setTimeout(() => get().evaluateCircuit(), 0);
+  },
+
+  recordScGlobalSequenceOutput: () => {
+    const state = get();
+    // Find the active global sequence (the one whose inputStr matches current scInputSequence)
+    const inputs = state.components
+      .filter((c) => c.type === 'INPUT')
+      .sort((a, b) => parseInt(a.label.replace('IN', '')) - parseInt(b.label.replace('IN', '')));
+    const numInputs = inputs.length;
+
+    // Build output string from scHistory (reversed: earliest → rightmost)
+    const outputStr = state.scHistory
+      .sort((a, b) => b.t - a.t)
+      .map((h) => h.outputBits.join(''))
+      .join('');
+
+    // Build current input string from scInputSequence (reversed: earliest → rightmost)
+    let inputStr = '';
+    const maxLen = Math.max(...state.scInputSequence.map((s) => s.length), 0);
+    for (let t = maxLen - 1; t >= 0; t--) {
+      for (let i = 0; i < numInputs; i++) {
+        inputStr += String(state.scInputSequence[i]?.[t] ?? 0);
+      }
+    }
+
+    // Find and update matching sequence
+    const seqs = [...state.scGlobalSequences];
+    const idx = seqs.findIndex((s) => s.inputStr === inputStr);
+    if (idx >= 0) {
+      seqs[idx] = { ...seqs[idx], outputStr };
+      set({ scGlobalSequences: seqs });
+    }
   },
 
   // Selected tool (click-to-place mode)
@@ -2041,9 +2178,6 @@ function getAutoSaveData() {
     textElements: s.textElements,
     comments: s.comments,
     boxes: s.boxes,
-    nextInputNum: s.nextInputNum,
-    nextOutputNum: s.nextOutputNum,
-    nextMemNum: s.nextMemNum,
     tabs: s.tabs,
     activeTabId: s.activeTabId,
     tabCircuits: Object.fromEntries(s.tabCircuits),
@@ -2102,9 +2236,6 @@ function loadAutoSave() {
       textElements: data.textElements || [],
       comments: data.comments || [],
       boxes: data.boxes || [],
-      nextInputNum: data.nextInputNum || 1,
-      nextOutputNum: data.nextOutputNum || 1,
-      nextMemNum: data.nextMemNum || 1,
       tabs: data.tabs || [{ id: 'tab-1', name: 'Circuit 1' }],
       activeTabId: data.activeTabId || 'tab-1',
       ...(tabCircuits.size > 0 ? { tabCircuits } : {}),

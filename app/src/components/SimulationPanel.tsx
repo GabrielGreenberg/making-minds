@@ -76,17 +76,6 @@ export function SimulationToolbar() {
         <button className="toolbar-btn" onClick={handleReset} title={isSC ? 'Reset to t=1, preserve input sequence' : 'Reset all inputs to 0'}>
           Reset
         </button>
-        {isSC && (
-          <button className="toolbar-btn" onClick={handleGlobalReset} title="Reset to t=1 and clear all inputs and memory">
-            Global Reset
-          </button>
-        )}
-
-        {isSC && (
-          <span style={{ fontSize: 12, color: '#ccc', marginLeft: 8, alignSelf: 'center' }}>
-            t = {scTimeStep}
-          </span>
-        )}
 
         <div className="toolbar-separator" />
         <button

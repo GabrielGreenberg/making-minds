@@ -597,6 +597,8 @@ function CircuitComponentView({
         // Arrow chevrons inside the block, flanking the stored value
         const arrowSize = 5;
         const arrowInset = 12; // distance from block edge to arrow tip
+        // Shift the whole arrow+value group when resolved so it stays visually centered
+        const groupShift = !dir ? 0 : dir === 'left-to-right' ? 4 : -4;
         const arrowColor = dir ? '#2a7fff' : '#999';
         // Determine arrow directions:
         // Undecided: both arrows point outward (← val →)
@@ -647,7 +649,7 @@ function CircuitComponentView({
             </text>
             {/* Left arrow inside block */}
             <path
-              d={chevron(comp.x + arrowInset, cy, leftDir)}
+              d={chevron(comp.x + arrowInset + groupShift, cy, leftDir)}
               fill="none"
               stroke={arrowColor}
               strokeWidth={1.5}
@@ -670,7 +672,7 @@ function CircuitComponentView({
             </text>
             {/* Right arrow inside block */}
             <path
-              d={chevron(comp.x + w - arrowInset, cy, rightDir)}
+              d={chevron(comp.x + w - arrowInset + groupShift, cy, rightDir)}
               fill="none"
               stroke={arrowColor}
               strokeWidth={1.5}

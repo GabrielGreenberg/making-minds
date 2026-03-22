@@ -4,6 +4,7 @@ import { ComponentLibrary } from './components/ComponentLibrary';
 import { CircuitCanvas } from './components/CircuitCanvas';
 import { DataTable } from './components/DataTable';
 import { SimulationToolbar } from './components/SimulationPanel';
+import { SequentialTimeline } from './components/SequentialTimeline';
 
 function App() {
   return (
@@ -13,7 +14,10 @@ function App() {
       <SimulationToolbar />
       <div className="main-area">
         <ComponentLibrary />
-        <CircuitCanvas />
+        <div className="canvas-and-timeline">
+          <CircuitCanvas />
+          <SequentialTimeline />
+        </div>
         <DataTable />
       </div>
     </div>
