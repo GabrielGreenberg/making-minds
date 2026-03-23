@@ -86,6 +86,8 @@ export interface OccupancyState {
   occupiedEdges: Map<number, string>;
   /** All routed wire segments for crossing detection */
   segments: { x1: number; y1: number; x2: number; y2: number; wireId: string }[];
+  /** Bend points used by wires. Key = "x,y", value = wireId */
+  occupiedBends: Map<string, string>;
 }
 
 /** A* search state */
@@ -541,6 +543,7 @@ function aStarSearch(
   goalDir: Dir,        // direction the stub is pointing at goal (must arrive from opposite)
   occupancy: OccupancyState,
   sourcePortKey: string, // for fan-out: wires from same port can share edges
+  ownStubs?: { x1: number; y1: number; x2: number; y2: number }[], // own stub segments to avoid overlapping
   previousPath?: Point[], // previous path for continuity bias (§7.2)
   maxIterations: number = 5000
 ): Point[] | null {
@@ -620,12 +623,29 @@ function aStarSearch(
       // Bend cost
       if (current.dir !== null && current.dir !== edgeDir) {
         cost += W_BEND;
+        // Penalize bends at nodes already used as bend points by other wires
+        // Use a moderate cost — less than overlap to avoid trading shared bends for overlapping segments
+        const bendKey = `${currentNode.x},${currentNode.y}`;
+        if (occupancy.occupiedBends.has(bendKey)) {
+          cost += W_BEND * 4;
+        }
       }
 
       // Overlap cost
       const occupantPort = occupancy.occupiedEdges.get(edge);
       if (occupantPort !== undefined && occupantPort !== sourcePortKey) {
         cost += W_OVERLAP;
+      }
+
+      // Self-stub overlap cost: penalize edges that overlap with this wire's own stubs
+      if (ownStubs) {
+        for (const stub of ownStubs) {
+          if (segmentsOverlap(currentNode.x, currentNode.y, neighborNode.x, neighborNode.y,
+                              stub.x1, stub.y1, stub.x2, stub.y2)) {
+            cost += W_OVERLAP;
+            break;
+          }
+        }
       }
 
       // Crossing cost
@@ -667,26 +687,54 @@ function aStarSearch(
 function fallbackPath(
   srcStub: Point, dstStub: Point, srcDir: Dir, dstDir: Dir
 ): Point[] {
-  // Simple approach: go out from source stub, make an L to destination stub
-  const midX = (srcStub.x + dstStub.x) / 2;
-  const midY = (srcStub.y + dstStub.y) / 2;
+  const EXTEND = 20; // extend beyond stub in stub direction before turning
 
-  // Determine shape based on stub directions
+  // Compute extension points that respect stub direction
+  const srcExt = { ...srcStub };
+  if (srcDir === 'E') srcExt.x = Math.max(srcStub.x + EXTEND, dstStub.x + EXTEND);
+  else if (srcDir === 'W') srcExt.x = Math.min(srcStub.x - EXTEND, dstStub.x - EXTEND);
+  else if (srcDir === 'S') srcExt.y = Math.max(srcStub.y + EXTEND, dstStub.y + EXTEND);
+  else if (srcDir === 'N') srcExt.y = Math.min(srcStub.y - EXTEND, dstStub.y - EXTEND);
+
+  const dstExt = { ...dstStub };
+  if (dstDir === 'E') dstExt.x = Math.max(dstStub.x + EXTEND, srcStub.x + EXTEND);
+  else if (dstDir === 'W') dstExt.x = Math.min(dstStub.x - EXTEND, srcStub.x - EXTEND);
+  else if (dstDir === 'S') dstExt.y = Math.max(dstStub.y + EXTEND, srcStub.y + EXTEND);
+  else if (dstDir === 'N') dstExt.y = Math.min(dstStub.y - EXTEND, srcStub.y - EXTEND);
+
   const srcHoriz = srcDir === 'E' || srcDir === 'W';
   const dstHoriz = dstDir === 'E' || dstDir === 'W';
 
+  // Check if direct midpoint path respects stub directions
+  const midX = (srcStub.x + dstStub.x) / 2;
+  const midY = (srcStub.y + dstStub.y) / 2;
+  const srcMidOk = (srcDir === 'E' && midX >= srcStub.x) || (srcDir === 'W' && midX <= srcStub.x)
+    || (srcDir === 'S' && midY >= srcStub.y) || (srcDir === 'N' && midY <= srcStub.y);
+  const dstMidOk = (dstDir === 'E' && midX >= dstStub.x) || (dstDir === 'W' && midX <= dstStub.x)
+    || (dstDir === 'S' && midY >= dstStub.y) || (dstDir === 'N' && midY <= dstStub.y);
+
+  if (srcMidOk && dstMidOk) {
+    // Simple midpoint path works without violating stub directions
+    if (srcHoriz && dstHoriz) {
+      return [srcStub, { x: midX, y: srcStub.y }, { x: midX, y: dstStub.y }, dstStub];
+    } else if (!srcHoriz && !dstHoriz) {
+      return [srcStub, { x: srcStub.x, y: midY }, { x: dstStub.x, y: midY }, dstStub];
+    } else if (srcHoriz) {
+      return [srcStub, { x: dstStub.x, y: srcStub.y }, dstStub];
+    } else {
+      return [srcStub, { x: srcStub.x, y: dstStub.y }, dstStub];
+    }
+  }
+
+  // Stub directions conflict with direct path — extend out first, then route
   if (srcHoriz && dstHoriz) {
-    // Both horizontal: use vertical midpoint
-    return [srcStub, { x: midX, y: srcStub.y }, { x: midX, y: dstStub.y }, dstStub];
+    return [srcStub, srcExt, { x: srcExt.x, y: dstStub.y }, dstStub];
   } else if (!srcHoriz && !dstHoriz) {
-    // Both vertical: use horizontal midpoint
-    return [srcStub, { x: srcStub.x, y: midY }, { x: dstStub.x, y: midY }, dstStub];
-  } else if (srcHoriz && !dstHoriz) {
-    // Source horizontal, dest vertical
-    return [srcStub, { x: dstStub.x, y: srcStub.y }, dstStub];
+    return [srcStub, srcExt, { x: dstStub.x, y: srcExt.y }, dstStub];
+  } else if (srcHoriz) {
+    return [srcStub, srcExt, { x: srcExt.x, y: dstStub.y }, dstStub];
   } else {
-    // Source vertical, dest horizontal
-    return [srcStub, { x: srcStub.x, y: dstStub.y }, dstStub];
+    return [srcStub, srcExt, { x: dstStub.x, y: srcExt.y }, dstStub];
   }
 }
 
@@ -801,6 +849,7 @@ export function routeAllWires(
   const occupancy: OccupancyState = {
     occupiedEdges: new Map(),
     segments: [],
+    occupiedBends: new Map(),
   };
 
   // Sort inputs: shorter wires first (by Manhattan distance), but keep fan-out groups together
@@ -847,11 +896,18 @@ export function routeAllWires(
         }
       }
 
+      // Build own stub segments for self-overlap avoidance
+      const ownStubs = [
+        { x1: input.sourcePos.x, y1: input.sourcePos.y, x2: srcStub.x, y2: srcStub.y },
+        { x1: dstStub.x, y1: dstStub.y, x2: input.targetPos.x, y2: input.targetPos.y },
+      ];
+
       // Run A* with continuity bias toward previous path
       let pathPoints = aStarSearch(
         grid, startNodeId, goalNodeId,
         srcDir, oppositeDir(dstDir),
         occupancy, input.sourcePortKey,
+        ownStubs,
         prevInnerPath
       );
 
@@ -898,20 +954,50 @@ export function routeAllWires(
       const h2Violation = isPathBlockedByBounds(path, expandedBounds);
 
       // Check H1: does the path overlap any other wire's segment (different source port)?
+      // Also check if the inner path overlaps its own stubs (self-stub overlap).
       let h1Violation = false;
+      const selfStubs = [
+        { x1: path[0].x, y1: path[0].y, x2: path[1].x, y2: path[1].y },
+        { x1: path[path.length - 2].x, y1: path[path.length - 2].y, x2: path[path.length - 1].x, y2: path[path.length - 1].y },
+      ];
       for (let i = 0; i < path.length - 1 && !h1Violation; i++) {
         const a = path[i], b = path[i + 1];
+        // Check against other wires
         for (const seg of occupancy.segments) {
           if (seg.wireId === item.input.wireId) continue;
-          // Check if segments are collinear and overlapping
           if (segmentsOverlap(a.x, a.y, b.x, b.y, seg.x1, seg.y1, seg.x2, seg.y2)) {
             h1Violation = true;
             break;
           }
         }
+        // Check inner segments against own stubs (skip stub segments themselves)
+        if (!h1Violation && i >= 1 && i < path.length - 2) {
+          for (const stub of selfStubs) {
+            if (segmentsOverlap(a.x, a.y, b.x, b.y, stub.x1, stub.y1, stub.x2, stub.y2)) {
+              h1Violation = true;
+              break;
+            }
+          }
+        }
       }
 
-      if (!h2Violation && !h1Violation) continue;
+      // Check H3: does this wire share any bend points with other wires?
+      let h3Violation = false;
+      for (let i = 1; i < path.length - 1 && !h3Violation; i++) {
+        const prev = path[i - 1], curr = path[i], next = path[i + 1];
+        const d1h = Math.abs(curr.x - prev.x) > 0.5;
+        const d2h = Math.abs(next.x - curr.x) > 0.5;
+        if (d1h !== d2h) {
+          // This is a bend point — check if another wire also bends here
+          const bendKey = `${Math.round(curr.x)},${Math.round(curr.y)}`;
+          const occupant = occupancy.occupiedBends.get(bendKey);
+          if (occupant && occupant !== item.input.wireId) {
+            h3Violation = true;
+          }
+        }
+      }
+
+      if (!h2Violation && !h1Violation && !h3Violation) continue;
 
       // Remove this wire's occupancy before re-routing
       removeOccupancy(occupancy, item.input.wireId);
@@ -920,10 +1006,15 @@ export function routeAllWires(
       const startNodeId = ensureNodeOnGrid(grid, srcStub, expandedBounds);
       const goalNodeId = ensureNodeOnGrid(grid, dstStub, expandedBounds);
 
+      const reOwnStubs = [
+        { x1: item.input.sourcePos.x, y1: item.input.sourcePos.y, x2: srcStub.x, y2: srcStub.y },
+        { x1: dstStub.x, y1: dstStub.y, x2: item.input.targetPos.x, y2: item.input.targetPos.y },
+      ];
       let pathPoints = aStarSearch(
         grid, startNodeId, goalNodeId,
         srcDir, oppositeDir(dstDir),
-        occupancy, item.input.sourcePortKey
+        occupancy, item.input.sourcePortKey,
+        reOwnStubs
       );
 
       if (!pathPoints || pathPoints.length === 0) {
@@ -977,8 +1068,10 @@ function segmentsOverlap(
 /** Remove a wire's segments from occupancy (before re-routing) */
 function removeOccupancy(occupancy: OccupancyState, wireId: string) {
   occupancy.segments = occupancy.segments.filter(s => s.wireId !== wireId);
-  // Note: we don't clean occupiedEdges because they're keyed by edge ID and
-  // we'd need the grid to map back. The re-routed wire will overwrite entries.
+  // Remove bend points for this wire
+  for (const [key, wid] of occupancy.occupiedBends) {
+    if (wid === wireId) occupancy.occupiedBends.delete(key);
+  }
 }
 
 /** Find all crossing points between this wire and other wires (for bridge rendering §8) */
@@ -1044,6 +1137,19 @@ function updateOccupancy(
       x2: path[i + 1].x, y2: path[i + 1].y,
       wireId,
     });
+  }
+
+  // Record bend points (where direction changes between consecutive segments)
+  for (let i = 1; i < path.length - 1; i++) {
+    const prev = path[i - 1];
+    const curr = path[i];
+    const next = path[i + 1];
+    const d1h = Math.abs(curr.x - prev.x) > 0.5; // prev→curr is horizontal
+    const d2h = Math.abs(next.x - curr.x) > 0.5; // curr→next is horizontal
+    if (d1h !== d2h) {
+      // Direction changed at curr → this is a bend point
+      occupancy.occupiedBends.set(`${Math.round(curr.x)},${Math.round(curr.y)}`, wireId);
+    }
   }
 
   // Record occupied edges (map path segments back to grid edges)

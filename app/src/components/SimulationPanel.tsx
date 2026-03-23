@@ -2,8 +2,6 @@ import { useStore } from '../store';
 import { saveToFile, openFile } from '../fileHandle';
 
 export function SimulationToolbar() {
-  const showWireValues = useStore((s) => s.showWireValues);
-  const setShowWireValues = useStore((s) => s.setShowWireValues);
   const snapToAlign = useStore((s) => s.snapToAlign);
   const setSnapToAlign = useStore((s) => s.setSnapToAlign);
   const selectedTool = useStore((s) => s.selectedTool);
@@ -13,15 +11,6 @@ export function SimulationToolbar() {
   const hasMem = components.some((c) => c.type === 'MEM');
   const isSC = buildMode === 'SC' || hasMem;
   const autoSaveStatus = useStore((s) => s.autoSaveStatus);
-
-  const handleStep = () => {
-    const state = useStore.getState();
-    if (isSC) {
-      state.scStep();
-    } else {
-      state.evaluateCircuit();
-    }
-  };
 
   const handleReset = () => {
     const state = useStore.getState();
@@ -59,17 +48,8 @@ export function SimulationToolbar() {
         </button>
         <div className="toolbar-separator" />
 
-        <button
-          className="toolbar-btn"
-          onClick={handleStep}
-          title={isSC ? 'Advance one clock cycle' : 'Evaluate circuit'}
-        >
-          <span className="toolbar-icon">{'\u25B6'}</span> Step
-        </button>
-        <div className="toolbar-separator" />
-
-        <button className="toolbar-btn" onClick={handleReset} title={isSC ? 'Reset to t=1, preserve input sequence' : 'Reset all inputs to 0'}>
-          Reset
+        <button className="toolbar-btn" onClick={handleReset} title={isSC ? 'Reset to t=1, preserve input sequence' : 'Clear all inputs'}>
+          Clear
         </button>
 
         <div className="toolbar-separator" />
@@ -86,13 +66,6 @@ export function SimulationToolbar() {
           <span className="toolbar-icon">{'\u21BB'}</span> Rotate
         </button>
         <div className="toolbar-separator" />
-        <button
-          className={`toolbar-btn ${showWireValues ? 'toolbar-btn-active' : ''}`}
-          onClick={() => setShowWireValues(!showWireValues)}
-          title="Toggle wire value annotations"
-        >
-          0/1
-        </button>
         <button
           className={`toolbar-btn ${snapToAlign ? 'toolbar-btn-active' : ''}`}
           onClick={() => setSnapToAlign(!snapToAlign)}

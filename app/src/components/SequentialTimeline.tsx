@@ -27,6 +27,11 @@ export function SequentialTimeline() {
   const maxHistoryT = scHistory.length > 0 ? Math.max(...scHistory.map((h) => h.t)) : 0;
   const numCols = Math.max(maxHistoryT, 1);
 
+  // Measure available width to fill empty space with tick marks
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [fillerCount, setFillerCount] = useState(0);
+  const colWidth = 28; // matches min-width on sc-table td
+
   // Auto-scroll left when new columns appear (they grow from the right edge leftward)
   useEffect(() => {
     if (numCols > prevColCount.current && scrollRef.current) {
@@ -34,6 +39,23 @@ export function SequentialTimeline() {
     }
     prevColCount.current = numCols;
   }, [numCols]);
+
+  useEffect(() => {
+    if (!open || !isSC || !containerRef.current) return;
+    const measure = () => {
+      const container = containerRef.current;
+      if (!container) return;
+      const availableWidth = container.clientWidth;
+      const labelColWidth = 42; // sticky label column
+      const dataWidth = numCols * colWidth;
+      const remaining = availableWidth - dataWidth - labelColWidth;
+      setFillerCount(Math.max(0, Math.floor(remaining / colWidth)));
+    };
+    measure();
+    const obs = new ResizeObserver(measure);
+    obs.observe(containerRef.current);
+    return () => obs.disconnect();
+  }, [open, numCols, isSC]);
 
   if (!isSC || inputs.length === 0) return null;
 
@@ -70,13 +92,20 @@ export function SequentialTimeline() {
       {open && (
         <div
           className="timeline-scroll-area"
-          ref={scrollRef}
+          ref={(el) => {
+            (scrollRef as React.MutableRefObject<HTMLDivElement | null>).current = el;
+            (containerRef as React.MutableRefObject<HTMLDivElement | null>).current = el;
+          }}
           style={{ overflowX: 'auto', overflowY: 'hidden', direction: 'rtl' }}
         >
           <div style={{ direction: 'ltr', display: 'inline-block', minWidth: '100%' }}>
-            <table className="data-table sc-table" style={{ marginLeft: 'auto', width: 'auto' }}>
+            <table className="data-table sc-table" style={{ marginLeft: 'auto', width: '100%' }}>
               <thead>
                 <tr>
+                  {/* Filler tick columns */}
+                  {Array.from({ length: fillerCount }, (_, i) => (
+                    <th key={`filler-${i}`} className="sc-filler-col" />
+                  ))}
                   {/* Time headers in reverse: highest t on the left */}
                   {[...timeSteps].reverse().map((t) => (
                     <th key={t} className={t === scTimeStep ? 'sc-current-step' : ''}>
@@ -89,6 +118,9 @@ export function SequentialTimeline() {
               <tbody>
                 {inputs.map((inp, inputIdx) => (
                   <tr key={inp.id} className="sc-input-row">
+                    {Array.from({ length: fillerCount }, (_, i) => (
+                      <td key={`filler-${i}`} className="sc-filler-col" />
+                    ))}
                     {[...timeSteps].reverse().map((t) => {
                       const val = getInputBit(inputIdx, t);
                       const evaluated = scHistory.some((h) => h.t === t);
@@ -98,13 +130,13 @@ export function SequentialTimeline() {
                           className={`sc-cell sc-input-cell ${val === 1 ? 'val-1' : ''} ${t === scTimeStep ? 'sc-current-step' : ''}`}
                         >
                           {evaluated ? (
-                            <span className="mono-value">{val ?? 0}</span>
+                            <span className="mono-value">{val !== undefined ? val : ''}</span>
                           ) : (
                             <input
                               type="text"
                               className="sc-input-field"
                               value={val !== undefined ? String(val) : ''}
-                              placeholder="0"
+                              placeholder=""
                               onChange={(e) => {
                                 const v = e.target.value;
                                 if (v === '0' || v === '1' || v === '') {
@@ -130,6 +162,9 @@ export function SequentialTimeline() {
                 ))}
                 {outputs.map((out, outputIdx) => (
                   <tr key={out.id} className="sc-output-row">
+                    {Array.from({ length: fillerCount }, (_, i) => (
+                      <td key={`filler-${i}`} className="sc-filler-col" />
+                    ))}
                     {[...timeSteps].reverse().map((t) => {
                       const val = getOutputBit(outputIdx, t);
                       return (

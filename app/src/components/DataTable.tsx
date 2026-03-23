@@ -1,6 +1,20 @@
 import { useMemo, useState, useCallback, useRef, useEffect } from 'react';
 import { useStore } from '../store';
 
+const UI_PREFS_KEY = 'making-minds-ui-prefs';
+
+function loadUiPrefs(): Record<string, unknown> {
+  try {
+    return JSON.parse(localStorage.getItem(UI_PREFS_KEY) || '{}');
+  } catch { return {}; }
+}
+
+function saveUiPref(key: string, value: unknown) {
+  const prefs = loadUiPrefs();
+  prefs[key] = value;
+  localStorage.setItem(UI_PREFS_KEY, JSON.stringify(prefs));
+}
+
 /** Valid tally: consecutive 1's from the left, then 0's. Returns count or null. */
 function bitsToTally(bits: number[]): number | null {
   let seenZero = false;
@@ -45,17 +59,31 @@ export function DataTable() {
   const scReset = useStore((s) => s.scReset);
   const scGlobalReset = useStore((s) => s.scGlobalReset);
 
+  // Local I/O stepping
+  const localStepActive = useStore((s) => s.localStepActive);
+  const localStepSelectedKey = useStore((s) => s.localStepSelectedKey);
+  const localStepIndex = useStore((s) => s.localStepIndex);
+  const localStepSorted = useStore((s) => s.localStepSorted);
+  const localStepSelect = useStore((s) => s.localStepSelect);
+  const localStepOne = useStore((s) => s.localStepOne);
+  const localStepReset = useStore((s) => s.localStepReset);
+
   // For animated sequence playback
   const [isRunning, setIsRunning] = useState(false);
+  const [localIsRunning, setLocalIsRunning] = useState(false);
   const [autoFocusIndex, setAutoFocusIndex] = useState<number | null>(null);
 
-  // Collapsible section state
-  const [localOpen, setLocalOpen] = useState(true);
-  const [globalOpen, setGlobalOpen] = useState(true);
-  const [avOpen, setAvOpen] = useState(true);
+  // Collapsible section state (persisted)
+  const _prefs = useRef(loadUiPrefs());
+  const [localOpen, _setLocalOpen] = useState(() => _prefs.current.localOpen !== false);
+  const [globalOpen, _setGlobalOpen] = useState(() => _prefs.current.globalOpen !== false);
+  const [avOpen, _setAvOpen] = useState(() => _prefs.current.avOpen !== false);
+  const setLocalOpen = (v: boolean) => { _setLocalOpen(v); saveUiPref('localOpen', v); };
+  const setGlobalOpen = (v: boolean) => { _setGlobalOpen(v); saveUiPref('globalOpen', v); };
+  const setAvOpen = (v: boolean) => { _setAvOpen(v); saveUiPref('avOpen', v); };
 
   // Run speed: multiplier (1 = 300ms per step, 2 = 150ms, 0.5 = 600ms, etc.)
-  const [runSpeed, setRunSpeed] = useState(1);
+  const [runSpeed, setRunSpeed] = useState(() => (typeof _prefs.current.runSpeed === 'number' ? _prefs.current.runSpeed as number : 1));
   const [showSpeedSlider, setShowSpeedSlider] = useState(false);
 
   // Which global I/O row is currently selected
@@ -75,40 +103,74 @@ export function DataTable() {
   }, [scHistory.length]);
 
   // Run through the currently loaded global sequence with animation
-  const runLoadedSequence = useCallback(() => {
+  // Ensure a global sequence is loaded into scInputSequence before running/stepping.
+  // If activeGlobalIndex is set, use that; otherwise find the first sequence with input.
+  const ensureSequenceLoaded = useCallback(() => {
     const state = useStore.getState();
-    const numInputs = state.components.filter((c) => c.type === 'INPUT').length;
     const maxLen = Math.max(...state.scInputSequence.map((s) => s.length), 0);
-    const remaining = maxLen - (state.scTimeStep - 1);
-    if (remaining <= 0 || numInputs === 0) return;
-    setIsRunning(true);
-    let step = 0;
-    const interval = setInterval(() => {
-      const s = useStore.getState();
-      const maxL = Math.max(...s.scInputSequence.map((sq) => sq.length), 0);
-      if (step >= remaining || s.scTimeStep > maxL) {
-        clearInterval(interval);
-        setIsRunning(false);
+    if (maxLen > 0 && state.scTimeStep <= maxLen) return; // already loaded and in progress
+
+    // Try active index first, then fall back to first sequence with input
+    const candidates = activeGlobalIndex !== null ? [activeGlobalIndex] : [];
+    for (let i = 0; i < state.scGlobalSequences.length; i++) {
+      if (i !== activeGlobalIndex) candidates.push(i);
+    }
+    for (const idx of candidates) {
+      const seq = state.scGlobalSequences[idx];
+      if (seq && seq.inputStr.length > 0) {
+        setActiveGlobalIndex(idx);
+        loadScGlobalSequence(idx);
         return;
       }
-      s.scStep();
-      step++;
-    }, Math.round(300 / runSpeed));
-  }, [runSpeed]);
-
-  // Step once in the currently loaded sequence
-  const stepLoadedSequence = useCallback(() => {
-    const state = useStore.getState();
-    const maxLen = Math.max(...state.scInputSequence.map((s) => s.length), 0);
-    if (state.scTimeStep <= maxLen) {
-      state.scStep();
     }
-  }, []);
+  }, [activeGlobalIndex, loadScGlobalSequence]);
 
-  // Reset the currently loaded sequence: clear output but keep input
+  const runLoadedSequence = useCallback(() => {
+    ensureSequenceLoaded();
+    // Re-read state after potential load
+    setTimeout(() => {
+      const state = useStore.getState();
+      const numInputs = state.components.filter((c) => c.type === 'INPUT').length;
+      if (numInputs === 0) return;
+      const maxLen = Math.max(...state.scInputSequence.map((s) => s.length), 0);
+      const remaining = maxLen - (state.scTimeStep - 1);
+      // If no sequence loaded, just do a single step
+      if (remaining <= 0 && maxLen === 0) {
+        state.scStep();
+        return;
+      }
+      if (remaining <= 0) return;
+      setIsRunning(true);
+      let step = 0;
+      const interval = setInterval(() => {
+        const s = useStore.getState();
+        const maxL = Math.max(...s.scInputSequence.map((sq) => sq.length), 0);
+        if (step >= remaining || s.scTimeStep > maxL) {
+          clearInterval(interval);
+          setIsRunning(false);
+          return;
+        }
+        s.scStep();
+        step++;
+      }, Math.round(300 / runSpeed));
+    }, 0);
+  }, [runSpeed, ensureSequenceLoaded]);
+
+  // Step once: if a sequence is loaded, advance within it; otherwise just step with current inputs
+  const stepLoadedSequence = useCallback(() => {
+    ensureSequenceLoaded();
+    setTimeout(() => {
+      const state = useStore.getState();
+      const maxLen = Math.max(...state.scInputSequence.map((s) => s.length), 0);
+      if (maxLen === 0 || state.scTimeStep <= maxLen) {
+        state.scStep();
+      }
+    }, 0);
+  }, [ensureSequenceLoaded]);
+
+  // Reset: if a global sequence is active, clear its output and re-load; otherwise just scReset
   const resetLoadedSequence = useCallback(() => {
     const state = useStore.getState();
-    // Find which global sequence is active and re-load it
     const seqs = state.scGlobalSequences;
     const numInputs = state.components.filter((c) => c.type === 'INPUT').length;
     const maxLen = Math.max(...state.scInputSequence.map((s) => s.length), 0);
@@ -126,6 +188,9 @@ export function DataTable() {
       useStore.setState({ scGlobalSequences: newSeqs });
       // Re-load to reset circuit state
       loadScGlobalSequence(idx);
+    } else {
+      // No active global sequence — just reset
+      state.scReset();
     }
   }, [loadScGlobalSequence]);
 
@@ -143,25 +208,28 @@ export function DataTable() {
     const needed = Math.max(260, maxLen * 7 * 2 + 80);
     return needed;
   }, [isSC, scGlobalSequences]);
-  const [panelWidth, setPanelWidth] = useState(260);
+  const [panelWidth, _setPanelWidth] = useState(() => (typeof _prefs.current.panelWidth === 'number' ? _prefs.current.panelWidth as number : 260));
   const dragRef = useRef<{ startX: number; startW: number } | null>(null);
 
+  const setPanelWidth = (v: number) => _setPanelWidth(v);
   const onResizePointerDown = useCallback((e: React.PointerEvent) => {
     e.preventDefault();
     dragRef.current = { startX: e.clientX, startW: panelWidth };
     const target = e.currentTarget as HTMLElement;
     target.setPointerCapture(e.pointerId);
 
+    let lastWidth = panelWidth;
     const onMove = (ev: PointerEvent) => {
       if (!dragRef.current) return;
-      const dx = dragRef.current.startX - ev.clientX;
-      setPanelWidth(Math.max(160, Math.min(600, dragRef.current.startW + dx)));
+      lastWidth = Math.max(160, Math.min(600, dragRef.current.startW + (dragRef.current.startX - ev.clientX)));
+      setPanelWidth(lastWidth);
     };
     const onUp = () => {
       dragRef.current = null;
       target.releasePointerCapture(e.pointerId);
       window.removeEventListener('pointermove', onMove);
       window.removeEventListener('pointerup', onUp);
+      saveUiPref('panelWidth', lastWidth);
     };
     window.addEventListener('pointermove', onMove);
     window.addEventListener('pointerup', onUp);
@@ -209,6 +277,9 @@ export function DataTable() {
   // For SC: use the latest history entry's input+mem combo (pre-step values)
   // so the highlight matches what was just evaluated
   const currentInputKey = useMemo(() => {
+    if (localStepActive && localStepSelectedKey) return localStepSelectedKey;
+    // No row highlighted if all inputs are unset (cleared state)
+    if (inputs.every((c) => c.value === undefined || c.value === null)) return null;
     if (isSC && scHistory.length > 0) {
       const latest = scHistory[scHistory.length - 1];
       return inputKey([...latest.inputBits, ...latest.memValues]);
@@ -217,26 +288,7 @@ export function DataTable() {
       return inputKey([...inputs.map((c) => c.value ?? 0), ...mems.map((c) => c.storedValue ?? 0)]);
     }
     return inputKey(inputs.map((c) => c.value ?? 0));
-  }, [isSC, scHistory, inputs, mems]);
-
-  // Set all input toggles to match a row's input bits
-  const activateRow = (inBits: number[]) => {
-    const state = useStore.getState();
-    inputs.forEach((inp, i) => {
-      state.setInputValue(inp.id, inBits[i] ?? 0);
-    });
-  };
-
-  // Set input values AND memory stored values for SC rows
-  const activateScRow = (inBits: number[], memBits: number[]) => {
-    const state = useStore.getState();
-    inputs.forEach((inp, i) => {
-      state.setInputValue(inp.id, inBits[i] ?? 0);
-    });
-    mems.forEach((mem, i) => {
-      state.setMemStoredValue(mem.id, memBits[i] ?? 0);
-    });
-  };
+  }, [isSC, scHistory, inputs, mems, localStepActive, localStepSelectedKey]);
 
   // Build lookup of which input combinations have been evaluated
   const evaluatedRows = useMemo(() => {
@@ -294,22 +346,6 @@ export function DataTable() {
     return rows;
   }, [inputs.length, outputs.length, mems.length, isSC]);
 
-  if (inputs.length === 0) {
-    return (
-      <div className="data-table-panel" style={{ width: Math.max(panelWidth, autoMinWidth) }}>
-        <div className="panel-resize-handle" onPointerDown={onResizePointerDown} />
-        <div className="data-table-panel-inner">
-          <div className="table-header" />
-          <div className="data-table-content">
-            <div style={{ padding: 12, color: '#999', fontSize: 12 }}>
-              Add inputs and outputs to see the I/O table.
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
   // ── For A/V table ──
   // SC: each global sequence with output is one row (input sequence → output sequence as numerals)
   // CC: evaluated rows from the truth table
@@ -332,9 +368,17 @@ export function DataTable() {
       return rows;
     }
     if (isCC) {
+      // During local stepping, don't show the in-progress row in A/V until all outputs are filled
+      const steppingKey = localStepActive ? localStepSelectedKey : null;
+      const steppingComplete = localStepActive && localStepIndex >= localStepSorted.length;
       return ccInputRows && ccInputRows !== 'too-many'
         ? (ccInputRows as number[][])
-            .filter((inBits) => evaluatedRows.has(inputKey(inBits)))
+            .filter((inBits) => {
+              if (!evaluatedRows.has(inputKey(inBits))) return false;
+              // Hide in-progress row unless stepping is complete
+              if (steppingKey === inputKey(inBits) && !steppingComplete) return false;
+              return true;
+            })
             .map((inBits) => ({
               inputBits: inBits,
               outputBits: evaluatedRows.get(inputKey(inBits))!,
@@ -342,9 +386,25 @@ export function DataTable() {
         : [];
     }
     return tableRows;
-  }, [isSC, isCC, scGlobalSequences, scHistory, activeGlobalIndex, ccInputRows, evaluatedRows, tableRows]);
+  }, [isSC, isCC, scGlobalSequences, scHistory, activeGlobalIndex, ccInputRows, evaluatedRows, tableRows, localStepActive, localStepSelectedKey, localStepIndex, localStepSorted.length]);
 
-  /** Small play-triangle button for a row */
+  if (inputs.length === 0) {
+    return (
+      <div className="data-table-panel" style={{ width: Math.max(panelWidth, autoMinWidth) }}>
+        <div className="panel-resize-handle" onPointerDown={onResizePointerDown} />
+        <div className="data-table-panel-inner">
+          <div className="table-header" />
+          <div className="data-table-content">
+            <div style={{ padding: 12, color: '#999', fontSize: 12 }}>
+              Add inputs and outputs to see the I/O table.
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  /** Small selection arrow for a row */
   const playBtn = (inBits: number[], isActive: boolean) => (
     <td
       className="row-play-btn"
@@ -355,8 +415,8 @@ export function DataTable() {
         border: 'none', background: 'transparent',
         fontSize: 9, textAlign: 'center',
       }}
-      onClick={() => { if (!isActive) activateRow(inBits); }}
-      title={isActive ? 'Current row' : 'Load this input combination'}
+      onClick={() => { if (!isActive) localStepSelect(inBits); }}
+      title={isActive ? 'Selected row' : 'Select this row'}
     >
       ▶
     </td>
@@ -375,15 +435,25 @@ export function DataTable() {
           <div className="table-section-label" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 4, cursor: 'pointer' }} onClick={() => setLocalOpen(!localOpen)}>
               <span className="pod-toggle">{localOpen ? '▼' : '▶'}</span>
-              <span>{isSC ? 'Local I/O' : 'I/O Table'}</span>
+              <span>{isSC ? 'Local I/O' : 'Input / Output'}</span>
             </div>
             <button
               className="toggle-btn"
-              onClick={() => { if (tableRows.length > 0) { clearTableRows(); if (isSC) scReset(); } }}
+              onClick={() => {
+                clearTableRows();
+                if (isSC) scReset();
+                if (localStepActive) useStore.getState().localStepClear();
+                // Reset all inputs and wire values
+                const state = useStore.getState();
+                for (const comp of state.components) {
+                  if (comp.type === 'INPUT') state.setInputValue(comp.id, undefined);
+                }
+                state.evaluateCircuit();
+              }}
               style={{
                 fontSize: 11, padding: '2px 8px',
-                color: tableRows.length > 0 ? '#555' : '#ccc',
-                cursor: tableRows.length > 0 ? 'pointer' : 'default',
+                color: (tableRows.length > 0 || localStepActive) ? '#555' : '#ccc',
+                cursor: (tableRows.length > 0 || localStepActive) ? 'pointer' : 'default',
               }}
             >
               clear
@@ -414,7 +484,12 @@ export function DataTable() {
                   const outBits = evaluatedRows.get(key);
                   const isActive = key === currentInputKey;
                   return (
-                    <tr key={isActive ? `${i}-flash-${flashCounter}` : i} className={isActive ? 'row-active row-flash' : ''}>
+                    <tr
+                      key={isActive ? `${i}-flash-${flashCounter}` : i}
+                      className={isActive ? 'row-active row-flash' : ''}
+                      style={{ cursor: isActive ? 'default' : 'pointer' }}
+                      onClick={() => { if (!isActive) localStepSelect(row.inputBits, row.memBits); }}
+                    >
                       <td
                         className="row-play-btn"
                         style={{
@@ -424,8 +499,8 @@ export function DataTable() {
                           border: 'none', background: 'transparent',
                           fontSize: 9, textAlign: 'center',
                         }}
-                        onClick={() => { if (!isActive) activateScRow(row.inputBits, row.memBits); }}
-                        title={isActive ? 'Current row' : 'Load this input/memory combination'}
+                        onClick={() => { if (!isActive) localStepSelect(row.inputBits, row.memBits); }}
+                        title={isActive ? 'Selected row' : 'Select this row'}
                       >
                         ▶
                       </td>
@@ -472,7 +547,7 @@ export function DataTable() {
                   const outBits = evaluatedRows.get(key);
                   const isActive = key === currentInputKey;
                   return (
-                    <tr key={i} className={isActive ? 'row-active' : ''}>
+                    <tr key={i} className={isActive ? 'row-active' : ''} style={{ cursor: isActive ? 'default' : 'pointer' }} onClick={() => { if (!isActive) localStepSelect(inBits); }}>
                       {playBtn(inBits, isActive)}
                       {inBits.map((b, j) => (
                         <td key={`i${j}`} className={b === 1 ? 'val-1' : ''}>
@@ -506,7 +581,7 @@ export function DataTable() {
                   const key = inputKey(row.inputBits);
                   const isActive = key === currentInputKey;
                   return (
-                    <tr key={i} className={isActive ? 'row-active' : ''}>
+                    <tr key={i} className={isActive ? 'row-active' : ''} style={{ cursor: isActive ? 'default' : 'pointer' }} onClick={() => { if (!isActive) localStepSelect(row.inputBits); }}>
                       {playBtn(row.inputBits, isActive)}
                       {row.inputBits.map((b, j) => (
                         <td key={`i${j}`} className={b === 1 ? 'val-1' : ''}>
@@ -528,6 +603,68 @@ export function DataTable() {
               Set input values on the canvas, then click Run to add a row.
             </div>
           ) : null}
+
+          {/* Local I/O Run/Step/Reset controls */}
+          {localOpen && (isCC || isSC) && inputs.length > 0 && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '5px 0 3px', paddingLeft: 18 }}>
+              <button
+                className="toggle-btn"
+                onClick={() => {
+                  if (localIsRunning) return;
+                  if (!localStepActive) return;
+                  setLocalIsRunning(true);
+                  const interval = setInterval(() => {
+                    const more = useStore.getState().localStepOne();
+                    if (!more) {
+                      clearInterval(interval);
+                      setLocalIsRunning(false);
+                    }
+                  }, Math.round(300 / runSpeed));
+                }}
+                disabled={localIsRunning || !localStepActive}
+                style={{
+                  fontSize: 11, padding: '2px 12px',
+                  color: localIsRunning || !localStepActive ? '#ccc' : '#555',
+                  cursor: localIsRunning || !localStepActive ? 'default' : 'pointer',
+                }}
+              >
+                Run
+              </button>
+              <button
+                className="toggle-btn"
+                onClick={() => {
+                  if (!localIsRunning && localStepActive) localStepOne();
+                }}
+                disabled={localIsRunning || !localStepActive}
+                style={{
+                  fontSize: 11, padding: '2px 12px',
+                  color: localIsRunning || !localStepActive ? '#ccc' : '#555',
+                  cursor: localIsRunning || !localStepActive ? 'default' : 'pointer',
+                }}
+              >
+                Step
+              </button>
+              <button
+                className="toggle-btn"
+                onClick={() => {
+                  if (!localIsRunning && localStepActive) localStepReset();
+                }}
+                disabled={localIsRunning || !localStepActive}
+                style={{
+                  fontSize: 11, padding: '2px 12px',
+                  color: localIsRunning || !localStepActive ? '#ccc' : '#555',
+                  cursor: localIsRunning || !localStepActive ? 'default' : 'pointer',
+                }}
+              >
+                Reset
+              </button>
+              {localStepActive && (
+                <span style={{ marginLeft: 'auto', fontSize: 10, color: '#888', fontFamily: 'monospace', paddingRight: 6 }}>
+                  {Math.min(localStepIndex, localStepSorted.length)}/{localStepSorted.length}
+                </span>
+              )}
+            </div>
+          )}
         </div>
 
         {/* ── Global I/O Table (SC only) ─────────────────────── */}
@@ -760,7 +897,7 @@ export function DataTable() {
                   }}
                   title="Run speed"
                 >
-                  {runSpeed}x
+                  {runSpeed >= 1 ? Math.round(runSpeed) : runSpeed.toFixed(2).replace(/0+$/, '').replace(/\.$/, '')}x
                 </span>
                 {showSpeedSlider && (
                   <div
@@ -784,13 +921,15 @@ export function DataTable() {
                         value={Math.log2(runSpeed)}
                         onChange={(e) => {
                           const exp = parseFloat(e.target.value);
-                          setRunSpeed(Math.round(Math.pow(2, exp) * 10) / 10);
+                          const speed = Math.pow(2, exp);
+                          setRunSpeed(speed);
+                          saveUiPref('runSpeed', speed);
                         }}
                         style={{ width: 80 }}
                       />
                       <span style={{ fontSize: 10, color: '#aaa' }}>fast</span>
                     </div>
-                    <div style={{ fontSize: 11, textAlign: 'center', marginTop: 2, fontFamily: 'monospace' }}>{runSpeed}x</div>
+                    <div style={{ fontSize: 11, textAlign: 'center', marginTop: 2, fontFamily: 'monospace' }}>{runSpeed >= 1 ? Math.round(runSpeed) : runSpeed.toFixed(2).replace(/0+$/, '').replace(/\.$/, '')}x</div>
                   </div>
                 )}
               </div>
@@ -836,21 +975,14 @@ export function DataTable() {
               </tbody>
             </table>
             <div style={{ display: 'flex', justifyContent: 'center', padding: '4px 0 2px' }}>
-              <div className="toggle-group">
-                <button
-                  className={`toggle-btn ${repSystem === 'tally' ? 'active' : ''}`}
-                  onClick={() => setRepSystem('tally')}
-                  style={{ fontSize: 10, padding: '2px 6px' }}
-                >
-                  Tally
-                </button>
-                <button
-                  className={`toggle-btn ${repSystem === 'binary' ? 'active' : ''}`}
-                  onClick={() => setRepSystem('binary')}
-                  style={{ fontSize: 10, padding: '2px 6px' }}
-                >
-                  Binary
-                </button>
+              <div className="slide-selector">
+                <div
+                  className="slide-selector-thumb"
+                  style={{ left: repSystem === 'tally' ? '0%' : repSystem === 'binary' ? '33.33%' : '66.66%', width: '33.33%' }}
+                />
+                <button className={`slide-selector-opt ${repSystem === 'tally' ? 'active' : ''}`} onClick={() => setRepSystem('tally')}>Tally</button>
+                <button className={`slide-selector-opt ${repSystem === 'binary' ? 'active' : ''}`} onClick={() => setRepSystem('binary')}>Binary</button>
+                <button className={`slide-selector-opt ${repSystem === 'plus' ? 'active' : ''}`} onClick={() => setRepSystem('plus')}>+</button>
               </div>
             </div>
           </>}

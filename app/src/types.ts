@@ -1,7 +1,7 @@
 // Core types for the Making Minds platform
 
 export type BuildMode = 'CC' | 'SC' | 'FSM' | 'turbot' | 'TM';
-export type RepSystem = 'tally' | 'binary';
+export type RepSystem = 'tally' | 'binary' | 'plus';
 export type DisplayMode = 'IO' | 'AV';
 export type Scope = 'local' | 'global';
 

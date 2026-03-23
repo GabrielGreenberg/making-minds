@@ -2576,7 +2576,20 @@ export function CircuitCanvas() {
         if (targetEl?.getAttribute?.('data-input-toggle') != null) {
           if (comp.type === 'INPUT') {
             // Cycle: undefined → 0 → 1 → 0 → 1...
-            state.setInputValue(comp.id, comp.value == null ? 0 : comp.value === 0 ? 1 : 0);
+            const newVal = comp.value == null ? 0 : comp.value === 0 ? 1 : 0;
+            state.setInputValue(comp.id, newVal);
+            // Auto-select the matching row in the I/O table
+            setTimeout(() => {
+              const s = useStore.getState();
+              const inputs = s.components
+                .filter((c) => c.type === 'INPUT')
+                .sort((a, b) => parseInt(a.label.replace('IN', '')) - parseInt(b.label.replace('IN', '')));
+              const mems = s.components.filter((c) => c.type === 'MEM')
+                .sort((a, b) => parseInt(a.label.replace('M', '')) - parseInt(b.label.replace('M', '')));
+              const inBits = inputs.map((c) => c.value ?? 0);
+              const memBits = mems.length > 0 ? mems.map((c) => c.storedValue ?? 0) : undefined;
+              s.localStepSelect(inBits, memBits);
+            }, 0);
           }
           return;
         }

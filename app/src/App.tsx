@@ -1,4 +1,3 @@
-import { MenuBar } from './components/MenuBar';
 import { TabBar } from './components/TabBar';
 import { ComponentLibrary } from './components/ComponentLibrary';
 import { CircuitCanvas } from './components/CircuitCanvas';
@@ -9,7 +8,6 @@ import { SequentialTimeline } from './components/SequentialTimeline';
 function App() {
   return (
     <div className="app">
-      <MenuBar />
       <TabBar />
       <SimulationToolbar />
       <div className="main-area">

@@ -180,6 +180,17 @@ interface AppState {
   addTableRow: () => void;
   clearTableRows: () => void;
 
+  // Local I/O stepping (per-component propagation)
+  localStepIndex: number;
+  localStepSorted: string[];
+  localStepPortValues: Record<string, number | undefined>;
+  localStepActive: boolean;
+  localStepSelectedKey: string | null;
+  localStepSelect: (inBits: number[], memBits?: number[]) => void;
+  localStepOne: () => boolean;
+  localStepReset: () => void;
+  localStepClear: () => void;
+
   // Sequential circuit state
   scTimeStep: number; // current time step (starts at 1)
   scHistory: { t: number; inputBits: number[]; outputBits: number[]; memValues: number[] }[];
@@ -598,7 +609,9 @@ export const useStore = create<AppState>()((set, get) => ({
         c.id === id ? { ...c, value, inputValues: [value] } : c
       ),
     }));
-    setTimeout(() => get().evaluateCircuit(), 0);
+    if (!get().localStepActive) {
+      setTimeout(() => get().evaluateCircuit(), 0);
+    }
   },
 
   setMemStoredValue: (id, value) => {
@@ -607,7 +620,9 @@ export const useStore = create<AppState>()((set, get) => ({
         c.id === id ? { ...c, storedValue: value } : c
       ),
     }));
-    setTimeout(() => get().evaluateCircuit(), 0);
+    if (!get().localStepActive) {
+      setTimeout(() => get().evaluateCircuit(), 0);
+    }
   },
 
   addWire: (sourceCompId, sourcePortId, targetCompId, targetPortId) => {
@@ -1709,6 +1724,322 @@ export const useStore = create<AppState>()((set, get) => ({
     set({ tableRows: [] });
   },
 
+  // Local I/O stepping state
+  localStepIndex: 0,
+  localStepSorted: [],
+  localStepPortValues: {},
+  localStepActive: false,
+  localStepSelectedKey: null,
+
+  localStepSelect: (inBits, memBits) => {
+    const state = get();
+    const { components, wires } = state;
+
+    const inputs = components
+      .filter((c) => c.type === 'INPUT')
+      .sort((a, b) => parseInt(a.label.replace('IN', '')) - parseInt(b.label.replace('IN', '')));
+    const mems = components
+      .filter((c) => c.type === 'MEM')
+      .sort((a, b) => parseInt(a.label.replace('M', '')) - parseInt(b.label.replace('M', '')));
+
+    // Set INPUT values and MEM stored values; clear everything else
+    const updatedComps = components.map((c) => {
+      if (c.type === 'INPUT') {
+        const idx = inputs.indexOf(c);
+        const val = idx >= 0 && idx < inBits.length ? inBits[idx] : 0;
+        return { ...c, value: val, inputValues: [val] };
+      }
+      if (c.type === 'MEM') {
+        const idx = mems.indexOf(c);
+        const val = memBits && idx >= 0 && idx < memBits.length ? memBits[idx] : (c.storedValue ?? 0);
+        return { ...c, storedValue: val, value: undefined };
+      }
+      return { ...c, value: undefined };
+    });
+
+    // Initialize port values with INPUT and MEM outputs only
+    const portValues: Record<string, number | undefined> = {};
+    for (const comp of updatedComps) {
+      if (comp.type === 'INPUT') {
+        portValues[`${comp.id}:out`] = comp.value;
+      } else if (comp.type === 'MEM') {
+        portValues[`${comp.id}:${getMemOutputPortId(comp)}`] = comp.storedValue ?? 0;
+      }
+    }
+
+    // Build wire evaluation order: follow topological sort of components.
+    // For each component in topo order, collect its outgoing wires.
+    // Inputs come first, then memories, then gates — all via topo sort.
+    const sorted = topologicalSort(updatedComps, wires);
+    // Separate: INPUTs first, then MEMs, then the rest (topo order handles the rest)
+    const inputComps = sorted.filter((c) => c.type === 'INPUT');
+    const memComps = sorted.filter((c) => c.type === 'MEM');
+    const otherComps = sorted.filter((c) => c.type !== 'INPUT' && c.type !== 'MEM');
+    const orderedSources = [...inputComps, ...memComps, ...otherComps];
+
+    const wireOrder: string[] = [];
+    const addedWires = new Set<string>();
+    for (const comp of orderedSources) {
+      // Collect all outgoing wires from this component
+      const outgoing: Wire[] = [];
+      for (const w of wires) {
+        if (w.sourceComponentId === comp.id && !addedWires.has(w.id)) {
+          // Skip feedback wires into MEM min ports
+          if (comp.type !== 'INPUT' && comp.type !== 'MEM') {
+            const targetComp = updatedComps.find((c) => c.id === w.targetComponentId);
+            if (targetComp?.type === 'MEM' && w.targetPortId === getMemInputPortId(targetComp)) continue;
+          }
+          outgoing.push(w);
+        }
+      }
+      // Sort fan-out wires: last in render order (highest z-index, on top) first,
+      // so the visually closest wire gets annotated first, working backwards.
+      if (outgoing.length > 1) {
+        outgoing.reverse();
+      }
+      for (const w of outgoing) {
+        wireOrder.push(w.id);
+        addedWires.add(w.id);
+      }
+    }
+
+    // Add OUTPUT component evaluations as separate steps after their input wires
+    const outputComps = updatedComps
+      .filter((c) => c.type === 'OUTPUT')
+      .sort((a, b) => parseInt(a.label.replace('OUT', '')) - parseInt(b.label.replace('OUT', '')));
+    for (const out of outputComps) {
+      wireOrder.push(`comp:${out.id}`);
+    }
+
+    // Build selected key
+    const keyBits = [...inBits, ...(memBits || mems.map((m) => m.storedValue ?? 0))];
+    const selectedKey = keyBits.join(',');
+
+    // Clear all wire values
+    const clearedWires = wires.map((w) => ({ ...w, value: -1 }));
+
+    set({
+      components: updatedComps,
+      wires: clearedWires,
+      wireValues: new Map(),
+      localStepIndex: 0,
+      localStepSorted: wireOrder, // now stores wire IDs, not component IDs
+      localStepPortValues: portValues,
+      localStepActive: true,
+      localStepSelectedKey: selectedKey,
+    });
+  },
+
+  localStepOne: () => {
+    const state = get();
+    const { localStepIndex, localStepSorted, localStepPortValues, components, wires } = state;
+
+    if (localStepIndex >= localStepSorted.length) {
+      return false;
+    }
+
+    // Check if this step is a component evaluation (comp:ID) or a wire annotation
+    const stepId = localStepSorted[localStepIndex];
+
+    if (stepId.startsWith('comp:')) {
+      // Evaluate the component directly (e.g. OUTPUT)
+      const compId = stepId.slice(5);
+      const comp = components.find((c) => c.id === compId);
+      if (!comp) {
+        set({ localStepIndex: localStepIndex + 1 });
+        return localStepIndex + 1 < localStepSorted.length;
+      }
+      const newPortValues = { ...localStepPortValues };
+      const inputPorts = comp.ports.filter((p) => p.side === 'left');
+      const inputVals: (number | undefined)[] = [];
+      let hasUndefined = false;
+      for (const port of inputPorts) {
+        const inWire = wires.find((w) => w.targetComponentId === comp.id && w.targetPortId === port.id);
+        if (inWire) {
+          const val = state.wireValues.has(inWire.id) ? state.wireValues.get(inWire.id) : undefined;
+          inputVals.push(val != null ? val : undefined);
+          if (val == null) hasUndefined = true;
+        } else {
+          inputVals.push(undefined);
+          hasUndefined = true;
+        }
+      }
+      if (comp.type === 'OUTPUT') {
+        newPortValues[`${comp.id}:in`] = hasUndefined ? undefined : (inputVals[0] ?? 0);
+      } else if (!hasUndefined) {
+        const outputs = evaluateGate(comp.type, inputVals as number[], comp);
+        const outputPorts = comp.ports.filter((p) => p.side === 'right');
+        for (let i = 0; i < outputPorts.length; i++) {
+          newPortValues[`${comp.id}:${outputPorts[i].id}`] = outputs[i] ?? 0;
+        }
+      }
+      const updatedComps = components.map((c) => {
+        if (c.id !== compId) return c;
+        if (c.type === 'OUTPUT') return { ...c, value: newPortValues[`${c.id}:in`] };
+        const outputPort = c.ports.find((p) => p.side === 'right');
+        if (outputPort) return { ...c, value: newPortValues[`${c.id}:${outputPort.id}`] };
+        return c;
+      });
+
+      // When an OUTPUT is evaluated, upsert the I/O table row with current output values
+      const updates: Record<string, unknown> = { components: updatedComps, localStepIndex: localStepIndex + 1, localStepPortValues: newPortValues };
+      if (comp.type === 'OUTPUT') {
+        const hasMem = components.some((c) => c.type === 'MEM');
+        const sortedInputs = components
+          .filter((c) => c.type === 'INPUT')
+          .sort((a, b) => parseInt(a.label.replace('IN', '')) - parseInt(b.label.replace('IN', '')));
+        const sortedOutputs = components
+          .filter((c) => c.type === 'OUTPUT')
+          .sort((a, b) => parseInt(a.label.replace('OUT', '')) - parseInt(b.label.replace('OUT', '')));
+        const sortedMems = components
+          .filter((c) => c.type === 'MEM')
+          .sort((a, b) => parseInt(a.label.replace('M', '')) - parseInt(b.label.replace('M', '')));
+
+        const inputBits = sortedInputs.map((c) => c.value ?? 0);
+        const outputBits = sortedOutputs.map((c) => {
+          const val = newPortValues[`${c.id}:in`];
+          return val !== undefined ? val : 0;
+        });
+        const memBitsVal = hasMem ? sortedMems.map((c) => c.storedValue ?? 0) : undefined;
+
+        const localKey = [...inputBits, ...(memBitsVal || [])].join(',');
+        const existingRows = state.tableRows;
+        const localIdx = existingRows.findIndex((r) => [...r.inputBits, ...(r.memBits || [])].join(',') === localKey);
+        let newTableRows = existingRows;
+        if (localIdx >= 0) {
+          newTableRows = [...existingRows];
+          newTableRows[localIdx] = { inputBits, memBits: memBitsVal, outputBits };
+        } else {
+          newTableRows = [...existingRows, { inputBits, memBits: memBitsVal, outputBits }];
+        }
+        updates.tableRows = newTableRows;
+      }
+      set(updates);
+      return localStepIndex + 1 < localStepSorted.length;
+    }
+
+    // Annotate one wire
+    const wireId = stepId;
+    const wire = wires.find((w) => w.id === wireId);
+    if (!wire) {
+      set({ localStepIndex: localStepIndex + 1 });
+      return localStepIndex + 1 < localStepSorted.length;
+    }
+
+    const newPortValues = { ...localStepPortValues };
+    const newWireValues = new Map(state.wireValues);
+
+    // Get the source port value and annotate this wire
+    const srcVal = newPortValues[`${wire.sourceComponentId}:${wire.sourcePortId}`];
+    if (srcVal != null) {
+      newWireValues.set(wire.id, srcVal);
+    }
+
+    // Update the wire object
+    const updatedWires = wires.map((w) =>
+      w.id === wireId ? { ...w, value: srcVal != null ? srcVal : -1 } : w
+    );
+
+    // Check if the target component now has ALL its input wires annotated.
+    // If so, evaluate it so its output port values are available for downstream wires.
+    const targetComp = components.find((c) => c.id === wire.targetComponentId);
+    let updatedComps = components;
+
+    if (targetComp && targetComp.type !== 'INPUT' && targetComp.type !== 'MEM' && targetComp.type !== 'OUTPUT') {
+      const inputPorts = targetComp.ports.filter((p) => p.side === 'left');
+      const allInputsReady = inputPorts.every((port) => {
+        const inWire = wires.find((w) => w.targetComponentId === targetComp.id && w.targetPortId === port.id);
+        if (!inWire) return true; // unconnected = ready (undefined)
+        // Check if this wire has been annotated (either just now or previously)
+        return inWire.id === wireId ? srcVal != null : newWireValues.has(inWire.id);
+      });
+
+      if (allInputsReady) {
+        // Gather input values and evaluate
+        const inputVals: (number | undefined)[] = [];
+        let hasUndefined = false;
+        for (const port of inputPorts) {
+          const inWire = wires.find((w) => w.targetComponentId === targetComp.id && w.targetPortId === port.id);
+          if (inWire) {
+            const val = inWire.id === wireId ? srcVal : newWireValues.get(inWire.id);
+            inputVals.push(val != null ? val : undefined);
+            if (val == null) hasUndefined = true;
+          } else {
+            inputVals.push(undefined);
+            hasUndefined = true;
+          }
+        }
+
+        if (hasUndefined) {
+          const outputPorts = targetComp.ports.filter((p) => p.side === 'right');
+          for (const op of outputPorts) {
+            newPortValues[`${targetComp.id}:${op.id}`] = undefined;
+          }
+        } else {
+          const outputs = evaluateGate(targetComp.type, inputVals as number[], targetComp);
+          const outputPorts = targetComp.ports.filter((p) => p.side === 'right');
+          for (let i = 0; i < outputPorts.length; i++) {
+            newPortValues[`${targetComp.id}:${outputPorts[i].id}`] = outputs[i] ?? 0;
+          }
+        }
+
+        // Update the target component's displayed value
+        updatedComps = components.map((c) => {
+          if (c.id !== targetComp.id) return c;
+          if (c.type === 'OUTPUT') {
+            return { ...c, value: newPortValues[`${c.id}:in`] };
+          }
+          const outputPort = c.ports.find((p) => p.side === 'right');
+          if (outputPort) {
+            return { ...c, value: newPortValues[`${c.id}:${outputPort.id}`] };
+          }
+          return c;
+        });
+      }
+    }
+
+    set({
+      components: updatedComps,
+      wires: updatedWires,
+      wireValues: newWireValues,
+      localStepIndex: localStepIndex + 1,
+      localStepPortValues: newPortValues,
+    });
+    return localStepIndex + 1 < localStepSorted.length;
+  },
+
+  localStepReset: () => {
+    const state = get();
+    if (!state.localStepActive) return;
+    const inputs = state.components
+      .filter((c) => c.type === 'INPUT')
+      .sort((a, b) => parseInt(a.label.replace('IN', '')) - parseInt(b.label.replace('IN', '')));
+    const mems = state.components
+      .filter((c) => c.type === 'MEM')
+      .sort((a, b) => parseInt(a.label.replace('M', '')) - parseInt(b.label.replace('M', '')));
+    const inBits = inputs.map((c) => c.value ?? 0);
+    const memBits = mems.length > 0 ? mems.map((c) => c.storedValue ?? 0) : undefined;
+
+    // Remove the output for this row from tableRows
+    const key = [...inBits, ...(memBits || [])].join(',');
+    const newTableRows = state.tableRows.filter((r) =>
+      [...r.inputBits, ...(r.memBits || [])].join(',') !== key
+    );
+    set({ tableRows: newTableRows });
+
+    get().localStepSelect(inBits, memBits);
+  },
+
+  localStepClear: () => {
+    set({
+      localStepActive: false,
+      localStepSelectedKey: null,
+      localStepIndex: 0,
+      localStepSorted: [],
+      localStepPortValues: {},
+    });
+  },
+
   // Sequential circuit state
   scTimeStep: 1,
   scHistory: [],
@@ -1743,9 +2074,10 @@ export const useStore = create<AppState>()((set, get) => ({
     const updatedComps = components.map((c) => {
       if (c.type === 'INPUT') {
         const inputIdx = inputs.indexOf(c);
-        if (inputIdx >= 0 && scInputSequence[inputIdx] && scInputSequence[inputIdx][tIdx] !== undefined) {
-          return { ...c, value: scInputSequence[inputIdx][tIdx], inputValues: [scInputSequence[inputIdx][tIdx]] };
-        }
+        const seqVal = (inputIdx >= 0 && scInputSequence[inputIdx] && scInputSequence[inputIdx][tIdx] !== undefined)
+          ? scInputSequence[inputIdx][tIdx]
+          : (c.value ?? 0);
+        return { ...c, value: seqVal, inputValues: [seqVal] };
       }
       return c;
     });
