@@ -109,9 +109,13 @@ export function SimulationToolbar() {
   const autoSaveStatus = useStore((s) => s.autoSaveStatus);
   const hasSelection = useStore((s) => s.selectedIds.length > 0);
 
+  const isFSM = buildMode === 'FSM';
+
   const handleReset = () => {
     const state = useStore.getState();
-    if (isSC) {
+    if (isFSM) {
+      state.fsmReset();
+    } else if (isSC) {
       state.scReset();
     } else {
       for (const comp of state.components) {

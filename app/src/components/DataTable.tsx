@@ -194,10 +194,24 @@ export function DataTable() {
     }
   }, [loadScGlobalSequence]);
 
+  // FSM state
+  const fsmCurrentStateId = useStore((s) => s.fsmCurrentStateId);
+  const fsmInputSequence = useStore((s) => s.fsmInputSequence);
+  const fsmTimeStep = useStore((s) => s.fsmTimeStep);
+  const fsmHistory = useStore((s) => s.fsmHistory);
+  const fsmHalted = useStore((s) => s.fsmHalted);
+  const fsmRunning = useStore((s) => s.fsmRunning);
+  const setFsmInputSequence = useStore((s) => s.setFsmInputSequence);
+  const fsmStep = useStore((s) => s.fsmStep);
+  const fsmRun = useStore((s) => s.fsmRun);
+  const fsmReset = useStore((s) => s.fsmReset);
+  const fsmGlobalReset = useStore((s) => s.fsmGlobalReset);
+
   const wires = useStore((s) => s.wires);
   const hasMem = components.some((c) => c.type === 'MEM');
   const isCC = buildMode === 'CC';
   const isSC = buildMode === 'SC' || hasMem;
+  const isFSM = buildMode === 'FSM';
 
   // ── Resizable panel ──
   // Auto-expand panel width based on longest global sequence
@@ -387,6 +401,208 @@ export function DataTable() {
     }
     return tableRows;
   }, [isSC, isCC, scGlobalSequences, scHistory, activeGlobalIndex, ccInputRows, evaluatedRows, tableRows, localStepActive, localStepSelectedKey, localStepIndex, localStepSorted.length]);
+
+  // ── FSM Mode ──────────────────────────────────────────────────────
+  if (isFSM) {
+    const states = components
+      .filter((c) => c.type === 'STATE')
+      .sort((a, b) => {
+        const subDigits = '₀₁₂₃₄₅₆₇₈₉';
+        const numA = parseInt(a.label.replace('S', '').split('').map(ch => { const idx = subDigits.indexOf(ch); return idx >= 0 ? String(idx) : ch; }).join('')) || 0;
+        const numB = parseInt(b.label.replace('S', '').split('').map(ch => { const idx = subDigits.indexOf(ch); return idx >= 0 ? String(idx) : ch; }).join('')) || 0;
+        return numA - numB;
+      });
+
+    // Build state table from transitions (wires between STATE components)
+    const stateTableRows: { state: string; input: number; output: number; nextState: string }[] = [];
+    for (const state of states) {
+      for (const inputBit of [0, 1]) {
+        const transition = wires.find((w) => {
+          if (w.sourceComponentId !== state.id) return false;
+          if (!w.transitionLabel) return false;
+          const parts = w.transitionLabel.split(':');
+          return parts.length === 2 && parseInt(parts[0]) === inputBit;
+        });
+        if (transition) {
+          const parts = transition.transitionLabel!.split(':');
+          const targetComp = components.find((c) => c.id === transition.targetComponentId);
+          stateTableRows.push({
+            state: state.label,
+            input: inputBit,
+            output: parseInt(parts[1]) || 0,
+            nextState: targetComp?.label || '?',
+          });
+        } else {
+          stateTableRows.push({
+            state: state.label,
+            input: inputBit,
+            output: -1, // no transition
+            nextState: 'HALT',
+          });
+        }
+      }
+    }
+
+    const fsmInputStr = fsmInputSequence.map(String).join('');
+    const fsmOutputStr = fsmHistory.map((h) => String(h.output)).join('');
+
+    return (
+      <div className="data-table-panel" style={{ width: Math.max(panelWidth, autoMinWidth) }}>
+        <div className="panel-resize-handle" onPointerDown={onResizePointerDown} />
+        <div className="data-table-panel-inner">
+        <div className="data-table-content">
+          {/* State Table */}
+          <div className="table-section">
+            <div className="table-section-label">
+              <span>State Table</span>
+            </div>
+            {states.length === 0 ? (
+              <div style={{ padding: 12, color: '#999', fontSize: 12 }}>
+                Add states and transitions to see the state table.
+              </div>
+            ) : (
+              <table className="data-table">
+                <thead>
+                  <tr>
+                    <th>CURRENT STATE</th>
+                    <th>IN</th>
+                    <th>OUT</th>
+                    <th>NEXT STATE</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {stateTableRows.map((row, i) => {
+                    const isCurrentRow = fsmCurrentStateId !== null &&
+                      row.state === components.find((c) => c.id === fsmCurrentStateId)?.label;
+                    return (
+                      <tr key={i} className={isCurrentRow ? 'row-active' : ''}>
+                        <td><span className="mono-value">{row.state}</span></td>
+                        <td className={row.input === 1 ? 'val-1' : ''}><span className="mono-value">{row.input}</span></td>
+                        <td className={row.output === 1 ? 'val-1' : ''}><span className="mono-value">{row.output === -1 ? '–' : row.output}</span></td>
+                        <td><span className="mono-value" style={row.nextState === 'HALT' ? { color: '#999', fontStyle: 'italic' } : undefined}>{row.nextState}</span></td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            )}
+          </div>
+
+          {/* Input / Output Sequence */}
+          <div className="table-section">
+            <div className="table-section-label" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <span>Input / Output</span>
+              <button
+                className="toggle-btn"
+                onClick={fsmGlobalReset}
+                style={{ fontSize: 11, padding: '2px 8px', color: fsmInputSequence.length > 0 ? '#555' : '#ccc' }}
+              >
+                clear
+              </button>
+            </div>
+            <table className="data-table">
+              <thead>
+                <tr>
+                  <th>IN</th>
+                  <th>OUT</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td style={{ overflow: 'hidden' }}>
+                    <div style={{ display: 'flex', alignItems: 'center' }}>
+                      <input
+                        type="text"
+                        className="sc-input-field"
+                        value={fsmInputStr}
+                        placeholder="01101..."
+                        onChange={(e) => {
+                          const raw = e.target.value.replace(/[^01]/g, '');
+                          setFsmInputSequence(raw.split('').map(Number));
+                        }}
+                        style={{
+                          flex: 1, minWidth: 0, textAlign: 'left', border: 'none',
+                          background: 'transparent', color: 'inherit',
+                          fontSize: 11, fontFamily: 'monospace',
+                        }}
+                      />
+                      <svg width="12" height="10" viewBox="0 0 12 10" style={{ flexShrink: 0, marginLeft: 2 }}>
+                        <line x1="1" y1="5" x2="10" y2="5" stroke="#888" strokeWidth="1.2" />
+                        <polyline points="7,2 10,5 7,8" fill="none" stroke="#888" strokeWidth="1.2" strokeLinejoin="round" strokeLinecap="round" />
+                      </svg>
+                    </div>
+                  </td>
+                  <td style={{ overflow: 'hidden' }}>
+                    <div style={{ display: 'flex', alignItems: 'center' }}>
+                      <span className="mono-value" style={{ flex: 1, fontSize: 11, textAlign: 'left' }}>{fsmOutputStr || ''}</span>
+                      <svg width="12" height="10" viewBox="0 0 12 10" style={{ flexShrink: 0, marginLeft: 2 }}>
+                        <line x1="1" y1="5" x2="10" y2="5" stroke="#888" strokeWidth="1.2" />
+                        <polyline points="7,2 10,5 7,8" fill="none" stroke="#888" strokeWidth="1.2" strokeLinejoin="round" strokeLinecap="round" />
+                      </svg>
+                    </div>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+            {/* Controls */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '5px 0 3px', paddingLeft: 4 }}>
+              <button className="action-btn" onClick={() => { if (!fsmRunning) fsmRun(); }} disabled={fsmRunning || fsmHalted || fsmTimeStep > fsmInputSequence.length}>
+                Run
+              </button>
+              <button className="action-btn" onClick={() => { if (!fsmRunning) fsmStep(); }} disabled={fsmRunning || fsmHalted || fsmTimeStep > fsmInputSequence.length}>
+                Step
+              </button>
+              <button className="action-btn" onClick={fsmReset} disabled={fsmRunning}>
+                Reset
+              </button>
+              {fsmHalted && (
+                <span style={{ fontSize: 10, color: '#e53935', fontWeight: 600, marginLeft: 'auto', paddingRight: 6 }}>
+                  HALTED
+                </span>
+              )}
+              {!fsmHalted && fsmTimeStep > 1 && (
+                <span style={{ marginLeft: 'auto', fontSize: 10, color: '#888', fontFamily: 'monospace', paddingRight: 6 }}>
+                  t={fsmTimeStep - 1}
+                </span>
+              )}
+            </div>
+          </div>
+
+          {/* History */}
+          {fsmHistory.length > 0 && (
+            <div className="table-section">
+              <div className="table-section-label">
+                <span>History</span>
+              </div>
+              <table className="data-table" style={{ fontSize: 11 }}>
+                <thead>
+                  <tr>
+                    <th>t</th>
+                    <th>STATE</th>
+                    <th>IN</th>
+                    <th>OUT</th>
+                    <th>NEXT</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {fsmHistory.map((h, i) => (
+                    <tr key={i}>
+                      <td><span className="mono-value">{h.t}</span></td>
+                      <td><span className="mono-value">{h.stateLabel}</span></td>
+                      <td className={h.input === 1 ? 'val-1' : ''}><span className="mono-value">{h.input}</span></td>
+                      <td className={h.output === 1 ? 'val-1' : ''}><span className="mono-value">{h.output}</span></td>
+                      <td><span className="mono-value">{h.nextStateLabel}</span></td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+        </div>
+      </div>
+    );
+  }
 
   if (inputs.length === 0) {
     return (

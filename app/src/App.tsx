@@ -4,8 +4,11 @@ import { CircuitCanvas } from './components/CircuitCanvas';
 import { DataTable } from './components/DataTable';
 import { SimulationToolbar } from './components/SimulationPanel';
 import { SequentialTimeline } from './components/SequentialTimeline';
+import { useStore } from './store';
 
 function App() {
+  const buildMode = useStore((s) => s.buildMode);
+
   return (
     <div className="app">
       <TabBar />
@@ -14,7 +17,7 @@ function App() {
         <ComponentLibrary />
         <div className="canvas-and-timeline">
           <CircuitCanvas />
-          <SequentialTimeline />
+          {buildMode !== 'FSM' && <SequentialTimeline />}
         </div>
         <DataTable />
       </div>

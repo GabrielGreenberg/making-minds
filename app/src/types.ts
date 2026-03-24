@@ -21,7 +21,8 @@ export type ComponentType =
   | 'XOR'
   | 'HA'
   | 'MEM'
-  | 'BOXED';
+  | 'BOXED'
+  | 'STATE';
 
 export interface CircuitComponent {
   id: string;
@@ -48,6 +49,8 @@ export interface Wire {
   value: number; // 0 or 1
   waypoints?: { x: number; y: number }[];
   manualSegments?: WireManualSegment[]; // manual overrides for wire segments
+  // FSM transition fields
+  transitionLabel?: string; // e.g., "0:1" meaning "input 0, output 1"
 }
 
 // Manual wire segment override: which segment index was moved to what position
@@ -177,6 +180,11 @@ export function getPortsForType(type: ComponentType): Port[] {
         { id: 'mout', label: 'M_OUT', side: 'left', index: 0 },
         { id: 'min', label: 'M_IN', side: 'right', index: 0 },
       ];
+    case 'STATE':
+      return [
+        { id: 'in', label: '', side: 'left', index: 0 },
+        { id: 'out', label: '', side: 'right', index: 0 },
+      ];
     default:
       return [];
   }
@@ -188,6 +196,31 @@ export const COMP_WIDTH = 75;
 export const COMP_HEIGHT = 70;
 export const PORT_RADIUS = 3.5;
 export const INPUT_OUTPUT_SIZE = 40;
+export const STATE_RADIUS = 30;
+export const STATE_SIZE = STATE_RADIUS * 2; // bounding box for a state circle
+
+// ─── FSM helpers ────────────────────────────────────────────────────
+
+/** Convert a number to Unicode subscript characters */
+export function toSubscript(n: number): string {
+  const subscripts = '₀₁₂₃₄₅₆₇₈₉';
+  return String(n).split('').map(d => subscripts[parseInt(d)] || d).join('');
+}
+
+/** FSM history entry for one time step */
+export interface FsmHistoryEntry {
+  t: number;
+  stateLabel: string;
+  input: number;
+  output: number;
+  nextStateLabel: string;
+}
+
+/** Parsed transition: extracted from a transition label like "0:1" */
+export interface ParsedTransition {
+  input: number;
+  output: number;
+}
 
 // ─── MEM direction helpers ──────────────────────────────────────────
 // Port IDs are fixed (mout=left, min=right) for backward compatibility.

@@ -7,13 +7,19 @@ interface LibraryEntry {
   section: string;
 }
 
-const LIBRARY_ITEMS: LibraryEntry[] = [
+const CC_LIBRARY_ITEMS: LibraryEntry[] = [
   { type: 'INPUT', label: 'Input', section: 'I/O' },
   { type: 'OUTPUT', label: 'Output', section: 'I/O' },
   { type: 'AND', label: 'AND', section: 'Gates' },
   { type: 'OR', label: 'OR', section: 'Gates' },
   { type: 'NOT', label: 'NOT', section: 'Gates' },
   { type: 'MEM', label: '', section: 'Memory' },
+  { type: 'TEXT', label: 'Text', section: 'Annotate' },
+  { type: 'COMMENT', label: 'Comment', section: 'Annotate' },
+];
+
+const FSM_LIBRARY_ITEMS: LibraryEntry[] = [
+  { type: 'STATE', label: 'State', section: 'States' },
   { type: 'TEXT', label: 'Text', section: 'Annotate' },
   { type: 'COMMENT', label: 'Comment', section: 'Annotate' },
 ];
@@ -92,6 +98,13 @@ function PaletteIcon({ type }: { type: string }) {
           <line x1="19" y1="20" x2="34" y2="20" stroke="#333" strokeWidth="1" />
         </svg>
       );
+    case 'STATE':
+      return (
+        <svg viewBox="-2 -2 60 44">
+          <circle cx="28" cy="20" r="16" fill="none" stroke="#333" strokeWidth={SW} />
+          <text x="28" y="24" textAnchor="middle" fontSize="11" fontWeight="600" fill="#333">S</text>
+        </svg>
+      );
     default:
       return (
         <svg viewBox="-2 -2 60 44">
@@ -116,7 +129,7 @@ export function ComponentLibrary() {
   const selectedTool = useStore((s) => s.selectedTool);
   const setSelectedTool = useStore((s) => s.setSelectedTool);
 
-  const items = LIBRARY_ITEMS;
+  const items = buildMode === 'FSM' ? FSM_LIBRARY_ITEMS : CC_LIBRARY_ITEMS;
 
   // Group by section
   const sections = new Map<string, LibraryEntry[]>();
@@ -161,8 +174,8 @@ export function ComponentLibrary() {
         </div>
       ))}
 
-      {/* New Box tool */}
-      <div>
+      {/* New Box tool (hidden in FSM mode) */}
+      {buildMode !== 'FSM' && <div>
         <div className="library-section-title">Boxing</div>
         <div
           className={`library-item${selectedTool === 'NEW_BOX' ? ' library-item-selected' : ''}`}
@@ -186,7 +199,7 @@ export function ComponentLibrary() {
           </svg>
           <span className="library-item-label">New Box</span>
         </div>
-      </div>
+      </div>}
 
       {/* Box Menu — confirmed boxes available across all tabs */}
       {confirmedBoxLibrary.length > 0 && (

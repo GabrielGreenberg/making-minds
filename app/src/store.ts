@@ -14,6 +14,7 @@ import type {
   BoxDefinition,
   ProblemSetData,
   WireManualSegment,
+  FsmHistoryEntry,
 } from './types';
 import {
   getPortsForType,
@@ -21,6 +22,7 @@ import {
   getMemInputPortId,
   isMemSinkPort,
   GRID_SIZE,
+  toSubscript,
 } from './types';
 
 interface HistoryEntry {
@@ -239,6 +241,24 @@ interface AppState {
   };
   setBoxDrawingPhase: (phase: 'idle' | 'drawing' | 'adjusting') => void;
   setDraftBox: (box: BoxDefinition | null) => void;
+
+  // FSM state
+  nextStateNum: number;
+  fsmCurrentStateId: string | null; // component ID of active state
+  fsmInputSequence: number[]; // flat array of input bits
+  fsmTimeStep: number; // starts at 1
+  fsmHistory: import('./types').FsmHistoryEntry[];
+  fsmRunning: boolean;
+  fsmRunIntervalId: number | null;
+  fsmHalted: boolean;
+  setTransitionLabel: (wireId: string, label: string) => void;
+  fsmStep: () => void;
+  fsmRun: () => void;
+  fsmPause: () => void;
+  fsmReset: () => void;
+  fsmGlobalReset: () => void;
+  setFsmInputBit: (index: number, value: number) => void;
+  setFsmInputSequence: (seq: number[]) => void;
 }
 
 function snapToGrid(val: number): number {
@@ -512,6 +532,7 @@ export const useStore = create<AppState>()((set, get) => ({
   nextInputNum: 1,
   nextOutputNum: 1,
   nextMemNum: 1,
+  nextStateNum: 0,
 
   addComponent: (type, x, y) => {
     const state = get();
@@ -536,6 +557,19 @@ export const useStore = create<AppState>()((set, get) => ({
       const usedNums = existing.map((c) => parseInt(c.label.replace('M', '')) || 0);
       const next = usedNums.length === 0 ? 1 : Math.max(...usedNums) + 1;
       label = `M${next}`;
+    } else if (type === 'STATE') {
+      const existing = state.components.filter((c) => c.type === 'STATE');
+      // Extract numeric part from labels like "S₀", "S₁"
+      const subDigits = '₀₁₂₃₄₅₆₇₈₉';
+      const usedNums = existing.map((c) => {
+        const numStr = c.label.replace('S', '').split('').map(ch => {
+          const idx = subDigits.indexOf(ch);
+          return idx >= 0 ? String(idx) : ch;
+        }).join('');
+        return parseInt(numStr) || 0;
+      });
+      const next = usedNums.length === 0 ? 0 : Math.max(...usedNums) + 1;
+      label = `S${toSubscript(next)}`;
     } else {
       label = type;
     }
@@ -634,15 +668,22 @@ export const useStore = create<AppState>()((set, get) => ({
 
   addWire: (sourceCompId, sourcePortId, targetCompId, targetPortId) => {
     const state = get();
+    const sourceComp = state.components.find((c) => c.id === sourceCompId);
+    const targetComp = state.components.find((c) => c.id === targetCompId);
+    const isFsmTransition = sourceComp?.type === 'STATE' && targetComp?.type === 'STATE';
+
     // Check: no merging - target port must not already have an incoming wire
-    const existing = state.wires.find(
-      (w) =>
-        w.targetComponentId === targetCompId &&
-        w.targetPortId === targetPortId
-    );
-    if (existing) {
-      console.warn('Merge violation: input port already has a connection');
-      return;
+    // (Except in FSM mode where STATE ports accept multiple transitions)
+    if (!isFsmTransition) {
+      const existing = state.wires.find(
+        (w) =>
+          w.targetComponentId === targetCompId &&
+          w.targetPortId === targetPortId
+      );
+      if (existing) {
+        console.warn('Merge violation: input port already has a connection');
+        return;
+      }
     }
     state.pushHistory();
     const wire: Wire = {
@@ -652,6 +693,7 @@ export const useStore = create<AppState>()((set, get) => ({
       targetComponentId: targetCompId,
       targetPortId: targetPortId,
       value: 0,
+      transitionLabel: isFsmTransition ? '0:0' : undefined,
     };
     const newWires = [...state.wires, wire];
     const resolvedComponents = resolveMemDirections(state.components, newWires);
@@ -2524,6 +2566,163 @@ export const useStore = create<AppState>()((set, get) => ({
     set((state) => ({
       boxDrawing: { ...state.boxDrawing, draftBox: box },
     }));
+  },
+
+  // ─── FSM state ──────────────────────────────────────────────────
+  fsmCurrentStateId: null,
+  fsmInputSequence: [],
+  fsmTimeStep: 1,
+  fsmHistory: [],
+  fsmRunning: false,
+  fsmRunIntervalId: null,
+  fsmHalted: false,
+
+  setTransitionLabel: (wireId, label) => {
+    const state = get();
+    state.pushHistory();
+    set({
+      wires: state.wires.map((w) =>
+        w.id === wireId ? { ...w, transitionLabel: label } : w
+      ),
+    });
+  },
+
+  setFsmInputBit: (index, value) => {
+    set((state) => {
+      const seq = [...state.fsmInputSequence];
+      while (seq.length <= index) seq.push(0);
+      seq[index] = value;
+      return { fsmInputSequence: seq };
+    });
+  },
+
+  setFsmInputSequence: (seq) => {
+    set({ fsmInputSequence: seq });
+  },
+
+  fsmStep: () => {
+    const state = get();
+    const { components, wires, fsmTimeStep, fsmHistory, fsmInputSequence, fsmHalted } = state;
+    if (fsmHalted) return;
+
+    const states = components
+      .filter((c) => c.type === 'STATE')
+      .sort((a, b) => {
+        // Sort by label number (S₀ < S₁ < S₂...)
+        const subDigits = '₀₁₂₃₄₅₆₇₈₉';
+        const numA = parseInt(a.label.replace('S', '').split('').map(ch => { const idx = subDigits.indexOf(ch); return idx >= 0 ? String(idx) : ch; }).join('')) || 0;
+        const numB = parseInt(b.label.replace('S', '').split('').map(ch => { const idx = subDigits.indexOf(ch); return idx >= 0 ? String(idx) : ch; }).join('')) || 0;
+        return numA - numB;
+      });
+
+    if (states.length === 0) return;
+
+    // Determine current state
+    let currentStateId = state.fsmCurrentStateId;
+    if (!currentStateId) {
+      // Start at S₀ (first state by label order)
+      currentStateId = states[0].id;
+    }
+
+    const currentState = components.find((c) => c.id === currentStateId);
+    if (!currentState) return;
+
+    // Get current input bit
+    const tIdx = fsmTimeStep - 1;
+    if (tIdx >= fsmInputSequence.length) return; // no more input
+    const inputBit = fsmInputSequence[tIdx];
+
+    // Find matching transition: wire from current state with matching input
+    const transitions = wires.filter((w) => w.sourceComponentId === currentStateId);
+    let matchedTransition: Wire | null = null;
+    for (const t of transitions) {
+      if (!t.transitionLabel) continue;
+      const parts = t.transitionLabel.split(':');
+      if (parts.length !== 2) continue;
+      const tInput = parseInt(parts[0]);
+      if (tInput === inputBit) {
+        matchedTransition = t;
+        break;
+      }
+    }
+
+    if (!matchedTransition) {
+      // No transition — machine halts
+      set({ fsmHalted: true });
+      return;
+    }
+
+    const parts = matchedTransition.transitionLabel!.split(':');
+    const output = parseInt(parts[1]) || 0;
+    const nextStateId = matchedTransition.targetComponentId;
+    const nextState = components.find((c) => c.id === nextStateId);
+
+    const entry: FsmHistoryEntry = {
+      t: fsmTimeStep,
+      stateLabel: currentState.label,
+      input: inputBit,
+      output,
+      nextStateLabel: nextState?.label || '?',
+    };
+
+    set({
+      fsmCurrentStateId: nextStateId,
+      fsmTimeStep: fsmTimeStep + 1,
+      fsmHistory: [...fsmHistory, entry],
+    });
+  },
+
+  fsmRun: () => {
+    const state = get();
+    if (state.fsmRunning) return;
+    const intervalId = window.setInterval(() => {
+      const s = get();
+      if (s.fsmHalted || s.fsmTimeStep > s.fsmInputSequence.length) {
+        s.fsmPause();
+        return;
+      }
+      s.fsmStep();
+    }, 300);
+    set({ fsmRunning: true, fsmRunIntervalId: intervalId });
+  },
+
+  fsmPause: () => {
+    const state = get();
+    if (state.fsmRunIntervalId !== null) {
+      window.clearInterval(state.fsmRunIntervalId);
+    }
+    set({ fsmRunning: false, fsmRunIntervalId: null });
+  },
+
+  fsmReset: () => {
+    const state = get();
+    if (state.fsmRunIntervalId !== null) {
+      window.clearInterval(state.fsmRunIntervalId);
+    }
+    set({
+      fsmCurrentStateId: null,
+      fsmTimeStep: 1,
+      fsmHistory: [],
+      fsmRunning: false,
+      fsmRunIntervalId: null,
+      fsmHalted: false,
+    });
+  },
+
+  fsmGlobalReset: () => {
+    const state = get();
+    if (state.fsmRunIntervalId !== null) {
+      window.clearInterval(state.fsmRunIntervalId);
+    }
+    set({
+      fsmCurrentStateId: null,
+      fsmInputSequence: [],
+      fsmTimeStep: 1,
+      fsmHistory: [],
+      fsmRunning: false,
+      fsmRunIntervalId: null,
+      fsmHalted: false,
+    });
   },
 }));
 

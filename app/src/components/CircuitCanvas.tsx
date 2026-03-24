@@ -14,6 +14,8 @@ import {
   COMP_HEIGHT,
   PORT_RADIUS,
   INPUT_OUTPUT_SIZE,
+  STATE_RADIUS,
+  STATE_SIZE,
   isMemSourcePort,
   isMemSinkPort,
 } from '../types';
@@ -35,6 +37,9 @@ function getCompDimensions(comp: CircuitComponent): { w: number; h: number } {
   if (comp.type === 'MEM') {
     return { w: 50, h: 50 };
   }
+  if (comp.type === 'STATE') {
+    return { w: STATE_SIZE, h: STATE_SIZE };
+  }
   return { w: COMP_WIDTH, h: COMP_HEIGHT };
 }
 
@@ -45,6 +50,14 @@ function getPortPositionLocal(
 ): { x: number; y: number } {
   const port = comp.ports.find((p) => p.id === portId);
   if (!port) return { x: comp.x, y: comp.y };
+
+  // STATE: ports at left and right edge of circle
+  if (comp.type === 'STATE') {
+    const cx = comp.x + STATE_RADIUS;
+    const cy = comp.y + STATE_RADIUS;
+    if (portId === 'in') return { x: cx - STATE_RADIUS, y: cy };
+    return { x: cx + STATE_RADIUS, y: cy };
+  }
 
   const { w, h } = getCompDimensions(comp);
   const portsOnSide = comp.ports.filter((p) => p.side === port.side);
@@ -712,6 +725,49 @@ function CircuitComponentView({
           </g>
         );
 
+      case 'STATE': {
+        const fsmCurrentStateId = useStore.getState().fsmCurrentStateId;
+        const isCurrentState = fsmCurrentStateId === comp.id;
+        // Initial state: S₀ (label contains ₀)
+        const isInitialState = comp.label.includes('₀');
+        return (
+          <g>
+            {/* Outer circle for initial state (double circle) */}
+            {isInitialState && (
+              <circle
+                cx={cx}
+                cy={cy}
+                r={STATE_RADIUS + 4}
+                fill="none"
+                stroke={isSelected ? '#2a7fff' : '#333'}
+                strokeWidth={1.5}
+              />
+            )}
+            {/* Main state circle */}
+            <circle
+              cx={cx}
+              cy={cy}
+              r={STATE_RADIUS}
+              fill={isCurrentState ? '#e8f5e9' : isSelected ? '#e3f2fd' : 'white'}
+              stroke={isCurrentState ? '#4caf50' : isSelected ? '#2a7fff' : '#333'}
+              strokeWidth={isSelected ? 2.5 : 2}
+            />
+            {/* State label */}
+            <text
+              x={cx}
+              y={cy}
+              textAnchor="middle"
+              dominantBaseline="central"
+              fontSize="16"
+              fontWeight="700"
+              fill="#333"
+            >
+              {comp.label}
+            </text>
+          </g>
+        );
+      }
+
       default:
         return (
           <rect
@@ -729,6 +785,7 @@ function CircuitComponentView({
   };
 
   const renderPorts = () => {
+    const isState = comp.type === 'STATE';
     return comp.ports.map((port) => {
       const pos = getPortPositionLocal(comp, port.id);
       return (
@@ -736,22 +793,25 @@ function CircuitComponentView({
           <circle
             cx={pos.x}
             cy={pos.y}
-            r={PORT_HIT_RADIUS}
+            r={isState ? STATE_RADIUS : PORT_HIT_RADIUS}
             fill="transparent"
             className="port-hit-area"
             data-port-compid={comp.id}
             data-port-id={port.id}
             data-port-side={port.side}
           />
-          <circle
-            cx={pos.x}
-            cy={pos.y}
-            r={PORT_RADIUS}
-            fill="#bbb"
-            stroke="#000"
-            strokeWidth={1}
-            pointerEvents="none"
-          />
+          {/* Hide visible port dots for STATE components */}
+          {!isState && (
+            <circle
+              cx={pos.x}
+              cy={pos.y}
+              r={PORT_RADIUS}
+              fill="#bbb"
+              stroke="#000"
+              strokeWidth={1}
+              pointerEvents="none"
+            />
+          )}
         </g>
       );
     });
@@ -924,6 +984,149 @@ function WireView({
           </>
         );
       })()}
+    </g>
+  );
+}
+
+// ─── FSM Transition View ─────────────────────────────────────────
+
+function FsmTransitionView({
+  wire,
+  pathD,
+  labelPos,
+  isSelected,
+}: {
+  wire: Wire;
+  pathD: string;
+  labelPos: { x: number; y: number };
+  isSelected: boolean;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [editValue, setEditValue] = useState('');
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  const label = wire.transitionLabel || '?:?';
+  const color = isSelected ? '#2a7fff' : '#333';
+
+  useEffect(() => {
+    if (editing && inputRef.current) {
+      inputRef.current.focus();
+      inputRef.current.select();
+    }
+  }, [editing]);
+
+  const handleDoubleClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setEditValue(label);
+    setEditing(true);
+  };
+
+  const commitEdit = () => {
+    setEditing(false);
+    const trimmed = editValue.trim();
+    if (trimmed && /^\d:\d$/.test(trimmed)) {
+      useStore.getState().setTransitionLabel(wire.id, trimmed);
+    }
+  };
+
+  return (
+    <g data-wire-id={wire.id} style={{ cursor: 'pointer' }}>
+      {/* SVG arrowhead marker definition */}
+      <defs>
+        <marker
+          id={`arrow-${wire.id}`}
+          markerWidth="10"
+          markerHeight="8"
+          refX="9"
+          refY="4"
+          orient="auto"
+          markerUnits="strokeWidth"
+        >
+          <path d="M0,0 L10,4 L0,8 L2,4 Z" fill={color} />
+        </marker>
+      </defs>
+      {/* Invisible wider path for easier clicking */}
+      <path
+        d={pathD}
+        fill="none"
+        stroke="transparent"
+        strokeWidth={14}
+        data-wire-id={wire.id}
+      />
+      {/* Visible curve with arrowhead */}
+      <path
+        d={pathD}
+        fill="none"
+        stroke={color}
+        strokeWidth={isSelected ? 2.5 : 2}
+        strokeLinecap="round"
+        markerEnd={`url(#arrow-${wire.id})`}
+        pointerEvents="none"
+      />
+      {/* Transition label */}
+      {!editing && (
+        <g onDoubleClick={handleDoubleClick}>
+          {/* Label background for readability */}
+          <rect
+            x={labelPos.x - 14}
+            y={labelPos.y - 10}
+            width={28}
+            height={16}
+            rx={3}
+            fill="white"
+            fillOpacity={0.9}
+            stroke="#ddd"
+            strokeWidth={0.5}
+            style={{ cursor: 'pointer' }}
+          />
+          <text
+            x={labelPos.x}
+            y={labelPos.y}
+            textAnchor="middle"
+            dominantBaseline="central"
+            fontSize="12"
+            fontFamily="'SF Mono', 'Fira Code', monospace"
+            fontWeight="600"
+            fill={color}
+            style={{ cursor: 'pointer' }}
+          >
+            {label}
+          </text>
+        </g>
+      )}
+      {editing && (
+        <foreignObject
+          x={labelPos.x - 24}
+          y={labelPos.y - 12}
+          width={48}
+          height={24}
+        >
+          <input
+            ref={inputRef}
+            type="text"
+            value={editValue}
+            onChange={(e) => setEditValue(e.target.value)}
+            onBlur={commitEdit}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') commitEdit();
+              if (e.key === 'Escape') setEditing(false);
+            }}
+            style={{
+              width: '100%',
+              height: '100%',
+              fontSize: 12,
+              fontFamily: "'SF Mono', 'Fira Code', monospace",
+              fontWeight: 600,
+              textAlign: 'center',
+              border: '1px solid #2a7fff',
+              borderRadius: 3,
+              outline: 'none',
+              padding: 0,
+              background: 'white',
+            }}
+          />
+        </foreignObject>
+      )}
     </g>
   );
 }
@@ -1493,6 +1696,8 @@ export function CircuitCanvas() {
   // ─── Validation warnings ───────────────────────────────────────
   const warnings = useMemo(() => {
     const w: string[] = [];
+    // Skip circuit validation warnings in FSM mode — loops and merged links are expected
+    if (buildMode === 'FSM') return w;
     {
       const compMap = new Map(components.map((c) => [c.id, c]));
       const visited = new Set<string>();
@@ -2138,15 +2343,21 @@ export function CircuitCanvas() {
         let bestDist = Infinity;
         let bestComp: typeof state.components[0] | null = null;
         let bestPort: typeof state.components[0]['ports'][0] | null = null;
+        const sourceComp = state.components.find((c) => c.id === drag.sourceCompId);
+        const isFsmSource = sourceComp?.type === 'STATE';
         for (const comp of state.components) {
-          if (comp.id === drag.sourceCompId) continue;
+          // For FSM: allow self-loops (same source and target STATE)
+          if (comp.id === drag.sourceCompId && !isFsmSource) continue;
           for (const port of comp.ports) {
+            // For STATE: 'in' port is the target (or same comp for self-loop)
             // For MEM, target port depends on direction; for all others, left-side ports are targets
-            const isTargetPort = comp.type === 'MEM' ? isMemSinkPort(comp, port.id) : port.side === 'left';
+            const isTargetPort = comp.type === 'STATE' ? port.id === 'in'
+              : comp.type === 'MEM' ? isMemSinkPort(comp, port.id) : port.side === 'left';
             if (!isTargetPort) continue;
             const portPos = getPortPosition(comp, port.id);
             const dist = Math.hypot(canvasPos.x - portPos.x, canvasPos.y - portPos.y);
-            if (dist < PORT_HIT_RADIUS + 10 && dist < bestDist) {
+            const hitRadius = comp.type === 'STATE' ? STATE_RADIUS + 10 : PORT_HIT_RADIUS + 10;
+            if (dist < hitRadius && dist < bestDist) {
               bestDist = dist;
               bestComp = comp;
               bestPort = port;
@@ -2156,12 +2367,13 @@ export function CircuitCanvas() {
         // Second pass: overshoot — cursor is inside component bounds, find closest target port
         if (!bestComp) {
           for (const comp of state.components) {
-            if (comp.id === drag.sourceCompId) continue;
+            if (comp.id === drag.sourceCompId && !isFsmSource) continue;
             const { w, h } = getCompDimensions(comp);
             if (canvasPos.x >= comp.x && canvasPos.x <= comp.x + w &&
                 canvasPos.y >= comp.y && canvasPos.y <= comp.y + h) {
               for (const port of comp.ports) {
-                const isTargetPort = comp.type === 'MEM' ? isMemSinkPort(comp, port.id) : port.side === 'left';
+                const isTargetPort = comp.type === 'STATE' ? port.id === 'in'
+                  : comp.type === 'MEM' ? isMemSinkPort(comp, port.id) : port.side === 'left';
                 if (!isTargetPort) continue;
                 const portPos = getPortPosition(comp, port.id);
                 const dist = Math.hypot(canvasPos.x - portPos.x, canvasPos.y - portPos.y);
@@ -2484,9 +2696,11 @@ export function CircuitCanvas() {
         const comp = state.components.find((c) => c.id === hit.compId);
         if (!comp) return;
 
-        // For MEM blocks, source port depends on direction; for all others, right-side ports are sources
+        // For MEM blocks, source port depends on direction; for STATE, 'out' port is source; for all others, right-side ports are sources
       const isSourcePort = comp.type === 'MEM'
         ? isMemSourcePort(comp, hit.portId)
+        : comp.type === 'STATE'
+        ? hit.portId === 'out'
         : hit.portSide === 'right';
       if (isSourcePort) {
           const pos = getPortPosition(comp, hit.portId);
@@ -2831,11 +3045,111 @@ export function CircuitCanvas() {
 
   // ─── Compute all wire paths (A* grid-based router) ──────────────
   const wireData = useMemo(() => {
-    const data = new Map<string, { pathD: string; points: { x: number; y: number }[]; basePoints: { x: number; y: number }[]; crossings: { x: number; y: number }[]; from: { x: number; y: number }; to: { x: number; y: number } }>();
+    const data = new Map<string, { pathD: string; points: { x: number; y: number }[]; basePoints: { x: number; y: number }[]; crossings: { x: number; y: number }[]; from: { x: number; y: number }; to: { x: number; y: number }; isFsmTransition?: boolean; labelPos?: { x: number; y: number } }>();
 
-    // Build routing inputs
-    const routeInputs: WireRouteInput[] = [];
+    // Separate FSM transitions from regular wires
+    const fsmWires: Wire[] = [];
+    const regularWires: Wire[] = [];
     for (const wire of wires) {
+      const sourceComp = components.find((c) => c.id === wire.sourceComponentId);
+      const targetComp = components.find((c) => c.id === wire.targetComponentId);
+      if (sourceComp?.type === 'STATE' && targetComp?.type === 'STATE') {
+        fsmWires.push(wire);
+      } else {
+        regularWires.push(wire);
+      }
+    }
+
+    // ── FSM transition curves ──────────────────────────────────────
+    // Count transitions between each pair for offset calculation
+    const pairCounts = new Map<string, number>();
+    const pairIndices = new Map<string, number>();
+    for (const wire of fsmWires) {
+      // Use sorted pair key so A→B and B→A share the same count
+      const pairKey = [wire.sourceComponentId, wire.targetComponentId].sort().join('|');
+      pairCounts.set(pairKey, (pairCounts.get(pairKey) || 0) + 1);
+    }
+    for (const wire of fsmWires) {
+      const pairKey = [wire.sourceComponentId, wire.targetComponentId].sort().join('|');
+      const idx = pairIndices.get(pairKey) || 0;
+      pairIndices.set(pairKey, idx + 1);
+
+      const sourceComp = components.find((c) => c.id === wire.sourceComponentId)!;
+      const targetComp = components.find((c) => c.id === wire.targetComponentId)!;
+      const sCx = sourceComp.x + STATE_RADIUS;
+      const sCy = sourceComp.y + STATE_RADIUS;
+      const tCx = targetComp.x + STATE_RADIUS;
+      const tCy = targetComp.y + STATE_RADIUS;
+
+      const isSelfLoop = wire.sourceComponentId === wire.targetComponentId;
+      const totalBetween = pairCounts.get(pairKey) || 1;
+
+      let pathD: string;
+      let labelPos: { x: number; y: number };
+
+      if (isSelfLoop) {
+        // Self-loop: draw a loop arc above the state
+        const loopR = 22;
+        const topY = sCy - STATE_RADIUS;
+        const cpX1 = sCx - loopR - 10;
+        const cpY = topY - loopR * 2;
+        const cpX2 = sCx + loopR + 10;
+        // Start and end at top-left and top-right of circle
+        const startAngle = -Math.PI * 0.75;
+        const endAngle = -Math.PI * 0.25;
+        const startX = sCx + STATE_RADIUS * Math.cos(startAngle);
+        const startY = sCy + STATE_RADIUS * Math.sin(startAngle);
+        const endX = sCx + STATE_RADIUS * Math.cos(endAngle);
+        const endY = sCy + STATE_RADIUS * Math.sin(endAngle);
+        pathD = `M${startX},${startY} C${cpX1},${cpY} ${cpX2},${cpY} ${endX},${endY}`;
+        labelPos = { x: sCx, y: cpY + 4 };
+      } else {
+        // Curve between two different states
+        const angle = Math.atan2(tCy - sCy, tCx - sCx);
+        // Start/end at circle edges
+        const startX = sCx + STATE_RADIUS * Math.cos(angle);
+        const startY = sCy + STATE_RADIUS * Math.sin(angle);
+        const endX = tCx - STATE_RADIUS * Math.cos(angle);
+        const endY = tCy - STATE_RADIUS * Math.sin(angle);
+
+        // Control point offset perpendicular to the line between states
+        const dist = Math.hypot(tCx - sCx, tCy - sCy);
+        const perpX = -(tCy - sCy) / dist;
+        const perpY = (tCx - sCx) / dist;
+        // Offset based on index among transitions between this pair
+        const baseOffset = totalBetween > 1 ? 40 : 25;
+        // Alternate sides for multiple transitions
+        const isReverse = wire.sourceComponentId > wire.targetComponentId;
+        const sign = (idx % 2 === 0 ? 1 : -1) * (isReverse ? -1 : 1);
+        const offset = sign * (baseOffset + Math.floor(idx / 2) * 30);
+
+        const midX = (startX + endX) / 2 + perpX * offset;
+        const midY = (startY + endY) / 2 + perpY * offset;
+        pathD = `M${startX},${startY} Q${midX},${midY} ${endX},${endY}`;
+        // Label position: midpoint of quadratic bezier
+        labelPos = {
+          x: (startX + 2 * midX + endX) / 4,
+          y: (startY + 2 * midY + endY) / 4,
+        };
+      }
+
+      const from = { x: sCx, y: sCy };
+      const to = { x: tCx, y: tCy };
+      data.set(wire.id, {
+        pathD,
+        points: [from, to],
+        basePoints: [from, to],
+        crossings: [],
+        from,
+        to,
+        isFsmTransition: true,
+        labelPos,
+      });
+    }
+
+    // ── Regular wires (A* routing) ─────────────────────────────────
+    const routeInputs: WireRouteInput[] = [];
+    for (const wire of regularWires) {
       const sourceComp = components.find((c) => c.id === wire.sourceComponentId);
       const targetComp = components.find((c) => c.id === wire.targetComponentId);
       if (!sourceComp || !targetComp) continue;
@@ -2859,14 +3173,14 @@ export function CircuitCanvas() {
       });
     }
 
-    // Route all wires using A* pathfinder with continuity bias
+    // Route regular wires using A* pathfinder with continuity bias
     const results = routeAllWires(routeInputs, components, previousPathsRef.current);
 
     // Build next previousPaths for continuity bias on next render
     const nextPreviousPaths = new Map<string, { x: number; y: number }[]>();
 
     for (const result of results) {
-      const wire = wires.find(w => w.id === result.wireId);
+      const wire = regularWires.find(w => w.id === result.wireId);
       if (!wire) continue;
       const input = routeInputs.find(r => r.wireId === result.wireId);
       if (!input) continue;
@@ -3099,6 +3413,17 @@ export function CircuitCanvas() {
           {wires.map((wire) => {
             const wd = wireData.get(wire.id);
             if (!wd) return null;
+            if (wd.isFsmTransition) {
+              return (
+                <FsmTransitionView
+                  key={wire.id}
+                  wire={wire}
+                  pathD={wd.pathD}
+                  labelPos={wd.labelPos!}
+                  isSelected={selectedIds.includes(wire.id)}
+                />
+              );
+            }
             return (
               <WireView
                 key={wire.id}
