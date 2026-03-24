@@ -599,7 +599,7 @@ function CircuitComponentView({
         const arrowInset = 12; // distance from block edge to arrow tip
         // Shift the whole arrow+value group when resolved so it stays visually centered
         const groupShift = !dir ? 0 : dir === 'left-to-right' ? 4 : -4;
-        const arrowColor = dir ? '#2a7fff' : '#999';
+        const arrowColor = dir ? '#555' : '#bbb';
         // Determine arrow directions:
         // Undecided: both arrows point outward (← val →)
         // left-to-right: both point right (→ val →)
@@ -632,7 +632,7 @@ function CircuitComponentView({
               height={h}
               rx={8}
               fill={isSelected ? '#e3f2fd' : '#f5f5f5'}
-              stroke={isSelected ? '#2a7fff' : '#aaa'}
+              stroke={isSelected ? '#2a7fff' : '#333'}
               strokeWidth={isSelected ? 2 : 1.5}
             />
             {/* Label above — bold */}
@@ -749,7 +749,7 @@ function CircuitComponentView({
             r={PORT_RADIUS}
             fill="#bbb"
             stroke="#000"
-            strokeWidth={2}
+            strokeWidth={1}
             pointerEvents="none"
           />
         </g>
@@ -877,32 +877,53 @@ function WireView({
           pointerEvents="none"
         />
       ))}
-      {showValues && !isBlankWire && (
-        <>
-          <text
-            x={fromPos.x + 8}
-            y={fromPos.y - 6}
-            fontSize="10"
-            fontFamily="'SF Mono', 'Fira Code', monospace"
-            fontWeight="600"
-            fill={wire.value === 1 ? '#e53935' : '#888'}
-            pointerEvents="none"
-          >
-            {valStr}
-          </text>
-          <text
-            x={toPos.x - 14}
-            y={toPos.y - 6}
-            fontSize="10"
-            fontFamily="'SF Mono', 'Fira Code', monospace"
-            fontWeight="600"
-            fill={wire.value === 1 ? '#e53935' : '#888'}
-            pointerEvents="none"
-          >
-            {valStr}
-          </text>
-        </>
-      )}
+      {showValues && !isBlankWire && (() => {
+        // Determine annotation positions from actual wire stub direction.
+        // pathPoints[0]=port, [1]=stub tip tells us the source direction;
+        // pathPoints[len-1]=port, [len-2]=stub tip tells us the target direction.
+        const valFill = wire.value === 1 ? '#e53935' : '#888';
+        const fontProps = { fontSize: 10, fontFamily: "'SF Mono', 'Fira Code', monospace", fontWeight: 600, fill: valFill, pointerEvents: 'none' as const };
+
+        // Source annotation: placed just past the stub tip
+        const srcDx = pathPoints.length >= 2 ? pathPoints[1].x - pathPoints[0].x : 1;
+        const srcDy = pathPoints.length >= 2 ? pathPoints[1].y - pathPoints[0].y : 0;
+        let srcX: number, srcY: number, srcAnchor: 'start' | 'end';
+        if (Math.abs(srcDx) >= Math.abs(srcDy)) {
+          // Horizontal stub
+          srcX = srcDx >= 0 ? fromPos.x + 8 : fromPos.x - 8;
+          srcY = fromPos.y - 6;
+          srcAnchor = srcDx >= 0 ? 'start' : 'end';
+        } else {
+          // Vertical stub
+          srcX = fromPos.x + 6;
+          srcY = srcDy >= 0 ? fromPos.y + 12 : fromPos.y - 4;
+          srcAnchor = 'start';
+        }
+
+        // Target annotation: placed just past the stub tip (arriving side)
+        const n = pathPoints.length;
+        const tgtDx = n >= 2 ? pathPoints[n - 2].x - pathPoints[n - 1].x : -1;
+        const tgtDy = n >= 2 ? pathPoints[n - 2].y - pathPoints[n - 1].y : 0;
+        let tgtX: number, tgtY: number, tgtAnchor: 'start' | 'end';
+        if (Math.abs(tgtDx) >= Math.abs(tgtDy)) {
+          // Horizontal stub
+          tgtX = tgtDx >= 0 ? toPos.x + 8 : toPos.x - 8;
+          tgtY = toPos.y - 6;
+          tgtAnchor = tgtDx >= 0 ? 'start' : 'end';
+        } else {
+          // Vertical stub
+          tgtX = toPos.x + 6;
+          tgtY = tgtDy >= 0 ? toPos.y + 12 : toPos.y - 4;
+          tgtAnchor = 'start';
+        }
+
+        return (
+          <>
+            <text x={srcX} y={srcY} textAnchor={srcAnchor} {...fontProps}>{valStr}</text>
+            <text x={tgtX} y={tgtY} textAnchor={tgtAnchor} {...fontProps}>{valStr}</text>
+          </>
+        );
+      })()}
     </g>
   );
 }

@@ -43,6 +43,10 @@ interface AppState {
   turboEnabled: boolean;
   setTurboEnabled: (v: boolean) => void;
 
+  // Active task
+  activeTask: 'arithmetic' | 'turbot' | 'navigation' | 'perception';
+  setActiveTask: (t: 'arithmetic' | 'turbot' | 'navigation' | 'perception') => void;
+
   // Table settings
   repSystem: RepSystem;
   displayMode: DisplayMode;
@@ -492,6 +496,9 @@ export const useStore = create<AppState>()((set, get) => ({
 
   turboEnabled: false,
   setTurboEnabled: (v) => set({ turboEnabled: v }),
+
+  activeTask: 'arithmetic',
+  setActiveTask: (t) => set({ activeTask: t }),
 
   repSystem: 'binary',
   displayMode: 'IO',
@@ -1803,7 +1810,22 @@ export const useStore = create<AppState>()((set, get) => ({
       }
     }
 
-    // Add OUTPUT component evaluations as separate steps after their input wires
+    // MEM feedback wires (value going INTO memory) — fill memories before outputs
+    for (const w of wires) {
+      if (!addedWires.has(w.id)) {
+        const targetComp = updatedComps.find((c) => c.id === w.targetComponentId);
+        if (targetComp?.type === 'MEM' && w.targetPortId === getMemInputPortId(targetComp)) {
+          wireOrder.push(w.id);
+          addedWires.add(w.id);
+        }
+      }
+    }
+    // MEM update steps (show value being received)
+    for (const mem of mems) {
+      wireOrder.push(`comp:${mem.id}`);
+    }
+
+    // OUTPUT evaluations come last
     const outputComps = updatedComps
       .filter((c) => c.type === 'OUTPUT')
       .sort((a, b) => parseInt(a.label.replace('OUT', '')) - parseInt(b.label.replace('OUT', '')));
@@ -1866,6 +1888,17 @@ export const useStore = create<AppState>()((set, get) => ({
       }
       if (comp.type === 'OUTPUT') {
         newPortValues[`${comp.id}:in`] = hasUndefined ? undefined : (inputVals[0] ?? 0);
+      } else if (comp.type === 'MEM') {
+        // MEM "evaluation" at end of cycle: read value from the feedback wire
+        // into the MEM input port and record it as the next stored value.
+        const memInputPortId = getMemInputPortId(comp);
+        const feedbackWire = wires.find(
+          (w) => w.targetComponentId === comp.id && w.targetPortId === memInputPortId
+        );
+        const feedbackVal = feedbackWire
+          ? (state.wireValues.get(feedbackWire.id) ?? 0)
+          : 0;
+        newPortValues[`${comp.id}:${memInputPortId}`] = feedbackVal;
       } else if (!hasUndefined) {
         const outputs = evaluateGate(comp.type, inputVals as number[], comp);
         const outputPorts = comp.ports.filter((p) => p.side === 'right');
@@ -1876,6 +1909,12 @@ export const useStore = create<AppState>()((set, get) => ({
       const updatedComps = components.map((c) => {
         if (c.id !== compId) return c;
         if (c.type === 'OUTPUT') return { ...c, value: newPortValues[`${c.id}:in`] };
+        if (c.type === 'MEM') {
+          // Show the incoming value visually on the MEM block
+          const memInputPortId = getMemInputPortId(c);
+          const inVal = newPortValues[`${c.id}:${memInputPortId}`];
+          return { ...c, storedValue: inVal != null ? inVal : (c.storedValue ?? 0) };
+        }
         const outputPort = c.ports.find((p) => p.side === 'right');
         if (outputPort) return { ...c, value: newPortValues[`${c.id}:${outputPort.id}`] };
         return c;

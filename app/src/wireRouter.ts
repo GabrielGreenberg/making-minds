@@ -925,6 +925,13 @@ export function routeAllWires(
         input.targetPos,
       ];
 
+      // Update occupancy with the UNSIMPLIFIED path so that every grid edge
+      // along the route gets marked as occupied. (Simplified paths merge
+      // collinear grid nodes, so their endpoints don't map back to individual
+      // grid edges — leaving occupiedEdges empty and allowing later wires to
+      // overlap.)
+      updateOccupancy(grid, fullPath, occupancy, input.sourcePortKey, input.wireId);
+
       // Simplify path: merge collinear consecutive points so that each
       // straight run (horizontal or vertical) becomes exactly ONE segment.
       // This is critical for manual wire editing — the UI exposes whole
@@ -932,9 +939,6 @@ export function routeAllWires(
       // Without this, the A* grid nodes would fragment a straight run into
       // many tiny segments that are individually useless to drag.
       const dedupedPath = simplifyPath(fullPath);
-
-      // Update occupancy with routed path segments
-      updateOccupancy(grid, dedupedPath, occupancy, input.sourcePortKey, input.wireId);
 
       results[item.index] = { wireId: input.wireId, points: dedupedPath };
     }
@@ -1024,8 +1028,8 @@ export function routeAllWires(
       const fullPath = [
         item.input.sourcePos, srcStub, ...pathPoints, dstStub, item.input.targetPos,
       ];
+      updateOccupancy(grid, fullPath, occupancy, item.input.sourcePortKey, item.input.wireId);
       const dedupedPath = simplifyPath(fullPath);
-      updateOccupancy(grid, dedupedPath, occupancy, item.input.sourcePortKey, item.input.wireId);
       results[item.index] = { wireId: item.input.wireId, points: dedupedPath };
       anyRerouted = true;
     }

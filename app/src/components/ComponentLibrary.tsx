@@ -1,8 +1,8 @@
 import { useStore } from '../store';
-import type { ComponentType, BuildMode } from '../types';
+import type { ComponentType } from '../types';
 
 interface LibraryEntry {
-  type: ComponentType;
+  type: ComponentType | 'TEXT' | 'COMMENT';
   label: string;
   section: string;
 }
@@ -13,20 +13,19 @@ const LIBRARY_ITEMS: LibraryEntry[] = [
   { type: 'AND', label: 'AND', section: 'Gates' },
   { type: 'OR', label: 'OR', section: 'Gates' },
   { type: 'NOT', label: 'NOT', section: 'Gates' },
-  { type: 'MEM', label: 'MEM', section: 'Memory' },
+  { type: 'MEM', label: '', section: 'Memory' },
+  { type: 'TEXT', label: 'Text', section: 'Annotate' },
+  { type: 'COMMENT', label: 'Comment', section: 'Annotate' },
 ];
 
-function GateIcon({ type }: { type: ComponentType }) {
+const SW = '1.5'; // uniform stroke width for all palette icons
+
+function PaletteIcon({ type }: { type: string }) {
   switch (type) {
     case 'AND':
       return (
         <svg viewBox="-2 -2 60 44">
-          <path
-            d="M8,4 L28,4 Q48,4 48,20 Q48,36 28,36 L8,36 Z"
-            fill="none"
-            stroke="#333"
-            strokeWidth="1.5"
-          />
+          <path d="M8,4 L28,4 Q48,4 48,20 Q48,36 28,36 L8,36 Z" fill="none" stroke="#333" strokeWidth={SW} />
           <circle cx="6" cy="14" r="2.5" fill="#555" />
           <circle cx="6" cy="26" r="2.5" fill="#555" />
           <circle cx="50" cy="20" r="2.5" fill="#555" />
@@ -36,12 +35,7 @@ function GateIcon({ type }: { type: ComponentType }) {
     case 'OR':
       return (
         <svg viewBox="-2 -2 60 44">
-          <path
-            d="M8,4 Q18,4 28,4 Q48,4 50,20 Q48,36 28,36 Q18,36 8,36 Q18,20 8,4 Z"
-            fill="none"
-            stroke="#333"
-            strokeWidth="1.5"
-          />
+          <path d="M8,4 Q18,4 28,4 Q48,4 50,20 Q48,36 28,36 Q18,36 8,36 Q18,20 8,4 Z" fill="none" stroke="#333" strokeWidth={SW} />
           <circle cx="10" cy="14" r="2.5" fill="#555" />
           <circle cx="10" cy="26" r="2.5" fill="#555" />
           <circle cx="50" cy="20" r="2.5" fill="#555" />
@@ -51,12 +45,7 @@ function GateIcon({ type }: { type: ComponentType }) {
     case 'NOT':
       return (
         <svg viewBox="-2 -2 60 44">
-          <polygon
-            points="8,4 48,20 8,36"
-            fill="none"
-            stroke="#333"
-            strokeWidth="1.5"
-          />
+          <polygon points="8,4 48,20 8,36" fill="none" stroke="#333" strokeWidth={SW} />
           <circle cx="6" cy="20" r="2.5" fill="#555" />
           <circle cx="50" cy="20" r="2.5" fill="#555" />
           <text x="20" y="24" textAnchor="middle" fontSize="14" fontWeight="700" fill="#333">{'\u00AC'}</text>
@@ -64,50 +53,64 @@ function GateIcon({ type }: { type: ComponentType }) {
       );
     case 'INPUT':
       return (
-        <svg viewBox="0 0 56 40">
-          <rect x="8" y="10" width="28" height="20" rx="2" fill="none" stroke="#333" strokeWidth="2" />
-          <line x1="36" y1="20" x2="48" y2="20" stroke="#333" strokeWidth="2" />
+        <svg viewBox="-2 -2 60 44">
+          <rect x="8" y="8" width="28" height="24" rx="2" fill="none" stroke="#333" strokeWidth={SW} />
+          <line x1="36" y1="20" x2="48" y2="20" stroke="#333" strokeWidth={SW} />
           <circle cx="50" cy="20" r="2.5" fill="#555" />
-          <text x="22" y="24" textAnchor="middle" fontSize="10" fontWeight="500" fill="#333">IN</text>
+          <text x="22" y="25" textAnchor="middle" fontSize="10" fontWeight="500" fill="#333">IN</text>
         </svg>
       );
     case 'OUTPUT':
       return (
-        <svg viewBox="0 0 56 40">
-          <rect x="16" y="10" width="28" height="20" rx="2" fill="none" stroke="#333" strokeWidth="2" />
-          <line x1="6" y1="20" x2="16" y2="20" stroke="#333" strokeWidth="2" />
+        <svg viewBox="-2 -2 60 44">
+          <rect x="16" y="8" width="28" height="24" rx="2" fill="none" stroke="#333" strokeWidth={SW} />
+          <line x1="6" y1="20" x2="16" y2="20" stroke="#333" strokeWidth={SW} />
           <circle cx="6" cy="20" r="2.5" fill="#555" />
-          <text x="30" y="24" textAnchor="middle" fontSize="9" fontWeight="500" fill="#333">OUT</text>
+          <text x="30" y="25" textAnchor="middle" fontSize="9" fontWeight="500" fill="#333">OUT</text>
         </svg>
       );
     case 'MEM':
       return (
-        <svg viewBox="0 0 56 40">
-          <rect x="10" y="6" width="36" height="28" rx="3" fill="none" stroke="#333" strokeWidth="2" />
-          <circle cx="8" cy="20" r="2.5" fill="#555" />
-          <circle cx="48" cy="20" r="2.5" fill="#555" />
+        <svg viewBox="-2 -2 60 44">
+          <rect x="8" y="6" width="40" height="28" rx="3" fill="none" stroke="#333" strokeWidth={SW} />
+          <circle cx="6" cy="20" r="2.5" fill="#555" />
+          <circle cx="50" cy="20" r="2.5" fill="#555" />
           <text x="28" y="24" textAnchor="middle" fontSize="12" fontWeight="600" fill="#333">M</text>
+        </svg>
+      );
+    case 'TEXT':
+      return (
+        <svg viewBox="-2 -2 60 44">
+          <text x="28" y="30" textAnchor="middle" fontSize="28" fontWeight="600" fontFamily="Georgia, serif" fill="#333">T</text>
+        </svg>
+      );
+    case 'COMMENT':
+      return (
+        <svg viewBox="4 0 48 44">
+          <path d="M16,6 L42,6 Q46,6 46,10 L46,24 Q46,28 42,28 L24,28 L18,35 L18,28 L16,28 Q12,28 12,24 L12,10 Q12,6 16,6 Z" fill="none" stroke="#333" strokeWidth={SW} />
+          <line x1="19" y1="14" x2="39" y2="14" stroke="#333" strokeWidth="1" />
+          <line x1="19" y1="20" x2="34" y2="20" stroke="#333" strokeWidth="1" />
         </svg>
       );
     default:
       return (
-        <svg viewBox="0 0 56 40">
-          <rect x="8" y="8" width="40" height="24" rx="3" fill="none" stroke="#333" strokeWidth="2" />
+        <svg viewBox="-2 -2 60 44">
+          <rect x="8" y="8" width="40" height="24" rx="3" fill="none" stroke="#333" strokeWidth={SW} />
           <text x="28" y="24" textAnchor="middle" fontSize="10" fill="#333">{type}</text>
         </svg>
       );
   }
 }
 
-const MACHINE_TYPES: { mode: BuildMode; label: string }[] = [
-  { mode: 'CC', label: 'Circuit' },
-  { mode: 'FSM', label: 'Finite State Machine' },
-  { mode: 'TM', label: 'Turing Machine' },
-];
+const MACHINE_LABELS: Record<string, string> = {
+  CC: 'Logic Circuit',
+  SC: 'Logic Circuit',
+  FSM: 'Finite State Machine',
+  TM: 'Turing Machine',
+};
 
 export function ComponentLibrary() {
   const buildMode = useStore((s) => s.buildMode);
-  const setBuildMode = useStore((s) => s.setBuildMode);
   const boxedLibrary = useStore((s) => s.boxedLibrary);
   const confirmedBoxLibrary = useStore((s) => s.confirmedBoxLibrary);
   const selectedTool = useStore((s) => s.selectedTool);
@@ -130,41 +133,31 @@ export function ComponentLibrary() {
 
   return (
     <div className="component-library">
-      {/* Machine Type Selector */}
-      <div className="machine-type-selector">
-        <select
-          className="machine-type-dropdown"
-          value={buildMode}
-          onChange={(e) => setBuildMode(e.target.value as BuildMode)}
-        >
-          {MACHINE_TYPES.map((mt) => (
-            <option key={mt.mode} value={mt.mode}>{mt.label}</option>
-          ))}
-        </select>
-      </div>
-
-      {/* Component sections */}
-      {Array.from(sections.entries()).map(([section, entries]) => (
+      <div className="library-machine-label">{MACHINE_LABELS[buildMode] || 'Logic Circuit'}</div>
+      {/* Component sections (non-Annotate) */}
+      {Array.from(sections.entries()).filter(([section]) => section !== 'Annotate').map(([section, entries]) => (
         <div key={section}>
           <div className="library-section-title">{section}</div>
-          {entries.map((entry) => (
-            <div
-              key={entry.type}
-              className={`library-item${selectedTool === entry.type ? ' library-item-selected' : ''}`}
-              draggable
-              onDragStart={(e) => handleDragStart(e, entry.type)}
-              onClick={() => {
-                if (selectedTool === entry.type) {
-                  setSelectedTool(null);
-                } else {
-                  setSelectedTool(entry.type);
-                }
-              }}
-            >
-              <GateIcon type={entry.type} />
-              <span className="library-item-label">{entry.label}</span>
-            </div>
-          ))}
+          {entries.map((entry) => {
+            return (
+              <div
+                key={entry.type}
+                className={`library-item${selectedTool === entry.type ? ' library-item-selected' : ''}`}
+                draggable
+                onDragStart={(e) => { handleDragStart(e, entry.type as ComponentType); }}
+                onClick={() => {
+                  if (selectedTool === entry.type) {
+                    setSelectedTool(null);
+                  } else {
+                    setSelectedTool(entry.type as ComponentType | 'TEXT' | 'COMMENT');
+                  }
+                }}
+              >
+                <PaletteIcon type={entry.type} />
+                {entry.label && <span className="library-item-label">{entry.label}</span>}
+              </div>
+            );
+          })}
         </div>
       ))}
 
@@ -262,7 +255,30 @@ export function ComponentLibrary() {
                 e.dataTransfer.setData('boxedName', b.name);
               }}
             >
-              <GateIcon type="BOXED" />
+              <PaletteIcon type="BOXED" />
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Annotate section */}
+      {sections.has('Annotate') && (
+        <div>
+          <div className="library-section-title">Annotate</div>
+          {sections.get('Annotate')!.map((entry) => (
+            <div
+              key={entry.type}
+              className={`library-item${selectedTool === entry.type ? ' library-item-selected' : ''}`}
+              onClick={() => {
+                if (selectedTool === entry.type) {
+                  setSelectedTool(null);
+                } else {
+                  setSelectedTool(entry.type as ComponentType | 'TEXT' | 'COMMENT');
+                }
+              }}
+            >
+              <PaletteIcon type={entry.type} />
+              {entry.label && <span className="library-item-label">{entry.label}</span>}
             </div>
           ))}
         </div>

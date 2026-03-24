@@ -404,21 +404,20 @@ export function DataTable() {
     );
   }
 
-  /** Small selection arrow for a row */
+  /** Red activity dot for the active row, empty for inactive */
   const playBtn = (inBits: number[], isActive: boolean) => (
     <td
       className="row-play-btn"
       style={{
         width: 18, padding: '2px 0',
         cursor: isActive ? 'default' : 'pointer',
-        color: isActive ? 'var(--accent)' : '#aaa',
         border: 'none', background: 'transparent',
-        fontSize: 9, textAlign: 'center',
+        textAlign: 'center', verticalAlign: 'middle',
       }}
       onClick={() => { if (!isActive) localStepSelect(inBits); }}
       title={isActive ? 'Selected row' : 'Select this row'}
     >
-      ▶
+      {isActive && <span style={{ display: 'inline-block', width: 7, height: 7, borderRadius: '50%', background: '#e53935' }} />}
     </td>
   );
 
@@ -435,7 +434,7 @@ export function DataTable() {
           <div className="table-section-label" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 4, cursor: 'pointer' }} onClick={() => setLocalOpen(!localOpen)}>
               <span className="pod-toggle">{localOpen ? '▼' : '▶'}</span>
-              <span>{isSC ? 'Local I/O' : 'Input / Output'}</span>
+              <span>{isSC ? 'Local Input / Output' : 'Input / Output'}</span>
             </div>
             <button
               className="toggle-btn"
@@ -495,14 +494,13 @@ export function DataTable() {
                         style={{
                           width: 18, padding: '2px 0',
                           cursor: isActive ? 'default' : 'pointer',
-                          color: isActive ? 'var(--accent)' : '#aaa',
                           border: 'none', background: 'transparent',
-                          fontSize: 9, textAlign: 'center',
+                          textAlign: 'center', verticalAlign: 'middle',
                         }}
                         onClick={() => { if (!isActive) localStepSelect(row.inputBits, row.memBits); }}
                         title={isActive ? 'Selected row' : 'Select this row'}
                       >
-                        ▶
+                        {isActive && <span style={{ display: 'inline-block', width: 7, height: 7, borderRadius: '50%', background: '#e53935' }} />}
                       </td>
                       {row.inputBits.map((b, j) => (
                         <td key={`i${j}`} className={b === 1 ? 'val-1' : ''}>
@@ -604,11 +602,11 @@ export function DataTable() {
             </div>
           ) : null}
 
-          {/* Local I/O Run/Step/Reset controls */}
+          {/* Local Run/Step/Reset controls */}
           {localOpen && (isCC || isSC) && inputs.length > 0 && (
             <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '5px 0 3px', paddingLeft: 18 }}>
               <button
-                className="toggle-btn"
+                className="action-btn"
                 onClick={() => {
                   if (localIsRunning) return;
                   if (!localStepActive) return;
@@ -622,39 +620,24 @@ export function DataTable() {
                   }, Math.round(300 / runSpeed));
                 }}
                 disabled={localIsRunning || !localStepActive}
-                style={{
-                  fontSize: 11, padding: '2px 12px',
-                  color: localIsRunning || !localStepActive ? '#ccc' : '#555',
-                  cursor: localIsRunning || !localStepActive ? 'default' : 'pointer',
-                }}
               >
                 Run
               </button>
               <button
-                className="toggle-btn"
+                className="action-btn"
                 onClick={() => {
                   if (!localIsRunning && localStepActive) localStepOne();
                 }}
                 disabled={localIsRunning || !localStepActive}
-                style={{
-                  fontSize: 11, padding: '2px 12px',
-                  color: localIsRunning || !localStepActive ? '#ccc' : '#555',
-                  cursor: localIsRunning || !localStepActive ? 'default' : 'pointer',
-                }}
               >
                 Step
               </button>
               <button
-                className="toggle-btn"
+                className="action-btn"
                 onClick={() => {
                   if (!localIsRunning && localStepActive) localStepReset();
                 }}
                 disabled={localIsRunning || !localStepActive}
-                style={{
-                  fontSize: 11, padding: '2px 12px',
-                  color: localIsRunning || !localStepActive ? '#ccc' : '#555',
-                  cursor: localIsRunning || !localStepActive ? 'default' : 'pointer',
-                }}
               >
                 Reset
               </button>
@@ -673,7 +656,7 @@ export function DataTable() {
             <div className="table-section-label" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 4, cursor: 'pointer' }} onClick={() => setGlobalOpen(!globalOpen)}>
                 <span className="pod-toggle">{globalOpen ? '▼' : '▶'}</span>
-                <span>Global I/O</span>
+                <span>Global Input / Output</span>
               </div>
               <button
                 className="toggle-btn"
@@ -726,9 +709,8 @@ export function DataTable() {
                         style={{
                           width: 18, padding: '2px 0',
                           cursor: isRunning ? 'wait' : 'pointer',
-                          color: isActive ? 'var(--accent)' : '#aaa',
                           border: 'none', background: 'transparent',
-                          fontSize: 9, textAlign: 'center',
+                          textAlign: 'center', verticalAlign: 'middle',
                         }}
                         onClick={() => {
                           if (!isRunning && !isActive) {
@@ -738,7 +720,7 @@ export function DataTable() {
                         }}
                         title={isActive ? 'Currently selected' : 'Select this input sequence'}
                       >
-                        ▶
+                        {isActive && <span style={{ display: 'inline-block', width: 7, height: 7, borderRadius: '50%', background: '#e53935' }} />}
                       </td>
                       <td style={{ overflow: 'hidden' }}>
                         <div style={{ display: 'flex', alignItems: 'center' }}>
@@ -839,8 +821,7 @@ export function DataTable() {
                   }}
                   title="Click to add a new input sequence"
                 >
-                  <td style={{ width: 18, padding: '2px 0', border: 'none', background: 'transparent', fontSize: 9, textAlign: 'center', color: '#ccc' }}>
-                    ▶
+                  <td style={{ width: 18, padding: '2px 0', border: 'none', background: 'transparent', textAlign: 'center' }}>
                   </td>
                   <td style={{ textAlign: 'center' }}>
                     <span style={{ color: '#444', fontSize: 14, fontWeight: 500 }}>+</span>
@@ -851,38 +832,23 @@ export function DataTable() {
             </table>
             <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '5px 0 3px', paddingLeft: 18 }}>
               <button
-                className="toggle-btn"
+                className="action-btn"
                 onClick={() => { if (!isRunning) runLoadedSequence(); }}
                 disabled={isRunning}
-                style={{
-                  fontSize: 11, padding: '2px 12px',
-                  color: isRunning ? '#ccc' : '#555',
-                  cursor: isRunning ? 'wait' : 'pointer',
-                }}
               >
                 Run
               </button>
               <button
-                className="toggle-btn"
+                className="action-btn"
                 onClick={() => { if (!isRunning) stepLoadedSequence(); }}
                 disabled={isRunning}
-                style={{
-                  fontSize: 11, padding: '2px 12px',
-                  color: isRunning ? '#ccc' : '#555',
-                  cursor: isRunning ? 'wait' : 'pointer',
-                }}
               >
                 Step
               </button>
               <button
-                className="toggle-btn"
+                className="action-btn"
                 onClick={() => { if (!isRunning) resetLoadedSequence(); }}
                 disabled={isRunning}
-                style={{
-                  fontSize: 11, padding: '2px 12px',
-                  color: isRunning ? '#ccc' : '#555',
-                  cursor: isRunning ? 'wait' : 'pointer',
-                }}
               >
                 Reset
               </button>
