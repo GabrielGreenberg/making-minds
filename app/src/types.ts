@@ -4,6 +4,7 @@ export type BuildMode = 'CC' | 'SC' | 'FSM' | 'turbot' | 'TM';
 export type RepSystem = 'tally' | 'binary' | 'plus';
 export type DisplayMode = 'IO' | 'AV';
 export type Scope = 'local' | 'global';
+export type ActiveTask = 'arithmetic' | 'turbot' | 'navigation' | 'perception';
 
 export interface Port {
   id: string;
@@ -93,6 +94,40 @@ export interface HomeworkProblem {
 export interface HomeworkData {
   title: string;
   problems: HomeworkProblem[];
+}
+
+// ─── Workbook / Worksheet ────────────────────────────────────────
+
+export interface WorksheetData {
+  id: string;
+  title: string;
+  buildMode: BuildMode;
+  activeTask: ActiveTask;
+  circuit: CircuitData;
+  textElements: TextElement[];
+  comments: CommentElement[];
+  boxes: BoxDefinition[];
+}
+
+export interface WorkbookData {
+  formatVersion: 2;
+  metadata: {
+    title: string;
+    author: string;
+    createdAt: string;
+    updatedAt: string;
+  };
+  worksheets: WorksheetData[];
+  activeWorksheetId: string;
+  viewPreferences: {
+    zoom: number;
+    panX: number;
+    panY: number;
+    showGrid: boolean;
+    showWireValues: boolean;
+    snapToAlign: boolean;
+    repSystem: RepSystem;
+  };
 }
 
 // ─── Text annotations ───────────────────────────────────────────

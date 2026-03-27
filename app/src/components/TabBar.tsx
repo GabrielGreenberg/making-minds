@@ -145,8 +145,8 @@ export function TabBar() {
       ))}
       <button
         className="tab-add-btn"
-        onClick={() => addTab(`Circuit ${tabs.length + 1}`, 'CC')}
-        title="New circuit"
+        onClick={() => addTab(`Circuit ${tabs.length + 1}`, 'CC', 'arithmetic')}
+        title="New worksheet"
       >
         +
       </button>

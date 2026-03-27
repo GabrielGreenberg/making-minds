@@ -1,6 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
 import { useStore } from '../store';
-import { openFile } from '../fileHandle';
 import type { BuildMode } from '../types';
 
 const MACHINE_OPTIONS: { mode: BuildMode; label: string }[] = [
@@ -27,11 +26,11 @@ function ToolbarDropdown({ label, items, activeId, onSelect }: {
 
   useEffect(() => {
     if (!open) return;
-    const handler = (e: MouseEvent) => {
+    const handler = (e: Event) => {
       if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
     };
-    document.addEventListener('mousedown', handler);
-    return () => document.removeEventListener('mousedown', handler);
+    document.addEventListener('pointerdown', handler, true);
+    return () => document.removeEventListener('pointerdown', handler, true);
   }, [open]);
 
   return (
@@ -66,11 +65,11 @@ function OptionsDropdown({ items }: {
 
   useEffect(() => {
     if (!open) return;
-    const handler = (e: MouseEvent) => {
+    const handler = (e: Event) => {
       if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
     };
-    document.addEventListener('mousedown', handler);
-    return () => document.removeEventListener('mousedown', handler);
+    document.addEventListener('pointerdown', handler, true);
+    return () => document.removeEventListener('pointerdown', handler, true);
   }, [open]);
 
   return (
@@ -126,21 +125,9 @@ export function SimulationToolbar() {
     }
   };
 
-  const handleOpen = async () => {
-    const text = await openFile();
-    if (text) {
-      useStore.getState().importProject(text);
-    }
-  };
-
   return (
     <>
       <div className="simulation-toolbar">
-        <button className="toolbar-btn" onClick={handleOpen} title="Open circuit file">
-          Open
-        </button>
-        <div className="toolbar-separator" />
-
         <ToolbarDropdown
           label="Machine"
           items={MACHINE_OPTIONS.map((m) => ({ id: m.mode, label: m.label }))}

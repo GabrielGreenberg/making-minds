@@ -515,7 +515,7 @@ export function DataTable() {
                         type="text"
                         className="sc-input-field"
                         value={fsmInputStr}
-                        placeholder="01101..."
+                        placeholder=""
                         onChange={(e) => {
                           const raw = e.target.value.replace(/[^01]/g, '');
                           setFsmInputSequence(raw.split('').map(Number));

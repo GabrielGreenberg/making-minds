@@ -1,7 +1,73 @@
 import { useState, useRef, useEffect } from 'react';
 import { useStore } from '../store';
-import type { BuildMode, ProblemSetData } from '../types';
-import { saveToFile, openFile } from '../fileHandle';
+import type { ProblemSetData } from '../types';
+import { saveToFileAs, openFile } from '../fileHandle';
+
+function EditableWorkbookTitle() {
+  const workbookTitle = useStore((s) => s.workbookTitle);
+  const closeWorkbook = useStore((s) => s.closeWorkbook);
+  const [editing, setEditing] = useState(false);
+  const [editValue, setEditValue] = useState(workbookTitle);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (editing && inputRef.current) {
+      inputRef.current.focus();
+      inputRef.current.select();
+    }
+  }, [editing]);
+
+  const commit = () => {
+    const trimmed = editValue.trim();
+    if (trimmed && trimmed !== workbookTitle) {
+      useStore.setState({ workbookTitle: trimmed });
+    } else {
+      setEditValue(workbookTitle);
+    }
+    setEditing(false);
+  };
+
+  if (editing) {
+    return (
+      <div className="workbook-title-area">
+        <input
+          ref={inputRef}
+          className="workbook-title-input"
+          value={editValue}
+          onChange={(e) => setEditValue(e.target.value)}
+          onBlur={commit}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
+            if (e.key === 'Escape') { setEditValue(workbookTitle); setEditing(false); }
+          }}
+          onClick={(e) => e.stopPropagation()}
+        />
+      </div>
+    );
+  }
+
+  return (
+    <div className="workbook-title-area">
+      <span
+        className="workbook-title"
+        onDoubleClick={() => { setEditValue(workbookTitle); setEditing(true); }}
+        title="Double-click to rename"
+      >
+        {workbookTitle}
+      </span>
+      <span
+        className="workbook-close-btn"
+        onClick={() => {
+          const ok = confirm('Close this workbook? Unsaved changes will be lost.');
+          if (ok) closeWorkbook();
+        }}
+        title="Close workbook"
+      >
+        {'\u00D7'}
+      </span>
+    </div>
+  );
+}
 
 export function MenuBar() {
   const [openMenu, setOpenMenu] = useState<string | null>(null);
@@ -9,57 +75,95 @@ export function MenuBar() {
   const menuRef = useRef<HTMLDivElement>(null);
 
   const {
-    addTab,
     undo,
     redo,
     deleteSelected,
     copySelected,
     paste,
     exportProject,
-    importProject,
+    exportWorkbook,
+    importWorkbook,
     loadHomework,
     loadProblemSet,
     homework,
     problemSet,
     importBoxedCircuit,
+    newWorkbook,
   } = useStore();
 
   useEffect(() => {
-    const handler = (e: MouseEvent) => {
+    const handler = (e: Event) => {
       if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
         setOpenMenu(null);
         setOpenSub(null);
       }
     };
-    document.addEventListener('mousedown', handler);
-    return () => document.removeEventListener('mousedown', handler);
+    document.addEventListener('pointerdown', handler, true);
+    return () => document.removeEventListener('pointerdown', handler, true);
   }, []);
 
-  const handleNew = (mode: BuildMode) => {
-    const names: Record<BuildMode, string> = {
-      CC: 'Circuit',
-      SC: 'Sequential Circuit',
-      FSM: 'FSM',
-      turbot: 'Turbot',
-      TM: 'Turing Machine',
-    };
-    addTab(names[mode], mode);
-    setOpenMenu(null);
-    setOpenSub(null);
-  };
+  const close = () => { setOpenMenu(null); setOpenSub(null); };
 
-  const handleSave = () => {
-    const json = exportProject();
-    saveToFile(json);
-    setOpenMenu(null);
+  const handleSaveAs = async () => {
+    const json = exportWorkbook();
+    const handle = await saveToFileAs(json);
+    if (handle) {
+      useStore.setState({ workbookFileHandle: handle });
+    }
+    close();
   };
 
   const handleOpen = async () => {
-    const text = await openFile();
-    if (text) {
-      importProject(text);
+    const result = await openFile();
+    if (result) {
+      importWorkbook(result.text, result.handle);
     }
-    setOpenMenu(null);
+    close();
+  };
+
+  const handleNewWorkbook = async () => {
+    const ok = confirm('Create a new workbook? Unsaved changes will be lost.\n\nClick Cancel to go back and save first.');
+    if (!ok) return;
+    newWorkbook();
+    close();
+  };
+
+  const handleExportWorksheet = () => {
+    const json = exportProject();
+    const blob = new Blob([json], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'circuit.json';
+    a.click();
+    URL.revokeObjectURL(url);
+    close();
+  };
+
+  const handleImportCircuit = () => {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '.json';
+    input.onchange = (e) => {
+      const file = (e.target as HTMLInputElement).files?.[0];
+      if (file) {
+        file.text().then((text) => {
+          try {
+            const data = JSON.parse(text);
+            if (data.circuit) {
+              const bm = data.metadata?.buildType || 'CC';
+              const title = data.metadata?.title || file.name.replace('.json', '');
+              useStore.getState().addTab(title, bm);
+              useStore.getState().importProject(text);
+            }
+          } catch {
+            alert('Invalid circuit JSON file.');
+          }
+        });
+      }
+    };
+    input.click();
+    close();
   };
 
   const handleImportBuild = () => {
@@ -74,8 +178,7 @@ export function MenuBar() {
       }
     };
     input.click();
-    setOpenMenu(null);
-    setOpenSub(null);
+    close();
   };
 
   const handleImportHomework = () => {
@@ -96,8 +199,7 @@ export function MenuBar() {
       }
     };
     input.click();
-    setOpenMenu(null);
-    setOpenSub(null);
+    close();
   };
 
   const handleImportProblemSet = () => {
@@ -118,12 +220,7 @@ export function MenuBar() {
       }
     };
     input.click();
-    setOpenMenu(null);
-    setOpenSub(null);
-  };
-
-  const handleExportBuild = () => {
-    handleSave();
+    close();
   };
 
   return (
@@ -136,35 +233,14 @@ export function MenuBar() {
         File
         {openMenu === 'file' && (
           <div className="menu-dropdown">
-            <div
-              className="menu-dropdown-item submenu-container"
-              onMouseEnter={() => setOpenSub('new')}
-              onMouseLeave={() => setOpenSub(null)}
-            >
-              <span>New</span>
-              <span>▸</span>
-              {openSub === 'new' && (
-                <div className="submenu-dropdown">
-                  <div className="menu-dropdown-item" onClick={() => handleNew('CC')}>
-                    Circuit
-                  </div>
-                  <div className="menu-dropdown-item" onClick={() => handleNew('SC')}>
-                    Sequential Circuit
-                  </div>
-                  <div className="menu-dropdown-item" onClick={() => handleNew('FSM')}>
-                    FSM
-                  </div>
-                  <div className="menu-dropdown-item" onClick={() => handleNew('turbot')}>
-                    Turbot
-                  </div>
-                </div>
-              )}
+            <div className="menu-dropdown-item" onClick={handleNewWorkbook}>
+              New Workbook
             </div>
             <div className="menu-dropdown-item" onClick={handleOpen}>
-              Open File
+              Open Workbook
             </div>
-            <div className="menu-dropdown-item" onClick={handleSave}>
-              Save
+            <div className="menu-dropdown-item" onClick={handleSaveAs}>
+              Save Workbook As...
             </div>
             <div className="menu-separator" />
             <div
@@ -173,14 +249,17 @@ export function MenuBar() {
               onMouseLeave={() => setOpenSub(null)}
             >
               <span>Import</span>
-              <span>▸</span>
+              <span>&#9656;</span>
               {openSub === 'import' && (
                 <div className="submenu-dropdown">
+                  <div className="menu-dropdown-item" onClick={handleImportCircuit}>
+                    Circuit (as new tab)
+                  </div>
                   <div className="menu-dropdown-item" onClick={handleImportBuild}>
-                    Build
+                    Build (boxed)
                   </div>
                   <div className="menu-dropdown-item" onClick={handleImportHomework}>
-                    Worksheet
+                    Homework
                   </div>
                   <div className="menu-dropdown-item" onClick={handleImportProblemSet}>
                     Problem Set
@@ -188,23 +267,8 @@ export function MenuBar() {
                 </div>
               )}
             </div>
-            <div
-              className="menu-dropdown-item submenu-container"
-              onMouseEnter={() => setOpenSub('export')}
-              onMouseLeave={() => setOpenSub(null)}
-            >
-              <span>Export</span>
-              <span>▸</span>
-              {openSub === 'export' && (
-                <div className="submenu-dropdown">
-                  <div className="menu-dropdown-item" onClick={handleExportBuild}>
-                    Build
-                  </div>
-                  <div className="menu-dropdown-item" onClick={handleSave}>
-                    Worksheet
-                  </div>
-                </div>
-              )}
+            <div className="menu-dropdown-item" onClick={handleExportWorksheet}>
+              Export Worksheet
             </div>
           </div>
         )}
@@ -218,25 +282,28 @@ export function MenuBar() {
         Edit
         {openMenu === 'edit' && (
           <div className="menu-dropdown">
-            <div className="menu-dropdown-item" onClick={() => { undo(); setOpenMenu(null); }}>
-              Undo <span style={{ color: '#999', fontSize: 11 }}>⌘Z</span>
+            <div className="menu-dropdown-item" onClick={() => { undo(); close(); }}>
+              Undo <span style={{ color: '#999', fontSize: 11 }}>&#8984;Z</span>
             </div>
-            <div className="menu-dropdown-item" onClick={() => { redo(); setOpenMenu(null); }}>
-              Redo <span style={{ color: '#999', fontSize: 11 }}>⌘⇧Z</span>
+            <div className="menu-dropdown-item" onClick={() => { redo(); close(); }}>
+              Redo <span style={{ color: '#999', fontSize: 11 }}>&#8984;&#8679;Z</span>
             </div>
             <div className="menu-separator" />
-            <div className="menu-dropdown-item" onClick={() => { copySelected(); setOpenMenu(null); }}>
-              Copy <span style={{ color: '#999', fontSize: 11 }}>⌘C</span>
+            <div className="menu-dropdown-item" onClick={() => { copySelected(); close(); }}>
+              Copy <span style={{ color: '#999', fontSize: 11 }}>&#8984;C</span>
             </div>
-            <div className="menu-dropdown-item" onClick={() => { paste(); setOpenMenu(null); }}>
-              Paste <span style={{ color: '#999', fontSize: 11 }}>⌘V</span>
+            <div className="menu-dropdown-item" onClick={() => { paste(); close(); }}>
+              Paste <span style={{ color: '#999', fontSize: 11 }}>&#8984;V</span>
             </div>
-            <div className="menu-dropdown-item" onClick={() => { deleteSelected(); setOpenMenu(null); }}>
-              Delete <span style={{ color: '#999', fontSize: 11 }}>⌫</span>
+            <div className="menu-dropdown-item" onClick={() => { deleteSelected(); close(); }}>
+              Delete <span style={{ color: '#999', fontSize: 11 }}>&#9003;</span>
             </div>
           </div>
         )}
       </div>
+
+      {/* Workbook title + close button, right-aligned */}
+      <EditableWorkbookTitle />
 
       {/* Homework menu (legacy) */}
       {homework && (
@@ -254,7 +321,7 @@ export function MenuBar() {
                   className="menu-dropdown-item"
                   onClick={() => {
                     useStore.getState().switchProblem(i);
-                    setOpenMenu(null);
+                    close();
                   }}
                 >
                   Q{p.id}: {p.text.substring(0, 40)}...
@@ -281,7 +348,7 @@ export function MenuBar() {
                   className="menu-dropdown-item"
                   onClick={() => {
                     useStore.getState().switchProblemPage(i);
-                    setOpenMenu(null);
+                    close();
                   }}
                 >
                   {p.label}: {p.statement.substring(0, 40)}...
@@ -292,7 +359,7 @@ export function MenuBar() {
                 className="menu-dropdown-item"
                 onClick={() => {
                   useStore.getState().closeProblemSet();
-                  setOpenMenu(null);
+                  close();
                 }}
               >
                 Close Problem Set

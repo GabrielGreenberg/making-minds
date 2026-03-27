@@ -5,6 +5,7 @@ import type {
   RepSystem,
   DisplayMode,
   Scope,
+  ActiveTask,
   CircuitComponent,
   Wire,
   ComponentType,
@@ -15,6 +16,8 @@ import type {
   ProblemSetData,
   WireManualSegment,
   FsmHistoryEntry,
+  WorkbookData,
+  WorksheetData,
 } from './types';
 import {
   getPortsForType,
@@ -37,6 +40,16 @@ interface AppState {
   // Auto-save status
   autoSaveStatus: 'saved' | 'unsaved' | 'saving';
 
+  // Workbook
+  workbookOpen: boolean;
+  workbookTitle: string;
+  workbookFileHandle: FileSystemFileHandle | null;
+  closeWorkbook: () => void;
+  newWorkbook: () => void;
+  openWorkbook: (json: string, handle?: FileSystemFileHandle | null) => void;
+  exportWorkbook: () => string;
+  importWorkbook: (json: string, handle?: FileSystemFileHandle | null) => void;
+
   // Build mode
   buildMode: BuildMode;
   setBuildMode: (mode: BuildMode) => void;
@@ -46,8 +59,8 @@ interface AppState {
   setTurboEnabled: (v: boolean) => void;
 
   // Active task
-  activeTask: 'arithmetic' | 'turbot' | 'navigation' | 'perception';
-  setActiveTask: (t: 'arithmetic' | 'turbot' | 'navigation' | 'perception') => void;
+  activeTask: ActiveTask;
+  setActiveTask: (t: ActiveTask) => void;
 
   // Table settings
   repSystem: RepSystem;
@@ -130,9 +143,10 @@ interface AppState {
   switchProblemPage: (index: number) => void;
   closeProblemSet: () => void;
 
-  // Save/Load
+  // Save/Load (legacy single-circuit export for "Export Worksheet")
   exportProject: () => string;
   importProject: (json: string) => void;
+  // exportWorkbook and importWorkbook are in the Workbook section above
 
   // Rotation
   rotateComponent: (id: string) => void;
@@ -168,10 +182,10 @@ interface AppState {
   copySelected: () => void;
   paste: () => void;
 
-  // Tabs
-  tabs: { id: string; title: string; buildMode: BuildMode }[];
+  // Tabs (worksheets)
+  tabs: { id: string; title: string; buildMode: BuildMode; activeTask: ActiveTask }[];
   activeTabId: string;
-  addTab: (title: string, buildMode: BuildMode) => void;
+  addTab: (title: string, buildMode: BuildMode, activeTask?: ActiveTask) => void;
   switchTab: (id: string) => void;
   removeTab: (id: string) => void;
   renameTab: (id: string, title: string) => void;
@@ -511,6 +525,204 @@ const defaultTabId = 'tab-1';
 export const useStore = create<AppState>()((set, get) => ({
   autoSaveStatus: 'saved' as const,
 
+  // Workbook state
+  workbookOpen: false,
+  workbookTitle: 'Untitled Workbook',
+  workbookFileHandle: null,
+
+  closeWorkbook: () => {
+    set({
+      workbookOpen: false,
+      workbookTitle: 'Untitled Workbook',
+      workbookFileHandle: null,
+      tabs: [{ id: defaultTabId, title: 'Circuit 1', buildMode: 'CC' as BuildMode, activeTask: 'arithmetic' as ActiveTask }],
+      activeTabId: defaultTabId,
+      tabCircuits: new Map(),
+      components: [],
+      wires: [],
+      textElements: [],
+      comments: [],
+      boxes: [],
+      buildMode: 'CC',
+      activeTask: 'arithmetic',
+      undoStack: [],
+      redoStack: [],
+    });
+    // Clear auto-save so next load shows welcome screen
+    try { localStorage.removeItem('making-minds-autosave'); } catch { /* ignore */ }
+  },
+
+  newWorkbook: () => {
+    const tabId = uuid();
+    set({
+      workbookOpen: true,
+      workbookTitle: 'Untitled Workbook',
+      workbookFileHandle: null,
+      tabs: [{ id: tabId, title: 'Circuit 1', buildMode: 'CC' as BuildMode, activeTask: 'arithmetic' as ActiveTask }],
+      activeTabId: tabId,
+      tabCircuits: new Map(),
+      components: [],
+      wires: [],
+      textElements: [],
+      comments: [],
+      boxes: [],
+      buildMode: 'CC',
+      activeTask: 'arithmetic',
+      undoStack: [],
+      redoStack: [],
+    });
+  },
+
+  openWorkbook: (json, handle) => {
+    get().importWorkbook(json, handle);
+  },
+
+  exportWorkbook: () => {
+    const state = get();
+    // Save current tab's circuit into tabCircuits for serialization
+    const allTabCircuits = new Map(state.tabCircuits);
+    allTabCircuits.set(state.activeTabId, {
+      components: state.components,
+      wires: state.wires,
+      textElements: state.textElements,
+      comments: state.comments,
+      boxes: state.boxes,
+    });
+
+    const worksheets: WorksheetData[] = state.tabs.map((tab) => {
+      const circuit = allTabCircuits.get(tab.id) || { components: [], wires: [], textElements: [], comments: [], boxes: [] };
+      return {
+        id: tab.id,
+        title: tab.title,
+        buildMode: tab.buildMode,
+        activeTask: tab.activeTask,
+        circuit: { components: circuit.components, wires: circuit.wires },
+        textElements: circuit.textElements,
+        comments: circuit.comments,
+        boxes: circuit.boxes,
+      };
+    });
+
+    const workbook: WorkbookData = {
+      formatVersion: 2,
+      metadata: {
+        title: state.workbookTitle,
+        author: '',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      },
+      worksheets,
+      activeWorksheetId: state.activeTabId,
+      viewPreferences: {
+        zoom: state.zoom,
+        panX: state.panX,
+        panY: state.panY,
+        showGrid: state.showGrid,
+        showWireValues: state.showWireValues,
+        snapToAlign: state.snapToAlign,
+        repSystem: state.repSystem,
+      },
+    };
+    return JSON.stringify(workbook, null, 2);
+  },
+
+  importWorkbook: (json, handle) => {
+    try {
+      const data = JSON.parse(json);
+
+      if (data.formatVersion === 2) {
+        // New workbook format
+        const wb = data as WorkbookData;
+        const tabCircuits = new Map<string, { components: CircuitComponent[]; wires: Wire[]; textElements: TextElement[]; comments: CommentElement[]; boxes: BoxDefinition[] }>();
+        const tabs = wb.worksheets.map((ws) => {
+          const resolvedComponents = resolveMemDirections(ws.circuit.components || [], ws.circuit.wires || []);
+          tabCircuits.set(ws.id, {
+            components: resolvedComponents,
+            wires: ws.circuit.wires || [],
+            textElements: ws.textElements || [],
+            comments: ws.comments || [],
+            boxes: ws.boxes || [],
+          });
+          return {
+            id: ws.id,
+            title: ws.title,
+            buildMode: ws.buildMode || 'CC' as BuildMode,
+            activeTask: ws.activeTask || 'arithmetic' as ActiveTask,
+          };
+        });
+
+        const activeId = wb.activeWorksheetId || tabs[0]?.id || defaultTabId;
+        const activeCircuit = tabCircuits.get(activeId) || { components: [], wires: [], textElements: [], comments: [], boxes: [] };
+        const activeTab = tabs.find((t) => t.id === activeId);
+
+        set({
+          workbookOpen: true,
+          workbookTitle: wb.metadata?.title || 'Untitled Workbook',
+          workbookFileHandle: handle || null,
+          tabs,
+          activeTabId: activeId,
+          tabCircuits,
+          components: activeCircuit.components,
+          wires: activeCircuit.wires,
+          textElements: activeCircuit.textElements,
+          comments: activeCircuit.comments,
+          boxes: activeCircuit.boxes,
+          buildMode: activeTab?.buildMode || 'CC',
+          activeTask: activeTab?.activeTask || 'arithmetic',
+          zoom: wb.viewPreferences?.zoom ?? 1,
+          panX: wb.viewPreferences?.panX ?? 0,
+          panY: wb.viewPreferences?.panY ?? 0,
+          showGrid: wb.viewPreferences?.showGrid ?? true,
+          showWireValues: wb.viewPreferences?.showWireValues ?? true,
+          snapToAlign: wb.viewPreferences?.snapToAlign ?? true,
+          repSystem: wb.viewPreferences?.repSystem || 'binary',
+          undoStack: [],
+          redoStack: [],
+        });
+        setTimeout(() => get().evaluateCircuit(), 0);
+      } else if (data.circuit) {
+        // Legacy single-circuit format — wrap in a one-worksheet workbook
+        const wsId = uuid();
+        const importedComponents = data.circuit.components || [];
+        const importedWires = data.circuit.wires || [];
+        const resolvedComponents = resolveMemDirections(importedComponents, importedWires);
+        const tabCircuits = new Map<string, { components: CircuitComponent[]; wires: Wire[]; textElements: TextElement[]; comments: CommentElement[]; boxes: BoxDefinition[] }>();
+        tabCircuits.set(wsId, {
+          components: resolvedComponents,
+          wires: importedWires,
+          textElements: data.textElements || [],
+          comments: data.comments || [],
+          boxes: data.boxes || [],
+        });
+        const bm = data.metadata?.buildType || 'CC';
+        set({
+          workbookOpen: true,
+          workbookTitle: data.metadata?.title || 'Imported Circuit',
+          workbookFileHandle: handle || null,
+          tabs: [{ id: wsId, title: data.metadata?.title || 'Circuit 1', buildMode: bm, activeTask: 'arithmetic' as ActiveTask }],
+          activeTabId: wsId,
+          tabCircuits,
+          components: resolvedComponents,
+          wires: importedWires,
+          textElements: data.textElements || [],
+          comments: data.comments || [],
+          boxes: data.boxes || [],
+          buildMode: bm,
+          activeTask: 'arithmetic',
+          repSystem: data.repSystem || 'binary',
+          undoStack: [],
+          redoStack: [],
+        });
+        setTimeout(() => get().evaluateCircuit(), 0);
+      } else {
+        alert('Invalid file format. Expected a workbook or circuit file.');
+      }
+    } catch (e) {
+      console.error('Invalid workbook JSON:', e);
+      alert('Invalid file. Please check the JSON format.');
+    }
+  },
+
   buildMode: 'CC',
   setBuildMode: (mode) => set({ buildMode: mode }),
 
@@ -518,7 +730,15 @@ export const useStore = create<AppState>()((set, get) => ({
   setTurboEnabled: (v) => set({ turboEnabled: v }),
 
   activeTask: 'arithmetic',
-  setActiveTask: (t) => set({ activeTask: t }),
+  setActiveTask: (t) => {
+    const state = get();
+    set({
+      activeTask: t,
+      tabs: state.tabs.map((tab) =>
+        tab.id === state.activeTabId ? { ...tab, activeTask: t } : tab
+      ),
+    });
+  },
 
   repSystem: 'binary',
   displayMode: 'IO',
@@ -1616,14 +1836,15 @@ export const useStore = create<AppState>()((set, get) => ({
     setTimeout(() => get().evaluateCircuit(), 0);
   },
 
-  // Tabs
-  tabs: [{ id: defaultTabId, title: 'Circuit 1', buildMode: 'CC' as BuildMode }],
+  // Tabs (worksheets)
+  tabs: [{ id: defaultTabId, title: 'Circuit 1', buildMode: 'CC' as BuildMode, activeTask: 'arithmetic' as ActiveTask }],
   activeTabId: defaultTabId,
   tabCircuits: new Map(),
 
-  addTab: (title, buildMode) => {
+  addTab: (title, buildMode, activeTask) => {
     const state = get();
     const newId = uuid();
+    const task = activeTask || 'arithmetic';
     // Save current tab
     const updatedTabCircuits = new Map(state.tabCircuits);
     updatedTabCircuits.set(state.activeTabId, {
@@ -1634,7 +1855,7 @@ export const useStore = create<AppState>()((set, get) => ({
       boxes: state.boxes,
     });
     set({
-      tabs: [...state.tabs, { id: newId, title, buildMode }],
+      tabs: [...state.tabs, { id: newId, title, buildMode, activeTask: task }],
       activeTabId: newId,
       tabCircuits: updatedTabCircuits,
       components: [],
@@ -1643,6 +1864,7 @@ export const useStore = create<AppState>()((set, get) => ({
       comments: [],
       boxes: [],
       buildMode,
+      activeTask: task,
     });
   },
 
@@ -1668,6 +1890,7 @@ export const useStore = create<AppState>()((set, get) => ({
       comments: saved.comments,
       boxes: saved.boxes,
       buildMode: tab?.buildMode || 'CC',
+      activeTask: tab?.activeTask || 'arithmetic',
     });
   },
 
@@ -2740,17 +2963,32 @@ let autoSaveTimer: ReturnType<typeof setTimeout> | null = null;
 
 function getAutoSaveData() {
   const s = useStore.getState();
-  return {
-    buildMode: s.buildMode,
-    repSystem: s.repSystem,
+  // Use the workbook export format for auto-save
+  // Save current tab circuit into tabCircuits
+  const allTabCircuits = new Map(s.tabCircuits);
+  allTabCircuits.set(s.activeTabId, {
     components: s.components,
     wires: s.wires,
     textElements: s.textElements,
     comments: s.comments,
     boxes: s.boxes,
+  });
+  return {
+    formatVersion: 2,
+    workbookOpen: s.workbookOpen,
+    workbookTitle: s.workbookTitle,
     tabs: s.tabs,
     activeTabId: s.activeTabId,
-    tabCircuits: Object.fromEntries(s.tabCircuits),
+    tabCircuits: Object.fromEntries(allTabCircuits),
+    viewPreferences: {
+      zoom: s.zoom,
+      panX: s.panX,
+      panY: s.panY,
+      showGrid: s.showGrid,
+      showWireValues: s.showWireValues,
+      snapToAlign: s.snapToAlign,
+      repSystem: s.repSystem,
+    },
   };
 }
 
@@ -2768,7 +3006,7 @@ function performAutoSave() {
 
 // Subscribe to state changes that should trigger auto-save
 useStore.subscribe((state, prev) => {
-  // Only auto-save when circuit data actually changes
+  // Only auto-save when circuit/workbook data actually changes
   if (
     state.components === prev.components &&
     state.wires === prev.wires &&
@@ -2778,7 +3016,9 @@ useStore.subscribe((state, prev) => {
     state.tabs === prev.tabs &&
     state.activeTabId === prev.activeTabId &&
     state.buildMode === prev.buildMode &&
-    state.tabCircuits === prev.tabCircuits
+    state.tabCircuits === prev.tabCircuits &&
+    state.workbookOpen === prev.workbookOpen &&
+    state.workbookTitle === prev.workbookTitle
   ) return;
 
   useStore.setState({ autoSaveStatus: 'unsaved' });
@@ -2787,32 +3027,86 @@ useStore.subscribe((state, prev) => {
 });
 
 // Load from localStorage on startup
+type TabCircuitData = { components: CircuitComponent[]; wires: Wire[]; textElements: TextElement[]; comments: CommentElement[]; boxes: BoxDefinition[] };
+
 function loadAutoSave() {
   try {
     const raw = localStorage.getItem(AUTO_SAVE_KEY);
-    if (!raw) return;
+    if (!raw) return; // No saved data — stay on welcome screen (workbookOpen: false)
     const data = JSON.parse(raw);
-    const tabCircuits = new Map<string, { components: CircuitComponent[]; wires: Wire[]; textElements: TextElement[]; comments: CommentElement[]; boxes: BoxDefinition[] }>();
-    if (data.tabCircuits) {
-      for (const [k, v] of Object.entries(data.tabCircuits)) {
-        tabCircuits.set(k, v as { components: CircuitComponent[]; wires: Wire[]; textElements: TextElement[]; comments: CommentElement[]; boxes: BoxDefinition[] });
+
+    if (data.formatVersion === 2) {
+      // New workbook auto-save format
+      const tabCircuits = new Map<string, TabCircuitData>();
+      if (data.tabCircuits) {
+        for (const [k, v] of Object.entries(data.tabCircuits)) {
+          tabCircuits.set(k, v as TabCircuitData);
+        }
       }
+      // Ensure tabs have activeTask field (migration for old auto-saves)
+      const tabs = (data.tabs || []).map((t: { id: string; title: string; buildMode: BuildMode; activeTask?: ActiveTask }) => ({
+        ...t,
+        activeTask: t.activeTask || 'arithmetic',
+      }));
+      const activeId = data.activeTabId || tabs[0]?.id || defaultTabId;
+      const activeCircuit = tabCircuits.get(activeId) || { components: [], wires: [], textElements: [], comments: [], boxes: [] };
+      const activeTab = tabs.find((t: { id: string }) => t.id === activeId);
+      const vp = data.viewPreferences || {};
+
+      useStore.setState({
+        workbookOpen: data.workbookOpen !== false, // default true for existing data
+        workbookTitle: data.workbookTitle || 'Untitled Workbook',
+        tabs,
+        activeTabId: activeId,
+        tabCircuits,
+        components: activeCircuit.components || [],
+        wires: activeCircuit.wires || [],
+        textElements: activeCircuit.textElements || [],
+        comments: activeCircuit.comments || [],
+        boxes: activeCircuit.boxes || [],
+        buildMode: activeTab?.buildMode || 'CC',
+        activeTask: activeTab?.activeTask || 'arithmetic',
+        repSystem: vp.repSystem || 'binary',
+        zoom: vp.zoom ?? 1,
+        panX: vp.panX ?? 0,
+        panY: vp.panY ?? 0,
+        showGrid: vp.showGrid ?? true,
+        showWireValues: vp.showWireValues ?? true,
+        snapToAlign: vp.snapToAlign ?? true,
+      });
+      setTimeout(() => useStore.getState().evaluateCircuit(), 0);
+    } else if (data.tabs) {
+      // Legacy auto-save format (has tabs but no formatVersion)
+      const tabCircuits = new Map<string, TabCircuitData>();
+      if (data.tabCircuits) {
+        for (const [k, v] of Object.entries(data.tabCircuits)) {
+          tabCircuits.set(k, v as TabCircuitData);
+        }
+      }
+      const tabs = (data.tabs || []).map((t: { id: string; title?: string; name?: string; buildMode?: BuildMode }) => ({
+        id: t.id,
+        title: t.title || t.name || 'Circuit',
+        buildMode: t.buildMode || 'CC',
+        activeTask: 'arithmetic' as ActiveTask,
+      }));
+      useStore.setState({
+        workbookOpen: true,
+        workbookTitle: 'Untitled Workbook',
+        buildMode: data.buildMode || 'CC',
+        repSystem: data.repSystem || 'binary',
+        components: data.components || [],
+        wires: data.wires || [],
+        textElements: data.textElements || [],
+        comments: data.comments || [],
+        boxes: data.boxes || [],
+        tabs,
+        activeTabId: data.activeTabId || tabs[0]?.id || defaultTabId,
+        ...(tabCircuits.size > 0 ? { tabCircuits } : {}),
+      });
+      setTimeout(() => useStore.getState().evaluateCircuit(), 0);
     }
-    useStore.setState({
-      buildMode: data.buildMode || 'CC',
-      repSystem: data.repSystem || 'binary',
-      components: data.components || [],
-      wires: data.wires || [],
-      textElements: data.textElements || [],
-      comments: data.comments || [],
-      boxes: data.boxes || [],
-      tabs: data.tabs || [{ id: 'tab-1', name: 'Circuit 1' }],
-      activeTabId: data.activeTabId || 'tab-1',
-      ...(tabCircuits.size > 0 ? { tabCircuits } : {}),
-    });
-    setTimeout(() => useStore.getState().evaluateCircuit(), 0);
   } catch {
-    // Corrupted data — ignore
+    // Corrupted data — ignore, stay on welcome screen
   }
 }
 
