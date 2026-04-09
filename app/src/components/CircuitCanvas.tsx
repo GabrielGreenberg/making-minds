@@ -994,15 +994,24 @@ function FsmTransitionView({
   wire,
   pathD,
   labelPos,
+  controlPt,
+  from,
+  to,
   isSelected,
+  onSnapGuides,
 }: {
   wire: Wire;
   pathD: string;
   labelPos: { x: number; y: number };
+  controlPt?: { x: number; y: number };
+  from: { x: number; y: number };
+  to: { x: number; y: number };
   isSelected: boolean;
+  onSnapGuides: (guides: AlignGuide[]) => void;
 }) {
   const [editing, setEditing] = useState(false);
   const [editValue, setEditValue] = useState('');
+  const [dragging, setDragging] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
   const label = wire.transitionLabel || '?:?';
@@ -1015,7 +1024,7 @@ function FsmTransitionView({
     }
   }, [editing]);
 
-  const handleDoubleClick = (e: React.MouseEvent) => {
+  const handleLabelClick = (e: React.MouseEvent) => {
     e.stopPropagation();
     setEditValue(label);
     setEditing(true);
@@ -1029,6 +1038,69 @@ function FsmTransitionView({
     }
   };
 
+  // ── Drag handling for control point ──
+  const handleDotPointerDown = useCallback((e: React.PointerEvent) => {
+    e.stopPropagation();
+    e.preventDefault();
+    setDragging(true);
+    const el = e.currentTarget as SVGElement;
+    el.setPointerCapture(e.pointerId);
+  }, []);
+
+  const handleDotPointerMove = useCallback((e: React.PointerEvent) => {
+    if (!dragging) return;
+    e.stopPropagation();
+    const state = useStore.getState();
+    const containerEl = (e.currentTarget as SVGElement).closest('svg')?.parentElement;
+    if (!containerEl) return;
+    const rect = containerEl.getBoundingClientRect();
+    // Mouse position in canvas coords = desired on-curve midpoint
+    let sx = (e.clientX - rect.left) / state.zoom - (state.panX ?? 0);
+    let sy = (e.clientY - rect.top) / state.zoom - (state.panY ?? 0);
+    // Object snapping: snap to state center X/Y lines and midpoint
+    const SNAP_DIST = 8;
+    const guides: AlignGuide[] = [];
+    const snapXs: number[] = [];
+    const snapYs: number[] = [];
+    for (const comp of state.components) {
+      if (comp.type !== 'STATE') continue;
+      snapXs.push(comp.x + STATE_RADIUS);
+      snapYs.push(comp.y + STATE_RADIUS);
+    }
+    // Also snap to midpoint between source and target
+    snapXs.push((from.x + to.x) / 2);
+    snapYs.push((from.y + to.y) / 2);
+    for (const tx of snapXs) {
+      if (Math.abs(sx - tx) < SNAP_DIST) {
+        sx = tx;
+        guides.push({ type: 'vertical', pos: tx, start: sy - 200, end: sy + 200 });
+        break;
+      }
+    }
+    for (const ty of snapYs) {
+      if (Math.abs(sy - ty) < SNAP_DIST) {
+        sy = ty;
+        guides.push({ type: 'horizontal', pos: ty, start: sx - 200, end: sx + 200 });
+        break;
+      }
+    }
+    onSnapGuides(guides);
+    // Convert on-curve midpoint to bezier control point:
+    // For quadratic bezier, point at t=0.5 = (S + 2*C + E) / 4
+    // So C = (4*P - S - E) / 2
+    const cx = (4 * sx - from.x - to.x) / 2;
+    const cy = (4 * sy - from.y - to.y) / 2;
+    state.setFsmControlPt(wire.id, { x: cx, y: cy });
+  }, [dragging, wire.id, from, to, onSnapGuides]);
+
+  const handleDotPointerUp = useCallback((e: React.PointerEvent) => {
+    if (!dragging) return;
+    e.stopPropagation();
+    setDragging(false);
+    onSnapGuides([]);
+    (e.currentTarget as SVGElement).releasePointerCapture(e.pointerId);
+  }, [dragging, onSnapGuides]);
+
   return (
     <g data-wire-id={wire.id} style={{ cursor: 'pointer' }}>
       {/* SVG arrowhead marker definition */}
@@ -1037,12 +1109,12 @@ function FsmTransitionView({
           id={`arrow-${wire.id}`}
           markerWidth="10"
           markerHeight="8"
-          refX="9"
+          refX="10"
           refY="4"
           orient="auto"
-          markerUnits="strokeWidth"
+          markerUnits="userSpaceOnUse"
         >
-          <path d="M0,0 L10,4 L0,8 L2,4 Z" fill={color} />
+          <path d="M0,0.5 L10,4 L0,7.5 Z" fill={color} />
         </marker>
       </defs>
       {/* Invisible wider path for easier clicking */}
@@ -1063,10 +1135,24 @@ function FsmTransitionView({
         markerEnd={`url(#arrow-${wire.id})`}
         pointerEvents="none"
       />
-      {/* Transition label */}
+      {/* Draggable control point dot on the wire */}
+      {controlPt && (
+        <circle
+          cx={controlPt.x}
+          cy={controlPt.y}
+          r={4}
+          fill={dragging ? '#2a7fff' : 'white'}
+          stroke={color}
+          strokeWidth={1.5}
+          style={{ cursor: 'move' }}
+          onPointerDown={handleDotPointerDown}
+          onPointerMove={handleDotPointerMove}
+          onPointerUp={handleDotPointerUp}
+        />
+      )}
+      {/* Transition label — offset from wire, single-click to edit */}
       {!editing && (
-        <g onDoubleClick={handleDoubleClick}>
-          {/* Label background for readability */}
+        <g onClick={handleLabelClick}>
           <rect
             x={labelPos.x - 14}
             y={labelPos.y - 10}
@@ -1077,7 +1163,7 @@ function FsmTransitionView({
             fillOpacity={0.9}
             stroke="#ddd"
             strokeWidth={0.5}
-            style={{ cursor: 'pointer' }}
+            style={{ cursor: 'text' }}
           />
           <text
             x={labelPos.x}
@@ -1088,7 +1174,7 @@ function FsmTransitionView({
             fontFamily="'SF Mono', 'Fira Code', monospace"
             fontWeight="600"
             fill={color}
-            style={{ cursor: 'pointer' }}
+            style={{ cursor: 'text' }}
           >
             {label}
           </text>
@@ -3043,9 +3129,15 @@ export function CircuitCanvas() {
   // ─── Previous paths ref for continuity bias (§7.2) ──
   const previousPathsRef = useRef<Map<string, { x: number; y: number }[]>>(new Map());
 
+  // ─── FSM control point snap guide callback ──────────────────────
+  const handleFsmSnapGuides = useCallback((guides: AlignGuide[]) => {
+    pendingOverlay.current.alignGuides = guides;
+    requestOverlayUpdate();
+  }, [requestOverlayUpdate]);
+
   // ─── Compute all wire paths (A* grid-based router) ──────────────
   const wireData = useMemo(() => {
-    const data = new Map<string, { pathD: string; points: { x: number; y: number }[]; basePoints: { x: number; y: number }[]; crossings: { x: number; y: number }[]; from: { x: number; y: number }; to: { x: number; y: number }; isFsmTransition?: boolean; labelPos?: { x: number; y: number } }>();
+    const data = new Map<string, { pathD: string; points: { x: number; y: number }[]; basePoints: { x: number; y: number }[]; crossings: { x: number; y: number }[]; from: { x: number; y: number }; to: { x: number; y: number }; isFsmTransition?: boolean; labelPos?: { x: number; y: number }; controlPt?: { x: number; y: number } }>();
 
     // Separate FSM transitions from regular wires
     const fsmWires: Wire[] = [];
@@ -3061,18 +3153,23 @@ export function CircuitCanvas() {
     }
 
     // ── FSM transition curves ──────────────────────────────────────
-    // Count transitions between each pair for offset calculation
-    const pairCounts = new Map<string, number>();
-    const pairIndices = new Map<string, number>();
+    // Build per-direction counts: separate A→B from B→A
+    const directedCounts = new Map<string, number>();
+    const directedIndices = new Map<string, number>();
+    // Also track total between each unordered pair (for deciding if straight)
+    const pairTotals = new Map<string, number>();
     for (const wire of fsmWires) {
-      // Use sorted pair key so A→B and B→A share the same count
+      const dirKey = `${wire.sourceComponentId}|${wire.targetComponentId}`;
+      directedCounts.set(dirKey, (directedCounts.get(dirKey) || 0) + 1);
       const pairKey = [wire.sourceComponentId, wire.targetComponentId].sort().join('|');
-      pairCounts.set(pairKey, (pairCounts.get(pairKey) || 0) + 1);
+      pairTotals.set(pairKey, (pairTotals.get(pairKey) || 0) + 1);
     }
+    // Arrowhead length for endpoint pullback (keeps stroke from peeking past arrow tip)
+    const ARROW_LEN = 2;
     for (const wire of fsmWires) {
-      const pairKey = [wire.sourceComponentId, wire.targetComponentId].sort().join('|');
-      const idx = pairIndices.get(pairKey) || 0;
-      pairIndices.set(pairKey, idx + 1);
+      const dirKey = `${wire.sourceComponentId}|${wire.targetComponentId}`;
+      const dirIdx = directedIndices.get(dirKey) || 0;
+      directedIndices.set(dirKey, dirIdx + 1);
 
       const sourceComp = components.find((c) => c.id === wire.sourceComponentId)!;
       const targetComp = components.find((c) => c.id === wire.targetComponentId)!;
@@ -3082,10 +3179,13 @@ export function CircuitCanvas() {
       const tCy = targetComp.y + STATE_RADIUS;
 
       const isSelfLoop = wire.sourceComponentId === wire.targetComponentId;
-      const totalBetween = pairCounts.get(pairKey) || 1;
+      const pairKey = [wire.sourceComponentId, wire.targetComponentId].sort().join('|');
+      const totalBetweenPair = pairTotals.get(pairKey) || 1;
+      const sameDirectionCount = directedCounts.get(dirKey) || 1;
 
       let pathD: string;
       let labelPos: { x: number; y: number };
+      let curvePointX = 0, curvePointY = 0;
 
       if (isSelfLoop) {
         // Self-loop: draw a loop arc above the state
@@ -3101,35 +3201,120 @@ export function CircuitCanvas() {
         const startY = sCy + STATE_RADIUS * Math.sin(startAngle);
         const endX = sCx + STATE_RADIUS * Math.cos(endAngle);
         const endY = sCy + STATE_RADIUS * Math.sin(endAngle);
-        pathD = `M${startX},${startY} C${cpX1},${cpY} ${cpX2},${cpY} ${endX},${endY}`;
+        // Pull end back for arrowhead
+        const eAngleTan = Math.atan2(endY - cpY, endX - cpX2);
+        const eX = endX - ARROW_LEN * Math.cos(eAngleTan);
+        const eY = endY - ARROW_LEN * Math.sin(eAngleTan);
+        pathD = `M${startX},${startY} C${cpX1},${cpY} ${cpX2},${cpY} ${eX},${eY}`;
         labelPos = { x: sCx, y: cpY + 4 };
       } else {
         // Curve between two different states
-        const angle = Math.atan2(tCy - sCy, tCx - sCx);
-        // Start/end at circle edges
-        const startX = sCx + STATE_RADIUS * Math.cos(angle);
-        const startY = sCy + STATE_RADIUS * Math.sin(angle);
-        const endX = tCx - STATE_RADIUS * Math.cos(angle);
-        const endY = tCy - STATE_RADIUS * Math.sin(angle);
-
-        // Control point offset perpendicular to the line between states
+        const centerAngle = Math.atan2(tCy - sCy, tCx - sCx);
         const dist = Math.hypot(tCx - sCx, tCy - sCy);
         const perpX = -(tCy - sCy) / dist;
         const perpY = (tCx - sCx) / dist;
-        // Offset based on index among transitions between this pair
-        const baseOffset = totalBetween > 1 ? 40 : 25;
-        // Alternate sides for multiple transitions
-        const isReverse = wire.sourceComponentId > wire.targetComponentId;
-        const sign = (idx % 2 === 0 ? 1 : -1) * (isReverse ? -1 : 1);
-        const offset = sign * (baseOffset + Math.floor(idx / 2) * 30);
 
-        const midX = (startX + endX) / 2 + perpX * offset;
-        const midY = (startY + endY) / 2 + perpY * offset;
-        pathD = `M${startX},${startY} Q${midX},${midY} ${endX},${endY}`;
-        // Label position: midpoint of quadratic bezier
+        // Determine curve offset using direction-consistent convention:
+        // A→B (where A<B lexically) curves to one side, B→A to the other.
+        // This ensures bidirectional arcs always separate cleanly.
+        const isForward = wire.sourceComponentId < wire.targetComponentId;
+        const side = isForward ? 1 : -1;
+
+        let offset: number;
+        if (totalBetweenPair === 1) {
+          // Only one transition between this pair → straight line
+          offset = 0;
+        } else if (sameDirectionCount === 1 && totalBetweenPair === 2) {
+          // Exactly one in each direction → symmetric separation
+          offset = side * 30;
+        } else {
+          // Multiple in same direction: stack them
+          offset = side * (30 + dirIdx * 25);
+        }
+
+        // ── State avoidance: push arc away from intermediate states ──
+        const clearance = STATE_RADIUS + 12; // circle radius + margin
+        for (const other of components) {
+          if (other.id === wire.sourceComponentId || other.id === wire.targetComponentId) continue;
+          if (other.type !== 'STATE') continue;
+          const oCx = other.x + STATE_RADIUS;
+          const oCy = other.y + STATE_RADIUS;
+          // Project other-state center onto the source→target line
+          const dx = tCx - sCx;
+          const dy = tCy - sCy;
+          const t = ((oCx - sCx) * dx + (oCy - sCy) * dy) / (dist * dist);
+          if (t <= 0.05 || t >= 0.95) continue; // only care about states between endpoints
+          // Perpendicular distance from line
+          const projX = sCx + t * dx;
+          const projY = sCy + t * dy;
+          const perpDist = (oCx - projX) * perpX + (oCy - projY) * perpY;
+          const absPerpDist = Math.abs(perpDist);
+          if (absPerpDist < clearance) {
+            // State is too close to the line — push the arc to the far side
+            const pushSide = perpDist >= 0 ? -1 : 1; // push away from the obstacle
+            const needed = (clearance - absPerpDist) + clearance;
+            const pushOffset = pushSide * needed;
+            if (Math.abs(pushOffset) > Math.abs(offset)) {
+              offset = pushOffset;
+            }
+          }
+        }
+
+        // Use manual control point if set, otherwise compute automatically
+        if (wire.fsmControlPt) {
+          // Recompute effective offset for start/end angle adjustment
+          const dotPerp = (wire.fsmControlPt.x - (sCx + tCx) / 2) * perpX + (wire.fsmControlPt.y - (sCy + tCy) / 2) * perpY;
+          offset = dotPerp;
+        }
+
+        // Adjust start/end angles to account for curve offset
+        const offsetAngle = dist > 0 ? Math.atan2(offset, dist / 2) : 0;
+        const startA = centerAngle + offsetAngle * 0.3;
+        const endA = centerAngle + Math.PI - offsetAngle * 0.3;
+
+        const startX = sCx + STATE_RADIUS * Math.cos(startA);
+        const startY = sCy + STATE_RADIUS * Math.sin(startA);
+        const rawEndX = tCx + STATE_RADIUS * Math.cos(endA);
+        const rawEndY = tCy + STATE_RADIUS * Math.sin(endA);
+
+        // Control point
+        const midX = wire.fsmControlPt
+          ? wire.fsmControlPt.x
+          : (startX + rawEndX) / 2 + perpX * offset;
+        const midY = wire.fsmControlPt
+          ? wire.fsmControlPt.y
+          : (startY + rawEndY) / 2 + perpY * offset;
+
+        // Pull endpoint back along approach tangent for clean arrowhead
+        const isStraight = Math.abs(offset) < 1;
+        const tanAngle = isStraight
+          ? centerAngle
+          : Math.atan2(rawEndY - midY, rawEndX - midX);
+        const endX = rawEndX - ARROW_LEN * Math.cos(tanAngle);
+        const endY = rawEndY - ARROW_LEN * Math.sin(tanAngle);
+
+        if (isStraight) {
+          pathD = `M${startX},${startY} L${endX},${endY}`;
+        } else {
+          pathD = `M${startX},${startY} Q${midX},${midY} ${endX},${endY}`;
+        }
+        // Control point position on the curve (for the draggable dot)
+        // For Q bezier: point at t=0.5 is (S + 2*C + E) / 4
+        curvePointX = isStraight ? (startX + endX) / 2 : (startX + 2 * midX + rawEndX) / 4;
+        curvePointY = isStraight ? (startY + endY) / 2 : (startY + 2 * midY + rawEndY) / 4;
+
+        // Label offset: above or to the side of the wire
+        const curveTangentX = isStraight ? (endX - startX) : (rawEndX - startX);
+        const curveTangentY = isStraight ? (endY - startY) : (rawEndY - startY);
+        const tLen = Math.hypot(curveTangentX, curveTangentY) || 1;
+        const labelOffsetDist = 14;
+        // Perpendicular to the tangent at the midpoint, away from center of curvature
+        const labelNx = -curveTangentY / tLen;
+        const labelNy = curveTangentX / tLen;
+        const labelSide = offset >= 0 ? 1 : -1;
         labelPos = {
-          x: (startX + 2 * midX + endX) / 4,
-          y: (startY + 2 * midY + endY) / 4,
+          x: curvePointX + labelNx * labelOffsetDist * labelSide,
+          y: curvePointY + labelNy * labelOffsetDist * labelSide,
         };
       }
 
@@ -3144,6 +3329,7 @@ export function CircuitCanvas() {
         to,
         isFsmTransition: true,
         labelPos,
+        controlPt: isSelfLoop ? undefined : { x: curvePointX, y: curvePointY },
       });
     }
 
@@ -3420,7 +3606,11 @@ export function CircuitCanvas() {
                   wire={wire}
                   pathD={wd.pathD}
                   labelPos={wd.labelPos!}
+                  controlPt={wd.controlPt}
+                  from={wd.from}
+                  to={wd.to}
                   isSelected={selectedIds.includes(wire.id)}
+                  onSnapGuides={handleFsmSnapGuides}
                 />
               );
             }

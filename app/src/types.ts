@@ -52,6 +52,7 @@ export interface Wire {
   manualSegments?: WireManualSegment[]; // manual overrides for wire segments
   // FSM transition fields
   transitionLabel?: string; // e.g., "0:1" meaning "input 0, output 1"
+  fsmControlPt?: { x: number; y: number }; // manual curve control point
 }
 
 // Manual wire segment override: which segment index was moved to what position

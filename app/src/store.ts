@@ -266,6 +266,7 @@ interface AppState {
   fsmRunIntervalId: number | null;
   fsmHalted: boolean;
   setTransitionLabel: (wireId: string, label: string) => void;
+  setFsmControlPt: (wireId: string, pt: { x: number; y: number } | undefined) => void;
   fsmStep: () => void;
   fsmRun: () => void;
   fsmPause: () => void;
@@ -2806,6 +2807,14 @@ export const useStore = create<AppState>()((set, get) => ({
     set({
       wires: state.wires.map((w) =>
         w.id === wireId ? { ...w, transitionLabel: label } : w
+      ),
+    });
+  },
+
+  setFsmControlPt: (wireId, pt) => {
+    set({
+      wires: get().wires.map((w) =>
+        w.id === wireId ? { ...w, fsmControlPt: pt } : w
       ),
     });
   },
