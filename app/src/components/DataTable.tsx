@@ -214,14 +214,6 @@ export function DataTable() {
   const isFSM = buildMode === 'FSM';
 
   // ── Resizable panel ──
-  // Auto-expand panel width based on longest global sequence
-  const autoMinWidth = useMemo(() => {
-    if (!isSC || scGlobalSequences.length === 0) return 260;
-    const maxLen = Math.max(...scGlobalSequences.map((s) => Math.max(s.inputStr.length, s.outputStr.length)), 0);
-    // Each char ~7px in monospace 11px, plus padding. Two equal columns + play btn + arrows
-    const needed = Math.max(260, maxLen * 7 * 2 + 80);
-    return needed;
-  }, [isSC, scGlobalSequences]);
   const [panelWidth, _setPanelWidth] = useState(() => (typeof _prefs.current.panelWidth === 'number' ? _prefs.current.panelWidth as number : 260));
   const dragRef = useRef<{ startX: number; startW: number } | null>(null);
 
