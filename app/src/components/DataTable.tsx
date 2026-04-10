@@ -235,7 +235,7 @@ export function DataTable() {
     let lastWidth = panelWidth;
     const onMove = (ev: PointerEvent) => {
       if (!dragRef.current) return;
-      lastWidth = Math.max(160, Math.min(600, dragRef.current.startW + (dragRef.current.startX - ev.clientX)));
+      lastWidth = Math.max(0, Math.min(600, dragRef.current.startW + (dragRef.current.startX - ev.clientX)));
       setPanelWidth(lastWidth);
     };
     const onUp = () => {
@@ -447,7 +447,7 @@ export function DataTable() {
     const fsmOutputStr = fsmHistory.map((h) => String(h.output)).join('');
 
     return (
-      <div className="data-table-panel" style={{ width: Math.max(panelWidth, autoMinWidth) }}>
+      <div className="data-table-panel" style={{ width: panelWidth }}>
         <div className="panel-resize-handle" onPointerDown={onResizePointerDown} />
         <div className="data-table-panel-inner">
         <div className="data-table-content">
@@ -606,7 +606,7 @@ export function DataTable() {
 
   if (inputs.length === 0) {
     return (
-      <div className="data-table-panel" style={{ width: Math.max(panelWidth, autoMinWidth) }}>
+      <div className="data-table-panel" style={{ width: panelWidth }}>
         <div className="panel-resize-handle" onPointerDown={onResizePointerDown} />
         <div className="data-table-panel-inner">
           <div className="table-header" />
@@ -641,7 +641,7 @@ export function DataTable() {
   const nonCCHasRows = !isCC && !isSC && tableRows.length > 0;
 
   return (
-    <div className="data-table-panel" style={{ width: Math.max(panelWidth, autoMinWidth) }}>
+    <div className="data-table-panel" style={{ width: panelWidth }}>
       <div className="panel-resize-handle" onPointerDown={onResizePointerDown} />
       <div className="data-table-panel-inner">
       <div className="data-table-content">
