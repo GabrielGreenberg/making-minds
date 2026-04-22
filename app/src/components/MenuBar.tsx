@@ -230,7 +230,7 @@ export function MenuBar() {
         className="menu-item"
         onClick={() => setOpenMenu(openMenu === 'file' ? null : 'file')}
       >
-        File*
+        File
         {openMenu === 'file' && (
           <div className="menu-dropdown">
             <div className="menu-dropdown-item" onClick={handleNewWorkbook}>
