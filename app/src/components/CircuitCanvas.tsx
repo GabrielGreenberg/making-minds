@@ -1033,9 +1033,12 @@ function FsmTransitionView({
   onSnapGuides: (guides: AlignGuide[]) => void;
 }) {
   const [editing, setEditing] = useState(false);
-  const [editValue, setEditValue] = useState('');
+  const [editLeft, setEditLeft] = useState('0');
+  const [editRight, setEditRight] = useState('0');
   const [dragging, setDragging] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
+  const inputRef2 = useRef<HTMLInputElement>(null);
+  const blurTimeoutRef = useRef<number | null>(null);
 
   const label = wire.transitionLabel || '?:?';
   const color = isSelected ? '#2a7fff' : '#333';
@@ -1049,15 +1052,26 @@ function FsmTransitionView({
 
   const handleLabelClick = (e: React.MouseEvent) => {
     e.stopPropagation();
-    setEditValue(label);
+    const current = wire.transitionLabel || '0:0';
+    const parts = current.split(':');
+    setEditLeft(parts[0] === '1' ? '1' : '0');
+    setEditRight(parts[1] === '1' ? '1' : '0');
     setEditing(true);
   };
 
   const commitEdit = () => {
     setEditing(false);
-    const trimmed = editValue.trim();
-    if (trimmed && /^\d:\d$/.test(trimmed)) {
-      useStore.getState().setTransitionLabel(wire.id, trimmed);
+    useStore.getState().setTransitionLabel(wire.id, `${editLeft}:${editRight}`);
+  };
+
+  const handleInputBlur = () => {
+    blurTimeoutRef.current = window.setTimeout(commitEdit, 50);
+  };
+
+  const handleInputFocus = () => {
+    if (blurTimeoutRef.current !== null) {
+      clearTimeout(blurTimeoutRef.current);
+      blurTimeoutRef.current = null;
     }
   };
 
@@ -1205,35 +1219,103 @@ function FsmTransitionView({
       )}
       {editing && (
         <foreignObject
-          x={labelPos.x - 24}
-          y={labelPos.y - 12}
-          width={48}
-          height={24}
+          x={labelPos.x - 30}
+          y={labelPos.y - 13}
+          width={60}
+          height={26}
         >
-          <input
-            ref={inputRef}
-            type="text"
-            value={editValue}
-            onChange={(e) => setEditValue(e.target.value)}
-            onBlur={commitEdit}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') commitEdit();
-              if (e.key === 'Escape') setEditing(false);
-            }}
-            style={{
-              width: '100%',
-              height: '100%',
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            width: '100%',
+            height: '100%',
+            gap: 2,
+            background: 'white',
+            border: '1px solid #2a7fff',
+            borderRadius: 3,
+            boxSizing: 'border-box',
+          }}>
+            <input
+              ref={inputRef}
+              type="text"
+              value={editLeft}
+              onChange={() => {}}
+              onFocus={handleInputFocus}
+              onBlur={handleInputBlur}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') { commitEdit(); return; }
+                if (e.key === 'Escape') { setEditing(false); return; }
+                if (e.key === '0' || e.key === '1') {
+                  setEditLeft(e.key);
+                  inputRef2.current?.focus();
+                  e.preventDefault();
+                  return;
+                }
+                if (e.key === 'ArrowRight' || (e.key === 'Tab' && !e.shiftKey)) {
+                  inputRef2.current?.focus();
+                  e.preventDefault();
+                  return;
+                }
+                e.preventDefault();
+              }}
+              style={{
+                width: 16,
+                height: '100%',
+                fontSize: 12,
+                fontFamily: "'SF Mono', 'Fira Code', monospace",
+                fontWeight: 600,
+                textAlign: 'center',
+                border: 'none',
+                outline: 'none',
+                padding: 0,
+                background: 'transparent',
+              }}
+            />
+            <span style={{
               fontSize: 12,
               fontFamily: "'SF Mono', 'Fira Code', monospace",
               fontWeight: 600,
-              textAlign: 'center',
-              border: '1px solid #2a7fff',
-              borderRadius: 3,
-              outline: 'none',
-              padding: 0,
-              background: 'white',
-            }}
-          />
+              color: '#555',
+              userSelect: 'none',
+              lineHeight: 1,
+            }}>:</span>
+            <input
+              ref={inputRef2}
+              type="text"
+              value={editRight}
+              onChange={() => {}}
+              onFocus={handleInputFocus}
+              onBlur={handleInputBlur}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') { commitEdit(); return; }
+                if (e.key === 'Escape') { setEditing(false); return; }
+                if (e.key === '0' || e.key === '1') {
+                  setEditRight(e.key);
+                  e.preventDefault();
+                  return;
+                }
+                if (e.key === 'Backspace' || e.key === 'ArrowLeft' || (e.key === 'Tab' && e.shiftKey)) {
+                  inputRef.current?.focus();
+                  e.preventDefault();
+                  return;
+                }
+                e.preventDefault();
+              }}
+              style={{
+                width: 16,
+                height: '100%',
+                fontSize: 12,
+                fontFamily: "'SF Mono', 'Fira Code', monospace",
+                fontWeight: 600,
+                textAlign: 'center',
+                border: 'none',
+                outline: 'none',
+                padding: 0,
+                background: 'transparent',
+              }}
+            />
+          </div>
         </foreignObject>
       )}
     </g>
@@ -3448,6 +3530,7 @@ export function CircuitCanvas() {
   const splitDots = useMemo(() => {
     const outputUsage = new Map<string, number>();
     for (const w of wires) {
+      if (w.transitionLabel !== undefined) continue; // FSM transitions don't split
       const key = `${w.sourceComponentId}:${w.sourcePortId}`;
       outputUsage.set(key, (outputUsage.get(key) || 0) + 1);
     }

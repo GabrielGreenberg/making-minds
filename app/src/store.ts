@@ -2802,6 +2802,7 @@ export const useStore = create<AppState>()((set, get) => ({
   fsmHalted: false,
 
   setTransitionLabel: (wireId, label) => {
+    if (!/^[01]:[01]$/.test(label)) return;
     const state = get();
     state.pushHistory();
     set({
@@ -2870,8 +2871,8 @@ export const useStore = create<AppState>()((set, get) => ({
     for (const t of transitions) {
       if (!t.transitionLabel) continue;
       const parts = t.transitionLabel.split(':');
-      if (parts.length !== 2) continue;
-      const tInput = parseInt(parts[0]);
+      if (parts.length !== 2 || (parts[0] !== '0' && parts[0] !== '1') || (parts[1] !== '0' && parts[1] !== '1')) continue;
+      const tInput = parts[0] === '1' ? 1 : 0;
       if (tInput === inputBit) {
         matchedTransition = t;
         break;
@@ -2885,7 +2886,7 @@ export const useStore = create<AppState>()((set, get) => ({
     }
 
     const parts = matchedTransition.transitionLabel!.split(':');
-    const output = parseInt(parts[1]) || 0;
+    const output = parts[1] === '1' ? 1 : 0;
     const nextStateId = matchedTransition.targetComponentId;
     const nextState = components.find((c) => c.id === nextStateId);
 
