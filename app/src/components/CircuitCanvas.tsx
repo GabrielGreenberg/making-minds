@@ -141,6 +141,43 @@ function pointsToPathD(points: { x: number; y: number }[]): string {
   return d;
 }
 
+/** Build a pathD string identical to pointsToPathD but with a small upward
+ *  arc substituted wherever a horizontal segment crosses a vertical wire.
+ *  Both wires remain visually continuous — no white gaps. */
+function pathDWithBumps(
+  points: { x: number; y: number }[],
+  crossings: { x: number; y: number }[],
+  R = 5
+): string {
+  if (points.length === 0) return '';
+  if (crossings.length === 0) return pointsToPathD(points);
+
+  let d = `M${points[0].x},${points[0].y}`;
+  for (let i = 0; i < points.length - 1; i++) {
+    const a = points[i], b = points[i + 1];
+    const isHoriz = Math.abs(a.y - b.y) < 0.5;
+    if (!isHoriz) { d += ` L${b.x},${b.y}`; continue; }
+
+    const goingRight = b.x >= a.x;
+    const minX = Math.min(a.x, b.x), maxX = Math.max(a.x, b.x);
+    const hits = crossings
+      .filter(cp => Math.abs(cp.y - a.y) < 2 && cp.x > minX + R && cp.x < maxX - R)
+      .sort((p, q) => goingRight ? p.x - q.x : q.x - p.x);
+
+    if (hits.length === 0) { d += ` L${b.x},${b.y}`; continue; }
+
+    for (const cp of hits) {
+      if (goingRight) {
+        d += ` L${cp.x - R},${a.y} A${R},${R} 0 0,0 ${cp.x + R},${a.y}`;
+      } else {
+        d += ` L${cp.x + R},${a.y} A${R},${R} 0 0,1 ${cp.x - R},${a.y}`;
+      }
+    }
+    d += ` L${b.x},${b.y}`;
+  }
+  return d;
+}
+
 // ─── Alignment guides ────────────────────────────────────────────
 
 interface AlignGuide {
@@ -836,11 +873,11 @@ function CircuitComponentView({
 
 // ─── Wire rendering ──────────────────────────────────────────────
 
+
 function WireView({
   wire,
   pathD,
   pathPoints,
-  crossings,
   isSelected,
   fromPos,
   toPos,
@@ -849,7 +886,6 @@ function WireView({
   wire: Wire;
   pathD: string;
   pathPoints: { x: number; y: number }[];
-  crossings: { x: number; y: number }[];
   isSelected: boolean;
   fromPos: { x: number; y: number };
   toPos: { x: number; y: number };
@@ -924,19 +960,6 @@ function WireView({
           />
         );
       })}
-      {/* ── Crossing bridge/hop indicators (§8) ────────────────────── */}
-      {crossings.map((cp, ci) => (
-        <circle
-          key={`cross-${wire.id}-${ci}`}
-          cx={cp.x}
-          cy={cp.y}
-          r={4}
-          fill="white"
-          stroke={isSelected ? '#2a7fff' : color}
-          strokeWidth={strokeW}
-          pointerEvents="none"
-        />
-      ))}
       {showValues && !isBlankWire && (() => {
         // Determine annotation positions from actual wire stub direction.
         // pathPoints[0]=port, [1]=stub tip tells us the source direction;
@@ -3385,6 +3408,38 @@ export function CircuitCanvas() {
     }
 
     previousPathsRef.current = nextPreviousPaths;
+
+    // ── Crossing detection + bump path generation ─────────────────
+    // Detect perpendicular crossings from the final displayed paths
+    // (after routing + manual-segment adjustments) and bake the arc
+    // directly into each horizontal wire's pathD so both wires remain
+    // visually continuous with no white gaps.
+    for (const [wireId, wd] of data) {
+      if (wd.isFsmTransition) continue;
+      const crossings: { x: number; y: number }[] = [];
+      const pts = wd.points;
+      for (let i = 0; i < pts.length - 1; i++) {
+        const a = pts[i], b = pts[i + 1];
+        if (Math.abs(a.y - b.y) > 0.5) continue;
+        const minHx = Math.min(a.x, b.x), maxHx = Math.max(a.x, b.x);
+        for (const [otherId, owd] of data) {
+          if (otherId === wireId || owd.isFsmTransition) continue;
+          const opts = owd.points;
+          for (let j = 0; j < opts.length - 1; j++) {
+            const c = opts[j], d = opts[j + 1];
+            if (Math.abs(c.x - d.x) > 0.5) continue;
+            const minVy = Math.min(c.y, d.y), maxVy = Math.max(c.y, d.y);
+            if (c.x > minHx + 1 && c.x < maxHx - 1 && a.y > minVy + 1 && a.y < maxVy - 1) {
+              crossings.push({ x: c.x, y: a.y });
+            }
+          }
+        }
+      }
+      if (crossings.length > 0) {
+        wd.pathD = pathDWithBumps(wd.points, crossings);
+      }
+    }
+
     wireDataRef.current = data;
     return data;
   }, [wires, components]);
@@ -3620,7 +3675,6 @@ export function CircuitCanvas() {
                 wire={wire}
                 pathD={wd.pathD}
                 pathPoints={wd.points}
-                crossings={wd.crossings}
                 isSelected={selectedIds.includes(wire.id)}
                 fromPos={wd.from}
                 toPos={wd.to}
@@ -3628,6 +3682,7 @@ export function CircuitCanvas() {
               />
             );
           })}
+
 
           {/* Split dots */}
           {splitDots}
