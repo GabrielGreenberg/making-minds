@@ -380,6 +380,7 @@ function CircuitComponentView({
   isSelected: boolean;
 }) {
   const { w, h } = getCompDimensions(comp);
+  const fsmCurrentStateId = useStore((s) => s.fsmCurrentStateId);
 
   const rot = comp.rotation ?? 0;
   const cx = comp.x + w / 2;
@@ -763,7 +764,6 @@ function CircuitComponentView({
         );
 
       case 'STATE': {
-        const fsmCurrentStateId = useStore.getState().fsmCurrentStateId;
         const isCurrentState = fsmCurrentStateId === comp.id;
         // Initial state: S₀ (label contains ₀)
         const isInitialState = comp.label.includes('₀');

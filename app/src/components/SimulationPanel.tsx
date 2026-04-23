@@ -36,7 +36,7 @@ function ToolbarDropdown({ label, items, activeId, onSelect }: {
   return (
     <div ref={ref} style={{ position: 'relative' }}>
       <span className="toolbar-menu-label" onClick={() => setOpen(!open)}>
-        {label} <span style={{ fontSize: 14, marginLeft: 2, opacity: 0.6, position: 'relative', top: '-3px', fontWeight: 300 }}>{'\u2304'}</span>
+        {label} <span style={{ fontSize: 14, marginLeft: 2, opacity: 0.6, position: 'relative', top: '-3px', fontWeight: 300 }}>{'⌄'}</span>
       </span>
       {open && (
         <div className="toolbar-dropdown-menu">
@@ -46,7 +46,7 @@ function ToolbarDropdown({ label, items, activeId, onSelect }: {
               className={`toolbar-dropdown-item${item.id === activeId ? ' active' : ''}`}
               onClick={() => { onSelect(item.id); setOpen(false); }}
             >
-              <span className="toolbar-dropdown-check">{item.id === activeId ? '\u2713' : ''}</span>
+              <span className="toolbar-dropdown-check">{item.id === activeId ? '✓' : ''}</span>
               {item.label}
             </div>
           ))}
@@ -75,7 +75,7 @@ function OptionsDropdown({ items }: {
   return (
     <div ref={ref} style={{ position: 'relative' }}>
       <span className="toolbar-menu-label" onClick={() => setOpen(!open)}>
-        Options <span style={{ fontSize: 14, marginLeft: 2, opacity: 0.6, position: 'relative', top: '-3px', fontWeight: 300 }}>{'\u2304'}</span>
+        Options <span style={{ fontSize: 14, marginLeft: 2, opacity: 0.6, position: 'relative', top: '-3px', fontWeight: 300 }}>{'⌄'}</span>
       </span>
       {open && (
         <div className="toolbar-dropdown-menu">
@@ -85,7 +85,7 @@ function OptionsDropdown({ items }: {
               className="toolbar-dropdown-item"
               onClick={() => item.onToggle()}
             >
-              <span className="toolbar-dropdown-check">{item.checked ? '\u2713' : ''}</span>
+              <span className="toolbar-dropdown-check">{item.checked ? '✓' : ''}</span>
               {item.label}
             </div>
           ))}
@@ -109,6 +109,10 @@ export function SimulationToolbar() {
   const hasSelection = useStore((s) => s.selectedIds.length > 0);
 
   const isFSM = buildMode === 'FSM';
+  const fsmCurrentStateId = useStore((s) => s.fsmCurrentStateId);
+  const fsmCurrentStateLabel = isFSM && fsmCurrentStateId
+    ? components.find((c) => c.id === fsmCurrentStateId)?.label ?? null
+    : null;
 
   const handleReset = () => {
     const state = useStore.getState();
@@ -166,14 +170,23 @@ export function SimulationToolbar() {
           }}
           title="Rotate selected components 90°"
         >
-          <span className="toolbar-icon">{'\u21BB'}</span> Rotate
+          <span className="toolbar-icon">{'↻'}</span> Rotate
         </button>
-        <span
-          className="autosave-indicator"
-          title={autoSaveStatus === 'saved' ? 'All changes saved' : autoSaveStatus === 'saving' ? 'Saving...' : 'Unsaved changes'}
-        >
-          {autoSaveStatus === 'saved' ? '\u2713 Saved' : autoSaveStatus === 'saving' ? 'Saving...' : '\u2022 Unsaved'}
-        </span>
+
+        <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 12 }}>
+          {isFSM && (
+            <span style={{ fontSize: 12, color: '#555', fontFamily: "'SF Mono', 'Fira Code', monospace" }}>
+              Current state: {fsmCurrentStateLabel ?? 'S₀'}
+            </span>
+          )}
+          <span
+            className="autosave-indicator"
+            style={{ marginLeft: 0 }}
+            title={autoSaveStatus === 'saved' ? 'All changes saved' : autoSaveStatus === 'saving' ? 'Saving...' : 'Unsaved changes'}
+          >
+            {autoSaveStatus === 'saved' ? '✓ Saved' : autoSaveStatus === 'saving' ? 'Saving...' : '• Unsaved'}
+          </span>
+        </div>
       </div>
     </>
   );
