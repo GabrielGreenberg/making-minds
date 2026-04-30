@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { useStore } from '../store';
 import type { ComponentType } from '../types';
 
@@ -122,6 +123,75 @@ const MACHINE_LABELS: Record<string, string> = {
   TM: 'Turing Machine',
 };
 
+function ConfirmedBoxItem({ box, numIn, numOut, isSelected }: {
+  box: { id: string; name: string; inputPortIds: string[]; outputPortIds: string[] };
+  numIn: number;
+  numOut: number;
+  isSelected: boolean;
+}) {
+  const [hovered, setHovered] = useState(false);
+
+  return (
+    <div
+      className={`library-item${isSelected ? ' library-item-selected' : ''}`}
+      draggable
+      onDragStart={(e) => {
+        e.dataTransfer.setData('componentType', 'BOXED_INSTANCE');
+        e.dataTransfer.setData('boxDefinitionId', box.id);
+        e.dataTransfer.effectAllowed = 'copy';
+      }}
+      onClick={() => useStore.getState().placeBoxInstance(box.id, 200, 200)}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      style={{ cursor: 'pointer', position: 'relative' }}
+    >
+      <svg viewBox="0 0 56 40">
+        <rect x="8" y="4" width="40" height="32" rx="3" fill="none" stroke="#333" strokeWidth="2" />
+        {Array.from({ length: numIn }).map((_, i) => {
+          const py = 4 + (32 / (numIn + 1)) * (i + 1);
+          return (
+            <g key={`in-${i}`}>
+              <line x1="2" y1={py} x2="8" y2={py} stroke="#333" strokeWidth="1.5" />
+              <circle cx="2" cy={py} r="2" fill="#555" />
+            </g>
+          );
+        })}
+        {Array.from({ length: numOut }).map((_, i) => {
+          const py = 4 + (32 / (numOut + 1)) * (i + 1);
+          return (
+            <g key={`out-${i}`}>
+              <line x1="48" y1={py} x2="54" y2={py} stroke="#333" strokeWidth="1.5" />
+              <circle cx="54" cy={py} r="2" fill="#555" />
+            </g>
+          );
+        })}
+        <text x="28" y="24" textAnchor="middle" fontSize="8" fontWeight="600" fill="#333">{box.name}</text>
+      </svg>
+      {hovered && (
+        <span
+          style={{
+            position: 'absolute',
+            top: 2,
+            right: 4,
+            fontSize: 14,
+            lineHeight: 1,
+            color: '#999',
+            cursor: 'pointer',
+            userSelect: 'none',
+          }}
+          title="Remove from library"
+          onClick={(e) => {
+            e.stopPropagation();
+            useStore.getState().removeConfirmedBox(box.id);
+          }}
+        >
+          ×
+        </span>
+      )}
+    </div>
+  );
+}
+
 export function ComponentLibrary() {
   const buildMode = useStore((s) => s.buildMode);
   const boxedLibrary = useStore((s) => s.boxedLibrary);
@@ -209,46 +279,13 @@ export function ComponentLibrary() {
             const numIn = box.inputPortIds.length;
             const numOut = box.outputPortIds.length;
             return (
-              <div
+              <ConfirmedBoxItem
                 key={box.id}
-                className={`library-item${selectedTool === (`BOX:${box.id}` as any) ? ' library-item-selected' : ''}`}
-                draggable
-                onDragStart={(e) => {
-                  e.dataTransfer.setData('componentType', 'BOXED_INSTANCE');
-                  e.dataTransfer.setData('boxDefinitionId', box.id);
-                  e.dataTransfer.effectAllowed = 'copy';
-                }}
-                onClick={() => {
-                  useStore.getState().placeBoxInstance(box.id, 200, 200);
-                }}
-                style={{ cursor: 'pointer' }}
-              >
-                <svg viewBox="0 0 56 40">
-                  {/* Solid box outline */}
-                  <rect x="8" y="4" width="40" height="32" rx="3" fill="none" stroke="#333" strokeWidth="2" />
-                  {/* Input ports (left side) */}
-                  {Array.from({ length: numIn }).map((_, i) => {
-                    const py = 4 + (32 / (numIn + 1)) * (i + 1);
-                    return (
-                      <g key={`in-${i}`}>
-                        <line x1="2" y1={py} x2="8" y2={py} stroke="#333" strokeWidth="1.5" />
-                        <circle cx="2" cy={py} r="2" fill="#555" />
-                      </g>
-                    );
-                  })}
-                  {/* Output ports (right side) */}
-                  {Array.from({ length: numOut }).map((_, i) => {
-                    const py = 4 + (32 / (numOut + 1)) * (i + 1);
-                    return (
-                      <g key={`out-${i}`}>
-                        <line x1="48" y1={py} x2="54" y2={py} stroke="#333" strokeWidth="1.5" />
-                        <circle cx="54" cy={py} r="2" fill="#555" />
-                      </g>
-                    );
-                  })}
-                  <text x="28" y="24" textAnchor="middle" fontSize="8" fontWeight="600" fill="#333">{box.name}</text>
-                </svg>
-              </div>
+                box={box}
+                numIn={numIn}
+                numOut={numOut}
+                isSelected={selectedTool === (`BOX:${box.id}` as any)}
+              />
             );
           })}
         </div>

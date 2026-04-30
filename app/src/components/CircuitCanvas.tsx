@@ -3066,6 +3066,8 @@ export function CircuitCanvas() {
               s.localStepSelect(inBits, memBits);
             }, 0);
           }
+          // Still select the component so Backspace can delete it
+          state.setSelectedIds([comp.id]);
           return;
         }
 

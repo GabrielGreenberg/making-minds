@@ -162,6 +162,7 @@ interface AppState {
   updateBox: (id: string, updates: Partial<BoxDefinition>) => void;
   removeBox: (id: string) => void;
   confirmBox: (id: string) => string | null; // returns error or null
+  removeConfirmedBox: (id: string) => void;
   placeBoxInstance: (boxId: string, x: number, y: number) => void; // place a copy of a box as a BOXED component
 
   // Global box library — confirmed boxes available across all tabs
@@ -1491,6 +1492,27 @@ export const useStore = create<AppState>()((set, get) => ({
     const state = get();
     state.pushHistory();
     set({ boxes: state.boxes.filter((b) => b.id !== id) });
+  },
+  removeConfirmedBox: (id) => {
+    const state = get();
+    state.pushHistory();
+    // Remove placed BOXED instances that reference this box definition
+    const removedCompIds = new Set(
+      state.components.filter((c) => c.type === 'BOXED' && c.boxedCircuitId === id).map((c) => c.id)
+    );
+    const newComponents = state.components.filter((c) => !removedCompIds.has(c.id));
+    const newWires = state.wires.filter(
+      (w) => !removedCompIds.has(w.sourceComponentId) && !removedCompIds.has(w.targetComponentId)
+    );
+    // Remove the BoxDefinition from the canvas boxes list too
+    const newBoxes = state.boxes.filter((b) => b.id !== id);
+    set({
+      confirmedBoxLibrary: state.confirmedBoxLibrary.filter((b) => b.id !== id),
+      components: newComponents,
+      wires: newWires,
+      boxes: newBoxes,
+      selectedIds: state.selectedIds.filter((sid) => !removedCompIds.has(sid)),
+    });
   },
   confirmBox: (id) => {
     const state = get();
