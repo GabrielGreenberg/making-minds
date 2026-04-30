@@ -1,5 +1,13 @@
 import { useState, useRef, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { useStore } from '../store';
+import type { BuildMode } from '../types';
+
+const MACHINE_OPTIONS: { mode: BuildMode; label: string }[] = [
+  { mode: 'CC',  label: 'Logic Circuit' },
+  { mode: 'FSM', label: 'Finite State Machine' },
+  { mode: 'TM',  label: 'Turing Machine' },
+];
 
 function EditableTabTitle({
   tabId,
@@ -68,13 +76,93 @@ function EditableTabTitle({
   );
 }
 
+function AddTabButton() {
+  const [open, setOpen] = useState(false);
+  const [menuPos, setMenuPos] = useState({ top: 0, left: 0 });
+  const btnRef = useRef<HTMLButtonElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+  const { tabs, addTab } = useStore();
+
+  useEffect(() => {
+    if (!open) return;
+    const handler = (e: Event) => {
+      const target = e.target as Node;
+      if (btnRef.current?.contains(target) || menuRef.current?.contains(target)) return;
+      setOpen(false);
+    };
+    document.addEventListener('pointerdown', handler, true);
+    return () => document.removeEventListener('pointerdown', handler, true);
+  }, [open]);
+
+  const handleOpen = () => {
+    if (btnRef.current) {
+      const rect = btnRef.current.getBoundingClientRect();
+      setMenuPos({ top: rect.bottom + 2, left: rect.left });
+    }
+    setOpen((o) => !o);
+  };
+
+  const handleSelect = (mode: BuildMode, label: string) => {
+    const count = tabs.filter((t) => t.buildMode === mode).length + 1;
+    addTab(`${label} ${count}`, mode, 'arithmetic');
+    setOpen(false);
+  };
+
+  return (
+    <>
+      <button
+        ref={btnRef}
+        className="tab-add-btn"
+        onClick={handleOpen}
+        title="New worksheet"
+      >
+        +
+      </button>
+      {open && createPortal(
+        <div
+          ref={menuRef}
+          style={{
+            position: 'fixed',
+            top: menuPos.top,
+            left: menuPos.left,
+            background: 'white',
+            border: '1px solid #ddd',
+            borderRadius: 6,
+            boxShadow: '0 4px 16px rgba(0,0,0,0.15)',
+            minWidth: 190,
+            zIndex: 9999,
+            overflow: 'hidden',
+          }}
+        >
+          {MACHINE_OPTIONS.map((opt) => (
+            <div
+              key={opt.mode}
+              onPointerDown={() => handleSelect(opt.mode, opt.label)}
+              style={{
+                padding: '9px 16px',
+                fontSize: 13,
+                cursor: 'pointer',
+                userSelect: 'none',
+              }}
+              onMouseEnter={(e) => (e.currentTarget.style.background = '#f0f0f0')}
+              onMouseLeave={(e) => (e.currentTarget.style.background = 'white')}
+            >
+              {opt.label}
+            </div>
+          ))}
+        </div>,
+        document.body
+      )}
+    </>
+  );
+}
+
 export function TabBar() {
   const {
     tabs,
     activeTabId,
     switchTab,
     removeTab,
-    addTab,
     homework,
     currentProblemIndex,
     switchProblem,
@@ -83,7 +171,6 @@ export function TabBar() {
     switchProblemPage,
   } = useStore();
 
-  // Problem Set mode tabs
   if (problemSet) {
     return (
       <div className="tab-bar">
@@ -100,7 +187,6 @@ export function TabBar() {
     );
   }
 
-  // Legacy homework mode tabs
   if (homework) {
     return (
       <div className="tab-bar">
@@ -138,18 +224,12 @@ export function TabBar() {
                 removeTab(tab.id);
               }}
             >
-              {'\u00D7'}
+              {'×'}
             </span>
           )}
         </div>
       ))}
-      <button
-        className="tab-add-btn"
-        onClick={() => addTab(`Circuit ${tabs.length + 1}`, 'CC', 'arithmetic')}
-        title="New worksheet"
-      >
-        +
-      </button>
+      <AddTabButton />
     </div>
   );
 }

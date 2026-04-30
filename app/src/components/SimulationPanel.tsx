@@ -1,12 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
 import { useStore } from '../store';
-import type { BuildMode } from '../types';
-
-const MACHINE_OPTIONS: { mode: BuildMode; label: string }[] = [
-  { mode: 'CC', label: 'Logic Circuit' },
-  { mode: 'FSM', label: 'Finite State Machine' },
-  { mode: 'TM', label: 'Turing Machine' },
-];
 
 const TASK_OPTIONS: { id: 'arithmetic' | 'turbot' | 'navigation' | 'perception'; label: string }[] = [
   { id: 'arithmetic', label: 'Arithmetic' },
@@ -99,7 +92,6 @@ export function SimulationToolbar() {
   const snapToAlign = useStore((s) => s.snapToAlign);
   const setSnapToAlign = useStore((s) => s.setSnapToAlign);
   const buildMode = useStore((s) => s.buildMode);
-  const setBuildMode = useStore((s) => s.setBuildMode);
   const activeTask = useStore((s) => s.activeTask);
   const setActiveTask = useStore((s) => s.setActiveTask);
   const components = useStore((s) => s.components);
@@ -132,13 +124,6 @@ export function SimulationToolbar() {
   return (
     <>
       <div className="simulation-toolbar">
-        <ToolbarDropdown
-          label="Machine"
-          items={MACHINE_OPTIONS.map((m) => ({ id: m.mode, label: m.label }))}
-          activeId={buildMode === 'SC' ? 'CC' : buildMode}
-          onSelect={(id) => setBuildMode(id as BuildMode)}
-        />
-
         <ToolbarDropdown
           label="Task"
           items={TASK_OPTIONS.map((t) => ({ id: t.id, label: t.label }))}

@@ -906,6 +906,16 @@ export const useStore = create<AppState>()((set, get) => ({
         return;
       }
     }
+
+    // FSM only: at most 2 outgoing transitions per state
+    if (isFsmTransition && state.buildMode === 'FSM') {
+      const outgoing = state.wires.filter((w) => w.sourceComponentId === sourceCompId && w.transitionLabel !== undefined);
+      if (outgoing.length >= 2) {
+        console.warn('FSM violation: a state can have at most 2 outgoing transitions');
+        return;
+      }
+    }
+
     state.pushHistory();
     const wire: Wire = {
       id: uuid(),

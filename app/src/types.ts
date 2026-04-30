@@ -218,8 +218,8 @@ export function getPortsForType(type: ComponentType): Port[] {
       ];
     case 'STATE':
       return [
-        { id: 'in', label: '', side: 'left', index: 0 },
-        { id: 'out', label: '', side: 'right', index: 0 },
+        { id: 'left',  label: '', side: 'left',  index: 0 },
+        { id: 'right', label: '', side: 'right', index: 0 },
       ];
     default:
       return [];

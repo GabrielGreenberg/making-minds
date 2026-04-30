@@ -51,12 +51,17 @@ function getPortPositionLocal(
   const port = comp.ports.find((p) => p.id === portId);
   if (!port) return { x: comp.x, y: comp.y };
 
-  // STATE: ports at left and right edge of circle
+  // STATE: ports on left/right of circle circumference
   if (comp.type === 'STATE') {
     const cx = comp.x + STATE_RADIUS;
     const cy = comp.y + STATE_RADIUS;
-    if (portId === 'in') return { x: cx - STATE_RADIUS, y: cy };
-    return { x: cx + STATE_RADIUS, y: cy };
+    switch (portId) {
+      case 'in':
+      case 'left':  return { x: cx - STATE_RADIUS, y: cy };
+      case 'out':
+      case 'right': return { x: cx + STATE_RADIUS, y: cy };
+      default:      return { x: cx, y: cy };
+    }
   }
 
   const { w, h } = getCompDimensions(comp);
@@ -765,29 +770,30 @@ function CircuitComponentView({
 
       case 'STATE': {
         const isCurrentState = fsmCurrentStateId === comp.id;
-        // Initial state: S₀ (label contains ₀)
-        const isInitialState = comp.label.includes('₀');
+        const ringR = STATE_RADIUS + 7;
+        const strokeColor = isCurrentState ? '#4caf50' : isSelected ? '#2a7fff' : '#333';
         return (
           <g>
-            {/* Outer circle for initial state (double circle) */}
-            {isInitialState && (
-              <circle
-                cx={cx}
-                cy={cy}
-                r={STATE_RADIUS + 4}
-                fill="none"
-                stroke={isSelected ? '#2a7fff' : '#333'}
-                strokeWidth={1.5}
-              />
-            )}
+            {/* Outer ring — wire-creation zone affordance */}
+            <circle
+              cx={cx}
+              cy={cy}
+              r={ringR}
+              fill="none"
+              stroke={strokeColor}
+              strokeWidth={1}
+              opacity={0.5}
+              pointerEvents="none"
+            />
             {/* Main state circle */}
             <circle
               cx={cx}
               cy={cy}
               r={STATE_RADIUS}
               fill={isCurrentState ? '#e8f5e9' : isSelected ? '#e3f2fd' : 'white'}
-              stroke={isCurrentState ? '#4caf50' : isSelected ? '#2a7fff' : '#333'}
+              stroke={strokeColor}
               strokeWidth={isSelected ? 2.5 : 2}
+              pointerEvents="none"
             />
             {/* State label */}
             <text
@@ -798,6 +804,7 @@ function CircuitComponentView({
               fontSize="16"
               fontWeight="700"
               fill="#333"
+              pointerEvents="none"
             >
               {comp.label}
             </text>
@@ -823,35 +830,77 @@ function CircuitComponentView({
 
   const renderPorts = () => {
     const isState = comp.type === 'STATE';
-    return comp.ports.map((port) => {
-      const pos = getPortPositionLocal(comp, port.id);
+
+    if (isState) {
+      const nodes = [
+        { id: 'left',  x: cx - STATE_RADIUS, y: cy, side: 'left'  },
+        { id: 'right', x: cx + STATE_RADIUS, y: cy, side: 'right' },
+      ];
       return (
-        <g key={port.id}>
-          <circle
-            cx={pos.x}
-            cy={pos.y}
-            r={isState ? STATE_RADIUS : PORT_HIT_RADIUS}
-            fill="transparent"
-            className="port-hit-area"
-            data-port-compid={comp.id}
-            data-port-id={port.id}
-            data-port-side={port.side}
-          />
-          {/* Hide visible port dots for STATE components */}
-          {!isState && (
+        <>
+          {/* Port hit areas */}
+          {nodes.map(({ id, x, y, side }) => (
             <circle
-              cx={pos.x}
-              cy={pos.y}
-              r={PORT_RADIUS}
-              fill="#bbb"
-              stroke="#000"
+              key={id}
+              cx={x}
+              cy={y}
+              r={STATE_RADIUS + 5}
+              fill="transparent"
+              className="port-hit-area"
+              data-port-compid={comp.id}
+              data-port-id={id}
+              data-port-side={side}
+            />
+          ))}
+          {/* Inner blocking circle — no port attrs, so inner clicks drag */}
+          <circle cx={cx} cy={cy} r={STATE_RADIUS - 1} fill="transparent" />
+          {/* Visual dots at left/right on the ring */}
+          {nodes.map(({ id, x, y }) => (
+            <circle
+              key={`dot-${id}`}
+              cx={x}
+              cy={y}
+              r={2.5}
+              fill="#888"
+              stroke="white"
               strokeWidth={1}
               pointerEvents="none"
             />
-          )}
-        </g>
+          ))}
+        </>
       );
-    });
+    }
+
+    return (
+      <>
+        {comp.ports.map((port) => {
+          const pos = getPortPositionLocal(comp, port.id);
+          return (
+            <g key={port.id}>
+              <circle
+                cx={pos.x}
+                cy={pos.y}
+                r={PORT_HIT_RADIUS}
+                fill="transparent"
+                className="port-hit-area"
+                data-port-compid={comp.id}
+                data-port-id={port.id}
+                data-port-side={port.side}
+              />
+              <circle
+                cx={pos.x}
+                cy={pos.y}
+                r={PORT_RADIUS}
+                fill="#bbb"
+                stroke="#000"
+                strokeWidth={1}
+                pointerEvents="none"
+              />
+            </g>
+          );
+        })}
+      </>
+    );
   };
 
   const rotation = comp.rotation ?? 0;
@@ -2542,7 +2591,7 @@ export function CircuitCanvas() {
           for (const port of comp.ports) {
             // For STATE: 'in' port is the target (or same comp for self-loop)
             // For MEM, target port depends on direction; for all others, left-side ports are targets
-            const isTargetPort = comp.type === 'STATE' ? port.id === 'in'
+            const isTargetPort = comp.type === 'STATE' ? port.id === 'left'
               : comp.type === 'MEM' ? isMemSinkPort(comp, port.id) : port.side === 'left';
             if (!isTargetPort) continue;
             const portPos = getPortPosition(comp, port.id);
@@ -2563,7 +2612,7 @@ export function CircuitCanvas() {
             if (canvasPos.x >= comp.x && canvasPos.x <= comp.x + w &&
                 canvasPos.y >= comp.y && canvasPos.y <= comp.y + h) {
               for (const port of comp.ports) {
-                const isTargetPort = comp.type === 'STATE' ? port.id === 'in'
+                const isTargetPort = comp.type === 'STATE' ? true
                   : comp.type === 'MEM' ? isMemSinkPort(comp, port.id) : port.side === 'left';
                 if (!isTargetPort) continue;
                 const portPos = getPortPosition(comp, port.id);
@@ -2891,7 +2940,7 @@ export function CircuitCanvas() {
       const isSourcePort = comp.type === 'MEM'
         ? isMemSourcePort(comp, hit.portId)
         : comp.type === 'STATE'
-        ? hit.portId === 'out'
+        ? hit.portId === 'right'
         : hit.portSide === 'right';
       if (isSourcePort) {
           const pos = getPortPosition(comp, hit.portId);
