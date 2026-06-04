@@ -164,16 +164,21 @@ interface AppState {
   confirmBox: (id: string) => string | null; // returns error or null
   removeConfirmedBox: (id: string) => void;
   placeBoxInstance: (boxId: string, x: number, y: number) => void; // place a copy of a box as a BOXED component
+  fsmPlaceBoxInstance: (boxId: string, x: number, y: number) => void; // expand FSM box states onto canvas
 
   // Global box library — confirmed boxes available across all tabs
   confirmedBoxLibrary: {
     id: string;
     name: string;
+    kind?: 'CC' | 'FSM';
     inputPortIds: string[];
     outputPortIds: string[];
     internalComponents: CircuitComponent[];
     internalWires: Wire[];
   }[];
+
+  // Clear workspace
+  clearWorkspace: () => void;
 
   // Delete selected
   deleteSelected: () => void;
@@ -908,15 +913,6 @@ export const useStore = create<AppState>()((set, get) => ({
       }
     }
 
-    // FSM only: at most 2 outgoing transitions per state
-    if (isFsmTransition && state.buildMode === 'FSM') {
-      const outgoing = state.wires.filter((w) => w.sourceComponentId === sourceCompId && w.transitionLabel !== undefined);
-      if (outgoing.length >= 2) {
-        console.warn('FSM violation: a state can have at most 2 outgoing transitions');
-        return;
-      }
-    }
-
     state.pushHistory();
     const wire: Wire = {
       id: uuid(),
@@ -1475,16 +1471,22 @@ export const useStore = create<AppState>()((set, get) => ({
       const newDraft = draftBox && draftBox.id === id
         ? { ...draftBox, ...updates }
         : draftBox;
-      // Sync name changes to global confirmedBoxLibrary
+      // Sync name changes to global confirmedBoxLibrary and placed instances
       const updatedLibrary = updates.name
         ? state.confirmedBoxLibrary.map((b) =>
             b.id === id ? { ...b, name: updates.name! } : b
           )
         : state.confirmedBoxLibrary;
+      const updatedComponents = updates.name
+        ? state.components.map((c) =>
+            c.boxedCircuitId === id ? { ...c, label: updates.name! } : c
+          )
+        : state.components;
       return {
         boxes: updatedBoxes,
         boxDrawing: { ...state.boxDrawing, draftBox: newDraft },
         confirmedBoxLibrary: updatedLibrary,
+        components: updatedComponents,
       };
     });
   },
@@ -1496,22 +1498,39 @@ export const useStore = create<AppState>()((set, get) => ({
   removeConfirmedBox: (id) => {
     const state = get();
     state.pushHistory();
-    // Remove placed BOXED instances that reference this box definition
-    const removedCompIds = new Set(
-      state.components.filter((c) => c.type === 'BOXED' && c.boxedCircuitId === id).map((c) => c.id)
-    );
-    const newComponents = state.components.filter((c) => !removedCompIds.has(c.id));
-    const newWires = state.wires.filter(
-      (w) => !removedCompIds.has(w.sourceComponentId) && !removedCompIds.has(w.targetComponentId)
-    );
-    // Remove the BoxDefinition from the canvas boxes list too
-    const newBoxes = state.boxes.filter((b) => b.id !== id);
+
+    // Helper: strip all instances of this box from a circuit snapshot
+    const stripBox = (comps: CircuitComponent[], wires: Wire[]) => {
+      const removedIds = new Set(
+        comps.filter((c) => c.boxedCircuitId === id).map((c) => c.id)
+      );
+      return {
+        components: comps.filter((c) => !removedIds.has(c.id)),
+        wires: wires.filter(
+          (w) => !removedIds.has(w.sourceComponentId) && !removedIds.has(w.targetComponentId)
+        ),
+        removedIds,
+      };
+    };
+
+    // Sweep the active tab
+    const { components: newComponents, wires: newWires, removedIds } =
+      stripBox(state.components, state.wires);
+
+    // Sweep all inactive tabs stored in tabCircuits
+    const newTabCircuits = new Map(state.tabCircuits);
+    for (const [tabId, circuit] of newTabCircuits) {
+      const { components, wires } = stripBox(circuit.components, circuit.wires);
+      newTabCircuits.set(tabId, { ...circuit, components, wires });
+    }
+
     set({
       confirmedBoxLibrary: state.confirmedBoxLibrary.filter((b) => b.id !== id),
       components: newComponents,
       wires: newWires,
-      boxes: newBoxes,
-      selectedIds: state.selectedIds.filter((sid) => !removedCompIds.has(sid)),
+      boxes: state.boxes.filter((b) => b.id !== id),
+      selectedIds: state.selectedIds.filter((sid) => !removedIds.has(sid)),
+      tabCircuits: newTabCircuits,
     });
   },
   confirmBox: (id) => {
@@ -1529,6 +1548,75 @@ export const useStore = create<AppState>()((set, get) => ({
     });
 
     if (insideComps.length === 0) return 'No components inside the box.';
+
+    // ── FSM boxing ────────────────────────────────────────────────
+    if (state.buildMode === 'FSM') {
+      const fsmComps = insideComps.filter((c) => c.type === 'STATE');
+      if (fsmComps.length === 0) return 'No states inside the box.';
+
+      const fsmIds = new Set(fsmComps.map((c) => c.id));
+
+      // All FSM transition wires among the boxed states
+      const internalWires = state.wires.filter(
+        (w) => fsmIds.has(w.sourceComponentId) && fsmIds.has(w.targetComponentId) && w.transitionLabel !== undefined
+      );
+
+      // No transitions may leave the box — S_B is terminal (no outputs)
+      const crossingOutWires = state.wires.filter(
+        (w) => fsmIds.has(w.sourceComponentId) && !fsmIds.has(w.targetComponentId) && w.transitionLabel !== undefined
+      );
+      if (crossingOutWires.length > 0) {
+        const culprits = [...new Set(crossingOutWires.map((w) => fsmComps.find((c) => c.id === w.sourceComponentId)?.label ?? ''))].join(', ');
+        return `State(s) ${culprits} have transitions leaving the box. The terminal state (S_B) must have no outgoing transitions — remove them before boxing.`;
+      }
+
+      // Rule 3: Exactly one terminal state S_B — the state with no outgoing transitions
+      const statesWithNoOutgoing = fsmComps.filter(
+        (c) => internalWires.filter((w) => w.sourceComponentId === c.id).length === 0
+      );
+      if (statesWithNoOutgoing.length === 0)
+        return 'No terminal state (S_B) found. Exactly one state must have no outgoing transitions — it becomes the exit point of the boxed machine.';
+      if (statesWithNoOutgoing.length > 1)
+        return `Multiple terminal states found (${statesWithNoOutgoing.map((c) => c.label).join(', ')}). Only one state may have no outgoing transitions (S_B).`;
+
+      // Rule 1: Every state except S_B must have exactly 2 outgoing transitions (completeness)
+      const sB = statesWithNoOutgoing[0];
+      for (const comp of fsmComps) {
+        if (comp.id === sB.id) continue;
+        const outgoing = internalWires.filter((w) => w.sourceComponentId === comp.id);
+        const inputs = outgoing.map((w) => w.transitionLabel!.split(':')[0]);
+        if (!inputs.includes('0')) return `State ${comp.label} is missing a transition for input 0. Every non-terminal state must handle all inputs.`;
+        if (!inputs.includes('1')) return `State ${comp.label} is missing a transition for input 1. Every non-terminal state must handle all inputs.`;
+      }
+
+      // Rule 2: S_A is the lowest-numbered state — must have at least one state inside
+      // (already satisfied since fsmComps.length > 0)
+
+      // Auto-name
+      const existingNames = state.confirmedBoxLibrary.map((b) => b.name);
+      let name = `FSM Box ${state.confirmedBoxLibrary.filter((b) => b.kind === 'FSM').length + 1}`;
+      let n = 1;
+      while (existingNames.includes(name)) { n++; name = `FSM Box ${n}`; }
+
+      const componentIds = fsmComps.map((c) => c.id);
+      set((s) => ({
+        boxes: s.boxes.map((b) => b.id === id ? { ...b, name, componentIds, inputPortIds: [], outputPortIds: [] } : b),
+        boxDrawing: { phase: 'idle', draftBox: null },
+        confirmedBoxLibrary: [
+          ...s.confirmedBoxLibrary,
+          {
+            id,
+            name,
+            kind: 'FSM' as const,
+            inputPortIds: [],
+            outputPortIds: [],
+            internalComponents: JSON.parse(JSON.stringify(fsmComps)),
+            internalWires: JSON.parse(JSON.stringify(internalWires)),
+          },
+        ],
+      }));
+      return null;
+    }
 
     const insideIds = new Set(insideComps.map((c) => c.id));
 
@@ -1767,7 +1855,46 @@ export const useStore = create<AppState>()((set, get) => ({
     setTimeout(() => get().evaluateCircuit(), 0);
   },
 
+  fsmPlaceBoxInstance: (boxId, x, y) => {
+    const state = get();
+    const entry = state.confirmedBoxLibrary.find((b) => b.id === boxId && b.kind === 'FSM');
+    if (!entry) return;
+    state.pushHistory();
+
+    // Place as a single box-shaped STATE component that represents the sub-machine
+    const comp: CircuitComponent = {
+      id: uuid(),
+      type: 'STATE',
+      x: snapToGrid(x),
+      y: snapToGrid(y),
+      label: entry.name,
+      ports: getPortsForType('STATE'),
+      boxedCircuitId: boxId,
+    };
+
+    set({ components: [...state.components, comp] });
+  },
+
   // Delete
+  clearWorkspace: () => {
+    const state = get();
+    state.pushHistory();
+    set({
+      components: [],
+      wires: [],
+      textElements: [],
+      comments: [],
+      boxes: [],
+      selectedIds: [],
+      boxDrawing: { phase: 'idle', draftBox: null },
+      nextInputNum: 1,
+      nextOutputNum: 1,
+      nextMemNum: 1,
+      nextStateNum: 0,
+    });
+    setTimeout(() => get().evaluateCircuit(), 0);
+  },
+
   deleteSelected: () => {
     const state = get();
     if (state.selectedIds.length === 0) return;

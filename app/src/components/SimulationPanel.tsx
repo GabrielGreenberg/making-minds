@@ -106,6 +106,8 @@ export function SimulationToolbar() {
     ? components.find((c) => c.id === fsmCurrentStateId)?.label ?? null
     : null;
 
+  const [showClearConfirm, setShowClearConfirm] = useState(false);
+
   const handleReset = () => {
     const state = useStore.getState();
     if (isFSM) {
@@ -140,8 +142,33 @@ export function SimulationToolbar() {
         <div className="toolbar-separator" />
 
         <button className="toolbar-btn" onClick={handleReset} title={isSC ? 'Reset to t=1, preserve input sequence' : 'Clear all inputs'}>
-          Clear
+          Reset
         </button>
+
+        <div style={{ position: 'relative' }}>
+          <button className="toolbar-btn" onClick={() => setShowClearConfirm(true)}>
+            Clear
+          </button>
+          {showClearConfirm && (
+            <div style={{
+              position: 'absolute', top: '100%', left: 0, marginTop: 4,
+              background: 'white', border: '1px solid #ddd', borderRadius: 6,
+              boxShadow: '0 4px 12px rgba(0,0,0,0.15)', padding: '10px 14px',
+              zIndex: 1000, whiteSpace: 'nowrap',
+            }}>
+              <div style={{ fontSize: 12, marginBottom: 8, color: '#333' }}>
+                Do you really want to clear the workspace?
+              </div>
+              <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
+                <button className="toolbar-btn" onClick={() => {
+                  useStore.getState().clearWorkspace();
+                  setShowClearConfirm(false);
+                }}>Yes</button>
+                <button className="toolbar-btn" onClick={() => setShowClearConfirm(false)}>No</button>
+              </div>
+            </div>
+          )}
+        </div>
 
         <div className="toolbar-separator" />
         <button

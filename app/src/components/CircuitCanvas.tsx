@@ -38,6 +38,7 @@ function getCompDimensions(comp: CircuitComponent): { w: number; h: number } {
     return { w: 50, h: 50 };
   }
   if (comp.type === 'STATE') {
+    if (comp.boxedCircuitId) return { w: 90, h: 50 };
     return { w: STATE_SIZE, h: STATE_SIZE };
   }
   return { w: COMP_WIDTH, h: COMP_HEIGHT };
@@ -51,8 +52,18 @@ function getPortPositionLocal(
   const port = comp.ports.find((p) => p.id === portId);
   if (!port) return { x: comp.x, y: comp.y };
 
-  // STATE: ports on left/right of circle circumference
+  // STATE: ports on left/right
   if (comp.type === 'STATE') {
+    if (comp.boxedCircuitId) {
+      // Boxed FSM instance: ports at left/right center of the rectangle
+      const { w, h } = getCompDimensions(comp);
+      const midY = comp.y + h / 2;
+      switch (portId) {
+        case 'left':  return { x: comp.x,     y: midY };
+        case 'right': return { x: comp.x + w, y: midY };
+        default:      return { x: comp.x + w / 2, y: midY };
+      }
+    }
     const cx = comp.x + STATE_RADIUS;
     const cy = comp.y + STATE_RADIUS;
     switch (portId) {
@@ -770,8 +781,33 @@ function CircuitComponentView({
 
       case 'STATE': {
         const isCurrentState = fsmCurrentStateId === comp.id;
-        const ringR = STATE_RADIUS + 7;
         const strokeColor = isCurrentState ? '#4caf50' : isSelected ? '#2a7fff' : '#333';
+
+        // Boxed FSM instance: render as a labeled rectangle
+        if (comp.boxedCircuitId) {
+          const { w, h } = getCompDimensions(comp);
+          return (
+            <g>
+              <rect
+                x={comp.x} y={comp.y} width={w} height={h} rx={5}
+                fill={isSelected ? '#e3f2fd' : '#f5f7ff'}
+                stroke={strokeColor}
+                strokeWidth={isSelected ? 2.5 : 2}
+                pointerEvents="none"
+              />
+              <text
+                x={comp.x + w / 2} y={comp.y + h / 2}
+                textAnchor="middle" dominantBaseline="central"
+                fontSize="13" fontWeight="700" fill="#333"
+                pointerEvents="none"
+              >
+                {comp.label}
+              </text>
+            </g>
+          );
+        }
+
+        const ringR = STATE_RADIUS + 7;
         return (
           <g>
             {/* Outer ring — wire-creation zone affordance */}
@@ -832,6 +868,33 @@ function CircuitComponentView({
     const isState = comp.type === 'STATE';
 
     if (isState) {
+      // Boxed FSM instance: rectangular port hit areas
+      if (comp.boxedCircuitId) {
+        const { w, h } = getCompDimensions(comp);
+        const midY = comp.y + h / 2;
+        const HIT_R = 12;
+        const nodes = [
+          { id: 'left',  x: comp.x,     y: midY, side: 'left'  },
+          { id: 'right', x: comp.x + w, y: midY, side: 'right' },
+        ];
+        return (
+          <>
+            {nodes.map(({ id, x, y, side }) => (
+              <circle key={id} cx={x} cy={y} r={HIT_R} fill="transparent"
+                className="port-hit-area"
+                data-port-compid={comp.id} data-port-id={id} data-port-side={side}
+              />
+            ))}
+            {/* Inner blocking rect — clicks in the middle drag the component */}
+            <rect x={comp.x + HIT_R} y={comp.y} width={w - 2 * HIT_R} height={h} fill="transparent" />
+            {/* Visual port dots */}
+            {nodes.map(({ id, x, y }) => (
+              <circle key={`dot-${id}`} cx={x} cy={y} r={3} fill="#888" stroke="white" strokeWidth={1} pointerEvents="none" />
+            ))}
+          </>
+        );
+      }
+
       const nodes = [
         { id: 'left',  x: cx - STATE_RADIUS, y: cy, side: 'left'  },
         { id: 'right', x: cx + STATE_RADIUS, y: cy, side: 'right' },
@@ -1084,43 +1147,53 @@ function FsmTransitionView({
   const [editing, setEditing] = useState(false);
   const [editLeft, setEditLeft] = useState('0');
   const [editRight, setEditRight] = useState('0');
+  const [activeField, setActiveField] = useState<'left' | 'right'>('left');
   const [dragging, setDragging] = useState(false);
-  const inputRef = useRef<HTMLInputElement>(null);
-  const inputRef2 = useRef<HTMLInputElement>(null);
-  const blurTimeoutRef = useRef<number | null>(null);
+  const editorRef = useRef<HTMLDivElement>(null);
 
   const label = wire.transitionLabel || '?:?';
   const color = isSelected ? '#2a7fff' : '#333';
 
   useEffect(() => {
-    if (editing && inputRef.current) {
-      inputRef.current.focus();
-      inputRef.current.select();
+    if (editing && editorRef.current) {
+      editorRef.current.focus();
     }
   }, [editing]);
 
-  const handleLabelClick = (e: React.MouseEvent) => {
-    e.stopPropagation();
+  const openEdit = (field: 'left' | 'right') => {
     const current = wire.transitionLabel || '0:0';
     const parts = current.split(':');
     setEditLeft(parts[0] === '1' ? '1' : '0');
     setEditRight(parts[1] === '1' ? '1' : '0');
+    setActiveField(field);
     setEditing(true);
   };
 
-  const commitEdit = () => {
+  const commitEdit = (left = editLeft, right = editRight) => {
     setEditing(false);
-    useStore.getState().setTransitionLabel(wire.id, `${editLeft}:${editRight}`);
+    useStore.getState().setTransitionLabel(wire.id, `${left}:${right}`);
   };
 
-  const handleInputBlur = () => {
-    blurTimeoutRef.current = window.setTimeout(commitEdit, 50);
-  };
-
-  const handleInputFocus = () => {
-    if (blurTimeoutRef.current !== null) {
-      clearTimeout(blurTimeoutRef.current);
-      blurTimeoutRef.current = null;
+  const handleEditorKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === '0' || e.key === '1') {
+      e.preventDefault();
+      if (activeField === 'left') {
+        setEditLeft(e.key);
+        setActiveField('right');
+      } else {
+        // Commit immediately with the new right value so closure captures it
+        setEditing(false);
+        useStore.getState().setTransitionLabel(wire.id, `${editLeft}:${e.key}`);
+      }
+    } else if (e.key === 'Tab' || e.key === 'ArrowRight') {
+      e.preventDefault();
+      setActiveField(activeField === 'left' ? 'right' : 'left');
+    } else if (e.key === 'ArrowLeft') {
+      e.preventDefault();
+      setActiveField(activeField === 'right' ? 'left' : 'right');
+    } else if (e.key === 'Enter' || e.key === 'Escape') {
+      e.preventDefault();
+      commitEdit();
     }
   };
 
@@ -1236,134 +1309,106 @@ function FsmTransitionView({
           onPointerUp={handleDotPointerUp}
         />
       )}
-      {/* Transition label — offset from wire, single-click to edit */}
-      {!editing && (
-        <g onClick={handleLabelClick}>
-          <rect
-            x={labelPos.x - 14}
-            y={labelPos.y - 10}
-            width={28}
-            height={16}
-            rx={3}
-            fill="white"
-            fillOpacity={0.9}
-            stroke="#ddd"
-            strokeWidth={0.5}
-            style={{ cursor: 'text' }}
-          />
-          <text
-            x={labelPos.x}
-            y={labelPos.y}
-            textAnchor="middle"
-            dominantBaseline="central"
-            fontSize="12"
-            fontFamily="'SF Mono', 'Fira Code', monospace"
-            fontWeight="600"
-            fill={color}
-            style={{ cursor: 'text' }}
-          >
-            {label}
-          </text>
-        </g>
-      )}
+      {/* Transition label — click either half to edit that field */}
+      {!editing && (() => {
+        const parts = label.split(':');
+        const lPart = parts[0] ?? '?';
+        const rPart = parts[1] ?? '?';
+        const W = 36; // total width
+        const H = 18;
+        const x0 = labelPos.x - W / 2;
+        const y0 = labelPos.y - H / 2;
+        const halfW = W / 2;
+        return (
+          <g>
+            {/* Background */}
+            <rect x={x0} y={y0} width={W} height={H} rx={3}
+              fill="white" fillOpacity={0.92} stroke="#ddd" strokeWidth={0.5} pointerEvents="none" />
+            {/* Left half (input) — click target */}
+            <rect x={x0} y={y0} width={halfW} height={H} rx={3} fill="transparent" style={{ cursor: 'text' }}
+              onClick={(e) => { e.stopPropagation(); openEdit('left'); }} />
+            {/* Right half (output) — click target */}
+            <rect x={labelPos.x} y={y0} width={halfW} height={H} rx={3} fill="transparent" style={{ cursor: 'text' }}
+              onClick={(e) => { e.stopPropagation(); openEdit('right'); }} />
+            {/* Input digit */}
+            <text x={x0 + halfW / 2} y={labelPos.y} textAnchor="middle" dominantBaseline="central"
+              fontSize="12" fontFamily="'SF Mono','Fira Code',monospace" fontWeight="600"
+              fill={color} pointerEvents="none">{lPart}</text>
+            {/* Colon */}
+            <text x={labelPos.x} y={labelPos.y} textAnchor="middle" dominantBaseline="central"
+              fontSize="11" fontFamily="'SF Mono','Fira Code',monospace" fontWeight="400"
+              fill="#aaa" pointerEvents="none">:</text>
+            {/* Output digit */}
+            <text x={x0 + halfW + halfW / 2} y={labelPos.y} textAnchor="middle" dominantBaseline="central"
+              fontSize="12" fontFamily="'SF Mono','Fira Code',monospace" fontWeight="600"
+              fill={color} pointerEvents="none">{rPart}</text>
+          </g>
+        );
+      })()}
       {editing && (
         <foreignObject
-          x={labelPos.x - 30}
-          y={labelPos.y - 13}
-          width={60}
-          height={26}
+          x={labelPos.x - 28}
+          y={labelPos.y - 15}
+          width={56}
+          height={30}
         >
-          <div style={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            width: '100%',
-            height: '100%',
-            gap: 2,
-            background: 'white',
-            border: '1px solid #2a7fff',
-            borderRadius: 3,
-            boxSizing: 'border-box',
-          }}>
-            <input
-              ref={inputRef}
-              type="text"
-              value={editLeft}
-              onChange={() => {}}
-              onFocus={handleInputFocus}
-              onBlur={handleInputBlur}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') { commitEdit(); return; }
-                if (e.key === 'Escape') { setEditing(false); return; }
-                if (e.key === '0' || e.key === '1') {
-                  setEditLeft(e.key);
-                  inputRef2.current?.focus();
-                  e.preventDefault();
-                  return;
-                }
-                if (e.key === 'ArrowRight' || (e.key === 'Tab' && !e.shiftKey)) {
-                  inputRef2.current?.focus();
-                  e.preventDefault();
-                  return;
-                }
-                e.preventDefault();
-              }}
+          <div
+            ref={editorRef}
+            tabIndex={0}
+            onKeyDown={handleEditorKeyDown}
+            onBlur={() => commitEdit()}
+            style={{
+              display: 'flex',
+              alignItems: 'stretch',
+              width: '100%',
+              height: '100%',
+              border: '1.5px solid #2a7fff',
+              borderRadius: 4,
+              background: 'white',
+              boxSizing: 'border-box',
+              outline: 'none',
+              overflow: 'hidden',
+            }}
+          >
+            {/* Input half */}
+            <div
+              onClick={(e) => { e.stopPropagation(); setActiveField('left'); editorRef.current?.focus(); }}
               style={{
-                width: 16,
-                height: '100%',
-                fontSize: 12,
-                fontFamily: "'SF Mono', 'Fira Code', monospace",
-                fontWeight: 600,
-                textAlign: 'center',
-                border: 'none',
-                outline: 'none',
-                padding: 0,
-                background: 'transparent',
+                flex: 1,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                background: activeField === 'left' ? '#2a7fff' : 'transparent',
+                color: activeField === 'left' ? 'white' : '#333',
+                fontFamily: "'SF Mono','Fira Code',monospace",
+                fontSize: 14,
+                fontWeight: 700,
+                cursor: 'default',
+                userSelect: 'none',
               }}
-            />
-            <span style={{
-              fontSize: 12,
-              fontFamily: "'SF Mono', 'Fira Code', monospace",
-              fontWeight: 600,
-              color: '#555',
-              userSelect: 'none',
-              lineHeight: 1,
-            }}>:</span>
-            <input
-              ref={inputRef2}
-              type="text"
-              value={editRight}
-              onChange={() => {}}
-              onFocus={handleInputFocus}
-              onBlur={handleInputBlur}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') { commitEdit(); return; }
-                if (e.key === 'Escape') { setEditing(false); return; }
-                if (e.key === '0' || e.key === '1') {
-                  setEditRight(e.key);
-                  e.preventDefault();
-                  return;
-                }
-                if (e.key === 'Backspace' || e.key === 'ArrowLeft' || (e.key === 'Tab' && e.shiftKey)) {
-                  inputRef.current?.focus();
-                  e.preventDefault();
-                  return;
-                }
-                e.preventDefault();
-              }}
+            >{editLeft}</div>
+            {/* Colon */}
+            <div style={{
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              fontSize: 11, color: '#aaa', padding: '0 1px', userSelect: 'none',
+            }}>:</div>
+            {/* Output half */}
+            <div
+              onClick={(e) => { e.stopPropagation(); setActiveField('right'); editorRef.current?.focus(); }}
               style={{
-                width: 16,
-                height: '100%',
-                fontSize: 12,
-                fontFamily: "'SF Mono', 'Fira Code', monospace",
-                fontWeight: 600,
-                textAlign: 'center',
-                border: 'none',
-                outline: 'none',
-                padding: 0,
-                background: 'transparent',
+                flex: 1,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                background: activeField === 'right' ? '#2a7fff' : 'transparent',
+                color: activeField === 'right' ? 'white' : '#333',
+                fontFamily: "'SF Mono','Fira Code',monospace",
+                fontSize: 14,
+                fontWeight: 700,
+                cursor: 'default',
+                userSelect: 'none',
               }}
-            />
+            >{editRight}</div>
           </div>
         </foreignObject>
       )}
@@ -1615,6 +1660,8 @@ function BoxView({
   onFinishEditName?: () => void;
 }) {
   const updateBox = useStore((s) => s.updateBox);
+  const removeConfirmedBox = useStore((s) => s.removeConfirmedBox);
+  const [hovered, setHovered] = useState(false);
 
   // Compute port positions along box boundary
   const inputPortPositions = useMemo(() => {
@@ -1638,7 +1685,7 @@ function BoxView({
   }, [isDraft, box.outputPortIds, box.x, box.y, box.width, box.height]);
 
   return (
-    <g data-box-id={box.id}>
+    <g data-box-id={box.id} onMouseEnter={() => setHovered(true)} onMouseLeave={() => setHovered(false)}>
       {/* Main box rect */}
       <rect
         x={box.x}
@@ -1768,6 +1815,29 @@ function BoxView({
             );
           })}
         </>
+      )}
+      {/* Delete button — top-right corner, visible on hover */}
+      {!isDraft && hovered && (
+        <g
+          style={{ cursor: 'pointer' }}
+          onPointerDown={(e) => {
+            e.stopPropagation();
+            removeConfirmedBox(box.id);
+          }}
+        >
+          <circle cx={box.x + box.width - 8} cy={box.y + 8} r={7} fill="white" stroke="#ccc" strokeWidth={1} />
+          <text
+            x={box.x + box.width - 8}
+            y={box.y + 8}
+            textAnchor="middle"
+            dominantBaseline="central"
+            fontSize="10"
+            fill="#888"
+            pointerEvents="none"
+          >
+            ×
+          </text>
+        </g>
       )}
     </g>
   );
@@ -2083,7 +2153,13 @@ export function CircuitCanvas() {
       if (type === 'BOXED_INSTANCE') {
         const boxId = e.dataTransfer.getData('boxDefinitionId');
         if (boxId) {
-          useStore.getState().placeBoxInstance(boxId, pos.x - 40, pos.y - 30);
+          const s = useStore.getState();
+          const entry = s.confirmedBoxLibrary.find((b) => b.id === boxId);
+          if (entry?.kind === 'FSM') {
+            s.fsmPlaceBoxInstance(boxId, pos.x, pos.y);
+          } else {
+            s.placeBoxInstance(boxId, pos.x - 40, pos.y - 30);
+          }
         }
         return;
       }
@@ -2936,14 +3012,19 @@ export function CircuitCanvas() {
         const comp = state.components.find((c) => c.id === hit.compId);
         if (!comp) return;
 
-        // For MEM blocks, source port depends on direction; for STATE, 'out' port is source; for all others, right-side ports are sources
+        // Always select the component when clicking its port, so Delete still works
+        state.setSelectedIds([hit.compId]);
+
+        // For MEM blocks, source port depends on direction; for STATE, either port initiates a wire (always from right); for all others, right-side ports are sources
       const isSourcePort = comp.type === 'MEM'
         ? isMemSourcePort(comp, hit.portId)
         : comp.type === 'STATE'
-        ? hit.portId === 'right'
+        ? true
         : hit.portSide === 'right';
+      // For STATE: always use the right port as the wire source, regardless of which port was clicked
+      const sourcePortId = (comp.type === 'STATE') ? 'right' : hit.portId;
       if (isSourcePort) {
-          const pos = getPortPosition(comp, hit.portId);
+          const pos = getPortPosition(comp, sourcePortId);
           dragRef.current = {
             type: 'wire',
             anchorScreenX: e.clientX,
@@ -2953,7 +3034,7 @@ export function CircuitCanvas() {
             currentCanvasX: pos.x,
             currentCanvasY: pos.y,
             sourceCompId: hit.compId,
-            sourcePortId: hit.portId,
+            sourcePortId: sourcePortId,
             wireFromX: pos.x,
             wireFromY: pos.y,
             pointerId: e.pointerId,

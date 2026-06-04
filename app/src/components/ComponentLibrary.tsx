@@ -1,4 +1,3 @@
-import { useState } from 'react';
 import { useStore } from '../store';
 import type { ComponentType } from '../types';
 
@@ -123,14 +122,14 @@ const MACHINE_LABELS: Record<string, string> = {
   TM: 'Turing Machine',
 };
 
-function ConfirmedBoxItem({ box, numIn, numOut, isSelected }: {
+function ConfirmedBoxItem({ box, numIn, numOut, isSelected, kind }: {
   box: { id: string; name: string; inputPortIds: string[]; outputPortIds: string[] };
   numIn: number;
   numOut: number;
   isSelected: boolean;
+  kind?: 'CC' | 'FSM';
 }) {
-  const [hovered, setHovered] = useState(false);
-
+  const isFsm = kind === 'FSM';
   return (
     <div
       className={`library-item${isSelected ? ' library-item-selected' : ''}`}
@@ -140,53 +139,43 @@ function ConfirmedBoxItem({ box, numIn, numOut, isSelected }: {
         e.dataTransfer.setData('boxDefinitionId', box.id);
         e.dataTransfer.effectAllowed = 'copy';
       }}
-      onClick={() => useStore.getState().placeBoxInstance(box.id, 200, 200)}
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
-      style={{ cursor: 'pointer', position: 'relative' }}
+      onClick={() => {
+        if (isFsm) {
+          useStore.getState().fsmPlaceBoxInstance(box.id, 200, 200);
+        } else {
+          useStore.getState().placeBoxInstance(box.id, 200, 200);
+        }
+      }}
+      style={{ cursor: 'pointer' }}
     >
-      <svg viewBox="0 0 56 40">
-        <rect x="8" y="4" width="40" height="32" rx="3" fill="none" stroke="#333" strokeWidth="2" />
-        {Array.from({ length: numIn }).map((_, i) => {
-          const py = 4 + (32 / (numIn + 1)) * (i + 1);
-          return (
-            <g key={`in-${i}`}>
-              <line x1="2" y1={py} x2="8" y2={py} stroke="#333" strokeWidth="1.5" />
-              <circle cx="2" cy={py} r="2" fill="#555" />
-            </g>
-          );
-        })}
-        {Array.from({ length: numOut }).map((_, i) => {
-          const py = 4 + (32 / (numOut + 1)) * (i + 1);
-          return (
-            <g key={`out-${i}`}>
-              <line x1="48" y1={py} x2="54" y2={py} stroke="#333" strokeWidth="1.5" />
-              <circle cx="54" cy={py} r="2" fill="#555" />
-            </g>
-          );
-        })}
-        <text x="28" y="24" textAnchor="middle" fontSize="8" fontWeight="600" fill="#333">{box.name}</text>
-      </svg>
-      {hovered && (
-        <span
-          style={{
-            position: 'absolute',
-            top: 2,
-            right: 4,
-            fontSize: 14,
-            lineHeight: 1,
-            color: '#999',
-            cursor: 'pointer',
-            userSelect: 'none',
-          }}
-          title="Remove from library"
-          onClick={(e) => {
-            e.stopPropagation();
-            useStore.getState().removeConfirmedBox(box.id);
-          }}
-        >
-          ×
-        </span>
+      {isFsm ? (
+        <svg viewBox="0 0 56 40">
+          <rect x="8" y="4" width="40" height="32" rx="3" fill="none" stroke="#333" strokeWidth="2" />
+          <text x="28" y="24" textAnchor="middle" fontSize="7" fontWeight="600" fill="#333">{box.name}</text>
+        </svg>
+      ) : (
+        <svg viewBox="0 0 56 40">
+          <rect x="8" y="4" width="40" height="32" rx="3" fill="none" stroke="#333" strokeWidth="2" />
+          {Array.from({ length: numIn }).map((_, i) => {
+            const py = 4 + (32 / (numIn + 1)) * (i + 1);
+            return (
+              <g key={`in-${i}`}>
+                <line x1="2" y1={py} x2="8" y2={py} stroke="#333" strokeWidth="1.5" />
+                <circle cx="2" cy={py} r="2" fill="#555" />
+              </g>
+            );
+          })}
+          {Array.from({ length: numOut }).map((_, i) => {
+            const py = 4 + (32 / (numOut + 1)) * (i + 1);
+            return (
+              <g key={`out-${i}`}>
+                <line x1="48" y1={py} x2="54" y2={py} stroke="#333" strokeWidth="1.5" />
+                <circle cx="54" cy={py} r="2" fill="#555" />
+              </g>
+            );
+          })}
+          <text x="28" y="24" textAnchor="middle" fontSize="8" fontWeight="600" fill="#333">{box.name}</text>
+        </svg>
       )}
     </div>
   );
@@ -244,8 +233,8 @@ export function ComponentLibrary() {
         </div>
       ))}
 
-      {/* New Box tool (hidden in FSM mode) */}
-      {buildMode !== 'FSM' && <div>
+      {/* New Box tool */}
+      {(buildMode === 'CC' || buildMode === 'FSM') && <div>
         <div className="library-section-title">Boxing</div>
         <div
           className={`library-item${selectedTool === 'NEW_BOX' ? ' library-item-selected' : ''}`}
@@ -271,25 +260,28 @@ export function ComponentLibrary() {
         </div>
       </div>}
 
-      {/* Box Menu — confirmed boxes available across all tabs */}
-      {confirmedBoxLibrary.length > 0 && (
-        <div>
-          <div className="library-section-title">Boxes</div>
-          {confirmedBoxLibrary.map((box) => {
-            const numIn = box.inputPortIds.length;
-            const numOut = box.outputPortIds.length;
-            return (
+      {/* Box Menu — show CC boxes in CC mode, FSM boxes in FSM mode */}
+      {(() => {
+        const visibleBoxes = confirmedBoxLibrary.filter((b) =>
+          buildMode === 'FSM' ? b.kind === 'FSM' : (b.kind ?? 'CC') === 'CC'
+        );
+        if (visibleBoxes.length === 0) return null;
+        return (
+          <div>
+            <div className="library-section-title">Boxes</div>
+            {visibleBoxes.map((box) => (
               <ConfirmedBoxItem
                 key={box.id}
                 box={box}
-                numIn={numIn}
-                numOut={numOut}
+                numIn={box.inputPortIds.length}
+                numOut={box.outputPortIds.length}
                 isSelected={selectedTool === (`BOX:${box.id}` as any)}
+                kind={box.kind}
               />
-            );
-          })}
-        </div>
-      )}
+            ))}
+          </div>
+        );
+      })()}
 
       {/* Legacy boxed library */}
       {boxedLibrary.length > 0 && (
