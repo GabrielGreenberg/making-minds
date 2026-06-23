@@ -1,0 +1,32 @@
+{
+  "id": "cc-basics",
+  "title": "CC basics",
+  "questions": [
+    {
+      "id": 1,
+      "label": "Q1",
+      "statement": "OUT = IN1 AND IN2",
+      "buildMode": "CC",
+      "representation": "binary",
+      "grading_mode": "exhaustive",
+      "test_vectors": [
+        { "input_sequence": [0, 0], "expected_output": [0] },
+        { "input_sequence": [0, 1], "expected_output": [0] },
+        { "input_sequence": [1, 0], "expected_output": [0] },
+        { "input_sequence": [1, 1], "expected_output": [1] }
+      ]
+    },
+    {
+      "id": 2,
+      "label": "Q2",
+      "statement": "OUT = NOT IN1",
+      "buildMode": "CC",
+      "representation": "binary",
+      "grading_mode": "exhaustive",
+      "test_vectors": [
+        { "input_sequence": [0], "expected_output": [1] },
+        { "input_sequence": [1], "expected_output": [0] }
+      ]
+    }
+  ]
+}

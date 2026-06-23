@@ -28,6 +28,7 @@ import {
   toSubscript,
 } from './types';
 import { topologicalSort, evaluateGate, evaluateCC } from './engine';
+import { getAssignment } from './assignments';
 
 interface HistoryEntry {
   components: CircuitComponent[];
@@ -148,6 +149,8 @@ interface AppState {
   // Per-question circuit + annotations, keyed by AssignmentQuestion.id.
   questionCircuits: Map<number, QuestionCircuit>;
   loadAssignment: (assignment: AssignmentData) => void;
+  // Open a bundled assignment by id and show its workbook. Returns false if unknown.
+  openAssignment: (id: string) => boolean;
   switchQuestion: (index: number) => void;
   closeAssignment: () => void;
 
@@ -1010,6 +1013,13 @@ export const useStore = create<AppState>()((set, get) => ({
       boxes: [],
       buildMode: assignment.questions[0]?.buildMode || 'CC',
     });
+  },
+  openAssignment: (id) => {
+    const def = getAssignment(id);
+    if (!def) return false;
+    get().loadAssignment(def);
+    set({ workbookOpen: true });
+    return true;
   },
   switchQuestion: (index) => {
     const state = get();
