@@ -97,6 +97,18 @@ export interface HomeworkData {
   problems: HomeworkProblem[];
 }
 
+/**
+ * A student's gradeable homework submission. Pure/serializable — produced by the
+ * app's submission export and consumed by the grader (in-app or the CLI). Each
+ * answer pairs a problem (by HomeworkProblem.id) with the circuit the student built.
+ */
+export interface SubmissionData {
+  homeworkTitle: string;
+  student?: string;        // free-form identity; auth-agnostic, falls back to filename
+  submittedAt: string;     // ISO timestamp
+  answers: { problemId: number; circuit: CircuitData }[];
+}
+
 // ─── Workbook / Worksheet ────────────────────────────────────────
 
 export interface WorksheetData {

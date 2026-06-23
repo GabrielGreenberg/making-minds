@@ -12,3 +12,6 @@ export {
   evaluateCCInputs,
 } from './cc';
 export type { CCEvalResult } from './cc';
+export { bitsToTally, bitsToBinary, interpretBits } from './representation';
+export { gradeProblem, gradeSubmission } from './grader';
+export type { CaseResult, ProblemResult, SubmissionResult } from './grader';

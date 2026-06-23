@@ -1,0 +1,75 @@
+{
+  "title": "HW-sample: CC basics",
+  "problems": [
+    {
+      "id": 1,
+      "text": "OUT = IN1 AND IN2",
+      "type": "CC",
+      "representation": "binary",
+      "grading_mode": "exhaustive",
+      "test_vectors": [
+        {
+          "input_sequence": [
+            0,
+            0
+          ],
+          "expected_output": [
+            0
+          ]
+        },
+        {
+          "input_sequence": [
+            0,
+            1
+          ],
+          "expected_output": [
+            0
+          ]
+        },
+        {
+          "input_sequence": [
+            1,
+            0
+          ],
+          "expected_output": [
+            0
+          ]
+        },
+        {
+          "input_sequence": [
+            1,
+            1
+          ],
+          "expected_output": [
+            1
+          ]
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "text": "OUT = NOT IN1",
+      "type": "CC",
+      "representation": "binary",
+      "grading_mode": "exhaustive",
+      "test_vectors": [
+        {
+          "input_sequence": [
+            0
+          ],
+          "expected_output": [
+            1
+          ]
+        },
+        {
+          "input_sequence": [
+            1
+          ],
+          "expected_output": [
+            0
+          ]
+        }
+      ]
+    }
+  ]
+}

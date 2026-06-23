@@ -81,6 +81,7 @@ export function MenuBar() {
     copySelected,
     paste,
     exportProject,
+    exportSubmission,
     exportWorkbook,
     importWorkbook,
     loadHomework,
@@ -135,6 +136,24 @@ export function MenuBar() {
     const a = document.createElement('a');
     a.href = url;
     a.download = 'circuit.json';
+    a.click();
+    URL.revokeObjectURL(url);
+    close();
+  };
+
+  const handleExportSubmission = () => {
+    const student = prompt('Your name (optional) — included in the submission for grading:') ?? undefined;
+    const json = exportSubmission(student);
+    if (json == null) {
+      alert('Import a homework file before exporting a submission.');
+      close();
+      return;
+    }
+    const blob = new Blob([json], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'submission.json';
     a.click();
     URL.revokeObjectURL(url);
     close();
@@ -270,6 +289,11 @@ export function MenuBar() {
             <div className="menu-dropdown-item" onClick={handleExportWorksheet}>
               Export Worksheet
             </div>
+            {homework && (
+              <div className="menu-dropdown-item" onClick={handleExportSubmission}>
+                Export Submission
+              </div>
+            )}
           </div>
         )}
       </div>

@@ -1,5 +1,6 @@
 import { useMemo, useState, useCallback, useRef, useEffect } from 'react';
 import { useStore } from '../store';
+import { bitsToTally, bitsToBinary } from '../engine';
 
 const UI_PREFS_KEY = 'making-minds-ui-prefs';
 
@@ -13,29 +14,6 @@ function saveUiPref(key: string, value: unknown) {
   const prefs = loadUiPrefs();
   prefs[key] = value;
   localStorage.setItem(UI_PREFS_KEY, JSON.stringify(prefs));
-}
-
-/** Valid tally: consecutive 1's from the left, then 0's. Returns count or null. */
-function bitsToTally(bits: number[]): number | null {
-  let seenZero = false;
-  let count = 0;
-  for (const b of bits) {
-    if (b === 1) {
-      if (seenZero) return null; // 1 after a 0 → invalid
-      count++;
-    } else {
-      seenZero = true;
-    }
-  }
-  return count;
-}
-
-function bitsToBinary(bits: number[]): number {
-  let val = 0;
-  for (let i = 0; i < bits.length; i++) {
-    val = (val << 1) | bits[i];
-  }
-  return val;
 }
 
 /** Key for an input combination, e.g. "0,1,0" */

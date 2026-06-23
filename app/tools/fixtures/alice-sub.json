@@ -1,0 +1,188 @@
+{
+  "homeworkTitle": "HW-sample: CC basics",
+  "student": "alice",
+  "submittedAt": "2026-06-23T04:56:21.302Z",
+  "answers": [
+    {
+      "problemId": 1,
+      "circuit": {
+        "components": [
+          {
+            "id": "i1",
+            "type": "INPUT",
+            "x": 0,
+            "y": 0,
+            "label": "IN1",
+            "ports": [
+              {
+                "id": "out",
+                "label": "",
+                "side": "right",
+                "index": 0
+              }
+            ]
+          },
+          {
+            "id": "i2",
+            "type": "INPUT",
+            "x": 0,
+            "y": 0,
+            "label": "IN2",
+            "ports": [
+              {
+                "id": "out",
+                "label": "",
+                "side": "right",
+                "index": 0
+              }
+            ]
+          },
+          {
+            "id": "g",
+            "type": "AND",
+            "x": 0,
+            "y": 0,
+            "label": "AND",
+            "ports": [
+              {
+                "id": "in1",
+                "label": "",
+                "side": "left",
+                "index": 0
+              },
+              {
+                "id": "in2",
+                "label": "",
+                "side": "left",
+                "index": 1
+              },
+              {
+                "id": "out",
+                "label": "",
+                "side": "right",
+                "index": 0
+              }
+            ]
+          },
+          {
+            "id": "o",
+            "type": "OUTPUT",
+            "x": 0,
+            "y": 0,
+            "label": "OUT1",
+            "ports": [
+              {
+                "id": "in",
+                "label": "",
+                "side": "left",
+                "index": 0
+              }
+            ]
+          }
+        ],
+        "wires": [
+          {
+            "id": "w1",
+            "sourceComponentId": "i1",
+            "sourcePortId": "out",
+            "targetComponentId": "g",
+            "targetPortId": "in1",
+            "value": 0
+          },
+          {
+            "id": "w2",
+            "sourceComponentId": "i2",
+            "sourcePortId": "out",
+            "targetComponentId": "g",
+            "targetPortId": "in2",
+            "value": 0
+          },
+          {
+            "id": "w3",
+            "sourceComponentId": "g",
+            "sourcePortId": "out",
+            "targetComponentId": "o",
+            "targetPortId": "in",
+            "value": 0
+          }
+        ]
+      }
+    },
+    {
+      "problemId": 2,
+      "circuit": {
+        "components": [
+          {
+            "id": "i1",
+            "type": "INPUT",
+            "x": 0,
+            "y": 0,
+            "label": "IN1",
+            "ports": [
+              {
+                "id": "out",
+                "label": "",
+                "side": "right",
+                "index": 0
+              }
+            ]
+          },
+          {
+            "id": "n",
+            "type": "NOT",
+            "x": 0,
+            "y": 0,
+            "label": "NOT",
+            "ports": [
+              {
+                "id": "in",
+                "label": "",
+                "side": "left",
+                "index": 0
+              },
+              {
+                "id": "out",
+                "label": "",
+                "side": "right",
+                "index": 0
+              }
+            ]
+          },
+          {
+            "id": "o",
+            "type": "OUTPUT",
+            "x": 0,
+            "y": 0,
+            "label": "OUT1",
+            "ports": [
+              {
+                "id": "in",
+                "label": "",
+                "side": "left",
+                "index": 0
+              }
+            ]
+          }
+        ],
+        "wires": [
+          {
+            "id": "w1",
+            "sourceComponentId": "i1",
+            "sourcePortId": "out",
+            "targetComponentId": "n",
+            "targetPortId": "in",
+            "value": 0
+          },
+          {
+            "id": "w2",
+            "sourceComponentId": "n",
+            "sourcePortId": "out",
+            "targetComponentId": "o",
+            "targetPortId": "in",
+            "value": 0
+          }
+        ]
+      }
+    }
+  ]
+}

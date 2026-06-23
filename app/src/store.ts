@@ -18,6 +18,7 @@ import type {
   FsmHistoryEntry,
   WorkbookData,
   WorksheetData,
+  SubmissionData,
 } from './types';
 import {
   getPortsForType,
@@ -147,6 +148,8 @@ interface AppState {
   // Save/Load (legacy single-circuit export for "Export Worksheet")
   exportProject: () => string;
   importProject: (json: string) => void;
+  // Homework submission export (null when no homework is loaded)
+  exportSubmission: (student?: string) => string | null;
   // exportWorkbook and importWorkbook are in the Workbook section above
 
   // Rotation
@@ -1106,6 +1109,29 @@ export const useStore = create<AppState>()((set, get) => ({
       null,
       2
     );
+  },
+  exportSubmission: (student) => {
+    const state = get();
+    if (!state.homework) return null;
+
+    // Sync the live problem into the map (same save step as switchProblem),
+    // so the currently-open problem's latest circuit is captured.
+    const circuits = new Map(state.problemCircuits);
+    circuits.set(state.currentProblemIndex, {
+      components: state.components,
+      wires: state.wires,
+    });
+
+    const submission: SubmissionData = {
+      homeworkTitle: state.homework.title,
+      student: student?.trim() || undefined,
+      submittedAt: new Date().toISOString(),
+      answers: state.homework.problems.map((p, i) => ({
+        problemId: p.id,
+        circuit: circuits.get(i) ?? { components: [], wires: [] },
+      })),
+    };
+    return JSON.stringify(submission, null, 2);
   },
   importProject: (json) => {
     try {
