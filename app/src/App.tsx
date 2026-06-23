@@ -5,14 +5,14 @@ import { CircuitCanvas } from './components/CircuitCanvas';
 import { DataTable } from './components/DataTable';
 import { SimulationToolbar } from './components/SimulationPanel';
 import { SequentialTimeline } from './components/SequentialTimeline';
-import { WelcomeScreen } from './components/WelcomeScreen';
+import { HomeScreen } from './components/HomeScreen';
 import { useStore } from './store';
 
 function App() {
   const workbookOpen = useStore((s) => s.workbookOpen);
   const buildMode = useStore((s) => s.buildMode);
 
-  if (!workbookOpen) return <WelcomeScreen />;
+  if (!workbookOpen) return <HomeScreen />;
 
   return (
     <div className="app">

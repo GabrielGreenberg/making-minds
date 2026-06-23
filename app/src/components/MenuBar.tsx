@@ -88,6 +88,7 @@ export function MenuBar() {
     assignment,
     importBoxedCircuit,
     newWorkbook,
+    goHome,
   } = useStore();
 
   useEffect(() => {
@@ -221,6 +222,10 @@ export function MenuBar() {
 
   return (
     <div className="menu-bar" ref={menuRef}>
+      {/* Home — back to the assignment catalog */}
+      <div className="menu-item" onClick={() => { goHome(); close(); }}>
+        ⌂ Home
+      </div>
       {/* File */}
       <div
         className="menu-item"

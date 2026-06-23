@@ -153,6 +153,9 @@ interface AppState {
   openAssignment: (id: string) => boolean;
   switchQuestion: (index: number) => void;
   closeAssignment: () => void;
+  // Navigation between the catalog (Home) and the editor.
+  goHome: () => void;          // hide the editor, return to the catalog (preserves in-memory work)
+  enterSandbox: () => void;    // open the freeform sandbox workbook (clears any active assignment)
 
   // Save/Load (legacy single-circuit export for "Export Worksheet")
   exportProject: () => string;
@@ -425,6 +428,7 @@ export const useStore = create<AppState>()((set, get) => ({
   newWorkbook: () => {
     const tabId = uuid();
     set({
+      assignment: null,
       workbookOpen: true,
       workbookTitle: 'Untitled Workbook',
       workbookFileHandle: null,
@@ -526,6 +530,7 @@ export const useStore = create<AppState>()((set, get) => ({
         const activeTab = tabs.find((t) => t.id === activeId);
 
         set({
+          assignment: null,
           workbookOpen: true,
           workbookTitle: wb.metadata?.title || 'Untitled Workbook',
           workbookFileHandle: handle || null,
@@ -566,6 +571,7 @@ export const useStore = create<AppState>()((set, get) => ({
         });
         const bm = data.metadata?.buildType || 'CC';
         set({
+          assignment: null,
           workbookOpen: true,
           workbookTitle: data.metadata?.title || 'Imported Circuit',
           workbookFileHandle: handle || null,
@@ -1017,9 +1023,71 @@ export const useStore = create<AppState>()((set, get) => ({
   openAssignment: (id) => {
     const def = getAssignment(id);
     if (!def) return false;
+    // Same assignment already in memory → resume without wiping in-progress work.
+    if (get().assignment?.id === id) {
+      set({ workbookOpen: true });
+      return true;
+    }
     get().loadAssignment(def);
     set({ workbookOpen: true });
     return true;
+  },
+  goHome: () => {
+    const state = get();
+    // Sync the live canvas into its container so nothing in memory is lost.
+    if (state.assignment) {
+      const q = state.assignment.questions[state.currentQuestionIndex];
+      if (q) {
+        const qc = new Map(state.questionCircuits);
+        qc.set(q.id, {
+          components: state.components,
+          wires: state.wires,
+          textElements: state.textElements,
+          comments: state.comments,
+          boxes: state.boxes,
+        });
+        set({ questionCircuits: qc });
+      }
+    } else {
+      const tc = new Map(state.tabCircuits);
+      tc.set(state.activeTabId, {
+        components: state.components,
+        wires: state.wires,
+        textElements: state.textElements,
+        comments: state.comments,
+        boxes: state.boxes,
+      });
+      set({ tabCircuits: tc });
+    }
+    set({ workbookOpen: false });
+  },
+  enterSandbox: () => {
+    const state = get();
+    if (state.tabs.length === 0) {
+      get().newWorkbook();
+      return;
+    }
+    // Fall back to an empty circuit (NOT the live components, which may belong
+    // to an assignment we're leaving) when this tab has no saved canvas yet.
+    const saved = state.tabCircuits.get(state.activeTabId) ?? {
+      components: [],
+      wires: [],
+      textElements: [],
+      comments: [],
+      boxes: [],
+    };
+    const tab = state.tabs.find((t) => t.id === state.activeTabId);
+    set({
+      assignment: null,
+      workbookOpen: true,
+      components: saved.components,
+      wires: saved.wires,
+      textElements: saved.textElements,
+      comments: saved.comments,
+      boxes: saved.boxes,
+      buildMode: tab?.buildMode || 'CC',
+      activeTask: tab?.activeTask || 'arithmetic',
+    });
   },
   switchQuestion: (index) => {
     const state = get();
@@ -2966,6 +3034,10 @@ function performAutoSave() {
 
 // Subscribe to state changes that should trigger auto-save
 useStore.subscribe((state, prev) => {
+  // Auto-save only covers the freeform sandbox. While an assignment is open,
+  // skip it so assignment circuits don't pollute the sandbox blob.
+  // (Per-assignment persistence arrives in a later step.)
+  if (state.assignment) return;
   // Only auto-save when circuit/workbook data actually changes
   if (
     state.components === prev.components &&
@@ -3014,7 +3086,7 @@ function loadAutoSave() {
       const vp = data.viewPreferences || {};
 
       useStore.setState({
-        workbookOpen: data.workbookOpen !== false, // default true for existing data
+        workbookOpen: false, // home-first: restore the sandbox into memory but land on Home
         workbookTitle: data.workbookTitle || 'Untitled Workbook',
         tabs,
         activeTabId: activeId,
@@ -3050,7 +3122,7 @@ function loadAutoSave() {
         activeTask: 'arithmetic' as ActiveTask,
       }));
       useStore.setState({
-        workbookOpen: true,
+        workbookOpen: false, // home-first: restore the sandbox but land on Home
         workbookTitle: 'Untitled Workbook',
         buildMode: data.buildMode || 'CC',
         repSystem: data.repSystem || 'binary',
