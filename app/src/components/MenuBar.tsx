@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import { useStore } from '../store';
 import type { AssignmentData } from '../types';
 import { saveToFileAs, openFile } from '../fileHandle';
+import { getCurrentUserEmail } from '../auth';
 
 function EditableWorkbookTitle() {
   const workbookTitle = useStore((s) => s.workbookTitle);
@@ -140,7 +141,7 @@ export function MenuBar() {
   };
 
   const handleExportSubmission = () => {
-    const student = prompt('Your name (optional) — included in the submission for grading:') ?? undefined;
+    const student = getCurrentUserEmail();
     const json = exportSubmission(student);
     if (json == null) {
       alert('Import an assignment before exporting a submission.');
