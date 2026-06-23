@@ -75,7 +75,8 @@ html, body, #root {
   min-width: 200px;
   z-index: 200;
   border-radius: 4px;
-  overflow: hidden;
+  /* visible so hover submenus (Import flyout) positioned at left:100% aren't clipped */
+  overflow: visible;
 }
 
 .menu-dropdown-item {
@@ -112,6 +113,7 @@ html, body, #root {
   min-width: 160px;
   border-radius: 4px;
   overflow: hidden;
+  z-index: 201;
 }
 
 /* ── Workbook title (in menu bar) ── */
