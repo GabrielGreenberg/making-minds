@@ -7,8 +7,8 @@
 
 import type {
   CircuitData,
-  HomeworkData,
-  HomeworkProblem,
+  AssignmentData,
+  AssignmentQuestion,
   SubmissionData,
 } from '../types';
 import { evaluateCCInputs } from './cc';
@@ -20,8 +20,8 @@ export interface CaseResult {
   pass: boolean;
 }
 
-export interface ProblemResult {
-  problemId: number;
+export interface QuestionResult {
+  questionId: number;
   status: 'graded' | 'skipped';
   reason?: string; // why it was skipped
   passed: number;
@@ -31,7 +31,7 @@ export interface ProblemResult {
 
 export interface SubmissionResult {
   student: string;
-  problems: ProblemResult[];
+  questions: QuestionResult[];
   passed: number; // rolled up across graded cases
   total: number;
 }
@@ -44,22 +44,22 @@ function bitsEqual(a: number[], b: number[]): boolean {
   return true;
 }
 
-function skip(problemId: number, reason: string): ProblemResult {
-  return { problemId, status: 'skipped', reason, passed: 0, total: 0, cases: [] };
+function skip(questionId: number, reason: string): QuestionResult {
+  return { questionId, status: 'skipped', reason, passed: 0, total: 0, cases: [] };
 }
 
 /**
- * Grade a single problem's circuit against its test vectors. Only CC problems
+ * Grade a single question's circuit against its test vectors. Only CC questions
  * with test vectors are gradeable today; everything else is skipped with a reason.
  */
-export function gradeProblem(problem: HomeworkProblem, circuit: CircuitData | undefined): ProblemResult {
-  if (!circuit) return skip(problem.id, 'no circuit submitted');
-  if (problem.type !== 'CC') return skip(problem.id, `grading not yet supported for type "${problem.type}"`);
-  if (!problem.test_vectors || problem.test_vectors.length === 0) {
-    return skip(problem.id, 'problem has no test vectors');
+export function gradeQuestion(question: AssignmentQuestion, circuit: CircuitData | undefined): QuestionResult {
+  if (!circuit) return skip(question.id, 'no circuit submitted');
+  if (question.buildMode !== 'CC') return skip(question.id, `grading not yet supported for mode "${question.buildMode}"`);
+  if (!question.test_vectors || question.test_vectors.length === 0) {
+    return skip(question.id, 'question has no test vectors');
   }
 
-  const cases: CaseResult[] = problem.test_vectors.map((tv) => {
+  const cases: CaseResult[] = question.test_vectors.map((tv) => {
     const got = evaluateCCInputs(circuit.components, circuit.wires, tv.input_sequence);
     return {
       input: tv.input_sequence,
@@ -70,24 +70,24 @@ export function gradeProblem(problem: HomeworkProblem, circuit: CircuitData | un
   });
 
   const passed = cases.filter((c) => c.pass).length;
-  return { problemId: problem.id, status: 'graded', passed, total: cases.length, cases };
+  return { questionId: question.id, status: 'graded', passed, total: cases.length, cases };
 }
 
 /**
- * Grade a full submission against a homework definition. Matches each homework
- * problem to its submitted answer by problem id.
+ * Grade a full submission against an assignment definition. Matches each
+ * assignment question to its submitted answer by question id.
  */
-export function gradeSubmission(homework: HomeworkData, submission: SubmissionData): SubmissionResult {
-  const byId = new Map(submission.answers.map((a) => [a.problemId, a.circuit]));
+export function gradeSubmission(assignment: AssignmentData, submission: SubmissionData): SubmissionResult {
+  const byId = new Map(submission.answers.map((a) => [a.questionId, a.circuit]));
 
-  const problems = homework.problems.map((p) => gradeProblem(p, byId.get(p.id)));
+  const questions = assignment.questions.map((q) => gradeQuestion(q, byId.get(q.id)));
 
-  const passed = problems.reduce((n, r) => n + r.passed, 0);
-  const total = problems.reduce((n, r) => n + r.total, 0);
+  const passed = questions.reduce((n, r) => n + r.passed, 0);
+  const total = questions.reduce((n, r) => n + r.total, 0);
 
   return {
     student: submission.student ?? 'unknown',
-    problems,
+    questions,
     passed,
     total,
   };

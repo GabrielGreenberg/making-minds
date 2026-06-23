@@ -1,10 +1,11 @@
 {
-  "title": "HW-sample: CC basics",
-  "problems": [
+  "title": "Sample assignment: CC basics",
+  "questions": [
     {
       "id": 1,
-      "text": "OUT = IN1 AND IN2",
-      "type": "CC",
+      "label": "Q1",
+      "statement": "OUT = IN1 AND IN2",
+      "buildMode": "CC",
       "representation": "binary",
       "grading_mode": "exhaustive",
       "test_vectors": [
@@ -48,8 +49,9 @@
     },
     {
       "id": 2,
-      "text": "OUT = NOT IN1",
-      "type": "CC",
+      "label": "Q2",
+      "statement": "OUT = NOT IN1",
+      "buildMode": "CC",
       "representation": "binary",
       "grading_mode": "exhaustive",
       "test_vectors": [

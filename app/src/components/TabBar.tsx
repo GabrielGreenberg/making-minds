@@ -163,40 +163,21 @@ export function TabBar() {
     activeTabId,
     switchTab,
     removeTab,
-    homework,
-    currentProblemIndex,
-    switchProblem,
-    problemSet,
-    currentProblemPageIndex,
-    switchProblemPage,
+    assignment,
+    currentQuestionIndex,
+    switchQuestion,
   } = useStore();
 
-  if (problemSet) {
+  if (assignment) {
     return (
       <div className="tab-bar">
-        {problemSet.pages.map((p, i) => (
+        {assignment.questions.map((q, i) => (
           <div
-            key={p.id}
-            className={`tab ${i === currentProblemPageIndex ? 'active' : ''}`}
-            onClick={() => switchProblemPage(i)}
+            key={q.id}
+            className={`tab ${i === currentQuestionIndex ? 'active' : ''}`}
+            onClick={() => switchQuestion(i)}
           >
-            {p.label}
-          </div>
-        ))}
-      </div>
-    );
-  }
-
-  if (homework) {
-    return (
-      <div className="tab-bar">
-        {homework.problems.map((p, i) => (
-          <div
-            key={p.id}
-            className={`tab ${i === currentProblemIndex ? 'active' : ''}`}
-            onClick={() => switchProblem(i)}
-          >
-            Q{p.id}
+            {q.label}
           </div>
         ))}
       </div>

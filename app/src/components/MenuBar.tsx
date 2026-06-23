@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { useStore } from '../store';
-import type { ProblemSetData } from '../types';
+import type { AssignmentData } from '../types';
 import { saveToFileAs, openFile } from '../fileHandle';
 
 function EditableWorkbookTitle() {
@@ -84,10 +84,8 @@ export function MenuBar() {
     exportSubmission,
     exportWorkbook,
     importWorkbook,
-    loadHomework,
-    loadProblemSet,
-    homework,
-    problemSet,
+    loadAssignment,
+    assignment,
     importBoxedCircuit,
     newWorkbook,
   } = useStore();
@@ -145,7 +143,7 @@ export function MenuBar() {
     const student = prompt('Your name (optional) — included in the submission for grading:') ?? undefined;
     const json = exportSubmission(student);
     if (json == null) {
-      alert('Import a homework file before exporting a submission.');
+      alert('Import an assignment before exporting a submission.');
       close();
       return;
     }
@@ -200,7 +198,7 @@ export function MenuBar() {
     close();
   };
 
-  const handleImportHomework = () => {
+  const handleImportAssignment = () => {
     const input = document.createElement('input');
     input.type = 'file';
     input.accept = '.json';
@@ -209,31 +207,10 @@ export function MenuBar() {
       if (file) {
         file.text().then((text) => {
           try {
-            const hw = JSON.parse(text);
-            loadHomework(hw);
+            const a: AssignmentData = JSON.parse(text);
+            loadAssignment(a);
           } catch {
-            alert('Invalid homework JSON file.');
-          }
-        });
-      }
-    };
-    input.click();
-    close();
-  };
-
-  const handleImportProblemSet = () => {
-    const input = document.createElement('input');
-    input.type = 'file';
-    input.accept = '.json';
-    input.onchange = (e) => {
-      const file = (e.target as HTMLInputElement).files?.[0];
-      if (file) {
-        file.text().then((text) => {
-          try {
-            const ps: ProblemSetData = JSON.parse(text);
-            loadProblemSet(ps);
-          } catch {
-            alert('Invalid problem set JSON file.');
+            alert('Invalid assignment JSON file.');
           }
         });
       }
@@ -277,11 +254,8 @@ export function MenuBar() {
                   <div className="menu-dropdown-item" onClick={handleImportBuild}>
                     Build (boxed)
                   </div>
-                  <div className="menu-dropdown-item" onClick={handleImportHomework}>
-                    Homework
-                  </div>
-                  <div className="menu-dropdown-item" onClick={handleImportProblemSet}>
-                    Problem Set
+                  <div className="menu-dropdown-item" onClick={handleImportAssignment}>
+                    Assignment
                   </div>
                 </div>
               )}
@@ -289,7 +263,7 @@ export function MenuBar() {
             <div className="menu-dropdown-item" onClick={handleExportWorksheet}>
               Export Worksheet
             </div>
-            {homework && (
+            {assignment && (
               <div className="menu-dropdown-item" onClick={handleExportSubmission}>
                 Export Submission
               </div>
@@ -329,64 +303,37 @@ export function MenuBar() {
       {/* Workbook title + close button, right-aligned */}
       <EditableWorkbookTitle />
 
-      {/* Homework menu (legacy) */}
-      {homework && (
-        <div
-          className="menu-item"
-          style={{ color: '#2e7d32', fontWeight: 600 }}
-          onClick={() => setOpenMenu(openMenu === 'hw' ? null : 'hw')}
-        >
-          {homework.title}
-          {openMenu === 'hw' && (
-            <div className="menu-dropdown">
-              {homework.problems.map((p, i) => (
-                <div
-                  key={p.id}
-                  className="menu-dropdown-item"
-                  onClick={() => {
-                    useStore.getState().switchProblem(i);
-                    close();
-                  }}
-                >
-                  Q{p.id}: {p.text.substring(0, 40)}...
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* Problem Set menu */}
-      {problemSet && (
+      {/* Assignment menu */}
+      {assignment && (
         <div
           className="menu-item"
           style={{ color: '#1565c0', fontWeight: 600 }}
-          onClick={() => setOpenMenu(openMenu === 'ps' ? null : 'ps')}
+          onClick={() => setOpenMenu(openMenu === 'assignment' ? null : 'assignment')}
         >
-          {problemSet.title}
-          {openMenu === 'ps' && (
+          {assignment.title}
+          {openMenu === 'assignment' && (
             <div className="menu-dropdown">
-              {problemSet.pages.map((p, i) => (
+              {assignment.questions.map((q, i) => (
                 <div
-                  key={p.id}
+                  key={q.id}
                   className="menu-dropdown-item"
                   onClick={() => {
-                    useStore.getState().switchProblemPage(i);
+                    useStore.getState().switchQuestion(i);
                     close();
                   }}
                 >
-                  {p.label}: {p.statement.substring(0, 40)}...
+                  {q.label}: {q.statement.substring(0, 40)}...
                 </div>
               ))}
               <div className="menu-separator" />
               <div
                 className="menu-dropdown-item"
                 onClick={() => {
-                  useStore.getState().closeProblemSet();
+                  useStore.getState().closeAssignment();
                   close();
                 }}
               >
-                Close Problem Set
+                Close Assignment
               </div>
             </div>
           )}

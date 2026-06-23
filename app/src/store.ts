@@ -9,11 +9,10 @@ import type {
   CircuitComponent,
   Wire,
   ComponentType,
-  HomeworkData,
+  AssignmentData,
   TextElement,
   CommentElement,
   BoxDefinition,
-  ProblemSetData,
   WireManualSegment,
   FsmHistoryEntry,
   WorkbookData,
@@ -37,6 +36,19 @@ interface HistoryEntry {
   comments: CommentElement[];
   boxes: BoxDefinition[];
 }
+
+/** Saved canvas state for one assignment question. */
+type QuestionCircuit = {
+  components: CircuitComponent[];
+  wires: Wire[];
+  textElements: TextElement[];
+  comments: CommentElement[];
+  boxes: BoxDefinition[];
+};
+
+const emptyQuestionCircuit = (): QuestionCircuit => ({
+  components: [], wires: [], textElements: [], comments: [], boxes: [],
+});
 
 interface AppState {
   // Auto-save status
@@ -130,25 +142,19 @@ interface AppState {
   undo: () => void;
   redo: () => void;
 
-  // Homework (legacy)
-  homework: HomeworkData | null;
-  currentProblemIndex: number;
-  problemCircuits: Map<number, { components: CircuitComponent[]; wires: Wire[] }>;
-  loadHomework: (hw: HomeworkData) => void;
-  switchProblem: (index: number) => void;
-
-  // Problem Set Mode
-  problemSet: ProblemSetData | null;
-  currentProblemPageIndex: number;
-  problemPageCircuits: Map<string, { components: CircuitComponent[]; wires: Wire[]; textElements: TextElement[]; comments: CommentElement[]; boxes: BoxDefinition[] }>;
-  loadProblemSet: (ps: ProblemSetData) => void;
-  switchProblemPage: (index: number) => void;
-  closeProblemSet: () => void;
+  // Assignment mode — one graded, multi-question assignment open at a time.
+  assignment: AssignmentData | null;
+  currentQuestionIndex: number;
+  // Per-question circuit + annotations, keyed by AssignmentQuestion.id.
+  questionCircuits: Map<number, QuestionCircuit>;
+  loadAssignment: (assignment: AssignmentData) => void;
+  switchQuestion: (index: number) => void;
+  closeAssignment: () => void;
 
   // Save/Load (legacy single-circuit export for "Export Worksheet")
   exportProject: () => string;
   importProject: (json: string) => void;
-  // Homework submission export (null when no homework is loaded)
+  // Submission export (null when no assignment is loaded)
   exportSubmission: (student?: string) => string | null;
   // exportWorkbook and importWorkbook are in the Workbook section above
 
@@ -984,76 +990,38 @@ export const useStore = create<AppState>()((set, get) => ({
     });
   },
 
-  // Homework (legacy)
-  homework: null,
-  currentProblemIndex: 0,
-  problemCircuits: new Map(),
-  loadHomework: (hw) => {
-    const problemCircuits = new Map<
-      number,
-      { components: CircuitComponent[]; wires: Wire[] }
-    >();
-    hw.problems.forEach((_, i) => {
-      problemCircuits.set(i, { components: [], wires: [] });
-    });
-    set({
-      homework: hw,
-      currentProblemIndex: 0,
-      problemCircuits,
-      components: [],
-      wires: [],
-    });
-  },
-  switchProblem: (index) => {
-    const state = get();
-    // Save current problem state
-    const updatedMap = new Map(state.problemCircuits);
-    updatedMap.set(state.currentProblemIndex, {
-      components: state.components,
-      wires: state.wires,
-    });
-
-    // Load new problem state
-    const saved = updatedMap.get(index) || { components: [], wires: [] };
-    set({
-      currentProblemIndex: index,
-      problemCircuits: updatedMap,
-      components: saved.components,
-      wires: saved.wires,
-    });
-  },
-
-  // Problem Set Mode
-  problemSet: null,
-  currentProblemPageIndex: 0,
-  problemPageCircuits: new Map(),
-  loadProblemSet: (ps) => {
-    const circuits = new Map<string, { components: CircuitComponent[]; wires: Wire[]; textElements: TextElement[]; comments: CommentElement[]; boxes: BoxDefinition[] }>();
-    for (const page of ps.pages) {
-      circuits.set(page.id, { components: [], wires: [], textElements: [], comments: [], boxes: [] });
+  // Assignment mode
+  assignment: null,
+  currentQuestionIndex: 0,
+  questionCircuits: new Map(),
+  loadAssignment: (assignment) => {
+    const questionCircuits = new Map<number, QuestionCircuit>();
+    for (const q of assignment.questions) {
+      questionCircuits.set(q.id, emptyQuestionCircuit());
     }
     set({
-      problemSet: ps,
-      currentProblemPageIndex: 0,
-      problemPageCircuits: circuits,
+      assignment,
+      currentQuestionIndex: 0,
+      questionCircuits,
       components: [],
       wires: [],
       textElements: [],
       comments: [],
       boxes: [],
-      buildMode: ps.pages[0]?.buildMode || 'CC',
+      buildMode: assignment.questions[0]?.buildMode || 'CC',
     });
   },
-  switchProblemPage: (index) => {
+  switchQuestion: (index) => {
     const state = get();
-    const ps = state.problemSet;
-    if (!ps) return;
-    const currentPage = ps.pages[state.currentProblemPageIndex];
-    const nextPage = ps.pages[index];
-    if (!currentPage || !nextPage) return;
+    const a = state.assignment;
+    if (!a) return;
+    const currentQ = a.questions[state.currentQuestionIndex];
+    const nextQ = a.questions[index];
+    if (!currentQ || !nextQ) return;
 
-    const updatedMap = new Map(state.problemPageCircuits);
-    updatedMap.set(currentPage.id, {
+    // Save the live question's canvas, load the target question's.
+    const updatedMap = new Map(state.questionCircuits);
+    updatedMap.set(currentQ.id, {
       components: state.components,
       wires: state.wires,
       textElements: state.textElements,
@@ -1061,23 +1029,23 @@ export const useStore = create<AppState>()((set, get) => ({
       boxes: state.boxes,
     });
 
-    const saved = updatedMap.get(nextPage.id) || { components: [], wires: [], textElements: [], comments: [], boxes: [] };
+    const saved = updatedMap.get(nextQ.id) ?? emptyQuestionCircuit();
     set({
-      currentProblemPageIndex: index,
-      problemPageCircuits: updatedMap,
+      currentQuestionIndex: index,
+      questionCircuits: updatedMap,
       components: saved.components,
       wires: saved.wires,
       textElements: saved.textElements,
       comments: saved.comments,
       boxes: saved.boxes,
-      buildMode: nextPage.buildMode,
+      buildMode: nextQ.buildMode,
     });
   },
-  closeProblemSet: () => {
+  closeAssignment: () => {
     set({
-      problemSet: null,
-      currentProblemPageIndex: 0,
-      problemPageCircuits: new Map(),
+      assignment: null,
+      currentQuestionIndex: 0,
+      questionCircuits: new Map(),
       components: [],
       wires: [],
       textElements: [],
@@ -1112,24 +1080,34 @@ export const useStore = create<AppState>()((set, get) => ({
   },
   exportSubmission: (student) => {
     const state = get();
-    if (!state.homework) return null;
+    const assignment = state.assignment;
+    if (!assignment) return null;
 
-    // Sync the live problem into the map (same save step as switchProblem),
-    // so the currently-open problem's latest circuit is captured.
-    const circuits = new Map(state.problemCircuits);
-    circuits.set(state.currentProblemIndex, {
-      components: state.components,
-      wires: state.wires,
-    });
+    // Sync the live question into the map (same save step as switchQuestion),
+    // so the currently-open question's latest circuit is captured.
+    const circuits = new Map(state.questionCircuits);
+    const currentQ = assignment.questions[state.currentQuestionIndex];
+    if (currentQ) {
+      circuits.set(currentQ.id, {
+        components: state.components,
+        wires: state.wires,
+        textElements: state.textElements,
+        comments: state.comments,
+        boxes: state.boxes,
+      });
+    }
 
     const submission: SubmissionData = {
-      homeworkTitle: state.homework.title,
+      assignmentTitle: assignment.title,
       student: student?.trim() || undefined,
       submittedAt: new Date().toISOString(),
-      answers: state.homework.problems.map((p, i) => ({
-        problemId: p.id,
-        circuit: circuits.get(i) ?? { components: [], wires: [] },
-      })),
+      answers: assignment.questions.map((q) => {
+        const saved = circuits.get(q.id) ?? emptyQuestionCircuit();
+        return {
+          questionId: q.id,
+          circuit: { components: saved.components, wires: saved.wires },
+        };
+      }),
     };
     return JSON.stringify(submission, null, 2);
   },

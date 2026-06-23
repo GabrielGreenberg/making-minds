@@ -78,11 +78,17 @@ export interface ProjectData {
   repSystem: RepSystem;
 }
 
-export interface HomeworkProblem {
-  id: number;
-  text: string;
-  type: BuildMode;
-  representation: RepSystem;
+// ─── Assignments ─────────────────────────────────────────────────
+// One unified model for graded, multi-question assignments. (Replaces the
+// earlier split between "Homework" — which carried grading test vectors — and
+// "Problem Set" — which carried per-question build modes and statements.)
+
+export interface AssignmentQuestion {
+  id: number;                  // stable id; referenced by the grader and submissions
+  label: string;               // e.g. "Problem 1", "Q2a"
+  statement: string;           // problem text shown above the canvas
+  buildMode: BuildMode;        // canvas mode for this question (CC, SC, FSM, …)
+  representation?: RepSystem;
   allowed_components?: ComponentType[];
   test_vectors?: {
     input_sequence: number[];
@@ -92,21 +98,21 @@ export interface HomeworkProblem {
   notes?: string;
 }
 
-export interface HomeworkData {
+export interface AssignmentData {
   title: string;
-  problems: HomeworkProblem[];
+  questions: AssignmentQuestion[];
 }
 
 /**
- * A student's gradeable homework submission. Pure/serializable — produced by the
- * app's submission export and consumed by the grader (in-app or the CLI). Each
- * answer pairs a problem (by HomeworkProblem.id) with the circuit the student built.
+ * A student's gradeable submission. Pure/serializable — produced by the app's
+ * submission export and consumed by the grader (in-app or the CLI). Each answer
+ * pairs a question (by AssignmentQuestion.id) with the circuit the student built.
  */
 export interface SubmissionData {
-  homeworkTitle: string;
+  assignmentTitle: string;
   student?: string;        // free-form identity; auth-agnostic, falls back to filename
   submittedAt: string;     // ISO timestamp
-  answers: { problemId: number; circuit: CircuitData }[];
+  answers: { questionId: number; circuit: CircuitData }[];
 }
 
 // ─── Workbook / Worksheet ────────────────────────────────────────
@@ -183,18 +189,6 @@ export interface BoxDefinition {
 }
 
 // ─── Problem Set Mode ───────────────────────────────────────────
-
-export interface ProblemPage {
-  id: string;
-  label: string; // e.g., "Problem 1", "Problem 2a"
-  statement: string; // problem text
-  buildMode: BuildMode;
-}
-
-export interface ProblemSetData {
-  title: string;
-  pages: ProblemPage[];
-}
 
 // Port definitions for each component type
 export function getPortsForType(type: ComponentType): Port[] {
