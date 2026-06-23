@@ -1,19 +1,11 @@
 import { useStore } from '../store';
-import { openFile } from '../fileHandle';
 import { listAssignments } from '../assignments';
 
 export function HomeScreen() {
   const openAssignment = useStore((s) => s.openAssignment);
   const enterSandbox = useStore((s) => s.enterSandbox);
-  const newWorkbook = useStore((s) => s.newWorkbook);
-  const importWorkbook = useStore((s) => s.importWorkbook);
 
   const assignments = listAssignments();
-
-  const handleOpenFile = async () => {
-    const result = await openFile();
-    if (result) importWorkbook(result.text, result.handle);
-  };
 
   return (
     <div className="welcome-screen">
@@ -47,15 +39,7 @@ export function HomeScreen() {
           <div className="home-grid">
             <button className="home-tile" onClick={() => enterSandbox()}>
               <span className="home-tile-title">Sandbox</span>
-              <span className="home-tile-meta">A freeform workbook to experiment</span>
-            </button>
-            <button className="home-tile" onClick={() => newWorkbook()}>
-              <span className="home-tile-title">New sandbox</span>
-              <span className="home-tile-meta">Start from a blank workbook</span>
-            </button>
-            <button className="home-tile" onClick={handleOpenFile}>
-              <span className="home-tile-title">Open workbook file…</span>
-              <span className="home-tile-meta">Load a saved .json workbook</span>
+              <span className="home-tile-meta">A freeform workbook to experiment — saved automatically</span>
             </button>
           </div>
         </section>
