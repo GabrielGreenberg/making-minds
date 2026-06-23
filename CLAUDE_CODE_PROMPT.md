@@ -15,6 +15,8 @@ You are building an interactive web platform for PHIL 133: "Making Minds," a phi
 
 Build this as a **single-page web application** (React + TypeScript recommended). The platform runs entirely in the browser — no backend server. Files are saved/loaded via browser download/upload of JSON.
 
+**Keep evaluation logic framework-agnostic.** All circuit/FSM evaluation lives in `app/src/engine/` (pure TypeScript, no React/Zustand/DOM) so the same code can run headlessly for server-side autograding later. The store and UI are thin wrappers over the engine.
+
 **Follow the six-phase structure in the spec:**
 
 1. **Phase 1: Combinatorial Circuits** — Logic gates (NOT, AND, OR), inputs/outputs, wiring with validation, I/O and A/V tables with tally/binary toggle, boxed circuits (including built-in XOR and Half-Adder), drag-and-drop canvas with snap-to-grid
