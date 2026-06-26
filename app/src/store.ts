@@ -18,6 +18,7 @@ import type {
   WorkbookData,
   WorksheetData,
   SubmissionData,
+  QuestionCircuit,
 } from './types';
 import {
   getPortsForType,
@@ -29,6 +30,11 @@ import {
 } from './types';
 import { topologicalSort, evaluateGate, evaluateCC } from './engine';
 import { getAssignment } from './assignments';
+import {
+  localWorkbookStore,
+  emptyQuestionCircuit,
+  restoreQuestionCircuits,
+} from './storage/workbookStore';
 
 interface HistoryEntry {
   components: CircuitComponent[];
@@ -38,18 +44,6 @@ interface HistoryEntry {
   boxes: BoxDefinition[];
 }
 
-/** Saved canvas state for one assignment question. */
-type QuestionCircuit = {
-  components: CircuitComponent[];
-  wires: Wire[];
-  textElements: TextElement[];
-  comments: CommentElement[];
-  boxes: BoxDefinition[];
-};
-
-const emptyQuestionCircuit = (): QuestionCircuit => ({
-  components: [], wires: [], textElements: [], comments: [], boxes: [],
-});
 
 interface AppState {
   // Auto-save status
@@ -1029,7 +1023,25 @@ export const useStore = create<AppState>()((set, get) => ({
       return true;
     }
     get().loadAssignment(def);
-    set({ workbookOpen: true });
+
+    // Restore any saved work for this assignment (merged by question id).
+    const saved = localWorkbookStore.loadAssignmentState(id);
+    const { questionCircuits, currentQuestionIndex } = restoreQuestionCircuits(def, saved);
+    const activeQ = def.questions[currentQuestionIndex];
+    const activeCircuit = activeQ
+      ? questionCircuits.get(activeQ.id) ?? emptyQuestionCircuit()
+      : emptyQuestionCircuit();
+    set({
+      questionCircuits,
+      currentQuestionIndex,
+      components: activeCircuit.components,
+      wires: activeCircuit.wires,
+      textElements: activeCircuit.textElements,
+      comments: activeCircuit.comments,
+      boxes: activeCircuit.boxes,
+      buildMode: activeQ?.buildMode || 'CC',
+      workbookOpen: true,
+    });
     return true;
   },
   goHome: () => {
@@ -1048,6 +1060,8 @@ export const useStore = create<AppState>()((set, get) => ({
         });
         set({ questionCircuits: qc });
       }
+      // Flush immediately so a quick Home click persists (don't wait for debounce).
+      saveAssignmentState();
     } else {
       const tc = new Map(state.tabCircuits);
       tc.set(state.activeTabId, {
@@ -3020,11 +3034,37 @@ function getAutoSaveData() {
   };
 }
 
+// Persist the open assignment's work (syncing the live question first) via the
+// storage seam, keyed by assignment id — separate from the sandbox blob.
+function saveAssignmentState() {
+  const s = useStore.getState();
+  const a = s.assignment;
+  if (!a) return;
+  const qc = new Map(s.questionCircuits);
+  const q = a.questions[s.currentQuestionIndex];
+  if (q) {
+    qc.set(q.id, {
+      components: s.components,
+      wires: s.wires,
+      textElements: s.textElements,
+      comments: s.comments,
+      boxes: s.boxes,
+    });
+  }
+  localWorkbookStore.saveAssignmentState(a.id, {
+    currentQuestionIndex: s.currentQuestionIndex,
+    questionCircuits: Object.fromEntries(qc) as Record<number, QuestionCircuit>,
+  });
+}
+
 function performAutoSave() {
   try {
     useStore.setState({ autoSaveStatus: 'saving' });
-    const data = getAutoSaveData();
-    localStorage.setItem(AUTO_SAVE_KEY, JSON.stringify(data));
+    if (useStore.getState().assignment) {
+      saveAssignmentState();
+    } else {
+      localStorage.setItem(AUTO_SAVE_KEY, JSON.stringify(getAutoSaveData()));
+    }
     useStore.setState({ autoSaveStatus: 'saved' });
   } catch {
     // localStorage full or unavailable — silent fail
@@ -3032,26 +3072,34 @@ function performAutoSave() {
   }
 }
 
-// Subscribe to state changes that should trigger auto-save
+// Subscribe to state changes that should trigger auto-save. Routes by context:
+// assignment mode → per-assignment storage; sandbox mode → the sandbox blob.
 useStore.subscribe((state, prev) => {
-  // Auto-save only covers the freeform sandbox. While an assignment is open,
-  // skip it so assignment circuits don't pollute the sandbox blob.
-  // (Per-assignment persistence arrives in a later step.)
-  if (state.assignment) return;
-  // Only auto-save when circuit/workbook data actually changes
-  if (
-    state.components === prev.components &&
-    state.wires === prev.wires &&
-    state.textElements === prev.textElements &&
-    state.comments === prev.comments &&
-    state.boxes === prev.boxes &&
-    state.tabs === prev.tabs &&
-    state.activeTabId === prev.activeTabId &&
-    state.buildMode === prev.buildMode &&
-    state.tabCircuits === prev.tabCircuits &&
-    state.workbookOpen === prev.workbookOpen &&
-    state.workbookTitle === prev.workbookTitle
-  ) return;
+  const canvasChanged =
+    state.components !== prev.components ||
+    state.wires !== prev.wires ||
+    state.textElements !== prev.textElements ||
+    state.comments !== prev.comments ||
+    state.boxes !== prev.boxes;
+
+  let changed: boolean;
+  if (state.assignment) {
+    changed =
+      canvasChanged ||
+      state.currentQuestionIndex !== prev.currentQuestionIndex ||
+      state.questionCircuits !== prev.questionCircuits ||
+      state.assignment !== prev.assignment;
+  } else {
+    changed =
+      canvasChanged ||
+      state.tabs !== prev.tabs ||
+      state.activeTabId !== prev.activeTabId ||
+      state.buildMode !== prev.buildMode ||
+      state.tabCircuits !== prev.tabCircuits ||
+      state.workbookOpen !== prev.workbookOpen ||
+      state.workbookTitle !== prev.workbookTitle;
+  }
+  if (!changed) return;
 
   useStore.setState({ autoSaveStatus: 'unsaved' });
   if (autoSaveTimer) clearTimeout(autoSaveTimer);

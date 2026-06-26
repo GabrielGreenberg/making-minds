@@ -116,6 +116,21 @@ export interface SubmissionData {
   answers: { questionId: number; circuit: CircuitData }[];
 }
 
+/** Saved canvas state for one assignment question (circuit + annotations). */
+export interface QuestionCircuit {
+  components: CircuitComponent[];
+  wires: Wire[];
+  textElements: TextElement[];
+  comments: CommentElement[];
+  boxes: BoxDefinition[];
+}
+
+/** A student's in-progress work for one assignment — the persisted payload. */
+export interface AssignmentState {
+  currentQuestionIndex: number;
+  questionCircuits: Record<number, QuestionCircuit>; // keyed by AssignmentQuestion.id
+}
+
 // ─── Workbook / Worksheet ────────────────────────────────────────
 
 export interface WorksheetData {
