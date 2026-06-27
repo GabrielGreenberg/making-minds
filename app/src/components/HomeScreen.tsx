@@ -1,10 +1,7 @@
-import { useStore } from '../store';
 import { listAssignments } from '../assignments';
+import { navigate } from '../routing';
 
 export function HomeScreen() {
-  const openAssignment = useStore((s) => s.openAssignment);
-  const enterSandbox = useStore((s) => s.enterSandbox);
-
   const assignments = listAssignments();
 
   return (
@@ -20,7 +17,7 @@ export function HomeScreen() {
               <button
                 key={a.id}
                 className="home-tile"
-                onClick={() => openAssignment(a.id)}
+                onClick={() => navigate({ kind: 'assignment', id: a.id })}
               >
                 <span className="home-tile-title">{a.title}</span>
                 <span className="home-tile-meta">
@@ -37,7 +34,7 @@ export function HomeScreen() {
         <section className="home-section">
           <h2 className="home-section-title">Explore</h2>
           <div className="home-grid">
-            <button className="home-tile" onClick={() => enterSandbox()}>
+            <button className="home-tile" onClick={() => navigate({ kind: 'sandbox' })}>
               <span className="home-tile-title">Sandbox</span>
               <span className="home-tile-meta">A freeform workbook to experiment — saved automatically</span>
             </button>

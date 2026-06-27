@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { useStore } from '../store';
+import { navigate } from '../routing';
 import type { BuildMode } from '../types';
 
 const MACHINE_OPTIONS: { mode: BuildMode; label: string }[] = [
@@ -165,7 +166,6 @@ export function TabBar() {
     removeTab,
     assignment,
     currentQuestionIndex,
-    switchQuestion,
   } = useStore();
 
   if (assignment) {
@@ -175,7 +175,7 @@ export function TabBar() {
           <div
             key={q.id}
             className={`tab ${i === currentQuestionIndex ? 'active' : ''}`}
-            onClick={() => switchQuestion(i)}
+            onClick={() => navigate({ kind: 'assignment', id: assignment.id, questionIndex: i }, { replace: true })}
           >
             {q.label}
           </div>

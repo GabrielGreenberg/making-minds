@@ -3,6 +3,7 @@ import { useStore } from '../store';
 import type { AssignmentData } from '../types';
 import { saveToFileAs, openFile } from '../fileHandle';
 import { getCurrentUserEmail } from '../auth';
+import { navigate } from '../routing';
 
 function EditableWorkbookTitle() {
   const workbookTitle = useStore((s) => s.workbookTitle);
@@ -60,7 +61,7 @@ function EditableWorkbookTitle() {
         className="workbook-close-btn"
         onClick={() => {
           const ok = confirm('Close this workbook? Unsaved changes will be lost.');
-          if (ok) closeWorkbook();
+          if (ok) { closeWorkbook(); navigate({ kind: 'home' }, { replace: true }); }
         }}
         title="Close workbook"
       >
@@ -89,7 +90,6 @@ export function MenuBar() {
     assignment,
     importBoxedCircuit,
     newWorkbook,
-    goHome,
   } = useStore();
 
   useEffect(() => {
@@ -224,7 +224,7 @@ export function MenuBar() {
   return (
     <div className="menu-bar" ref={menuRef}>
       {/* Home — back to the assignment catalog */}
-      <div className="menu-item" onClick={() => { goHome(); close(); }}>
+      <div className="menu-item" onClick={() => { navigate({ kind: 'home' }); close(); }}>
         ⌂ Home
       </div>
       {/* File */}
@@ -324,7 +324,7 @@ export function MenuBar() {
                   key={q.id}
                   className="menu-dropdown-item"
                   onClick={() => {
-                    useStore.getState().switchQuestion(i);
+                    navigate({ kind: 'assignment', id: assignment.id, questionIndex: i }, { replace: true });
                     close();
                   }}
                 >
@@ -335,6 +335,7 @@ export function MenuBar() {
               <div
                 className="menu-dropdown-item"
                 onClick={() => {
+                  navigate({ kind: 'home' });
                   useStore.getState().closeAssignment();
                   close();
                 }}
