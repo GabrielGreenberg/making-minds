@@ -26,6 +26,7 @@ We're building the browser app and the (future) server so that each external dep
 | Identity | `src/auth/` (stub) | stub user / email | real SSO |
 | Persistence | `WorkbookStore` | `LocalWorkbookStore` (localStorage) | `RemoteWorkbookStore` (server) |
 | Navigation | `routing` (`Route` + `navigate`) | hash URLs via History API | same routes; can add server-rendered deep links |
+| Submission | `SubmissionStore` | `LocalSubmissionStore` (localStorage) | server endpoint (POST → autograde) |
 
 ## What we recently achieved
 
@@ -39,17 +40,17 @@ In rough order (all on `main` unless noted):
 - **Auth stub layer** — `src/auth/` (AuthGate + stub) establishing the login seam ahead of real SSO.
 - **Per-assignment persistence** — each assignment's work is saved to localStorage behind the `WorkbookStore` seam (`mm:asg:<id>`), restored on open, with drift handling when an assignment definition changes. Confirmed by a manual reload round-trip and a headless storage test.
 - **Hash routing** — the URL hash records *where* you are (`#/`, `#/sandbox`, `#/a/<id>`, `#/a/<id>/q/<n>`); a reload or the Back button returns you *into* the assignment/question instead of landing on Home. Built on the History API behind a small `routing` seam (pure `parseHash`/`routeToHash` + `navigate()`); UI intents route through it. Question switches use `replace` (Back doesn't accumulate them); major transitions push real history entries.
+- **Submit-from-anywhere** — Submit is now a real action (workbook menu bar **and** each Home card), not a buried File→Export. It records an immutable, timestamped snapshot behind a new `SubmissionStore` seam (`mm:sub:<id>`, append-only attempts). From a Home card it builds from persisted state, so you can submit without opening the assignment; from the workbook it builds from live state. Cards show a submitted/not-submitted badge. No grading happens client-side — the seam only *records* (the swap point for the future POST-to-server flow). File→Export Submission remains the instructor-CLI file handoff.
 
 ## Where we are now
 
-A browser-only single-page app that already supports most of the **local** version of the target flow: stub login → browse assignments → open one → work with instant local autosave → leave and resume (same browser) → export a submission JSON that an instructor can grade with the CLI.
+A browser-only single-page app that already supports the **local** version of the full target flow: stub login → browse assignments → open one → work with instant local autosave → leave and resume (same browser, reload/Back returns you into the assignment) → Submit a snapshot. The instructor can still export a submission JSON to grade with the CLI.
 
 The missing half is the **server** and the productized submit/grade loop.
 
 ## What's next
 
 **Near-term (still no backend):**
-- **Submit-from-anywhere** — a real Submit button in the workbook and on each Home card that produces an immutable, timestamped submission snapshot (currently submission is a manual File→Export).
 - **SC/FSM grading** — extract `scStep`/`fsmStep` into the engine so non-CC questions become gradeable (today only CC is).
 
 **The backend phase (the big step):**
