@@ -1,6 +1,6 @@
 # Making Minds — Development Status
 
-_Last updated: 2026-06-25_
+_Last updated: 2026-06-27_
 
 ## The goal we're building toward
 
@@ -25,6 +25,7 @@ We're building the browser app and the (future) server so that each external dep
 | Grading | `engine/grader.ts` + CLI | instructor runs CLI on exported JSON | server grades on submit |
 | Identity | `src/auth/` (stub) | stub user / email | real SSO |
 | Persistence | `WorkbookStore` | `LocalWorkbookStore` (localStorage) | `RemoteWorkbookStore` (server) |
+| Navigation | `routing` (`Route` + `navigate`) | hash URLs via History API | same routes; can add server-rendered deep links |
 
 ## What we recently achieved
 
@@ -36,7 +37,8 @@ In rough order (all on `main` unless noted):
 - **Bundled assignment registry** — built-in assignments with stable ids; `listAssignments()` / `getAssignment()` (the swap point for a future server fetch); `openAssignment(id)`.
 - **Home/catalog screen** — the app now lands on a Home page listing assignments + a single persistent Sandbox; opening an assignment shows per-question tabs with the correct canvas mode; a Home control returns to the catalog.
 - **Auth stub layer** — `src/auth/` (AuthGate + stub) establishing the login seam ahead of real SSO.
-- **Per-assignment persistence** _(on branch `persistence`, not yet merged)_ — each assignment's work is saved to localStorage behind the `WorkbookStore` seam (`mm:asg:<id>`), restored on open, with drift handling when an assignment definition changes. _Manual reload round-trip still to be confirmed; storage logic covered by a headless test._
+- **Per-assignment persistence** — each assignment's work is saved to localStorage behind the `WorkbookStore` seam (`mm:asg:<id>`), restored on open, with drift handling when an assignment definition changes. Confirmed by a manual reload round-trip and a headless storage test.
+- **Hash routing** — the URL hash records *where* you are (`#/`, `#/sandbox`, `#/a/<id>`, `#/a/<id>/q/<n>`); a reload or the Back button returns you *into* the assignment/question instead of landing on Home. Built on the History API behind a small `routing` seam (pure `parseHash`/`routeToHash` + `navigate()`); UI intents route through it. Question switches use `replace` (Back doesn't accumulate them); major transitions push real history entries.
 
 ## Where we are now
 
@@ -47,7 +49,6 @@ The missing half is the **server** and the productized submit/grade loop.
 ## What's next
 
 **Near-term (still no backend):**
-- **Hash routing** — make a page reload / Back button return you *into* the assignment (deep links), instead of landing on Home. (Persistence already keeps the data safe; this restores the *location*.)
 - **Submit-from-anywhere** — a real Submit button in the workbook and on each Home card that produces an immutable, timestamped submission snapshot (currently submission is a manual File→Export).
 - **SC/FSM grading** — extract `scStep`/`fsmStep` into the engine so non-CC questions become gradeable (today only CC is).
 
