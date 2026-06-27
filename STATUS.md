@@ -51,6 +51,7 @@ The missing half is the **server** and the productized submit/grade loop.
 ## What's next
 
 **Near-term (still no backend):**
+- **Question statement in the right sidebar** — the on-canvas question banner was removed; the problem statement will move into the right-hand sidebar (currently the data table area) so it's visible without cluttering the canvas. Not yet implemented.
 - **SC/FSM grading** — extract `scStep`/`fsmStep` into the engine so non-CC questions become gradeable (today only CC is).
 
 **The backend phase (the big step):**
