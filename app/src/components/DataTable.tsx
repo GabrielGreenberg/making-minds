@@ -268,11 +268,18 @@ export function DataTable() {
       const latest = scHistory[scHistory.length - 1];
       return inputKey([...latest.inputBits, ...latest.memValues]);
     }
-    if (isSC) {
-      return inputKey([...inputs.map((c) => c.value ?? 0), ...mems.map((c) => c.storedValue ?? 0)]);
-    }
-    return inputKey(inputs.map((c) => c.value ?? 0));
-  }, [isSC, scHistory, inputs, mems, localStepActive, localStepSelectedKey]);
+    // Highlight the current input combo only if it's actually been evaluated
+    // (present in the table). After a structural edit the inputs are kept but
+    // not re-run, so nothing is highlighted and every row stays clickable to
+    // start stepping — otherwise the "current" row looks active but is
+    // unclickable, leaving Run/Step/Reset stuck disabled.
+    const key = isSC
+      ? inputKey([...inputs.map((c) => c.value ?? 0), ...mems.map((c) => c.storedValue ?? 0)])
+      : inputKey(inputs.map((c) => c.value ?? 0));
+    return tableRows.some((r) => inputKey([...r.inputBits, ...(r.memBits || [])]) === key)
+      ? key
+      : null;
+  }, [isSC, scHistory, inputs, mems, localStepActive, localStepSelectedKey, tableRows]);
 
   // Build lookup of which input combinations have been evaluated
   const evaluatedRows = useMemo(() => {
