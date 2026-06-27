@@ -1102,26 +1102,6 @@ thead .sc-label-col {
 }
 
 /* ── Problem Set Header ── */
-.problem-set-header {
-  padding: 8px 16px;
-  background: #e3f2fd;
-  border-bottom: 1px solid #90caf9;
-  flex-shrink: 0;
-}
-
-.problem-set-label {
-  font-size: 12px;
-  font-weight: 700;
-  color: #1565c0;
-  margin-bottom: 2px;
-}
-
-.problem-set-statement {
-  font-size: 13px;
-  color: #1565c0;
-  line-height: 1.4;
-}
-
 /* ── Text Formatting Toolbar ── */
 .text-format-toolbar {
   position: absolute;

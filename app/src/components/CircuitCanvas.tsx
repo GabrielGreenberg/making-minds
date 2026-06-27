@@ -1978,8 +1978,6 @@ export function CircuitCanvas() {
   const addComponent = useStore((s) => s.addComponent);
   const selectedIds = useStore((s) => s.selectedIds);
   const buildMode = useStore((s) => s.buildMode);
-  const assignment = useStore((s) => s.assignment);
-  const currentQuestionIndex = useStore((s) => s.currentQuestionIndex);
   const selectedTool = useStore((s) => s.selectedTool);
   const textElements = useStore((s) => s.textElements);
   const comments = useStore((s) => s.comments);
@@ -3734,9 +3732,6 @@ export function CircuitCanvas() {
   else if (selectedTool === 'NEW_BOX') cursor = 'crosshair';
   else if (selectedTool) cursor = 'crosshair';
 
-  // Current assignment question (for the on-canvas statement banner)
-  const currentQuestion = assignment?.questions[currentQuestionIndex];
-
   // Selected text element for formatting toolbar
   const selectedTextElem = textElements.find((t) => selectedIds.includes(t.id));
 
@@ -3747,14 +3742,6 @@ export function CircuitCanvas() {
       onDrop={handleDrop}
       onDragOver={handleDragOver}
     >
-      {/* Assignment question header */}
-      {currentQuestion && (
-        <div className="problem-set-header">
-          <div className="problem-set-label">{currentQuestion.label}</div>
-          <div className="problem-set-statement">{currentQuestion.statement}</div>
-        </div>
-      )}
-
       {/* Text formatting toolbar */}
       {selectedTextElem && (
         <TextFormattingToolbar elem={selectedTextElem} />
