@@ -3184,9 +3184,12 @@ function connectivitySignature(components: CircuitComponent[], wires: Wire[]): s
   return comps + '#' + ws;
 }
 
-// Wipe the cached I/O evaluation (truth-table outputs + any in-progress local
-// stepping) when the circuit's connectivity/components change — but NOT when
-// elements are merely moved, since position changes don't alter the signature.
+// Wipe the cached I/O evaluation when the circuit's connectivity/components
+// change — but NOT when elements are merely moved, since position changes don't
+// alter the signature. This resets to a clean slate (like the "clear" button):
+// the truth-table rows and any local stepping are cleared, and input values are
+// blanked so the re-evaluation that an edit triggers does NOT auto-run and
+// re-populate the previously selected row.
 let lastConnSig: string | null = null;
 useStore.subscribe((state) => {
   const sig = connectivitySignature(state.components, state.wires);
@@ -3196,8 +3199,22 @@ useStore.subscribe((state) => {
   }
   if (sig === lastConnSig) return;
   lastConnSig = sig;
-  if (state.tableRows.length > 0) useStore.getState().clearTableRows();
+
+  const inputsSet = state.components.some(
+    (c) => c.type === 'INPUT' && (c.value != null || c.inputValues?.some((v) => v != null)),
+  );
+  if (state.tableRows.length === 0 && !inputsSet && !state.localStepActive) return;
+
+  useStore.setState({
+    tableRows: [],
+    components: state.components.map((c) =>
+      c.type === 'INPUT' ? { ...c, value: undefined, inputValues: [undefined] } : c,
+    ),
+  });
   if (state.localStepActive) useStore.getState().localStepClear();
+  // Re-evaluate so the canvas reflects the cleared inputs (blank wires/outputs).
+  // With inputs blank, evaluateCircuit adds no row.
+  setTimeout(() => useStore.getState().evaluateCircuit(), 0);
 });
 
 // Load from localStorage on startup
