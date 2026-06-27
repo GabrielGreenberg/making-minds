@@ -17,7 +17,7 @@ import type {
   FsmHistoryEntry,
   WorkbookData,
   WorksheetData,
-  SubmissionData,
+  SubmissionRecord,
   QuestionCircuit,
 } from './types';
 import {
@@ -29,12 +29,13 @@ import {
   toSubscript,
 } from './types';
 import { topologicalSort, evaluateGate, evaluateCC } from './engine';
-import { getAssignment } from './assignments';
+import { getAssignment, listAssignments } from './assignments';
 import {
   localWorkbookStore,
   emptyQuestionCircuit,
   restoreQuestionCircuits,
 } from './storage/workbookStore';
+import { localSubmissionStore, buildSubmission } from './storage/submissionStore';
 
 interface HistoryEntry {
   components: CircuitComponent[];
@@ -156,6 +157,11 @@ interface AppState {
   importProject: (json: string) => void;
   // Submission export (null when no assignment is loaded)
   exportSubmission: (student?: string) => string | null;
+  // Latest recorded submission per assignment id (reactive; for status badges).
+  submissions: Record<string, SubmissionRecord>;
+  // Record an immutable snapshot for an assignment. Works whether the assignment
+  // is open (live state) or not (persisted state). Returns null if id is unknown.
+  submitAssignment: (id: string, student?: string) => SubmissionRecord | null;
   // exportWorkbook and importWorkbook are in the Workbook section above
 
   // Rotation
@@ -396,6 +402,7 @@ export const useStore = create<AppState>()((set, get) => ({
   workbookOpen: false,
   workbookTitle: 'Untitled Workbook',
   workbookFileHandle: null,
+  submissions: loadSubmissions(),
 
   closeWorkbook: () => {
     set({
@@ -1174,34 +1181,29 @@ export const useStore = create<AppState>()((set, get) => ({
     const state = get();
     const assignment = state.assignment;
     if (!assignment) return null;
-
-    // Sync the live question into the map (same save step as switchQuestion),
-    // so the currently-open question's latest circuit is captured.
-    const circuits = new Map(state.questionCircuits);
-    const currentQ = assignment.questions[state.currentQuestionIndex];
-    if (currentQ) {
-      circuits.set(currentQ.id, {
-        components: state.components,
-        wires: state.wires,
-        textElements: state.textElements,
-        comments: state.comments,
-        boxes: state.boxes,
-      });
-    }
-
-    const submission: SubmissionData = {
-      assignmentTitle: assignment.title,
-      student: student?.trim() || undefined,
+    const submission = buildSubmission(assignment, syncedQuestionCircuits(state), {
+      student,
       submittedAt: new Date().toISOString(),
-      answers: assignment.questions.map((q) => {
-        const saved = circuits.get(q.id) ?? emptyQuestionCircuit();
-        return {
-          questionId: q.id,
-          circuit: { components: saved.components, wires: saved.wires },
-        };
-      }),
-    };
+    });
     return JSON.stringify(submission, null, 2);
+  },
+  submitAssignment: (id, student) => {
+    const def = getAssignment(id);
+    if (!def) return null;
+    const state = get();
+    // Build from live state if this assignment is open; otherwise from the
+    // persisted state — so you can submit straight from a Home card.
+    const circuits =
+      state.assignment?.id === id
+        ? syncedQuestionCircuits(state)
+        : restoreQuestionCircuits(def, localWorkbookStore.loadAssignmentState(id)).questionCircuits;
+    const submission = buildSubmission(def, circuits, {
+      student,
+      submittedAt: new Date().toISOString(),
+    });
+    const record = localSubmissionStore.submit(id, submission);
+    set({ submissions: { ...get().submissions, [id]: record } });
+    return record;
   },
   importProject: (json) => {
     try {
@@ -3036,6 +3038,37 @@ function getAutoSaveData() {
 
 // Persist the open assignment's work (syncing the live question first) via the
 // storage seam, keyed by assignment id — separate from the sandbox blob.
+/**
+ * The assignment's per-question circuits with the live canvas folded into the
+ * current question (the same save step as switchQuestion/goHome), so callers see
+ * the latest in-progress work for the open question. Caller must ensure an
+ * assignment is active.
+ */
+function syncedQuestionCircuits(s: AppState): Map<number, QuestionCircuit> {
+  const circuits = new Map(s.questionCircuits);
+  const q = s.assignment?.questions[s.currentQuestionIndex];
+  if (q) {
+    circuits.set(q.id, {
+      components: s.components,
+      wires: s.wires,
+      textElements: s.textElements,
+      comments: s.comments,
+      boxes: s.boxes,
+    });
+  }
+  return circuits;
+}
+
+/** Hydrate the latest-submission-per-assignment map from the submission store. */
+function loadSubmissions(): Record<string, SubmissionRecord> {
+  const out: Record<string, SubmissionRecord> = {};
+  for (const a of listAssignments()) {
+    const latest = localSubmissionStore.getLatest(a.id);
+    if (latest) out[a.id] = latest;
+  }
+  return out;
+}
+
 function saveAssignmentState() {
   const s = useStore.getState();
   const a = s.assignment;

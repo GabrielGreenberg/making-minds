@@ -1318,3 +1318,71 @@ thead .sc-label-col {
   color: #aaa;
   margin: 0;
 }
+
+/* Assignment tile becomes a container (open-area button + footer); the Sandbox
+   tile is still a plain .home-tile button, so scope these to the container. */
+.home-tile:has(.home-tile-main) {
+  padding: 0;
+  cursor: default;
+  overflow: hidden;
+}
+
+.home-tile-main {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  width: 100%;
+  padding: 16px;
+  border: none;
+  background: transparent;
+  text-align: left;
+  font: inherit;
+  cursor: pointer;
+}
+
+.home-tile-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 12px;
+  border-top: 1px solid #eee;
+  background: #fafafa;
+}
+
+.home-tile-status {
+  font-size: 11px;
+  color: #999;
+}
+
+.home-tile-status--done {
+  color: #2e7d32;
+  font-weight: 600;
+}
+
+.home-tile-submit {
+  flex-shrink: 0;
+  font-size: 12px;
+  font-weight: 600;
+  color: #fff;
+  background: #1565c0;
+  border: none;
+  border-radius: 5px;
+  padding: 5px 12px;
+  cursor: pointer;
+}
+
+.home-tile-submit:hover {
+  background: #0d47a1;
+}
+
+/* MenuBar Submit (assignment active) */
+.menu-submit {
+  color: #2e7d32;
+  font-weight: 600;
+}
+
+.menu-submit:hover {
+  background: #e8f5e9;
+}

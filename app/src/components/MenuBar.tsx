@@ -90,6 +90,8 @@ export function MenuBar() {
     assignment,
     importBoxedCircuit,
     newWorkbook,
+    submitAssignment,
+    submissions,
   } = useStore();
 
   useEffect(() => {
@@ -157,6 +159,15 @@ export function MenuBar() {
     a.click();
     URL.revokeObjectURL(url);
     close();
+  };
+
+  const handleSubmitAssignment = () => {
+    if (!assignment) return;
+    const ok = confirm(`Submit "${assignment.title}"? This records a snapshot of your current work.`);
+    if (!ok) return;
+    const rec = submitAssignment(assignment.id, getCurrentUserEmail());
+    close();
+    if (rec) alert(`Submitted "${assignment.title}" — attempt ${rec.attempt}.`);
   };
 
   const handleImportCircuit = () => {
@@ -308,6 +319,21 @@ export function MenuBar() {
 
       {/* Workbook title + close button, right-aligned */}
       <EditableWorkbookTitle />
+
+      {/* Submit — record an immutable snapshot of the current assignment */}
+      {assignment && (
+        <div
+          className="menu-item menu-submit"
+          onClick={handleSubmitAssignment}
+          title={
+            submissions[assignment.id]
+              ? `Last submitted ${new Date(submissions[assignment.id].submittedAt).toLocaleString()}`
+              : 'Submit this assignment'
+          }
+        >
+          {submissions[assignment.id] ? 'Submit ✓' : 'Submit'}
+        </div>
+      )}
 
       {/* Assignment menu */}
       {assignment && (

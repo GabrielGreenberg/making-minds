@@ -116,6 +116,19 @@ export interface SubmissionData {
   answers: { questionId: number; circuit: CircuitData }[];
 }
 
+/**
+ * One recorded submission attempt — an immutable, timestamped snapshot. Produced
+ * by the Submit action and stored behind the `SubmissionStore` seam (localStorage
+ * today, a server endpoint later). Resubmitting appends a new record; past records
+ * are never mutated.
+ */
+export interface SubmissionRecord {
+  assignmentId: string;
+  attempt: number;         // 1-based; increments per submit
+  submittedAt: string;     // ISO timestamp (canonical)
+  submission: SubmissionData;
+}
+
 /** Saved canvas state for one assignment question (circuit + annotations). */
 export interface QuestionCircuit {
   components: CircuitComponent[];
