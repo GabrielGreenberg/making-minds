@@ -395,6 +395,13 @@ function resolveMemDirections(
 
 const defaultTabId = 'tab-1';
 
+// When the circuit's structure changes, the table is wiped but input values are
+// kept. This flag suppresses evaluateCircuit's auto-add so the re-evaluation
+// that an edit triggers doesn't immediately re-populate the current row. It
+// stays set until the user next acts on an input (setInputValue / row select),
+// which is the signal that they want this combo evaluated again.
+let suppressAutoAddRow = false;
+
 export const useStore = create<AppState>()((set, get) => ({
   autoSaveStatus: 'saved' as const,
 
@@ -742,6 +749,7 @@ export const useStore = create<AppState>()((set, get) => ({
   },
 
   setInputValue: (id, value) => {
+    suppressAutoAddRow = false; // explicit input change → re-enable table auto-add
     set((state) => ({
       components: state.components.map((c) =>
         c.id === id ? { ...c, value, inputValues: [value] } : c
@@ -888,7 +896,7 @@ export const useStore = create<AppState>()((set, get) => ({
     // CC mode: auto-populate the I/O table with the current input→output row
     // Auto-populate the I/O table with the current input→output row
     const hasMem = updatedComponents.some((c) => c.type === 'MEM');
-    if (state.buildMode === 'CC' || hasMem) {
+    if ((state.buildMode === 'CC' || hasMem) && !suppressAutoAddRow) {
       const inputs = updatedComponents
         .filter((c) => c.type === 'INPUT')
         .sort((a, b) => {
@@ -2039,6 +2047,7 @@ export const useStore = create<AppState>()((set, get) => ({
   localStepSelectedKey: null,
 
   localStepSelect: (inBits, memBits) => {
+    suppressAutoAddRow = false; // selecting a row to evaluate → re-enable auto-add
     const state = get();
     const { components, wires } = state;
 
@@ -3186,10 +3195,10 @@ function connectivitySignature(components: CircuitComponent[], wires: Wire[]): s
 
 // Wipe the cached I/O evaluation when the circuit's connectivity/components
 // change — but NOT when elements are merely moved, since position changes don't
-// alter the signature. This resets to a clean slate (like the "clear" button):
-// the truth-table rows and any local stepping are cleared, and input values are
-// blanked so the re-evaluation that an edit triggers does NOT auto-run and
-// re-populate the previously selected row.
+// alter the signature. Input values are kept (surviving input nodes retain their
+// values, so the student needn't re-enter them); instead we set suppressAutoAddRow
+// so the re-evaluation an edit triggers does NOT re-populate the selected row.
+// The table stays empty until the user next acts on an input.
 let lastConnSig: string | null = null;
 useStore.subscribe((state) => {
   const sig = connectivitySignature(state.components, state.wires);
@@ -3200,21 +3209,9 @@ useStore.subscribe((state) => {
   if (sig === lastConnSig) return;
   lastConnSig = sig;
 
-  const inputsSet = state.components.some(
-    (c) => c.type === 'INPUT' && (c.value != null || c.inputValues?.some((v) => v != null)),
-  );
-  if (state.tableRows.length === 0 && !inputsSet && !state.localStepActive) return;
-
-  useStore.setState({
-    tableRows: [],
-    components: state.components.map((c) =>
-      c.type === 'INPUT' ? { ...c, value: undefined, inputValues: [undefined] } : c,
-    ),
-  });
+  suppressAutoAddRow = true;
+  if (state.tableRows.length > 0) useStore.getState().clearTableRows();
   if (state.localStepActive) useStore.getState().localStepClear();
-  // Re-evaluate so the canvas reflects the cleared inputs (blank wires/outputs).
-  // With inputs blank, evaluateCircuit adds no row.
-  setTimeout(() => useStore.getState().evaluateCircuit(), 0);
 });
 
 // Load from localStorage on startup
