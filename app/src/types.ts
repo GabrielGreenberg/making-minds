@@ -83,6 +83,32 @@ export interface ProjectData {
 // earlier split between "Homework" — which carried grading test vectors — and
 // "Problem Set" — which carried per-question build modes and statements.)
 
+// ─── CC question specification (instructor authoring) ────────────
+// Captures everything needed to generate `test_vectors` and to display a CC
+// question in the instructor UI. When present on an AssignmentQuestion, the
+// system regenerates `test_vectors` from it at save time. The grader never
+// reads cc_spec — it is an authoring artifact (see engine/testVectorGen.ts).
+
+export type CCEncoding = 'binary' | 'unary';
+
+export interface CCInputGroup {
+  name: string;            // variable name used in the formula, e.g. "x"
+  width: number;           // number of input wires in this group
+  encoding: CCEncoding;
+}
+
+export interface CCOutputGroup {
+  name: string;            // label shown to students, e.g. "y"
+  width: number;           // number of output wires in this group
+  encoding: CCEncoding;
+  formula: string;         // affine expression over input group names, e.g. "2 * x"
+}
+
+export interface CCSpec {
+  inputs: CCInputGroup[];
+  outputs: CCOutputGroup[];
+}
+
 export interface AssignmentQuestion {
   id: number;                  // stable id; referenced by the grader and submissions
   label: string;               // e.g. "Problem 1", "Q2a"
@@ -90,6 +116,7 @@ export interface AssignmentQuestion {
   buildMode: BuildMode;        // canvas mode for this question (CC, SC, FSM, …)
   representation?: RepSystem;
   allowed_components?: ComponentType[];
+  cc_spec?: CCSpec;            // authoring spec; generates test_vectors at save time
   test_vectors?: {
     input_sequence: number[];
     expected_output: number[];

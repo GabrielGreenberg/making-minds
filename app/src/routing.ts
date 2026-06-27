@@ -16,13 +16,29 @@ import { useStore } from './store';
 export type Route =
   | { kind: 'home' }
   | { kind: 'sandbox' }
-  | { kind: 'assignment'; id: string; questionIndex?: number };
+  | { kind: 'assignment'; id: string; questionIndex?: number }
+  | { kind: 'instructor' }
+  | { kind: 'instructor-new-assignment' }
+  | { kind: 'instructor-edit'; id: string }
+  | { kind: 'instructor-submissions'; id: string };
 
 /** Parse a location hash (e.g. "#/a/cc-basics/q/2") into a Route. Pure. */
 export function parseHash(hash: string): Route {
   const parts = hash.replace(/^#/, '').replace(/^\/+/, '').split('/').filter(Boolean);
   if (parts.length === 0) return { kind: 'home' };
   if (parts[0] === 'sandbox') return { kind: 'sandbox' };
+  if (parts[0] === 'instructor') {
+    // #/instructor/assignments/new | .../:id/edit | .../:id/submissions
+    if (parts[1] === 'assignments') {
+      if (parts[2] === 'new') return { kind: 'instructor-new-assignment' };
+      if (parts[2]) {
+        const id = decodeURIComponent(parts[2]);
+        if (parts[3] === 'edit') return { kind: 'instructor-edit', id };
+        if (parts[3] === 'submissions') return { kind: 'instructor-submissions', id };
+      }
+    }
+    return { kind: 'instructor' };
+  }
   if (parts[0] === 'a' && parts[1]) {
     const id = decodeURIComponent(parts[1]);
     if (parts[2] === 'q' && parts[3] != null) {
@@ -45,6 +61,14 @@ export function routeToHash(route: Route): string {
       return route.questionIndex != null
         ? `#/a/${encodeURIComponent(route.id)}/q/${route.questionIndex}`
         : `#/a/${encodeURIComponent(route.id)}`;
+    case 'instructor':
+      return '#/instructor';
+    case 'instructor-new-assignment':
+      return '#/instructor/assignments/new';
+    case 'instructor-edit':
+      return `#/instructor/assignments/${encodeURIComponent(route.id)}/edit`;
+    case 'instructor-submissions':
+      return `#/instructor/assignments/${encodeURIComponent(route.id)}/submissions`;
   }
 }
 
@@ -52,6 +76,15 @@ export function routeToHash(route: Route): string {
 function applyRoute(route: Route): void {
   const store = useStore.getState();
   switch (route.kind) {
+    case 'instructor':
+    case 'instructor-new-assignment':
+    case 'instructor-edit':
+    case 'instructor-submissions':
+      // Instructor routes bypass the student Zustand store entirely — the
+      // instructor UI reads the hash directly (see useInstructorRoute). Role
+      // gating is handled by <InstructorGate> (which shows an unlock screen when
+      // the user is not in instructor mode), so there is nothing to do here.
+      return;
     case 'home':
       store.goHome();
       return;
@@ -91,7 +124,15 @@ export function navigate(route: Route, opts?: { replace?: boolean }): void {
   if (opts?.replace) history.replaceState(null, '', url);
   else history.pushState(null, '', url);
   applyRoute(route);
+  // pushState/replaceState do not fire popstate, and instructor routes don't
+  // change the Zustand store, so the instructor UI would not otherwise re-render
+  // on navigation. Notify it explicitly (see useInstructorRoute). Harmless for
+  // student routes, which already re-render via the store.
+  window.dispatchEvent(new Event(ROUTE_EVENT));
 }
+
+/** Custom event fired by `navigate` so hash-reading hooks can re-render. */
+export const ROUTE_EVENT = 'mm:route';
 
 /** Wire up Back/Forward and apply the initial URL. Call once at startup. */
 export function initRouting(): void {
