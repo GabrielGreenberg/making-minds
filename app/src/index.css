@@ -1359,6 +1359,7 @@ thead .sc-label-col {
 
 /* MenuBar Submit (assignment active) */
 .menu-submit {
+  margin-left: auto;
   color: #2e7d32;
   font-weight: 600;
 }

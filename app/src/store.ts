@@ -3139,6 +3139,67 @@ useStore.subscribe((state, prev) => {
   autoSaveTimer = setTimeout(performAutoSave, AUTO_SAVE_DELAY);
 });
 
+// Flush a pending debounced save immediately — e.g. when the tab is closing or
+// hidden — so the most recent edit (even just moving a component) is persisted
+// rather than lost in the debounce window.
+function flushAutoSave() {
+  if (!autoSaveTimer) return;
+  clearTimeout(autoSaveTimer);
+  autoSaveTimer = null;
+  performAutoSave();
+}
+window.addEventListener('beforeunload', flushAutoSave);
+window.addEventListener('pagehide', flushAutoSave);
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'hidden') flushAutoSave();
+});
+
+/**
+ * Signature of the circuit's *structure* — component ids/types (plus the fields
+ * that affect evaluation) and wire connections — but NOT positions or runtime
+ * values. Two layouts that differ only by where things sit hash the same.
+ */
+function connectivitySignature(components: CircuitComponent[], wires: Wire[]): string {
+  const comps = components
+    .map((c) =>
+      [
+        c.id,
+        c.type,
+        c.memDirection ?? '',
+        c.boxedCircuitId ?? '',
+        c.internalCircuit
+          ? `${c.internalCircuit.components.length}/${c.internalCircuit.wires.length}`
+          : '',
+      ].join(':'),
+    )
+    .sort()
+    .join('|');
+  const ws = wires
+    .map(
+      (w) =>
+        `${w.sourceComponentId}.${w.sourcePortId}->${w.targetComponentId}.${w.targetPortId}:${w.transitionLabel ?? ''}`,
+    )
+    .sort()
+    .join('|');
+  return comps + '#' + ws;
+}
+
+// Wipe the cached I/O evaluation (truth-table outputs + any in-progress local
+// stepping) when the circuit's connectivity/components change — but NOT when
+// elements are merely moved, since position changes don't alter the signature.
+let lastConnSig: string | null = null;
+useStore.subscribe((state) => {
+  const sig = connectivitySignature(state.components, state.wires);
+  if (lastConnSig === null) {
+    lastConnSig = sig;
+    return;
+  }
+  if (sig === lastConnSig) return;
+  lastConnSig = sig;
+  if (state.tableRows.length > 0) useStore.getState().clearTableRows();
+  if (state.localStepActive) useStore.getState().localStepClear();
+});
+
 // Load from localStorage on startup
 type TabCircuitData = { components: CircuitComponent[]; wires: Wire[]; textElements: TextElement[]; comments: CommentElement[]; boxes: BoxDefinition[] };
 

@@ -6,72 +6,6 @@ import { getCurrentUserEmail } from '../auth';
 import { navigate } from '../routing';
 import { downloadJson } from '../download';
 
-function EditableWorkbookTitle() {
-  const workbookTitle = useStore((s) => s.workbookTitle);
-  const closeWorkbook = useStore((s) => s.closeWorkbook);
-  const [editing, setEditing] = useState(false);
-  const [editValue, setEditValue] = useState(workbookTitle);
-  const inputRef = useRef<HTMLInputElement>(null);
-
-  useEffect(() => {
-    if (editing && inputRef.current) {
-      inputRef.current.focus();
-      inputRef.current.select();
-    }
-  }, [editing]);
-
-  const commit = () => {
-    const trimmed = editValue.trim();
-    if (trimmed && trimmed !== workbookTitle) {
-      useStore.setState({ workbookTitle: trimmed });
-    } else {
-      setEditValue(workbookTitle);
-    }
-    setEditing(false);
-  };
-
-  if (editing) {
-    return (
-      <div className="workbook-title-area">
-        <input
-          ref={inputRef}
-          className="workbook-title-input"
-          value={editValue}
-          onChange={(e) => setEditValue(e.target.value)}
-          onBlur={commit}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
-            if (e.key === 'Escape') { setEditValue(workbookTitle); setEditing(false); }
-          }}
-          onClick={(e) => e.stopPropagation()}
-        />
-      </div>
-    );
-  }
-
-  return (
-    <div className="workbook-title-area">
-      <span
-        className="workbook-title"
-        onDoubleClick={() => { setEditValue(workbookTitle); setEditing(true); }}
-        title="Double-click to rename"
-      >
-        {workbookTitle}
-      </span>
-      <span
-        className="workbook-close-btn"
-        onClick={() => {
-          const ok = confirm('Close this workbook? Unsaved changes will be lost.');
-          if (ok) { closeWorkbook(); navigate({ kind: 'home' }, { replace: true }); }
-        }}
-        title="Close workbook"
-      >
-        {'\u00D7'}
-      </span>
-    </div>
-  );
-}
-
 export function MenuBar() {
   const [openMenu, setOpenMenu] = useState<string | null>(null);
   const [openSub, setOpenSub] = useState<string | null>(null);
@@ -320,10 +254,8 @@ export function MenuBar() {
         )}
       </div>
 
-      {/* Workbook title + close button, right-aligned */}
-      <EditableWorkbookTitle />
-
-      {/* Submit — record an immutable snapshot of the current assignment */}
+      {/* Submit — record an immutable snapshot of the current assignment.
+          Right-aligned (margin-left: auto) now that the workbook title is gone. */}
       {assignment && (
         <div
           className="menu-item menu-submit"
@@ -335,44 +267,6 @@ export function MenuBar() {
           }
         >
           {submissions[assignment.id] ? 'Submit ✓' : 'Submit'}
-        </div>
-      )}
-
-      {/* Assignment menu */}
-      {assignment && (
-        <div
-          className="menu-item"
-          style={{ color: '#1565c0', fontWeight: 600 }}
-          onClick={() => setOpenMenu(openMenu === 'assignment' ? null : 'assignment')}
-        >
-          {assignment.title}
-          {openMenu === 'assignment' && (
-            <div className="menu-dropdown">
-              {assignment.questions.map((q, i) => (
-                <div
-                  key={q.id}
-                  className="menu-dropdown-item"
-                  onClick={() => {
-                    navigate({ kind: 'assignment', id: assignment.id, questionIndex: i }, { replace: true });
-                    close();
-                  }}
-                >
-                  {q.label}: {q.statement.substring(0, 40)}...
-                </div>
-              ))}
-              <div className="menu-separator" />
-              <div
-                className="menu-dropdown-item"
-                onClick={() => {
-                  navigate({ kind: 'home' });
-                  useStore.getState().closeAssignment();
-                  close();
-                }}
-              >
-                Close Assignment
-              </div>
-            </div>
-          )}
         </div>
       )}
     </div>
