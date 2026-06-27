@@ -4,6 +4,7 @@ import type { AssignmentData } from '../types';
 import { saveToFileAs, openFile } from '../fileHandle';
 import { getCurrentUserEmail } from '../auth';
 import { navigate } from '../routing';
+import { downloadJson } from '../download';
 
 function EditableWorkbookTitle() {
   const workbookTitle = useStore((s) => s.workbookTitle);
@@ -163,11 +164,13 @@ export function MenuBar() {
 
   const handleSubmitAssignment = () => {
     if (!assignment) return;
-    const ok = confirm(`Submit "${assignment.title}"? This records a snapshot of your current work.`);
+    const ok = confirm(`Submit "${assignment.title}"? This records a snapshot of your current work and downloads it.`);
     if (!ok) return;
     const rec = submitAssignment(assignment.id, getCurrentUserEmail());
     close();
-    if (rec) alert(`Submitted "${assignment.title}" — attempt ${rec.attempt}.`);
+    // Local grading: until there's a server endpoint, the submission is delivered
+    // as a downloaded JSON file (the instructor grades it with the CLI).
+    if (rec) downloadJson(`submission-${assignment.id}-attempt${rec.attempt}.json`, rec.submission);
   };
 
   const handleImportCircuit = () => {

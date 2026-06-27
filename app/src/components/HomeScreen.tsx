@@ -2,6 +2,7 @@ import { useStore } from '../store';
 import { listAssignments } from '../assignments';
 import { navigate } from '../routing';
 import { getCurrentUserEmail } from '../auth';
+import { downloadJson } from '../download';
 
 function formatSubmittedAt(iso: string): string {
   const d = new Date(iso);
@@ -16,10 +17,12 @@ export function HomeScreen() {
   const assignments = listAssignments();
 
   const handleSubmit = (id: string, title: string) => {
-    const ok = confirm(`Submit "${title}"? This records a snapshot of your saved work.`);
+    const ok = confirm(`Submit "${title}"? This records a snapshot of your saved work and downloads it.`);
     if (!ok) return;
     const rec = submitAssignment(id, getCurrentUserEmail());
-    if (rec) alert(`Submitted "${title}" — attempt ${rec.attempt}.`);
+    // Local grading: deliver the submission as a downloaded JSON file until the
+    // server endpoint exists.
+    if (rec) downloadJson(`submission-${id}-attempt${rec.attempt}.json`, rec.submission);
   };
 
   return (
