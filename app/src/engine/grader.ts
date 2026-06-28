@@ -12,6 +12,8 @@ import type {
   SubmissionData,
 } from '../types';
 import { evaluateCCInputs } from './cc';
+import { evaluateSCSequence } from './sc';
+import { evaluateFSMSequence } from './fsm';
 
 export interface CaseResult {
   input: number[];
@@ -48,29 +50,115 @@ function skip(questionId: number, reason: string): QuestionResult {
   return { questionId, status: 'skipped', reason, passed: 0, total: 0, cases: [] };
 }
 
+// ---------------------------------------------------------------------------
+// Test-vector format adapters.
+// These are the most likely part to change as the question-design workflow
+// evolves. Keep them here, isolated, so the engines stay untouched.
+// ---------------------------------------------------------------------------
+
 /**
- * Grade a single question's circuit against its test vectors. Only CC questions
- * with test vectors are gradeable today; everything else is skipped with a reason.
+ * Chunk a flat input_sequence and expected_output into per-time-step arrays
+ * for SC grading. The number of inputs/outputs per step is inferred from the
+ * submitted circuit's INPUT/OUTPUT component counts.
+ */
+function parseSCTestVector(
+  inputSequence: number[],
+  expectedOutput: number[],
+  numInputs: number,
+  numOutputs: number
+): { inputSteps: number[][]; expectedSteps: number[][] } {
+  const numSteps = numInputs > 0 ? Math.floor(inputSequence.length / numInputs) : 0;
+  const inputSteps: number[][] = [];
+  const expectedSteps: number[][] = [];
+  for (let i = 0; i < numSteps; i++) {
+    inputSteps.push(inputSequence.slice(i * numInputs, (i + 1) * numInputs));
+    expectedSteps.push(expectedOutput.slice(i * numOutputs, (i + 1) * numOutputs));
+  }
+  return { inputSteps, expectedSteps };
+}
+
+/**
+ * For FSM: single input bit per step, single output bit per step.
+ */
+function parseFSMTestVector(
+  inputSequence: number[],
+  expectedOutput: number[]
+): { inputBits: number[]; expectedBits: number[] } {
+  return { inputBits: inputSequence, expectedBits: expectedOutput };
+}
+
+// ---------------------------------------------------------------------------
+
+/**
+ * Grade a single question's circuit against its test vectors.
  */
 export function gradeQuestion(question: AssignmentQuestion, circuit: CircuitData | undefined): QuestionResult {
   if (!circuit) return skip(question.id, 'no circuit submitted');
-  if (question.buildMode !== 'CC') return skip(question.id, `grading not yet supported for mode "${question.buildMode}"`);
   if (!question.test_vectors || question.test_vectors.length === 0) {
     return skip(question.id, 'question has no test vectors');
   }
 
-  const cases: CaseResult[] = question.test_vectors.map((tv) => {
-    const got = evaluateCCInputs(circuit.components, circuit.wires, tv.input_sequence);
-    return {
-      input: tv.input_sequence,
-      expected: tv.expected_output,
-      got,
-      pass: bitsEqual(got, tv.expected_output),
-    };
-  });
+  if (question.buildMode === 'CC') {
+    const cases: CaseResult[] = question.test_vectors.map((tv) => {
+      const got = evaluateCCInputs(circuit.components, circuit.wires, tv.input_sequence);
+      return {
+        input: tv.input_sequence,
+        expected: tv.expected_output,
+        got,
+        pass: bitsEqual(got, tv.expected_output),
+      };
+    });
+    const passed = cases.filter((c) => c.pass).length;
+    return { questionId: question.id, status: 'graded', passed, total: cases.length, cases };
+  }
 
-  const passed = cases.filter((c) => c.pass).length;
-  return { questionId: question.id, status: 'graded', passed, total: cases.length, cases };
+  if (question.buildMode === 'SC') {
+    const numInputs = circuit.components.filter((c) => c.type === 'INPUT').length;
+    const numOutputs = circuit.components.filter((c) => c.type === 'OUTPUT').length;
+
+    const cases: CaseResult[] = question.test_vectors.map((tv) => {
+      const { inputSteps, expectedSteps } = parseSCTestVector(
+        tv.input_sequence, tv.expected_output, numInputs, numOutputs
+      );
+      const gotSteps = evaluateSCSequence(circuit.components, circuit.wires, inputSteps);
+      const got = gotSteps.flat();
+      const expected = expectedSteps.flat();
+      return {
+        input: tv.input_sequence,
+        expected: tv.expected_output,
+        got,
+        pass: bitsEqual(got, expected),
+      };
+    });
+    const passed = cases.filter((c) => c.pass).length;
+    return { questionId: question.id, status: 'graded', passed, total: cases.length, cases };
+  }
+
+  if (question.buildMode === 'FSM') {
+    const cases: CaseResult[] = question.test_vectors.map((tv) => {
+      const { inputBits, expectedBits } = parseFSMTestVector(tv.input_sequence, tv.expected_output);
+      const result = evaluateFSMSequence(circuit.components, circuit.wires, inputBits);
+      const got = result.outputBits;
+      return {
+        input: tv.input_sequence,
+        expected: tv.expected_output,
+        got,
+        pass: !result.halted && bitsEqual(got, expectedBits),
+      };
+    });
+    const passed = cases.filter((c) => c.pass).length;
+    return { questionId: question.id, status: 'graded', passed, total: cases.length, cases };
+  }
+
+  if (question.buildMode === 'TM') {
+    return skip(question.id, 'TM grading not yet implemented');
+  }
+
+  if (question.buildMode === 'turbot') {
+    return skip(question.id, 'turbot grading not yet implemented');
+  }
+
+  return skip(question.id, `grading not yet supported for mode "${question.buildMode}"`);
 }
 
 /**
