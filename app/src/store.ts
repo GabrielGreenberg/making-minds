@@ -28,7 +28,7 @@ import {
   GRID_SIZE,
   toSubscript,
 } from './types';
-import { topologicalSort, evaluateGate, evaluateCC } from './engine';
+import { topologicalSort, evaluateGate, evaluateCC, evaluateSCSingleStep, sortStateComponents, evaluateFSMSingleStep } from './engine';
 import { getAssignment, listAssignments } from './assignments';
 import {
   localWorkbookStore,
@@ -2400,112 +2400,46 @@ export const useStore = create<AppState>()((set, get) => ({
     const state = get();
     const { components, wires, scTimeStep, scHistory, scInputSequence } = state;
 
-    // Gather sorted inputs, outputs, MEM blocks
-    const inputs = components
+    // Sorted component lists (consistent with the engine's ordering)
+    const sortedInputs = components
       .filter((c) => c.type === 'INPUT')
-      .sort((a, b) => {
-        const numA = parseInt(a.label.replace('IN', ''));
-        const numB = parseInt(b.label.replace('IN', ''));
-        return numA - numB;
-      });
-    const outputs = components
+      .sort((a, b) => (parseInt(a.label.replace('IN', '')) || 0) - (parseInt(b.label.replace('IN', '')) || 0));
+    const sortedOutputs = components
       .filter((c) => c.type === 'OUTPUT')
-      .sort((a, b) => {
-        const numA = parseInt(a.label.replace('OUT', ''));
-        const numB = parseInt(b.label.replace('OUT', ''));
-        return numA - numB;
-      });
-    const mems = components.filter((c) => c.type === 'MEM');
+      .sort((a, b) => (parseInt(a.label.replace('OUT', '')) || 0) - (parseInt(b.label.replace('OUT', '')) || 0));
+    const sortedMems = components
+      .filter((c) => c.type === 'MEM')
+      .sort((a, b) => (parseInt(a.label.replace(/\D/g, '')) || 0) - (parseInt(b.label.replace(/\D/g, '')) || 0));
 
-    // Set input values from the input sequence for this time step
-    const tIdx = scTimeStep - 1; // 0-based index
-    const updatedComps = components.map((c) => {
+    const tIdx = scTimeStep - 1;
+    const inputBitVector = sortedInputs.map((inp, idx) =>
+      scInputSequence[idx]?.[tIdx] !== undefined ? scInputSequence[idx][tIdx] : (inp.value ?? 0)
+    );
+    const memStoredValues = sortedMems.map((m) => m.storedValue ?? 0);
+
+    // Delegate propagation to the engine (same logic used by the grader)
+    const { outputBits, newMemValues, portValues } = evaluateSCSingleStep(
+      components, wires, inputBitVector,
+      sortedInputs, sortedOutputs, sortedMems, memStoredValues
+    );
+
+    // Update components
+    const newComponents = components.map((c) => {
       if (c.type === 'INPUT') {
-        const inputIdx = inputs.indexOf(c);
-        const seqVal = (inputIdx >= 0 && scInputSequence[inputIdx] && scInputSequence[inputIdx][tIdx] !== undefined)
-          ? scInputSequence[inputIdx][tIdx]
-          : (c.value ?? 0);
-        return { ...c, value: seqVal, inputValues: [seqVal] };
+        const idx = sortedInputs.findIndex((inp) => inp.id === c.id);
+        const val = idx >= 0 ? inputBitVector[idx] : (c.value ?? 0);
+        return { ...c, value: val, inputValues: [val] };
       }
-      return c;
-    });
-
-    // Step 1: Read M_OUT from all MEM blocks (current stored values)
-    // Step 2: Evaluate combinational logic
-    // For topological sort, treat MEM as having only an output (mout).
-    // MEM's min port is a sink that receives the new value.
-    const sorted = topologicalSort(updatedComps, wires);
-    const portValues = new Map<string, number>();
-
-    // Set MEM block M_OUT values from stored values
-    for (const comp of updatedComps) {
-      if (comp.type === 'MEM') {
-        portValues.set(`${comp.id}:${getMemOutputPortId(comp)}`, comp.storedValue ?? 0);
-      }
-    }
-
-    // Set input values
-    for (const comp of sorted) {
-      if (comp.type === 'INPUT') {
-        const idx = inputs.findIndex((inp) => inp.id === comp.id);
-        const val = idx >= 0 && scInputSequence[idx] && scInputSequence[idx][tIdx] !== undefined
-          ? scInputSequence[idx][tIdx]
-          : (comp.value ?? 0);
-        portValues.set(`${comp.id}:out`, val);
-      }
-    }
-
-    // Propagate through sorted components
-    for (const comp of sorted) {
-      if (comp.type === 'INPUT' || comp.type === 'MEM') continue;
-
-      const inputPorts = comp.ports.filter((p) => p.side === 'left');
-      const inputVals: number[] = [];
-      for (const port of inputPorts) {
-        const incomingWire = wires.find(
-          (w) => w.targetComponentId === comp.id && w.targetPortId === port.id
-        );
-        if (incomingWire) {
-          const srcVal = portValues.get(
-            `${incomingWire.sourceComponentId}:${incomingWire.sourcePortId}`
-          ) ?? 0;
-          inputVals.push(srcVal);
-        } else {
-          inputVals.push(0);
-        }
-      }
-
-      if (comp.type === 'OUTPUT') {
-        portValues.set(`${comp.id}:in`, inputVals[0] ?? 0);
-      } else {
-        const evalOutputs = evaluateGate(comp.type, inputVals, comp);
-        const outputPorts = comp.ports.filter((p) => p.side === 'right');
-        for (let i = 0; i < outputPorts.length; i++) {
-          portValues.set(`${comp.id}:${outputPorts[i].id}`, evalOutputs[i] ?? 0);
-        }
-      }
-    }
-
-    // Step 3: Determine M_IN values and write into MEM blocks for next cycle
-    const newComponents = updatedComps.map((c) => {
       if (c.type === 'MEM') {
-        // Find the wire feeding into M_IN (input port based on direction)
-        const minWire = wires.find(
-          (w) => w.targetComponentId === c.id && w.targetPortId === getMemInputPortId(c)
-        );
-        const newStoredValue = minWire
-          ? (portValues.get(`${minWire.sourceComponentId}:${minWire.sourcePortId}`) ?? 0)
-          : 0;
-        return { ...c, storedValue: newStoredValue };
+        const idx = sortedMems.findIndex((m) => m.id === c.id);
+        return { ...c, storedValue: idx >= 0 ? newMemValues[idx] : (c.storedValue ?? 0) };
       }
       if (c.type === 'OUTPUT') {
         return { ...c, value: portValues.get(`${c.id}:in`) ?? 0 };
       }
-      if (c.type !== 'INPUT') {
-        const outputPort = c.ports.find((p) => p.side === 'right');
-        if (outputPort) {
-          return { ...c, value: portValues.get(`${c.id}:${outputPort.id}`) ?? 0 };
-        }
+      const outputPort = c.ports.find((p) => p.side === 'right');
+      if (outputPort) {
+        return { ...c, value: portValues.get(`${c.id}:${outputPort.id}`) ?? 0 };
       }
       return c;
     });
@@ -2513,33 +2447,25 @@ export const useStore = create<AppState>()((set, get) => ({
     // Update wire values
     const newWireValues = new Map<string, number>();
     for (const w of wires) {
-      const srcVal = portValues.get(`${w.sourceComponentId}:${w.sourcePortId}`) ?? 0;
-      newWireValues.set(w.id, srcVal);
+      newWireValues.set(w.id, portValues.get(`${w.sourceComponentId}:${w.sourcePortId}`) ?? 0);
     }
 
-    // Build history entry
-    const inputBits = inputs.map((inp) => {
-      const idx = inputs.indexOf(inp);
-      return idx >= 0 && scInputSequence[idx] && scInputSequence[idx][tIdx] !== undefined
-        ? scInputSequence[idx][tIdx]
-        : (inp.value ?? 0);
-    });
-    const outputBits = outputs.map((o) => portValues.get(`${o.id}:in`) ?? 0);
-    const memValues = mems.map((m) => m.storedValue ?? 0); // values BEFORE this step
-
+    // Build history entry (memValues = stored values BEFORE this step)
+    const inputBits = inputBitVector;
+    const memValues = memStoredValues;
     const newHistory = [...scHistory, { t: scTimeStep, inputBits, outputBits, memValues }];
 
-    // Also update the local I/O tableRows for this input+mem→output combo
-    const memBits = memValues; // values BEFORE step = what determined the output
+    // Update local I/O tableRows
+    const memBits = memValues;
     const localKey = [...inputBits, ...memBits].join(',');
     const existingRows = state.tableRows;
     const localIdx = existingRows.findIndex((r) => [...r.inputBits, ...(r.memBits || [])].join(',') === localKey);
     let newTableRows = existingRows;
     if (localIdx >= 0) {
       newTableRows = [...existingRows];
-      newTableRows[localIdx] = { inputBits, memBits: mems.length > 0 ? memBits : undefined, outputBits };
+      newTableRows[localIdx] = { inputBits, memBits: sortedMems.length > 0 ? memBits : undefined, outputBits };
     } else {
-      newTableRows = [...existingRows, { inputBits, memBits: mems.length > 0 ? memBits : undefined, outputBits }];
+      newTableRows = [...existingRows, { inputBits, memBits: sortedMems.length > 0 ? memBits : undefined, outputBits }];
     }
 
     set({
@@ -2553,8 +2479,7 @@ export const useStore = create<AppState>()((set, get) => ({
 
     // Update matching global sequence output
     const updState = get();
-    const numInputs = inputs.length;
-    // Build currentInputStr reversed: earliest time step → rightmost position
+    const numInputs = sortedInputs.length;
     let currentInputStr = '';
     const maxSeqLen = Math.max(...updState.scInputSequence.map((s) => s.length), 0);
     for (let t = maxSeqLen - 1; t >= 0; t--) {
@@ -2562,7 +2487,6 @@ export const useStore = create<AppState>()((set, get) => ({
         currentInputStr += String(updState.scInputSequence[ii]?.[t] ?? 0);
       }
     }
-    // Build output string right-to-left: earliest output → rightmost position
     const outputStr = newHistory
       .slice()
       .sort((a, b) => b.t - a.t)
@@ -2881,68 +2805,35 @@ export const useStore = create<AppState>()((set, get) => ({
     const { components, wires, fsmTimeStep, fsmHistory, fsmInputSequence, fsmHalted } = state;
     if (fsmHalted) return;
 
-    const states = components
-      .filter((c) => c.type === 'STATE')
-      .sort((a, b) => {
-        // Sort by label number (S₀ < S₁ < S₂...)
-        const subDigits = '₀₁₂₃₄₅₆₇₈₉';
-        const numA = parseInt(a.label.replace('S', '').split('').map(ch => { const idx = subDigits.indexOf(ch); return idx >= 0 ? String(idx) : ch; }).join('')) || 0;
-        const numB = parseInt(b.label.replace('S', '').split('').map(ch => { const idx = subDigits.indexOf(ch); return idx >= 0 ? String(idx) : ch; }).join('')) || 0;
-        return numA - numB;
-      });
-
+    const states = sortStateComponents(components);
     if (states.length === 0) return;
 
-    // Determine current state
-    let currentStateId = state.fsmCurrentStateId;
-    if (!currentStateId) {
-      // Start at S₀ (first state by label order)
-      currentStateId = states[0].id;
-    }
-
+    const currentStateId = state.fsmCurrentStateId || states[0].id;
     const currentState = components.find((c) => c.id === currentStateId);
     if (!currentState) return;
 
-    // Get current input bit
     const tIdx = fsmTimeStep - 1;
-    if (tIdx >= fsmInputSequence.length) return; // no more input
+    if (tIdx >= fsmInputSequence.length) return;
     const inputBit = fsmInputSequence[tIdx];
 
-    // Find matching transition: wire from current state with matching input
-    const transitions = wires.filter((w) => w.sourceComponentId === currentStateId);
-    let matchedTransition: Wire | null = null;
-    for (const t of transitions) {
-      if (!t.transitionLabel) continue;
-      const parts = t.transitionLabel.split(':');
-      if (parts.length !== 2 || (parts[0] !== '0' && parts[0] !== '1') || (parts[1] !== '0' && parts[1] !== '1')) continue;
-      const tInput = parts[0] === '1' ? 1 : 0;
-      if (tInput === inputBit) {
-        matchedTransition = t;
-        break;
-      }
-    }
-
-    if (!matchedTransition) {
-      // No transition — machine halts
+    // Delegate transition logic to the engine (same logic used by the grader)
+    const result = evaluateFSMSingleStep(wires, currentStateId, inputBit);
+    if (!result) {
       set({ fsmHalted: true });
       return;
     }
 
-    const parts = matchedTransition.transitionLabel!.split(':');
-    const output = parts[1] === '1' ? 1 : 0;
-    const nextStateId = matchedTransition.targetComponentId;
-    const nextState = components.find((c) => c.id === nextStateId);
-
+    const nextState = components.find((c) => c.id === result.nextStateId);
     const entry: FsmHistoryEntry = {
       t: fsmTimeStep,
       stateLabel: currentState.label,
       input: inputBit,
-      output,
+      output: result.output,
       nextStateLabel: nextState?.label || '?',
     };
 
     set({
-      fsmCurrentStateId: nextStateId,
+      fsmCurrentStateId: result.nextStateId,
       fsmTimeStep: fsmTimeStep + 1,
       fsmHistory: [...fsmHistory, entry],
     });
