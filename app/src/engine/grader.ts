@@ -10,33 +10,18 @@ import type {
   AssignmentData,
   AssignmentQuestion,
   SubmissionData,
+  CaseResult,
+  QuestionResult,
+  SubmissionResult,
 } from '../types';
 import { evaluateCCInputs } from './cc';
 import { evaluateSCSequence } from './sc';
 import { evaluateFSMSequence } from './fsm';
 
-export interface CaseResult {
-  input: number[];
-  expected: number[];
-  got: number[];
-  pass: boolean;
-}
-
-export interface QuestionResult {
-  questionId: number;
-  status: 'graded' | 'skipped';
-  reason?: string; // why it was skipped
-  passed: number;
-  total: number;
-  cases: CaseResult[];
-}
-
-export interface SubmissionResult {
-  student: string;
-  questions: QuestionResult[];
-  passed: number; // rolled up across graded cases
-  total: number;
-}
+// The grading result types live in types.ts (so SubmissionRecord can carry a
+// result without a types→engine dependency). Re-exported here for the existing
+// call sites that import them from the grader.
+export type { CaseResult, QuestionResult, SubmissionResult } from '../types';
 
 function bitsEqual(a: number[], b: number[]): boolean {
   if (a.length !== b.length) return false;
@@ -178,5 +163,28 @@ export function gradeSubmission(assignment: AssignmentData, submission: Submissi
     questions,
     passed,
     total,
+  };
+}
+
+/**
+ * Roll a SubmissionResult up into headline counts for display. "Questions
+ * passed" counts a question as passed only when it was graded and every one of
+ * its test vectors matched; skipped questions are excluded from the question
+ * total so they don't penalise the student. "Vectors" are the finer-grained
+ * test-vector tallies already on the result.
+ */
+export function summarizeResult(result: SubmissionResult): {
+  questionsPassed: number;
+  questionsTotal: number;
+  vectorsPassed: number;
+  vectorsTotal: number;
+} {
+  const graded = result.questions.filter((q) => q.status === 'graded');
+  const questionsPassed = graded.filter((q) => q.total > 0 && q.passed === q.total).length;
+  return {
+    questionsPassed,
+    questionsTotal: graded.length,
+    vectorsPassed: result.passed,
+    vectorsTotal: result.total,
   };
 }

@@ -3,6 +3,7 @@ import { listAssignments } from '../assignments';
 import { navigate } from '../routing';
 import { getCurrentUserEmail } from '../auth';
 import { downloadJson } from '../download';
+import { summarizeResult } from '../engine/grader';
 
 function formatSubmittedAt(iso: string): string {
   const d = new Date(iso);
@@ -20,9 +21,18 @@ export function HomeScreen() {
     const ok = confirm(`Submit "${title}"? This records a snapshot of your saved work and downloads it.`);
     if (!ok) return;
     const rec = submitAssignment(id, getCurrentUserEmail());
-    // Local grading: deliver the submission as a downloaded JSON file until the
-    // server endpoint exists.
-    if (rec) downloadJson(`submission-${id}-attempt${rec.attempt}.json`, rec.submission);
+    if (!rec) return;
+    // The submission is autograded on receipt — report the result to the student.
+    if (rec.result) {
+      const s = summarizeResult(rec.result);
+      const detail = s.questionsTotal > 0
+        ? `Autograded: ${s.questionsPassed}/${s.questionsTotal} questions passed (${s.vectorsPassed}/${s.vectorsTotal} test cases).`
+        : 'No autogradable questions in this assignment yet.';
+      alert(`Submitted "${title}" (attempt ${rec.attempt}).\n${detail}`);
+    }
+    // Also deliver the submission as a downloaded JSON file until a real server
+    // endpoint exists.
+    downloadJson(`submission-${id}-attempt${rec.attempt}.json`, rec.submission);
   };
 
   return (

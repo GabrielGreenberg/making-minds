@@ -32,7 +32,10 @@ export function gradeSubmissions(
 ): SubmissionGrade[] {
   const totalQuestions = assignment.questions.length;
   return records.map((record) => {
-    const result = gradeSubmission(assignment, record.submission);
+    // Prefer the grade computed at submission time (the "server" autogrades on
+    // receipt). Fall back to grading on the fly for legacy records saved before
+    // autograde-on-submit existed.
+    const result = record.result ?? gradeSubmission(assignment, record.submission);
     const grades = result.questions.map(toQuestionGrade);
     const passedQuestions = grades.filter((g) => g.passed).length;
     const score = totalQuestions > 0 ? passedQuestions / totalQuestions : 0;

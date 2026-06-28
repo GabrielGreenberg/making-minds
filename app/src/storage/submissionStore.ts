@@ -5,8 +5,11 @@
 // localStorage directly, so the future "POST to the server, autograde there"
 // endpoint drops in without touching the UI. Mirrors the `WorkbookStore` seam.
 //
-// Students cannot autograde: this layer only *records* the snapshot. No grading
-// happens here — the server holds the test vectors and grades on receipt.
+// This layer is the "server" stand-in: it records the snapshot AND autogrades it
+// on receipt (the server holds the test vectors). Grading at submit time means
+// the grade is persisted on the record, so the instructor frontend reads a
+// stored result instead of recomputing. When a real server endpoint lands, it
+// does exactly this and the UI is unchanged.
 
 import type {
   AssignmentData,
@@ -15,6 +18,8 @@ import type {
   SubmissionRecord,
 } from '../types';
 import { emptyQuestionCircuit } from './workbookStore';
+import { getAssignment } from '../assignments';
+import { gradeSubmission } from '../engine/grader';
 
 /**
  * Build a submission snapshot from an assignment definition and the student's
@@ -43,6 +48,8 @@ export interface SubmissionStore {
   submit(id: string, submission: SubmissionData): SubmissionRecord;
   listSubmissions(id: string): SubmissionRecord[];
   getLatest(id: string): SubmissionRecord | null;
+  /** Drop all stored submissions for an assignment (e.g. reseeding dev data). */
+  clearSubmissions(id: string): void;
 }
 
 const KEY_PREFIX = 'mm:sub:';
@@ -64,13 +71,26 @@ class LocalSubmissionStore implements SubmissionStore {
     return all.length ? all[all.length - 1] : null;
   }
 
+  clearSubmissions(id: string): void {
+    try {
+      localStorage.removeItem(KEY_PREFIX + id);
+    } catch {
+      // ignore
+    }
+  }
+
   submit(id: string, submission: SubmissionData): SubmissionRecord {
     const all = this.listSubmissions(id);
+    // Autograde on receipt: the "server" holds the test vectors, so it can grade
+    // the moment the submission lands and persist the result on the record.
+    const def = getAssignment(id);
+    const result = def ? gradeSubmission(def, submission) : undefined;
     const record: SubmissionRecord = {
       assignmentId: id,
       attempt: all.length + 1,
       submittedAt: submission.submittedAt,
       submission,
+      result,
     };
     try {
       localStorage.setItem(KEY_PREFIX + id, JSON.stringify([...all, record]));

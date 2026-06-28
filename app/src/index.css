@@ -1633,3 +1633,5 @@ thead .sc-label-col {
 .instructor-detail-q { margin-bottom: 12px; font-size: 13px; }
 .instructor-detail-table { border-collapse: collapse; margin-top: 6px; font-size: 12px; }
 .instructor-detail-table th, .instructor-detail-table td { border: 1px solid #eee; padding: 3px 10px; text-align: center; }
+
+.instructor-head-actions { display: flex; gap: 8px; align-items: center; }

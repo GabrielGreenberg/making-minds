@@ -143,6 +143,38 @@ export interface SubmissionData {
   answers: { questionId: number; circuit: CircuitData }[];
 }
 
+// ─── Autograding results ─────────────────────────────────────────
+// Produced by the grader (engine/grader.ts) and persisted on a SubmissionRecord
+// when the "server" autogrades on receipt. Defined here (not in the engine) so
+// SubmissionRecord can carry the grade without types.ts depending on the engine;
+// grader.ts re-exports these.
+
+/** One test vector's outcome for a question. */
+export interface CaseResult {
+  input: number[];
+  expected: number[];
+  got: number[];
+  pass: boolean;
+}
+
+/** Grading outcome for one question of a submission. */
+export interface QuestionResult {
+  questionId: number;
+  status: 'graded' | 'skipped';
+  reason?: string;         // why it was skipped
+  passed: number;          // test vectors passed
+  total: number;           // test vectors total
+  cases: CaseResult[];
+}
+
+/** Grading outcome for a full submission. */
+export interface SubmissionResult {
+  student: string;
+  questions: QuestionResult[];
+  passed: number;          // rolled up across graded test vectors
+  total: number;
+}
+
 /**
  * One recorded submission attempt — an immutable, timestamped snapshot. Produced
  * by the Submit action and stored behind the `SubmissionStore` seam (localStorage
@@ -154,6 +186,7 @@ export interface SubmissionRecord {
   attempt: number;         // 1-based; increments per submit
   submittedAt: string;     // ISO timestamp (canonical)
   submission: SubmissionData;
+  result?: SubmissionResult; // autograde computed at receipt (see SubmissionStore)
 }
 
 /** Saved canvas state for one assignment question (circuit + annotations). */

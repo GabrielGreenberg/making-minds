@@ -9,6 +9,7 @@ import { localAssignmentStore } from '../storage/AssignmentStore';
 import { localSubmissionStore } from '../storage/submissionStore';
 import { downloadJson } from '../download';
 import { navigate } from '../routing';
+import { seedSampleData } from '../devData/seed';
 
 /**
  * Instructor dashboard: lists every assignment (bundled + instructor-authored)
@@ -41,13 +42,27 @@ export function InstructorDashboard() {
     rerender();
   };
 
+  const handleSeed = () => {
+    const { submissionCount } = seedSampleData();
+    rerender();
+    window.alert(
+      `Loaded the sample CC/SC/FSM assignment and ${submissionCount} autograded submissions. ` +
+        'Open its Submissions to see the grades.',
+    );
+  };
+
   return (
     <div className="instructor-dashboard">
       <div className="instructor-page-head">
         <h2 className="instructor-page-title">Assignments</h2>
-        <button className="instructor-btn instructor-btn--primary" onClick={handleNew}>
-          New Assignment
-        </button>
+        <div className="instructor-head-actions">
+          <button className="instructor-btn" onClick={handleSeed} title="Dev: seed a sample assignment and autograded submissions">
+            Load sample data
+          </button>
+          <button className="instructor-btn instructor-btn--primary" onClick={handleNew}>
+            New Assignment
+          </button>
+        </div>
       </div>
 
       {assignments.length === 0 ? (

@@ -150,8 +150,9 @@ function SubmissionDetail({
   record: SubmissionRecord;
   assignment: AssignmentData;
 }) {
-  // Re-run the grader to get per-case detail (the rolled-up grades omit it).
-  const result = gradeSubmission(assignment, record.submission);
+  // Prefer the grade stored at submission time (it carries full per-case
+  // detail); re-grade only for legacy records that predate autograde-on-submit.
+  const result = record.result ?? gradeSubmission(assignment, record.submission);
 
   return (
     <div className="instructor-detail">
