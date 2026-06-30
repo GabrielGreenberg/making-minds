@@ -1,11 +1,21 @@
 # Codec & function-grading pipeline
 
-> **Status: PLANNED — NOT YET BUILT.** This is a design spec for a redesign of the autograder,
-> not a description of existing code. Today's grader grades CC/SC/FSM bit-exactly, plus an
-> **interim TM** branch (`engines/tm.md`); see `engines/grading.md` for the as-is. Treat every
-> "is" below as "will be". When built, update `engines/grading.md`,
-> `pipeline/autograde-pipeline.md`, **and the per-engine docs** (`engines/cc.md` / `sc.md` /
-> `fsm.md` / `tm.md`) to match. This doc is registered in the `CLAUDE.md` knowledge-base mapping.
+> **Status: BUILT.** All four modes (CC/SC/FSM/TM) grade through this pipeline. The space/time
+> codec is `engine/codec.ts`; Stage-1 validation is `engine/machineValidation.ts`; the tape axis
+> is delegated to `engine/tmCodec.ts` (+ `tmValidate.ts`). `engine/testVectorGen.ts` generates
+> numeric `test_cases`; `engine/grader.ts` runs the single
+> `validate → encode → run → accept → decode → compare` path. Headless checks:
+> `app/tools/codecCheck.ts` (codec + rep core), `pipelineCheck.ts` (CC/SC/FSM end-to-end),
+> `tmCheck.ts` (TM). The bit-based `test_vectors` and per-mode adapters are **gone**. See
+> `engines/grading.md` for the as-built summary; the design rationale below remains the
+> authority for *why* it is shaped this way.
+>
+> **What differs from the original plan (below):** `RepSystem` keeps `'plus'` (a display-only
+> value in the DataTable toggle); the codec treats anything non-`tally` as binary, so grading
+> rep is effectively `binary | tally`. `CCEncoding` and per-group `encoding` were removed in
+> favour of one question-level `representation`; widths now live on `cc_spec` and the codec reads
+> them. `CaseResult` kept its `got: number[]` field (empty `[]` on rejection) plus a `reason`,
+> rather than a separate `got`/reason union.
 
 Read `engines/grading.md` (current state), `engines/overview.md` (bit layout), and the DSL
 section of `CLAUDE.md` first.

@@ -42,17 +42,18 @@ the helpers, never the raw port ids:
 - `getMemOutputPortId(comp)` — the port that **emits** the stored value (a source).
 - `getMemInputPortId(comp)` — the port that **receives** the next value (a sink).
 
-## Bit-vector ordering (critical, shared by CC/SC and the test-vector generator)
+## Bit-vector ordering (critical, shared by the engines and the codec)
 
 When a circuit is fed a flat bit vector or read out as one:
 - **Inputs** are ordered by the numeric suffix of the INPUT label: `IN1, IN2, IN3, …`.
 - **Outputs** are ordered by the numeric suffix of the OUTPUT label: `OUT1, OUT2, …`.
-- For a multi-bit **group** (instructor authoring), bits are **MSB first** within the group,
-  and groups are concatenated in declaration order.
+- For a multi-bit **group** (the space axis), bits are **MSB first** within the group, and
+  groups are concatenated in declaration order.
 
-`engine/cc.ts` (`evaluateCCInputs`) and `engine/testVectorGen.ts` MUST agree on this layout —
-if you change one, change both. FSM uses one bit per step (no grouping); SC chunks a flat
-vector by the live circuit's INPUT/OUTPUT counts (see `sc.md` / `grading.md`).
+`engine/cc.ts` (`evaluateCCInputs`) and `engine/codec.ts` (`encodeInput`/`decodeOutput`, space
+axis) MUST agree on this layout — if you change one, change both. The **time** axis (SC/FSM)
+instead lays each value LSB-first along its own wire over time; FSM uses one bit per step (the
+`n=1` time case). See `grading.md` / `pipeline/codec.md` for the codec, `sc.md` for SC.
 
 ## Topological evaluation (CC, reused by SC)
 
@@ -71,9 +72,12 @@ computes one component's outputs.
 | `engine/fsm.ts` | `sortStateComponents`, `evaluateFSMSingleStep`, `evaluateFSMSequence` | `fsm.md` |
 | `engine/tm.ts` | `evaluateTMSingleStep`, `evaluateTMSequence`, tape/parse helpers, `DEFAULT_TM_MAX_STEPS` | `tm.md` |
 | `engine/grader.ts` | `gradeQuestion`, `gradeSubmission`, `summarizeResult` | `grading.md` |
-| `engine/testVectorGen.ts` | `generateCCTestVectors`, `decodeBits`, `encodeBits` | `grading.md` |
+| `engine/codec.ts` | `axisForMode`, `encodeInput`, `decodeOutput`, `outputAccepted`, `stepCountFor`, `CodecLayout` | `grading.md` + `pipeline/codec.md` |
+| `engine/machineValidation.ts` | `validateMachine` (Stage 1, all modes) | `grading.md` + `pipeline/codec.md` |
+| `engine/tmCodec.ts` / `tmValidate.ts` | TM tape axis (`encodeTM`/`acceptTM`/`decodeTM`) + TM Stage 1 | `tm.md` |
+| `engine/testVectorGen.ts` | `generateTestCases(spec, rep)` | `grading.md` |
 | `engine/formulaEval.ts` | `evalFormula`, `FormulaError` | `grading.md` + CLAUDE.md DSL section |
-| `engine/representation.ts` | `bitsToTally`, `bitsToBinary`, `interpretBits` | `grading.md` |
+| `engine/representation.ts` | `valueToBits`, `isValidCodeword`, `bitsToValue`, `bitsToTally`, `bitsToBinary`, `interpretBits` | `grading.md` |
 | `engine/index.ts` | barrel re-exports of the above | — |
 
 ## Unified engine interface (grader + frontend)
@@ -95,10 +99,10 @@ Every mode engine exposes the **same two-function shape**, so the **grader/codec
 | TM | `evaluateTMSingleStep` | `evaluateTMSequence` | tape |
 
 **The engines speak bits/tapes, never values.** Converting a question's numeric `TestCase` to/from
-that bit/tape layout is the **codec**'s job (`pipeline/codec.md`), not the engine's or the store's
-— so the *same* engine code serves both grading and the canvas unchanged. (Today's grader still
-uses per-mode `test_vector` adapters; the codec redesign replaces them — see `grading.md` and
-`pipeline/codec.md`.)
+that bit/tape layout is the **codec**'s job (`engine/codec.ts` for space/time, `tmCodec.ts` for
+tape — see `grading.md` and `pipeline/codec.md`), not the engine's or the store's, so the *same*
+engine code serves both grading and the canvas unchanged. The codec is built: the grader runs one
+`validate → encode → run → accept → decode → compare` path for all four modes.
 
 ## How the store relates to the engine
 

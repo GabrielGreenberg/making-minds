@@ -1,14 +1,14 @@
 // Live preview + validation for the CC question creator. Pure (no React), so the
 // authoring logic is testable headlessly and the component stays presentational.
 //
-// The preview enumerates the input space, decodes each group to its integer
-// value, evaluates each output formula, and encodes the result — exactly what
-// generateCCTestVectors does at save, but it keeps the intermediate values for
+// The preview enumerates the input space, evaluates each output formula, and
+// shows each value's bits under the question's representation — the same values
+// generateTestCases stores at save, but it keeps the intermediate detail for
 // display and reports per-output formula errors instead of throwing.
 
-import type { CCInputGroup, CCOutputGroup, CCEncoding } from '../types';
+import type { CCInputGroup, CCOutputGroup, RepSystem } from '../types';
 import { evalFormula, FormulaError } from '../engine/formulaEval';
-import { encodeBits } from '../engine/testVectorGen';
+import { valueToBits } from '../engine/representation';
 
 // Guard against an explosively large input space hanging the browser. PHIL 133
 // CC exercises are tiny; anything past this is almost certainly a mistake.
@@ -41,9 +41,9 @@ export interface PreviewResult {
   structuralErrors: string[];
 }
 
-/** Integer values an input group can take. */
-function intValues(width: number, encoding: CCEncoding): number[] {
-  const max = encoding === 'unary' ? width : Math.pow(2, width) - 1;
+/** Integer values an input group can take under the question's representation. */
+function intValues(width: number, rep: RepSystem): number[] {
+  const max = rep === 'tally' ? width : Math.pow(2, width) - 1;
   return Array.from({ length: max + 1 }, (_, i) => i);
 }
 
@@ -95,6 +95,7 @@ export function validateGroups(
 export function buildPreview(
   inputs: CCInputGroup[],
   outputs: CCOutputGroup[],
+  rep: RepSystem,
 ): PreviewResult {
   const structuralErrors = validateGroups(inputs, outputs);
   const outputErrors: (string | null)[] = outputs.map(() => null);
@@ -105,7 +106,7 @@ export function buildPreview(
   }
 
   const totalCombos = inputs.reduce(
-    (n, g) => n * intValues(g.width, g.encoding).length,
+    (n, g) => n * intValues(g.width, rep).length,
     1,
   );
   if (totalCombos > MAX_COMBOS) {
@@ -118,18 +119,18 @@ export function buildPreview(
     };
   }
 
-  const combos = cartesian(inputs.map((g) => intValues(g.width, g.encoding)));
+  const combos = cartesian(inputs.map((g) => intValues(g.width, rep)));
   const rows: PreviewRow[] = combos.map((values) => {
     const vars: Record<string, number> = {};
     const inputCells: PreviewCellInput[] = inputs.map((g, i) => {
       vars[g.name] = values[i];
-      return { name: g.name, value: values[i], bits: encodeBits(values[i], g.width, g.encoding) };
+      return { name: g.name, value: values[i], bits: valueToBits(values[i], g.width, rep) };
     });
 
     const outputCells: PreviewCellOutput[] = outputs.map((g, gi) => {
       try {
         const result = evalFormula(g.formula, vars);
-        return { name: g.name, result, bits: encodeBits(result, g.width, g.encoding) };
+        return { name: g.name, result, bits: valueToBits(result, g.width, rep) };
       } catch (e) {
         const msg = e instanceof FormulaError ? e.message : 'Invalid formula';
         if (outputErrors[gi] == null) outputErrors[gi] = msg;

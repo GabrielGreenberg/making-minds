@@ -24,7 +24,7 @@ function check(label: string, cond: boolean) {
 
 console.log('Assignment:', assignment.title);
 for (const q of assignment.questions) {
-  console.log(`  ${q.label}: ${q.test_vectors?.length ?? 0} test vectors`);
+  console.log(`  ${q.label}: ${q.test_cases?.length ?? 0} test cases`);
 }
 
 console.log('\n[correct submission]');

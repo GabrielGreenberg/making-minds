@@ -8,12 +8,18 @@
       "statement": "OUT = IN1 AND IN2",
       "buildMode": "CC",
       "representation": "binary",
-      "grading_mode": "exhaustive",
-      "test_vectors": [
-        { "input_sequence": [0, 0], "expected_output": [0] },
-        { "input_sequence": [0, 1], "expected_output": [0] },
-        { "input_sequence": [1, 0], "expected_output": [0] },
-        { "input_sequence": [1, 1], "expected_output": [1] }
+      "cc_spec": {
+        "inputs": [
+          { "name": "a", "width": 1 },
+          { "name": "b", "width": 1 }
+        ],
+        "outputs": [{ "name": "y", "width": 1, "formula": "a & b" }]
+      },
+      "test_cases": [
+        { "inputs": [0, 0], "outputs": [0] },
+        { "inputs": [0, 1], "outputs": [0] },
+        { "inputs": [1, 0], "outputs": [0] },
+        { "inputs": [1, 1], "outputs": [1] }
       ]
     },
     {
@@ -22,10 +28,13 @@
       "statement": "OUT = NOT IN1",
       "buildMode": "CC",
       "representation": "binary",
-      "grading_mode": "exhaustive",
-      "test_vectors": [
-        { "input_sequence": [0], "expected_output": [1] },
-        { "input_sequence": [1], "expected_output": [0] }
+      "cc_spec": {
+        "inputs": [{ "name": "a", "width": 1 }],
+        "outputs": [{ "name": "y", "width": 1, "formula": "1 - a" }]
+      },
+      "test_cases": [
+        { "inputs": [0], "outputs": [1] },
+        { "inputs": [1], "outputs": [0] }
       ]
     }
   ]

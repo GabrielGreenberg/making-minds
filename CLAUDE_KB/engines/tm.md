@@ -14,7 +14,7 @@ and performs **one** tape action. The control half reuses `sortStateComponents` 
 
 ## Relationship to the codec pipeline (authority: `pipeline/codec.md`)
 
-The cross-cutting grading design lives in **`pipeline/codec.md`** (PLANNED). SC/FSM/TM are all
+The cross-cutting grading design lives in **`pipeline/codec.md`** (BUILT). SC/FSM/TM are all
 graded like CC — against a **machine-agnostic** bank of numeric `(x, f(x))` test cases — through
 a shared **codec** (value↔bits per axis) and a split **validate → encode → run → accept → decode
 → compare** pipeline. **`codec.md` is authoritative** for the pipeline structure, the data model
@@ -281,13 +281,13 @@ The earlier cell-0 / fixed-window model has been reworked to the semantics above
 
 `app/tools/tmCheck.ts` now exercises the value-based pipeline (engine, codec, validation, grader).
 
-**Grading shape (interim, pre-codec).** The codec redesign (`pipeline/codec.md`) is not yet built,
-so TM grading reads the new value-based `question.test_cases` (`TestCase {inputs, outputs}`, added
-to `types.ts` alongside the legacy bit-based `test_vectors` that CC/SC/FSM still use) and runs its
-own `validate → encode → run → accept → decode → compare` branch in `grader.ts`. When the codec
-lands, this branch folds into the unified path with no change to `tmCodec.ts`. Notation comes from
-`question.representation` via `notationForRepresentation` (`'binary'` → binary, else unary).
-`CaseResult` gained an optional `reason` carrying the rejection / syntax-error explanation.
+**Grading shape — folded into the unified codec path.** The codec (`pipeline/codec.md`) is built,
+and TM is now the `tape` axis of the single `grader.ts` path: `gradeQuestion` routes the tape axis
+to `tmCodec`/`validateTMTable` (via `machineValidation`) with no TM-only grader branch. There is
+one value-based `question.test_cases` (`TestCase {inputs, outputs}`) for every mode — the legacy
+bit-based `test_vectors` are gone. Notation comes from `question.representation` via
+`notationForRepresentation` (`'binary'` → binary, else unary). `CaseResult` carries an optional
+`reason` for the rejection / syntax-error explanation.
 
 ## Not yet built (store + UI)
 

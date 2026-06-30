@@ -39,21 +39,22 @@ end-to-end:
 - **Student side** — stub login → browse assignments → open one → per-question canvas in the
   correct mode → instant local autosave → leave and resume (reload/Back returns you into the
   assignment) → Submit a timestamped snapshot.
-- **Autograding** — pure headless `engine/` simulators for **CC, SC, FSM, and TM**; `grader.ts`
-  dispatches on `buildMode`. CC/SC/FSM grade bit-exactly against stored `test_vectors`; **TM**
-  grades value-based against `test_cases` via a validate → encode → run → accept → decode →
-  compare pipeline (the shape the planned codec redesign generalises to all modes). Submissions
-  **autograde on receipt** in `SubmissionStore` and the result is persisted on the record (the
-  exact shape a real server endpoint will take).
+- **Autograding (the codec)** — pure headless `engine/` simulators for **CC, SC, FSM, and TM**,
+  graded through one **value-based codec pipeline**: every machine implements a function `f`, and
+  `grader.ts` checks it against a machine-agnostic bank of numeric `(x, f(x))` `test_cases` via
+  `validate → encode → run → accept → decode → compare`. The only per-mode knowledge is the
+  **axis** — how a number maps to/from bits over wires (CC `space`), time (SC/FSM `time`), or tape
+  (TM `tape`) — which lives in the **codec** (`engine/codec.ts` + `tmCodec.ts`). The old bit-based
+  `test_vectors` are gone. Submissions **autograde on receipt** in `SubmissionStore` and the
+  result is persisted on the record (the exact shape a real server endpoint will take).
 - **Instructor side** — role-gated `#/instructor` mode: dashboard, assignment editor, a **CC
   question creator**, and a **gradebook** that reflects stored autogrades (scores, per-question
-  pass rates, failed-vector drill-down). Sample CC/SC/FSM data can be seeded to demo the
-  pipeline.
-- **Reference-function DSL** — instructors don't hand-write test vectors. They declare a
-  question's input/output groups and specify the correct output with a small **affine/bitwise
-  arithmetic mini-language** (the "reference function"); the system enumerates inputs,
-  evaluates the formula, and auto-generates the `test_vectors` at authoring time, with a live
-  preview table. See the DSL section in Part 2.
+  pass rates, failed-case drill-down). Sample CC/SC/FSM data can be seeded to demo the pipeline.
+- **Reference-function DSL** — instructors don't hand-write test cases. They declare a question's
+  input/output groups + one representation and specify the correct output with a small
+  **affine/bitwise arithmetic mini-language** (the "reference function"); the system enumerates
+  inputs, evaluates the formula, and auto-generates the numeric `test_cases` at authoring time,
+  with a live preview table. See the DSL section in Part 2.
 
 The missing half is the **server** and productized submit/grade loop.
 
@@ -102,9 +103,9 @@ the layout and conventions.)
 | Finite state machines — states, transitions | `CLAUDE_KB/engines/overview.md`, `CLAUDE_KB/engines/fsm.md` |
 | Turing machines — tape, head, single-action transitions (engine + grading built; store/UI not) | `CLAUDE_KB/engines/overview.md`, `CLAUDE_KB/engines/fsm.md`, `CLAUDE_KB/engines/tm.md` |
 | TM store + UI (the next TM step: `tmStep`, tape strip, status display) | `CLAUDE_KB/plans/tm-store.md`, `CLAUDE_KB/engines/tm.md` |
-| Autograder, test-vector format, grading bugs | `CLAUDE_KB/engines/grading.md` + the relevant per-mode doc |
+| Autograder, codec, test-case format, grading bugs | `CLAUDE_KB/engines/grading.md` + the relevant per-mode doc |
 | Submission → grade → gradebook pipeline | `CLAUDE_KB/pipeline/autograde-pipeline.md`, `CLAUDE_KB/engines/grading.md` |
-| Codec / unified value-based grading redesign (planned) | `CLAUDE_KB/pipeline/codec.md`, `CLAUDE_KB/engines/grading.md`, `CLAUDE_KB/engines/overview.md` |
+| Codec — unified value-based grading (built; the cross-cutting design) | `CLAUDE_KB/pipeline/codec.md`, `CLAUDE_KB/engines/grading.md`, `CLAUDE_KB/engines/overview.md` |
 | Instructor frontend — authoring, gradebook, role gating | `CLAUDE_KB/instructor/frontend.md` |
 | Mockup auth — login, account-based student/instructor role gating (next step) | `CLAUDE_KB/plans/auth-mockup.md`, `CLAUDE_KB/instructor/frontend.md` |
 | Reference-function DSL (formula authoring) | `CLAUDE_KB/engines/grading.md` + "Reference-function DSL" below |
@@ -137,9 +138,10 @@ the engine.
 | Types         | `app/src/types.ts`                                                             | All domain types: `AssignmentData`, `AssignmentQuestion`, `SubmissionData`/`SubmissionRecord`, `CircuitData`, `CCSpec`, `SubmissionResult` |
 | Engine        | `app/src/engine/cc.ts`, `sc.ts`, `fsm.ts`                                      | Pure simulators per mode (topological eval for CC; clocked step for SC; transition-matching for FSM)                                       |
 | Engine        | `app/src/engine/tm.ts`, `tmValidate.ts`, `tmCodec.ts`                          | TM: notation-aware tape engine; pre-engine table validation (ambiguous/unparseable); encode/accept/decode (the codec `tape` axis)          |
-| Engine        | `app/src/engine/grader.ts`                                                     | `gradeSubmission` / `gradeQuestion` — dispatch on `buildMode`. CC/SC/FSM vs `test_vectors`; TM value-based vs `test_cases`; turbot skipped  |
-| Engine        | `app/src/engine/testVectorGen.ts`, `formulaEval.ts`                            | Authoring-time: affine-formula language → generated CC test vectors                                                                        |
-| Engine        | `app/src/engine/representation.ts`, `index.ts`                                 | Bit encoding/decoding; barrel exports                                                                                                      |
+| Engine        | `app/src/engine/grader.ts`                                                     | `gradeSubmission` / `gradeQuestion` — one value-based codec pipeline for CC/SC/FSM/TM against numeric `test_cases`; turbot skipped          |
+| Engine        | `app/src/engine/codec.ts`, `machineValidation.ts`                              | The codec (`space`/`time` value↔bits; `tape` → `tmCodec`) and Stage-1 machine validation for all modes                                     |
+| Engine        | `app/src/engine/testVectorGen.ts`, `formulaEval.ts`                            | Authoring-time: affine-formula language → `generateTestCases(spec, rep)` → numeric `test_cases`                                            |
+| Engine        | `app/src/engine/representation.ts`, `index.ts`                                 | value↔bits core (`valueToBits`/`isValidCodeword`/`bitsToValue`) + display helpers; barrel exports                                          |
 | Store         | `app/src/store.ts`                                                             | Zustand UI state; delegates simulation to `engine/`                                                                                        |
 | Routing       | `app/src/routing.ts`                                                           | `Route` union, `parseHash`/`routeToHash`, `navigate()`                                                                                     |
 | Storage       | `app/src/storage/workbookStore.ts`, `AssignmentStore.ts`, `submissionStore.ts` | The three localStorage-backed seams                                                                                                        |
@@ -148,19 +150,19 @@ the engine.
 | Instructor UI | `app/src/instructor/`                                                          | `InstructorApp`, `InstructorGate`, `InstructorDashboard`, `AssignmentEditor`, `QuestionCreator`, `Gradebook(.ts/View.tsx)`                 |
 | Student UI    | `app/src/components/`                                                          | `CircuitCanvas`, `ComponentLibrary`, `DataTable`, `HomeScreen`, `MenuBar`, `SequentialTimeline`, `SimulationPanel`, `TabBar`               |
 | Dev/sample    | `app/src/devData/sampleData.ts`, `seed.ts`                                     | Builders + seeding for demo CC/SC/FSM assignments and submissions                                                                          |
-| Tools         | `app/tools/grade.ts`, `pipelineCheck.ts`, `tmCheck.ts`                          | Headless CLI grader, submit→grade pipeline check, and TM engine/codec/grader smoke test (`npx tsx`)                                        |
+| Tools         | `app/tools/grade.ts`, `pipelineCheck.ts`, `codecCheck.ts`, `tmCheck.ts`        | Headless CLI grader, submit→grade pipeline check, codec + rep-core unit checks, and TM engine/codec/grader smoke test (`npx tsx`)          |
 
 ## Reference-function DSL (instructor authoring)
 
 Instructors specify _what a student circuit must compute_ with a small arithmetic
-mini-language instead of writing test vectors by hand. This is an authoring-time convenience
-only — the grader never sees the formula; it runs against the generated `test_vectors`.
+mini-language instead of writing test cases by hand. This is an authoring-time convenience
+only — the grader never sees the formula; it runs against the generated numeric `test_cases`.
 
 - **Where it lives** — `engine/formulaEval.ts` (`evalFormula(expr, vars)` → non-negative
-  integer; throws `FormulaError`) and `engine/testVectorGen.ts` (enumerates input
-  combinations, evaluates the formula, encodes outputs → `test_vectors`). The instructor UI
-  (`instructor/QuestionCreator.tsx`, with `instructor/ccPreview.ts`) renders a **live preview
-  table** and blocks save on any formula error.
+  integer; throws `FormulaError`) and `engine/testVectorGen.ts` (`generateTestCases(spec, rep)`
+  enumerates input combinations, evaluates the formula, truncates each output to its group width
+  → numeric `test_cases`). The instructor UI (`instructor/QuestionCreator.tsx`, with
+  `instructor/ccPreview.ts`) renders a **live preview table** and blocks save on any formula error.
 - **The language** — variables (declared input-group names like `x`, `y`), non-negative
   integer literals, and the operators `+ - *` and bitwise `& | ^ ~`, with parentheses. No
   division, modulo, conditionals, or function calls. Each formula is one expression returning a
@@ -168,10 +170,12 @@ only — the grader never sees the formula; it runs against the generated `test_
 - **Width is the implicit modulus** — the output group's bit width truncates the result to its
   least-significant bits, so an instructor writes `x + y` with a 1-bit output to mean XOR, or a
   2-bit output to also get the carry. No explicit `% 2` needed.
-- **Encoding** — each input/output group is **binary or unary**; this governs how bit groups
-  decode to the integer the formula receives and how the result re-encodes to output wires.
-- **Today CC only.** SC/FSM/TM authoring via the DSL is not implemented; their sample
-  assignments are seeded directly (see `devData/`). The grader already supports SC/FSM.
+- **Representation** — one per question (`binary` | `tally`), not per group. It governs the input
+  value ranges, how the codec lays values onto the machine's axis, and how outputs decode. The
+  codec — not the DSL — owns the value↔bits mapping at grade time.
+- **Today CC only in the UI.** SC/FSM express functions via the same DSL (the sample SC delay is
+  `2 * x`, the FSM identity is `x`), but `QuestionCreator` emits CC questions only; SC/FSM/TM
+  samples are seeded in `devData/`. The grader handles all modes via the codec.
 - **Safety** — `evalFormula` validates against a strict token whitelist (digits, declared
   variable names, the allowed operators) before evaluating via `new Function()`. Acceptable
   because formulas are instructor-authored, never student-supplied.
@@ -218,14 +222,14 @@ only — the grader never sees the formula; it runs against the generated `test_
 - **Turbot encoding is hardcoded** — sensor in: 0 empty, 1 block. Motor out: 00 stop, 01
   left, 10 right, 11 forward.
 - **CC evaluation** — topological sort for gate order; propagation is instantaneous.
-- **Homework JSON** (spec §1.5) carries `test_vectors`; the grader compares student outputs
-  against expected.
+- **Homework JSON** (spec §1.5) carries numeric `test_cases` (`{inputs, outputs}` of values); the
+  codec encodes/decodes per axis and the grader compares decoded outputs to expected.
 
 ## Things to watch
 
-- **Test vectors must not ship to the client in production.** Bundled assignment JSON today
-  includes `test_vectors` (the answers) — fine for the prototype, where grading happens inside
+- **Test cases must not ship to the client in production.** Bundled assignment JSON today
+  includes `test_cases` (the answers) — fine for the prototype, where grading happens inside
   the `SubmissionStore` seam. In the product, split assignments into a client part (statements,
-  modes) and a server-only part (test vectors); the server grades on submit.
+  modes) and a server-only part (test cases); the server grades on submit.
 - **localStorage is a stopgap** — per-browser, per-device, ~5 MB. The `WorkbookStore` /
   `AssignmentStore` / `SubmissionStore` seams are exactly the boundaries a server replaces.

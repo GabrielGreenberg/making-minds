@@ -4,11 +4,10 @@ import type {
   BuildMode,
   CCInputGroup,
   CCOutputGroup,
-  CCEncoding,
   RepSystem,
 } from '../types';
 import { getAssignment } from '../assignments';
-import { generateCCTestVectors } from '../engine/testVectorGen';
+import { generateTestCases } from '../engine/testVectorGen';
 import { buildPreview, canSave, type PreviewRow } from './ccPreview';
 
 interface Props {
@@ -26,15 +25,15 @@ const MODES: { mode: BuildMode; label: string; enabled: boolean }[] = [
 ];
 
 function blankInput(): CCInputGroup {
-  return { name: '', width: 1, encoding: 'binary' };
+  return { name: '', width: 1 };
 }
 function blankOutput(): CCOutputGroup {
-  return { name: '', width: 1, encoding: 'binary', formula: '' };
+  return { name: '', width: 1, formula: '' };
 }
 
-function encodingToRep(encoding: CCEncoding): RepSystem {
-  return encoding === 'unary' ? 'tally' : 'binary';
-}
+// Representation systems the codec grades against (the display-only 'plus' is not
+// a grading representation, so it isn't offered here).
+const REPS: RepSystem[] = ['binary', 'tally'];
 
 export function QuestionCreator({ assignmentId, existingQuestion, onSave, onCancel }: Props) {
   // Step 1: mode. CC is the only implemented mode; existing questions skip this.
@@ -46,9 +45,13 @@ export function QuestionCreator({ assignmentId, existingQuestion, onSave, onCanc
   const [outputs, setOutputs] = useState<CCOutputGroup[]>(
     () => existingQuestion?.cc_spec?.outputs.map((g) => ({ ...g })) ?? [blankOutput()],
   );
+  // One representation system per question (governs grading + the preview).
+  const [rep, setRep] = useState<RepSystem>(
+    () => existingQuestion?.representation === 'tally' ? 'tally' : 'binary',
+  );
   const [statement, setStatement] = useState(existingQuestion?.statement ?? '');
 
-  const preview = useMemo(() => buildPreview(inputs, outputs), [inputs, outputs]);
+  const preview = useMemo(() => buildPreview(inputs, outputs, rep), [inputs, outputs, rep]);
   const saveable = canSave(preview, statement);
 
   const totalInputWires = inputs.reduce((n, g) => n + (g.width || 0), 0);
@@ -91,7 +94,7 @@ export function QuestionCreator({ assignmentId, existingQuestion, onSave, onCanc
   const handleSave = () => {
     if (!saveable) return;
     const spec = { inputs, outputs };
-    const test_vectors = generateCCTestVectors(spec);
+    const test_cases = generateTestCases(spec, rep);
 
     const def = getAssignment(assignmentId);
     const existingQs = def?.questions ?? [];
@@ -105,10 +108,9 @@ export function QuestionCreator({ assignmentId, existingQuestion, onSave, onCanc
       label,
       statement: statement.trim(),
       buildMode: 'CC',
-      representation: encodingToRep(inputs[0]?.encoding ?? 'binary'),
+      representation: rep,
       cc_spec: spec,
-      test_vectors,
-      grading_mode: 'exhaustive',
+      test_cases,
     });
   };
 
@@ -122,6 +124,14 @@ export function QuestionCreator({ assignmentId, existingQuestion, onSave, onCanc
           Cancel
         </button>
       </div>
+
+      {/* Representation (one per question; governs grading + the preview) */}
+      <section className="instructor-creator-section">
+        <div className="instructor-section-head">
+          <h4 className="instructor-subhead">Representation</h4>
+          <RepToggle value={rep} onChange={setRep} />
+        </div>
+      </section>
 
       {/* Inputs */}
       <section className="instructor-creator-section">
@@ -148,10 +158,6 @@ export function QuestionCreator({ assignmentId, existingQuestion, onSave, onCanc
                 onChange={(e) => updateInput(i, { width: Number(e.target.value) })}
               />
             </label>
-            <EncodingToggle
-              value={g.encoding}
-              onChange={(encoding) => updateInput(i, { encoding })}
-            />
             <button
               className="instructor-btn instructor-btn--icon instructor-btn--danger"
               onClick={() => setInputs((gs) => gs.filter((_, idx) => idx !== i))}
@@ -195,10 +201,6 @@ export function QuestionCreator({ assignmentId, existingQuestion, onSave, onCanc
                   onChange={(e) => updateOutput(i, { width: Number(e.target.value) })}
                 />
               </label>
-              <EncodingToggle
-                value={g.encoding}
-                onChange={(encoding) => updateOutput(i, { encoding })}
-              />
               <button
                 className="instructor-btn instructor-btn--icon instructor-btn--danger"
                 onClick={() => setOutputs((gs) => gs.filter((_, idx) => idx !== i))}
@@ -274,24 +276,24 @@ export function QuestionCreator({ assignmentId, existingQuestion, onSave, onCanc
   );
 }
 
-function EncodingToggle({
+function RepToggle({
   value,
   onChange,
 }: {
-  value: CCEncoding;
-  onChange: (e: CCEncoding) => void;
+  value: RepSystem;
+  onChange: (r: RepSystem) => void;
 }) {
   return (
     <div className="instructor-encoding-toggle">
-      {(['binary', 'unary'] as CCEncoding[]).map((enc) => (
+      {REPS.map((r) => (
         <button
-          key={enc}
+          key={r}
           className={
-            'instructor-encoding-btn' + (value === enc ? ' instructor-encoding-btn--active' : '')
+            'instructor-encoding-btn' + (value === r ? ' instructor-encoding-btn--active' : '')
           }
-          onClick={() => onChange(enc)}
+          onClick={() => onChange(r)}
         >
-          {enc}
+          {r}
         </button>
       ))}
     </div>

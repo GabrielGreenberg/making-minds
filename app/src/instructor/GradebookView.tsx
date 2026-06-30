@@ -181,9 +181,11 @@ function SubmissionDetail({
                 <tbody>
                   {failed.map((c, ci) => (
                     <tr key={ci}>
-                      <td className="instructor-bits">{c.input.join('')}</td>
-                      <td className="instructor-bits">{c.expected.join('')}</td>
-                      <td className="instructor-bits instructor-fail">{c.got.join('')}</td>
+                      <td className="instructor-bits">{c.input.join(', ')}</td>
+                      <td className="instructor-bits">{c.expected.join(', ')}</td>
+                      <td className="instructor-bits instructor-fail">
+                        {c.reason ?? c.got.join(', ')}
+                      </td>
                     </tr>
                   ))}
                 </tbody>

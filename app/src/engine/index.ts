@@ -38,6 +38,24 @@ export { validateTMTable } from './tmValidate';
 export type { TMValidationError, TMValidationKind } from './tmValidate';
 export { encodeTM, acceptTM, decodeTM, notationForRepresentation } from './tmCodec';
 export type { TMReject, AcceptOptions } from './tmCodec';
-export { bitsToTally, bitsToBinary, interpretBits } from './representation';
-export { gradeQuestion, gradeSubmission } from './grader';
+export {
+  bitsToTally,
+  bitsToBinary,
+  interpretBits,
+  valueToBits,
+  isValidCodeword,
+  bitsToValue,
+} from './representation';
+export {
+  axisForMode,
+  stepCountFor,
+  encodeInput,
+  decodeOutput,
+  outputAccepted,
+} from './codec';
+export type { Axis, CodecLayout, EncodedInput, RawOutput } from './codec';
+export { validateMachine } from './machineValidation';
+export type { MachineValidation } from './machineValidation';
+export { generateTestCases } from './testVectorGen';
+export { gradeQuestion, gradeSubmission, summarizeResult } from './grader';
 export type { CaseResult, QuestionResult, SubmissionResult } from './grader';

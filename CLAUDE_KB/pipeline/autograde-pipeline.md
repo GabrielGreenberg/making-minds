@@ -18,13 +18,13 @@ student clicks Submit (Home card or workbook)
   → SubmissionRecord stored at mm:sub:<id> (append-only attempts)
 instructor opens the gradebook
   → Gradebook.gradeSubmissions reads record.result (no recompute)
-  → scores, per-question pass rates, failed-vector drill-down
+  → scores, per-question pass rates, failed-case drill-down
 ```
 
 ## Grade on receipt (the server model)
 
 `SubmissionStore` **is** the server stand-in, so grading belongs at submit time — the server
-holds the test vectors and grades the moment a submission lands. In
+holds the test cases and grades the moment a submission lands. In
 `storage/submissionStore.ts`, `LocalSubmissionStore.submit` looks up the assignment via
 `getAssignment(id)`, calls `gradeSubmission`, and attaches `result` to the record before
 persisting. If the assignment is unknown, `result` is left `undefined` (graceful). When a real
@@ -45,10 +45,9 @@ imports `submissionStore` or `store.ts`, so the grader path stays headless-safe 
 - **Storage** — `localSubmissionStore.submit` writes an immutable `SubmissionRecord`;
   `store.submitAssignment` calls it and mirrors the latest record. Submit is exposed on the Home
   cards and in the workbook.
-- **Grading** — `engine/grader.ts` dispatches on `buildMode` for **CC, SC, FSM**, plus an
-  **interim TM** branch (cell-0 semantics, to be reworked — `engines/tm.md`); turbot is skipped
-  with a reason. A unified value-based rewrite is planned in `pipeline/codec.md`. See
-  `CLAUDE_KB/engines/grading.md`.
+- **Grading** — `engine/grader.ts` runs one value-based codec pipeline for **CC, SC, FSM, TM**
+  (`validate → encode → run → accept → decode → compare`); turbot is skipped with a reason. See
+  `CLAUDE_KB/engines/grading.md` and `pipeline/codec.md`.
 - **Engines** — pure SC/FSM simulators (`engine/sc.ts`, `engine/fsm.ts`) and the store delegate
   to the same code the grader uses. See `engines/sc.md`, `engines/fsm.md`.
 
@@ -64,17 +63,19 @@ vectors matched; skipped questions excluded). `HomeScreen` surfaces this after s
 
 ## Sample / dev data
 
-`devData/sampleData.ts` builds a multi-mode (CC + SC + FSM) sample assignment whose
-`test_vectors` come from known-correct circuits (`generateCCTestVectors` for CC,
-`evaluateSCSequence` / `evaluateFSMSequence` for SC/FSM), plus correct and deliberately-broken
-submissions. `devData/seed.ts` (a "Load sample data" button on the instructor dashboard) writes
-the assignment via `localAssignmentStore` and submits artificial students through the **real**
-`submit()` path, so they autograde and persist and the gradebook shows varied scores.
-`tools/pipelineCheck.ts` (`npx tsx`) asserts correct = 100% / broken < 100% for CC/SC/FSM.
+`devData/sampleData.ts` builds a multi-mode (CC + SC + FSM) sample assignment whose `test_cases`
+are generated from a `cc_spec` + DSL formula per question (`generateTestCases`): CC `a & b`
+(space), SC `2 * x` implemented by a delay register (time), FSM `x` by a pass-through identity
+(time). It ships correct and deliberately-broken submissions. `devData/seed.ts` (a "Load sample
+data" button on the instructor dashboard) writes the assignment via `localAssignmentStore` and
+submits artificial students through the **real** `submit()` path, so they autograde and persist
+and the gradebook shows varied scores. `tools/pipelineCheck.ts` (`npx tsx`) asserts correct =
+100% / broken < 100% for CC/SC/FSM; `tools/codecCheck.ts` unit-tests the codec + rep core.
 
 ## Out of scope
 
-- Productised TM grading — an interim engine + grader branch exist; the value-based rework
-  (`engines/tm.md`) and the unified codec pipeline (`pipeline/codec.md`) are still to come.
+- TM **store + UI** — the TM engine, validation, codec, and value-based grading are built (it
+  grades through the unified codec pipeline); the store (`tmStep`) and UI are not (`engines/tm.md`).
+- SC/FSM/TM **authoring** in `QuestionCreator` (CC-only today; samples are seeded).
 - Real multi-user server / student identity / SSO.
 - Authoring SC/FSM questions (samples are seeded; the creator stays CC-only).

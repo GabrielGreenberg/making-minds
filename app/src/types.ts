@@ -83,24 +83,25 @@ export interface ProjectData {
 // earlier split between "Homework" — which carried grading test vectors — and
 // "Problem Set" — which carried per-question build modes and statements.)
 
-// ─── CC question specification (instructor authoring) ────────────
-// Captures everything needed to generate `test_vectors` and to display a CC
-// question in the instructor UI. When present on an AssignmentQuestion, the
-// system regenerates `test_vectors` from it at save time. The grader never
-// reads cc_spec — it is an authoring artifact (see engine/testVectorGen.ts).
-
-export type CCEncoding = 'binary' | 'unary';
+// ─── Question specification (instructor authoring) ───────────────
+// Captures everything needed to generate `test_cases` and to display a question
+// in the instructor UI. When present on an AssignmentQuestion, the system
+// regenerates `test_cases` from it at save time (engine/testVectorGen.ts).
+//
+// The codec reads `cc_spec` for grading too — it is the source of the per-group
+// **widths** the codec needs to lay values out on each axis (space/time). The
+// single representation system is on the question (`representation`), not per
+// group. `width` is wires/group on the space axis (CC), steps/group on the time
+// axis (SC/FSM). Named `cc_spec` for historical reasons; it serves all modes.
 
 export interface CCInputGroup {
   name: string;            // variable name used in the formula, e.g. "x"
-  width: number;           // number of input wires in this group
-  encoding: CCEncoding;
+  width: number;           // bit width of this group (wires for CC; time steps for SC/FSM)
 }
 
 export interface CCOutputGroup {
   name: string;            // label shown to students, e.g. "y"
-  width: number;           // number of output wires in this group
-  encoding: CCEncoding;
+  width: number;           // bit width of this group (wires for CC; time steps for SC/FSM)
   formula: string;         // affine expression over input group names, e.g. "2 * x"
 }
 
@@ -115,8 +116,9 @@ export interface CCSpec {
  * input group, ≥ 1 for multi-input functions); `outputs` is `[f(x)]`. Bits/tape
  * encodings exist only transiently at grade time, never in the bank.
  *
- * Today only the TM grader path consumes `test_cases`; CC/SC/FSM still grade
- * against the bit-based `test_vectors` until the codec rewrite lands.
+ * Every mode is graded against `test_cases` through the codec pipeline
+ * (engine/grader.ts): the codec turns these values into the right bits/tape per
+ * axis at grade time. This supersedes the old bit-based `test_vectors`.
  */
 export interface TestCase {
   inputs: number[];
@@ -128,15 +130,10 @@ export interface AssignmentQuestion {
   label: string;               // e.g. "Problem 1", "Q2a"
   statement: string;           // problem text shown above the canvas
   buildMode: BuildMode;        // canvas mode for this question (CC, SC, FSM, …)
-  representation?: RepSystem;  // TM grading reads this as the notation (tally→unary, binary→binary)
+  representation: RepSystem;   // authoritative for grading (binary | tally; TM notation: tally→unary)
   allowed_components?: ComponentType[];
-  cc_spec?: CCSpec;            // authoring spec; generates test_vectors at save time
-  test_vectors?: {
-    input_sequence: number[];
-    expected_output: number[];
-  }[];
-  test_cases?: TestCase[];     // value-based grading cases (TM today; all modes after codec)
-  grading_mode?: 'exhaustive' | 'test_vectors';
+  cc_spec?: CCSpec;            // authoring spec; source of group widths + generates test_cases at save
+  test_cases?: TestCase[];     // value-based grading cases (one bank, all modes — see TestCase)
   notes?: string;
 }
 
@@ -165,11 +162,11 @@ export interface SubmissionData {
 // grader.ts re-exports these.
 
 /**
- * One case's outcome for a question. For bit-based modes (CC/SC/FSM) the arrays
- * are bit vectors; for value-based modes (TM) they are value lists and `got` is
- * the decoded value (or empty when the output was rejected before decoding).
- * `reason` carries a rejection / syntax-error explanation for instructor-only
- * feedback (e.g. malformed output, no halt, ambiguous transition table).
+ * One case's outcome for a question (instructor-only — students never see failed
+ * cases). All modes are value-based: `input` is the input value list `x`,
+ * `expected` is `f(x)`, and `got` is the decoded output value list — empty `[]`
+ * when the output was rejected before decoding. `reason` carries a rejection /
+ * syntax-error explanation (malformed output, no halt, invalid machine table).
  */
 export interface CaseResult {
   input: number[];
@@ -184,8 +181,8 @@ export interface QuestionResult {
   questionId: number;
   status: 'graded' | 'skipped';
   reason?: string;         // why it was skipped
-  passed: number;          // test vectors passed
-  total: number;           // test vectors total
+  passed: number;          // test cases passed
+  total: number;           // test cases total
   cases: CaseResult[];
 }
 
@@ -193,7 +190,7 @@ export interface QuestionResult {
 export interface SubmissionResult {
   student: string;
   questions: QuestionResult[];
-  passed: number;          // rolled up across graded test vectors
+  passed: number;          // rolled up across graded test cases
   total: number;
 }
 

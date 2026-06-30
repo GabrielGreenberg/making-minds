@@ -55,24 +55,25 @@ In the SC time-step table, **time flows right-to-left**: t1 is on the right, lat
 leftward. The engine returns steps in chronological order (index 0 = first step); the table
 rendering reverses for display.
 
-## Grading & the test-vector format
+## Grading — the codec's time axis
 
-The grader (`grader.ts`) stores SC test vectors as **flat** arrays and chunks them with
-`parseSCTestVector(inputSequence, expectedOutput, numInputs, numOutputs)`:
-- `numInputs` / `numOutputs` are **inferred from the submitted circuit's** INPUT / OUTPUT
-  component counts.
-- The flat `input_sequence` is sliced into `numInputs`-wide steps; `expected_output` into
-  `numOutputs`-wide steps. `got` and `expected` are compared after `.flat()`.
+SC is the **time axis** of the codec (`grading.md` / `pipeline/codec.md`). The old flat
+`test_vectors` + `parseSCTestVector` chunking adapter is **gone**. Per case: **Stage 1**
+`validateMachine` checks `#INPUT == #input groups` and `#OUTPUT == #output groups` (one wire per
+value). Then the codec lays each input value **LSB-first along its own wire over time** (step
+count = the widest in/out group; extra steps drain carries), `evaluateSCSequence` runs all steps,
+and each output wire's step-series decodes back to a value compared to `f(x)`.
 
-This adapter is the **fragile seam**: it assumes the flat encoding matches the circuit's port
-counts. If a circuit has a different number of INPUTs than the vector was generated for, the
-chunking silently misaligns. Check this adapter first when SC grading looks wrong.
+The classic sanity check: a **1-step delay register** outputs the input shifted one step later,
+which on the LSB-first time axis decodes to **2x** — a legal DSL formula. The sample SC question
+is authored exactly this way (`devData/`, formula `2 * x`), so a correct delay register scores
+100%.
 
 ## Working-on notes
 
-- There is no SC authoring in `QuestionCreator` yet — SC sample assignments are built directly
-  in `app/src/devData/` (vectors generated from a known-correct circuit via
-  `evaluateSCSequence`). The DSL/`testVectorGen` path is CC-only.
+- There is no SC authoring in `QuestionCreator` yet — the SC sample is built in
+  `app/src/devData/` from a `cc_spec` + formula (`2 * x`) via `generateTestCases`, and a
+  delay-register circuit that implements it on the time axis.
 - MEM `memDirection` may be undecided in freshly-placed blocks; the helpers treat undecided
   ports as both-capable. Grading assumes a decided, well-formed circuit.
 - Keep clock/state logic here; never push it down into `cc.ts`.

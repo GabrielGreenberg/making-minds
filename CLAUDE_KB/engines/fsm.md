@@ -43,22 +43,16 @@ the step that couldn't proceed. With no STATE components it returns `halted: tru
 
 ## Grading
 
-`parseFSMTestVector` passes the flat arrays straight through: **one input bit per step, one
-output bit per step**. In `grader.ts`, a case passes only when the machine **did not halt** and
-the full output sequence matches:
+FSM is the **`n=1` time axis** of the codec (`grading.md` / `pipeline/codec.md`). Per case:
+**Stage 1** `validateMachine` requires ≥1 state and **exactly one transition per input bit
+`{0,1}` on every STATE** (total + deterministic) — an invalid table fails the question before any
+case runs. Then the codec encodes the input value LSB-first along the single wire (one bit per
+step), the grader flattens that to the engine's `inputBits`, `evaluateFSMSequence` runs, and the
+output step-series decodes back to a value compared to `f(x)`. Because Stage 1 guarantees
+totality, a valid FSM never halts mid-run (the grader still guards against it defensively).
 
-```ts
-pass: !result.halted && bitsEqual(got, expectedBits)
-```
-
-A halted FSM fails the case but still returns its partial `got` output, which the gradebook can
-show as feedback.
-
-> **Under the codec redesign (`pipeline/codec.md`):** ambiguity and non-totality become **Stage-1
-> machine-validation failures** — the question fails before any case runs, and every STATE must
-> have exactly one transition per input bit (so the engine can't halt mid-run and the acceptor
-> always accepts). This supersedes the first-match tie-break and mid-run-halt behaviour described
-> here, which is what today's engine does. TM already follows this rule (`tm.md`).
+This **supersedes** the old first-match tie-break and mid-run-halt grading: ambiguity /
+non-totality are now Stage-1 failures, not silently-resolved at run time.
 
 ## Working-on notes
 

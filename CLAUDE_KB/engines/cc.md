@@ -68,8 +68,9 @@ input/output ordering matches the canvas exactly (see `overview.md` bit ordering
 
 ## Working-on notes
 
-- Changing the bit ordering here means changing `testVectorGen.ts` in lockstep, or every CC
-  question's stored `test_vectors` will silently mis-grade.
+- Changing the bit ordering here means changing the codec's `space` axis (`engine/codec.ts`,
+  `encodeInput`/`decodeOutput`) in lockstep, or CC grading will silently mis-decode. CC is the
+  codec's `space` axis: values → wires MSB-first, groups concatenated in declaration order.
 - If you add a new gate type: extend `ComponentType` + `getPortsForType` in `types.ts`, add a
   case to `evaluateGate`, and decide its undefined-propagation behaviour.
 - This engine is the dependency floor: `sc.ts` imports `topologicalSort` and `evaluateGate`

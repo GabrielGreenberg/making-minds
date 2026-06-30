@@ -1,52 +1,29 @@
-// Test-vector generation from a CC question spec (instructor authoring tooling).
+// Test-case generation from a question spec (instructor authoring tooling).
 //
-// Pure and framework-agnostic. Called at authoring time (when an instructor
-// saves a question), never at grading time: it enumerates the finite CC input
-// space, evaluates each output formula, and serialises the results to the
-// `test_vectors` the grader consumes. The grader (engine/grader.ts) is unchanged
-// and never sees the formula again.
+// Pure and framework-agnostic. Called at authoring time (when an instructor saves
+// a question), never at grading time: it enumerates the finite input space,
+// evaluates each output formula, and stores the results as **numeric** test cases
+// (`TestCase { inputs, outputs }`) — values, not bits. The mode never enters
+// generation: the codec (engine/codec.ts) turns these values into the right
+// bits/tape per axis at grade time, so one bank grades CC/SC/FSM alike.
 //
-// Bit layout — must match engine/cc.ts `evaluateCCInputs`, which feeds input
-// bits to INPUT components ordered IN1, IN2, … and reads OUTPUT bits ordered
-// OUT1, OUT2, …. So: input groups are concatenated in declaration order, and
-// within each group the MSB comes first (wire I₁ = most significant bit for
-// binary). Output groups follow the same convention.
+// The output group's bit width is the **implicit modulus**: the stored output is
+// the formula result truncated to what the group can represent (binary: the
+// least-significant `width` bits; tally: clamped to 0..width). This mirrors the
+// codec's `valueToBits`/`bitsToValue`, so a generated case always round-trips.
 
-import type { CCSpec, CCEncoding } from '../types';
+import type { CCSpec, RepSystem, TestCase } from '../types';
 import { evalFormula } from './formulaEval';
+import { valueToBits, bitsToValue } from './representation';
 
-/**
- * Decode a bit array to an integer under the given encoding.
- * - binary: MSB first (bits[0] is the most significant bit)
- * - unary: the count of 1-bits (so 111…1 with k ones decodes to k)
- */
-export function decodeBits(bits: number[], encoding: CCEncoding): number {
-  if (encoding === 'unary') {
-    return bits.reduce((n, b) => n + (b ? 1 : 0), 0);
-  }
-  // binary, MSB first
-  return bits.reduce((n, b) => n * 2 + (b ? 1 : 0), 0);
+/** Apply the width-as-modulus truncation a circuit would impose on a value. */
+function truncate(value: number, width: number, rep: RepSystem): number {
+  return bitsToValue(valueToBits(value, width, rep), rep);
 }
 
-/**
- * Encode an integer to a bit array of exactly `width` bits under the given
- * encoding.
- * - binary: the least-significant `width` bits, MSB first (truncation gives the
- *   implicit modulus described in the spec).
- * - unary: `n` ones followed by zeros, clamped into 0..width.
- */
-export function encodeBits(n: number, width: number, encoding: CCEncoding): number[] {
-  if (encoding === 'unary') {
-    const ones = Math.max(0, Math.min(width, n));
-    return Array.from({ length: width }, (_, i) => (i < ones ? 1 : 0));
-  }
-  // binary, MSB first; mask to the least-significant `width` bits.
-  return Array.from({ length: width }, (_, i) => (n >> (width - 1 - i)) & 1);
-}
-
-/** The valid integer values an input group can take: 0..2ⁿ−1 (binary) or 0..n (unary). */
-function inputValues(width: number, encoding: CCEncoding): number[] {
-  const max = encoding === 'unary' ? width : Math.pow(2, width) - 1;
+/** The valid integer values an input group can take: 0..2ⁿ−1 (binary) or 0..n (tally). */
+function inputValues(width: number, rep: RepSystem): number[] {
+  const max = rep === 'tally' ? width : Math.pow(2, width) - 1;
   return Array.from({ length: max + 1 }, (_, i) => i);
 }
 
@@ -58,35 +35,22 @@ function cartesian(lists: number[][]): number[][] {
   );
 }
 
-export interface CCTestVector {
-  input_sequence: number[];
-  expected_output: number[];
-}
-
 /**
- * Generate all test vectors for a CC question spec by exhaustive enumeration
- * over the input space. Throws FormulaError (propagated from evalFormula) if any
- * output formula is invalid or produces a value a circuit cannot represent.
+ * Generate all test cases for a question spec by exhaustive enumeration over the
+ * input space under `rep`. Throws FormulaError (propagated from evalFormula) if
+ * any output formula is invalid.
  */
-export function generateCCTestVectors(spec: CCSpec): CCTestVector[] {
-  const combos = cartesian(spec.inputs.map((g) => inputValues(g.width, g.encoding)));
+export function generateTestCases(spec: CCSpec, rep: RepSystem): TestCase[] {
+  const combos = cartesian(spec.inputs.map((g) => inputValues(g.width, rep)));
 
   return combos.map((values) => {
-    // Bind each input group name to its integer value for formula evaluation,
-    // and serialise the inputs to bits (declaration order, MSB first per group).
     const vars: Record<string, number> = {};
-    const input_sequence: number[] = [];
     spec.inputs.forEach((g, i) => {
       vars[g.name] = values[i];
-      input_sequence.push(...encodeBits(values[i], g.width, g.encoding));
     });
-
-    const expected_output: number[] = [];
-    for (const out of spec.outputs) {
-      const result = evalFormula(out.formula, vars);
-      expected_output.push(...encodeBits(result, out.width, out.encoding));
-    }
-
-    return { input_sequence, expected_output };
+    const outputs = spec.outputs.map((out) =>
+      truncate(evalFormula(out.formula, vars), out.width, rep),
+    );
+    return { inputs: values, outputs };
   });
 }

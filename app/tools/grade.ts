@@ -9,8 +9,8 @@
  */
 import { readFileSync, writeFileSync, statSync, readdirSync } from 'node:fs';
 import { basename, join, extname } from 'node:path';
-import { gradeSubmission, interpretBits } from '../src/engine';
-import type { AssignmentData, SubmissionData, RepSystem } from '../src/types';
+import { gradeSubmission } from '../src/engine';
+import type { AssignmentData, SubmissionData } from '../src/types';
 
 function fail(msg: string): never {
   console.error(`error: ${msg}`);
@@ -46,10 +46,6 @@ if (!assignmentPath || submissionArgs.length === 0) {
 }
 
 const assignment = readJson<AssignmentData>(assignmentPath);
-// Map question id -> representation, for readable interpreted values in the report.
-const repById = new Map<number, RepSystem>(
-  assignment.questions.map((q) => [q.id, q.representation ?? 'binary'])
-);
 
 const submissionFiles = collectFiles(submissionArgs);
 const csvRows: string[] = ['student,questionId,status,passed,total'];
@@ -64,17 +60,14 @@ for (const file of submissionFiles) {
   console.log(`── ${result.student}  (${result.passed}/${result.total} cases) ──`);
 
   for (const qr of result.questions) {
-    const rep = repById.get(qr.questionId) ?? 'binary';
     if (qr.status === 'skipped') {
       console.log(`  Q${qr.questionId}: skipped — ${qr.reason}`);
     } else {
       const mark = qr.passed === qr.total ? '✓' : '✗';
       console.log(`  ${mark} Q${qr.questionId}: ${qr.passed}/${qr.total}`);
       for (const c of qr.cases.filter((c) => !c.pass)) {
-        console.log(
-          `      in [${c.input.join('')}]  expected ${interpretBits(c.expected, rep)} [${c.expected.join('')}]` +
-          `  got ${interpretBits(c.got, rep)} [${c.got.join('')}]`
-        );
+        const got = c.reason ?? `[${c.got.join(', ')}]`;
+        console.log(`      in [${c.input.join(', ')}]  expected [${c.expected.join(', ')}]  got ${got}`);
       }
     }
     csvRows.push(`${result.student},${qr.questionId},${qr.status},${qr.passed},${qr.total}`);

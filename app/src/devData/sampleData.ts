@@ -5,22 +5,24 @@
 // values only — no storage, no React. The browser dev seed (devData/seed.ts) and
 // the headless pipeline check (tools/pipelineCheck.ts) both build on these.
 //
-// Test vectors are derived from the known-correct circuits (CC via the instructor
-// formula path; SC/FSM by running the engines), so a correct submission is
-// guaranteed to score 100% and the pipeline test is self-consistent.
+// Every question's test_cases are generated from a DSL formula + representation
+// (engine/testVectorGen.ts) — the codec model (CLAUDE_KB/pipeline/codec.md). The
+// sample circuits implement those functions exactly on their axis: CC `a & b`
+// (space); SC a 1-step delay register, which on the time axis computes `2 * x`;
+// FSM a pass-through identity, `x`. So a correct submission scores 100% and the
+// pipeline check is self-consistent.
 
 import type {
   AssignmentData,
   AssignmentQuestion,
+  CCSpec,
   CircuitComponent,
   CircuitData,
   SubmissionData,
   Wire,
 } from '../types';
 import { getPortsForType } from '../types';
-import { generateCCTestVectors } from '../engine/testVectorGen';
-import { evaluateSCSequence } from '../engine/sc';
-import { evaluateFSMSequence } from '../engine/fsm';
+import { generateTestCases } from '../engine/testVectorGen';
 
 export const SAMPLE_ASSIGNMENT_ID = 'sample-mixed';
 
@@ -109,100 +111,91 @@ export function scIncorrect(): CircuitData {
   };
 }
 
-// ── FSM: a 2-state Mealy machine ───────────────────────────────
-// S0: 0→0 stay S0, 1→1 go S1.   S1: 0→1 go S0, 1→0 stay S1.
+// ── FSM: pass-through identity. OUT[t] = IN[t] each step ────────
+// On the time axis (one bit per step, LSB-first) this computes f(x) = x.
+// A single state echoes each input bit: S0 on 0→0 (stay), on 1→1 (stay).
 
 export function fsmCorrect(): CircuitData {
   return {
-    components: [comp('fsm-s0', 'STATE', 'S₀'), comp('fsm-s1', 'STATE', 'S₁')],
+    components: [comp('fsm-s0', 'STATE', 'S₀')],
     wires: [
       wire('fsm-t1', 'fsm-s0', 'right', 'fsm-s0', 'left', { transitionLabel: '0:0' }),
-      wire('fsm-t2', 'fsm-s0', 'right', 'fsm-s1', 'left', { transitionLabel: '1:1' }),
-      wire('fsm-t3', 'fsm-s1', 'right', 'fsm-s0', 'left', { transitionLabel: '0:1' }),
-      wire('fsm-t4', 'fsm-s1', 'right', 'fsm-s1', 'left', { transitionLabel: '1:0' }),
+      wire('fsm-t2', 'fsm-s0', 'right', 'fsm-s0', 'left', { transitionLabel: '1:1' }),
     ],
   };
 }
 
-// Wrong: flip the output on the S0 →1 transition (1:1 becomes 1:0).
+// Wrong: complement each bit (0:1, 1:0) → computes 7−x on a 3-bit value, never x.
 export function fsmIncorrect(): CircuitData {
-  const c = fsmCorrect();
   return {
-    components: c.components,
-    wires: c.wires.map((w) => (w.id === 'fsm-t2' ? { ...w, transitionLabel: '1:0' } : w)),
+    components: [comp('fsm-s0', 'STATE', 'S₀')],
+    wires: [
+      wire('fsm-t1', 'fsm-s0', 'right', 'fsm-s0', 'left', { transitionLabel: '0:1' }),
+      wire('fsm-t2', 'fsm-s0', 'right', 'fsm-s0', 'left', { transitionLabel: '1:0' }),
+    ],
   };
 }
 
-// ── Sample assignment (test vectors derived from the correct circuits) ──
+// ── Sample assignment (test cases generated from DSL formulas + rep) ──
+// Each question is value-based: the codec encodes inputs to the mode's axis,
+// runs the circuit, decodes the output, and compares to f(x).
 
-// SC input sequences (flat, one bit per step since the circuit has 1 INPUT).
-const SC_INPUT_SEQS = [
-  [1, 0, 1, 1, 0, 0, 1],
-  [0, 0, 1, 0, 1, 1, 1, 0],
-];
-// FSM input sequences (one bit per step).
-const FSM_INPUT_SEQS = [
-  [1, 1, 0, 1, 0, 0],
-  [0, 1, 0, 1, 1, 1, 0],
-];
-
-function scExpected(inputSeq: number[]): number[] {
-  // 1 input/step, 1 output/step → outputs flatten back to one bit per step.
-  const steps = inputSeq.map((b) => [b]);
-  return evaluateSCSequence(scCorrect().components, scCorrect().wires, steps).flat();
-}
-
-function fsmExpected(inputSeq: number[]): number[] {
-  return evaluateFSMSequence(fsmCorrect().components, fsmCorrect().wires, inputSeq).outputBits;
+function question(
+  id: number,
+  label: string,
+  statement: string,
+  buildMode: AssignmentQuestion['buildMode'],
+  spec: CCSpec,
+): AssignmentQuestion {
+  return {
+    id,
+    label,
+    statement,
+    buildMode,
+    representation: 'binary',
+    cc_spec: spec,
+    test_cases: generateTestCases(spec, 'binary'),
+  };
 }
 
 export function buildSampleAssignment(): AssignmentData {
-  const ccQuestion: AssignmentQuestion = {
-    id: 1,
-    label: 'Q1 (CC)',
-    statement: 'Build a combinatorial circuit computing OUT1 = IN1 AND IN2.',
-    buildMode: 'CC',
-    representation: 'binary',
-    grading_mode: 'exhaustive',
-    cc_spec: {
-      inputs: [
-        { name: 'a', width: 1, encoding: 'binary' },
-        { name: 'b', width: 1, encoding: 'binary' },
-      ],
-      outputs: [{ name: 'y', width: 1, encoding: 'binary', formula: 'a & b' }],
+  // CC: y = a AND b (space axis — bits across wires).
+  const ccQuestion = question(
+    1,
+    'Q1 (CC)',
+    'Build a combinatorial circuit computing OUT1 = IN1 AND IN2.',
+    'CC',
+    {
+      inputs: [{ name: 'a', width: 1 }, { name: 'b', width: 1 }],
+      outputs: [{ name: 'y', width: 1, formula: 'a & b' }],
     },
-    test_vectors: generateCCTestVectors({
-      inputs: [
-        { name: 'a', width: 1, encoding: 'binary' },
-        { name: 'b', width: 1, encoding: 'binary' },
-      ],
-      outputs: [{ name: 'y', width: 1, encoding: 'binary', formula: 'a & b' }],
-    }),
-  };
+  );
 
-  const scQuestion: AssignmentQuestion = {
-    id: 2,
-    label: 'Q2 (SC)',
-    statement: 'Build a sequential circuit that delays the input by one clock tick (OUT1[t] = IN1[t−1], starting at 0).',
-    buildMode: 'SC',
-    representation: 'binary',
-    test_vectors: SC_INPUT_SEQS.map((seq) => ({
-      input_sequence: seq,
-      expected_output: scExpected(seq),
-    })),
-  };
+  // SC: a 1-step delay register, which on the time axis (LSB-first) computes
+  // y = 2x. Output width 4 holds 2x for the 3-bit input range and gives the
+  // drain step the shifted bit needs.
+  const scQuestion = question(
+    2,
+    'Q2 (SC)',
+    'Build a sequential circuit that delays the input by one clock tick (OUT1[t] = IN1[t−1], starting at 0).',
+    'SC',
+    {
+      inputs: [{ name: 'x', width: 3 }],
+      outputs: [{ name: 'y', width: 4, formula: '2 * x' }],
+    },
+  );
 
-  const fsmQuestion: AssignmentQuestion = {
-    id: 3,
-    label: 'Q3 (FSM)',
-    statement: 'Build a finite-state machine matching the given input/output behaviour.',
-    buildMode: 'FSM',
-    representation: 'binary',
-    test_vectors: FSM_INPUT_SEQS.map((seq) => ({
-      input_sequence: seq,
-      expected_output: fsmExpected(seq),
-    })),
-  };
+  // FSM: pass-through identity, y = x (time axis, one bit per step).
+  const fsmQuestion = question(
+    3,
+    'Q3 (FSM)',
+    'Build a finite-state machine that outputs each input bit unchanged (identity).',
+    'FSM',
+    {
+      inputs: [{ name: 'x', width: 3 }],
+      outputs: [{ name: 'y', width: 3, formula: 'x' }],
+    },
+  );
 
   return {
     id: SAMPLE_ASSIGNMENT_ID,

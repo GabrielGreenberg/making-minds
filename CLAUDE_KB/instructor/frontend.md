@@ -45,32 +45,37 @@ for a collision-free id, saves an empty assignment, and returns it.
 
 ## Data model for authoring (`types.ts`)
 
-`AssignmentQuestion.cc_spec?: CCSpec` captures everything needed to (re)generate `test_vectors`
-and render the question in the instructor UI:
+`AssignmentQuestion.cc_spec?: CCSpec` captures everything needed to (re)generate `test_cases` and
+render the question in the instructor UI:
 
 ```
 CCSpec    = { inputs: CCInputGroup[]; outputs: CCOutputGroup[] }
-CCInputGroup  = { name; width; encoding: 'binary' | 'unary' }
-CCOutputGroup = { name; width; encoding; formula }   // formula = the reference function
+CCInputGroup  = { name; width }
+CCOutputGroup = { name; width; formula }   // formula = the reference function
+AssignmentQuestion.representation: RepSystem   // one rep per question (binary | tally)
 ```
 
-`cc_spec` is an **authoring artifact** — the grader never reads it; it grades against the
-generated `test_vectors`. See `CLAUDE_KB/engines/grading.md` for generation and the
-`CLAUDE.md` "Reference-function DSL" section for the formula language.
+`cc_spec` drives authoring **and** supplies the per-group **widths** the codec needs to grade
+(space = wires/group, time = steps/group). The single `representation` (not per-group `encoding`)
+governs both generation and grading. The grader compares against the generated numeric
+`test_cases`. See `CLAUDE_KB/engines/grading.md` (codec) and the `CLAUDE.md` "Reference-function
+DSL" section for the formula language.
 
 ## Question creator (`instructor/QuestionCreator.tsx`)
 
 A self-contained stepped flow (local state, no routing between steps):
 1. **Mode** — `CC | SC | FSM | TM`. Only **CC** is functional; SC/FSM/TM are shown disabled
    ("coming soon").
-2. **Inputs/outputs** — dynamic lists of groups (name, width, binary/unary), with running wire
-   counts.
-3. **Formula + live preview** — each output group's formula drives a preview table
-   (`instructor/ccPreview.ts`) computed via the DSL; invalid formulas show inline and block
-   save.
-4. **Statement** — plain-text instructions shown to students.
-5. **Save** — generates `test_vectors` via `generateCCTestVectors`, builds the
-   `AssignmentQuestion`, hands it to the editor, which persists via `localAssignmentStore.save`.
+2. **Representation** — one binary/tally toggle for the whole question (governs grading + the
+   preview).
+3. **Inputs/outputs** — dynamic lists of groups (name, width), with running wire counts.
+4. **Formula + live preview** — each output group's formula drives a preview table
+   (`instructor/ccPreview.ts`) computed via the DSL under the chosen representation; invalid
+   formulas show inline and block save.
+5. **Statement** — plain-text instructions shown to students.
+6. **Save** — generates `test_cases` via `generateTestCases(spec, rep)`, builds the
+   `AssignmentQuestion` (with `representation`), hands it to the editor, which persists via
+   `localAssignmentStore.save`.
 
 `instructor/ccSummary.ts` renders a one-line summary of a `cc_spec` for the editor's question
 list.

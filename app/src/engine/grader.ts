@@ -1,15 +1,31 @@
-// Autograder built on the headless CC engine.
+// Autograder — the unified, value-based grading pipeline (CLAUDE_KB/pipeline/
+// codec.md).
 //
-// Framework-agnostic (no React/Zustand/DOM): runs in the browser and in the
-// Node grading CLI from the same source. Scope: CC problems graded against
-// `test_vectors` with bit-exact comparison. Anything else is reported as
-// `skipped` with a reason rather than silently passing.
+// Framework-agnostic (no React/Zustand/DOM): runs in the browser and in the Node
+// grading CLI from the same source. Every mode is graded the same way — a machine
+// implements a function f, and we check it against a machine-agnostic bank of
+// numeric (x, f(x)) test cases:
+//
+//   validate → encode → run → accept → decode → compare
+//
+// The only per-mode knowledge is the **axis** (how a number maps to/from bits
+// over wires/time/tape), which lives entirely in the codec:
+//   CC → space, SC/FSM → time, TM → tape (delegated to tmCodec).
+//
+// Scoring is all-or-nothing at the question level: a question passes iff the
+// machine is valid AND every case passes. A case passes iff its output is
+// accepted and decodes to f(x). No partial credit — a rejected output and a wrong
+// value fail identically. A Stage-1-invalid machine fails every case (0/total),
+// never `skipped`. Failing cases are recorded for the INSTRUCTOR only.
 
 import type {
   CircuitData,
   AssignmentData,
   AssignmentQuestion,
   SubmissionData,
+  TestCase,
+  RepSystem,
+  BuildMode,
   CaseResult,
   QuestionResult,
   SubmissionResult,
@@ -18,7 +34,15 @@ import { evaluateCCInputs } from './cc';
 import { evaluateSCSequence } from './sc';
 import { evaluateFSMSequence } from './fsm';
 import { evaluateTMSequence } from './tm';
-import { validateTMTable } from './tmValidate';
+import { validateMachine } from './machineValidation';
+import {
+  axisForMode,
+  encodeInput,
+  decodeOutput,
+  outputAccepted,
+  type CodecLayout,
+  type RawOutput,
+} from './codec';
 import { encodeTM, acceptTM, decodeTM, notationForRepresentation } from './tmCodec';
 
 // The grading result types live in types.ts (so SubmissionRecord can carry a
@@ -26,7 +50,7 @@ import { encodeTM, acceptTM, decodeTM, notationForRepresentation } from './tmCod
 // call sites that import them from the grader.
 export type { CaseResult, QuestionResult, SubmissionResult } from '../types';
 
-function bitsEqual(a: number[], b: number[]): boolean {
+function valuesEqual(a: number[], b: number[]): boolean {
   if (a.length !== b.length) return false;
   for (let i = 0; i < a.length; i++) {
     if (a[i] !== b[i]) return false;
@@ -38,160 +62,117 @@ function skip(questionId: number, reason: string): QuestionResult {
   return { questionId, status: 'skipped', reason, passed: 0, total: 0, cases: [] };
 }
 
-// ---------------------------------------------------------------------------
-// Test-vector format adapters.
-// These are the most likely part to change as the question-design workflow
-// evolves. Keep them here, isolated, so the engines stay untouched.
-// ---------------------------------------------------------------------------
+function reject(tc: TestCase, reason: string): CaseResult {
+  return { input: tc.inputs, expected: tc.outputs, got: [], pass: false, reason };
+}
 
-/**
- * Chunk a flat input_sequence and expected_output into per-time-step arrays
- * for SC grading. The number of inputs/outputs per step is inferred from the
- * submitted circuit's INPUT/OUTPUT component counts.
- */
-function parseSCTestVector(
-  inputSequence: number[],
-  expectedOutput: number[],
-  numInputs: number,
-  numOutputs: number
-): { inputSteps: number[][]; expectedSteps: number[][] } {
-  const numSteps = numInputs > 0 ? Math.floor(inputSequence.length / numInputs) : 0;
-  const inputSteps: number[][] = [];
-  const expectedSteps: number[][] = [];
-  for (let i = 0; i < numSteps; i++) {
-    inputSteps.push(inputSequence.slice(i * numInputs, (i + 1) * numInputs));
-    expectedSteps.push(expectedOutput.slice(i * numOutputs, (i + 1) * numOutputs));
-  }
-  return { inputSteps, expectedSteps };
+/** Stage-1 failure: an invalid machine fails every case (never `skipped`). */
+function failEvery(questionId: number, cases: TestCase[], reason: string): QuestionResult {
+  const out = cases.map((tc) => reject(tc, reason));
+  return { questionId, status: 'graded', passed: 0, total: out.length, cases: out };
+}
+
+function tally(questionId: number, cases: CaseResult[]): QuestionResult {
+  const passed = cases.filter((c) => c.pass).length;
+  return { questionId, status: 'graded', passed, total: cases.length, cases };
 }
 
 /**
- * For FSM: single input bit per step, single output bit per step.
- */
-function parseFSMTestVector(
-  inputSequence: number[],
-  expectedOutput: number[]
-): { inputBits: number[]; expectedBits: number[] } {
-  return { inputBits: inputSequence, expectedBits: expectedOutput };
-}
-
-// ---------------------------------------------------------------------------
-
-/**
- * Grade a single question's circuit against its test vectors.
+ * Grade a single question's circuit against its numeric test cases.
  */
 export function gradeQuestion(question: AssignmentQuestion, circuit: CircuitData | undefined): QuestionResult {
   if (!circuit) return skip(question.id, 'no circuit submitted');
+  if (question.buildMode === 'turbot') return skip(question.id, 'turbot grading not yet implemented');
 
-  // TM follows the value-based codec pipeline (CLAUDE_KB/engines/tm.md): per
-  // case, Stage-1 validate the table → encode inputs at standard position → run
-  // to halt/step-limit → accept (well-formed output) → decode → compare values.
-  // It reads `test_cases` (numeric), not the bit-based `test_vectors`.
-  if (question.buildMode === 'TM') {
-    if (!question.test_cases || question.test_cases.length === 0) {
-      return skip(question.id, 'question has no test cases');
-    }
-    const notation = notationForRepresentation(question.representation);
+  const cases = question.test_cases;
+  if (!cases || cases.length === 0) return skip(question.id, 'question has no test cases');
 
-    // Stage 1: an ill-formed table fails EVERY case (never `skipped`), with the
-    // syntax error as instructor feedback.
-    const errors = validateTMTable(circuit.components, circuit.wires, notation);
-    if (errors.length > 0) {
-      const reason = errors.map((e) => e.message).join(' ');
-      const cases: CaseResult[] = question.test_cases.map((tc) => ({
-        input: tc.inputs,
-        expected: tc.outputs,
-        got: [],
-        pass: false,
-        reason,
-      }));
-      return { questionId: question.id, status: 'graded', passed: 0, total: cases.length, cases };
-    }
+  const mode = question.buildMode;
+  const rep: RepSystem = question.representation ?? 'binary';
+  const axis = axisForMode(mode);
 
-    const cases: CaseResult[] = question.test_cases.map((tc) => {
-      const run = evaluateTMSequence(
-        circuit.components,
-        circuit.wires,
-        encodeTM(notation, tc.inputs),
-        notation
-      );
-      const reject = acceptTM(notation, run);
-      if (reject) {
-        return { input: tc.inputs, expected: tc.outputs, got: [], pass: false, reason: reject.reason };
-      }
-      const got = decodeTM(notation, run.tape);
-      return {
-        input: tc.inputs,
-        expected: tc.outputs,
-        got: [got],
-        pass: got === tc.outputs[0],
-      };
-    });
-    const passed = cases.filter((c) => c.pass).length;
-    return { questionId: question.id, status: 'graded', passed, total: cases.length, cases };
+  // Tape axis (TM): widths are content-relative — the tape codec lays values out
+  // and locates the output block by content, so no cc_spec is required.
+  if (axis === 'tape') return gradeTape(question.id, circuit, cases, rep);
+
+  // Space/time axes need the per-group widths from the authoring spec.
+  const spec = question.cc_spec;
+  if (!spec) return skip(question.id, 'question has no spec (group widths unknown)');
+  const layout: CodecLayout = {
+    axis,
+    rep,
+    inputWidths: spec.inputs.map((g) => g.width),
+    outputWidths: spec.outputs.map((g) => g.width),
+  };
+
+  // Stage 1: machine validation. Invalid ⇒ fail every case with no testing.
+  const valid = validateMachine(circuit, mode, layout, rep);
+  if (!valid.ok) return failEvery(question.id, cases, valid.reason ?? 'invalid machine');
+
+  // Stage 2: test each case through the codec.
+  const results = cases.map((tc) => gradeSpaceTimeCase(circuit, mode, layout, tc));
+  return tally(question.id, results);
+}
+
+/** One case on the space (CC) or time (SC/FSM) axis. */
+function gradeSpaceTimeCase(
+  circuit: CircuitData,
+  mode: BuildMode,
+  layout: CodecLayout,
+  tc: TestCase,
+): CaseResult {
+  const enc = encodeInput(tc.inputs, layout);
+
+  let raw: RawOutput;
+  if (enc.axis === 'space') {
+    // CC — one combinational evaluation.
+    const bits = evaluateCCInputs(circuit.components, circuit.wires, enc.bits);
+    raw = { axis: 'space', bits };
+  } else if (mode === 'SC') {
+    const steps = evaluateSCSequence(circuit.components, circuit.wires, enc.steps);
+    raw = { axis: 'time', steps };
+  } else {
+    // FSM — n=1: flatten the single wire to one input bit per step. Stage 1
+    // guarantees totality, so a valid FSM cannot halt mid-run; guard anyway.
+    const inputBits = enc.steps.map((s) => s[0]);
+    const r = evaluateFSMSequence(circuit.components, circuit.wires, inputBits);
+    if (r.halted) return reject(tc, 'machine halted before consuming the input');
+    raw = { axis: 'time', steps: r.outputBits.map((b) => [b]) };
   }
 
-  if (question.buildMode === 'turbot') {
-    return skip(question.id, 'turbot grading not yet implemented');
-  }
+  // Acceptor (rep-level) before decoding; decode is total.
+  if (!outputAccepted(raw, layout)) return reject(tc, 'malformed output');
+  const got = decodeOutput(raw, layout);
+  return { input: tc.inputs, expected: tc.outputs, got, pass: valuesEqual(got, tc.outputs) };
+}
 
-  if (!question.test_vectors || question.test_vectors.length === 0) {
-    return skip(question.id, 'question has no test vectors');
-  }
+/** TM grading — the codec's tape axis, delegated to tmCodec. */
+function gradeTape(
+  questionId: number,
+  circuit: CircuitData,
+  cases: TestCase[],
+  rep: RepSystem,
+): QuestionResult {
+  const notation = notationForRepresentation(rep);
+  const layout: CodecLayout = { axis: 'tape', rep, inputWidths: [], outputWidths: [] };
 
-  if (question.buildMode === 'CC') {
-    const cases: CaseResult[] = question.test_vectors.map((tv) => {
-      const got = evaluateCCInputs(circuit.components, circuit.wires, tv.input_sequence);
-      return {
-        input: tv.input_sequence,
-        expected: tv.expected_output,
-        got,
-        pass: bitsEqual(got, tv.expected_output),
-      };
-    });
-    const passed = cases.filter((c) => c.pass).length;
-    return { questionId: question.id, status: 'graded', passed, total: cases.length, cases };
-  }
+  // Stage 1: an ill-formed table fails every case with the syntax error.
+  const valid = validateMachine(circuit, 'TM', layout, rep);
+  if (!valid.ok) return failEvery(questionId, cases, valid.reason ?? 'invalid machine');
 
-  if (question.buildMode === 'SC') {
-    const numInputs = circuit.components.filter((c) => c.type === 'INPUT').length;
-    const numOutputs = circuit.components.filter((c) => c.type === 'OUTPUT').length;
-
-    const cases: CaseResult[] = question.test_vectors.map((tv) => {
-      const { inputSteps, expectedSteps } = parseSCTestVector(
-        tv.input_sequence, tv.expected_output, numInputs, numOutputs
-      );
-      const gotSteps = evaluateSCSequence(circuit.components, circuit.wires, inputSteps);
-      const got = gotSteps.flat();
-      const expected = expectedSteps.flat();
-      return {
-        input: tv.input_sequence,
-        expected: tv.expected_output,
-        got,
-        pass: bitsEqual(got, expected),
-      };
-    });
-    const passed = cases.filter((c) => c.pass).length;
-    return { questionId: question.id, status: 'graded', passed, total: cases.length, cases };
-  }
-
-  if (question.buildMode === 'FSM') {
-    const cases: CaseResult[] = question.test_vectors.map((tv) => {
-      const { inputBits, expectedBits } = parseFSMTestVector(tv.input_sequence, tv.expected_output);
-      const result = evaluateFSMSequence(circuit.components, circuit.wires, inputBits);
-      const got = result.outputBits;
-      return {
-        input: tv.input_sequence,
-        expected: tv.expected_output,
-        got,
-        pass: !result.halted && bitsEqual(got, expectedBits),
-      };
-    });
-    const passed = cases.filter((c) => c.pass).length;
-    return { questionId: question.id, status: 'graded', passed, total: cases.length, cases };
-  }
-
-  return skip(question.id, `grading not yet supported for mode "${question.buildMode}"`);
+  const results = cases.map((tc) => {
+    const run = evaluateTMSequence(
+      circuit.components,
+      circuit.wires,
+      encodeTM(notation, tc.inputs),
+      notation,
+    );
+    const rej = acceptTM(notation, run);
+    if (rej) return reject(tc, rej.reason);
+    const got = decodeTM(notation, run.tape);
+    return { input: tc.inputs, expected: tc.outputs, got: [got], pass: got === tc.outputs[0] };
+  });
+  return tally(questionId, results);
 }
 
 /**
@@ -215,11 +196,11 @@ export function gradeSubmission(assignment: AssignmentData, submission: Submissi
 }
 
 /**
- * Roll a SubmissionResult up into headline counts for display. "Questions
- * passed" counts a question as passed only when it was graded and every one of
- * its test vectors matched; skipped questions are excluded from the question
- * total so they don't penalise the student. "Vectors" are the finer-grained
- * test-vector tallies already on the result.
+ * Roll a SubmissionResult up into headline counts for display. "Questions passed"
+ * counts a question as passed only when it was graded and every one of its cases
+ * matched; skipped questions are excluded from the question total so they don't
+ * penalise the student. "Cases" are the finer-grained per-case tallies already on
+ * the result.
  */
 export function summarizeResult(result: SubmissionResult): {
   questionsPassed: number;
