@@ -106,6 +106,7 @@ the layout and conventions.)
 | Submission → grade → gradebook pipeline | `CLAUDE_KB/pipeline/autograde-pipeline.md`, `CLAUDE_KB/engines/grading.md` |
 | Codec / unified value-based grading redesign (planned) | `CLAUDE_KB/pipeline/codec.md`, `CLAUDE_KB/engines/grading.md`, `CLAUDE_KB/engines/overview.md` |
 | Instructor frontend — authoring, gradebook, role gating | `CLAUDE_KB/instructor/frontend.md` |
+| Mockup auth — login, account-based student/instructor role gating (next step) | `CLAUDE_KB/plans/auth-mockup.md`, `CLAUDE_KB/instructor/frontend.md` |
 | Reference-function DSL (formula authoring) | `CLAUDE_KB/engines/grading.md` + "Reference-function DSL" below |
 
 ## Architecture principle: seams
