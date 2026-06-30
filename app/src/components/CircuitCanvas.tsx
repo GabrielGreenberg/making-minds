@@ -1294,8 +1294,11 @@ function FsmTransitionView({
         markerEnd={`url(#arrow-${wire.id})`}
         pointerEvents="none"
       />
-      {/* Draggable control point dot on the wire */}
-      {controlPt && (
+      {/* Draggable control point dot on the wire — only shown when the
+          transition is selected, so it isn't a mystery "dead" handle sitting
+          on every wire midpoint. Select the transition (click its curve) to
+          reveal it, then drag to reshape the arc. */}
+      {controlPt && isSelected && (
         <circle
           cx={controlPt.x}
           cy={controlPt.y}
@@ -1324,12 +1327,16 @@ function FsmTransitionView({
             {/* Background */}
             <rect x={x0} y={y0} width={W} height={H} rx={3}
               fill="white" fillOpacity={0.92} stroke="#ddd" strokeWidth={0.5} pointerEvents="none" />
-            {/* Left half (input) — click target */}
+            {/* Left half (input) — click target.
+                Use onPointerDown (not onClick): the SVG-level handlePointerDown
+                calls preventDefault() on wire hits, which suppresses the synthetic
+                click. Intercepting pointerdown here (and stopping propagation)
+                opens the editor and keeps the canvas handler from running. */}
             <rect x={x0} y={y0} width={halfW} height={H} rx={3} fill="transparent" style={{ cursor: 'text' }}
-              onClick={(e) => { e.stopPropagation(); openEdit('left'); }} />
+              onPointerDown={(e) => { e.stopPropagation(); e.preventDefault(); openEdit('left'); }} />
             {/* Right half (output) — click target */}
             <rect x={labelPos.x} y={y0} width={halfW} height={H} rx={3} fill="transparent" style={{ cursor: 'text' }}
-              onClick={(e) => { e.stopPropagation(); openEdit('right'); }} />
+              onPointerDown={(e) => { e.stopPropagation(); e.preventDefault(); openEdit('right'); }} />
             {/* Input digit */}
             <text x={x0 + halfW / 2} y={labelPos.y} textAnchor="middle" dominantBaseline="central"
               fontSize="12" fontFamily="'SF Mono','Fira Code',monospace" fontWeight="600"
@@ -1355,8 +1362,10 @@ function FsmTransitionView({
           <div
             ref={editorRef}
             tabIndex={0}
+            data-fsm-editor
             onKeyDown={handleEditorKeyDown}
             onBlur={() => commitEdit()}
+            onPointerDown={(e) => e.stopPropagation()}
             style={{
               display: 'flex',
               alignItems: 'stretch',
@@ -2788,7 +2797,9 @@ export function CircuitCanvas() {
       const activeEl = document.activeElement;
       if (
         activeEl &&
-        (activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA') &&
+        (activeEl.tagName === 'INPUT' ||
+          activeEl.tagName === 'TEXTAREA' ||
+          activeEl.hasAttribute('data-fsm-editor')) &&
         activeEl !== e.target
       ) {
         (activeEl as HTMLElement).blur();
