@@ -16,6 +16,25 @@ export { evaluateSCSingleStep, evaluateSCSequence } from './sc';
 export type { SCSingleStepResult } from './sc';
 export { sortStateComponents, evaluateFSMSingleStep, evaluateFSMSequence } from './fsm';
 export type { FSMStepResult, FSMEvalResult } from './fsm';
+export {
+  readCell,
+  makeTape,
+  readTape,
+  parseTMAction,
+  parseTMTransition,
+  applyAction,
+  evaluateTMSingleStep,
+  evaluateTMSequence,
+  DEFAULT_TM_MAX_STEPS,
+} from './tm';
+export type {
+  TMAction,
+  TMActionToken,
+  TMTape,
+  TMStepResult,
+  TMEvalResult,
+  ParsedTMTransition,
+} from './tm';
 export { bitsToTally, bitsToBinary, interpretBits } from './representation';
 export { gradeQuestion, gradeSubmission } from './grader';
 export type { CaseResult, QuestionResult, SubmissionResult } from './grader';

@@ -91,7 +91,7 @@ the layout and conventions.)
 | Combinatorial circuits — gates, canvas eval, boxed circuits | `CLAUDE_KB/engines/overview.md`, `CLAUDE_KB/engines/cc.md` |
 | Sequential circuits — MEM, clock, timing | `CLAUDE_KB/engines/overview.md`, `CLAUDE_KB/engines/cc.md`, `CLAUDE_KB/engines/sc.md` |
 | Finite state machines — states, transitions | `CLAUDE_KB/engines/overview.md`, `CLAUDE_KB/engines/fsm.md` |
-| Turing machines (not yet built — design notes) | `CLAUDE_KB/engines/overview.md`, `CLAUDE_KB/engines/tm.md` |
+| Turing machines — tape, head, single-action transitions (engine built; store/UI not) | `CLAUDE_KB/engines/overview.md`, `CLAUDE_KB/engines/fsm.md`, `CLAUDE_KB/engines/tm.md` |
 | Autograder, test-vector format, grading bugs | `CLAUDE_KB/engines/grading.md` + the relevant per-mode doc |
 | Submission → grade → gradebook pipeline | `CLAUDE_KB/pipeline/autograde-pipeline.md`, `CLAUDE_KB/engines/grading.md` |
 | Instructor frontend — authoring, gradebook, role gating | `CLAUDE_KB/instructor/frontend.md` |

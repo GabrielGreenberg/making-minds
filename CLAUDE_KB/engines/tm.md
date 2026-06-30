@@ -1,64 +1,343 @@
-# TM — Turing machines engine
+# TM — Turing machine engine
 
-> **Status: NOT YET IMPLEMENTED.** There is no `engine/tm.ts`. `buildMode: 'TM'` exists in
-> `types.ts`, but `grader.ts` returns `skip(question.id, 'TM grading not yet implemented')` for
-> it, and the instructor `QuestionCreator` shows TM as "coming soon". This doc is a **design
-> spec** for the engine to be built — it describes intended behaviour, not existing code. Treat
-> every "should" below as a decision to confirm against the spec, not a fact about the repo.
+**File:** `app/src/engine/tm.ts` · **Status:** tape/step engine implemented, but the **semantics
+below are the agreed target and the current code does not yet match them** (it hardcodes a
+`{0,1}` tape, starts the head at cell 0, and reads a fixed window instead of locating an output
+block — see "Implementation status"). Read `overview.md`, `fsm.md`, and `grading.md` first — a
+TM here is "the FSM control graph + a tape," and reuses FSM machinery.
 
-Read `overview.md`, `cc.md`, and `grading.md` first; the TM engine should mirror their shape.
+A Turing machine is an FSM (STATE nodes + transition wires) augmented with a two-way-infinite
+read/write tape. At each step it reads the cell under the head, takes the matching transition,
+and performs **one** tape action. The control half reuses `sortStateComponents` from `fsm.ts`.
 
-## Source of truth
+## The model — single-action transitions
 
-The behavioural spec lives in `spec/PHIL_133_Platform_Spec_v2.md` (Phase 5: Turing Machines)
-and the course textbook `spec/mm_textbook.pdf`. The original brief (`CLAUDE_CODE_PROMPT.md`)
-summarises it: an infinite tape, a read/write head, TM transition labels, and a TM operation
-cycle. Build against the spec, not against this summary.
+Single-action / Post–Turing model (platform spec §10.3): each transition does exactly one of
+move-left, move-right, or write-a-symbol — **not** the textbook combined write+move+state. A
+write and a move are two separate steps.
 
-## Why TM grading is harder than CC
+> An earlier draft proposed a combined `read:write,move` grammar — **wrong** for this project.
+> This section supersedes any such note.
 
-CC has a **finite** input space, so `testVectorGen.ts` enumerates it exhaustively. A TM's input
-is an **arbitrary-length tape** — the input space is infinite, so exhaustive enumeration is
-impossible. Grading must therefore be **sampling-based**: pick representative tapes (short,
-long, all-zeros, all-ones, boundary cases like carry propagation / tape edges) and check the
-machine's output on each. The instructor reviews/supplements the sample at authoring time. This
-is the same problem SC/TM share (noted in the instructor-frontend design); the autograde is a
-**correctness-by-sampling** approximation, since semantic properties of TMs are undecidable in
-general (you cannot decide whether a given TM computes addition).
+## Module boundaries — keep the engine pure
 
-## Proposed engine shape (to build)
+Three concerns, three modules. **The engine is only the middle one.**
 
-Follow the CC/SC/FSM pattern — pure, framework-agnostic, side-effect-free, importable from Node:
+1. **Machine-table validation (pre-engine).** Checks the transition table is *unambiguous* and
+   every label *parses*. These are **syntax errors** (below). Shared by the authoring UI and the
+   grader. A valid table is a **precondition** of the engine.
+2. **Engine (`tm.ts`).** Pure simulation. **Assumes an unambiguous, validated table.** Steps
+   until halt or step limit and reports the final tape, final head position, halted/step-limited
+   status, and history. It does **not** check ambiguity and does **not** judge whether the output
+   is well-formed.
+3. **Output acceptance / decoding (post-engine).** Given the final tape + head + notation,
+   locates the output block(s), enforces **exactly one** (a well-formedness error otherwise),
+   decodes it to a number, and — optionally — checks the head halted in standard position.
+
+Grading composes them: validate → run engine → accept/decode → compare to `f(x)`.
+
+This split is also what the **student UI** needs: a learner can run and step their machine
+(engine + tape rendering) **without being told whether the output is well-formed** — the
+acceptance module is simply not invoked in that mode.
+
+## What it means for a TM to compute a function
+
+A TM **computes** `x ↦ f(x)` iff, started with a representation of `x` and the head in **standard
+position**, it:
+
+1. **halts**,
+2. leaves **exactly one output block**, and
+3. that output block **encodes `f(x)`**.
+
+Plus one **optional, toggleable** condition:
+
+4. it **halts in standard position** — the head rests on the rightmost symbol of the output
+   block.
+
+Condition (4) is a run-time toggle (e.g. `requireStandardHaltPosition`). Architecturally it is
+part of the **acceptance check** (it reads the engine's reported final head position); the engine
+loop itself does not enforce it. Default and exact semantics TBD with the first TM assignments.
+
+**Standard position** = the head on the **rightmost cell of the rightmost input's block** at
+start (for a zero-valued unary input, the single `0` slot it occupies — see Input layout), and,
+for condition 4, the rightmost cell of the output block at halt. It is content-relative, **not**
+cell 0.
+
+## Notation: alphabets, action sets, and input layout
+
+A TM is either **unary** or **binary**; the two are **separate machines** with different
+alphabets and action sets. There is **no blank symbol** — the symbol `0` is the background that
+separates and surrounds blocks.
+
+| | Tape alphabet | Action tokens | Output block |
+| --- | --- | --- | --- |
+| **Unary** | `0`, `1` | `R`, `L`, `0`, `1` | a contiguous run of `1`s (a stroke block); a run of **length 0 is allowed** and denotes 0 |
+| **Binary** | `0`, `1`, `*` | `R`, `L`, `0`, `1`, `*` | a binary numeral **enclosed in `*`**: `*d_k…d_0*` |
+
+So a **binary** machine *can* write `*` (its action set includes it); a unary machine cannot.
+The `input` half of a transition label ranges over the machine's alphabet too (binary states may
+branch on reading `*`).
+
+**Input layout.** Inputs are blocks laid out left-to-right, **consecutive inputs separated by a
+single `0`**, with background `0`s on the outside:
+
+- Unary: a value `n > 0` is a run of `n` `1`s; a value `0` is a **single `0` cell** occupying its
+  own slot. Consecutive inputs are separated by a single `0`. So with a zero-valued **rightmost**
+  input: `… <input n-1> 0 0 0 …` — the three `0`s are, left to right, the separator, the
+  zero-valued `input n` (its slot), then the trailing separator; the head's standard position is
+  on `input n`'s slot (the middle `0`). Because the tape normalises away `0` cells, a zero input
+  contributes **no stored cell** — it is carried purely by `head` + the surrounding positions.
+- Binary: `…0 *…* 0 *…* 0…`. A value `0` is `*0*`.
+
+> **Future (not now):** we may let students separate the *encoding* from the *machine* — exposing
+> a single 3-symbol (`0,1,*`) machine whose encoding toggles unary/binary. For now, unary and
+> binary machines are kept separate as above.
+
+## Output well-formedness (post-engine)
+
+When the machine halts, the acceptance module scans the final tape for output blocks under the
+notation:
+
+- **Unary:** accept **zero or one** contiguous run of `1`s. **Zero runs (a blank, all-`0` tape)
+  is the valid representation of the output `0`** — nothing to locate, just note the absence of
+  `1`s. **Two or more** separate runs is a well-formedness error. Value = the number of strokes
+  (0 when blank).
+- **Binary:** accept **exactly one** `*…*` block; zero or two-plus is a well-formedness error.
+  Value = the numeral between the `*`s.
+- A block decoding to `f(x)` does **not** rescue an otherwise ill-formed tape (e.g. a second
+  stray block) — the machine does not compute `f`.
+
+These checks live **outside the engine** (module 3). The engine neither produces nor validates
+them.
+
+## Machine-table validation — syntax errors (pre-engine)
+
+Two conditions make a table **ill-formed**; both are **syntax errors** that reject the machine
+(flagged in authoring, failed in grading) rather than being silently resolved:
+
+1. **Ambiguous transitions** — two transitions out of the same state matching the **same read
+   symbol**. The machine is nondeterministic. (No first-match-by-wire-order tie-break.)
+2. **Unparseable label** — a `transitionLabel` that is not a valid `input:action` for the
+   machine's notation.
+
+This is a pre-engine pass; the engine assumes it has already passed.
+
+## Representation
+
+- **States** are `STATE` components; start state = lowest numeric subscript (`S₀`), via
+  `sortStateComponents`.
+- **Transitions** are wires with `transitionLabel = "input:action"`; `sourceComponentId` /
+  `targetComponentId` give from/to. Valid `input`/`action` tokens are notation-dependent (table
+  above).
+- **Tape** — `TMTape = { cells: Record<number, TMSymbol>; head: number }`. See **Tape
+  representation** below for the full design. *(Current code fixes the symbol type at `0|1` and
+  starts the head at cell 0 — see Implementation status.)*
+
+## Tape representation
+
+**`*` never escapes the tape.** Test vectors are numeric `(x, f(x))` pairs — abstract *values*.
+The `*` symbol is born in the encoder (value → standard representation) and consumed in the
+decoder (tape → value), so it lives only inside the tape type and the encode/decode boundary.
+`test_vectors` therefore stay `number[]`-based and **mode-agnostic** — the grader dispatch,
+gradebook, and other engines are unaffected.
 
 ```ts
-// engine/tm.ts  (to be created)
-evaluateTMSingleStep(...): { writeSymbol, move: 'L'|'R', nextStateId } | null   // null = halt
-evaluateTMSequence(machine, inputTape, opts?): { tape, halted, steps, haltedAt? }
+// In types.ts (the store and saved workspace reference a tape — avoid a types→engine dep).
+type TMSymbol = '0' | '1' | '*';        // unary machines never use '*'
+interface TMTape {
+  cells: Record<number, TMSymbol>;      // sparse; an absent key reads as background '0'
+  head: number;                         // absolute index; never renormalised
+}
 ```
 
-- Model the tape as a sparse/grow-on-demand structure (infinite in both directions) with a head
-  position. All blank cells read as the blank symbol (0 in a binary alphabet).
-- Reuse `STATE` components for control states if the canvas represents TMs that way; carry the
-  TM transition (`read : write , move`) on the wire `transitionLabel`, analogous to FSM's
-  `"X:Y"`. **Confirm the exact label grammar against the spec before parsing.**
-- Add a **step bound** so a non-halting machine terminates grading with a halt/timeout instead
-  of looping forever (undecidability of halting → you must cap steps).
+- **String-union symbols.** Uniform with the `input:action` label grammar (tokens are chars), so
+  `read`-compare and `write` need no number↔string juggling, and `'*'` renders directly in the
+  tape strip. Numeric `0/1` elsewhere is unaffected because `*` never leaves the tape.
+- **Sparse, normalised to non-background.** Store only `'1'`/`'*'` cells; **writing `'0'` deletes
+  the key.** Then a blank tape is `{}`, the unary-`0` check is exactly "no keys," block scans walk
+  only real marks, and saved tapes stay small. JSON-clean (negative indices serialise as string
+  keys).
+- **Head absolute, never renormalised** — keeps history/stepping and the render window stable.
+  The render window and block bounds are **derived** (`Object.keys(cells).map(Number)` → min/max,
+  padded around `head`), never stored.
+- **Immutability.** `applyAction` is pure: a *move* shares the `cells` ref (head changes only); a
+  *write* returns a new object (`{...cells,[head]:sym}`, or clone-minus-key when writing `'0'`).
+  The store needs immutable per-step snapshots anyway, so pure is the default. At ≤ `maxSteps` the
+  per-write spread is fine; if it ever profiles hot, the grader may run a mutable working copy and
+  snapshot only for history — without changing the public API.
 
-## Wiring it into grading (to build)
+### Encode / decode — the value↔tape boundary
 
-1. Add a `parseTMTestVector` adapter in `grader.ts` (alongside `parseSCTestVector` /
-   `parseFSMTestVector`) that maps the flat `test_vectors` encoding to input/output tapes.
-2. Add a `buildMode === 'TM'` branch in `gradeQuestion` that calls `evaluateTMSequence` and
-   compares the output tape (decoded under the question's encoding) — **replace** the current
-   `skip`.
-3. For authoring, add a TM path to `testVectorGen.ts` that **samples** (not enumerates) tapes,
-   plus TM support in `QuestionCreator`. Encoding (binary/unary over a variable-length tape)
-   follows the same group model as CC — see the DSL section in `grading.md` / `CLAUDE.md`.
+```ts
+encode(notation, values: number[]): TMTape            // pre-engine: lay out blocks with single-'0'
+                                                      // separators; head at standard position.
+decode(notation, tape): { value: number } | WellFormednessError   // post-engine acceptance core
+```
 
-## Working-on notes
+`encode` replaces the current `makeTape`; `decode` replaces the current `readTape`-and-compare.
+They live in the pre-engine (input-layout) and post-engine (acceptance) modules respectively —
+**not** in `tm.ts`. The same `TMTape` serves the future unified 3-symbol machine; only validation
+(which symbols/actions are legal) changes, not the representation.
 
-- Phase 6 ("TM Turbots") layers a TM as a turbot's internal circuitry; it depends on this
-  engine plus the (also-unbuilt) turbot workspace.
-- Until the engine exists, leave the grader's `skip` in place so TM questions never throw.
-- When you build it, add the real spec to this file (signatures, label grammar, sampling
-  strategy) and remove the "NOT YET IMPLEMENTED" banner.
+## Engine: one step / a run
+
+```ts
+evaluateTMSingleStep(wires, currentStateId, tape): { read, action, nextStateId, tape } | null
+evaluateTMSequence(components, wires, initialTape, maxSteps = DEFAULT_TM_MAX_STEPS)
+  : { tape, halted, steps, hitStepLimit, history }
+```
+
+`evaluateTMSingleStep` reads under the head, takes the (unique, on a valid table) matching
+transition, applies its action, and returns the next state + new tape. **`null` ⇒ halt** (no
+matching transition).
+
+`evaluateTMSequence` starts at `S₀` and steps until:
+
+- **Halt** — returns `halted: true`. **For a TM, halting is the success precondition** — the
+  inverse of FSM (where `halted` = failure). Do not pattern-match `halted`'s meaning from `fsm.ts`.
+- **Step limit** — `maxSteps` reached (default `DEFAULT_TM_MAX_STEPS = 10000`); returns
+  `hitStepLimit: true`. Halting is undecidable, so the bound is mandatory.
+
+`history: TmHistoryEntry[]` (`t, stateLabel, read, action, headBefore, nextStateLabel`) — one per
+step, for the (not-yet-built) status table.
+
+## Grading (target semantics)
+
+Each `test_vector` is one `(x, f(x))` pair. Per vector: **validate** the table → lay out the
+representation of `x` with the head in **standard position** → **run** to halt or step limit →
+**accept/decode** (locate the single output block, decode under the notation, optionally check
+standard halt position) → compare to `f(x)`.
+
+- **Notation** comes from `question.representation` (`'tally'` → unary, `'binary'` → binary);
+  "representation" and "notation" are the same thing here.
+- **Test vectors carry values, not tape/bit encodings** — the project-wide convention (CC/SC/FSM
+  store values too). For TM: `input_sequence` is the list of input *values* (≥ 1, for
+  multi-input functions); `expected_output` is `[f(x)]`, a single value.
+- A table that **fails validation fails every vector** (passed 0 / total), surfacing the syntax
+  error as feedback — never `skipped`.
+
+A vector passes iff the table is valid **and** the machine halted (not step-limited) **and**
+there is exactly one well-formed output block **and** it decodes to `f(x)` **and** (if the toggle
+is on) the head halted in standard position. Failures keep the final tape as gradebook feedback.
+
+TM input is an infinite space and TM correctness is undecidable, so grading is
+**correctness-by-sampling**: instructors supply representative vectors (short/long, zero-valued,
+boundary cases like carry propagation). There is no exhaustive mode, and there cannot be one.
+
+## Implementation status — where the code diverges
+
+`tm.ts` / `grader.ts` were written to an earlier, simpler model and **must be reworked**:
+
+| Concern | Current code | Target |
+| --- | --- | --- |
+| Tape alphabet | `{0,1}`, blank = 0 | notation-dependent: `{0,1}` unary, `{0,1,*}` binary |
+| Action set | `{R,L,0,1}` only | `{R,L,0,1}` unary, `{R,L,0,1,*}` binary |
+| Head start | cell 0 (`makeTape`) | standard position (rightmost symbol of rightmost input) |
+| Output location | fixed window `readTape(tape, len)` | post-engine module locates the one block by content |
+| Block-count / well-formedness | none | post-engine acceptance check (exactly one) |
+| Standard-halt-position | none | optional toggle in the acceptance check |
+| Ambiguous transitions | first-match by wire order (in `evaluateTMSingleStep`) | pre-engine **syntax error** |
+| Unparseable label | silently skipped | pre-engine **syntax error** |
+| Validation / acceptance modules | none (logic inlined in grader) | two separate modules around the engine |
+
+`app/tools/tmCheck.ts` tests the interim cell-0 behaviour and must be updated with the rework.
+
+## Not yet built (store + UI)
+
+- **Store.** No `tmStep`. Mirror `fsmStep`: wrap `evaluateTMSingleStep`, hold the tape
+  **immutably** (`applyAction` shares `cells` on a *move*, clones only on a *write* — never
+  mutate `tape.cells` in place), append a `TmHistoryEntry` per step.
+- **UI.** Tape strip (click-to-toggle cells + head marker, scrollable, §10.2), §10.5 status
+  display, `input:action` validation + syntax-error reporting in the transition editor,
+  `buildMode === 'TM'` in the library.
+- **Authoring.** No TM path in `QuestionCreator` / `testVectorGen.ts`; samples are hand-authored.
+  Generation must **sample** tapes, not enumerate.
+
+## Module map
+
+**Today** `tm.ts` exports: `readCell`, `makeTape`, `readTape`, `parseTMAction`,
+`parseTMTransition`, `applyAction`, `evaluateTMSingleStep`, `evaluateTMSequence`,
+`DEFAULT_TM_MAX_STEPS`, and types `TMAction`, `TMActionToken`, `TMTape`, `TMStepResult`,
+`TMEvalResult`, `ParsedTMTransition`. `TmHistoryEntry` already lives in `types.ts`.
+
+**After the rewrite** (see "Rewrite plan"):
+- `TMTape`, `TMSymbol`, and `TMNotation` move to `types.ts` (the store + saved workspace need
+  them without a types→engine dependency).
+- `makeTape`/`readTape` are removed from `tm.ts`; `encode`/`decode` take their place in the new
+  **input-layout** and **acceptance** modules.
+- New files for the pre-engine **validation** and post-engine **acceptance/decoding** modules —
+  separate from `tm.ts`, never inside it.
+- `parseTMAction`/`parseTMTransition` become **notation-aware** (accept `*` only for binary).
+
+## Rewrite plan
+
+> **Self-contained.** A fresh session can execute this from the repo plus this doc alone. The
+> engine stays framework-agnostic (no React/Zustand/DOM — see `overview.md`). There is **no test
+> framework**; smoke-test with `tsx` like `app/tools/pipelineCheck.ts`. After each step run
+> `cd app && npx tsx tools/tmCheck.ts`. Mirror the shapes in `app/src/engine/fsm.ts` and
+> `sc.ts`, and the grader dispatch in `grader.ts`. Keep this doc in sync as the surface changes
+> (CLAUDE_KB convention). Do the store/UI **later** — out of scope here.
+
+**Settled decisions — do not re-litigate (baked in from design review):**
+
+- **Notation = `question.representation`**: `'tally'` → unary, `'binary'` → binary. No new field;
+  "representation" and "notation" are the same thing.
+- **Test vectors carry values, not tape/bit encodings** (project-wide convention, shared with
+  CC/SC/FSM): `input_sequence` = list of input *values* (≥ 1); `expected_output = [f(x)]`.
+- **An ill-formed table fails every vector** (passed 0 / total) with the syntax error as
+  feedback — never `skipped`.
+- **Zero-valued unary input** occupies a single `0` slot (`… <input n-1> 0 0 0 …` = sep / the
+  zero input / trailing sep); standard position is the head on that slot. It contributes no
+  stored cell (tape normalises away `0`s) — see "Input layout."
+
+**Steps** (ordered; each independently testable):
+
+1. **Types — `app/src/types.ts`.** Add `TMSymbol = '0'|'1'|'*'`, `TMNotation = 'unary'|'binary'`,
+   and `TMTape { cells: Record<number, TMSymbol>; head: number }`. (`TmHistoryEntry` is already
+   here.) The engine imports these rather than defining its own.
+
+2. **Engine core — `app/src/engine/tm.ts`.**
+   - `cells: Record<number, TMSymbol>`; `readCell` returns `'0'` for absent keys.
+   - `parseTMAction(token, notation)` / `parseTMTransition(label, notation)` become
+     **notation-aware**: `*` is a legal input/action symbol **only** for binary.
+   - `applyAction`: writing `'1'`/`'*'` sets the cell; writing `'0'` **deletes the key**
+     (normalise-to-non-background); a *move* shares `cells` and shifts `head`.
+   - `evaluateTMSingleStep` / `evaluateTMSequence` keep their current shapes but **assume a
+     validated table** (the matching transition is unique — no first-match tie-break).
+   - **Remove** `makeTape` and `readTape` (superseded by `encode`/`decode` in step 4).
+
+3. **Validation — new `app/src/engine/tmValidate.ts`.**
+   `validateTMTable(components, wires, notation): TMSyntaxError[]`, where `TMSyntaxError` carries a
+   kind (`'ambiguous' | 'unparseable'`), the offending state/wire id(s), and a message.
+   - **Ambiguous**: group out-edges per source state; two sharing the same parsed `input` symbol → error.
+   - **Unparseable**: any transition wire whose label fails `parseTMTransition(label, notation)`.
+   Consumed by the grader (step 5) and, later, the authoring UI.
+
+4. **Input-layout + acceptance — new `app/src/engine/tmEncoding.ts`.**
+   - `encode(notation, values: number[]): TMTape` — input blocks left-to-right, single-`0`
+     separators, head at **standard position** (rightmost cell of the rightmost input's block).
+     Unary: value `n>0` → run of `n` `'1'`s; value `0` → an (unstored) single-`0` slot (so a zero
+     rightmost input leaves the head on that empty slot). Binary: value → `'*'` + binary digits +
+     `'*'` (value 0 → `*0*`).
+   - `decode(notation, tape): { value: number } | WellFormednessError` — scan the final tape.
+     Unary: maximal runs of `'1'` → 0 runs = value 0, 1 run = its length, ≥2 = error. Binary:
+     `*…*` blocks → exactly 1 parses the digits, else error.
+   - `haltedInStandardPosition(notation, tape): boolean` — head on the rightmost cell of the one
+     output block (for the optional toggle).
+
+5. **Grader — `app/src/engine/grader.ts` (TM branch).** Derive `notation` from
+   `question.representation`. Per vector: `validateTMTable` (errors → fail all vectors) →
+   `encode(notation, tv.input_sequence)` → `evaluateTMSequence` → `decode(notation, finalTape)` →
+   compare the value to `tv.expected_output[0]`, plus `haltedInStandardPosition` if the toggle is
+   on. `CaseResult.got` records the decoded value (or the error).
+
+6. **Tests — `app/tools/tmCheck.ts`.** Rewrite for value-based vectors + notation. Cover: unary
+   increment (standard position); **zero output** (blank tape decodes to 0); a **binary** example;
+   an **ambiguous-transition** table (validation → all vectors fail); a **two-block** tape
+   (well-formedness failure); and the **standard-halt-position** toggle.
+
+7. **Barrel + spec — `app/src/engine/index.ts` and this doc.** Export the new modules/types;
+   update the "Module map" and retire the "Implementation status" divergence rows as resolved.
+
+**Out of scope here:** the store (`tmStep`) and UI (tape strip, §10.5 status display, label
+editor) — a separate later phase (see "Not yet built").

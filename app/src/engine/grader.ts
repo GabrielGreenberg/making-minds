@@ -17,6 +17,7 @@ import type {
 import { evaluateCCInputs } from './cc';
 import { evaluateSCSequence } from './sc';
 import { evaluateFSMSequence } from './fsm';
+import { makeTape, readTape, evaluateTMSequence } from './tm';
 
 // The grading result types live in types.ts (so SubmissionRecord can carry a
 // result without a types→engine dependency). Re-exported here for the existing
@@ -136,7 +137,26 @@ export function gradeQuestion(question: AssignmentQuestion, circuit: CircuitData
   }
 
   if (question.buildMode === 'TM') {
-    return skip(question.id, 'TM grading not yet implemented');
+    // Each test vector's input_sequence is the initial tape (written to cells
+    // 0..n-1, head at 0); expected_output is the tape window read back after the
+    // machine halts. Same input→output framing as CC/SC. A machine that hits the
+    // step limit (probable infinite loop) fails the vector with a partial `got`.
+    const cases: CaseResult[] = question.test_vectors.map((tv) => {
+      const result = evaluateTMSequence(
+        circuit.components,
+        circuit.wires,
+        makeTape(tv.input_sequence)
+      );
+      const got = readTape(result.tape, tv.expected_output.length);
+      return {
+        input: tv.input_sequence,
+        expected: tv.expected_output,
+        got,
+        pass: result.halted && !result.hitStepLimit && bitsEqual(got, tv.expected_output),
+      };
+    });
+    const passed = cases.filter((c) => c.pass).length;
+    return { questionId: question.id, status: 'graded', passed, total: cases.length, cases };
   }
 
   if (question.buildMode === 'turbot') {

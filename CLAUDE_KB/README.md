@@ -20,7 +20,7 @@ CLAUDE_KB/
     cc.md                combinatorial circuits   (app/src/engine/cc.ts)
     sc.md                sequential circuits       (app/src/engine/sc.ts)
     fsm.md               finite state machines     (app/src/engine/fsm.ts)
-    tm.md                turing machines           (NOT YET IMPLEMENTED — design notes)
+    tm.md                turing machines           (app/src/engine/tm.ts; store/UI not yet built)
     grading.md           autograder, test vectors, formula DSL, representation
   instructor/          ← the instructor-facing mode
     frontend.md          authoring, gradebook, routing, role gating

@@ -353,6 +353,22 @@ export interface ParsedTransition {
   output: number;
 }
 
+// ─── TM helpers ─────────────────────────────────────────────────────
+// A Turing machine reuses the FSM editor (STATE components + transition
+// wires). Transition labels use the grammar "input:action" where action is
+// one of R (move right), L (move left), 1 (write 1), 0 (write 0) — a single
+// tape action per step (the Post–Turing model from the spec, §10.3).
+
+/** TM history entry for one time step */
+export interface TmHistoryEntry {
+  t: number;
+  stateLabel: string;
+  read: number;          // bit read from the cell under the head
+  action: string;        // raw action token: 'R' | 'L' | '0' | '1'
+  headBefore: number;    // head position before the action
+  nextStateLabel: string;
+}
+
 // ─── MEM direction helpers ──────────────────────────────────────────
 // Port IDs are fixed (mout=left, min=right) for backward compatibility.
 // These helpers map them to semantic roles based on memDirection.
