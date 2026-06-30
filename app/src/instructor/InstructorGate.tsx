@@ -1,38 +1,37 @@
-import { useState, type ReactNode } from 'react';
+import type { ReactNode } from 'react';
 import { instructorRole } from '../auth/instructorRole';
+import { useAuth } from '../auth';
+import { navigate } from '../routing';
 
 /**
- * Gates the instructor frontend. Mirrors AuthGate, but for the instructor role.
+ * Gates the instructor frontend on the logged-in account's role. Mirrors AuthGate,
+ * but for the instructor role.
  *
- * When the user is not in instructor mode, renders a simple unlock screen with a
- * single "Enter Instructor Mode" button (no passphrase in the prototype). On
- * click it flips the role flag and forces a re-render. When the user is in
- * instructor mode, renders the wrapped instructor UI.
+ * Instructor accounts render the wrapped instructor UI. A student who reaches an
+ * instructor route (only by typing the URL — the link is hidden from students)
+ * gets an access-denied screen, not the instructor views. This is the gating demo.
  *
  * Later, the SSO token carries the role claim; this component is unchanged — only
  * `instructorRole.isInstructor()` gains real behavior.
  */
 export function InstructorGate({ children }: { children: ReactNode }) {
-  const [, force] = useState(0);
+  const { user } = useAuth();
 
   if (!instructorRole.isInstructor()) {
     return (
       <div className="instructor-unlock">
         <div className="instructor-unlock-card">
-          <h1 className="instructor-unlock-title">Instructor Mode</h1>
+          <h1 className="instructor-unlock-title">Instructors only</h1>
           <p className="instructor-unlock-text">
-            This area lets you author assignments, generate autograder test vectors,
-            and review student submissions. It is separate from the student
-            experience.
+            This area is for authoring assignments and reviewing submissions. You are
+            signed in as {user ? `${user.name} (student)` : 'a student'}, so it isn't
+            available to you.
           </p>
           <button
             className="instructor-unlock-button"
-            onClick={() => {
-              instructorRole.enter();
-              force((n) => n + 1);
-            }}
+            onClick={() => navigate({ kind: 'home' })}
           >
-            Enter Instructor Mode
+            Back to my assignments
           </button>
         </div>
       </div>

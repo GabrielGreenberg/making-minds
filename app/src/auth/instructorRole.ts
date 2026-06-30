@@ -1,43 +1,20 @@
 // Instructor role seam.
 //
-// Gates the instructor frontend. In the prototype the role is a session flag the
-// user sets via the unlock screen; it lives in sessionStorage so it clears when
-// the tab closes and never touches the student-side localStorage data. Later the
-// SSO token carries a role claim and `isInstructor()` reads it — consumers
-// (InstructorGate) stay unchanged.
+// Role is a property of the logged-in account (see ./accounts), not a separate
+// toggle: an instructor account *is* an instructor. `isInstructor()` reads the
+// persisted session's role. Later the SSO token carries the role claim and this
+// reads that instead — consumers (InstructorGate, the nav links) stay unchanged.
+
+import { readPersistedAccount } from './accounts';
 
 export interface InstructorRole {
   isInstructor(): boolean;
-  enter(): void;
-  exit(): void;
 }
 
-const KEY = 'mm:instructor';
-
-class SessionInstructorRole implements InstructorRole {
+class AccountInstructorRole implements InstructorRole {
   isInstructor(): boolean {
-    try {
-      return sessionStorage.getItem(KEY) === '1';
-    } catch {
-      return false;
-    }
-  }
-
-  enter(): void {
-    try {
-      sessionStorage.setItem(KEY, '1');
-    } catch {
-      // sessionStorage unavailable — role simply won't persist.
-    }
-  }
-
-  exit(): void {
-    try {
-      sessionStorage.removeItem(KEY);
-    } catch {
-      // ignore
-    }
+    return readPersistedAccount()?.role === 'instructor';
   }
 }
 
-export const instructorRole: InstructorRole = new SessionInstructorRole();
+export const instructorRole: InstructorRole = new AccountInstructorRole();

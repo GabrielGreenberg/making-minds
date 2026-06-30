@@ -1,29 +1,59 @@
-import { createContext, useContext } from 'react';
+import { createContext, useContext, useState, useCallback } from 'react';
 import type { ReactNode } from 'react';
 import type { AuthUser, AuthContextValue } from './types';
+import { SESSION_KEY, findAccount, readPersistedAccount } from './accounts';
 
-// TODO(auth): replace this stub with a Supabase-backed implementation — see
-// .claude/plans/quiet-finding-seal.md. Real auth keeps the same exports
-// (AuthProvider / useAuth / getCurrentUserEmail) so consumers stay unchanged;
-// only this file (and the AuthGate no-session branch) gain real behavior.
+// Mockup auth. There is no password and no security — the login screen picks one
+// of a fixed set of toy accounts (see ./accounts) and the choice is persisted in
+// localStorage so a reload keeps the session. The whole point is to demo the two
+// perspectives (student / instructor) and exercise role gating + routing.
+//
+// TODO(auth): replace with a Supabase-backed implementation. Real auth keeps the
+// same exports (AuthProvider / useAuth / getCurrentUserEmail) so consumers stay
+// unchanged; the account table + localStorage session go away and `role` comes
+// from the SSO token's role claim.
 
-/** The fixed identity we are "logged in" as until real auth lands. */
-const STUB_USER: AuthUser = {
-  email: 'john.doe@example.com',
-  name: 'John Doe',
-};
+function accountToUser(account: ReturnType<typeof readPersistedAccount>): AuthUser | null {
+  if (!account) return null;
+  return { email: account.email, name: account.name, role: account.role };
+}
 
-const STUB_VALUE: AuthContextValue = {
-  user: STUB_USER,
+const AuthContext = createContext<AuthContextValue>({
+  user: null,
   loading: false,
-};
-
-const AuthContext = createContext<AuthContextValue>(STUB_VALUE);
+  login: () => {},
+  logout: () => {},
+});
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  // Stub: the context value never changes. The real provider will hold session
-  // state here and update it via Supabase's onAuthStateChange.
-  return <AuthContext.Provider value={STUB_VALUE}>{children}</AuthContext.Provider>;
+  // Seed from the persisted session so a reload stays logged in.
+  const [user, setUser] = useState<AuthUser | null>(() => accountToUser(readPersistedAccount()));
+
+  const login = useCallback((accountId: string) => {
+    const account = findAccount(accountId);
+    if (!account) return;
+    try {
+      localStorage.setItem(SESSION_KEY, account.id);
+    } catch {
+      // localStorage unavailable — the session just won't persist across reloads.
+    }
+    setUser(accountToUser(account));
+  }, []);
+
+  const logout = useCallback(() => {
+    try {
+      localStorage.removeItem(SESSION_KEY);
+    } catch {
+      // ignore
+    }
+    setUser(null);
+  }, []);
+
+  return (
+    <AuthContext.Provider value={{ user, loading: false, login, logout }}>
+      {children}
+    </AuthContext.Provider>
+  );
 }
 
 export function useAuth(): AuthContextValue {
@@ -31,10 +61,12 @@ export function useAuth(): AuthContextValue {
 }
 
 /**
- * Non-hook accessor for imperative call sites (e.g. submission export).
- * Returns the current user's email. Under the stub this is always John Doe;
- * the real version will read the live Supabase session.
+ * Non-hook accessor for imperative call sites (e.g. submission tagging). Reads the
+ * persisted session directly so it works outside React. Throws when logged out —
+ * every caller runs behind <AuthGate>, so a user is always present.
  */
 export function getCurrentUserEmail(): string {
-  return STUB_USER.email;
+  const account = readPersistedAccount();
+  if (!account) throw new Error('getCurrentUserEmail called with no logged-in user');
+  return account.email;
 }

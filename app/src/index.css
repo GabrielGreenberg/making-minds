@@ -1635,3 +1635,96 @@ thead .sc-label-col {
 .instructor-detail-table th, .instructor-detail-table td { border: 1px solid #eee; padding: 3px 10px; text-align: center; }
 
 .instructor-head-actions { display: flex; gap: 8px; align-items: center; }
+
+/* ─────────────────────────────────────────────────────────────────
+   Mockup auth — login screen + session controls
+   ───────────────────────────────────────────────────────────────── */
+
+/* Login screen (shown by AuthGate until an account is chosen) */
+.login-screen {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100vh;
+  width: 100vw;
+  background: var(--panel-bg);
+}
+.login-card {
+  width: 420px;
+  max-width: 90vw;
+  padding: 32px;
+  background: #fff;
+  border: 1px solid var(--menu-border);
+  border-radius: 10px;
+  text-align: center;
+}
+.login-title { font-size: 24px; margin-bottom: 6px; }
+.login-text { color: var(--text-secondary); margin-bottom: 20px; }
+.login-accounts { display: flex; flex-direction: column; gap: 10px; }
+.login-account {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  grid-template-areas: "name role" "email role";
+  align-items: center;
+  gap: 2px 10px;
+  padding: 12px 16px;
+  background: #fff;
+  border: 1px solid var(--menu-border);
+  border-radius: 8px;
+  cursor: pointer;
+  text-align: left;
+}
+.login-account:hover { border-color: var(--accent); background: #fafbff; }
+.login-account-name { grid-area: name; font-size: 15px; font-weight: 600; color: var(--text); }
+.login-account-email { grid-area: email; font-size: 12px; color: var(--text-secondary); }
+.login-account-role {
+  grid-area: role;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 3px 10px;
+  border-radius: 999px;
+}
+.login-account-role--student { background: #e3f2fd; color: #1565c0; }
+.login-account-role--instructor { background: #ede7f6; color: #5e35b1; }
+
+/* Session controls — shown in the menu bar, home screen, and instructor header */
+.session-chip {
+  font-size: 13px;
+  color: var(--text-secondary);
+  padding: 4px 10px;
+  background: #fff;
+  border: 1px solid var(--menu-border);
+  border-radius: 999px;
+  white-space: nowrap;
+}
+.menu-link-button {
+  border: 1px solid var(--menu-border);
+  background: #fff;
+  border-radius: 5px;
+  padding: 4px 12px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  color: var(--text-secondary);
+}
+.menu-link-button:hover { color: var(--text); border-color: #999; }
+
+.menu-right {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 8px;
+}
+/* When Submit is present it owns the auto-margin; keep a gap before the group. */
+.menu-submit + .menu-right { margin-left: 8px; }
+
+.instructor-header-actions { display: flex; align-items: center; gap: 8px; }
+
+.home-session {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-bottom: 8px;
+}

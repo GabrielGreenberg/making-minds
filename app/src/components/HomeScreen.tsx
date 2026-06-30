@@ -1,7 +1,7 @@
 import { useStore } from '../store';
 import { listAssignments } from '../assignments';
 import { navigate } from '../routing';
-import { getCurrentUserEmail } from '../auth';
+import { getCurrentUserEmail, useAuth } from '../auth';
 import { downloadJson } from '../download';
 import { summarizeResult } from '../engine/grader';
 
@@ -14,6 +14,7 @@ function formatSubmittedAt(iso: string): string {
 export function HomeScreen() {
   const submissions = useStore((s) => s.submissions);
   const submitAssignment = useStore((s) => s.submitAssignment);
+  const { user, logout } = useAuth();
 
   const assignments = listAssignments();
 
@@ -38,6 +39,17 @@ export function HomeScreen() {
   return (
     <div className="welcome-screen">
       <div className="home-card">
+        <div className="home-session">
+          {user && <span className="session-chip">{user.name} · {user.role === 'instructor' ? 'Instructor' : 'Student'}</span>}
+          {user?.role === 'instructor' && (
+            <button className="menu-link-button" onClick={() => navigate({ kind: 'instructor' })}>
+              Instructor view
+            </button>
+          )}
+          <button className="menu-link-button" onClick={() => { logout(); navigate({ kind: 'home' }); }}>
+            Log out
+          </button>
+        </div>
         <h1 className="welcome-title">Making Minds</h1>
         <p className="welcome-subtitle">Design circuits, state machines, and more</p>
 

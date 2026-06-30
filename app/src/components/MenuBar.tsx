@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import { useStore } from '../store';
 import type { AssignmentData } from '../types';
 import { saveToFileAs, openFile } from '../fileHandle';
-import { getCurrentUserEmail } from '../auth';
+import { getCurrentUserEmail, useAuth } from '../auth';
 import { navigate } from '../routing';
 import { downloadJson } from '../download';
 
@@ -10,6 +10,7 @@ export function MenuBar() {
   const [openMenu, setOpenMenu] = useState<string | null>(null);
   const [openSub, setOpenSub] = useState<string | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
+  const { user, logout } = useAuth();
 
   const {
     undo,
@@ -269,6 +270,24 @@ export function MenuBar() {
           {submissions[assignment.id] ? 'Submit ✓' : 'Submit'}
         </div>
       )}
+
+      {/* Session controls — right-aligned. The instructor link is shown only to
+          instructor accounts; students never see it (typing #/instructor hits the
+          access-denied gate). */}
+      <div className="menu-right">
+        {user?.role === 'instructor' && (
+          <button
+            className="menu-link-button"
+            onClick={() => { navigate({ kind: 'instructor' }); close(); }}
+          >
+            Instructor view
+          </button>
+        )}
+        {user && <span className="session-chip">{user.name} · {user.role === 'instructor' ? 'Instructor' : 'Student'}</span>}
+        <button className="menu-link-button" onClick={() => { logout(); navigate({ kind: 'home' }); }}>
+          Log out
+        </button>
+      </div>
     </div>
   );
 }

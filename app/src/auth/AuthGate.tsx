@@ -1,13 +1,11 @@
 import type { ReactNode } from 'react';
 import { useAuth } from './stubAuth';
+import { LoginScreen } from './LoginScreen';
 
 /**
- * Gates the app behind authentication. Renders children only when a user is
- * logged in.
- *
- * Under the current stub a user is always present, so the app renders
- * immediately. When real auth lands, the `!user` branch becomes the
- * Login / SetPassword flow — consumers wrapping with <AuthGate> stay the same.
+ * Gates the app behind authentication. Renders the login screen until a user is
+ * logged in, then the app. Consumers wrapping with <AuthGate> stay the same when
+ * real auth replaces the mockup — only what `useAuth` resolves to changes.
  */
 export function AuthGate({ children }: { children: ReactNode }) {
   const { user, loading } = useAuth();
@@ -21,9 +19,7 @@ export function AuthGate({ children }: { children: ReactNode }) {
   }
 
   if (!user) {
-    // TODO(auth): render the Login / SetPassword screen here once real auth lands.
-    // Unreachable under the stub.
-    return null;
+    return <LoginScreen />;
   }
 
   return <>{children}</>;

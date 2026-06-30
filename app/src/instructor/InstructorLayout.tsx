@@ -1,14 +1,17 @@
 import type { ReactNode } from 'react';
-import { instructorRole } from '../auth/instructorRole';
+import { useAuth } from '../auth';
 import { navigate } from '../routing';
 
 /**
- * Thin shell shared by all instructor views: a header bar with the title and an
- * "Exit Instructor Mode" link, plus a content area for the active view.
+ * Thin shell shared by all instructor views: a header bar with the title, the
+ * signed-in identity, a link back to the student view, and Log out — plus a
+ * content area for the active view.
  */
 export function InstructorLayout({ children }: { children: ReactNode }) {
-  const handleExit = () => {
-    instructorRole.exit();
+  const { user, logout } = useAuth();
+
+  const handleLogout = () => {
+    logout();
     navigate({ kind: 'home' });
   };
 
@@ -21,9 +24,15 @@ export function InstructorLayout({ children }: { children: ReactNode }) {
         >
           Instructor — Making Minds
         </button>
-        <button className="instructor-header-exit" onClick={handleExit}>
-          Exit Instructor Mode
-        </button>
+        <div className="instructor-header-actions">
+          {user && <span className="session-chip">{user.name} · Instructor</span>}
+          <button className="instructor-header-exit" onClick={() => navigate({ kind: 'home' })}>
+            Student view
+          </button>
+          <button className="instructor-header-exit" onClick={handleLogout}>
+            Log out
+          </button>
+        </div>
       </header>
       <main className="instructor-content">{children}</main>
     </div>
