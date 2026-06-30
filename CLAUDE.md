@@ -8,7 +8,8 @@ Claude to load into context).
 > **Maintenance:** Before pushing or merging a substantive feature, update **Part 1** —
 > keep "Where we are now" and "What's next" in sync with what actually shipped, and bump the
 > _Last updated_ date below. Update **Part 2** only when the architecture, file layout, or a
-> design rule actually changes.
+> design rule actually changes. When you add a doc under `CLAUDE_KB/`, register it in the
+> "Knowledge base" mapping in Part 2 so it stays discoverable.
 
 _Last updated: 2026-06-29_
 
@@ -77,6 +78,22 @@ course (~80 students). Students build circuits, finite state machines, and grid-
 ("turbots"), completing and submitting homeworks that are automatically graded. Built as a
 **single-page React + TypeScript app** that runs entirely in the browser today; designed so a
 server can be added later by swapping implementations behind interfaces ("seams").
+
+## Knowledge base — read before working on a feature
+
+Deeper technical specs live under `CLAUDE_KB/` and are loaded **on demand**, not every session.
+Before starting on an area below, read the listed docs first. (See `CLAUDE_KB/README.md` for
+the layout and conventions.)
+
+| When working on… | Read |
+| ---------------- | ---- |
+| Anything in `engine/` (orientation) | `CLAUDE_KB/engines/overview.md` |
+| Combinatorial circuits — gates, canvas eval, boxed circuits | `CLAUDE_KB/engines/overview.md`, `CLAUDE_KB/engines/cc.md` |
+| Sequential circuits — MEM, clock, timing | `CLAUDE_KB/engines/overview.md`, `CLAUDE_KB/engines/cc.md`, `CLAUDE_KB/engines/sc.md` |
+| Finite state machines — states, transitions | `CLAUDE_KB/engines/overview.md`, `CLAUDE_KB/engines/fsm.md` |
+| Turing machines (not yet built — design notes) | `CLAUDE_KB/engines/overview.md`, `CLAUDE_KB/engines/tm.md` |
+| Autograder, test-vector format, grading bugs | `CLAUDE_KB/engines/grading.md` + the relevant per-mode doc |
+| Instructor authoring / reference-function DSL | `CLAUDE_KB/engines/grading.md` + "Reference-function DSL" below |
 
 ## Architecture principle: seams
 
