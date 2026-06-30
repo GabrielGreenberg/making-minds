@@ -69,11 +69,36 @@ computes one component's outputs.
 | `engine/cc.ts` | `topologicalSort`, `evaluateGate`, `evaluateBoxedCircuit`, `evaluateCC`, `evaluateCCInputs` | `cc.md` |
 | `engine/sc.ts` | `evaluateSCSingleStep`, `evaluateSCSequence`, `SCSingleStepResult` | `sc.md` |
 | `engine/fsm.ts` | `sortStateComponents`, `evaluateFSMSingleStep`, `evaluateFSMSequence` | `fsm.md` |
+| `engine/tm.ts` | `evaluateTMSingleStep`, `evaluateTMSequence`, tape/parse helpers, `DEFAULT_TM_MAX_STEPS` | `tm.md` |
 | `engine/grader.ts` | `gradeQuestion`, `gradeSubmission`, `summarizeResult` | `grading.md` |
 | `engine/testVectorGen.ts` | `generateCCTestVectors`, `decodeBits`, `encodeBits` | `grading.md` |
 | `engine/formulaEval.ts` | `evalFormula`, `FormulaError` | `grading.md` + CLAUDE.md DSL section |
 | `engine/representation.ts` | `bitsToTally`, `bitsToBinary`, `interpretBits` | `grading.md` |
 | `engine/index.ts` | barrel re-exports of the above | — |
+
+## Unified engine interface (grader + frontend)
+
+Every mode engine exposes the **same two-function shape**, so the **grader/codec** and the
+**frontend store** drive identical logic — no mode reimplements evaluation for the UI:
+
+- **`evaluate<Mode>SingleStep(...)`** — one step/cycle; pure; returns the next state plus per-port
+  (or tape) values. The **store** (`scStep` / `fsmStep` / `tmStep`) calls this to animate run/step
+  and build the history tables.
+- **`evaluate<Mode>Sequence(...)`** — runs a whole input to completion; what the **grader/codec**
+  calls. CC is the degenerate one-step case.
+
+| Mode | single-step (store) | sequence (grader) | codec axis (`pipeline/codec.md`) |
+|------|---------------------|-------------------|----------------------------------|
+| CC | — (combinational) | `evaluateCCInputs` | space |
+| SC | `evaluateSCSingleStep` | `evaluateSCSequence` | time |
+| FSM | `evaluateFSMSingleStep` | `evaluateFSMSequence` | time (`n=1`) |
+| TM | `evaluateTMSingleStep` | `evaluateTMSequence` | tape |
+
+**The engines speak bits/tapes, never values.** Converting a question's numeric `TestCase` to/from
+that bit/tape layout is the **codec**'s job (`pipeline/codec.md`), not the engine's or the store's
+— so the *same* engine code serves both grading and the canvas unchanged. (Today's grader still
+uses per-mode `test_vector` adapters; the codec redesign replaces them — see `grading.md` and
+`pipeline/codec.md`.)
 
 ## How the store relates to the engine
 

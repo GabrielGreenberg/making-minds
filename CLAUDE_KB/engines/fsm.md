@@ -54,6 +54,12 @@ pass: !result.halted && bitsEqual(got, expectedBits)
 A halted FSM fails the case but still returns its partial `got` output, which the gradebook can
 show as feedback.
 
+> **Under the codec redesign (`pipeline/codec.md`):** ambiguity and non-totality become **Stage-1
+> machine-validation failures** — the question fails before any case runs, and every STATE must
+> have exactly one transition per input bit (so the engine can't halt mid-run and the acceptor
+> always accepts). This supersedes the first-match tie-break and mid-run-halt behaviour described
+> here, which is what today's engine does. TM already follows this rule (`tm.md`).
+
 ## Working-on notes
 
 - **First-match-wins by wire order.** If a state has two transitions for the same input bit,

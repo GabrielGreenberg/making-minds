@@ -4,6 +4,12 @@ Covers `engine/grader.ts`, `engine/testVectorGen.ts`, `engine/formulaEval.ts`, a
 `engine/representation.ts`. Read `overview.md` first; the per-mode evaluation details are in
 `cc.md` / `sc.md` / `fsm.md` / `tm.md`.
 
+> **Planned redesign — `pipeline/codec.md`.** That spec reworks this whole flow: value-based
+> `test_cases` (not bit `test_vectors`), a mode-agnostic **codec** for value↔bits, and a unified
+> `validate → encode → run → accept → decode → compare` pipeline across CC/SC/FSM/TM (no per-mode
+> adapters). This doc is the **as-is**; when the codec lands, update it (and the per-mode docs) to
+> match.
+
 ## The pipeline
 
 ```
@@ -28,7 +34,7 @@ Interpretation is **per build mode**:
 | CC | one full input combination; `evaluateCCInputs` runs it once | (none — used directly) |
 | SC | a flat concatenation of per-cycle inputs; chunked into steps | `parseSCTestVector` (infers step width from the circuit's INPUT/OUTPUT counts) |
 | FSM | one input bit per step | `parseFSMTestVector` (pass-through) |
-| TM | — | not implemented (`tm.md`) |
+| TM | interim: bits laid on the tape from cell 0, output read as a fixed window | inline TM branch — **interim, to be reworked to value-based** per `tm.md` / `codec.md` |
 
 The **format adapters** at the top of `grader.ts` are the most likely thing to change as the
 question-design workflow evolves — they are deliberately isolated so the engines stay
@@ -36,9 +42,10 @@ untouched. When grading looks wrong for SC/FSM, suspect the adapter before the e
 
 ## `grader.ts` API
 
-- `gradeQuestion(question, circuit) → QuestionResult` — dispatches on `question.buildMode`. CC
-  / SC / FSM are graded; **TM and turbot return `status: 'skipped'`** with a reason (never
-  throw, never silently pass). Missing circuit or empty `test_vectors` also `skip`.
+- `gradeQuestion(question, circuit) → QuestionResult` — dispatches on `question.buildMode`. CC /
+  SC / FSM / TM are graded (TM via an **interim** branch with cell-0 semantics, to be reworked —
+  `tm.md`); **turbot returns `status: 'skipped'`** with a reason (never throw, never silently
+  pass). Missing circuit or empty `test_vectors` also `skip`.
 - `gradeSubmission(assignment, submission) → SubmissionResult` — matches each question to its
   answer by `questionId`, grades all, rolls up `passed`/`total` across test vectors.
 - `summarizeResult(result) → { questionsPassed, questionsTotal, vectorsPassed, vectorsTotal }`

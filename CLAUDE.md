@@ -94,6 +94,7 @@ the layout and conventions.)
 | Turing machines — tape, head, single-action transitions (engine built; store/UI not) | `CLAUDE_KB/engines/overview.md`, `CLAUDE_KB/engines/fsm.md`, `CLAUDE_KB/engines/tm.md` |
 | Autograder, test-vector format, grading bugs | `CLAUDE_KB/engines/grading.md` + the relevant per-mode doc |
 | Submission → grade → gradebook pipeline | `CLAUDE_KB/pipeline/autograde-pipeline.md`, `CLAUDE_KB/engines/grading.md` |
+| Codec / unified value-based grading redesign (planned) | `CLAUDE_KB/pipeline/codec.md`, `CLAUDE_KB/engines/grading.md`, `CLAUDE_KB/engines/overview.md` |
 | Instructor frontend — authoring, gradebook, role gating | `CLAUDE_KB/instructor/frontend.md` |
 | Reference-function DSL (formula authoring) | `CLAUDE_KB/engines/grading.md` + "Reference-function DSL" below |
 
@@ -124,7 +125,7 @@ the engine.
 | ------------- | ------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------ |
 | Types         | `app/src/types.ts`                                                             | All domain types: `AssignmentData`, `AssignmentQuestion`, `SubmissionData`/`SubmissionRecord`, `CircuitData`, `CCSpec`, `SubmissionResult` |
 | Engine        | `app/src/engine/cc.ts`, `sc.ts`, `fsm.ts`                                      | Pure simulators per mode (topological eval for CC; clocked step for SC; transition-matching for FSM)                                       |
-| Engine        | `app/src/engine/grader.ts`                                                     | `gradeSubmission` / `gradeQuestion` — dispatch on `buildMode`, compare against `test_vectors`; TM/turbot skipped                           |
+| Engine        | `app/src/engine/grader.ts`                                                     | `gradeSubmission` / `gradeQuestion` — dispatch on `buildMode`, compare against `test_vectors`; TM interim, turbot skipped                           |
 | Engine        | `app/src/engine/testVectorGen.ts`, `formulaEval.ts`                            | Authoring-time: affine-formula language → generated CC test vectors                                                                        |
 | Engine        | `app/src/engine/representation.ts`, `index.ts`                                 | Bit encoding/decoding; barrel exports                                                                                                      |
 | Store         | `app/src/store.ts`                                                             | Zustand UI state; delegates simulation to `engine/`                                                                                        |

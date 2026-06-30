@@ -1,10 +1,11 @@
 # Codec & function-grading pipeline
 
 > **Status: PLANNED — NOT YET BUILT.** This is a design spec for a redesign of the autograder,
-> not a description of existing code. Today's grader is CC-only-ish and bit-exact; see
-> `engines/grading.md` for the as-is. Treat every "is" below as "will be". When built, update
-> `engines/grading.md` + `pipeline/autograde-pipeline.md` to match and register this doc in the
-> `CLAUDE.md` knowledge-base mapping.
+> not a description of existing code. Today's grader grades CC/SC/FSM bit-exactly, plus an
+> **interim TM** branch (`engines/tm.md`); see `engines/grading.md` for the as-is. Treat every
+> "is" below as "will be". When built, update `engines/grading.md`,
+> `pipeline/autograde-pipeline.md`, **and the per-engine docs** (`engines/cc.md` / `sc.md` /
+> `fsm.md` / `tm.md`) to match. This doc is registered in the `CLAUDE.md` knowledge-base mapping.
 
 Read `engines/grading.md` (current state), `engines/overview.md` (bit layout), and the DSL
 section of `CLAUDE.md` first.
@@ -88,8 +89,11 @@ Axis behaviour:
   ...outWidths)`. Each input value LSB-first on its wire for its width, then **0-padded** (drain
   steps let carry propagate). Decode each output wire's step-series LSB-first over its width. FSM
   = the `n=1` case; the grader flattens the single wire to the FSM engine's `inputBits`.
-- **tape (TM):** value → bitstring for the engine to lay on the tape; decode the engine's
-  returned (trimmed) tape. Time is internal computation, not an I/O axis.
+- **tape (TM):** the codec **delegates** this axis to a TM-owned helper — the space/time
+  bit-laying logic does not apply. Encode lays the input *values* out as a `TMTape` with the head
+  in **standard position**; decode reads the single output block back to a number. The tape
+  layout, output-block format, and acceptor are **TM-specific — see `engines/tm.md`**. (Time is
+  internal computation, not an I/O axis.)
 
 Why LSB-first in time but MSB-first in space: the SC/FSM table runs right-to-left (t1 on the
 right), so LSB-at-t1 renders as a normal MSB-left numeral; it also matches serial-carry
@@ -114,9 +118,10 @@ binary-encode width truncation remains the **implicit modulus** the DSL relies o
 ## Stage 2 — acceptor
 
 Composes two checks; reject ⇒ question-level fail:
-- **mode-level:** TM only — did it halt within the step bound with output in the format defined
-  in `engines/tm.md`? CC/SC always accept (engine always returns bits). FSM always accepts
-  *because* Stage 1 enforced totality (it can't halt mid-run).
+- **mode-level:** TM only — did it halt within the step bound with **exactly one well-formed
+  output block** (and, optionally, the head in standard position), in the format defined in
+  `engines/tm.md`? CC/SC always accept (engine always returns bits). FSM always accepts *because*
+  Stage 1 enforced totality (it can't halt mid-run).
 - **rep-level:** `isValidCodeword(rawOut, rep)` — a tally output `101` is rejected, not decoded.
 
 ## Test-case generation (`engine/testVectorGen.ts`, generalized)
@@ -176,12 +181,13 @@ interface AssignmentQuestion {
 2. `generateTestCases` + `ccPreview` + types rename + drop `grading_mode`.
 3. grader rewrite + machine validation + acceptor; re-seed; run `pipelineCheck`.
 4. QuestionCreator rep selector; SC/FSM authoring (same form, pick mode + rep).
-5. `tape` axis against stub; real `engine/tm.ts` (other agent) plugs into the grader's TM
-   adapter with **no codec change**.
+5. `tape` axis against stub; the real `engine/tm.ts` plugs into the codec's **`tape`-axis
+   delegation** (a TM-owned encode/accept/decode helper — `engines/tm.md`) with **no change to the
+   space/time codec**.
 
 ## Out of scope
 
 - Bit-exact / representation-as-target grading (everything is value-equality for now).
 - `'plus'` representation (junk; ignored).
-- The TM engine itself (`engines/tm.md`, separate work) — the codec only defines its
-  encode/decode + acceptor boundary.
+- The TM engine and its tape encode/accept/decode (`engines/tm.md`, separate work) — the codec
+  defines only the `tape`-axis **delegation seam**, not the tape format.

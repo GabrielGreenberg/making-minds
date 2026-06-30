@@ -45,8 +45,10 @@ imports `submissionStore` or `store.ts`, so the grader path stays headless-safe 
 - **Storage** — `localSubmissionStore.submit` writes an immutable `SubmissionRecord`;
   `store.submitAssignment` calls it and mirrors the latest record. Submit is exposed on the Home
   cards and in the workbook.
-- **Grading** — `engine/grader.ts` dispatches on `buildMode` for **CC, SC, FSM**; TM/turbot are
-  skipped with a reason. See `CLAUDE_KB/engines/grading.md`.
+- **Grading** — `engine/grader.ts` dispatches on `buildMode` for **CC, SC, FSM**, plus an
+  **interim TM** branch (cell-0 semantics, to be reworked — `engines/tm.md`); turbot is skipped
+  with a reason. A unified value-based rewrite is planned in `pipeline/codec.md`. See
+  `CLAUDE_KB/engines/grading.md`.
 - **Engines** — pure SC/FSM simulators (`engine/sc.ts`, `engine/fsm.ts`) and the store delegate
   to the same code the grader uses. See `engines/sc.md`, `engines/fsm.md`.
 
@@ -72,6 +74,7 @@ the assignment via `localAssignmentStore` and submits artificial students throug
 
 ## Out of scope
 
-- TM grading (no engine yet — `engines/tm.md`).
+- Productised TM grading — an interim engine + grader branch exist; the value-based rework
+  (`engines/tm.md`) and the unified codec pipeline (`pipeline/codec.md`) are still to come.
 - Real multi-user server / student identity / SSO.
 - Authoring SC/FSM questions (samples are seeded; the creator stays CC-only).

@@ -10,6 +10,34 @@ A Turing machine is an FSM (STATE nodes + transition wires) augmented with a two
 read/write tape. At each step it reads the cell under the head, takes the matching transition,
 and performs **one** tape action. The control half reuses `sortStateComponents` from `fsm.ts`.
 
+## Relationship to the codec pipeline (authority: `pipeline/codec.md`)
+
+The cross-cutting grading design lives in **`pipeline/codec.md`** (PLANNED). SC/FSM/TM are all
+graded like CC — against a **machine-agnostic** bank of numeric `(x, f(x))` test cases — through
+a shared **codec** (value↔bits per axis) and a split **validate → encode → run → accept → decode
+→ compare** pipeline. **`codec.md` is authoritative** for the pipeline structure, the data model
+(`TestCase`, required `representation`), Stage-1 machine validation, and the accept-then-decode
+split. **This doc defines only the TM-specific pieces `codec.md` defers to** — the tape
+representation and input layout, the output-block *format*, the TM acceptor (halt + block
+well-formedness + optional standard position), and the engine itself. TM is the codec's **`tape`
+axis** and adds **no** new pipeline.
+
+Concept mapping (term used here → its home in `codec.md`):
+
+| TM-specific here | Codec pipeline (`codec.md`) |
+| --- | --- |
+| machine-table validation (ambiguous / unparseable) | **Stage 1** `validateMachine`, TM row |
+| `encode(notation, values) → TMTape` | **Stage 2** codec `encodeInput`, `tape` axis (delegated to TM) |
+| output-block well-formedness + halt + standard position | **Stage 2** **acceptor** (mode-level, TM) |
+| value decode (block → number) | **Stage 2** `decodeOutput` / `bitsToValue` (TOTAL; assumes accepted) |
+| `test_case {inputs, outputs}` (numeric) | `TestCase {inputs, outputs}` |
+
+**Accept before decode.** Per `codec.md` the acceptor checks well-formedness/halt and decoding is
+**total** (assumes an accepted tape). So the TM "decode" is two things: a TM **acceptor** (halt +
+exactly-one-block + optional standard position) and then a **total value decode**. Earlier drafts
+of this doc folded both into one `decode` returning a `WellFormednessError`; the split below
+matches the codec.
+
 ## The model — single-action transitions
 
 Single-action / Post–Turing model (platform spec §10.3): each transition does exactly one of
@@ -135,11 +163,11 @@ This is a pre-engine pass; the engine assumes it has already passed.
 
 ## Tape representation
 
-**`*` never escapes the tape.** Test vectors are numeric `(x, f(x))` pairs — abstract *values*.
-The `*` symbol is born in the encoder (value → standard representation) and consumed in the
-decoder (tape → value), so it lives only inside the tape type and the encode/decode boundary.
-`test_vectors` therefore stay `number[]`-based and **mode-agnostic** — the grader dispatch,
-gradebook, and other engines are unaffected.
+**`*` never escapes the tape.** Test cases are numeric `(x, f(x))` pairs — abstract *values* (the
+codec's machine-agnostic model). The `*` symbol is born in the encoder (value → standard
+representation) and consumed in the decoder (tape → value), so it lives only inside the tape type
+and the codec's `tape`-axis boundary. The `TestCase` bank therefore stays numeric and
+**mode-agnostic** — the codec, grader, gradebook, and other engines are unaffected.
 
 ```ts
 // In types.ts (the store and saved workspace reference a tape — avoid a types→engine dep).
@@ -166,18 +194,26 @@ interface TMTape {
   per-write spread is fine; if it ever profiles hot, the grader may run a mutable working copy and
   snapshot only for history — without changing the public API.
 
-### Encode / decode — the value↔tape boundary
+### Encode / accept / decode — the codec `tape` axis
+
+These are the TM implementation of the codec's `tape` axis + acceptor (see `codec.md` Stage 2);
+they are **not** a parallel TM-only boundary, and they replace the interim `makeTape`/`readTape`:
 
 ```ts
-encode(notation, values: number[]): TMTape            // pre-engine: lay out blocks with single-'0'
-                                                      // separators; head at standard position.
-decode(notation, tape): { value: number } | WellFormednessError   // post-engine acceptance core
+encode(notation, values: number[]): TMTape    // codec tape-axis encodeInput → blocks + single-'0'
+                                              // separators, head at standard position.
+acceptTM(notation, run): TMReject | null      // acceptor: halted (not step-limited) + exactly one
+                                              // well-formed output block + (optional) standard pos.
+decodeTM(notation, tape): number              // TOTAL value decode; precondition: acceptTM passed.
 ```
 
-`encode` replaces the current `makeTape`; `decode` replaces the current `readTape`-and-compare.
-They live in the pre-engine (input-layout) and post-engine (acceptance) modules respectively —
-**not** in `tm.ts`. The same `TMTape` serves the future unified 3-symbol machine; only validation
-(which symbols/actions are legal) changes, not the representation.
+The accept/decode split mirrors the codec (validity before decoding; the decode is total). The
+codec delegates its `tape` axis to these because TM tape layout (blocks, separators, `*`
+delimiters, standard position) is irreducibly TM-specific — `codec.md`'s generic `encodeInput`/
+`decodeOutput` cover only `space`/`time`. **These live in a TM-owned helper the codec's `tape`
+axis calls** (decided) — `codec.ts` stays thin and the tape mechanics stay with TM. The same
+`TMTape` serves the future unified 3-symbol machine; only validation (which symbols/actions are
+legal) changes.
 
 ## Engine: one step / a run
 
@@ -203,22 +239,24 @@ step, for the (not-yet-built) status table.
 
 ## Grading (target semantics)
 
-Each `test_vector` is one `(x, f(x))` pair. Per vector: **validate** the table → lay out the
-representation of `x` with the head in **standard position** → **run** to halt or step limit →
-**accept/decode** (locate the single output block, decode under the notation, optionally check
-standard halt position) → compare to `f(x)`.
+Grading follows the codec pipeline (`codec.md`); this section is just its TM instantiation. Each
+`TestCase` is one `(x, f(x))` pair of **values**. Per case: **Stage 1** validate the table →
+`encode(notation, inputs)` (head at **standard position**) → **run** to halt or step limit →
+**acceptor** (halted, exactly one well-formed output block, optional standard position) → **total
+decode** to a number → compare to `outputs`.
 
 - **Notation** comes from `question.representation` (`'tally'` → unary, `'binary'` → binary);
   "representation" and "notation" are the same thing here.
-- **Test vectors carry values, not tape/bit encodings** — the project-wide convention (CC/SC/FSM
-  store values too). For TM: `input_sequence` is the list of input *values* (≥ 1, for
-  multi-input functions); `expected_output` is `[f(x)]`, a single value.
-- A table that **fails validation fails every vector** (passed 0 / total), surfacing the syntax
-  error as feedback — never `skipped`.
+- **Test cases carry values, not tape/bit encodings** — the codec's machine-agnostic model
+  (CC/SC/FSM too): `TestCase.inputs` is the list of input *values* (≥ 1, for multi-input
+  functions); `outputs` is `[f(x)]`.
+- An ill-formed table (Stage-1 invalid) **fails every case** (0 / total) with the syntax error as
+  feedback — never `skipped`.
 
-A vector passes iff the table is valid **and** the machine halted (not step-limited) **and**
-there is exactly one well-formed output block **and** it decodes to `f(x)` **and** (if the toggle
-is on) the head halted in standard position. Failures keep the final tape as gradebook feedback.
+A case passes iff the table is valid **and** the output is **accepted** (machine halted, exactly
+one well-formed block, and — if the toggle is on — head in standard position) **and** the decoded
+value equals `f(x)`. A rejected output and a wrong value fail identically — no partial credit, per
+`codec.md`. Instructor-only feedback records the decoded `got` value or the rejection reason.
 
 TM input is an infinite space and TM correctness is undecidable, so grading is
 **correctness-by-sampling**: instructors supply representative vectors (short/long, zero-valued,
@@ -282,8 +320,8 @@ boundary cases like carry propagation). There is no exhaustive mode, and there c
 
 - **Notation = `question.representation`**: `'tally'` → unary, `'binary'` → binary. No new field;
   "representation" and "notation" are the same thing.
-- **Test vectors carry values, not tape/bit encodings** (project-wide convention, shared with
-  CC/SC/FSM): `input_sequence` = list of input *values* (≥ 1); `expected_output = [f(x)]`.
+- **Test cases carry values** (the codec model, shared with CC/SC/FSM): `TestCase.inputs` = list
+  of input *values* (≥ 1); `outputs = [f(x)]`. (`codec.md` renames `test_vectors → test_cases`.)
 - **An ill-formed table fails every vector** (passed 0 / total) with the syntax error as
   feedback — never `skipped`.
 - **Zero-valued unary input** occupies a single `0` slot (`… <input n-1> 0 0 0 …` = sep / the
@@ -306,30 +344,34 @@ boundary cases like carry propagation). There is no exhaustive mode, and there c
      validated table** (the matching transition is unique — no first-match tie-break).
    - **Remove** `makeTape` and `readTape` (superseded by `encode`/`decode` in step 4).
 
-3. **Validation — new `app/src/engine/tmValidate.ts`.**
-   `validateTMTable(components, wires, notation): TMSyntaxError[]`, where `TMSyntaxError` carries a
-   kind (`'ambiguous' | 'unparseable'`), the offending state/wire id(s), and a message.
-   - **Ambiguous**: group out-edges per source state; two sharing the same parsed `input` symbol → error.
-   - **Unparseable**: any transition wire whose label fails `parseTMTransition(label, notation)`.
-   Consumed by the grader (step 5) and, later, the authoring UI.
+   > Steps 3–5 implement the **TM slice of the codec pipeline** (`codec.md`), not a parallel
+   > TM-only boundary. Coordinate names/homes with `codec.md`; if the codec rewrite lands first,
+   > TM plugs into its unified `validate → encode → run → accept → decode → compare` path with no
+   > new grader branch.
 
-4. **Input-layout + acceptance — new `app/src/engine/tmEncoding.ts`.**
+3. **Stage-1 validation (TM row of the codec's `validateMachine`).** Implement the TM checks —
+   each state has **≤ one transition per read symbol** (ambiguous → error) and every label parses
+   (`parseTMTransition(label, notation)`; unparseable → error). Return structured errors (kind +
+   offending state/wire id(s) + message) for the grader and the authoring UI. Home: the codec's
+   Stage-1 module (`machineValidation.ts`) or a `tmValidate` helper it calls — match `codec.md`.
+
+4. **Codec `tape` axis + TM acceptor** (the codec delegates `tape` to TM — see "Relationship").
    - `encode(notation, values: number[]): TMTape` — input blocks left-to-right, single-`0`
-     separators, head at **standard position** (rightmost cell of the rightmost input's block).
-     Unary: value `n>0` → run of `n` `'1'`s; value `0` → an (unstored) single-`0` slot (so a zero
-     rightmost input leaves the head on that empty slot). Binary: value → `'*'` + binary digits +
-     `'*'` (value 0 → `*0*`).
-   - `decode(notation, tape): { value: number } | WellFormednessError` — scan the final tape.
-     Unary: maximal runs of `'1'` → 0 runs = value 0, 1 run = its length, ≥2 = error. Binary:
-     `*…*` blocks → exactly 1 parses the digits, else error.
-   - `haltedInStandardPosition(notation, tape): boolean` — head on the rightmost cell of the one
-     output block (for the optional toggle).
+     separators, head at **standard position**. Unary: value `n>0` → run of `n` `'1'`s; value `0`
+     → an (unstored) single-`0` slot (a zero rightmost input leaves the head on that slot).
+     Binary: value → `'*'` + binary digits + `'*'` (value 0 → `*0*`).
+   - `acceptTM(notation, run): TMReject | null` — halted (not step-limited) + exactly one
+     well-formed output block + (optional) standard position. Unary: 0 runs of `'1'` = value 0,
+     1 run = ok, ≥2 = reject. Binary: exactly one `*…*`, else reject.
+   - `decodeTM(notation, tape): number` — **total**; precondition `acceptTM` passed. Unary = run
+     length (0 if blank); binary = the numeral between the `*`s.
+   - Home: a TM-owned helper the codec's `tape` axis calls (decided — `codec.ts` stays thin).
 
-5. **Grader — `app/src/engine/grader.ts` (TM branch).** Derive `notation` from
-   `question.representation`. Per vector: `validateTMTable` (errors → fail all vectors) →
-   `encode(notation, tv.input_sequence)` → `evaluateTMSequence` → `decode(notation, finalTape)` →
-   compare the value to `tv.expected_output[0]`, plus `haltedInStandardPosition` if the toggle is
-   on. `CaseResult.got` records the decoded value (or the error).
+5. **Grader.** TM plugs into the codec grader path: Stage-1 validate (errors → fail all cases) →
+   `encode(notation, TestCase.inputs)` → `evaluateTMSequence` → `acceptTM` → `decodeTM` → compare
+   to `TestCase.outputs[0]`. `CaseResult.got` records the decoded value or the rejection reason.
+   If the codec rewrite hasn't landed, add an interim TM branch in `grader.ts` mirroring this
+   pipeline, to be folded into the unified path later.
 
 6. **Tests — `app/tools/tmCheck.ts`.** Rewrite for value-based vectors + notation. Cover: unary
    increment (standard position); **zero output** (blank tape decodes to 0); a **binary** example;
