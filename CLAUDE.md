@@ -93,7 +93,9 @@ the layout and conventions.)
 | Finite state machines — states, transitions | `CLAUDE_KB/engines/overview.md`, `CLAUDE_KB/engines/fsm.md` |
 | Turing machines (not yet built — design notes) | `CLAUDE_KB/engines/overview.md`, `CLAUDE_KB/engines/tm.md` |
 | Autograder, test-vector format, grading bugs | `CLAUDE_KB/engines/grading.md` + the relevant per-mode doc |
-| Instructor authoring / reference-function DSL | `CLAUDE_KB/engines/grading.md` + "Reference-function DSL" below |
+| Submission → grade → gradebook pipeline | `CLAUDE_KB/pipeline/autograde-pipeline.md`, `CLAUDE_KB/engines/grading.md` |
+| Instructor frontend — authoring, gradebook, role gating | `CLAUDE_KB/instructor/frontend.md` |
+| Reference-function DSL (formula authoring) | `CLAUDE_KB/engines/grading.md` + "Reference-function DSL" below |
 
 ## Architecture principle: seams
 

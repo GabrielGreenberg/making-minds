@@ -22,6 +22,10 @@ CLAUDE_KB/
     fsm.md               finite state machines     (app/src/engine/fsm.ts)
     tm.md                turing machines           (NOT YET IMPLEMENTED — design notes)
     grading.md           autograder, test vectors, formula DSL, representation
+  instructor/          ← the instructor-facing mode
+    frontend.md          authoring, gradebook, routing, role gating
+  pipeline/            ← cross-cutting data flows
+    autograde-pipeline.md  submit → grade-on-receipt → gradebook
 ```
 
 ## Conventions
