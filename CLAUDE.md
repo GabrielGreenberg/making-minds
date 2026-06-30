@@ -1,11 +1,20 @@
-# Making Minds — Development Status
+# Making Minds — Project Guide
+
+This file is read automatically at the start of every session. It has two parts:
+**Part 1 — Project Status** (an overview of what's done and what's left, for humans and
+Claude) and **Part 2 — Technical Reference** (architecture, key files, and design rules for
+Claude to load into context).
+
+> **Maintenance:** Before pushing or merging a substantive feature, update **Part 1** —
+> keep "Where we are now" and "What's next" in sync with what actually shipped, and bump the
+> _Last updated_ date below. Update **Part 2** only when the architecture, file layout, or a
+> design rule actually changes.
 
 _Last updated: 2026-06-29_
 
-> **Maintenance:** Always update this document before pushing or merging a substantive
-> feature — keep "Where we are now" and "What's next" in sync with what actually shipped, and
-> bump the _Last updated_ date. This file is read automatically at the start of every session,
-> so it is the canonical status of the project.
+---
+
+# Part 1 — Project Status
 
 ## The goal
 
@@ -15,21 +24,6 @@ resumes exactly where they left off — then submits the whole assignment with o
 submit it goes to the **server** and is **autograded**. Instructors author assignments and
 view scores. **Students cannot grade their own work** — grading is a server/instructor
 capability.
-
-## Architecture principle: seams
-
-Every external dependency sits **behind an interface**, so the no-backend prototype becomes a
-server-backed product by swapping implementations — not rewriting the UI.
-
-| Seam | Interface | Today (prototype) | Later (product) |
-|------|-----------|-------------------|-----------------|
-| Evaluation | `engine/` (pure, headless) | runs in browser | same code grades on server |
-| Grading | `engine/grader.ts` | grades on receipt in `SubmissionStore` | server grades on submit |
-| Identity | `src/auth/` (stub) | stub user; sessionStorage instructor role | real SSO + role claim |
-| Persistence | `WorkbookStore` | `LocalWorkbookStore` (localStorage) | `RemoteWorkbookStore` |
-| Assignments | `AssignmentStore` + registry | bundled + localStorage (instructor-authored) | server CRUD |
-| Submission | `SubmissionStore` | `LocalSubmissionStore` (localStorage) | server endpoint |
-| Navigation | `routing` (`Route` + `navigate`) | hash URLs via History API | same routes |
 
 ## Where we are now
 
@@ -63,15 +57,109 @@ The missing half is the **server** and productized submit/grade loop.
   devices. (Supabase free tier looks sufficient.)
 - **Submission endpoint + server-side autograding** — submit → server runs `engine/grader` →
   results stored; instructor gradebook reads them (the local pipeline already mirrors this).
-- **Real assignment content** — author the actual PHIL 133 homeworks.
+- **Real assignment content** — author the actual PHIL 133 homeworks (HW1–HW7).
 
-## Design notes / things to watch
+---
+
+# Part 2 — Technical Reference
+
+## What this is
+
+An interactive web platform for **PHIL 133 ("Making Minds")**, a philosophy/computation
+course (~80 students). Students build circuits, finite state machines, and grid-based agents
+("turbots"), completing and submitting homeworks that are automatically graded. Built as a
+**single-page React + TypeScript app** that runs entirely in the browser today; designed so a
+server can be added later by swapping implementations behind interfaces ("seams").
+
+## Architecture principle: seams
+
+Every external dependency sits **behind an interface**, so the no-backend prototype becomes a
+server-backed product by swapping implementations — not rewriting the UI. **Route new features
+through these seams, not around them.**
+
+| Seam | Interface | Today (prototype) | Later (product) |
+|------|-----------|-------------------|-----------------|
+| Evaluation | `engine/` (pure, headless) | runs in browser | same code grades on server |
+| Grading | `engine/grader.ts` | grades on receipt in `SubmissionStore` | server grades on submit |
+| Identity | `src/auth/` (stub) | stub user; sessionStorage instructor role | real SSO + role claim |
+| Persistence | `WorkbookStore` | `LocalWorkbookStore` (localStorage) | `RemoteWorkbookStore` |
+| Assignments | `AssignmentStore` + registry | bundled + localStorage (instructor-authored) | server CRUD |
+| Submission | `SubmissionStore` | `LocalSubmissionStore` (localStorage) | server endpoint |
+| Navigation | `routing` (`Route` + `navigate`) | hash URLs via History API | same routes |
+
+**Keep evaluation logic framework-agnostic.** All circuit/FSM evaluation lives in
+`app/src/engine/` (pure TypeScript — no React, Zustand, or DOM) so the same code runs in the
+browser and headlessly for server-side autograding. The store and UI are thin wrappers over
+the engine.
+
+## Key files
+
+| Area | Path | What's there |
+|------|------|--------------|
+| Types | `app/src/types.ts` | All domain types: `AssignmentData`, `AssignmentQuestion`, `SubmissionData`/`SubmissionRecord`, `CircuitData`, `CCSpec`, `SubmissionResult` |
+| Engine | `app/src/engine/cc.ts`, `sc.ts`, `fsm.ts` | Pure simulators per mode (topological eval for CC; clocked step for SC; transition-matching for FSM) |
+| Engine | `app/src/engine/grader.ts` | `gradeSubmission` / `gradeQuestion` — dispatch on `buildMode`, compare against `test_vectors`; TM/turbot skipped |
+| Engine | `app/src/engine/testVectorGen.ts`, `formulaEval.ts` | Authoring-time: affine-formula language → generated CC test vectors |
+| Engine | `app/src/engine/representation.ts`, `index.ts` | Bit encoding/decoding; barrel exports |
+| Store | `app/src/store.ts` | Zustand UI state; delegates simulation to `engine/` |
+| Routing | `app/src/routing.ts` | `Route` union, `parseHash`/`routeToHash`, `navigate()` |
+| Storage | `app/src/storage/workbookStore.ts`, `AssignmentStore.ts`, `submissionStore.ts` | The three localStorage-backed seams |
+| Auth | `app/src/auth/` | `AuthGate.tsx`, `stubAuth.tsx`, `instructorRole.ts` |
+| Assignments | `app/src/assignments/index.ts`, `cc-basics.json` | Bundled registry (`listAssignments`/`getAssignment`) + the one bundled CC assignment |
+| Instructor UI | `app/src/instructor/` | `InstructorApp`, `InstructorGate`, `InstructorDashboard`, `AssignmentEditor`, `QuestionCreator`, `Gradebook(.ts/View.tsx)` |
+| Student UI | `app/src/components/` | `CircuitCanvas`, `ComponentLibrary`, `DataTable`, `HomeScreen`, `MenuBar`, `SequentialTimeline`, `SimulationPanel`, `TabBar` |
+| Dev/sample | `app/src/devData/sampleData.ts`, `seed.ts` | Builders + seeding for demo CC/SC/FSM assignments and submissions |
+| Tools | `app/tools/grade.ts`, `pipelineCheck.ts` | Headless CLI grader and submit→grade pipeline check (`npx tsx`) |
+
+## Source-of-truth docs (in repo, not auto-loaded)
+
+- `spec/PHIL_133_Platform_Spec_v2.md` — full platform spec; the authority for behavior,
+  layout, and feature decisions. Read before implementing a phase.
+- `CLAUDE_CODE_PROMPT.md` — the original implementation brief (phase plan + design details).
+- `spec/mm_textbook.pdf` — course textbook for pedagogy and notation.
+- `problem sets/hw1.pdf`…`hw7.pdf` — the real homeworks the grader must handle.
+- `spec/Private & Shared/.../Mock_Ups-*.jpg` — UI mockups (CC/SC workspaces, FSM editor,
+  turbot split view, TM).
+
+## Build phases (from the spec)
+
+1. **CC** — gates (NOT/AND/OR), I/O, validated wiring, I/O & A/V tables, boxed circuits
+   (XOR, Half-Adder), drag-and-drop snap-to-grid canvas. *(built)*
+2. **SC** — MEM block, clock/time model, right-to-left time-step table. *(built)*
+3. **FSM** — state nodes, `input:output` transition arrows, simulation with state
+   highlighting, state table. *(built)*
+4. **Turbots** — split arena/circuitry workspace, grid arena, hardcoded sensor/motor
+   encoding, live-linked internal circuit.
+5. **Turing Machines** — infinite tape, read/write head, TM transition labels, op cycle.
+6. **TM Turbots** — turbot with TM-based internal circuitry.
+
+## Critical design rules (don't miss these)
+
+- **Directionality** — every component has inputs on the **left**, outputs on the **right**;
+  signal flows left→right (gates, MEM, boxed circuits alike).
+- **Wires** — splitting allowed (one output → many inputs); merging forbidden. Crossings
+  draw a bump/arc; splits draw a dot. Color: **black = 0, red = 1**.
+- **Validation** — *warn, don't block* on loops, merged links, and free ends (red highlight +
+  tooltip).
+- **I/O vs A/V tables** — I/O shows raw per-wire bits; A/V shows concatenated numerals under
+  **tally or binary**. Local scope = per-wire; global scope = all inputs as one number, all
+  outputs as one number.
+- **Time flows right-to-left** in SC and FSM tables (t1 on the right; later steps extend left).
+- **MEM block** — M_OUT (left) feeds the stored value in; M_IN (right) receives the new value.
+  All memory initializes to 0; display the stored value during simulation.
+- **Input labels** — assigned at creation and permanent; new inputs get the next sequential
+  number regardless of vertical position.
+- **Turbot encoding is hardcoded** — sensor in: 0 empty, 1 block. Motor out: 00 stop, 01
+  left, 10 right, 11 forward.
+- **CC evaluation** — topological sort for gate order; propagation is instantaneous.
+- **Homework JSON** (spec §1.5) carries `test_vectors`; the grader compares student outputs
+  against expected.
+
+## Things to watch
 
 - **Test vectors must not ship to the client in production.** Bundled assignment JSON today
-  includes `test_vectors` (the answers) — fine for the prototype, where grading already happens
-  inside the `SubmissionStore` seam. In the product, split assignments into a client part
-  (statements, modes) and a server-only part (test vectors); the server grades on submit.
+  includes `test_vectors` (the answers) — fine for the prototype, where grading happens inside
+  the `SubmissionStore` seam. In the product, split assignments into a client part (statements,
+  modes) and a server-only part (test vectors); the server grades on submit.
 - **localStorage is a stopgap** — per-browser, per-device, ~5 MB. The `WorkbookStore` /
   `AssignmentStore` / `SubmissionStore` seams are exactly the boundaries a server replaces.
-- **The seams are the leverage.** Every "later" column above is an interface swap, not a UI
-  rewrite — route new features through `engine`, the stores, `src/auth`, and the registry.
