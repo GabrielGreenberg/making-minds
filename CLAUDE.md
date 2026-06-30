@@ -101,6 +101,7 @@ the layout and conventions.)
 | Sequential circuits — MEM, clock, timing | `CLAUDE_KB/engines/overview.md`, `CLAUDE_KB/engines/cc.md`, `CLAUDE_KB/engines/sc.md` |
 | Finite state machines — states, transitions | `CLAUDE_KB/engines/overview.md`, `CLAUDE_KB/engines/fsm.md` |
 | Turing machines — tape, head, single-action transitions (engine + grading built; store/UI not) | `CLAUDE_KB/engines/overview.md`, `CLAUDE_KB/engines/fsm.md`, `CLAUDE_KB/engines/tm.md` |
+| TM store + UI (the next TM step: `tmStep`, tape strip, status display) | `CLAUDE_KB/plans/tm-store.md`, `CLAUDE_KB/engines/tm.md` |
 | Autograder, test-vector format, grading bugs | `CLAUDE_KB/engines/grading.md` + the relevant per-mode doc |
 | Submission → grade → gradebook pipeline | `CLAUDE_KB/pipeline/autograde-pipeline.md`, `CLAUDE_KB/engines/grading.md` |
 | Codec / unified value-based grading redesign (planned) | `CLAUDE_KB/pipeline/codec.md`, `CLAUDE_KB/engines/grading.md`, `CLAUDE_KB/engines/overview.md` |

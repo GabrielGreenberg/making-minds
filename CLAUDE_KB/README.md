@@ -26,6 +26,8 @@ CLAUDE_KB/
     frontend.md          authoring, gradebook, routing, role gating
   pipeline/            ← cross-cutting data flows
     autograde-pipeline.md  submit → grade-on-receipt → gradebook
+  plans/               ← session-handoff plans for not-yet-built work
+    tm-store.md          next TM step: store (tmStep) + UI wiring
 ```
 
 ## Conventions
@@ -37,3 +39,7 @@ CLAUDE_KB/
 - When you add a doc, **register it in the mapping** in `CLAUDE.md` (Part 2 → "Knowledge
   base") so it's discoverable — an unlisted doc is an invisible doc.
 - When code changes invalidate a spec, update the spec in the same change.
+- `plans/` holds **session-handoff plans** for work that is agreed but not yet built — a starting
+  point for the next session. Each says "PLANNED — NOT YET BUILT" at the top, references current
+  code, and is **deleted** once the work ships and the affected specs are updated. (Engine specs
+  describe code as-is; plans describe code to-be.)
