@@ -38,20 +38,27 @@ end-to-end:
   **autograde on receipt** in `SubmissionStore` and the result is persisted on the record (the
   exact shape a real server endpoint will take).
 - **Instructor side** — role-gated `#/instructor` mode: dashboard, assignment editor, a **CC
-  question creator** (affine-formula mini-language → auto-generated test vectors, with live
-  preview), and a **gradebook** that reflects stored autogrades (scores, per-question pass
-  rates, failed-vector drill-down). Sample CC/SC/FSM data can be seeded to demo the pipeline.
+  question creator**, and a **gradebook** that reflects stored autogrades (scores, per-question
+  pass rates, failed-vector drill-down). Sample CC/SC/FSM data can be seeded to demo the
+  pipeline.
+- **Reference-function DSL** — instructors don't hand-write test vectors. They declare a
+  question's input/output groups and specify the correct output with a small **affine/bitwise
+  arithmetic mini-language** (the "reference function"); the system enumerates inputs,
+  evaluates the formula, and auto-generates the `test_vectors` at authoring time, with a live
+  preview table. See the DSL section in Part 2.
 
 The missing half is the **server** and productized submit/grade loop.
 
 ## What's next
 
 **Near-term (still no backend):**
+
 - **TM grading** — no TM simulation engine yet; `grader.ts` skips TM cleanly until one exists.
 - **SC/FSM/TM authoring** — the QuestionCreator is CC-only (other modes show "coming soon");
   SC/FSM assignments are seeded directly rather than authored.
 
 **The backend phase (the big step):**
+
 - **Real auth** — replace the stub with UCLA SSO; student vs. instructor roles from the token.
 - **Server persistence** — `RemoteWorkbookStore` behind the existing seam, syncing across
   devices. (Supabase free tier looks sufficient.)
@@ -77,15 +84,15 @@ Every external dependency sits **behind an interface**, so the no-backend protot
 server-backed product by swapping implementations — not rewriting the UI. **Route new features
 through these seams, not around them.**
 
-| Seam | Interface | Today (prototype) | Later (product) |
-|------|-----------|-------------------|-----------------|
-| Evaluation | `engine/` (pure, headless) | runs in browser | same code grades on server |
-| Grading | `engine/grader.ts` | grades on receipt in `SubmissionStore` | server grades on submit |
-| Identity | `src/auth/` (stub) | stub user; sessionStorage instructor role | real SSO + role claim |
-| Persistence | `WorkbookStore` | `LocalWorkbookStore` (localStorage) | `RemoteWorkbookStore` |
-| Assignments | `AssignmentStore` + registry | bundled + localStorage (instructor-authored) | server CRUD |
-| Submission | `SubmissionStore` | `LocalSubmissionStore` (localStorage) | server endpoint |
-| Navigation | `routing` (`Route` + `navigate`) | hash URLs via History API | same routes |
+| Seam        | Interface                        | Today (prototype)                            | Later (product)            |
+| ----------- | -------------------------------- | -------------------------------------------- | -------------------------- |
+| Evaluation  | `engine/` (pure, headless)       | runs in browser                              | same code grades on server |
+| Grading     | `engine/grader.ts`               | grades on receipt in `SubmissionStore`       | server grades on submit    |
+| Identity    | `src/auth/` (stub)               | stub user; sessionStorage instructor role    | real SSO + role claim      |
+| Persistence | `WorkbookStore`                  | `LocalWorkbookStore` (localStorage)          | `RemoteWorkbookStore`      |
+| Assignments | `AssignmentStore` + registry     | bundled + localStorage (instructor-authored) | server CRUD                |
+| Submission  | `SubmissionStore`                | `LocalSubmissionStore` (localStorage)        | server endpoint            |
+| Navigation  | `routing` (`Route` + `navigate`) | hash URLs via History API                    | same routes                |
 
 **Keep evaluation logic framework-agnostic.** All circuit/FSM evaluation lives in
 `app/src/engine/` (pure TypeScript — no React, Zustand, or DOM) so the same code runs in the
@@ -94,22 +101,48 @@ the engine.
 
 ## Key files
 
-| Area | Path | What's there |
-|------|------|--------------|
-| Types | `app/src/types.ts` | All domain types: `AssignmentData`, `AssignmentQuestion`, `SubmissionData`/`SubmissionRecord`, `CircuitData`, `CCSpec`, `SubmissionResult` |
-| Engine | `app/src/engine/cc.ts`, `sc.ts`, `fsm.ts` | Pure simulators per mode (topological eval for CC; clocked step for SC; transition-matching for FSM) |
-| Engine | `app/src/engine/grader.ts` | `gradeSubmission` / `gradeQuestion` — dispatch on `buildMode`, compare against `test_vectors`; TM/turbot skipped |
-| Engine | `app/src/engine/testVectorGen.ts`, `formulaEval.ts` | Authoring-time: affine-formula language → generated CC test vectors |
-| Engine | `app/src/engine/representation.ts`, `index.ts` | Bit encoding/decoding; barrel exports |
-| Store | `app/src/store.ts` | Zustand UI state; delegates simulation to `engine/` |
-| Routing | `app/src/routing.ts` | `Route` union, `parseHash`/`routeToHash`, `navigate()` |
-| Storage | `app/src/storage/workbookStore.ts`, `AssignmentStore.ts`, `submissionStore.ts` | The three localStorage-backed seams |
-| Auth | `app/src/auth/` | `AuthGate.tsx`, `stubAuth.tsx`, `instructorRole.ts` |
-| Assignments | `app/src/assignments/index.ts`, `cc-basics.json` | Bundled registry (`listAssignments`/`getAssignment`) + the one bundled CC assignment |
-| Instructor UI | `app/src/instructor/` | `InstructorApp`, `InstructorGate`, `InstructorDashboard`, `AssignmentEditor`, `QuestionCreator`, `Gradebook(.ts/View.tsx)` |
-| Student UI | `app/src/components/` | `CircuitCanvas`, `ComponentLibrary`, `DataTable`, `HomeScreen`, `MenuBar`, `SequentialTimeline`, `SimulationPanel`, `TabBar` |
-| Dev/sample | `app/src/devData/sampleData.ts`, `seed.ts` | Builders + seeding for demo CC/SC/FSM assignments and submissions |
-| Tools | `app/tools/grade.ts`, `pipelineCheck.ts` | Headless CLI grader and submit→grade pipeline check (`npx tsx`) |
+| Area          | Path                                                                           | What's there                                                                                                                               |
+| ------------- | ------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| Types         | `app/src/types.ts`                                                             | All domain types: `AssignmentData`, `AssignmentQuestion`, `SubmissionData`/`SubmissionRecord`, `CircuitData`, `CCSpec`, `SubmissionResult` |
+| Engine        | `app/src/engine/cc.ts`, `sc.ts`, `fsm.ts`                                      | Pure simulators per mode (topological eval for CC; clocked step for SC; transition-matching for FSM)                                       |
+| Engine        | `app/src/engine/grader.ts`                                                     | `gradeSubmission` / `gradeQuestion` — dispatch on `buildMode`, compare against `test_vectors`; TM/turbot skipped                           |
+| Engine        | `app/src/engine/testVectorGen.ts`, `formulaEval.ts`                            | Authoring-time: affine-formula language → generated CC test vectors                                                                        |
+| Engine        | `app/src/engine/representation.ts`, `index.ts`                                 | Bit encoding/decoding; barrel exports                                                                                                      |
+| Store         | `app/src/store.ts`                                                             | Zustand UI state; delegates simulation to `engine/`                                                                                        |
+| Routing       | `app/src/routing.ts`                                                           | `Route` union, `parseHash`/`routeToHash`, `navigate()`                                                                                     |
+| Storage       | `app/src/storage/workbookStore.ts`, `AssignmentStore.ts`, `submissionStore.ts` | The three localStorage-backed seams                                                                                                        |
+| Auth          | `app/src/auth/`                                                                | `AuthGate.tsx`, `stubAuth.tsx`, `instructorRole.ts`                                                                                        |
+| Assignments   | `app/src/assignments/index.ts`, `cc-basics.json`                               | Bundled registry (`listAssignments`/`getAssignment`) + the one bundled CC assignment                                                       |
+| Instructor UI | `app/src/instructor/`                                                          | `InstructorApp`, `InstructorGate`, `InstructorDashboard`, `AssignmentEditor`, `QuestionCreator`, `Gradebook(.ts/View.tsx)`                 |
+| Student UI    | `app/src/components/`                                                          | `CircuitCanvas`, `ComponentLibrary`, `DataTable`, `HomeScreen`, `MenuBar`, `SequentialTimeline`, `SimulationPanel`, `TabBar`               |
+| Dev/sample    | `app/src/devData/sampleData.ts`, `seed.ts`                                     | Builders + seeding for demo CC/SC/FSM assignments and submissions                                                                          |
+| Tools         | `app/tools/grade.ts`, `pipelineCheck.ts`                                       | Headless CLI grader and submit→grade pipeline check (`npx tsx`)                                                                            |
+
+## Reference-function DSL (instructor authoring)
+
+Instructors specify _what a student circuit must compute_ with a small arithmetic
+mini-language instead of writing test vectors by hand. This is an authoring-time convenience
+only — the grader never sees the formula; it runs against the generated `test_vectors`.
+
+- **Where it lives** — `engine/formulaEval.ts` (`evalFormula(expr, vars)` → non-negative
+  integer; throws `FormulaError`) and `engine/testVectorGen.ts` (enumerates input
+  combinations, evaluates the formula, encodes outputs → `test_vectors`). The instructor UI
+  (`instructor/QuestionCreator.tsx`, with `instructor/ccPreview.ts`) renders a **live preview
+  table** and blocks save on any formula error.
+- **The language** — variables (declared input-group names like `x`, `y`), non-negative
+  integer literals, and the operators `+ - *` and bitwise `& | ^ ~`, with parentheses. No
+  division, modulo, conditionals, or function calls. Each formula is one expression returning a
+  single non-negative integer.
+- **Width is the implicit modulus** — the output group's bit width truncates the result to its
+  least-significant bits, so an instructor writes `x + y` with a 1-bit output to mean XOR, or a
+  2-bit output to also get the carry. No explicit `% 2` needed.
+- **Encoding** — each input/output group is **binary or unary**; this governs how bit groups
+  decode to the integer the formula receives and how the result re-encodes to output wires.
+- **Today CC only.** SC/FSM/TM authoring via the DSL is not implemented; their sample
+  assignments are seeded directly (see `devData/`). The grader already supports SC/FSM.
+- **Safety** — `evalFormula` validates against a strict token whitelist (digits, declared
+  variable names, the allowed operators) before evaluating via `new Function()`. Acceptable
+  because formulas are instructor-authored, never student-supplied.
 
 ## Source-of-truth docs (in repo, not auto-loaded)
 
@@ -124,10 +157,10 @@ the engine.
 ## Build phases (from the spec)
 
 1. **CC** — gates (NOT/AND/OR), I/O, validated wiring, I/O & A/V tables, boxed circuits
-   (XOR, Half-Adder), drag-and-drop snap-to-grid canvas. *(built)*
-2. **SC** — MEM block, clock/time model, right-to-left time-step table. *(built)*
+   (XOR, Half-Adder), drag-and-drop snap-to-grid canvas. _(built)_
+2. **SC** — MEM block, clock/time model, right-to-left time-step table. _(built)_
 3. **FSM** — state nodes, `input:output` transition arrows, simulation with state
-   highlighting, state table. *(built)*
+   highlighting, state table. _(built)_
 4. **Turbots** — split arena/circuitry workspace, grid arena, hardcoded sensor/motor
    encoding, live-linked internal circuit.
 5. **Turing Machines** — infinite tape, read/write head, TM transition labels, op cycle.
@@ -139,7 +172,7 @@ the engine.
   signal flows left→right (gates, MEM, boxed circuits alike).
 - **Wires** — splitting allowed (one output → many inputs); merging forbidden. Crossings
   draw a bump/arc; splits draw a dot. Color: **black = 0, red = 1**.
-- **Validation** — *warn, don't block* on loops, merged links, and free ends (red highlight +
+- **Validation** — _warn, don't block_ on loops, merged links, and free ends (red highlight +
   tooltip).
 - **I/O vs A/V tables** — I/O shows raw per-wire bits; A/V shows concatenated numerals under
   **tally or binary**. Local scope = per-wire; global scope = all inputs as one number, all
