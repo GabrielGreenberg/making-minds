@@ -36,7 +36,7 @@ capability.
 A browser-only single-page app supporting the **local** version of the full target flow,
 end-to-end:
 
-- **Student side** — stub login → browse assignments → open one → per-question canvas in the
+- **Student side** — mockup login (pick a student or instructor account) → browse assignments → open one → per-question canvas in the
   correct mode → instant local autosave → leave and resume (reload/Back returns you into the
   assignment) → Submit a timestamped snapshot.
 - **Autograding (the codec)** — pure headless `engine/` simulators for **CC, SC, FSM, and TM**,
@@ -70,7 +70,7 @@ The missing half is the **server** and productized submit/grade loop.
 
 **The backend phase (the big step):**
 
-- **Real auth** — replace the stub with UCLA SSO; student vs. instructor roles from the token.
+- **Real auth** — replace the mockup login with UCLA SSO; student vs. instructor roles from the token.
 - **Server persistence** — `RemoteWorkbookStore` behind the existing seam, syncing across
   devices. (Supabase free tier looks sufficient.)
 - **Submission endpoint + server-side autograding** — submit → server runs `engine/grader` →
@@ -107,7 +107,7 @@ the layout and conventions.)
 | Submission → grade → gradebook pipeline | `CLAUDE_KB/pipeline/autograde-pipeline.md`, `CLAUDE_KB/engines/grading.md` |
 | Codec — unified value-based grading (built; the cross-cutting design) | `CLAUDE_KB/pipeline/codec.md`, `CLAUDE_KB/engines/grading.md`, `CLAUDE_KB/engines/overview.md` |
 | Instructor frontend — authoring, gradebook, role gating | `CLAUDE_KB/instructor/frontend.md` |
-| Mockup auth — login, account-based student/instructor role gating (next step) | `CLAUDE_KB/plans/auth-mockup.md`, `CLAUDE_KB/instructor/frontend.md` |
+| Mockup auth — login, account-based student/instructor role gating | `CLAUDE_KB/instructor/frontend.md` |
 | Reference-function DSL (formula authoring) | `CLAUDE_KB/engines/grading.md` + "Reference-function DSL" below |
 
 ## Architecture principle: seams
@@ -120,7 +120,7 @@ through these seams, not around them.**
 | ----------- | -------------------------------- | -------------------------------------------- | -------------------------- |
 | Evaluation  | `engine/` (pure, headless)       | runs in browser                              | same code grades on server |
 | Grading     | `engine/grader.ts`               | grades on receipt in `SubmissionStore`       | server grades on submit    |
-| Identity    | `src/auth/` (stub)               | stub user; sessionStorage instructor role    | real SSO + role claim      |
+| Identity    | `src/auth/` (mockup)             | mockup login: pick a toy account (student/instructor); role gates views | real SSO + role claim      |
 | Persistence | `WorkbookStore`                  | `LocalWorkbookStore` (localStorage)          | `RemoteWorkbookStore`      |
 | Assignments | `AssignmentStore` + registry     | bundled + localStorage (instructor-authored) | server CRUD                |
 | Submission  | `SubmissionStore`                | `LocalSubmissionStore` (localStorage)        | server endpoint            |

@@ -27,13 +27,19 @@ hash via `useSyncExternalStore`, re-rendering on `popstate` and the `ROUTE_EVENT
 
 | Seam | Interface | Today | Later |
 |------|-----------|-------|-------|
-| Instructor role | `auth/instructorRole.ts` (`isInstructor/enter/exit`) | `sessionStorage` flag `mm:instructor`, set on the unlock screen | SSO role claim |
+| Identity | `auth/` (`useAuth`, `getCurrentUserEmail`) | mockup login: pick a toy account (`auth/accounts.ts`); session in `localStorage` `mm:auth:current` | SSO session |
+| Instructor role | `auth/instructorRole.ts` (`isInstructor`) | derived from the logged-in account's `role` | SSO role claim |
 | Authored assignments | `storage/AssignmentStore.ts` (`list/get/save/remove`) | `localStorage` prefix `mm:inst-asg:` | server CRUD |
 | Gradebook | `instructor/Gradebook.ts` (`gradeSubmissions/computeStats`) | reads `localSubmissionStore` | server query |
 
-The role is `sessionStorage` (not `localStorage`) so it clears on tab close and never touches
-student data. `InstructorGate` shows an unlock screen ("Enter Instructor Mode", no passphrase
-in the prototype) when `!isInstructor()`; the affordance isn't linked from the student UI.
+**Role is a property of the account, not a separate toggle.** `AuthGate` shows a login screen
+(`auth/LoginScreen.tsx`) until you pick a toy account — **John Doe** (student) or **Prof. Ada**
+(instructor); the choice persists in `localStorage` so a reload stays signed in. `isInstructor()`
+reads that account's `role`. `InstructorGate` renders the instructor UI for instructor accounts
+and an **access-denied** screen for students. The "Instructor view" link is shown only to
+instructor accounts, so a student reaches `#/instructor` only by typing the URL — and hits the
+denial. This is the same seam SSO replaces: `Account.role` becomes the token's role claim and
+`isInstructor()` reads that; the consumers don't change.
 
 ## Assignment registry merge (`assignments/index.ts`)
 
