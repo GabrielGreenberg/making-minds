@@ -109,18 +109,33 @@ export interface CCSpec {
   outputs: CCOutputGroup[];
 }
 
+/**
+ * A machine-agnostic, value-based grading case (the codec model — see
+ * CLAUDE_KB/pipeline/codec.md). `inputs` is the list of input *values* (one per
+ * input group, ≥ 1 for multi-input functions); `outputs` is `[f(x)]`. Bits/tape
+ * encodings exist only transiently at grade time, never in the bank.
+ *
+ * Today only the TM grader path consumes `test_cases`; CC/SC/FSM still grade
+ * against the bit-based `test_vectors` until the codec rewrite lands.
+ */
+export interface TestCase {
+  inputs: number[];
+  outputs: number[];
+}
+
 export interface AssignmentQuestion {
   id: number;                  // stable id; referenced by the grader and submissions
   label: string;               // e.g. "Problem 1", "Q2a"
   statement: string;           // problem text shown above the canvas
   buildMode: BuildMode;        // canvas mode for this question (CC, SC, FSM, …)
-  representation?: RepSystem;
+  representation?: RepSystem;  // TM grading reads this as the notation (tally→unary, binary→binary)
   allowed_components?: ComponentType[];
   cc_spec?: CCSpec;            // authoring spec; generates test_vectors at save time
   test_vectors?: {
     input_sequence: number[];
     expected_output: number[];
   }[];
+  test_cases?: TestCase[];     // value-based grading cases (TM today; all modes after codec)
   grading_mode?: 'exhaustive' | 'test_vectors';
   notes?: string;
 }
@@ -149,12 +164,19 @@ export interface SubmissionData {
 // SubmissionRecord can carry the grade without types.ts depending on the engine;
 // grader.ts re-exports these.
 
-/** One test vector's outcome for a question. */
+/**
+ * One case's outcome for a question. For bit-based modes (CC/SC/FSM) the arrays
+ * are bit vectors; for value-based modes (TM) they are value lists and `got` is
+ * the decoded value (or empty when the output was rejected before decoding).
+ * `reason` carries a rejection / syntax-error explanation for instructor-only
+ * feedback (e.g. malformed output, no halt, ambiguous transition table).
+ */
 export interface CaseResult {
   input: number[];
   expected: number[];
   got: number[];
   pass: boolean;
+  reason?: string;
 }
 
 /** Grading outcome for one question of a submission. */
@@ -356,15 +378,38 @@ export interface ParsedTransition {
 // ─── TM helpers ─────────────────────────────────────────────────────
 // A Turing machine reuses the FSM editor (STATE components + transition
 // wires). Transition labels use the grammar "input:action" where action is
-// one of R (move right), L (move left), 1 (write 1), 0 (write 0) — a single
-// tape action per step (the Post–Turing model from the spec, §10.3).
+// a single tape primitive — R (move right), L (move left), or write a symbol
+// (0/1, and `*` for binary machines): one tape action per step (the
+// Post–Turing model from the spec, §10.3). See CLAUDE_KB/engines/tm.md.
+
+/**
+ * Tape alphabet. Unary machines use only `'0'` / `'1'`; binary machines may
+ * also write `'*'` (the numeral delimiter). `'*'` never escapes the tape — it
+ * is born in the codec encoder and consumed in the decoder.
+ */
+export type TMSymbol = '0' | '1' | '*';
+
+/** A TM is either a unary (stroke) or a binary machine; separate alphabets. */
+export type TMNotation = 'unary' | 'binary';
+
+/**
+ * A two-way-infinite tape. Sparse and normalised to non-background: only
+ * `'1'`/`'*'` cells are stored; an absent key reads as background `'0'`
+ * (writing `'0'` deletes the key). `head` is an absolute index, never
+ * renormalised. Lives in types.ts so the store and saved workspace can
+ * reference a tape without a types→engine dependency.
+ */
+export interface TMTape {
+  cells: Record<number, TMSymbol>;
+  head: number;
+}
 
 /** TM history entry for one time step */
 export interface TmHistoryEntry {
   t: number;
   stateLabel: string;
-  read: number;          // bit read from the cell under the head
-  action: string;        // raw action token: 'R' | 'L' | '0' | '1'
+  read: TMSymbol;        // symbol read from the cell under the head
+  action: string;        // raw action token: 'R' | 'L' | '0' | '1' | '*'
   headBefore: number;    // head position before the action
   nextStateLabel: string;
 }

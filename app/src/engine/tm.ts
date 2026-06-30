@@ -5,97 +5,111 @@
 // A TM here is "the FSM editor + a tape": STATE components are the control
 // states and wires carry a `transitionLabel`. Where an FSM label is
 // `input:output`, a TM label is `input:action` (spec §10.3) where action is a
-// single tape primitive: R (move right), L (move left), 1 (write 1), 0 (write
-// 0). Exactly one action happens per step — a write and a move are two
-// separate transitions/steps.
+// single tape primitive: R (move right), L (move left), or write a symbol
+// (`0`/`1`, plus `*` for binary machines). Exactly one action happens per step
+// — a write and a move are two separate transitions/steps.
+//
+// This module is the PURE SIMULATION layer only (module 2 of CLAUDE_KB/engines/
+// tm.md). It assumes the transition table has already passed machine-table
+// validation (tmValidate.ts) — the matching transition is unique, every label
+// parses — and it does NOT judge whether the output is well-formed (that is the
+// post-engine acceptor in tmCodec.ts). Input encoding / output decoding also
+// live in tmCodec.ts; this file no longer builds or reads tapes by content.
 
-import type { CircuitComponent, Wire, TmHistoryEntry } from '../types';
+import type {
+  CircuitComponent,
+  Wire,
+  TmHistoryEntry,
+  TMSymbol,
+  TMNotation,
+  TMTape,
+} from '../types';
 import { sortStateComponents } from './fsm';
 
-export type TMActionToken = 'R' | 'L' | '0' | '1';
+export type { TMTape } from '../types';
+
+export type TMActionToken = 'R' | 'L' | '0' | '1' | '*';
 
 export interface TMAction {
   raw: TMActionToken;
   kind: 'move' | 'write';
-  dir?: 'L' | 'R';   // when kind === 'move'
-  bit?: 0 | 1;       // when kind === 'write'
+  dir?: 'L' | 'R';      // when kind === 'move'
+  symbol?: TMSymbol;    // when kind === 'write'
+}
+
+/** True if `symbol` is a legal tape symbol for the given notation. */
+export function isSymbolForNotation(symbol: string, notation: TMNotation): symbol is TMSymbol {
+  if (symbol === '0' || symbol === '1') return true;
+  if (symbol === '*') return notation === 'binary';
+  return false;
+}
+
+/** Read the symbol under a given index ('0' for unwritten/background cells). */
+export function readCell(tape: TMTape, index: number): TMSymbol {
+  return tape.cells[index] ?? '0';
 }
 
 /**
- * A two-way-infinite tape. Only non-default cells are stored; every unstored
- * cell reads 0. `head` is the integer index of the cell under the read/write
- * head. Cells are kept sparse (a plain object keyed by integer index) so the
- * tape can grow in either direction without offset bookkeeping and serializes
- * cleanly.
+ * Parse an action token into a structured action, or null if invalid for the
+ * notation. `*` is a legal write only for binary machines.
  */
-export interface TMTape {
-  cells: Record<number, 0 | 1>;
-  head: number;
-}
-
-/** Read the bit under a given index (default 0 for unwritten cells). */
-export function readCell(tape: TMTape, index: number): 0 | 1 {
-  return tape.cells[index] ?? 0;
-}
-
-/** Build a fresh tape from an input bit vector written to cells 0..n-1, head at 0. */
-export function makeTape(inputBits: number[] = []): TMTape {
-  const cells: Record<number, 0 | 1> = {};
-  for (let i = 0; i < inputBits.length; i++) {
-    cells[i] = inputBits[i] ? 1 : 0;
-  }
-  return { cells, head: 0 };
-}
-
-/**
- * Read a fixed window of the tape, cells 0..length-1, as a flat bit vector.
- * This is how grading recovers an "output vector" from the final tape, mirroring
- * the input vector that seeded it.
- */
-export function readTape(tape: TMTape, length: number): number[] {
-  const out: number[] = [];
-  for (let i = 0; i < length; i++) out.push(readCell(tape, i));
-  return out;
-}
-
-/** Parse an action token ('R' | 'L' | '0' | '1') into a structured action, or null if invalid. */
-export function parseTMAction(token: string): TMAction | null {
+export function parseTMAction(token: string, notation: TMNotation): TMAction | null {
   switch (token) {
     case 'R': return { raw: 'R', kind: 'move', dir: 'R' };
     case 'L': return { raw: 'L', kind: 'move', dir: 'L' };
-    case '0': return { raw: '0', kind: 'write', bit: 0 };
-    case '1': return { raw: '1', kind: 'write', bit: 1 };
+    case '0': return { raw: '0', kind: 'write', symbol: '0' };
+    case '1': return { raw: '1', kind: 'write', symbol: '1' };
+    case '*': return notation === 'binary'
+      ? { raw: '*', kind: 'write', symbol: '*' }
+      : null;
     default:  return null;
   }
 }
 
 export interface ParsedTMTransition {
-  input: 0 | 1;
+  input: TMSymbol;
   action: TMAction;
 }
 
-/** Parse a transition label of the form "input:action" (e.g. "1:R", "0:1"). */
-export function parseTMTransition(label: string | undefined): ParsedTMTransition | null {
+/**
+ * Parse a transition label of the form "input:action" (e.g. "1:R", "0:1",
+ * "*:L"), notation-aware. The read symbol and the action must both be legal for
+ * the machine's notation. Returns null on any malformed/illegal label.
+ */
+export function parseTMTransition(
+  label: string | undefined,
+  notation: TMNotation
+): ParsedTMTransition | null {
   if (!label) return null;
   const parts = label.split(':');
   if (parts.length !== 2) return null;
-  if (!/^[01]$/.test(parts[0])) return null;
-  const action = parseTMAction(parts[1]);
+  if (!isSymbolForNotation(parts[0], notation)) return null;
+  const action = parseTMAction(parts[1], notation);
   if (!action) return null;
-  return { input: parts[0] === '1' ? 1 : 0, action };
+  return { input: parts[0], action };
 }
 
-/** Apply a tape action, returning a new tape (no mutation of the input). */
+/**
+ * Apply a tape action, returning a new tape (no mutation of the input). A *move*
+ * shares the `cells` reference (only `head` changes); a *write* returns a fresh
+ * `cells` object. Writing background `'0'` deletes the key (normalise to
+ * non-background) so a blank tape is `{}` and block scans walk only real marks.
+ */
 export function applyAction(tape: TMTape, action: TMAction): TMTape {
   if (action.kind === 'move') {
     return { cells: tape.cells, head: tape.head + (action.dir === 'R' ? 1 : -1) };
   }
   // write
-  return { cells: { ...tape.cells, [tape.head]: action.bit! }, head: tape.head };
+  if (action.symbol === '0') {
+    const cells = { ...tape.cells };
+    delete cells[tape.head];
+    return { cells, head: tape.head };
+  }
+  return { cells: { ...tape.cells, [tape.head]: action.symbol! }, head: tape.head };
 }
 
 export interface TMStepResult {
-  read: 0 | 1;
+  read: TMSymbol;
   action: TMAction;
   nextStateId: string;
   tape: TMTape;     // new tape after applying the action
@@ -103,19 +117,23 @@ export interface TMStepResult {
 
 /**
  * Attempt a single TM step from `currentStateId` given the current `tape`.
- * Reads the cell under the head, finds the outgoing transition matching that
- * bit, applies its action, and returns the next state + new tape.
+ * Reads the symbol under the head, finds the outgoing transition matching that
+ * symbol, applies its action, and returns the next state + new tape.
  * Returns null if no matching transition exists (the machine halts).
+ *
+ * Assumes a validated table (see tmValidate.ts): the matching transition is
+ * unique, so the first match is the only match.
  */
 export function evaluateTMSingleStep(
   wires: Wire[],
   currentStateId: string,
-  tape: TMTape
+  tape: TMTape,
+  notation: TMNotation
 ): TMStepResult | null {
   const read = readCell(tape, tape.head);
   const transitions = wires.filter((w) => w.sourceComponentId === currentStateId);
   for (const t of transitions) {
-    const parsed = parseTMTransition(t.transitionLabel);
+    const parsed = parseTMTransition(t.transitionLabel, notation);
     if (!parsed) continue;
     if (parsed.input === read) {
       return {
@@ -141,19 +159,22 @@ export const DEFAULT_TM_MAX_STEPS = 10000;
 
 /**
  * Run a Turing machine from S₀ on an initial tape until it halts (no matching
- * transition) or `maxSteps` is reached. Unlike an FSM, halting is the *success*
- * condition — it means the computation finished. Hitting the step limit signals
- * a probable infinite loop.
+ * transition) or `maxSteps` is reached. Unlike an FSM, halting is the *success
+ * precondition* — it means the computation finished. Hitting the step limit
+ * signals a probable infinite loop. The acceptor (tmCodec.ts) then decides
+ * whether the halted tape is well-formed.
  *
  * @param components - All circuit components (STATE nodes).
  * @param wires      - All wires; TM transition wires carry an `input:action` label.
- * @param initialTape - Starting tape (see makeTape). Defaults to a blank tape.
+ * @param initialTape - Starting tape (built by the codec's `encodeTM`).
+ * @param notation   - Tape alphabet / action set ('unary' | 'binary').
  * @param maxSteps   - Safety bound against non-terminating machines.
  */
 export function evaluateTMSequence(
   components: CircuitComponent[],
   wires: Wire[],
-  initialTape: TMTape = makeTape(),
+  initialTape: TMTape,
+  notation: TMNotation,
   maxSteps: number = DEFAULT_TM_MAX_STEPS
 ): TMEvalResult {
   const states = sortStateComponents(components);
@@ -166,7 +187,7 @@ export function evaluateTMSequence(
   const history: TmHistoryEntry[] = [];
 
   for (let step = 0; step < maxSteps; step++) {
-    const result = evaluateTMSingleStep(wires, currentStateId, tape);
+    const result = evaluateTMSingleStep(wires, currentStateId, tape, notation);
     if (!result) {
       return { tape, halted: true, steps: step, hitStepLimit: false, history };
     }

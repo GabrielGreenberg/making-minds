@@ -18,8 +18,7 @@ export { sortStateComponents, evaluateFSMSingleStep, evaluateFSMSequence } from 
 export type { FSMStepResult, FSMEvalResult } from './fsm';
 export {
   readCell,
-  makeTape,
-  readTape,
+  isSymbolForNotation,
   parseTMAction,
   parseTMTransition,
   applyAction,
@@ -35,6 +34,10 @@ export type {
   TMEvalResult,
   ParsedTMTransition,
 } from './tm';
+export { validateTMTable } from './tmValidate';
+export type { TMValidationError, TMValidationKind } from './tmValidate';
+export { encodeTM, acceptTM, decodeTM, notationForRepresentation } from './tmCodec';
+export type { TMReject, AcceptOptions } from './tmCodec';
 export { bitsToTally, bitsToBinary, interpretBits } from './representation';
 export { gradeQuestion, gradeSubmission } from './grader';
 export type { CaseResult, QuestionResult, SubmissionResult } from './grader';

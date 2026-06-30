@@ -34,7 +34,7 @@ Interpretation is **per build mode**:
 | CC | one full input combination; `evaluateCCInputs` runs it once | (none — used directly) |
 | SC | a flat concatenation of per-cycle inputs; chunked into steps | `parseSCTestVector` (infers step width from the circuit's INPUT/OUTPUT counts) |
 | FSM | one input bit per step | `parseFSMTestVector` (pass-through) |
-| TM | interim: bits laid on the tape from cell 0, output read as a fixed window | inline TM branch — **interim, to be reworked to value-based** per `tm.md` / `codec.md` |
+| TM | **value-based** (`question.test_cases`, not `test_vectors`): each case is `{inputs, outputs}` of numbers | inline TM branch — validate → encode → run → accept → decode → compare per `tm.md` (interim until the `codec.md` rewrite) |
 
 The **format adapters** at the top of `grader.ts` are the most likely thing to change as the
 question-design workflow evolves — they are deliberately isolated so the engines stay
@@ -43,9 +43,11 @@ untouched. When grading looks wrong for SC/FSM, suspect the adapter before the e
 ## `grader.ts` API
 
 - `gradeQuestion(question, circuit) → QuestionResult` — dispatches on `question.buildMode`. CC /
-  SC / FSM / TM are graded (TM via an **interim** branch with cell-0 semantics, to be reworked —
-  `tm.md`); **turbot returns `status: 'skipped'`** with a reason (never throw, never silently
-  pass). Missing circuit or empty `test_vectors` also `skip`.
+  SC / FSM grade bit-exactly against `test_vectors`; **TM** grades value-based against `test_cases`
+  via its own validate → encode → run → accept → decode → compare branch (`tm.md`). **turbot
+  returns `status: 'skipped'`** with a reason (never throw, never silently pass). Missing circuit,
+  or empty `test_vectors` (CC/SC/FSM) / `test_cases` (TM), also `skip`. An ill-formed TM table is
+  **not** skipped — it is `graded` with every case failed (the syntax error as `reason`).
 - `gradeSubmission(assignment, submission) → SubmissionResult` — matches each question to its
   answer by `questionId`, grades all, rolls up `passed`/`total` across test vectors.
 - `summarizeResult(result) → { questionsPassed, questionsTotal, vectorsPassed, vectorsTotal }`

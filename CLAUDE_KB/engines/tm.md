@@ -1,10 +1,12 @@
 # TM — Turing machine engine
 
-**File:** `app/src/engine/tm.ts` · **Status:** tape/step engine implemented, but the **semantics
-below are the agreed target and the current code does not yet match them** (it hardcodes a
-`{0,1}` tape, starts the head at cell 0, and reads a fixed window instead of locating an output
-block — see "Implementation status"). Read `overview.md`, `fsm.md`, and `grading.md` first — a
-TM here is "the FSM control graph + a tape," and reuses FSM machinery.
+**Files:** `app/src/engine/tm.ts` (engine), `app/src/engine/tmValidate.ts` (pre-engine
+validation), `app/src/engine/tmCodec.ts` (encode/accept/decode) · **Status:** implemented to the
+semantics below — notation-aware tape (`{0,1}` unary / `{0,1,*}` binary), standard-position
+input layout, content-located output blocks, and the validate → run → accept → decode grading
+path. Smoke-tested by `app/tools/tmCheck.ts`. The **store (`tmStep`) and UI are still unbuilt**
+(see "Not yet built"). Read `overview.md`, `fsm.md`, and `grading.md` first — a TM here is "the
+FSM control graph + a tape," and reuses FSM machinery.
 
 A Turing machine is an FSM (STATE nodes + transition wires) augmented with a two-way-infinite
 read/write tape. At each step it reads the cell under the head, takes the matching transition,
@@ -157,9 +159,8 @@ This is a pre-engine pass; the engine assumes it has already passed.
 - **Transitions** are wires with `transitionLabel = "input:action"`; `sourceComponentId` /
   `targetComponentId` give from/to. Valid `input`/`action` tokens are notation-dependent (table
   above).
-- **Tape** — `TMTape = { cells: Record<number, TMSymbol>; head: number }`. See **Tape
-  representation** below for the full design. *(Current code fixes the symbol type at `0|1` and
-  starts the head at cell 0 — see Implementation status.)*
+- **Tape** — `TMTape = { cells: Record<number, TMSymbol>; head: number }` (in `types.ts`). See
+  **Tape representation** below for the full design.
 
 ## Tape representation
 
@@ -262,23 +263,31 @@ TM input is an infinite space and TM correctness is undecidable, so grading is
 **correctness-by-sampling**: instructors supply representative vectors (short/long, zero-valued,
 boundary cases like carry propagation). There is no exhaustive mode, and there cannot be one.
 
-## Implementation status — where the code diverges
+## Implementation status — resolved
 
-`tm.ts` / `grader.ts` were written to an earlier, simpler model and **must be reworked**:
+The earlier cell-0 / fixed-window model has been reworked to the semantics above. As built:
 
-| Concern | Current code | Target |
-| --- | --- | --- |
-| Tape alphabet | `{0,1}`, blank = 0 | notation-dependent: `{0,1}` unary, `{0,1,*}` binary |
-| Action set | `{R,L,0,1}` only | `{R,L,0,1}` unary, `{R,L,0,1,*}` binary |
-| Head start | cell 0 (`makeTape`) | standard position (rightmost symbol of rightmost input) |
-| Output location | fixed window `readTape(tape, len)` | post-engine module locates the one block by content |
-| Block-count / well-formedness | none | post-engine acceptance check (exactly one) |
-| Standard-halt-position | none | optional toggle in the acceptance check |
-| Ambiguous transitions | first-match by wire order (in `evaluateTMSingleStep`) | pre-engine **syntax error** |
-| Unparseable label | silently skipped | pre-engine **syntax error** |
-| Validation / acceptance modules | none (logic inlined in grader) | two separate modules around the engine |
+| Concern | Now |
+| --- | --- |
+| Tape alphabet | notation-dependent: `{0,1}` unary, `{0,1,*}` binary (`TMSymbol`, `isSymbolForNotation`) |
+| Action set | `{R,L,0,1}` unary, `{R,L,0,1,*}` binary (`parseTMAction(token, notation)`) |
+| Head start | standard position — rightmost symbol of rightmost input (`encodeTM`) |
+| Output location | `acceptTM`/`decodeTM` locate the one block by content (`tmCodec.ts`) |
+| Block-count / well-formedness | `acceptTM` — exactly one block; unary blank = value 0 |
+| Standard-halt-position | optional `AcceptOptions.requireStandardHaltPosition` (default off) |
+| Ambiguous transitions | pre-engine **syntax error** (`validateTMTable`) |
+| Unparseable label | pre-engine **syntax error** (`validateTMTable`) |
+| Validation / acceptance modules | separate modules: `tmValidate.ts` (pre-engine), `tmCodec.ts` (post-engine) |
 
-`app/tools/tmCheck.ts` tests the interim cell-0 behaviour and must be updated with the rework.
+`app/tools/tmCheck.ts` now exercises the value-based pipeline (engine, codec, validation, grader).
+
+**Grading shape (interim, pre-codec).** The codec redesign (`pipeline/codec.md`) is not yet built,
+so TM grading reads the new value-based `question.test_cases` (`TestCase {inputs, outputs}`, added
+to `types.ts` alongside the legacy bit-based `test_vectors` that CC/SC/FSM still use) and runs its
+own `validate → encode → run → accept → decode → compare` branch in `grader.ts`. When the codec
+lands, this branch folds into the unified path with no change to `tmCodec.ts`. Notation comes from
+`question.representation` via `notationForRepresentation` (`'binary'` → binary, else unary).
+`CaseResult` gained an optional `reason` carrying the rejection / syntax-error explanation.
 
 ## Not yet built (store + UI)
 
@@ -293,21 +302,30 @@ boundary cases like carry propagation). There is no exhaustive mode, and there c
 
 ## Module map
 
-**Today** `tm.ts` exports: `readCell`, `makeTape`, `readTape`, `parseTMAction`,
-`parseTMTransition`, `applyAction`, `evaluateTMSingleStep`, `evaluateTMSequence`,
-`DEFAULT_TM_MAX_STEPS`, and types `TMAction`, `TMActionToken`, `TMTape`, `TMStepResult`,
-`TMEvalResult`, `ParsedTMTransition`. `TmHistoryEntry` already lives in `types.ts`.
+Types in `types.ts`: `TMSymbol` (`'0'|'1'|'*'`), `TMNotation` (`'unary'|'binary'`), `TMTape`
+(`{cells, head}`), `TmHistoryEntry` (its `read` is now a `TMSymbol`), and the value-based
+`TestCase`. The engine imports these rather than defining its own (so the store + saved workspace
+reference a tape without a types→engine dependency).
 
-**After the rewrite** (see "Rewrite plan"):
-- `TMTape`, `TMSymbol`, and `TMNotation` move to `types.ts` (the store + saved workspace need
-  them without a types→engine dependency).
-- `makeTape`/`readTape` are removed from `tm.ts`; `encode`/`decode` take their place in the new
-  **input-layout** and **acceptance** modules.
-- New files for the pre-engine **validation** and post-engine **acceptance/decoding** modules —
-  separate from `tm.ts`, never inside it.
-- `parseTMAction`/`parseTMTransition` become **notation-aware** (accept `*` only for binary).
+- **`tm.ts` (engine).** `readCell`, `isSymbolForNotation`, `parseTMAction(token, notation)`,
+  `parseTMTransition(label, notation)`, `applyAction`, `evaluateTMSingleStep(wires, stateId, tape,
+  notation)`, `evaluateTMSequence(components, wires, tape, notation, maxSteps?)`,
+  `DEFAULT_TM_MAX_STEPS`; types `TMAction`, `TMActionToken`, `TMStepResult`, `TMEvalResult`,
+  `ParsedTMTransition` (and a re-export of `TMTape`). `makeTape`/`readTape` are **gone**.
+- **`tmValidate.ts` (pre-engine).** `validateTMTable(components, wires, notation)
+  → TMValidationError[]` (`kind: 'ambiguous' | 'unparseable'`); empty = valid.
+- **`tmCodec.ts` (post-engine + input layout).** `encodeTM(notation, values) → TMTape`,
+  `acceptTM(notation, run, opts?) → TMReject | null`, `decodeTM(notation, tape) → number`,
+  `notationForRepresentation(rep)`; types `TMReject`, `AcceptOptions`.
+
+All are re-exported from `engine/index.ts`.
 
 ## Rewrite plan
+
+> **Status: DONE (engine slice).** Steps 1–7 below are implemented (`tm.ts`, `tmValidate.ts`,
+> `tmCodec.ts`, the grader TM branch, `types.ts` additions, `tmCheck.ts`, the barrel). Kept here
+> as the design record. **Out of scope and still open:** the store (`tmStep`) and UI — see "Not
+> yet built". The grading shape is interim until the codec rewrite (`pipeline/codec.md`) lands.
 
 > **Self-contained.** A fresh session can execute this from the repo plus this doc alone. The
 > engine stays framework-agnostic (no React/Zustand/DOM — see `overview.md`). There is **no test

@@ -5,13 +5,18 @@ This file is read automatically at the start of every session. It has two parts:
 Claude) and **Part 2 — Technical Reference** (architecture, key files, and design rules for
 Claude to load into context).
 
-> **Maintenance:** Before pushing or merging a substantive feature, update **Part 1** —
-> keep "Where we are now" and "What's next" in sync with what actually shipped, and bump the
-> _Last updated_ date below. Update **Part 2** only when the architecture, file layout, or a
-> design rule actually changes. When you add a doc under `CLAUDE_KB/`, register it in the
-> "Knowledge base" mapping in Part 2 so it stays discoverable.
+> **Maintenance — keep this file current.** Whenever you finish a task that changes what is
+> built, how it works, or what comes next, update this file **as part of that task** (before you
+> report it done) — do not leave it stale for a later pass. Specifically:
+> - Update **Part 1** ("Where we are now" / "What's next") to match what actually shipped, and
+>   bump the _Last updated_ date below.
+> - Update **Part 2** when the architecture, file layout, key files, or a design rule changes.
+> - When you add a doc under `CLAUDE_KB/`, register it in the "Knowledge base" mapping in Part 2,
+>   and keep the per-area docs themselves in sync (the `CLAUDE_KB` convention).
+>
+> A change isn't finished until the docs that describe it are too.
 
-_Last updated: 2026-06-29_
+_Last updated: 2026-06-30_
 
 ---
 
@@ -34,8 +39,10 @@ end-to-end:
 - **Student side** — stub login → browse assignments → open one → per-question canvas in the
   correct mode → instant local autosave → leave and resume (reload/Back returns you into the
   assignment) → Submit a timestamped snapshot.
-- **Autograding** — pure headless `engine/` simulators for **CC, SC, FSM**; `grader.ts`
-  dispatches on `buildMode` and checks submissions against stored `test_vectors`. Submissions
+- **Autograding** — pure headless `engine/` simulators for **CC, SC, FSM, and TM**; `grader.ts`
+  dispatches on `buildMode`. CC/SC/FSM grade bit-exactly against stored `test_vectors`; **TM**
+  grades value-based against `test_cases` via a validate → encode → run → accept → decode →
+  compare pipeline (the shape the planned codec redesign generalises to all modes). Submissions
   **autograde on receipt** in `SubmissionStore` and the result is persisted on the record (the
   exact shape a real server endpoint will take).
 - **Instructor side** — role-gated `#/instructor` mode: dashboard, assignment editor, a **CC
@@ -54,9 +61,11 @@ The missing half is the **server** and productized submit/grade loop.
 
 **Near-term (still no backend):**
 
-- **TM grading** — no TM simulation engine yet; `grader.ts` skips TM cleanly until one exists.
+- **TM store + UI** — the TM **engine and grading are built** (`engine/tm.ts`, `tmValidate.ts`,
+  `tmCodec.ts`); the store (`tmStep`) and UI (tape strip, status table, `input:action` label
+  editor) are not. This is the next TM step — see `CLAUDE_KB/engines/tm.md` → "Not yet built".
 - **SC/FSM/TM authoring** — the QuestionCreator is CC-only (other modes show "coming soon");
-  SC/FSM assignments are seeded directly rather than authored.
+  SC/FSM/TM assignments are seeded/hand-authored rather than authored through the UI.
 
 **The backend phase (the big step):**
 
@@ -91,7 +100,7 @@ the layout and conventions.)
 | Combinatorial circuits — gates, canvas eval, boxed circuits | `CLAUDE_KB/engines/overview.md`, `CLAUDE_KB/engines/cc.md` |
 | Sequential circuits — MEM, clock, timing | `CLAUDE_KB/engines/overview.md`, `CLAUDE_KB/engines/cc.md`, `CLAUDE_KB/engines/sc.md` |
 | Finite state machines — states, transitions | `CLAUDE_KB/engines/overview.md`, `CLAUDE_KB/engines/fsm.md` |
-| Turing machines — tape, head, single-action transitions (engine built; store/UI not) | `CLAUDE_KB/engines/overview.md`, `CLAUDE_KB/engines/fsm.md`, `CLAUDE_KB/engines/tm.md` |
+| Turing machines — tape, head, single-action transitions (engine + grading built; store/UI not) | `CLAUDE_KB/engines/overview.md`, `CLAUDE_KB/engines/fsm.md`, `CLAUDE_KB/engines/tm.md` |
 | Autograder, test-vector format, grading bugs | `CLAUDE_KB/engines/grading.md` + the relevant per-mode doc |
 | Submission → grade → gradebook pipeline | `CLAUDE_KB/pipeline/autograde-pipeline.md`, `CLAUDE_KB/engines/grading.md` |
 | Codec / unified value-based grading redesign (planned) | `CLAUDE_KB/pipeline/codec.md`, `CLAUDE_KB/engines/grading.md`, `CLAUDE_KB/engines/overview.md` |
@@ -125,7 +134,8 @@ the engine.
 | ------------- | ------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------ |
 | Types         | `app/src/types.ts`                                                             | All domain types: `AssignmentData`, `AssignmentQuestion`, `SubmissionData`/`SubmissionRecord`, `CircuitData`, `CCSpec`, `SubmissionResult` |
 | Engine        | `app/src/engine/cc.ts`, `sc.ts`, `fsm.ts`                                      | Pure simulators per mode (topological eval for CC; clocked step for SC; transition-matching for FSM)                                       |
-| Engine        | `app/src/engine/grader.ts`                                                     | `gradeSubmission` / `gradeQuestion` — dispatch on `buildMode`, compare against `test_vectors`; TM interim, turbot skipped                           |
+| Engine        | `app/src/engine/tm.ts`, `tmValidate.ts`, `tmCodec.ts`                          | TM: notation-aware tape engine; pre-engine table validation (ambiguous/unparseable); encode/accept/decode (the codec `tape` axis)          |
+| Engine        | `app/src/engine/grader.ts`                                                     | `gradeSubmission` / `gradeQuestion` — dispatch on `buildMode`. CC/SC/FSM vs `test_vectors`; TM value-based vs `test_cases`; turbot skipped  |
 | Engine        | `app/src/engine/testVectorGen.ts`, `formulaEval.ts`                            | Authoring-time: affine-formula language → generated CC test vectors                                                                        |
 | Engine        | `app/src/engine/representation.ts`, `index.ts`                                 | Bit encoding/decoding; barrel exports                                                                                                      |
 | Store         | `app/src/store.ts`                                                             | Zustand UI state; delegates simulation to `engine/`                                                                                        |
@@ -136,7 +146,7 @@ the engine.
 | Instructor UI | `app/src/instructor/`                                                          | `InstructorApp`, `InstructorGate`, `InstructorDashboard`, `AssignmentEditor`, `QuestionCreator`, `Gradebook(.ts/View.tsx)`                 |
 | Student UI    | `app/src/components/`                                                          | `CircuitCanvas`, `ComponentLibrary`, `DataTable`, `HomeScreen`, `MenuBar`, `SequentialTimeline`, `SimulationPanel`, `TabBar`               |
 | Dev/sample    | `app/src/devData/sampleData.ts`, `seed.ts`                                     | Builders + seeding for demo CC/SC/FSM assignments and submissions                                                                          |
-| Tools         | `app/tools/grade.ts`, `pipelineCheck.ts`                                       | Headless CLI grader and submit→grade pipeline check (`npx tsx`)                                                                            |
+| Tools         | `app/tools/grade.ts`, `pipelineCheck.ts`, `tmCheck.ts`                          | Headless CLI grader, submit→grade pipeline check, and TM engine/codec/grader smoke test (`npx tsx`)                                        |
 
 ## Reference-function DSL (instructor authoring)
 
@@ -184,6 +194,7 @@ only — the grader never sees the formula; it runs against the generated `test_
 4. **Turbots** — split arena/circuitry workspace, grid arena, hardcoded sensor/motor
    encoding, live-linked internal circuit.
 5. **Turing Machines** — infinite tape, read/write head, TM transition labels, op cycle.
+   _(engine + grading built; store/UI next)_
 6. **TM Turbots** — turbot with TM-based internal circuitry.
 
 ## Critical design rules (don't miss these)

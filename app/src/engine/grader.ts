@@ -17,7 +17,9 @@ import type {
 import { evaluateCCInputs } from './cc';
 import { evaluateSCSequence } from './sc';
 import { evaluateFSMSequence } from './fsm';
-import { makeTape, readTape, evaluateTMSequence } from './tm';
+import { evaluateTMSequence } from './tm';
+import { validateTMTable } from './tmValidate';
+import { encodeTM, acceptTM, decodeTM, notationForRepresentation } from './tmCodec';
 
 // The grading result types live in types.ts (so SubmissionRecord can carry a
 // result without a types→engine dependency). Re-exported here for the existing
@@ -80,6 +82,59 @@ function parseFSMTestVector(
  */
 export function gradeQuestion(question: AssignmentQuestion, circuit: CircuitData | undefined): QuestionResult {
   if (!circuit) return skip(question.id, 'no circuit submitted');
+
+  // TM follows the value-based codec pipeline (CLAUDE_KB/engines/tm.md): per
+  // case, Stage-1 validate the table → encode inputs at standard position → run
+  // to halt/step-limit → accept (well-formed output) → decode → compare values.
+  // It reads `test_cases` (numeric), not the bit-based `test_vectors`.
+  if (question.buildMode === 'TM') {
+    if (!question.test_cases || question.test_cases.length === 0) {
+      return skip(question.id, 'question has no test cases');
+    }
+    const notation = notationForRepresentation(question.representation);
+
+    // Stage 1: an ill-formed table fails EVERY case (never `skipped`), with the
+    // syntax error as instructor feedback.
+    const errors = validateTMTable(circuit.components, circuit.wires, notation);
+    if (errors.length > 0) {
+      const reason = errors.map((e) => e.message).join(' ');
+      const cases: CaseResult[] = question.test_cases.map((tc) => ({
+        input: tc.inputs,
+        expected: tc.outputs,
+        got: [],
+        pass: false,
+        reason,
+      }));
+      return { questionId: question.id, status: 'graded', passed: 0, total: cases.length, cases };
+    }
+
+    const cases: CaseResult[] = question.test_cases.map((tc) => {
+      const run = evaluateTMSequence(
+        circuit.components,
+        circuit.wires,
+        encodeTM(notation, tc.inputs),
+        notation
+      );
+      const reject = acceptTM(notation, run);
+      if (reject) {
+        return { input: tc.inputs, expected: tc.outputs, got: [], pass: false, reason: reject.reason };
+      }
+      const got = decodeTM(notation, run.tape);
+      return {
+        input: tc.inputs,
+        expected: tc.outputs,
+        got: [got],
+        pass: got === tc.outputs[0],
+      };
+    });
+    const passed = cases.filter((c) => c.pass).length;
+    return { questionId: question.id, status: 'graded', passed, total: cases.length, cases };
+  }
+
+  if (question.buildMode === 'turbot') {
+    return skip(question.id, 'turbot grading not yet implemented');
+  }
+
   if (!question.test_vectors || question.test_vectors.length === 0) {
     return skip(question.id, 'question has no test vectors');
   }
@@ -134,33 +189,6 @@ export function gradeQuestion(question: AssignmentQuestion, circuit: CircuitData
     });
     const passed = cases.filter((c) => c.pass).length;
     return { questionId: question.id, status: 'graded', passed, total: cases.length, cases };
-  }
-
-  if (question.buildMode === 'TM') {
-    // Each test vector's input_sequence is the initial tape (written to cells
-    // 0..n-1, head at 0); expected_output is the tape window read back after the
-    // machine halts. Same input→output framing as CC/SC. A machine that hits the
-    // step limit (probable infinite loop) fails the vector with a partial `got`.
-    const cases: CaseResult[] = question.test_vectors.map((tv) => {
-      const result = evaluateTMSequence(
-        circuit.components,
-        circuit.wires,
-        makeTape(tv.input_sequence)
-      );
-      const got = readTape(result.tape, tv.expected_output.length);
-      return {
-        input: tv.input_sequence,
-        expected: tv.expected_output,
-        got,
-        pass: result.halted && !result.hitStepLimit && bitsEqual(got, tv.expected_output),
-      };
-    });
-    const passed = cases.filter((c) => c.pass).length;
-    return { questionId: question.id, status: 'graded', passed, total: cases.length, cases };
-  }
-
-  if (question.buildMode === 'turbot') {
-    return skip(question.id, 'turbot grading not yet implemented');
   }
 
   return skip(question.id, `grading not yet supported for mode "${question.buildMode}"`);
