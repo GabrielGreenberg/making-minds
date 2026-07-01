@@ -1149,7 +1149,7 @@ function FsmTransitionView({
   const [editRight, setEditRight] = useState('0');
   const [activeField, setActiveField] = useState<'left' | 'right'>('left');
   const [dragging, setDragging] = useState(false);
-  const editorRef = useRef<HTMLDivElement>(null);
+  const editorRef = useRef<HTMLInputElement>(null);
 
   const label = wire.transitionLabel || '?:?';
   const color = isSelected ? '#2a7fff' : '#333';
@@ -1353,11 +1353,8 @@ function FsmTransitionView({
           height={30}
         >
           <div
-            ref={editorRef}
-            tabIndex={0}
-            onKeyDown={handleEditorKeyDown}
-            onBlur={() => commitEdit()}
             style={{
+              position: 'relative',
               display: 'flex',
               alignItems: 'stretch',
               width: '100%',
@@ -1370,6 +1367,36 @@ function FsmTransitionView({
               overflow: 'hidden',
             }}
           >
+            {/* A tabIndex'd <div> inside an SVG <foreignObject> doesn't reliably
+                take/keep keyboard focus in WebKit, so onKeyDown never fired and
+                0/1 presses were silently dropped. A real <input> focuses
+                reliably; keep it invisible and overlaid so the two colored
+                halves below remain the visible UI. */}
+            <input
+              ref={editorRef}
+              readOnly
+              value=""
+              onKeyDown={handleEditorKeyDown}
+              onBlur={() => commitEdit()}
+              style={{
+                position: 'absolute',
+                inset: 0,
+                width: '100%',
+                height: '100%',
+                margin: 0,
+                padding: 0,
+                border: 'none',
+                background: 'transparent',
+                color: 'transparent',
+                caretColor: 'transparent',
+                outline: 'none',
+                cursor: 'default',
+                // Let clicks fall through to the two halves below (which set
+                // the active field and refocus this input) instead of the
+                // absolutely-positioned input eating them.
+                pointerEvents: 'none',
+              }}
+            />
             {/* Input half */}
             <div
               onClick={(e) => { e.stopPropagation(); setActiveField('left'); editorRef.current?.focus(); }}

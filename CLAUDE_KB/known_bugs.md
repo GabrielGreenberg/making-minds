@@ -1,0 +1,1 @@
+- TM question no longer visible in the test assignment ("load sample data" only loads CC, SC, and FSM questions). Since the TM (and SC, and FSM) question editors are not yet live, this is the only way of accessing the TM canvas.
