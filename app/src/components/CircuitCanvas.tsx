@@ -1334,10 +1334,9 @@ function FsmTransitionView({
             <text x={x0 + halfW / 2} y={labelPos.y} textAnchor="middle" dominantBaseline="central"
               fontSize="12" fontFamily="'SF Mono','Fira Code',monospace" fontWeight="600"
               fill={color} pointerEvents="none">{lPart}</text>
-            {/* Colon */}
-            <text x={labelPos.x} y={labelPos.y} textAnchor="middle" dominantBaseline="central"
-              fontSize="11" fontFamily="'SF Mono','Fira Code',monospace" fontWeight="400"
-              fill="#aaa" pointerEvents="none">:</text>
+            {/* Separator */}
+            <line x1={labelPos.x} y1={y0 + 3} x2={labelPos.x} y2={y0 + H - 3}
+              stroke="#ccc" strokeWidth={1} pointerEvents="none" />
             {/* Output digit */}
             <text x={x0 + halfW + halfW / 2} y={labelPos.y} textAnchor="middle" dominantBaseline="central"
               fontSize="12" fontFamily="'SF Mono','Fira Code',monospace" fontWeight="600"
@@ -1353,6 +1352,10 @@ function FsmTransitionView({
           height={30}
         >
           <div
+            // Lets the canvas-level pointerdown handler recognize a click on
+            // the OTHER half of this editor and skip its forced blur, so the
+            // click can switch the active field instead of closing the editor.
+            data-fsm-transition-editor="true"
             style={{
               position: 'relative',
               display: 'flex',
@@ -1414,11 +1417,11 @@ function FsmTransitionView({
                 userSelect: 'none',
               }}
             >{editLeft}</div>
-            {/* Colon */}
+            {/* Separator */}
             <div style={{
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              fontSize: 11, color: '#aaa', padding: '0 1px', userSelect: 'none',
-            }}>:</div>
+              width: 1, alignSelf: 'stretch', margin: '5px 1px',
+              background: '#ccc', flexShrink: 0,
+            }} />
             {/* Output half */}
             <div
               onClick={(e) => { e.stopPropagation(); setActiveField('right'); editorRef.current?.focus(); }}
@@ -2812,11 +2815,16 @@ export function CircuitCanvas() {
       // tab name), blur it first so the edit commits before we do anything else.
       // This is needed because preventDefault() below would suppress the
       // automatic blur that browsers normally do on pointerdown.
+      // Exception: a click on the other half of an open FSM transition-label
+      // editor should switch which side is active, not blur-and-close — that
+      // half's own click handler manages focus/activeField itself.
       const activeEl = document.activeElement;
+      const withinOpenFsmEditor = (e.target as Element).closest?.('[data-fsm-transition-editor]');
       if (
         activeEl &&
         (activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA') &&
-        activeEl !== e.target
+        activeEl !== e.target &&
+        !withinOpenFsmEditor
       ) {
         (activeEl as HTMLElement).blur();
       }
