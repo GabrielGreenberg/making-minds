@@ -1,5 +1,5 @@
 // Sample assignment + artificial submissions for exercising the full pipeline
-// (submit → store → autograde → instructor gradebook) across CC, SC, and FSM.
+// (submit → store → autograde → instructor gradebook) across CC, SC, FSM, and TM.
 //
 // Pure and framework-agnostic: builds `AssignmentData` and `SubmissionData`
 // values only — no storage, no React. The browser dev seed (devData/seed.ts) and
@@ -9,8 +9,9 @@
 // (engine/testVectorGen.ts) — the codec model (CLAUDE_KB/pipeline/codec.md). The
 // sample circuits implement those functions exactly on their axis: CC `a & b`
 // (space); SC a 1-step delay register, which on the time axis computes `2 * x`;
-// FSM a pass-through identity, `x`. So a correct submission scores 100% and the
-// pipeline check is self-consistent.
+// FSM a pass-through identity, `x`; TM unary successor, which on the tape axis
+// computes `x + 1`. So a correct submission scores 100% and the pipeline check
+// is self-consistent.
 
 import type {
   AssignmentData,
@@ -18,6 +19,7 @@ import type {
   CCSpec,
   CircuitComponent,
   CircuitData,
+  RepSystem,
   SubmissionData,
   Wire,
 } from '../types';
@@ -78,7 +80,9 @@ export function ccCorrect(): CircuitData {
 export function ccIncorrect(): CircuitData {
   const c = ccCorrect();
   return {
-    components: c.components.map((x) => (x.id === 'cc-and' ? { ...x, type: 'OR' } : x)),
+    components: c.components.map((x) =>
+      x.id === 'cc-and' ? { ...x, type: 'OR' } : x,
+    ),
     wires: c.wires,
   };
 }
@@ -103,10 +107,7 @@ export function scCorrect(): CircuitData {
 // Wrong: pass-through (no delay). OUT1[t] = IN1[t].
 export function scIncorrect(): CircuitData {
   return {
-    components: [
-      comp('sc-in1', 'INPUT', 'IN1'),
-      comp('sc-out1', 'OUTPUT', 'OUT1'),
-    ],
+    components: [comp('sc-in1', 'INPUT', 'IN1'), comp('sc-out1', 'OUTPUT', 'OUT1')],
     wires: [wire('sc-w1', 'sc-in1', 'out', 'sc-out1', 'in')],
   };
 }
@@ -136,6 +137,31 @@ export function fsmIncorrect(): CircuitData {
   };
 }
 
+// ── TM: unary successor. y = x + 1 (tape axis, unary/tally notation) ───
+// S₀ scans right over strokes (stay); on the first background cell it writes
+// a stroke and halts in S₁ — appending one 1 to the block.
+
+export function tmCorrect(): CircuitData {
+  return {
+    components: [comp('tm-s0', 'STATE', 'S₀'), comp('tm-s1', 'STATE', 'S₁')],
+    wires: [
+      wire('tm-t1', 'tm-s0', 'right', 'tm-s0', 'left', { transitionLabel: '1:R' }),
+      wire('tm-t2', 'tm-s0', 'right', 'tm-s1', 'left', { transitionLabel: '0:1' }),
+    ],
+  };
+}
+
+// Wrong: erase every stroke walking left, then halt → always outputs 0.
+export function tmIncorrect(): CircuitData {
+  return {
+    components: [comp('tm-s0', 'STATE', 'S₀'), comp('tm-s1', 'STATE', 'S₁')],
+    wires: [
+      wire('tm-t1', 'tm-s0', 'right', 'tm-s1', 'left', { transitionLabel: '1:0' }),
+      wire('tm-t2', 'tm-s1', 'right', 'tm-s0', 'left', { transitionLabel: '0:L' }),
+    ],
+  };
+}
+
 // ── Sample assignment (test cases generated from DSL formulas + rep) ──
 // Each question is value-based: the codec encodes inputs to the mode's axis,
 // runs the circuit, decodes the output, and compares to f(x).
@@ -146,15 +172,16 @@ function question(
   statement: string,
   buildMode: AssignmentQuestion['buildMode'],
   spec: CCSpec,
+  representation: RepSystem = 'binary',
 ): AssignmentQuestion {
   return {
     id,
     label,
     statement,
     buildMode,
-    representation: 'binary',
+    representation,
     cc_spec: spec,
-    test_cases: generateTestCases(spec, 'binary'),
+    test_cases: generateTestCases(spec, representation),
   };
 }
 
@@ -166,7 +193,10 @@ export function buildSampleAssignment(): AssignmentData {
     'Build a combinatorial circuit computing OUT1 = IN1 AND IN2.',
     'CC',
     {
-      inputs: [{ name: 'a', width: 1 }, { name: 'b', width: 1 }],
+      inputs: [
+        { name: 'a', width: 1 },
+        { name: 'b', width: 1 },
+      ],
       outputs: [{ name: 'y', width: 1, formula: 'a & b' }],
     },
   );
@@ -197,10 +227,25 @@ export function buildSampleAssignment(): AssignmentData {
     },
   );
 
+  // TM: unary successor, y = x + 1 (tape axis; "tally" representation is the
+  // unary notation on this axis). Output width 4 holds x+1 for the 0..3 input
+  // range.
+  const tmQuestion = question(
+    4,
+    'Q4 (TM)',
+    'Build a Turing machine that computes the unary successor (OUT = IN + 1).',
+    'TM',
+    {
+      inputs: [{ name: 'x', width: 3 }],
+      outputs: [{ name: 'y', width: 4, formula: 'x + 1' }],
+    },
+    'tally',
+  );
+
   return {
     id: SAMPLE_ASSIGNMENT_ID,
-    title: 'Sample — CC / SC / FSM',
-    questions: [ccQuestion, scQuestion, fsmQuestion],
+    title: 'Sample — CC / SC / FSM / TM',
+    questions: [ccQuestion, scQuestion, fsmQuestion, tmQuestion],
   };
 }
 
@@ -211,27 +256,29 @@ function submission(
   cc: CircuitData,
   sc: CircuitData,
   fsm: CircuitData,
+  tm: CircuitData,
 ): SubmissionData {
   return {
-    assignmentTitle: 'Sample — CC / SC / FSM',
+    assignmentTitle: 'Sample — CC / SC / FSM / TM',
     student,
     submittedAt: '2026-06-27T12:00:00.000Z', // stamped by caller in real flow
     answers: [
       { questionId: 1, circuit: cc },
       { questionId: 2, circuit: sc },
       { questionId: 3, circuit: fsm },
+      { questionId: 4, circuit: tm },
     ],
   };
 }
 
-/** All-correct submission (should score 3/3). */
+/** All-correct submission (should score 4/4). */
 export function buildCorrectSubmission(student = 'correct@example.com'): SubmissionData {
-  return submission(student, ccCorrect(), scCorrect(), fsmCorrect());
+  return submission(student, ccCorrect(), scCorrect(), fsmCorrect(), tmCorrect());
 }
 
-/** All-incorrect submission (should score 0/3). */
+/** All-incorrect submission (should score 0/4). */
 export function buildIncorrectSubmission(student = 'wrong@example.com'): SubmissionData {
-  return submission(student, ccIncorrect(), scIncorrect(), fsmIncorrect());
+  return submission(student, ccIncorrect(), scIncorrect(), fsmIncorrect(), tmIncorrect());
 }
 
 /**
@@ -240,10 +287,10 @@ export function buildIncorrectSubmission(student = 'wrong@example.com'): Submiss
  */
 export function buildSampleSubmissions(): SubmissionData[] {
   return [
-    submission('ada@example.com', ccCorrect(), scCorrect(), fsmCorrect()), // 3/3
-    submission('alan@example.com', ccCorrect(), scIncorrect(), fsmCorrect()), // 2/3
-    submission('grace@example.com', ccCorrect(), scCorrect(), fsmIncorrect()), // 2/3
-    submission('claude@example.com', ccIncorrect(), scIncorrect(), fsmIncorrect()), // 0/3
-    submission('', ccCorrect(), scCorrect(), fsmCorrect()), // Anonymous, 3/3
+    submission('ada@example.com', ccCorrect(), scCorrect(), fsmCorrect(), tmCorrect()), // 4/4
+    submission('alan@example.com', ccCorrect(), scIncorrect(), fsmCorrect(), tmCorrect()), // 3/4
+    submission('grace@example.com', ccCorrect(), scCorrect(), fsmIncorrect(), tmIncorrect()), // 2/4
+    submission('claude@example.com', ccIncorrect(), scIncorrect(), fsmIncorrect(), tmIncorrect()), // 0/4
+    submission('', ccCorrect(), scCorrect(), fsmCorrect(), tmCorrect()), // Anonymous, 4/4
   ];
 }
