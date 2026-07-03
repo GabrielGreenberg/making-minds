@@ -1620,6 +1620,14 @@ thead .sc-label-col {
 .instructor-preview-errors { color: var(--danger); padding-left: 18px; }
 .instructor-preview-warning { color: var(--danger); }
 
+/* Live single-input probe */
+.instructor-probe { display: flex; align-items: center; flex-wrap: wrap; gap: 14px; margin-top: 8px; }
+.instructor-probe-inputs, .instructor-probe-outputs { display: flex; align-items: center; flex-wrap: wrap; gap: 14px; }
+.instructor-probe-field { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; }
+.instructor-probe-name { color: var(--text-secondary); font-family: ui-monospace, Menlo, monospace; }
+.instructor-probe-arrow { color: var(--text-secondary); font-size: 16px; }
+.instructor-probe-out { font-size: 13px; }
+
 /* Gradebook */
 .instructor-stats { display: flex; gap: 24px; flex-wrap: wrap; margin-bottom: 20px; padding: 14px 16px; background: var(--panel-bg); border-radius: 8px; }
 .instructor-stat { display: flex; flex-direction: column; }
