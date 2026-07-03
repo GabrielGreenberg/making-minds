@@ -16,7 +16,7 @@ Claude to load into context).
 >
 > A change isn't finished until the docs that describe it are too.
 
-_Last updated: 2026-06-30_
+_Last updated: 2026-07-03_
 
 ---
 
@@ -66,7 +66,10 @@ The missing half is the **server** and productized submit/grade loop.
   `tmCodec.ts`); the store (`tmStep`) and UI (tape strip, status table, `input:action` label
   editor) are not. This is the next TM step — see `CLAUDE_KB/engines/tm.md` → "Not yet built".
 - **SC/FSM/TM authoring** — the QuestionCreator is CC-only (other modes show "coming soon");
-  SC/FSM/TM assignments are seeded/hand-authored rather than authored through the UI.
+  SC/FSM/TM assignments are seeded/hand-authored rather than authored through the UI. A concrete
+  plan to unify the editor across all four modes exists — see
+  `CLAUDE_KB/plans/question-editor-unification.md` — including a prerequisite bug fix (TM output
+  values get wrongly width-truncated by the current test-case generator).
 
 **The backend phase (the big step):**
 
@@ -103,6 +106,7 @@ the layout and conventions.)
 | Finite state machines — states, transitions | `CLAUDE_KB/engines/overview.md`, `CLAUDE_KB/engines/fsm.md` |
 | Turing machines — tape, head, single-action transitions (engine + grading built; store/UI not) | `CLAUDE_KB/engines/overview.md`, `CLAUDE_KB/engines/fsm.md`, `CLAUDE_KB/engines/tm.md` |
 | TM store + UI (the next TM step: `tmStep`, tape strip, status display) | `CLAUDE_KB/plans/tm-store.md`, `CLAUDE_KB/engines/tm.md` |
+| Question editor unification (CC/SC/FSM/TM authoring in one form) | `CLAUDE_KB/plans/question-editor-unification.md` |
 | Autograder, codec, test-case format, grading bugs | `CLAUDE_KB/engines/grading.md` + the relevant per-mode doc |
 | Submission → grade → gradebook pipeline | `CLAUDE_KB/pipeline/autograde-pipeline.md`, `CLAUDE_KB/engines/grading.md` |
 | Codec — unified value-based grading (built; the cross-cutting design) | `CLAUDE_KB/pipeline/codec.md`, `CLAUDE_KB/engines/grading.md`, `CLAUDE_KB/engines/overview.md` |

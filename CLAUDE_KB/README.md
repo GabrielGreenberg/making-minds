@@ -28,6 +28,7 @@ CLAUDE_KB/
     autograde-pipeline.md  submit → grade-on-receipt → gradebook
   plans/               ← session-handoff plans for not-yet-built work
     tm-store.md          next TM step: store (tmStep) + UI wiring
+    question-editor-unification.md   unify the CC/SC/FSM/TM question editor into one form
 ```
 
 ## Conventions

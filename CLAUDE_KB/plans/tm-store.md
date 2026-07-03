@@ -91,9 +91,13 @@ tmHitStepLimit: boolean;        // bailed at DEFAULT_TM_MAX_STEPS — probable i
 
 ## Authoring (separate, later)
 
-No TM path in `QuestionCreator` / `testVectorGen.ts`; TM samples are hand-authored as value-based
-`test_cases`. TM generation must **sample** tapes, not enumerate (TM correctness is undecidable) —
-see `../engines/tm.md` "Grading (target semantics)".
+No TM path in `QuestionCreator` / `testVectorGen.ts` yet; TM samples are hand-authored as
+value-based `test_cases`. See `../plans/question-editor-unification.md` for the concrete plan —
+it corrects an earlier note here that generation "must sample, not enumerate": `generateTestCases`
+enumerates a bounded input space the same way for every mode (width still bounds which `x` values
+get tested), and that's fine for TM too. The real TM-specific issue is that the generator
+currently **width-truncates the stored output**, which is wrong for TM's unbounded tape (see
+`../known_bugs.md`) — that's a bug to fix, not a reason to sample instead of enumerate.
 
 ## Testing
 
