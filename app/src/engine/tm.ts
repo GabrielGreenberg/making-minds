@@ -5,9 +5,11 @@
 // A TM here is "the FSM editor + a tape": STATE components are the control
 // states and wires carry a `transitionLabel`. Where an FSM label is
 // `input:output`, a TM label is `input:action` (spec §10.3) where action is a
-// single tape primitive: R (move right), L (move left), or write a symbol
-// (`0`/`1`, plus `*` for binary machines). Exactly one action happens per step
-// — a write and a move are two separate transitions/steps.
+// compound write+move token: `[symbol][L|R]` — write a symbol under the head,
+// then move the head one cell. Every step does BOTH, as one atomic action.
+// The write symbol is `0`/`1` (plus `*` for binary machines); the move is `L`
+// or `R`. So the action tokens are `0L 0R 1L 1R` (unary) / `0L 0R 1L 1R *L *R`
+// (binary), e.g. `1:0R` = read `1`, write `0`, move right.
 //
 // This module is the PURE SIMULATION layer only (module 2 of CLAUDE_KB/engines/
 // tm.md). It assumes the transition table has already passed machine-table
@@ -28,13 +30,12 @@ import { sortStateComponents } from './fsm';
 
 export type { TMTape } from '../types';
 
-export type TMActionToken = 'R' | 'L' | '0' | '1' | '*';
+export type TMActionToken = '0L' | '0R' | '1L' | '1R' | '*L' | '*R';
 
 export interface TMAction {
   raw: TMActionToken;
-  kind: 'move' | 'write';
-  dir?: 'L' | 'R';      // when kind === 'move'
-  symbol?: TMSymbol;    // when kind === 'write'
+  symbol: TMSymbol;     // symbol written under the head
+  dir: 'L' | 'R';       // direction the head then moves
 }
 
 /** True if `symbol` is a legal tape symbol for the given notation. */
@@ -50,20 +51,18 @@ export function readCell(tape: TMTape, index: number): TMSymbol {
 }
 
 /**
- * Parse an action token into a structured action, or null if invalid for the
- * notation. `*` is a legal write only for binary machines.
+ * Parse an action token into a structured write+move action, or null if invalid
+ * for the notation. A token is exactly two characters `[symbol][L|R]`: the
+ * symbol written under the head (legality is notation-gated — `*` only for
+ * binary) followed by the move direction.
  */
 export function parseTMAction(token: string, notation: TMNotation): TMAction | null {
-  switch (token) {
-    case 'R': return { raw: 'R', kind: 'move', dir: 'R' };
-    case 'L': return { raw: 'L', kind: 'move', dir: 'L' };
-    case '0': return { raw: '0', kind: 'write', symbol: '0' };
-    case '1': return { raw: '1', kind: 'write', symbol: '1' };
-    case '*': return notation === 'binary'
-      ? { raw: '*', kind: 'write', symbol: '*' }
-      : null;
-    default:  return null;
-  }
+  if (token.length !== 2) return null;
+  const symbol = token[0];
+  const move = token[1];
+  if (!isSymbolForNotation(symbol, notation)) return null;
+  if (move !== 'L' && move !== 'R') return null;
+  return { raw: token as TMActionToken, symbol, dir: move };
 }
 
 export interface ParsedTMTransition {
@@ -72,9 +71,10 @@ export interface ParsedTMTransition {
 }
 
 /**
- * Parse a transition label of the form "input:action" (e.g. "1:R", "0:1",
- * "*:L"), notation-aware. The read symbol and the action must both be legal for
- * the machine's notation. Returns null on any malformed/illegal label.
+ * Parse a transition label of the form "input:action" (e.g. "1:0R", "0:1R",
+ * "*:*L"), notation-aware. The read symbol and the write+move action must both
+ * be legal for the machine's notation. Returns null on any malformed/illegal
+ * label.
  */
 export function parseTMTransition(
   label: string | undefined,
@@ -90,22 +90,20 @@ export function parseTMTransition(
 }
 
 /**
- * Apply a tape action, returning a new tape (no mutation of the input). A *move*
- * shares the `cells` reference (only `head` changes); a *write* returns a fresh
- * `cells` object. Writing background `'0'` deletes the key (normalise to
- * non-background) so a blank tape is `{}` and block scans walk only real marks.
+ * Apply a write+move action, returning a new tape (no mutation of the input).
+ * Writes `symbol` under the head, then shifts `head` by `dir`. Every step both
+ * writes and moves, so `cells` is always cloned. Writing background `'0'`
+ * deletes the key (normalise to non-background) so a blank tape is `{}` and
+ * block scans walk only real marks.
  */
 export function applyAction(tape: TMTape, action: TMAction): TMTape {
-  if (action.kind === 'move') {
-    return { cells: tape.cells, head: tape.head + (action.dir === 'R' ? 1 : -1) };
-  }
-  // write
+  const head = tape.head + (action.dir === 'R' ? 1 : -1);
   if (action.symbol === '0') {
     const cells = { ...tape.cells };
     delete cells[tape.head];
-    return { cells, head: tape.head };
+    return { cells, head };
   }
-  return { cells: { ...tape.cells, [tape.head]: action.symbol! }, head: tape.head };
+  return { cells: { ...tape.cells, [tape.head]: action.symbol }, head };
 }
 
 export interface TMStepResult {

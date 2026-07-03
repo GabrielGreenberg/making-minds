@@ -1,9 +1,12 @@
 # Plan — TM two-action model (write + move per step)
 
-> **Status: PLANNED — NOT YET BUILT.** Session handoff doc. This is an engine-level revision to
-> the TM transition-action grammar, ahead of the store/UI (`tm-store.md`). Read `../engines/tm.md`
-> first — this plan changes that doc's action-token grammar throughout; keep it consistent rather
-> than layering a second grammar description on top.
+> **Status: DONE (engine + docs), except step 10.** Steps 1–9 are implemented: `engine/tm.ts`
+> (compound `[symbol][L|R]` tokens, always write-then-move), the sample circuits, `tools/tmCheck.ts`
+> coverage, and every KB doc (`../engines/tm.md`, `tm-store.md`, `CLAUDE.md`) now describe the
+> two-action grammar consistently. Verified green by `tmCheck.ts` / `pipelineCheck.ts` /
+> `codecCheck.ts`. **Still open: step 10** — `spec/PHIL_133_Platform_Spec_v2.md` §10.3–10.4 edits
+> need explicit sign-off before touching the checked-in source-of-truth doc. Kept as the design
+> record.
 
 ## The change
 

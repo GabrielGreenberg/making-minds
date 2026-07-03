@@ -67,8 +67,9 @@ tmHitStepLimit: boolean;        // bailed at DEFAULT_TM_MAX_STEPS — probable i
   `setTmTapeFromValues(values)` using `encodeTM(tmNotation(), values)` as a convenience.
 - **Transition labels:** STATE→STATE wire creation hardcodes `transitionLabel: '0:0'`
   (store.ts:802) and `setTransitionLabel` enforces the FSM regex `^[01]:[01]$` (store.ts:2771).
-  For TM the default should be a valid TM label (e.g. `'0:R'`) and the setter must validate
-  `input:action` via `parseTMTransition(label, notation)`. Either branch these by `buildMode` or
+  For TM the default should be a valid TM label (e.g. `'0:0R'` — write `0`, move right, under the
+  two-action model) and the setter must validate `input:action` via
+  `parseTMTransition(label, notation)`. Either branch these by `buildMode` or
   add a `setTmTransitionLabel`.
 
 ## Integration points (small, easy to miss)

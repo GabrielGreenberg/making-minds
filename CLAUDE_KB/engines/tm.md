@@ -10,7 +10,8 @@ FSM control graph + a tape," and reuses FSM machinery.
 
 A Turing machine is an FSM (STATE nodes + transition wires) augmented with a two-way-infinite
 read/write tape. At each step it reads the cell under the head, takes the matching transition,
-and performs **one** tape action. The control half reuses `sortStateComponents` from `fsm.ts`.
+and performs one compound **write+move** action — writes a symbol under the head, then moves the
+head one cell. The control half reuses `sortStateComponents` from `fsm.ts`.
 
 ## Relationship to the codec pipeline (authority: `pipeline/codec.md`)
 
@@ -40,14 +41,17 @@ exactly-one-block + optional standard position) and then a **total value decode*
 of this doc folded both into one `decode` returning a `WellFormednessError`; the split below
 matches the codec.
 
-## The model — single-action transitions
+## The model — two-action transitions (write + move)
 
-Single-action / Post–Turing model (platform spec §10.3): each transition does exactly one of
-move-left, move-right, or write-a-symbol — **not** the textbook combined write+move+state. A
-write and a move are two separate steps.
+Every transition performs a **write and a move together**, as one atomic step (platform spec
+§10.3): it writes a symbol under the head, then moves the head one cell left or right. The action
+half of a label is a two-character token `[symbol][L|R]` (e.g. `1:0R` = read `1`, write `0`, move
+right). This is the classic write-then-move Turing model; the machine's *state* is carried by the
+transition's target as in the FSM.
 
-> An earlier draft proposed a combined `read:write,move` grammar — **wrong** for this project.
-> This section supersedes any such note.
+> Earlier drafts used a **single-action** grammar (`R`/`L`/`0`/`1`/`*` — a move *or* a write,
+> never both, so a write and a move were two separate steps). That is superseded: every step now
+> both writes and moves. See `plans/tm-two-action-model.md` for the revision.
 
 ## Module boundaries — keep the engine pure
 
@@ -99,14 +103,15 @@ A TM is either **unary** or **binary**; the two are **separate machines** with d
 alphabets and action sets. There is **no blank symbol** — the symbol `0` is the background that
 separates and surrounds blocks.
 
-| | Tape alphabet | Action tokens | Output block |
+| | Tape alphabet | Action tokens (`[symbol][L\|R]`) | Output block |
 | --- | --- | --- | --- |
-| **Unary** | `0`, `1` | `R`, `L`, `0`, `1` | a contiguous run of `1`s (a stroke block); a run of **length 0 is allowed** and denotes 0 |
-| **Binary** | `0`, `1`, `*` | `R`, `L`, `0`, `1`, `*` | a binary numeral **enclosed in `*`**: `*d_k…d_0*` |
+| **Unary** | `0`, `1` | `0L`, `0R`, `1L`, `1R` | a contiguous run of `1`s (a stroke block); a run of **length 0 is allowed** and denotes 0 |
+| **Binary** | `0`, `1`, `*` | `0L`, `0R`, `1L`, `1R`, `*L`, `*R` | a binary numeral **enclosed in `*`**: `*d_k…d_0*` |
 
-So a **binary** machine *can* write `*` (its action set includes it); a unary machine cannot.
-The `input` half of a transition label ranges over the machine's alphabet too (binary states may
-branch on reading `*`).
+So a **binary** machine *can* write `*` (its action set includes `*L`/`*R`); a unary machine
+cannot. The `input` half of a transition label ranges over the machine's alphabet too (binary
+states may branch on reading `*`); the `input` half is always a single symbol — only the `action`
+half is two characters.
 
 **Input layout.** Inputs are blocks laid out left-to-right, **consecutive inputs separated by a
 single `0`**, with background `0`s on the outside:
@@ -189,11 +194,11 @@ interface TMTape {
 - **Head absolute, never renormalised** — keeps history/stepping and the render window stable.
   The render window and block bounds are **derived** (`Object.keys(cells).map(Number)` → min/max,
   padded around `head`), never stored.
-- **Immutability.** `applyAction` is pure: a *move* shares the `cells` ref (head changes only); a
-  *write* returns a new object (`{...cells,[head]:sym}`, or clone-minus-key when writing `'0'`).
-  The store needs immutable per-step snapshots anyway, so pure is the default. At ≤ `maxSteps` the
-  per-write spread is fine; if it ever profiles hot, the grader may run a mutable working copy and
-  snapshot only for history — without changing the public API.
+- **Immutability.** `applyAction` is pure: every step both writes and moves, so it always returns
+  a new object (`{...cells,[head]:sym}`, or clone-minus-key when writing `'0'`) with the shifted
+  `head`. The store needs immutable per-step snapshots anyway, so pure is the default. At ≤
+  `maxSteps` the per-step spread is fine; if it ever profiles hot, the grader may run a mutable
+  working copy and snapshot only for history — without changing the public API.
 
 ### Encode / accept / decode — the codec `tape` axis
 
@@ -270,7 +275,7 @@ The earlier cell-0 / fixed-window model has been reworked to the semantics above
 | Concern | Now |
 | --- | --- |
 | Tape alphabet | notation-dependent: `{0,1}` unary, `{0,1,*}` binary (`TMSymbol`, `isSymbolForNotation`) |
-| Action set | `{R,L,0,1}` unary, `{R,L,0,1,*}` binary (`parseTMAction(token, notation)`) |
+| Action set | write+move tokens `[symbol][L\|R]`: `{0L,0R,1L,1R}` unary, `+ {*L,*R}` binary (`parseTMAction(token, notation)`) |
 | Head start | standard position — rightmost symbol of rightmost input (`encodeTM`) |
 | Output location | `acceptTM`/`decodeTM` locate the one block by content (`tmCodec.ts`) |
 | Block-count / well-formedness | `acceptTM` — exactly one block; unary blank = value 0 |
@@ -292,8 +297,8 @@ bit-based `test_vectors` are gone. Notation comes from `question.representation`
 ## Not yet built (store + UI)
 
 - **Store.** No `tmStep`. Mirror `fsmStep`: wrap `evaluateTMSingleStep`, hold the tape
-  **immutably** (`applyAction` shares `cells` on a *move*, clones only on a *write* — never
-  mutate `tape.cells` in place), append a `TmHistoryEntry` per step.
+  **immutably** (`applyAction` returns a fresh tape every step — never mutate `tape.cells` in
+  place), append a `TmHistoryEntry` per step.
 - **UI.** Tape strip (click-to-toggle cells + head marker, scrollable, §10.2), §10.5 status
   display, `input:action` validation + syntax-error reporting in the transition editor,
   `buildMode === 'TM'` in the library.
@@ -354,10 +359,12 @@ All are re-exported from `engine/index.ts`.
 
 2. **Engine core — `app/src/engine/tm.ts`.**
    - `cells: Record<number, TMSymbol>`; `readCell` returns `'0'` for absent keys.
-   - `parseTMAction(token, notation)` / `parseTMTransition(label, notation)` become
-     **notation-aware**: `*` is a legal input/action symbol **only** for binary.
-   - `applyAction`: writing `'1'`/`'*'` sets the cell; writing `'0'` **deletes the key**
-     (normalise-to-non-background); a *move* shares `cells` and shifts `head`.
+   - `parseTMAction(token, notation)` / `parseTMTransition(label, notation)` are
+     **notation-aware**: `*` is a legal input/write symbol **only** for binary. An action token
+     is `[symbol][L|R]` (two-action model — see `plans/tm-two-action-model.md`).
+   - `applyAction`: writes the symbol under the head — `'1'`/`'*'` sets the cell, `'0'` **deletes
+     the key** (normalise-to-non-background) — then shifts `head` by the move direction. Every
+     step both writes and moves.
    - `evaluateTMSingleStep` / `evaluateTMSequence` keep their current shapes but **assume a
      validated table** (the matching transition is unique — no first-match tie-break).
    - **Remove** `makeTape` and `readTape` (superseded by `encode`/`decode` in step 4).
