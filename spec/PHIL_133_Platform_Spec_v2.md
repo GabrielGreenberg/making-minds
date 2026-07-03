@@ -600,16 +600,23 @@ A Turing Machine consists of:
 
 TM transitions use the format **input:action** where:
 
-- Input is 0 or 1 (the value read from the current tape cell)
-- Action is one of: R (move right), L (move left), 1 (write 1), 0 (write 0)
+- Input is the symbol read from the current tape cell (0 or 1; also `*` for binary machines)
+- Action is a compound **write-then-move** token `[symbol][L|R]`: the machine writes the symbol
+  under the head, then moves the head one cell. So every transition both writes and moves in a
+  single step — a write and a move are not separate steps.
+  - Unary machines: `0L`, `0R`, `1L`, `1R`
+  - Binary machines: `0L`, `0R`, `1L`, `1R`, `*L`, `*R`
+
+For example, `1:0R` means "on reading 1, write 0 and move right."
 
 ### 10.4 TM Operation Cycle
 
 At each time step:
 
 1. **Read** the current tape cell
-2. **Run** the FSM: given current state and tape reading, determine output and next state
-3. **Execute** the tape action (move or write)
+2. **Run** the FSM: given current state and tape reading, determine the transition's action and
+   next state
+3. **Write** the action's symbol under the head, **then move** the head left or right
 4. Repeat (or halt, if no transition exists for the current state and input)
 
 ### 10.5 TM Status Display
@@ -619,7 +626,7 @@ The upper-right panel shows:
 - Current time step
 - Current state
 - Read value
-- Write/Move action
+- Action (write + move, e.g. `0R`)
 - Next state
 
 ### 10.6 TM Halting

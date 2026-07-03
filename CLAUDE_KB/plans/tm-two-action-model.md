@@ -1,12 +1,11 @@
 # Plan — TM two-action model (write + move per step)
 
-> **Status: DONE (engine + docs), except step 10.** Steps 1–9 are implemented: `engine/tm.ts`
-> (compound `[symbol][L|R]` tokens, always write-then-move), the sample circuits, `tools/tmCheck.ts`
-> coverage, and every KB doc (`../engines/tm.md`, `tm-store.md`, `CLAUDE.md`) now describe the
-> two-action grammar consistently. Verified green by `tmCheck.ts` / `pipelineCheck.ts` /
-> `codecCheck.ts`. **Still open: step 10** — `spec/PHIL_133_Platform_Spec_v2.md` §10.3–10.4 edits
-> need explicit sign-off before touching the checked-in source-of-truth doc. Kept as the design
-> record.
+> **Status: DONE (all steps).** Steps 1–10 are implemented: `engine/tm.ts` (compound
+> `[symbol][L|R]` tokens, always write-then-move), the sample circuits, `tools/tmCheck.ts`
+> coverage, and every doc — the KB (`../engines/tm.md`, `tm-store.md`, `CLAUDE.md`) and
+> `spec/PHIL_133_Platform_Spec_v2.md` §10.3–10.5 (signed off) — now describe the two-action grammar
+> consistently. Verified green by `tmCheck.ts` / `pipelineCheck.ts` / `codecCheck.ts`. Kept as the
+> design record.
 
 ## The change
 
