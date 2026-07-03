@@ -6,9 +6,11 @@
 // generateTestCases stores at save, but it keeps the intermediate detail for
 // display and reports per-output formula errors instead of throwing.
 
-import type { CCInputGroup, CCOutputGroup, RepSystem } from '../types';
+import type { BuildMode, CCInputGroup, CCOutputGroup, RepSystem } from '../types';
 import { evalFormula, FormulaError } from '../engine/formulaEval';
 import { valueToBits } from '../engine/representation';
+import { axisForMode } from '../engine/codec';
+import { formatTMValue, notationForRepresentation } from '../engine/tmCodec';
 
 // Guard against an explosively large input space hanging the browser. PHIL 133
 // CC exercises are tiny; anything past this is almost certainly a mistake.
@@ -20,11 +22,15 @@ export interface PreviewCellInput {
   name: string;
   bits: number[];
   value: number;
+  // TM only: the natural (unpadded) tape encoding, shown instead of `bits`.
+  display?: string;
 }
 export interface PreviewCellOutput {
   name: string;
   result: number | null; // null when the formula errored for this row
   bits: number[] | null;
+  // TM only: the natural (unpadded) tape encoding, shown instead of `bits`.
+  display?: string;
 }
 export interface PreviewRow {
   inputs: PreviewCellInput[];
@@ -96,7 +102,13 @@ export function buildPreview(
   inputs: CCInputGroup[],
   outputs: CCOutputGroup[],
   rep: RepSystem,
+  mode: BuildMode,
 ): PreviewResult {
+  // TM's tape axis is unbounded: don't width-truncate outputs, and render the
+  // natural tape encoding rather than a fixed-width bit vector (see §1–3 of
+  // CLAUDE_KB/plans/question-editor-unification.md).
+  const isTape = axisForMode(mode) === 'tape';
+  const notation = notationForRepresentation(rep);
   const structuralErrors = validateGroups(inputs, outputs);
   const outputErrors: (string | null)[] = outputs.map(() => null);
 
@@ -124,12 +136,21 @@ export function buildPreview(
     const vars: Record<string, number> = {};
     const inputCells: PreviewCellInput[] = inputs.map((g, i) => {
       vars[g.name] = values[i];
-      return { name: g.name, value: values[i], bits: valueToBits(values[i], g.width, rep) };
+      return {
+        name: g.name,
+        value: values[i],
+        bits: valueToBits(values[i], g.width, rep),
+        ...(isTape ? { display: formatTMValue(values[i], notation) } : {}),
+      };
     });
 
     const outputCells: PreviewCellOutput[] = outputs.map((g, gi) => {
       try {
         const result = evalFormula(g.formula, vars);
+        // TM: store the raw (untruncated) value and its natural tape rendering.
+        if (isTape) {
+          return { name: g.name, result, bits: null, display: formatTMValue(result, notation) };
+        }
         return { name: g.name, result, bits: valueToBits(result, g.width, rep) };
       } catch (e) {
         const msg = e instanceof FormulaError ? e.message : 'Invalid formula';

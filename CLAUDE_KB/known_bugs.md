@@ -1,33 +1,22 @@
 - TM question no longer visible in the test assignment ("load sample data" only loads CC, SC, and FSM questions). Since the TM (and SC, and FSM) question editors are not yet live, this is the only way of accessing the TM canvas.
 
-- **`generateTestCases` wrongly width-truncates TM output values.** (`engine/testVectorGen.ts`,
-  found while inventorying the question editor for the CC/SC/FSM/TM unification.)
+- **FIXED (2026-07-03): `generateTestCases` wrongly width-truncated TM output values.**
+  (`engine/testVectorGen.ts`.) `generateTestCases` now takes the build mode and, on the TM `tape`
+  axis (`axisForMode(mode) === 'tape'`), stores the **raw** `evalFormula` result for outputs
+  instead of truncating to `outputWidth` — the tape is unbounded, so a correct TM writes the full
+  value and `decodeTM` reads it all back. CC/SC/FSM behavior is unchanged (still width-truncated,
+  which is correct for the space/time axes). The live authoring preview (`instructor/ccPreview.ts`)
+  got the same TM branch and now renders the natural unpadded tape encoding (`formatTMValue`).
+  Verified: a `x+1` unary TM question with output width 1 now stores `[1,2,3,4]` (not `[1,1,1,1]`)
+  and a correct increment TM grades 4/4.
 
-  `generateTestCases` computes every mode's expected output the same way: `truncate(evalFormula(...),
-  outputWidth, rep)` — i.e. it stores `f(x)` reduced to what `outputWidth` bits/tally-marks can
-  hold (the "width is the implicit modulus" rule from `CLAUDE.md`'s DSL section). That's correct
-  for CC (the circuit has exactly that many output wires — it *cannot* represent anything past
-  `outputWidth`) and consistent for SC/FSM (the time-axis decode itself only reads `outputWidth`
-  steps of the output wire, so generation and grading agree on the same bound).
-
-  It's wrong for TM. `encodeTM`/`decodeTM` (`engine/tmCodec.ts`) take **no width parameter at
-  all** — the tape is unbounded, so a TM computing `x + 1` just writes however many strokes/digits
-  the true value needs, and `decodeTM` reads all of them back with no truncation. If a question's
-  declared `outputWidth` is smaller than what `f(x)` actually needs for some tested `x`, a
-  genuinely correct (unbounded) TM will produce the untruncated value, which will then be compared
-  against a wrongly-truncated "expected" value in the test case — failing a correct machine (or
-  passing an incorrect one that happens to match the truncated remainder).
-
-  Not yet visible in practice because the one hand-authored TM sample question
-  (`devData/sampleData.ts`, `x + 1` with input width 3 / output width 4) happens to have a wide
-  enough declared output width to avoid the mismatch. It will surface as soon as a TM question is
-  generated where `f(x)` can exceed the declared output width. Fix: `generateTestCases` needs a
-  TM branch that stores the raw `evalFormula` result for outputs, untruncated — output width
-  should not apply as a modulus for the tape axis. (Input width can still legitimately bound which
-  `x` values get enumerated at authoring time; that part isn't the bug.)
-
-- **Open design question: does "width" mean anything for FSM (and likely SC) inputs/outputs?**
-  Raised in the same review. For CC, `width` is a genuine structural property of the submitted
+- **Open design question (still open): does "width" mean anything for FSM (and likely SC)
+  inputs/outputs?** The unified question editor (2026-07-03) ships with a per-mode `width` caption
+  and a one-line caveat for SC/FSM/TM ("width is only how many steps/values this question tests,
+  not a machine capacity"), which is honest about the limitation but does **not** resolve it — the
+  deeper question of what authoring knob should replace "width" for streaming machines is still
+  deferred. Details below.
+  Raised in an earlier review. For CC, `width` is a genuine structural property of the submitted
   circuit — Stage 1 (`machineValidation.ts`) checks `#INPUT wires == Σ inputWidths`, so a
   CC circuit really cannot represent a value outside `0..2^width-1`. For the time axis (SC/FSM),
   Stage 1 does **not** check wire count against width at all (SC only checks one wire per group;

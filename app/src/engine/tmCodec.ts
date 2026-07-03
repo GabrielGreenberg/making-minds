@@ -171,3 +171,16 @@ export function decodeTM(notation: TMNotation, tape: TMTape): number {
 export function notationForRepresentation(rep: string | undefined): TMNotation {
   return rep === 'binary' ? 'binary' : 'unary';
 }
+
+/**
+ * Human-readable single-block rendering of a value on the tape, mirroring what
+ * `encodeTM` writes for one block. Used by the authoring preview so TM cells show
+ * the natural (unpadded) tape encoding instead of a fixed-width bit vector.
+ *   unary:  n → a run of n `1`s (0 → the single blank `0` slot)
+ *   binary: n → `*` + binary digits (MSB-first) + `*` (0 → `*0*`)
+ */
+export function formatTMValue(value: number, notation: TMNotation): string {
+  const n = Math.max(0, Math.trunc(value));
+  if (notation === 'unary') return n === 0 ? '0' : '1'.repeat(n);
+  return `*${n.toString(2)}*`;
+}
