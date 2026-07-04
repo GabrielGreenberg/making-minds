@@ -138,15 +138,16 @@ export function fsmIncorrect(): CircuitData {
 }
 
 // ── TM: unary successor. y = x + 1 (tape axis, unary/tally notation) ───
-// S₀ scans right over strokes (stay); on the first background cell it writes
-// a stroke and halts in S₁ — appending one 1 to the block.
+// S₀ scans right over strokes (rewriting 1, moving right each step); on the
+// first background cell it writes a stroke, moves right, and halts in S₁ —
+// appending one 1 to the block.
 
 export function tmCorrect(): CircuitData {
   return {
     components: [comp('tm-s0', 'STATE', 'S₀'), comp('tm-s1', 'STATE', 'S₁')],
     wires: [
-      wire('tm-t1', 'tm-s0', 'right', 'tm-s0', 'left', { transitionLabel: '1:R' }),
-      wire('tm-t2', 'tm-s0', 'right', 'tm-s1', 'left', { transitionLabel: '0:1' }),
+      wire('tm-t1', 'tm-s0', 'right', 'tm-s0', 'left', { transitionLabel: '1:1R' }),
+      wire('tm-t2', 'tm-s0', 'right', 'tm-s1', 'left', { transitionLabel: '0:1R' }),
     ],
   };
 }
@@ -154,10 +155,9 @@ export function tmCorrect(): CircuitData {
 // Wrong: erase every stroke walking left, then halt → always outputs 0.
 export function tmIncorrect(): CircuitData {
   return {
-    components: [comp('tm-s0', 'STATE', 'S₀'), comp('tm-s1', 'STATE', 'S₁')],
+    components: [comp('tm-s0', 'STATE', 'S₀')],
     wires: [
-      wire('tm-t1', 'tm-s0', 'right', 'tm-s1', 'left', { transitionLabel: '1:0' }),
-      wire('tm-t2', 'tm-s1', 'right', 'tm-s0', 'left', { transitionLabel: '0:L' }),
+      wire('tm-t1', 'tm-s0', 'right', 'tm-s0', 'left', { transitionLabel: '1:0L' }),
     ],
   };
 }

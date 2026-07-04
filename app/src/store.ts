@@ -824,7 +824,9 @@ export const useStore = create<AppState>()((set, get) => ({
       targetComponentId: targetCompId,
       targetPortId: targetPortId,
       value: 0,
-      transitionLabel: isFsmTransition ? '0:0' : undefined,
+      transitionLabel: isFsmTransition
+        ? (state.buildMode === 'TM' ? '0:0R' : '0:0')
+        : undefined,
     };
     const newWires = [...state.wires, wire];
     const resolvedComponents = resolveMemDirections(state.components, newWires);
@@ -2808,8 +2810,9 @@ export const useStore = create<AppState>()((set, get) => ({
   setTransitionLabel: (wireId, label) => {
     // FSM labels are input:output bits; TM labels are input:action where the
     // input is a tape symbol (0/1, plus * for binary machines) and the action
-    // is one tape primitive (R/L move or a symbol write) — spec §10.3.
-    const re = get().buildMode === 'TM' ? /^[01*]:[RL01*]$/ : /^[01]:[01]$/;
+    // is a dual action — a write symbol (0/1/*) followed by a move direction
+    // (R/L) — spec §10.3.
+    const re = get().buildMode === 'TM' ? /^[01*]:[01*][RL]$/ : /^[01]:[01]$/;
     if (!re.test(label)) return;
     const state = get();
     state.pushHistory();
