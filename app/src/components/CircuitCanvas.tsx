@@ -1147,15 +1147,22 @@ function FsmTransitionView({
   const [editing, setEditing] = useState(false);
   const [editLeft, setEditLeft] = useState('0');
   const [editRight, setEditRight] = useState('0');
+  const [editWrite, setEditWrite] = useState('0');
+  const [editMove, setEditMove] = useState<'R' | 'L'>('R');
   const [activeField, setActiveField] = useState<'left' | 'right'>('left');
+  // TM only: which half of the combined write+move action is being entered.
+  const [rightSubField, setRightSubField] = useState<'write' | 'move'>('write');
   const [dragging, setDragging] = useState(false);
   const editorRef = useRef<HTMLInputElement>(null);
 
-  // TM transitions read a tape symbol (0/1/*) and perform one tape action
-  // (R/L move or a 0/1/* write); FSM transitions are input:output bits.
+  // TM transitions read a tape symbol (0/1/*) and perform one dual action —
+  // a write (0/1/*) followed by a move (R/L) — as a single atomic step; FSM
+  // transitions are input:output bits.
   const isTM = useStore((s) => s.buildMode === 'TM');
   const leftTokens = isTM ? ['0', '1', '*'] : ['0', '1'];
-  const rightTokens = isTM ? ['0', '1', '*', 'R', 'L'] : ['0', '1'];
+  const rightTokens = ['0', '1'];
+  const writeTokens = ['0', '1', '*'];
+  const moveTokens = ['R', 'L'];
 
   const label = wire.transitionLabel || '?:?';
   const color = isSelected ? '#2a7fff' : '#333';
@@ -1167,21 +1174,59 @@ function FsmTransitionView({
   }, [editing]);
 
   const openEdit = (field: 'left' | 'right') => {
-    const current = wire.transitionLabel || '0:0';
+    const current = wire.transitionLabel || (isTM ? '0:0R' : '0:0');
     const parts = current.split(':');
     setEditLeft(leftTokens.includes(parts[0]) ? parts[0] : '0');
-    setEditRight(rightTokens.includes(parts[1]) ? parts[1] : '0');
+    if (isTM) {
+      const action = parts[1] ?? '0R';
+      setEditWrite(writeTokens.includes(action[0]) ? action[0] : '0');
+      setEditMove(action[1] === 'L' ? 'L' : 'R');
+      setRightSubField('write');
+    } else {
+      setEditRight(rightTokens.includes(parts[1]) ? parts[1] : '0');
+    }
     setActiveField(field);
     setEditing(true);
   };
 
-  const commitEdit = (left = editLeft, right = editRight) => {
+  const commitEdit = (left = editLeft, right = isTM ? `${editWrite}${editMove}` : editRight) => {
     setEditing(false);
     useStore.getState().setTransitionLabel(wire.id, `${left}:${right}`);
   };
 
   const handleEditorKeyDown = (e: React.KeyboardEvent) => {
     const key = e.key.length === 1 ? e.key.toUpperCase() : e.key;
+    if (isTM) {
+      if (activeField === 'left' && leftTokens.includes(e.key)) {
+        e.preventDefault();
+        setEditLeft(e.key);
+        setActiveField('right');
+        setRightSubField('write');
+      } else if (activeField === 'right' && rightSubField === 'write' && writeTokens.includes(key)) {
+        e.preventDefault();
+        setEditWrite(key);
+        setRightSubField('move');
+      } else if (activeField === 'right' && rightSubField === 'move' && moveTokens.includes(key)) {
+        e.preventDefault();
+        // Commit immediately with the new move value so closure captures it
+        setEditing(false);
+        useStore.getState().setTransitionLabel(wire.id, `${editLeft}:${editWrite}${key}`);
+      } else if (e.key === 'Tab' || e.key === 'ArrowRight') {
+        e.preventDefault();
+        if (activeField === 'left') { setActiveField('right'); setRightSubField('write'); }
+        else if (rightSubField === 'write') { setRightSubField('move'); }
+        else { setActiveField('left'); }
+      } else if (e.key === 'ArrowLeft') {
+        e.preventDefault();
+        if (activeField === 'right' && rightSubField === 'move') { setRightSubField('write'); }
+        else if (activeField === 'right' && rightSubField === 'write') { setActiveField('left'); }
+        else { setActiveField('right'); setRightSubField('move'); }
+      } else if (e.key === 'Enter' || e.key === 'Escape') {
+        e.preventDefault();
+        commitEdit();
+      }
+      return;
+    }
     if (activeField === 'left' && leftTokens.includes(e.key)) {
       e.preventDefault();
       setEditLeft(e.key);
@@ -1320,7 +1365,7 @@ function FsmTransitionView({
         const parts = label.split(':');
         const lPart = parts[0] ?? '?';
         const rPart = parts[1] ?? '?';
-        const W = 36; // total width
+        const W = isTM ? 44 : 36; // total width (TM's right half holds a 2-char write+move token)
         const H = 18;
         const x0 = labelPos.x - W / 2;
         const y0 = labelPos.y - H / 2;
@@ -1352,9 +1397,9 @@ function FsmTransitionView({
       })()}
       {editing && (
         <foreignObject
-          x={labelPos.x - 28}
+          x={labelPos.x - (isTM ? 32 : 28)}
           y={labelPos.y - 15}
-          width={56}
+          width={isTM ? 64 : 56}
           height={30}
         >
           <div
@@ -1428,9 +1473,14 @@ function FsmTransitionView({
               width: 1, alignSelf: 'stretch', margin: '5px 1px',
               background: '#ccc', flexShrink: 0,
             }} />
-            {/* Output half */}
+            {/* Output half — for TM this is the combined write+move action */}
             <div
-              onClick={(e) => { e.stopPropagation(); setActiveField('right'); editorRef.current?.focus(); }}
+              onClick={(e) => {
+                e.stopPropagation();
+                setActiveField('right');
+                if (isTM) setRightSubField('write');
+                editorRef.current?.focus();
+              }}
               style={{
                 flex: 1,
                 display: 'flex',
@@ -1444,7 +1494,16 @@ function FsmTransitionView({
                 cursor: 'default',
                 userSelect: 'none',
               }}
-            >{editRight}</div>
+            >
+              {isTM
+                ? (
+                  <>
+                    <span style={{ opacity: activeField === 'right' && rightSubField === 'move' ? 0.5 : 1 }}>{editWrite}</span>
+                    <span style={{ opacity: activeField === 'right' && rightSubField === 'write' ? 0.5 : 1 }}>{editMove}</span>
+                  </>
+                )
+                : editRight}
+            </div>
           </div>
         </foreignObject>
       )}

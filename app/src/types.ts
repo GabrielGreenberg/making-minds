@@ -375,10 +375,10 @@ export interface ParsedTransition {
 
 // ─── TM helpers ─────────────────────────────────────────────────────
 // A Turing machine reuses the FSM editor (STATE components + transition
-// wires). Transition labels use the grammar "input:action" where action is
-// a single tape primitive — R (move right), L (move left), or write a symbol
-// (0/1, and `*` for binary machines): one tape action per step (the
-// Post–Turing model from the spec, §10.3). See CLAUDE_KB/engines/tm.md.
+// wires). Transition labels use the grammar "input:action" where action is a
+// single **dual action** — a write symbol (0/1, and `*` for binary machines)
+// followed by a move direction (R right, L left), e.g. "1:0R": every step
+// both writes and moves (spec §10.3). See CLAUDE_KB/engines/tm.md.
 
 /**
  * Tape alphabet. Unary machines use only `'0'` / `'1'`; binary machines may
@@ -407,7 +407,7 @@ export interface TmHistoryEntry {
   t: number;
   stateLabel: string;
   read: TMSymbol;        // symbol read from the cell under the head
-  action: string;        // raw action token: 'R' | 'L' | '0' | '1' | '*'
+  action: string;        // raw dual-action token, e.g. "0R" (write '0', move right)
   headBefore: number;    // head position before the action
   nextStateLabel: string;
 }

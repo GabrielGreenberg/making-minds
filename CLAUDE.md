@@ -14,7 +14,7 @@ Claude to load into context).
 >
 > A change isn't finished until the docs that describe it are too.
 
-_Last updated: 2026-07-04 (TM store + UI; assignment question-list layout; question creator rework — names, no previews, no width; home screen: assignment tiles → list rows)_
+_Last updated: 2026-07-04 (TM dual-action model: every transition writes and moves in one atomic step, replacing the old write-XOR-move step; TM store + UI; assignment question-list layout; question creator rework — names, no previews, no width; home screen: assignment tiles → list rows)_
 
 ---
 
@@ -128,7 +128,7 @@ the engine.
 | ------------- | ------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------ |
 | Types         | `app/src/types.ts`                                                             | All domain types: `AssignmentData`, `AssignmentQuestion`, `SubmissionData`/`SubmissionRecord`, `CircuitData`, `CCSpec`, `SubmissionResult` |
 | Engine        | `app/src/engine/cc.ts`, `sc.ts`, `fsm.ts`                                      | Pure simulators per mode (topological eval for CC; clocked step for SC; transition-matching for FSM)                                       |
-| Engine        | `app/src/engine/tm.ts`, `tmValidate.ts`, `tmCodec.ts`                          | TM: notation-aware tape engine; pre-engine table validation (ambiguous/unparseable); encode/accept/decode (the codec `tape` axis)          |
+| Engine        | `app/src/engine/tm.ts`, `tmValidate.ts`, `tmCodec.ts`                          | TM: notation-aware tape engine, **dual-action** model (every transition writes a symbol and moves in one atomic step, e.g. `1:0R`); pre-engine table validation (ambiguous/unparseable); encode/accept/decode (the codec `tape` axis)          |
 | Engine        | `app/src/engine/grader.ts`                                                     | `gradeSubmission` / `gradeQuestion` — one value-based codec pipeline for CC/SC/FSM/TM against numeric `test_cases`; turbot skipped          |
 | Engine        | `app/src/engine/codec.ts`, `machineValidation.ts`                              | The codec (`space`/`time` value↔bits; `tape` → `tmCodec`) and Stage-1 machine validation for all modes                                     |
 | Engine        | `app/src/engine/testVectorGen.ts`, `formulaEval.ts`                            | Authoring-time: affine-formula language → `buildQuestionBank(inputs, outputs, rep, mode)` → `{spec, test_cases}` (widths derived; SC/FSM/TM sampled). Legacy `generateTestCases(spec, rep, mode)` remains for the sample data |

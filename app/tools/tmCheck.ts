@@ -43,21 +43,22 @@ function check(label: string, cond: boolean) {
   if (!cond) failures++;
 }
 
-// Unary increment: scan right over 1s, write a 1 into the first background cell.
-//   S₀ on 1 → R (stay S₀); S₀ on 0 → write 1 (go S₁, which halts).
+// Unary increment: scan right over 1s (rewriting 1, moving right each step),
+// then write a 1 into the first background cell and halt.
+//   S₀ on 1 → write 1, move R (stay S₀); S₀ on 0 → write 1, move R (go S₁, halts).
 function tmIncrement() {
   return {
     components: [comp('s0', 'S₀'), comp('s1', 'S₁')],
-    wires: [wire('t1', 's0', 's0', '1:R'), wire('t2', 's0', 's1', '0:1')],
+    wires: [wire('t1', 's0', 's0', '1:1R'), wire('t2', 's0', 's1', '0:1R')],
   };
 }
 
 // Unary constant-zero: erase every stroke walking left, then halt.
-//   S₀ on 1 → write 0 (go S₁); S₁ on 0 → L (go S₀); S₀ on 0 → halt.
+//   S₀ on 1 → write 0, move L (stay S₀); S₀ on 0 → halt (no matching transition).
 function tmZero() {
   return {
-    components: [comp('s0', 'S₀'), comp('s1', 'S₁')],
-    wires: [wire('t1', 's0', 's1', '1:0'), wire('t2', 's1', 's0', '0:L')],
+    components: [comp('s0', 'S₀')],
+    wires: [wire('t1', 's0', 's0', '1:0L')],
   };
 }
 
@@ -71,7 +72,7 @@ function tmIdentity() {
 function tmAmbiguous() {
   return {
     components: [comp('s0', 'S₀')],
-    wires: [wire('t1', 's0', 's0', '1:R'), wire('t2', 's0', 's0', '1:L')],
+    wires: [wire('t1', 's0', 's0', '1:0R'), wire('t2', 's0', 's0', '1:1L')],
   };
 }
 
@@ -101,8 +102,8 @@ const id0 = run(tmIdentity(), 'binary', [0]);
 check('binary identity 0 → 0 (*0*)', acceptTM('binary', id0) === null && decodeTM('binary', id0.tape) === 0);
 
 check('encode/decode binary round-trip 11', decodeTM('binary', encodeTM('binary', [11])) === 11);
-check('parse: `*` action is binary-only',
-  parseTMAction('*', 'binary') !== null && parseTMAction('*', 'unary') === null);
+check('parse: `*` write is binary-only',
+  parseTMAction('*R', 'binary') !== null && parseTMAction('*R', 'unary') === null);
 
 // ── acceptor edge cases (constructed tapes) ────────────────────
 console.log('\n[acceptor]');
@@ -132,7 +133,7 @@ const ambErrors = validateTMTable(tmAmbiguous().components, tmAmbiguous().wires,
 check('ambiguous table → error', ambErrors.length > 0 && ambErrors[0].kind === 'ambiguous');
 const unparseable = validateTMTable([comp('s0', 'S₀')], [wire('t1', 's0', 's0', 'x:y')], 'unary');
 check('unparseable label → error', unparseable.length > 0 && unparseable[0].kind === 'unparseable');
-const starInUnary = validateTMTable([comp('s0', 'S₀')], [wire('t1', 's0', 's0', '*:R')], 'unary');
+const starInUnary = validateTMTable([comp('s0', 'S₀')], [wire('t1', 's0', 's0', '*:0R')], 'unary');
 check('`*` read in a unary machine → unparseable', starInUnary.length > 0 && starInUnary[0].kind === 'unparseable');
 
 // ── grader ─────────────────────────────────────────────────────

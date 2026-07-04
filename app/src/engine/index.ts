@@ -28,7 +28,7 @@ export {
 } from './tm';
 export type {
   TMAction,
-  TMActionToken,
+  TMMoveDir,
   TMTape,
   TMStepResult,
   TMEvalResult,
