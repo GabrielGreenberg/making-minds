@@ -14,7 +14,7 @@ Claude to load into context).
 >
 > A change isn't finished until the docs that describe it are too.
 
-_Last updated: 2026-07-04 (TM dual-action model: every transition writes and moves in one atomic step, replacing the old write-XOR-move step; TM store + UI; assignment question-list layout; question creator rework — names, no previews, no width; home screen: assignment tiles → list rows)_
+_Last updated: 2026-07-04 (TM alphabet tied to the question's representation — `selectTmNotation` in the store drives the transition editor, tape clicks, and machine table, so `*` is only offerable/enterable on binary questions (sandbox still follows `repSystem`); TM dual-action model: every transition writes and moves in one atomic step, replacing the old write-XOR-move step; TM store + UI; assignment question-list layout; question creator rework — names, no previews, no width; home screen: assignment tiles → list rows)_
 
 ---
 
@@ -37,7 +37,9 @@ end-to-end:
 - **Student side** — mockup login (pick a student or instructor account) → browse assignments →
   open one to its **question list** (`AssignmentOverview`) → click a question to open its
   dedicated canvas in the correct mode (**CC, SC, FSM, and TM** — TM has a clickable tape strip
-  below the canvas plus machine-table/run/history panels; the question statement appears at the
+  below the canvas plus machine-table/run/history panels; its tape alphabet is tied to the
+  question's `representation`, so `*` can only be entered — in the transition editor or on the
+  tape — on binary questions; the question statement appears at the
   top of the right data panel) → navigate back to the list or between questions via the nav bar
   → instant local autosave →
   leave and resume (reload/Back returns you into the assignment) → Submit a timestamped snapshot.
@@ -76,9 +78,7 @@ The missing half is the **server** and productized submit/grade loop.
 - **Turbots** (all four machine kinds) — the next big feature block.
 - **Deferred authoring follow-ups** — the `requireStandardHaltPosition` TM acceptance toggle and
   mode-filtered `allowed_components` (both optional fields on `AssignmentQuestion`, not yet
-  exposed in the question creator's editor UI). Also: in TM mode the student UI has no
-  notation selector — the tape notation follows the global `repSystem` (binary→binary,
-  otherwise unary) rather than the question's `representation`.
+  exposed in the question creator's editor UI).
 
 **The backend phase (the big step):**
 
@@ -133,7 +133,7 @@ the engine.
 | Engine        | `app/src/engine/codec.ts`, `machineValidation.ts`                              | The codec (`space`/`time` value↔bits; `tape` → `tmCodec`) and Stage-1 machine validation for all modes                                     |
 | Engine        | `app/src/engine/testVectorGen.ts`, `formulaEval.ts`                            | Authoring-time: affine-formula language → `buildQuestionBank(inputs, outputs, rep, mode)` → `{spec, test_cases}` (widths derived; SC/FSM/TM sampled). Legacy `generateTestCases(spec, rep, mode)` remains for the sample data |
 | Engine        | `app/src/engine/representation.ts`, `index.ts`                                 | value↔bits core (`valueToBits`/`isValidCodeword`/`bitsToValue`) + display helpers; barrel exports                                          |
-| Store         | `app/src/store.ts`                                                             | Zustand UI state; delegates simulation to `engine/`. Per-mode sim state incl. TM (`tmTape`/`tmStep`/`setTmCell`) and `assignmentView` ('overview' \| 'question')  |
+| Store         | `app/src/store.ts`                                                             | Zustand UI state; delegates simulation to `engine/`. Per-mode sim state incl. TM (`tmTape`/`tmStep`/`setTmCell`), `selectTmNotation` (TM alphabet: open question's `representation`, sandbox falls back to `repSystem`), and `assignmentView` ('overview' \| 'question')  |
 | Routing       | `app/src/routing.ts`                                                           | `Route` union, `parseHash`/`routeToHash`, `navigate()`                                                                                     |
 | Storage       | `app/src/storage/workbookStore.ts`, `AssignmentStore.ts`, `submissionStore.ts` | The three localStorage-backed seams                                                                                                        |
 | Auth          | `app/src/auth/`                                                                | `AuthGate.tsx`, `stubAuth.tsx`, `instructorRole.ts`                                                                                        |

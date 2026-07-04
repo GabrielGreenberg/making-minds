@@ -1,6 +1,6 @@
 import { useMemo, useState, useCallback, useRef, useEffect } from 'react';
-import { useStore } from '../store';
-import { bitsToTally, bitsToBinary, parseTMTransition, notationForRepresentation } from '../engine';
+import { useStore, selectTmNotation } from '../store';
+import { bitsToTally, bitsToBinary, parseTMTransition } from '../engine';
 import type { TMSymbol } from '../types';
 
 const UI_PREFS_KEY = 'making-minds-ui-prefs';
@@ -46,6 +46,8 @@ export function DataTable() {
   const setRepSystem = useStore((s) => s.setRepSystem);
   const clearTableRows = useStore((s) => s.clearTableRows);
   const buildMode = useStore((s) => s.buildMode);
+  // TM alphabet is tied to the question's representation (sandbox: repSystem).
+  const tmNotation = useStore(selectTmNotation);
 
   // SC state
   const scHistory = useStore((s) => s.scHistory);
@@ -619,7 +621,7 @@ export function DataTable() {
 
   // ── TM Mode ──────────────────────────────────────────────────────
   if (isTM) {
-    const notation = notationForRepresentation(repSystem);
+    const notation = tmNotation;
     const symbols: TMSymbol[] = notation === 'binary' ? ['0', '1', '*'] : ['0', '1'];
     const states = components
       .filter((c) => c.type === 'STATE')

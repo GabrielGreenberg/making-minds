@@ -1,6 +1,5 @@
 import { useState } from 'react';
-import { useStore } from '../store';
-import { notationForRepresentation } from '../engine';
+import { useStore, selectTmNotation } from '../store';
 
 /**
  * The Turing machine tape: a horizontal strip of cells at the bottom of the
@@ -15,13 +14,13 @@ export function TMTapePanel() {
   const tmTimeStep = useStore((s) => s.tmTimeStep);
   const tmRunning = useStore((s) => s.tmRunning);
   const tmHalted = useStore((s) => s.tmHalted);
-  const repSystem = useStore((s) => s.repSystem);
   const setTmCell = useStore((s) => s.setTmCell);
   const setTmHead = useStore((s) => s.setTmHead);
 
   const [open, setOpen] = useState(true);
 
-  const notation = notationForRepresentation(repSystem);
+  // Alphabet is tied to the question's representation (sandbox: repSystem).
+  const notation = useStore(selectTmNotation);
   const editable = tmTimeStep === 1 && !tmRunning && !tmHalted;
 
   // Show every written cell and the head, with a margin of blank cells on both

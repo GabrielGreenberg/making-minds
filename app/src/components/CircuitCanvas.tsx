@@ -1,5 +1,5 @@
 import { useRef, useState, useCallback, useEffect, useMemo } from 'react';
-import { useStore } from '../store';
+import { useStore, selectTmNotation } from '../store';
 import type {
   CircuitComponent,
   Wire,
@@ -1155,13 +1155,17 @@ function FsmTransitionView({
   const [dragging, setDragging] = useState(false);
   const editorRef = useRef<HTMLInputElement>(null);
 
-  // TM transitions read a tape symbol (0/1/*) and perform one dual action —
-  // a write (0/1/*) followed by a move (R/L) — as a single atomic step; FSM
-  // transitions are input:output bits.
+  // TM transitions read a tape symbol and perform one dual action — a write
+  // followed by a move (R/L) — as a single atomic step; FSM transitions are
+  // input:output bits. The TM alphabet is tied to the question's
+  // representation (binary: 0/1/*; unary: 0/1), so the editor only ever
+  // offers/accepts symbols that exist on this machine's tape.
   const isTM = useStore((s) => s.buildMode === 'TM');
-  const leftTokens = isTM ? ['0', '1', '*'] : ['0', '1'];
+  const tmNotation = useStore(selectTmNotation);
+  const tmSymbols = tmNotation === 'binary' ? ['0', '1', '*'] : ['0', '1'];
+  const leftTokens = isTM ? tmSymbols : ['0', '1'];
   const rightTokens = ['0', '1'];
-  const writeTokens = ['0', '1', '*'];
+  const writeTokens = tmSymbols;
   const moveTokens = ['R', 'L'];
 
   const label = wire.transitionLabel || '?:?';

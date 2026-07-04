@@ -21,6 +21,7 @@ import type {
   QuestionCircuit,
   TMTape,
   TMSymbol,
+  TMNotation,
   TmHistoryEntry,
 } from './types';
 import {
@@ -39,6 +40,24 @@ import {
   restoreQuestionCircuits,
 } from './storage/workbookStore';
 import { localSubmissionStore, buildSubmission } from './storage/submissionStore';
+
+/**
+ * TM tape notation (alphabet) for the current context. Inside an assignment
+ * the open question's `representation` is authoritative — a binary question
+ * gets the {0, 1, *} alphabet, a tally question gets {0, 1} — regardless of
+ * the global repSystem display toggle. The sandbox (no assignment open)
+ * follows repSystem. Every TM surface (transition editor, tape clicks,
+ * machine table, simulation) derives its alphabet from this one selector, so
+ * an out-of-alphabet symbol can never be entered in the first place.
+ */
+export function selectTmNotation(s: {
+  assignment: AssignmentData | null;
+  currentQuestionIndex: number;
+  repSystem: RepSystem;
+}): TMNotation {
+  const q = s.assignment?.questions[s.currentQuestionIndex];
+  return notationForRepresentation(q ? q.representation : s.repSystem);
+}
 
 interface HistoryEntry {
   components: CircuitComponent[];
@@ -2950,7 +2969,7 @@ export const useStore = create<AppState>()((set, get) => ({
     const state = get();
     // The tape is only editable while idle (before any step has run).
     if (state.tmRunning || state.tmTimeStep > 1 || state.tmHalted) return;
-    const notation = notationForRepresentation(state.repSystem);
+    const notation = selectTmNotation(state);
     const current: TMSymbol = state.tmTape.cells[index] ?? '0';
     // Cycle through the notation's alphabet: unary 0→1→0; binary 0→1→*→0.
     const next: TMSymbol =
@@ -2977,7 +2996,7 @@ export const useStore = create<AppState>()((set, get) => ({
     const states = sortStateComponents(components);
     if (states.length === 0) return;
     const currentStateId = state.tmCurrentStateId || states[0].id;
-    const notation = notationForRepresentation(state.repSystem);
+    const notation = selectTmNotation(state);
 
     // Delegate the step to the engine (same logic used by the grader). No
     // matching transition means the machine halts — for a TM that is the
