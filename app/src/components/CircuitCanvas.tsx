@@ -3462,25 +3462,37 @@ export function CircuitCanvas() {
       let curvePointX = 0, curvePointY = 0;
 
       if (isSelfLoop) {
-        // Self-loop: draw a loop arc above the state
-        const loopR = 22;
-        const topY = sCy - STATE_RADIUS;
-        const cpX1 = sCx - loopR - 10;
-        const cpY = topY - loopR * 2;
-        const cpX2 = sCx + loopR + 10;
-        // Start and end at top-left and top-right of circle
-        const startAngle = -Math.PI * 0.75;
-        const endAngle = -Math.PI * 0.25;
+        // Self-loop: draw a loop arc that fans out around the state.
+        // Successive self-loops on the same state (dirIdx > 0) are rotated
+        // around the state so their arcs and anchor points don't coincide
+        // with earlier ones (which would otherwise make the earlier ones
+        // unclickable, since they'd be fully shadowed).
+        const loopR = 22 + dirIdx * 4;
+        const rotationStep = (Math.PI * 50) / 180;
+        const dirAngle = -Math.PI / 2 + dirIdx * rotationStep;
+        const dX = Math.cos(dirAngle);
+        const dY = Math.sin(dirAngle);
+        const pX = -dY;
+        const pY = dX;
+        const bulgeX = sCx + dX * (STATE_RADIUS + loopR * 2);
+        const bulgeY = sCy + dY * (STATE_RADIUS + loopR * 2);
+        const cpX1 = bulgeX - pX * (loopR + 10);
+        const cpY1 = bulgeY - pY * (loopR + 10);
+        const cpX2 = bulgeX + pX * (loopR + 10);
+        const cpY2 = bulgeY + pY * (loopR + 10);
+        // Start and end anchors spread symmetrically around dirAngle
+        const startAngle = dirAngle - Math.PI / 4;
+        const endAngle = dirAngle + Math.PI / 4;
         const startX = sCx + STATE_RADIUS * Math.cos(startAngle);
         const startY = sCy + STATE_RADIUS * Math.sin(startAngle);
-        const endX = sCx + STATE_RADIUS * Math.cos(endAngle);
-        const endY = sCy + STATE_RADIUS * Math.sin(endAngle);
+        const endX0 = sCx + STATE_RADIUS * Math.cos(endAngle);
+        const endY0 = sCy + STATE_RADIUS * Math.sin(endAngle);
         // Pull end back for arrowhead
-        const eAngleTan = Math.atan2(endY - cpY, endX - cpX2);
-        const eX = endX - ARROW_LEN * Math.cos(eAngleTan);
-        const eY = endY - ARROW_LEN * Math.sin(eAngleTan);
-        pathD = `M${startX},${startY} C${cpX1},${cpY} ${cpX2},${cpY} ${eX},${eY}`;
-        labelPos = { x: sCx, y: cpY + 4 };
+        const eAngleTan = Math.atan2(endY0 - cpY2, endX0 - cpX2);
+        const eX = endX0 - ARROW_LEN * Math.cos(eAngleTan);
+        const eY = endY0 - ARROW_LEN * Math.sin(eAngleTan);
+        pathD = `M${startX},${startY} C${cpX1},${cpY1} ${cpX2},${cpY2} ${eX},${eY}`;
+        labelPos = { x: bulgeX - dX * 6, y: bulgeY - dY * 6 };
       } else {
         // Curve between two different states
         const centerAngle = Math.atan2(tCy - sCy, tCx - sCx);
