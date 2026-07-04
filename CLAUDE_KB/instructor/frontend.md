@@ -78,15 +78,25 @@ are mode-agnostic, so mode is an ordinary field, not a gate:
 3. **Inputs/outputs** — dynamic lists of groups (name, width), with running wire counts. The
    `width` label is captioned per mode (wires for CC; time steps for SC/FSM; max input value for
    TM), with a one-line caveat for SC/FSM/TM that width isn't a machine capacity there.
-4. **Formula + live preview** — each output group's formula drives a preview table
-   (`instructor/ccPreview.ts`) computed via the DSL under the chosen representation and mode;
-   invalid formulas show inline and block save. For TM (the unbounded tape axis) cells show the
-   natural unpadded tape encoding (`formatTMValue`) instead of a fixed-width bit vector, and
-   outputs are not width-truncated.
+4. **Formula + preview** — each output group's formula is evaluated by the DSL under the chosen
+   representation and mode (`instructor/ccPreview.ts`). Enumerating the whole input space on every
+   keystroke was the source of editing lag, so the preview is split into two tiers:
+   - **Live check** (`probeFormulas`, per keystroke) — evaluates every formula on a **single**
+     input (editable per group; defaults to each group's max value). O(#groups), independent of
+     space size. Surfaces formula syntax/reference errors inline and blocks save.
+   - **Examples** (`buildExamples`, on demand) — a button enumerates only the **first
+     `DEFAULT_EXAMPLE_LIMIT` (16)** inputs (mixed-radix `firstCombos`, never the full cartesian).
+     Cleared to stale whenever inputs/outputs/rep/mode change.
+   Both tiers share `evalRow`, which for TM (the unbounded tape axis) renders the natural unpadded
+   tape encoding (`formatTMValue`) instead of a fixed-width bit vector and does not width-truncate
+   outputs. `countCombos` (a product, no enumeration) drives the `MAX_COMBOS` too-large guard
+   cheaply. The exhaustive enumeration happens **only at save** (see step 6).
 5. **Statement** — plain-text instructions shown to students.
-6. **Save** — generates `test_cases` via `generateTestCases(spec, rep, mode)`, builds the
-   `AssignmentQuestion` (with `buildMode` + `representation`), hands it to the editor, which
-   persists via `localAssignmentStore.save`.
+6. **Save** — generates the full `test_cases` via `generateTestCases(spec, rep, mode)` (the one
+   exhaustive enumeration, wrapped in try/catch so a formula that only fails on an input the
+   single-input probe never exercised — e.g. one that goes negative — reports an error instead of
+   throwing), builds the `AssignmentQuestion` (with `buildMode` + `representation`), hands it to
+   the editor, which persists via `localAssignmentStore.save`.
 
 `instructor/ccSummary.ts` renders a one-line summary of a `cc_spec` for the editor's question
 list.

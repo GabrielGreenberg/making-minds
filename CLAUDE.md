@@ -53,8 +53,10 @@ end-to-end:
 - **Reference-function DSL** — instructors don't hand-write test cases. They declare a question's
   input/output groups + one representation and specify the correct output with a small
   **affine/bitwise arithmetic mini-language** (the "reference function"); the system enumerates
-  inputs, evaluates the formula, and auto-generates the numeric `test_cases` at authoring time,
-  with a live preview table. See the DSL section in Part 2.
+  inputs, evaluates the formula, and auto-generates the numeric `test_cases` — the full
+  enumeration runs once, at save. While editing, a live check evaluates the formula on a single
+  input per keystroke and a button previews up to 16 worked examples on demand (enumerating the
+  whole space per keystroke was too slow). See the DSL section in Part 2.
 
 The missing half is the **server** and productized submit/grade loop.
 
@@ -145,7 +147,7 @@ the engine.
 | Engine        | `app/src/engine/tm.ts`, `tmValidate.ts`, `tmCodec.ts`                          | TM: notation-aware tape engine; pre-engine table validation (ambiguous/unparseable); encode/accept/decode (the codec `tape` axis)          |
 | Engine        | `app/src/engine/grader.ts`                                                     | `gradeSubmission` / `gradeQuestion` — one value-based codec pipeline for CC/SC/FSM/TM against numeric `test_cases`; turbot skipped          |
 | Engine        | `app/src/engine/codec.ts`, `machineValidation.ts`                              | The codec (`space`/`time` value↔bits; `tape` → `tmCodec`) and Stage-1 machine validation for all modes                                     |
-| Engine        | `app/src/engine/testVectorGen.ts`, `formulaEval.ts`                            | Authoring-time: affine-formula language → `generateTestCases(spec, rep)` → numeric `test_cases`                                            |
+| Engine        | `app/src/engine/testVectorGen.ts`, `formulaEval.ts`                            | Authoring-time: affine-formula language → `generateTestCases(spec, rep, mode)` → numeric `test_cases`                                            |
 | Engine        | `app/src/engine/representation.ts`, `index.ts`                                 | value↔bits core (`valueToBits`/`isValidCodeword`/`bitsToValue`) + display helpers; barrel exports                                          |
 | Store         | `app/src/store.ts`                                                             | Zustand UI state; delegates simulation to `engine/`                                                                                        |
 | Routing       | `app/src/routing.ts`                                                           | `Route` union, `parseHash`/`routeToHash`, `navigate()`                                                                                     |
@@ -164,10 +166,13 @@ mini-language instead of writing test cases by hand. This is an authoring-time c
 only — the grader never sees the formula; it runs against the generated numeric `test_cases`.
 
 - **Where it lives** — `engine/formulaEval.ts` (`evalFormula(expr, vars)` → non-negative
-  integer; throws `FormulaError`) and `engine/testVectorGen.ts` (`generateTestCases(spec, rep)`
+  integer; throws `FormulaError`) and `engine/testVectorGen.ts` (`generateTestCases(spec, rep, mode)`
   enumerates input combinations, evaluates the formula, truncates each output to its group width
-  → numeric `test_cases`). The instructor UI (`instructor/QuestionCreator.tsx`, with
-  `instructor/ccPreview.ts`) renders a **live preview table** and blocks save on any formula error.
+  on the space/time axes — but not for the unbounded TM tape axis — → numeric `test_cases`, all at
+  save). The instructor UI (`instructor/QuestionCreator.tsx`, with
+  `instructor/ccPreview.ts`) validates formulas **live on a single input** (`probeFormulas`,
+  cheap per keystroke) and generates up to 16 example rows **on demand** (`buildExamples`) — it
+  no longer enumerates the whole space on every keystroke. Blocks save on any formula error.
 - **The language** — variables (declared input-group names like `x`, `y`), non-negative
   integer literals, and the operators `+ - *` and bitwise `& | ^ ~`, with parentheses. No
   division, modulo, conditionals, or function calls. Each formula is one expression returning a
