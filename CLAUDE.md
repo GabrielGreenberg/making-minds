@@ -16,7 +16,7 @@ Claude to load into context).
 >
 > A change isn't finished until the docs that describe it are too.
 
-_Last updated: 2026-06-30_
+_Last updated: 2026-07-03_
 
 ---
 
@@ -53,8 +53,10 @@ end-to-end:
 - **Reference-function DSL** — instructors don't hand-write test cases. They declare a question's
   input/output groups + one representation and specify the correct output with a small
   **affine/bitwise arithmetic mini-language** (the "reference function"); the system enumerates
-  inputs, evaluates the formula, and auto-generates the numeric `test_cases` at authoring time,
-  with a live preview table. See the DSL section in Part 2.
+  inputs, evaluates the formula, and auto-generates the numeric `test_cases` — the full
+  enumeration runs once, at save. While editing, a live check evaluates the formula on a single
+  input per keystroke and a button previews up to 16 worked examples on demand (enumerating the
+  whole space per keystroke was too slow). See the DSL section in Part 2.
 
 The missing half is the **server** and productized submit/grade loop.
 
@@ -161,8 +163,10 @@ only — the grader never sees the formula; it runs against the generated numeri
 - **Where it lives** — `engine/formulaEval.ts` (`evalFormula(expr, vars)` → non-negative
   integer; throws `FormulaError`) and `engine/testVectorGen.ts` (`generateTestCases(spec, rep)`
   enumerates input combinations, evaluates the formula, truncates each output to its group width
-  → numeric `test_cases`). The instructor UI (`instructor/QuestionCreator.tsx`, with
-  `instructor/ccPreview.ts`) renders a **live preview table** and blocks save on any formula error.
+  → numeric `test_cases`, all at save). The instructor UI (`instructor/QuestionCreator.tsx`, with
+  `instructor/ccPreview.ts`) validates formulas **live on a single input** (`probeFormulas`,
+  cheap per keystroke) and generates up to 16 example rows **on demand** (`buildExamples`) — it
+  no longer enumerates the whole space on every keystroke. Blocks save on any formula error.
 - **The language** — variables (declared input-group names like `x`, `y`), non-negative
   integer literals, and the operators `+ - *` and bitwise `& | ^ ~`, with parentheses. No
   division, modulo, conditionals, or function calls. Each formula is one expression returning a

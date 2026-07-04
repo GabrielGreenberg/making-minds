@@ -75,13 +75,23 @@ A self-contained stepped flow (local state, no routing between steps):
 2. **Representation** — one binary/tally toggle for the whole question (governs grading + the
    preview).
 3. **Inputs/outputs** — dynamic lists of groups (name, width), with running wire counts.
-4. **Formula + live preview** — each output group's formula drives a preview table
-   (`instructor/ccPreview.ts`) computed via the DSL under the chosen representation; invalid
-   formulas show inline and block save.
+4. **Formula + preview** — each output group's formula is evaluated by the DSL under the chosen
+   representation (`instructor/ccPreview.ts`). Enumerating the whole input space on every
+   keystroke was the source of editing lag, so the preview is split into two tiers:
+   - **Live check** (`probeFormulas`, per keystroke) — evaluates every formula on a **single**
+     input (editable per group; defaults to each group's max value). O(#groups), independent of
+     space size. Surfaces formula syntax/reference errors inline and blocks save.
+   - **Examples** (`buildExamples`, on demand) — a button enumerates only the **first
+     `DEFAULT_EXAMPLE_LIMIT` (16)** inputs (mixed-radix `firstCombos`, never the full cartesian).
+     Cleared to stale whenever inputs/outputs/rep change.
+   `countCombos` (a product, no enumeration) drives the `MAX_COMBOS` too-large guard cheaply. The
+   exhaustive enumeration happens **only at save** (see step 6).
 5. **Statement** — plain-text instructions shown to students.
-6. **Save** — generates `test_cases` via `generateTestCases(spec, rep)`, builds the
-   `AssignmentQuestion` (with `representation`), hands it to the editor, which persists via
-   `localAssignmentStore.save`.
+6. **Save** — generates the full `test_cases` via `generateTestCases(spec, rep)` (the one
+   exhaustive enumeration, wrapped in try/catch so a formula that only fails on an input the
+   single-input probe never exercised — e.g. one that goes negative — reports an error instead of
+   throwing), builds the `AssignmentQuestion` (with `representation`), hands it to the editor,
+   which persists via `localAssignmentStore.save`.
 
 `instructor/ccSummary.ts` renders a one-line summary of a `cc_spec` for the editor's question
 list.

@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import type {
   AssignmentQuestion,
   BuildMode,
@@ -8,7 +8,18 @@ import type {
 } from '../types';
 import { getAssignment } from '../assignments';
 import { generateTestCases } from '../engine/testVectorGen';
-import { buildPreview, canSave, type PreviewRow } from './ccPreview';
+import { FormulaError } from '../engine/formulaEval';
+import {
+  buildExamples,
+  countCombos,
+  maxValue,
+  probeFormulas,
+  validateGroups,
+  MAX_COMBOS,
+  DEFAULT_EXAMPLE_LIMIT,
+  type ExamplesResult,
+  type PreviewRow,
+} from './ccPreview';
 
 interface Props {
   assignmentId: string;
@@ -51,8 +62,45 @@ export function QuestionCreator({ assignmentId, existingQuestion, onSave, onCanc
   );
   const [statement, setStatement] = useState(existingQuestion?.statement ?? '');
 
-  const preview = useMemo(() => buildPreview(inputs, outputs, rep), [inputs, outputs, rep]);
-  const saveable = canSave(preview, statement);
+  // The single input the live probe evaluates the formulas on. Keyed by group
+  // name (robust to add/remove/reorder); unset groups default to their max value.
+  const [probeOverrides, setProbeOverrides] = useState<Record<string, number>>({});
+
+  // The bounded example table is computed on demand (the "confirm formula" step),
+  // not per keystroke. It goes stale — and is cleared — whenever the spec changes.
+  const [examples, setExamples] = useState<ExamplesResult | null>(null);
+  // Surfaced only if the exhaustive save-time generation rejects a formula on some
+  // input the single-input probe never exercised (e.g. a value that goes negative).
+  const [saveError, setSaveError] = useState<string | null>(null);
+
+  useEffect(() => {
+    setExamples(null);
+    setSaveError(null);
+  }, [inputs, outputs, rep]);
+
+  // ── Live, per-keystroke validation (all O(#groups), no space enumeration) ──
+  const structuralErrors = validateGroups(inputs, outputs);
+  const structurallyValid = structuralErrors.length === 0;
+  const totalCombos = countCombos(inputs, rep);
+  const tooLarge = totalCombos > MAX_COMBOS;
+
+  // Probe values aligned to input order, clamped to each group's range.
+  const probeValues = inputs.map((g) => {
+    const max = maxValue(g.width, rep);
+    const raw = probeOverrides[g.name];
+    const v = raw == null ? max : Math.trunc(raw);
+    return Number.isFinite(v) ? Math.max(0, Math.min(max, v)) : 0;
+  });
+
+  // Single-input evaluation: cheap, and enough to catch formula syntax/reference
+  // errors. Only run when the group shapes are valid (probe assumes valid widths).
+  const probe = structurallyValid
+    ? probeFormulas(inputs, outputs, rep, probeValues)
+    : null;
+  const formulasOk = probe ? probe.outputErrors.every((e) => e == null) : false;
+
+  const saveable =
+    structurallyValid && !tooLarge && formulasOk && statement.trim().length > 0;
 
   const totalInputWires = inputs.reduce((n, g) => n + (g.width || 0), 0);
   const totalOutputWires = outputs.reduce((n, g) => n + (g.width || 0), 0);
@@ -91,10 +139,26 @@ export function QuestionCreator({ assignmentId, existingQuestion, onSave, onCanc
   const updateOutput = (i: number, patch: Partial<CCOutputGroup>) =>
     setOutputs((gs) => gs.map((g, idx) => (idx === i ? { ...g, ...patch } : g)));
 
+  const handleGenerate = () => {
+    if (!structurallyValid) return;
+    setExamples(buildExamples(inputs, outputs, rep));
+  };
+
   const handleSave = () => {
     if (!saveable) return;
     const spec = { inputs, outputs };
-    const test_cases = generateTestCases(spec, rep);
+    // The exhaustive test bank is generated here — and only here — at save.
+    let test_cases;
+    try {
+      test_cases = generateTestCases(spec, rep);
+    } catch (e) {
+      setSaveError(
+        e instanceof FormulaError
+          ? `A formula fails on some input: ${e.message}`
+          : 'Could not generate test cases from these formulas.',
+      );
+      return;
+    }
 
     const def = getAssignment(assignmentId);
     const existingQs = def?.questions ?? [];
@@ -219,8 +283,8 @@ export function QuestionCreator({ assignmentId, existingQuestion, onSave, onCanc
                   onChange={(e) => updateOutput(i, { formula: e.target.value })}
                 />
               </label>
-              {preview.outputErrors[i] && (
-                <span className="instructor-formula-error">{preview.outputErrors[i]}</span>
+              {probe?.outputErrors[i] && (
+                <span className="instructor-formula-error">{probe.outputErrors[i]}</span>
               )}
             </div>
           </div>
@@ -233,17 +297,44 @@ export function QuestionCreator({ assignmentId, existingQuestion, onSave, onCanc
         </button>
       </section>
 
-      {/* Preview */}
+      {/* Live single-input behavior (updates as you type; no full enumeration) */}
       <section className="instructor-creator-section">
-        <h4 className="instructor-subhead">Preview</h4>
-        <PreviewTable
-          inputs={inputs}
-          outputs={outputs}
-          rows={preview.rows}
-          totalCombos={preview.totalCombos}
-          tooLarge={preview.tooLarge}
-          structuralErrors={preview.structuralErrors}
-        />
+        <div className="instructor-section-head">
+          <h4 className="instructor-subhead">Live check</h4>
+          <span className="instructor-count">one input, updates as you type</span>
+        </div>
+        {structuralErrors.length > 0 ? (
+          <ul className="instructor-preview-errors">
+            {structuralErrors.map((e, i) => (
+              <li key={i}>{e}</li>
+            ))}
+          </ul>
+        ) : (
+          <ProbePanel
+            inputs={inputs}
+            rep={rep}
+            probeValues={probeValues}
+            row={probe!.row}
+            onProbeChange={(name, value) =>
+              setProbeOverrides((o) => ({ ...o, [name]: value }))
+            }
+          />
+        )}
+      </section>
+
+      {/* Bounded examples, computed only when the instructor confirms the formula */}
+      <section className="instructor-creator-section">
+        <div className="instructor-section-head">
+          <h4 className="instructor-subhead">Examples</h4>
+          <button
+            className="instructor-btn"
+            disabled={!structurallyValid}
+            onClick={handleGenerate}
+          >
+            {examples ? 'Refresh examples' : `Preview up to ${DEFAULT_EXAMPLE_LIMIT} examples`}
+          </button>
+        </div>
+        <ExamplesPanel inputs={inputs} outputs={outputs} examples={examples} />
       </section>
 
       {/* Statement */}
@@ -261,6 +352,7 @@ export function QuestionCreator({ assignmentId, existingQuestion, onSave, onCanc
       </section>
 
       <div className="instructor-creator-foot">
+        {saveError && <span className="instructor-formula-error">{saveError}</span>}
         <button className="instructor-btn" onClick={onCancel}>
           Cancel
         </button>
@@ -300,48 +392,113 @@ function RepToggle({
   );
 }
 
-function PreviewTable({
+/** The live single-input row: editable input values → the formulas' outputs. */
+function ProbePanel({
+  inputs,
+  rep,
+  probeValues,
+  row,
+  onProbeChange,
+}: {
+  inputs: CCInputGroup[];
+  rep: RepSystem;
+  probeValues: number[];
+  row: PreviewRow;
+  onProbeChange: (name: string, value: number) => void;
+}) {
+  return (
+    <div className="instructor-probe">
+      <div className="instructor-probe-inputs">
+        {inputs.map((g, i) => (
+          <label key={i} className="instructor-probe-field">
+            <span className="instructor-probe-name">{g.name}</span>
+            <input
+              className="instructor-input instructor-input--num"
+              type="number"
+              min={0}
+              max={maxValue(g.width, rep)}
+              value={probeValues[i]}
+              onChange={(e) => onProbeChange(g.name, Number(e.target.value))}
+            />
+            <span className="instructor-bits">{row.inputs[i]?.bits.join('')}</span>
+          </label>
+        ))}
+      </div>
+      <span className="instructor-probe-arrow">→</span>
+      <div className="instructor-probe-outputs">
+        {row.outputs.map((c, ci) => (
+          <span key={ci} className="instructor-probe-out">
+            <span className="instructor-probe-name">{c.name} =</span>{' '}
+            {c.bits ? (
+              <>
+                <span className="instructor-bits">{c.bits.join('')}</span>
+                <span className="instructor-int">({c.result})</span>
+              </>
+            ) : (
+              <span className="instructor-formula-error">error</span>
+            )}
+          </span>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/** The on-demand, bounded example table (or a hint / warning when not shown). */
+function ExamplesPanel({
   inputs,
   outputs,
-  rows,
-  totalCombos,
-  tooLarge,
-  structuralErrors,
+  examples,
 }: {
   inputs: CCInputGroup[];
   outputs: CCOutputGroup[];
-  rows: PreviewRow[];
-  totalCombos: number;
-  tooLarge: boolean;
-  structuralErrors: string[];
+  examples: ExamplesResult | null;
 }) {
-  if (structuralErrors.length > 0) {
+  if (!examples) {
     return (
-      <ul className="instructor-preview-errors">
-        {structuralErrors.map((e, i) => (
-          <li key={i}>{e}</li>
-        ))}
-      </ul>
-    );
-  }
-  if (tooLarge) {
-    return (
-      <p className="instructor-preview-warning">
-        Input space is too large to enumerate ({totalCombos.toLocaleString()} combinations).
-        Reduce the input widths.
+      <p className="instructor-empty">
+        Confirm the formulas by generating a few worked examples before saving.
       </p>
     );
   }
-  if (rows.length === 0) return <p className="instructor-empty">No rows to preview.</p>;
+  if (examples.tooLarge) {
+    return (
+      <p className="instructor-preview-warning">
+        Input space is too large to enumerate ({examples.totalCombos.toLocaleString()}{' '}
+        combinations). Reduce the input widths.
+      </p>
+    );
+  }
+  if (examples.rows.length === 0) {
+    return <p className="instructor-empty">No rows to preview.</p>;
+  }
 
-  // Show all rows up to 16; otherwise first 8 + last 8 with an elision marker.
-  const HEAD = 8;
-  const TAIL = 8;
-  const truncated = rows.length > 16;
-  const head = truncated ? rows.slice(0, HEAD) : rows;
-  const tail = truncated ? rows.slice(rows.length - TAIL) : [];
+  return (
+    <>
+      <table className="instructor-preview-table">
+        <thead>
+          <tr>
+            {inputs.map((g, i) => (
+              <th key={`hi${i}`}>{g.name || '?'} (in)</th>
+            ))}
+            {outputs.map((g, i) => (
+              <th key={`ho${i}`}>{g.name || '?'} (out)</th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>{examples.rows.map((r, i) => renderRow(r, i))}</tbody>
+      </table>
+      <p className="instructor-count">
+        {examples.truncated
+          ? `Showing first ${examples.shown} of ${examples.totalCombos.toLocaleString()} inputs. The full test bank is generated on save.`
+          : `Showing all ${examples.shown} inputs.`}
+      </p>
+    </>
+  );
+}
 
-  const renderRow = (row: PreviewRow, key: number) => (
+function renderRow(row: PreviewRow, key: number) {
+  return (
     <tr key={key}>
       {row.inputs.map((c, ci) => (
         <td key={`i${ci}`} className="instructor-preview-bits">
@@ -362,31 +519,5 @@ function PreviewTable({
         </td>
       ))}
     </tr>
-  );
-
-  return (
-    <table className="instructor-preview-table">
-      <thead>
-        <tr>
-          {inputs.map((g, i) => (
-            <th key={`hi${i}`}>{g.name || '?'} (in)</th>
-          ))}
-          {outputs.map((g, i) => (
-            <th key={`ho${i}`}>{g.name || '?'} (out)</th>
-          ))}
-        </tr>
-      </thead>
-      <tbody>
-        {head.map((r, i) => renderRow(r, i))}
-        {truncated && (
-          <tr className="instructor-preview-elision">
-            <td colSpan={inputs.length + outputs.length}>
-              … {totalCombos} rows total …
-            </td>
-          </tr>
-        )}
-        {tail.map((r, i) => renderRow(r, HEAD + i))}
-      </tbody>
-    </table>
   );
 }
