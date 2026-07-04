@@ -27,14 +27,15 @@ function inputKey(bits: number[]): string {
 function QuestionStatement() {
   const assignment = useStore((s) => s.assignment);
   const currentQuestionIndex = useStore((s) => s.currentQuestionIndex);
-  const statement = assignment?.questions[currentQuestionIndex]?.statement;
-  if (!statement) return null;
+  const question = assignment?.questions[currentQuestionIndex];
+  if (!question?.statement) return null;
   return (
     <div className="table-section">
       <div className="table-section-label">
         <span>Question</span>
+        <span className="question-rep-badge">{question.representation} representation</span>
       </div>
-      <p className="question-statement">{statement}</p>
+      <p className="question-statement">{question.statement}</p>
     </div>
   );
 }

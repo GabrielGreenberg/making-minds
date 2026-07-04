@@ -19,8 +19,15 @@ function pct(fraction: number): string {
   return `${Math.round(fraction * 100)}%`;
 }
 
+/** One student's submissions, oldest first; `latest` is the graded one. */
+interface StudentGrades {
+  student: string;
+  all: SubmissionGrade[]; // oldest → newest
+  latest: SubmissionGrade;
+}
+
 export function GradebookView({ id }: { id: string }) {
-  const [expanded, setExpanded] = useState<number | null>(null);
+  const [expandedStudent, setExpandedStudent] = useState<string | null>(null);
 
   const assignment = getAssignment(id);
   if (!assignment) {
@@ -36,7 +43,22 @@ export function GradebookView({ id }: { id: string }) {
 
   const records = localSubmissionStore.listSubmissions(id);
   const grades = gradeSubmissions(assignment, records);
-  const stats = computeStats(grades, assignment);
+
+  // Group by student. Only the LATEST submission counts toward the grade;
+  // earlier attempts stay visible under the expanded student row.
+  const byStudent = new Map<string, SubmissionGrade[]>();
+  for (const g of grades) {
+    const student = g.record.submission.student || 'Anonymous';
+    const list = byStudent.get(student) ?? [];
+    list.push(g);
+    byStudent.set(student, list);
+  }
+  const students: StudentGrades[] = [...byStudent.entries()]
+    .map(([student, all]) => ({ student, all, latest: all[all.length - 1] }))
+    .sort((a, b) => a.student.localeCompare(b.student));
+
+  // Stats reflect what counts for grading: each student's latest submission.
+  const stats = computeStats(students.map((s) => s.latest), assignment);
 
   return (
     <div className="instructor-gradebook">
@@ -47,10 +69,14 @@ export function GradebookView({ id }: { id: string }) {
         <h3 className="instructor-section-title">{assignment.title} — Submissions</h3>
       </div>
 
-      {/* Summary */}
+      {/* Summary (over each student's latest submission) */}
       <div className="instructor-stats">
         <div className="instructor-stat">
-          <span className="instructor-stat-value">{stats.submissionCount}</span>
+          <span className="instructor-stat-value">{students.length}</span>
+          <span className="instructor-stat-label">students</span>
+        </div>
+        <div className="instructor-stat">
+          <span className="instructor-stat-value">{grades.length}</span>
           <span className="instructor-stat-label">submissions</span>
         </div>
         <div className="instructor-stat">
@@ -72,8 +98,8 @@ export function GradebookView({ id }: { id: string }) {
           <thead>
             <tr>
               <th>Student</th>
-              <th>Submitted</th>
-              <th>Attempt</th>
+              <th>Last submitted</th>
+              <th>Attempts</th>
               {assignment.questions.map((q) => (
                 <th key={q.id}>{q.label}</th>
               ))}
@@ -81,13 +107,15 @@ export function GradebookView({ id }: { id: string }) {
             </tr>
           </thead>
           <tbody>
-            {grades.map((g, i) => (
-              <SubmissionRow
-                key={i}
-                grade={g}
+            {students.map((s) => (
+              <StudentRow
+                key={s.student}
+                studentGrades={s}
                 assignment={assignment}
-                expanded={expanded === i}
-                onToggle={() => setExpanded(expanded === i ? null : i)}
+                expanded={expandedStudent === s.student}
+                onToggle={() =>
+                  setExpandedStudent(expandedStudent === s.student ? null : s.student)
+                }
               />
             ))}
           </tbody>
@@ -97,45 +125,123 @@ export function GradebookView({ id }: { id: string }) {
   );
 }
 
-function SubmissionRow({
+function QuestionMarks({
   grade,
+  assignment,
+}: {
+  grade: SubmissionGrade;
+  assignment: AssignmentData;
+}) {
+  return (
+    <>
+      {assignment.questions.map((q) => {
+        const qg = grade.grades.find((x) => x.questionId === q.id);
+        return (
+          <td key={q.id}>
+            {qg?.passed ? (
+              <span className="instructor-pass">✓</span>
+            ) : (
+              <span className="instructor-fail">✗</span>
+            )}
+          </td>
+        );
+      })}
+    </>
+  );
+}
+
+/** The per-student row: latest submission's scores; expands to the full
+ *  submission history (earlier attempts and their per-question results). */
+function StudentRow({
+  studentGrades,
   assignment,
   expanded,
   onToggle,
 }: {
-  grade: SubmissionGrade;
+  studentGrades: StudentGrades;
   assignment: AssignmentData;
   expanded: boolean;
   onToggle: () => void;
 }) {
-  const { record } = grade;
-  const student = record.submission.student || 'Anonymous';
+  const { student, all, latest } = studentGrades;
   const colSpan = 4 + assignment.questions.length;
 
   return (
     <>
       <tr className="instructor-submission-row" onClick={onToggle}>
-        <td>{student}</td>
-        <td>{formatTime(record.submittedAt)}</td>
-        <td>{record.attempt}</td>
-        {assignment.questions.map((q) => {
-          const qg = grade.grades.find((x) => x.questionId === q.id);
-          return (
-            <td key={q.id}>
-              {qg?.passed ? (
-                <span className="instructor-pass">✓</span>
-              ) : (
-                <span className="instructor-fail">✗</span>
-              )}
-            </td>
-          );
-        })}
-        <td>{pct(grade.score)}</td>
+        <td>
+          <span className="instructor-expand-caret">{expanded ? '▾' : '▸'}</span> {student}
+        </td>
+        <td>{formatTime(latest.record.submittedAt)}</td>
+        <td>{all.length}</td>
+        <QuestionMarks grade={latest} assignment={assignment} />
+        <td>{pct(latest.score)}</td>
       </tr>
       {expanded && (
         <tr className="instructor-submission-detail">
           <td colSpan={colSpan}>
-            <SubmissionDetail record={record} assignment={assignment} />
+            <table className="instructor-table instructor-attempt-table">
+              <thead>
+                <tr>
+                  <th>Attempt</th>
+                  <th>Submitted</th>
+                  {assignment.questions.map((q) => (
+                    <th key={q.id}>{q.label}</th>
+                  ))}
+                  <th>Score</th>
+                </tr>
+              </thead>
+              <tbody>
+                {all
+                  .map((g, i) => ({ g, attempt: i + 1 }))
+                  .reverse()
+                  .map(({ g, attempt }) => (
+                    <AttemptRow
+                      key={attempt}
+                      grade={g}
+                      attempt={attempt}
+                      isLatest={attempt === all.length}
+                      assignment={assignment}
+                    />
+                  ))}
+              </tbody>
+            </table>
+          </td>
+        </tr>
+      )}
+    </>
+  );
+}
+
+function AttemptRow({
+  grade,
+  attempt,
+  isLatest,
+  assignment,
+}: {
+  grade: SubmissionGrade;
+  attempt: number;
+  isLatest: boolean;
+  assignment: AssignmentData;
+}) {
+  const [showDetail, setShowDetail] = useState(false);
+  const colSpan = 3 + assignment.questions.length;
+
+  return (
+    <>
+      <tr className="instructor-submission-row" onClick={() => setShowDetail(!showDetail)}>
+        <td>
+          {attempt}
+          {isLatest && <span className="instructor-latest-tag"> (graded)</span>}
+        </td>
+        <td>{formatTime(grade.record.submittedAt)}</td>
+        <QuestionMarks grade={grade} assignment={assignment} />
+        <td>{pct(grade.score)}</td>
+      </tr>
+      {showDetail && (
+        <tr className="instructor-submission-detail">
+          <td colSpan={colSpan}>
+            <SubmissionDetail record={grade.record} assignment={assignment} />
           </td>
         </tr>
       )}

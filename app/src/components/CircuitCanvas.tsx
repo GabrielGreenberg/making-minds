@@ -116,6 +116,67 @@ function getPortPosition(
 
 const PORT_HIT_RADIUS = 20;
 
+/** Find the wire target under `canvasPos`: nearest valid input port (first
+ *  pass: proximity; second pass: cursor inside component bounds). Used both
+ *  when a wire drag is released and when a click completes a pending wire. */
+function findWireTarget(
+  components: CircuitComponent[],
+  canvasPos: { x: number; y: number },
+  sourceCompId?: string
+): { comp: CircuitComponent; port: CircuitComponent['ports'][0] } | null {
+  let bestDist = Infinity;
+  let bestComp: CircuitComponent | null = null;
+  let bestPort: CircuitComponent['ports'][0] | null = null;
+  const sourceComp = components.find((c) => c.id === sourceCompId);
+  const isFsmSource = sourceComp?.type === 'STATE';
+  for (const comp of components) {
+    // For FSM: allow self-loops (same source and target STATE)
+    if (comp.id === sourceCompId && !isFsmSource) continue;
+    for (const port of comp.ports) {
+      // For STATE: 'in' port is the target (or same comp for self-loop)
+      // For MEM, target port depends on direction; for all others, left-side ports are targets
+      const isTargetPort = comp.type === 'STATE' ? port.id === 'left'
+        : comp.type === 'MEM' ? isMemSinkPort(comp, port.id) : port.side === 'left';
+      if (!isTargetPort) continue;
+      // For STATE targets, releasing anywhere in (or just outside) the
+      // circle connects — measure from the state's center, not the port.
+      const portPos = comp.type === 'STATE' && !comp.boxedCircuitId
+        ? { x: comp.x + STATE_RADIUS, y: comp.y + STATE_RADIUS }
+        : getPortPosition(comp, port.id);
+      const dist = Math.hypot(canvasPos.x - portPos.x, canvasPos.y - portPos.y);
+      const hitRadius = comp.type === 'STATE' ? STATE_RADIUS + 12 : PORT_HIT_RADIUS + 10;
+      if (dist < hitRadius && dist < bestDist) {
+        bestDist = dist;
+        bestComp = comp;
+        bestPort = port;
+      }
+    }
+  }
+  // Second pass: overshoot — cursor is inside component bounds, find closest target port
+  if (!bestComp) {
+    for (const comp of components) {
+      if (comp.id === sourceCompId && !isFsmSource) continue;
+      const { w, h } = getCompDimensions(comp);
+      if (canvasPos.x >= comp.x && canvasPos.x <= comp.x + w &&
+          canvasPos.y >= comp.y && canvasPos.y <= comp.y + h) {
+        for (const port of comp.ports) {
+          const isTargetPort = comp.type === 'STATE' ? true
+            : comp.type === 'MEM' ? isMemSinkPort(comp, port.id) : port.side === 'left';
+          if (!isTargetPort) continue;
+          const portPos = getPortPosition(comp, port.id);
+          const dist = Math.hypot(canvasPos.x - portPos.x, canvasPos.y - portPos.y);
+          if (dist < bestDist) {
+            bestDist = dist;
+            bestComp = comp;
+            bestPort = port;
+          }
+        }
+      }
+    }
+  }
+  return bestComp && bestPort ? { comp: bestComp, port: bestPort } : null;
+}
+
 // ─── Wire routing (A* pathfinder — see wireRouter.ts) ────────────
 
 /** Apply manual segment overrides to a computed wire path, maintaining connectivity.
@@ -346,6 +407,9 @@ interface DragInfo {
   sourcePortId?: string;
   wireFromX?: number;
   wireFromY?: number;
+  // true when the drag re-routes an existing wire picked up from its target
+  // port (a plain click must then re-attach it, not be discarded as a no-op)
+  isRewire?: boolean;
   // for 'pan'
   origPanX?: number;
   origPanY?: number;
@@ -901,22 +965,21 @@ function CircuitComponentView({
       ];
       return (
         <>
-          {/* Port hit areas */}
-          {nodes.map(({ id, x, y, side }) => (
-            <circle
-              key={id}
-              cx={x}
-              cy={y}
-              r={STATE_RADIUS + 5}
-              fill="transparent"
-              className="port-hit-area"
-              data-port-compid={comp.id}
-              data-port-id={id}
-              data-port-side={side}
-            />
-          ))}
+          {/* Full-ring wire-start hit area: dragging from anywhere on the
+              outer rim starts a transition (the wire source is always the
+              state's 'right' port, so one ring with port attrs suffices). */}
+          <circle
+            cx={cx}
+            cy={cy}
+            r={STATE_RADIUS + 10}
+            fill="transparent"
+            className="port-hit-area"
+            data-port-compid={comp.id}
+            data-port-id="right"
+            data-port-side="right"
+          />
           {/* Inner blocking circle — no port attrs, so inner clicks drag */}
-          <circle cx={cx} cy={cy} r={STATE_RADIUS - 1} fill="transparent" />
+          <circle cx={cx} cy={cy} r={STATE_RADIUS - 5} fill="transparent" />
           {/* Visual dots at left/right on the ring */}
           {nodes.map(({ id, x, y }) => (
             <circle
@@ -2417,6 +2480,36 @@ export function CircuitCanvas() {
     []
   );
 
+  // ─── Pending (armed) wire: a click on a source port arms a wire that
+  //     follows the cursor; the next click on a valid target completes it ───
+  const pendingWireRef = useRef<{
+    sourceCompId: string;
+    sourcePortId: string;
+    fromX: number;
+    fromY: number;
+  } | null>(null);
+
+  const pendingWireMove = useCallback(
+    (e: PointerEvent) => {
+      const p = pendingWireRef.current;
+      if (!p) return;
+      const pos = screenToCanvas(e.clientX, e.clientY);
+      pendingOverlay.current.wirePreview = {
+        fromX: p.fromX, fromY: p.fromY, toX: pos.x, toY: pos.y,
+      };
+      requestOverlayUpdate();
+    },
+    [screenToCanvas, requestOverlayUpdate]
+  );
+
+  const clearPendingWire = useCallback(() => {
+    if (!pendingWireRef.current) return;
+    pendingWireRef.current = null;
+    window.removeEventListener('pointermove', pendingWireMove);
+    pendingOverlay.current.wirePreview = null;
+    requestOverlayUpdate();
+  }, [pendingWireMove, requestOverlayUpdate]);
+
   useEffect(() => {
     handlersRef.current.onMove = (e: PointerEvent) => {
       const drag = dragRef.current;
@@ -2749,60 +2842,33 @@ export function CircuitCanvas() {
       const state = useStore.getState();
 
       if (drag.type === 'wire') {
+        // A click that never really moved doesn't drop the wire — it ARMS it:
+        // the wire stays attached to the cursor and the next click on a valid
+        // target completes it (so click-port-then-click-state connects, and a
+        // stray click on a state's rim no longer creates an instant self-loop).
+        // Rewires are exempt: there a plain click re-attaches the wire.
+        const movedDist = Math.hypot(
+          e.clientX - drag.anchorScreenX,
+          e.clientY - drag.anchorScreenY
+        );
+        if (movedDist < 5 && !drag.isRewire) {
+          pendingWireRef.current = {
+            sourceCompId: drag.sourceCompId!,
+            sourcePortId: drag.sourcePortId!,
+            fromX: drag.wireFromX!,
+            fromY: drag.wireFromY!,
+          };
+          window.addEventListener('pointermove', pendingWireMove);
+          return;
+        }
         const canvasPos = screenToCanvas(e.clientX, e.clientY);
-        // First pass: direct proximity to port
-        let bestDist = Infinity;
-        let bestComp: typeof state.components[0] | null = null;
-        let bestPort: typeof state.components[0]['ports'][0] | null = null;
-        const sourceComp = state.components.find((c) => c.id === drag.sourceCompId);
-        const isFsmSource = sourceComp?.type === 'STATE';
-        for (const comp of state.components) {
-          // For FSM: allow self-loops (same source and target STATE)
-          if (comp.id === drag.sourceCompId && !isFsmSource) continue;
-          for (const port of comp.ports) {
-            // For STATE: 'in' port is the target (or same comp for self-loop)
-            // For MEM, target port depends on direction; for all others, left-side ports are targets
-            const isTargetPort = comp.type === 'STATE' ? port.id === 'left'
-              : comp.type === 'MEM' ? isMemSinkPort(comp, port.id) : port.side === 'left';
-            if (!isTargetPort) continue;
-            const portPos = getPortPosition(comp, port.id);
-            const dist = Math.hypot(canvasPos.x - portPos.x, canvasPos.y - portPos.y);
-            const hitRadius = comp.type === 'STATE' ? STATE_RADIUS + 10 : PORT_HIT_RADIUS + 10;
-            if (dist < hitRadius && dist < bestDist) {
-              bestDist = dist;
-              bestComp = comp;
-              bestPort = port;
-            }
-          }
-        }
-        // Second pass: overshoot — cursor is inside component bounds, find closest target port
-        if (!bestComp) {
-          for (const comp of state.components) {
-            if (comp.id === drag.sourceCompId && !isFsmSource) continue;
-            const { w, h } = getCompDimensions(comp);
-            if (canvasPos.x >= comp.x && canvasPos.x <= comp.x + w &&
-                canvasPos.y >= comp.y && canvasPos.y <= comp.y + h) {
-              for (const port of comp.ports) {
-                const isTargetPort = comp.type === 'STATE' ? true
-                  : comp.type === 'MEM' ? isMemSinkPort(comp, port.id) : port.side === 'left';
-                if (!isTargetPort) continue;
-                const portPos = getPortPosition(comp, port.id);
-                const dist = Math.hypot(canvasPos.x - portPos.x, canvasPos.y - portPos.y);
-                if (dist < bestDist) {
-                  bestDist = dist;
-                  bestComp = comp;
-                  bestPort = port;
-                }
-              }
-            }
-          }
-        }
-        if (bestComp && bestPort) {
+        const target = findWireTarget(state.components, canvasPos, drag.sourceCompId);
+        if (target) {
           state.addWire(
             drag.sourceCompId!,
             drag.sourcePortId!,
-            bestComp.id,
-            bestPort.id
+            target.comp.id,
+            target.port.id
           );
         }
         pendingOverlay.current.wirePreview = null;
@@ -2828,7 +2894,20 @@ export function CircuitCanvas() {
               return t.x + t.width > x1 && t.x < x2 && t.y + t.height > y1 && t.y < y2;
             })
             .map((t) => t.id);
-          state.setSelectedIds([...compIds, ...textIds]);
+          // FSM/TM transition arrows: selected when both endpoint states are
+          // inside the rectangle (covers self-loops too, where from === to),
+          // or when the rectangle captures the arrow's label.
+          const inRect = (p: { x: number; y: number }) =>
+            p.x > x1 && p.x < x2 && p.y > y1 && p.y < y2;
+          const transitionIds = state.wires
+            .filter((w) => {
+              const wd = wireDataRef.current.get(w.id);
+              if (!wd?.isFsmTransition) return false;
+              if (inRect(wd.from) && inRect(wd.to)) return true;
+              return wd.labelPos != null && inRect(wd.labelPos);
+            })
+            .map((w) => w.id);
+          state.setSelectedIds([...compIds, ...textIds, ...transitionIds]);
         }
         pendingOverlay.current.boxSelect = null;
         requestOverlayUpdate();
@@ -2901,6 +2980,40 @@ export function CircuitCanvas() {
       const state = useStore.getState();
       const canvasPos = screenToCanvas(e.clientX, e.clientY);
       const hit = findTarget(e);
+
+      // FSM/TM: with a single state s1 selected, shift-clicking another state
+      // s2 creates the transition s1 → s2 directly (no drag needed). Returns
+      // true when it handled the click.
+      const tryShiftConnect = (targetCompId: string): boolean => {
+        if (!e.shiftKey) return false;
+        if (state.buildMode !== 'FSM' && state.buildMode !== 'TM') return false;
+        const target = state.components.find((c) => c.id === targetCompId);
+        if (!target || target.type !== 'STATE') return false;
+        if (state.selectedIds.length !== 1) return false;
+        const source = state.components.find((c) => c.id === state.selectedIds[0]);
+        if (!source || source.type !== 'STATE' || source.id === targetCompId) return false;
+        state.addWire(source.id, 'right', targetCompId, 'left');
+        // Move the selection along so connections can be chained s1→s2→s3…
+        state.setSelectedIds([targetCompId]);
+        return true;
+      };
+
+      // A pending (armed) wire completes on the next click: connect to the
+      // target under the cursor, or cancel if the click lands on nothing.
+      if (pendingWireRef.current && e.button === 0 && !e.altKey) {
+        const pending = pendingWireRef.current;
+        clearPendingWire();
+        if (hit.type === 'port' || hit.type === 'component') {
+          const target = findWireTarget(state.components, canvasPos, pending.sourceCompId);
+          if (target) {
+            e.preventDefault();
+            e.stopPropagation();
+            state.addWire(pending.sourceCompId, pending.sourcePortId, target.comp.id, target.port.id);
+            return;
+          }
+        }
+        // No valid target — the pending wire is cancelled; the click behaves normally.
+      }
 
       // Middle-click or alt+left-click → pan
       if (e.button === 1 || (e.button === 0 && e.altKey)) {
@@ -3112,6 +3225,10 @@ export function CircuitCanvas() {
         const comp = state.components.find((c) => c.id === hit.compId);
         if (!comp) return;
 
+        // Shift-click connect (FSM/TM): the rim hit areas cover most of a
+        // state, so a shift-click landing on a "port" must connect too.
+        if (tryShiftConnect(hit.compId)) return;
+
         // Always select the component when clicking its port, so Delete still works
         state.setSelectedIds([hit.compId]);
 
@@ -3169,6 +3286,7 @@ export function CircuitCanvas() {
                 sourcePortId: existingWire.sourcePortId,
                 wireFromX: srcPos.x,
                 wireFromY: srcPos.y,
+                isRewire: true,
                 pointerId: e.pointerId,
               };
               pendingOverlay.current.wirePreview = {
@@ -3252,8 +3370,20 @@ export function CircuitCanvas() {
           return;
         }
 
+        // Triple-click a component → select everything on the canvas
+        if (e.detail >= 3) {
+          state.setSelectedIds([
+            ...state.components.map((c) => c.id),
+            ...state.textElements.map((t) => t.id),
+          ]);
+          return;
+        }
+
         if (e.shiftKey) {
-          useStore.getState().rotateComponent(hit.compId);
+          // FSM/TM: selected state + shift-click another state → transition
+          if (tryShiftConnect(hit.compId)) return;
+          // Otherwise shift-click toggles the component in/out of the selection
+          state.toggleSelected(hit.compId);
           return;
         }
 
@@ -3367,7 +3497,7 @@ export function CircuitCanvas() {
       window.addEventListener('pointermove', stableOnMove);
       window.addEventListener('pointerup', stableOnUp);
     },
-    [screenToCanvas, requestOverlayUpdate, stableOnMove, stableOnUp]
+    [screenToCanvas, requestOverlayUpdate, stableOnMove, stableOnUp, clearPendingWire]
   );
 
   // Clean up on unmount
@@ -3376,8 +3506,18 @@ export function CircuitCanvas() {
       if (rafRef.current) cancelAnimationFrame(rafRef.current);
       window.removeEventListener('pointermove', stableOnMove);
       window.removeEventListener('pointerup', stableOnUp);
+      window.removeEventListener('pointermove', pendingWireMove);
     };
-  }, [stableOnMove, stableOnUp]);
+  }, [stableOnMove, stableOnUp, pendingWireMove]);
+
+  // Escape cancels a pending (armed) wire
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') clearPendingWire();
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [clearPendingWire]);
 
   // ─── Navigation arrow ─────────────────────────────────────────
   const navArrow = useMemo(() => {
@@ -3461,7 +3601,7 @@ export function CircuitCanvas() {
   }, [showGrid]);
 
   // ─── Wire data ref (for event handlers that need current wire paths) ──
-  const wireDataRef = useRef<Map<string, { pathD: string; points: { x: number; y: number }[]; basePoints: { x: number; y: number }[]; crossings: { x: number; y: number }[]; from: { x: number; y: number }; to: { x: number; y: number } }>>(new Map());
+  const wireDataRef = useRef<Map<string, { pathD: string; points: { x: number; y: number }[]; basePoints: { x: number; y: number }[]; crossings: { x: number; y: number }[]; from: { x: number; y: number }; to: { x: number; y: number }; isFsmTransition?: boolean; labelPos?: { x: number; y: number } }>>(new Map());
 
   // ─── Previous paths ref for continuity bias (§7.2) ──
   const previousPathsRef = useRef<Map<string, { x: number; y: number }[]>>(new Map());

@@ -1,7 +1,6 @@
 import { useStore } from '../store';
 import { getCurrentUserEmail, useAuth } from '../auth';
 import { navigate } from '../routing';
-import { downloadJson } from '../download';
 
 export function MenuBar() {
   const { user, logout } = useAuth();
@@ -9,12 +8,12 @@ export function MenuBar() {
 
   const handleSubmitAssignment = () => {
     if (!assignment) return;
-    const ok = confirm(`Submit "${assignment.title}"? This records a snapshot of your current work and downloads it.`);
+    const ok = confirm(
+      `Submit "${assignment.title}"? This records a snapshot of your current work.\n\n` +
+      'Note: only your most recent submission is graded — submitting again replaces any earlier submission for grading purposes.'
+    );
     if (!ok) return;
-    const rec = submitAssignment(assignment.id, getCurrentUserEmail());
-    // Local grading: until there's a server endpoint, the submission is delivered
-    // as a downloaded JSON file (the instructor grades it with the CLI).
-    if (rec) downloadJson(`submission-${assignment.id}-attempt${rec.attempt}.json`, rec.submission);
+    submitAssignment(assignment.id, getCurrentUserEmail());
   };
 
   return (

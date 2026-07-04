@@ -1,7 +1,6 @@
 import { useStore } from '../store';
 import { navigate } from '../routing';
 import { getCurrentUserEmail, useAuth } from '../auth';
-import { downloadJson } from '../download';
 
 /**
  * The question list an assignment opens to. Clicking a question opens its
@@ -18,10 +17,12 @@ export function AssignmentOverview() {
   const sub = submissions[assignment.id];
 
   const handleSubmit = () => {
-    const ok = confirm(`Submit "${assignment.title}"? This records a snapshot of your current work and downloads it.`);
+    const ok = confirm(
+      `Submit "${assignment.title}"? This records a snapshot of your current work.\n\n` +
+      'Note: only your most recent submission is graded — submitting again replaces any earlier submission for grading purposes.'
+    );
     if (!ok) return;
-    const rec = submitAssignment(assignment.id, getCurrentUserEmail());
-    if (rec) downloadJson(`submission-${assignment.id}-attempt${rec.attempt}.json`, rec.submission);
+    submitAssignment(assignment.id, getCurrentUserEmail());
   };
 
   return (

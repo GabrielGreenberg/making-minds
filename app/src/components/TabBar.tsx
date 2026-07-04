@@ -184,10 +184,6 @@ export function TabBar() {
         >
           ‹ Questions
         </button>
-        <span className="question-nav-label">
-          {q?.label ?? '?'}
-          <span className="question-nav-count"> · {currentQuestionIndex + 1} of {count}</span>
-        </span>
         <span className="question-nav-arrows">
           <button
             className="question-nav-btn"
@@ -205,6 +201,10 @@ export function TabBar() {
           >
             →
           </button>
+        </span>
+        <span className="question-nav-label">
+          {q?.label ?? '?'}
+          <span className="question-nav-count"> · {currentQuestionIndex + 1} of {count}</span>
         </span>
       </div>
     );

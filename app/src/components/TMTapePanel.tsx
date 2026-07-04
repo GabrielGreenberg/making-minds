@@ -50,7 +50,7 @@ export function TMTapePanel() {
         </span>
       </div>
       {open && (
-        <div style={{ overflowX: 'auto', padding: '12px 10px 8px' }}>
+        <div style={{ overflowX: 'auto', padding: '18px 10px 10px' }}>
           <div style={{ display: 'flex', width: 'max-content', margin: '0 auto' }}>
             {indices.map((i) => {
               const symbol = tmTape.cells[i] ?? '0';
@@ -65,8 +65,8 @@ export function TMTapePanel() {
                   }}
                   title={editable ? `cell ${i} — click to change` : `cell ${i}`}
                   style={{
-                    width: 26,
-                    height: 30,
+                    width: 40,
+                    height: 46,
                     flexShrink: 0,
                     display: 'flex',
                     alignItems: 'center',
@@ -77,7 +77,7 @@ export function TMTapePanel() {
                     position: 'relative',
                     cursor: editable ? 'pointer' : 'default',
                     fontFamily: "'SF Mono','Fira Code',monospace",
-                    fontSize: 13,
+                    fontSize: 19,
                     fontWeight: symbol === '0' ? 400 : 700,
                     color: symbol === '0' ? '#ccc' : symbol === '*' ? '#2a7fff' : '#c62828',
                     background: isHead ? '#fff8e1' : 'white',
@@ -89,11 +89,11 @@ export function TMTapePanel() {
                     <span
                       style={{
                         position: 'absolute',
-                        top: -11,
+                        top: -14,
                         left: 0,
                         right: 0,
                         textAlign: 'center',
-                        fontSize: 9,
+                        fontSize: 12,
                         color: '#e53935',
                         lineHeight: 1,
                       }}

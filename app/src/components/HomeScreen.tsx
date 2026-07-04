@@ -2,7 +2,6 @@ import { useStore } from '../store';
 import { listAssignments } from '../assignments';
 import { navigate } from '../routing';
 import { getCurrentUserEmail, useAuth } from '../auth';
-import { downloadJson } from '../download';
 import { summarizeResult } from '../engine/grader';
 
 function formatSubmittedAt(iso: string): string {
@@ -19,7 +18,10 @@ export function HomeScreen() {
   const assignments = listAssignments();
 
   const handleSubmit = (id: string, title: string) => {
-    const ok = confirm(`Submit "${title}"? This records a snapshot of your saved work and downloads it.`);
+    const ok = confirm(
+      `Submit "${title}"? This records a snapshot of your saved work.\n\n` +
+      'Note: only your most recent submission is graded — submitting again replaces any earlier submission for grading purposes.'
+    );
     if (!ok) return;
     const rec = submitAssignment(id, getCurrentUserEmail());
     if (!rec) return;
@@ -31,9 +33,6 @@ export function HomeScreen() {
         : 'No autogradable questions in this assignment yet.';
       alert(`Submitted "${title}" (attempt ${rec.attempt}).\n${detail}`);
     }
-    // Also deliver the submission as a downloaded JSON file until a real server
-    // endpoint exists.
-    downloadJson(`submission-${id}-attempt${rec.attempt}.json`, rec.submission);
   };
 
   return (

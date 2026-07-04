@@ -14,7 +14,7 @@ Claude to load into context).
 >
 > A change isn't finished until the docs that describe it are too.
 
-_Last updated: 2026-07-04 (TM alphabet tied to the question's representation — `selectTmNotation` in the store drives the transition editor, tape clicks, and machine table, so `*` is only offerable/enterable on binary questions (sandbox still follows `repSystem`); TM dual-action model: every transition writes and moves in one atomic step, replacing the old write-XOR-move step; TM store + UI; assignment question-list layout; question creator rework — names, no previews, no width; home screen: assignment tiles → list rows)_
+_Last updated: 2026-07-04 (UI/UX batch from notes/todos.md — FSM/TM state connection rework: drag from anywhere on a state's rim, release anywhere in the target; click-port-then-click-target "arms" a pending wire (no more accidental self-loops); select-s1-then-shift-click-s2 creates a transition; shift-click-rotate removed (shift-click now toggles selection; Rotate stays in the toolbar); triple-click selects all; drag-select picks up transition arrows; Task/Options dropdowns removed; bigger TM tape; question panel shows the representation; question-nav arrows moved next to "‹ Questions"; question creator: single-output **Target function** section (`f(x, y) = …`) with an inline live check (spinner-less number fields); submit no longer downloads JSON and warns that only the latest submission is graded; gradebook groups submissions by student — latest scores per student, per-student attempt counts, expandable history. Earlier same day: TM alphabet tied to the question's representation; TM dual-action transitions; TM store + UI; assignment question-list layout; home screen list rows)_
 
 ---
 
@@ -53,11 +53,15 @@ end-to-end:
   `test_vectors` are gone. Submissions **autograde on receipt** in `SubmissionStore` and the
   result is persisted on the record (the exact shape a real server endpoint will take).
 - **Instructor side** — role-gated `#/instructor` mode: dashboard, assignment editor, a **question
-  creator**, and a **gradebook** that reflects stored autogrades (scores, per-question pass rates,
-  failed-case drill-down). Sample CC/SC/FSM/TM data can be seeded to demo the pipeline. The
-  question creator is one shared form authoring **all four modes** (CC/SC/FSM/TM) — mode is an
+  creator**, and a **gradebook** that reflects stored autogrades, **grouped by student**: one row
+  per student showing the **latest** submission's scores (only the latest counts for grading) and a
+  per-student attempt count; expanding a student reveals the full submission history with
+  failed-case drill-down per attempt. Sample CC/SC/FSM/TM data can be seeded to demo the pipeline.
+  The question creator is one shared form authoring **all four modes** (CC/SC/FSM/TM) — mode is an
   ordinary field, not a gate; question names are editable; there is no bit-width field and no
-  example-preview table (only the live single-input check). CC input groups declare a **max input
+  example-preview table. Each question computes exactly **one output**: the **Target function**
+  section shows `f(x, y, …) = <formula>` over the declared input-group names, with a lightweight
+  live single-input check inline next to it. CC input groups declare a **max input
   value**; SC/FSM/TM have no size field — they're tested on a **sampled** set of values across a
   range of input lengths (`buildQuestionBank` in `engine/testVectorGen.ts`, which also derives all
   group widths).

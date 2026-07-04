@@ -46,9 +46,6 @@ const SAMPLING_NOTE: Partial<Record<BuildMode, string>> = {
 function blankInput(): AuthoredInputGroup {
   return { name: '', maxVal: 1 };
 }
-function blankOutput(): AuthoredOutputGroup {
-  return { name: '', formula: '' };
-}
 
 // Representation systems the codec grades against (the display-only 'plus' is not
 // a grading representation, so it isn't offered here).
@@ -74,12 +71,12 @@ export function QuestionCreator({ assignmentId, existingQuestion, onSave, onCanc
         (existingQuestion.representation === 'tally' ? g.width : Math.pow(2, g.width) - 1),
     })) ?? [blankInput()],
   );
-  const [outputs, setOutputs] = useState<AuthoredOutputGroup[]>(
-    () =>
-      existingQuestion?.cc_spec?.outputs.map((g) => ({ name: g.name, formula: g.formula })) ?? [
-        blankOutput(),
-      ],
+  // The target function: every question computes exactly ONE output, so the
+  // instructor authors a single formula (the output group's name is fixed).
+  const [formula, setFormula] = useState<string>(
+    () => existingQuestion?.cc_spec?.outputs[0]?.formula ?? '',
   );
+  const outputs: AuthoredOutputGroup[] = [{ name: 'f', formula }];
   const [label, setLabel] = useState(() => {
     if (existingQuestion) return existingQuestion.label;
     const count = getAssignment(assignmentId)?.questions.length ?? 0;
@@ -126,8 +123,6 @@ export function QuestionCreator({ assignmentId, existingQuestion, onSave, onCanc
   // ── Group editing helpers ──────────────────────────────────────
   const updateInput = (i: number, patch: Partial<AuthoredInputGroup>) =>
     setInputs((gs) => gs.map((g, idx) => (idx === i ? { ...g, ...patch } : g)));
-  const updateOutput = (i: number, patch: Partial<AuthoredOutputGroup>) =>
-    setOutputs((gs) => gs.map((g, idx) => (idx === i ? { ...g, ...patch } : g)));
 
   const handleSave = () => {
     if (!saveable) return;
@@ -249,57 +244,25 @@ export function QuestionCreator({ assignmentId, existingQuestion, onSave, onCanc
         </button>
       </section>
 
-      {/* Outputs */}
+      {/* Target function — one formula, one output. The live single-input
+          check sits right next to the formula (no separate section). */}
       <section className="instructor-creator-section">
         <div className="instructor-section-head">
-          <h4 className="instructor-subhead">Output groups</h4>
+          <h4 className="instructor-subhead">Target function</h4>
         </div>
-        {outputs.map((g, i) => (
-          <div key={i} className="instructor-group-block">
-            <div className="instructor-group-row">
-              <input
-                className="instructor-input instructor-input--name"
-                placeholder="name"
-                value={g.name}
-                onChange={(e) => updateOutput(i, { name: e.target.value })}
-              />
-              <button
-                className="instructor-btn instructor-btn--icon instructor-btn--danger"
-                onClick={() => setOutputs((gs) => gs.filter((_, idx) => idx !== i))}
-                title="Remove output group"
-              >
-                ✕
-              </button>
-            </div>
-            <div className="instructor-formula-row">
-              <label className="instructor-inline-field instructor-formula-field">
-                {g.name || 'f'} =
-                <input
-                  className="instructor-input instructor-input--formula"
-                  placeholder="e.g. 2 * x"
-                  value={g.formula}
-                  onChange={(e) => updateOutput(i, { formula: e.target.value })}
-                />
-              </label>
-              {probe?.outputErrors[i] && (
-                <span className="instructor-formula-error">{probe.outputErrors[i]}</span>
-              )}
-            </div>
-          </div>
-        ))}
-        <button
-          className="instructor-btn"
-          onClick={() => setOutputs((gs) => [...gs, blankOutput()])}
-        >
-          Add output group
-        </button>
-      </section>
-
-      {/* Live single-input behavior (updates as you type; no full enumeration) */}
-      <section className="instructor-creator-section">
-        <div className="instructor-section-head">
-          <h4 className="instructor-subhead">Live check</h4>
-          <span className="instructor-count">one input, updates as you type</span>
+        <div className="instructor-formula-row">
+          <label className="instructor-inline-field instructor-formula-field">
+            f({inputs.map((g) => g.name.trim() || '?').join(', ')}) =
+            <input
+              className="instructor-input instructor-input--formula"
+              placeholder="e.g. 2 * x"
+              value={formula}
+              onChange={(e) => setFormula(e.target.value)}
+            />
+          </label>
+          {probe?.outputErrors[0] && (
+            <span className="instructor-formula-error">{probe.outputErrors[0]}</span>
+          )}
         </div>
         {structuralErrors.length > 0 ? (
           <ul className="instructor-preview-errors">
@@ -399,17 +362,21 @@ function ProbePanel({
 }) {
   return (
     <div className="instructor-probe">
+      <span className="instructor-probe-name">check:</span>
       <div className="instructor-probe-inputs">
         {inputs.map((g, i) => (
           <label key={i} className="instructor-probe-field">
             <span className="instructor-probe-name">{g.name}</span>
             <input
               className="instructor-input instructor-input--num"
-              type="number"
-              min={0}
-              max={probeMax(g, rep, mode)}
+              type="text"
+              inputMode="numeric"
+              title={`0 to ${probeMax(g, rep, mode)}`}
               value={probeValues[i]}
-              onChange={(e) => onProbeChange(g.name, Number(e.target.value))}
+              onChange={(e) => {
+                const v = Number(e.target.value.replace(/[^0-9]/g, ''));
+                onProbeChange(g.name, Number.isFinite(v) ? v : 0);
+              }}
             />
             <span className="instructor-bits">
               {row.inputs[i]?.display ?? row.inputs[i]?.bits.join('')}
@@ -421,7 +388,7 @@ function ProbePanel({
       <div className="instructor-probe-outputs">
         {row.outputs.map((c, ci) => (
           <span key={ci} className="instructor-probe-out">
-            <span className="instructor-probe-name">{c.name} =</span>{' '}
+            <span className="instructor-probe-name">f =</span>{' '}
             {c.result != null ? (
               <>
                 <span className="instructor-bits">{c.display ?? c.bits?.join('')}</span>
