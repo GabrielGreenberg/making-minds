@@ -16,7 +16,7 @@ Claude to load into context).
 >
 > A change isn't finished until the docs that describe it are too.
 
-_Last updated: 2026-06-30_
+_Last updated: 2026-07-03_
 
 ---
 
@@ -65,8 +65,12 @@ The missing half is the **server** and productized submit/grade loop.
 - **TM store + UI** — the TM **engine and grading are built** (`engine/tm.ts`, `tmValidate.ts`,
   `tmCodec.ts`); the store (`tmStep`) and UI (tape strip, status table, `input:action` label
   editor) are not. This is the next TM step — see `CLAUDE_KB/engines/tm.md` → "Not yet built".
-- **SC/FSM/TM authoring** — the QuestionCreator is CC-only (other modes show "coming soon");
-  SC/FSM/TM assignments are seeded/hand-authored rather than authored through the UI.
+- **SC/FSM/TM authoring — done.** The QuestionCreator is now one shared form authoring all four
+  modes (mode is an ordinary field, not a gate); `generateTestCases(spec, rep, mode)` skips output
+  width-truncation on the TM tape axis, and the preview renders the natural tape encoding for TM.
+  Deferred follow-ups: the `requireStandardHaltPosition` TM acceptance toggle and mode-filtered
+  `allowed_components` (both optional editor fields), and the open design question of what `width`
+  should mean for streaming FSM/SC machines (see `CLAUDE_KB/known_bugs.md`).
 
 **The backend phase (the big step):**
 
@@ -103,6 +107,7 @@ the layout and conventions.)
 | Finite state machines — states, transitions | `CLAUDE_KB/engines/overview.md`, `CLAUDE_KB/engines/fsm.md` |
 | Turing machines — tape, head, single-action transitions (engine + grading built; store/UI not) | `CLAUDE_KB/engines/overview.md`, `CLAUDE_KB/engines/fsm.md`, `CLAUDE_KB/engines/tm.md` |
 | TM store + UI (the next TM step: `tmStep`, tape strip, status display) | `CLAUDE_KB/plans/tm-store.md`, `CLAUDE_KB/engines/tm.md` |
+| Question editor / authoring (one shared form, all four modes) | `CLAUDE_KB/instructor/frontend.md` + the "Reference-function DSL" section of `CLAUDE.md` |
 | Autograder, codec, test-case format, grading bugs | `CLAUDE_KB/engines/grading.md` + the relevant per-mode doc |
 | Submission → grade → gradebook pipeline | `CLAUDE_KB/pipeline/autograde-pipeline.md`, `CLAUDE_KB/engines/grading.md` |
 | Codec — unified value-based grading (built; the cross-cutting design) | `CLAUDE_KB/pipeline/codec.md`, `CLAUDE_KB/engines/grading.md`, `CLAUDE_KB/engines/overview.md` |
@@ -173,9 +178,11 @@ only — the grader never sees the formula; it runs against the generated numeri
 - **Representation** — one per question (`binary` | `tally`), not per group. It governs the input
   value ranges, how the codec lays values onto the machine's axis, and how outputs decode. The
   codec — not the DSL — owns the value↔bits mapping at grade time.
-- **Today CC only in the UI.** SC/FSM express functions via the same DSL (the sample SC delay is
-  `2 * x`, the FSM identity is `x`), but `QuestionCreator` emits CC questions only; SC/FSM/TM
-  samples are seeded in `devData/`. The grader handles all modes via the codec.
+- **All four modes in the UI.** `QuestionCreator` authors CC/SC/FSM/TM through one shared form
+  (mode is a field, not a separate step); the same DSL expresses every mode's function (the sample
+  SC delay is `2 * x`, the FSM identity is `x`, the TM increment is `x + 1`). `generateTestCases`
+  takes the mode so it can skip width-truncation on the unbounded TM tape axis. The grader handles
+  all modes via the codec.
 - **Safety** — `evalFormula` validates against a strict token whitelist (digits, declared
   variable names, the allowed operators) before evaluating via `new Function()`. Acceptable
   because formulas are instructor-authored, never student-supplied.

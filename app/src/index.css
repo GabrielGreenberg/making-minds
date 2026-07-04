@@ -1469,6 +1469,7 @@ thead .sc-label-col {
 .instructor-error { padding: 24px; }
 .instructor-error p { margin-bottom: 12px; }
 .instructor-count { color: var(--text-secondary); font-size: 13px; }
+.instructor-hint { color: var(--text-secondary); font-size: 13px; margin: 0 0 10px; font-style: italic; }
 
 /* Buttons */
 .instructor-btn {

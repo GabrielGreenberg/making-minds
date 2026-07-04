@@ -17,12 +17,33 @@ interface Props {
   onCancel: () => void;
 }
 
-const MODES: { mode: BuildMode; label: string; enabled: boolean }[] = [
-  { mode: 'CC', label: 'CC', enabled: true },
-  { mode: 'SC', label: 'SC', enabled: false },
-  { mode: 'FSM', label: 'FSM', enabled: false },
-  { mode: 'TM', label: 'TM', enabled: false },
+// All four machine modes are authorable through this one form: the CCSpec shape,
+// the DSL, the representation toggle, and the preview are all mode-agnostic. Only
+// the width caption (below) and the TM preview rendering differ per mode.
+const MODES: { mode: BuildMode; label: string }[] = [
+  { mode: 'CC', label: 'CC' },
+  { mode: 'SC', label: 'SC' },
+  { mode: 'FSM', label: 'FSM' },
+  { mode: 'TM', label: 'TM' },
 ];
+
+// `width` bounds something different per mode; caption it honestly rather than
+// hiding it (see CLAUDE_KB/plans/question-editor-unification.md §4).
+const WIDTH_CAPTION: Record<BuildMode, string> = {
+  CC: 'width (wires)',
+  SC: 'width (time steps to test)',
+  FSM: 'width (time steps to test)',
+  TM: 'width (max input value to test)',
+  turbot: 'width',
+};
+
+// For SC/FSM/TM, `width` is not a structural capacity of the machine — it only
+// bounds how large a value this question happens to test. Surface that caveat.
+const WIDTH_CAVEAT: Partial<Record<BuildMode, string>> = {
+  SC: 'For SC, width is only how many time steps this question tests — not a limit on what the machine can compute.',
+  FSM: 'For FSM, width is only how many time steps this question tests — a valid FSM must handle input streams of any length.',
+  TM: 'For TM, width only bounds which input values are tested; the tape is unbounded, so outputs are never truncated.',
+};
 
 function blankInput(): CCInputGroup {
   return { name: '', width: 1 };
@@ -36,8 +57,10 @@ function blankOutput(): CCOutputGroup {
 const REPS: RepSystem[] = ['binary', 'tally'];
 
 export function QuestionCreator({ assignmentId, existingQuestion, onSave, onCancel }: Props) {
-  // Step 1: mode. CC is the only implemented mode; existing questions skip this.
-  const [mode, setMode] = useState<BuildMode | null>(existingQuestion?.buildMode ?? null);
+  // Mode is an ordinary field of the shared form: new questions default to CC,
+  // existing ones keep their mode. Switching it must NOT reset the groups/formulas
+  // below — they're valid regardless of mode (the whole point of the shared shape).
+  const [mode, setMode] = useState<BuildMode>(existingQuestion?.buildMode ?? 'CC');
 
   const [inputs, setInputs] = useState<CCInputGroup[]>(
     () => existingQuestion?.cc_spec?.inputs.map((g) => ({ ...g })) ?? [blankInput()],
@@ -51,39 +74,16 @@ export function QuestionCreator({ assignmentId, existingQuestion, onSave, onCanc
   );
   const [statement, setStatement] = useState(existingQuestion?.statement ?? '');
 
-  const preview = useMemo(() => buildPreview(inputs, outputs, rep), [inputs, outputs, rep]);
+  const preview = useMemo(
+    () => buildPreview(inputs, outputs, rep, mode),
+    [inputs, outputs, rep, mode],
+  );
   const saveable = canSave(preview, statement);
 
   const totalInputWires = inputs.reduce((n, g) => n + (g.width || 0), 0);
   const totalOutputWires = outputs.reduce((n, g) => n + (g.width || 0), 0);
-
-  // ── Step 1: mode picker ────────────────────────────────────────
-  if (mode == null) {
-    return (
-      <div className="instructor-creator">
-        <h3 className="instructor-section-title">New question — pick a mode</h3>
-        <div className="instructor-mode-group">
-          {MODES.map((m) => (
-            <button
-              key={m.mode}
-              className="instructor-mode-btn"
-              disabled={!m.enabled}
-              title={m.enabled ? '' : 'Coming soon'}
-              onClick={() => m.enabled && setMode(m.mode)}
-            >
-              {m.label}
-              {!m.enabled && <span className="instructor-mode-soon">coming soon</span>}
-            </button>
-          ))}
-        </div>
-        <div className="instructor-creator-foot">
-          <button className="instructor-btn" onClick={onCancel}>
-            Cancel
-          </button>
-        </div>
-      </div>
-    );
-  }
+  const widthCaption = WIDTH_CAPTION[mode];
+  const widthCaveat = WIDTH_CAVEAT[mode];
 
   // ── Group editing helpers ──────────────────────────────────────
   const updateInput = (i: number, patch: Partial<CCInputGroup>) =>
@@ -94,7 +94,7 @@ export function QuestionCreator({ assignmentId, existingQuestion, onSave, onCanc
   const handleSave = () => {
     if (!saveable) return;
     const spec = { inputs, outputs };
-    const test_cases = generateTestCases(spec, rep);
+    const test_cases = generateTestCases(spec, rep, mode);
 
     const def = getAssignment(assignmentId);
     const existingQs = def?.questions ?? [];
@@ -107,7 +107,7 @@ export function QuestionCreator({ assignmentId, existingQuestion, onSave, onCanc
       id,
       label,
       statement: statement.trim(),
-      buildMode: 'CC',
+      buildMode: mode,
       representation: rep,
       cc_spec: spec,
       test_cases,
@@ -118,15 +118,32 @@ export function QuestionCreator({ assignmentId, existingQuestion, onSave, onCanc
     <div className="instructor-creator">
       <div className="instructor-page-head">
         <h3 className="instructor-section-title">
-          {existingQuestion ? `Edit ${existingQuestion.label}` : 'New CC question'}
+          {existingQuestion ? `Edit ${existingQuestion.label}` : `New ${mode} question`}
         </h3>
         <button className="instructor-btn" onClick={onCancel}>
           Cancel
         </button>
       </div>
 
-      {/* Representation (one per question; governs grading + the preview) */}
+      {/* Mode + representation (both per-question; govern grading + the preview) */}
       <section className="instructor-creator-section">
+        <div className="instructor-section-head">
+          <h4 className="instructor-subhead">Mode</h4>
+          <div className="instructor-encoding-toggle">
+            {MODES.map((m) => (
+              <button
+                key={m.mode}
+                className={
+                  'instructor-encoding-btn' +
+                  (mode === m.mode ? ' instructor-encoding-btn--active' : '')
+                }
+                onClick={() => setMode(m.mode)}
+              >
+                {m.label}
+              </button>
+            ))}
+          </div>
+        </div>
         <div className="instructor-section-head">
           <h4 className="instructor-subhead">Representation</h4>
           <RepToggle value={rep} onChange={setRep} />
@@ -139,6 +156,7 @@ export function QuestionCreator({ assignmentId, existingQuestion, onSave, onCanc
           <h4 className="instructor-subhead">Input groups</h4>
           <span className="instructor-count">{totalInputWires} input wires total</span>
         </div>
+        {widthCaveat && <p className="instructor-hint">{widthCaveat}</p>}
         {inputs.map((g, i) => (
           <div key={i} className="instructor-group-row">
             <input
@@ -148,7 +166,7 @@ export function QuestionCreator({ assignmentId, existingQuestion, onSave, onCanc
               onChange={(e) => updateInput(i, { name: e.target.value })}
             />
             <label className="instructor-inline-field">
-              width
+              {widthCaption}
               <input
                 className="instructor-input instructor-input--num"
                 type="number"
@@ -191,7 +209,7 @@ export function QuestionCreator({ assignmentId, existingQuestion, onSave, onCanc
                 onChange={(e) => updateOutput(i, { name: e.target.value })}
               />
               <label className="instructor-inline-field">
-                width
+                {widthCaption}
                 <input
                   className="instructor-input instructor-input--num"
                   type="number"
@@ -345,15 +363,15 @@ function PreviewTable({
     <tr key={key}>
       {row.inputs.map((c, ci) => (
         <td key={`i${ci}`} className="instructor-preview-bits">
-          <span className="instructor-bits">{c.bits.join('')}</span>
+          <span className="instructor-bits">{c.display ?? c.bits.join('')}</span>
           <span className="instructor-int">({c.value})</span>
         </td>
       ))}
       {row.outputs.map((c, ci) => (
         <td key={`o${ci}`} className="instructor-preview-bits">
-          {c.bits ? (
+          {c.result != null ? (
             <>
-              <span className="instructor-bits">{c.bits.join('')}</span>
+              <span className="instructor-bits">{c.display ?? c.bits?.join('')}</span>
               <span className="instructor-int">({c.result})</span>
             </>
           ) : (

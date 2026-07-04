@@ -91,9 +91,11 @@ tmHitStepLimit: boolean;        // bailed at DEFAULT_TM_MAX_STEPS — probable i
 
 ## Authoring (separate, later)
 
-No TM path in `QuestionCreator` / `testVectorGen.ts`; TM samples are hand-authored as value-based
-`test_cases`. TM generation must **sample** tapes, not enumerate (TM correctness is undecidable) —
-see `../engines/tm.md` "Grading (target semantics)".
+TM authoring now lives in the shared `QuestionCreator` form (see `../instructor/frontend.md`);
+`generateTestCases(spec, rep, mode)` enumerates a bounded input space the same way for every mode
+(width still bounds which `x` values get tested), and skips output width-truncation on the TM tape
+axis — a correct earlier concern here that generation "must sample, not enumerate" was wrong;
+enumeration is fine for TM. The store/UI below (`tmStep`, tape strip) is the remaining TM work.
 
 ## Testing
 

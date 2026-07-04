@@ -181,7 +181,7 @@ function question(
     buildMode,
     representation,
     cc_spec: spec,
-    test_cases: generateTestCases(spec, representation),
+    test_cases: generateTestCases(spec, representation, buildMode),
   };
 }
 

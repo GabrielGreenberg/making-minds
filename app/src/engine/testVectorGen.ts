@@ -3,18 +3,24 @@
 // Pure and framework-agnostic. Called at authoring time (when an instructor saves
 // a question), never at grading time: it enumerates the finite input space,
 // evaluates each output formula, and stores the results as **numeric** test cases
-// (`TestCase { inputs, outputs }`) — values, not bits. The mode never enters
-// generation: the codec (engine/codec.ts) turns these values into the right
-// bits/tape per axis at grade time, so one bank grades CC/SC/FSM alike.
+// (`TestCase { inputs, outputs }`) — values, not bits. The codec (engine/codec.ts)
+// turns these values into the right bits/tape per axis at grade time, so one bank
+// grades CC/SC/FSM/TM alike.
 //
-// The output group's bit width is the **implicit modulus**: the stored output is
-// the formula result truncated to what the group can represent (binary: the
-// least-significant `width` bits; tally: clamped to 0..width). This mirrors the
-// codec's `valueToBits`/`bitsToValue`, so a generated case always round-trips.
+// For the space/time axes (CC/SC/FSM) the output group's bit width is the
+// **implicit modulus**: the stored output is the formula result truncated to what
+// the group can represent (binary: the least-significant `width` bits; tally:
+// clamped to 0..width). This mirrors the codec's `valueToBits`/`bitsToValue`, so a
+// generated case always round-trips. The **tape** axis (TM) is different — the tape
+// is unbounded and `encodeTM`/`decodeTM` take no width, so a correct TM writes the
+// full untruncated value. There we store the raw `evalFormula` result; width only
+// bounds which input values get enumerated, never the output. (See
+// CLAUDE_KB/plans/question-editor-unification.md §1 and CLAUDE_KB/known_bugs.md.)
 
-import type { CCSpec, RepSystem, TestCase } from '../types';
+import type { BuildMode, CCSpec, RepSystem, TestCase } from '../types';
 import { evalFormula } from './formulaEval';
 import { valueToBits, bitsToValue } from './representation';
+import { axisForMode } from './codec';
 
 /** Apply the width-as-modulus truncation a circuit would impose on a value. */
 function truncate(value: number, width: number, rep: RepSystem): number {
@@ -40,7 +46,9 @@ function cartesian(lists: number[][]): number[][] {
  * input space under `rep`. Throws FormulaError (propagated from evalFormula) if
  * any output formula is invalid.
  */
-export function generateTestCases(spec: CCSpec, rep: RepSystem): TestCase[] {
+export function generateTestCases(spec: CCSpec, rep: RepSystem, mode: BuildMode): TestCase[] {
+  // The tape axis (TM) is unbounded — never truncate the stored output by width.
+  const isTape = axisForMode(mode) === 'tape';
   const combos = cartesian(spec.inputs.map((g) => inputValues(g.width, rep)));
 
   return combos.map((values) => {
@@ -48,9 +56,10 @@ export function generateTestCases(spec: CCSpec, rep: RepSystem): TestCase[] {
     spec.inputs.forEach((g, i) => {
       vars[g.name] = values[i];
     });
-    const outputs = spec.outputs.map((out) =>
-      truncate(evalFormula(out.formula, vars), out.width, rep),
-    );
+    const outputs = spec.outputs.map((out) => {
+      const value = evalFormula(out.formula, vars);
+      return isTape ? value : truncate(value, out.width, rep);
+    });
     return { inputs: values, outputs };
   });
 }

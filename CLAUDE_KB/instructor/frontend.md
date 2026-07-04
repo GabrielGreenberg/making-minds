@@ -69,19 +69,24 @@ DSL" section for the formula language.
 
 ## Question creator (`instructor/QuestionCreator.tsx`)
 
-A self-contained stepped flow (local state, no routing between steps):
-1. **Mode** — `CC | SC | FSM | TM`. Only **CC** is functional; SC/FSM/TM are shown disabled
-   ("coming soon").
+One shared form (local state), authoring all four modes — the `CCSpec` shape, DSL, and preview
+are mode-agnostic, so mode is an ordinary field, not a gate:
+1. **Mode** — `CC | SC | FSM | TM`, a button toggle next to Representation. All four are
+   functional; switching mode does **not** clear the entered groups/formulas.
 2. **Representation** — one binary/tally toggle for the whole question (governs grading + the
-   preview).
-3. **Inputs/outputs** — dynamic lists of groups (name, width), with running wire counts.
+   preview). For TM this is the tape notation (tally→unary, binary→binary).
+3. **Inputs/outputs** — dynamic lists of groups (name, width), with running wire counts. The
+   `width` label is captioned per mode (wires for CC; time steps for SC/FSM; max input value for
+   TM), with a one-line caveat for SC/FSM/TM that width isn't a machine capacity there.
 4. **Formula + live preview** — each output group's formula drives a preview table
-   (`instructor/ccPreview.ts`) computed via the DSL under the chosen representation; invalid
-   formulas show inline and block save.
+   (`instructor/ccPreview.ts`) computed via the DSL under the chosen representation and mode;
+   invalid formulas show inline and block save. For TM (the unbounded tape axis) cells show the
+   natural unpadded tape encoding (`formatTMValue`) instead of a fixed-width bit vector, and
+   outputs are not width-truncated.
 5. **Statement** — plain-text instructions shown to students.
-6. **Save** — generates `test_cases` via `generateTestCases(spec, rep)`, builds the
-   `AssignmentQuestion` (with `representation`), hands it to the editor, which persists via
-   `localAssignmentStore.save`.
+6. **Save** — generates `test_cases` via `generateTestCases(spec, rep, mode)`, builds the
+   `AssignmentQuestion` (with `buildMode` + `representation`), hands it to the editor, which
+   persists via `localAssignmentStore.save`.
 
 `instructor/ccSummary.ts` renders a one-line summary of a `cc_spec` for the editor's question
 list.
@@ -98,7 +103,8 @@ be seeded from the dashboard (`devData/seed.ts`).
 
 ## Deferred (not built)
 
-- SC / FSM / TM question authoring (creator is CC-only; SC/FSM samples are seeded directly).
+- `requireStandardHaltPosition` (TM acceptance option) and `allowed_components` (mode-filtered
+  palette) — both optional editor fields, deferred (see the deleted unification plan's §5/§6).
 - Drag-and-drop question reordering (Up/Down only).
 - Markdown / LaTeX in statements.
 - Multi-user gradebook, student identity, per-question point values / weighted scoring.
