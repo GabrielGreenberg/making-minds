@@ -14,7 +14,7 @@ Claude to load into context).
 >
 > A change isn't finished until the docs that describe it are too.
 
-_Last updated: 2026-07-03 (removed the CLAUDE_KB doc set; this file is now the sole doc)_
+_Last updated: 2026-07-04 (home screen: assignment tiles → assignment list rows, matching the question list)_
 
 ---
 

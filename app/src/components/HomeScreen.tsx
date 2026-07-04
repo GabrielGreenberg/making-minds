@@ -55,38 +55,36 @@ export function HomeScreen() {
 
         <section className="home-section">
           <h2 className="home-section-title">Assignments</h2>
-          <div className="home-grid">
+          <div className="home-list">
             {assignments.map((a) => {
               const sub = submissions[a.id];
               return (
-                <div key={a.id} className="home-tile">
+                <div key={a.id} className="home-list-item">
                   <button
-                    className="home-tile-main"
+                    className="home-list-main"
                     onClick={() => navigate({ kind: 'assignment', id: a.id })}
                   >
-                    <span className="home-tile-title">{a.title}</span>
-                    <span className="home-tile-meta">
+                    <span className="home-list-title">{a.title}</span>
+                    <span className="home-list-meta">
                       {a.questionCount} question{a.questionCount === 1 ? '' : 's'}
                     </span>
                   </button>
-                  <div className="home-tile-footer">
-                    {sub ? (
-                      <span
-                        className="home-tile-status home-tile-status--done"
-                        title={`Attempt ${sub.attempt}`}
-                      >
-                        ✓ Submitted {formatSubmittedAt(sub.submittedAt)}
-                      </span>
-                    ) : (
-                      <span className="home-tile-status">Not submitted</span>
-                    )}
-                    <button
-                      className="home-tile-submit"
-                      onClick={() => handleSubmit(a.id, a.title)}
+                  {sub ? (
+                    <span
+                      className="home-tile-status home-tile-status--done"
+                      title={`Attempt ${sub.attempt}`}
                     >
-                      Submit
-                    </button>
-                  </div>
+                      ✓ Submitted {formatSubmittedAt(sub.submittedAt)}
+                    </span>
+                  ) : (
+                    <span className="home-tile-status">Not submitted</span>
+                  )}
+                  <button
+                    className="home-tile-submit"
+                    onClick={() => handleSubmit(a.id, a.title)}
+                  >
+                    Submit
+                  </button>
                 </div>
               );
             })}

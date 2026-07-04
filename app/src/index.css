@@ -1299,26 +1299,59 @@ thead .sc-label-col {
   margin: 0;
 }
 
-/* Assignment tile becomes a container (open-area button + footer); the Sandbox
-   tile is still a plain .home-tile button, so scope these to the container. */
-.home-tile:has(.home-tile-main) {
-  padding: 0;
-  cursor: default;
-  overflow: hidden;
-}
-
-.home-tile-main {
+/* Assignment list (home) — one row per assignment, matching the look of the
+   assignment overview's question list. Each row is a container: an open-area
+   button on the left, submission status + Submit on the right. */
+.home-list {
   display: flex;
   flex-direction: column;
-  align-items: flex-start;
-  gap: 4px;
-  width: 100%;
-  padding: 16px;
+  gap: 10px;
+}
+
+.home-list-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding-right: 12px;
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  background: #fff;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+.home-list-item:hover {
+  border-color: #1565c0;
+  box-shadow: 0 2px 8px rgba(21, 101, 192, 0.12);
+}
+
+.home-list-main {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  flex: 1;
+  min-width: 0;
+  padding: 14px 16px;
   border: none;
   background: transparent;
   text-align: left;
   font: inherit;
   cursor: pointer;
+}
+
+.home-list-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: #1a1a1a;
+}
+
+.home-list-meta {
+  font-size: 12px;
+  color: #888;
+  white-space: nowrap;
+}
+
+.home-list-item .home-tile-status {
+  white-space: nowrap;
 }
 
 .home-tile-footer {
