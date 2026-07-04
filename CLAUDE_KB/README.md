@@ -28,6 +28,7 @@ CLAUDE_KB/
     autograde-pipeline.md  submit → grade-on-receipt → gradebook
   plans/               ← session-handoff plans for not-yet-built work
     tm-store.md          next TM step: store (tmStep) + UI wiring
+    turbot.md            turbots: arena engine, per-mode reuse, TM-turbot design
 ```
 
 ## Conventions
