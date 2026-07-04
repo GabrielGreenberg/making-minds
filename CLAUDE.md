@@ -11,12 +11,10 @@ Claude to load into context).
 > - Update **Part 1** ("Where we are now" / "What's next") to match what actually shipped, and
 >   bump the _Last updated_ date below.
 > - Update **Part 2** when the architecture, file layout, key files, or a design rule changes.
-> - When you add a doc under `CLAUDE_KB/`, register it in the "Knowledge base" mapping in Part 2,
->   and keep the per-area docs themselves in sync (the `CLAUDE_KB` convention).
 >
 > A change isn't finished until the docs that describe it are too.
 
-_Last updated: 2026-07-03_
+_Last updated: 2026-07-03 (removed the CLAUDE_KB doc set; this file is now the sole doc)_
 
 ---
 
@@ -47,9 +45,12 @@ end-to-end:
   (TM `tape`) — which lives in the **codec** (`engine/codec.ts` + `tmCodec.ts`). The old bit-based
   `test_vectors` are gone. Submissions **autograde on receipt** in `SubmissionStore` and the
   result is persisted on the record (the exact shape a real server endpoint will take).
-- **Instructor side** — role-gated `#/instructor` mode: dashboard, assignment editor, a **CC
-  question creator**, and a **gradebook** that reflects stored autogrades (scores, per-question
-  pass rates, failed-case drill-down). Sample CC/SC/FSM data can be seeded to demo the pipeline.
+- **Instructor side** — role-gated `#/instructor` mode: dashboard, assignment editor, a **question
+  creator**, and a **gradebook** that reflects stored autogrades (scores, per-question pass rates,
+  failed-case drill-down). Sample CC/SC/FSM data can be seeded to demo the pipeline. The question
+  creator is one shared form authoring **all four modes** (CC/SC/FSM/TM) — mode is an ordinary
+  field, not a gate; `generateTestCases(spec, rep, mode)` skips output width-truncation on the TM
+  tape axis, and the preview renders the natural tape encoding for TM.
 - **Reference-function DSL** — instructors don't hand-write test cases. They declare a question's
   input/output groups + one representation and specify the correct output with a small
   **affine/bitwise arithmetic mini-language** (the "reference function"); the system enumerates
@@ -66,13 +67,11 @@ The missing half is the **server** and productized submit/grade loop.
 
 - **TM store + UI** — the TM **engine and grading are built** (`engine/tm.ts`, `tmValidate.ts`,
   `tmCodec.ts`); the store (`tmStep`) and UI (tape strip, status table, `input:action` label
-  editor) are not. This is the next TM step — see `CLAUDE_KB/engines/tm.md` → "Not yet built".
-- **SC/FSM/TM authoring — done.** The QuestionCreator is now one shared form authoring all four
-  modes (mode is an ordinary field, not a gate); `generateTestCases(spec, rep, mode)` skips output
-  width-truncation on the TM tape axis, and the preview renders the natural tape encoding for TM.
-  Deferred follow-ups: the `requireStandardHaltPosition` TM acceptance toggle and mode-filtered
-  `allowed_components` (both optional editor fields), and the open design question of what `width`
-  should mean for streaming FSM/SC machines (see `CLAUDE_KB/known_bugs.md`).
+  editor) are not. This is the next TM step.
+- **Deferred authoring follow-ups** — the `requireStandardHaltPosition` TM acceptance toggle and
+  mode-filtered `allowed_components` (both optional fields on `AssignmentQuestion`, not yet
+  exposed in the question creator's editor UI), and the open design question of what `width`
+  should mean for streaming FSM/SC machines.
 
 **The backend phase (the big step):**
 
@@ -94,28 +93,6 @@ course (~80 students). Students build circuits, finite state machines, and grid-
 ("turbots"), completing and submitting homeworks that are automatically graded. Built as a
 **single-page React + TypeScript app** that runs entirely in the browser today; designed so a
 server can be added later by swapping implementations behind interfaces ("seams").
-
-## Knowledge base — read before working on a feature
-
-Deeper technical specs live under `CLAUDE_KB/` and are loaded **on demand**, not every session.
-Before starting on an area below, read the listed docs first. (See `CLAUDE_KB/README.md` for
-the layout and conventions.)
-
-| When working on… | Read |
-| ---------------- | ---- |
-| Anything in `engine/` (orientation) | `CLAUDE_KB/engines/overview.md` |
-| Combinatorial circuits — gates, canvas eval, boxed circuits | `CLAUDE_KB/engines/overview.md`, `CLAUDE_KB/engines/cc.md` |
-| Sequential circuits — MEM, clock, timing | `CLAUDE_KB/engines/overview.md`, `CLAUDE_KB/engines/cc.md`, `CLAUDE_KB/engines/sc.md` |
-| Finite state machines — states, transitions | `CLAUDE_KB/engines/overview.md`, `CLAUDE_KB/engines/fsm.md` |
-| Turing machines — tape, head, single-action transitions (engine + grading built; store/UI not) | `CLAUDE_KB/engines/overview.md`, `CLAUDE_KB/engines/fsm.md`, `CLAUDE_KB/engines/tm.md` |
-| TM store + UI (the next TM step: `tmStep`, tape strip, status display) | `CLAUDE_KB/plans/tm-store.md`, `CLAUDE_KB/engines/tm.md` |
-| Question editor / authoring (one shared form, all four modes) | `CLAUDE_KB/instructor/frontend.md` + the "Reference-function DSL" section of `CLAUDE.md` |
-| Autograder, codec, test-case format, grading bugs | `CLAUDE_KB/engines/grading.md` + the relevant per-mode doc |
-| Submission → grade → gradebook pipeline | `CLAUDE_KB/pipeline/autograde-pipeline.md`, `CLAUDE_KB/engines/grading.md` |
-| Codec — unified value-based grading (built; the cross-cutting design) | `CLAUDE_KB/pipeline/codec.md`, `CLAUDE_KB/engines/grading.md`, `CLAUDE_KB/engines/overview.md` |
-| Instructor frontend — authoring, gradebook, role gating | `CLAUDE_KB/instructor/frontend.md` |
-| Mockup auth — login, account-based student/instructor role gating | `CLAUDE_KB/instructor/frontend.md` |
-| Reference-function DSL (formula authoring) | `CLAUDE_KB/engines/grading.md` + "Reference-function DSL" below |
 
 ## Architecture principle: seams
 
