@@ -1,6 +1,7 @@
 import { useMemo, useState, useCallback, useRef, useEffect } from 'react';
 import { useStore } from '../store';
-import { bitsToTally, bitsToBinary } from '../engine';
+import { bitsToTally, bitsToBinary, parseTMTransition, notationForRepresentation } from '../engine';
+import type { TMSymbol } from '../types';
 
 const UI_PREFS_KEY = 'making-minds-ui-prefs';
 
@@ -19,6 +20,23 @@ function saveUiPref(key: string, value: unknown) {
 /** Key for an input combination, e.g. "0,1,0" */
 function inputKey(bits: number[]): string {
   return bits.join(',');
+}
+
+/** The open assignment question's statement, shown above the tables in every
+ *  mode's panel. Renders nothing in the sandbox. */
+function QuestionStatement() {
+  const assignment = useStore((s) => s.assignment);
+  const currentQuestionIndex = useStore((s) => s.currentQuestionIndex);
+  const statement = assignment?.questions[currentQuestionIndex]?.statement;
+  if (!statement) return null;
+  return (
+    <div className="table-section">
+      <div className="table-section-label">
+        <span>Question</span>
+      </div>
+      <p className="question-statement">{statement}</p>
+    </div>
+  );
 }
 
 export function DataTable() {
@@ -86,7 +104,8 @@ export function DataTable() {
   const ensureSequenceLoaded = useCallback(() => {
     const state = useStore.getState();
     const maxLen = Math.max(...state.scInputSequence.map((s) => s.length), 0);
-    if (maxLen > 0 && state.scTimeStep <= maxLen) return; // already loaded and in progress
+    const drain = state.components.filter((c) => c.type === 'MEM').length;
+    if (maxLen > 0 && state.scTimeStep <= maxLen + drain) return; // already loaded and in progress
 
     // Try active index first, then fall back to first sequence with input
     const candidates = activeGlobalIndex !== null ? [activeGlobalIndex] : [];
@@ -111,7 +130,9 @@ export function DataTable() {
       const numInputs = state.components.filter((c) => c.type === 'INPUT').length;
       if (numInputs === 0) return;
       const maxLen = Math.max(...state.scInputSequence.map((s) => s.length), 0);
-      const remaining = maxLen - (state.scTimeStep - 1);
+      // Extra flush steps: one 0-input step per MEM so delayed bits drain out.
+      const drain = state.components.filter((c) => c.type === 'MEM').length;
+      const remaining = maxLen + drain - (state.scTimeStep - 1);
       // If no sequence loaded, just do a single step
       if (remaining <= 0 && maxLen === 0) {
         state.scStep();
@@ -122,7 +143,8 @@ export function DataTable() {
       let step = 0;
       const interval = setInterval(() => {
         const s = useStore.getState();
-        const maxL = Math.max(...s.scInputSequence.map((sq) => sq.length), 0);
+        const maxL = Math.max(...s.scInputSequence.map((sq) => sq.length), 0) +
+          s.components.filter((c) => c.type === 'MEM').length;
         if (step >= remaining || s.scTimeStep > maxL) {
           clearInterval(interval);
           setIsRunning(false);
@@ -140,7 +162,8 @@ export function DataTable() {
     setTimeout(() => {
       const state = useStore.getState();
       const maxLen = Math.max(...state.scInputSequence.map((s) => s.length), 0);
-      if (maxLen === 0 || state.scTimeStep <= maxLen) {
+      const drain = state.components.filter((c) => c.type === 'MEM').length;
+      if (maxLen === 0 || state.scTimeStep <= maxLen + drain) {
         state.scStep();
       }
     }, 0);
@@ -185,11 +208,23 @@ export function DataTable() {
   const fsmReset = useStore((s) => s.fsmReset);
   const fsmGlobalReset = useStore((s) => s.fsmGlobalReset);
 
+  // TM state
+  const tmCurrentStateId = useStore((s) => s.tmCurrentStateId);
+  const tmTimeStep = useStore((s) => s.tmTimeStep);
+  const tmHistory = useStore((s) => s.tmHistory);
+  const tmHalted = useStore((s) => s.tmHalted);
+  const tmRunning = useStore((s) => s.tmRunning);
+  const tmStep = useStore((s) => s.tmStep);
+  const tmRun = useStore((s) => s.tmRun);
+  const tmReset = useStore((s) => s.tmReset);
+  const tmGlobalReset = useStore((s) => s.tmGlobalReset);
+
   const wires = useStore((s) => s.wires);
   const hasMem = components.some((c) => c.type === 'MEM');
   const isCC = buildMode === 'CC';
   const isSC = buildMode === 'SC' || hasMem;
   const isFSM = buildMode === 'FSM';
+  const isTM = buildMode === 'TM';
 
   // ── Resizable panel ──
   const [panelWidth, _setPanelWidth] = useState(() => (typeof _prefs.current.panelWidth === 'number' ? _prefs.current.panelWidth as number : 260));
@@ -428,6 +463,7 @@ export function DataTable() {
         <div className="panel-resize-handle" onPointerDown={onResizePointerDown} />
         <div className="data-table-panel-inner">
         <div className="data-table-content">
+          <QuestionStatement />
           {/* State Table */}
           <div className="table-section">
             <div className="table-section-label">
@@ -581,6 +617,164 @@ export function DataTable() {
     );
   }
 
+  // ── TM Mode ──────────────────────────────────────────────────────
+  if (isTM) {
+    const notation = notationForRepresentation(repSystem);
+    const symbols: TMSymbol[] = notation === 'binary' ? ['0', '1', '*'] : ['0', '1'];
+    const states = components
+      .filter((c) => c.type === 'STATE')
+      .sort((a, b) => {
+        const subDigits = '₀₁₂₃₄₅₆₇₈₉';
+        const num = (l: string) =>
+          parseInt(l.replace('S', '').split('').map((ch) => {
+            const idx = subDigits.indexOf(ch);
+            return idx >= 0 ? String(idx) : ch;
+          }).join('')) || 0;
+        return num(a.label) - num(b.label);
+      });
+
+    // Build the machine table from transitions (input:action per read symbol).
+    const tmTableRows: { state: string; input: TMSymbol; action: string; nextState: string }[] = [];
+    for (const state of states) {
+      for (const symbol of symbols) {
+        const transition = wires.find((w) => {
+          if (w.sourceComponentId !== state.id) return false;
+          const parsed = parseTMTransition(w.transitionLabel, notation);
+          return parsed !== null && parsed.input === symbol;
+        });
+        if (transition) {
+          const parsed = parseTMTransition(transition.transitionLabel, notation)!;
+          const targetComp = components.find((c) => c.id === transition.targetComponentId);
+          tmTableRows.push({
+            state: state.label,
+            input: symbol,
+            action: parsed.action.raw,
+            nextState: targetComp?.label || '?',
+          });
+        } else {
+          tmTableRows.push({ state: state.label, input: symbol, action: '–', nextState: 'HALT' });
+        }
+      }
+    }
+
+    return (
+      <div className="data-table-panel" style={{ width: panelWidth }}>
+        <div className="panel-resize-handle" onPointerDown={onResizePointerDown} />
+        <div className="data-table-panel-inner">
+        <div className="data-table-content">
+          <QuestionStatement />
+          {/* Machine Table */}
+          <div className="table-section">
+            <div className="table-section-label">
+              <span>Machine Table</span>
+            </div>
+            {states.length === 0 ? (
+              <div style={{ padding: 12, color: '#999', fontSize: 12 }}>
+                Add states and transitions to see the machine table.
+              </div>
+            ) : (
+              <table className="data-table">
+                <thead>
+                  <tr>
+                    <th>STATE</th>
+                    <th>READ</th>
+                    <th>ACTION</th>
+                    <th>NEXT STATE</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {tmTableRows.map((row, i) => {
+                    const isCurrentRow = tmCurrentStateId !== null &&
+                      row.state === components.find((c) => c.id === tmCurrentStateId)?.label;
+                    return (
+                      <tr key={i} className={isCurrentRow ? 'row-active' : ''}>
+                        <td><span className="mono-value">{row.state}</span></td>
+                        <td className={row.input === '1' ? 'val-1' : ''}><span className="mono-value">{row.input}</span></td>
+                        <td><span className="mono-value">{row.action}</span></td>
+                        <td><span className="mono-value" style={row.nextState === 'HALT' ? { color: '#999', fontStyle: 'italic' } : undefined}>{row.nextState}</span></td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            )}
+          </div>
+
+          {/* Controls */}
+          <div className="table-section">
+            <div className="table-section-label" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <span>Run</span>
+              <button
+                className="toggle-btn"
+                onClick={tmGlobalReset}
+                style={{ fontSize: 11, padding: '2px 8px', color: '#555' }}
+                title="Reset and blank the whole tape"
+              >
+                clear tape
+              </button>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '5px 0 3px', paddingLeft: 4 }}>
+              <button className="action-btn" onClick={() => { if (!tmRunning) tmRun(); }} disabled={tmRunning || tmHalted}>
+                Run
+              </button>
+              <button className="action-btn" onClick={() => { if (!tmRunning) tmStep(); }} disabled={tmRunning || tmHalted}>
+                Step
+              </button>
+              <button className="action-btn" onClick={tmReset} disabled={tmRunning}>
+                Reset
+              </button>
+              {tmHalted && (
+                <span style={{ fontSize: 10, color: '#e53935', fontWeight: 600, marginLeft: 'auto', paddingRight: 6 }}>
+                  HALTED
+                </span>
+              )}
+              {!tmHalted && tmTimeStep > 1 && (
+                <span style={{ marginLeft: 'auto', fontSize: 10, color: '#888', fontFamily: 'monospace', paddingRight: 6 }}>
+                  t={tmTimeStep - 1}
+                </span>
+              )}
+            </div>
+            <div style={{ padding: '2px 4px 6px', fontSize: 10, color: '#999' }}>
+              Set the input on the tape below the canvas, then Run or Step. Halting ends the computation.
+            </div>
+          </div>
+
+          {/* History */}
+          {tmHistory.length > 0 && (
+            <div className="table-section">
+              <div className="table-section-label">
+                <span>History</span>
+              </div>
+              <table className="data-table" style={{ fontSize: 11 }}>
+                <thead>
+                  <tr>
+                    <th>t</th>
+                    <th>STATE</th>
+                    <th>READ</th>
+                    <th>ACT</th>
+                    <th>NEXT</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {tmHistory.map((h, i) => (
+                    <tr key={i}>
+                      <td><span className="mono-value">{h.t}</span></td>
+                      <td><span className="mono-value">{h.stateLabel}</span></td>
+                      <td className={h.read === '1' ? 'val-1' : ''}><span className="mono-value">{h.read}</span></td>
+                      <td><span className="mono-value">{h.action}</span></td>
+                      <td><span className="mono-value">{h.nextStateLabel}</span></td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+        </div>
+      </div>
+    );
+  }
+
   if (inputs.length === 0) {
     return (
       <div className="data-table-panel" style={{ width: panelWidth }}>
@@ -588,6 +782,7 @@ export function DataTable() {
         <div className="data-table-panel-inner">
           <div className="table-header" />
           <div className="data-table-content">
+            <QuestionStatement />
             <div style={{ padding: 12, color: '#999', fontSize: 12 }}>
               Add inputs and outputs to see the I/O table.
             </div>
@@ -622,6 +817,7 @@ export function DataTable() {
       <div className="panel-resize-handle" onPointerDown={onResizePointerDown} />
       <div className="data-table-panel-inner">
       <div className="data-table-content">
+        <QuestionStatement />
         {/* ── I/O Table (CC and SC) ────────────────────────────── */}
         <div className="table-section">
           <div className="table-section-label" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>

@@ -19,6 +19,9 @@ import type {
   WorksheetData,
   SubmissionRecord,
   QuestionCircuit,
+  TMTape,
+  TMSymbol,
+  TmHistoryEntry,
 } from './types';
 import {
   getPortsForType,
@@ -28,7 +31,7 @@ import {
   GRID_SIZE,
   toSubscript,
 } from './types';
-import { topologicalSort, evaluateGate, evaluateCC, evaluateSCSingleStep, sortStateComponents, evaluateFSMSingleStep } from './engine';
+import { topologicalSort, evaluateGate, evaluateCC, evaluateSCSingleStep, sortStateComponents, evaluateFSMSingleStep, evaluateTMSingleStep, notationForRepresentation } from './engine';
 import { getAssignment, listAssignments } from './assignments';
 import {
   localWorkbookStore,
@@ -140,6 +143,10 @@ interface AppState {
 
   // Assignment mode — one graded, multi-question assignment open at a time.
   assignment: AssignmentData | null;
+  // What the open assignment shows: its question list ('overview') or one
+  // question's dedicated canvas ('question'). Driven by the route (see
+  // routing.applyRoute): #/a/:id → overview, #/a/:id/q/:i → question.
+  assignmentView: 'overview' | 'question';
   currentQuestionIndex: number;
   // Per-question circuit + annotations, keyed by AssignmentQuestion.id.
   questionCircuits: Map<number, QuestionCircuit>;
@@ -296,6 +303,24 @@ interface AppState {
   fsmGlobalReset: () => void;
   setFsmInputBit: (index: number, value: number) => void;
   setFsmInputSequence: (seq: number[]) => void;
+
+  // TM state — the FSM editor plus a tape. The tape is edited by clicking
+  // cells while idle (t=1); Reset returns to the edited initial tape.
+  tmTape: TMTape;
+  tmInitialTape: TMTape;
+  tmCurrentStateId: string | null; // component ID of active state
+  tmTimeStep: number; // starts at 1
+  tmHistory: TmHistoryEntry[];
+  tmRunning: boolean;
+  tmRunIntervalId: number | null;
+  tmHalted: boolean;
+  setTmCell: (index: number) => void; // cycle the symbol at a cell (idle only)
+  setTmHead: (index: number) => void; // move the head (idle only)
+  tmStep: () => void;
+  tmRun: () => void;
+  tmPause: () => void;
+  tmReset: () => void; // back to the initial tape, t=1
+  tmGlobalReset: () => void; // blank the tape entirely
 }
 
 function snapToGrid(val: number): number {
@@ -1010,6 +1035,7 @@ export const useStore = create<AppState>()((set, get) => ({
 
   // Assignment mode
   assignment: null,
+  assignmentView: 'overview',
   currentQuestionIndex: 0,
   questionCircuits: new Map(),
   loadAssignment: (assignment) => {
@@ -2412,8 +2438,16 @@ export const useStore = create<AppState>()((set, get) => ({
       .sort((a, b) => (parseInt(a.label.replace(/\D/g, '')) || 0) - (parseInt(b.label.replace(/\D/g, '')) || 0));
 
     const tIdx = scTimeStep - 1;
+    // Past the end of a loaded input sequence, feed 0s (flush steps) so bits
+    // still held in MEM can drain to the outputs instead of re-reading the
+    // input component's last value.
+    const seqLoaded = scInputSequence.some((s) => s.length > 0);
     const inputBitVector = sortedInputs.map((inp, idx) =>
-      scInputSequence[idx]?.[tIdx] !== undefined ? scInputSequence[idx][tIdx] : (inp.value ?? 0)
+      scInputSequence[idx]?.[tIdx] !== undefined
+        ? scInputSequence[idx][tIdx]
+        : seqLoaded
+          ? 0
+          : (inp.value ?? 0)
     );
     const memStoredValues = sortedMems.map((m) => m.storedValue ?? 0);
 
@@ -2505,9 +2539,12 @@ export const useStore = create<AppState>()((set, get) => ({
     if (state.scRunning) return;
     const intervalId = window.setInterval(() => {
       const s = get();
-      // Stop if we've consumed all input
+      // Stop once all input is consumed AND the memory pipeline has been
+      // flushed (one extra 0-input step per MEM, so delayed bits — e.g. a
+      // serial adder's final carry — still reach the outputs).
       const maxLen = Math.max(...s.scInputSequence.map((seq) => seq.length), 0);
-      if (s.scTimeStep > maxLen && maxLen > 0) {
+      const drain = s.components.filter((c) => c.type === 'MEM').length;
+      if (maxLen > 0 && s.scTimeStep > maxLen + drain) {
         s.scPause();
         return;
       }
@@ -2769,7 +2806,11 @@ export const useStore = create<AppState>()((set, get) => ({
   fsmHalted: false,
 
   setTransitionLabel: (wireId, label) => {
-    if (!/^[01]:[01]$/.test(label)) return;
+    // FSM labels are input:output bits; TM labels are input:action where the
+    // input is a tape symbol (0/1, plus * for binary machines) and the action
+    // is one tape primitive (R/L move or a symbol write) — spec §10.3.
+    const re = get().buildMode === 'TM' ? /^[01*]:[RL01*]$/ : /^[01]:[01]$/;
+    if (!re.test(label)) return;
     const state = get();
     state.pushHistory();
     set({
@@ -2889,6 +2930,133 @@ export const useStore = create<AppState>()((set, get) => ({
       fsmRunning: false,
       fsmRunIntervalId: null,
       fsmHalted: false,
+    });
+  },
+
+  // ─── TM state ──────────────────────────────────────────────────
+  tmTape: { cells: {}, head: 0 },
+  tmInitialTape: { cells: {}, head: 0 },
+  tmCurrentStateId: null,
+  tmTimeStep: 1,
+  tmHistory: [],
+  tmRunning: false,
+  tmRunIntervalId: null,
+  tmHalted: false,
+
+  setTmCell: (index) => {
+    const state = get();
+    // The tape is only editable while idle (before any step has run).
+    if (state.tmRunning || state.tmTimeStep > 1 || state.tmHalted) return;
+    const notation = notationForRepresentation(state.repSystem);
+    const current: TMSymbol = state.tmTape.cells[index] ?? '0';
+    // Cycle through the notation's alphabet: unary 0→1→0; binary 0→1→*→0.
+    const next: TMSymbol =
+      current === '0' ? '1' : current === '1' && notation === 'binary' ? '*' : '0';
+    const cells = { ...state.tmTape.cells };
+    if (next === '0') delete cells[index];
+    else cells[index] = next;
+    const tape: TMTape = { cells, head: state.tmTape.head };
+    set({ tmTape: tape, tmInitialTape: tape });
+  },
+
+  setTmHead: (index) => {
+    const state = get();
+    if (state.tmRunning || state.tmTimeStep > 1 || state.tmHalted) return;
+    const tape: TMTape = { cells: state.tmTape.cells, head: index };
+    set({ tmTape: tape, tmInitialTape: tape });
+  },
+
+  tmStep: () => {
+    const state = get();
+    const { components, wires, tmTape, tmTimeStep, tmHistory, tmHalted } = state;
+    if (tmHalted) return;
+
+    const states = sortStateComponents(components);
+    if (states.length === 0) return;
+    const currentStateId = state.tmCurrentStateId || states[0].id;
+    const notation = notationForRepresentation(state.repSystem);
+
+    // Delegate the step to the engine (same logic used by the grader). No
+    // matching transition means the machine halts — for a TM that is the
+    // normal end of the computation, not an error.
+    const result = evaluateTMSingleStep(wires, currentStateId, tmTape, notation);
+    if (!result) {
+      set({ tmHalted: true });
+      return;
+    }
+
+    const fromState = components.find((c) => c.id === currentStateId);
+    const toState = components.find((c) => c.id === result.nextStateId);
+    const entry: TmHistoryEntry = {
+      t: tmTimeStep,
+      stateLabel: fromState?.label ?? '?',
+      read: result.read,
+      action: result.action.raw,
+      headBefore: tmTape.head,
+      nextStateLabel: toState?.label ?? '?',
+    };
+
+    set({
+      tmCurrentStateId: result.nextStateId,
+      tmTape: result.tape,
+      tmTimeStep: tmTimeStep + 1,
+      tmHistory: [...tmHistory, entry],
+    });
+  },
+
+  tmRun: () => {
+    const state = get();
+    if (state.tmRunning) return;
+    const MAX_UI_TM_STEPS = 1000; // stop a runaway machine in the UI
+    const intervalId = window.setInterval(() => {
+      const s = get();
+      if (s.tmHalted || s.tmTimeStep > MAX_UI_TM_STEPS) {
+        s.tmPause();
+        return;
+      }
+      s.tmStep();
+    }, 300);
+    set({ tmRunning: true, tmRunIntervalId: intervalId });
+  },
+
+  tmPause: () => {
+    const state = get();
+    if (state.tmRunIntervalId !== null) {
+      window.clearInterval(state.tmRunIntervalId);
+    }
+    set({ tmRunning: false, tmRunIntervalId: null });
+  },
+
+  tmReset: () => {
+    const state = get();
+    if (state.tmRunIntervalId !== null) {
+      window.clearInterval(state.tmRunIntervalId);
+    }
+    set({
+      tmTape: state.tmInitialTape,
+      tmCurrentStateId: null,
+      tmTimeStep: 1,
+      tmHistory: [],
+      tmRunning: false,
+      tmRunIntervalId: null,
+      tmHalted: false,
+    });
+  },
+
+  tmGlobalReset: () => {
+    const state = get();
+    if (state.tmRunIntervalId !== null) {
+      window.clearInterval(state.tmRunIntervalId);
+    }
+    set({
+      tmTape: { cells: {}, head: 0 },
+      tmInitialTape: { cells: {}, head: 0 },
+      tmCurrentStateId: null,
+      tmTimeStep: 1,
+      tmHistory: [],
+      tmRunning: false,
+      tmRunIntervalId: null,
+      tmHalted: false,
     });
   },
 }));

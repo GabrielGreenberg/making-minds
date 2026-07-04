@@ -1,23 +1,19 @@
-import { useEffect, useState } from 'react';
-import type {
-  AssignmentQuestion,
-  BuildMode,
-  CCInputGroup,
-  CCOutputGroup,
-  RepSystem,
-} from '../types';
+import { useState } from 'react';
+import type { AssignmentQuestion, BuildMode, RepSystem } from '../types';
 import { getAssignment } from '../assignments';
-import { generateTestCases } from '../engine/testVectorGen';
+import {
+  buildQuestionBank,
+  type AuthoredInputGroup,
+  type AuthoredOutputGroup,
+} from '../engine/testVectorGen';
 import { FormulaError } from '../engine/formulaEval';
 import {
-  buildExamples,
   countCombos,
-  maxValue,
+  maxInputLimit,
   probeFormulas,
+  probeMax,
   validateGroups,
   MAX_COMBOS,
-  DEFAULT_EXAMPLE_LIMIT,
-  type ExamplesResult,
   type PreviewRow,
 } from './ccPreview';
 
@@ -28,9 +24,12 @@ interface Props {
   onCancel: () => void;
 }
 
-// All four machine modes are authorable through this one form: the CCSpec shape,
-// the DSL, the representation toggle, and the preview are all mode-agnostic. Only
-// the width caption (below) and the TM preview rendering differ per mode.
+// All four machine modes are authorable through this one form: the group
+// shapes, the DSL, and the representation toggle are all mode-agnostic. Only
+// the input-size field differs: CC (the one finite, exhaustively tested space)
+// asks for each group's max input value; SC/FSM/TM input spaces are unbounded,
+// so they are tested on a fixed sample of values across a range of input
+// lengths and have no size field at all.
 const MODES: { mode: BuildMode; label: string }[] = [
   { mode: 'CC', label: 'CC' },
   { mode: 'SC', label: 'SC' },
@@ -38,29 +37,17 @@ const MODES: { mode: BuildMode; label: string }[] = [
   { mode: 'TM', label: 'TM' },
 ];
 
-// `width` bounds something different per mode; caption it honestly rather than
-// hiding it (see CLAUDE_KB/plans/question-editor-unification.md §4).
-const WIDTH_CAPTION: Record<BuildMode, string> = {
-  CC: 'width (wires)',
-  SC: 'width (time steps to test)',
-  FSM: 'width (time steps to test)',
-  TM: 'width (max input value to test)',
-  turbot: 'width',
+const SAMPLING_NOTE: Partial<Record<BuildMode, string>> = {
+  SC: 'SC inputs stream over time, so this question is tested on a sample of input values across a range of input lengths.',
+  FSM: 'FSM inputs stream over time, so this question is tested on a sample of input values across a range of input lengths.',
+  TM: 'The tape is unbounded, so this question is tested on a sample of input values across a range of input lengths.',
 };
 
-// For SC/FSM/TM, `width` is not a structural capacity of the machine — it only
-// bounds how large a value this question happens to test. Surface that caveat.
-const WIDTH_CAVEAT: Partial<Record<BuildMode, string>> = {
-  SC: 'For SC, width is only how many time steps this question tests — not a limit on what the machine can compute.',
-  FSM: 'For FSM, width is only how many time steps this question tests — a valid FSM must handle input streams of any length.',
-  TM: 'For TM, width only bounds which input values are tested; the tape is unbounded, so outputs are never truncated.',
-};
-
-function blankInput(): CCInputGroup {
-  return { name: '', width: 1 };
+function blankInput(): AuthoredInputGroup {
+  return { name: '', maxVal: 1 };
 }
-function blankOutput(): CCOutputGroup {
-  return { name: '', width: 1, formula: '' };
+function blankOutput(): AuthoredOutputGroup {
+  return { name: '', formula: '' };
 }
 
 // Representation systems the codec grades against (the display-only 'plus' is not
@@ -73,83 +60,81 @@ export function QuestionCreator({ assignmentId, existingQuestion, onSave, onCanc
   // below — they're valid regardless of mode (the whole point of the shared shape).
   const [mode, setMode] = useState<BuildMode>(existingQuestion?.buildMode ?? 'CC');
 
-  const [inputs, setInputs] = useState<CCInputGroup[]>(
-    () => existingQuestion?.cc_spec?.inputs.map((g) => ({ ...g })) ?? [blankInput()],
-  );
-  const [outputs, setOutputs] = useState<CCOutputGroup[]>(
-    () => existingQuestion?.cc_spec?.outputs.map((g) => ({ ...g })) ?? [blankOutput()],
-  );
-  // One representation system per question (governs grading + the preview).
+  // One representation system per question (governs grading + the live check).
   const [rep, setRep] = useState<RepSystem>(
     () => existingQuestion?.representation === 'tally' ? 'tally' : 'binary',
   );
+
+  const [inputs, setInputs] = useState<AuthoredInputGroup[]>(() =>
+    existingQuestion?.cc_spec?.inputs.map((g) => ({
+      name: g.name,
+      // Prefer the authored max value; older width-based questions fall back to
+      // the largest value the stored width can hold.
+      maxVal: g.max_value ??
+        (existingQuestion.representation === 'tally' ? g.width : Math.pow(2, g.width) - 1),
+    })) ?? [blankInput()],
+  );
+  const [outputs, setOutputs] = useState<AuthoredOutputGroup[]>(
+    () =>
+      existingQuestion?.cc_spec?.outputs.map((g) => ({ name: g.name, formula: g.formula })) ?? [
+        blankOutput(),
+      ],
+  );
+  const [label, setLabel] = useState(() => {
+    if (existingQuestion) return existingQuestion.label;
+    const count = getAssignment(assignmentId)?.questions.length ?? 0;
+    return `Problem ${count + 1}`;
+  });
   const [statement, setStatement] = useState(existingQuestion?.statement ?? '');
 
   // The single input the live probe evaluates the formulas on. Keyed by group
   // name (robust to add/remove/reorder); unset groups default to their max value.
   const [probeOverrides, setProbeOverrides] = useState<Record<string, number>>({});
 
-  // The bounded example table is computed on demand (the "confirm formula" step),
-  // not per keystroke. It goes stale — and is cleared — whenever the spec changes.
-  const [examples, setExamples] = useState<ExamplesResult | null>(null);
-  // Surfaced only if the exhaustive save-time generation rejects a formula on some
-  // input the single-input probe never exercised (e.g. a value that goes negative).
+  // Surfaced only if the save-time generation rejects a formula on some input
+  // the single-input probe never exercised (e.g. a value that goes negative).
   const [saveError, setSaveError] = useState<string | null>(null);
 
-  // Clear the stale example table when the spec changes — including the mode, since
-  // it changes how TM values render and whether outputs are width-truncated.
-  useEffect(() => {
-    setExamples(null);
-    setSaveError(null);
-  }, [inputs, outputs, rep, mode]);
-
   // ── Live, per-keystroke validation (all O(#groups), no space enumeration) ──
-  const structuralErrors = validateGroups(inputs, outputs);
+  const structuralErrors = validateGroups(inputs, outputs, rep, mode);
   const structurallyValid = structuralErrors.length === 0;
-  const totalCombos = countCombos(inputs, rep);
-  const tooLarge = totalCombos > MAX_COMBOS;
+  const isCC = mode === 'CC';
+  const tooLarge = isCC && countCombos(inputs) > MAX_COMBOS;
 
   // Probe values aligned to input order, clamped to each group's range.
   const probeValues = inputs.map((g) => {
-    const max = maxValue(g.width, rep);
+    const max = probeMax(g, rep, mode);
     const raw = probeOverrides[g.name];
     const v = raw == null ? max : Math.trunc(raw);
     return Number.isFinite(v) ? Math.max(0, Math.min(max, v)) : 0;
   });
 
   // Single-input evaluation: cheap, and enough to catch formula syntax/reference
-  // errors. Only run when the group shapes are valid (probe assumes valid widths).
+  // errors. Only run when the group shapes are valid.
   const probe = structurallyValid
     ? probeFormulas(inputs, outputs, rep, probeValues, mode)
     : null;
   const formulasOk = probe ? probe.outputErrors.every((e) => e == null) : false;
 
   const saveable =
-    structurallyValid && !tooLarge && formulasOk && statement.trim().length > 0;
-
-  const totalInputWires = inputs.reduce((n, g) => n + (g.width || 0), 0);
-  const totalOutputWires = outputs.reduce((n, g) => n + (g.width || 0), 0);
-  const widthCaption = WIDTH_CAPTION[mode];
-  const widthCaveat = WIDTH_CAVEAT[mode];
+    structurallyValid &&
+    !tooLarge &&
+    formulasOk &&
+    label.trim().length > 0 &&
+    statement.trim().length > 0;
 
   // ── Group editing helpers ──────────────────────────────────────
-  const updateInput = (i: number, patch: Partial<CCInputGroup>) =>
+  const updateInput = (i: number, patch: Partial<AuthoredInputGroup>) =>
     setInputs((gs) => gs.map((g, idx) => (idx === i ? { ...g, ...patch } : g)));
-  const updateOutput = (i: number, patch: Partial<CCOutputGroup>) =>
+  const updateOutput = (i: number, patch: Partial<AuthoredOutputGroup>) =>
     setOutputs((gs) => gs.map((g, idx) => (idx === i ? { ...g, ...patch } : g)));
-
-  const handleGenerate = () => {
-    if (!structurallyValid) return;
-    setExamples(buildExamples(inputs, outputs, rep, mode));
-  };
 
   const handleSave = () => {
     if (!saveable) return;
-    const spec = { inputs, outputs };
-    // The exhaustive test bank is generated here — and only here — at save.
-    let test_cases;
+    // The test bank is generated here — and only here — at save.
+    let bank;
     try {
-      test_cases = generateTestCases(spec, rep, mode);
+      bank = buildQuestionBank(inputs, outputs, rep, mode);
     } catch (e) {
       setSaveError(
         e instanceof FormulaError
@@ -159,21 +144,19 @@ export function QuestionCreator({ assignmentId, existingQuestion, onSave, onCanc
       return;
     }
 
-    const def = getAssignment(assignmentId);
-    const existingQs = def?.questions ?? [];
+    const existingQs = getAssignment(assignmentId)?.questions ?? [];
     const id =
       existingQuestion?.id ??
       existingQs.reduce((max, q) => Math.max(max, q.id), 0) + 1;
-    const label = existingQuestion?.label ?? `Problem ${existingQs.length + 1}`;
 
     onSave({
       id,
-      label,
+      label: label.trim(),
       statement: statement.trim(),
       buildMode: mode,
       representation: rep,
-      cc_spec: spec,
-      test_cases,
+      cc_spec: bank.spec,
+      test_cases: bank.test_cases,
     });
   };
 
@@ -188,8 +171,17 @@ export function QuestionCreator({ assignmentId, existingQuestion, onSave, onCanc
         </button>
       </div>
 
-      {/* Mode + representation (both per-question; govern grading + the preview) */}
+      {/* Name + mode + representation (all per-question) */}
       <section className="instructor-creator-section">
+        <label className="instructor-field">
+          <span className="instructor-field-label">Question name</span>
+          <input
+            className="instructor-input instructor-input--name"
+            placeholder="e.g. Problem 1"
+            value={label}
+            onChange={(e) => setLabel(e.target.value)}
+          />
+        </label>
         <div className="instructor-section-head">
           <h4 className="instructor-subhead">Mode</h4>
           <div className="instructor-encoding-toggle">
@@ -217,9 +209,8 @@ export function QuestionCreator({ assignmentId, existingQuestion, onSave, onCanc
       <section className="instructor-creator-section">
         <div className="instructor-section-head">
           <h4 className="instructor-subhead">Input groups</h4>
-          <span className="instructor-count">{totalInputWires} input wires total</span>
         </div>
-        {widthCaveat && <p className="instructor-hint">{widthCaveat}</p>}
+        {SAMPLING_NOTE[mode] && <p className="instructor-hint">{SAMPLING_NOTE[mode]}</p>}
         {inputs.map((g, i) => (
           <div key={i} className="instructor-group-row">
             <input
@@ -228,17 +219,19 @@ export function QuestionCreator({ assignmentId, existingQuestion, onSave, onCanc
               value={g.name}
               onChange={(e) => updateInput(i, { name: e.target.value })}
             />
-            <label className="instructor-inline-field">
-              {widthCaption}
-              <input
-                className="instructor-input instructor-input--num"
-                type="number"
-                min={1}
-                max={8}
-                value={g.width}
-                onChange={(e) => updateInput(i, { width: Number(e.target.value) })}
-              />
-            </label>
+            {isCC && (
+              <label className="instructor-inline-field">
+                max input value
+                <input
+                  className="instructor-input instructor-input--num"
+                  type="number"
+                  min={1}
+                  max={maxInputLimit(rep)}
+                  value={g.maxVal}
+                  onChange={(e) => updateInput(i, { maxVal: Number(e.target.value) })}
+                />
+              </label>
+            )}
             <button
               className="instructor-btn instructor-btn--icon instructor-btn--danger"
               onClick={() => setInputs((gs) => gs.filter((_, idx) => idx !== i))}
@@ -260,7 +253,6 @@ export function QuestionCreator({ assignmentId, existingQuestion, onSave, onCanc
       <section className="instructor-creator-section">
         <div className="instructor-section-head">
           <h4 className="instructor-subhead">Output groups</h4>
-          <span className="instructor-count">{totalOutputWires} output wires total</span>
         </div>
         {outputs.map((g, i) => (
           <div key={i} className="instructor-group-block">
@@ -271,17 +263,6 @@ export function QuestionCreator({ assignmentId, existingQuestion, onSave, onCanc
                 value={g.name}
                 onChange={(e) => updateOutput(i, { name: e.target.value })}
               />
-              <label className="instructor-inline-field">
-                {widthCaption}
-                <input
-                  className="instructor-input instructor-input--num"
-                  type="number"
-                  min={1}
-                  max={8}
-                  value={g.width}
-                  onChange={(e) => updateOutput(i, { width: Number(e.target.value) })}
-                />
-              </label>
               <button
                 className="instructor-btn instructor-btn--icon instructor-btn--danger"
                 onClick={() => setOutputs((gs) => gs.filter((_, idx) => idx !== i))}
@@ -326,10 +307,16 @@ export function QuestionCreator({ assignmentId, existingQuestion, onSave, onCanc
               <li key={i}>{e}</li>
             ))}
           </ul>
+        ) : tooLarge ? (
+          <p className="instructor-preview-warning">
+            Input space is too large to enumerate ({countCombos(inputs).toLocaleString()}{' '}
+            combinations). Reduce the max input values.
+          </p>
         ) : (
           <ProbePanel
             inputs={inputs}
             rep={rep}
+            mode={mode}
             probeValues={probeValues}
             row={probe!.row}
             onProbeChange={(name, value) =>
@@ -337,21 +324,6 @@ export function QuestionCreator({ assignmentId, existingQuestion, onSave, onCanc
             }
           />
         )}
-      </section>
-
-      {/* Bounded examples, computed only when the instructor confirms the formula */}
-      <section className="instructor-creator-section">
-        <div className="instructor-section-head">
-          <h4 className="instructor-subhead">Examples</h4>
-          <button
-            className="instructor-btn"
-            disabled={!structurallyValid}
-            onClick={handleGenerate}
-          >
-            {examples ? 'Refresh examples' : `Preview up to ${DEFAULT_EXAMPLE_LIMIT} examples`}
-          </button>
-        </div>
-        <ExamplesPanel inputs={inputs} outputs={outputs} examples={examples} />
       </section>
 
       {/* Statement */}
@@ -413,12 +385,14 @@ function RepToggle({
 function ProbePanel({
   inputs,
   rep,
+  mode,
   probeValues,
   row,
   onProbeChange,
 }: {
-  inputs: CCInputGroup[];
+  inputs: AuthoredInputGroup[];
   rep: RepSystem;
+  mode: BuildMode;
   probeValues: number[];
   row: PreviewRow;
   onProbeChange: (name: string, value: number) => void;
@@ -433,7 +407,7 @@ function ProbePanel({
               className="instructor-input instructor-input--num"
               type="number"
               min={0}
-              max={maxValue(g.width, rep)}
+              max={probeMax(g, rep, mode)}
               value={probeValues[i]}
               onChange={(e) => onProbeChange(g.name, Number(e.target.value))}
             />
@@ -460,83 +434,5 @@ function ProbePanel({
         ))}
       </div>
     </div>
-  );
-}
-
-/** The on-demand, bounded example table (or a hint / warning when not shown). */
-function ExamplesPanel({
-  inputs,
-  outputs,
-  examples,
-}: {
-  inputs: CCInputGroup[];
-  outputs: CCOutputGroup[];
-  examples: ExamplesResult | null;
-}) {
-  if (!examples) {
-    return (
-      <p className="instructor-empty">
-        Confirm the formulas by generating a few worked examples before saving.
-      </p>
-    );
-  }
-  if (examples.tooLarge) {
-    return (
-      <p className="instructor-preview-warning">
-        Input space is too large to enumerate ({examples.totalCombos.toLocaleString()}{' '}
-        combinations). Reduce the input widths.
-      </p>
-    );
-  }
-  if (examples.rows.length === 0) {
-    return <p className="instructor-empty">No rows to preview.</p>;
-  }
-
-  return (
-    <>
-      <table className="instructor-preview-table">
-        <thead>
-          <tr>
-            {inputs.map((g, i) => (
-              <th key={`hi${i}`}>{g.name || '?'} (in)</th>
-            ))}
-            {outputs.map((g, i) => (
-              <th key={`ho${i}`}>{g.name || '?'} (out)</th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>{examples.rows.map((r, i) => renderRow(r, i))}</tbody>
-      </table>
-      <p className="instructor-count">
-        {examples.truncated
-          ? `Showing first ${examples.shown} of ${examples.totalCombos.toLocaleString()} inputs. The full test bank is generated on save.`
-          : `Showing all ${examples.shown} inputs.`}
-      </p>
-    </>
-  );
-}
-
-function renderRow(row: PreviewRow, key: number) {
-  return (
-    <tr key={key}>
-      {row.inputs.map((c, ci) => (
-        <td key={`i${ci}`} className="instructor-preview-bits">
-          <span className="instructor-bits">{c.display ?? c.bits.join('')}</span>
-          <span className="instructor-int">({c.value})</span>
-        </td>
-      ))}
-      {row.outputs.map((c, ci) => (
-        <td key={`o${ci}`} className="instructor-preview-bits">
-          {c.result != null ? (
-            <>
-              <span className="instructor-bits">{c.display ?? c.bits?.join('')}</span>
-              <span className="instructor-int">({c.result})</span>
-            </>
-          ) : (
-            <span className="instructor-formula-error">error</span>
-          )}
-        </td>
-      ))}
-    </tr>
   );
 }

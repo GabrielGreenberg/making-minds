@@ -101,9 +101,12 @@ export function SimulationToolbar() {
   const hasSelection = useStore((s) => s.selectedIds.length > 0);
 
   const isFSM = buildMode === 'FSM';
+  const isTM = buildMode === 'TM';
   const fsmCurrentStateId = useStore((s) => s.fsmCurrentStateId);
-  const fsmCurrentStateLabel = isFSM && fsmCurrentStateId
-    ? components.find((c) => c.id === fsmCurrentStateId)?.label ?? null
+  const tmCurrentStateId = useStore((s) => s.tmCurrentStateId);
+  const currentStateId = isFSM ? fsmCurrentStateId : isTM ? tmCurrentStateId : null;
+  const currentStateLabel = currentStateId
+    ? components.find((c) => c.id === currentStateId)?.label ?? null
     : null;
 
   const [showClearConfirm, setShowClearConfirm] = useState(false);
@@ -112,6 +115,8 @@ export function SimulationToolbar() {
     const state = useStore.getState();
     if (isFSM) {
       state.fsmReset();
+    } else if (isTM) {
+      state.tmReset();
     } else if (isSC) {
       state.scReset();
     } else {
@@ -186,9 +191,9 @@ export function SimulationToolbar() {
         </button>
 
         <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 12 }}>
-          {isFSM && (
+          {(isFSM || isTM) && (
             <span style={{ fontSize: 12, color: '#555', fontFamily: "'SF Mono', 'Fira Code', monospace" }}>
-              Current state: {fsmCurrentStateLabel ?? 'S₀'}
+              Current state: {currentStateLabel ?? 'S₀'}
             </span>
           )}
           <span

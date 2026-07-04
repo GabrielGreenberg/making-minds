@@ -97,6 +97,7 @@ export interface ProjectData {
 export interface CCInputGroup {
   name: string;            // variable name used in the formula, e.g. "x"
   width: number;           // bit width of this group (wires for CC; time steps for SC/FSM)
+  max_value?: number;      // CC authoring: largest input value tested (width is derived from it)
 }
 
 export interface CCOutputGroup {

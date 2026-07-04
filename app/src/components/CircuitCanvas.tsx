@@ -1151,6 +1151,12 @@ function FsmTransitionView({
   const [dragging, setDragging] = useState(false);
   const editorRef = useRef<HTMLInputElement>(null);
 
+  // TM transitions read a tape symbol (0/1/*) and perform one tape action
+  // (R/L move or a 0/1/* write); FSM transitions are input:output bits.
+  const isTM = useStore((s) => s.buildMode === 'TM');
+  const leftTokens = isTM ? ['0', '1', '*'] : ['0', '1'];
+  const rightTokens = isTM ? ['0', '1', '*', 'R', 'L'] : ['0', '1'];
+
   const label = wire.transitionLabel || '?:?';
   const color = isSelected ? '#2a7fff' : '#333';
 
@@ -1163,8 +1169,8 @@ function FsmTransitionView({
   const openEdit = (field: 'left' | 'right') => {
     const current = wire.transitionLabel || '0:0';
     const parts = current.split(':');
-    setEditLeft(parts[0] === '1' ? '1' : '0');
-    setEditRight(parts[1] === '1' ? '1' : '0');
+    setEditLeft(leftTokens.includes(parts[0]) ? parts[0] : '0');
+    setEditRight(rightTokens.includes(parts[1]) ? parts[1] : '0');
     setActiveField(field);
     setEditing(true);
   };
@@ -1175,16 +1181,16 @@ function FsmTransitionView({
   };
 
   const handleEditorKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === '0' || e.key === '1') {
+    const key = e.key.length === 1 ? e.key.toUpperCase() : e.key;
+    if (activeField === 'left' && leftTokens.includes(e.key)) {
       e.preventDefault();
-      if (activeField === 'left') {
-        setEditLeft(e.key);
-        setActiveField('right');
-      } else {
-        // Commit immediately with the new right value so closure captures it
-        setEditing(false);
-        useStore.getState().setTransitionLabel(wire.id, `${editLeft}:${e.key}`);
-      }
+      setEditLeft(e.key);
+      setActiveField('right');
+    } else if (activeField === 'right' && rightTokens.includes(key)) {
+      e.preventDefault();
+      // Commit immediately with the new right value so closure captures it
+      setEditing(false);
+      useStore.getState().setTransitionLabel(wire.id, `${editLeft}:${key}`);
     } else if (e.key === 'Tab' || e.key === 'ArrowRight') {
       e.preventDefault();
       setActiveField(activeField === 'left' ? 'right' : 'left');
@@ -2032,8 +2038,8 @@ export function CircuitCanvas() {
   // ─── Validation warnings ───────────────────────────────────────
   const warnings = useMemo(() => {
     const w: string[] = [];
-    // Skip circuit validation warnings in FSM mode — loops and merged links are expected
-    if (buildMode === 'FSM') return w;
+    // Skip circuit validation warnings in FSM/TM mode — loops and merged links are expected
+    if (buildMode === 'FSM' || buildMode === 'TM') return w;
     {
       const compMap = new Map(components.map((c) => [c.id, c]));
       const visited = new Set<string>();

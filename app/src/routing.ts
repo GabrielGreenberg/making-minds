@@ -108,6 +108,10 @@ function applyRoute(route: Route): void {
         ) {
           store.switchQuestion(route.questionIndex);
         }
+        useStore.setState({ assignmentView: 'question' });
+      } else {
+        // No question in the URL → the assignment's question list.
+        useStore.setState({ assignmentView: 'overview' });
       }
       return;
     }

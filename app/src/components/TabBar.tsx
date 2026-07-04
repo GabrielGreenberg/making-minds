@@ -169,17 +169,43 @@ export function TabBar() {
   } = useStore();
 
   if (assignment) {
+    // Per-question navigation: back to the assignment's question list, or to
+    // the previous/next question — one dedicated canvas per question.
+    const q = assignment.questions[currentQuestionIndex];
+    const count = assignment.questions.length;
+    const go = (i: number) =>
+      navigate({ kind: 'assignment', id: assignment.id, questionIndex: i }, { replace: true });
     return (
-      <div className="tab-bar">
-        {assignment.questions.map((q, i) => (
-          <div
-            key={q.id}
-            className={`tab ${i === currentQuestionIndex ? 'active' : ''}`}
-            onClick={() => navigate({ kind: 'assignment', id: assignment.id, questionIndex: i }, { replace: true })}
+      <div className="tab-bar question-nav">
+        <button
+          className="question-nav-back"
+          onClick={() => navigate({ kind: 'assignment', id: assignment.id })}
+          title="Back to the question list"
+        >
+          ‹ Questions
+        </button>
+        <span className="question-nav-label">
+          {q?.label ?? '?'}
+          <span className="question-nav-count"> · {currentQuestionIndex + 1} of {count}</span>
+        </span>
+        <span className="question-nav-arrows">
+          <button
+            className="question-nav-btn"
+            disabled={currentQuestionIndex === 0}
+            onClick={() => go(currentQuestionIndex - 1)}
+            title="Previous question"
           >
-            {q.label}
-          </div>
-        ))}
+            ←
+          </button>
+          <button
+            className="question-nav-btn"
+            disabled={currentQuestionIndex >= count - 1}
+            onClick={() => go(currentQuestionIndex + 1)}
+            title="Next question"
+          >
+            →
+          </button>
+        </span>
       </div>
     );
   }

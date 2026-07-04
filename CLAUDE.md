@@ -14,7 +14,7 @@ Claude to load into context).
 >
 > A change isn't finished until the docs that describe it are too.
 
-_Last updated: 2026-07-04 (home screen: assignment tiles → assignment list rows, matching the question list)_
+_Last updated: 2026-07-04 (TM store + UI; assignment question-list layout; question creator rework — names, no previews, no width; home screen: assignment tiles → list rows)_
 
 ---
 
@@ -34,9 +34,14 @@ capability.
 A browser-only single-page app supporting the **local** version of the full target flow,
 end-to-end:
 
-- **Student side** — mockup login (pick a student or instructor account) → browse assignments → open one → per-question canvas in the
-  correct mode → instant local autosave → leave and resume (reload/Back returns you into the
-  assignment) → Submit a timestamped snapshot.
+- **Student side** — mockup login (pick a student or instructor account) → browse assignments →
+  open one to its **question list** (`AssignmentOverview`) → click a question to open its
+  dedicated canvas in the correct mode (**CC, SC, FSM, and TM** — TM has a clickable tape strip
+  below the canvas plus machine-table/run/history panels; the question statement appears at the
+  top of the right data panel) → navigate back to the list or between questions via the nav bar
+  → instant local autosave →
+  leave and resume (reload/Back returns you into the assignment) → Submit a timestamped snapshot.
+  The editor chrome is minimal: no File/Edit menus (Home + Submit + session controls only).
 - **Autograding (the codec)** — pure headless `engine/` simulators for **CC, SC, FSM, and TM**,
   graded through one **value-based codec pipeline**: every machine implements a function `f`, and
   `grader.ts` checks it against a machine-agnostic bank of numeric `(x, f(x))` `test_cases` via
@@ -47,10 +52,13 @@ end-to-end:
   result is persisted on the record (the exact shape a real server endpoint will take).
 - **Instructor side** — role-gated `#/instructor` mode: dashboard, assignment editor, a **question
   creator**, and a **gradebook** that reflects stored autogrades (scores, per-question pass rates,
-  failed-case drill-down). Sample CC/SC/FSM data can be seeded to demo the pipeline. The question
-  creator is one shared form authoring **all four modes** (CC/SC/FSM/TM) — mode is an ordinary
-  field, not a gate; `generateTestCases(spec, rep, mode)` skips output width-truncation on the TM
-  tape axis, and the preview renders the natural tape encoding for TM.
+  failed-case drill-down). Sample CC/SC/FSM/TM data can be seeded to demo the pipeline. The
+  question creator is one shared form authoring **all four modes** (CC/SC/FSM/TM) — mode is an
+  ordinary field, not a gate; question names are editable; there is no bit-width field and no
+  example-preview table (only the live single-input check). CC input groups declare a **max input
+  value**; SC/FSM/TM have no size field — they're tested on a **sampled** set of values across a
+  range of input lengths (`buildQuestionBank` in `engine/testVectorGen.ts`, which also derives all
+  group widths).
 - **Reference-function DSL** — instructors don't hand-write test cases. They declare a question's
   input/output groups + one representation and specify the correct output with a small
   **affine/bitwise arithmetic mini-language** (the "reference function"); the system enumerates
@@ -65,13 +73,12 @@ The missing half is the **server** and productized submit/grade loop.
 
 **Near-term (still no backend):**
 
-- **TM store + UI** — the TM **engine and grading are built** (`engine/tm.ts`, `tmValidate.ts`,
-  `tmCodec.ts`); the store (`tmStep`) and UI (tape strip, status table, `input:action` label
-  editor) are not. This is the next TM step.
+- **Turbots** (all four machine kinds) — the next big feature block.
 - **Deferred authoring follow-ups** — the `requireStandardHaltPosition` TM acceptance toggle and
   mode-filtered `allowed_components` (both optional fields on `AssignmentQuestion`, not yet
-  exposed in the question creator's editor UI), and the open design question of what `width`
-  should mean for streaming FSM/SC machines.
+  exposed in the question creator's editor UI). Also: in TM mode the student UI has no
+  notation selector — the tape notation follows the global `repSystem` (binary→binary,
+  otherwise unary) rather than the question's `representation`.
 
 **The backend phase (the big step):**
 
@@ -124,15 +131,15 @@ the engine.
 | Engine        | `app/src/engine/tm.ts`, `tmValidate.ts`, `tmCodec.ts`                          | TM: notation-aware tape engine; pre-engine table validation (ambiguous/unparseable); encode/accept/decode (the codec `tape` axis)          |
 | Engine        | `app/src/engine/grader.ts`                                                     | `gradeSubmission` / `gradeQuestion` — one value-based codec pipeline for CC/SC/FSM/TM against numeric `test_cases`; turbot skipped          |
 | Engine        | `app/src/engine/codec.ts`, `machineValidation.ts`                              | The codec (`space`/`time` value↔bits; `tape` → `tmCodec`) and Stage-1 machine validation for all modes                                     |
-| Engine        | `app/src/engine/testVectorGen.ts`, `formulaEval.ts`                            | Authoring-time: affine-formula language → `generateTestCases(spec, rep, mode)` → numeric `test_cases`                                            |
+| Engine        | `app/src/engine/testVectorGen.ts`, `formulaEval.ts`                            | Authoring-time: affine-formula language → `buildQuestionBank(inputs, outputs, rep, mode)` → `{spec, test_cases}` (widths derived; SC/FSM/TM sampled). Legacy `generateTestCases(spec, rep, mode)` remains for the sample data |
 | Engine        | `app/src/engine/representation.ts`, `index.ts`                                 | value↔bits core (`valueToBits`/`isValidCodeword`/`bitsToValue`) + display helpers; barrel exports                                          |
-| Store         | `app/src/store.ts`                                                             | Zustand UI state; delegates simulation to `engine/`                                                                                        |
+| Store         | `app/src/store.ts`                                                             | Zustand UI state; delegates simulation to `engine/`. Per-mode sim state incl. TM (`tmTape`/`tmStep`/`setTmCell`) and `assignmentView` ('overview' \| 'question')  |
 | Routing       | `app/src/routing.ts`                                                           | `Route` union, `parseHash`/`routeToHash`, `navigate()`                                                                                     |
 | Storage       | `app/src/storage/workbookStore.ts`, `AssignmentStore.ts`, `submissionStore.ts` | The three localStorage-backed seams                                                                                                        |
 | Auth          | `app/src/auth/`                                                                | `AuthGate.tsx`, `stubAuth.tsx`, `instructorRole.ts`                                                                                        |
 | Assignments   | `app/src/assignments/index.ts`, `cc-basics.json`                               | Bundled registry (`listAssignments`/`getAssignment`) + the one bundled CC assignment                                                       |
 | Instructor UI | `app/src/instructor/`                                                          | `InstructorApp`, `InstructorGate`, `InstructorDashboard`, `AssignmentEditor`, `QuestionCreator`, `Gradebook(.ts/View.tsx)`                 |
-| Student UI    | `app/src/components/`                                                          | `CircuitCanvas`, `ComponentLibrary`, `DataTable`, `HomeScreen`, `MenuBar`, `SequentialTimeline`, `SimulationPanel`, `TabBar`               |
+| Student UI    | `app/src/components/`                                                          | `CircuitCanvas`, `ComponentLibrary`, `DataTable`, `HomeScreen`, `AssignmentOverview` (question list), `MenuBar`, `SequentialTimeline`, `TMTapePanel` (clickable tape), `SimulationPanel`, `TabBar` (question nav bar in assignments) |
 | Dev/sample    | `app/src/devData/sampleData.ts`, `seed.ts`                                     | Builders + seeding for demo CC/SC/FSM assignments and submissions                                                                          |
 | Tools         | `app/tools/grade.ts`, `pipelineCheck.ts`, `codecCheck.ts`, `tmCheck.ts`        | Headless CLI grader, submit→grade pipeline check, codec + rep-core unit checks, and TM engine/codec/grader smoke test (`npx tsx`)          |
 
@@ -143,28 +150,31 @@ mini-language instead of writing test cases by hand. This is an authoring-time c
 only — the grader never sees the formula; it runs against the generated numeric `test_cases`.
 
 - **Where it lives** — `engine/formulaEval.ts` (`evalFormula(expr, vars)` → non-negative
-  integer; throws `FormulaError`) and `engine/testVectorGen.ts` (`generateTestCases(spec, rep, mode)`
-  enumerates input combinations, evaluates the formula, truncates each output to its group width
-  on the space/time axes — but not for the unbounded TM tape axis — → numeric `test_cases`, all at
-  save). The instructor UI (`instructor/QuestionCreator.tsx`, with
-  `instructor/ccPreview.ts`) validates formulas **live on a single input** (`probeFormulas`,
-  cheap per keystroke) and generates up to 16 example rows **on demand** (`buildExamples`) — it
-  no longer enumerates the whole space on every keystroke. Blocks save on any formula error.
+  integer; throws `FormulaError`) and `engine/testVectorGen.ts`
+  (`buildQuestionBank(inputs, outputs, rep, mode)` → `{spec, test_cases}`, all at save). The
+  instructor UI (`instructor/QuestionCreator.tsx`, with `instructor/ccPreview.ts`) validates
+  formulas **live on a single input** (`probeFormulas`, cheap per keystroke); there is no
+  example-preview table. Blocks save on any formula error.
 - **The language** — variables (declared input-group names like `x`, `y`), non-negative
   integer literals, and the operators `+ - *` and bitwise `& | ^ ~`, with parentheses. No
   division, modulo, conditionals, or function calls. Each formula is one expression returning a
   single non-negative integer.
-- **Width is the implicit modulus** — the output group's bit width truncates the result to its
-  least-significant bits, so an instructor writes `x + y` with a 1-bit output to mean XOR, or a
-  2-bit output to also get the carry. No explicit `% 2` needed.
+- **No width fields; widths are derived.** Instructors never enter bit widths. A CC input group
+  declares a **max input value** (stored as `max_value`; width = bits/strokes to hold it) and is
+  enumerated exhaustively 0..max. SC/FSM/TM input spaces are unbounded/streaming, so they get no
+  size field: `buildQuestionBank` tests a **sample** of values across a range of input lengths
+  (binary: min/mid/max of each bit-length up to `SAMPLE_MAX_LEN`; tally: 0..`TALLY_SAMPLE_MAX`
+  exhaustively; cartesian capped at `MAX_SAMPLED_CASES`). Output group widths are derived from
+  the largest generated output, so **outputs are never truncated** — there is no
+  width-as-modulus trick; write `x ^ y` for XOR, and `x + y` always keeps its carry.
 - **Representation** — one per question (`binary` | `tally`), not per group. It governs the input
   value ranges, how the codec lays values onto the machine's axis, and how outputs decode. The
   codec — not the DSL — owns the value↔bits mapping at grade time.
 - **All four modes in the UI.** `QuestionCreator` authors CC/SC/FSM/TM through one shared form
-  (mode is a field, not a separate step); the same DSL expresses every mode's function (the sample
-  SC delay is `2 * x`, the FSM identity is `x`, the TM increment is `x + 1`). `generateTestCases`
-  takes the mode so it can skip width-truncation on the unbounded TM tape axis. The grader handles
-  all modes via the codec.
+  (mode is a field, not a separate step; the question **name** is editable); the same DSL
+  expresses every mode's function (the sample SC delay is `2 * x`, the FSM identity is `x`, the
+  TM increment is `x + 1`). `buildQuestionBank` takes the mode to pick exhaustive-vs-sampled
+  enumeration per axis. The grader handles all modes via the codec.
 - **Safety** — `evalFormula` validates against a strict token whitelist (digits, declared
   variable names, the allowed operators) before evaluating via `new Function()`. Acceptable
   because formulas are instructor-authored, never student-supplied.
@@ -189,7 +199,8 @@ only — the grader never sees the formula; it runs against the generated numeri
 4. **Turbots** — split arena/circuitry workspace, grid arena, hardcoded sensor/motor
    encoding, live-linked internal circuit.
 5. **Turing Machines** — infinite tape, read/write head, TM transition labels, op cycle.
-   _(engine + grading built; store/UI next)_
+   _(built: engine + grading + store + UI — FSM-style state editor, `input:action` labels,
+   clickable tape strip, machine table / run controls / history)_
 6. **TM Turbots** — turbot with TM-based internal circuitry.
 
 ## Critical design rules (don't miss these)
@@ -204,6 +215,9 @@ only — the grader never sees the formula; it runs against the generated numeri
   **tally or binary**. Local scope = per-wire; global scope = all inputs as one number, all
   outputs as one number.
 - **Time flows right-to-left** in SC and FSM tables (t1 on the right; later steps extend left).
+- **SC runs flush the pipeline** — after a loaded input sequence is consumed, Run continues for
+  one 0-input drain step per MEM so delayed bits (a serial adder's final carry, a delay
+  register's last bit) reach the output instead of being dropped.
 - **MEM block** — M_OUT (left) feeds the stored value in; M_IN (right) receives the new value.
   All memory initializes to 0; display the stored value during simulation.
 - **Input labels** — assigned at creation and permanent; new inputs get the next sequential

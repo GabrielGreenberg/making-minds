@@ -188,7 +188,8 @@ export function ComponentLibrary() {
   const selectedTool = useStore((s) => s.selectedTool);
   const setSelectedTool = useStore((s) => s.setSelectedTool);
 
-  const items = buildMode === 'FSM' ? FSM_LIBRARY_ITEMS : CC_LIBRARY_ITEMS;
+  // TM shares the FSM editor palette (STATE nodes + transition wires).
+  const items = buildMode === 'FSM' || buildMode === 'TM' ? FSM_LIBRARY_ITEMS : CC_LIBRARY_ITEMS;
 
   // Group by section
   const sections = new Map<string, LibraryEntry[]>();
