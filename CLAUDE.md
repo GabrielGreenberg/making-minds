@@ -14,7 +14,25 @@ Claude to load into context).
 >
 > A change isn't finished until the docs that describe it are too.
 
-_Last updated: 2026-07-04 (UI/UX batch from notes/todos.md — FSM/TM state connection rework: drag from anywhere on a state's rim, release anywhere in the target; click-port-then-click-target "arms" a pending wire (no more accidental self-loops); select-s1-then-shift-click-s2 creates a transition; shift-click-rotate removed (shift-click now toggles selection; Rotate stays in the toolbar); triple-click selects all; drag-select picks up transition arrows; Task/Options dropdowns removed; bigger TM tape; question panel shows the representation; question-nav arrows moved next to "‹ Questions"; question creator: single-output **Target function** section (`f(x, y) = …`) with an inline live check (spinner-less number fields); submit no longer downloads JSON and warns that only the latest submission is graded; gradebook groups submissions by student — latest scores per student, per-student attempt counts, expandable history. Earlier same day: TM alphabet tied to the question's representation; TM dual-action transitions; TM store + UI; assignment question-list layout; home screen list rows)_
+_Last updated: 2026-07-05 (turbot engine — first slice of the turbot feature block: pure
+`engine/turbot.ts` (arena driver loop around the existing CC/SC/FSM/TM single-step evaluators —
+sense → run one brain cycle → apply motor command → record history, halting on motor "00" or a
+halted FSM/TM brain) plus the grader's `gradeTurbot` branch (arena-based success criteria —
+reach-and-stop / pass-through / return-to-start — replacing the old `skip('turbot grading not
+yet implemented')`). New types: `ArenaConfig`, `TurbotState`, `TurbotHistoryEntry`,
+`TurbotTestCase`, `TurbotCaseResult`, plus `innerMode`/`turbot_cases` on `AssignmentQuestion`.
+Headless-only so far — no arena canvas, no instructor arena editor, no store wiring yet; verified
+via `tools/turbotCheck.ts`. Earlier 2026-07-04: UI/UX batch from notes/todos.md — FSM/TM state
+connection rework: drag from anywhere on a state's rim, release anywhere in the target;
+click-port-then-click-target "arms" a pending wire (no more accidental self-loops);
+select-s1-then-shift-click-s2 creates a transition; shift-click-rotate removed (shift-click now
+toggles selection; Rotate stays in the toolbar); triple-click selects all; drag-select picks up
+transition arrows; Task/Options dropdowns removed; bigger TM tape; question panel shows the
+representation; question-nav arrows moved next to "‹ Questions"; question creator: single-output
+**Target function** section (`f(x, y) = …`) with an inline live check (spinner-less number
+fields); submit no longer downloads JSON and warns that only the latest submission is graded;
+gradebook groups submissions by student — latest scores per student, per-student attempt counts,
+expandable history)_
 
 ---
 
@@ -79,7 +97,14 @@ The missing half is the **server** and productized submit/grade loop.
 
 **Near-term (still no backend):**
 
-- **Turbots** (all four machine kinds) — the next big feature block.
+- **Turbots** — pure engine + grader branch done (`engine/turbot.ts`, `gradeTurbot` in
+  `grader.ts`; a turbot's brain is a CC/SC/FSM/TM circuit with a fixed 1-bit sensor / 2-bit motor
+  interface, not a fifth simulation engine). Still to build: the student arena canvas +
+  split-panel workspace (arena on top, the inner circuit's normal editor below), the store's
+  turbot sim slice (position/history/step/run), and the instructor's arena editor + `innerMode`/
+  criterion/max-steps fields in `QuestionCreator`. TM-brained turbots (spec's Phase 6) are
+  supported by the engine already but deferred everywhere else, matching CC/SC/FSM/TM's own phase
+  order.
 - **Deferred authoring follow-ups** — the `requireStandardHaltPosition` TM acceptance toggle and
   mode-filtered `allowed_components` (both optional fields on `AssignmentQuestion`, not yet
   exposed in the question creator's editor UI).
@@ -133,10 +158,11 @@ the engine.
 | Types         | `app/src/types.ts`                                                             | All domain types: `AssignmentData`, `AssignmentQuestion`, `SubmissionData`/`SubmissionRecord`, `CircuitData`, `CCSpec`, `SubmissionResult` |
 | Engine        | `app/src/engine/cc.ts`, `sc.ts`, `fsm.ts`                                      | Pure simulators per mode (topological eval for CC; clocked step for SC; transition-matching for FSM)                                       |
 | Engine        | `app/src/engine/tm.ts`, `tmValidate.ts`, `tmCodec.ts`                          | TM: notation-aware tape engine, **dual-action** model (every transition writes a symbol and moves in one atomic step, e.g. `1:0R`); pre-engine table validation (ambiguous/unparseable); encode/accept/decode (the codec `tape` axis)          |
-| Engine        | `app/src/engine/grader.ts`                                                     | `gradeSubmission` / `gradeQuestion` — one value-based codec pipeline for CC/SC/FSM/TM against numeric `test_cases`; turbot skipped          |
+| Engine        | `app/src/engine/grader.ts`                                                     | `gradeSubmission` / `gradeQuestion` — one value-based codec pipeline for CC/SC/FSM/TM against numeric `test_cases`, plus a separate `gradeTurbot` branch (arena success criteria, not the codec)          |
 | Engine        | `app/src/engine/codec.ts`, `machineValidation.ts`                              | The codec (`space`/`time` value↔bits; `tape` → `tmCodec`) and Stage-1 machine validation for all modes                                     |
 | Engine        | `app/src/engine/testVectorGen.ts`, `formulaEval.ts`                            | Authoring-time: affine-formula language → `buildQuestionBank(inputs, outputs, rep, mode)` → `{spec, test_cases}` (widths derived; SC/FSM/TM sampled). Legacy `generateTestCases(spec, rep, mode)` remains for the sample data |
 | Engine        | `app/src/engine/representation.ts`, `index.ts`                                 | value↔bits core (`valueToBits`/`isValidCodeword`/`bitsToValue`) + display helpers; barrel exports                                          |
+| Engine        | `app/src/engine/turbot.ts`                                                     | Turbot arena driver loop: `senseAhead`/`decodeMotorCommand`/`applyMotorCommand` (grid + sensor/motor per spec §9.2) and `runTurbot`, which drives one movement cycle per call into `evaluateCCInputs`/`evaluateSCSingleStep`/`evaluateFSMSingleStep`/an inline TM step — a turbot brain is a CC/SC/FSM/TM circuit, not a new engine. `evaluateTurbotCriterion` judges a run against `reach-and-stop` / `pass-through` / `return-to-start` (spec §12.5). No arena canvas or store wiring yet (headless only) |
 | Store         | `app/src/store.ts`                                                             | Zustand UI state; delegates simulation to `engine/`. Per-mode sim state incl. TM (`tmTape`/`tmStep`/`setTmCell`), `selectTmNotation` (TM alphabet: open question's `representation`, sandbox falls back to `repSystem`), and `assignmentView` ('overview' \| 'question')  |
 | Routing       | `app/src/routing.ts`                                                           | `Route` union, `parseHash`/`routeToHash`, `navigate()`                                                                                     |
 | Storage       | `app/src/storage/workbookStore.ts`, `AssignmentStore.ts`, `submissionStore.ts` | The three localStorage-backed seams                                                                                                        |
@@ -145,7 +171,7 @@ the engine.
 | Instructor UI | `app/src/instructor/`                                                          | `InstructorApp`, `InstructorGate`, `InstructorDashboard`, `AssignmentEditor`, `QuestionCreator`, `Gradebook(.ts/View.tsx)`                 |
 | Student UI    | `app/src/components/`                                                          | `CircuitCanvas`, `ComponentLibrary`, `DataTable`, `HomeScreen`, `AssignmentOverview` (question list), `MenuBar`, `SequentialTimeline`, `TMTapePanel` (clickable tape), `SimulationPanel`, `TabBar` (question nav bar in assignments) |
 | Dev/sample    | `app/src/devData/sampleData.ts`, `seed.ts`                                     | Builders + seeding for demo CC/SC/FSM assignments and submissions                                                                          |
-| Tools         | `app/tools/grade.ts`, `pipelineCheck.ts`, `codecCheck.ts`, `tmCheck.ts`        | Headless CLI grader, submit→grade pipeline check, codec + rep-core unit checks, and TM engine/codec/grader smoke test (`npx tsx`)          |
+| Tools         | `app/tools/grade.ts`, `pipelineCheck.ts`, `codecCheck.ts`, `tmCheck.ts`, `turbotCheck.ts` | Headless CLI grader, submit→grade pipeline check, codec + rep-core unit checks, TM engine/codec/grader smoke test, and turbot engine/grader smoke test (`npx tsx`)          |
 
 ## Reference-function DSL (instructor authoring)
 

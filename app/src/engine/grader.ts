@@ -24,6 +24,8 @@ import type {
   AssignmentQuestion,
   SubmissionData,
   TestCase,
+  TurbotTestCase,
+  TurbotCaseResult,
   RepSystem,
   BuildMode,
   CaseResult,
@@ -34,6 +36,7 @@ import { evaluateCCInputs } from './cc';
 import { evaluateSCSequence } from './sc';
 import { evaluateFSMSequence } from './fsm';
 import { evaluateTMSequence } from './tm';
+import { runTurbot, evaluateTurbotCriterion } from './turbot';
 import { validateMachine } from './machineValidation';
 import {
   axisForMode,
@@ -82,7 +85,7 @@ function tally(questionId: number, cases: CaseResult[]): QuestionResult {
  */
 export function gradeQuestion(question: AssignmentQuestion, circuit: CircuitData | undefined): QuestionResult {
   if (!circuit) return skip(question.id, 'no circuit submitted');
-  if (question.buildMode === 'turbot') return skip(question.id, 'turbot grading not yet implemented');
+  if (question.buildMode === 'turbot') return gradeTurbot(question, circuit);
 
   const cases = question.test_cases;
   if (!cases || cases.length === 0) return skip(question.id, 'question has no test cases');
@@ -173,6 +176,54 @@ function gradeTape(
     return { input: tc.inputs, expected: tc.outputs, got: [got], pass: got === tc.outputs[0] };
   });
   return tally(questionId, results);
+}
+
+/**
+ * Structural layout for a turbot brain's fixed sensor/motor interface, keyed
+ * by inner mode. Only CC/SC read `inputWidths`/`outputWidths` in
+ * validateMachine; FSM/TM ignore layout entirely (see machineValidation.ts).
+ */
+function turbotLayout(innerMode: BuildMode): CodecLayout {
+  if (innerMode === 'SC') return { axis: 'time', rep: 'binary', inputWidths: [1], outputWidths: [1, 1] };
+  return { axis: 'space', rep: 'binary', inputWidths: [1], outputWidths: [2] };
+}
+
+/** Turbot grading — runs the arena driver loop per case and checks the success criterion. */
+function gradeTurbot(question: AssignmentQuestion, circuit: CircuitData): QuestionResult {
+  const innerMode = question.innerMode;
+  if (!innerMode) return skip(question.id, 'question has no inner mode (CC/SC/FSM/TM) set');
+
+  const cases = question.turbot_cases;
+  if (!cases || cases.length === 0) return skip(question.id, 'question has no turbot cases');
+
+  const layout = turbotLayout(innerMode);
+  const valid = validateMachine(circuit, innerMode, layout, question.representation ?? 'binary');
+  if (!valid.ok) {
+    const rejected: TurbotCaseResult[] = cases.map((tc) => ({
+      pass: false,
+      stepsTaken: 0,
+      finalPosition: { ...tc.arena.start },
+      hitStepLimit: false,
+      reason: valid.reason,
+    }));
+    return { questionId: question.id, status: 'graded', passed: 0, total: rejected.length, cases: [], turbotCases: rejected };
+  }
+
+  const turbotCases = cases.map((tc) => gradeTurbotCase(circuit, innerMode, tc));
+  const passed = turbotCases.filter((c) => c.pass).length;
+  return { questionId: question.id, status: 'graded', passed, total: turbotCases.length, cases: [], turbotCases };
+}
+
+function gradeTurbotCase(circuit: CircuitData, innerMode: BuildMode, tc: TurbotTestCase): TurbotCaseResult {
+  const run = runTurbot(circuit.components, circuit.wires, innerMode, tc.arena, tc.maxSteps);
+  if (run.hitStepLimit) {
+    return { pass: false, stepsTaken: tc.maxSteps, finalPosition: run.finalState, hitStepLimit: true, reason: 'exceeded max steps' };
+  }
+  if (run.haltedByBrain && tc.criterion === 'reach-and-stop') {
+    return { pass: false, stepsTaken: run.history.length, finalPosition: run.finalState, hitStepLimit: false, reason: 'brain halted without a matching transition' };
+  }
+  const pass = evaluateTurbotCriterion(tc.arena, run, tc.criterion);
+  return { pass, stepsTaken: run.history.length, finalPosition: run.finalState, hitStepLimit: false };
 }
 
 /**

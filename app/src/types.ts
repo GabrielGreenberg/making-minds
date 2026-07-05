@@ -130,11 +130,18 @@ export interface AssignmentQuestion {
   id: number;                  // stable id; referenced by the grader and submissions
   label: string;               // e.g. "Problem 1", "Q2a"
   statement: string;           // problem text shown above the canvas
-  buildMode: BuildMode;        // canvas mode for this question (CC, SC, FSM, …)
+  buildMode: BuildMode;        // canvas mode for this question (CC, SC, FSM, turbot, …)
   representation: RepSystem;   // authoritative for grading (binary | tally; TM notation: tally→unary)
   allowed_components?: ComponentType[];
   cc_spec?: CCSpec;            // authoring spec; source of group widths + generates test_cases at save
   test_cases?: TestCase[];     // value-based grading cases (one bank, all modes — see TestCase)
+  // Turbot-only fields (buildMode === 'turbot'). A turbot question's "circuit"
+  // is a CC/SC/FSM/TM brain wired to a fixed 1-bit sensor / 2-bit motor
+  // interface; innerMode picks which editor authors that brain, and
+  // turbot_cases carries the arena(s) + success criteria it's graded against
+  // (hand-authored, not enumerated — see engine/turbot.ts + grader.ts).
+  innerMode?: BuildMode;
+  turbot_cases?: TurbotTestCase[];
   notes?: string;
 }
 
@@ -185,6 +192,9 @@ export interface QuestionResult {
   passed: number;          // test cases passed
   total: number;           // test cases total
   cases: CaseResult[];
+  // Populated instead of `cases` for turbot questions — arena grading
+  // doesn't produce an f(x) value comparison, so it gets its own result shape.
+  turbotCases?: TurbotCaseResult[];
 }
 
 /** Grading outcome for a full submission. */
@@ -410,6 +420,66 @@ export interface TmHistoryEntry {
   action: string;        // raw dual-action token, e.g. "0R" (write '0', move right)
   headBefore: number;    // head position before the action
   nextStateLabel: string;
+}
+
+// ─── Turbot helpers ──────────────────────────────────────────────────
+// A turbot is an agent in a grid arena whose behavior is controlled by an
+// "inner" CC/SC/FSM/TM circuit with a fixed 1-bit sensor input and 2-bit
+// motor output (spec §9). The inner circuit is evaluated one cycle per
+// movement cycle; the turbot engine (engine/turbot.ts) is a driver loop
+// around the existing per-mode single-step evaluators — it is not a fifth
+// simulation engine.
+
+export type TurbotOrientation = 'N' | 'E' | 'S' | 'W';
+
+/** One cell of the arena grid. */
+export type ArenaCell = 'empty' | 'block' | 'goal';
+
+/** A turbot arena: grid contents plus the turbot's starting pose. */
+export interface ArenaConfig {
+  width: number;
+  height: number;
+  cells: ArenaCell[][]; // cells[y][x]; goal/block are mutually exclusive with the start cell
+  start: { x: number; y: number; facing: TurbotOrientation };
+}
+
+/** Live turbot pose during simulation (mirrors TMTape as the engine's carried state). */
+export interface TurbotState {
+  x: number;
+  y: number;
+  facing: TurbotOrientation;
+}
+
+/** Motor command decoded from the inner circuit's 2-bit output (spec §9.2, Appendix B). */
+export type TurbotMotorCommand = 'stop' | 'left' | 'right' | 'forward';
+
+/** Turbot history entry for one movement cycle. */
+export interface TurbotHistoryEntry {
+  t: number;
+  sensor: 0 | 1;
+  motor: TurbotMotorCommand;
+  x: number;
+  y: number;
+  facing: TurbotOrientation;
+}
+
+/** How a turbot question's success is judged (spec §12.5). */
+export type TurbotSuccessCriterion = 'reach-and-stop' | 'pass-through' | 'return-to-start';
+
+/** One turbot grading case: an arena, a step budget, and a success criterion. */
+export interface TurbotTestCase {
+  arena: ArenaConfig;
+  maxSteps: number;
+  criterion: TurbotSuccessCriterion;
+}
+
+/** Grading outcome for one turbot test case (parallel to CaseResult, richer shape). */
+export interface TurbotCaseResult {
+  pass: boolean;
+  stepsTaken: number;
+  finalPosition: { x: number; y: number; facing: TurbotOrientation };
+  hitStepLimit: boolean;
+  reason?: string;
 }
 
 // ─── MEM direction helpers ──────────────────────────────────────────
