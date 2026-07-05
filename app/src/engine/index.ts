@@ -59,3 +59,13 @@ export type { MachineValidation } from './machineValidation';
 export { generateTestCases } from './testVectorGen';
 export { gradeQuestion, gradeSubmission, summarizeResult } from './grader';
 export type { CaseResult, QuestionResult, SubmissionResult } from './grader';
+export {
+  senseAhead,
+  decodeMotorCommand,
+  applyMotorCommand,
+  initialBrainState,
+  runBrainStep,
+  runTurbot,
+  evaluateTurbotCriterion,
+} from './turbot';
+export type { BrainState, BrainStepResult, TurbotRunResult } from './turbot';
