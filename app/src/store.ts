@@ -23,6 +23,9 @@ import type {
   TMSymbol,
   TMNotation,
   TmHistoryEntry,
+  ArenaConfig,
+  TurbotState,
+  TurbotHistoryEntry,
 } from './types';
 import {
   getPortsForType,
@@ -33,6 +36,7 @@ import {
   toSubscript,
 } from './types';
 import { topologicalSort, evaluateGate, evaluateCC, evaluateSCSingleStep, sortStateComponents, evaluateFSMSingleStep, evaluateTMSingleStep, notationForRepresentation } from './engine';
+import { senseAhead, decodeMotorCommand, applyMotorCommand, initialBrainState, runBrainStep, type BrainState } from './engine/turbot';
 import { getAssignment, listAssignments } from './assignments';
 import {
   localWorkbookStore,
@@ -57,6 +61,38 @@ export function selectTmNotation(s: {
 }): TMNotation {
   const q = s.assignment?.questions[s.currentQuestionIndex];
   return notationForRepresentation(q ? q.representation : s.repSystem);
+}
+
+/** A blank arena for the sandbox / question-authoring preview (no assignment context). */
+export function defaultArenaConfig(): ArenaConfig {
+  return {
+    width: 5,
+    height: 5,
+    cells: Array.from({ length: 5 }, () => Array.from({ length: 5 }, () => 'empty' as const)),
+    start: { x: 0, y: 0, facing: 'E' },
+  };
+}
+
+/**
+ * The active turbot question's primary arena (its first `turbot_cases` entry
+ * — the one the student sees and simulates against; see engine/turbot.ts).
+ * Falls back to a blank arena outside an assignment/turbot context.
+ */
+export function selectTurbotArena(s: {
+  assignment: AssignmentData | null;
+  currentQuestionIndex: number;
+}): ArenaConfig {
+  const q = s.assignment?.questions[s.currentQuestionIndex];
+  return q?.turbot_cases?.[0]?.arena ?? defaultArenaConfig();
+}
+
+/** The inner-circuit editor mode (CC/SC/FSM/TM) for the active turbot question. */
+export function selectTurbotInnerMode(s: {
+  assignment: AssignmentData | null;
+  currentQuestionIndex: number;
+}): BuildMode {
+  const q = s.assignment?.questions[s.currentQuestionIndex];
+  return q?.innerMode ?? 'CC';
 }
 
 interface HistoryEntry {
@@ -340,6 +376,23 @@ interface AppState {
   tmPause: () => void;
   tmReset: () => void; // back to the initial tape, t=1
   tmGlobalReset: () => void; // blank the tape entirely
+
+  // Turbot state — the arena pose plus whatever the inner brain (CC/SC/FSM/TM)
+  // is carrying between cycles. A turbot's "circuit" is the brain, edited via
+  // the normal per-mode canvas (see engine/turbot.ts); this slice only drives
+  // the arena driver loop (runBrainStep/applyMotorCommand) one cycle at a
+  // time, mirroring the tm* slice's step/run/reset shape.
+  turbotState: TurbotState;
+  turbotBrainState: BrainState;
+  turbotHistory: TurbotHistoryEntry[];
+  turbotRunning: boolean;
+  turbotRunIntervalId: number | null;
+  turbotHalted: boolean;
+  turbotStopReason: 'motor' | 'brain' | 'limit' | null;
+  turbotStep: () => void;
+  turbotRun: () => void;
+  turbotPause: () => void;
+  turbotReset: () => void; // back to the arena's start pose, brain re-initialized
 }
 
 function snapToGrid(val: number): number {
@@ -1075,6 +1128,7 @@ export const useStore = create<AppState>()((set, get) => ({
       boxes: [],
       buildMode: assignment.questions[0]?.buildMode || 'CC',
     });
+    get().turbotReset();
   },
   openAssignment: (id) => {
     const def = getAssignment(id);
@@ -1104,6 +1158,7 @@ export const useStore = create<AppState>()((set, get) => ({
       buildMode: activeQ?.buildMode || 'CC',
       workbookOpen: true,
     });
+    get().turbotReset();
     return true;
   },
   goHome: () => {
@@ -1194,6 +1249,7 @@ export const useStore = create<AppState>()((set, get) => ({
       boxes: saved.boxes,
       buildMode: nextQ.buildMode,
     });
+    get().turbotReset();
   },
   closeAssignment: () => {
     set({
@@ -3079,6 +3135,90 @@ export const useStore = create<AppState>()((set, get) => ({
       tmRunning: false,
       tmRunIntervalId: null,
       tmHalted: false,
+    });
+  },
+
+  // ─── Turbot state ──────────────────────────────────────────────
+  turbotState: { ...defaultArenaConfig().start },
+  turbotBrainState: {},
+  turbotHistory: [],
+  turbotRunning: false,
+  turbotRunIntervalId: null,
+  turbotHalted: false,
+  turbotStopReason: null,
+
+  turbotStep: () => {
+    const state = get();
+    const { components, wires, turbotHistory, turbotHalted, turbotBrainState, turbotState } = state;
+    if (turbotHalted) return;
+
+    const arena = selectTurbotArena(state);
+    const innerMode = selectTurbotInnerMode(state);
+    const sensor = senseAhead(arena, turbotState);
+    const result = runBrainStep(components, wires, innerMode, sensor, turbotBrainState);
+    if (!result) {
+      set({ turbotHalted: true, turbotStopReason: 'brain' });
+      return;
+    }
+
+    const motor = decodeMotorCommand(result.motorBits);
+    const nextPose = applyMotorCommand(arena, turbotState, motor);
+    const entry: TurbotHistoryEntry = {
+      t: turbotHistory.length + 1,
+      sensor,
+      motor,
+      x: nextPose.x,
+      y: nextPose.y,
+      facing: nextPose.facing,
+    };
+
+    set({
+      turbotState: nextPose,
+      turbotBrainState: result.brainState,
+      turbotHistory: [...turbotHistory, entry],
+      ...(motor === 'stop' ? { turbotHalted: true, turbotStopReason: 'motor' as const } : {}),
+    });
+  },
+
+  turbotRun: () => {
+    const state = get();
+    if (state.turbotRunning) return;
+    const MAX_UI_TURBOT_STEPS = 1000; // stop a runaway turbot in the UI
+    const intervalId = window.setInterval(() => {
+      const s = get();
+      if (s.turbotHalted || s.turbotHistory.length >= MAX_UI_TURBOT_STEPS) {
+        s.turbotPause();
+        if (!s.turbotHalted) set({ turbotHalted: true, turbotStopReason: 'limit' });
+        return;
+      }
+      s.turbotStep();
+    }, 300);
+    set({ turbotRunning: true, turbotRunIntervalId: intervalId });
+  },
+
+  turbotPause: () => {
+    const state = get();
+    if (state.turbotRunIntervalId !== null) {
+      window.clearInterval(state.turbotRunIntervalId);
+    }
+    set({ turbotRunning: false, turbotRunIntervalId: null });
+  },
+
+  turbotReset: () => {
+    const state = get();
+    if (state.turbotRunIntervalId !== null) {
+      window.clearInterval(state.turbotRunIntervalId);
+    }
+    const arena = selectTurbotArena(state);
+    const innerMode = selectTurbotInnerMode(state);
+    set({
+      turbotState: { ...arena.start },
+      turbotBrainState: initialBrainState(state.components, innerMode),
+      turbotHistory: [],
+      turbotRunning: false,
+      turbotRunIntervalId: null,
+      turbotHalted: false,
+      turbotStopReason: null,
     });
   },
 }));
