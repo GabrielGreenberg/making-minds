@@ -6,16 +6,18 @@ import { DataTable } from './components/DataTable';
 import { SimulationToolbar } from './components/SimulationPanel';
 import { SequentialTimeline } from './components/SequentialTimeline';
 import { TMTapePanel } from './components/TMTapePanel';
+import { TurbotTapePanel } from './components/TurbotTapePanel';
 import { HomeScreen } from './components/HomeScreen';
 import { AssignmentOverview } from './components/AssignmentOverview';
 import { InstructorApp } from './instructor/InstructorApp';
 import { useInstructorRoute } from './instructor/useInstructorRoute';
-import { useStore } from './store';
+import { useStore, selectEffectiveMode } from './store';
 
 function App() {
   const instructorRoute = useInstructorRoute();
   const workbookOpen = useStore((s) => s.workbookOpen);
   const buildMode = useStore((s) => s.buildMode);
+  const effectiveMode = useStore(selectEffectiveMode);
   const assignment = useStore((s) => s.assignment);
   const assignmentView = useStore((s) => s.assignmentView);
 
@@ -40,10 +42,12 @@ function App() {
         <div className="canvas-and-timeline">
           {/* Turbot questions: the arena ("Map") lives in the right data
               panel (DataTable's turbot branch), not here — the canvas column
-              is the inner machine's normal editor. */}
+              is the inner machine's normal editor. A TM-brained turbot shows
+              its internal tape (read-only: turbots start on a blank tape). */}
           <CircuitCanvas />
           {buildMode !== 'FSM' && buildMode !== 'TM' && buildMode !== 'turbot' && <SequentialTimeline />}
           {buildMode === 'TM' && <TMTapePanel />}
+          {buildMode === 'turbot' && effectiveMode === 'TM' && <TurbotTapePanel />}
         </div>
         <DataTable />
       </div>

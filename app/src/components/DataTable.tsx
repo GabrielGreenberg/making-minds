@@ -506,33 +506,35 @@ export function DataTable() {
             </div>
           )}
 
-          {/* Movement history: one row per completed cycle (spec §9.4's I/O
-              table — sensor in, motor out, resulting pose). */}
+          {/* History: one row per transition. Circuit brains only take
+              external steps (sensor in, motor out); a turbot TM interleaves
+              internal tape ops (read in, write/move out — pose unchanged,
+              shown dimmed). */}
           <div className="table-section">
             <div className="table-section-label">
-              <span>Movement History</span>
+              <span>History</span>
             </div>
             {turbotHistory.length === 0 ? (
               <div style={{ padding: 12, color: '#999', fontSize: 12 }}>
-                Step or Run the turbot (above the canvas) to record movement cycles.
+                Step or Run the turbot (in the Map section above) to record steps.
               </div>
             ) : (
               <table className="data-table" style={{ fontSize: 11 }}>
                 <thead>
                   <tr>
                     <th>t</th>
-                    <th>SENSE</th>
-                    <th>MOTOR</th>
+                    <th>IN</th>
+                    <th>OP</th>
                     <th>POS</th>
                     <th>DIR</th>
                   </tr>
                 </thead>
                 <tbody>
                   {turbotHistory.map((h, i) => (
-                    <tr key={i}>
+                    <tr key={i} style={h.kind === 'internal' ? { opacity: 0.65 } : undefined}>
                       <td><span className="mono-value">{h.t}</span></td>
-                      <td className={h.sensor === 1 ? 'val-1' : ''}><span className="mono-value">{h.sensor}</span></td>
-                      <td><span className="mono-value">{h.motor}</span></td>
+                      <td className={h.input === '1' || h.input === 'B' ? 'val-1' : ''}><span className="mono-value">{h.input}</span></td>
+                      <td><span className="mono-value">{h.action}</span></td>
                       <td><span className="mono-value">({h.x}, {h.y})</span></td>
                       <td><span className="mono-value">{h.facing}</span></td>
                     </tr>

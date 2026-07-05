@@ -36,7 +36,7 @@ import { evaluateCCInputs } from './cc';
 import { evaluateSCSequence } from './sc';
 import { evaluateFSMSequence } from './fsm';
 import { evaluateTMSequence } from './tm';
-import { runTurbot, evaluateTurbotCriterion } from './turbot';
+import { runTurbot, evaluateTurbotCriterion, validateTurbotTM } from './turbot';
 import { validateMachine } from './machineValidation';
 import {
   axisForMode,
@@ -196,8 +196,16 @@ function gradeTurbot(question: AssignmentQuestion, circuit: CircuitData): Questi
   const cases = question.turbot_cases;
   if (!cases || cases.length === 0) return skip(question.id, 'question has no turbot cases');
 
-  const layout = turbotLayout(innerMode);
-  const valid = validateMachine(circuit, innerMode, layout, question.representation ?? 'binary');
+  // Stage 1: a TM brain is a *turbot TM* (per-state internal/external
+  // grammar, single actions) with its own validator; circuit brains reuse
+  // the shared machine validation.
+  let valid: { ok: boolean; reason?: string };
+  if (innerMode === 'TM') {
+    const errors = validateTurbotTM(circuit.components, circuit.wires);
+    valid = errors.length === 0 ? { ok: true } : { ok: false, reason: errors.map((e) => e.message).join(' ') };
+  } else {
+    valid = validateMachine(circuit, innerMode, turbotLayout(innerMode), question.representation ?? 'binary');
+  }
   if (!valid.ok) {
     const rejected: TurbotCaseResult[] = cases.map((tc) => ({
       pass: false,
@@ -219,11 +227,13 @@ function gradeTurbotCase(circuit: CircuitData, innerMode: BuildMode, tc: TurbotT
   if (run.hitStepLimit) {
     return { pass: false, stepsTaken: tc.maxSteps, finalPosition: run.finalState, hitStepLimit: true, reason: 'exceeded max steps' };
   }
-  if (run.haltedByBrain && tc.criterion === 'reach-and-stop') {
-    return { pass: false, stepsTaken: run.history.length, finalPosition: run.finalState, hitStepLimit: false, reason: 'brain halted without a matching transition' };
-  }
   const pass = evaluateTurbotCriterion(tc.arena, run, tc.criterion);
-  return { pass, stepsTaken: run.history.length, finalPosition: run.finalState, hitStepLimit: false };
+  // A halted-but-not-stopped brain (a dead FSM — a turbot TM's halt counts
+  // as its stop) gets the explanatory reason on failure.
+  const reason = !pass && run.haltedByBrain && !run.stopped
+    ? 'brain halted without a matching transition'
+    : undefined;
+  return { pass, stepsTaken: run.history.length, finalPosition: run.finalState, hitStepLimit: false, reason };
 }
 
 /**

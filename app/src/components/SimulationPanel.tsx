@@ -8,7 +8,9 @@ export function SimulationToolbar() {
   const hasMem = components.some((c) => c.type === 'MEM');
   const isSC = buildMode === 'SC' || hasMem;
   const autoSaveStatus = useStore((s) => s.autoSaveStatus);
-  const hasSelection = useStore((s) => s.selectedIds.length > 0);
+  const selectedIds = useStore((s) => s.selectedIds);
+  const hasSelection = selectedIds.length > 0;
+  const hasStateSelected = selectedIds.some((id) => components.find((c) => c.id === id)?.type === 'STATE');
 
   const isTurbot = buildMode === 'turbot';
   // The state-machine chrome (current-state readout) follows the effective
@@ -92,6 +94,24 @@ export function SimulationToolbar() {
         >
           <span className="toolbar-icon">{'↻'}</span> Rotate
         </button>
+
+        {/* Turbot TM: flip selected states between internal (circle, tape
+            ops) and external (square, sense/move ops) — textbook convention. */}
+        {isTurbot && isTM && (
+          <button
+            className="toolbar-btn"
+            disabled={!hasStateSelected}
+            onClick={() => {
+              const state = useStore.getState();
+              for (const id of state.selectedIds) {
+                state.toggleStateKind(id);
+              }
+            }}
+            title="Toggle selected states between internal (circle: read/write/move the tape) and external (square: sense ahead and move/turn)"
+          >
+            <span className="toolbar-icon">{'▢'}</span> In/External
+          </button>
+        )}
 
         <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 12 }}>
           {(isFSM || isTM) && (

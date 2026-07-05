@@ -39,6 +39,10 @@ export interface CircuitComponent {
   rotation?: number; // 0, 90, 180, 270 degrees clockwise
   boxedCircuitId?: string; // for BOXED type
   internalCircuit?: CircuitData; // for BOXED type - the encapsulated circuit
+  // Turbot-TM STATE nodes only (textbook "Turbots: Operation"): an internal
+  // state (circle) operates on the tape, an external state (square) senses
+  // and moves in the arena. Absent = internal. Meaningless outside turbot TM.
+  stateKind?: 'internal' | 'external';
 }
 
 export interface Wire {
@@ -453,11 +457,24 @@ export interface TurbotState {
 /** Motor command decoded from the inner circuit's 2-bit output (spec §9.2, Appendix B). */
 export type TurbotMotorCommand = 'stop' | 'left' | 'right' | 'forward';
 
-/** Turbot history entry for one movement cycle. */
+/**
+ * What a turbot TM's external state senses in the cell ahead (textbook
+ * "Turbots: Operation"): B = block (or the arena boundary), E = empty,
+ * F = food (the goal — passable, unlike blocks). Circuit brains collapse
+ * this to the 1-bit sensor: B → 1, E/F → 0.
+ */
+export type TurbotSense = 'B' | 'E' | 'F';
+
+/**
+ * Turbot history entry for one transition. Circuit brains (CC/SC/FSM) only
+ * take external steps; a turbot TM alternates freely — an internal step
+ * reads/writes/moves on the tape and leaves the pose unchanged.
+ */
 export interface TurbotHistoryEntry {
   t: number;
-  sensor: 0 | 1;
-  motor: TurbotMotorCommand;
+  kind: 'external' | 'internal';
+  input: string;   // external: sensor bit or B/E/F; internal: tape symbol read
+  action: string;  // external: motor command name; internal: write/move token
   x: number;
   y: number;
   facing: TurbotOrientation;

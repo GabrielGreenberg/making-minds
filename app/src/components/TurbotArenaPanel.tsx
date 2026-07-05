@@ -4,8 +4,8 @@
 // machine/history tables. The simulation itself lives in the store's turbot
 // slice; the canvas column stays the inner machine's normal editor.
 
-import { useStore, selectTurbotArena } from '../store';
-import { senseAhead } from '../engine/turbot';
+import { useStore, selectTurbotArena, selectTurbotInnerMode } from '../store';
+import { senseAhead, senseAheadSymbol } from '../engine/turbot';
 import { ArenaCanvas } from './ArenaCanvas';
 
 export function TurbotArenaPanel() {
@@ -20,12 +20,18 @@ export function TurbotArenaPanel() {
   const turbotPause = useStore((s) => s.turbotPause);
   const turbotReset = useStore((s) => s.turbotReset);
 
+  const innerMode = useStore(selectTurbotInnerMode);
   const cycle = turbotHistory.length;
-  const sensor = senseAhead(arena, turbotState);
+  // Circuit brains see the 1-bit sensor; a turbot TM's external states
+  // sense B (block) / E (empty) / F (food).
+  const sensor = innerMode === 'TM'
+    ? senseAheadSymbol(arena, turbotState)
+    : senseAhead(arena, turbotState);
 
+  // For a turbot TM, halting on no-transition IS the normal stop (textbook).
   const stopLabel =
     turbotStopReason === 'motor' ? 'STOPPED (motor 00)' :
-    turbotStopReason === 'brain' ? 'HALTED (no transition)' :
+    turbotStopReason === 'brain' ? (innerMode === 'TM' ? 'HALTED' : 'HALTED (no transition)') :
     turbotStopReason === 'limit' ? 'STOPPED (step limit)' : null;
 
   return (
