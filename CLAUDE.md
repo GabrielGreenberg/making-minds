@@ -14,7 +14,10 @@ Claude to load into context).
 >
 > A change isn't finished until the docs that describe it are too.
 
-_Last updated: 2026-07-05 (**turbot TM + Map relocation** — the TM-brained turbot is now the
+_Last updated: 2026-07-05 (also: a percept/motor **glossary** under the Map — TM brains list the
+internal/external vocabularies (B/E/F → ↑/↱/↰; 0/1/* → write/move), circuit brains the 1-bit
+sensor and motor codes — and the question creator's Save/Cancel now also appear at the top of
+the form. Same day, **turbot TM + Map relocation** — the TM-brained turbot is now the
 textbook's real model ("Turbots: Operation"), replacing the earlier placeholder that reused the
 base dual-action TM engine: STATE nodes carry a `stateKind` (internal = circle, external =
 square; toolbar "In/External" toggle), internal transitions read the private {0,1,*} tape and

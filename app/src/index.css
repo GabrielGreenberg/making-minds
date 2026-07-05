@@ -1501,6 +1501,12 @@ thead .sc-label-col {
   gap: 12px;
   margin-bottom: 20px;
 }
+
+.instructor-page-head-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
 .instructor-page-title { font-size: 20px; }
 .instructor-section-title { font-size: 18px; }
 .instructor-subhead { font-size: 15px; color: var(--text); }
@@ -1998,4 +2004,44 @@ thead .sc-label-col {
 .turbot-arena-stop {
   color: #e53935;
   font-weight: 600;
+}
+
+/* Percept/motor glossary under the Map */
+.turbot-glossary {
+  padding: 4px 8px 8px;
+  border-top: 1px dashed #e0e0e0;
+  margin-top: 4px;
+}
+
+.turbot-glossary-group + .turbot-glossary-group {
+  margin-top: 8px;
+}
+
+.turbot-glossary-title {
+  font-size: 10px;
+  font-weight: 600;
+  color: #555;
+  margin: 4px 0 2px;
+}
+
+.turbot-glossary-cols {
+  display: flex;
+  gap: 18px;
+}
+
+.turbot-glossary-head {
+  font-size: 10px;
+  font-weight: 600;
+  color: #888;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  margin: 2px 0;
+}
+
+.turbot-glossary-line {
+  font-size: 10px;
+  font-family: 'SF Mono', 'Fira Code', monospace;
+  color: #444;
+  line-height: 1.6;
+  white-space: nowrap;
 }

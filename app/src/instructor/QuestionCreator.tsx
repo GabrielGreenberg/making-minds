@@ -247,9 +247,19 @@ export function QuestionCreator({ assignmentId, existingQuestion, onSave, onCanc
         <h3 className="instructor-section-title">
           {existingQuestion ? `Edit ${existingQuestion.label}` : `New ${mode} question`}
         </h3>
-        <button className="instructor-btn" onClick={onCancel}>
-          Cancel
-        </button>
+        <div className="instructor-page-head-actions">
+          {saveError && <span className="instructor-formula-error">{saveError}</span>}
+          <button className="instructor-btn" onClick={onCancel}>
+            Cancel
+          </button>
+          <button
+            className="instructor-btn instructor-btn--primary"
+            disabled={!saveable}
+            onClick={handleSave}
+          >
+            {existingQuestion ? 'Save Question' : 'Add to Assignment'}
+          </button>
+        </div>
       </div>
 
       {/* Name + mode + representation (all per-question) */}
