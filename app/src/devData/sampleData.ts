@@ -1,5 +1,6 @@
 // Sample assignment + artificial submissions for exercising the full pipeline
-// (submit → store → autograde → instructor gradebook) across CC, SC, FSM, and TM.
+// (submit → store → autograde → instructor gradebook) across CC, SC, FSM, TM,
+// and turbot.
 //
 // Pure and framework-agnostic: builds `AssignmentData` and `SubmissionData`
 // values only — no storage, no React. The browser dev seed (devData/seed.ts) and
@@ -162,6 +163,44 @@ export function tmIncorrect(): CircuitData {
   };
 }
 
+// ── Turbot: "walk forward until blocked, then stop" (CC brain) ──────
+// A single NOT gate split to both motor wires: sensor 0 (clear ahead) →
+// bits 11 (forward); sensor 1 (blocked) → bits 00 (stop). In the sample
+// corridor the goal sits against the far wall, so stopping at the wall
+// satisfies reach-and-stop.
+
+export function turbotCorrect(): CircuitData {
+  return {
+    components: [
+      comp('tb-in1', 'INPUT', 'IN1'),
+      comp('tb-not', 'NOT', ''),
+      comp('tb-out1', 'OUTPUT', 'OUT1'),
+      comp('tb-out2', 'OUTPUT', 'OUT2'),
+    ],
+    wires: [
+      wire('tb-w1', 'tb-in1', 'out', 'tb-not', 'in'),
+      wire('tb-w2', 'tb-not', 'out', 'tb-out1', 'in'),
+      wire('tb-w3', 'tb-not', 'out', 'tb-out2', 'in'),
+    ],
+  };
+}
+
+// Wrong: motor wired straight from the sensor — outputs 00 (stop) on the
+// very first clear-ahead cycle, so the turbot never leaves the start.
+export function turbotIncorrect(): CircuitData {
+  return {
+    components: [
+      comp('tb-in1', 'INPUT', 'IN1'),
+      comp('tb-out1', 'OUTPUT', 'OUT1'),
+      comp('tb-out2', 'OUTPUT', 'OUT2'),
+    ],
+    wires: [
+      wire('tb-w1', 'tb-in1', 'out', 'tb-out1', 'in'),
+      wire('tb-w2', 'tb-in1', 'out', 'tb-out2', 'in'),
+    ],
+  };
+}
+
 // ── Sample assignment (test cases generated from DSL formulas + rep) ──
 // Each question is value-based: the codec encodes inputs to the mode's axis,
 // runs the circuit, decodes the output, and compares to f(x).
@@ -242,10 +281,34 @@ export function buildSampleAssignment(): AssignmentData {
     'tally',
   );
 
+  // Turbot: a 1×5 corridor, goal against the east wall; a CC brain must walk
+  // east and stop at the goal (arena-based grading — no test_cases/cc_spec).
+  const turbotQuestion: AssignmentQuestion = {
+    id: 5,
+    label: 'Q5 (Turbot)',
+    statement:
+      'Program the turbot to walk forward until it is blocked, then stop. The goal sits against the far wall.',
+    buildMode: 'turbot',
+    representation: 'tally',
+    innerMode: 'CC',
+    turbot_cases: [
+      {
+        arena: {
+          width: 5,
+          height: 1,
+          cells: [['empty', 'empty', 'empty', 'empty', 'goal']],
+          start: { x: 0, y: 0, facing: 'E' },
+        },
+        maxSteps: 20,
+        criterion: 'reach-and-stop',
+      },
+    ],
+  };
+
   return {
     id: SAMPLE_ASSIGNMENT_ID,
     title: 'Sample — CC / SC / FSM / TM',
-    questions: [ccQuestion, scQuestion, fsmQuestion, tmQuestion],
+    questions: [ccQuestion, scQuestion, fsmQuestion, tmQuestion, turbotQuestion],
   };
 }
 
@@ -257,6 +320,7 @@ function submission(
   sc: CircuitData,
   fsm: CircuitData,
   tm: CircuitData,
+  turbot: CircuitData,
 ): SubmissionData {
   return {
     assignmentTitle: 'Sample — CC / SC / FSM / TM',
@@ -267,18 +331,19 @@ function submission(
       { questionId: 2, circuit: sc },
       { questionId: 3, circuit: fsm },
       { questionId: 4, circuit: tm },
+      { questionId: 5, circuit: turbot },
     ],
   };
 }
 
-/** All-correct submission (should score 4/4). */
+/** All-correct submission (should score 5/5). */
 export function buildCorrectSubmission(student = 'correct@example.com'): SubmissionData {
-  return submission(student, ccCorrect(), scCorrect(), fsmCorrect(), tmCorrect());
+  return submission(student, ccCorrect(), scCorrect(), fsmCorrect(), tmCorrect(), turbotCorrect());
 }
 
-/** All-incorrect submission (should score 0/4). */
+/** All-incorrect submission (should score 0/5). */
 export function buildIncorrectSubmission(student = 'wrong@example.com'): SubmissionData {
-  return submission(student, ccIncorrect(), scIncorrect(), fsmIncorrect(), tmIncorrect());
+  return submission(student, ccIncorrect(), scIncorrect(), fsmIncorrect(), tmIncorrect(), turbotIncorrect());
 }
 
 /**
@@ -287,10 +352,10 @@ export function buildIncorrectSubmission(student = 'wrong@example.com'): Submiss
  */
 export function buildSampleSubmissions(): SubmissionData[] {
   return [
-    submission('ada@example.com', ccCorrect(), scCorrect(), fsmCorrect(), tmCorrect()), // 4/4
-    submission('alan@example.com', ccCorrect(), scIncorrect(), fsmCorrect(), tmCorrect()), // 3/4
-    submission('grace@example.com', ccCorrect(), scCorrect(), fsmIncorrect(), tmIncorrect()), // 2/4
-    submission('claude@example.com', ccIncorrect(), scIncorrect(), fsmIncorrect(), tmIncorrect()), // 0/4
-    submission('', ccCorrect(), scCorrect(), fsmCorrect(), tmCorrect()), // Anonymous, 4/4
+    submission('ada@example.com', ccCorrect(), scCorrect(), fsmCorrect(), tmCorrect(), turbotCorrect()), // 5/5
+    submission('alan@example.com', ccCorrect(), scIncorrect(), fsmCorrect(), tmCorrect(), turbotCorrect()), // 4/5
+    submission('grace@example.com', ccCorrect(), scCorrect(), fsmIncorrect(), tmIncorrect(), turbotIncorrect()), // 2/5
+    submission('claude@example.com', ccIncorrect(), scIncorrect(), fsmIncorrect(), tmIncorrect(), turbotIncorrect()), // 0/5
+    submission('', ccCorrect(), scCorrect(), fsmCorrect(), tmCorrect(), turbotCorrect()), // Anonymous, 5/5
   ];
 }

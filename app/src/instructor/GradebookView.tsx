@@ -271,6 +271,44 @@ function SubmissionDetail({
             </div>
           );
         }
+        // Turbot questions grade against arenas, not value cases — their
+        // failures report steps taken + final pose instead of expected/got.
+        if (qr.turbotCases) {
+          const failedRuns = qr.turbotCases
+            .map((c, i) => ({ ...c, arenaIndex: i + 1 }))
+            .filter((c) => !c.pass);
+          return (
+            <div className="instructor-detail-q" key={qr.questionId}>
+              <strong>{q?.label ?? `Q${qr.questionId}`}</strong>: {qr.passed}/{qr.total} arenas passed
+              {failedRuns.length > 0 && (
+                <table className="instructor-detail-table">
+                  <thead>
+                    <tr>
+                      <th>arena</th>
+                      <th>steps</th>
+                      <th>final position</th>
+                      <th>why it failed</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {failedRuns.map((c, ci) => (
+                      <tr key={ci}>
+                        <td className="instructor-bits">#{c.arenaIndex}</td>
+                        <td className="instructor-bits">{c.stepsTaken}</td>
+                        <td className="instructor-bits">
+                          ({c.finalPosition.x}, {c.finalPosition.y}) {c.finalPosition.facing}
+                        </td>
+                        <td className="instructor-bits instructor-fail">
+                          {c.reason ?? 'criterion not met'}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </div>
+          );
+        }
         const failed = qr.cases.filter((c) => !c.pass);
         return (
           <div className="instructor-detail-q" key={qr.questionId}>
