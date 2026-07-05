@@ -1913,3 +1913,61 @@ thead .sc-label-col {
   color: #444;
   white-space: pre-wrap;
 }
+
+/* ─── Turbot arena (shared: instructor editor + student workspace) ─── */
+
+.arena-grid {
+  display: grid;
+  gap: 0;
+  width: fit-content;
+  border: 2px solid #555;
+  background: #fff;
+}
+
+.arena-cell {
+  position: relative;
+  box-sizing: border-box;
+  border: 1px solid #ddd;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.arena-cell--block {
+  background: #9e9e9e;
+}
+
+.arena-cell--clickable {
+  cursor: pointer;
+}
+
+.arena-cell--clickable:hover {
+  outline: 2px solid #1565c0;
+  outline-offset: -2px;
+  z-index: 1;
+}
+
+.arena-goal {
+  width: 55%;
+  height: 55%;
+  border-radius: 50%;
+  background: #2e7d32;
+}
+
+.arena-turbot {
+  position: absolute;
+  inset: 12%;
+  fill: #c73535;
+}
+
+.instructor-arena-size {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.instructor-criterion-row {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
