@@ -1,5 +1,5 @@
 import { useRef, useState, useCallback, useEffect, useMemo } from 'react';
-import { useStore, selectTmNotation } from '../store';
+import { useStore, selectTmNotation, selectEffectiveMode } from '../store';
 import type {
   CircuitComponent,
   Wire,
@@ -1223,7 +1223,7 @@ function FsmTransitionView({
   // input:output bits. The TM alphabet is tied to the question's
   // representation (binary: 0/1/*; unary: 0/1), so the editor only ever
   // offers/accepts symbols that exist on this machine's tape.
-  const isTM = useStore((s) => s.buildMode === 'TM');
+  const isTM = useStore((s) => selectEffectiveMode(s) === 'TM');
   const tmNotation = useStore(selectTmNotation);
   const tmSymbols = tmNotation === 'binary' ? ['0', '1', '*'] : ['0', '1'];
   const leftTokens = isTM ? tmSymbols : ['0', '1'];
@@ -2139,7 +2139,9 @@ export function CircuitCanvas() {
   const showWireValues = useStore((s) => s.showWireValues);
   const addComponent = useStore((s) => s.addComponent);
   const selectedIds = useStore((s) => s.selectedIds);
-  const buildMode = useStore((s) => s.buildMode);
+  // For turbot questions the canvas edits the inner brain circuit, so
+  // editor-behavior branches key off the effective (inner) mode.
+  const effectiveMode = useStore(selectEffectiveMode);
   const selectedTool = useStore((s) => s.selectedTool);
   const textElements = useStore((s) => s.textElements);
   const comments = useStore((s) => s.comments);
@@ -2165,7 +2167,7 @@ export function CircuitCanvas() {
   const warnings = useMemo(() => {
     const w: string[] = [];
     // Skip circuit validation warnings in FSM/TM mode — loops and merged links are expected
-    if (buildMode === 'FSM' || buildMode === 'TM') return w;
+    if (effectiveMode === 'FSM' || effectiveMode === 'TM') return w;
     {
       const compMap = new Map(components.map((c) => [c.id, c]));
       const visited = new Set<string>();
@@ -2208,7 +2210,7 @@ export function CircuitCanvas() {
       }
     }
     return w;
-  }, [components, wires, buildMode]);
+  }, [components, wires, effectiveMode]);
 
   // ─── Keyboard shortcuts ──────────────────────────────────────
   useEffect(() => {
@@ -2986,7 +2988,7 @@ export function CircuitCanvas() {
       // true when it handled the click.
       const tryShiftConnect = (targetCompId: string): boolean => {
         if (!e.shiftKey) return false;
-        if (state.buildMode !== 'FSM' && state.buildMode !== 'TM') return false;
+        if (selectEffectiveMode(state) !== 'FSM' && selectEffectiveMode(state) !== 'TM') return false;
         const target = state.components.find((c) => c.id === targetCompId);
         if (!target || target.type !== 'STATE') return false;
         if (state.selectedIds.length !== 1) return false;

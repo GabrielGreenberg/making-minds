@@ -95,6 +95,21 @@ export function selectTurbotInnerMode(s: {
   return q?.innerMode ?? 'CC';
 }
 
+/**
+ * The mode the *editing surface* should behave as. For a turbot question the
+ * canvas edits the inner brain circuit, so every editor-behavior branch
+ * (palette items, transition-label grammar, STATE interactions, wire routing)
+ * must key off the question's innerMode, not the literal 'turbot' buildMode.
+ * Non-turbot modes pass through unchanged.
+ */
+export function selectEffectiveMode(s: {
+  buildMode: BuildMode;
+  assignment: AssignmentData | null;
+  currentQuestionIndex: number;
+}): BuildMode {
+  return s.buildMode === 'turbot' ? selectTurbotInnerMode(s) : s.buildMode;
+}
+
 interface HistoryEntry {
   components: CircuitComponent[];
   wires: Wire[];
@@ -897,7 +912,7 @@ export const useStore = create<AppState>()((set, get) => ({
       targetPortId: targetPortId,
       value: 0,
       transitionLabel: isFsmTransition
-        ? (state.buildMode === 'TM' ? '0:0R' : '0:0')
+        ? (selectEffectiveMode(state) === 'TM' ? '0:0R' : '0:0')
         : undefined,
     };
     const newWires = [...state.wires, wire];
@@ -1536,7 +1551,7 @@ export const useStore = create<AppState>()((set, get) => ({
     if (insideComps.length === 0) return 'No components inside the box.';
 
     // ── FSM boxing ────────────────────────────────────────────────
-    if (state.buildMode === 'FSM') {
+    if (selectEffectiveMode(state) === 'FSM') {
       const fsmComps = insideComps.filter((c) => c.type === 'STATE');
       if (fsmComps.length === 0) return 'No states inside the box.';
 
@@ -2887,7 +2902,7 @@ export const useStore = create<AppState>()((set, get) => ({
     // input is a tape symbol (0/1, plus * for binary machines) and the action
     // is a dual action — a write symbol (0/1/*) followed by a move direction
     // (R/L) — spec §10.3.
-    const re = get().buildMode === 'TM' ? /^[01*]:[01*][RL]$/ : /^[01]:[01]$/;
+    const re = selectEffectiveMode(get()) === 'TM' ? /^[01*]:[01*][RL]$/ : /^[01]:[01]$/;
     if (!re.test(label)) return;
     const state = get();
     state.pushHistory();
@@ -3149,11 +3164,17 @@ export const useStore = create<AppState>()((set, get) => ({
 
   turbotStep: () => {
     const state = get();
-    const { components, wires, turbotHistory, turbotHalted, turbotBrainState, turbotState } = state;
+    const { components, wires, turbotHistory, turbotHalted, turbotState } = state;
     if (turbotHalted) return;
 
     const arena = selectTurbotArena(state);
     const innerMode = selectTurbotInnerMode(state);
+    // On the first cycle, derive the brain state from the circuit as it is
+    // NOW — the student normally builds the brain after the last reset, so a
+    // reset-time snapshot would still point at a state that didn't exist yet.
+    const turbotBrainState = turbotHistory.length === 0
+      ? initialBrainState(components, innerMode)
+      : state.turbotBrainState;
     const sensor = senseAhead(arena, turbotState);
     const result = runBrainStep(components, wires, innerMode, sensor, turbotBrainState);
     if (!result) {

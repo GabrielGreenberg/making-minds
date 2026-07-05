@@ -1971,3 +1971,52 @@ thead .sc-label-col {
   gap: 12px;
   align-items: center;
 }
+
+/* ─── Turbot workspace arena panel (student side) ─── */
+
+.turbot-arena-panel {
+  flex-shrink: 0;
+  border-bottom: 1px solid #ddd;
+  background: #fafafa;
+  display: flex;
+  flex-direction: column;
+  max-height: 45%;
+}
+
+.turbot-arena-head {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 6px 10px;
+  border-bottom: 1px solid #eee;
+}
+
+.turbot-arena-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: #555;
+}
+
+.turbot-arena-controls {
+  display: flex;
+  gap: 6px;
+}
+
+.turbot-arena-status {
+  display: flex;
+  gap: 12px;
+  margin-left: auto;
+  font-size: 11px;
+  font-family: 'SF Mono', 'Fira Code', monospace;
+  color: #666;
+}
+
+.turbot-arena-stop {
+  color: #e53935;
+  font-weight: 600;
+}
+
+.turbot-arena-scroll {
+  overflow: auto;
+  padding: 10px;
+}

@@ -1,4 +1,4 @@
-import { useStore } from '../store';
+import { useStore, selectEffectiveMode } from '../store';
 import type { ComponentType } from '../types';
 
 interface LibraryEntry {
@@ -183,13 +183,16 @@ function ConfirmedBoxItem({ box, numIn, numOut, isSelected, kind }: {
 
 export function ComponentLibrary() {
   const buildMode = useStore((s) => s.buildMode);
+  // Turbot questions edit the inner brain circuit, so the palette (and
+  // boxing rules below) follow the question's innerMode, not 'turbot'.
+  const effectiveMode = useStore(selectEffectiveMode);
   const boxedLibrary = useStore((s) => s.boxedLibrary);
   const confirmedBoxLibrary = useStore((s) => s.confirmedBoxLibrary);
   const selectedTool = useStore((s) => s.selectedTool);
   const setSelectedTool = useStore((s) => s.setSelectedTool);
 
   // TM shares the FSM editor palette (STATE nodes + transition wires).
-  const items = buildMode === 'FSM' || buildMode === 'TM' ? FSM_LIBRARY_ITEMS : CC_LIBRARY_ITEMS;
+  const items = effectiveMode === 'FSM' || effectiveMode === 'TM' ? FSM_LIBRARY_ITEMS : CC_LIBRARY_ITEMS;
 
   // Group by section
   const sections = new Map<string, LibraryEntry[]>();
@@ -206,7 +209,11 @@ export function ComponentLibrary() {
 
   return (
     <div className="component-library">
-      <div className="library-machine-label">{MACHINE_LABELS[buildMode] || 'Logic Circuit'}</div>
+      <div className="library-machine-label">
+        {buildMode === 'turbot'
+          ? `Turbot · ${MACHINE_LABELS[effectiveMode] || 'Logic Circuit'}`
+          : MACHINE_LABELS[buildMode] || 'Logic Circuit'}
+      </div>
       {/* Component sections (non-Annotate) */}
       {Array.from(sections.entries()).filter(([section]) => section !== 'Annotate').map(([section, entries]) => (
         <div key={section}>
@@ -235,7 +242,7 @@ export function ComponentLibrary() {
       ))}
 
       {/* New Box tool */}
-      {(buildMode === 'CC' || buildMode === 'FSM') && <div>
+      {(effectiveMode === 'CC' || effectiveMode === 'FSM') && <div>
         <div className="library-section-title">Boxing</div>
         <div
           className={`library-item${selectedTool === 'NEW_BOX' ? ' library-item-selected' : ''}`}
@@ -264,7 +271,7 @@ export function ComponentLibrary() {
       {/* Box Menu — show CC boxes in CC mode, FSM boxes in FSM mode */}
       {(() => {
         const visibleBoxes = confirmedBoxLibrary.filter((b) =>
-          buildMode === 'FSM' ? b.kind === 'FSM' : (b.kind ?? 'CC') === 'CC'
+          effectiveMode === 'FSM' ? b.kind === 'FSM' : (b.kind ?? 'CC') === 'CC'
         );
         if (visibleBoxes.length === 0) return null;
         return (

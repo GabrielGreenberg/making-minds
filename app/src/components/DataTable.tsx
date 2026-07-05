@@ -1,5 +1,5 @@
 import { useMemo, useState, useCallback, useRef, useEffect } from 'react';
-import { useStore, selectTmNotation } from '../store';
+import { useStore, selectTmNotation, selectEffectiveMode } from '../store';
 import { bitsToTally, bitsToBinary, parseTMTransition } from '../engine';
 import type { TMSymbol } from '../types';
 
@@ -222,8 +222,15 @@ export function DataTable() {
   const tmReset = useStore((s) => s.tmReset);
   const tmGlobalReset = useStore((s) => s.tmGlobalReset);
 
+  // Turbot state — the arena + run controls live in TurbotArenaPanel; this
+  // right panel shows the brain's machine table and the movement history.
+  const turbotHistory = useStore((s) => s.turbotHistory);
+  const turbotBrainStateId = useStore((s) => s.turbotBrainState.stateId ?? null);
+  const effectiveMode = useStore(selectEffectiveMode);
+
   const wires = useStore((s) => s.wires);
   const hasMem = components.some((c) => c.type === 'MEM');
+  const isTurbot = buildMode === 'turbot';
   const isCC = buildMode === 'CC';
   const isSC = buildMode === 'SC' || hasMem;
   const isFSM = buildMode === 'FSM';
@@ -418,6 +425,123 @@ export function DataTable() {
   }, [isSC, isCC, scGlobalSequences, scHistory, activeGlobalIndex, ccInputRows, evaluatedRows, tableRows, localStepActive, localStepSelectedKey, localStepIndex, localStepSorted.length]);
 
   // ── FSM Mode ──────────────────────────────────────────────────────
+  // ── Turbot Mode ───────────────────────────────────────────────────
+  // Must precede the SC check: a MEM-carrying (SC-brained) turbot would
+  // otherwise fall into the SC panel via the hasMem shortcut.
+  if (isTurbot) {
+    const stateComps = components
+      .filter((c) => c.type === 'STATE')
+      .sort((a, b) => {
+        const subDigits = '₀₁₂₃₄₅₆₇₈₉';
+        const num = (label: string) =>
+          parseInt(label.replace('S', '').split('').map((ch) => {
+            const idx = subDigits.indexOf(ch);
+            return idx >= 0 ? String(idx) : ch;
+          }).join('')) || 0;
+        return num(a.label) - num(b.label);
+      });
+    const isStateBrain = effectiveMode === 'FSM' || effectiveMode === 'TM';
+
+    return (
+      <div className="data-table-panel" style={{ width: panelWidth }}>
+        <div className="panel-resize-handle" onPointerDown={onResizePointerDown} />
+        <div className="data-table-panel-inner">
+        <div className="data-table-content">
+          <QuestionStatement />
+
+          {/* Machine table for FSM/TM brains: one row per transition. The
+              label column carries either grammar (in:out / in:action). */}
+          {isStateBrain && (
+            <div className="table-section">
+              <div className="table-section-label">
+                <span>Machine Table</span>
+              </div>
+              {stateComps.length === 0 ? (
+                <div style={{ padding: 12, color: '#999', fontSize: 12 }}>
+                  Add states and transitions to see the machine table.
+                </div>
+              ) : (
+                <table className="data-table">
+                  <thead>
+                    <tr>
+                      <th>STATE</th>
+                      <th>TRANSITION</th>
+                      <th>NEXT</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {stateComps.flatMap((state) => {
+                      const outgoing = wires.filter(
+                        (w) => w.sourceComponentId === state.id && w.transitionLabel,
+                      );
+                      const isCurrent = turbotBrainStateId === state.id;
+                      if (outgoing.length === 0) {
+                        return [(
+                          <tr key={state.id} className={isCurrent ? 'row-active' : ''}>
+                            <td><span className="mono-value">{state.label}</span></td>
+                            <td><span className="mono-value" style={{ color: '#999', fontStyle: 'italic' }}>–</span></td>
+                            <td><span className="mono-value" style={{ color: '#999', fontStyle: 'italic' }}>HALT</span></td>
+                          </tr>
+                        )];
+                      }
+                      return outgoing.map((w) => {
+                        const target = components.find((c) => c.id === w.targetComponentId);
+                        return (
+                          <tr key={w.id} className={isCurrent ? 'row-active' : ''}>
+                            <td><span className="mono-value">{state.label}</span></td>
+                            <td><span className="mono-value">{w.transitionLabel}</span></td>
+                            <td><span className="mono-value">{target?.label ?? '?'}</span></td>
+                          </tr>
+                        );
+                      });
+                    })}
+                  </tbody>
+                </table>
+              )}
+            </div>
+          )}
+
+          {/* Movement history: one row per completed cycle (spec §9.4's I/O
+              table — sensor in, motor out, resulting pose). */}
+          <div className="table-section">
+            <div className="table-section-label">
+              <span>Movement History</span>
+            </div>
+            {turbotHistory.length === 0 ? (
+              <div style={{ padding: 12, color: '#999', fontSize: 12 }}>
+                Step or Run the turbot (above the canvas) to record movement cycles.
+              </div>
+            ) : (
+              <table className="data-table" style={{ fontSize: 11 }}>
+                <thead>
+                  <tr>
+                    <th>t</th>
+                    <th>SENSE</th>
+                    <th>MOTOR</th>
+                    <th>POS</th>
+                    <th>DIR</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {turbotHistory.map((h, i) => (
+                    <tr key={i}>
+                      <td><span className="mono-value">{h.t}</span></td>
+                      <td className={h.sensor === 1 ? 'val-1' : ''}><span className="mono-value">{h.sensor}</span></td>
+                      <td><span className="mono-value">{h.motor}</span></td>
+                      <td><span className="mono-value">({h.x}, {h.y})</span></td>
+                      <td><span className="mono-value">{h.facing}</span></td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
+        </div>
+        </div>
+      </div>
+    );
+  }
+
   if (isFSM) {
     const states = components
       .filter((c) => c.type === 'STATE')

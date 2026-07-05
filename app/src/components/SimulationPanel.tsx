@@ -1,19 +1,26 @@
 import { useState } from 'react';
-import { useStore } from '../store';
+import { useStore, selectEffectiveMode } from '../store';
 
 export function SimulationToolbar() {
   const buildMode = useStore((s) => s.buildMode);
+  const effectiveMode = useStore(selectEffectiveMode);
   const components = useStore((s) => s.components);
   const hasMem = components.some((c) => c.type === 'MEM');
   const isSC = buildMode === 'SC' || hasMem;
   const autoSaveStatus = useStore((s) => s.autoSaveStatus);
   const hasSelection = useStore((s) => s.selectedIds.length > 0);
 
-  const isFSM = buildMode === 'FSM';
-  const isTM = buildMode === 'TM';
+  const isTurbot = buildMode === 'turbot';
+  // The state-machine chrome (current-state readout) follows the effective
+  // (inner) mode so FSM/TM-brained turbots show their control state too.
+  const isFSM = effectiveMode === 'FSM';
+  const isTM = effectiveMode === 'TM';
   const fsmCurrentStateId = useStore((s) => s.fsmCurrentStateId);
   const tmCurrentStateId = useStore((s) => s.tmCurrentStateId);
-  const currentStateId = isFSM ? fsmCurrentStateId : isTM ? tmCurrentStateId : null;
+  const turbotBrainStateId = useStore((s) => s.turbotBrainState.stateId ?? null);
+  const currentStateId = isTurbot
+    ? turbotBrainStateId
+    : isFSM ? fsmCurrentStateId : isTM ? tmCurrentStateId : null;
   const currentStateLabel = currentStateId
     ? components.find((c) => c.id === currentStateId)?.label ?? null
     : null;
@@ -22,7 +29,9 @@ export function SimulationToolbar() {
 
   const handleReset = () => {
     const state = useStore.getState();
-    if (isFSM) {
+    if (isTurbot) {
+      state.turbotReset();
+    } else if (isFSM) {
       state.fsmReset();
     } else if (isTM) {
       state.tmReset();
