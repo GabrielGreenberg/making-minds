@@ -75,13 +75,18 @@ export function senseAhead(arena: ArenaConfig, state: TurbotState): 0 | 1 {
   return senseAheadSymbol(arena, state) === 'B' ? 1 : 0;
 }
 
-/** Decode the inner circuit's 2-bit motor output (spec §9.2, Appendix B). */
+/**
+ * Decode the inner circuit's 2-bit motor output (spec §9.2, Appendix B).
+ * The bits are the wheel motors — OUT1 = left wheel, OUT2 = right wheel:
+ * 00 both off (stay), 01 right motor only (pivot left), 10 left motor only
+ * (pivot right), 11 both on (move forward).
+ */
 export function decodeMotorCommand(bits: number[]): TurbotMotorCommand {
-  const b0 = bits[0] ?? 0;
-  const b1 = bits[1] ?? 0;
-  if (b0 === 0 && b1 === 0) return 'stop';
-  if (b0 === 0 && b1 === 1) return 'left';
-  if (b0 === 1 && b1 === 0) return 'right';
+  const left = bits[0] ?? 0;
+  const right = bits[1] ?? 0;
+  if (left === 0 && right === 0) return 'stop';
+  if (left === 0 && right === 1) return 'left';   // right wheel drives → turn left
+  if (left === 1 && right === 0) return 'right';  // left wheel drives → turn right
   return 'forward';
 }
 

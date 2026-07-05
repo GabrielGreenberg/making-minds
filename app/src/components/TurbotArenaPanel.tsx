@@ -44,13 +44,21 @@ function TurbotGlossary({ innerMode }: { innerMode: BuildMode }) {
         ? [
             {
               input: ['0 = empty/food ahead', '1 = block ahead'],
-              output: ['0 = stop', '1 = move forward'],
+              output: ['0 = motors off (stay)', '1 = both motors on (forward)'],
             },
           ]
         : [
             {
+              // The two output wires drive the wheel motors: OUT1 = left
+              // wheel, OUT2 = right wheel. One motor on pivots the turbot
+              // toward the OFF side.
               input: ['0 = empty/food ahead', '1 = block ahead'],
-              output: ['00 = stop', '01 = turn left', '10 = turn right', '11 = move forward'],
+              output: [
+                '00 = motors off (stay)',
+                '01 = right motor on (turn left)',
+                '10 = left motor on (turn right)',
+                '11 = both on (forward)',
+              ],
             },
           ];
 

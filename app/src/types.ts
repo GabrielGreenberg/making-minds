@@ -454,7 +454,12 @@ export interface TurbotState {
   facing: TurbotOrientation;
 }
 
-/** Motor command decoded from the inner circuit's 2-bit output (spec §9.2, Appendix B). */
+/**
+ * Motor command decoded from the inner circuit's 2-bit output (spec §9.2,
+ * Appendix B). The bits are the wheel motors (OUT1 = left, OUT2 = right):
+ * 00 stay, 01 right motor on → turn left, 10 left motor on → turn right,
+ * 11 both on → forward.
+ */
 export type TurbotMotorCommand = 'stop' | 'left' | 'right' | 'forward';
 
 /**

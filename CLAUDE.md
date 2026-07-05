@@ -289,8 +289,9 @@ only — the grader never sees the formula; it runs against the generated numeri
   All memory initializes to 0; display the stored value during simulation.
 - **Input labels** — assigned at creation and permanent; new inputs get the next sequential
   number regardless of vertical position.
-- **Turbot encoding is hardcoded** — sensor in: 0 empty, 1 block. Motor out: 00 stop, 01
-  left, 10 right, 11 forward.
+- **Turbot encoding is hardcoded** — sensor in: 0 empty, 1 block. Motor out `ij` = the two
+  wheel motors (i = left wheel, j = right wheel): 00 stay, 01 right motor on → turn left,
+  10 left motor on → turn right, 11 both on → forward.
 - **CC evaluation** — topological sort for gate order; propagation is instantaneous.
 - **Homework JSON** (spec §1.5) carries numeric `test_cases` (`{inputs, outputs}` of values); the
   codec encodes/decodes per axis and the grader compares decoded outputs to expected.
