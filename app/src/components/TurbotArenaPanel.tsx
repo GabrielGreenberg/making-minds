@@ -1,8 +1,8 @@
-// The turbot workspace's arena panel: the grid ("Map", spec §9.1) with the
-// live simulated turbot pose, plus the movement-cycle controls. Mounted above
-// the circuit canvas in App.tsx when buildMode === 'turbot' — the lower panel
-// stays the normal editor for the question's inner machine (spec §9.3's
-// split view). The simulation itself lives in the store's turbot slice.
+// The turbot arena ("Map", spec §9.1) with the live simulated turbot pose,
+// plus the movement-cycle controls. Mounted in the right data panel
+// (DataTable's turbot branch), below the question statement and above the
+// machine/history tables. The simulation itself lives in the store's turbot
+// slice; the canvas column stays the inner machine's normal editor.
 
 import { useStore, selectTurbotArena } from '../store';
 import { senseAhead } from '../engine/turbot';
@@ -22,7 +22,6 @@ export function TurbotArenaPanel() {
 
   const cycle = turbotHistory.length;
   const sensor = senseAhead(arena, turbotState);
-  const lastMotor = turbotHistory[turbotHistory.length - 1]?.motor ?? null;
 
   const stopLabel =
     turbotStopReason === 'motor' ? 'STOPPED (motor 00)' :
@@ -30,31 +29,30 @@ export function TurbotArenaPanel() {
     turbotStopReason === 'limit' ? 'STOPPED (step limit)' : null;
 
   return (
-    <div className="turbot-arena-panel">
-      <div className="turbot-arena-head">
-        <span className="turbot-arena-label">Map</span>
-        <div className="turbot-arena-controls">
-          <button className="action-btn" onClick={turbotStep} disabled={turbotRunning || turbotHalted}>
-            Step
-          </button>
-          {turbotRunning ? (
-            <button className="action-btn" onClick={turbotPause}>Pause</button>
-          ) : (
-            <button className="action-btn" onClick={turbotRun} disabled={turbotHalted}>Run</button>
-          )}
-          <button className="action-btn" onClick={turbotReset} disabled={turbotRunning}>
-            Reset
-          </button>
-        </div>
-        <div className="turbot-arena-status">
-          <span>cycle {cycle}</span>
-          <span>sensor: {sensor}</span>
-          {lastMotor && <span>motor: {lastMotor}</span>}
-          {stopLabel && <span className="turbot-arena-stop">{stopLabel}</span>}
-        </div>
+    <div className="table-section">
+      <div className="table-section-label">
+        <span>Map</span>
       </div>
       <div className="turbot-arena-scroll">
-        <ArenaCanvas arena={arena} turbot={turbotState} cellSize={36} />
+        <ArenaCanvas arena={arena} turbot={turbotState} cellSize={28} />
+      </div>
+      <div className="turbot-arena-controls">
+        <button className="action-btn" onClick={turbotStep} disabled={turbotRunning || turbotHalted}>
+          Step
+        </button>
+        {turbotRunning ? (
+          <button className="action-btn" onClick={turbotPause}>Pause</button>
+        ) : (
+          <button className="action-btn" onClick={turbotRun} disabled={turbotHalted}>Run</button>
+        )}
+        <button className="action-btn" onClick={turbotReset} disabled={turbotRunning}>
+          Reset
+        </button>
+      </div>
+      <div className="turbot-arena-status">
+        <span>cycle {cycle}</span>
+        <span>sensor: {sensor}</span>
+        {stopLabel && <span className="turbot-arena-stop">{stopLabel}</span>}
       </div>
     </div>
   );

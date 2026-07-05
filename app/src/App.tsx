@@ -6,7 +6,6 @@ import { DataTable } from './components/DataTable';
 import { SimulationToolbar } from './components/SimulationPanel';
 import { SequentialTimeline } from './components/SequentialTimeline';
 import { TMTapePanel } from './components/TMTapePanel';
-import { TurbotArenaPanel } from './components/TurbotArenaPanel';
 import { HomeScreen } from './components/HomeScreen';
 import { AssignmentOverview } from './components/AssignmentOverview';
 import { InstructorApp } from './instructor/InstructorApp';
@@ -39,10 +38,9 @@ function App() {
       <div className="main-area">
         <ComponentLibrary />
         <div className="canvas-and-timeline">
-          {/* Turbot split view (spec §9.1): arena on top, the inner machine's
-              normal editor below. The TM tape strip stays hidden — a turbot
-              TM brain keeps a private scratch tape, not the store's tmTape. */}
-          {buildMode === 'turbot' && <TurbotArenaPanel />}
+          {/* Turbot questions: the arena ("Map") lives in the right data
+              panel (DataTable's turbot branch), not here — the canvas column
+              is the inner machine's normal editor. */}
           <CircuitCanvas />
           {buildMode !== 'FSM' && buildMode !== 'TM' && buildMode !== 'turbot' && <SequentialTimeline />}
           {buildMode === 'TM' && <TMTapePanel />}

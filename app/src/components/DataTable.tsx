@@ -1,6 +1,7 @@
 import { useMemo, useState, useCallback, useRef, useEffect } from 'react';
 import { useStore, selectTmNotation, selectEffectiveMode } from '../store';
 import { bitsToTally, bitsToBinary, parseTMTransition } from '../engine';
+import { TurbotArenaPanel } from './TurbotArenaPanel';
 import type { TMSymbol } from '../types';
 
 const UI_PREFS_KEY = 'making-minds-ui-prefs';
@@ -448,6 +449,10 @@ export function DataTable() {
         <div className="data-table-panel-inner">
         <div className="data-table-content">
           <QuestionStatement />
+
+          {/* The arena ("Map") + run controls: below the question statement,
+              above the machine/history tables (spec §9.1's Map panel). */}
+          <TurbotArenaPanel />
 
           {/* Machine table for FSM/TM brains: one row per transition. The
               label column carries either grammar (in:out / in:action). */}

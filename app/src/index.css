@@ -1972,41 +1972,25 @@ thead .sc-label-col {
   align-items: center;
 }
 
-/* ─── Turbot workspace arena panel (student side) ─── */
+/* ─── Turbot arena panel (right data panel, "Map" section) ─── */
 
-.turbot-arena-panel {
-  flex-shrink: 0;
-  border-bottom: 1px solid #ddd;
-  background: #fafafa;
-  display: flex;
-  flex-direction: column;
-  max-height: 45%;
-}
-
-.turbot-arena-head {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  padding: 6px 10px;
-  border-bottom: 1px solid #eee;
-}
-
-.turbot-arena-label {
-  font-size: 12px;
-  font-weight: 600;
-  color: #555;
+.turbot-arena-scroll {
+  overflow: auto;
+  padding: 8px;
 }
 
 .turbot-arena-controls {
   display: flex;
   gap: 6px;
+  padding: 2px 8px 4px;
 }
 
 .turbot-arena-status {
   display: flex;
-  gap: 12px;
-  margin-left: auto;
-  font-size: 11px;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding: 0 8px 6px;
+  font-size: 10px;
   font-family: 'SF Mono', 'Fira Code', monospace;
   color: #666;
 }
@@ -2014,9 +1998,4 @@ thead .sc-label-col {
 .turbot-arena-stop {
   color: #e53935;
   font-weight: 600;
-}
-
-.turbot-arena-scroll {
-  overflow: auto;
-  padding: 10px;
 }
