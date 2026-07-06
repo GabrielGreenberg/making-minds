@@ -40,11 +40,19 @@ CC → SC → FSM → TM → turbot; within a mode: arithmetic → perception �
 
 ## Phase 2 — TM two-output visual change  _(the one deliberate departure)_
 
-- [ ] **P2.1** Change TM transition notation from `input:action` (`1:0R`) to the
-  one-input → **two-output** form (write output + move output). Touch
+- [ ] **P2.1** TM transitions: one-input → **two-output** notation (write + move).
+  **Depth check first (design memo):** the app already has *four* transition
+  grammars scattered as string conventions through the canvas/store (FSM `0:1`,
+  TM `1:0R`, turbot-TM internal `0:1`/`1:L`, turbot-TM external `E:↑`) — this
+  task is one instance of that family. The deep solution is a per-mode
+  **transition-notation module** (parse / validate / render / edit as one
+  pluggable unit) that all four grammars implement; the TM two-output form then
+  becomes a notation swap, not a scatter-edit. Write
+  `designs/transition-notation.md` weighing this against the shallow
+  string-change; implement at the chosen depth. Touch points either way:
   `engine/tm.ts` (`parseTMTransition`/`parseTMAction`), `tmValidate.ts`, the
-  transition label editor in `CircuitCanvas.tsx` (~1200–1510), the render
-  (`FsmTransitionView`); migrate devData/fixtures; update VISUAL_VOCAB + spec §10.3.
+  label editor in `CircuitCanvas.tsx` (~1200–1510), `FsmTransitionView`;
+  migrate devData/fixtures; update VISUAL_VOCAB + spec §10.3.
   **Acceptance:** `tmCheck` + `coverage` self-test green; TM editor shows two
   outputs; a TM reference (hw5-p1) still grades.
 - [ ] **P2.2** Reference solutions for **HW5 TM arithmetic** — tally (hw5-p1…p6),
@@ -55,11 +63,18 @@ CC → SC → FSM → TM → turbot; within a mode: arithmetic → perception �
 
 ## Phase 3 — Perception
 
-- [ ] **P3.1** **Design spike (decision required):** can perception targets
-  (≥3 consecutive 1s; exactly 3; = a literal pattern; current≠previous; motion) be
-  authored? Compare (a) extending the arithmetic DSL with predicate/pattern
-  operators vs. (b) a separate pattern/truth-table question type. Write the
-  decision into this queue + NORTH_STAR before building. **Advances:** unblocks P3.2–3.3.
+- [ ] **P3.1** **Design spike (decision required, design memo):** can perception
+  targets (≥3 consecutive 1s; exactly 3; = a literal pattern; current≠previous;
+  motion) be authored? The family: a question's **target function** currently has
+  exactly one representation — an arithmetic formula over integer values. The
+  deep framing is a unified target-function abstraction with multiple
+  *specification forms* (arithmetic formula | pattern predicate | explicit
+  table…) behind one interface that `buildQuestionBank`/the grader consume —
+  perception then becomes a second form, not a bolted-on question type. Compare
+  that against (a) extending the DSL with predicate operators and (b) a separate
+  truth-table question type; pick the deepest option the actual HW2/HW3
+  perception problems warrant. Write `designs/target-functions.md` + the
+  decision into this queue before building. **Advances:** unblocks P3.2–3.3.
 - [ ] **P3.2** CC perception (hw2-p10…p12), incl. reconciling the 8-in schematic
   with the 9-bit landmark pattern. **Advances:** hw2-p10..p12.
 - [ ] **P3.3** SC perception (hw3-p11, p12) — spatio-temporal, 8 parallel inputs.
@@ -67,10 +82,14 @@ CC → SC → FSM → TM → turbot; within a mode: arithmetic → perception �
 
 ## Phase 4 — Navigation
 
-- [ ] **P4.1** **Fix the FSM-turbot 2-bit motor.** A 1-bit Mealy output can't
+- [ ] **P4.1** **FSM-turbot motor: 2-bit outputs.** A 1-bit Mealy output can't
   encode L/R turns, but HW4 navigation needs F/S/R/L (see `runBrainStep` in
-  `engine/turbot.ts`). Widen the FSM-brain transition output to a 2-bit motor
-  command. **Acceptance:** an FSM turbot can turn; `turbotCheck` green.
+  `engine/turbot.ts`). **Depth check:** is this one instance of "FSM transition
+  outputs are single-bit" generally (would multi-bit FSM outputs also serve
+  arithmetic problems with wider outputs, and unify with how the codec handles
+  output groups on the time axis)? If yes, generalize FSM output arity once
+  rather than special-casing the turbot brain; note the choice (memo if it grows
+  architectural). **Acceptance:** an FSM turbot can turn; `turbotCheck` green.
 - [ ] **P4.2** **Multi-arena navigation grading** for unknown distance/position
   (Mad Max, Way Finder, Desert Ant): put a *family* of arenas in `turbot_cases`;
   confirm the grader requires all to pass. **Acceptance:** a single-layout-only
@@ -100,7 +119,10 @@ CC → SC → FSM → TM → turbot; within a mode: arithmetic → perception �
 
 - [ ] **META-audit-queue** — _every ~5 iterations._ Run `npm run coverage`;
   reconcile COVERAGE + this queue against the harness JSON; prune dead/duplicate
-  tasks; re-rank by dependency and value; confirm no drift. Log what changed.
+  tasks; re-rank by dependency and value; confirm no drift. **Also audit for
+  patch accumulation:** look for clusters of surgical fixes that landed since the
+  last audit and share a family — if found, enqueue one unifying architectural
+  task (with a design memo) to replace the cluster's trajectory. Log what changed.
 - [ ] **META-visual-vocab** — before starting a new mode's appearance work, re-read
   the relevant `mm_textbook.pdf` chapter + `spec/…/Mock_Ups-*.jpg`; refresh
   VISUAL_VOCAB.

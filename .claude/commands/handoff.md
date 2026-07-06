@@ -13,6 +13,24 @@ in order. Do exactly **one** task this iteration (or one meta-task), then hand o
 Run git/npm from the repo; `app/` is the working dir for npm. Work on a
 `buildout-*` branch (do not commit to `main`).
 
+## Operating style (both are standing directives)
+
+- **Depth over patches** — the central design principle, in full in
+  `NORTH_STAR.md`. For every non-trivial task: name the *family* of phenomena the
+  problem belongs to; state the shallow fix vs. the deep fix; pick the deepest
+  solution warranted by real phenomena that also improves the app; route it
+  through the seams. Significant architectural moves get a design memo
+  (`docs/buildout/designs/<slug>.md`) **before** implementation. Guardrail: depth
+  must land with the harness green within an iteration or two — split (seam
+  first, migrate next) rather than spiral.
+- **Delegate liberally to conserve this session's context.** Your context is the
+  scarcest resource in the loop; an iteration that burns it on file dumps dies
+  before updating the memos. Use **Workflows** (and Explore agents) for anything
+  fan-out or read-heavy: orienting across many files, building/verifying batches
+  of fixtures, sweeping appearance checks, auditing the queue. Keep only
+  conclusions in this session; let subagents hold the raw reading. Solo work is
+  for small single-file edits and the memo updates themselves.
+
 ## A · Orient
 1. Read `docs/buildout/HANDOFF.md`, then `QUEUE.md`, `COVERAGE.md`, `NORTH_STAR.md`,
    and the repo `CLAUDE.md`. Skim `VISUAL_VOCAB.md` if this task touches appearance.
@@ -26,7 +44,11 @@ Run git/npm from the repo; `app/` is the working dir for npm. Work on a
 Take the top unblocked `todo` in QUEUE.md (honor deps; finish one mode/category
 vertical before broadening: CC→SC→FSM→TM→turbot, arithmetic→perception→navigation).
 If a meta-task is due (e.g. META-audit-queue every ~5 iterations), do that instead.
-State which task you picked and its acceptance criterion.
+State which task you picked and its acceptance criterion — **and its depth**: the
+family of phenomena, the shallow fix, the deep fix, and which you chose and why
+(per NORTH_STAR's central design principle). If the deep route is a significant
+architectural move, write the design memo first and consider making *that* this
+iteration's task.
 
 ## C · Build / fix
 Implement the vertical slice the task needs (engine / store / UI / instructor

@@ -16,6 +16,7 @@ any single session is disposable.
 | [VISUAL_VOCAB.md](VISUAL_VOCAB.md) | The appearance oracle (textbook/mockup notation). |
 | [LOG.md](LOG.md) | Append-only session journal. |
 | [HANDOFF.md](HANDOFF.md) | The hot state — read first, rewritten each iteration. |
+| [designs/](designs/README.md) | One memo per major architectural decision (problem family → options → chosen depth), written before implementing. |
 
 Machine-readable siblings: `app/tools/fixtures/coverage-manifest.json` (the rows +
 fixture paths) and `app/tools/fixtures/reference/*.json` (reference solutions).

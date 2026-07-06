@@ -46,6 +46,15 @@ QUEUE order. Keep finishing one vertical before broadening.
 
 ## Watch out for
 
+- **Depth over patches** (NORTH_STAR's central design principle): before
+  implementing any non-trivial task, name the problem's family, weigh shallow vs.
+  deep, and prefer the unified architectural solution the phenomena warrant —
+  with a design memo (`designs/`) for significant moves. Several queue tasks
+  (P2.1, P3.1, P4.1) have their deep framing spelled out; don't take the
+  surgical shortcut silently.
+- **Delegate to survive**: use Workflows/Explore agents for read-heavy and
+  fan-out work so this session's context lasts through the memo updates.
+
 - Author machines **in code** via `app/tools/builder.ts` (port ids documented in
   its header; canonical five-mode examples in `src/devData/sampleData.ts`). The
   running app is only needed for the appearance check — and as a fallback for

@@ -10,6 +10,38 @@ category in PHIL 133 — and keep it that way. Success is measured concretely: f
 each problem in the real homeworks, a person can build a solution in the app and
 the real autograder passes it, while the visual vocabulary matches the textbook.
 
+## Central design principle — depth over patches
+
+Prefer **unified, deep, architectural solutions that capture a whole family of
+related phenomena** over superficial, surgical patches. When a task exposes a
+problem, ask what *class* of problems it belongs to and, whenever reasonable,
+choose the deepest solution that also improves the app. The codebase already
+works this way — the seams, and the one value-based codec pipeline instead of
+five per-mode graders — continue in that grain.
+
+For every non-trivial task:
+
+- **Name the family.** What related phenomena share this problem's shape?
+  (The FSM-turbot's 1-bit motor is one instance of "transition outputs are
+  single-bit everywhere"; the TM `1:0R` token is one instance of "per-mode
+  transition grammars are string conventions scattered through the canvas";
+  perception authoring is one instance of "a question's target function has
+  exactly one representation — an arithmetic formula".)
+- **Choose depth deliberately.** State the shallow fix and the deep fix; pick
+  the deepest one *warranted by real phenomena* (course problems, COVERAGE
+  rows, named follow-ups) — not speculative generality.
+- **Route through the seams** (pure engine / store / UI separation, the codec),
+  never around them. A deep solution that bypasses a seam is a deep patch.
+- **Big moves get a design memo first.** Before implementing a significant
+  architectural change, write `docs/buildout/designs/<slug>.md`: problem family
+  → options with depths → chosen solution → blast radius. Later sessions follow
+  the reasoning, not just the diff.
+
+**Convergence guardrail** (this loop runs unattended): depth must land. A deep
+solution ships with the harness green in the same arc; if it can't reach green
+within an iteration or two, split it — land the architectural seam first,
+migrate callers next. Depth is measured by phenomena captured, not lines moved.
+
 ## Definition of done
 
 The finish line is the **Problem Coverage Matrix** ([COVERAGE.md](COVERAGE.md)),
