@@ -910,12 +910,15 @@ export const useStore = create<AppState>()((set, get) => ({
     state.pushHistory();
     // Default transition label by grammar: FSM "in:out"; base TM dual-action
     // "in:writeMove"; turbot TM single-action by the SOURCE state's kind —
-    // internal "read:action", external "sense:motor".
+    // internal "read:action", external "sense:motor"; turbot FSM 2-bit motor
+    // "in:ij" (default: sensor clear → both motors on, i.e. forward).
     let defaultLabel: string | undefined;
     if (isFsmTransition) {
       const effMode = selectEffectiveMode(state);
       if (state.buildMode === 'turbot' && effMode === 'TM') {
         defaultLabel = stateKindOf(sourceComp!) === 'external' ? `E:${TURBOT_FORWARD}` : '0:R';
+      } else if (state.buildMode === 'turbot' && effMode === 'FSM') {
+        defaultLabel = '0:11';
       } else {
         defaultLabel = effMode === 'TM' ? '0:0R' : '0:0';
       }

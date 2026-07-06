@@ -73,6 +73,8 @@ export {
   parseTurbotExternalLabel,
   applyTurbotTapeAction,
   validateTurbotTM,
+  validateTurbotFSM,
+  parseTurbotFSMLabel,
   TURBOT_FORWARD,
   TURBOT_TURN_RIGHT,
   TURBOT_TURN_LEFT,

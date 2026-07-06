@@ -1222,7 +1222,9 @@ function FsmTransitionView({
   const [editLeft, setEditLeft] = useState('0');
   const [editRight, setEditRight] = useState('0');
   const [editWrite, setEditWrite] = useState('0');
-  const [editMove, setEditMove] = useState<'R' | 'L'>('R');
+  // Second right-half sub-token: base-TM head move (R/L) or a turbot FSM's
+  // right-wheel motor bit (0/1).
+  const [editMove, setEditMove] = useState('R');
   const [activeField, setActiveField] = useState<'left' | 'right'>('left');
   // TM only: which half of the combined write+move action is being entered.
   const [rightSubField, setRightSubField] = useState<'write' | 'move'>('write');
@@ -1239,7 +1241,14 @@ function FsmTransitionView({
   // external senses B/E/F and moves forward (↑) or turns (↱/↰). Turbot-TM
   // labels edit FSM-style (one char per half).
   const isTurbotTM = useStore((s) => s.buildMode === 'turbot' && selectEffectiveMode(s) === 'TM');
+  // A turbot FSM's Mealy output is the FULL 2-bit motor code ("in:ij", e.g.
+  // "0:11") — unlike the base FSM's single output bit — so an FSM brain can
+  // issue every movement command, turns included.
+  const isTurbotFSM = useStore((s) => s.buildMode === 'turbot' && selectEffectiveMode(s) === 'FSM');
   const isTM = useStore((s) => selectEffectiveMode(s) === 'TM') && !isTurbotTM;
+  // The right half holds two characters (base-TM write+move, or a turbot
+  // FSM's 2-bit motor code) and edits as two sub-fields.
+  const twoCharRight = isTM || isTurbotFSM;
   const sourceExternal = useStore((s) =>
     isTurbotTM &&
     s.components.find((c) => c.id === wire.sourceComponentId)?.stateKind === 'external'
@@ -1252,11 +1261,11 @@ function FsmTransitionView({
   const rightTokens = isTurbotTM
     ? (sourceExternal ? ['↑', '↱', '↰'] : [...tmSymbols, 'R', 'L'])
     : ['0', '1'];
-  const writeTokens = tmSymbols;
-  const moveTokens = ['R', 'L'];
+  const writeTokens = isTurbotFSM ? ['0', '1'] : tmSymbols;
+  const moveTokens = isTurbotFSM ? ['0', '1'] : ['R', 'L'];
   const defaultTransitionLabel = isTurbotTM
     ? (sourceExternal ? 'E:↑' : '0:R')
-    : isTM ? '0:0R' : '0:0';
+    : isTM ? '0:0R' : isTurbotFSM ? '0:11' : '0:0';
 
   const label = wire.transitionLabel || '?:?';
   const color = isSelected ? '#2a7fff' : '#333';
@@ -1271,10 +1280,10 @@ function FsmTransitionView({
     const current = wire.transitionLabel || defaultTransitionLabel;
     const parts = current.split(':');
     setEditLeft(leftTokens.includes(parts[0]) ? parts[0] : leftTokens[0]);
-    if (isTM) {
-      const action = parts[1] ?? '0R';
-      setEditWrite(writeTokens.includes(action[0]) ? action[0] : '0');
-      setEditMove(action[1] === 'L' ? 'L' : 'R');
+    if (twoCharRight) {
+      const action = parts[1] ?? (isTM ? '0R' : '11');
+      setEditWrite(writeTokens.includes(action[0]) ? action[0] : writeTokens[0]);
+      setEditMove(moveTokens.includes(action[1]) ? action[1] : moveTokens[0]);
       setRightSubField('write');
     } else {
       setEditRight(rightTokens.includes(parts[1]) ? parts[1] : rightTokens[0]);
@@ -1283,14 +1292,14 @@ function FsmTransitionView({
     setEditing(true);
   };
 
-  const commitEdit = (left = editLeft, right = isTM ? `${editWrite}${editMove}` : editRight) => {
+  const commitEdit = (left = editLeft, right = twoCharRight ? `${editWrite}${editMove}` : editRight) => {
     setEditing(false);
     useStore.getState().setTransitionLabel(wire.id, `${left}:${right}`);
   };
 
   const handleEditorKeyDown = (e: React.KeyboardEvent) => {
     const key = e.key.length === 1 ? e.key.toUpperCase() : e.key;
-    if (isTM) {
+    if (twoCharRight) {
       if (activeField === 'left' && leftTokens.includes(e.key)) {
         e.preventDefault();
         setEditLeft(e.key);
@@ -1467,7 +1476,7 @@ function FsmTransitionView({
         const parts = label.split(':');
         const lPart = parts[0] ?? '?';
         const rPart = parts[1] ?? '?';
-        const W = isTM ? 44 : 36; // total width (TM's right half holds a 2-char write+move token)
+        const W = twoCharRight ? 44 : 36; // total width (2-char right half: TM write+move / turbot-FSM motor code)
         const H = 18;
         const x0 = labelPos.x - W / 2;
         const y0 = labelPos.y - H / 2;
@@ -1499,9 +1508,9 @@ function FsmTransitionView({
       })()}
       {editing && (
         <foreignObject
-          x={labelPos.x - (isTM ? 32 : 28)}
+          x={labelPos.x - (twoCharRight ? 32 : 28)}
           y={labelPos.y - 15}
-          width={isTM ? 64 : 56}
+          width={twoCharRight ? 64 : 56}
           height={30}
         >
           <div
@@ -1580,7 +1589,7 @@ function FsmTransitionView({
               onClick={(e) => {
                 e.stopPropagation();
                 setActiveField('right');
-                if (isTM) setRightSubField('write');
+                if (twoCharRight) setRightSubField('write');
                 editorRef.current?.focus();
               }}
               style={{
@@ -1597,7 +1606,7 @@ function FsmTransitionView({
                 userSelect: 'none',
               }}
             >
-              {isTM
+              {twoCharRight
                 ? (
                   <>
                     <span style={{ opacity: activeField === 'right' && rightSubField === 'move' ? 0.5 : 1 }}>{editWrite}</span>

@@ -36,7 +36,7 @@ import type {
 } from '../types';
 import { evaluateCCInputs } from './cc';
 import { evaluateSCSingleStep } from './sc';
-import { sortStateComponents, evaluateFSMSingleStep } from './fsm';
+import { sortStateComponents } from './fsm';
 import { readCell } from './tm';
 
 // ─── Arena geometry ──────────────────────────────────────────────────
@@ -193,6 +193,65 @@ export function parseTurbotExternalLabel(label: string | undefined): TurbotTMExt
   return { sense, motor };
 }
 
+// ─── Turbot FSM: 2-bit motor transition labels ───────────────────────
+// An FSM-brained turbot's Mealy transitions output the FULL 2-bit motor
+// command ("in:ij", e.g. "0:11", "1:01") — the same wheel-motor encoding as
+// CC/SC output wires (i = left wheel, j = right wheel) — so an FSM brain can
+// issue every movement command, turns included. (The base FSM's one-bit
+// "in:out" grammar is a different machine; turbot questions use this one.)
+
+export interface TurbotFSMTransition {
+  input: 0 | 1;
+  motor: TurbotMotorCommand;
+}
+
+/** Parse a turbot-FSM transition label "sensor:ij" (e.g. "0:11", "1:00"). */
+export function parseTurbotFSMLabel(label: string | undefined): TurbotFSMTransition | null {
+  if (!label) return null;
+  const m = /^([01]):([01])([01])$/.exec(label);
+  if (!m) return null;
+  return {
+    input: m[1] === '1' ? 1 : 0,
+    motor: decodeMotorCommand([Number(m[2]), Number(m[3])]),
+  };
+}
+
+/**
+ * Validate a turbot FSM table: every transition label must be "sensor:ij"
+ * (2-bit motor output), and — like the base FSM (machineValidation.ts) —
+ * every state must handle both sensor inputs exactly once (total and
+ * deterministic; an FSM brain has no halt, a missing transition is a dead
+ * machine).
+ */
+export function validateTurbotFSM(components: CircuitComponent[], wires: Wire[]): TurbotTMValidationError[] {
+  const errors: TurbotTMValidationError[] = [];
+  const states = components.filter((c) => c.type === 'STATE');
+  if (states.length === 0) {
+    return [{ stateLabel: '—', message: 'machine has no states' }];
+  }
+  for (const s of states) {
+    const outgoing = wires.filter((w) => w.sourceComponentId === s.id);
+    for (const w of outgoing) {
+      if (!parseTurbotFSMLabel(w.transitionLabel)) {
+        errors.push({
+          stateLabel: s.label,
+          message: `state ${s.label} has an invalid transition label "${w.transitionLabel ?? ''}" (turbot FSM labels are sensor:ij, e.g. 0:11)`,
+        });
+      }
+    }
+    for (const bit of [0, 1] as const) {
+      const matching = outgoing.filter((w) => parseTurbotFSMLabel(w.transitionLabel)?.input === bit);
+      if (matching.length !== 1) {
+        errors.push({
+          stateLabel: s.label,
+          message: `state ${s.label} must have exactly one transition for input ${bit} (found ${matching.length})`,
+        });
+      }
+    }
+  }
+  return errors;
+}
+
 /** Apply an internal single action: a write leaves the head, a move leaves the cells. */
 export function applyTurbotTapeAction(tape: TMTape, action: TurbotTMInternalAction): TMTape {
   if (action.kind === 'move') {
@@ -335,13 +394,20 @@ export function runBrainStep(
 
   if (innerMode === 'FSM') {
     if (!brainState.stateId) return null;
-    const result = evaluateFSMSingleStep(wires, brainState.stateId, sensorBit);
-    if (!result) return null;
-    // An FSM's Mealy transition label only carries one output bit, so
-    // FSM-brained turbots use only the "stop"/"forward" half of the 2-bit
-    // motor command space (spec §9.3): 0 -> stop, 1 -> forward.
-    const motor: TurbotMotorCommand = result.output === 1 ? 'forward' : 'stop';
-    return { motor, input: String(sensorBit), action: motor, brainState: { stateId: result.nextStateId } };
+    // Turbot-FSM Mealy transitions output the full 2-bit motor command
+    // ("in:ij"), so an FSM brain can issue every movement, turns included.
+    for (const t of wires) {
+      if (t.sourceComponentId !== brainState.stateId) continue;
+      const parsed = parseTurbotFSMLabel(t.transitionLabel);
+      if (!parsed || parsed.input !== sensorBit) continue;
+      return {
+        motor: parsed.motor,
+        input: String(sensorBit),
+        action: parsed.motor,
+        brainState: { stateId: t.targetComponentId },
+      };
+    }
+    return null;
   }
 
   // Turbot TM (textbook model): the current state's kind picks the op.

@@ -37,7 +37,7 @@ import { evaluateCCInputs } from './cc';
 import { evaluateSCSequence } from './sc';
 import { evaluateFSMSequence } from './fsm';
 import { evaluateTMSequence } from './tm';
-import { runTurbot, evaluateTurbotCriterion, validateTurbotTM } from './turbot';
+import { runTurbot, evaluateTurbotCriterion, validateTurbotTM, validateTurbotFSM } from './turbot';
 import { validateMachine } from './machineValidation';
 import {
   axisForMode,
@@ -198,14 +198,17 @@ function gradeTurbot(question: AssignmentQuestion, circuit: CircuitData): Questi
   if (!cases || cases.length === 0) return skip(question.id, 'question has no turbot cases');
 
   // Stage 1: a TM brain is a *turbot TM* (per-state internal/external
-  // grammar, single actions) with its own validator; circuit brains reuse
-  // the shared machine validation.
+  // grammar, single actions) and an FSM brain a *turbot FSM* (2-bit motor
+  // outputs, "in:ij") — each with its own validator; CC/SC brains reuse the
+  // shared machine validation.
   // The question's encoding (representation) picks a turbot TM's internal
   // tape alphabet: binary {0,1,*}, unary (tally) {0,1}.
   const notation = notationForRepresentation(question.representation ?? 'binary');
   let valid: { ok: boolean; reason?: string };
-  if (innerMode === 'TM') {
-    const errors = validateTurbotTM(circuit.components, circuit.wires, notation);
+  if (innerMode === 'TM' || innerMode === 'FSM') {
+    const errors = innerMode === 'TM'
+      ? validateTurbotTM(circuit.components, circuit.wires, notation)
+      : validateTurbotFSM(circuit.components, circuit.wires);
     valid = errors.length === 0 ? { ok: true } : { ok: false, reason: errors.map((e) => e.message).join(' ') };
   } else {
     valid = validateMachine(circuit, innerMode, turbotLayout(innerMode), question.representation ?? 'binary');

@@ -20,8 +20,9 @@ import { ArenaCanvas } from './ArenaCanvas';
  * The percept/motor glossary: what the brain can read and output, so
  * students know how to label state transitions. TM brains get the
  * textbook's internal/external vocabularies (internal alphabet per the
- * question's encoding: binary {0,1,*}, unary {0,1}); circuit brains get the
- * 1-bit sensor and the 2-bit motor codes (FSM: one output bit). Outputs are
+ * question's encoding: binary {0,1,*}, unary {0,1}); CC/SC/FSM brains get
+ * the 1-bit sensor and the 2-bit motor codes (an FSM brain's transition
+ * outputs are the same "ij" codes as CC/SC output wires). Outputs are
  * described as motor states — which wheel motors are on — not as the
  * resulting movement.
  */
@@ -48,26 +49,20 @@ function TurbotGlossary({ innerMode, notation }: { innerMode: BuildMode; notatio
             ],
           },
         ]
-      : innerMode === 'FSM'
-        ? [
-            {
-              input: ['0 = empty/food ahead', '1 = block ahead'],
-              output: ['0 = both motors off', '1 = both motors on'],
-            },
-          ]
-        : [
-            {
-              // The two output wires drive the wheel motors: OUT1 = left
-              // wheel, OUT2 = right wheel.
-              input: ['0 = empty/food ahead', '1 = block ahead'],
-              output: [
-                '00 = both motors off',
-                '01 = right motor on',
-                '10 = left motor on',
-                '11 = both motors on',
-              ],
-            },
-          ];
+      : [
+          {
+            // The two motor bits ij drive the wheel motors: i = left wheel,
+            // j = right wheel (CC/SC: the OUT1/OUT2 wires; FSM: the
+            // transition label's output half).
+            input: ['0 = empty/food ahead', '1 = block ahead'],
+            output: [
+              '00 = both motors off',
+              '01 = right motor on',
+              '10 = left motor on',
+              '11 = both motors on',
+            ],
+          },
+        ];
 
   return (
     <div className="turbot-glossary">

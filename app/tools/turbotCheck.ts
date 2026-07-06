@@ -20,6 +20,7 @@ import {
   runTurbot,
   evaluateTurbotCriterion,
   validateTurbotTM,
+  validateTurbotFSM,
   TURBOT_FORWARD,
 } from '../src/engine/turbot';
 import { gradeSubmission } from '../src/engine/grader';
@@ -57,14 +58,29 @@ function ccForwardBrain(): { components: CircuitComponent[]; wires: Wire[] } {
   };
 }
 
-// ── FSM brain: same behavior, one state, one output bit (S0 loops on itself). ─
+// ── FSM brain: same behavior, one state (S0 loops on itself). Turbot-FSM
+// transitions output the FULL 2-bit motor code ("in:ij"): clear ahead → 11
+// (forward), blocked → 00 (stop).
 function fsmForwardBrain(): { components: CircuitComponent[]; wires: Wire[] } {
   const s0: CircuitComponent = { id: 's0', type: 'STATE', x: 0, y: 0, label: 'S₀', ports: getPortsForType('STATE') };
   return {
     components: [s0],
     wires: [
-      { id: 't1', sourceComponentId: 's0', sourcePortId: 'right', targetComponentId: 's0', targetPortId: 'left', value: 0, transitionLabel: '0:1' },
-      { id: 't2', sourceComponentId: 's0', sourcePortId: 'right', targetComponentId: 's0', targetPortId: 'left', value: 0, transitionLabel: '1:0' },
+      { id: 't1', sourceComponentId: 's0', sourcePortId: 'right', targetComponentId: 's0', targetPortId: 'left', value: 0, transitionLabel: '0:11' },
+      { id: 't2', sourceComponentId: 's0', sourcePortId: 'right', targetComponentId: 's0', targetPortId: 'left', value: 0, transitionLabel: '1:00' },
+    ],
+  };
+}
+
+// ── FSM brain that TURNS: wall-follower — clear ahead → forward (11),
+// blocked → turn left (01, right motor only). Never stops.
+function fsmTurnerBrain(): { components: CircuitComponent[]; wires: Wire[] } {
+  const s0: CircuitComponent = { id: 's0', type: 'STATE', x: 0, y: 0, label: 'S₀', ports: getPortsForType('STATE') };
+  return {
+    components: [s0],
+    wires: [
+      { id: 't1', sourceComponentId: 's0', sourcePortId: 'right', targetComponentId: 's0', targetPortId: 'left', value: 0, transitionLabel: '0:11' },
+      { id: 't2', sourceComponentId: 's0', sourcePortId: 'right', targetComponentId: 's0', targetPortId: 'left', value: 0, transitionLabel: '1:01' },
     ],
   };
 }
@@ -94,6 +110,35 @@ console.log('\n[engine: FSM brain]');
 const fsmBrain = fsmForwardBrain();
 const runFSM = runTurbot(fsmBrain.components, fsmBrain.wires, 'FSM', corridor(3, 2), 10);
 check('FSM brain: same forward-until-wall behavior', runFSM.haltedByMotor && runFSM.finalState.x === 2);
+
+// FSM brains can issue every motor command, turns included: in a 1×1 box the
+// turner senses B every cycle and pivots left (E → N → W → S → …) forever.
+const fsmTurner = fsmTurnerBrain();
+const boxed1x1: ArenaConfig = { width: 1, height: 1, cells: [['empty']], start: { x: 0, y: 0, facing: 'E' } };
+const runTurner = runTurbot(fsmTurner.components, fsmTurner.wires, 'FSM', boxed1x1, 4);
+check('FSM brain can turn: 01 pivots the turbot left each cycle',
+  runTurner.history.map((h) => h.facing).join('') === 'NWSE' &&
+  runTurner.history.every((h) => h.action === 'left'));
+check('a never-stopping FSM turner runs to the step limit', runTurner.hitStepLimit);
+
+console.log('\n[turbot FSM validation]');
+check('2-bit-output FSM table validates',
+  validateTurbotFSM(fsmBrain.components, fsmBrain.wires).length === 0);
+const oneBitFsm = {
+  components: [{ id: 's0', type: 'STATE', x: 0, y: 0, label: 'S₀', ports: getPortsForType('STATE') } as CircuitComponent],
+  wires: [
+    tWire('t1', 's0', 's0', '0:1'), // base-FSM single output bit — not turbot-FSM grammar
+    tWire('t2', 's0', 's0', '1:00'),
+  ],
+};
+check('base-FSM one-bit label is rejected (and input 0 left unhandled)',
+  validateTurbotFSM(oneBitFsm.components, oneBitFsm.wires).length > 0);
+const partialFsm = {
+  components: [{ id: 's0', type: 'STATE', x: 0, y: 0, label: 'S₀', ports: getPortsForType('STATE') } as CircuitComponent],
+  wires: [tWire('t1', 's0', 's0', '0:11')],
+};
+check('FSM table missing an input transition is rejected (must be total)',
+  validateTurbotFSM(partialFsm.components, partialFsm.wires).length > 0);
 
 console.log('\n[engine: step limit]');
 const infiniteArena = corridor(1000, 999);
