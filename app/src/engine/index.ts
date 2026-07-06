@@ -49,6 +49,7 @@ export {
 export {
   axisForMode,
   stepCountFor,
+  timeOutputBits,
   encodeInput,
   decodeOutput,
   outputAccepted,

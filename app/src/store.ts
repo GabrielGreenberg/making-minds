@@ -35,7 +35,7 @@ import {
   GRID_SIZE,
   toSubscript,
 } from './types';
-import { topologicalSort, evaluateGate, evaluateCC, evaluateSCSingleStep, sortStateComponents, evaluateFSMSingleStep, evaluateTMSingleStep, notationForRepresentation } from './engine';
+import { topologicalSort, evaluateGate, evaluateCC, evaluateSCSingleStep, sortStateComponents, evaluateFSMSingleStep, evaluateTMSingleStep, notationForRepresentation, stepCountFor, encodeInput, bitsToTally, bitsToBinary, type CodecLayout } from './engine';
 import { senseAheadSymbol, applyMotorCommand, initialBrainState, runBrainStep, stateKindOf, TURBOT_FORWARD, type BrainState } from './engine/turbot';
 import { getAssignment, listAssignments } from './assignments';
 import {
@@ -61,6 +61,76 @@ export function selectTmNotation(s: {
 }): TMNotation {
   const q = s.assignment?.questions[s.currentQuestionIndex];
   return notationForRepresentation(q ? q.representation : s.repSystem);
+}
+
+/**
+ * The codec layout of the open SC/FSM question (the grader's view of it), or
+ * null in the sandbox (no open question, or a question without a time-axis
+ * cc_spec). Everything question-run-specific — the run window, the exact input
+ * stream to feed — derives from this one selector.
+ */
+export function selectCodecLayout(s: {
+  assignment: AssignmentData | null;
+  currentQuestionIndex: number;
+}): CodecLayout | null {
+  const q = s.assignment?.questions[s.currentQuestionIndex];
+  if (!q?.cc_spec) return null;
+  if (q.buildMode !== 'SC' && q.buildMode !== 'FSM') return null;
+  return {
+    axis: 'time',
+    rep: q.representation,
+    inputWidths: q.cc_spec.inputs.map((g) => g.width),
+    outputWidths: q.cc_spec.outputs.map((g) => g.width),
+  };
+}
+
+/**
+ * The canonical run window (in time steps) for the open SC/FSM question — the
+ * grader's `stepCountFor` over the question's cc_spec group widths. Question
+ * runs (Run/Step and the A/V decode) must execute/present exactly this window
+ * so the student sees exactly what the grader grades. Returns null in the
+ * sandbox — sandbox runs keep their own lengths (SC: L + one 0-drain step per
+ * MEM; FSM: L).
+ */
+export function selectCodecWindow(s: {
+  assignment: AssignmentData | null;
+  currentQuestionIndex: number;
+}): number | null {
+  const layout = selectCodecLayout(s);
+  return layout ? stepCountFor(layout) : null;
+}
+
+/** Parse display-order digits as a numeral under `rep` — exactly how the A/V
+ *  ARG column reads typed input (tally "11" = 2; binary "110" = 6). Returns
+ *  null when the digits are not a valid codeword (tally with a 1 after a 0 —
+ *  the same strings the ARG column flags '/'). */
+function numeralValue(digits: number[], rep: RepSystem): number | null {
+  return rep === 'tally' ? bitsToTally(digits) : bitsToBinary(digits);
+}
+
+/**
+ * The EXACT input stream the grader would feed for the student's typed input:
+ * each input group's typed digits are read as a value and laid on the time
+ * axis by the codec's own `encodeInput` (LSB at t1 — so a tally value's ones
+ * arrive LAST, zeros leading; values wider than the group are clamped/masked
+ * by `valueToBits` exactly as the codec does). Returns null when codec feeding
+ * doesn't apply and the caller must fall back to raw typed bits: no open
+ * question (sandbox), the machine's input count differs from the question
+ * spec, or a typed string that is not a valid numeral for the representation.
+ */
+function codecInputSteps(
+  layout: CodecLayout | null,
+  numeralsPerGroup: number[][],
+): number[][] | null {
+  if (!layout || numeralsPerGroup.length !== layout.inputWidths.length) return null;
+  const values: number[] = [];
+  for (const numeral of numeralsPerGroup) {
+    const v = numeralValue(numeral, layout.rep);
+    if (v === null) return null;
+    values.push(v);
+  }
+  const enc = encodeInput(values, layout);
+  return enc.axis === 'time' ? enc.steps : null;
 }
 
 /** A blank arena for the sandbox / question-authoring preview (no assignment context). */
@@ -2532,6 +2602,12 @@ export const useStore = create<AppState>()((set, get) => ({
     const state = get();
     const { components, wires, scTimeStep, scHistory, scInputSequence } = state;
 
+    // Question runs are bounded by the codec window — the exact step count
+    // the grader runs (engine stepCountFor). Steps past it would show state
+    // the grader never reads. Sandbox (window null): unbounded stepping.
+    const codecWindow = selectCodecWindow(state);
+    if (codecWindow !== null && scTimeStep > codecWindow) return;
+
     // Sorted component lists (consistent with the engine's ordering)
     const sortedInputs = components
       .filter((c) => c.type === 'INPUT')
@@ -2544,17 +2620,33 @@ export const useStore = create<AppState>()((set, get) => ({
       .sort((a, b) => (parseInt(a.label.replace(/\D/g, '')) || 0) - (parseInt(b.label.replace(/\D/g, '')) || 0));
 
     const tIdx = scTimeStep - 1;
-    // Past the end of a loaded input sequence, feed 0s (flush steps) so bits
-    // still held in MEM can drain to the outputs instead of re-reading the
-    // input component's last value.
     const seqLoaded = scInputSequence.some((s) => s.length > 0);
-    const inputBitVector = sortedInputs.map((inp, idx) =>
-      scInputSequence[idx]?.[tIdx] !== undefined
-        ? scInputSequence[idx][tIdx]
-        : seqLoaded
-          ? 0
-          : (inp.value ?? 0)
-    );
+    // Question runs feed EXACTLY the grader's input stream: the typed string
+    // is parsed as a value per input group (as the A/V ARG column reads it)
+    // and laid on the time axis by the codec's encodeInput — for tally the
+    // ones arrive LAST (zeros leading), not in typed order. Falls back to raw
+    // typed bits when the typed string is not a valid numeral (the ARG column
+    // flags those '/') or the machine's input count doesn't match the spec.
+    // scInputSequence is time-ordered (index 0 = t1 = rightmost typed char),
+    // so each group's display-order numeral is its sequence reversed.
+    const codecSteps = seqLoaded
+      ? codecInputSteps(
+          selectCodecLayout(state),
+          sortedInputs.map((_, idx) => (scInputSequence[idx] ?? []).slice().reverse()),
+        )
+      : null;
+    // Sandbox / fallback: past the end of a loaded input sequence, feed 0s
+    // (flush steps) so bits still held in MEM can drain to the outputs
+    // instead of re-reading the input component's last value.
+    const inputBitVector = codecSteps
+      ? sortedInputs.map((_, idx) => codecSteps[tIdx]?.[idx] ?? 0)
+      : sortedInputs.map((inp, idx) =>
+          scInputSequence[idx]?.[tIdx] !== undefined
+            ? scInputSequence[idx][tIdx]
+            : seqLoaded
+              ? 0
+              : (inp.value ?? 0)
+        );
     const memStoredValues = sortedMems.map((m) => m.storedValue ?? 0);
 
     // Delegate propagation to the engine (same logic used by the grader)
@@ -2645,14 +2737,24 @@ export const useStore = create<AppState>()((set, get) => ({
     if (state.scRunning) return;
     const intervalId = window.setInterval(() => {
       const s = get();
-      // Stop once all input is consumed AND the memory pipeline has been
-      // flushed (one extra 0-input step per MEM, so delayed bits — e.g. a
-      // serial adder's final carry — still reach the outputs).
-      const maxLen = Math.max(...s.scInputSequence.map((seq) => seq.length), 0);
-      const drain = s.components.filter((c) => c.type === 'MEM').length;
-      if (maxLen > 0 && s.scTimeStep > maxLen + drain) {
-        s.scPause();
-        return;
+      // Question runs execute exactly the codec window (the grader's run
+      // length — see selectCodecWindow), 0-padding past the typed input.
+      const codecWindow = selectCodecWindow(s);
+      if (codecWindow !== null) {
+        if (s.scTimeStep > codecWindow) {
+          s.scPause();
+          return;
+        }
+      } else {
+        // Sandbox: stop once all input is consumed AND the memory pipeline
+        // has been flushed (one extra 0-input step per MEM, so delayed bits —
+        // e.g. a serial adder's final carry — still reach the outputs).
+        const maxLen = Math.max(...s.scInputSequence.map((seq) => seq.length), 0);
+        const drain = s.components.filter((c) => c.type === 'MEM').length;
+        if (maxLen > 0 && s.scTimeStep > maxLen + drain) {
+          s.scPause();
+          return;
+        }
       }
       s.scStep();
     }, 300);
@@ -2971,8 +3073,19 @@ export const useStore = create<AppState>()((set, get) => ({
     if (!currentState) return;
 
     const tIdx = fsmTimeStep - 1;
-    if (tIdx >= fsmInputSequence.length) return;
-    const inputBit = fsmInputSequence[tIdx];
+    // Question runs consume the full codec window (the grader's run length —
+    // see selectCodecWindow); the sandbox stops at the typed length.
+    const layout = selectCodecLayout(state);
+    const codecWindow = layout ? stepCountFor(layout) : null;
+    if (codecWindow !== null ? tIdx >= codecWindow : tIdx >= fsmInputSequence.length) return;
+    // Question runs feed EXACTLY the grader's input stream: the typed digits,
+    // read as one numeral under the question's representation (typed "110" =
+    // binary 6 / tally 2), laid on the time axis by the codec's encodeInput
+    // (LSB at t1; a tally value's ones arrive last). An invalid numeral
+    // (tally with a 1 after a 0) falls back to the raw typed digits. Sandbox:
+    // raw digits in typed order, unchanged.
+    const codecSteps = layout ? codecInputSteps(layout, [fsmInputSequence]) : null;
+    const inputBit = codecSteps ? (codecSteps[tIdx]?.[0] ?? 0) : (fsmInputSequence[tIdx] ?? 0);
 
     // Delegate transition logic to the engine (same logic used by the grader)
     const result = evaluateFSMSingleStep(wires, currentStateId, inputBit);
@@ -3002,7 +3115,10 @@ export const useStore = create<AppState>()((set, get) => ({
     if (state.fsmRunning) return;
     const intervalId = window.setInterval(() => {
       const s = get();
-      if (s.fsmHalted || s.fsmTimeStep > s.fsmInputSequence.length) {
+      // Question runs execute exactly the codec window; sandbox runs stop at
+      // the typed input length (see selectCodecWindow).
+      const runEnd = selectCodecWindow(s) ?? s.fsmInputSequence.length;
+      if (s.fsmHalted || s.fsmTimeStep > runEnd) {
         s.fsmPause();
         return;
       }

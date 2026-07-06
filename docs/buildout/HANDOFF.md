@@ -6,64 +6,57 @@ run `npm run coverage` and reconcile._
 
 ## Where we are
 
-Branch `buildout-infra`. **23 / 56 verified** (HW1 7/7, HW2 arithmetic 7/7, HW3
-arithmetic 9/9), 33 pending, 0 regressed. Five iterations done; iteration 5 was
-the META-audit — ledger clean, Phase-1 tail re-ranked to **P1.9 → P1.7 → P1.4 →
-P1.8 → P1.5 → P1.6** (rationale in LOG iteration 5).
+Branch `buildout-infra`. **23 / 56 verified**, 33 pending, 0 regressed. Six
+iterations done. Iteration 6 shipped the loop's first app-code change (P1.9):
+SC/FSM question runs now execute the **canonical codec window** and feed the
+codec's own encoded input stream, the A/V decode is window-clamped, FSM rows
+render t1-rightmost — all pinned by `app/tools/scWindowCheck.ts` (45 checks in
+`npm run check`). Grader behavior unchanged. A pedagogy flag for Gabriel sits in
+LOG iteration 6 (late-but-right tally = wrong; say the word to revisit).
 
-## Do this next — P1.9: reconcile UI-vs-grader drain semantics
+## Do this next — P1.7: harness hardening
 
-A potential **real grading-fairness bug**, and a dependency for the FSM batch
-(same time axis). The claim to test: CLAUDE.md says the UI's SC Run drains one
-0-input step **per MEM** after the input is consumed; the grader's run length
-is `stepCountFor = max(inputWidth, outputWidth)` (`engine/codec.ts`),
-independent of MEM count.
+`coverageCheck.ts` only asserts the broken variant fails ≥1 case. Add:
 
-1. **Reproduce:** build a functionally correct SC machine whose output emerges
-   LATE — e.g. a `2x` computed with TWO chained delay registers computing
-   `4x/2`… no: simplest is x delayed k extra cycles (compute `2x` as delay∘
-   delay∘(divide-by-2)? — impossible; instead take `x + 0` = identity via two
-   MEMs: delay twice then nothing arrives in window). Concretely: an identity
-   circuit built as a 2-step delay computes 4x on the codec window (every delay
-   = ×2 on the LSB-first axis) — so instead craft a machine whose SEMANTIC
-   answer needs more steps than max(inW,outW): e.g. grade `2x` (outW = inW+1)
-   with a circuit that emits 4x/2 — see LOG iteration 4's bit-order note; or
-   simulate the UI path (`store` Run semantics per CLAUDE.md) vs
-   `evaluateSCInputs` on the same machine and diff the traces. The point is to
-   EXHIBIT a machine the two semantics judge differently (or prove none can
-   exist — also a valid outcome, then P1.9 closes as documentation).
-2. **Read both sides:** `engine/sc.ts` + `engine/codec.ts` (`stepCountFor`,
-   time-axis encode/decode) vs the store's SC Run/drain implementation
-   (`store.ts`, SC sim slice; CLAUDE.md "SC runs flush the pipeline").
-3. **Decide the canonical semantics** (likely: the codec window — grading and
-   UI should agree that a correct circuit emits within max(inW,outW) steps;
-   the UI's per-MEM drain then needs to clamp/extend to the same window), fix
-   the divergent side, update CLAUDE.md's SC-drain bullet + spec if touched.
-4. **Gates:** all hw3 fixtures must still verify (they are the regression bank
-   for this change); `npm run check`, `tsc`, `build` green.
+1. **Broken-breadth bar:** per-row broken-fail fraction printed in the ledger;
+   warn (or fail) under 25% of the bank. hw2-p6 (fails 1/16 — the narrowest
+   near-miss) is the known edge: decide warn-vs-fail so it stays green or gets
+   a second broken variant.
+2. **Drain-coverage bar (SC/FSM rows):** assert the bank contains ≥1 case whose
+   output width exceeds input width (the drain-exercising case); currently
+   hw3-p1/p2 hang on a single such case each.
+3. **Statement lint:** no ledger-shorthand prefixes (`+2 [0-15] B.`-style), no
+   answer-giveaway parentheticals ("(It is possible: …)") — two manual cleanup
+   rounds (hw2, hw3) prove it recurs.
+4. **Promote the layout oracle:** `scratchpad/routecheck_near.ts` (strict 3px
+   near-parallel variant, imports the app's real `routeAllWires`) →
+   `app/tools/layoutCheck.ts`, run for router-rendered (CC/SC) fixtures in the
+   manifest; TM/FSM/turbot rows skip it (STATE curves bypass the router).
+5. Wire all of it into `npm run coverage` / `npm run check`; a synthetic
+   single-case-divergence fixture must trip the breadth warning (prove the
+   check checks).
 
-**Acceptance:** a written statement of the single canonical drain semantics
-(LOG + CLAUDE.md), the divergent side fixed, an exhibit test (or impossibility
-note) checked into `app/tools/` or the harness, all gates green, 0 regressed.
+**Acceptance:** harness prints per-row fractions; all 23 verified rows stay
+green (or get explicitly better broken variants); statement lint + layout
+oracle run in the harness; gates green.
 
 ## Then
 
-P1.7 (harness: breadth + drain bars, statement lint, promote
-`scratchpad/routecheck_near.ts` to `app/tools/`) → P1.4 (HW4 FSM arithmetic,
-with its META-visual-vocab first step) → P1.8 (router design memo; gates
-Phase 3) → P1.5/P1.6 → Phase 2.
+P1.4 (HW4 FSM arithmetic, hw4-p3…p11 — META-visual-vocab first step; note the
+P1.9 groundwork: FSM question runs now 0-pad to the codec window, typed input
+is a numeral, so fixtures test exactly what students see) → P1.8 (router design
+memo; gates Phase 3) → P1.5/P1.6/P1.10/P1.11 → Phase 2.
 
 ## Watch out for
 
-- **P1.9 is the first app-code change of the loop** — route it through the
-  seams (engine/codec vs store), keep it small, and update CLAUDE.md (its
-  maintenance rule) — that also starts META-reconcile-claude.
+- **scWindowCheck is now load-bearing** — any store/DataTable/codec touch must
+  keep its 45 checks green; it drives the real zustand store headlessly
+  (window/document shims before dynamic import — copy that pattern for new
+  store-level checks).
 - **Ops:** 529 outages → `Workflow({scriptPath, resumeFromRunId})`; subagent
-  session limit can hit (resets were ~4:50am) — critical verification can be
-  finished solo with preview tools.
-- **Appearance seeding recipe v3** (LOG iteration 4): reload → land on Home →
-  seed `mm:inst-asg:<id>` + `mm:asg:<id>` → click-navigate. Never
-  seed-then-reload. Base path `/making-minds/`. Clean up keys twice.
-- **Layout oracle:** run `scratchpad/routecheck_near.ts <fixture.json>` on any
-  new/edited CC/SC fixture before the browser sweep.
+  session limit can hit mid-workflow — finish critical verification solo.
+- **Appearance seeding recipe v3** (LOG iteration 4): reload → Home → seed
+  `mm:inst-asg:<id>` + `mm:asg:<id>` → click-navigate; never seed-then-reload;
+  base path `/making-minds/`; clean keys twice.
+- **Layout oracle** on any new/edited CC/SC fixture before the browser sweep.
 - `tsx` missing after checkout → `npm install`; no lockfile churn commits.

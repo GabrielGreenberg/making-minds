@@ -1,6 +1,7 @@
 import { useMemo, useState, useCallback, useRef, useEffect } from 'react';
-import { useStore, selectTmNotation, selectEffectiveMode } from '../store';
-import { bitsToTally, bitsToBinary, parseTMTransition } from '../engine';
+import { useStore, selectTmNotation, selectEffectiveMode, selectCodecWindow } from '../store';
+import { bitsToTally, bitsToBinary, parseTMTransition, timeOutputBits } from '../engine';
+import { outputDisplayString } from './outputDisplay';
 import { TurbotArenaPanel } from './TurbotArenaPanel';
 import type { TMSymbol } from '../types';
 
@@ -50,6 +51,11 @@ export function DataTable() {
   const buildMode = useStore((s) => s.buildMode);
   // TM alphabet is tied to the question's representation (sandbox: repSystem).
   const tmNotation = useStore(selectTmNotation);
+  // Codec run window for the open SC/FSM question (null in the sandbox):
+  // question runs execute — and the A/V decode presents — exactly the steps
+  // the grader reads, so UI verdicts match grades.
+  const codecWindow = useStore(selectCodecWindow);
+  const openQuestion = useStore((s) => s.assignment?.questions[s.currentQuestionIndex]);
 
   // SC state
   const scHistory = useStore((s) => s.scHistory);
@@ -109,7 +115,10 @@ export function DataTable() {
     const state = useStore.getState();
     const maxLen = Math.max(...state.scInputSequence.map((s) => s.length), 0);
     const drain = state.components.filter((c) => c.type === 'MEM').length;
-    if (maxLen > 0 && state.scTimeStep <= maxLen + drain) return; // already loaded and in progress
+    // Question runs end at the codec window (grader's run length); sandbox
+    // runs at L + one 0-drain step per MEM.
+    const runEnd = selectCodecWindow(state) ?? maxLen + drain;
+    if (maxLen > 0 && state.scTimeStep <= runEnd) return; // already loaded and in progress
 
     // Try active index first, then fall back to first sequence with input
     const candidates = activeGlobalIndex !== null ? [activeGlobalIndex] : [];
@@ -134,11 +143,15 @@ export function DataTable() {
       const numInputs = state.components.filter((c) => c.type === 'INPUT').length;
       if (numInputs === 0) return;
       const maxLen = Math.max(...state.scInputSequence.map((s) => s.length), 0);
-      // Extra flush steps: one 0-input step per MEM so delayed bits drain out.
+      // Question runs execute exactly the codec window (the steps the grader
+      // reads), feeding the codec's stream for the typed value (see scStep).
+      // Sandbox: L plus one 0-input flush step per MEM so delayed bits drain.
       const drain = state.components.filter((c) => c.type === 'MEM').length;
-      const remaining = maxLen + drain - (state.scTimeStep - 1);
-      // If no sequence loaded, just do a single step
-      if (remaining <= 0 && maxLen === 0) {
+      const win = selectCodecWindow(state);
+      const runEnd = win ?? maxLen + drain;
+      const remaining = runEnd - (state.scTimeStep - 1);
+      // If no sequence loaded (sandbox), just do a single step
+      if (remaining <= 0 && maxLen === 0 && win === null) {
         state.scStep();
         return;
       }
@@ -147,9 +160,10 @@ export function DataTable() {
       let step = 0;
       const interval = setInterval(() => {
         const s = useStore.getState();
-        const maxL = Math.max(...s.scInputSequence.map((sq) => sq.length), 0) +
+        const end = selectCodecWindow(s) ??
+          Math.max(...s.scInputSequence.map((sq) => sq.length), 0) +
           s.components.filter((c) => c.type === 'MEM').length;
-        if (step >= remaining || s.scTimeStep > maxL) {
+        if (step >= remaining || s.scTimeStep > end) {
           clearInterval(interval);
           setIsRunning(false);
           return;
@@ -167,7 +181,9 @@ export function DataTable() {
       const state = useStore.getState();
       const maxLen = Math.max(...state.scInputSequence.map((s) => s.length), 0);
       const drain = state.components.filter((c) => c.type === 'MEM').length;
-      if (maxLen === 0 || state.scTimeStep <= maxLen + drain) {
+      // Question steps stop at the codec window; sandbox at L + per-MEM drain.
+      const win = selectCodecWindow(state);
+      if (win !== null ? state.scTimeStep <= win : (maxLen === 0 || state.scTimeStep <= maxLen + drain)) {
         state.scStep();
       }
     }, 0);
@@ -388,17 +404,33 @@ export function DataTable() {
   // CC: evaluated rows from the truth table
   const avRows = useMemo(() => {
     if (isSC) {
+      // Question runs: the VAL numeral must decode exactly the codec window
+      // the grader reads — output wire j's steps 1..Wo_j (missing steps as 0)
+      // — not the entire run string. Sandbox: whole string as before.
+      const outputWidths = openQuestion?.buildMode === 'SC' && openQuestion.cc_spec
+        ? openQuestion.cc_spec.outputs.map((g) => g.width)
+        : null;
+      const nOut = outputs.length;
       // Build from global sequences that have outputs
       const rows: { inputBits: number[]; outputBits: number[] }[] = [];
       for (let si = 0; si < scGlobalSequences.length; si++) {
         const seq = scGlobalSequences[si];
         const isActiveSeq = activeGlobalIndex === si;
         const outStr = isActiveSeq && scHistory.length > 0
-          ? scHistory.slice().sort((a, b) => b.t - a.t).map((h) => h.outputBits.join('')).join('')
+          ? outputDisplayString(scHistory.map((h) => ({ t: h.t, bits: h.outputBits })))
           : seq.outputStr;
         if (seq.inputStr.length > 0 && outStr && outStr.length > 0) {
           const inBits = seq.inputStr.split('').map(Number);
-          const outBits = outStr.split('').map(Number);
+          let outBits = outStr.split('').map(Number);
+          if (outputWidths && nOut === outputWidths.length && outBits.length % nOut === 0) {
+            // The history string is t-DESCENDING (latest step leftmost, nOut
+            // chars per step); rebuild [step][wire] t-ascending and take the
+            // grader's slice per output group via the codec's own reader.
+            const T = outBits.length / nOut;
+            const steps = Array.from({ length: T }, (_, t) =>
+              outBits.slice((T - 1 - t) * nOut, (T - t) * nOut));
+            outBits = outputWidths.flatMap((w, j) => timeOutputBits(steps, w, j));
+          }
           rows.push({ inputBits: inBits, outputBits: outBits });
         }
       }
@@ -423,7 +455,7 @@ export function DataTable() {
         : [];
     }
     return tableRows;
-  }, [isSC, isCC, scGlobalSequences, scHistory, activeGlobalIndex, ccInputRows, evaluatedRows, tableRows, localStepActive, localStepSelectedKey, localStepIndex, localStepSorted.length]);
+  }, [isSC, isCC, scGlobalSequences, scHistory, activeGlobalIndex, ccInputRows, evaluatedRows, tableRows, localStepActive, localStepSelectedKey, localStepIndex, localStepSorted.length, openQuestion, outputs.length]);
 
   // ── FSM Mode ──────────────────────────────────────────────────────
   // ── Turbot Mode ───────────────────────────────────────────────────
@@ -590,7 +622,12 @@ export function DataTable() {
     }
 
     const fsmInputStr = fsmInputSequence.map(String).join('');
-    const fsmOutputStr = fsmHistory.map((h) => String(h.output)).join('');
+    // Time flows right-to-left (t1 rightmost, later steps extend left) — the
+    // same direction as the SC Global I/O rows, so a question run's OUT reads
+    // as a numeral just like the typed IN (binary identity on "110" shows an
+    // OUT that reads 110 = 6). fsmHistory is t-ascending, hence the shared
+    // t-descending builder.
+    const fsmOutputStr = outputDisplayString(fsmHistory.map((h) => ({ t: h.t, bits: [h.output] })));
 
     return (
       <div className="data-table-panel" style={{ width: panelWidth }}>
@@ -656,6 +693,9 @@ export function DataTable() {
               </thead>
               <tbody>
                 <tr>
+                  {/* Same convention as the SC Global I/O rows: t1 rightmost
+                      (time flows right-to-left), right-aligned strings, arrow
+                      pointing left. Typed IN is a numeral (MSB left). */}
                   <td style={{ overflow: 'hidden' }}>
                     <div style={{ display: 'flex', alignItems: 'center' }}>
                       <input
@@ -668,23 +708,23 @@ export function DataTable() {
                           setFsmInputSequence(raw.split('').map(Number));
                         }}
                         style={{
-                          flex: 1, minWidth: 0, textAlign: 'left', border: 'none',
+                          flex: 1, minWidth: 0, textAlign: 'right', border: 'none',
                           background: 'transparent', color: 'inherit',
                           fontSize: 11, fontFamily: 'monospace',
                         }}
                       />
                       <svg width="12" height="10" viewBox="0 0 12 10" style={{ flexShrink: 0, marginLeft: 2 }}>
-                        <line x1="1" y1="5" x2="10" y2="5" stroke="#888" strokeWidth="1.2" />
-                        <polyline points="7,2 10,5 7,8" fill="none" stroke="#888" strokeWidth="1.2" strokeLinejoin="round" strokeLinecap="round" />
+                        <line x1="11" y1="5" x2="2" y2="5" stroke="#e53935" strokeWidth="1.2" />
+                        <polyline points="5,2 2,5 5,8" fill="none" stroke="#e53935" strokeWidth="1.2" strokeLinejoin="round" strokeLinecap="round" />
                       </svg>
                     </div>
                   </td>
                   <td style={{ overflow: 'hidden' }}>
                     <div style={{ display: 'flex', alignItems: 'center' }}>
-                      <span className="mono-value" style={{ flex: 1, fontSize: 11, textAlign: 'left' }}>{fsmOutputStr || ''}</span>
+                      <span className="mono-value" style={{ flex: 1, minWidth: 0, fontSize: 11, textAlign: 'right', display: 'block', overflow: 'hidden' }}>{fsmOutputStr || ''}</span>
                       <svg width="12" height="10" viewBox="0 0 12 10" style={{ flexShrink: 0, marginLeft: 2 }}>
-                        <line x1="1" y1="5" x2="10" y2="5" stroke="#888" strokeWidth="1.2" />
-                        <polyline points="7,2 10,5 7,8" fill="none" stroke="#888" strokeWidth="1.2" strokeLinejoin="round" strokeLinecap="round" />
+                        <line x1="11" y1="5" x2="2" y2="5" stroke="#e53935" strokeWidth="1.2" />
+                        <polyline points="5,2 2,5 5,8" fill="none" stroke="#e53935" strokeWidth="1.2" strokeLinejoin="round" strokeLinecap="round" />
                       </svg>
                     </div>
                   </td>
@@ -693,10 +733,13 @@ export function DataTable() {
             </table>
             {/* Controls */}
             <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '5px 0 3px', paddingLeft: 4 }}>
-              <button className="action-btn" onClick={() => { if (!fsmRunning) fsmRun(); }} disabled={fsmRunning || fsmHalted || fsmTimeStep > fsmInputSequence.length}>
+              {/* Question runs go to the codec window, fed the codec's stream
+                  for the typed value (see fsmStep); sandbox runs feed the raw
+                  digits and stop at the typed length. */}
+              <button className="action-btn" onClick={() => { if (!fsmRunning) fsmRun(); }} disabled={fsmRunning || fsmHalted || fsmTimeStep > (codecWindow ?? fsmInputSequence.length)}>
                 Run
               </button>
-              <button className="action-btn" onClick={() => { if (!fsmRunning) fsmStep(); }} disabled={fsmRunning || fsmHalted || fsmTimeStep > fsmInputSequence.length}>
+              <button className="action-btn" onClick={() => { if (!fsmRunning) fsmStep(); }} disabled={fsmRunning || fsmHalted || fsmTimeStep > (codecWindow ?? fsmInputSequence.length)}>
                 Step
               </button>
               <button className="action-btn" onClick={fsmReset} disabled={fsmRunning}>
@@ -1212,11 +1255,7 @@ export function DataTable() {
                   const isActive = activeGlobalIndex === i;
                   // Build output string from scHistory: earliest output → rightmost
                   const outputStr = isActive && scHistory.length > 0
-                    ? scHistory
-                        .slice()
-                        .sort((a, b) => b.t - a.t)
-                        .map((h) => h.outputBits.join(''))
-                        .join('')
+                    ? outputDisplayString(scHistory.map((h) => ({ t: h.t, bits: h.outputBits })))
                     : seq.outputStr;
                   // Traditional arrow: line + arrowhead pointing left
                   const seqArrow = (

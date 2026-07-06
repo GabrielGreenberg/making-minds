@@ -228,3 +228,53 @@ be the first).
 late-emitting SC circuit (passes UI-style per-MEM drain, fails the codec
 window, or vice versa), decide canonical semantics, fix the divergent side,
 document. Then P1.7.
+
+## 2026-07-06 (iteration 6) — P1.9: drain semantics reconciled · first app-code change
+
+**The bug was real, in both directions.** Investigation exhibits: (B) a tally
+identity with ONE redundant MEM delay looked correct in the UI for every value
+(tally decode is shift-invariant over the UI's whole-history string) but graded
+1/9 — the extra stroke slides out of the grader's fixed window; (C) a binary
+machine emitting garbage after the window graded 16/16 while looking broken in
+the UI; FSM ran ZERO drain steps in the UI (grader reads steps the UI never
+executed whenever outW > inW). Root cause: two different run windows (UI: L +
+#MEM for SC, L for FSM; grader: `stepCountFor = max(inW,outW)`) and a UI A/V
+decode over the whole history string.
+
+**Decision:** the codec window is canonical (grading contracts on it; it's
+machine-independent — the point of value-based grading). Grader untouched; the
+UI stops misleading.
+
+**Shipped (three rounds, each adversarially verified — rounds 1–2 REFUTED with
+real counter-exhibits before round 3 passed):**
+- `store.ts`: `selectCodecLayout`/`selectCodecWindow` (question-run predicate =
+  open SC/FSM question with a `cc_spec`); SC/FSM question runs execute exactly
+  the codec window; typed input parsed as a VALUE per group and fed as the
+  codec's `encodeInput` stream (round 2 — fixes tally, whose ones arrive LAST
+  in time; round 1's char-per-step feed matched only binary); sandbox unchanged
+  (SC L+#MEM, FSM L, raw bits).
+- `DataTable.tsx` (+ new `components/outputDisplay.ts`): the REAL Run/Step
+  buttons (which bypass store `scRun` — round-1 discovery) use the window; A/V
+  VAL decodes via the codec's own `timeOutputBits` (now exported); FSM IN/OUT
+  rows render t1-rightmost per VISUAL_VOCAB (round 3).
+- FSM typed input is now a numeral (MSB-left, "110" = 6) like SC/ARG —
+  intentional unification, caught undisclosed+unpinned by the round-2 verifier
+  (their non-palindrome probe; the fixer's own test used palindrome "101").
+- `tools/scWindowCheck.ts` (NEW, in `npm run check`, 45 checks): pins grader
+  exhibits B/C, store-driven window+content parity for SC/FSM × binary/tally
+  (incl. the real hw3-p7 fixture and a 2-group hw3-p9 probe), display
+  direction, invalid-codeword fallback, and sandbox behaviors.
+- CLAUDE.md: drain bullet rewritten (codec window canonical; per-MEM flush is
+  sandbox-only), changelog + tools row updated.
+
+**Pedagogy flag for Gabriel:** canonicalizing the window means a tally machine
+that emits the right numeral one step LATE is WRONG (it always was, to the
+grader — now the UI agrees). If late-but-right should count, the codec window
+must grow instead; say the word and we revisit.
+
+**Queued:** P1.10 (sandbox FSM feed direction — display flip made the sandbox
+mirror its IN; minor), P1.11 (ARG column renders multi-group typed input as one
+numeral — pre-existing).
+
+**Next:** **P1.7** — harness hardening (breadth ≥25% + drain bars, statement
+lint, promote `routecheck_near.ts` to `app/tools/`).

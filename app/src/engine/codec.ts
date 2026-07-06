@@ -66,7 +66,11 @@ export function axisForMode(mode: BuildMode): Axis {
 }
 
 /** Number of time steps a time-axis run takes: enough to lay out the widest
- *  input or output value, with the extras acting as drain steps for carries. */
+ *  input or output value, with the extras acting as drain steps for carries
+ *  (drain budget = max output width − max input width zero-fed steps). This
+ *  window is CANONICAL — the grader runs exactly this many steps and decodes
+ *  output wire j from steps 1..Wo_j only, and question runs in the UI present
+ *  the same window (store `selectCodecWindow`). */
 export function stepCountFor(layout: CodecLayout): number {
   return Math.max(1, ...layout.inputWidths, ...layout.outputWidths);
 }
@@ -103,8 +107,10 @@ export function encodeInput(values: number[], layout: CodecLayout): EncodedInput
   throw new Error('encodeInput: tape axis is delegated to tmCodec');
 }
 
-/** Collect output wire `j`'s step-series (LSB-first) over its width. */
-function timeOutputBits(steps: number[][], width: number, wire: number): number[] {
+/** Collect output wire `j`'s step-series (LSB-first) over its width.
+ *  Exported so the UI's A/V decode reads the SAME window slice the grader
+ *  does (steps 1..width, missing steps as 0, reversed to MSB-first). */
+export function timeOutputBits(steps: number[][], width: number, wire: number): number[] {
   const series: number[] = [];
   for (let t = 0; t < width; t++) series.push(steps[t]?.[wire] ?? 0);
   return series.reverse(); // LSB-first along time → MSB-first for the rep core

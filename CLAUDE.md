@@ -14,7 +14,26 @@ Claude to load into context).
 >
 > A change isn't finished until the docs that describe it are too.
 
-_Last updated: 2026-07-05 (also: a percept/motor **glossary** under the Map — TM brains list the
+_Last updated: 2026-07-06 (**SC/FSM question runs now mirror the grader exactly — window AND
+content** — inside an assignment question, Run/Step execute exactly the grader's `stepCountFor`
+window and feed exactly the grader's input stream: the typed global input is parsed as a
+**value** per input group (exactly how the A/V ARG column reads it — tally "11" = 2, binary
+"110" = 6) and laid on the time axis by the codec's `encodeInput` (LSB at t1, so a tally
+value's ones arrive LAST, zeros leading) in `scStep`/`fsmStep` via the store's
+`selectCodecLayout`; the SC A/V numeral decodes only the grader's window per output group
+(`timeOutputBits`). What the student types is the value the grader tests, and UI verdicts
+match grades in **both representations**. Note this changes FSM question-run typed input: it
+is now read as a **numeral** (MSB-left, "110" = 6) like SC and the ARG column — previously it
+was fed t1-first raw; sandbox FSM is unchanged. The FSM Input/Output row's OUT display now
+also renders t1-rightmost (time flows right-to-left, matching SC) via the pure builder
+`components/outputDisplay.ts`, so a passing identity's OUT reads as the same numeral as its
+typed IN. A typed string that is not a valid numeral for the
+representation (tally "101") denotes no value: the run falls back to the raw typed bits and
+the ARG column flags it '/'; values wider than a group clamp/mask via `valueToBits` as
+everywhere else. Sandbox behavior is unchanged (raw typed bits; SC: L + one 0-drain step per
+MEM; FSM: L). Pinned by `tools/scWindowCheck.ts` (grader + real-store headless runs, incl. the
+real hw3-p7 tally fixture's correct machine), part of `npm run check`. Earlier 2026-07-05: a
+percept/motor **glossary** under the Map — TM brains list the
 internal/external vocabularies (B/E/F → ↑/↱/↰; 0/1/* → write/move), circuit brains the 1-bit
 sensor and motor codes — and the question creator's Save/Cancel now also appear at the top of
 the form. Same day, **turbot TM + Map relocation** — the TM-brained turbot is now the
@@ -203,7 +222,7 @@ the engine.
 | Instructor UI | `app/src/instructor/`                                                          | `InstructorApp`, `InstructorGate`, `InstructorDashboard`, `AssignmentEditor`, `QuestionCreator` (incl. turbot arena editor; pure paint/resize/place helpers in `arenaEditing.ts`), `Gradebook(.ts/View.tsx)`                 |
 | Student UI    | `app/src/components/`                                                          | `CircuitCanvas`, `ComponentLibrary`, `DataTable`, `HomeScreen`, `AssignmentOverview` (question list), `MenuBar`, `SequentialTimeline`, `TMTapePanel` (clickable tape), `ArenaCanvas` (shared arena grid renderer), `TurbotArenaPanel` ("Map" + run controls, in the right data panel), `TurbotTapePanel` (turbot TM's read-only internal tape), `SimulationPanel`, `TabBar` (question nav bar in assignments) |
 | Dev/sample    | `app/src/devData/sampleData.ts`, `seed.ts`                                     | Builders + seeding for demo CC/SC/FSM/TM/turbot assignments and submissions                                                                |
-| Tools         | `app/tools/grade.ts`, `pipelineCheck.ts`, `codecCheck.ts`, `tmCheck.ts`, `turbotCheck.ts` | Headless CLI grader, submit→grade pipeline check (all five modes), codec + rep-core unit checks, TM engine/codec/grader smoke test, and turbot engine/grader smoke test (`npx tsx`)          |
+| Tools         | `app/tools/grade.ts`, `pipelineCheck.ts`, `codecCheck.ts`, `tmCheck.ts`, `turbotCheck.ts`, `scWindowCheck.ts` | Headless CLI grader, submit→grade pipeline check (all five modes), codec + rep-core unit checks, TM engine/codec/grader smoke test, turbot engine/grader smoke test, and the SC/FSM question-run contract check (grader window length + codec input-stream content parity, via real-store headless runs incl. the hw3-p7 fixture) (`npx tsx`)          |
 
 ## Reference-function DSL (instructor authoring)
 
@@ -282,9 +301,20 @@ only — the grader never sees the formula; it runs against the generated numeri
   **tally or binary**. Local scope = per-wire; global scope = all inputs as one number, all
   outputs as one number.
 - **Time flows right-to-left** in SC and FSM tables (t1 on the right; later steps extend left).
-- **SC runs flush the pipeline** — after a loaded input sequence is consumed, Run continues for
-  one 0-input drain step per MEM so delayed bits (a serial adder's final carry, a delay
-  register's last bit) reach the output instead of being dropped.
+- **SC/FSM question runs are the grader's runs** — inside an assignment question, Run/Step
+  execute exactly the grader's run length (`stepCountFor` = max(input widths, output widths)
+  time steps) AND feed exactly the grader's input stream: the typed global input is parsed as
+  a **value** per input group (as the A/V ARG column reads it — tally "11" = 2) and laid on
+  the time axis by the codec's `encodeInput` (LSB at t1 — a tally value's ones arrive last,
+  zeros leading), and the SC A/V numeral decodes only the grader's window per output group.
+  What the student types is the value the grader tests; the UI verdict matches the grade in
+  both representations (`selectCodecLayout`/`selectCodecWindow` in the store; pinned by
+  `tools/scWindowCheck.ts`, incl. the real hw3-p7 tally fixture). Typed input that is not a
+  valid numeral for the representation (tally "101") runs on the raw typed bits and is flagged
+  '/' in ARG. The per-MEM flush rule — after the typed input is consumed, Run continues for
+  one 0-input drain step per MEM so delayed bits (a serial adder's final carry) reach the
+  output — applies only to **sandbox** SC runs (which feed raw typed bits); sandbox FSM runs
+  stop at the typed length L.
 - **MEM block** — M_OUT (left) feeds the stored value in; M_IN (right) receives the new value.
   All memory initializes to 0; display the stored value during simulation.
 - **Input labels** — assigned at creation and permanent; new inputs get the next sequential

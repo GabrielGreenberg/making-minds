@@ -45,15 +45,19 @@ CC → SC → FSM → TM → turbot; within a mode: arithmetic → perception �
 <!-- Reordered by META-audit-queue 2026-07-06 (iteration 5): P1.9 and P1.7 precede
 P1.4 because both de-risk the time-axis/sampled-bank FSM batch; P1.8 must land
 before Phase 3 (perception returns to router-rendered CC/SC). Task ids unchanged. -->
-- [ ] **P1.9** _(discovered 2026-07-06, hw3 critic — potential grading-fairness
-  bug)_ **Reconcile UI-vs-grader drain semantics.** CLAUDE.md says UI Run drains
-  one 0-input step per MEM; the grader's run length is `stepCountFor` =
-  max(inputWidth, outputWidth) (codec.ts), independent of MEM count. A
-  functionally correct student circuit whose answer emerges one cycle later
-  than the codec window would pass in the UI but fail grading (or vice versa).
-  Investigate with a deliberately-late circuit; decide the canonical semantics;
-  fix the divergent side; document in spec §. 
-  **Acceptance:** a documented, single semantics; harness + pipelineCheck green.
+- [x] **P1.9** **Reconcile UI-vs-grader drain semantics.** — _done 2026-07-06
+  (iteration 6; three fix rounds, each adversarially verified — rounds 1 and 2
+  were refuted with real exhibits before round 3 passed)._ The bug was real in
+  BOTH directions (tally machine +1 redundant delay: UI showed correct on every
+  value, grader 1/9; post-window garbage: grader 16/16, UI looked broken; FSM
+  ran zero drain steps). **Canonical semantics: the codec window**
+  (`stepCountFor = max(inW,outW)`); grader untouched; UI question runs now
+  execute exactly the window, feed the codec's own `encodeInput` stream (typed
+  input parsed as a VALUE — fixes tally alignment), and clamp the A/V decode to
+  the grader's window; sandbox unchanged (SC L+#MEM, FSM L). FSM typed input is
+  now a numeral (MSB-left) like SC/ARG; FSM OUT rows render t1-rightmost per
+  VISUAL_VOCAB. All pinned by `app/tools/scWindowCheck.ts` (45 checks, wired
+  into `npm run check`). Spawned P1.10, P1.11.
 - [ ] **P1.7** _(discovered 2026-07-06, hw3 critic)_ **Harness: enforce the
   broken-breadth and drain-coverage bars.** `coverageCheck.ts` only asserts the
   broken variant fails ≥1 case; nothing enforces breadth (≥25% of the bank) or
@@ -114,6 +118,19 @@ before Phase 3 (perception returns to router-rendered CC/SC). Task ids unchanged
   one shared label-order helper used by both paths.
   **Acceptance:** single implementation; `npm run check` (incl. hw2-p6 fixture)
   green.
+- [ ] **P1.10** _(discovered 2026-07-06, P1.9 round-3 verifier; sandbox-only,
+  minor)_ **Sandbox FSM feed direction.** The FSM IN/OUT display is now
+  t1-rightmost everywhere, but the sandbox FSM feed still consumes the typed
+  string leftmost-first (SC sandbox parses rightmost = t1) — a sandbox identity
+  FSM typed "110" displays OUT "011". Reverse the sandbox FSM feed to match SC
+  and update the corresponding scWindowCheck sandbox pin.
+  **Acceptance:** sandbox identity FSM displays OUT == IN; scWindowCheck green.
+- [ ] **P1.11** _(discovered 2026-07-06, P1.9 round-2 verifier; pre-existing,
+  minor)_ **A/V ARG rendering for multi-group questions.** The ARG column
+  renders the whole interleaved typed string as ONE numeral — typed "111101"
+  (x=2, y=3 on hw3-p9) shows ARG '/' while VAL correctly shows 5. Render
+  per-group values ("2, 3") in question mode.
+  **Acceptance:** hw3-p6/p9-style questions show per-group ARGs; gates green.
 
 ## Phase 2 — TM two-output visual change  _(the one deliberate departure)_
 
