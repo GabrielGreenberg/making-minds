@@ -1,0 +1,450 @@
+{
+  "question": {
+    "id": 4,
+    "label": "Problem 4",
+    "statement": "Design a sequential circuit that computes 2x + 1 in binary: given the binary numeral for x streamed in over time, output the binary numeral for 2x + 1. [Use one 2x circuit and one +1 circuit.]",
+    "buildMode": "SC",
+    "representation": "binary",
+    "cc_spec": {
+      "inputs": [
+        {
+          "name": "x",
+          "width": 6
+        }
+      ],
+      "outputs": [
+        {
+          "name": "y",
+          "width": 7,
+          "formula": "2 * x + 1"
+        }
+      ]
+    },
+    "test_cases": [
+      {
+        "inputs": [
+          0
+        ],
+        "outputs": [
+          1
+        ]
+      },
+      {
+        "inputs": [
+          1
+        ],
+        "outputs": [
+          3
+        ]
+      },
+      {
+        "inputs": [
+          2
+        ],
+        "outputs": [
+          5
+        ]
+      },
+      {
+        "inputs": [
+          3
+        ],
+        "outputs": [
+          7
+        ]
+      },
+      {
+        "inputs": [
+          4
+        ],
+        "outputs": [
+          9
+        ]
+      },
+      {
+        "inputs": [
+          5
+        ],
+        "outputs": [
+          11
+        ]
+      },
+      {
+        "inputs": [
+          7
+        ],
+        "outputs": [
+          15
+        ]
+      },
+      {
+        "inputs": [
+          8
+        ],
+        "outputs": [
+          17
+        ]
+      },
+      {
+        "inputs": [
+          11
+        ],
+        "outputs": [
+          23
+        ]
+      },
+      {
+        "inputs": [
+          15
+        ],
+        "outputs": [
+          31
+        ]
+      },
+      {
+        "inputs": [
+          16
+        ],
+        "outputs": [
+          33
+        ]
+      },
+      {
+        "inputs": [
+          23
+        ],
+        "outputs": [
+          47
+        ]
+      },
+      {
+        "inputs": [
+          31
+        ],
+        "outputs": [
+          63
+        ]
+      },
+      {
+        "inputs": [
+          32
+        ],
+        "outputs": [
+          65
+        ]
+      },
+      {
+        "inputs": [
+          47
+        ],
+        "outputs": [
+          95
+        ]
+      },
+      {
+        "inputs": [
+          63
+        ],
+        "outputs": [
+          127
+        ]
+      }
+    ]
+  },
+  "correct": {
+    "components": [
+      {
+        "id": "hw3-p4-in1",
+        "type": "INPUT",
+        "x": 80,
+        "y": 320,
+        "label": "IN1",
+        "ports": [
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "hw3-p4-m1",
+        "type": "MEM",
+        "x": 360,
+        "y": 60,
+        "label": "M1",
+        "ports": [
+          {
+            "id": "mout",
+            "label": "M_OUT",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "min",
+            "label": "M_IN",
+            "side": "right",
+            "index": 0
+          }
+        ],
+        "memDirection": "right-to-left",
+        "storedValue": 0
+      },
+      {
+        "id": "hw3-p4-m2",
+        "type": "MEM",
+        "x": 680,
+        "y": 60,
+        "label": "M2",
+        "ports": [
+          {
+            "id": "mout",
+            "label": "M_OUT",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "min",
+            "label": "M_IN",
+            "side": "right",
+            "index": 0
+          }
+        ],
+        "memDirection": "right-to-left",
+        "storedValue": 0
+      },
+      {
+        "id": "hw3-p4-not1",
+        "type": "NOT",
+        "x": 360,
+        "y": 220,
+        "label": "",
+        "ports": [
+          {
+            "id": "in",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "hw3-p4-or1",
+        "type": "OR",
+        "x": 520,
+        "y": 140,
+        "label": "",
+        "ports": [
+          {
+            "id": "in1",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "in2",
+            "label": "",
+            "side": "left",
+            "index": 1
+          },
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "hw3-p4-or2",
+        "type": "OR",
+        "x": 600,
+        "y": 320,
+        "label": "",
+        "ports": [
+          {
+            "id": "in1",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "in2",
+            "label": "",
+            "side": "left",
+            "index": 1
+          },
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "hw3-p4-out1",
+        "type": "OUTPUT",
+        "x": 760,
+        "y": 320,
+        "label": "OUT1",
+        "ports": [
+          {
+            "id": "in",
+            "label": "",
+            "side": "left",
+            "index": 0
+          }
+        ]
+      }
+    ],
+    "wires": [
+      {
+        "id": "hw3-p4-w1",
+        "sourceComponentId": "hw3-p4-in1",
+        "sourcePortId": "out",
+        "targetComponentId": "hw3-p4-m1",
+        "targetPortId": "min",
+        "value": 0
+      },
+      {
+        "id": "hw3-p4-w2",
+        "sourceComponentId": "hw3-p4-m1",
+        "sourcePortId": "mout",
+        "targetComponentId": "hw3-p4-or2",
+        "targetPortId": "in1",
+        "value": 0
+      },
+      {
+        "id": "hw3-p4-w3",
+        "sourceComponentId": "hw3-p4-m2",
+        "sourcePortId": "mout",
+        "targetComponentId": "hw3-p4-not1",
+        "targetPortId": "in",
+        "value": 0
+      },
+      {
+        "id": "hw3-p4-w4",
+        "sourceComponentId": "hw3-p4-not1",
+        "sourcePortId": "out",
+        "targetComponentId": "hw3-p4-or1",
+        "targetPortId": "in1",
+        "value": 0
+      },
+      {
+        "id": "hw3-p4-w5",
+        "sourceComponentId": "hw3-p4-m2",
+        "sourcePortId": "mout",
+        "targetComponentId": "hw3-p4-or1",
+        "targetPortId": "in2",
+        "value": 0
+      },
+      {
+        "id": "hw3-p4-w6",
+        "sourceComponentId": "hw3-p4-or1",
+        "sourcePortId": "out",
+        "targetComponentId": "hw3-p4-m2",
+        "targetPortId": "min",
+        "value": 0
+      },
+      {
+        "id": "hw3-p4-w7",
+        "sourceComponentId": "hw3-p4-not1",
+        "sourcePortId": "out",
+        "targetComponentId": "hw3-p4-or2",
+        "targetPortId": "in2",
+        "value": 0
+      },
+      {
+        "id": "hw3-p4-w8",
+        "sourceComponentId": "hw3-p4-or2",
+        "sourcePortId": "out",
+        "targetComponentId": "hw3-p4-out1",
+        "targetPortId": "in",
+        "value": 0
+      }
+    ]
+  },
+  "broken": {
+    "components": [
+      {
+        "id": "hw3-p4-in1",
+        "type": "INPUT",
+        "x": 80,
+        "y": 320,
+        "label": "IN1",
+        "ports": [
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "hw3-p4-m1",
+        "type": "MEM",
+        "x": 360,
+        "y": 60,
+        "label": "M1",
+        "ports": [
+          {
+            "id": "mout",
+            "label": "M_OUT",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "min",
+            "label": "M_IN",
+            "side": "right",
+            "index": 0
+          }
+        ],
+        "memDirection": "right-to-left",
+        "storedValue": 0
+      },
+      {
+        "id": "hw3-p4-out1",
+        "type": "OUTPUT",
+        "x": 760,
+        "y": 320,
+        "label": "OUT1",
+        "ports": [
+          {
+            "id": "in",
+            "label": "",
+            "side": "left",
+            "index": 0
+          }
+        ]
+      }
+    ],
+    "wires": [
+      {
+        "id": "hw3-p4-w1",
+        "sourceComponentId": "hw3-p4-in1",
+        "sourcePortId": "out",
+        "targetComponentId": "hw3-p4-m1",
+        "targetPortId": "min",
+        "value": 0
+      },
+      {
+        "id": "hw3-p4-w2",
+        "sourceComponentId": "hw3-p4-m1",
+        "sourcePortId": "mout",
+        "targetComponentId": "hw3-p4-out1",
+        "targetPortId": "in",
+        "value": 0
+      }
+    ]
+  }
+}

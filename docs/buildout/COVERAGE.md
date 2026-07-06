@@ -15,9 +15,9 @@ A row is ✅ only when the manifest row has a fixture and the harness reports it
 `verified` (correct passes every case, broken variant fails), AND appearance has
 been checked against [VISUAL_VOCAB.md](VISUAL_VOCAB.md).
 
-**As of 2026-07-06 (iteration 3):** harness live, **14/56 verified** (HW1 complete
-+ HW2 arithmetic), 42 pending. The self-test proves the harness discriminates
-across all five modes.
+**As of 2026-07-06 (iteration 4):** harness live, **23/56 verified** (HW1 + HW2
+arithmetic + HW3 arithmetic), 33 pending. The self-test proves the harness
+discriminates across all five modes.
 
 ## Columns
 
@@ -56,19 +56,19 @@ harness verified (correct✓ + broken✗) · `appr` = appearance matches VISUAL_
 | hw2-p14 | full circle (CC turbot, pass-through) | navigation | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | |
 | hw2-p15 | zig-zag (CC turbot, pass-through) | navigation | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | |
 
-### HW3 — Computing with SCs  ·  0/14
+### HW3 — Computing with SCs  ·  9/14
 
 | id | problem | category | auth | build | grades | appr | status | notes |
 |----|---------|----------|:----:|:-----:|:------:|:----:|:------:|-------|
-| hw3-p1  | +1 B | arithmetic | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | |
-| hw3-p2  | +2 B | arithmetic | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | |
-| hw3-p3  | 2x B | arithmetic | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | |
-| hw3-p4  | 2x+1 B | arithmetic | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | reuse 2x + +1 |
-| hw3-p5  | 2(x+1) B | arithmetic | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | reuse 2x + +1 |
-| hw3-p6  | x+y B | arithmetic | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | |
-| hw3-p7  | +3 T (feasible) | arithmetic | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | expected constructible |
-| hw3-p8  | 2x T (feasible) | arithmetic | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | expected constructible |
-| hw3-p9  | x+y T (feasible) | arithmetic | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | expected constructible |
+| hw3-p1  | +1 B | arithmetic | ✅ | ✅ | ✅ | ✅ | ✅ | `reference/hw3-p1.json`; serial incrementer (t1-pulse timer + carry MEM); drain case 63→64 |
+| hw3-p2  | +2 B | arithmetic | ✅ | ✅ | ✅ | ✅ | ✅ | `reference/hw3-p2.json`; serial full adder vs constant stream "2" (t2 pulse); broken = t1 pulse (+1) |
+| hw3-p3  | 2x B | arithmetic | ✅ | ✅ | ✅ | ✅ | ✅ | `reference/hw3-p3.json`; canonical 1-step delay register; broken = pass-through |
+| hw3-p4  | 2x+1 B | arithmetic | ✅ | ✅ | ✅ | ✅ | ✅ | `reference/hw3-p4.json`; delay + one-shot t1 OR (2x is even → no carry); broken = bare delay |
+| hw3-p5  | 2(x+1) B | arithmetic | ✅ | ✅ | ✅ | ✅ | ✅ | `reference/hw3-p5.json`; serial +1 then delay; broken = delay-then-+1 order swap |
+| hw3-p6  | x+y B | arithmetic | ✅ | ✅ | ✅ | ✅ | ✅ | `reference/hw3-p6.json`; serial full adder, 128-case bank; broken = carry-less XOR (57% fail) |
+| hw3-p7  | +3 T (feasible) | arithmetic | ✅ | ✅ | ✅ | ✅ | ✅ | `reference/hw3-p7.json`; window-aware counter (canonical tally: ones block must END at final step); every case exercises drain |
+| hw3-p8  | 2x T (feasible) | arithmetic | ✅ | ✅ | ✅ | ✅ | ✅ | `reference/hw3-p8.json`; window-aware (unbounded-stream version is FSM-infeasible — noted in LOG); 16-step runs |
+| hw3-p9  | x+y T (feasible) | arithmetic | ✅ | ✅ | ✅ | ✅ | ✅ | `reference/hw3-p9.json`; counter/latch over 81-case bank; layout uses the p7 right-to-left MEM-chain convention |
 | hw3-p11 | change detector (current ≠ previous) | perception | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | 8-in SC, spatio-temporal |
 | hw3-p12 | motion detector (object image moving up) | perception | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | 8-in SC, spatio-temporal |
 | hw3-p13 | zig-zag: reach & keep going | navigation | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | SC turbot, pass-through |

@@ -145,3 +145,52 @@ New mode for the batch: MEM blocks, time axis, pipeline-drain on carries
 (CLAUDE.md: SC runs flush one 0-input drain step per MEM). Builders should read
 `engine/sc.ts` + the SC sample in devData first; banks are SAMPLED for SC (not
 exhaustive) — broken variants must fail within the sampled bank.
+
+## 2026-07-06 (iteration 4) — P1.3: HW3 SC arithmetic · 23/56
+
+**Shipped:** nine SC fixtures (`hw3-p1..p9`) — first non-CC batch. Six binary
+serial machines (incrementer with t1-pulse timer, +2 via constant-stream "2",
+delay-register 2x, 2x+1, 2(x+1), serial full adder x+y over a 128-case bank)
+and three tally feasibility items built as **window-aware counter machines**
+(the unbounded-stream versions of 2x T / x+y T are FSM-infeasible; the
+platform's fixed 8-step window + drain makes them constructible — the PDF's
+"if not, explain why" prose branch can't be graded anyway). All banks via
+production `buildQuestionBank`; verifiers regenerated independent banks +
+plain-JS oracles; 0 refutations; drain cases (63→64 etc.) confirmed. Harness:
+**23 verified / 33 pending / 0 regressed**; all gates green.
+
+**The hard part — appearance.** First sweep failed 6/9: the auto-router runs
+every wire into `MEM.min` down a fixed obstacle-blind **fallback lane** (the
+min stub sits inside the router's phantom 75×70 MEM bounds; rendered body is
+50×50), and those fixed lanes ran collinear with other wires / through bodies.
+Fixed by a 6-agent workflow: each fixer re-implemented the route oracle by
+importing the app's real `routeAllWires` (validated against known-good hw3-p7
+= 0/0/0), then repositioned components until zero different-source collinear
+overlaps / body passes / box collisions — regrades unchanged. One residual the
+0.5px oracle missed: two p9 lanes **1px apart** (A* channel hugging a fallback
+lane) — found by the in-browser DOM audit, fixed by hand (MEM `g1` x→1040 so
+its fallback lane landed in a clear corridor; the strict 3px oracle
+`scratchpad/routecheck_near.ts` now passes all six). Browser re-sweep: 9/9.
+
+**Ops surprises:** two consecutive 529-Overloaded outages killed the spec agent
+(resume via `Workflow({scriptPath, resumeFromRunId})` worked perfectly — third
+attempt ran to completion); then the **subagent session limit** hit during the
+re-sweep (resets 4:50am) — finished the sweep + p9 nudge solo with preview
+tools. Seeding lesson repeated the hard way: seed localStorage ONLY while
+parked on Home after a reload; seeding then reloading in one step lets the old
+page's flushAutoSave clobber the seed (cost one confused audit of a stale
+canvas). Vite serves the app under base path `/making-minds/`.
+
+**Fixture-content lessons:** statements must be clean prose — stripped ledger
+shorthand ("+2 B.") and answer-giveaway parentheticals ("(It is possible: …)")
+from p2/p7/p9. Watch spec agents: they must return full row ids AND clean
+statements; builders copy whatever they're given.
+
+**Queued:** P1.7 (harness: enforce broken-breadth ≥25% + drain-coverage bars),
+P1.8 (renderer: router fallback bounds / lane separation / divergence dots —
+design memo), P1.9 (**possible grading-fairness bug**: UI drains one step per
+MEM but the grader's window is max(inWidth,outWidth) — a late-emitting correct
+circuit could pass UI and fail grading).
+
+**Next:** iteration 5 = **META-audit-queue** (due: 5 iterations elapsed), then
+P1.4 (HW4 FSM arithmetic, hw4-p3…p11).
