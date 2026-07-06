@@ -58,22 +58,20 @@ before Phase 3 (perception returns to router-rendered CC/SC). Task ids unchanged
   now a numeral (MSB-left) like SC/ARG; FSM OUT rows render t1-rightmost per
   VISUAL_VOCAB. All pinned by `app/tools/scWindowCheck.ts` (45 checks, wired
   into `npm run check`). Spawned P1.10, P1.11.
-- [ ] **P1.7** _(discovered 2026-07-06, hw3 critic)_ **Harness: enforce the
-  broken-breadth and drain-coverage bars.** `coverageCheck.ts` only asserts the
-  broken variant fails ≥1 case; nothing enforces breadth (≥25% of the bank) or
-  that an SC bank contains at least one drain-exercising case (output bits
-  beyond the input window). Both bars exist only as memo lore; a bank
-  regeneration or sampler change could silently drop them. Add per-row
-  failure-fraction reporting + a warn/fail threshold, and an SC-mode assertion
-  that some case has output width > input width. _(Audit 2026-07-06 folded in:)_
-  also add a **statement lint** (no ledger-shorthand prefixes, no
-  answer-giveaway parentheticals — two rounds of manual cleanup in hw2/hw3
-  prove the pattern recurs), and **promote the layout oracle**
-  (`scratchpad/routecheck_near.ts`, strict 3px variant) to `app/tools/` wired
-  into `npm run coverage` for router-rendered (CC/SC) fixtures.
-  **Acceptance:** harness prints per-row broken-fail fractions; hw3 rows pass;
-  a synthetic single-case-divergence fixture trips the warning; statement lint
-  + layout oracle run in the harness.
+- [x] **P1.7** **Harness hardening: breadth/drain/statement/layout bars.** —
+  _done 2026-07-06 (iteration 7; adversarial verifier proved every bar bites by
+  MUTATION on the real ledger path — refuted nothing)._ `coverageCheck.ts` now
+  prints per-row broken-fail fractions (WARN <25% on sampled SC/FSM/TM banks;
+  info-only on exhaustive CC — hw2-p6's 1/16 narrow near-miss stays green by
+  policy), warns when an SC/FSM bank lacks a drain witness (all 9 SC banks have
+  one), hard-FAILs statement-lint violations (shorthand prefixes, answer
+  giveaways), and hard-FAILs layout violations for CC/SC fixtures via the
+  promoted `tools/layoutCheck.ts` (real-router oracle, CLI + harness). Five
+  synthetic self-test tripwires prove the checks check. Surprise: hw2-p6,
+  hw2-p7 (broken machine), hw3-p4 were NOT oracle-clean (predated the strict
+  oracle) — repositioned, position-only, regrades unchanged. Accepted minors
+  (LOG): bars key off manifest mode (consistency untested), lint regex scoped
+  to x/y variables.
 - [ ] **P1.4** Reference solutions for **HW4 FSM arithmetic** (hw4-p3…p11).
   First step = **META-visual-vocab** for FSM: re-read the textbook FSM chapter +
   `Mock_Ups-9.jpg`, refresh VISUAL_VOCAB's FSM section before the appearance

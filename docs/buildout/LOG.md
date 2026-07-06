@@ -278,3 +278,41 @@ numeral — pre-existing).
 
 **Next:** **P1.7** — harness hardening (breadth ≥25% + drain bars, statement
 lint, promote `routecheck_near.ts` to `app/tools/`).
+
+## 2026-07-06 (iteration 7) — P1.7: harness hardening · four bars encoded
+
+**Shipped:** the quality bars that lived only as memo lore are now code.
+`coverageCheck.ts` prints every fixtured row's broken-fail fraction and
+enforces: **breadth** (WARN <25% on sampled SC/FSM/TM banks; info-only on
+exhaustive CC — hw2-p6's designed 1/16 narrow near-miss stays green),
+**drain coverage** (WARN when an SC/FSM bank with outW>inW lacks a case whose
+expected output emits during drain steps — all 9 SC banks verified to carry a
+witness), **statement lint** (hard FAIL: shorthand prefixes, answer-giveaway
+parentheticals), and the **layout oracle** (hard FAIL for CC/SC fixtures;
+`scratchpad/routecheck_near.ts` promoted to `tools/layoutCheck.ts`, geometry
+unchanged, CLI + harness integration, machines routed once per run). Five
+synthetic self-test tripwires prove each check fires. JSON summary gained
+warnings counts + per-row fractions without breaking existing keys.
+
+**Adversarial verification (refuted nothing):** the verifier proved every bar
+bites by MUTATION on the real ledger path — injected a shorthand statement
+(row regressed), reverted the builder's hw2-p6 layout nudge (row regressed —
+proving the nudge was a genuine fix), and filtered a bank to a 14% broken
+fraction (WARN fired, row stayed verified). Tree restored byte-identical.
+
+**Surprise:** three fixtures were NOT oracle-clean — hw2-p6 (1 near-parallel
+pair), hw2-p7 (14 collinear pairs in the BROKEN machine: its input→XOR wires
+all fell back to one midpoint track), hw3-p4 (4 pairs). hw2 predates the
+oracle; hw3-p4 passed the first browser sweep but was never re-run under the
+strict 3px variant. Repositioned (position-only — verified byte-identical
+otherwise; regading unchanged). Lesson encoded: the oracle now runs in the
+harness, so this class can't silently recur.
+
+**Accepted minors:** bars key off the manifest row's mode (a mistyped manifest
+mode would misroute policy — all 23 rows consistent today); lint's shorthand
+regex admits only x/y variable letters; sub-0.5% fractions print as "(0%)".
+
+**Next:** **P1.4** — HW4 FSM arithmetic (hw4-p3…p11), with its
+META-visual-vocab first step (textbook FSM chapter + Mock_Ups-9). The P1.9/P1.7
+groundwork pays off here: FSM question runs now execute the codec window with
+numeral input, and the new bars gate the batch automatically.

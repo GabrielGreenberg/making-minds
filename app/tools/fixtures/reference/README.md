@@ -31,6 +31,30 @@ harness's adversarial assertions pass.
 Wire the path into that row's `"fixture"` field, relative to `tools/fixtures/`
 (e.g. `"reference/hw2-p1.json"`).
 
+## Hardening bars (what the harness checks beyond pass/fail)
+
+Every wired fixture also runs through four bars in `coverageCheck.ts`:
+
+- **Broken-breadth (WARN)** — the ledger prints each row's broken-fail fraction
+  (`failed / bank size`). On SAMPLED banks (SC/FSM/TM) a fraction **< 25%** gets a
+  WARN — a broken variant that trips almost none of a sample isn't proving much.
+  Exhaustive CC banks print the fraction as info only (a narrow near-miss like
+  hw2-p6's 1/16 is legitimate when the whole input space is tested). Warnings
+  never change row state or the exit code.
+- **Drain coverage (WARN, SC/FSM)** — if the question's output width exceeds its
+  input width, the bank must contain at least one case whose expected output
+  (encoded on the codec's time axis) has a nonzero bit at a step >= the input
+  width — i.e. a case that only passes if the machine emits during drain steps.
+- **Statement lint (hard FAIL)** — `question.statement` must be clean prose:
+  non-empty, no ledger-shorthand prefix ("2x B. …"), no answer-giveaway
+  parenthetical ("(It is possible…", "(Yes,…").
+- **Layout oracle (hard FAIL, CC/SC rows)** — `tools/layoutCheck.ts` routes both
+  machines through the app's real wire router with CircuitCanvas's exact port
+  geometry and rejects different-source collinear/near-parallel wire overlaps,
+  wires through foreign component bodies, and overlapping component boxes.
+  Check a fixture standalone with `npx tsx tools/layoutCheck.ts <fixture.json>`.
+  (FSM/TM/turbot STATE curves bypass the router — those rows are skipped.)
+
 ## Navigation generality
 
 Problems with unknown distances/positions (Mad Max, Way Finder, Desert Ant) are
