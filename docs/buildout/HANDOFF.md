@@ -16,19 +16,25 @@ the loop's job, starting now.
 The single most important first iteration: turn **one** COVERAGE row green
 end-to-end, establishing the template every later fixture copies.
 
-1. Start the dev server (`preview_start`, config in `.claude/launch.json`, port 5173).
-2. In the app, build a **NAND** circuit (2 inputs → AND → NOT → 1 output). Verify
-   it computes NAND, then **export** its `CircuitData` (components + wires).
-3. Also make a **broken** variant (e.g. drop the NOT, so it computes AND) and export it.
-4. Author the question: `buildMode: "CC"`, `representation: "binary"`, a `cc_spec`
+1. **Author headlessly — no browser needed.** In a scratch `tsx` script, build a
+   **NAND** diagram (IN1, IN2 → AND → NOT → OUT1) with the helpers in
+   `app/tools/builder.ts` (`comp`/`wire`), plus a **broken** variant (drop the
+   NOT → plain AND). Give components real grid positions (left→right) so the
+   fixture also renders well later. This exact machine has already been proven
+   headlessly (simulate + grade 4/4 correct, 0/4 broken) during bootstrap.
+2. Author the question: `buildMode: "CC"`, `representation: "binary"`, a `cc_spec`
    with two 1-wide inputs + one 1-wide output, and the four NAND `test_cases`.
-5. Write `app/tools/fixtures/reference/hw1-p1.json` as
-   `{ question, correct, broken }` (see `fixtures/reference/README.md`).
-6. Set the `hw1-p1` row's `"fixture": "reference/hw1-p1.json"` in
+3. In the same script, assert `gradeQuestion(question, correct)` passes 4/4 and
+   the broken variant fails; only then write
+   `app/tools/fixtures/reference/hw1-p1.json` as `{ question, correct, broken }`
+   (see `fixtures/reference/README.md`).
+4. Set the `hw1-p1` row's `"fixture": "reference/hw1-p1.json"` in
    `coverage-manifest.json`.
-7. `npm run coverage` → `hw1-p1` must report **verified** (correct passes all 4
-   cases, broken fails ≥1). Appearance-check the NAND render against VISUAL_VOCAB.
-8. Update COVERAGE (row → ✅), QUEUE (P0.4 done), LOG (append), this HANDOFF
+5. `npm run coverage` → `hw1-p1` must report **verified**.
+6. Appearance check (this is the only step that uses the browser): load the
+   machine in the app (`preview_start`, port 5173) and compare against
+   VISUAL_VOCAB.
+7. Update COVERAGE (row → ✅), QUEUE (P0.4 done), LOG (append), this HANDOFF
    (point at P1.1), then commit.
 
 **Acceptance:** `npm run coverage` shows 1/56 verified; COVERAGE hw1-p1 fully ✅.
@@ -40,8 +46,10 @@ QUEUE order. Keep finishing one vertical before broadening.
 
 ## Watch out for
 
-- Building the `correct` machine JSON by hand is error-prone (component/port/wire
-  ids). Prefer **export from the running app**.
+- Author machines **in code** via `app/tools/builder.ts` (port ids documented in
+  its header; canonical five-mode examples in `src/devData/sampleData.ts`). The
+  running app is only needed for the appearance check — and as a fallback for
+  diagrams easier to draw than to code.
 - Every fixture needs a **broken** variant or the harness flags it as regressed —
   that's intentional (the check must be adversarial).
 - Keep the lockfile clean: if `tsx`/deps are missing, `npm install` (it reconciles

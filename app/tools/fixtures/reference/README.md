@@ -38,8 +38,23 @@ only proven by a **family** of arenas. Put several arenas in
 `question.turbot_cases`; the grader requires all of them to pass, so a solution
 that only works for one layout will fail the fixture.
 
-## Building fixtures by running the app
+## Authoring fixtures headlessly (the primary path — no browser)
 
-The most reliable way to produce `correct` machine JSON is to build the solution
-in the running app and export it, rather than hand-authoring component/port/wire
-ids. Keep the exported `CircuitData` and pair it with the authored `question`.
+Machines are plain JSON and the engine is pure, so author fixtures **in code**
+and verify them with the real grader before writing the file:
+
+1. Import the helpers from `app/tools/builder.ts` (`comp`, `wire`, `transition`,
+   `circuit`) — the same pattern as `src/devData/sampleData.ts`, which has
+   canonical programmatic machines for all five modes.
+2. Build `correct` and `broken`, author the `question`, and check them in the
+   same script: `gradeQuestion(question, correct)` must pass every case and
+   `gradeQuestion(question, broken)` must not. Run it with `npx tsx` from `app/`.
+3. Write the fixture JSON only once the script proves both assertions.
+
+Give components real grid positions (left→right flow, ~160px column spacing) so
+the same fixture also loads cleanly in the UI for the appearance check — grading
+ignores positions, rendering doesn't.
+
+The running app remains a fallback: build a machine in the UI and export its
+`CircuitData` if a diagram is easier to draw than to code (large layouts,
+tricky wiring).

@@ -30,10 +30,12 @@ State which task you picked and its acceptance criterion.
 
 ## C · Build / fix
 Implement the vertical slice the task needs (engine / store / UI / instructor
-authoring / a reference fixture). Reference solutions are best produced by building
-in the running app (`preview_start`, port 5173) and exporting `CircuitData`, then
-pairing with an authored `question` and a **broken** variant — see
-`app/tools/fixtures/reference/README.md`.
+authoring / a reference fixture). Author reference machines **headlessly, in
+code** — `app/tools/builder.ts` helpers (port ids in its header), canonical
+examples in `src/devData/sampleData.ts` — and prove them with `gradeQuestion`
+in a `tsx` script *before* writing the fixture (`{ question, correct, broken }`,
+see `app/tools/fixtures/reference/README.md`). The browser is only for the
+appearance check (and as a fallback for diagrams easier to draw than to code).
 
 ## D · Adversarially verify  (use a Workflow for multi-problem sections)
 - `npm run coverage` — the task's COVERAGE rows must go `verified` (correct passes
