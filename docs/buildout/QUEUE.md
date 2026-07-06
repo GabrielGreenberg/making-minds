@@ -72,13 +72,41 @@ before Phase 3 (perception returns to router-rendered CC/SC). Task ids unchanged
   oracle) — repositioned, position-only, regrades unchanged. Accepted minors
   (LOG): bars key off manifest mode (consistency untested), lint regex scoped
   to x/y variables.
-- [ ] **P1.4** Reference solutions for **HW4 FSM arithmetic** (hw4-p3…p11).
-  First step = **META-visual-vocab** for FSM: re-read the textbook FSM chapter +
-  `Mock_Ups-9.jpg`, refresh VISUAL_VOCAB's FSM section before the appearance
-  sweep. Spec agent reads `engine/fsm.ts` + the devData FSM sample; same
-  LSB-first time axis as SC; sampled banks (broken must fail broadly); pin full
-  row ids (`hw4-pN`) in the spec schema.
-  **Advances:** hw4-p3..p11.
+- [x] **P1.4** Reference solutions for **HW4 FSM arithmetic** (hw4-p3…p10; p11
+  blocked). — _done 2026-07-06 (iteration 8; 23-agent workflow incl. the
+  META-visual-vocab FSM refresh — textbook ch. 22 corrected the initial-state
+  rule: NO incoming-arrow marker, S₀ by name alone). 8 fixtures verified, 0
+  refutations, 0 warnings; 31/56._ Remainders: **hw4-p11 BLOCKED** (single-bit
+  FSM grammar + grader feeds wire 0 only → P1.12); hw4-p8/p9/p10 grading-✅ but
+  appearance-blocked on the coincident-arc renderer defect (→ P1.13).
+- [ ] **P1.12** _(discovered 2026-07-06, hw4 batch — absorbs P4.1's depth check
+  and is the P2.1 design's first slice)_ **Transition-notation design memo +
+  FSM multi-bit alphabet.** One engine change unblocks TWO clusters: hw4-p11
+  needs 2-bit INPUT symbols (`xy:o`, alphabet 00/01/10/11 per the codec's wire
+  order) and hw4-p12–14 navigation needs 2-bit OUTPUT symbols (motor 11=F/00=S/
+  10=R/01=L per hw4.pdf p188). The family is P2.1's: FOUR transition grammars
+  live as scattered string conventions (FSM `0:1`, TM `1:0R`, turbot-TM
+  internal/external). Write `designs/transition-notation.md` FIRST (per-mode
+  notation module: parse/validate/render/edit as one pluggable unit), then
+  implement the FSM k-bit slice through it: `engine/fsm.ts` match on the joined
+  input row, `machineValidation.ts` enumerate 2^k symbols, `grader.ts` feed the
+  full row (not `s[0]`), editor label entry, store typed-sequence feeding.
+  **Also fix the silent-misgrading footgun** even for unsupported cases:
+  validateMachine must reject/flag an FSM question whose input-group count
+  exceeds the supported alphabet width (today it grades wire 0 silently).
+  **Acceptance:** memo written; hw4-p11 fixture builds + verifies (33/56);
+  a 2-input FSM question can no longer silently mis-grade; scWindowCheck/
+  tmCheck/turbotCheck/coverage all green.
+- [ ] **P1.13** _(discovered 2026-07-06, hw4 appearance sweep)_ **FSM renderer:
+  coincident opposite-direction arcs.** S₀→S₁ and S₁→S₀ render as geometrically
+  coincident quadratic curves with superimposed labels (one transition visually
+  hidden) — violates the textbook's separated-arcs rule (VISUAL_VOCAB, refreshed
+  from ch. 22). Fix the curve control-point offset for opposite-direction pairs
+  in CircuitCanvas; re-sweep hw4-p8/p9/p10 (their appr cells + statuses flip ✅).
+  Renderer family sibling of P1.8 (wire router) — one CircuitCanvas fix, not
+  fixture nudges (the machines NEED both directions).
+  **Acceptance:** hw4-p8/p9/p10 appearance passes; no regression in the other
+  FSM fixtures' rendering; gates green.
 - [ ] **P1.8** _(discovered 2026-07-06, hw3 appearance sweep)_ **Renderer: wire
   lanes and junction dots** — design memo first (`designs/wire-routing.md`).
   Family: the auto-router (a) sends every wire into `MEM.min` down a fixed

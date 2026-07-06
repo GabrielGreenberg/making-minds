@@ -56,12 +56,38 @@ center. MEM initializes to 0 and displays its stored value during simulation.
 
 ## FSM
 
-- States are **circles** labeled `S₀, S₁, …`; `S₀` is the initial state, marked
-  with an incoming arrow from nowhere. Current state highlighted (filled green).
-- Transition arrows labeled **`input:output`** (e.g. `0:1` = "on input 0, output 1").
-  At most one outgoing arrow per input value; a missing arrow ⇒ halt on that input.
-- A **state table** view mirrors the diagram: `STATE | IN | OUT | NEXT`.
-- "Current state: Sₙ" shown above the canvas.
+_(textbook ch. 22, pp. 99–103; mockup `Mock_Ups-9.jpg`)_
+
+- States are **circles** labeled `S₀, S₁, …` (S + subscript numeral; palette
+  stencil reads `Sₙ`). **The initial state is marked by name alone — it is always
+  `S₀`.** No arrow-from-nowhere, double ring, or other initial-state marker
+  (textbook p. 100; the mockup shows none either).
+- Current state highlighted **filled green** (mockup); "Current state: Sₙ" readout
+  above the canvas. (The textbook's step-by-step figures instead use markers: red
+  ▲ at the current state, blue ▲ under the current IN bit, blue ▶ beside the
+  current transition's label — print convention, not the app's.)
+- Transition arrows are **one-directional** (arrowhead at the target), labeled
+  **`input:output`** (Mealy, e.g. `0:1` = "on input 0, output 1"); the label sits
+  beside/above its arrow. The textbook's output-on-state variation (input-only
+  labels) is noted there as a variation and NOT used.
+- **Determinism** — per state, at most one outgoing arrow per input symbol (≤ n
+  arrows for n readable symbols; binary ⇒ ≤ 2). Zero outgoing arrows is legal.
+  Self-loops and multi-state loops are legal; lines may cross.
+- **Self-loops** draw as a small arc looping outside the circle, label at the
+  apex; multiple self-loops on one state fan out at distinct angles. When A→B and
+  B→A both exist they draw as two separated curved arcs, never overlapping (a
+  lone transition between a pair may be a straight arrow).
+- **Halting** — no arrow for the read input ⇒ the machine halts in that state on
+  that input; no outgoing arrows at all ⇒ halts on any input. Design rule
+  (p. 101): a function-computing FSM should **never halt** — its final state
+  carries `0:0` and `1:0` self-loops (outputs 0s indefinitely).
+- **State table** mirrors the diagram: `CURRENT STATE | IN | OUT | NEXT STATE`,
+  two rows per state (inputs 0 and 1, states in S₀ < S₁ < … order); a missing
+  transition shows OUT `–` / NEXT `HALT`; the current state's rows highlight
+  during simulation.
+- Run panel: IN and OUT bit rows under `… t2 t1` headers, t1 rightmost, later
+  steps extend left (mockup: `+` affordance on the table's left edge);
+  Run / Pause / Step / Reset controls.
 
 ## TM  ⚠ the one deliberate departure
 

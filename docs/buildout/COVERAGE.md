@@ -15,9 +15,11 @@ A row is ✅ only when the manifest row has a fixture and the harness reports it
 `verified` (correct passes every case, broken variant fails), AND appearance has
 been checked against [VISUAL_VOCAB.md](VISUAL_VOCAB.md).
 
-**As of 2026-07-06 (iteration 4):** harness live, **23/56 verified** (HW1 + HW2
-arithmetic + HW3 arithmetic), 33 pending. The self-test proves the harness
-discriminates across all five modes.
+**As of 2026-07-06 (iteration 8):** harness live, **31/56 verified** (HW1, HW2
+arith, HW3 arith, HW4 arith minus the blocked p11), 25 pending, 0 regressed.
+Four hw4 rows are grading-verified but appearance-blocked on the FSM
+coincident-arc renderer defect (P1.13); hw4-p11 is blocked on the FSM multi-bit
+transition alphabet (P1.12).
 
 ## Columns
 
@@ -77,19 +79,19 @@ harness verified (correct✓ + broken✗) · `appr` = appearance matches VISUAL_
 
 _Note: HW3 #10 (x·y B) is an impossibility argument (not SC-computable) — excluded._
 
-### HW4 — Computing with FSMs  ·  0/12
+### HW4 — Computing with FSMs  ·  4 full + 4 grading-✅ (appr blocked) / 12
 
 | id | problem | category | auth | build | grades | appr | status | notes |
 |----|---------|----------|:----:|:-----:|:------:|:----:|:------:|-------|
-| hw4-p3  | +1 T | arithmetic | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | |
-| hw4-p4  | +2 T | arithmetic | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | |
-| hw4-p5  | +1 B | arithmetic | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | |
-| hw4-p6  | +2 B | arithmetic | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | |
-| hw4-p7  | +4 B | arithmetic | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | |
-| hw4-p8  | 2x B | arithmetic | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | |
-| hw4-p9  | 2x+1 B | arithmetic | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | |
-| hw4-p10 | 2(x+1) B | arithmetic | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | |
-| hw4-p11 | x+y B | arithmetic | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | |
+| hw4-p3  | +1 T | arithmetic | ✅ | ✅ | ✅ | ✅ | ✅ | `reference/hw4-p3.json`; 10-state leading-zero counter (canonical tally: ones arrive last); broken fails 9/9 |
+| hw4-p4  | +2 T | arithmetic | ✅ | ✅ | ✅ | ✅ | ✅ | `reference/hw4-p4.json`; 12-state counted +2; broken = counted +1 (window degeneracy note in LOG: p3's saturating machine also passes p4 — do not use as its broken) |
+| hw4-p5  | +1 B | arithmetic | ✅ | ✅ | ✅ | ✅ | ✅ | `reference/hw4-p5.json`; 2-state carry FSM; broken = carry-dropper (62.5%) |
+| hw4-p6  | +2 B | arithmetic | ✅ | ✅ | ✅ | ✅ | ✅ | `reference/hw4-p6.json`; 3-state shifted carry |
+| hw4-p7  | +4 B | arithmetic | ✅ | ✅ | ✅ | ✅ | ✅ | `reference/hw4-p7.json`; 4-state (echo two bits + carry) |
+| hw4-p8  | 2x B | arithmetic | ✅ | ✅ | ✅ | ⚠ | ⚠ | `reference/hw4-p8.json`; 2-state delay; grades ✅ but **renderer defect**: opposite-direction arcs S₀⇄S₁ render coincident (→ P1.13) |
+| hw4-p9  | 2x+1 B | arithmetic | ✅ | ✅ | ✅ | ⚠ | ⚠ | `reference/hw4-p9.json`; 3-state; same coincident-arc defect S₁⇄S₂ (→ P1.13) |
+| hw4-p10 | 2(x+1) B | arithmetic | ✅ | ✅ | ✅ | ⚠ | ⚠ | `reference/hw4-p10.json`; 3-state delayed increment; same defect S₁⇄S₂ (→ P1.13) |
+| hw4-p11 | x+y B | arithmetic | ⬜ | ⬜ | ⬜ | ⬜ | 🚫 | **BLOCKED — engine gap**: FSM label grammar is single-bit and the grader feeds wire 0 only (identity machine passes exactly the y=0 slice). Needs the multi-bit transition alphabet (→ P1.12 / transition-notation design) |
 | hw4-p12 | zig-zag: reach & keep going | navigation | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | FSM turbot; **needs 2-bit motor F/S/R/L** |
 | hw4-p13 | three ahead: reach & stop | navigation | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | FSM turbot; needs 2-bit motor |
 | hw4-p14 | way finder: any non-branching maze | navigation | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | general solver; **multi-arena** |

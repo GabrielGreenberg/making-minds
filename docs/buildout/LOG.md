@@ -316,3 +316,43 @@ regex admits only x/y variable letters; sub-0.5% fractions print as "(0%)".
 META-visual-vocab first step (textbook FSM chapter + Mock_Ups-9). The P1.9/P1.7
 groundwork pays off here: FSM question runs now execute the codec window with
 numeral input, and the new bars gate the batch automatically.
+
+## 2026-07-06 (iteration 8) — P1.4: HW4 FSM arithmetic · 31/56, one engine gap exposed
+
+**Shipped:** eight FSM fixtures (`hw4-p3..p10`) — tally +1/+2 as leading-zero
+counter machines (10/12 states; canonical ones-arrive-last streams), binary
++1/+2/+4/2x/2x+1/2(x+1) as 2–4-state carry/delay Mealy machines. All banks via
+`buildQuestionBank`; 0 refutations (verifiers hand-traced drain steps); 0
+harness warnings (lowest broken-fail fraction 62.5%). **31/56 verified, 0
+regressed.** Plus the META-visual-vocab FSM refresh from textbook ch. 22 —
+notably it CORRECTED our vocab: the initial state has NO incoming-arrow
+marker (S₀ is identified by name alone), and function-computing FSMs must
+never halt (final state needs 0:0/1:0 self-loops).
+
+**Engine gap exposed (hw4-p11 x+y BLOCKED):** the FSM transition grammar is
+strictly single-bit (`^[01]:[01]$` across fsm.ts / machineValidation / editor)
+and `grader.ts` feeds `enc.steps.map(s => s[0])` — wire 0 only. Proven: an
+identity machine passes exactly the 16/128 y=0 cases of the p11 bank. Worse,
+this is a **silent-misgrading footgun**: QuestionCreator can author a 2-input
+FSM question today and it grades wrong without any error. One engine change
+(multi-bit transition alphabet) unblocks BOTH hw4-p11 (2-bit inputs) and the
+Phase-4 FSM navigation cluster (2-bit motor outputs, 11=F/00=S/10=R/01=L per
+hw4.pdf p188) — queued as **P1.12**, which absorbs P4.1's depth check and is
+the first slice of P2.1's transition-notation design (memo first).
+
+**Renderer defect (appearance 4/8 → 7/8 after a fixture fix):** hw4-p4 just
+had plain-ASCII state labels (relabeled to S₀-style subscripts solo, regraded
+green). But hw4-p8/p9/p10 hit a real CircuitCanvas defect: **opposite-direction
+transition pairs render as coincident quadratic curves** with superimposed
+labels — one transition visually hidden. Machines inherently need both
+directions, so this is a renderer fix (→ **P1.13**), not fixture nudging (P1.8
+lesson applied). Their rows: grades ✅, appr ⚠ in COVERAGE.
+
+**Process notes:** HANDOFF's guessed problem list was wrong (p3 was "+1 T" not
+"x B identity") — the PDF-wins spec step caught it, as designed. The
+p3-saturating-+1-machine-also-passes-p4 window degeneracy is documented in the
+prove script (don't reuse saturating machines as broken variants for adjacent
+questions). hw4-p11's manifest row now carries the blocker note.
+
+**Next:** **P1.12** — write `designs/transition-notation.md`, then the FSM
+k-bit alphabet slice (unblocks hw4-p11 → 32/56; kills the footgun). Then P1.13.

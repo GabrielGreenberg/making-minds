@@ -1,0 +1,539 @@
+{
+  "question": {
+    "id": 3,
+    "label": "Problem 3",
+    "statement": "Design a finite-state machine that computes x + 1 on tally numerals.",
+    "buildMode": "FSM",
+    "representation": "tally",
+    "cc_spec": {
+      "inputs": [
+        {
+          "name": "x",
+          "width": 8
+        }
+      ],
+      "outputs": [
+        {
+          "name": "out",
+          "width": 9,
+          "formula": "x + 1"
+        }
+      ]
+    },
+    "test_cases": [
+      {
+        "inputs": [
+          0
+        ],
+        "outputs": [
+          1
+        ]
+      },
+      {
+        "inputs": [
+          1
+        ],
+        "outputs": [
+          2
+        ]
+      },
+      {
+        "inputs": [
+          2
+        ],
+        "outputs": [
+          3
+        ]
+      },
+      {
+        "inputs": [
+          3
+        ],
+        "outputs": [
+          4
+        ]
+      },
+      {
+        "inputs": [
+          4
+        ],
+        "outputs": [
+          5
+        ]
+      },
+      {
+        "inputs": [
+          5
+        ],
+        "outputs": [
+          6
+        ]
+      },
+      {
+        "inputs": [
+          6
+        ],
+        "outputs": [
+          7
+        ]
+      },
+      {
+        "inputs": [
+          7
+        ],
+        "outputs": [
+          8
+        ]
+      },
+      {
+        "inputs": [
+          8
+        ],
+        "outputs": [
+          9
+        ]
+      }
+    ]
+  },
+  "correct": {
+    "components": [
+      {
+        "id": "hw4-p3-s0",
+        "type": "STATE",
+        "x": 80,
+        "y": 80,
+        "label": "S₀",
+        "ports": [
+          {
+            "id": "left",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "right",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "hw4-p3-s1",
+        "type": "STATE",
+        "x": 280,
+        "y": 80,
+        "label": "S₁",
+        "ports": [
+          {
+            "id": "left",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "right",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "hw4-p3-s2",
+        "type": "STATE",
+        "x": 480,
+        "y": 80,
+        "label": "S₂",
+        "ports": [
+          {
+            "id": "left",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "right",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "hw4-p3-s3",
+        "type": "STATE",
+        "x": 680,
+        "y": 80,
+        "label": "S₃",
+        "ports": [
+          {
+            "id": "left",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "right",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "hw4-p3-s4",
+        "type": "STATE",
+        "x": 880,
+        "y": 80,
+        "label": "S₄",
+        "ports": [
+          {
+            "id": "left",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "right",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "hw4-p3-s5",
+        "type": "STATE",
+        "x": 880,
+        "y": 300,
+        "label": "S₅",
+        "ports": [
+          {
+            "id": "left",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "right",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "hw4-p3-s6",
+        "type": "STATE",
+        "x": 680,
+        "y": 300,
+        "label": "S₆",
+        "ports": [
+          {
+            "id": "left",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "right",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "hw4-p3-s7",
+        "type": "STATE",
+        "x": 480,
+        "y": 300,
+        "label": "S₇",
+        "ports": [
+          {
+            "id": "left",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "right",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "hw4-p3-s8",
+        "type": "STATE",
+        "x": 280,
+        "y": 300,
+        "label": "S₈",
+        "ports": [
+          {
+            "id": "left",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "right",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "hw4-p3-s9",
+        "type": "STATE",
+        "x": 480,
+        "y": 540,
+        "label": "S₉",
+        "ports": [
+          {
+            "id": "left",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "right",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      }
+    ],
+    "wires": [
+      {
+        "id": "hw4-p3-w-s0-0",
+        "sourceComponentId": "hw4-p3-s0",
+        "sourcePortId": "right",
+        "targetComponentId": "hw4-p3-s1",
+        "targetPortId": "left",
+        "value": 0,
+        "transitionLabel": "0:0"
+      },
+      {
+        "id": "hw4-p3-w-s0-1",
+        "sourceComponentId": "hw4-p3-s0",
+        "sourcePortId": "right",
+        "targetComponentId": "hw4-p3-s9",
+        "targetPortId": "left",
+        "value": 0,
+        "transitionLabel": "1:1"
+      },
+      {
+        "id": "hw4-p3-w-s1-0",
+        "sourceComponentId": "hw4-p3-s1",
+        "sourcePortId": "right",
+        "targetComponentId": "hw4-p3-s2",
+        "targetPortId": "left",
+        "value": 0,
+        "transitionLabel": "0:0"
+      },
+      {
+        "id": "hw4-p3-w-s1-1",
+        "sourceComponentId": "hw4-p3-s1",
+        "sourcePortId": "right",
+        "targetComponentId": "hw4-p3-s9",
+        "targetPortId": "left",
+        "value": 0,
+        "transitionLabel": "1:1"
+      },
+      {
+        "id": "hw4-p3-w-s2-0",
+        "sourceComponentId": "hw4-p3-s2",
+        "sourcePortId": "right",
+        "targetComponentId": "hw4-p3-s3",
+        "targetPortId": "left",
+        "value": 0,
+        "transitionLabel": "0:0"
+      },
+      {
+        "id": "hw4-p3-w-s2-1",
+        "sourceComponentId": "hw4-p3-s2",
+        "sourcePortId": "right",
+        "targetComponentId": "hw4-p3-s9",
+        "targetPortId": "left",
+        "value": 0,
+        "transitionLabel": "1:1"
+      },
+      {
+        "id": "hw4-p3-w-s3-0",
+        "sourceComponentId": "hw4-p3-s3",
+        "sourcePortId": "right",
+        "targetComponentId": "hw4-p3-s4",
+        "targetPortId": "left",
+        "value": 0,
+        "transitionLabel": "0:0"
+      },
+      {
+        "id": "hw4-p3-w-s3-1",
+        "sourceComponentId": "hw4-p3-s3",
+        "sourcePortId": "right",
+        "targetComponentId": "hw4-p3-s9",
+        "targetPortId": "left",
+        "value": 0,
+        "transitionLabel": "1:1"
+      },
+      {
+        "id": "hw4-p3-w-s4-0",
+        "sourceComponentId": "hw4-p3-s4",
+        "sourcePortId": "right",
+        "targetComponentId": "hw4-p3-s5",
+        "targetPortId": "left",
+        "value": 0,
+        "transitionLabel": "0:0"
+      },
+      {
+        "id": "hw4-p3-w-s4-1",
+        "sourceComponentId": "hw4-p3-s4",
+        "sourcePortId": "right",
+        "targetComponentId": "hw4-p3-s9",
+        "targetPortId": "left",
+        "value": 0,
+        "transitionLabel": "1:1"
+      },
+      {
+        "id": "hw4-p3-w-s5-0",
+        "sourceComponentId": "hw4-p3-s5",
+        "sourcePortId": "right",
+        "targetComponentId": "hw4-p3-s6",
+        "targetPortId": "left",
+        "value": 0,
+        "transitionLabel": "0:0"
+      },
+      {
+        "id": "hw4-p3-w-s5-1",
+        "sourceComponentId": "hw4-p3-s5",
+        "sourcePortId": "right",
+        "targetComponentId": "hw4-p3-s9",
+        "targetPortId": "left",
+        "value": 0,
+        "transitionLabel": "1:1"
+      },
+      {
+        "id": "hw4-p3-w-s6-0",
+        "sourceComponentId": "hw4-p3-s6",
+        "sourcePortId": "right",
+        "targetComponentId": "hw4-p3-s7",
+        "targetPortId": "left",
+        "value": 0,
+        "transitionLabel": "0:0"
+      },
+      {
+        "id": "hw4-p3-w-s6-1",
+        "sourceComponentId": "hw4-p3-s6",
+        "sourcePortId": "right",
+        "targetComponentId": "hw4-p3-s9",
+        "targetPortId": "left",
+        "value": 0,
+        "transitionLabel": "1:1"
+      },
+      {
+        "id": "hw4-p3-w-s7-0",
+        "sourceComponentId": "hw4-p3-s7",
+        "sourcePortId": "right",
+        "targetComponentId": "hw4-p3-s8",
+        "targetPortId": "left",
+        "value": 0,
+        "transitionLabel": "0:0"
+      },
+      {
+        "id": "hw4-p3-w-s7-1",
+        "sourceComponentId": "hw4-p3-s7",
+        "sourcePortId": "right",
+        "targetComponentId": "hw4-p3-s9",
+        "targetPortId": "left",
+        "value": 0,
+        "transitionLabel": "1:1"
+      },
+      {
+        "id": "hw4-p3-w-s8-0",
+        "sourceComponentId": "hw4-p3-s8",
+        "sourcePortId": "right",
+        "targetComponentId": "hw4-p3-s9",
+        "targetPortId": "left",
+        "value": 0,
+        "transitionLabel": "0:1"
+      },
+      {
+        "id": "hw4-p3-w-s8-1",
+        "sourceComponentId": "hw4-p3-s8",
+        "sourcePortId": "right",
+        "targetComponentId": "hw4-p3-s9",
+        "targetPortId": "left",
+        "value": 0,
+        "transitionLabel": "1:1"
+      },
+      {
+        "id": "hw4-p3-w-s9-0",
+        "sourceComponentId": "hw4-p3-s9",
+        "sourcePortId": "right",
+        "targetComponentId": "hw4-p3-s9",
+        "targetPortId": "left",
+        "value": 0,
+        "transitionLabel": "0:1"
+      },
+      {
+        "id": "hw4-p3-w-s9-1",
+        "sourceComponentId": "hw4-p3-s9",
+        "sourcePortId": "right",
+        "targetComponentId": "hw4-p3-s9",
+        "targetPortId": "left",
+        "value": 0,
+        "transitionLabel": "1:1"
+      }
+    ]
+  },
+  "broken": {
+    "components": [
+      {
+        "id": "hw4-p3-s0",
+        "type": "STATE",
+        "x": 280,
+        "y": 200,
+        "label": "S₀",
+        "ports": [
+          {
+            "id": "left",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "right",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      }
+    ],
+    "wires": [
+      {
+        "id": "hw4-p3-w-s0-0",
+        "sourceComponentId": "hw4-p3-s0",
+        "sourcePortId": "right",
+        "targetComponentId": "hw4-p3-s0",
+        "targetPortId": "left",
+        "value": 0,
+        "transitionLabel": "0:0"
+      },
+      {
+        "id": "hw4-p3-w-s0-1",
+        "sourceComponentId": "hw4-p3-s0",
+        "sourcePortId": "right",
+        "targetComponentId": "hw4-p3-s0",
+        "targetPortId": "left",
+        "value": 0,
+        "transitionLabel": "1:1"
+      }
+    ]
+  }
+}
