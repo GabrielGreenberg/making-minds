@@ -17,8 +17,18 @@
 //   ROUND-TRIP         format(parse(l)) === l for every canonical label.
 //   WIDENING           turbotFsmNotation keeps legacy 1-bit outputs valid
 //     ('1' → '11' forward, '0' → '00' stop) and format decays them.
+//   BIT ORDER (asymmetric)  a k=2 FSM computing x + 2*y — NOT symmetric x+y —
+//     grades end-to-end, and the same machine with swapped symbol halves
+//     FAILS: wire order = cc_spec declaration order (x is the LEFT char).
+//   TOTALITY/ARITY     Stage-1 names the student's actual mistake ("has a
+//     1-bit input symbol; this question has 2 input wires"), never grades a
+//     wrong-arity machine, and caps kIn at 3 with an explicit reason.
 
-import type { TMNotation } from '../src/types';
+import type { AssignmentQuestion, TMNotation } from '../src/types';
+import { buildQuestionBank } from '../src/engine/testVectorGen';
+import { gradeQuestion } from '../src/engine/grader';
+import { validateMachine } from '../src/engine/machineValidation';
+import { comp, transition, circuit } from './builder';
 import { parseTMTransition } from '../src/engine/tm';
 import {
   parseTurbotInternalLabel,
@@ -192,6 +202,92 @@ check("decay: format(parse('1:1')) === '1:11' (canonical, not the alias)",
   turbotFsmNotation.format(turbotFsmNotation.parse('1:1') as ParsedTransition) === '1:11');
 check('malformed still rejected', turbotFsmNotation.parse('1:111') === null &&
   turbotFsmNotation.parse('11:1') === null && turbotFsmNotation.parse('') === null);
+
+// ─── Bit-order grade pin (ASYMMETRIC: x + 2*y) ───────────────────────
+// hw4-p11's x+y is symmetric — blind to a swapped symbol join — so the wire-
+// order pin uses x + 2*y: state = (carry, previous y bit), input symbol 'xy'
+// with x the LEFT char (cc_spec declaration order = codec wire order).
+
+console.log('\n[k=2 grade pin: x + 2*y end-to-end]');
+{
+  const bank = buildQuestionBank(
+    [{ name: 'x', maxVal: 0 }, { name: 'y', maxVal: 0 }],
+    [{ name: 'out', formula: 'x + 2*y' }],
+    'binary',
+    'FSM',
+  );
+  const question: AssignmentQuestion = {
+    id: 900,
+    label: 'x + 2y pin',
+    statement: 'Compute x + 2y, reading one bit of x and one bit of y per step.',
+    buildMode: 'FSM',
+    representation: 'binary',
+    cc_spec: bank.spec,
+    test_cases: bank.test_cases,
+  };
+  check('question has 2 input groups (x first)',
+    bank.spec.inputs.length === 2 && bank.spec.inputs[0].name === 'x');
+
+  // State = (carry c, previous y bit p); on 'xy': sum = x + p + c, emit
+  // sum & 1, carry' = sum >> 1, p' = y. S0=(0,0) S1=(0,1) S2=(1,0) S3=(1,1).
+  const rows: [string, string, string, string][] = [
+    // [from, symbol:out, to] rows flattened below
+    ['s0', '00:0', 's0', 't01'], ['s0', '01:0', 's1', 't02'],
+    ['s0', '10:1', 's0', 't03'], ['s0', '11:1', 's1', 't04'],
+    ['s1', '00:1', 's0', 't05'], ['s1', '01:1', 's1', 't06'],
+    ['s1', '10:0', 's2', 't07'], ['s1', '11:0', 's3', 't08'],
+    ['s2', '00:1', 's0', 't09'], ['s2', '01:1', 's1', 't10'],
+    ['s2', '10:0', 's2', 't11'], ['s2', '11:0', 's3', 't12'],
+    ['s3', '00:0', 's2', 't13'], ['s3', '01:0', 's3', 't14'],
+    ['s3', '10:1', 's2', 't15'], ['s3', '11:1', 's3', 't16'],
+  ];
+  const states = [
+    comp('s0', 'STATE', 'S₀', 100, 100), comp('s1', 'STATE', 'S₁', 300, 100),
+    comp('s2', 'STATE', 'S₂', 100, 300), comp('s3', 'STATE', 'S₃', 300, 300),
+  ];
+  const xPlus2y = circuit(states,
+    rows.map(([from, label, to, id]) => transition(id, from, to, label)));
+  // The SAME machine with each symbol's halves swapped computes y + 2x — if
+  // the grader joined the row in the wrong wire order, THIS one would pass.
+  const swapped = circuit(states,
+    rows.map(([from, label, to, id]) =>
+      transition(id, from, to, `${label[1]}${label[0]}:${label[3]}`)));
+
+  const rGood = gradeQuestion(question, xPlus2y);
+  check(`x + 2*y machine passes every case (${rGood.passed}/${rGood.total})`,
+    rGood.status === 'graded' && rGood.total > 0 && rGood.passed === rGood.total);
+
+  const rSwapped = gradeQuestion(question, swapped);
+  check(`swapped-halves machine (y + 2*x) FAILS (${rSwapped.passed}/${rSwapped.total})`,
+    rSwapped.status === 'graded' && rSwapped.passed < rSwapped.total);
+
+  // ── Totality/arity Stage-1 pins (the footgun dies loudly) ──
+  console.log('\n[Stage-1 totality/arity on the 2-group question]');
+  const oneBitIdentity = circuit(
+    [comp('s0', 'STATE', 'S₀', 100, 100)],
+    [transition('t1', 's0', 's0', '0:0'), transition('t2', 's0', 's0', '1:1')],
+  );
+  const rArity = gradeQuestion(question, oneBitIdentity);
+  check('1-bit machine on the 2-group question fails EVERY case (never wire-0 grading)',
+    rArity.status === 'graded' && rArity.total > 0 && rArity.passed === 0);
+  check('…and the reason names the arity',
+    (rArity.cases[0]?.reason ?? '').includes('has a 1-bit input symbol; this question has 2 input wires'));
+
+  const missingSymbol = circuit(states,
+    rows.filter(([, , , id]) => id !== 't04')
+      .map(([from, label, to, id]) => transition(id, from, to, label)));
+  const rTotality = gradeQuestion(question, missingSymbol);
+  check('missing one symbol fails totality with the symbol named',
+    rTotality.status === 'graded' && rTotality.passed === 0 &&
+    (rTotality.cases[0]?.reason ?? '').includes('must have exactly one transition for input 11 (found 0)'));
+
+  const kInCap = validateMachine(xPlus2y, 'FSM', {
+    axis: 'time', rep: 'binary',
+    inputWidths: [6, 6, 6, 6], outputWidths: [8],
+  }, 'binary');
+  check('kIn > 3 fails Stage 1 with an explicit cap reason',
+    !kInCap.ok && (kInCap.reason ?? '').includes('at most 3 input groups'));
+}
 
 // ─── verdict ─────────────────────────────────────────────────────────
 

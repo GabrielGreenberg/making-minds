@@ -14,8 +14,19 @@ export {
 export type { CCEvalResult } from './cc';
 export { evaluateSCSingleStep, evaluateSCSequence } from './sc';
 export type { SCSingleStepResult } from './sc';
-export { sortStateComponents, evaluateFSMSingleStep, evaluateFSMSequence } from './fsm';
-export type { FSMStepResult, FSMEvalResult } from './fsm';
+export {
+  sortStateComponents,
+  evaluateFSMSymbolStep,
+  evaluateFSMSymbolSequence,
+  evaluateFSMSingleStep,
+  evaluateFSMSequence,
+} from './fsm';
+export type {
+  FSMStepResult,
+  FSMEvalResult,
+  FSMSymbolStepResult,
+  FSMSymbolEvalResult,
+} from './fsm';
 export {
   readCell,
   isSymbolForNotation,

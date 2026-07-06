@@ -34,7 +34,8 @@ import type {
 } from '../types';
 import { evaluateCCInputs } from './cc';
 import { evaluateSCSequence } from './sc';
-import { evaluateFSMSequence } from './fsm';
+import { evaluateFSMSymbolSequence } from './fsm';
+import { fsmNotation } from './notation';
 import { evaluateTMSequence } from './tm';
 import { runTurbot, evaluateTurbotCriterion, validateTurbotTM } from './turbot';
 import { validateMachine } from './machineValidation';
@@ -135,12 +136,15 @@ function gradeSpaceTimeCase(
     const steps = evaluateSCSequence(circuit.components, circuit.wires, enc.steps);
     raw = { axis: 'time', steps };
   } else {
-    // FSM — n=1: flatten the single wire to one input bit per step. Stage 1
-    // guarantees totality, so a valid FSM cannot halt mid-run; guard anyway.
-    const inputBits = enc.steps.map((s) => s[0]);
-    const r = evaluateFSMSequence(circuit.components, circuit.wires, inputBits);
+    // FSM — feed the FULL encoded row per step as one input symbol: symbol
+    // char i = input wire i (cc_spec declaration order = codec wire order).
+    // Stage 1 validated totality over this notation's whole alphabet, so a
+    // valid FSM cannot halt mid-run; guard anyway.
+    const notation = fsmNotation(layout.inputWidths.length, layout.outputWidths.length);
+    const symbols = enc.steps.map((s) => s.join(''));
+    const r = evaluateFSMSymbolSequence(circuit.components, circuit.wires, symbols, notation);
     if (r.halted) return reject(tc, 'machine halted before consuming the input');
-    raw = { axis: 'time', steps: r.outputBits.map((b) => [b]) };
+    raw = { axis: 'time', steps: r.outputs.map((sym) => sym.split('').map(Number)) };
   }
 
   // Acceptor (rep-level) before decoding; decode is total.
