@@ -1,5 +1,5 @@
 import { useRef, useState, useCallback, useEffect, useMemo } from 'react';
-import { useStore, selectTmNotation } from '../store';
+import { useStore, selectTmNotation, selectEffectiveMode } from '../store';
 import type {
   CircuitComponent,
   Wire,
@@ -872,29 +872,40 @@ function CircuitComponentView({
         }
 
         const ringR = STATE_RADIUS + 7;
+        // Turbot-TM convention (textbook): external states draw as squares,
+        // internal states as circles. stateKind is only ever set on turbot-TM
+        // states, so plain FSM/TM machines are unaffected.
+        const isExternal = comp.stateKind === 'external';
+        const stateFill = isCurrentState ? '#e8f5e9' : isSelected ? '#e3f2fd' : 'white';
         return (
           <g>
             {/* Outer ring — wire-creation zone affordance */}
-            <circle
-              cx={cx}
-              cy={cy}
-              r={ringR}
-              fill="none"
-              stroke={strokeColor}
-              strokeWidth={1}
-              opacity={0.5}
-              pointerEvents="none"
-            />
-            {/* Main state circle */}
-            <circle
-              cx={cx}
-              cy={cy}
-              r={STATE_RADIUS}
-              fill={isCurrentState ? '#e8f5e9' : isSelected ? '#e3f2fd' : 'white'}
-              stroke={strokeColor}
-              strokeWidth={isSelected ? 2.5 : 2}
-              pointerEvents="none"
-            />
+            {isExternal ? (
+              <rect
+                x={cx - ringR} y={cy - ringR} width={ringR * 2} height={ringR * 2} rx={6}
+                fill="none" stroke={strokeColor} strokeWidth={1} opacity={0.5} pointerEvents="none"
+              />
+            ) : (
+              <circle
+                cx={cx} cy={cy} r={ringR}
+                fill="none" stroke={strokeColor} strokeWidth={1} opacity={0.5} pointerEvents="none"
+              />
+            )}
+            {/* Main state shape */}
+            {isExternal ? (
+              <rect
+                x={cx - STATE_RADIUS} y={cy - STATE_RADIUS}
+                width={STATE_RADIUS * 2} height={STATE_RADIUS * 2} rx={4}
+                fill={stateFill} stroke={strokeColor}
+                strokeWidth={isSelected ? 2.5 : 2} pointerEvents="none"
+              />
+            ) : (
+              <circle
+                cx={cx} cy={cy} r={STATE_RADIUS}
+                fill={stateFill} stroke={strokeColor}
+                strokeWidth={isSelected ? 2.5 : 2} pointerEvents="none"
+              />
+            )}
             {/* State label */}
             <text
               x={cx}
@@ -1218,18 +1229,33 @@ function FsmTransitionView({
   const [dragging, setDragging] = useState(false);
   const editorRef = useRef<HTMLInputElement>(null);
 
-  // TM transitions read a tape symbol and perform one dual action — a write
-  // followed by a move (R/L) — as a single atomic step; FSM transitions are
-  // input:output bits. The TM alphabet is tied to the question's
-  // representation (binary: 0/1/*; unary: 0/1), so the editor only ever
-  // offers/accepts symbols that exist on this machine's tape.
-  const isTM = useStore((s) => s.buildMode === 'TM');
+  // Base-TM transitions read a tape symbol and perform one dual action — a
+  // write followed by a move (R/L) — as a single atomic step; FSM transitions
+  // are input:output bits. The base-TM alphabet is tied to the question's
+  // representation (binary: 0/1/*; unary: 0/1). A TURBOT TM is different
+  // (textbook "Turbots: Operation"): single-action labels whose grammar
+  // depends on the SOURCE state's kind — internal reads {0,1,*} and writes a
+  // symbol OR moves; external senses B/E/F and moves forward (↑) or turns
+  // (↱/↰). Turbot-TM labels edit FSM-style (one char per half).
+  const isTurbotTM = useStore((s) => s.buildMode === 'turbot' && selectEffectiveMode(s) === 'TM');
+  const isTM = useStore((s) => selectEffectiveMode(s) === 'TM') && !isTurbotTM;
+  const sourceExternal = useStore((s) =>
+    isTurbotTM &&
+    s.components.find((c) => c.id === wire.sourceComponentId)?.stateKind === 'external'
+  );
   const tmNotation = useStore(selectTmNotation);
   const tmSymbols = tmNotation === 'binary' ? ['0', '1', '*'] : ['0', '1'];
-  const leftTokens = isTM ? tmSymbols : ['0', '1'];
-  const rightTokens = ['0', '1'];
+  const leftTokens = isTurbotTM
+    ? (sourceExternal ? ['B', 'E', 'F'] : ['0', '1', '*'])
+    : isTM ? tmSymbols : ['0', '1'];
+  const rightTokens = isTurbotTM
+    ? (sourceExternal ? ['↑', '↱', '↰'] : ['0', '1', '*', 'R', 'L'])
+    : ['0', '1'];
   const writeTokens = tmSymbols;
   const moveTokens = ['R', 'L'];
+  const defaultTransitionLabel = isTurbotTM
+    ? (sourceExternal ? 'E:↑' : '0:R')
+    : isTM ? '0:0R' : '0:0';
 
   const label = wire.transitionLabel || '?:?';
   const color = isSelected ? '#2a7fff' : '#333';
@@ -1241,16 +1267,16 @@ function FsmTransitionView({
   }, [editing]);
 
   const openEdit = (field: 'left' | 'right') => {
-    const current = wire.transitionLabel || (isTM ? '0:0R' : '0:0');
+    const current = wire.transitionLabel || defaultTransitionLabel;
     const parts = current.split(':');
-    setEditLeft(leftTokens.includes(parts[0]) ? parts[0] : '0');
+    setEditLeft(leftTokens.includes(parts[0]) ? parts[0] : leftTokens[0]);
     if (isTM) {
       const action = parts[1] ?? '0R';
       setEditWrite(writeTokens.includes(action[0]) ? action[0] : '0');
       setEditMove(action[1] === 'L' ? 'L' : 'R');
       setRightSubField('write');
     } else {
-      setEditRight(rightTokens.includes(parts[1]) ? parts[1] : '0');
+      setEditRight(rightTokens.includes(parts[1]) ? parts[1] : rightTokens[0]);
     }
     setActiveField(field);
     setEditing(true);
@@ -1294,15 +1320,23 @@ function FsmTransitionView({
       }
       return;
     }
-    if (activeField === 'left' && leftTokens.includes(e.key)) {
+    // Turbot-TM external motor tokens aren't typable — accept aliases:
+    // F/W/ArrowUp = forward (↑), R = right turn (↱), L = left turn (↰).
+    let rightKey = key;
+    if (isTurbotTM && sourceExternal && activeField === 'right') {
+      if (key === 'F' || key === 'W' || e.key === 'ArrowUp') rightKey = '↑';
+      else if (key === 'R') rightKey = '↱';
+      else if (key === 'L') rightKey = '↰';
+    }
+    if (activeField === 'left' && leftTokens.includes(key)) {
       e.preventDefault();
-      setEditLeft(e.key);
+      setEditLeft(key);
       setActiveField('right');
-    } else if (activeField === 'right' && rightTokens.includes(key)) {
+    } else if (activeField === 'right' && rightTokens.includes(rightKey)) {
       e.preventDefault();
       // Commit immediately with the new right value so closure captures it
       setEditing(false);
-      useStore.getState().setTransitionLabel(wire.id, `${editLeft}:${key}`);
+      useStore.getState().setTransitionLabel(wire.id, `${editLeft}:${rightKey}`);
     } else if (e.key === 'Tab' || e.key === 'ArrowRight') {
       e.preventDefault();
       setActiveField(activeField === 'left' ? 'right' : 'left');
@@ -2139,7 +2173,9 @@ export function CircuitCanvas() {
   const showWireValues = useStore((s) => s.showWireValues);
   const addComponent = useStore((s) => s.addComponent);
   const selectedIds = useStore((s) => s.selectedIds);
-  const buildMode = useStore((s) => s.buildMode);
+  // For turbot questions the canvas edits the inner brain circuit, so
+  // editor-behavior branches key off the effective (inner) mode.
+  const effectiveMode = useStore(selectEffectiveMode);
   const selectedTool = useStore((s) => s.selectedTool);
   const textElements = useStore((s) => s.textElements);
   const comments = useStore((s) => s.comments);
@@ -2165,7 +2201,7 @@ export function CircuitCanvas() {
   const warnings = useMemo(() => {
     const w: string[] = [];
     // Skip circuit validation warnings in FSM/TM mode — loops and merged links are expected
-    if (buildMode === 'FSM' || buildMode === 'TM') return w;
+    if (effectiveMode === 'FSM' || effectiveMode === 'TM') return w;
     {
       const compMap = new Map(components.map((c) => [c.id, c]));
       const visited = new Set<string>();
@@ -2208,7 +2244,7 @@ export function CircuitCanvas() {
       }
     }
     return w;
-  }, [components, wires, buildMode]);
+  }, [components, wires, effectiveMode]);
 
   // ─── Keyboard shortcuts ──────────────────────────────────────
   useEffect(() => {
@@ -2986,7 +3022,7 @@ export function CircuitCanvas() {
       // true when it handled the click.
       const tryShiftConnect = (targetCompId: string): boolean => {
         if (!e.shiftKey) return false;
-        if (state.buildMode !== 'FSM' && state.buildMode !== 'TM') return false;
+        if (selectEffectiveMode(state) !== 'FSM' && selectEffectiveMode(state) !== 'TM') return false;
         const target = state.components.find((c) => c.id === targetCompId);
         if (!target || target.type !== 'STATE') return false;
         if (state.selectedIds.length !== 1) return false;

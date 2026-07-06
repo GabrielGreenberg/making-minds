@@ -1501,6 +1501,12 @@ thead .sc-label-col {
   gap: 12px;
   margin-bottom: 20px;
 }
+
+.instructor-page-head-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
 .instructor-page-title { font-size: 20px; }
 .instructor-section-title { font-size: 18px; }
 .instructor-subhead { font-size: 15px; color: var(--text); }
@@ -1912,4 +1918,130 @@ thead .sc-label-col {
   line-height: 1.5;
   color: #444;
   white-space: pre-wrap;
+}
+
+/* ─── Turbot arena (shared: instructor editor + student workspace) ─── */
+
+.arena-grid {
+  display: grid;
+  gap: 0;
+  width: fit-content;
+  border: 2px solid #555;
+  background: #fff;
+}
+
+.arena-cell {
+  position: relative;
+  box-sizing: border-box;
+  border: 1px solid #ddd;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.arena-cell--block {
+  background: #9e9e9e;
+}
+
+.arena-cell--clickable {
+  cursor: pointer;
+}
+
+.arena-cell--clickable:hover {
+  outline: 2px solid #1565c0;
+  outline-offset: -2px;
+  z-index: 1;
+}
+
+.arena-goal {
+  width: 55%;
+  height: 55%;
+  border-radius: 50%;
+  background: #2e7d32;
+}
+
+.arena-turbot {
+  position: absolute;
+  inset: 12%;
+  fill: #c73535;
+}
+
+.instructor-arena-size {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.instructor-criterion-row {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+/* ─── Turbot arena panel (right data panel, "Map" section) ─── */
+
+.turbot-arena-scroll {
+  overflow: auto;
+  padding: 8px;
+}
+
+.turbot-arena-controls {
+  display: flex;
+  gap: 6px;
+  padding: 2px 8px 4px;
+}
+
+.turbot-arena-status {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding: 0 8px 6px;
+  font-size: 10px;
+  font-family: 'SF Mono', 'Fira Code', monospace;
+  color: #666;
+}
+
+.turbot-arena-stop {
+  color: #e53935;
+  font-weight: 600;
+}
+
+/* Percept/motor glossary under the Map */
+.turbot-glossary {
+  padding: 4px 8px 8px;
+  border-top: 1px dashed #e0e0e0;
+  margin-top: 4px;
+}
+
+.turbot-glossary-group + .turbot-glossary-group {
+  margin-top: 8px;
+}
+
+.turbot-glossary-title {
+  font-size: 10px;
+  font-weight: 600;
+  color: #555;
+  margin: 4px 0 2px;
+}
+
+.turbot-glossary-cols {
+  display: flex;
+  gap: 18px;
+}
+
+.turbot-glossary-head {
+  font-size: 10px;
+  font-weight: 600;
+  color: #888;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  margin: 2px 0;
+}
+
+.turbot-glossary-line {
+  font-size: 10px;
+  font-family: 'SF Mono', 'Fira Code', monospace;
+  color: #444;
+  line-height: 1.6;
+  white-space: nowrap;
 }

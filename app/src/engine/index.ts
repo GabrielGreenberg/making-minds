@@ -61,11 +61,32 @@ export { gradeQuestion, gradeSubmission, summarizeResult } from './grader';
 export type { CaseResult, QuestionResult, SubmissionResult } from './grader';
 export {
   senseAhead,
+  senseAheadSymbol,
   decodeMotorCommand,
   applyMotorCommand,
   initialBrainState,
   runBrainStep,
   runTurbot,
   evaluateTurbotCriterion,
+  stateKindOf,
+  parseTurbotInternalLabel,
+  parseTurbotExternalLabel,
+  applyTurbotTapeAction,
+  validateTurbotTM,
+  TURBOT_FORWARD,
+  TURBOT_TURN_RIGHT,
+  TURBOT_TURN_LEFT,
+  TURBOT_TM_READ_SYMBOLS,
+  TURBOT_TM_INTERNAL_ACTIONS,
+  TURBOT_TM_SENSES,
+  TURBOT_TM_EXTERNAL_ACTIONS,
 } from './turbot';
-export type { BrainState, BrainStepResult, TurbotRunResult } from './turbot';
+export type {
+  BrainState,
+  BrainStepResult,
+  TurbotRunResult,
+  TurbotTMInternalAction,
+  TurbotTMInternalTransition,
+  TurbotTMExternalTransition,
+  TurbotTMValidationError,
+} from './turbot';

@@ -1,4 +1,5 @@
-// Headless end-to-end check of the autograding pipeline for CC, SC, FSM, and TM.
+// Headless end-to-end check of the autograding pipeline for CC, SC, FSM, TM,
+// and turbot.
 //
 //   npx tsx tools/pipelineCheck.ts
 //
@@ -24,7 +25,8 @@ function check(label: string, cond: boolean) {
 
 console.log('Assignment:', assignment.title);
 for (const q of assignment.questions) {
-  console.log(`  ${q.label}: ${q.test_cases?.length ?? 0} test cases`);
+  const n = q.buildMode === 'turbot' ? q.turbot_cases?.length : q.test_cases?.length;
+  console.log(`  ${q.label}: ${n ?? 0} ${q.buildMode === 'turbot' ? 'arenas' : 'test cases'}`);
 }
 
 console.log('\n[correct submission]');
@@ -35,7 +37,7 @@ for (const q of correct.questions) {
   check(`${def?.label} all vectors pass`, q.status === 'graded' && q.total > 0 && q.passed === q.total);
 }
 const cs = summarizeResult(correct);
-check('correct: 4/4 questions', cs.questionsPassed === 4 && cs.questionsTotal === 4);
+check('correct: 5/5 questions', cs.questionsPassed === 5 && cs.questionsTotal === 5);
 
 console.log('\n[incorrect submission]');
 const wrong = gradeSubmission(assignment, buildIncorrectSubmission());
@@ -45,7 +47,7 @@ for (const q of wrong.questions) {
   check(`${def?.label} fails at least one vector`, q.status === 'graded' && q.passed < q.total);
 }
 const ws = summarizeResult(wrong);
-check('incorrect: 0/4 questions', ws.questionsPassed === 0 && ws.questionsTotal === 4);
+check('incorrect: 0/5 questions', ws.questionsPassed === 0 && ws.questionsTotal === 5);
 
 console.log(`\n${failures === 0 ? 'PIPELINE OK' : `PIPELINE FAILED (${failures} checks)`}`);
 process.exit(failures === 0 ? 0 : 1);

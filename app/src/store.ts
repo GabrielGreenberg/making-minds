@@ -23,6 +23,9 @@ import type {
   TMSymbol,
   TMNotation,
   TmHistoryEntry,
+  ArenaConfig,
+  TurbotState,
+  TurbotHistoryEntry,
 } from './types';
 import {
   getPortsForType,
@@ -33,6 +36,7 @@ import {
   toSubscript,
 } from './types';
 import { topologicalSort, evaluateGate, evaluateCC, evaluateSCSingleStep, sortStateComponents, evaluateFSMSingleStep, evaluateTMSingleStep, notationForRepresentation } from './engine';
+import { senseAheadSymbol, applyMotorCommand, initialBrainState, runBrainStep, stateKindOf, TURBOT_FORWARD, type BrainState } from './engine/turbot';
 import { getAssignment, listAssignments } from './assignments';
 import {
   localWorkbookStore,
@@ -57,6 +61,53 @@ export function selectTmNotation(s: {
 }): TMNotation {
   const q = s.assignment?.questions[s.currentQuestionIndex];
   return notationForRepresentation(q ? q.representation : s.repSystem);
+}
+
+/** A blank arena for the sandbox / question-authoring preview (no assignment context). */
+export function defaultArenaConfig(): ArenaConfig {
+  return {
+    width: 5,
+    height: 5,
+    cells: Array.from({ length: 5 }, () => Array.from({ length: 5 }, () => 'empty' as const)),
+    start: { x: 0, y: 0, facing: 'E' },
+  };
+}
+
+/**
+ * The active turbot question's primary arena (its first `turbot_cases` entry
+ * — the one the student sees and simulates against; see engine/turbot.ts).
+ * Falls back to a blank arena outside an assignment/turbot context.
+ */
+export function selectTurbotArena(s: {
+  assignment: AssignmentData | null;
+  currentQuestionIndex: number;
+}): ArenaConfig {
+  const q = s.assignment?.questions[s.currentQuestionIndex];
+  return q?.turbot_cases?.[0]?.arena ?? defaultArenaConfig();
+}
+
+/** The inner-circuit editor mode (CC/SC/FSM/TM) for the active turbot question. */
+export function selectTurbotInnerMode(s: {
+  assignment: AssignmentData | null;
+  currentQuestionIndex: number;
+}): BuildMode {
+  const q = s.assignment?.questions[s.currentQuestionIndex];
+  return q?.innerMode ?? 'CC';
+}
+
+/**
+ * The mode the *editing surface* should behave as. For a turbot question the
+ * canvas edits the inner brain circuit, so every editor-behavior branch
+ * (palette items, transition-label grammar, STATE interactions, wire routing)
+ * must key off the question's innerMode, not the literal 'turbot' buildMode.
+ * Non-turbot modes pass through unchanged.
+ */
+export function selectEffectiveMode(s: {
+  buildMode: BuildMode;
+  assignment: AssignmentData | null;
+  currentQuestionIndex: number;
+}): BuildMode {
+  return s.buildMode === 'turbot' ? selectTurbotInnerMode(s) : s.buildMode;
 }
 
 interface HistoryEntry {
@@ -340,6 +391,27 @@ interface AppState {
   tmPause: () => void;
   tmReset: () => void; // back to the initial tape, t=1
   tmGlobalReset: () => void; // blank the tape entirely
+
+  // Turbot state — the arena pose plus whatever the inner brain (CC/SC/FSM/TM)
+  // is carrying between cycles. A turbot's "circuit" is the brain, edited via
+  // the normal per-mode canvas (see engine/turbot.ts); this slice only drives
+  // the arena driver loop (runBrainStep/applyMotorCommand) one cycle at a
+  // time, mirroring the tm* slice's step/run/reset shape.
+  turbotState: TurbotState;
+  turbotBrainState: BrainState;
+  turbotHistory: TurbotHistoryEntry[];
+  turbotRunning: boolean;
+  turbotRunIntervalId: number | null;
+  turbotHalted: boolean;
+  turbotStopReason: 'motor' | 'brain' | 'limit' | null;
+  turbotStep: () => void;
+  turbotRun: () => void;
+  turbotPause: () => void;
+  turbotReset: () => void; // back to the arena's start pose, brain re-initialized
+  // Turbot TM: flip a STATE between internal (circle, tape ops) and external
+  // (square, sense/move ops). Outgoing transition labels are reset to the new
+  // kind's default since the grammars are disjoint.
+  toggleStateKind: (id: string) => void;
 }
 
 function snapToGrid(val: number): number {
@@ -836,6 +908,18 @@ export const useStore = create<AppState>()((set, get) => ({
     }
 
     state.pushHistory();
+    // Default transition label by grammar: FSM "in:out"; base TM dual-action
+    // "in:writeMove"; turbot TM single-action by the SOURCE state's kind —
+    // internal "read:action", external "sense:motor".
+    let defaultLabel: string | undefined;
+    if (isFsmTransition) {
+      const effMode = selectEffectiveMode(state);
+      if (state.buildMode === 'turbot' && effMode === 'TM') {
+        defaultLabel = stateKindOf(sourceComp!) === 'external' ? `E:${TURBOT_FORWARD}` : '0:R';
+      } else {
+        defaultLabel = effMode === 'TM' ? '0:0R' : '0:0';
+      }
+    }
     const wire: Wire = {
       id: uuid(),
       sourceComponentId: sourceCompId,
@@ -843,9 +927,7 @@ export const useStore = create<AppState>()((set, get) => ({
       targetComponentId: targetCompId,
       targetPortId: targetPortId,
       value: 0,
-      transitionLabel: isFsmTransition
-        ? (state.buildMode === 'TM' ? '0:0R' : '0:0')
-        : undefined,
+      transitionLabel: defaultLabel,
     };
     const newWires = [...state.wires, wire];
     const resolvedComponents = resolveMemDirections(state.components, newWires);
@@ -1075,6 +1157,7 @@ export const useStore = create<AppState>()((set, get) => ({
       boxes: [],
       buildMode: assignment.questions[0]?.buildMode || 'CC',
     });
+    get().turbotReset();
   },
   openAssignment: (id) => {
     const def = getAssignment(id);
@@ -1104,6 +1187,7 @@ export const useStore = create<AppState>()((set, get) => ({
       buildMode: activeQ?.buildMode || 'CC',
       workbookOpen: true,
     });
+    get().turbotReset();
     return true;
   },
   goHome: () => {
@@ -1194,6 +1278,7 @@ export const useStore = create<AppState>()((set, get) => ({
       boxes: saved.boxes,
       buildMode: nextQ.buildMode,
     });
+    get().turbotReset();
   },
   closeAssignment: () => {
     set({
@@ -1480,7 +1565,7 @@ export const useStore = create<AppState>()((set, get) => ({
     if (insideComps.length === 0) return 'No components inside the box.';
 
     // ── FSM boxing ────────────────────────────────────────────────
-    if (state.buildMode === 'FSM') {
+    if (selectEffectiveMode(state) === 'FSM') {
       const fsmComps = insideComps.filter((c) => c.type === 'STATE');
       if (fsmComps.length === 0) return 'No states inside the box.';
 
@@ -2827,11 +2912,21 @@ export const useStore = create<AppState>()((set, get) => ({
   fsmHalted: false,
 
   setTransitionLabel: (wireId, label) => {
-    // FSM labels are input:output bits; TM labels are input:action where the
-    // input is a tape symbol (0/1, plus * for binary machines) and the action
-    // is a dual action — a write symbol (0/1/*) followed by a move direction
-    // (R/L) — spec §10.3.
-    const re = get().buildMode === 'TM' ? /^[01*]:[01*][RL]$/ : /^[01]:[01]$/;
+    // FSM labels are input:output bits; base-TM labels are input:action with
+    // a dual action (write symbol + move, spec §10.3). Turbot-TM labels are
+    // single-action and depend on the SOURCE state's kind: internal
+    // "read:(write|move)" over {0,1,*}+{R,L}, external "B|E|F : ↑|↱|↰".
+    const state0 = get();
+    let re: RegExp;
+    if (state0.buildMode === 'turbot' && selectEffectiveMode(state0) === 'TM') {
+      const wire0 = state0.wires.find((w) => w.id === wireId);
+      const source = state0.components.find((c) => c.id === wire0?.sourceComponentId);
+      re = source && stateKindOf(source) === 'external'
+        ? /^[BEF]:[↑↱↰]$/
+        : /^[01*]:[01*RL]$/;
+    } else {
+      re = selectEffectiveMode(state0) === 'TM' ? /^[01*]:[01*][RL]$/ : /^[01]:[01]$/;
+    }
     if (!re.test(label)) return;
     const state = get();
     state.pushHistory();
@@ -3079,6 +3174,122 @@ export const useStore = create<AppState>()((set, get) => ({
       tmRunning: false,
       tmRunIntervalId: null,
       tmHalted: false,
+    });
+  },
+
+  // ─── Turbot state ──────────────────────────────────────────────
+  turbotState: { ...defaultArenaConfig().start },
+  turbotBrainState: {},
+  turbotHistory: [],
+  turbotRunning: false,
+  turbotRunIntervalId: null,
+  turbotHalted: false,
+  turbotStopReason: null,
+
+  turbotStep: () => {
+    const state = get();
+    const { components, wires, turbotHistory, turbotHalted, turbotState } = state;
+    if (turbotHalted) return;
+
+    const arena = selectTurbotArena(state);
+    const innerMode = selectTurbotInnerMode(state);
+    // On the first cycle, derive the brain state from the circuit as it is
+    // NOW — the student normally builds the brain after the last reset, so a
+    // reset-time snapshot would still point at a state that didn't exist yet.
+    const turbotBrainState = turbotHistory.length === 0
+      ? initialBrainState(components, innerMode)
+      : state.turbotBrainState;
+    const sense = senseAheadSymbol(arena, turbotState);
+    const result = runBrainStep(components, wires, innerMode, sense, turbotBrainState);
+    if (!result) {
+      // No matching transition. For a turbot TM this is the normal stop
+      // (it has no stop output — textbook); the panel words it accordingly.
+      set({ turbotHalted: true, turbotStopReason: 'brain' });
+      return;
+    }
+
+    // Internal turbot-TM ops leave the pose unchanged (motor === null).
+    const nextPose = result.motor !== null
+      ? applyMotorCommand(arena, turbotState, result.motor)
+      : turbotState;
+    const entry: TurbotHistoryEntry = {
+      t: turbotHistory.length + 1,
+      kind: result.motor === null ? 'internal' : 'external',
+      input: result.input,
+      action: result.action,
+      x: nextPose.x,
+      y: nextPose.y,
+      facing: nextPose.facing,
+    };
+
+    set({
+      turbotState: nextPose,
+      turbotBrainState: result.brainState,
+      turbotHistory: [...turbotHistory, entry],
+      ...(result.motor === 'stop' ? { turbotHalted: true, turbotStopReason: 'motor' as const } : {}),
+    });
+  },
+
+  turbotRun: () => {
+    const state = get();
+    if (state.turbotRunning) return;
+    const MAX_UI_TURBOT_STEPS = 1000; // stop a runaway turbot in the UI
+    const intervalId = window.setInterval(() => {
+      const s = get();
+      if (s.turbotHalted || s.turbotHistory.length >= MAX_UI_TURBOT_STEPS) {
+        s.turbotPause();
+        if (!s.turbotHalted) set({ turbotHalted: true, turbotStopReason: 'limit' });
+        return;
+      }
+      s.turbotStep();
+    }, 300);
+    set({ turbotRunning: true, turbotRunIntervalId: intervalId });
+  },
+
+  turbotPause: () => {
+    const state = get();
+    if (state.turbotRunIntervalId !== null) {
+      window.clearInterval(state.turbotRunIntervalId);
+    }
+    set({ turbotRunning: false, turbotRunIntervalId: null });
+  },
+
+  turbotReset: () => {
+    const state = get();
+    if (state.turbotRunIntervalId !== null) {
+      window.clearInterval(state.turbotRunIntervalId);
+    }
+    const arena = selectTurbotArena(state);
+    const innerMode = selectTurbotInnerMode(state);
+    set({
+      turbotState: { ...arena.start },
+      turbotBrainState: initialBrainState(state.components, innerMode),
+      turbotHistory: [],
+      turbotRunning: false,
+      turbotRunIntervalId: null,
+      turbotHalted: false,
+      turbotStopReason: null,
+    });
+  },
+
+  toggleStateKind: (id) => {
+    const state = get();
+    const comp = state.components.find((c) => c.id === id);
+    if (!comp || comp.type !== 'STATE') return;
+    state.pushHistory();
+    const newKind = stateKindOf(comp) === 'external' ? 'internal' : 'external';
+    // The two kinds' label grammars are disjoint, so outgoing transitions
+    // are re-labelled to the new kind's default rather than left invalid.
+    const defaultLabel = newKind === 'external' ? `E:${TURBOT_FORWARD}` : '0:R';
+    set({
+      components: state.components.map((c) =>
+        c.id === id ? { ...c, stateKind: newKind } : c
+      ),
+      wires: state.wires.map((w) =>
+        w.sourceComponentId === id && w.transitionLabel != null
+          ? { ...w, transitionLabel: defaultLabel }
+          : w
+      ),
     });
   },
 }));

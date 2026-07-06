@@ -1,6 +1,14 @@
 import { useState } from 'react';
-import type { AssignmentQuestion, BuildMode, RepSystem } from '../types';
+import type {
+  AssignmentQuestion,
+  BuildMode,
+  RepSystem,
+  ArenaConfig,
+  TurbotSuccessCriterion,
+} from '../types';
 import { getAssignment } from '../assignments';
+import { ArenaCanvas } from '../components/ArenaCanvas';
+import { blankArena, resizeArena, setArenaCell, placeStart, MAX_ARENA_SIZE } from './arenaEditing';
 import {
   buildQuestionBank,
   type AuthoredInputGroup,
@@ -35,6 +43,31 @@ const MODES: { mode: BuildMode; label: string }[] = [
   { mode: 'SC', label: 'SC' },
   { mode: 'FSM', label: 'FSM' },
   { mode: 'TM', label: 'TM' },
+  { mode: 'turbot', label: 'Turbot' },
+];
+
+// A turbot's brain is one of the four machine kinds (spec §9.3); the arena
+// and criterion are shared regardless of which brain drives the turbot.
+const INNER_MODES: { mode: BuildMode; label: string }[] = [
+  { mode: 'CC', label: 'CC' },
+  { mode: 'SC', label: 'SC' },
+  { mode: 'FSM', label: 'FSM' },
+  { mode: 'TM', label: 'TM' },
+];
+
+const CRITERIA: { value: TurbotSuccessCriterion; label: string; hint: string }[] = [
+  { value: 'reach-and-stop', label: 'Reach goal and stop', hint: 'The turbot must halt itself (motor 00) on the goal cell.' },
+  { value: 'pass-through', label: 'Pass through goal', hint: 'The turbot must visit the goal cell at some step.' },
+  { value: 'return-to-start', label: 'Return to start', hint: 'The turbot must end on its starting cell.' },
+];
+
+type ArenaTool = 'block' | 'goal' | 'erase' | 'start';
+
+const ARENA_TOOLS: { tool: ArenaTool; label: string }[] = [
+  { tool: 'block', label: 'Block' },
+  { tool: 'goal', label: 'Goal' },
+  { tool: 'erase', label: 'Erase' },
+  { tool: 'start', label: 'Turbot' },
 ];
 
 const SAMPLING_NOTE: Partial<Record<BuildMode, string>> = {
@@ -84,6 +117,32 @@ export function QuestionCreator({ assignmentId, existingQuestion, onSave, onCanc
   });
   const [statement, setStatement] = useState(existingQuestion?.statement ?? '');
 
+  // ── Turbot-only fields (mode === 'turbot') ─────────────────────
+  // One primary arena per question for now; the data model (`turbot_cases`)
+  // is a list so held-out grading arenas can be added without a migration.
+  const [innerMode, setInnerMode] = useState<BuildMode>(existingQuestion?.innerMode ?? 'CC');
+  const [arena, setArena] = useState<ArenaConfig>(
+    () => existingQuestion?.turbot_cases?.[0]?.arena ?? blankArena(),
+  );
+  const [maxSteps, setMaxSteps] = useState<number>(
+    existingQuestion?.turbot_cases?.[0]?.maxSteps ?? 100,
+  );
+  const [criterion, setCriterion] = useState<TurbotSuccessCriterion>(
+    existingQuestion?.turbot_cases?.[0]?.criterion ?? 'reach-and-stop',
+  );
+  const [arenaTool, setArenaTool] = useState<ArenaTool>('block');
+
+  const handleArenaClick = (x: number, y: number) => {
+    setArena((a) => {
+      switch (arenaTool) {
+        case 'block': return setArenaCell(a, x, y, 'block');
+        case 'goal': return setArenaCell(a, x, y, 'goal');
+        case 'erase': return setArenaCell(a, x, y, 'empty');
+        case 'start': return placeStart(a, x, y);
+      }
+    });
+  };
+
   // The single input the live probe evaluates the formulas on. Keyed by group
   // name (robust to add/remove/reorder); unset groups default to their max value.
   const [probeOverrides, setProbeOverrides] = useState<Record<string, number>>({});
@@ -93,7 +152,8 @@ export function QuestionCreator({ assignmentId, existingQuestion, onSave, onCanc
   const [saveError, setSaveError] = useState<string | null>(null);
 
   // ── Live, per-keystroke validation (all O(#groups), no space enumeration) ──
-  const structuralErrors = validateGroups(inputs, outputs, rep, mode);
+  const isTurbot = mode === 'turbot';
+  const structuralErrors = isTurbot ? [] : validateGroups(inputs, outputs, rep, mode);
   const structurallyValid = structuralErrors.length === 0;
   const isCC = mode === 'CC';
   const tooLarge = isCC && countCombos(inputs) > MAX_COMBOS;
@@ -108,17 +168,25 @@ export function QuestionCreator({ assignmentId, existingQuestion, onSave, onCanc
 
   // Single-input evaluation: cheap, and enough to catch formula syntax/reference
   // errors. Only run when the group shapes are valid.
-  const probe = structurallyValid
+  const probe = structurallyValid && !isTurbot
     ? probeFormulas(inputs, outputs, rep, probeValues, mode)
     : null;
   const formulasOk = probe ? probe.outputErrors.every((e) => e == null) : false;
 
+  // Turbot questions are gated on the arena instead of the formula pipeline:
+  // goal-directed criteria need at least one goal cell to be satisfiable.
+  const arenaHasGoal = arena.cells.some((row) => row.some((c) => c === 'goal'));
+  const needsGoal = criterion === 'reach-and-stop' || criterion === 'pass-through';
+  const arenaError = isTurbot && needsGoal && !arenaHasGoal
+    ? 'This success criterion needs at least one goal cell in the arena.'
+    : null;
+
   const saveable =
-    structurallyValid &&
-    !tooLarge &&
-    formulasOk &&
     label.trim().length > 0 &&
-    statement.trim().length > 0;
+    statement.trim().length > 0 &&
+    (isTurbot
+      ? maxSteps >= 1 && !arenaError
+      : structurallyValid && !tooLarge && formulasOk);
 
   // ── Group editing helpers ──────────────────────────────────────
   const updateInput = (i: number, patch: Partial<AuthoredInputGroup>) =>
@@ -126,6 +194,29 @@ export function QuestionCreator({ assignmentId, existingQuestion, onSave, onCanc
 
   const handleSave = () => {
     if (!saveable) return;
+
+    const existingQsForId = getAssignment(assignmentId)?.questions ?? [];
+    const newId =
+      existingQuestion?.id ??
+      existingQsForId.reduce((max, q) => Math.max(max, q.id), 0) + 1;
+
+    // Turbot questions carry an arena + criterion, not a generated test bank.
+    // representation is fixed to 'tally' so a TM brain gets the unary {0,1}
+    // alphabet — matching the sensor/motor bit encoding the arena driver
+    // loop feeds it (engine/turbot.ts runs turbot TM brains as unary).
+    if (mode === 'turbot') {
+      onSave({
+        id: newId,
+        label: label.trim(),
+        statement: statement.trim(),
+        buildMode: 'turbot',
+        representation: 'tally',
+        innerMode,
+        turbot_cases: [{ arena, maxSteps, criterion }],
+      });
+      return;
+    }
+
     // The test bank is generated here — and only here — at save.
     let bank;
     try {
@@ -139,13 +230,8 @@ export function QuestionCreator({ assignmentId, existingQuestion, onSave, onCanc
       return;
     }
 
-    const existingQs = getAssignment(assignmentId)?.questions ?? [];
-    const id =
-      existingQuestion?.id ??
-      existingQs.reduce((max, q) => Math.max(max, q.id), 0) + 1;
-
     onSave({
-      id,
+      id: newId,
       label: label.trim(),
       statement: statement.trim(),
       buildMode: mode,
@@ -161,9 +247,19 @@ export function QuestionCreator({ assignmentId, existingQuestion, onSave, onCanc
         <h3 className="instructor-section-title">
           {existingQuestion ? `Edit ${existingQuestion.label}` : `New ${mode} question`}
         </h3>
-        <button className="instructor-btn" onClick={onCancel}>
-          Cancel
-        </button>
+        <div className="instructor-page-head-actions">
+          {saveError && <span className="instructor-formula-error">{saveError}</span>}
+          <button className="instructor-btn" onClick={onCancel}>
+            Cancel
+          </button>
+          <button
+            className="instructor-btn instructor-btn--primary"
+            disabled={!saveable}
+            onClick={handleSave}
+          >
+            {existingQuestion ? 'Save Question' : 'Add to Assignment'}
+          </button>
+        </div>
       </div>
 
       {/* Name + mode + representation (all per-question) */}
@@ -194,13 +290,124 @@ export function QuestionCreator({ assignmentId, existingQuestion, onSave, onCanc
             ))}
           </div>
         </div>
-        <div className="instructor-section-head">
-          <h4 className="instructor-subhead">Representation</h4>
-          <RepToggle value={rep} onChange={setRep} />
-        </div>
+        {!isTurbot && (
+          <div className="instructor-section-head">
+            <h4 className="instructor-subhead">Representation</h4>
+            <RepToggle value={rep} onChange={setRep} />
+          </div>
+        )}
+        {isTurbot && (
+          <div className="instructor-section-head">
+            <h4 className="instructor-subhead">Internal machine</h4>
+            <div className="instructor-encoding-toggle">
+              {INNER_MODES.map((m) => (
+                <button
+                  key={m.mode}
+                  className={
+                    'instructor-encoding-btn' +
+                    (innerMode === m.mode ? ' instructor-encoding-btn--active' : '')
+                  }
+                  onClick={() => setInnerMode(m.mode)}
+                >
+                  {m.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
       </section>
 
+      {/* Turbot: arena editor + success criterion (replaces the value-based
+          inputs/target-function pipeline below) */}
+      {isTurbot && (
+        <>
+          <section className="instructor-creator-section">
+            <div className="instructor-section-head">
+              <h4 className="instructor-subhead">Arena</h4>
+              <div className="instructor-encoding-toggle">
+                {ARENA_TOOLS.map((t) => (
+                  <button
+                    key={t.tool}
+                    className={
+                      'instructor-encoding-btn' +
+                      (arenaTool === t.tool ? ' instructor-encoding-btn--active' : '')
+                    }
+                    onClick={() => setArenaTool(t.tool)}
+                  >
+                    {t.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <p className="instructor-hint">
+              Click cells to paint with the selected tool. With the Turbot tool, click a cell to
+              move the start there; click the turbot again to rotate it.
+            </p>
+            <div className="instructor-arena-size">
+              <label className="instructor-inline-field">
+                width
+                <input
+                  className="instructor-input instructor-input--num"
+                  type="number"
+                  min={1}
+                  max={MAX_ARENA_SIZE}
+                  value={arena.width}
+                  onChange={(e) => setArena((a) => resizeArena(a, Number(e.target.value), a.height))}
+                />
+              </label>
+              <label className="instructor-inline-field">
+                height
+                <input
+                  className="instructor-input instructor-input--num"
+                  type="number"
+                  min={1}
+                  max={MAX_ARENA_SIZE}
+                  value={arena.height}
+                  onChange={(e) => setArena((a) => resizeArena(a, a.width, Number(e.target.value)))}
+                />
+              </label>
+            </div>
+            <ArenaCanvas arena={arena} onCellClick={handleArenaClick} />
+            {arenaError && <p className="instructor-preview-warning">{arenaError}</p>}
+          </section>
+
+          <section className="instructor-creator-section">
+            <div className="instructor-section-head">
+              <h4 className="instructor-subhead">Success criterion</h4>
+            </div>
+            <div className="instructor-criterion-row">
+              <select
+                className="instructor-input"
+                value={criterion}
+                onChange={(e) => setCriterion(e.target.value as TurbotSuccessCriterion)}
+              >
+                {CRITERIA.map((c) => (
+                  <option key={c.value} value={c.value}>{c.label}</option>
+                ))}
+              </select>
+              <label className="instructor-inline-field">
+                max steps
+                <input
+                  className="instructor-input instructor-input--num"
+                  type="number"
+                  min={1}
+                  max={10000}
+                  value={maxSteps}
+                  onChange={(e) => setMaxSteps(Math.max(1, Math.trunc(Number(e.target.value)) || 1))}
+                />
+              </label>
+            </div>
+            <p className="instructor-hint">
+              {CRITERIA.find((c) => c.value === criterion)?.hint} The turbot fails if it exceeds
+              the step budget.
+            </p>
+          </section>
+        </>
+      )}
+
       {/* Inputs */}
+      {!isTurbot && (
+      <>
       <section className="instructor-creator-section">
         <div className="instructor-section-head">
           <h4 className="instructor-subhead">Input groups</h4>
@@ -288,6 +495,8 @@ export function QuestionCreator({ assignmentId, existingQuestion, onSave, onCanc
           />
         )}
       </section>
+      </>
+      )}
 
       {/* Statement */}
       <section className="instructor-creator-section">

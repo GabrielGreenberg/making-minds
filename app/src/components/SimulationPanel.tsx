@@ -1,19 +1,28 @@
 import { useState } from 'react';
-import { useStore } from '../store';
+import { useStore, selectEffectiveMode } from '../store';
 
 export function SimulationToolbar() {
   const buildMode = useStore((s) => s.buildMode);
+  const effectiveMode = useStore(selectEffectiveMode);
   const components = useStore((s) => s.components);
   const hasMem = components.some((c) => c.type === 'MEM');
   const isSC = buildMode === 'SC' || hasMem;
   const autoSaveStatus = useStore((s) => s.autoSaveStatus);
-  const hasSelection = useStore((s) => s.selectedIds.length > 0);
+  const selectedIds = useStore((s) => s.selectedIds);
+  const hasSelection = selectedIds.length > 0;
+  const hasStateSelected = selectedIds.some((id) => components.find((c) => c.id === id)?.type === 'STATE');
 
-  const isFSM = buildMode === 'FSM';
-  const isTM = buildMode === 'TM';
+  const isTurbot = buildMode === 'turbot';
+  // The state-machine chrome (current-state readout) follows the effective
+  // (inner) mode so FSM/TM-brained turbots show their control state too.
+  const isFSM = effectiveMode === 'FSM';
+  const isTM = effectiveMode === 'TM';
   const fsmCurrentStateId = useStore((s) => s.fsmCurrentStateId);
   const tmCurrentStateId = useStore((s) => s.tmCurrentStateId);
-  const currentStateId = isFSM ? fsmCurrentStateId : isTM ? tmCurrentStateId : null;
+  const turbotBrainStateId = useStore((s) => s.turbotBrainState.stateId ?? null);
+  const currentStateId = isTurbot
+    ? turbotBrainStateId
+    : isFSM ? fsmCurrentStateId : isTM ? tmCurrentStateId : null;
   const currentStateLabel = currentStateId
     ? components.find((c) => c.id === currentStateId)?.label ?? null
     : null;
@@ -22,7 +31,9 @@ export function SimulationToolbar() {
 
   const handleReset = () => {
     const state = useStore.getState();
-    if (isFSM) {
+    if (isTurbot) {
+      state.turbotReset();
+    } else if (isFSM) {
       state.fsmReset();
     } else if (isTM) {
       state.tmReset();
@@ -83,6 +94,24 @@ export function SimulationToolbar() {
         >
           <span className="toolbar-icon">{'↻'}</span> Rotate
         </button>
+
+        {/* Turbot TM: flip selected states between internal (circle, tape
+            ops) and external (square, sense/move ops) — textbook convention. */}
+        {isTurbot && isTM && (
+          <button
+            className="toolbar-btn"
+            disabled={!hasStateSelected}
+            onClick={() => {
+              const state = useStore.getState();
+              for (const id of state.selectedIds) {
+                state.toggleStateKind(id);
+              }
+            }}
+            title="Toggle selected states between internal (circle: read/write/move the tape) and external (square: sense ahead and move/turn)"
+          >
+            <span className="toolbar-icon">{'▢'}</span> In/External
+          </button>
+        )}
 
         <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 12 }}>
           {(isFSM || isTM) && (
