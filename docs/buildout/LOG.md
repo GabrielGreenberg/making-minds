@@ -356,3 +356,52 @@ questions). hw4-p11's manifest row now carries the blocker note.
 
 **Next:** **P1.12** — write `designs/transition-notation.md`, then the FSM
 k-bit alphabet slice (unblocks hw4-p11 → 32/56; kills the footgun). Then P1.13.
+
+## 2026-07-06 (iteration 9) — P1.12: transition-notation seam + FSM k-bit · 32/56
+
+**The loop's first design-memo architecture change, landed end-to-end.**
+Judge-panel design (three angles: full-module-now / seam-first / structured
+data model) → **seam-first won** on iteration-delivery + compat weights, with
+two sharp judge catches: (a) x+y is symmetric and useless as a bit-order pin —
+an asymmetric x+2y probe is mandated; (b) ALL designs missed that a k=2 serial
+adder has three self-loops per state, colliding with the P1.13 renderer defect
+— the fixture must hand-place `fsmControlPt`. Memo:
+`designs/transition-notation.md` (+ implementation postscript).
+
+**Shipped (four staged commits, 739fcfc..5244276, gates green after each):**
+1. `engine/notation.ts` — `TransitionNotation` interface (parse / canonical
+   format / input alphabet / editor token fields / default label); native k-bit
+   `fsmNotation` (legacy (1,1) byte-compatible); TM/turbot parsers untouched
+   behind ~20-line delegating adapters; `turbotFsmNotation` = the ONE validity
+   answer for turbot-FSM brains (legacy 1-bit alias → canonical 2-bit motor,
+   decays on edit-save). `tools/notationCheck.ts` in `npm run check` (adapter ≡
+   parser corpora, byte-compat, alphabet enumeration, asymmetric x+2y grade
+   pin, and a grep gate keeping label dissection inside the seam).
+2. Engine flip: FSM evaluates k-bit symbols; validator checks totality over
+   2^kIn (cap kIn≤3) with kIn derived from the question's input groups — the
+   **silent-misgrading footgun is dead** (verifier proved it previously alive:
+   wire-0 identity passed 16/128; now fails Stage-1 loudly with the arity
+   named); grader feeds the full encoded row.
+3. Store/UI flip: question runs join the full row (scWindowCheck's 45 pins
+   stay green + new k=2 store-twin pin); label editor reads token fields from
+   the seam for all four grammars; **P1.10 folded in** (sandbox FSM feed now
+   rightmost-char-first; the palindrome pin that had pinned the bug repointed).
+4. hw4-p11: 2-state serial adder, four `xy:o` transitions per state, 128/128
+   correct / broken 57%; appearance PASSES (hand-placed control points beat the
+   coincident-arc defect; k=2 editor verified in-browser) → **32/56, 0
+   regressed**.
+
+**Adversarial verification (refuted nothing):** byte-identical verdicts for
+all 31 pre-slice fixtures against a pristine worktree (62 grades); bit-order
+pinned from BOTH sides (verifier built its own x+2y machine AND the
+swapped-halves variant that must fail); turbot legacy labels bit-identical;
+single-validator rule confirmed by grep.
+
+**Consequences downstream:** P2.1 (TM two-output) is now a notation swap;
+hw4-p12–14's 2-bit motor labels are already executable by the engine (the
+navigation task shrinks to arenas + authoring surface + P4.2 multi-arena
+grading). Stage-1 FSM validation is stricter (stray malformed labels error).
+
+**Next:** **P1.13** — FSM coincident-arc renderer fix (opposite-direction
+pairs get automatic control-point offsets), flipping hw4-p8/p9/p10's appr
+cells → all HW4 arithmetic fully ✅.

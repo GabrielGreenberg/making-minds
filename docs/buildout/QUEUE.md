@@ -79,24 +79,22 @@ before Phase 3 (perception returns to router-rendered CC/SC). Task ids unchanged
   refutations, 0 warnings; 31/56._ Remainders: **hw4-p11 BLOCKED** (single-bit
   FSM grammar + grader feeds wire 0 only → P1.12); hw4-p8/p9/p10 grading-✅ but
   appearance-blocked on the coincident-arc renderer defect (→ P1.13).
-- [ ] **P1.12** _(discovered 2026-07-06, hw4 batch — absorbs P4.1's depth check
-  and is the P2.1 design's first slice)_ **Transition-notation design memo +
-  FSM multi-bit alphabet.** One engine change unblocks TWO clusters: hw4-p11
-  needs 2-bit INPUT symbols (`xy:o`, alphabet 00/01/10/11 per the codec's wire
-  order) and hw4-p12–14 navigation needs 2-bit OUTPUT symbols (motor 11=F/00=S/
-  10=R/01=L per hw4.pdf p188). The family is P2.1's: FOUR transition grammars
-  live as scattered string conventions (FSM `0:1`, TM `1:0R`, turbot-TM
-  internal/external). Write `designs/transition-notation.md` FIRST (per-mode
-  notation module: parse/validate/render/edit as one pluggable unit), then
-  implement the FSM k-bit slice through it: `engine/fsm.ts` match on the joined
-  input row, `machineValidation.ts` enumerate 2^k symbols, `grader.ts` feed the
-  full row (not `s[0]`), editor label entry, store typed-sequence feeding.
-  **Also fix the silent-misgrading footgun** even for unsupported cases:
-  validateMachine must reject/flag an FSM question whose input-group count
-  exceeds the supported alphabet width (today it grades wire 0 silently).
-  **Acceptance:** memo written; hw4-p11 fixture builds + verifies (33/56);
-  a 2-input FSM question can no longer silently mis-grade; scWindowCheck/
-  tmCheck/turbotCheck/coverage all green.
+- [x] **P1.12** **Transition-notation design memo + FSM multi-bit alphabet.** —
+  _done 2026-07-06 (iteration 9)._ Judge-panel design (3 angles) → **seam-first
+  won**: `engine/notation.ts` owns transition-label SYNTAX for all four
+  grammars behind one `TransitionNotation` interface; FSM is k-bit native
+  (`fsmNotation(inBits,outBits)`, legacy (1,1) byte-compatible); TM/turbot
+  parsers untouched behind delegating adapters; editor token fields read the
+  seam for all four grammars. Landed as four staged commits (739fcfc..5244276),
+  each gates-green. hw4-p11 (k=2 serial adder) **fully verified incl.
+  appearance + k=2 editor** → **32/56**. Footgun dead (2-input FSM questions
+  fail Stage-1 loudly; verifier proved it previously mis-graded). Adversarial
+  verification: byte-identical verdicts for all 31 prior fixtures vs a pristine
+  worktree; bit-order pinned from both sides. `tools/notationCheck.ts` (incl. a
+  grep gate keeping label dissection inside the seam) added to `npm run check`.
+  Memo postscript records two deliberate deviations (runBrainStep flip pulled
+  forward for the alias-decay rule; P1.10 folded in). **P2.1 is now a notation
+  swap; hw4-p12–14's 2-bit motor labels are already executable.**
 - [ ] **P1.13** _(discovered 2026-07-06, hw4 appearance sweep)_ **FSM renderer:
   coincident opposite-direction arcs.** S₀→S₁ and S₁→S₀ render as geometrically
   coincident quadratic curves with superimposed labels (one transition visually
@@ -144,13 +142,10 @@ before Phase 3 (perception returns to router-rendered CC/SC). Task ids unchanged
   one shared label-order helper used by both paths.
   **Acceptance:** single implementation; `npm run check` (incl. hw2-p6 fixture)
   green.
-- [ ] **P1.10** _(discovered 2026-07-06, P1.9 round-3 verifier; sandbox-only,
-  minor)_ **Sandbox FSM feed direction.** The FSM IN/OUT display is now
-  t1-rightmost everywhere, but the sandbox FSM feed still consumes the typed
-  string leftmost-first (SC sandbox parses rightmost = t1) — a sandbox identity
-  FSM typed "110" displays OUT "011". Reverse the sandbox FSM feed to match SC
-  and update the corresponding scWindowCheck sandbox pin.
-  **Acceptance:** sandbox identity FSM displays OUT == IN; scWindowCheck green.
+- [x] **P1.10** **Sandbox FSM feed direction.** — _done 2026-07-06, folded into
+  P1.12 commit f896943 (the same `fsmStep` lines were being rewritten; the
+  scWindowCheck sandbox pin — which had pinned the bug via a palindrome — was
+  repointed to the fixed rightmost-char-=-t1 behavior)._
 - [ ] **P1.11** _(discovered 2026-07-06, P1.9 round-2 verifier; pre-existing,
   minor)_ **A/V ARG rendering for multi-group questions.** The ARG column
   renders the whole interleaved typed string as ONE numeral — typed "111101"
