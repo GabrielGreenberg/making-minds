@@ -15,8 +15,9 @@ A row is ✅ only when the manifest row has a fixture and the harness reports it
 `verified` (correct passes every case, broken variant fails), AND appearance has
 been checked against [VISUAL_VOCAB.md](VISUAL_VOCAB.md).
 
-**As of 2026-07-06 (iteration 2):** harness live, **7/56 verified** (all of HW1),
-49 pending. The self-test proves the harness discriminates across all five modes.
+**As of 2026-07-06 (iteration 3):** harness live, **14/56 verified** (HW1 complete
++ HW2 arithmetic), 42 pending. The self-test proves the harness discriminates
+across all five modes.
 
 ## Columns
 
@@ -37,17 +38,17 @@ harness verified (correct✓ + broken✗) · `appr` = appearance matches VISUAL_
 | hw1-p16 | M: successor of tal(I), 1-in → 2-out | arithmetic | ✅ | ✅ | ✅ | ✅ | ✅ | `reference/hw1-p16.json`; canonical tally forces O1=1, O2=I (PDF's position-insensitive tal() nuance noted in LOG); broken emits non-canonical `01` |
 | hw1-p17 | N: successor of bin(I), 1-in → 2-out | arithmetic | ✅ | ✅ | ✅ | ✅ | ✅ | `reference/hw1-p17.json`; one 2-wide output group (OUT1 = MSB); broken = endianness swap |
 
-### HW2 — Computing with CCs  ·  0/13
+### HW2 — Computing with CCs  ·  7/13
 
 | id | problem | category | auth | build | grades | appr | status | notes |
 |----|---------|----------|:----:|:-----:|:------:|:----:|:------:|-------|
-| hw2-p1  | +1 [0-15] B | arithmetic | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | |
-| hw2-p2  | +2 [0-15] B | arithmetic | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | |
-| hw2-p3  | +3 [0-15] B | arithmetic | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | |
-| hw2-p4  | 2x [0-15] B | arithmetic | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | |
-| hw2-p5  | 2x+1 [0-15] B | arithmetic | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | |
-| hw2-p6  | 2(x+1) [0-15] B | arithmetic | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | reuse one +1 sub-part |
-| hw2-p7  | x+y [0-15] B | arithmetic | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | |
+| hw2-p1  | +1 [0-15] B | arithmetic | ✅ | ✅ | ✅ | ✅ | ✅ | `reference/hw2-p1.json`; HA-ripple increment; bank via `buildQuestionBank` (16 cases); broken = dropped carry |
+| hw2-p2  | +2 [0-15] B | arithmetic | ✅ | ✅ | ✅ | ✅ | ✅ | `reference/hw2-p2.json`; shifted ripple from bit 1; broken = carry-free `x^2` |
+| hw2-p3  | +3 [0-15] B | arithmetic | ✅ | ✅ | ✅ | ✅ | ✅ | `reference/hw2-p3.json`; two-bit constant add (XOR/OR/HA); broken = `x^3` |
+| hw2-p4  | 2x [0-15] B | arithmetic | ✅ | ✅ | ✅ | ✅ | ✅ | `reference/hw2-p4.json`; wire shift + synthesized const-0 LSB; broken = endianness swap |
+| hw2-p5  | 2x+1 [0-15] B | arithmetic | ✅ | ✅ | ✅ | ✅ | ✅ | `reference/hw2-p5.json`; shift + const-1 LSB (`OR(w, NOT w)`); broken = const-0 (computes 2x) |
+| hw2-p6  | 2(x+1) [0-15] B | arithmetic | ✅ | ✅ | ✅ | ✅ | ✅ | `reference/hw2-p6.json`; **BOXED `+1` reuse exercised** (internals = p1 circuit); broken diverges only at x=15 (narrowest near-miss) |
+| hw2-p7  | x+y [0-15] B | arithmetic | ✅ | ✅ | ✅ | ✅ | ✅ | `reference/hw2-p7.json`; ripple adder (7 HA + 3 OR), 256/256; layout re-computed by topo depth after appr failure (backward carry wires) — now 25/25 forward |
 | hw2-p10 | edge detector (≥3 consecutive 1s) | perception | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | 8-in→1-out; **DSL can't express — spike** |
 | hw2-p11 | object detector (exactly 3 consecutive 1s) | perception | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | 8-in→1-out |
 | hw2-p12 | landmark recognition (= 110010111) | perception | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | pattern 9 bits vs 8-in schematic — reconcile |

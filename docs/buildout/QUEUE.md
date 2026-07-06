@@ -31,8 +31,11 @@ CC → SC → FSM → TM → turbot; within a mode: arithmetic → perception �
   parallel build+prove → wire → 6 adversarial verifiers + gates + appearance
   sweep → critic; 7/7 HW1 verified, 0 refutations)._ hw1-p2 sets
   `allowed_components` but the field is unenforced → spawned P1.5.
-- [ ] **P1.2** Reference solutions for **HW2 CC arithmetic** (hw2-p1…p7).
-  **Advances:** hw2-p1..p7.
+- [x] **P1.2** Reference solutions for **HW2 CC arithmetic** (hw2-p1…p7). — _done
+  2026-07-06 (19-agent workflow + cleanup agent; banks authored via the production
+  `buildQuestionBank` path; hw2-p7 = 256-case ripple adder; hw2-p6 exercises BOXED
+  reuse of the +1 circuit; 0 refutations; appearance 7/7 after a topo-depth
+  re-layout of p7)._ Spawned P1.6 (cc.ts label-ordering duplication).
 - [ ] **P1.3** Reference solutions for **HW3 SC arithmetic** (hw3-p1…p9, incl. the
   three feasible tally items). Confirm SC pipeline-drain behaviour on carries.
   **Advances:** hw3-p1..p9.
@@ -51,6 +54,15 @@ CC → SC → FSM → TM → turbot; within a mode: arithmetic → perception �
   **Acceptance:** a correct-function OR-using machine FAILS hw1-p2 grading (add
   a second broken variant or a harness case proving it); palette hides OR on
   hw1-p2; creator can author the restriction; all gates green.
+- [ ] **P1.6** _(discovered 2026-07-06, hw2 critic)_ **Unify the IN/OUT
+  label-ordering convention in `engine/cc.ts`.** Two separate implementations of
+  the same convention: the top-level path orders I/O components via
+  `sortByLabel`, while `evaluateBoxedCircuit` binds boxed internals via
+  `parseInt(label.replace('IN',''))` — a future relabel/refactor could desync
+  them (boxed circuits are now load-bearing: hw2-p6 grades through one). Extract
+  one shared label-order helper used by both paths.
+  **Acceptance:** single implementation; `npm run check` (incl. hw2-p6 fixture)
+  green.
 
 ## Phase 2 — TM two-output visual change  _(the one deliberate departure)_
 

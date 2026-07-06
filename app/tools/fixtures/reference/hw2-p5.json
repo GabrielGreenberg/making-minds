@@ -1,0 +1,661 @@
+{
+  "question": {
+    "id": 5,
+    "label": "Problem 5",
+    "statement": "Design a combinatorial circuit that computes 2x + 1: given a binary input x between 0 and 15, output the binary numeral for 2x + 1. Consider how this circuit relates to your 2x circuit.",
+    "buildMode": "CC",
+    "representation": "binary",
+    "cc_spec": {
+      "inputs": [
+        {
+          "name": "x",
+          "width": 4,
+          "max_value": 15
+        }
+      ],
+      "outputs": [
+        {
+          "name": "y",
+          "width": 5,
+          "formula": "2 * x + 1"
+        }
+      ]
+    },
+    "test_cases": [
+      {
+        "inputs": [
+          0
+        ],
+        "outputs": [
+          1
+        ]
+      },
+      {
+        "inputs": [
+          1
+        ],
+        "outputs": [
+          3
+        ]
+      },
+      {
+        "inputs": [
+          2
+        ],
+        "outputs": [
+          5
+        ]
+      },
+      {
+        "inputs": [
+          3
+        ],
+        "outputs": [
+          7
+        ]
+      },
+      {
+        "inputs": [
+          4
+        ],
+        "outputs": [
+          9
+        ]
+      },
+      {
+        "inputs": [
+          5
+        ],
+        "outputs": [
+          11
+        ]
+      },
+      {
+        "inputs": [
+          6
+        ],
+        "outputs": [
+          13
+        ]
+      },
+      {
+        "inputs": [
+          7
+        ],
+        "outputs": [
+          15
+        ]
+      },
+      {
+        "inputs": [
+          8
+        ],
+        "outputs": [
+          17
+        ]
+      },
+      {
+        "inputs": [
+          9
+        ],
+        "outputs": [
+          19
+        ]
+      },
+      {
+        "inputs": [
+          10
+        ],
+        "outputs": [
+          21
+        ]
+      },
+      {
+        "inputs": [
+          11
+        ],
+        "outputs": [
+          23
+        ]
+      },
+      {
+        "inputs": [
+          12
+        ],
+        "outputs": [
+          25
+        ]
+      },
+      {
+        "inputs": [
+          13
+        ],
+        "outputs": [
+          27
+        ]
+      },
+      {
+        "inputs": [
+          14
+        ],
+        "outputs": [
+          29
+        ]
+      },
+      {
+        "inputs": [
+          15
+        ],
+        "outputs": [
+          31
+        ]
+      }
+    ]
+  },
+  "correct": {
+    "components": [
+      {
+        "id": "p5-in1",
+        "type": "INPUT",
+        "x": 80,
+        "y": 80,
+        "label": "IN1",
+        "ports": [
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "p5-in2",
+        "type": "INPUT",
+        "x": 80,
+        "y": 160,
+        "label": "IN2",
+        "ports": [
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "p5-in3",
+        "type": "INPUT",
+        "x": 80,
+        "y": 240,
+        "label": "IN3",
+        "ports": [
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "p5-in4",
+        "type": "INPUT",
+        "x": 80,
+        "y": 320,
+        "label": "IN4",
+        "ports": [
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "p5-not1",
+        "type": "NOT",
+        "x": 260,
+        "y": 460,
+        "label": "",
+        "ports": [
+          {
+            "id": "in",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "p5-or1",
+        "type": "OR",
+        "x": 420,
+        "y": 420,
+        "label": "",
+        "ports": [
+          {
+            "id": "in1",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "in2",
+            "label": "",
+            "side": "left",
+            "index": 1
+          },
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "p5-out1",
+        "type": "OUTPUT",
+        "x": 580,
+        "y": 80,
+        "label": "OUT1",
+        "ports": [
+          {
+            "id": "in",
+            "label": "",
+            "side": "left",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "p5-out2",
+        "type": "OUTPUT",
+        "x": 580,
+        "y": 160,
+        "label": "OUT2",
+        "ports": [
+          {
+            "id": "in",
+            "label": "",
+            "side": "left",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "p5-out3",
+        "type": "OUTPUT",
+        "x": 580,
+        "y": 240,
+        "label": "OUT3",
+        "ports": [
+          {
+            "id": "in",
+            "label": "",
+            "side": "left",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "p5-out4",
+        "type": "OUTPUT",
+        "x": 580,
+        "y": 320,
+        "label": "OUT4",
+        "ports": [
+          {
+            "id": "in",
+            "label": "",
+            "side": "left",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "p5-out5",
+        "type": "OUTPUT",
+        "x": 580,
+        "y": 400,
+        "label": "OUT5",
+        "ports": [
+          {
+            "id": "in",
+            "label": "",
+            "side": "left",
+            "index": 0
+          }
+        ]
+      }
+    ],
+    "wires": [
+      {
+        "id": "p5-w1",
+        "sourceComponentId": "p5-in1",
+        "sourcePortId": "out",
+        "targetComponentId": "p5-out1",
+        "targetPortId": "in",
+        "value": 0
+      },
+      {
+        "id": "p5-w2",
+        "sourceComponentId": "p5-in2",
+        "sourcePortId": "out",
+        "targetComponentId": "p5-out2",
+        "targetPortId": "in",
+        "value": 0
+      },
+      {
+        "id": "p5-w3",
+        "sourceComponentId": "p5-in3",
+        "sourcePortId": "out",
+        "targetComponentId": "p5-out3",
+        "targetPortId": "in",
+        "value": 0
+      },
+      {
+        "id": "p5-w4",
+        "sourceComponentId": "p5-in4",
+        "sourcePortId": "out",
+        "targetComponentId": "p5-out4",
+        "targetPortId": "in",
+        "value": 0
+      },
+      {
+        "id": "p5-w5",
+        "sourceComponentId": "p5-in4",
+        "sourcePortId": "out",
+        "targetComponentId": "p5-or1",
+        "targetPortId": "in1",
+        "value": 0
+      },
+      {
+        "id": "p5-w6",
+        "sourceComponentId": "p5-in4",
+        "sourcePortId": "out",
+        "targetComponentId": "p5-not1",
+        "targetPortId": "in",
+        "value": 0
+      },
+      {
+        "id": "p5-w7",
+        "sourceComponentId": "p5-not1",
+        "sourcePortId": "out",
+        "targetComponentId": "p5-or1",
+        "targetPortId": "in2",
+        "value": 0
+      },
+      {
+        "id": "p5-w8",
+        "sourceComponentId": "p5-or1",
+        "sourcePortId": "out",
+        "targetComponentId": "p5-out5",
+        "targetPortId": "in",
+        "value": 0
+      }
+    ]
+  },
+  "broken": {
+    "components": [
+      {
+        "id": "p5-in1",
+        "type": "INPUT",
+        "x": 80,
+        "y": 80,
+        "label": "IN1",
+        "ports": [
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "p5-in2",
+        "type": "INPUT",
+        "x": 80,
+        "y": 160,
+        "label": "IN2",
+        "ports": [
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "p5-in3",
+        "type": "INPUT",
+        "x": 80,
+        "y": 240,
+        "label": "IN3",
+        "ports": [
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "p5-in4",
+        "type": "INPUT",
+        "x": 80,
+        "y": 320,
+        "label": "IN4",
+        "ports": [
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "p5-not1",
+        "type": "NOT",
+        "x": 260,
+        "y": 460,
+        "label": "",
+        "ports": [
+          {
+            "id": "in",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "p5-and1",
+        "type": "AND",
+        "x": 420,
+        "y": 420,
+        "label": "",
+        "ports": [
+          {
+            "id": "in1",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "in2",
+            "label": "",
+            "side": "left",
+            "index": 1
+          },
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "p5-out1",
+        "type": "OUTPUT",
+        "x": 580,
+        "y": 80,
+        "label": "OUT1",
+        "ports": [
+          {
+            "id": "in",
+            "label": "",
+            "side": "left",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "p5-out2",
+        "type": "OUTPUT",
+        "x": 580,
+        "y": 160,
+        "label": "OUT2",
+        "ports": [
+          {
+            "id": "in",
+            "label": "",
+            "side": "left",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "p5-out3",
+        "type": "OUTPUT",
+        "x": 580,
+        "y": 240,
+        "label": "OUT3",
+        "ports": [
+          {
+            "id": "in",
+            "label": "",
+            "side": "left",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "p5-out4",
+        "type": "OUTPUT",
+        "x": 580,
+        "y": 320,
+        "label": "OUT4",
+        "ports": [
+          {
+            "id": "in",
+            "label": "",
+            "side": "left",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "p5-out5",
+        "type": "OUTPUT",
+        "x": 580,
+        "y": 400,
+        "label": "OUT5",
+        "ports": [
+          {
+            "id": "in",
+            "label": "",
+            "side": "left",
+            "index": 0
+          }
+        ]
+      }
+    ],
+    "wires": [
+      {
+        "id": "p5-w1",
+        "sourceComponentId": "p5-in1",
+        "sourcePortId": "out",
+        "targetComponentId": "p5-out1",
+        "targetPortId": "in",
+        "value": 0
+      },
+      {
+        "id": "p5-w2",
+        "sourceComponentId": "p5-in2",
+        "sourcePortId": "out",
+        "targetComponentId": "p5-out2",
+        "targetPortId": "in",
+        "value": 0
+      },
+      {
+        "id": "p5-w3",
+        "sourceComponentId": "p5-in3",
+        "sourcePortId": "out",
+        "targetComponentId": "p5-out3",
+        "targetPortId": "in",
+        "value": 0
+      },
+      {
+        "id": "p5-w4",
+        "sourceComponentId": "p5-in4",
+        "sourcePortId": "out",
+        "targetComponentId": "p5-out4",
+        "targetPortId": "in",
+        "value": 0
+      },
+      {
+        "id": "p5-w5",
+        "sourceComponentId": "p5-in4",
+        "sourcePortId": "out",
+        "targetComponentId": "p5-and1",
+        "targetPortId": "in1",
+        "value": 0
+      },
+      {
+        "id": "p5-w6",
+        "sourceComponentId": "p5-in4",
+        "sourcePortId": "out",
+        "targetComponentId": "p5-not1",
+        "targetPortId": "in",
+        "value": 0
+      },
+      {
+        "id": "p5-w7",
+        "sourceComponentId": "p5-not1",
+        "sourcePortId": "out",
+        "targetComponentId": "p5-and1",
+        "targetPortId": "in2",
+        "value": 0
+      },
+      {
+        "id": "p5-w8",
+        "sourceComponentId": "p5-and1",
+        "sourcePortId": "out",
+        "targetComponentId": "p5-out5",
+        "targetPortId": "in",
+        "value": 0
+      }
+    ]
+  }
+}

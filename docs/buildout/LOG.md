@@ -109,3 +109,39 @@ not just screenshots).
 the HW2 PDF for exact specs; multi-bit groups will exercise the codec's
 IN1-is-MSB convention more heavily (p17's endianness-swap broken variant is the
 canonical near-miss for these).
+
+## 2026-07-06 (iteration 3) — P1.2: HW2 CC arithmetic · 14/56
+
+**Shipped:** seven fixtures (`hw2-p1..p7`) — the first multi-bit circuits — via
+the batch workflow (19 agents, ~1.19M tokens) plus one cleanup agent. Question
+banks authored through the **production path** (`buildQuestionBank`: exhaustive
+0..15 enumeration, 16 cases each; 256 for `x+y`), spot-checked against
+PDF-derived pairs. Correct machines: HA-ripple increments (+1/+2/+3), wire-shift
+2x/2x+1 with synthesized constants (`OR(w, NOT w)` = 1, `AND(w, NOT w)` = 0),
+BOXED `+1` reuse for 2(x+1), and a 7-HA/3-OR ripple adder for x+y (256/256).
+Verifiers used independent plain-JS oracles against the engine — 0 refutations.
+Harness: **14 verified / 42 pending / 0 regressed**; all gates green.
+
+**Surprises / knowledge gained:**
+- **XOR, HA, BOXED are engine-native** (`evaluateGate` in cc.ts): HA ports
+  in1/in2 → sum/carry; BOXED recursively evaluates `internalCircuit` mapping
+  externals to internal IN/OUT by label. Reference fixtures may use them
+  directly; boxing XOR/HA from primitives is a pedagogical nicety only.
+- **Two batch defects caught by the adversarial stages, fixed pre-commit:**
+  (1) the spec agent returned short ids (`p1`) so builders wrote `p1.json..` —
+  renamed to `hw2-pN.json` + manifest rewired (**lesson: pin the id format in
+  spec-agent schemas**; the README convention is `<row-id>.json`);
+  (2) hw2-p7's ripple layout ran its carry chain BACKWARD (appearance sweep
+  caught it) — re-laid-out by topological depth (x = 80 + 180·depth), verified
+  25/25 wires forward, re-graded 256/256, re-checked in browser.
+- **hw2-p6's broken variant diverges only at x=15** — the harness bar
+  (fail ≥1) is met, but single-case divergence is fragile if banks ever get
+  sampled. Fine for CC (exhaustive); watch for SC/FSM/TM where banks are sampled.
+- Discovered (hw2 critic): cc.ts has TWO label-ordering implementations
+  (`sortByLabel` vs `parseInt` in `evaluateBoxedCircuit`) → queued **P1.6**.
+
+**Next:** **P1.3** — HW3 SC arithmetic (hw3-p1…p9, incl. three tally items).
+New mode for the batch: MEM blocks, time axis, pipeline-drain on carries
+(CLAUDE.md: SC runs flush one 0-input drain step per MEM). Builders should read
+`engine/sc.ts` + the SC sample in devData first; banks are SAMPLED for SC (not
+exhaustive) — broken variants must fail within the sampled bank.
