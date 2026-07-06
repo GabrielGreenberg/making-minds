@@ -4,24 +4,28 @@
 // machine/history tables. The simulation itself lives in the store's turbot
 // slice; the canvas column stays the inner machine's normal editor.
 
-import { useStore, selectTurbotArena, selectTurbotInnerMode } from '../store';
+import { useStore, selectTurbotArena, selectTurbotInnerMode, selectTmNotation } from '../store';
 import {
   senseAhead,
   senseAheadSymbol,
+  turbotTMReadSymbols,
   TURBOT_FORWARD,
   TURBOT_TURN_RIGHT,
   TURBOT_TURN_LEFT,
 } from '../engine/turbot';
-import type { BuildMode } from '../types';
+import type { BuildMode, TMNotation } from '../types';
 import { ArenaCanvas } from './ArenaCanvas';
 
 /**
  * The percept/motor glossary: what the brain can read and output, so
  * students know how to label state transitions. TM brains get the
- * textbook's internal/external vocabularies; circuit brains get the 1-bit
- * sensor and the 2-bit motor codes (FSM: one output bit, stop/forward).
+ * textbook's internal/external vocabularies (internal alphabet per the
+ * question's encoding: binary {0,1,*}, unary {0,1}); circuit brains get the
+ * 1-bit sensor and the 2-bit motor codes (FSM: one output bit). Outputs are
+ * described as motor states — which wheel motors are on — not as the
+ * resulting movement.
  */
-function TurbotGlossary({ innerMode }: { innerMode: BuildMode }) {
+function TurbotGlossary({ innerMode, notation }: { innerMode: BuildMode; notation: TMNotation }) {
   const rows: { input: string[]; output: string[]; title?: string }[] =
     innerMode === 'TM'
       ? [
@@ -29,35 +33,38 @@ function TurbotGlossary({ innerMode }: { innerMode: BuildMode }) {
             title: 'External states (square)',
             input: ['B = see block', 'E = see empty', 'F = see food'],
             output: [
-              `${TURBOT_FORWARD} = move forward`,
-              `${TURBOT_TURN_RIGHT} = right turn`,
-              `${TURBOT_TURN_LEFT} = left turn`,
+              `${TURBOT_FORWARD} = both motors on`,
+              `${TURBOT_TURN_RIGHT} = left motor on`,
+              `${TURBOT_TURN_LEFT} = right motor on`,
             ],
           },
           {
             title: 'Internal states (circle)',
-            input: ['0 = read 0', '1 = read 1', '* = read *'],
-            output: ['0 = write 0', '1 = write 1', '* = write *', 'R = move right', 'L = move left'],
+            input: turbotTMReadSymbols(notation).map((s) => `${s} = read ${s}`),
+            output: [
+              ...turbotTMReadSymbols(notation).map((s) => `${s} = write ${s}`),
+              'R = move right',
+              'L = move left',
+            ],
           },
         ]
       : innerMode === 'FSM'
         ? [
             {
               input: ['0 = empty/food ahead', '1 = block ahead'],
-              output: ['0 = motors off (stay)', '1 = both motors on (forward)'],
+              output: ['0 = both motors off', '1 = both motors on'],
             },
           ]
         : [
             {
               // The two output wires drive the wheel motors: OUT1 = left
-              // wheel, OUT2 = right wheel. One motor on pivots the turbot
-              // toward the OFF side.
+              // wheel, OUT2 = right wheel.
               input: ['0 = empty/food ahead', '1 = block ahead'],
               output: [
-                '00 = motors off (stay)',
-                '01 = right motor on (turn left)',
-                '10 = left motor on (turn right)',
-                '11 = both on (forward)',
+                '00 = both motors off',
+                '01 = right motor on',
+                '10 = left motor on',
+                '11 = both motors on',
               ],
             },
           ];
@@ -100,6 +107,7 @@ export function TurbotArenaPanel() {
   const turbotReset = useStore((s) => s.turbotReset);
 
   const innerMode = useStore(selectTurbotInnerMode);
+  const notation = useStore(selectTmNotation);
   const cycle = turbotHistory.length;
   // Circuit brains see the 1-bit sensor; a turbot TM's external states
   // sense B (block) / E (empty) / F (food).
@@ -118,28 +126,34 @@ export function TurbotArenaPanel() {
       <div className="table-section-label">
         <span>Map</span>
       </div>
-      <div className="turbot-arena-scroll">
-        <ArenaCanvas arena={arena} turbot={turbotState} cellSize={28} />
+      {/* Map column + glossary sit level when the panel is wide enough;
+          flex-wrap drops the glossary below the map when it isn't. */}
+      <div className="turbot-map-row">
+        <div className="turbot-map-col">
+          <div className="turbot-arena-scroll">
+            <ArenaCanvas arena={arena} turbot={turbotState} cellSize={28} />
+          </div>
+          <div className="turbot-arena-controls">
+            <button className="action-btn" onClick={turbotStep} disabled={turbotRunning || turbotHalted}>
+              Step
+            </button>
+            {turbotRunning ? (
+              <button className="action-btn" onClick={turbotPause}>Pause</button>
+            ) : (
+              <button className="action-btn" onClick={turbotRun} disabled={turbotHalted}>Run</button>
+            )}
+            <button className="action-btn" onClick={turbotReset} disabled={turbotRunning}>
+              Reset
+            </button>
+          </div>
+          <div className="turbot-arena-status">
+            <span>cycle {cycle}</span>
+            <span>sensor: {sensor}</span>
+            {stopLabel && <span className="turbot-arena-stop">{stopLabel}</span>}
+          </div>
+        </div>
+        <TurbotGlossary innerMode={innerMode} notation={notation} />
       </div>
-      <div className="turbot-arena-controls">
-        <button className="action-btn" onClick={turbotStep} disabled={turbotRunning || turbotHalted}>
-          Step
-        </button>
-        {turbotRunning ? (
-          <button className="action-btn" onClick={turbotPause}>Pause</button>
-        ) : (
-          <button className="action-btn" onClick={turbotRun} disabled={turbotHalted}>Run</button>
-        )}
-        <button className="action-btn" onClick={turbotReset} disabled={turbotRunning}>
-          Reset
-        </button>
-      </div>
-      <div className="turbot-arena-status">
-        <span>cycle {cycle}</span>
-        <span>sensor: {sensor}</span>
-        {stopLabel && <span className="turbot-arena-stop">{stopLabel}</span>}
-      </div>
-      <TurbotGlossary innerMode={innerMode} />
     </div>
   );
 }

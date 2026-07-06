@@ -201,16 +201,16 @@ export function QuestionCreator({ assignmentId, existingQuestion, onSave, onCanc
       existingQsForId.reduce((max, q) => Math.max(max, q.id), 0) + 1;
 
     // Turbot questions carry an arena + criterion, not a generated test bank.
-    // representation is fixed to 'tally' so a TM brain gets the unary {0,1}
-    // alphabet — matching the sensor/motor bit encoding the arena driver
-    // loop feeds it (engine/turbot.ts runs turbot TM brains as unary).
+    // The authored encoding still matters: it picks a turbot-TM brain's
+    // internal tape alphabet (binary {0,1,*}, unary {0,1}) for the editor,
+    // the arena driver loop, and grading.
     if (mode === 'turbot') {
       onSave({
         id: newId,
         label: label.trim(),
         statement: statement.trim(),
         buildMode: 'turbot',
-        representation: 'tally',
+        representation: rep,
         innerMode,
         turbot_cases: [{ arena, maxSteps, criterion }],
       });
@@ -297,23 +297,45 @@ export function QuestionCreator({ assignmentId, existingQuestion, onSave, onCanc
           </div>
         )}
         {isTurbot && (
-          <div className="instructor-section-head">
-            <h4 className="instructor-subhead">Internal machine</h4>
-            <div className="instructor-encoding-toggle">
-              {INNER_MODES.map((m) => (
-                <button
-                  key={m.mode}
-                  className={
-                    'instructor-encoding-btn' +
-                    (innerMode === m.mode ? ' instructor-encoding-btn--active' : '')
-                  }
-                  onClick={() => setInnerMode(m.mode)}
-                >
-                  {m.label}
-                </button>
-              ))}
+          <>
+            <div className="instructor-section-head">
+              <h4 className="instructor-subhead">Internal machine</h4>
+              <div className="instructor-encoding-toggle">
+                {INNER_MODES.map((m) => (
+                  <button
+                    key={m.mode}
+                    className={
+                      'instructor-encoding-btn' +
+                      (innerMode === m.mode ? ' instructor-encoding-btn--active' : '')
+                    }
+                    onClick={() => setInnerMode(m.mode)}
+                  >
+                    {m.label}
+                  </button>
+                ))}
+              </div>
             </div>
-          </div>
+            {/* The machine's encoding (stored as the question's representation;
+                'tally' is the unary system). For a TM brain it picks the
+                internal tape alphabet: binary {0,1,*}, unary {0,1}. */}
+            <div className="instructor-section-head">
+              <h4 className="instructor-subhead">Encoding</h4>
+              <div className="instructor-encoding-toggle">
+                {REPS.map((r) => (
+                  <button
+                    key={r}
+                    className={
+                      'instructor-encoding-btn' +
+                      (rep === r ? ' instructor-encoding-btn--active' : '')
+                    }
+                    onClick={() => setRep(r)}
+                  >
+                    {r === 'tally' ? 'unary' : r}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </>
         )}
       </section>
 

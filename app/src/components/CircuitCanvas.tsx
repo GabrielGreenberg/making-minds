@@ -1234,9 +1234,10 @@ function FsmTransitionView({
   // are input:output bits. The base-TM alphabet is tied to the question's
   // representation (binary: 0/1/*; unary: 0/1). A TURBOT TM is different
   // (textbook "Turbots: Operation"): single-action labels whose grammar
-  // depends on the SOURCE state's kind — internal reads {0,1,*} and writes a
-  // symbol OR moves; external senses B/E/F and moves forward (↑) or turns
-  // (↱/↰). Turbot-TM labels edit FSM-style (one char per half).
+  // depends on the SOURCE state's kind — internal reads the tape alphabet
+  // (same notation rule as the base TM) and writes a symbol OR moves;
+  // external senses B/E/F and moves forward (↑) or turns (↱/↰). Turbot-TM
+  // labels edit FSM-style (one char per half).
   const isTurbotTM = useStore((s) => s.buildMode === 'turbot' && selectEffectiveMode(s) === 'TM');
   const isTM = useStore((s) => selectEffectiveMode(s) === 'TM') && !isTurbotTM;
   const sourceExternal = useStore((s) =>
@@ -1246,10 +1247,10 @@ function FsmTransitionView({
   const tmNotation = useStore(selectTmNotation);
   const tmSymbols = tmNotation === 'binary' ? ['0', '1', '*'] : ['0', '1'];
   const leftTokens = isTurbotTM
-    ? (sourceExternal ? ['B', 'E', 'F'] : ['0', '1', '*'])
+    ? (sourceExternal ? ['B', 'E', 'F'] : tmSymbols)
     : isTM ? tmSymbols : ['0', '1'];
   const rightTokens = isTurbotTM
-    ? (sourceExternal ? ['↑', '↱', '↰'] : ['0', '1', '*', 'R', 'L'])
+    ? (sourceExternal ? ['↑', '↱', '↰'] : [...tmSymbols, 'R', 'L'])
     : ['0', '1'];
   const writeTokens = tmSymbols;
   const moveTokens = ['R', 'L'];

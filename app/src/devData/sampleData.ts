@@ -289,7 +289,9 @@ export function buildSampleAssignment(): AssignmentData {
     statement:
       'Program the turbot to walk forward until it is blocked, then stop. The goal sits against the far wall.',
     buildMode: 'turbot',
-    representation: 'tally',
+    // The authored encoding (only meaningful for TM brains, where it picks
+    // the internal tape alphabet; a CC brain ignores it).
+    representation: 'binary',
     innerMode: 'CC',
     turbot_cases: [
       {

@@ -32,6 +32,7 @@ import type {
   TurbotSuccessCriterion,
   TMTape,
   TMSymbol,
+  TMNotation,
 } from '../types';
 import { evaluateCCInputs } from './cc';
 import { evaluateSCSingleStep } from './sc';
@@ -122,10 +123,23 @@ export const TURBOT_FORWARD = '↑';
 export const TURBOT_TURN_RIGHT = '↱';
 export const TURBOT_TURN_LEFT = '↰';
 
-export const TURBOT_TM_READ_SYMBOLS: TMSymbol[] = ['0', '1', '*'];
-export const TURBOT_TM_INTERNAL_ACTIONS = ['0', '1', '*', 'R', 'L'] as const;
 export const TURBOT_TM_SENSES: TurbotSense[] = ['B', 'E', 'F'];
 export const TURBOT_TM_EXTERNAL_ACTIONS = [TURBOT_FORWARD, TURBOT_TURN_RIGHT, TURBOT_TURN_LEFT];
+
+/**
+ * The internal tape alphabet under the question's encoding (its
+ * `representation`, mapped through notationForRepresentation): binary
+ * machines read/write {0,1,*}; unary (tally) machines only {0,1} — the same
+ * rule as the base TM's tape (engine/tm.ts isSymbolForNotation).
+ */
+export function turbotTMReadSymbols(notation: TMNotation): TMSymbol[] {
+  return notation === 'binary' ? ['0', '1', '*'] : ['0', '1'];
+}
+
+/** Internal single-action tokens under the notation: the writes plus head moves. */
+export function turbotTMInternalActions(notation: TMNotation): string[] {
+  return [...turbotTMReadSymbols(notation), 'R', 'L'];
+}
 
 /** A STATE node's kind in a turbot TM; absent means internal (circle). */
 export function stateKindOf(comp: CircuitComponent): 'internal' | 'external' {
@@ -146,10 +160,17 @@ export interface TurbotTMExternalTransition {
   motor: 'forward' | 'left' | 'right';
 }
 
-/** Parse an internal transition label "read:action" (e.g. "0:1", "1:L", "*:R"). */
-export function parseTurbotInternalLabel(label: string | undefined): TurbotTMInternalTransition | null {
+/**
+ * Parse an internal transition label "read:action" (e.g. "0:1", "1:L",
+ * "*:R"), notation-aware: under the unary encoding `*` is not a legal read
+ * or write, so any label mentioning it fails to parse.
+ */
+export function parseTurbotInternalLabel(
+  label: string | undefined,
+  notation: TMNotation = 'binary'
+): TurbotTMInternalTransition | null {
   if (!label) return null;
-  const m = /^([01*]):([01*RL])$/.exec(label);
+  const m = (notation === 'binary' ? /^([01*]):([01*RL])$/ : /^([01]):([01RL])$/).exec(label);
   if (!m) return null;
   const read = m[1] as TMSymbol;
   const a = m[2];
@@ -193,9 +214,14 @@ export interface TurbotTMValidationError {
  * SOURCE state's kind grammar, and each state may have at most one
  * transition per input token (deterministic). Mirrors validateTMTable's
  * role for the base TM (engine/tmValidate.ts), which cannot be reused here —
- * its dual-action grammar and single alphabet don't apply.
+ * its dual-action grammar and single alphabet don't apply. `notation` is the
+ * question's encoding: unary machines may not mention `*` in internal labels.
  */
-export function validateTurbotTM(components: CircuitComponent[], wires: Wire[]): TurbotTMValidationError[] {
+export function validateTurbotTM(
+  components: CircuitComponent[],
+  wires: Wire[],
+  notation: TMNotation = 'binary'
+): TurbotTMValidationError[] {
   const errors: TurbotTMValidationError[] = [];
   const states = components.filter((c) => c.type === 'STATE');
   if (states.length === 0) {
@@ -208,7 +234,7 @@ export function validateTurbotTM(components: CircuitComponent[], wires: Wire[]):
       if (w.sourceComponentId !== s.id) continue;
       const label = w.transitionLabel;
       const parsedInput = kind === 'internal'
-        ? parseTurbotInternalLabel(label)?.read
+        ? parseTurbotInternalLabel(label, notation)?.read
         : parseTurbotExternalLabel(label)?.sense;
       if (parsedInput == null) {
         errors.push({
@@ -269,14 +295,16 @@ export function initialBrainState(components: CircuitComponent[], innerMode: Bui
  * the prior brain state, produce this step's external effect (motor command,
  * or null for an internal turbot-TM op) and the next brain state. Returns
  * null when an FSM/TM brain halts (no matching transition) — CC/SC brains
- * never halt (spec §9.3: they react every cycle).
+ * never halt (spec §9.3: they react every cycle). `notation` is the
+ * question's encoding; only a turbot TM's internal alphabet depends on it.
  */
 export function runBrainStep(
   components: CircuitComponent[],
   wires: Wire[],
   innerMode: BuildMode,
   sense: TurbotSense,
-  brainState: BrainState
+  brainState: BrainState,
+  notation: TMNotation = 'binary'
 ): BrainStepResult | null {
   // Circuit brains see the 1-bit sensor: block/boundary = 1, else 0.
   const sensorBit: 0 | 1 = sense === 'B' ? 1 : 0;
@@ -340,7 +368,7 @@ export function runBrainStep(
   // Internal op: read the tape, write a symbol OR move the head; pose untouched.
   const read = readCell(brainState.tape, brainState.tape.head);
   for (const t of transitions) {
-    const parsed = parseTurbotInternalLabel(t.transitionLabel);
+    const parsed = parseTurbotInternalLabel(t.transitionLabel, notation);
     if (!parsed || parsed.read !== read) continue;
     return {
       motor: null,
@@ -382,7 +410,8 @@ export function runTurbot(
   wires: Wire[],
   innerMode: BuildMode,
   arena: ArenaConfig,
-  maxSteps: number
+  maxSteps: number,
+  notation: TMNotation = 'binary'
 ): TurbotRunResult {
   let state: TurbotState = { ...arena.start };
   let brainState = initialBrainState(components, innerMode);
@@ -390,7 +419,7 @@ export function runTurbot(
 
   for (let step = 0; step < maxSteps; step++) {
     const sense = senseAheadSymbol(arena, state);
-    const stepResult = runBrainStep(components, wires, innerMode, sense, brainState);
+    const stepResult = runBrainStep(components, wires, innerMode, sense, brainState, notation);
     if (!stepResult) {
       const isTM = innerMode === 'TM';
       return { finalState: state, history, haltedByMotor: false, haltedByBrain: true, stopped: isTM, hitStepLimit: false };

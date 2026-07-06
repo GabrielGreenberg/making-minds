@@ -76,8 +76,8 @@ export {
   TURBOT_FORWARD,
   TURBOT_TURN_RIGHT,
   TURBOT_TURN_LEFT,
-  TURBOT_TM_READ_SYMBOLS,
-  TURBOT_TM_INTERNAL_ACTIONS,
+  turbotTMReadSymbols,
+  turbotTMInternalActions,
   TURBOT_TM_SENSES,
   TURBOT_TM_EXTERNAL_ACTIONS,
 } from './turbot';

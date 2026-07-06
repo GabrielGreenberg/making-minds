@@ -1980,6 +1980,19 @@ thead .sc-label-col {
 
 /* ─── Turbot arena panel (right data panel, "Map" section) ─── */
 
+/* The map column and the glossary share a wrapping row: level with each
+   other when the panel is wide enough, glossary below the map otherwise. */
+.turbot-map-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+}
+
+.turbot-map-col {
+  flex: 0 0 auto;
+  max-width: 100%;
+}
+
 .turbot-arena-scroll {
   overflow: auto;
   padding: 8px;
@@ -2006,11 +2019,12 @@ thead .sc-label-col {
   font-weight: 600;
 }
 
-/* Percept/motor glossary under the Map */
+/* Percept/motor glossary: beside the Map when it fits, below it when not */
 .turbot-glossary {
-  padding: 4px 8px 8px;
-  border-top: 1px dashed #e0e0e0;
-  margin-top: 4px;
+  /* The 220px basis is the wrap threshold: with less than that left beside
+     the map column, the glossary drops to its own full-width line. */
+  flex: 1 1 220px;
+  padding: 8px 8px;
 }
 
 .turbot-glossary-group + .turbot-glossary-group {

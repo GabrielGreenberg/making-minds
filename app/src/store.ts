@@ -3200,7 +3200,7 @@ export const useStore = create<AppState>()((set, get) => ({
       ? initialBrainState(components, innerMode)
       : state.turbotBrainState;
     const sense = senseAheadSymbol(arena, turbotState);
-    const result = runBrainStep(components, wires, innerMode, sense, turbotBrainState);
+    const result = runBrainStep(components, wires, innerMode, sense, turbotBrainState, selectTmNotation(state));
     if (!result) {
       // No matching transition. For a turbot TM this is the normal stop
       // (it has no stop output — textbook); the panel words it accordingly.

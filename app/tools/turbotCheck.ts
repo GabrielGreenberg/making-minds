@@ -170,6 +170,19 @@ const ambiguousExternal = {
 check('two transitions on the same sense are rejected',
   validateTurbotTM(ambiguousExternal.components, ambiguousExternal.wires).length > 0);
 
+// The question's encoding picks the internal alphabet: binary {0,1,*},
+// unary {0,1} — a label mentioning * is only legal under binary.
+const starUser = {
+  components: [stateComp('s0', 'S₀', 'internal')],
+  wires: [tWire('t1', 's0', 's0', '0:*')],
+};
+check('a * label validates under the binary encoding',
+  validateTurbotTM(starUser.components, starUser.wires, 'binary').length === 0);
+check('a * label is rejected under the unary encoding',
+  validateTurbotTM(starUser.components, starUser.wires, 'unary').length > 0);
+check('a *-free table validates under the unary encoding',
+  validateTurbotTM(turbotTmWalker().components, turbotTmWalker().wires, 'unary').length === 0);
+
 console.log('\n[grader: turbot TM]');
 const tmAssignment: AssignmentData = {
   id: 'turbot-tm-smoke',
@@ -211,6 +224,14 @@ const tmInvalidGraded = gradeSubmission(tmAssignment, tmInvalidSub);
 check('dual-action table fails validation with a reason',
   tmInvalidGraded.questions[0].passed === 0 &&
   !!tmInvalidGraded.questions[0].turbotCases?.[0]?.reason);
+
+// The tally question grades under the unary encoding, so a * table is
+// rejected at Stage 1 even though it would be a legal binary machine.
+const tmStarSub: SubmissionData = { ...tmCorrectSub, student: 'star@example.com', answers: [{ questionId: 1, circuit: starUser }] };
+const tmStarGraded = gradeSubmission(tmAssignment, tmStarSub);
+check('grading respects the encoding: * table fails a unary (tally) question',
+  tmStarGraded.questions[0].passed === 0 &&
+  !!tmStarGraded.questions[0].turbotCases?.[0]?.reason);
 
 // ── grader ─────────────────────────────────────────────────────
 console.log('\n[grader]');

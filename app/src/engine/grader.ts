@@ -28,6 +28,7 @@ import type {
   TurbotCaseResult,
   RepSystem,
   BuildMode,
+  TMNotation,
   CaseResult,
   QuestionResult,
   SubmissionResult,
@@ -199,9 +200,12 @@ function gradeTurbot(question: AssignmentQuestion, circuit: CircuitData): Questi
   // Stage 1: a TM brain is a *turbot TM* (per-state internal/external
   // grammar, single actions) with its own validator; circuit brains reuse
   // the shared machine validation.
+  // The question's encoding (representation) picks a turbot TM's internal
+  // tape alphabet: binary {0,1,*}, unary (tally) {0,1}.
+  const notation = notationForRepresentation(question.representation ?? 'binary');
   let valid: { ok: boolean; reason?: string };
   if (innerMode === 'TM') {
-    const errors = validateTurbotTM(circuit.components, circuit.wires);
+    const errors = validateTurbotTM(circuit.components, circuit.wires, notation);
     valid = errors.length === 0 ? { ok: true } : { ok: false, reason: errors.map((e) => e.message).join(' ') };
   } else {
     valid = validateMachine(circuit, innerMode, turbotLayout(innerMode), question.representation ?? 'binary');
@@ -217,13 +221,13 @@ function gradeTurbot(question: AssignmentQuestion, circuit: CircuitData): Questi
     return { questionId: question.id, status: 'graded', passed: 0, total: rejected.length, cases: [], turbotCases: rejected };
   }
 
-  const turbotCases = cases.map((tc) => gradeTurbotCase(circuit, innerMode, tc));
+  const turbotCases = cases.map((tc) => gradeTurbotCase(circuit, innerMode, tc, notation));
   const passed = turbotCases.filter((c) => c.pass).length;
   return { questionId: question.id, status: 'graded', passed, total: turbotCases.length, cases: [], turbotCases };
 }
 
-function gradeTurbotCase(circuit: CircuitData, innerMode: BuildMode, tc: TurbotTestCase): TurbotCaseResult {
-  const run = runTurbot(circuit.components, circuit.wires, innerMode, tc.arena, tc.maxSteps);
+function gradeTurbotCase(circuit: CircuitData, innerMode: BuildMode, tc: TurbotTestCase, notation: TMNotation): TurbotCaseResult {
+  const run = runTurbot(circuit.components, circuit.wires, innerMode, tc.arena, tc.maxSteps, notation);
   if (run.hitStepLimit) {
     return { pass: false, stepsTaken: tc.maxSteps, finalPosition: run.finalState, hitStepLimit: true, reason: 'exceeded max steps' };
   }
