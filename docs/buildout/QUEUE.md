@@ -42,8 +42,56 @@ CC → SC → FSM → TM → turbot; within a mode: arithmetic → perception �
   subagent session limit hit; 0 refutations; drain confirmed on carries; appearance
   9/9 after re-layouts — see LOG iteration 4 for the router lessons)._ Spawned
   P1.7–P1.9.
+<!-- Reordered by META-audit-queue 2026-07-06 (iteration 5): P1.9 and P1.7 precede
+P1.4 because both de-risk the time-axis/sampled-bank FSM batch; P1.8 must land
+before Phase 3 (perception returns to router-rendered CC/SC). Task ids unchanged. -->
+- [ ] **P1.9** _(discovered 2026-07-06, hw3 critic — potential grading-fairness
+  bug)_ **Reconcile UI-vs-grader drain semantics.** CLAUDE.md says UI Run drains
+  one 0-input step per MEM; the grader's run length is `stepCountFor` =
+  max(inputWidth, outputWidth) (codec.ts), independent of MEM count. A
+  functionally correct student circuit whose answer emerges one cycle later
+  than the codec window would pass in the UI but fail grading (or vice versa).
+  Investigate with a deliberately-late circuit; decide the canonical semantics;
+  fix the divergent side; document in spec §. 
+  **Acceptance:** a documented, single semantics; harness + pipelineCheck green.
+- [ ] **P1.7** _(discovered 2026-07-06, hw3 critic)_ **Harness: enforce the
+  broken-breadth and drain-coverage bars.** `coverageCheck.ts` only asserts the
+  broken variant fails ≥1 case; nothing enforces breadth (≥25% of the bank) or
+  that an SC bank contains at least one drain-exercising case (output bits
+  beyond the input window). Both bars exist only as memo lore; a bank
+  regeneration or sampler change could silently drop them. Add per-row
+  failure-fraction reporting + a warn/fail threshold, and an SC-mode assertion
+  that some case has output width > input width. _(Audit 2026-07-06 folded in:)_
+  also add a **statement lint** (no ledger-shorthand prefixes, no
+  answer-giveaway parentheticals — two rounds of manual cleanup in hw2/hw3
+  prove the pattern recurs), and **promote the layout oracle**
+  (`scratchpad/routecheck_near.ts`, strict 3px variant) to `app/tools/` wired
+  into `npm run coverage` for router-rendered (CC/SC) fixtures.
+  **Acceptance:** harness prints per-row broken-fail fractions; hw3 rows pass;
+  a synthetic single-case-divergence fixture trips the warning; statement lint
+  + layout oracle run in the harness.
 - [ ] **P1.4** Reference solutions for **HW4 FSM arithmetic** (hw4-p3…p11).
+  First step = **META-visual-vocab** for FSM: re-read the textbook FSM chapter +
+  `Mock_Ups-9.jpg`, refresh VISUAL_VOCAB's FSM section before the appearance
+  sweep. Spec agent reads `engine/fsm.ts` + the devData FSM sample; same
+  LSB-first time axis as SC; sampled banks (broken must fail broadly); pin full
+  row ids (`hw4-pN`) in the spec schema.
   **Advances:** hw4-p3..p11.
+- [ ] **P1.8** _(discovered 2026-07-06, hw3 appearance sweep)_ **Renderer: wire
+  lanes and junction dots** — design memo first (`designs/wire-routing.md`).
+  Family: the auto-router (a) sends every wire into `MEM.min` down a fixed
+  obstacle-blind fallback path because the min stub sits inside the router's
+  phantom 75×70 MEM bounds (rendered body is 50×50) — these fixed lanes caused
+  all six HW3 appearance failures; (b) can run different-source wires collinear
+  or 1px apart (reads as a forbidden merge); (c) draws the split junction dot
+  only at the source port, leaving multi-branch divergence elbows undotted.
+  Deep fix: align router obstacle bounds with rendered geometry (or make
+  min-stub reachable), add a lane-separation cost for foreign collinear runs,
+  and dot divergence points. Improves every student's canvas, not just fixtures.
+  **Acceptance:** memo written; hw3 fixtures still oracle-clean under the
+  (P1.7-promoted) layout oracle. _(Audit 2026-07-06: FSM/TM transitions render
+  as curves between STATE circles, bypassing the router — this task gates
+  Phase 3 perception (CC/SC), not P1.4/P2.)_
 - [ ] **P1.5** _(discovered 2026-07-06, hw1-p2 critic)_ **Enforce
   `allowed_components` end-to-end.** The field exists on `AssignmentQuestion`
   (types.ts:139) but is read by NOTHING — a student can pass hw1-p2 ("no OR
@@ -66,38 +114,6 @@ CC → SC → FSM → TM → turbot; within a mode: arithmetic → perception �
   one shared label-order helper used by both paths.
   **Acceptance:** single implementation; `npm run check` (incl. hw2-p6 fixture)
   green.
-- [ ] **P1.7** _(discovered 2026-07-06, hw3 critic)_ **Harness: enforce the
-  broken-breadth and drain-coverage bars.** `coverageCheck.ts` only asserts the
-  broken variant fails ≥1 case; nothing enforces breadth (≥25% of the bank) or
-  that an SC bank contains at least one drain-exercising case (output bits
-  beyond the input window). Both bars exist only as memo lore; a bank
-  regeneration or sampler change could silently drop them. Add per-row
-  failure-fraction reporting + a warn/fail threshold, and an SC-mode assertion
-  that some case has output width > input width.
-  **Acceptance:** harness prints per-row broken-fail fractions; hw3 rows pass;
-  a synthetic single-case-divergence fixture trips the warning.
-- [ ] **P1.8** _(discovered 2026-07-06, hw3 appearance sweep)_ **Renderer: wire
-  lanes and junction dots** — design memo first (`designs/wire-routing.md`).
-  Family: the auto-router (a) sends every wire into `MEM.min` down a fixed
-  obstacle-blind fallback path because the min stub sits inside the router's
-  phantom 75×70 MEM bounds (rendered body is 50×50) — these fixed lanes caused
-  all six HW3 appearance failures; (b) can run different-source wires collinear
-  or 1px apart (reads as a forbidden merge); (c) draws the split junction dot
-  only at the source port, leaving multi-branch divergence elbows undotted.
-  Deep fix: align router obstacle bounds with rendered geometry (or make
-  min-stub reachable), add a lane-separation cost for foreign collinear runs,
-  and dot divergence points. Improves every student's canvas, not just fixtures.
-  **Acceptance:** memo written; hw3 fixtures still oracle-clean; a regression
-  script (e.g. promote scratchpad routecheck to `tools/`) gates future layouts.
-- [ ] **P1.9** _(discovered 2026-07-06, hw3 critic — potential grading-fairness
-  bug)_ **Reconcile UI-vs-grader drain semantics.** CLAUDE.md says UI Run drains
-  one 0-input step per MEM; the grader's run length is `stepCountFor` =
-  max(inputWidth, outputWidth) (codec.ts), independent of MEM count. A
-  functionally correct student circuit whose answer emerges one cycle later
-  than the codec window would pass in the UI but fail grading (or vice versa).
-  Investigate with a deliberately-late circuit; decide the canonical semantics;
-  fix the divergent side; document in spec §. 
-  **Acceptance:** a documented, single semantics; harness + pipelineCheck green.
 
 ## Phase 2 — TM two-output visual change  _(the one deliberate departure)_
 

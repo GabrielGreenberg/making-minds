@@ -194,3 +194,37 @@ circuit could pass UI and fail grading).
 
 **Next:** iteration 5 = **META-audit-queue** (due: 5 iterations elapsed), then
 P1.4 (HW4 FSM arithmetic, hw4-p3…p11).
+
+## 2026-07-06 (iteration 5) — META-audit-queue · ledger clean, queue re-ranked
+
+**Reconciled:** harness (23 verified / 33 pending / 0 regressed) matches
+COVERAGE.md and QUEUE.md exactly — no drift after four fixture iterations.
+tsc/coverage green; tree clean at `0d0c5e5`.
+
+**Re-ranked Phase 1 tail** (ids unchanged): **P1.9 → P1.7 → P1.4 → P1.8 →
+P1.5 → P1.6**. Rationale: P1.9 (UI-vs-grader drain divergence) is a potential
+real grading bug on the same time axis the FSM batch builds on — settle
+canonical semantics BEFORE authoring nine more time-axis fixtures; P1.7
+hardens the harness bars those fixtures are graded against. Verified by code
+read: FSM/TM transitions render as quadratic curves between STATE circles
+(CircuitCanvas "FSM transition curves" branch), bypassing `routeAllWires` — so
+P1.8 (router) does not block P1.4/P2 but MUST precede Phase 3 (perception is
+CC/SC, back on the router).
+
+**Patch-accumulation audit:** three router-adjacent patch rounds (hw2-p7
+re-layout, hw3 six-fixture re-layout workflow, the p9 1px hand-nudge) are one
+family → P1.8 is the unifying task; no further per-fixture nudge rounds on
+router-rendered fixtures. Statement hygiene recurred twice (hw2, hw3) → folded
+a statement lint into P1.7, along with promoting the layout oracle
+(`routecheck_near.ts`) into `app/tools/` as a harness gate. P1.4 gained its
+META-visual-vocab first step (FSM textbook chapter + Mock_Ups-9).
+
+**CLAUDE.md:** untouched — no app-code change has shipped in iterations 1–5
+(fixtures + memos only), so its status section remains accurate.
+META-reconcile-claude stays pending until an app change lands (P1.9/P1.7 will
+be the first).
+
+**Next:** **P1.9** — reproduce the drain divergence with a deliberately
+late-emitting SC circuit (passes UI-style per-MEM drain, fails the codec
+window, or vice versa), decide canonical semantics, fix the divergent side,
+document. Then P1.7.

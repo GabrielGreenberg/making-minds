@@ -7,57 +7,63 @@ run `npm run coverage` and reconcile._
 ## Where we are
 
 Branch `buildout-infra`. **23 / 56 verified** (HW1 7/7, HW2 arithmetic 7/7, HW3
-arithmetic 9/9), 33 pending, 0 regressed. Four iterations done. The batch
-workflow shape is proven across CC and SC; the SC conventions (LSB-first time
-axis, MEM min/mout semantics, drain, canonical-tally ones-block-at-end) are
-written up in LOG iteration 4 and inside the hw3 fixtures.
+arithmetic 9/9), 33 pending, 0 regressed. Five iterations done; iteration 5 was
+the META-audit — ledger clean, Phase-1 tail re-ranked to **P1.9 → P1.7 → P1.4 →
+P1.8 → P1.5 → P1.6** (rationale in LOG iteration 5).
 
-## Do this next — iteration 5: META-audit-queue
+## Do this next — P1.9: reconcile UI-vs-grader drain semantics
 
-Five iterations have elapsed → the recurring audit is due (QUEUE bottom):
+A potential **real grading-fairness bug**, and a dependency for the FSM batch
+(same time axis). The claim to test: CLAUDE.md says the UI's SC Run drains one
+0-input step **per MEM** after the input is consumed; the grader's run length
+is `stepCountFor = max(inputWidth, outputWidth)` (`engine/codec.ts`),
+independent of MEM count.
 
-1. `npm run coverage`; reconcile COVERAGE.md + QUEUE.md against the harness
-   JSON (the harness wins).
-2. Prune dead/duplicate tasks; re-rank by dependency and value. In particular
-   decide the ordering of the discovered-work backlog **P1.5–P1.9** vs the
-   remaining fixture verticals (P1.4 FSM → P2 TM → P3 perception → P4/P5
-   navigation/turbot). Recommendation to evaluate: P1.9 (drain-semantics
-   divergence) is a potential real grading bug and cheap to investigate — it
-   may deserve to jump the queue; P1.8 (router) is app-wide UX depth with a
-   design memo; P1.7 hardens the harness the whole rest of the loop leans on.
-3. **Audit for patch accumulation** (NORTH_STAR): the three router-adjacent
-   items (hw2-p7 re-layout, hw3 layout-fix workflow, P1.8) are one family —
-   confirm P1.8's design memo subsumes them rather than more per-fixture
-   nudging. Likewise the statement-hygiene fixes (hw2, hw3) suggest adding a
-   statement-lint to the harness (fold into P1.7 or queue separately).
-4. Log what changed; point HANDOFF at the winner (default: P1.4, HW4 FSM
-   arithmetic hw4-p3…p11).
+1. **Reproduce:** build a functionally correct SC machine whose output emerges
+   LATE — e.g. a `2x` computed with TWO chained delay registers computing
+   `4x/2`… no: simplest is x delayed k extra cycles (compute `2x` as delay∘
+   delay∘(divide-by-2)? — impossible; instead take `x + 0` = identity via two
+   MEMs: delay twice then nothing arrives in window). Concretely: an identity
+   circuit built as a 2-step delay computes 4x on the codec window (every delay
+   = ×2 on the LSB-first axis) — so instead craft a machine whose SEMANTIC
+   answer needs more steps than max(inW,outW): e.g. grade `2x` (outW = inW+1)
+   with a circuit that emits 4x/2 — see LOG iteration 4's bit-order note; or
+   simulate the UI path (`store` Run semantics per CLAUDE.md) vs
+   `evaluateSCInputs` on the same machine and diff the traces. The point is to
+   EXHIBIT a machine the two semantics judge differently (or prove none can
+   exist — also a valid outcome, then P1.9 closes as documentation).
+2. **Read both sides:** `engine/sc.ts` + `engine/codec.ts` (`stepCountFor`,
+   time-axis encode/decode) vs the store's SC Run/drain implementation
+   (`store.ts`, SC sim slice; CLAUDE.md "SC runs flush the pipeline").
+3. **Decide the canonical semantics** (likely: the codec window — grading and
+   UI should agree that a correct circuit emits within max(inW,outW) steps;
+   the UI's per-MEM drain then needs to clamp/extend to the same window), fix
+   the divergent side, update CLAUDE.md's SC-drain bullet + spec if touched.
+4. **Gates:** all hw3 fixtures must still verify (they are the regression bank
+   for this change); `npm run check`, `tsc`, `build` green.
+
+**Acceptance:** a written statement of the single canonical drain semantics
+(LOG + CLAUDE.md), the divergent side fixed, an exhibit test (or impossibility
+note) checked into `app/tools/` or the harness, all gates green, 0 regressed.
 
 ## Then
 
-P1.4 — HW4 FSM arithmetic (hw4-p3…p11), same workflow shape. FSM notes for the
-spec agent: states are circles S0/S1/…, transitions `input:output` Mealy labels,
-time axis same LSB-first codec as SC; read `engine/fsm.ts` + the FSM sample in
-devData; broken variants must fail broadly (sampled banks).
+P1.7 (harness: breadth + drain bars, statement lint, promote
+`scratchpad/routecheck_near.ts` to `app/tools/`) → P1.4 (HW4 FSM arithmetic,
+with its META-visual-vocab first step) → P1.8 (router design memo; gates
+Phase 3) → P1.5/P1.6 → Phase 2.
 
 ## Watch out for
 
-- **Ops:** 529-Overloaded outages → resume with
-  `Workflow({scriptPath, resumeFromRunId})` (cached prefix is free). Subagent
-  **session limit** can hit mid-workflow (last reset 4:50am) — finish critical
-  verification solo with preview tools if needed.
+- **P1.9 is the first app-code change of the loop** — route it through the
+  seams (engine/codec vs store), keep it small, and update CLAUDE.md (its
+  maintenance rule) — that also starts META-reconcile-claude.
+- **Ops:** 529 outages → `Workflow({scriptPath, resumeFromRunId})`; subagent
+  session limit can hit (resets were ~4:50am) — critical verification can be
+  finished solo with preview tools.
 - **Appearance seeding recipe v3** (LOG iteration 4): reload → land on Home →
-  seed localStorage (instructor assignment `mm:inst-asg:<id>` + workbook
-  `mm:asg:<id>`) → click-navigate in. NEVER seed-then-reload (flushAutoSave
-  clobbers the seed). App is served at base path `/making-minds/` (public files
-  fetch from there). Remove seeded keys twice at cleanup.
-- **Layout oracle:** `scratchpad/routecheck_near.ts <fixture.json>` (strict 3px
-  near-parallel variant; imports the app's real `routeAllWires`) — run it on
-  every new fixture BEFORE the browser sweep; consider promoting to `tools/`
-  as part of P1.7/P1.8. MEM feedback wires always take a fixed fallback lane at
-  (min-port x + 32) — place components so those lanes have clear corridors;
-  copy hw3-p7/p9's right-to-left top-row MEM-chain convention.
-- **Fixture content hygiene:** statements = clean prose (no ledger shorthand,
-  no answer giveaways); spec agents must return full row ids (`hw4-p3`, never
-  `p3`) — pin it in their schema.
-- `tsx` missing after checkout → `npm install`; don't commit lockfile churn.
+  seed `mm:inst-asg:<id>` + `mm:asg:<id>` → click-navigate. Never
+  seed-then-reload. Base path `/making-minds/`. Clean up keys twice.
+- **Layout oracle:** run `scratchpad/routecheck_near.ts <fixture.json>` on any
+  new/edited CC/SC fixture before the browser sweep.
+- `tsx` missing after checkout → `npm install`; no lockfile churn commits.
