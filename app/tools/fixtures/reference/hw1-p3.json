@@ -1,0 +1,356 @@
+{
+  "question": {
+    "id": 3,
+    "label": "Problem 3",
+    "statement": "Splitting outputs. Design a combinatorial circuit with two inputs and two outputs, with the following input-output profile: IN1=0,IN2=0 -> OUT1=0,OUT2=1; IN1=0,IN2=1 -> OUT1=0,OUT2=1; IN1=1,IN2=0 -> OUT1=0,OUT2=1; IN1=1,IN2=1 -> OUT1=1,OUT2=0.",
+    "buildMode": "CC",
+    "representation": "binary",
+    "cc_spec": {
+      "inputs": [
+        {
+          "name": "x",
+          "width": 1,
+          "max_value": 1
+        },
+        {
+          "name": "y",
+          "width": 1,
+          "max_value": 1
+        }
+      ],
+      "outputs": [
+        {
+          "name": "OUT1",
+          "width": 1,
+          "formula": "x & y"
+        },
+        {
+          "name": "OUT2",
+          "width": 1,
+          "formula": "(x & y) ^ 1"
+        }
+      ]
+    },
+    "test_cases": [
+      {
+        "inputs": [
+          0,
+          0
+        ],
+        "outputs": [
+          0,
+          1
+        ]
+      },
+      {
+        "inputs": [
+          0,
+          1
+        ],
+        "outputs": [
+          0,
+          1
+        ]
+      },
+      {
+        "inputs": [
+          1,
+          0
+        ],
+        "outputs": [
+          0,
+          1
+        ]
+      },
+      {
+        "inputs": [
+          1,
+          1
+        ],
+        "outputs": [
+          1,
+          0
+        ]
+      }
+    ]
+  },
+  "correct": {
+    "components": [
+      {
+        "id": "hw1-p3-in1",
+        "type": "INPUT",
+        "x": 80,
+        "y": 100,
+        "label": "IN1",
+        "ports": [
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "hw1-p3-in2",
+        "type": "INPUT",
+        "x": 80,
+        "y": 260,
+        "label": "IN2",
+        "ports": [
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "hw1-p3-and",
+        "type": "AND",
+        "x": 260,
+        "y": 180,
+        "label": "",
+        "ports": [
+          {
+            "id": "in1",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "in2",
+            "label": "",
+            "side": "left",
+            "index": 1
+          },
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "hw1-p3-not",
+        "type": "NOT",
+        "x": 420,
+        "y": 280,
+        "label": "",
+        "ports": [
+          {
+            "id": "in",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "hw1-p3-out1",
+        "type": "OUTPUT",
+        "x": 580,
+        "y": 100,
+        "label": "OUT1",
+        "ports": [
+          {
+            "id": "in",
+            "label": "",
+            "side": "left",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "hw1-p3-out2",
+        "type": "OUTPUT",
+        "x": 580,
+        "y": 280,
+        "label": "OUT2",
+        "ports": [
+          {
+            "id": "in",
+            "label": "",
+            "side": "left",
+            "index": 0
+          }
+        ]
+      }
+    ],
+    "wires": [
+      {
+        "id": "hw1-p3-w1",
+        "sourceComponentId": "hw1-p3-in1",
+        "sourcePortId": "out",
+        "targetComponentId": "hw1-p3-and",
+        "targetPortId": "in1",
+        "value": 0
+      },
+      {
+        "id": "hw1-p3-w2",
+        "sourceComponentId": "hw1-p3-in2",
+        "sourcePortId": "out",
+        "targetComponentId": "hw1-p3-and",
+        "targetPortId": "in2",
+        "value": 0
+      },
+      {
+        "id": "hw1-p3-w3",
+        "sourceComponentId": "hw1-p3-and",
+        "sourcePortId": "out",
+        "targetComponentId": "hw1-p3-out1",
+        "targetPortId": "in",
+        "value": 0
+      },
+      {
+        "id": "hw1-p3-w4",
+        "sourceComponentId": "hw1-p3-and",
+        "sourcePortId": "out",
+        "targetComponentId": "hw1-p3-not",
+        "targetPortId": "in",
+        "value": 0
+      },
+      {
+        "id": "hw1-p3-w5",
+        "sourceComponentId": "hw1-p3-not",
+        "sourcePortId": "out",
+        "targetComponentId": "hw1-p3-out2",
+        "targetPortId": "in",
+        "value": 0
+      }
+    ]
+  },
+  "broken": {
+    "components": [
+      {
+        "id": "hw1-p3-in1",
+        "type": "INPUT",
+        "x": 80,
+        "y": 100,
+        "label": "IN1",
+        "ports": [
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "hw1-p3-in2",
+        "type": "INPUT",
+        "x": 80,
+        "y": 260,
+        "label": "IN2",
+        "ports": [
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "hw1-p3-and",
+        "type": "AND",
+        "x": 260,
+        "y": 180,
+        "label": "",
+        "ports": [
+          {
+            "id": "in1",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "in2",
+            "label": "",
+            "side": "left",
+            "index": 1
+          },
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "hw1-p3-out1",
+        "type": "OUTPUT",
+        "x": 580,
+        "y": 100,
+        "label": "OUT1",
+        "ports": [
+          {
+            "id": "in",
+            "label": "",
+            "side": "left",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "hw1-p3-out2",
+        "type": "OUTPUT",
+        "x": 580,
+        "y": 280,
+        "label": "OUT2",
+        "ports": [
+          {
+            "id": "in",
+            "label": "",
+            "side": "left",
+            "index": 0
+          }
+        ]
+      }
+    ],
+    "wires": [
+      {
+        "id": "hw1-p3-w1",
+        "sourceComponentId": "hw1-p3-in1",
+        "sourcePortId": "out",
+        "targetComponentId": "hw1-p3-and",
+        "targetPortId": "in1",
+        "value": 0
+      },
+      {
+        "id": "hw1-p3-w2",
+        "sourceComponentId": "hw1-p3-in2",
+        "sourcePortId": "out",
+        "targetComponentId": "hw1-p3-and",
+        "targetPortId": "in2",
+        "value": 0
+      },
+      {
+        "id": "hw1-p3-w3",
+        "sourceComponentId": "hw1-p3-and",
+        "sourcePortId": "out",
+        "targetComponentId": "hw1-p3-out1",
+        "targetPortId": "in",
+        "value": 0
+      },
+      {
+        "id": "hw1-p3-w4",
+        "sourceComponentId": "hw1-p3-and",
+        "sourcePortId": "out",
+        "targetComponentId": "hw1-p3-out2",
+        "targetPortId": "in",
+        "value": 0
+      }
+    ]
+  }
+}

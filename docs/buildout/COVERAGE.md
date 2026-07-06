@@ -15,8 +15,8 @@ A row is ✅ only when the manifest row has a fixture and the harness reports it
 `verified` (correct passes every case, broken variant fails), AND appearance has
 been checked against [VISUAL_VOCAB.md](VISUAL_VOCAB.md).
 
-**As of 2026-07-06:** harness live, **1/56 verified** (hw1-p1), 55 pending. The
-self-test proves the harness discriminates across all five modes today.
+**As of 2026-07-06 (iteration 2):** harness live, **7/56 verified** (all of HW1),
+49 pending. The self-test proves the harness discriminates across all five modes.
 
 ## Columns
 
@@ -25,17 +25,17 @@ harness verified (correct✓ + broken✗) · `appr` = appearance matches VISUAL_
 
 ---
 
-### HW1 — Basics (CC)  ·  1/7
+### HW1 — Basics (CC)  ·  7/7 ✅
 
 | id | problem | category | auth | build | grades | appr | status | notes |
 |----|---------|----------|:----:|:-----:|:------:|:----:|:------:|-------|
 | hw1-p1  | NAND | logic | ✅ | ✅ | ✅ | ✅ | ✅ | fixture `reference/hw1-p1.json`; proven headlessly (4/4 correct, 0/4 broken), appearance checked 2026-07-06 |
-| hw1-p2  | reconstruct OR (no OR gate, DeMorgan) | logic | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | allowed_components should exclude OR |
-| hw1-p3  | splitting outputs (2-in → 2-out) | logic | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | |
-| hw1-p4  | XOR | logic | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | |
-| hw1-p5  | combining circuits (2-in → 2-out) | logic | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | |
-| hw1-p16 | M: successor of tal(I), 1-in → 2-out | arithmetic | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | tally successor |
-| hw1-p17 | N: successor of bin(I), 1-in → 2-out | arithmetic | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | binary successor |
+| hw1-p2  | reconstruct OR (no OR gate, DeMorgan) | logic | ✅ | ✅ | ✅ | ✅ | ✅ | `reference/hw1-p2.json`; correct = DeMorgan (no OR), broken = NAND near-miss; `allowed_components` set on the question but **unenforced** (→ QUEUE P1.5) |
+| hw1-p3  | splitting outputs (2-in → 2-out) | logic | ✅ | ✅ | ✅ | ✅ | ✅ | `reference/hw1-p3.json`; AND splits to OUT1 + NOT→OUT2; junction dot verified |
+| hw1-p4  | XOR | logic | ✅ | ✅ | ✅ | ✅ | ✅ | `reference/hw1-p4.json`; primitives (2 NOT, 2 AND, OR); broken = plain OR fails on (1,1) |
+| hw1-p5  | combining circuits (2-in → 2-out) | logic | ✅ | ✅ | ✅ | ✅ | ✅ | `reference/hw1-p5.json`; half-adder (sum `x ^ y`, carry `x & y`); crossing bump verified |
+| hw1-p16 | M: successor of tal(I), 1-in → 2-out | arithmetic | ✅ | ✅ | ✅ | ✅ | ✅ | `reference/hw1-p16.json`; canonical tally forces O1=1, O2=I (PDF's position-insensitive tal() nuance noted in LOG); broken emits non-canonical `01` |
+| hw1-p17 | N: successor of bin(I), 1-in → 2-out | arithmetic | ✅ | ✅ | ✅ | ✅ | ✅ | `reference/hw1-p17.json`; one 2-wide output group (OUT1 = MSB); broken = endianness swap |
 
 ### HW2 — Computing with CCs  ·  0/13
 

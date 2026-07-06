@@ -73,3 +73,39 @@ Batch job: same template ×6; good Workflow fan-out (build+prove per problem in
 parallel, then one verify pass + one appearance sweep). hw1-p2 needs
 `allowed_components` without OR — note the field exists on `AssignmentQuestion`
 but has no creator UI yet (deferred), setting it in fixture JSON is fine.
+
+## 2026-07-06 (iteration 2) — P1.1: HW1 complete · 7/56
+
+**Shipped:** six fixtures (`hw1-p2..p5, p16, p17`) via one workflow (17 agents,
+~890k tokens): spec-extraction from `problem sets/hw1.pdf` → 6 parallel
+build+prove agents → manifest wire → 6 adversarial verifiers + regression gates
++ browser appearance sweep → completeness critic. Harness: **7 verified / 49
+pending / 0 regressed**; all gates green; 0 refutations; appearance 6/6
+(junction dots, the p5 crossing bump, and ¬/∧/∨ glyphs verified in the SVG DOM,
+not just screenshots).
+
+**Surprises / gotchas worth keeping:**
+- **Tally canonicality:** the textbook's `tal()` is position-insensitive
+  (PDF: `tal(01) = one`) but the platform codec only accepts canonical
+  1s-then-0s codewords — so hw1-p16's correct circuit must emit `10` for
+  successor(0) (O1 = const 1 via `OR(I, NOT I)`, O2 = I), not `01`. Remember
+  this for every future tally fixture.
+- **`allowed_components` is unenforced** (types.ts:139 is its only mention):
+  grader, palette, and creator all ignore it — a student could pass hw1-p2 with
+  an OR gate. Enqueued as **P1.5** (three-touchpoint slice: machineValidation
+  Stage-1 + ComponentLibrary filter + QuestionCreator field). Broken variants
+  must stay *functionally* wrong until it lands.
+- **Appearance-injection recipe v2** (the LOG-template step 4 recipe silently
+  fails): the store registers `beforeunload`/`pagehide` flushAutoSave handlers,
+  so seeding localStorage then reloading lets the OLD page's in-memory circuit
+  overwrite the seed. Working sequence: (1) reload to Home (`hash=''`) first,
+  (2) seed `mm:asg:cc-basics` while on Home, (3) click through CC basics → Q1
+  (`openAssignment` reads localStorage at open time), (4) screenshot + SVG DOM
+  inspection for fine details (dots r=4 #333, wire stroke #333, glyph text nodes).
+- DSL note: no unary minus context — for "NOT x" as a formula use `x ^ 1` (p3);
+  `1 - (a & b)` also works (p1). `~` risks negative values; avoid.
+
+**Next:** **P1.2** — HW2 CC arithmetic (hw2-p1…p7), same workflow shape. Check
+the HW2 PDF for exact specs; multi-bit groups will exercise the codec's
+IN1-is-MSB convention more heavily (p17's endianness-swap broken variant is the
+canonical near-miss for these).

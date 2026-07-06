@@ -26,9 +26,11 @@ CC → SC → FSM → TM → turbot; within a mode: arithmetic → perception �
 
 ## Phase 1 — CC + SC arithmetic baseline (prove "all built" for the easy path)
 
-- [ ] **P1.1** Reference solutions for **HW1 logic** (hw1-p2…p5) + **HW1 synthesis**
-  (hw1-p16 M, hw1-p17 N). Note hw1-p2 must set `allowed_components` without OR.
-  **Advances:** hw1-p2..p5, p16, p17.
+- [x] **P1.1** Reference solutions for **HW1 logic** (hw1-p2…p5) + **HW1 synthesis**
+  (hw1-p16 M, hw1-p17 N). — _done 2026-07-06 (workflow batch: spec-from-PDF → 6
+  parallel build+prove → wire → 6 adversarial verifiers + gates + appearance
+  sweep → critic; 7/7 HW1 verified, 0 refutations)._ hw1-p2 sets
+  `allowed_components` but the field is unenforced → spawned P1.5.
 - [ ] **P1.2** Reference solutions for **HW2 CC arithmetic** (hw2-p1…p7).
   **Advances:** hw2-p1..p7.
 - [ ] **P1.3** Reference solutions for **HW3 SC arithmetic** (hw3-p1…p9, incl. the
@@ -36,6 +38,19 @@ CC → SC → FSM → TM → turbot; within a mode: arithmetic → perception �
   **Advances:** hw3-p1..p9.
 - [ ] **P1.4** Reference solutions for **HW4 FSM arithmetic** (hw4-p3…p11).
   **Advances:** hw4-p3..p11.
+- [ ] **P1.5** _(discovered 2026-07-06, hw1-p2 critic)_ **Enforce
+  `allowed_components` end-to-end.** The field exists on `AssignmentQuestion`
+  (types.ts:139) but is read by NOTHING — a student can pass hw1-p2 ("no OR
+  gate") using an OR gate. The family: question-level component restrictions
+  have three touchpoints that must agree — (1) grading: a Stage-1 check in
+  `engine/machineValidation.ts` rejecting machines containing component types
+  outside the allowed set; (2) student UI: `ComponentLibrary` palette filtered
+  to the allowed set; (3) instructor authoring: expose the field in
+  `QuestionCreator` (already a deferred follow-up in CLAUDE.md). Do all three as
+  one seam-respecting slice, not a grader-only patch.
+  **Acceptance:** a correct-function OR-using machine FAILS hw1-p2 grading (add
+  a second broken variant or a harness case proving it); palette hides OR on
+  hw1-p2; creator can author the restriction; all gates green.
 
 ## Phase 2 — TM two-output visual change  _(the one deliberate departure)_
 

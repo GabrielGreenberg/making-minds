@@ -1,0 +1,235 @@
+{
+  "question": {
+    "id": 17,
+    "label": "Problem 17",
+    "statement": "Let bin(.) be a function which maps strings of binary 1's and 0's to their numerical values (bin(0)=zero, bin(1)=one, bin(00)=zero, bin(01)=one, bin(10)=two, bin(11)=three, and so on). Consider a machine N which, on any one occasion, takes as input a single atomic symbol I, and produces two atomic symbols as output, O1 and O2, such that, in any context, successor(bin(I)) = bin(O1O2). Design a combinatorial circuit for machine N (schematic: I -> [N] -> O1, O2).",
+    "buildMode": "CC",
+    "representation": "binary",
+    "cc_spec": {
+      "inputs": [
+        {
+          "name": "x",
+          "width": 1,
+          "max_value": 1
+        }
+      ],
+      "outputs": [
+        {
+          "name": "y",
+          "width": 2,
+          "formula": "x + 1"
+        }
+      ]
+    },
+    "test_cases": [
+      {
+        "inputs": [
+          0
+        ],
+        "outputs": [
+          1
+        ]
+      },
+      {
+        "inputs": [
+          1
+        ],
+        "outputs": [
+          2
+        ]
+      }
+    ]
+  },
+  "correct": {
+    "components": [
+      {
+        "id": "hw1-p17-in1",
+        "type": "INPUT",
+        "x": 80,
+        "y": 180,
+        "label": "IN1",
+        "ports": [
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "hw1-p17-not",
+        "type": "NOT",
+        "x": 260,
+        "y": 260,
+        "label": "",
+        "ports": [
+          {
+            "id": "in",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "hw1-p17-out1",
+        "type": "OUTPUT",
+        "x": 420,
+        "y": 100,
+        "label": "OUT1",
+        "ports": [
+          {
+            "id": "in",
+            "label": "",
+            "side": "left",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "hw1-p17-out2",
+        "type": "OUTPUT",
+        "x": 420,
+        "y": 260,
+        "label": "OUT2",
+        "ports": [
+          {
+            "id": "in",
+            "label": "",
+            "side": "left",
+            "index": 0
+          }
+        ]
+      }
+    ],
+    "wires": [
+      {
+        "id": "hw1-p17-w1",
+        "sourceComponentId": "hw1-p17-in1",
+        "sourcePortId": "out",
+        "targetComponentId": "hw1-p17-out1",
+        "targetPortId": "in",
+        "value": 0
+      },
+      {
+        "id": "hw1-p17-w2",
+        "sourceComponentId": "hw1-p17-in1",
+        "sourcePortId": "out",
+        "targetComponentId": "hw1-p17-not",
+        "targetPortId": "in",
+        "value": 0
+      },
+      {
+        "id": "hw1-p17-w3",
+        "sourceComponentId": "hw1-p17-not",
+        "sourcePortId": "out",
+        "targetComponentId": "hw1-p17-out2",
+        "targetPortId": "in",
+        "value": 0
+      }
+    ]
+  },
+  "broken": {
+    "components": [
+      {
+        "id": "hw1-p17-in1",
+        "type": "INPUT",
+        "x": 80,
+        "y": 180,
+        "label": "IN1",
+        "ports": [
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "hw1-p17-not",
+        "type": "NOT",
+        "x": 260,
+        "y": 100,
+        "label": "",
+        "ports": [
+          {
+            "id": "in",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "hw1-p17-out1",
+        "type": "OUTPUT",
+        "x": 420,
+        "y": 100,
+        "label": "OUT1",
+        "ports": [
+          {
+            "id": "in",
+            "label": "",
+            "side": "left",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "hw1-p17-out2",
+        "type": "OUTPUT",
+        "x": 420,
+        "y": 260,
+        "label": "OUT2",
+        "ports": [
+          {
+            "id": "in",
+            "label": "",
+            "side": "left",
+            "index": 0
+          }
+        ]
+      }
+    ],
+    "wires": [
+      {
+        "id": "hw1-p17-w1",
+        "sourceComponentId": "hw1-p17-in1",
+        "sourcePortId": "out",
+        "targetComponentId": "hw1-p17-not",
+        "targetPortId": "in",
+        "value": 0
+      },
+      {
+        "id": "hw1-p17-w2",
+        "sourceComponentId": "hw1-p17-not",
+        "sourcePortId": "out",
+        "targetComponentId": "hw1-p17-out1",
+        "targetPortId": "in",
+        "value": 0
+      },
+      {
+        "id": "hw1-p17-w3",
+        "sourceComponentId": "hw1-p17-in1",
+        "sourcePortId": "out",
+        "targetComponentId": "hw1-p17-out2",
+        "targetPortId": "in",
+        "value": 0
+      }
+    ]
+  }
+}

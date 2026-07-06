@@ -1,0 +1,278 @@
+{
+  "question": {
+    "id": 16,
+    "label": "Problem 16",
+    "statement": "Let tal(.) be a function which maps strings of tally 1's and 0's to their numerical values (tal(0)=zero, tal(1)=one, tal(00)=zero, tal(01)=one, tal(11)=two, and so on). Consider a machine M which, on any one occasion, takes as input a single atomic symbol I, and produces two atomic symbols as output, O1 and O2, such that, in any context, successor(tal(I)) = tal(O1O2). Design a combinatorial circuit for machine M (schematic: I -> [M] -> O1, O2).",
+    "buildMode": "CC",
+    "representation": "tally",
+    "cc_spec": {
+      "inputs": [
+        {
+          "name": "x",
+          "width": 1,
+          "max_value": 1
+        }
+      ],
+      "outputs": [
+        {
+          "name": "y",
+          "width": 2,
+          "formula": "x + 1"
+        }
+      ]
+    },
+    "test_cases": [
+      {
+        "inputs": [
+          0
+        ],
+        "outputs": [
+          1
+        ]
+      },
+      {
+        "inputs": [
+          1
+        ],
+        "outputs": [
+          2
+        ]
+      }
+    ]
+  },
+  "correct": {
+    "components": [
+      {
+        "id": "hw1-p16-in1",
+        "type": "INPUT",
+        "x": 80,
+        "y": 180,
+        "label": "IN1",
+        "ports": [
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "hw1-p16-not",
+        "type": "NOT",
+        "x": 260,
+        "y": 260,
+        "label": "",
+        "ports": [
+          {
+            "id": "in",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "hw1-p16-or",
+        "type": "OR",
+        "x": 420,
+        "y": 100,
+        "label": "",
+        "ports": [
+          {
+            "id": "in1",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "in2",
+            "label": "",
+            "side": "left",
+            "index": 1
+          },
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "hw1-p16-out1",
+        "type": "OUTPUT",
+        "x": 580,
+        "y": 100,
+        "label": "OUT1",
+        "ports": [
+          {
+            "id": "in",
+            "label": "",
+            "side": "left",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "hw1-p16-out2",
+        "type": "OUTPUT",
+        "x": 580,
+        "y": 260,
+        "label": "OUT2",
+        "ports": [
+          {
+            "id": "in",
+            "label": "",
+            "side": "left",
+            "index": 0
+          }
+        ]
+      }
+    ],
+    "wires": [
+      {
+        "id": "hw1-p16-w1",
+        "sourceComponentId": "hw1-p16-in1",
+        "sourcePortId": "out",
+        "targetComponentId": "hw1-p16-or",
+        "targetPortId": "in1",
+        "value": 0
+      },
+      {
+        "id": "hw1-p16-w2",
+        "sourceComponentId": "hw1-p16-in1",
+        "sourcePortId": "out",
+        "targetComponentId": "hw1-p16-not",
+        "targetPortId": "in",
+        "value": 0
+      },
+      {
+        "id": "hw1-p16-w3",
+        "sourceComponentId": "hw1-p16-not",
+        "sourcePortId": "out",
+        "targetComponentId": "hw1-p16-or",
+        "targetPortId": "in2",
+        "value": 0
+      },
+      {
+        "id": "hw1-p16-w4",
+        "sourceComponentId": "hw1-p16-or",
+        "sourcePortId": "out",
+        "targetComponentId": "hw1-p16-out1",
+        "targetPortId": "in",
+        "value": 0
+      },
+      {
+        "id": "hw1-p16-w5",
+        "sourceComponentId": "hw1-p16-in1",
+        "sourcePortId": "out",
+        "targetComponentId": "hw1-p16-out2",
+        "targetPortId": "in",
+        "value": 0
+      }
+    ]
+  },
+  "broken": {
+    "components": [
+      {
+        "id": "hw1-p16-in1",
+        "type": "INPUT",
+        "x": 80,
+        "y": 100,
+        "label": "IN1",
+        "ports": [
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "hw1-p16-not",
+        "type": "NOT",
+        "x": 260,
+        "y": 260,
+        "label": "",
+        "ports": [
+          {
+            "id": "in",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "hw1-p16-out1",
+        "type": "OUTPUT",
+        "x": 420,
+        "y": 100,
+        "label": "OUT1",
+        "ports": [
+          {
+            "id": "in",
+            "label": "",
+            "side": "left",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "hw1-p16-out2",
+        "type": "OUTPUT",
+        "x": 420,
+        "y": 260,
+        "label": "OUT2",
+        "ports": [
+          {
+            "id": "in",
+            "label": "",
+            "side": "left",
+            "index": 0
+          }
+        ]
+      }
+    ],
+    "wires": [
+      {
+        "id": "hw1-p16-w1",
+        "sourceComponentId": "hw1-p16-in1",
+        "sourcePortId": "out",
+        "targetComponentId": "hw1-p16-out1",
+        "targetPortId": "in",
+        "value": 0
+      },
+      {
+        "id": "hw1-p16-w2",
+        "sourceComponentId": "hw1-p16-in1",
+        "sourcePortId": "out",
+        "targetComponentId": "hw1-p16-not",
+        "targetPortId": "in",
+        "value": 0
+      },
+      {
+        "id": "hw1-p16-w3",
+        "sourceComponentId": "hw1-p16-not",
+        "sourcePortId": "out",
+        "targetComponentId": "hw1-p16-out2",
+        "targetPortId": "in",
+        "value": 0
+      }
+    ]
+  }
+}
