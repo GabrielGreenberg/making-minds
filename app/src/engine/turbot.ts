@@ -35,7 +35,8 @@ import type {
 } from '../types';
 import { evaluateCCInputs } from './cc';
 import { evaluateSCSingleStep } from './sc';
-import { sortStateComponents, evaluateFSMSingleStep } from './fsm';
+import { sortStateComponents, evaluateFSMSymbolStep } from './fsm';
+import { turbotFsmNotation } from './notation';
 import { readCell } from './tm';
 
 // ─── Arena geometry ──────────────────────────────────────────────────
@@ -307,12 +308,15 @@ export function runBrainStep(
 
   if (innerMode === 'FSM') {
     if (!brainState.stateId) return null;
-    const result = evaluateFSMSingleStep(wires, brainState.stateId, sensorBit);
+    // Labels are read under turbotFsmNotation — THE single answer to "is
+    // this turbot-FSM brain label legal" (engine/notation.ts), shared with
+    // Stage-1 validation and the store's label editor. Legacy 1-bit outputs
+    // widen ('1' → '11' forward, '0' → '00' stop) and canonical 2-bit motor
+    // labels decode through the same wheel-bit table as circuit brains
+    // (spec §9.2), so decayed labels keep executing bit-identically.
+    const result = evaluateFSMSymbolStep(wires, brainState.stateId, String(sensorBit), turbotFsmNotation);
     if (!result) return null;
-    // An FSM's Mealy transition label only carries one output bit, so
-    // FSM-brained turbots use only the "stop"/"forward" half of the 2-bit
-    // motor command space (spec §9.3): 0 -> stop, 1 -> forward.
-    const motor: TurbotMotorCommand = result.output === 1 ? 'forward' : 'stop';
+    const motor = decodeMotorCommand(result.output.split('').map(Number));
     return { motor, input: String(sensorBit), action: motor, brainState: { stateId: result.nextStateId } };
   }
 

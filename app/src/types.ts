@@ -372,12 +372,14 @@ export function toSubscript(n: number): string {
   return String(n).split('').map(d => subscripts[parseInt(d)] || d).join('');
 }
 
-/** FSM history entry for one time step */
+/** FSM history entry for one time step. Single-bit symbols are carried as
+ *  numbers (the classic k=1 machine); k-bit input/output symbols ('10') are
+ *  carried as strings. */
 export interface FsmHistoryEntry {
   t: number;
   stateLabel: string;
-  input: number;
-  output: number;
+  input: number | string;
+  output: number | string;
   nextStateLabel: string;
 }
 

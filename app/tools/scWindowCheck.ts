@@ -262,6 +262,10 @@ function sameSteps(a: number[][], b: number[][]): boolean {
   return JSON.stringify(a) === JSON.stringify(b);
 }
 
+function eqArr(a: string[], b: string[]): boolean {
+  return JSON.stringify(a) === JSON.stringify(b);
+}
+
 // ── SC question runs feed the codec stream (TALLY content parity) ──────────
 console.log('\n[store: SC tally question runs feed the codec stream]');
 {
@@ -457,7 +461,12 @@ console.log('\n[store: sandbox unchanged]');
 
   useStore.getState().fsmGlobalReset();
   useStore.setState({ components: fsmIdentity.components, wires: fsmIdentity.wires, buildMode: 'FSM' });
-  useStore.getState().setFsmInputSequence([1, 0, 1]);
+  // NON-palindrome "110": the old pin used the palindrome [1,0,1], which
+  // could not tell feed directions apart — it silently pinned the P1.10 bug
+  // (sandbox FSM consumed typed input LEFTMOST-first, the reverse of the SC
+  // sandbox above). P1.12 folded the P1.10 fix into the fsmStep rewrite:
+  // the sandbox now feeds t1 = RIGHTMOST typed char, matching SC.
+  useStore.getState().setFsmInputSequence([1, 1, 0]);
   useStore.getState().fsmRun();
   const fsmDone = await waitUntil(() => {
     const s = useStore.getState();
@@ -465,9 +474,78 @@ console.log('\n[store: sandbox unchanged]');
   });
   const fsmRan = useStore.getState().fsmHistory.length;
   check(`FSM sandbox run stops at the typed length: ${fsmRan} steps (want 3)`, fsmDone && fsmRan === 3);
-  check('FSM sandbox feeds the raw typed bits in typed order',
+  check('FSM sandbox feeds the raw typed bits, t1 = rightmost char (matches SC; P1.10)',
     sameSteps(useStore.getState().fsmHistory.slice().sort((a, b) => a.t - b.t).map((h) => [h.input]),
-      [[1], [0], [1]]));
+      [[0], [1], [1]]));
+}
+
+// ── 2-input FSM question: the store run ≡ the grader run ───────────────────
+// The store twin of grader.ts's old wire-0 flatten (codecSteps[tIdx]?.[0])
+// died in P1.12: question runs join the FULL encoded row into one k-char
+// symbol per step. Pin: a k=2 serial adder's store run feeds exactly the
+// grader's stream and its window decodes to the grader's expected output.
+console.log('\n[store: 2-input FSM question run matches the grader]');
+{
+  const bank = buildQuestionBank(
+    [{ name: 'x', maxVal: 0 }, { name: 'y', maxVal: 0 }],
+    [{ name: 'out', formula: 'x + y' }],
+    'binary',
+    'FSM',
+  );
+  const qXY: AssignmentQuestion = {
+    id: 2,
+    label: 'x + y (FSM, k=2)',
+    statement: 'Add two binary numerals, one bit of each per step.',
+    buildMode: 'FSM',
+    representation: 'binary',
+    cc_spec: bank.spec,
+    test_cases: bank.test_cases,
+  };
+  // Classic 2-state serial adder over 'xy:o' labels (S0 = no carry, S1 = carry).
+  const adder: CircuitData = circuit(
+    [comp('add-s0', 'STATE', 'S₀'), comp('add-s1', 'STATE', 'S₁')],
+    [
+      transition('add-t1', 'add-s0', 'add-s0', '00:0'),
+      transition('add-t2', 'add-s0', 'add-s0', '01:1'),
+      transition('add-t3', 'add-s0', 'add-s0', '10:1'),
+      transition('add-t4', 'add-s0', 'add-s1', '11:0'),
+      transition('add-t5', 'add-s1', 'add-s0', '00:1'),
+      transition('add-t6', 'add-s1', 'add-s1', '01:0'),
+      transition('add-t7', 'add-s1', 'add-s1', '10:0'),
+      transition('add-t8', 'add-s1', 'add-s1', '11:1'),
+    ],
+  );
+
+  const graded = gradeQuestion(qXY, adder);
+  check(`grader control: the adder passes the k=2 bank (${graded.passed}/${graded.total})`,
+    graded.status === 'graded' && graded.total > 0 && graded.passed === graded.total);
+
+  const win = windowOf(qXY);
+  openQuestion(qXY, adder);
+  useStore.getState().fsmGlobalReset();
+  // Typed IN chunks right-to-left, `numGroups` chars per step, char i =
+  // group i (the SC global-sequence convention): "101101" = x 110 (6), y 011 (3).
+  useStore.getState().setFsmInputSequence([1, 0, 1, 1, 0, 1]);
+  useStore.getState().fsmRun();
+  const done = await waitUntil(() => {
+    const s = useStore.getState();
+    return !s.fsmRunning && s.fsmHistory.length > 0;
+  });
+  check('k=2 run terminates on its own', done);
+
+  const s = useStore.getState();
+  check(`k=2 run executes the codec window (${s.fsmHistory.length} steps, want ${win})`,
+    s.fsmHistory.length === win);
+
+  const wantStream = encodeInput([6, 3], layoutOf(qXY));
+  const fedSymbols = s.fsmHistory.slice().sort((a, b) => a.t - b.t).map((h) => String(h.input));
+  check('k=2 fed symbols EQUAL the codec rows joined (x char first per step)',
+    wantStream.axis === 'time' &&
+    eqArr(fedSymbols, wantStream.steps.map((row) => row.join(''))));
+
+  const series = s.fsmHistory.slice().sort((a, b) => a.t - b.t).map((h) => [Number(h.output)]);
+  const decoded = bitsToValue(timeOutputBits(series, qXY.cc_spec!.outputs[0].width, 0), 'binary');
+  check(`k=2 window decodes to the grader's expected 6 + 3 = 9 (got ${decoded})`, decoded === 9);
 }
 
 console.log(`\n${failures === 0 ? 'SC WINDOW CHECK OK' : `SC WINDOW CHECK FAILED (${failures} checks)`}`);

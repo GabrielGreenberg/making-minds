@@ -95,6 +95,77 @@ const fsmBrain = fsmForwardBrain();
 const runFSM = runTurbot(fsmBrain.components, fsmBrain.wires, 'FSM', corridor(3, 2), 10);
 check('FSM brain: same forward-until-wall behavior', runFSM.haltedByMotor && runFSM.finalState.x === 2);
 
+// ── ONE validity function for turbot-FSM labels (P1.12) ─────────────
+// turbotFsmNotation (engine/notation.ts) is the single answer to "is this
+// turbot-FSM brain label legal" — grader Stage-1, runBrainStep, and the
+// store's label editor all read it. Legacy 1-bit outputs ('0:1' forward,
+// '1:0' stop) alias to the canonical 2-bit motor spelling ('0:11'/'1:00');
+// a brain written in either spelling must validate and run bit-identically,
+// and canonical turn labels ('01' left / '10' right) execute via the same
+// wheel-bit table as circuit brains (spec §9.2).
+console.log('\n[engine: turbot-FSM one-notation validity]');
+function fsmForwardBrainCanonical(): { components: CircuitComponent[]; wires: Wire[] } {
+  const s0: CircuitComponent = { id: 's0', type: 'STATE', x: 0, y: 0, label: 'S₀', ports: getPortsForType('STATE') };
+  return {
+    components: [s0],
+    wires: [
+      { id: 't1', sourceComponentId: 's0', sourcePortId: 'right', targetComponentId: 's0', targetPortId: 'left', value: 0, transitionLabel: '0:11' },
+      { id: 't2', sourceComponentId: 's0', sourcePortId: 'right', targetComponentId: 's0', targetPortId: 'left', value: 0, transitionLabel: '1:00' },
+    ],
+  };
+}
+{
+  const canon = fsmForwardBrainCanonical();
+  const runCanon = runTurbot(canon.components, canon.wires, 'FSM', corridor(3, 2), 10);
+  check('canonical 2-bit motor labels behave bit-identically to the legacy alias',
+    runCanon.haltedByMotor && runCanon.finalState.x === runFSM.finalState.x &&
+    runCanon.history.length === runFSM.history.length);
+
+  const fsmAssignment: AssignmentData = {
+    id: 'turbot-fsm-notation-smoke',
+    title: 'Turbot FSM notation smoke',
+    questions: [{
+      id: 1,
+      label: 'Q1 (turbot FSM)',
+      statement: 'Move forward until blocked, then stop on the goal.',
+      buildMode: 'turbot',
+      innerMode: 'FSM',
+      representation: 'binary',
+      turbot_cases: [{ arena: corridor(3, 2), maxSteps: 10, criterion: 'reach-and-stop' }],
+    }],
+  };
+  const gradeBrain = (circuit: { components: CircuitComponent[]; wires: Wire[] }) =>
+    gradeSubmission(fsmAssignment, {
+      assignmentTitle: fsmAssignment.title,
+      student: 'fsm-notation@example.com',
+      submittedAt: '2026-07-06T00:00:00Z',
+      answers: [{ questionId: 1, circuit }],
+    }).questions[0];
+  check('grader accepts the legacy-alias brain', gradeBrain(fsmForwardBrain()).passed === 1);
+  check('grader accepts the canonical-label brain', gradeBrain(canon).passed === 1);
+
+  const badLabel = {
+    components: canon.components,
+    wires: [{ ...canon.wires[0] }, { ...canon.wires[1], transitionLabel: '1:2' }],
+  };
+  const badResult = gradeBrain(badLabel);
+  check('an illegal turbot-FSM label fails Stage-1 with a reason',
+    badResult.passed === 0 && !!badResult.turbotCases?.[0]?.reason);
+
+  // Canonical turn labels now execute: '0:01' = right wheel only = pivot left.
+  const spinner: { components: CircuitComponent[]; wires: Wire[] } = {
+    components: [{ id: 's0', type: 'STATE', x: 0, y: 0, label: 'S₀', ports: getPortsForType('STATE') }],
+    wires: [
+      { id: 't1', sourceComponentId: 's0', sourcePortId: 'right', targetComponentId: 's0', targetPortId: 'left', value: 0, transitionLabel: '0:01' },
+      { id: 't2', sourceComponentId: 's0', sourcePortId: 'right', targetComponentId: 's0', targetPortId: 'left', value: 0, transitionLabel: '1:01' },
+    ],
+  };
+  const runSpin = runTurbot(spinner.components, spinner.wires, 'FSM', corridor(3, 2), 4);
+  check('canonical turn label pivots in place (left turns, no movement)',
+    runSpin.hitStepLimit && runSpin.finalState.x === 0 &&
+    runSpin.history.every((h) => h.action === 'left'));
+}
+
 console.log('\n[engine: step limit]');
 const infiniteArena = corridor(1000, 999);
 const runLimited = runTurbot(ccBrain.components, ccBrain.wires, 'CC', infiniteArena, 5);

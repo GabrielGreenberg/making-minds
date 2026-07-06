@@ -1,5 +1,5 @@
 import { useMemo, useState, useCallback, useRef, useEffect } from 'react';
-import { useStore, selectTmNotation, selectEffectiveMode, selectCodecWindow } from '../store';
+import { useStore, selectTmNotation, selectEffectiveMode, selectCodecWindow, selectFsmNotation } from '../store';
 import { bitsToTally, bitsToBinary, parseTMTransition, timeOutputBits } from '../engine';
 import { outputDisplayString } from './outputDisplay';
 import { TurbotArenaPanel } from './TurbotArenaPanel';
@@ -227,6 +227,10 @@ export function DataTable() {
   const fsmRun = useStore((s) => s.fsmRun);
   const fsmReset = useStore((s) => s.fsmReset);
   const fsmGlobalReset = useStore((s) => s.fsmGlobalReset);
+  // The FSM label notation for this editing surface (engine/notation.ts):
+  // sized to the open question's input/output group counts; 1-bit in the
+  // sandbox. Drives the state table's input-symbol enumeration.
+  const fsmDataNotation = useStore(selectFsmNotation);
 
   // TM state
   const tmCurrentStateId = useStore((s) => s.tmCurrentStateId);
@@ -591,30 +595,30 @@ export function DataTable() {
         return numA - numB;
       });
 
-    // Build state table from transitions (wires between STATE components)
-    const stateTableRows: { state: string; input: number; output: number; nextState: string }[] = [];
+    // Build the state table from transitions (wires between STATE components),
+    // one row per (state, input symbol) of the question's notation — the same
+    // alphabet the grader validates totality over (a k=2 question enumerates
+    // 00/01/10/11). Labels are read through the notation, never dissected.
+    const stateTableRows: { state: string; input: string; output: string; nextState: string }[] = [];
     for (const state of states) {
-      for (const inputBit of [0, 1]) {
-        const transition = wires.find((w) => {
-          if (w.sourceComponentId !== state.id) return false;
-          if (!w.transitionLabel) return false;
-          const parts = w.transitionLabel.split(':');
-          return parts.length === 2 && parseInt(parts[0]) === inputBit;
-        });
+      for (const inputSymbol of fsmDataNotation.inputAlphabet) {
+        const transition = wires.find((w) =>
+          w.sourceComponentId === state.id &&
+          fsmDataNotation.parse(w.transitionLabel)?.input === inputSymbol);
         if (transition) {
-          const parts = transition.transitionLabel!.split(':');
+          const parsed = fsmDataNotation.parse(transition.transitionLabel)!;
           const targetComp = components.find((c) => c.id === transition.targetComponentId);
           stateTableRows.push({
             state: state.label,
-            input: inputBit,
-            output: parseInt(parts[1]) || 0,
+            input: inputSymbol,
+            output: parsed.outputs.join(''),
             nextState: targetComp?.label || '?',
           });
         } else {
           stateTableRows.push({
             state: state.label,
-            input: inputBit,
-            output: -1, // no transition
+            input: inputSymbol,
+            output: '–', // no transition
             nextState: 'HALT',
           });
         }
@@ -626,8 +630,10 @@ export function DataTable() {
     // same direction as the SC Global I/O rows, so a question run's OUT reads
     // as a numeral just like the typed IN (binary identity on "110" shows an
     // OUT that reads 110 = 6). fsmHistory is t-ascending, hence the shared
-    // t-descending builder.
-    const fsmOutputStr = outputDisplayString(fsmHistory.map((h) => ({ t: h.t, bits: [h.output] })));
+    // t-descending builder. Multi-bit output symbols contribute one bit per
+    // output wire per step, exactly like the SC Global rows.
+    const fsmOutputStr = outputDisplayString(
+      fsmHistory.map((h) => ({ t: h.t, bits: String(h.output).split('').map(Number) })));
 
     return (
       <div className="data-table-panel" style={{ width: panelWidth }}>
@@ -661,8 +667,8 @@ export function DataTable() {
                     return (
                       <tr key={i} className={isCurrentRow ? 'row-active' : ''}>
                         <td><span className="mono-value">{row.state}</span></td>
-                        <td className={row.input === 1 ? 'val-1' : ''}><span className="mono-value">{row.input}</span></td>
-                        <td className={row.output === 1 ? 'val-1' : ''}><span className="mono-value">{row.output === -1 ? '–' : row.output}</span></td>
+                        <td className={row.input === '1' ? 'val-1' : ''}><span className="mono-value">{row.input}</span></td>
+                        <td className={row.output === '1' ? 'val-1' : ''}><span className="mono-value">{row.output}</span></td>
                         <td><span className="mono-value" style={row.nextState === 'HALT' ? { color: '#999', fontStyle: 'italic' } : undefined}>{row.nextState}</span></td>
                       </tr>
                     );

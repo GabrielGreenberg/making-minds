@@ -24,6 +24,9 @@
 //     1-bit input symbol; this question has 2 input wires"), never grades a
 //     wrong-arity machine, and caps kIn at 3 with an explicit reason.
 
+import { readdirSync, readFileSync, statSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+import { dirname, join, relative } from 'node:path';
 import type { AssignmentQuestion, TMNotation } from '../src/types';
 import { buildQuestionBank } from '../src/engine/testVectorGen';
 import { gradeQuestion } from '../src/engine/grader';
@@ -287,6 +290,57 @@ console.log('\n[k=2 grade pin: x + 2*y end-to-end]');
   }, 'binary');
   check('kIn > 3 fails Stage 1 with an explicit cap reason',
     !kInCap.ok && (kInCap.reason ?? '').includes('at most 3 input groups'));
+}
+
+// ─── Grep gate: label dissection lives ONLY behind the seam ──────────
+// Anti-rot as enforced structure: raw transitionLabel string-dissection (and
+// transition-grammar regex literals) may appear only in engine/notation.ts
+// and the delegated legacy parsers (engine/tm.ts, engine/turbot.ts — until
+// P2.1 / turbot slice 3). Everything else must go through a
+// TransitionNotation's parse/format.
+
+console.log('\n[grep gate: no label dissection outside the seam]');
+{
+  const HERE = dirname(fileURLToPath(import.meta.url));
+  const SRC = join(HERE, '../src');
+  const WHITELIST = new Set([
+    'engine/notation.ts',
+    'engine/tm.ts',     // parseTMTransition/parseTMAction (delegated; P2.1 folds them in)
+    'engine/turbot.ts', // parseTurbotInternal/ExternalLabel (delegated; slice 3)
+  ]);
+
+  const files: string[] = [];
+  const walk = (dir: string) => {
+    for (const name of readdirSync(dir)) {
+      const p = join(dir, name);
+      if (statSync(p).isDirectory()) walk(p);
+      else if (/\.(ts|tsx)$/.test(name)) files.push(p);
+    }
+  };
+  walk(SRC);
+
+  const violations: string[] = [];
+  for (const file of files) {
+    const rel = relative(SRC, file).split('\\').join('/');
+    if (WHITELIST.has(rel)) continue;
+    const lines = readFileSync(file, 'utf8').split('\n');
+    lines.forEach((line, i) => {
+      const trimmed = line.trim();
+      const isComment = trimmed.startsWith('//') || trimmed.startsWith('*') || trimmed.startsWith('/*');
+      // (a) splitting a transition label by hand
+      if (/transitionLabel\b[^\n]*\.split\(/.test(line) && !isComment) {
+        violations.push(`${rel}:${i + 1} dissects transitionLabel with .split()`);
+      }
+      // (b) a transition-grammar regex literal (e.g. /^[01]:[01]$/) — the
+      // "]:[" or "]:(" core survives any anchoring/flag choices.
+      if ((line.includes(']:[') || line.includes(']:(')) && !isComment) {
+        violations.push(`${rel}:${i + 1} declares a transition-grammar regex outside the seam`);
+      }
+    });
+  }
+  for (const v of violations) console.log(`        → ${v}`);
+  check(`no raw label dissection outside notation.ts + delegated parsers (${files.length} files scanned)`,
+    violations.length === 0);
 }
 
 // ─── verdict ─────────────────────────────────────────────────────────

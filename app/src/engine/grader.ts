@@ -34,8 +34,8 @@ import type {
 } from '../types';
 import { evaluateCCInputs } from './cc';
 import { evaluateSCSequence } from './sc';
-import { evaluateFSMSymbolSequence } from './fsm';
-import { fsmNotation } from './notation';
+import { evaluateFSMSymbolSequence, sortStateComponents } from './fsm';
+import { fsmNotation, turbotFsmNotation, validateTransitionTable } from './notation';
 import { evaluateTMSequence } from './tm';
 import { runTurbot, evaluateTurbotCriterion, validateTurbotTM } from './turbot';
 import { validateMachine } from './machineValidation';
@@ -184,8 +184,9 @@ function gradeTape(
 
 /**
  * Structural layout for a turbot brain's fixed sensor/motor interface, keyed
- * by inner mode. Only CC/SC read `inputWidths`/`outputWidths` in
- * validateMachine; FSM/TM ignore layout entirely (see machineValidation.ts).
+ * by inner mode. Only CC/SC brains reach validateMachine (FSM brains
+ * validate against turbotFsmNotation above; TM brains against
+ * validateTurbotTM), so only those two rows are read.
  */
 function turbotLayout(innerMode: BuildMode): CodecLayout {
   if (innerMode === 'SC') return { axis: 'time', rep: 'binary', inputWidths: [1], outputWidths: [1, 1] };
@@ -201,12 +202,23 @@ function gradeTurbot(question: AssignmentQuestion, circuit: CircuitData): Questi
   if (!cases || cases.length === 0) return skip(question.id, 'question has no turbot cases');
 
   // Stage 1: a TM brain is a *turbot TM* (per-state internal/external
-  // grammar, single actions) with its own validator; circuit brains reuse
-  // the shared machine validation.
+  // grammar, single actions) with its own validator; an FSM brain validates
+  // against turbotFsmNotation — the SAME notation runBrainStep executes and
+  // the store's label editor accepts (legacy 1-bit aliases and canonical
+  // 2-bit motor labels alike); CC/SC brains reuse the shared machine
+  // validation.
   let valid: { ok: boolean; reason?: string };
   if (innerMode === 'TM') {
     const errors = validateTurbotTM(circuit.components, circuit.wires);
     valid = errors.length === 0 ? { ok: true } : { ok: false, reason: errors.map((e) => e.message).join(' ') };
+  } else if (innerMode === 'FSM') {
+    const states = sortStateComponents(circuit.components);
+    if (states.length === 0) {
+      valid = { ok: false, reason: 'machine has no states' };
+    } else {
+      const errors = validateTransitionTable(states, circuit.wires, () => turbotFsmNotation, 'total');
+      valid = errors.length === 0 ? { ok: true } : { ok: false, reason: errors.map((e) => e.message).join(' ') };
+    }
   } else {
     valid = validateMachine(circuit, innerMode, turbotLayout(innerMode), question.representation ?? 'binary');
   }
