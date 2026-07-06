@@ -18,12 +18,11 @@ CC → SC → FSM → TM → turbot; within a mode: arithmetic → perception �
   format; wire `npm run coverage` / `npm run check`. Self-test discriminates
   across all 5 modes. — _done_
 - [x] **P0.3** Write `.claude/commands/handoff.md`. — _done_
-- [ ] **P0.4** _(first loop iteration)_ **Prove the fixture path end-to-end.**
-  Author + build a reference solution for the simplest CC problem (**hw1-p1 NAND**)
-  by constructing it in the running app and exporting `CircuitData`; add
-  `broken` variant; wire the fixture into the manifest.
-  **Acceptance:** `npm run coverage` shows `hw1-p1` `verified`; COVERAGE row ✅.
-  **Advances:** hw1-p1. This is the template every later fixture follows.
+- [x] **P0.4** **Prove the fixture path end-to-end.** — _done 2026-07-06._
+  hw1-p1 NAND authored **headlessly in code** (`builder.ts` helpers, proven with
+  `gradeQuestion` before writing `reference/hw1-p1.json`; broken = NOT dropped);
+  browser used only for the appearance check. Harness: 1/56 verified. This is the
+  template every later fixture follows — see LOG 2026-07-06 for the recipe.
 
 ## Phase 1 — CC + SC arithmetic baseline (prove "all built" for the easy path)
 

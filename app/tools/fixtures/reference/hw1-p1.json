@@ -1,0 +1,301 @@
+{
+  "question": {
+    "id": 1,
+    "label": "Problem 1",
+    "statement": "Build a combinatorial circuit computing OUT1 = NAND(IN1, IN2): the output is 1 unless both inputs are 1.",
+    "buildMode": "CC",
+    "representation": "binary",
+    "cc_spec": {
+      "inputs": [
+        {
+          "name": "a",
+          "width": 1,
+          "max_value": 1
+        },
+        {
+          "name": "b",
+          "width": 1,
+          "max_value": 1
+        }
+      ],
+      "outputs": [
+        {
+          "name": "y",
+          "width": 1,
+          "formula": "1 - (a & b)"
+        }
+      ]
+    },
+    "test_cases": [
+      {
+        "inputs": [
+          0,
+          0
+        ],
+        "outputs": [
+          1
+        ]
+      },
+      {
+        "inputs": [
+          0,
+          1
+        ],
+        "outputs": [
+          1
+        ]
+      },
+      {
+        "inputs": [
+          1,
+          0
+        ],
+        "outputs": [
+          1
+        ]
+      },
+      {
+        "inputs": [
+          1,
+          1
+        ],
+        "outputs": [
+          0
+        ]
+      }
+    ]
+  },
+  "correct": {
+    "components": [
+      {
+        "id": "nand-in1",
+        "type": "INPUT",
+        "x": 80,
+        "y": 100,
+        "label": "IN1",
+        "ports": [
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "nand-in2",
+        "type": "INPUT",
+        "x": 80,
+        "y": 260,
+        "label": "IN2",
+        "ports": [
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "nand-and",
+        "type": "AND",
+        "x": 260,
+        "y": 180,
+        "label": "",
+        "ports": [
+          {
+            "id": "in1",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "in2",
+            "label": "",
+            "side": "left",
+            "index": 1
+          },
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "nand-not",
+        "type": "NOT",
+        "x": 420,
+        "y": 180,
+        "label": "",
+        "ports": [
+          {
+            "id": "in",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "nand-out1",
+        "type": "OUTPUT",
+        "x": 580,
+        "y": 180,
+        "label": "OUT1",
+        "ports": [
+          {
+            "id": "in",
+            "label": "",
+            "side": "left",
+            "index": 0
+          }
+        ]
+      }
+    ],
+    "wires": [
+      {
+        "id": "nand-w1",
+        "sourceComponentId": "nand-in1",
+        "sourcePortId": "out",
+        "targetComponentId": "nand-and",
+        "targetPortId": "in1",
+        "value": 0
+      },
+      {
+        "id": "nand-w2",
+        "sourceComponentId": "nand-in2",
+        "sourcePortId": "out",
+        "targetComponentId": "nand-and",
+        "targetPortId": "in2",
+        "value": 0
+      },
+      {
+        "id": "nand-w3",
+        "sourceComponentId": "nand-and",
+        "sourcePortId": "out",
+        "targetComponentId": "nand-not",
+        "targetPortId": "in",
+        "value": 0
+      },
+      {
+        "id": "nand-w4",
+        "sourceComponentId": "nand-not",
+        "sourcePortId": "out",
+        "targetComponentId": "nand-out1",
+        "targetPortId": "in",
+        "value": 0
+      }
+    ]
+  },
+  "broken": {
+    "components": [
+      {
+        "id": "nand-in1",
+        "type": "INPUT",
+        "x": 80,
+        "y": 100,
+        "label": "IN1",
+        "ports": [
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "nand-in2",
+        "type": "INPUT",
+        "x": 80,
+        "y": 260,
+        "label": "IN2",
+        "ports": [
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "nand-and",
+        "type": "AND",
+        "x": 260,
+        "y": 180,
+        "label": "",
+        "ports": [
+          {
+            "id": "in1",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "in2",
+            "label": "",
+            "side": "left",
+            "index": 1
+          },
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "nand-out1",
+        "type": "OUTPUT",
+        "x": 420,
+        "y": 180,
+        "label": "OUT1",
+        "ports": [
+          {
+            "id": "in",
+            "label": "",
+            "side": "left",
+            "index": 0
+          }
+        ]
+      }
+    ],
+    "wires": [
+      {
+        "id": "nand-w1",
+        "sourceComponentId": "nand-in1",
+        "sourcePortId": "out",
+        "targetComponentId": "nand-and",
+        "targetPortId": "in1",
+        "value": 0
+      },
+      {
+        "id": "nand-w2",
+        "sourceComponentId": "nand-in2",
+        "sourcePortId": "out",
+        "targetComponentId": "nand-and",
+        "targetPortId": "in2",
+        "value": 0
+      },
+      {
+        "id": "nand-w3",
+        "sourceComponentId": "nand-and",
+        "sourcePortId": "out",
+        "targetComponentId": "nand-out1",
+        "targetPortId": "in",
+        "value": 0
+      }
+    ]
+  }
+}

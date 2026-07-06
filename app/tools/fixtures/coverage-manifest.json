@@ -7,7 +7,7 @@
     "generated": "HW1-6 seeded from problem sets/hw1-7.pdf on branch buildout-infra"
   },
   "rows": [
-    { "id": "hw1-p1",  "hw": "HW1", "problem": "1",  "mode": "CC",  "category": "logic",       "title": "NAND",                                  "fixture": null, "status": "pending" },
+    { "id": "hw1-p1",  "hw": "HW1", "problem": "1",  "mode": "CC",  "category": "logic",       "title": "NAND",                                  "fixture": "reference/hw1-p1.json", "status": "verified" },
     { "id": "hw1-p2",  "hw": "HW1", "problem": "2",  "mode": "CC",  "category": "logic",       "title": "reconstruct OR (no OR gate, DeMorgan)",  "fixture": null, "status": "pending" },
     { "id": "hw1-p3",  "hw": "HW1", "problem": "3",  "mode": "CC",  "category": "logic",       "title": "splitting outputs (2-in -> 2-out)",      "fixture": null, "status": "pending" },
     { "id": "hw1-p4",  "hw": "HW1", "problem": "4",  "mode": "CC",  "category": "logic",       "title": "XOR",                                    "fixture": null, "status": "pending" },
