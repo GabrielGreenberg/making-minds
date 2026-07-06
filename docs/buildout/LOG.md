@@ -429,3 +429,35 @@ points anywhere; all gates green; UI-only diff (one file). hw4-p8/p9/p10 appr �
 
 **Next:** iteration 11 = **META-audit-queue** (due — 5 iterations since the
 last). Then P1.8 (wire-router design memo, gating Phase 3 perception).
+
+## 2026-07-06 (iteration 11) — META-audit-queue · tracks ordered for the back half
+
+**Reconciled:** harness (32 verified / 24 pending / 0 regressed, 0 warnings)
+matches COVERAGE/QUEUE exactly; tsc clean; tree clean at `1d80b05`. All four
+arithmetic verticals complete — the project's back half is TM, perception,
+navigation, capstone, close-out.
+
+**Re-ranked (remaining todo order):** P2.1 (TM two-output swap — re-scoped:
+its design-memo prerequisite ALREADY LANDED with P1.12, so it shrinks to a
+notation swap through the seam + label migration) → P2.2 (HW5 ×9) → P1.8
+(router memo, MOVED to gate Phase 3 — perception fixtures are CC/SC and hit
+the router) → P3.1 (target-functions memo) → P3.2/P3.3 (perception fixtures)
+→ P4.2 (multi-arena grading) → P4.3 (nav arenas + brains) → P5.1 (Desert Ant
+capstone) → smalls (P1.5/P1.6/P1.11, bucketed as Phase 5.5) → P6 close-out.
+
+**Pruned/absorbed:** P4.1 closed — P1.12's `turbotFsmNotation` already makes
+canonical 2-bit motor labels executable (pinned in turbotCheck); only the
+authoring-surface vocabulary rides P4.3. P2.1's stale depth-check text
+replaced (memo exists; four grammars already behind the seam).
+
+**Patch-accumulation check:** clean. The notation seam absorbed the grammar
+family; the arc fix absorbed the FSM-rendering family. One convention noted,
+not a cluster: fixtures p6/p11 carry hand-placed `fsmControlPt` from before
+the auto-offset — fine (explicit wins), and NEW fixtures should prefer auto
+arcs, hand-placing only when a sweep fails.
+
+**Next:** **P2.1** — the TM two-output swap. Read
+`designs/transition-notation.md` (incl. Stage-B migration notes) before
+implementing; the exact rendered form must be recorded in VISUAL_VOCAB + spec
+§10.3. Note there are NO TM fixtures yet (HW5 is pending), so label migration
+touches only devData + any sandbox localStorage story.

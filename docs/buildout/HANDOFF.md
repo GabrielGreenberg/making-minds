@@ -7,55 +7,59 @@ run `npm run coverage` and reconcile._
 ## Where we are
 
 Branch `buildout-infra`. **32 / 56 verified**, 24 pending, 0 regressed, 0
-warnings. Ten iterations done. **All four arithmetic verticals are complete**
-(HW1 7/7, HW2 7/7, HW3 9/9, HW4 9/9 — appearance included). Remaining pending:
-CC/SC perception (hw2-p10..12, hw3-p11..12 — needs the P3.1 target-function
-design spike), navigation (hw2/hw3/hw4 ×3 — needs arenas + P4.2 multi-arena
-grading; FSM 2-bit motor labels already work via the P1.12 seam), HW5 TM (9 —
-Phase 2 first), HW6 turbot-TM capstone (1).
+warnings. Eleven iterations done; the second META-audit just ran. All four
+arithmetic verticals (HW1–HW4) are fully complete. Remaining walk (QUEUE):
+**P2.1 → P2.2 → P1.8 → P3.1 → P3.2/P3.3 → P4.2 → P4.3 → P5.1 → smalls → P6**.
 
-## Do this next — iteration 11: META-audit-queue
+## Do this next — P2.1: TM two-output notation swap
 
-Five iterations since the last audit (iteration 5). Standard reconcile + one
-big re-planning question this time:
+The one deliberate departure from the textbook (spec §10.3): TM transitions
+must show ONE input (read symbol) driving TWO outputs (write symbol, move) —
+industry style — instead of the dual-action token `1:0R`.
 
-1. `npm run coverage`; reconcile COVERAGE/QUEUE with the harness (expect
-   clean — 32/0).
-2. **Re-rank what remains.** The arithmetic spine is done; what's left splits
-   into three tracks with different blockers:
-   (a) **Phase 2 TM** (P2.1 two-output notation — now a notation swap per
-   `designs/transition-notation.md` — then P2.2's nine HW5 fixtures);
-   (b) **Phase 3 perception** (P3.1 design spike — target-function abstraction
-   — then hw2-p10..12, hw3-p11..12; ALSO needs P1.8's router memo since
-   perception fixtures are CC/SC);
-   (c) **Phase 4/5 navigation** (P4.2 multi-arena grading + arenas; P1.12
-   already delivered the motor labels; then hw6-p2 capstone).
-   Decide the order (suggested: keep the mode walk — TM next since it's
-   unblocked and P2.1 is cheap now; perception needs TWO design memos first).
-   Also slot the small tasks (P1.5 allowed_components, P1.6 label-ordering,
-   P1.11 ARG multi-group, P1.8 router memo) where they gate things.
-3. **Patch-accumulation check:** the notation seam absorbed the grammar family
-   cleanly; check whether anything new is accumulating (e.g. fixture
-   appearance conventions — hand-placed fsmControlPt in p6/p11 vs auto arcs —
-   is that a family needing a rule, or fine as-is?).
-4. Log; point HANDOFF at the winner.
+The heavy lifting is already done: `engine/notation.ts` (P1.12,
+`designs/transition-notation.md` + postscript) owns TM label syntax behind a
+delegating adapter, and the editor's token fields are seam-driven. The swap:
 
-## Then (default expectation)
+1. **Read the design memo first** — especially its Stage-B/migration notes and
+   the P2.1-shaped slice description.
+2. Replace the tm notation object's parse/format with the two-output grammar.
+   Decide the exact stored + rendered form (e.g. `1:0,R` stored; rendered as
+   two labeled output fields) — record it in VISUAL_VOCAB §TM (it has a
+   placeholder: "Record the exact rendered form here once P2.1 lands") and
+   spec §10.3 if the spec file carries it.
+3. Fold `validateTMTable` onto the generic `validateTransitionTable` walker
+   (the memo planned this); keep turbot-TM grammars byte-unchanged.
+4. **Migrate stored labels:** devData TM sample (`sampleData.ts`), any sandbox
+   localStorage story per the memo. There are NO TM fixtures yet — HW5 comes
+   next — so migration surface is small. Keep `parseTMAction`-based engine
+   execution working (the engine stores TMAction {write, move} separately
+   already; this is notation-layer).
+5. Editor: the TM label editor should present input → two output fields
+   (write, move) via the seam's token fields; verify in-browser.
+6. Repoint notationCheck's TM adapter≡parser pins to the new grammar; tmCheck
+   must stay green (it pins engine semantics, which don't change).
 
-P2.1 (TM two-output — implement via the notation seam; VISUAL_VOCAB TM section
-+ spec §10.3 updates; migrate devData/fixture labels; tmCheck/coverage green)
-→ P2.2 (HW5 TM fixtures ×9) → P1.8 + P3.1 design memos → perception →
-navigation → capstone → Phase 6 close-out.
+**Acceptance:** tmCheck + notationCheck + scWindowCheck + turbotCheck +
+coverage (32/0 regressed) + tsc + build green; TM editor shows two outputs
+in-browser; a TM machine round-trips edit→store→grade; VISUAL_VOCAB §TM
+records the rendered form.
+
+## Then
+
+P2.2 — HW5 TM fixtures (tally hw5-p1…p6, binary p7…p9; check
+`requireStandardHaltPosition` where problems demand standard-position halting;
+TM boxing if reuse demands it). Then P1.8 (router memo — gates Phase 3).
 
 ## Watch out for
 
-- **notationCheck's grep gate**: label dissection must stay inside
-  `engine/notation.ts` — P2.1's TM swap must go through the seam.
-- **P2.1 changes STORED label format** (dual-action `1:0R` → two-output) —
-  fixtures/devData/localStorage migration story is pre-planned in the design
-  memo (Stage B notes); re-read it before implementing.
-- **scWindowCheck + turbotCheck pin everything** the notation seam touches.
-- **Ops:** 529 → resume workflow; session limit → finish verification solo.
-- **Appearance recipe v3**; seeds from `app/public/` at `/making-minds/`;
-  clean keys twice.
+- **notationCheck's grep gate**: TM label logic must live in the seam.
+- **tmCheck pins engine semantics** — the TM engine's dual-action execution
+  (TMAction {write, move}) is NOT changing; only the label notation is.
+- **Turbot-TM grammars must be byte-unchanged** (internal `0:1`/`1:L`,
+  external `E:↑`) — turbotCheck is the canary.
+- **TM tape alphabet is representation-tied** (`*` only on binary questions) —
+  the notation's token fields must respect that (the current editor does).
+- **Ops:** 529 → resume workflow; session limit → finish solo.
+- **Appearance recipe v3**; seeds from `app/public/` at `/making-minds/`.
 - `tsx` missing → `npm install`; no lockfile churn.

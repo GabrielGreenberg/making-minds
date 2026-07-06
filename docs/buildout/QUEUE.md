@@ -103,6 +103,36 @@ before Phase 3 (perception returns to router-rendered CC/SC). Task ids unchanged
   self-loops + same-direction pairs untouched. Six-machine browser re-sweep
   6/6 with DOM control-point separation evidence; all gates green; UI-only
   diff. hw4-p8/p9/p10 appr → ✅ (HW4 arithmetic complete).
+- [x] **P1.10** **Sandbox FSM feed direction.** — _done 2026-07-06, folded into
+  P1.12 commit f896943 (the same `fsmStep` lines were being rewritten; the
+  scWindowCheck sandbox pin — which had pinned the bug via a palindrome — was
+  repointed to the fixed rightmost-char-=-t1 behavior)._
+
+## Phase 2 — TM two-output visual change  _(the one deliberate departure)_
+
+- [ ] **P2.1** **TM two-output notation swap** _(re-scoped by META-audit
+  2026-07-06: the depth work is DONE — `designs/transition-notation.md` +
+  postscript landed with P1.12, and `engine/notation.ts` already owns TM label
+  syntax behind a delegating adapter)._ Implement the swap THROUGH the seam:
+  replace the tm notation object's parse/format with the two-output form
+  (input → write-symbol + move as two labeled outputs; exact rendered form TBD
+  per the memo — record it in VISUAL_VOCAB §TM + spec §10.3), fold
+  `validateTMTable` onto the generic `validateTransitionTable` walker, update
+  the editor token fields (already seam-driven), and MIGRATE stored labels
+  (devData TM sample, any TM fixtures, localStorage story per the memo's
+  Stage-B notes). notationCheck's adapter≡parser pins get repointed to the new
+  grammar; turbot-TM grammars unchanged.
+  **Acceptance:** tmCheck + notationCheck + coverage green; TM editor shows two
+  outputs; a TM machine round-trips edit→store→grade; VISUAL_VOCAB records the
+  rendered form.
+- [ ] **P2.2** Reference solutions for **HW5 TM arithmetic** — tally (hw5-p1…p6),
+  binary (hw5-p7…p9). Expose/verify standard-position halting acceptance
+  (`requireStandardHaltPosition`) where the problems require it; TM boxing if
+  reuse (x+3 from x+1, …) demands it.
+  **Advances:** hw5-p1..p9.
+
+## Phase 3 — Perception
+
 - [ ] **P1.8** _(discovered 2026-07-06, hw3 appearance sweep)_ **Renderer: wire
   lanes and junction dots** — design memo first (`designs/wire-routing.md`).
   Family: the auto-router (a) sends every wire into `MEM.min` down a fixed
@@ -118,6 +148,49 @@ before Phase 3 (perception returns to router-rendered CC/SC). Task ids unchanged
   (P1.7-promoted) layout oracle. _(Audit 2026-07-06: FSM/TM transitions render
   as curves between STATE circles, bypassing the router — this task gates
   Phase 3 perception (CC/SC), not P1.4/P2.)_
+- [ ] **P3.1** **Design spike (decision required, design memo):** can perception
+  targets (≥3 consecutive 1s; exactly 3; = a literal pattern; current≠previous;
+  motion) be authored? The family: a question's **target function** currently has
+  exactly one representation — an arithmetic formula over integer values. The
+  deep framing is a unified target-function abstraction with multiple
+  *specification forms* (arithmetic formula | pattern predicate | explicit
+  table…) behind one interface that `buildQuestionBank`/the grader consume —
+  perception then becomes a second form, not a bolted-on question type. Compare
+  that against (a) extending the DSL with predicate operators and (b) a separate
+  truth-table question type; pick the deepest option the actual HW2/HW3
+  perception problems warrant. Write `designs/target-functions.md` + the
+  decision into this queue before building. **Advances:** unblocks P3.2–3.3.
+- [ ] **P3.2** CC perception (hw2-p10…p12), incl. reconciling the 8-in schematic
+  with the 9-bit landmark pattern. **Advances:** hw2-p10..p12.
+- [ ] **P3.3** SC perception (hw3-p11, p12) — spatio-temporal, 8 parallel inputs.
+  **Advances:** hw3-p11, p12.
+
+## Phase 4 — Navigation
+
+- [x] **P4.1** **FSM-turbot motor: 2-bit outputs.** — _absorbed by P1.12
+  (2026-07-06): `turbotFsmNotation` makes canonical 2-bit motor labels
+  (`0:01` = pivot left) executable and pinned in turbotCheck; legacy 1-bit
+  labels alias + decay. Remaining surface work (palette/glossary vocabulary
+  for 2-bit outputs in the turbot editor) rides P4.3's authoring pass._
+- [ ] **P4.2** **Multi-arena navigation grading** for unknown distance/position
+  (Mad Max, Way Finder, Desert Ant): put a *family* of arenas in `turbot_cases`;
+  confirm the grader requires all to pass. **Acceptance:** a single-layout-only
+  solution fails the family.
+- [ ] **P4.3** Author the specific arenas + reference brains: CC nav (hw2-p13…p15),
+  SC nav (hw3-p13…p15), FSM nav (hw4-p12…p14). **Advances:** those 9 rows.
+- [ ] **P4.4** Add a **turbot sandbox** tab (currently turbot only exists inside
+  assignments; `TabBar` lists CC/FSM/TM only). Optional but eases authoring/appr.
+- [ ] **P4.5** _(optional)_ Wire the perception/navigation **category taxonomy**
+  (`ActiveTask` is typed but unused) to organize questions / gate palettes.
+
+## Phase 5 — TM-turbot capstone
+
+- [ ] **P5.1** **Desert Ant** (hw6-p2): TM-brained turbot, 30×30 arena, ≤20 tape
+  cells, unknown start + food in NE quadrant; verified over a family of configs.
+  **Advances:** hw6-p2.
+
+## Phase 5.5 — Small hardening (slot opportunistically before close-out)
+
 - [ ] **P1.5** _(discovered 2026-07-06, hw1-p2 critic)_ **Enforce
   `allowed_components` end-to-end.** The field exists on `AssignmentQuestion`
   (types.ts:139) but is read by NOTHING — a student can pass hw1-p2 ("no OR
@@ -140,85 +213,12 @@ before Phase 3 (perception returns to router-rendered CC/SC). Task ids unchanged
   one shared label-order helper used by both paths.
   **Acceptance:** single implementation; `npm run check` (incl. hw2-p6 fixture)
   green.
-- [x] **P1.10** **Sandbox FSM feed direction.** — _done 2026-07-06, folded into
-  P1.12 commit f896943 (the same `fsmStep` lines were being rewritten; the
-  scWindowCheck sandbox pin — which had pinned the bug via a palindrome — was
-  repointed to the fixed rightmost-char-=-t1 behavior)._
 - [ ] **P1.11** _(discovered 2026-07-06, P1.9 round-2 verifier; pre-existing,
   minor)_ **A/V ARG rendering for multi-group questions.** The ARG column
   renders the whole interleaved typed string as ONE numeral — typed "111101"
   (x=2, y=3 on hw3-p9) shows ARG '/' while VAL correctly shows 5. Render
   per-group values ("2, 3") in question mode.
   **Acceptance:** hw3-p6/p9-style questions show per-group ARGs; gates green.
-
-## Phase 2 — TM two-output visual change  _(the one deliberate departure)_
-
-- [ ] **P2.1** TM transitions: one-input → **two-output** notation (write + move).
-  **Depth check first (design memo):** the app already has *four* transition
-  grammars scattered as string conventions through the canvas/store (FSM `0:1`,
-  TM `1:0R`, turbot-TM internal `0:1`/`1:L`, turbot-TM external `E:↑`) — this
-  task is one instance of that family. The deep solution is a per-mode
-  **transition-notation module** (parse / validate / render / edit as one
-  pluggable unit) that all four grammars implement; the TM two-output form then
-  becomes a notation swap, not a scatter-edit. Write
-  `designs/transition-notation.md` weighing this against the shallow
-  string-change; implement at the chosen depth. Touch points either way:
-  `engine/tm.ts` (`parseTMTransition`/`parseTMAction`), `tmValidate.ts`, the
-  label editor in `CircuitCanvas.tsx` (~1200–1510), `FsmTransitionView`;
-  migrate devData/fixtures; update VISUAL_VOCAB + spec §10.3.
-  **Acceptance:** `tmCheck` + `coverage` self-test green; TM editor shows two
-  outputs; a TM reference (hw5-p1) still grades.
-- [ ] **P2.2** Reference solutions for **HW5 TM arithmetic** — tally (hw5-p1…p6),
-  binary (hw5-p7…p9). Expose/verify standard-position halting acceptance
-  (`requireStandardHaltPosition`) where the problems require it; TM boxing if
-  reuse (x+3 from x+1, …) demands it.
-  **Advances:** hw5-p1..p9.
-
-## Phase 3 — Perception
-
-- [ ] **P3.1** **Design spike (decision required, design memo):** can perception
-  targets (≥3 consecutive 1s; exactly 3; = a literal pattern; current≠previous;
-  motion) be authored? The family: a question's **target function** currently has
-  exactly one representation — an arithmetic formula over integer values. The
-  deep framing is a unified target-function abstraction with multiple
-  *specification forms* (arithmetic formula | pattern predicate | explicit
-  table…) behind one interface that `buildQuestionBank`/the grader consume —
-  perception then becomes a second form, not a bolted-on question type. Compare
-  that against (a) extending the DSL with predicate operators and (b) a separate
-  truth-table question type; pick the deepest option the actual HW2/HW3
-  perception problems warrant. Write `designs/target-functions.md` + the
-  decision into this queue before building. **Advances:** unblocks P3.2–3.3.
-- [ ] **P3.2** CC perception (hw2-p10…p12), incl. reconciling the 8-in schematic
-  with the 9-bit landmark pattern. **Advances:** hw2-p10..p12.
-- [ ] **P3.3** SC perception (hw3-p11, p12) — spatio-temporal, 8 parallel inputs.
-  **Advances:** hw3-p11, p12.
-
-## Phase 4 — Navigation
-
-- [ ] **P4.1** **FSM-turbot motor: 2-bit outputs.** A 1-bit Mealy output can't
-  encode L/R turns, but HW4 navigation needs F/S/R/L (see `runBrainStep` in
-  `engine/turbot.ts`). **Depth check:** is this one instance of "FSM transition
-  outputs are single-bit" generally (would multi-bit FSM outputs also serve
-  arithmetic problems with wider outputs, and unify with how the codec handles
-  output groups on the time axis)? If yes, generalize FSM output arity once
-  rather than special-casing the turbot brain; note the choice (memo if it grows
-  architectural). **Acceptance:** an FSM turbot can turn; `turbotCheck` green.
-- [ ] **P4.2** **Multi-arena navigation grading** for unknown distance/position
-  (Mad Max, Way Finder, Desert Ant): put a *family* of arenas in `turbot_cases`;
-  confirm the grader requires all to pass. **Acceptance:** a single-layout-only
-  solution fails the family.
-- [ ] **P4.3** Author the specific arenas + reference brains: CC nav (hw2-p13…p15),
-  SC nav (hw3-p13…p15), FSM nav (hw4-p12…p14). **Advances:** those 9 rows.
-- [ ] **P4.4** Add a **turbot sandbox** tab (currently turbot only exists inside
-  assignments; `TabBar` lists CC/FSM/TM only). Optional but eases authoring/appr.
-- [ ] **P4.5** _(optional)_ Wire the perception/navigation **category taxonomy**
-  (`ActiveTask` is typed but unused) to organize questions / gate palettes.
-
-## Phase 5 — TM-turbot capstone
-
-- [ ] **P5.1** **Desert Ant** (hw6-p2): TM-brained turbot, 30×30 arena, ≤20 tape
-  cells, unknown start + food in NE quadrant; verified over a family of configs.
-  **Advances:** hw6-p2.
 
 ## Phase 6 — Close out
 
