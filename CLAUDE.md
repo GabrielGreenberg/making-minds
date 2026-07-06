@@ -14,7 +14,13 @@ Claude to load into context).
 >
 > A change isn't finished until the docs that describe it are too.
 
-_Last updated: 2026-07-06 (also: **turbotCheck FSM/SC coverage** — the turbot smoke test now
+_Last updated: 2026-07-06 (**sample turbot questions for all four inner modes** — the seeded
+sample assignment now has eight questions: CC/SC/FSM/TM plus one turbot question per inner
+mode (Q5 CC corridor, Q6 SC 3×3 L-course needing a MEM turner, Q7 FSM corridor, Q8 TM textbook
+walker on a tally/unary question), each with correct/incorrect sample brains wired into the
+sample submissions and `pipelineCheck` (now 8/8 vs 0/8); mode chips in the student question
+list and the instructor assignment editor now name a turbot question's inner machine
+("turbot - TM") via the new `questionModeLabel` helper in `types.ts`. Also: **turbotCheck FSM/SC coverage** — the turbot smoke test now
 grades questions in all four inner modes: new FSM- and SC-brained graded questions beside the
 existing TM and CC ones, plus first engine coverage for SC brains — a MEM-latching turner that
 threads a 3×3 L-course (forward → turn left at the first wall → stop at the second), proving
@@ -162,10 +168,10 @@ The missing half is the **server** and productized submit/grade loop.
 - **Turbot polish** — the full turbot flow (engine, grader, store, student workspace, instructor
   authoring, gradebook, sample data) shipped 2026-07-05, including the textbook turbot TM
   (internal/external states, single tape actions, B/E/F senses, ↑/↱/↰ motors); FSM brains got
-  full 2-bit motor outputs 2026-07-06. Known follow-ups:
+  full 2-bit motor outputs 2026-07-06, and the sample assignment gained a turbot question per
+  inner mode the same day. Known follow-ups:
   multi-arena authoring UI (the `turbot_cases` data model already holds a list; the creator
-  authors one), a sample TM-turbot question
-  in devData, and live-linking arena stepping to circuit-edit invalidation (currently the
+  authors one), and live-linking arena stepping to circuit-edit invalidation (currently the
   student Resets manually after editing mid-run, same as TM).
 - **Deferred authoring follow-ups** — the `requireStandardHaltPosition` TM acceptance toggle and
   mode-filtered `allowed_components` (both optional fields on `AssignmentQuestion`, not yet

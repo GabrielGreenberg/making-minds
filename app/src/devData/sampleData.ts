@@ -11,10 +11,13 @@
 // sample circuits implement those functions exactly on their axis: CC `a & b`
 // (space); SC a 1-step delay register, which on the time axis computes `2 * x`;
 // FSM a pass-through identity, `x`; TM unary successor, which on the tape axis
-// computes `x + 1`. So a correct submission scores 100% and the pipeline check
-// is self-consistent.
+// computes `x + 1`. Turbot questions (one per inner mode: CC, SC, FSM, TM)
+// grade positionally instead — each sample brain solves its arena's success
+// criterion. So a correct submission scores 100% and the pipeline check is
+// self-consistent.
 
 import type {
+  ArenaCell,
   AssignmentData,
   AssignmentQuestion,
   CCSpec,
@@ -28,6 +31,7 @@ import { getPortsForType } from '../types';
 import { generateTestCases } from '../engine/testVectorGen';
 
 export const SAMPLE_ASSIGNMENT_ID = 'sample-mixed';
+const SAMPLE_ASSIGNMENT_TITLE = 'Sample — CC / SC / FSM / TM / Turbot';
 
 // ── small builders ─────────────────────────────────────────────
 
@@ -163,7 +167,7 @@ export function tmIncorrect(): CircuitData {
   };
 }
 
-// ── Turbot: "walk forward until blocked, then stop" (CC brain) ──────
+// ── Turbot (CC brain): "walk forward until blocked, then stop" ──────
 // A single NOT gate split to both motor wires: sensor 0 (clear ahead) →
 // bits 11 (forward); sensor 1 (blocked) → bits 00 (stop). In the sample
 // corridor the goal sits against the far wall, so stopping at the wall
@@ -197,6 +201,106 @@ export function turbotIncorrect(): CircuitData {
     wires: [
       wire('tb-w1', 'tb-in1', 'out', 'tb-out1', 'in'),
       wire('tb-w2', 'tb-in1', 'out', 'tb-out2', 'in'),
+    ],
+  };
+}
+
+// ── Turbot (SC brain): "turn left at the first wall, stop at the second" ──
+// MEM M1 latches "have I ever been blocked" (m' = s OR m), so what the brain
+// does at a wall depends on state carried across cycles: left wheel i = NOT s,
+// right wheel j = (NOT s) OR (NOT m) — clear → 11 forward, first wall (m=0) →
+// 01 turn left, any later wall (m=1) → 00 stop. On the sample L course it
+// walks east, turns the corner, walks north, and stops on the goal.
+
+export function turbotScCorrect(): CircuitData {
+  return {
+    components: [
+      comp('tsc-in1', 'INPUT', 'IN1'),
+      comp('tsc-m1', 'MEM', 'M1', { memDirection: 'right-to-left', storedValue: 0 }),
+      comp('tsc-nots', 'NOT', ''), // NOT s
+      comp('tsc-notm', 'NOT', ''), // NOT m
+      comp('tsc-orj', 'OR', ''),   // j = NOT s OR NOT m
+      comp('tsc-orm', 'OR', ''),   // m' = s OR m
+      comp('tsc-out1', 'OUTPUT', 'OUT1'),
+      comp('tsc-out2', 'OUTPUT', 'OUT2'),
+    ],
+    wires: [
+      wire('tsc-w1', 'tsc-in1', 'out', 'tsc-nots', 'in'),
+      wire('tsc-w2', 'tsc-nots', 'out', 'tsc-out1', 'in'),
+      wire('tsc-w3', 'tsc-nots', 'out', 'tsc-orj', 'in1'),
+      wire('tsc-w4', 'tsc-m1', 'mout', 'tsc-notm', 'in'),
+      wire('tsc-w5', 'tsc-notm', 'out', 'tsc-orj', 'in2'),
+      wire('tsc-w6', 'tsc-orj', 'out', 'tsc-out2', 'in'),
+      wire('tsc-w7', 'tsc-in1', 'out', 'tsc-orm', 'in1'),
+      wire('tsc-w8', 'tsc-m1', 'mout', 'tsc-orm', 'in2'),
+      wire('tsc-w9', 'tsc-orm', 'out', 'tsc-m1', 'min'),
+    ],
+  };
+}
+
+// Wrong: the memoryless forward-until-blocked brain — treats every wall the
+// same, so it stops at the first wall, short of the corner goal.
+export function turbotScIncorrect(): CircuitData {
+  return turbotCorrect();
+}
+
+// ── Turbot (FSM brain): "walk forward until blocked, then stop" ──────
+// One state; turbot-FSM Mealy transitions carry the full 2-bit motor code
+// ("in:ij"): clear ahead → 11 (forward), blocked → 00 (stop).
+
+export function turbotFsmCorrect(): CircuitData {
+  return {
+    components: [comp('tfsm-s0', 'STATE', 'S₀')],
+    wires: [
+      wire('tfsm-t1', 'tfsm-s0', 'right', 'tfsm-s0', 'left', { transitionLabel: '0:11' }),
+      wire('tfsm-t2', 'tfsm-s0', 'right', 'tfsm-s0', 'left', { transitionLabel: '1:00' }),
+    ],
+  };
+}
+
+// Wrong: turns left (01) instead of stopping when blocked — pivots at the
+// wall forever and runs into the step limit.
+export function turbotFsmIncorrect(): CircuitData {
+  return {
+    components: [comp('tfsm-s0', 'STATE', 'S₀')],
+    wires: [
+      wire('tfsm-t1', 'tfsm-s0', 'right', 'tfsm-s0', 'left', { transitionLabel: '0:11' }),
+      wire('tfsm-t2', 'tfsm-s0', 'right', 'tfsm-s0', 'left', { transitionLabel: '1:01' }),
+    ],
+  };
+}
+
+// ── Turbot (TM brain): the textbook walker ("Turbots: Operation") ─────
+// S₀ (external) senses E/F ahead and moves forward into S₁; S₁ (internal)
+// writes a 1 on the private tape; S₂ (internal) moves the head left and
+// returns to S₀ — recording one stroke per forward move. At a wall S₀ senses
+// B, has no transition, and halts; halting IS stopping for a turbot TM, so
+// halting on the food satisfies reach-and-stop.
+
+export function turbotTmCorrect(): CircuitData {
+  return {
+    components: [
+      comp('ttm-s0', 'STATE', 'S₀', { stateKind: 'external' }),
+      comp('ttm-s1', 'STATE', 'S₁', { stateKind: 'internal' }),
+      comp('ttm-s2', 'STATE', 'S₂', { stateKind: 'internal' }),
+    ],
+    wires: [
+      wire('ttm-t1', 'ttm-s0', 'right', 'ttm-s1', 'left', { transitionLabel: 'E:↑' }),
+      wire('ttm-t2', 'ttm-s0', 'right', 'ttm-s1', 'left', { transitionLabel: 'F:↑' }),
+      wire('ttm-t3', 'ttm-s1', 'right', 'ttm-s2', 'left', { transitionLabel: '0:1' }),
+      wire('ttm-t4', 'ttm-s2', 'right', 'ttm-s0', 'left', { transitionLabel: '1:L' }),
+    ],
+  };
+}
+
+// Wrong: a single internal state spinning right over the blank tape (0:R) —
+// it never reaches an external state, never moves in the arena, and runs
+// into the step limit.
+export function turbotTmIncorrect(): CircuitData {
+  return {
+    components: [comp('ttm-s0', 'STATE', 'S₀', { stateKind: 'internal' })],
+    wires: [
+      wire('ttm-t1', 'ttm-s0', 'right', 'ttm-s0', 'left', { transitionLabel: '0:R' }),
     ],
   };
 }
@@ -281,25 +385,55 @@ export function buildSampleAssignment(): AssignmentData {
     'tally',
   );
 
-  // Turbot: a 1×5 corridor, goal against the east wall; a CC brain must walk
-  // east and stop at the goal (arena-based grading — no test_cases/cc_spec).
-  const turbotQuestion: AssignmentQuestion = {
+  // A 1×5 corridor, goal against the east wall: walk east and stop at the
+  // goal (arena-based grading — no test_cases/cc_spec).
+  const corridorCase = {
+    arena: {
+      width: 5,
+      height: 1,
+      cells: [['empty', 'empty', 'empty', 'empty', 'goal']] as ArenaCell[][],
+      start: { x: 0, y: 0, facing: 'E' as const },
+    },
+    maxSteps: 20,
+    criterion: 'reach-and-stop' as const,
+  };
+
+  // Turbot (CC brain): the corridor walk.
+  const turbotCcQuestion: AssignmentQuestion = {
     id: 5,
-    label: 'Q5 (Turbot)',
+    label: 'Q5 (Turbot - CC)',
     statement:
       'Program the turbot to walk forward until it is blocked, then stop. The goal sits against the far wall.',
     buildMode: 'turbot',
     // The authored encoding (only meaningful for TM brains, where it picks
-    // the internal tape alphabet; a CC brain ignores it).
+    // the internal tape alphabet; a circuit brain ignores it).
     representation: 'binary',
     innerMode: 'CC',
+    turbot_cases: [corridorCase],
+  };
+
+  // Turbot (SC brain): a 3×3 "L" course — start SW facing east, goal NE.
+  // Reaching it takes a turn at the east wall, and treating the two walls
+  // differently (turn, then stop) takes memory.
+  const turbotScQuestion: AssignmentQuestion = {
+    id: 6,
+    label: 'Q6 (Turbot - SC)',
+    statement:
+      'Walk the L-shaped course: go forward, turn left at the first wall, and stop on the goal at the second. Use memory to treat the two walls differently.',
+    buildMode: 'turbot',
+    representation: 'binary',
+    innerMode: 'SC',
     turbot_cases: [
       {
         arena: {
-          width: 5,
-          height: 1,
-          cells: [['empty', 'empty', 'empty', 'empty', 'goal']],
-          start: { x: 0, y: 0, facing: 'E' },
+          width: 3,
+          height: 3,
+          cells: [
+            ['empty', 'empty', 'goal'],
+            ['empty', 'empty', 'empty'],
+            ['empty', 'empty', 'empty'],
+          ],
+          start: { x: 0, y: 2, facing: 'E' },
         },
         maxSteps: 20,
         criterion: 'reach-and-stop',
@@ -307,45 +441,95 @@ export function buildSampleAssignment(): AssignmentData {
     ],
   };
 
+  // Turbot (FSM brain): the corridor walk again, but the brain is a state
+  // machine — turbot-FSM transitions carry the full 2-bit motor code.
+  const turbotFsmQuestion: AssignmentQuestion = {
+    id: 7,
+    label: 'Q7 (Turbot - FSM)',
+    statement:
+      'Program the turbot to walk forward until it is blocked, then stop — this time with a finite-state machine brain.',
+    buildMode: 'turbot',
+    representation: 'binary',
+    innerMode: 'FSM',
+    turbot_cases: [corridorCase],
+  };
+
+  // Turbot (TM brain): the textbook walker — reach the food and halt there
+  // (halting IS stopping). Unary encoding: the internal tape alphabet is
+  // {0,1}, no * allowed.
+  const turbotTmQuestion: AssignmentQuestion = {
+    id: 8,
+    label: 'Q8 (Turbot - TM)',
+    statement:
+      'Program the turbot to walk forward to the food and halt there, recording a stroke on its internal tape for each move.',
+    buildMode: 'turbot',
+    representation: 'tally',
+    innerMode: 'TM',
+    turbot_cases: [
+      {
+        arena: {
+          width: 4,
+          height: 1,
+          cells: [['empty', 'empty', 'empty', 'goal']],
+          start: { x: 0, y: 0, facing: 'E' },
+        },
+        maxSteps: 50,
+        criterion: 'reach-and-stop',
+      },
+    ],
+  };
+
   return {
     id: SAMPLE_ASSIGNMENT_ID,
-    title: 'Sample — CC / SC / FSM / TM',
-    questions: [ccQuestion, scQuestion, fsmQuestion, tmQuestion, turbotQuestion],
-  };
-}
-
-// ── Sample submissions ─────────────────────────────────────────
-
-function submission(
-  student: string,
-  cc: CircuitData,
-  sc: CircuitData,
-  fsm: CircuitData,
-  tm: CircuitData,
-  turbot: CircuitData,
-): SubmissionData {
-  return {
-    assignmentTitle: 'Sample — CC / SC / FSM / TM',
-    student,
-    submittedAt: '2026-06-27T12:00:00.000Z', // stamped by caller in real flow
-    answers: [
-      { questionId: 1, circuit: cc },
-      { questionId: 2, circuit: sc },
-      { questionId: 3, circuit: fsm },
-      { questionId: 4, circuit: tm },
-      { questionId: 5, circuit: turbot },
+    title: SAMPLE_ASSIGNMENT_TITLE,
+    questions: [
+      ccQuestion,
+      scQuestion,
+      fsmQuestion,
+      tmQuestion,
+      turbotCcQuestion,
+      turbotScQuestion,
+      turbotFsmQuestion,
+      turbotTmQuestion,
     ],
   };
 }
 
-/** All-correct submission (should score 5/5). */
-export function buildCorrectSubmission(student = 'correct@example.com'): SubmissionData {
-  return submission(student, ccCorrect(), scCorrect(), fsmCorrect(), tmCorrect(), turbotCorrect());
+// ── Sample submissions ─────────────────────────────────────────
+// One answer per question, in question-id order (1..8):
+// CC, SC, FSM, TM, Turbot-CC, Turbot-SC, Turbot-FSM, Turbot-TM.
+
+function submission(student: string, circuits: CircuitData[]): SubmissionData {
+  return {
+    assignmentTitle: SAMPLE_ASSIGNMENT_TITLE,
+    student,
+    submittedAt: '2026-06-27T12:00:00.000Z', // stamped by caller in real flow
+    answers: circuits.map((circuit, i) => ({ questionId: i + 1, circuit })),
+  };
 }
 
-/** All-incorrect submission (should score 0/5). */
+function allCorrect(): CircuitData[] {
+  return [
+    ccCorrect(), scCorrect(), fsmCorrect(), tmCorrect(),
+    turbotCorrect(), turbotScCorrect(), turbotFsmCorrect(), turbotTmCorrect(),
+  ];
+}
+
+function allIncorrect(): CircuitData[] {
+  return [
+    ccIncorrect(), scIncorrect(), fsmIncorrect(), tmIncorrect(),
+    turbotIncorrect(), turbotScIncorrect(), turbotFsmIncorrect(), turbotTmIncorrect(),
+  ];
+}
+
+/** All-correct submission (should score 8/8). */
+export function buildCorrectSubmission(student = 'correct@example.com'): SubmissionData {
+  return submission(student, allCorrect());
+}
+
+/** All-incorrect submission (should score 0/8). */
 export function buildIncorrectSubmission(student = 'wrong@example.com'): SubmissionData {
-  return submission(student, ccIncorrect(), scIncorrect(), fsmIncorrect(), tmIncorrect(), turbotIncorrect());
+  return submission(student, allIncorrect());
 }
 
 /**
@@ -353,11 +537,18 @@ export function buildIncorrectSubmission(student = 'wrong@example.com'): Submiss
  * instructor gradebook with something interesting to look at.
  */
 export function buildSampleSubmissions(): SubmissionData[] {
+  // Mix the two banks per student: pick the correct circuit for the listed
+  // question ids, the incorrect one elsewhere.
+  const mixed = (student: string, correctIds: number[]): SubmissionData => {
+    const good = allCorrect();
+    const bad = allIncorrect();
+    return submission(student, good.map((c, i) => (correctIds.includes(i + 1) ? c : bad[i])));
+  };
   return [
-    submission('ada@example.com', ccCorrect(), scCorrect(), fsmCorrect(), tmCorrect(), turbotCorrect()), // 5/5
-    submission('alan@example.com', ccCorrect(), scIncorrect(), fsmCorrect(), tmCorrect(), turbotCorrect()), // 4/5
-    submission('grace@example.com', ccCorrect(), scCorrect(), fsmIncorrect(), tmIncorrect(), turbotIncorrect()), // 2/5
-    submission('claude@example.com', ccIncorrect(), scIncorrect(), fsmIncorrect(), tmIncorrect(), turbotIncorrect()), // 0/5
-    submission('', ccCorrect(), scCorrect(), fsmCorrect(), tmCorrect(), turbotCorrect()), // Anonymous, 5/5
+    mixed('ada@example.com', [1, 2, 3, 4, 5, 6, 7, 8]), // 8/8
+    mixed('alan@example.com', [1, 3, 4, 5, 6, 7, 8]), // 7/8 (SC wrong)
+    mixed('grace@example.com', [1, 2, 5, 6]), // 4/8
+    mixed('claude@example.com', []), // 0/8
+    mixed('', [1, 2, 3, 4, 5, 6, 7, 8]), // Anonymous, 8/8
   ];
 }
