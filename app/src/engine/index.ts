@@ -34,6 +34,21 @@ export type {
   TMEvalResult,
   ParsedTMTransition,
 } from './tm';
+export {
+  fsmNotation,
+  turbotFsmNotation,
+  tmDualNotation,
+  turbotInternalNotation,
+  turbotExternalNotation,
+  inputCharTokens,
+  validateTransitionTable,
+} from './notation';
+export type {
+  TransitionNotation,
+  ParsedTransition as ParsedTransitionLabel,
+  OutputField,
+  TableError,
+} from './notation';
 export { validateTMTable } from './tmValidate';
 export type { TMValidationError, TMValidationKind } from './tmValidate';
 export { encodeTM, acceptTM, decodeTM, notationForRepresentation } from './tmCodec';
