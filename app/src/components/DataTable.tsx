@@ -1,6 +1,6 @@
 import { useMemo, useState, useCallback, useRef, useEffect } from 'react';
 import { useStore, selectTmNotation, selectEffectiveMode, selectCodecWindow, selectFsmNotation } from '../store';
-import { bitsToTally, bitsToBinary, parseTMTransition, timeOutputBits } from '../engine';
+import { bitsToTally, bitsToBinary, tmNotation, timeOutputBits } from '../engine';
 import { outputDisplayString } from './outputDisplay';
 import { TurbotArenaPanel } from './TurbotArenaPanel';
 import type { TMSymbol } from '../types';
@@ -50,7 +50,7 @@ export function DataTable() {
   const clearTableRows = useStore((s) => s.clearTableRows);
   const buildMode = useStore((s) => s.buildMode);
   // TM alphabet is tied to the question's representation (sandbox: repSystem).
-  const tmNotation = useStore(selectTmNotation);
+  const tmRep = useStore(selectTmNotation);
   // Codec run window for the open SC/FSM question (null in the sandbox):
   // question runs execute — and the A/V decode presents — exactly the steps
   // the grader reads, so UI verdicts match grades.
@@ -802,7 +802,8 @@ export function DataTable() {
 
   // ── TM Mode ──────────────────────────────────────────────────────
   if (isTM) {
-    const notation = tmNotation;
+    const notation = tmRep;
+    const grammar = tmNotation(notation);
     const symbols: TMSymbol[] = notation === 'binary' ? ['0', '1', '*'] : ['0', '1'];
     const states = components
       .filter((c) => c.type === 'STATE')
@@ -816,26 +817,28 @@ export function DataTable() {
         return num(a.label) - num(b.label);
       });
 
-    // Build the machine table from transitions (input:action per read symbol).
-    const tmTableRows: { state: string; input: TMSymbol; action: string; nextState: string }[] = [];
+    // Build the machine table from transitions. Two-output form (spec §10.3):
+    // per read symbol, the WRITE symbol and MOVE direction are separate columns.
+    const tmTableRows: { state: string; input: TMSymbol; write: string; move: string; nextState: string }[] = [];
     for (const state of states) {
       for (const symbol of symbols) {
         const transition = wires.find((w) => {
           if (w.sourceComponentId !== state.id) return false;
-          const parsed = parseTMTransition(w.transitionLabel, notation);
+          const parsed = grammar.parse(w.transitionLabel);
           return parsed !== null && parsed.input === symbol;
         });
         if (transition) {
-          const parsed = parseTMTransition(transition.transitionLabel, notation)!;
+          const parsed = grammar.parse(transition.transitionLabel)!;
           const targetComp = components.find((c) => c.id === transition.targetComponentId);
           tmTableRows.push({
             state: state.label,
             input: symbol,
-            action: parsed.action.raw,
+            write: parsed.outputs[0],
+            move: parsed.outputs[1],
             nextState: targetComp?.label || '?',
           });
         } else {
-          tmTableRows.push({ state: state.label, input: symbol, action: '–', nextState: 'HALT' });
+          tmTableRows.push({ state: state.label, input: symbol, write: '–', move: '–', nextState: 'HALT' });
         }
       }
     }
@@ -861,7 +864,8 @@ export function DataTable() {
                   <tr>
                     <th>STATE</th>
                     <th>READ</th>
-                    <th>ACTION</th>
+                    <th>WRITE</th>
+                    <th>MOVE</th>
                     <th>NEXT STATE</th>
                   </tr>
                 </thead>
@@ -869,12 +873,14 @@ export function DataTable() {
                   {tmTableRows.map((row, i) => {
                     const isCurrentRow = tmCurrentStateId !== null &&
                       row.state === components.find((c) => c.id === tmCurrentStateId)?.label;
+                    const haltStyle = row.nextState === 'HALT' ? { color: '#999', fontStyle: 'italic' as const } : undefined;
                     return (
                       <tr key={i} className={isCurrentRow ? 'row-active' : ''}>
                         <td><span className="mono-value">{row.state}</span></td>
                         <td className={row.input === '1' ? 'val-1' : ''}><span className="mono-value">{row.input}</span></td>
-                        <td><span className="mono-value">{row.action}</span></td>
-                        <td><span className="mono-value" style={row.nextState === 'HALT' ? { color: '#999', fontStyle: 'italic' } : undefined}>{row.nextState}</span></td>
+                        <td><span className="mono-value" style={haltStyle}>{row.write}</span></td>
+                        <td><span className="mono-value" style={haltStyle}>{row.move}</span></td>
+                        <td><span className="mono-value" style={haltStyle}>{row.nextState}</span></td>
                       </tr>
                     );
                   })}

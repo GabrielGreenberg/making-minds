@@ -147,8 +147,8 @@ export function tmCorrect(): CircuitData {
   return {
     components: [comp('tm-s0', 'STATE', 'S₀'), comp('tm-s1', 'STATE', 'S₁')],
     wires: [
-      wire('tm-t1', 'tm-s0', 'right', 'tm-s0', 'left', { transitionLabel: '1:1R' }),
-      wire('tm-t2', 'tm-s0', 'right', 'tm-s1', 'left', { transitionLabel: '0:1R' }),
+      wire('tm-t1', 'tm-s0', 'right', 'tm-s0', 'left', { transitionLabel: '1:1,R' }),
+      wire('tm-t2', 'tm-s0', 'right', 'tm-s1', 'left', { transitionLabel: '0:1,R' }),
     ],
   };
 }
@@ -158,7 +158,7 @@ export function tmIncorrect(): CircuitData {
   return {
     components: [comp('tm-s0', 'STATE', 'S₀')],
     wires: [
-      wire('tm-t1', 'tm-s0', 'right', 'tm-s0', 'left', { transitionLabel: '1:0L' }),
+      wire('tm-t1', 'tm-s0', 'right', 'tm-s0', 'left', { transitionLabel: '1:0,L' }),
     ],
   };
 }

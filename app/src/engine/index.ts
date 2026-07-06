@@ -29,9 +29,6 @@ export type {
 } from './fsm';
 export {
   readCell,
-  isSymbolForNotation,
-  parseTMAction,
-  parseTMTransition,
   applyAction,
   evaluateTMSingleStep,
   evaluateTMSequence,
@@ -43,12 +40,11 @@ export type {
   TMTape,
   TMStepResult,
   TMEvalResult,
-  ParsedTMTransition,
 } from './tm';
 export {
   fsmNotation,
   turbotFsmNotation,
-  tmDualNotation,
+  tmNotation,
   turbotInternalNotation,
   turbotExternalNotation,
   inputCharTokens,

@@ -20,9 +20,9 @@ import type {
 import { getPortsForType } from '../src/types';
 import {
   evaluateTMSequence,
-  parseTMAction,
   type TMEvalResult,
 } from '../src/engine/tm';
+import { tmNotation } from '../src/engine/notation';
 import { encodeTM, acceptTM, decodeTM } from '../src/engine/tmCodec';
 import { validateTMTable } from '../src/engine/tmValidate';
 import { gradeSubmission } from '../src/engine/grader';
@@ -49,6 +49,15 @@ function check(label: string, cond: boolean) {
 function tmIncrement() {
   return {
     components: [comp('s0', 'S₀'), comp('s1', 'S₁')],
+    wires: [wire('t1', 's0', 's0', '1:1,R'), wire('t2', 's0', 's1', '0:1,R')],
+  };
+}
+
+// The SAME machine spelled with the legacy dual-action alias ('1:1R') — the
+// engine must execute it identically (the alias is accepted forever).
+function tmIncrementLegacy() {
+  return {
+    components: [comp('s0', 'S₀'), comp('s1', 'S₁')],
     wires: [wire('t1', 's0', 's0', '1:1R'), wire('t2', 's0', 's1', '0:1R')],
   };
 }
@@ -58,7 +67,7 @@ function tmIncrement() {
 function tmZero() {
   return {
     components: [comp('s0', 'S₀')],
-    wires: [wire('t1', 's0', 's0', '1:0L')],
+    wires: [wire('t1', 's0', 's0', '1:0,L')],
   };
 }
 
@@ -68,11 +77,13 @@ function tmIdentity() {
   return { components: [comp('s0', 'S₀')], wires: [] as Wire[] };
 }
 
-// Ambiguous: two transitions out of S₀ on reading 1 (nondeterministic).
+// Ambiguous: two transitions out of S₀ on reading 1 (nondeterministic). One
+// is spelled canonically, one via the legacy alias — validation must see the
+// clash across spellings.
 function tmAmbiguous() {
   return {
     components: [comp('s0', 'S₀')],
-    wires: [wire('t1', 's0', 's0', '1:0R'), wire('t2', 's0', 's0', '1:1L')],
+    wires: [wire('t1', 's0', 's0', '1:0,R'), wire('t2', 's0', 's0', '1:1L')],
   };
 }
 
@@ -102,8 +113,16 @@ const id0 = run(tmIdentity(), 'binary', [0]);
 check('binary identity 0 → 0 (*0*)', acceptTM('binary', id0) === null && decodeTM('binary', id0.tape) === 0);
 
 check('encode/decode binary round-trip 11', decodeTM('binary', encodeTM('binary', [11])) === 11);
-check('parse: `*` write is binary-only',
-  parseTMAction('*R', 'binary') !== null && parseTMAction('*R', 'unary') === null);
+check('parse: `*` write is binary-only (canonical and legacy spellings)',
+  tmNotation('binary').parse('0:*,R') !== null && tmNotation('unary').parse('0:*,R') === null &&
+  tmNotation('binary').parse('0:*R') !== null && tmNotation('unary').parse('0:*R') === null);
+
+// Legacy dual-action alias: the SAME machine spelled '1:1R' runs identically.
+const incLegacy = run(tmIncrementLegacy(), 'unary', [2]);
+check('legacy-alias machine runs identically (2 → 3, halts)',
+  incLegacy.halted && acceptTM('unary', incLegacy) === null && decodeTM('unary', incLegacy.tape) === 3);
+check('legacy-alias history records the canonical action ("1,R")',
+  incLegacy.history.length > 0 && incLegacy.history.every((h) => h.action === '1,R'));
 
 // ── acceptor edge cases (constructed tapes) ────────────────────
 console.log('\n[acceptor]');
@@ -133,7 +152,7 @@ const ambErrors = validateTMTable(tmAmbiguous().components, tmAmbiguous().wires,
 check('ambiguous table → error', ambErrors.length > 0 && ambErrors[0].kind === 'ambiguous');
 const unparseable = validateTMTable([comp('s0', 'S₀')], [wire('t1', 's0', 's0', 'x:y')], 'unary');
 check('unparseable label → error', unparseable.length > 0 && unparseable[0].kind === 'unparseable');
-const starInUnary = validateTMTable([comp('s0', 'S₀')], [wire('t1', 's0', 's0', '*:0R')], 'unary');
+const starInUnary = validateTMTable([comp('s0', 'S₀')], [wire('t1', 's0', 's0', '*:0,R')], 'unary');
 check('`*` read in a unary machine → unparseable', starInUnary.length > 0 && starInUnary[0].kind === 'unparseable');
 
 // ── grader ─────────────────────────────────────────────────────

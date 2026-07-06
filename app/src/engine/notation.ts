@@ -4,37 +4,38 @@
 // Framework-agnostic: no React, no Zustand, no DOM. Importable from Node.
 //
 // Four transition-label grammars live in this codebase: FSM `0:1` (k-bit
-// capable: `00:0`), base-TM dual-action `1:0R`, turbot-TM internal `0:1`/`1:L`
-// and turbot-TM external `E:↑`. This module answers every SYNTAX question
-// about them — parse, canonical format, input alphabet, editor token fields,
-// default label — behind one `TransitionNotation` interface. SEMANTICS (what
-// an output token makes a machine *do*) stay per-engine.
+// capable: `00:0`), base-TM two-output `1:0,R` (P2.1 — one read symbol drives
+// two separate outputs, write + move; the old dual-action `1:0R` is accepted
+// forever as a legacy alias), turbot-TM internal `0:1`/`1:L` and turbot-TM
+// external `E:↑`. This module answers every SYNTAX question about them —
+// parse, canonical format, input alphabet, editor token fields, default label
+// — behind one `TransitionNotation` interface. SEMANTICS (what an output
+// token makes a machine *do*) stay per-engine.
 //
-// Only the FSM notation is implemented natively here. The TM and turbot-TM
-// notations DELEGATE to their existing engine parsers (`parseTMTransition`,
-// `parseTurbotInternalLabel`/`ExternalLabel`) — no grammar is duplicated, and
-// tools/notationCheck.ts pins adapter ≡ parser on every run. P2.1 (the TM
-// two-output label migration) swaps the tm-dual adapter's parse/format here
-// instead of scatter-editing engine/validator/editor/store.
+// The FSM and base-TM notations are implemented natively here. The turbot-TM
+// notations DELEGATE to their existing engine parsers
+// (`parseTurbotInternalLabel`/`ExternalLabel`) — no grammar is duplicated,
+// and tools/notationCheck.ts pins adapter ≡ parser on every run (turbot
+// slice 3 folds them in).
 //
 // Raw `transitionLabel` string dissection is allowed ONLY in this module and
-// in the delegated legacy parsers (engine/tm.ts, engine/turbot.ts — until
-// P2.1 / turbot slice 3). notationCheck's grep gate enforces this.
+// in the delegated legacy turbot parsers (engine/turbot.ts — until turbot
+// slice 3). notationCheck's grep gate enforces this.
 
 import type { CircuitComponent, Wire, TMNotation } from '../types';
-import { parseTMTransition } from './tm';
 import { parseTurbotInternalLabel, parseTurbotExternalLabel } from './turbot';
 
-// NOTE on the import cycle: fsm.ts → notation.ts → tm.ts/turbot.ts → fsm.ts.
-// This is safe because notation.ts reads NO imported binding at module-init
-// time — the delegated parsers are only called inside parse() at runtime, and
-// every token/label literal below is spelled locally (the adapter≡parser pins
-// in notationCheck keep the spellings honest).
+// NOTE on the import cycle: tm.ts → notation.ts → turbot.ts → tm.ts (and
+// fsm.ts → notation.ts). This is safe because notation.ts reads NO imported
+// binding at module-init time — the delegated turbot parsers are only called
+// inside parse() at runtime, and every token/label literal below is spelled
+// locally (the adapter≡parser pins in notationCheck keep the spellings
+// honest).
 
 /** A parsed label: the input symbol and one string per output field. */
 export interface ParsedTransition {
   input: string;      // '0' | '10' | '*' | 'E' … (inputWidth chars)
-  outputs: string[];  // FSM ['1'] · TM dual ['0','R'] · turbot external ['↑']
+  outputs: string[];  // FSM ['1'] · TM two-output ['0','R'] · turbot external ['↑']
 }
 
 /** One output field of a label (mirrors the editor's sub-field entry). */
@@ -45,11 +46,14 @@ export interface OutputField {
 }
 
 export interface TransitionNotation {
-  id: 'fsm' | 'tm-dual' | 'turbot-fsm' | 'turbot-internal' | 'turbot-external';
+  id: 'fsm' | 'tm' | 'turbot-fsm' | 'turbot-internal' | 'turbot-external';
   /** FULL input-symbol enumeration — drives totality validation AND editor tokens. */
   inputAlphabet: string[];
   inputWidth: number;
   outputFields: OutputField[];
+  /** Separator rendered (and stored) BETWEEN output fields — `','` for the
+   *  TM's `write,move`, absent/empty for single-field grammars. */
+  outputSeparator?: string;
   defaultLabel: string;
   /** null = malformed. Accepts legacy aliases where the grammar defines them. */
   parse(label: string | undefined): ParsedTransition | null;
@@ -138,33 +142,55 @@ export const turbotFsmNotation: TransitionNotation = {
   },
 };
 
-// ─── Base TM dual-action (delegating adapter) ────────────────────────
-// P2.1 stored-form contract: outputFields stay [write, move]; P2.1's parse
-// will accept the old `1:0R` concatenation forever while format emits the
-// canonical new form. Until then this adapter delegates to parseTMTransition
-// so the grammar lives in exactly one place (engine/tm.ts).
+// ─── Base TM two-output (native) ─────────────────────────────────────
+// The platform's ONE deliberate departure from the textbook (spec §10.3,
+// VISUAL_VOCAB §TM): a TM transition is one read symbol driving TWO separate
+// outputs — the symbol to WRITE and the direction to MOVE — stored as
+// `read:write,move` (e.g. `1:0,R`). Per the P1.12 stored-form contract,
+// parse ALSO accepts the textbook's dual-action concatenation `1:0R`
+// forever as a legacy alias; format is canonical, so every edit-save decays
+// the alias out of stored machines (localStorage needs no migration).
+// Execution semantics are unchanged: every step still writes AND moves as
+// one atomic action (engine/tm.ts's TMAction {write, move}).
+// The alphabet is representation-tied: `*` reads/writes only on binary.
 
 const tmCache = new Map<TMNotation, TransitionNotation>();
 
-export function tmDualNotation(notation: TMNotation): TransitionNotation {
+export function tmNotation(notation: TMNotation): TransitionNotation {
   const cached = tmCache.get(notation);
   if (cached) return cached;
   const symbols = notation === 'binary' ? ['0', '1', '*'] : ['0', '1'];
+  const isMove = (ch: string) => ch === 'R' || ch === 'L';
   const n: TransitionNotation = {
-    id: 'tm-dual',
+    id: 'tm',
     inputAlphabet: symbols,
     inputWidth: 1,
     outputFields: [
       { name: 'write', tokens: symbols, width: 1 },
       { name: 'move', tokens: ['R', 'L'], width: 1 },
     ],
-    defaultLabel: '0:0R',
+    outputSeparator: ',',
+    defaultLabel: '0:0,R',
     parse(label) {
-      const p = parseTMTransition(label, notation);
-      return p ? { input: p.input, outputs: [p.action.write, p.action.move] } : null;
+      if (!label) return null;
+      const parts = label.split(':');
+      if (parts.length !== 2) return null;
+      if (!symbols.includes(parts[0])) return null;
+      const rhs = parts[1];
+      let write: string;
+      let move: string;
+      if (rhs.length === 3 && rhs[1] === ',') {
+        [write, , move] = rhs;                 // canonical `write,move`
+      } else if (rhs.length === 2) {
+        [write, move] = rhs;                   // legacy dual-action alias `writemove`
+      } else {
+        return null;
+      }
+      if (!symbols.includes(write) || !isMove(move)) return null;
+      return { input: parts[0], outputs: [write, move] };
     },
     format(t) {
-      return `${t.input}:${t.outputs.join('')}`;
+      return `${t.input}:${t.outputs.join(',')}`;
     },
   };
   tmCache.set(notation, n);
@@ -240,6 +266,9 @@ export function inputCharTokens(n: TransitionNotation): string[] {
 // ─── Generic transition-table walker ─────────────────────────────────
 
 export interface TableError {
+  /** unparseable = label fails parse; ambiguous = two transitions match one
+   *  (state, input symbol); missing = 'total' mode only, symbol uncovered. */
+  kind: 'unparseable' | 'ambiguous' | 'missing';
   message: string;
   stateId?: string;
   wireIds: string[];
@@ -254,6 +283,10 @@ function describeParseFailure(
   source: CircuitComponent,
 ): string {
   const raw = label ?? '';
+  if (notation.id === 'tm') {
+    const machine = notation.inputAlphabet.includes('*') ? 'binary' : 'unary';
+    return `Transition "${raw}" is not a valid "read:write,move" label for a ${machine} machine (e.g. "${notation.defaultLabel}").`;
+  }
   if (notation.id === 'fsm' || notation.id === 'turbot-fsm') {
     const parts = raw.split(':');
     if (parts.length === 2 && /^[01]+$/.test(parts[0]) && /^[01]+$/.test(parts[1])) {
@@ -296,6 +329,7 @@ export function validateTransitionTable(
     const parsed = notation.parse(w.transitionLabel);
     if (!parsed) {
       errors.push({
+        kind: 'unparseable',
         message: describeParseFailure(w.transitionLabel, notation, source),
         stateId: source.id,
         wireIds: [w.id],
@@ -319,12 +353,16 @@ export function validateTransitionTable(
       const ids = perInput.get(sym) ?? [];
       if (ids.length > 1) {
         errors.push({
-          message: `state ${s.label} has ${ids.length} transitions for input ${sym} (must be ${mode === 'total' ? 'exactly' : 'at most'} one)`,
+          kind: 'ambiguous',
+          message: mode === 'total'
+            ? `state ${s.label} has ${ids.length} transitions for input ${sym} (must be exactly one)`
+            : `state ${s.label} has ${ids.length} transitions for input ${sym} (must be at most one — the machine is nondeterministic)`,
           stateId: s.id,
           wireIds: ids,
         });
       } else if (mode === 'total' && ids.length === 0) {
         errors.push({
+          kind: 'missing',
           message: `state ${s.label} must have exactly one transition for input ${sym} (found 0)`,
           stateId: s.id,
           wireIds: [],

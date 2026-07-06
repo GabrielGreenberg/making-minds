@@ -194,7 +194,7 @@ export interface TurbotTMValidationError {
  * SOURCE state's kind grammar, and each state may have at most one
  * transition per input token (deterministic). Mirrors validateTMTable's
  * role for the base TM (engine/tmValidate.ts), which cannot be reused here —
- * its dual-action grammar and single alphabet don't apply.
+ * its two-output label grammar and single alphabet don't apply.
  */
 export function validateTurbotTM(components: CircuitComponent[], wires: Wire[]): TurbotTMValidationError[] {
   const errors: TurbotTMValidationError[] = [];

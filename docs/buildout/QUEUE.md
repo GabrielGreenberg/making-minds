@@ -110,21 +110,19 @@ before Phase 3 (perception returns to router-rendered CC/SC). Task ids unchanged
 
 ## Phase 2 — TM two-output visual change  _(the one deliberate departure)_
 
-- [ ] **P2.1** **TM two-output notation swap** _(re-scoped by META-audit
-  2026-07-06: the depth work is DONE — `designs/transition-notation.md` +
-  postscript landed with P1.12, and `engine/notation.ts` already owns TM label
-  syntax behind a delegating adapter)._ Implement the swap THROUGH the seam:
-  replace the tm notation object's parse/format with the two-output form
-  (input → write-symbol + move as two labeled outputs; exact rendered form TBD
-  per the memo — record it in VISUAL_VOCAB §TM + spec §10.3), fold
-  `validateTMTable` onto the generic `validateTransitionTable` walker, update
-  the editor token fields (already seam-driven), and MIGRATE stored labels
-  (devData TM sample, any TM fixtures, localStorage story per the memo's
-  Stage-B notes). notationCheck's adapter≡parser pins get repointed to the new
-  grammar; turbot-TM grammars unchanged.
-  **Acceptance:** tmCheck + notationCheck + coverage green; TM editor shows two
-  outputs; a TM machine round-trips edit→store→grade; VISUAL_VOCAB records the
-  rendered form.
+- [x] **P2.1** **TM two-output notation swap.** — _done 2026-07-06 (iteration
+  12)._ Canonical stored form **`read:write,move`** (`1:0,R`); canvas renders
+  read │ write,move; editor = one input field + two output fields; machine
+  table gains separate WRITE/MOVE columns. Legacy `1:0R` parses forever as an
+  alias and decays on edit-save (no migration needed; devData migrated anyway).
+  `tmNotation(rep)` is native in the seam (adapter deleted;
+  `parseTMTransition`/`parseTMAction` removed from tm.ts — the grep gate got
+  STRONGER); `validateTMTable` folded onto the generic walker with a
+  `TableError.kind`. Engine semantics unchanged (atomic write+move) — verified
+  by byte-equal traces vs a pre-swap worktree AND across spellings; two-output
+  editor + rep-tied `*` + live sim verified in-browser. Recorded in
+  VISUAL_VOCAB §TM, spec §10.3, NORTH_STAR (departure now past tense), design
+  memo postscript. All gates green; 32/56 / 0 regressed.
 - [ ] **P2.2** Reference solutions for **HW5 TM arithmetic** — tally (hw5-p1…p6),
   binary (hw5-p7…p9). Expose/verify standard-position halting acceptance
   (`requireStandardHaltPosition`) where the problems require it; TM boxing if

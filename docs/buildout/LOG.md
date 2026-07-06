@@ -461,3 +461,40 @@ arcs, hand-placing only when a sweep fails.
 implementing; the exact rendered form must be recorded in VISUAL_VOCAB + spec
 §10.3. Note there are NO TM fixtures yet (HW5 is pending), so label migration
 touches only devData + any sandbox localStorage story.
+
+## 2026-07-06 (iteration 12) — P2.1: TM two-output notation · the deliberate departure lands
+
+**Shipped:** TM transition labels moved off the textbook's dual-action token
+(`1:0R`) to the industry-standard two-output form: canonical stored
+**`read:write,move`** (`1:0,R`), canvas pill read │ write,move, editor = one
+input + two output fields (write, move — write tokens representation-tied, `*`
+binary only), machine table gains separate WRITE/MOVE columns, history shows
+`0,R`. **Alias + decay** (the P1.12 pattern): legacy `1:0R` parses forever and
+canonicalizes on any edit-save — zero migration for old localStorage machines;
+devData migrated to canonical anyway. `tmNotation(rep)` is now NATIVE in
+`engine/notation.ts` (delegating adapter deleted; `parseTMTransition`/
+`parseTMAction` removed from tm.ts entirely — the grep gate de-whitelisted
+tm.ts and got stronger); `validateTMTable` folded onto the generic
+`validateTransitionTable` walker with a semantic `TableError.kind`
+(unparseable/ambiguous/missing) instead of message-sniffing. Engine semantics
+untouched: every transition still writes and moves atomically.
+
+**Verified (0 refutations):** byte-equal step traces for three machines × 8
+tapes across (a) canonical vs legacy spellings and (b) live engine vs a
+pre-swap worktree at `cc8d962`; parse∘format identity over the full corpus; 26
+aliases decay correctly; in-browser: three-field editing with rep-tied tokens
+(`*` accepted on binary read/write, rejected in move; rejected wholesale on
+tally), default label `0:0,R`, live sim writes+moves with canonical history.
+Docs recorded everywhere the old token lived: VISUAL_VOCAB §TM, spec §10.3
+(departure note rewritten), CLAUDE.md, NORTH_STAR (past tense), design-memo
+postscript. Three stale comments the verifier flagged were fixed at close-out.
+
+**Consequence:** the transition-notation seam has now absorbed its third
+grammar natively (FSM k-bit, turbot-FSM motor, TM two-output) with turbot-TM
+still adapter-delegated — exactly the staged-migration path the design memo
+drew. HW5 fixtures (next) author directly in the new notation.
+
+**Next:** **P2.2** — the nine HW5 TM fixtures (tally p1…p6, binary p7…p9).
+Batch workflow; spec agent must nail TM codec conventions (tape axis,
+`requireStandardHaltPosition`, boxing-for-reuse questions) from engine/tmCodec
++ hw5.pdf; builders author labels in the NEW notation.

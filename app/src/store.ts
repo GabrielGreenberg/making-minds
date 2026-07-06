@@ -35,7 +35,7 @@ import {
   GRID_SIZE,
   toSubscript,
 } from './types';
-import { topologicalSort, evaluateGate, evaluateCC, evaluateSCSingleStep, sortStateComponents, evaluateFSMSymbolStep, evaluateTMSingleStep, notationForRepresentation, stepCountFor, encodeInput, bitsToTally, bitsToBinary, fsmNotation, turbotFsmNotation, tmDualNotation, turbotInternalNotation, turbotExternalNotation, type CodecLayout, type TransitionNotation } from './engine';
+import { topologicalSort, evaluateGate, evaluateCC, evaluateSCSingleStep, sortStateComponents, evaluateFSMSymbolStep, evaluateTMSingleStep, notationForRepresentation, stepCountFor, encodeInput, bitsToTally, bitsToBinary, fsmNotation, turbotFsmNotation, tmNotation, turbotInternalNotation, turbotExternalNotation, type CodecLayout, type TransitionNotation } from './engine';
 import { senseAheadSymbol, applyMotorCommand, initialBrainState, runBrainStep, stateKindOf, type BrainState } from './engine/turbot';
 import { getAssignment, listAssignments } from './assignments';
 import {
@@ -246,7 +246,7 @@ export function selectTransitionNotationForSource(
         ? turbotExternalNotation
         : turbotInternalNotation;
     }
-    return tmDualNotation(selectTmNotation(s));
+    return tmNotation(selectTmNotation(s));
   }
   return selectFsmNotation(s);
 }
@@ -3082,11 +3082,12 @@ export const useStore = create<AppState>()((set, get) => ({
 
   setTransitionLabel: (wireId, label) => {
     // The wire's SOURCE state picks the grammar (engine/notation.ts): FSM
-    // sized to the question's group counts, base-TM dual action, turbot-TM
-    // per state kind, turbot-FSM motor labels. A label the notation cannot
-    // parse is rejected; a parseable one is stored in CANONICAL form
-    // (notation.format), so legacy aliases — e.g. a turbot-FSM '0:1' — decay
-    // to their canonical spelling ('0:11') on every edit-save.
+    // sized to the question's group counts, base-TM two-output (read:write,
+    // move), turbot-TM per state kind, turbot-FSM motor labels. A label the
+    // notation cannot parse is rejected; a parseable one is stored in
+    // CANONICAL form (notation.format), so legacy aliases — a turbot-FSM
+    // '0:1', a dual-action TM '1:0R' — decay to their canonical spelling
+    // ('0:11' / '1:0,R') on every edit-save.
     const state = get();
     const wire = state.wires.find((w) => w.id === wireId);
     const source = state.components.find((c) => c.id === wire?.sourceComponentId);

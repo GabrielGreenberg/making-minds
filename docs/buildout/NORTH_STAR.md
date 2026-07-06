@@ -73,13 +73,16 @@ essay). These are excluded by design and absent from the matrix.
 
 ## The one deliberate visual change
 
-Turing-machine transitions currently use the textbook's dual-action token
-`input:action` (e.g. `1:0R`). Switch the UI to the **industry-standard
-one-input → two-output** form: one input symbol drives **two separate outputs**,
-one for *what to write* and one for *how to move*. The engine already stores
-`TMAction {write, move}` separately, so this is a notation/editor/display/migration
+The textbook writes Turing-machine transitions as a dual-action token
+`input:action` (e.g. `1:0R`). The platform instead uses the **industry-standard
+one-input → two-output** form _(landed, P2.1)_: one input symbol drives **two
+separate outputs**, one for *what to write* and one for *how to move* — stored
+`read:write,move` (`1:0,R`), rendered as two labeled output fields; the legacy
+token parses forever as an alias and decays on edit-save. The engine stores
+`TMAction {write, move}` separately, so this was a notation/editor/display
 change, not an engine rewrite. This is the single place the app intentionally
-departs from the textbook; record the departure in VISUAL_VOCAB and spec §10.3.
+departs from the textbook; the departure is recorded in VISUAL_VOCAB §TM and
+spec §10.3.
 
 ## Principles that keep it honest
 

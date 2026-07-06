@@ -4,17 +4,21 @@
 //   cd app && npx tsx tools/notationCheck.ts
 //
 // The seam: engine/notation.ts owns transition-label SYNTAX for all four
-// grammars behind one TransitionNotation interface. Only the FSM notation is
-// implemented natively; TM and turbot-TM notations DELEGATE to the existing
-// engine parsers. These pins make drift impossible:
+// grammars behind one TransitionNotation interface. The FSM and base-TM
+// notations are implemented natively; turbot-TM notations DELEGATE to the
+// existing engine parsers. These pins make drift impossible:
 //
-//   ADAPTER ≡ PARSER   each delegating adapter must agree with its engine
-//     parser on an exhaustive label corpus (legal AND malformed) — two paths
-//     answering "what does this label mean" cannot diverge silently.
+//   ADAPTER ≡ PARSER   each delegating turbot adapter must agree with its
+//     engine parser on an exhaustive label corpus (legal AND malformed) —
+//     two paths answering "what does this label mean" cannot diverge silently.
 //   LEGACY BYTE-COMPAT fsmNotation(1,1) accepts/rejects exactly what the
 //     legacy regex ^[01]:[01]$ did, over a generated string corpus.
 //   ALPHABET           fsmNotation(2,1) enumerates 00/01/10/11 in order.
 //   ROUND-TRIP         format(parse(l)) === l for every canonical label.
+//   TM TWO-OUTPUT      (P2.1) canonical `read:write,move` labels parse into
+//     [write, move]; the legacy dual-action alias `1:0R` parses identically
+//     FOREVER and format decays it to `1:0,R`; `*` stays binary-only in both
+//     spellings; the outputFields contract stays [write, move].
 //   WIDENING           turbotFsmNotation keeps legacy 1-bit outputs valid
 //     ('1' → '11' forward, '0' → '00' stop) and format decays them.
 //   BIT ORDER (asymmetric)  a k=2 FSM computing x + 2*y — NOT symmetric x+y —
@@ -32,7 +36,6 @@ import { buildQuestionBank } from '../src/engine/testVectorGen';
 import { gradeQuestion } from '../src/engine/grader';
 import { validateMachine } from '../src/engine/machineValidation';
 import { comp, transition, circuit } from './builder';
-import { parseTMTransition } from '../src/engine/tm';
 import {
   parseTurbotInternalLabel,
   parseTurbotExternalLabel,
@@ -43,7 +46,7 @@ import {
 import {
   fsmNotation,
   turbotFsmNotation,
-  tmDualNotation,
+  tmNotation,
   turbotInternalNotation,
   turbotExternalNotation,
   type TransitionNotation,
@@ -67,16 +70,27 @@ const MALFORMED = [
   '', ':', '0', '1', '0:', ':0', '0:0:0', '00', '0:2', '2:0', 'x:0', '0:x',
   '0 :0', '0: 0', '0:0 ', ' 0:0', '0:0\n', 'B:0', '0:B', 'E:E', '↑:E',
   '0:RL', '0:LR', '0:0RR', '*:*L*', '0;0', '0-0', 'O:0', '0:O',
+  // two-output TM shapes that must NOT parse
+  '0:0,', '0:,R', '0:,', '0:0,R,', '0:0,RR', '0:00,R', '0:R,0', '0:0;R',
+  '0:0.R', '0:0, R', '0:0 ,R', '0:0,r', '0,0:R', ',:0R',
 ];
 
-const TM_LEGAL: Record<TMNotation, string[]> = {
-  binary: ['0:0R', '0:0L', '0:1R', '0:1L', '0:*R', '0:*L',
-           '1:0R', '1:0L', '1:1R', '1:1L', '1:*R', '1:*L',
-           '*:0R', '*:0L', '*:1R', '*:1L', '*:*R', '*:*L'],
-  unary: ['0:0R', '0:0L', '0:1R', '0:1L', '1:0R', '1:0L', '1:1R', '1:1L'],
-};
-// Legal-for-binary-only labels must be REJECTED by the unary adapter too.
-const TM_STAR_ONLY = TM_LEGAL.binary.filter((l) => l.includes('*'));
+// Canonical two-output TM labels (`read:write,move`) and their legacy
+// dual-action aliases (`read:writemove`) — index i of LEGACY is the alias of
+// index i of CANONICAL.
+function tmLabels(reads: string[], writes: string[]): { canonical: string[]; legacy: string[] } {
+  const canonical: string[] = [];
+  const legacy: string[] = [];
+  for (const r of reads) for (const w of writes) for (const m of ['R', 'L']) {
+    canonical.push(`${r}:${w},${m}`);
+    legacy.push(`${r}:${w}${m}`);
+  }
+  return { canonical, legacy };
+}
+const TM_BINARY = tmLabels(['0', '1', '*'], ['0', '1', '*']); // 18 each
+const TM_UNARY = tmLabels(['0', '1'], ['0', '1']);            // 8 each
+// Legal-for-binary-only labels must be REJECTED by the unary grammar too.
+const TM_STAR_ONLY = [...TM_BINARY.canonical, ...TM_BINARY.legacy].filter((l) => l.includes('*'));
 
 const INTERNAL_LEGAL = ['0:0', '0:1', '0:*', '0:R', '0:L',
                         '1:0', '1:1', '1:*', '1:R', '1:L',
@@ -85,25 +99,59 @@ const INTERNAL_LEGAL = ['0:0', '0:1', '0:*', '0:R', '0:L',
 const EXTERNAL_LEGAL = ['B', 'E', 'F'].flatMap((s) =>
   [TURBOT_FORWARD, TURBOT_TURN_RIGHT, TURBOT_TURN_LEFT].map((m) => `${s}:${m}`));
 
-// ─── Adapter ≡ parser equivalence ────────────────────────────────────
+// ─── TM two-output grammar (native, P2.1) ────────────────────────────
 
-console.log('[adapter ≡ engine parser]');
+console.log('[tm two-output grammar]');
 
 for (const notation of ['binary', 'unary'] as TMNotation[]) {
-  const adapter = tmDualNotation(notation);
-  const corpus = [...TM_LEGAL[notation], ...TM_STAR_ONLY, ...MALFORMED, ...INTERNAL_LEGAL, ...EXTERNAL_LEGAL];
-  const agree = corpus.every((label) => {
-    const engine = parseTMTransition(label, notation);
-    const seam = adapter.parse(label);
-    if (engine === null || seam === null) return engine === null && seam === null;
-    return seam.input === engine.input &&
-      eq(seam.outputs, [engine.action.write, engine.action.move]);
-  });
-  check(`tm-dual(${notation}): adapter agrees with parseTMTransition on ${corpus.length} labels`, agree);
+  const n = tmNotation(notation);
+  const labels = notation === 'binary' ? TM_BINARY : TM_UNARY;
+
+  check(`tm(${notation}): all ${labels.canonical.length} canonical labels parse into [write, move]`,
+    labels.canonical.every((label) => {
+      const p = n.parse(label);
+      return p !== null && p.outputs.length === 2 &&
+        label === `${p.input}:${p.outputs[0]},${p.outputs[1]}`;
+    }));
+
+  check(`tm(${notation}): every legacy dual-action alias parses ≡ its canonical label`,
+    labels.legacy.every((legacy, i) => {
+      const viaAlias = n.parse(legacy);
+      const viaCanonical = n.parse(labels.canonical[i]);
+      return viaAlias !== null && eq(viaAlias, viaCanonical);
+    }));
+
+  check(`tm(${notation}): format decays every alias to the canonical form`,
+    labels.legacy.every((legacy, i) =>
+      n.format(n.parse(legacy) as ParsedTransition) === labels.canonical[i]));
+
+  const rejects = [...MALFORMED, ...INTERNAL_LEGAL, ...EXTERNAL_LEGAL,
+    ...(notation === 'unary' ? TM_STAR_ONLY : [])];
+  check(`tm(${notation}): rejects ${rejects.length} malformed/foreign-grammar labels`,
+    rejects.every((label) => n.parse(label) === null) && n.parse(undefined) === null);
 }
 
+// The P1.12 stored-form contract: outputFields stay [write, move], tokens
+// representation-tied, separator is the comma, default is canonical.
 {
-  const corpus = [...INTERNAL_LEGAL, ...EXTERNAL_LEGAL, ...TM_LEGAL.binary, ...MALFORMED];
+  const bin = tmNotation('binary');
+  const un = tmNotation('unary');
+  check('tm: outputFields contract ([write, move], rep-tied tokens, "," separator, canonical default)',
+    eq(bin.outputFields.map((f) => f.name), ['write', 'move']) &&
+    eq(bin.outputFields[0].tokens, ['0', '1', '*']) &&
+    eq(un.outputFields[0].tokens, ['0', '1']) &&
+    eq(bin.outputFields[1].tokens, ['R', 'L']) &&
+    bin.outputSeparator === ',' && un.outputSeparator === ',' &&
+    bin.defaultLabel === '0:0,R' && un.defaultLabel === '0:0,R' &&
+    eq(bin.inputAlphabet, ['0', '1', '*']) && eq(un.inputAlphabet, ['0', '1']));
+}
+
+// ─── Adapter ≡ parser equivalence (delegating turbot notations) ──────
+
+console.log('\n[adapter ≡ engine parser]');
+
+{
+  const corpus = [...INTERNAL_LEGAL, ...EXTERNAL_LEGAL, ...TM_BINARY.canonical, ...TM_BINARY.legacy, ...MALFORMED];
   const agree = corpus.every((label) => {
     const engine = parseTurbotInternalLabel(label);
     const seam = turbotInternalNotation.parse(label);
@@ -115,7 +163,7 @@ for (const notation of ['binary', 'unary'] as TMNotation[]) {
 }
 
 {
-  const corpus = [...EXTERNAL_LEGAL, ...INTERNAL_LEGAL, ...TM_LEGAL.binary, ...MALFORMED];
+  const corpus = [...EXTERNAL_LEGAL, ...INTERNAL_LEGAL, ...TM_BINARY.canonical, ...TM_BINARY.legacy, ...MALFORMED];
   const arrowOf = { forward: TURBOT_FORWARD, right: TURBOT_TURN_RIGHT, left: TURBOT_TURN_LEFT } as const;
   const agree = corpus.every((label) => {
     const engine = parseTurbotExternalLabel(label);
@@ -170,7 +218,7 @@ check('fsmNotation(2,1) parses "10:1" with wire order preserved (x first)',
 check('fsmNotation(2,1) rejects 1-bit and 3-bit inputs',
   fsmNotation(2, 1).parse('0:1') === null && fsmNotation(2, 1).parse('010:1') === null);
 check('fsmNotation instances are memoized (selector identity)',
-  fsmNotation(2, 1) === fsmNotation(2, 1) && tmDualNotation('binary') === tmDualNotation('binary'));
+  fsmNotation(2, 1) === fsmNotation(2, 1) && tmNotation('binary') === tmNotation('binary'));
 
 // ─── render ∘ parse identity (canonical labels) ──────────────────────
 
@@ -187,8 +235,8 @@ check('fsm(1,1): all 4 labels', roundTrips(fsmNotation(1, 1), ['0:0', '0:1', '1:
 check('fsm(2,1): all 8 labels',
   roundTrips(fsmNotation(2, 1), fsmNotation(2, 1).inputAlphabet.flatMap((s) => [`${s}:0`, `${s}:1`])));
 check('fsm(2,2): sample', roundTrips(fsmNotation(2, 2), ['00:00', '01:10', '11:11', '10:01']));
-check('tm-dual(binary): all 18 labels', roundTrips(tmDualNotation('binary'), TM_LEGAL.binary));
-check('tm-dual(unary): all 8 labels', roundTrips(tmDualNotation('unary'), TM_LEGAL.unary));
+check('tm(binary): all 18 canonical labels', roundTrips(tmNotation('binary'), TM_BINARY.canonical));
+check('tm(unary): all 8 canonical labels', roundTrips(tmNotation('unary'), TM_UNARY.canonical));
 check('turbot-internal: all 15 labels', roundTrips(turbotInternalNotation, INTERNAL_LEGAL));
 check('turbot-external: all 9 labels', roundTrips(turbotExternalNotation, EXTERNAL_LEGAL));
 check('turbot-fsm: canonical 2-bit labels',
@@ -295,9 +343,10 @@ console.log('\n[k=2 grade pin: x + 2*y end-to-end]');
 // ─── Grep gate: label dissection lives ONLY behind the seam ──────────
 // Anti-rot as enforced structure: raw transitionLabel string-dissection (and
 // transition-grammar regex literals) may appear only in engine/notation.ts
-// and the delegated legacy parsers (engine/tm.ts, engine/turbot.ts — until
-// P2.1 / turbot slice 3). Everything else must go through a
-// TransitionNotation's parse/format.
+// and the delegated legacy turbot parsers (engine/turbot.ts — until turbot
+// slice 3). Everything else must go through a TransitionNotation's
+// parse/format. (P2.1 removed engine/tm.ts from this whitelist: the TM
+// grammar now lives natively in the seam.)
 
 console.log('\n[grep gate: no label dissection outside the seam]');
 {
@@ -305,7 +354,6 @@ console.log('\n[grep gate: no label dissection outside the seam]');
   const SRC = join(HERE, '../src');
   const WHITELIST = new Set([
     'engine/notation.ts',
-    'engine/tm.ts',     // parseTMTransition/parseTMAction (delegated; P2.1 folds them in)
     'engine/turbot.ts', // parseTurbotInternal/ExternalLabel (delegated; slice 3)
   ]);
 

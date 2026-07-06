@@ -7,59 +7,60 @@ run `npm run coverage` and reconcile._
 ## Where we are
 
 Branch `buildout-infra`. **32 / 56 verified**, 24 pending, 0 regressed, 0
-warnings. Eleven iterations done; the second META-audit just ran. All four
-arithmetic verticals (HW1–HW4) are fully complete. Remaining walk (QUEUE):
-**P2.1 → P2.2 → P1.8 → P3.1 → P3.2/P3.3 → P4.2 → P4.3 → P5.1 → smalls → P6**.
+warnings. Twelve iterations done. Arithmetic verticals HW1–HW4 complete. P2.1
+landed: TM transitions are now the two-output form (`read:write,move`, stored
+`1:0,R`; legacy `1:0R` aliases forever, decays on edit-save). Remaining walk:
+**P2.2 → P1.8 → P3.1 → P3.2/P3.3 → P4.2 → P4.3 → P5.1 → smalls → P6**.
 
-## Do this next — P2.1: TM two-output notation swap
+## Do this next — P2.2: HW5 TM arithmetic fixtures (hw5-p1…p9)
 
-The one deliberate departure from the textbook (spec §10.3): TM transitions
-must show ONE input (read symbol) driving TWO outputs (write symbol, move) —
-industry style — instead of the dual-action token `1:0R`.
+Nine TM fixtures — tally: p1 `x+1`, p2 `x+3` (reuse x+1), p3 `3x` (reuse x+3),
+p4 `x+y` (arbitrary block separation), p5 `3(x+y)`, p6 `x+3y`; binary: p7 `x+1`
+(extra leftmost 0), p8 `x-1` (0 if x=0), p9 `x+y` (reuse; clean up tape).
+Standard batch workflow (spec → parallel build+prove → wire → adversarial
+verify + gates + appearance → critic). TM-specific prep:
 
-The heavy lifting is already done: `engine/notation.ts` (P1.12,
-`designs/transition-notation.md` + postscript) owns TM label syntax behind a
-delegating adapter, and the editor's token fields are seam-driven. The swap:
+- **Spec agent must nail the TM codec conventions** from
+  `engine/tmCodec.ts` + `engine/tm.ts` + the devData TM sample: how a value
+  lays onto the tape (position, direction, blanks), how accept/decode reads the
+  final tape, halting semantics (missing transition = halt), the
+  `requireStandardHaltPosition` acceptance toggle on AssignmentQuestion
+  (exposed? grader-honored? — QUEUE says expose/verify where problems demand
+  standard-position halting), and how TWO tape arguments encode for x+y
+  (block separation — p4 says ARBITRARY separation, so the bank/codec must
+  vary it or the spec agent must report how the codec lays two values).
+- **Labels in the NEW two-output notation** (`1:0,R`) — builders author via
+  `tmNotation(rep)`; tape alphabet representation-tied (`*` binary only).
+- **Reuse questions** (p2 from p1, p3 from p2, p9 from p7/p8): grading is
+  functional — boxing/reuse is pedagogy, not a grading requirement (note in
+  issues if skipped, per the hw2-p6 precedent). BUT check whether TM boxing
+  even exists as a mechanism before promising it.
+- **hw5.pdf** for exact statements (clean prose — the lint bites); pin full
+  row ids `hw5-pN`.
+- **Broken variants** must fail broadly (sampled banks; breadth bar warns
+  <25%).
+- **Appearance:** TM canvas = FSM-style state editor + tape strip below
+  (`TMTapePanel`); machine table READ|WRITE|MOVE|NEXT columns; VISUAL_VOCAB
+  §TM (two-output form just recorded). FSM arc auto-offsets apply to TM state
+  diagrams too (same renderer) — no hand-placed control points unless a sweep
+  fails.
 
-1. **Read the design memo first** — especially its Stage-B/migration notes and
-   the P2.1-shaped slice description.
-2. Replace the tm notation object's parse/format with the two-output grammar.
-   Decide the exact stored + rendered form (e.g. `1:0,R` stored; rendered as
-   two labeled output fields) — record it in VISUAL_VOCAB §TM (it has a
-   placeholder: "Record the exact rendered form here once P2.1 lands") and
-   spec §10.3 if the spec file carries it.
-3. Fold `validateTMTable` onto the generic `validateTransitionTable` walker
-   (the memo planned this); keep turbot-TM grammars byte-unchanged.
-4. **Migrate stored labels:** devData TM sample (`sampleData.ts`), any sandbox
-   localStorage story per the memo. There are NO TM fixtures yet — HW5 comes
-   next — so migration surface is small. Keep `parseTMAction`-based engine
-   execution working (the engine stores TMAction {write, move} separately
-   already; this is notation-layer).
-5. Editor: the TM label editor should present input → two output fields
-   (write, move) via the seam's token fields; verify in-browser.
-6. Repoint notationCheck's TM adapter≡parser pins to the new grammar; tmCheck
-   must stay green (it pins engine semantics, which don't change).
-
-**Acceptance:** tmCheck + notationCheck + scWindowCheck + turbotCheck +
-coverage (32/0 regressed) + tsc + build green; TM editor shows two outputs
-in-browser; a TM machine round-trips edit→store→grade; VISUAL_VOCAB §TM
-records the rendered form.
+**Acceptance:** `npm run coverage` → 41/56, 0 regressed, no unexplained
+warnings; hw5-p1..p9 fully ✅ incl. appearance; gates green.
 
 ## Then
 
-P2.2 — HW5 TM fixtures (tally hw5-p1…p6, binary p7…p9; check
-`requireStandardHaltPosition` where problems demand standard-position halting;
-TM boxing if reuse demands it). Then P1.8 (router memo — gates Phase 3).
+P1.8 (wire-router design memo — gates Phase 3) → P3.1 (target-functions memo)
+→ perception fixtures → P4.2/P4.3 navigation → P5.1 capstone → smalls → P6.
 
 ## Watch out for
 
-- **notationCheck's grep gate**: TM label logic must live in the seam.
-- **tmCheck pins engine semantics** — the TM engine's dual-action execution
-  (TMAction {write, move}) is NOT changing; only the label notation is.
-- **Turbot-TM grammars must be byte-unchanged** (internal `0:1`/`1:L`,
-  external `E:↑`) — turbotCheck is the canary.
-- **TM tape alphabet is representation-tied** (`*` only on binary questions) —
-  the notation's token fields must respect that (the current editor does).
+- **`requireStandardHaltPosition`** is a deferred authoring follow-up
+  (CLAUDE.md) — if HW5 problems need it, exposing it may become part of P2.2
+  (small QuestionCreator + grader surface; check what exists first).
+- **notationCheck grep gate**: TM label handling must stay in the seam.
+- **tmCheck + notationCheck pin the new grammar** — fixture labels must be
+  canonical (`1:0,R`).
 - **Ops:** 529 → resume workflow; session limit → finish solo.
 - **Appearance recipe v3**; seeds from `app/public/` at `/making-minds/`.
 - `tsx` missing → `npm install`; no lockfile churn.

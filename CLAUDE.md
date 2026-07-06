@@ -14,14 +14,31 @@ Claude to load into context).
 >
 > A change isn't finished until the docs that describe it are too.
 
-_Last updated: 2026-07-06 (**FSM arc-rendering fix** — opposite-direction transition
+_Last updated: 2026-07-06 (**P2.1 — TM two-output notation** — TM transition labels moved
+off the textbook's dual-action token (`1:0R`) to the industry-standard **two-output form**
+`read:write,move` (stored `1:0,R`; canvas renders read │ write,move with the comma shown;
+the label editor presents one input field + two output fields (write, move); the machine
+table gains separate WRITE/MOVE columns; history shows `1,R`) — the platform's ONE
+deliberate departure from the textbook, recorded in spec §10.3 and VISUAL_VOCAB §TM. The
+grammar now lives natively in `engine/notation.ts` (`tmNotation(rep)` — replacing the
+delegating `tmDualNotation` adapter; alphabet still representation-tied, `*` only on
+binary); the legacy dual-action spelling parses FOREVER as an alias and decays to canonical
+on any edit-save, so old localStorage machines keep working with no migration (devData's TM
+sample migrated to canonical anyway). `parseTMTransition`/`parseTMAction` are gone from
+`engine/tm.ts` — the engine parses through the seam — and `validateTMTable` folded onto the
+generic `validateTransitionTable` walker (which now carries a `kind`:
+unparseable/ambiguous/missing), preserving its error shape. Engine SEMANTICS are unchanged:
+every transition still writes and moves as one atomic step. notationCheck pins the new
+grammar (canonical corpus, alias≡canonical, decay, `*` binary-only, outputFields contract)
+and its grep gate no longer whitelists tm.ts; tmCheck gained legacy-alias engine-equivalence
+pins. Earlier same day: **FSM arc-rendering fix** — opposite-direction transition
 pairs (S₀→S₁ and S₁→S₀) now auto-offset into two separated arcs (each bows left of its
 own travel direction, distance-scaled); previously both curves computed to the same
 control point and rendered coincident with superimposed labels. Explicit `fsmControlPt`
 still wins; self-loop fanning and same-direction parallel stacking unchanged. Earlier
 same day: **Transition-notation seam + k-bit FSM (P1.12)** — new
 framework-agnostic `engine/notation.ts` owns transition-label SYNTAX for all four grammars
-(FSM, base-TM dual-action, turbot-TM internal/external) behind one `TransitionNotation`
+(FSM, base-TM, turbot-TM internal/external) behind one `TransitionNotation`
 interface: parse / canonical format / input alphabet / editor token fields / default label.
 FSM is k-bit capable — `fsmNotation(inBits, outBits)`, symbol char i = cc_spec group i — so
 multi-input FSM questions (hw4-p11 `x+y`) now validate (totality over all 2^kIn symbols,
@@ -227,7 +244,7 @@ the engine.
 | ------------- | ------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------ |
 | Types         | `app/src/types.ts`                                                             | All domain types: `AssignmentData`, `AssignmentQuestion`, `SubmissionData`/`SubmissionRecord`, `CircuitData`, `CCSpec`, `SubmissionResult` |
 | Engine        | `app/src/engine/cc.ts`, `sc.ts`, `fsm.ts`                                      | Pure simulators per mode (topological eval for CC; clocked step for SC; transition-matching for FSM)                                       |
-| Engine        | `app/src/engine/tm.ts`, `tmValidate.ts`, `tmCodec.ts`                          | TM: notation-aware tape engine, **dual-action** model (every transition writes a symbol and moves in one atomic step, e.g. `1:0R`); pre-engine table validation (ambiguous/unparseable); encode/accept/decode (the codec `tape` axis)          |
+| Engine        | `app/src/engine/tm.ts`, `tmValidate.ts`, `tmCodec.ts`                          | TM: notation-aware tape engine — **two-output** labels `read:write,move` (e.g. `1:0,R`; legacy `1:0R` parses as an alias), executed as one **atomic step** (every transition writes a symbol AND moves; grammar lives in `engine/notation.ts`); pre-engine table validation (ambiguous/unparseable, via the generic walker); encode/accept/decode (the codec `tape` axis)          |
 | Engine        | `app/src/engine/grader.ts`                                                     | `gradeSubmission` / `gradeQuestion` — one value-based codec pipeline for CC/SC/FSM/TM against numeric `test_cases`, plus a separate `gradeTurbot` branch (arena success criteria, not the codec)          |
 | Engine        | `app/src/engine/codec.ts`, `machineValidation.ts`                              | The codec (`space`/`time` value↔bits; `tape` → `tmCodec`) and Stage-1 machine validation for all modes                                     |
 | Engine        | `app/src/engine/testVectorGen.ts`, `formulaEval.ts`                            | Authoring-time: affine-formula language → `buildQuestionBank(inputs, outputs, rep, mode)` → `{spec, test_cases}` (widths derived; SC/FSM/TM sampled). Legacy `generateTestCases(spec, rep, mode)` remains for the sample data |
@@ -302,7 +319,8 @@ only — the grader never sees the formula; it runs against the generated numeri
    instructor arena authoring; brain = CC/SC/FSM/TM circuit behind a fixed 1-bit sensor /
    2-bit motor interface)_
 5. **Turing Machines** — infinite tape, read/write head, TM transition labels, op cycle.
-   _(built: engine + grading + store + UI — FSM-style state editor, `input:action` labels,
+   _(built: engine + grading + store + UI — FSM-style state editor, two-output
+   `read:write,move` labels (the platform's one deliberate textbook departure, spec §10.3),
    clickable tape strip, machine table / run controls / history)_
 6. **TM Turbots** — turbot with TM-based internal circuitry. _(built, per the textbook
    "Turbots: Operation" model: internal (circle) states do single-action {0,1,*} tape ops,

@@ -196,3 +196,33 @@ both adversarially verified as behavior-preserving:
 Also noteworthy: Stage-1 FSM validation is now stricter (unparseable stray
 labels error loudly instead of being silently ignored) — no fixture affected;
 consistent with the footgun-guard philosophy.
+
+## P2.1 postscript (2026-07-06) — slice 2 landed
+
+The TM two-output swap shipped exactly through the seam, per §2's binding
+contract. **Stored canonical form: `read:write,move`** (e.g. `1:0,R`;
+default `0:0,R`); **the legacy dual-action concatenation `1:0R` parses
+forever** as an alias and, because `format` is canonical, **decays to
+`1:0,R` on any edit-save** — the turbot-FSM widening pattern, so no
+localStorage/fixture migration was needed (devData's TM sample was migrated
+anyway, and there were no TM fixtures yet). Details:
+
+- `tmDualNotation` (delegating) → native `tmNotation(rep)`, id `'tm'`;
+  `outputFields` stayed `[write, move]` as promised; a new optional
+  `TransitionNotation.outputSeparator` (`','` for TM) drives both `format`
+  and the canvas/editor render, keeping the comma out of every consumer.
+- `parseTMTransition`/`parseTMAction` deleted from `engine/tm.ts`; the
+  engine parses through the seam (`TMAction.raw` is now the canonical
+  `"0,R"` text). The grep gate no longer whitelists `tm.ts`.
+- `validateTMTable` folded onto `validateTransitionTable` (mode
+  'at-most-one'); `TableError` gained `kind: unparseable|ambiguous|missing`
+  so the TM wrapper preserves its `TMValidationKind` shape byte-compatibly.
+- The dev-mode `format(parse(l)) === l` assert planned here was NOT added:
+  `setTransitionLabel` already stores `format(parse(label))` uncondition-
+  ally, which is strictly stronger than an assert.
+- Pins: notationCheck's tm adapter≡parser block became native-grammar pins
+  (canonical corpus, alias≡canonical equivalence, decay, `*` binary-only
+  in both spellings, outputFields/separator contract); tmCheck gained a
+  legacy-alias engine-equivalence run. turbot grammars byte-unchanged.
+
+Remaining scope for slice 3 is unchanged (turbot authoring/glossary surface).

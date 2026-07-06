@@ -1222,7 +1222,7 @@ function FsmTransitionView({
   const [editing, setEditing] = useState(false);
   // Field 0 = the input symbol; field 1+i = notation.outputFields[i]. Every
   // field is a fixed-width run of single-character tokens (an FSM question's
-  // k-bit symbol, a TM dual action's write+move, a turbot motor pair …),
+  // k-bit symbol, a TM transition's write+move outputs, a turbot motor pair …),
   // entered one character at a time.
   const [editFields, setEditFields] = useState<string[]>(['0', '0']);
   const [activeField, setActiveField] = useState(0);
@@ -1232,24 +1232,29 @@ function FsmTransitionView({
 
   // The label's grammar comes from the notation seam (engine/notation.ts):
   // the wire's SOURCE state picks the TransitionNotation — FSM sized to the
-  // question's input/output group counts, base TM (dual action, alphabet
-  // tied to the question's representation), turbot-TM per state kind,
-  // turbot-FSM motor labels. Token lists, field widths, and the default
-  // label are all read from that one object; this component never dissects
-  // a label string itself.
+  // question's input/output group counts, base TM (two-output write,move;
+  // alphabet tied to the question's representation), turbot-TM per state
+  // kind, turbot-FSM motor labels. Token lists, field widths, and the
+  // default label are all read from that one object; this component never
+  // dissects a label string itself.
   const notation = useStore((s) =>
     selectTransitionNotationForSource(s, s.components.find((c) => c.id === wire.sourceComponentId)));
   const fieldWidths = [notation.inputWidth, ...notation.outputFields.map((f) => f.width)];
   const fieldTokens = [inputCharTokens(notation), ...notation.outputFields.map((f) => f.tokens)];
-  const totalChars = fieldWidths.reduce((a, b) => a + b, 0);
+  // Separator rendered between output FIELDS (TM write,move) — mirrors the
+  // stored canonical form, so the label reads exactly as it is stored.
+  const outputSep = notation.outputSeparator ?? '';
+  const totalChars = fieldWidths.reduce((a, b) => a + b, 0) +
+    outputSep.length * (notation.outputFields.length - 1);
   const lastField = fieldWidths.length - 1;
 
   const label = wire.transitionLabel || '?:?';
-  // Render canonical: a stored legacy alias (turbot-FSM '0:1') displays as
-  // its canonical form ('0:11') — the same string an edit-save would store.
+  // Render canonical: a stored legacy alias (turbot-FSM '0:1', dual-action TM
+  // '1:0R') displays as its canonical form ('0:11' / '1:0,R') — the same
+  // string an edit-save would store.
   const parsedLabel = notation.parse(wire.transitionLabel);
   const displayLeft = parsedLabel?.input;
-  const displayRight = parsedLabel ? parsedLabel.outputs.join('') : undefined;
+  const displayRight = parsedLabel ? parsedLabel.outputs.join(outputSep) : undefined;
   const color = isSelected ? '#2a7fff' : '#333';
 
   useEffect(() => {
@@ -1582,10 +1587,11 @@ function FsmTransitionView({
               width: 1, alignSelf: 'stretch', margin: '5px 1px',
               background: '#ccc', flexShrink: 0,
             }} />
-            {/* Output half — every output field's characters in sequence
-                (a TM's write+move action, an FSM question's k output bits,
-                a turbot motor pair). The character being entered is full-
-                opacity; its field-mates dim, like the old TM sub-fields. */}
+            {/* Output half — every output field's characters in sequence,
+                with the notation's separator between fields (a TM's
+                write,move; an FSM question's k output bits; a turbot motor
+                pair). The character being entered is full-opacity; its
+                field-mates dim, like the old TM sub-fields. */}
             <div
               onClick={(e) => {
                 e.stopPropagation();
@@ -1607,13 +1613,17 @@ function FsmTransitionView({
                 userSelect: 'none',
               }}
             >
-              {editFields.slice(1).flatMap((field, fi) =>
-                field.split('').map((ch, i) => (
+              {editFields.slice(1).flatMap((field, fi) => [
+                ...(fi > 0 && outputSep
+                  ? [<span key={`sep:${fi}`} style={{ opacity: 0.5 }}>{outputSep}</span>]
+                  : []),
+                ...field.split('').map((ch, i) => (
                   <span
                     key={`${fi}:${i}`}
                     style={{ opacity: activeField > 0 && !(activeField === fi + 1 && charPos === i) ? 0.5 : 1 }}
                   >{ch}</span>
-                )))}
+                )),
+              ])}
             </div>
           </div>
         </foreignObject>

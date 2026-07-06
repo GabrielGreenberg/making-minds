@@ -93,14 +93,23 @@ _(textbook ch. 22, pp. 99–103; mockup `Mock_Ups-9.jpg`)_
 
 - Tape: horizontal strip of cells; a **triangle** read/write head marks the current
   cell. Uninitialized cells read 0 (unary/tally) or blank; scrollable both ways.
-- **Transition notation — target state (industry standard, NOT the textbook):**
-  one **input** symbol drives **two separate outputs** — one for the symbol to
-  **write**, one for the **move** direction. The engine already stores
-  `TMAction {write, move}` separately; the UI must present them as two outputs.
-  - Current (textbook, being replaced): dual-action token `input:action`, e.g.
-    `1:0R` = read 1, write 0, move right.
-  - Target: one input → (write, move) as two labeled outputs. Record the exact
-    rendered form here once P2.1 lands, and note the departure in spec §10.3.
+- **Transition notation — two-output form (industry standard, NOT the textbook;
+  landed P2.1):** one **read** symbol drives **two separate outputs** — the
+  symbol to **write** and the direction to **move**.
+  - **Stored form:** `read:write,move` — e.g. `1:0,R` (read 1 → write 0, move
+    right). Default new-transition label `0:0,R`.
+  - **Rendered form (canvas):** two-cell label boxes as in FSM — left cell the
+    read symbol, right cell `write,move` with the comma shown (e.g. `1 │ 0,R`)
+    — WYSIWYG with the stored text. The label editor presents **one input
+    field + two output fields** (write, then move), comma between them,
+    entered one token at a time.
+  - **Machine table:** `STATE | READ | WRITE | MOVE | NEXT STATE` (write and
+    move are separate columns; halt rows show `– / – / HALT`). History `ACT`
+    column shows `0,R`.
+  - **Legacy alias:** the textbook's dual-action token `1:0R` parses forever
+    (old stored machines keep working) but renders canonically and **decays
+    to `1:0,R` on any edit-save**. Execution is unchanged: write+move is one
+    atomic step.
 - Status panel: time step, current state, read value, write+move action, next state.
 - Alphabet is tied to the question's `representation` (`*` only on binary).
 
