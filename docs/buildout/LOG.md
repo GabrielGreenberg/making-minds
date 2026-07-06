@@ -405,3 +405,27 @@ grading). Stage-1 FSM validation is stricter (stray malformed labels error).
 **Next:** **P1.13** — FSM coincident-arc renderer fix (opposite-direction
 pairs get automatic control-point offsets), flipping hw4-p8/p9/p10's appr
 cells → all HW4 arithmetic fully ✅.
+
+## 2026-07-06 (iteration 10) — P1.13: FSM arc renderer fix · HW4 arithmetic complete
+
+**Shipped:** the coincident opposite-direction arc defect is fixed in
+CircuitCanvas. Root cause was a beautiful sign-cancellation: the old code
+picked a side via `sourceId < targetId` **inside each wire's own perp frame**,
+and the perp frame itself flips between opposite wires — two flips cancel, so
+S₀→S₁ and S₁→S₀ computed the IDENTICAL world control point and printed both
+labels at the same pixels. Fix: an auto arc with an opposite-direction sibling
+bows LEFT of its own travel direction (offset = min(150, max(50, dist·0.3)) +
+25px per extra same-direction wire) — deterministic, textbook-style (top/bottom
+arcs), matching hw4-p11's hand-placed convention. Explicit `fsmControlPt`
+always wins (p11 paths byte-identical before/after — verified at DOM and
+persisted-data level); self-loop fanning and same-direction parallel stacking
+untouched.
+
+**Verified:** six-machine browser re-sweep 6/6 (p8: arcs 166px apart; p9:
+202px; p10: 166px; p5 self-loops, p6 hand-placed parallel pair, p11 explicit
+overrides all clean); DOM audit deduped every FSM path — no coincident control
+points anywhere; all gates green; UI-only diff (one file). hw4-p8/p9/p10 appr →
+✅: **HW4 arithmetic fully complete; 32/56 with all arithmetic verticals done.**
+
+**Next:** iteration 11 = **META-audit-queue** (due — 5 iterations since the
+last). Then P1.8 (wire-router design memo, gating Phase 3 perception).

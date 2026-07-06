@@ -14,7 +14,12 @@ Claude to load into context).
 >
 > A change isn't finished until the docs that describe it are too.
 
-_Last updated: 2026-07-06 (**Transition-notation seam + k-bit FSM (P1.12)** — new
+_Last updated: 2026-07-06 (**FSM arc-rendering fix** — opposite-direction transition
+pairs (S₀→S₁ and S₁→S₀) now auto-offset into two separated arcs (each bows left of its
+own travel direction, distance-scaled); previously both curves computed to the same
+control point and rendered coincident with superimposed labels. Explicit `fsmControlPt`
+still wins; self-loop fanning and same-direction parallel stacking unchanged. Earlier
+same day: **Transition-notation seam + k-bit FSM (P1.12)** — new
 framework-agnostic `engine/notation.ts` owns transition-label SYNTAX for all four grammars
 (FSM, base-TM dual-action, turbot-TM internal/external) behind one `TransitionNotation`
 interface: parse / canonical format / input alphabet / editor token fields / default label.

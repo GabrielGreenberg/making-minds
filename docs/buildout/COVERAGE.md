@@ -15,11 +15,11 @@ A row is ✅ only when the manifest row has a fixture and the harness reports it
 `verified` (correct passes every case, broken variant fails), AND appearance has
 been checked against [VISUAL_VOCAB.md](VISUAL_VOCAB.md).
 
-**As of 2026-07-06 (iteration 9):** harness live, **32/56 verified** (all HW1–
-HW4 arithmetic), 24 pending, 0 regressed. Three hw4 rows (p8/p9/p10) are
-grading-verified but appearance-blocked on the FSM coincident-arc renderer
-defect (P1.13). The FSM k-bit transition alphabet landed (P1.12 notation seam),
-unblocking hw4-p11 and pre-enabling the Phase-4 2-bit motor labels.
+**As of 2026-07-06 (iteration 10):** harness live, **32/56 verified** (all
+HW1–HW4 arithmetic, appearance included — the P1.13 arc fix cleared the last
+three appr cells), 24 pending, 0 regressed. Remaining pending: perception
+(hw2-p10..12, hw3-p11..12), navigation (hw2/hw3/hw4 ×3 each), HW5 TM (9),
+HW6 turbot-TM (1).
 
 ## Columns
 
@@ -79,7 +79,7 @@ harness verified (correct✓ + broken✗) · `appr` = appearance matches VISUAL_
 
 _Note: HW3 #10 (x·y B) is an impossibility argument (not SC-computable) — excluded._
 
-### HW4 — Computing with FSMs  ·  6 full + 3 grading-✅ (appr blocked) / 12
+### HW4 — Computing with FSMs  ·  9/12 (arithmetic complete)
 
 | id | problem | category | auth | build | grades | appr | status | notes |
 |----|---------|----------|:----:|:-----:|:------:|:----:|:------:|-------|
@@ -88,9 +88,9 @@ _Note: HW3 #10 (x·y B) is an impossibility argument (not SC-computable) — exc
 | hw4-p5  | +1 B | arithmetic | ✅ | ✅ | ✅ | ✅ | ✅ | `reference/hw4-p5.json`; 2-state carry FSM; broken = carry-dropper (62.5%) |
 | hw4-p6  | +2 B | arithmetic | ✅ | ✅ | ✅ | ✅ | ✅ | `reference/hw4-p6.json`; 3-state shifted carry |
 | hw4-p7  | +4 B | arithmetic | ✅ | ✅ | ✅ | ✅ | ✅ | `reference/hw4-p7.json`; 4-state (echo two bits + carry) |
-| hw4-p8  | 2x B | arithmetic | ✅ | ✅ | ✅ | ⚠ | ⚠ | `reference/hw4-p8.json`; 2-state delay; grades ✅ but **renderer defect**: opposite-direction arcs S₀⇄S₁ render coincident (→ P1.13) |
-| hw4-p9  | 2x+1 B | arithmetic | ✅ | ✅ | ✅ | ⚠ | ⚠ | `reference/hw4-p9.json`; 3-state; same coincident-arc defect S₁⇄S₂ (→ P1.13) |
-| hw4-p10 | 2(x+1) B | arithmetic | ✅ | ✅ | ✅ | ⚠ | ⚠ | `reference/hw4-p10.json`; 3-state delayed increment; same defect S₁⇄S₂ (→ P1.13) |
+| hw4-p8  | 2x B | arithmetic | ✅ | ✅ | ✅ | ✅ | ✅ | `reference/hw4-p8.json`; 2-state delay; appr ✅ after the P1.13 arc fix (arcs 166px apart, DOM-verified) |
+| hw4-p9  | 2x+1 B | arithmetic | ✅ | ✅ | ✅ | ✅ | ✅ | `reference/hw4-p9.json`; 3-state; appr ✅ after P1.13 (202px separation) |
+| hw4-p10 | 2(x+1) B | arithmetic | ✅ | ✅ | ✅ | ✅ | ✅ | `reference/hw4-p10.json`; 3-state delayed increment; appr ✅ after P1.13 |
 | hw4-p11 | x+y B | arithmetic | ✅ | ✅ | ✅ | ✅ | ✅ | `reference/hw4-p11.json`; 2-state serial adder, k=2 labels `xy:o` via the P1.12 notation seam; 128/128 correct, broken 57%; hand-placed `fsmControlPt` dodges the P1.13 arc defect; k=2 label editor verified in-browser |
 | hw4-p12 | zig-zag: reach & keep going | navigation | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | FSM turbot; **needs 2-bit motor F/S/R/L** |
 | hw4-p13 | three ahead: reach & stop | navigation | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | FSM turbot; needs 2-bit motor |

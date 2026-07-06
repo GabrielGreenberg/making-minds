@@ -3704,7 +3704,6 @@ export function CircuitCanvas() {
       const isSelfLoop = wire.sourceComponentId === wire.targetComponentId;
       const pairKey = [wire.sourceComponentId, wire.targetComponentId].sort().join('|');
       const totalBetweenPair = pairTotals.get(pairKey) || 1;
-      const sameDirectionCount = directedCounts.get(dirKey) || 1;
 
       let pathD: string;
       let labelPos: { x: number; y: number };
@@ -3749,21 +3748,31 @@ export function CircuitCanvas() {
         const perpX = -(tCy - sCy) / dist;
         const perpY = (tCx - sCx) / dist;
 
-        // Determine curve offset using direction-consistent convention:
-        // A→B (where A<B lexically) curves to one side, B→A to the other.
-        // This ensures bidirectional arcs always separate cleanly.
-        const isForward = wire.sourceComponentId < wire.targetComponentId;
-        const side = isForward ? 1 : -1;
+        // Determine curve offset.
+        //
+        // Opposite-direction sibling (some B→A wire alongside this A→B one):
+        // each arc bows to the LEFT of its own direction of travel. `perp` is
+        // the travel direction rotated 90° (travel-right on screen), and it
+        // flips with direction — so a negative own-frame offset lands A→B and
+        // B→A on opposite world sides deterministically, matching the
+        // hand-placed hw4-p11 convention (left→right arc on top, right→left
+        // arc underneath). The bow scales with state spacing (~30% of the
+        // center distance, clamped) so both arcs and their labels stay
+        // clearly distinct at typical 200–400px spacings.
+        const reverseKey = `${wire.targetComponentId}|${wire.sourceComponentId}`;
+        const hasOppositeSibling = (directedCounts.get(reverseKey) || 0) > 0;
 
         let offset: number;
-        if (totalBetweenPair === 1) {
+        if (hasOppositeSibling) {
+          const bowMag = Math.min(150, Math.max(50, dist * 0.3));
+          offset = -(bowMag + dirIdx * 25);
+        } else if (totalBetweenPair === 1) {
           // Only one transition between this pair → straight line
           offset = 0;
-        } else if (sameDirectionCount === 1 && totalBetweenPair === 2) {
-          // Exactly one in each direction → symmetric separation
-          offset = side * 30;
         } else {
-          // Multiple in same direction: stack them
+          // Multiple in the same direction (no reverse sibling): stack them
+          // to one side, chosen by lexical id order for determinism.
+          const side = wire.sourceComponentId < wire.targetComponentId ? 1 : -1;
           offset = side * (30 + dirIdx * 25);
         }
 

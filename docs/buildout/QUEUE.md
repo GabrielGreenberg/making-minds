@@ -95,16 +95,14 @@ before Phase 3 (perception returns to router-rendered CC/SC). Task ids unchanged
   Memo postscript records two deliberate deviations (runBrainStep flip pulled
   forward for the alias-decay rule; P1.10 folded in). **P2.1 is now a notation
   swap; hw4-p12–14's 2-bit motor labels are already executable.**
-- [ ] **P1.13** _(discovered 2026-07-06, hw4 appearance sweep)_ **FSM renderer:
-  coincident opposite-direction arcs.** S₀→S₁ and S₁→S₀ render as geometrically
-  coincident quadratic curves with superimposed labels (one transition visually
-  hidden) — violates the textbook's separated-arcs rule (VISUAL_VOCAB, refreshed
-  from ch. 22). Fix the curve control-point offset for opposite-direction pairs
-  in CircuitCanvas; re-sweep hw4-p8/p9/p10 (their appr cells + statuses flip ✅).
-  Renderer family sibling of P1.8 (wire router) — one CircuitCanvas fix, not
-  fixture nudges (the machines NEED both directions).
-  **Acceptance:** hw4-p8/p9/p10 appearance passes; no regression in the other
-  FSM fixtures' rendering; gates green.
+- [x] **P1.13** **FSM renderer: coincident opposite-direction arcs.** — _done
+  2026-07-06 (iteration 10)._ Root cause: the side-sign AND the per-wire perp
+  frame both flip for opposite wires, cancelling to one world point. Fix: each
+  auto arc bows left of its own travel direction (distance-scaled, stacking);
+  explicit `fsmControlPt` always wins (hw4-p11 byte-identical before/after);
+  self-loops + same-direction pairs untouched. Six-machine browser re-sweep
+  6/6 with DOM control-point separation evidence; all gates green; UI-only
+  diff. hw4-p8/p9/p10 appr → ✅ (HW4 arithmetic complete).
 - [ ] **P1.8** _(discovered 2026-07-06, hw3 appearance sweep)_ **Renderer: wire
   lanes and junction dots** — design memo first (`designs/wire-routing.md`).
   Family: the auto-router (a) sends every wire into `MEM.min` down a fixed

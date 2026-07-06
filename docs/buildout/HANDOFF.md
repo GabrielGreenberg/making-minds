@@ -7,60 +7,55 @@ run `npm run coverage` and reconcile._
 ## Where we are
 
 Branch `buildout-infra`. **32 / 56 verified**, 24 pending, 0 regressed, 0
-warnings. Nine iterations done. All HW1–HW4 **arithmetic** rows are
-grading-verified; hw4-p8/p9/p10 remain appearance-blocked on the coincident-arc
-renderer defect. The transition-notation seam landed (P1.12,
-`designs/transition-notation.md` + postscript): `engine/notation.ts` owns label
-syntax for all four grammars, FSM is k-bit, the 2-input footgun is dead, P2.1
-is now a notation swap, and 2-bit motor labels are already executable.
+warnings. Ten iterations done. **All four arithmetic verticals are complete**
+(HW1 7/7, HW2 7/7, HW3 9/9, HW4 9/9 — appearance included). Remaining pending:
+CC/SC perception (hw2-p10..12, hw3-p11..12 — needs the P3.1 target-function
+design spike), navigation (hw2/hw3/hw4 ×3 — needs arenas + P4.2 multi-arena
+grading; FSM 2-bit motor labels already work via the P1.12 seam), HW5 TM (9 —
+Phase 2 first), HW6 turbot-TM capstone (1).
 
-## Do this next — P1.13: FSM coincident-arc renderer fix
+## Do this next — iteration 11: META-audit-queue
 
-The last blocker on the HW4 arithmetic vertical. CircuitCanvas renders
-opposite-direction transition pairs (S₀→S₁ and S₁→S₀) as geometrically
-coincident quadratic curves with superimposed labels (identical control
-points) — one transition visually hidden. hw4-p11 dodged it with hand-placed
-`fsmControlPt`; hw4-p8/p9/p10 need the real fix (their machines inherently use
-both directions).
+Five iterations since the last audit (iteration 5). Standard reconcile + one
+big re-planning question this time:
 
-1. Find the FSM transition-curve construction in CircuitCanvas.tsx (the "FSM
-   transition curves" branch, ~line 3660s; `fsmControlPt` override exists).
-   When a wire has NO explicit `fsmControlPt` and an opposite-direction sibling
-   exists between the same two states, offset the control point perpendicular
-   to the state-center line (one arc bows up/left, the other down/right —
-   VISUAL_VOCAB: "A→B/B→A separated arcs"). Respect existing `fsmControlPt`
-   (hw4-p11 must render unchanged). Check multiple SELF-LOOPS on one state fan
-   out at distinct angles (the auto-fan exists — verify it holds for 3+ loops,
-   hw4-p11's case, though its loops auto-fanned fine).
-2. Label placement must follow the offset arcs (labels at each arc's apex, not
-   superimposed).
-3. Re-sweep hw4-p8/p9/p10 in the browser (recipe v3; VISUAL_VOCAB FSM rules) —
-   their appr cells + statuses flip ✅ in COVERAGE. Spot-check hw4-p5/p6/p11
-   and the devData FSM sample for rendering regressions (opposite pairs are
-   common).
-4. Gates: check/tsc/build + coverage (32/0 regressed — this is UI-only, no
-   grading change).
+1. `npm run coverage`; reconcile COVERAGE/QUEUE with the harness (expect
+   clean — 32/0).
+2. **Re-rank what remains.** The arithmetic spine is done; what's left splits
+   into three tracks with different blockers:
+   (a) **Phase 2 TM** (P2.1 two-output notation — now a notation swap per
+   `designs/transition-notation.md` — then P2.2's nine HW5 fixtures);
+   (b) **Phase 3 perception** (P3.1 design spike — target-function abstraction
+   — then hw2-p10..12, hw3-p11..12; ALSO needs P1.8's router memo since
+   perception fixtures are CC/SC);
+   (c) **Phase 4/5 navigation** (P4.2 multi-arena grading + arenas; P1.12
+   already delivered the motor labels; then hw6-p2 capstone).
+   Decide the order (suggested: keep the mode walk — TM next since it's
+   unblocked and P2.1 is cheap now; perception needs TWO design memos first).
+   Also slot the small tasks (P1.5 allowed_components, P1.6 label-ordering,
+   P1.11 ARG multi-group, P1.8 router memo) where they gate things.
+3. **Patch-accumulation check:** the notation seam absorbed the grammar family
+   cleanly; check whether anything new is accumulating (e.g. fixture
+   appearance conventions — hand-placed fsmControlPt in p6/p11 vs auto arcs —
+   is that a family needing a rule, or fine as-is?).
+4. Log; point HANDOFF at the winner.
 
-**Acceptance:** hw4-p8/p9/p10 appearance passes → HW4 arithmetic fully ✅ in
-COVERAGE; no rendering regressions elsewhere; gates green.
+## Then (default expectation)
 
-## Then
-
-P1.8 (wire-router design memo — gates Phase 3 perception) → P1.5
-(allowed_components) → P1.6/P1.11 (small) → **P2.1 TM two-output** (now a
-notation swap per the P1.12 seam; its design questions are pre-answered in
-`designs/transition-notation.md`) → P2.2 (HW5 TM fixtures). META-audit-queue
-due ~iteration 10 (next iteration or the one after).
+P2.1 (TM two-output — implement via the notation seam; VISUAL_VOCAB TM section
++ spec §10.3 updates; migrate devData/fixture labels; tmCheck/coverage green)
+→ P2.2 (HW5 TM fixtures ×9) → P1.8 + P3.1 design memos → perception →
+navigation → capstone → Phase 6 close-out.
 
 ## Watch out for
 
-- **notationCheck's grep gate** fails the build if label dissection leaks
-  outside the seam — new code must use `engine/notation.ts`.
-- **hw4-p11 has hand-placed `fsmControlPt`** — the P1.13 auto-offset must not
-  fight explicit control points.
-- **scWindowCheck (45+ pins) + turbotCheck pin the notation seam** — store/
-  editor changes must keep them green.
+- **notationCheck's grep gate**: label dissection must stay inside
+  `engine/notation.ts` — P2.1's TM swap must go through the seam.
+- **P2.1 changes STORED label format** (dual-action `1:0R` → two-output) —
+  fixtures/devData/localStorage migration story is pre-planned in the design
+  memo (Stage B notes); re-read it before implementing.
+- **scWindowCheck + turbotCheck pin everything** the notation seam touches.
 - **Ops:** 529 → resume workflow; session limit → finish verification solo.
-- **Appearance recipe v3**; seeds served from `app/public/` at `/making-minds/`;
+- **Appearance recipe v3**; seeds from `app/public/` at `/making-minds/`;
   clean keys twice.
 - `tsx` missing → `npm install`; no lockfile churn.
