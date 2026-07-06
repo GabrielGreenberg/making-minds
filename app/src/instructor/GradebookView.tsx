@@ -309,6 +309,42 @@ function SubmissionDetail({
             </div>
           );
         }
+        // Perception questions grade raw frames bit-level — their failures
+        // report the stimulus and the first mismatching time step.
+        if (qr.perceptionCases) {
+          const failedCases = qr.perceptionCases.filter((c) => !c.pass);
+          return (
+            <div className="instructor-detail-q" key={qr.questionId}>
+              <strong>{q?.label ?? `Q${qr.questionId}`}</strong>: {qr.passed}/{qr.total} cases passed
+              {failedCases.length > 0 && (
+                <table className="instructor-detail-table">
+                  <thead>
+                    <tr>
+                      <th>input frames (t1 → tn)</th>
+                      <th>expected</th>
+                      <th>got</th>
+                      <th>first wrong step</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {failedCases.map((c, ci) => (
+                      <tr key={ci}>
+                        <td className="instructor-bits">
+                          {c.frames.map((f) => f.join('')).join(' → ')}
+                        </td>
+                        <td className="instructor-bits">{c.expected.join('')}</td>
+                        <td className="instructor-bits instructor-fail">
+                          {c.reason ?? c.got.join('')}
+                        </td>
+                        <td className="instructor-bits">{c.failStep ?? '—'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </div>
+          );
+        }
         const failed = qr.cases.filter((c) => !c.pass);
         return (
           <div className="instructor-detail-q" key={qr.questionId}>
