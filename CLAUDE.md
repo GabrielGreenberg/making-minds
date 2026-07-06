@@ -14,7 +14,11 @@ Claude to load into context).
 >
 > A change isn't finished until the docs that describe it are too.
 
-_Last updated: 2026-07-06 (also: **turbot-FSM 2-bit motors** — an FSM-brained turbot's Mealy
+_Last updated: 2026-07-06 (also: **turbotCheck FSM/SC coverage** — the turbot smoke test now
+grades questions in all four inner modes: new FSM- and SC-brained graded questions beside the
+existing TM and CC ones, plus first engine coverage for SC brains — a MEM-latching turner that
+threads a 3×3 L-course (forward → turn left at the first wall → stop at the second), proving
+brain state carries across arena cycles. Same day, **turbot-FSM 2-bit motors** — an FSM-brained turbot's Mealy
 transitions now output the full 2-bit motor code (`in:ij`, e.g. `0:11`, `1:01` — same
 wheel-motor encoding as CC/SC output wires), so FSM brains can issue every movement command,
 turns included, closing the old stop/forward-only limitation: new `parseTurbotFSMLabel` +
