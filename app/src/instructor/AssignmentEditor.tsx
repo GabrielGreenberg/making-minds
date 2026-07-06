@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import type { AssignmentData, AssignmentQuestion } from '../types';
+import { questionModeLabel } from '../types';
 import { getAssignment, isBundledAssignment } from '../assignments';
 import { localAssignmentStore } from '../storage/AssignmentStore';
 import { downloadJson } from '../download';
@@ -129,7 +130,7 @@ export function AssignmentEditor({ id }: { id: string }) {
             <li key={q.id} className="instructor-question-row">
               <div className="instructor-question-main">
                 <span className="instructor-question-label">{q.label}</span>
-                <span className="instructor-badge instructor-badge--mode">{q.buildMode}</span>
+                <span className="instructor-badge instructor-badge--mode">{questionModeLabel(q)}</span>
                 <span className="instructor-question-summary">{summarizeQuestion(q)}</span>
               </div>
               <div className="instructor-question-actions">

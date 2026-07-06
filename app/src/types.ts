@@ -149,6 +149,15 @@ export interface AssignmentQuestion {
   notes?: string;
 }
 
+/**
+ * Display label for a question's mode chip. A turbot question names its inner
+ * machine too ("turbot - TM"), since the brain's mode is what the student
+ * actually edits.
+ */
+export function questionModeLabel(q: Pick<AssignmentQuestion, 'buildMode' | 'innerMode'>): string {
+  return q.buildMode === 'turbot' ? `turbot - ${q.innerMode ?? 'CC'}` : q.buildMode;
+}
+
 export interface AssignmentData {
   id: string;                  // stable slug (e.g. "cc-basics"); keys the registry/persistence
   title: string;

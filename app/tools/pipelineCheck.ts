@@ -37,7 +37,7 @@ for (const q of correct.questions) {
   check(`${def?.label} all vectors pass`, q.status === 'graded' && q.total > 0 && q.passed === q.total);
 }
 const cs = summarizeResult(correct);
-check('correct: 5/5 questions', cs.questionsPassed === 5 && cs.questionsTotal === 5);
+check('correct: 8/8 questions', cs.questionsPassed === 8 && cs.questionsTotal === 8);
 
 console.log('\n[incorrect submission]');
 const wrong = gradeSubmission(assignment, buildIncorrectSubmission());
@@ -47,7 +47,7 @@ for (const q of wrong.questions) {
   check(`${def?.label} fails at least one vector`, q.status === 'graded' && q.passed < q.total);
 }
 const ws = summarizeResult(wrong);
-check('incorrect: 0/5 questions', ws.questionsPassed === 0 && ws.questionsTotal === 5);
+check('incorrect: 0/8 questions', ws.questionsPassed === 0 && ws.questionsTotal === 8);
 
 console.log(`\n${failures === 0 ? 'PIPELINE OK' : `PIPELINE FAILED (${failures} checks)`}`);
 process.exit(failures === 0 ? 0 : 1);
