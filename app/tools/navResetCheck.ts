@@ -1,16 +1,19 @@
-// Headless regression check: question navigation must flush EVERY mode's
+// Headless regression check: every canvas swap must flush EVERY mode's
 // transient sim state. The sim slices (SC history/sequences, FSM run state,
 // TM tape/history, turbot pose, the I/O table) are shared app-wide — they are
-// NOT part of questionCircuits — so anything left in them after navigating
-// shows up against the next question's circuit (e.g. question 1's typed SC
-// input row, OUT string, and full timeline rendered on question 2).
+// NOT part of questionCircuits or tabCircuits — so anything left in them
+// after navigating shows up against the next canvas's circuit (e.g. question
+// 1's typed SC input row, OUT string, and full timeline rendered on question
+// 2, or a sandbox tab's run rendered on the next tab).
 //
 //   cd app && npx tsx tools/navResetCheck.ts
 //
-// Drives the real Zustand store through the three navigation entry points
-// (loadAssignment, openAssignment, switchQuestion) with real runs on the
-// sample SC / FSM / TM circuits, asserting `resetAllSimState` leaves every
-// slice fresh each time.
+// Drives the real Zustand store through the assignment navigation entry
+// points (loadAssignment, openAssignment, switchQuestion) and the sandbox
+// canvas swaps (enterSandbox, addTab, switchTab, removeTab, newWorkbook,
+// importWorkbook) with real runs on the sample SC / FSM / TM circuits,
+// asserting `resetAllSimState` leaves every slice fresh each time — and that
+// removing a background tab (no canvas swap) leaves the live run alone.
 
 // The store registers window/document listeners and reads localStorage at
 // import time, so install minimal shims BEFORE dynamically importing it.
@@ -180,6 +183,107 @@ useStore.getState().closeAssignment();
 plantSimJunk();
 check('openAssignment succeeds', useStore.getState().openAssignment(SAMPLE_ASSIGNMENT_ID) === true);
 checkAllSimFresh('after open');
+
+// ═════ Sandbox tabs share the same fresh-machine contract ═══════
+
+/** A real SC run on the live canvas: scCorrect circuit, '0110' in, 3 steps. */
+function runScOnLiveCanvas() {
+  useStore.setState({ components: scCorrect().components, wires: scCorrect().wires });
+  useStore.getState().setScGlobalSequenceInput(0, '0110');
+  useStore.getState().loadScGlobalSequence(0);
+  for (let i = 0; i < 3; i++) useStore.getState().scStep();
+}
+
+// ── enterSandbox (leaving the assignment) lands fresh ───────────
+console.log('[enterSandbox flushes assignment sim state]');
+plantSimJunk();
+useStore.getState().enterSandbox();
+check('sandbox is open without an assignment',
+  useStore.getState().assignment === null && useStore.getState().workbookOpen);
+checkAllSimFresh('after enterSandbox');
+
+// ── SC run on tab 1, addTab: the new blank tab starts fresh ─────
+console.log('[SC leak across addTab]');
+const tab1Id = useStore.getState().activeTabId;
+runScOnLiveCanvas();
+{
+  const s = useStore.getState();
+  check('sandbox SC run recorded history', s.scHistory.length === 3 && s.scTimeStep === 4);
+  const mem = s.components.find((c) => c.type === 'MEM');
+  check('sandbox MEM holds a mid-run value before adding a tab', mem?.storedValue === 1);
+}
+useStore.getState().addTab('Scratch 2', 'SC', 'arithmetic');
+check('addTab switched to the new tab', useStore.getState().activeTabId !== tab1Id);
+check('new tab starts with an empty canvas', useStore.getState().components.length === 0);
+checkAllSimFresh('after addTab');
+await flushTimers();
+check('deferred evaluate adds no ghost I/O row on the new tab',
+  useStore.getState().tableRows.length === 0);
+
+// ── switchTab back: fresh machine, circuit preserved ────────────
+console.log('[switchTab back to the run tab]');
+plantSimJunk();
+useStore.getState().switchTab(tab1Id);
+checkAllSimFresh('after switchTab');
+{
+  const s = useStore.getState();
+  const mem = s.components.find((c) => c.type === 'MEM');
+  const input = s.components.find((c) => c.type === 'INPUT');
+  check('re-entered tab: MEM re-zeroed', mem?.storedValue === 0);
+  check('re-entered tab: input values cleared', input?.value == null);
+  check('re-entered tab: circuit itself preserved',
+    s.components.length === 3 && s.wires.length === 2);
+}
+
+// ── removeTab (active): the surviving tab starts fresh ──────────
+console.log('[removeTab active-tab branch]');
+runScOnLiveCanvas();
+check('run recorded before removing the active tab', useStore.getState().scHistory.length === 3);
+useStore.getState().removeTab(tab1Id);
+check('removal switched to the surviving tab', useStore.getState().activeTabId !== tab1Id);
+checkAllSimFresh('after removing the active tab');
+
+// ── removeTab (background): the live run is left alone ──────────
+console.log('[removeTab background-tab branch preserves the live run]');
+const survivorId = useStore.getState().activeTabId;
+useStore.getState().addTab('Scratch 3', 'SC', 'arithmetic');
+runScOnLiveCanvas();
+useStore.getState().removeTab(survivorId); // a tab we are NOT looking at
+{
+  const s = useStore.getState();
+  check('background removal keeps the tab list right',
+    s.tabs.length === 1 && s.tabs[0].title === 'Scratch 3');
+  const mem = s.components.find((c) => c.type === 'MEM');
+  check('background removal does not reset the in-progress run',
+    s.scHistory.length === 3 && s.scTimeStep === 4 && mem?.storedValue === 1);
+}
+
+// ── newWorkbook flushes planted junk ────────────────────────────
+console.log('[newWorkbook flushes junk]');
+plantSimJunk();
+useStore.getState().newWorkbook();
+checkAllSimFresh('after newWorkbook');
+
+// ── importWorkbook flushes planted junk ─────────────────────────
+console.log('[importWorkbook flushes junk]');
+plantSimJunk();
+useStore.getState().importWorkbook(JSON.stringify({
+  formatVersion: 2,
+  metadata: { title: 'Imported' },
+  activeWorksheetId: 'ws-1',
+  worksheets: [{
+    id: 'ws-1',
+    title: 'Sheet 1',
+    buildMode: 'SC',
+    activeTask: 'arithmetic',
+    circuit: { components: [], wires: [] },
+    textElements: [],
+    comments: [],
+    boxes: [],
+  }],
+}));
+check('import landed on the imported worksheet', useStore.getState().activeTabId === 'ws-1');
+checkAllSimFresh('after importWorkbook');
 
 await flushTimers();
 console.log(`\nnavResetCheck: ${passed} passed, ${failed} failed`);

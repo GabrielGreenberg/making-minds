@@ -562,9 +562,10 @@ interface AppState {
   toggleStateKind: (id: string) => void;
 
   // Flush EVERY mode's transient sim state (SC/FSM/TM/turbot + the I/O table).
-  // Question navigation must call this — the sim slices are shared app-wide,
-  // not per-question, so anything left in them shows up against the next
-  // question's circuit.
+  // Every canvas swap must call this — question navigation and sandbox
+  // tab/workbook entry alike — because the sim slices are shared app-wide,
+  // not per-canvas, so anything left in them shows up against the next
+  // canvas's circuit.
   resetAllSimState: () => void;
 }
 
@@ -723,6 +724,7 @@ export const useStore = create<AppState>()((set, get) => ({
       undoStack: [],
       redoStack: [],
     });
+    get().resetAllSimState();
   },
 
   openWorkbook: (json, handle) => {
@@ -832,6 +834,7 @@ export const useStore = create<AppState>()((set, get) => ({
           undoStack: [],
           redoStack: [],
         });
+        get().resetAllSimState();
         setTimeout(() => get().evaluateCircuit(), 0);
       } else if (data.circuit) {
         // Legacy single-circuit format — wrap in a one-worksheet workbook
@@ -867,6 +870,7 @@ export const useStore = create<AppState>()((set, get) => ({
           undoStack: [],
           redoStack: [],
         });
+        get().resetAllSimState();
         setTimeout(() => get().evaluateCircuit(), 0);
       } else {
         alert('Invalid file format. Expected a workbook or circuit file.');
@@ -1402,6 +1406,7 @@ export const useStore = create<AppState>()((set, get) => ({
       buildMode: tab?.buildMode || 'CC',
       activeTask: tab?.activeTask || 'arithmetic',
     });
+    get().resetAllSimState();
   },
   switchQuestion: (index) => {
     const state = get();
@@ -2200,6 +2205,7 @@ export const useStore = create<AppState>()((set, get) => ({
       buildMode,
       activeTask: task,
     });
+    get().resetAllSimState();
   },
 
   switchTab: (id) => {
@@ -2226,6 +2232,7 @@ export const useStore = create<AppState>()((set, get) => ({
       buildMode: tab?.buildMode || 'CC',
       activeTask: tab?.activeTask || 'arithmetic',
     });
+    get().resetAllSimState();
   },
 
   removeTab: (id) => {
@@ -2253,7 +2260,10 @@ export const useStore = create<AppState>()((set, get) => ({
         comments: saved.comments,
         boxes: saved.boxes,
       });
+      get().resetAllSimState();
     } else {
+      // Removing a background tab doesn't swap the canvas — leave the live
+      // tab's in-progress run undisturbed.
       set({ tabs: newTabs, tabCircuits: updatedTabCircuits });
     }
   },
@@ -3489,10 +3499,11 @@ export const useStore = create<AppState>()((set, get) => ({
     });
   },
 
-  // One aggregate reset for question navigation. Delegates to the per-mode
-  // global resets so each slice's field list lives in exactly one place;
-  // turbotReset runs last because it re-derives brain state from the (possibly
-  // just-remapped) live components.
+  // One aggregate reset for canvas-swapping navigation (question navigation
+  // and sandbox tab/workbook entry). Delegates to the per-mode global resets
+  // so each slice's field list lives in exactly one place; turbotReset runs
+  // last because it re-derives brain state from the (possibly just-remapped)
+  // live components.
   resetAllSimState: () => {
     get().scGlobalReset();
     get().fsmGlobalReset();
