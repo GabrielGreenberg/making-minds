@@ -862,3 +862,36 @@ verbatim from hw3.pdf, framing per house style.
 
 **Next:** P1.8 S3 (foreign-lane cost + H4 near-merge + the XOR floor + bumpCheck
 into the gate) — now with three pinned exhibits and a full mechanism map.
+
+## 2026-07-07 (iteration 21) — merge #3: server groundwork · S3 taken by a concurrent session
+
+**Shipped:** merge `8dc2ff5` — main's backend-phase opening wave (PR #15 server
+groundwork: Express 5 + node:sqlite API behind an AuthProvider seam, grading
+server-side on submit with the SAME engine/grader.ts imported cross-package,
+sanitize.ts strips test_cases from client payloads, Lightsail/Cloudflare
+deploy recipes, serverCheck.ts 28 checks; PR #14 instructor manual grading for
+open questions; grade-release gating). Only CLAUDE.md conflicted. All four
+semantic probes clean: release gating is display policy in a separate
+localStorage seam (harness reads autogrades unchanged); ManualReview ANNOTATES
+(open contract pending 0/0 intact, pipelineCheck gained a manual-review
+section); api/client.ts maps 1:1 to future Remote* stores and is imported by
+NOTHING; no app config changes. Pins touched: none. Gates green on a pristine
+checkout-index copy AND server tsc/check (28/28). Enqueued P6.3
+(server↔engine grading parity pin + server in CI) and P6.4 (Remote-store
+cutover, Gabriel's timing).
+
+**The bigger finding — tree contention:** a concurrent local Claude session
+(spawned ~9:05AM from the iteration-20 XOR-floor diagnosis chip) is editing
+`app/src/wireRouter.ts` IN THIS SAME CHECKOUT, implementing P1.8 S3's
+own-endpoint exemption. Its unstaged WIP made gates flap mid-merge (coverage
+briefly showed 12 regressed — all phantom); the merge agent recovered by
+gating against a `git checkout-index` copy and committing from the index
+only. **Consequences:** S3/S4 are externally owned until that session lands
+(the loop checks its commit against the S3 acceptance list — bumpCheck,
+toggle-tab obstacles, H4 round, repinned budget ≈3 — and enqueues leftovers);
+the loop's next feature slice must gate in an ISOLATED WORKTREE while foreign
+WIP is present; saved as a durable memory
+(project-shared-worktree-concurrency) + HANDOFF watch-out.
+
+**Next:** P4.2 multi-arena navigation grading (engine/grader/turbot — disjoint
+from wireRouter.ts), built and gated in an isolated worktree.

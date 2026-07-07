@@ -167,7 +167,14 @@ before Phase 3 (perception returns to router-rendered CC/SC). Task ids unchanged
 
 ## Phase 3 — Perception
 
-- [~] **P1.8** **Renderer: wire lanes and junction dots.** — _design memo done
+- [~] **P1.8** **Renderer: wire lanes and junction dots.** — _⚠ S3 TAKEN BY A
+  CONCURRENT SESSION (2026-07-07, ~9:05AM): a separate local Claude session
+  (spawned from the iteration-20 diagnosis chip) is implementing the
+  own-endpoint exemption in wireRouter.ts IN THIS SAME WORKING TREE. The loop
+  must NOT start S3/S4 until that lands; it must repin EXPECTED_FALLBACKS
+  (expected ≈3) and should adopt the S3 acceptance list below (bumpCheck,
+  toggle-tab obstacles, H4 round) — check its commit against that list and
+  enqueue whatever it leaves undone._ — _design memo done
   (`designs/wire-routing.md`, judge-panel: MODEL-FIX won 77–65); S1+S2 landed
   2026-07-06 (iteration 16, commits `4e62a7e`, `bdf13b1`); S3–S5 remain._
   **S1 (done):** new `src/componentGeometry.ts` owns rendered dimensions (MEM
@@ -259,6 +266,18 @@ before Phase 3 (perception returns to router-rendered CC/SC). Task ids unchanged
   (`0:01` = pivot left) executable and pinned in turbotCheck; legacy 1-bit
   labels alias + decay. Remaining surface work (palette/glossary vocabulary
   for 2-bit outputs in the turbot editor) rides P4.3's authoring pass._
+- [ ] **P6.3** _(enqueued iteration 21, merge-#3 report)_ **Server↔engine
+  grading parity pin:** serverCheck and pipelineCheck should share a fixture —
+  same submission graded via HTTP (server/src, engine imported cross-package)
+  and via direct `gradeSubmission` must yield identical results; plus fold
+  `server: typecheck + check` into the repo's CI/gate story. Guards the
+  Evaluation seam's "same code grades on server" promise as both sides evolve.
+- [ ] **P6.4** _(enqueued iteration 21)_ **Remote-store cutover** (backend
+  phase): async `Remote*` stores backed by `api/client.ts` (currently 1:1,
+  imported by NOTHING) replacing the localStorage seams; retires the
+  grade-release/manual-review duplication (server-authoritative + local
+  mirror). Gabriel's call on timing — enqueue-only; probably his next
+  parallel-session slice.
 - [ ] **P4.2** **Multi-arena navigation grading** for unknown distance/position
   (Mad Max, Way Finder, Desert Ant): put a *family* of arenas in `turbot_cases`;
   confirm the grader requires all to pass. **Acceptance:** a single-layout-only

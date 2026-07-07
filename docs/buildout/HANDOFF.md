@@ -7,112 +7,93 @@ run `npm run coverage` and reconcile._
 ## Where we are
 
 Branch `buildout-infra` (pushed to `origin`). **46 / 56 exact-verified**, 10
-pending (tier `interface`), 0 regressed, 0 warnings. Twenty iterations done.
-**All arithmetic (HW1–HW5) and ALL perception (hw2-p10..p12, hw3-p11..p12)
-complete at exact tier** — every perception row promoted from Gabriel's
-devData samples, adversarially confirmed, appearance-swept. Remaining pending:
-9 navigation rows + the HW6 Desert Ant capstone.
+pending (tier `interface` — 9 navigation + the HW6 capstone), 0 regressed, 0
+warnings. Twenty-one iterations done. All arithmetic AND all perception
+complete at exact tier. Merge `8dc2ff5` (iteration 21) brought main's
+**backend-phase opening wave**: an Express+sqlite API server that grades
+server-side with the SAME `engine/grader.ts` (test cases stripped from client
+payloads; results withheld until release), instructor manual grading for open
+questions (annotates, doesn't change the pending 0/0 contract), grade-release
+gating (display policy in its own localStorage seam), deploy recipes, and
+`server npm run check` (28 checks, green). `api/client.ts` maps 1:1 to future
+Remote* stores and is imported by nothing yet.
 
-**Iteration-20 diagnostic win — the router fallback budget is now a named
-mechanism, not a mystery:** hw3-p11 exposed 48 new fallbacks; a bounded agent
-proved they are the **structural XOR floor** — XOR's left-port inset (11.25px)
-exceeds STUB_LENGTH(12)−ELEMENT_MARGIN(5), so every A* goal at an XOR in-port
-is born blocked → exactly 3 fallbacks per XOR-in wire. The ENTIRE 147 budget
-decomposes as 3×XOR-in wires per fixture + 3 one-off doomed wires
-(hw3-p1/p8/p9). Deliberately pinned (`routerCheck.ts` header has mechanism +
-fix candidates). hw3-p12 (146 comps, PLA-matrix layout, 270°-rotated MEMs) has
-ZERO fallbacks because it has zero XORs.
+## ⚠ TREE CONTENTION — read before touching anything
 
-## ⚠ SCOPE SHIFT (user directive 2026-07-06) — read before picking work
+A concurrent local Claude session (spawned 2026-07-07 ~9:05AM from the
+iteration-20 XOR-floor diagnosis chip) is editing `app/src/wireRouter.ts` IN
+THIS SAME CHECKOUT — implementing **P1.8 S3** (own-endpoint exemption).
+Protocol until its work lands:
+- `git status --short` FIRST; treat foreign modified files as theirs — never
+  `git add` them, never `git checkout` over them.
+- Gates on the shared tree are NONDETERMINISTIC while their WIP is unstaged —
+  run gates in an isolated worktree (or a `git checkout-index` copy, as the
+  iteration-21 merge agent did).
+- Do NOT start S3/S4. When their commit lands (watch `git log` for
+  wireRouter.ts changes), check it against the S3 acceptance list (QUEUE
+  P1.8): repinned EXPECTED_FALLBACKS (expected ≈3), bumpCheck clean on all
+  CC/SC fixtures + wired into `npm run check`, INPUT toggle-tab obstacles, H4
+  near-merge round. Enqueue whatever it leaves undone.
+- Durable memory saved: `project-shared-worktree-concurrency`.
 
-**Interface over correctness.** All 10 remaining rows are navigation/capstone:
-the bar is a plausible attempt that authors, builds, validates Stage-1, and
-grades end-to-end; scores reported, not asserted. Do NOT hunt correct
-solutions (Way Finder, Mad Max, Desert Ant) — future correct-answers project.
-**Exception:** free correct machines (devData/problem-set-printed) — take
-them; the HW4 zig-zag FSM is PRINTED in the problem set.
+## ⚠ SCOPE SHIFT (user directive 2026-07-06)
 
-## Do this next — FIRST merge origin/main (8 commits, discovered at iteration-20 close), THEN P1.8 S3
+All 10 remaining rows are navigation/capstone at tier `interface`: a plausible
+attempt that authors, builds, validates, and grades end-to-end; scores
+reported, not asserted. Free correct machines excepted — the HW4 zig-zag FSM
+is PRINTED in the problem set; take it.
 
-**The merge is not optional and not small:** main now carries the BACKEND
-phase's opening moves — PR #15 "server groundwork" (API server, typed client,
-deploy recipes for Lightsail + Cloudflare Pages), PR #14 instructor manual
-grading for open questions, and grade-release gating (students see no grades
-until released). These touch the persistence/submission/grading seams the
-buildout depends on. Same drill as iteration 18: delegate the merge to one
-agent (both-sides-preserved, gates green before commit, report semantic
-collisions + what the server groundwork means for the harness/tools), verify
-independently, THEN proceed to S3 (below) if budget remains — otherwise S3 is
-the next iteration.
+## Do this next — P4.2: multi-arena navigation grading
 
-## P1.8 S3 (router: lanes + the XOR floor)
+Files are disjoint from the concurrent session's (engine/turbot.ts, grader.ts,
+turbotCheck, types) but BUILD AND GATE IN AN ISOLATED WORKTREE anyway (tree
+contention above), merging back only when the shared tree is quiet.
 
-Per `designs/wire-routing.md` + three pinned exhibits, S3 now has a full
-mechanism map. Scope:
-1. **Foreign-lane A* cost** (W_LANE; calibration capped at two sweep rounds,
-   fall back to H4-only) — kills hug-lanes generally.
-2. **The XOR fallback floor**: fix candidates — exempt the wire's OWN
-   endpoint-component bounds on first/last approach edges, or lengthen stubs
-   past inset+margin. Expected post-fix budget ≈ 3 (ratchet
-   `EXPECTED_FALLBACKS` DOWN deliberately).
-3. **Bumpless-crossing class**: hug lanes at port±ELEMENT_MARGIN(5) ≡ R=5
-   bump-skip radius — break the coincidence. Acceptance: `tools/bumpCheck.ts`
-   clean on ALL CC/SC fixtures (exhibits: hw2-p11 6, hw3-p12 17+12), then
-   wire bumpCheck into `npm run check`.
-4. **Obstacle-model gap**: INPUT toggle-tabs aren't router obstacles
-   (hw3-p12 wire pmo-36 elbows through IN2's tab) — add to obstacle bounds.
-5. **H4 near-merge validation round** with the oracle's `collinearOverlap`;
-   thresholds ≥0.5px (elbows integer-round over fractional trunks); decide
-   the hw3-p9 (1375,757) bump-adjacent dot-skip (moot or tune).
-Gates per slice: `npm run check` (edit routerCheck pins DELIBERATELY
-downward) + tsc + build + coverage (46/56, 0 regressed) + layoutCheck +
-browser spot-check of moved routes (serial, ONE agent).
-
-**Queue-jump decision for the iteration after S3:** P1.15 (real app bug — SC
-sim state leaks across question navigation; only TM+turbot slices reset;
-deep fix = ONE unified all-modes sim reset in the store) — but the appearance
-agent flagged a chip for Gabriel, who fixed the TM twin himself yesterday in
-a parallel session. CHECK `git log origin/main` for his fix before building;
-if untaken by then, P1.15 beats S4/P4.x on user impact.
+The task: navigation problems demand generality — Mad Max ("unknown
+distance"), Way Finder ("any non-branching maze"), Desert Ant. The data model
+already holds a LIST (`turbot_cases`); verify/complete the grader's
+all-arenas-must-pass semantics and prove it has teeth.
+**Acceptance:** a single-layout-only brain (hardcoded step count) PASSES a
+1-arena family but FAILS a multi-arena family through `gradeTurbot`; grader
+requires every arena; per-arena results readable in the gradebook drill-down
+(already built for turbots — verify it renders multi-arena). Add turbotCheck
+pins. Check first what already works — this may be mostly a verification +
+pins task (the grader loops `turbot_cases` already; the authoring UI edits
+only ONE arena — the multi-arena AUTHORING gap is P4.3's problem, fixtures
+can hand-author the list).
 
 ## Then
 
-P1.8 S4 (fallback phase-0 + lane-nudge + per-wire `usedFallback`) → P4.2
-multi-arena navigation grading (grader must require ALL arenas in
-`turbot_cases`; acceptance: single-layout solution fails the family) → P4.3
-nav arenas + plausible brains (zig-zag FSM is printed in HW4 — free; main's
-turbot rework grades all four inner modes; 2-bit motor labels canonical via
+P4.3 nav arenas + plausible brains (9 rows: hw2-p13..15 CC, hw3-p13..15 SC,
+hw4-p12..14 FSM; zig-zag FSM printed in HW4 = free; 2-bit motor labels via
 `turbotFsmNotation`, default `0:11`) → P4.4 turbot sandbox tab (optional) →
-P5.1 Desert Ant capstone (interface proof, NOT a solved ant) → smalls (P1.5
-allowed_components, P1.6 cc.ts label-order, P1.11 ARG multi-group, P1.15 if
-still open, P1.16 rotated-MEM labels) → P6 close-out. META-audit-queue due
+P5.1 Desert Ant capstone (interface proof) → smalls (P1.5, P1.6, P1.11, P1.15
+SC-sim-leak unified reset — CHECK main for Gabriel's fix first, P1.16
+rotated-MEM labels) → P6 close-out incl. P6.3 server↔engine parity pin and
+P6.4 Remote-store cutover (Gabriel's timing). META-audit-queue due
 ~iteration 23.
 
 ## Watch out for
 
-- **Fetch main first** every iteration (`git rev-list --count
-  HEAD..origin/main`); Gabriel ships from parallel sessions — merge before
-  building. Check specifically for a P1.15 fix landing.
-- **Runaway fix agents:** hard bar + stop rule in every fix-agent prompt
-  (iteration-19 annealer, 200k tokens). Iteration-20's bounded agent HONORED
-  its stop rule and returned a root cause instead of a spiral — that's the
-  template (LOG 20).
+- **Fetch main + `git status` for foreign WIP at the START of every
+  iteration** (memory: project-shared-worktree-concurrency). Main moves
+  several times a day; the tree may be shared with live sessions.
+- **Runaway fix agents:** hard bar + stop rule in every fix-agent prompt; the
+  iteration-20 bounded-diagnosis agent is the template.
 - **Interface tier, not answer-chasing** — free correct machines excepted.
-- **Perception grades OUTSIDE the codec**; coverageCheck's Stage-1 mirror
-  matches gradeQuestion's dispatch (open → perception → turbot → codec).
-- **routerCheck pins are now MECHANISM-NAMED** (XOR floor) — S3 ratchets them
-  down; never raise without a diagnosis like iteration 20's.
-- **Rotated MEMs are sanctioned** (first-class `rotation` field,
-  rotation-aware port math, validated end-to-end on hw3-p12); known cosmetic
-  issue: label bisection (P1.16).
-- **`turbotFsmNotation` single grammar answer**; 1-bit = alias BY DESIGN
-  (main's contrary pin was flipped — still flagged for Gabriel).
+- **routerCheck pins are mechanism-named** (XOR floor; 147 total). The
+  concurrent S3 session will repin ≈3 — expect that diff, don't fight it.
+- **Perception grades OUTSIDE the codec**; Stage-1 mirror in lockstep with
+  gradeQuestion's dispatch (open → perception → turbot → codec).
+- **Server exists now:** engine changes must keep `server npm run check`
+  green too (it imports app engine sources cross-package); P6.3 will pin
+  parity formally.
+- **Rotated MEMs sanctioned**; P1.16 label bisection open. **turbotFsmNotation
+  single grammar answer**; 1-bit = alias BY DESIGN (flagged for Gabriel).
 - **notationCheck grep gate**, **scWindowCheck**, **tmCheck**,
-  **perceptionCheck** green; `bumpCheck.ts` NOT a gate until S3.
-- iteration-16 `validateSegmentPosition` drag-halo side effect: benign,
-  unswept.
+  **perceptionCheck**, **serverCheck** green; `bumpCheck.ts` NOT a gate until
+  S3 lands.
 - **Ops:** 529 → `Workflow({scriptPath, resumeFromRunId})`; commit landed
-  slices before long agent runs; serial browser work = ONE agent.
-- **Appearance recipe v3**; seeds from `app/public/` at `/making-minds/`;
-  clean keys twice; delete seed JSONs + dist copies.
+  slices early; serial browser work = ONE agent; appearance recipe v3 (seeds
+  from `app/public/`, clean keys twice, delete seed JSONs).
 - `tsx` missing → `npm install`; no lockfile churn.
