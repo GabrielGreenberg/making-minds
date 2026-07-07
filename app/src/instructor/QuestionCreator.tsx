@@ -5,7 +5,14 @@ import type {
   RepSystem,
   ArenaConfig,
   TurbotSuccessCriterion,
+  PerceptionRule,
 } from '../types';
+import {
+  buildPerceptionCases,
+  describePerceptionRule,
+  MAX_PERCEPTION_WIDTH,
+  MIN_PERCEPTION_WIDTH,
+} from '../engine/perception';
 import { getAssignment } from '../assignments';
 import { ArenaCanvas } from '../components/ArenaCanvas';
 import { blankArena, resizeArena, setArenaCell, placeStart, MAX_ARENA_SIZE } from './arenaEditing';
@@ -87,6 +94,21 @@ function blankInput(): AuthoredInputGroup {
 // a grading representation, so it isn't offered here).
 const REPS: RepSystem[] = ['binary', 'tally'];
 
+// Perception rules, by the mode they belong to: run rules & patterns are
+// spatial (one CC frame), change & motion are temporal (an SC frame stream).
+type PerceptionKind = PerceptionRule['kind'];
+const PERCEPTION_KINDS: Record<'CC' | 'SC', { kind: PerceptionKind; label: string }[]> = {
+  CC: [
+    { kind: 'min-run', label: 'At least k consecutive 1s (edge detector)' },
+    { kind: 'exact-run', label: 'Exactly k consecutive 1s (object detector)' },
+    { kind: 'pattern', label: 'Match an exact pattern (landmark recognition)' },
+  ],
+  SC: [
+    { kind: 'change', label: 'Change detector (input differs from previous)' },
+    { kind: 'motion', label: 'Motion detector (object moving upwards)' },
+  ],
+};
+
 export function QuestionCreator({ assignmentId, existingQuestion, onSave, onCancel }: Props) {
   // Mode is an ordinary field of the shared form: new questions default to CC,
   // existing ones keep their mode. Switching it must NOT reset the groups/formulas
@@ -119,6 +141,27 @@ export function QuestionCreator({ assignmentId, existingQuestion, onSave, onCanc
     return `Problem ${count + 1}`;
   });
   const [statement, setStatement] = useState(existingQuestion?.statement ?? '');
+
+  // ── Perception fields (CC/SC questions with task === 'perception') ──
+  // Perception questions grade raw bit frames against a rule, not a formula
+  // (engine/perception.ts); representation is implicitly binary bits.
+  const [task, setTask] = useState<'function' | 'perception'>(
+    existingQuestion?.perception ? 'perception' : 'function',
+  );
+  const [pKind, setPKind] = useState<PerceptionKind>(
+    existingQuestion?.perception?.rule.kind ?? 'min-run',
+  );
+  const [pWidth, setPWidth] = useState<number>(existingQuestion?.perception?.width ?? 8);
+  const [pRunLength, setPRunLength] = useState<number>(() => {
+    const r = existingQuestion?.perception?.rule;
+    if (r?.kind === 'min-run' || r?.kind === 'exact-run') return r.runLength;
+    if (r?.kind === 'motion') return r.objectLength;
+    return 3;
+  });
+  const [pPattern, setPPattern] = useState<string>(() => {
+    const r = existingQuestion?.perception?.rule;
+    return r?.kind === 'pattern' ? r.pattern : '';
+  });
 
   // ── Turbot-only fields (mode === 'turbot') ─────────────────────
   // One primary arena per question for now; the data model (`turbot_cases`)
@@ -157,7 +200,37 @@ export function QuestionCreator({ assignmentId, existingQuestion, onSave, onCanc
   // ── Live, per-keystroke validation (all O(#groups), no space enumeration) ──
   const isTurbot = mode === 'turbot';
   const isOpen = mode === 'open';
-  const structuralErrors = isTurbot || isOpen ? [] : validateGroups(inputs, outputs, rep, mode);
+  const canPerceive = mode === 'CC' || mode === 'SC';
+  const isPerception = canPerceive && task === 'perception';
+
+  // The rule kind must match the mode's family; coerce when the mode flips.
+  const kindChoices = mode === 'CC' || mode === 'SC' ? PERCEPTION_KINDS[mode] : [];
+  const kind: PerceptionKind = kindChoices.some((k) => k.kind === pKind)
+    ? pKind
+    : (mode === 'SC' ? 'change' : 'min-run');
+
+  // The effective retina width: a pattern rule's width IS its pattern length.
+  const effWidth = kind === 'pattern' ? pPattern.length : pWidth;
+  const rule: PerceptionRule =
+    kind === 'min-run' ? { kind, runLength: pRunLength } :
+    kind === 'exact-run' ? { kind, runLength: pRunLength } :
+    kind === 'pattern' ? { kind, pattern: pPattern } :
+    kind === 'change' ? { kind } :
+    { kind: 'motion', objectLength: pRunLength };
+
+  const perceptionError = !isPerception
+    ? null
+    : kind === 'pattern' && !/^[01]+$/.test(pPattern)
+      ? 'The pattern must be a non-empty string of 0s and 1s.'
+      : effWidth < MIN_PERCEPTION_WIDTH || effWidth > MAX_PERCEPTION_WIDTH
+        ? `The number of inputs must be between ${MIN_PERCEPTION_WIDTH} and ${MAX_PERCEPTION_WIDTH}.`
+        : (kind === 'min-run' || kind === 'exact-run' || kind === 'motion') &&
+            (pRunLength < 1 || pRunLength > effWidth)
+          ? 'The run length must be between 1 and the number of inputs.'
+          : null;
+
+  const structuralErrors =
+    isTurbot || isOpen || isPerception ? [] : validateGroups(inputs, outputs, rep, mode);
   const structurallyValid = structuralErrors.length === 0;
   const isCC = mode === 'CC';
   const tooLarge = isCC && countCombos(inputs) > MAX_COMBOS;
@@ -172,7 +245,7 @@ export function QuestionCreator({ assignmentId, existingQuestion, onSave, onCanc
 
   // Single-input evaluation: cheap, and enough to catch formula syntax/reference
   // errors. Only run when the group shapes are valid.
-  const probe = structurallyValid && !isTurbot && !isOpen
+  const probe = structurallyValid && !isTurbot && !isOpen && !isPerception
     ? probeFormulas(inputs, outputs, rep, probeValues, mode)
     : null;
   const formulasOk = probe ? probe.outputErrors.every((e) => e == null) : false;
@@ -193,7 +266,9 @@ export function QuestionCreator({ assignmentId, existingQuestion, onSave, onCanc
       ? true
       : isTurbot
         ? maxSteps >= 1 && !arenaError
-        : structurallyValid && !tooLarge && formulasOk);
+        : isPerception
+          ? !perceptionError
+          : structurallyValid && !tooLarge && formulasOk);
 
   // ── Group editing helpers ──────────────────────────────────────
   const updateInput = (i: number, patch: Partial<AuthoredInputGroup>) =>
@@ -234,6 +309,28 @@ export function QuestionCreator({ assignmentId, existingQuestion, onSave, onCanc
         representation: rep,
         innerMode,
         turbot_cases: [{ arena, maxSteps, criterion }],
+      });
+      return;
+    }
+
+    // Perception questions carry a rule + generated bit-level frame bank; the
+    // representation is implicitly binary (raw bits, no numeral system).
+    if (isPerception) {
+      let perception_cases;
+      try {
+        perception_cases = buildPerceptionCases({ rule, width: effWidth });
+      } catch (e) {
+        setSaveError(e instanceof Error ? e.message : 'Could not generate perception cases.');
+        return;
+      }
+      onSave({
+        id: newId,
+        label: label.trim(),
+        statement: statement.trim(),
+        buildMode: mode,
+        representation: 'binary',
+        perception: { rule, width: effWidth },
+        perception_cases,
       });
       return;
     }
@@ -311,7 +408,25 @@ export function QuestionCreator({ assignmentId, existingQuestion, onSave, onCanc
             ))}
           </div>
         </div>
-        {!isTurbot && !isOpen && (
+        {canPerceive && (
+          <div className="instructor-section-head">
+            <h4 className="instructor-subhead">Task</h4>
+            <div className="instructor-encoding-toggle">
+              {(['function', 'perception'] as const).map((t) => (
+                <button
+                  key={t}
+                  className={
+                    'instructor-encoding-btn' + (task === t ? ' instructor-encoding-btn--active' : '')
+                  }
+                  onClick={() => setTask(t)}
+                >
+                  {t === 'function' ? 'Function' : 'Perception'}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+        {!isTurbot && !isOpen && !isPerception && (
           <div className="instructor-section-head">
             <h4 className="instructor-subhead">Representation</h4>
             <RepToggle value={rep} onChange={setRep} />
@@ -454,8 +569,83 @@ export function QuestionCreator({ assignmentId, existingQuestion, onSave, onCanc
         </>
       )}
 
+      {/* Perception: rule + retina size (replaces the value-based
+          inputs/target-function pipeline below; grading is raw bits) */}
+      {isPerception && (
+        <section className="instructor-creator-section">
+          <div className="instructor-section-head">
+            <h4 className="instructor-subhead">Perception rule</h4>
+          </div>
+          <p className="instructor-hint">
+            The machine's inputs are an array of stimulations (like light hitting a retina) and
+            its single output classifies them. Grading feeds raw bit patterns
+            {mode === 'SC' ? ' — one frame per clock tick — ' : ' '}to the circuit and checks the
+            output bit{mode === 'SC' ? ' at every step. The "previous input" before the first frame is all 0s (what fresh MEM blocks hold).' : '.'}
+          </p>
+          <div className="instructor-criterion-row">
+            <select
+              className="instructor-input"
+              value={kind}
+              onChange={(e) => setPKind(e.target.value as PerceptionKind)}
+            >
+              {kindChoices.map((k) => (
+                <option key={k.kind} value={k.kind}>{k.label}</option>
+              ))}
+            </select>
+            {(kind === 'min-run' || kind === 'exact-run' || kind === 'motion') && (
+              <label className="instructor-inline-field">
+                {kind === 'motion' ? 'object length' : 'run length k'}
+                <input
+                  className="instructor-input instructor-input--num"
+                  type="number"
+                  min={1}
+                  max={effWidth}
+                  value={pRunLength}
+                  onChange={(e) => setPRunLength(Math.max(1, Math.trunc(Number(e.target.value)) || 1))}
+                />
+              </label>
+            )}
+            {kind === 'pattern' ? (
+              <label className="instructor-inline-field">
+                pattern
+                <input
+                  className="instructor-input"
+                  placeholder="e.g. 110010111"
+                  value={pPattern}
+                  onChange={(e) => setPPattern(e.target.value.replace(/[^01]/g, ''))}
+                />
+              </label>
+            ) : (
+              <label className="instructor-inline-field">
+                inputs
+                <input
+                  className="instructor-input instructor-input--num"
+                  type="number"
+                  min={MIN_PERCEPTION_WIDTH}
+                  max={MAX_PERCEPTION_WIDTH}
+                  value={pWidth}
+                  onChange={(e) => setPWidth(Math.trunc(Number(e.target.value)) || 0)}
+                />
+              </label>
+            )}
+          </div>
+          {kind === 'pattern' && (
+            <p className="instructor-hint">
+              The number of inputs equals the pattern length ({effWidth || '—'}).
+            </p>
+          )}
+          {perceptionError ? (
+            <p className="instructor-preview-warning">{perceptionError}</p>
+          ) : (
+            <p className="instructor-hint">
+              Rule: {describePerceptionRule(rule)}. The circuit needs {effWidth} inputs and 1 output.
+            </p>
+          )}
+        </section>
+      )}
+
       {/* Inputs */}
-      {!isTurbot && !isOpen && (
+      {!isTurbot && !isOpen && !isPerception && (
       <>
       <section className="instructor-creator-section">
         <div className="instructor-section-head">

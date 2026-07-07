@@ -150,16 +150,27 @@ export interface AssignmentQuestion {
   // (hand-authored, not enumerated — see engine/turbot.ts + grader.ts).
   innerMode?: BuildMode;
   turbot_cases?: TurbotTestCase[];
+  // Perception-only fields (buildMode CC or SC). A perception question grades
+  // at the BIT level, not through the value codec: the input is a raw array of
+  // stimulations across `width` input wires (an SC gets one frame per time
+  // step) and the single output bit classifies it. `perception` carries the
+  // authored rule; `perception_cases` the generated bit-level bank (see
+  // engine/perception.ts + gradePerception in grader.ts).
+  perception?: PerceptionSpec;
+  perception_cases?: PerceptionTestCase[];
   notes?: string;
 }
 
 /**
  * Display label for a question's mode chip. A turbot question names its inner
  * machine too ("turbot - TM"), since the brain's mode is what the student
- * actually edits.
+ * actually edits; a perception question flags its bit-level task.
  */
-export function questionModeLabel(q: Pick<AssignmentQuestion, 'buildMode' | 'innerMode'>): string {
-  return q.buildMode === 'turbot' ? `turbot - ${q.innerMode ?? 'CC'}` : q.buildMode;
+export function questionModeLabel(
+  q: Pick<AssignmentQuestion, 'buildMode' | 'innerMode' | 'perception'>,
+): string {
+  if (q.buildMode === 'turbot') return `turbot - ${q.innerMode ?? 'CC'}`;
+  return q.perception ? `${q.buildMode} - perception` : q.buildMode;
 }
 
 export interface AssignmentData {
@@ -220,6 +231,9 @@ export interface QuestionResult {
   // Populated instead of `cases` for turbot questions — arena grading
   // doesn't produce an f(x) value comparison, so it gets its own result shape.
   turbotCases?: TurbotCaseResult[];
+  // Populated instead of `cases` for perception questions — bit-level frame
+  // grading, no value comparison (see engine/perception.ts).
+  perceptionCases?: PerceptionCaseResult[];
 }
 
 /** Grading outcome for a full submission. */
@@ -526,6 +540,46 @@ export interface TurbotCaseResult {
   finalPosition: { x: number; y: number; facing: TurbotOrientation };
   hitStepLimit: boolean;
   reason?: string;
+}
+
+// ─── Perception helpers ─────────────────────────────────────────────
+// A perception question (buildMode CC or SC) treats the machine's inputs as an
+// array of stimulations hitting a retina and its single output as a symbol
+// classifying the stimulus. Grading is bit-level (raw frames in, one bit out
+// per step) — it bypasses the value codec entirely (engine/perception.ts).
+
+/** The classification rule a perception question tests. */
+export type PerceptionRule =
+  | { kind: 'min-run'; runLength: number }    // CC: ≥ k consecutive 1s anywhere
+  | { kind: 'exact-run'; runLength: number }  // CC: a maximal run of exactly k 1s
+  | { kind: 'pattern'; pattern: string }      // CC: input equals this exact bit string
+  | { kind: 'change' }                        // SC: current frame differs from the previous
+  | { kind: 'motion'; objectLength: number }; // SC: a k-long object moving up 1/step
+
+/** Authored perception spec: the rule plus the retina size (# input wires). */
+export interface PerceptionSpec {
+  rule: PerceptionRule;
+  width: number;
+}
+
+/**
+ * One bit-level perception grading case. `frames[t]` is the full input
+ * bit-vector for time step t (IN1 first); a CC case has exactly one frame.
+ * `expected[t]` is the required output bit at step t (parallel to `frames`).
+ */
+export interface PerceptionTestCase {
+  frames: number[][];
+  expected: number[];
+}
+
+/** Grading outcome for one perception case (parallel to CaseResult, bit-level shape). */
+export interface PerceptionCaseResult {
+  pass: boolean;
+  frames: number[][];
+  expected: number[];
+  got: number[];
+  failStep?: number;   // 1-based first mismatching time step
+  reason?: string;     // machine-validation rejection, when grading never ran
 }
 
 // ─── MEM direction helpers ──────────────────────────────────────────

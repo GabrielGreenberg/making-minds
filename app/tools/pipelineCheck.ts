@@ -1,5 +1,5 @@
 // Headless end-to-end check of the autograding pipeline for CC, SC, FSM, TM,
-// turbot, and open questions.
+// turbot, perception, and open questions.
 //
 //   npx tsx tools/pipelineCheck.ts
 //
@@ -31,8 +31,11 @@ for (const q of assignment.questions) {
     console.log(`  ${q.label}: open question (manual review)`);
     continue;
   }
-  const n = q.buildMode === 'turbot' ? q.turbot_cases?.length : q.test_cases?.length;
-  console.log(`  ${q.label}: ${n ?? 0} ${q.buildMode === 'turbot' ? 'arenas' : 'test cases'}`);
+  const n = q.buildMode === 'turbot' ? q.turbot_cases?.length
+    : q.perception ? q.perception_cases?.length
+    : q.test_cases?.length;
+  const unit = q.buildMode === 'turbot' ? 'arenas' : q.perception ? 'perception cases' : 'test cases';
+  console.log(`  ${q.label}: ${n ?? 0} ${unit}`);
 }
 
 console.log('\n[correct submission]');
@@ -48,7 +51,7 @@ for (const q of correct.questions) {
   }
 }
 const cs = summarizeResult(correct);
-check('correct: 8/8 autograded questions', cs.questionsPassed === 8 && cs.questionsTotal === 8);
+check('correct: 13/13 autograded questions', cs.questionsPassed === 13 && cs.questionsTotal === 13);
 
 console.log('\n[incorrect submission]');
 const wrong = gradeSubmission(assignment, buildIncorrectSubmission());
@@ -63,7 +66,7 @@ for (const q of wrong.questions) {
   }
 }
 const ws = summarizeResult(wrong);
-check('incorrect: 0/8 autograded questions', ws.questionsPassed === 0 && ws.questionsTotal === 8);
+check('incorrect: 0/13 autograded questions', ws.questionsPassed === 0 && ws.questionsTotal === 13);
 
 console.log(`\n${failures === 0 ? 'PIPELINE OK' : `PIPELINE FAILED (${failures} checks)`}`);
 process.exit(failures === 0 ? 0 : 1);
