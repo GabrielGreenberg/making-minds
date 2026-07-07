@@ -132,6 +132,12 @@ export interface CCSpec {
 export interface TestCase {
   inputs: number[];
   outputs: number[];
+  /** Optional tape-layout hint (TM/tape axis only; other axes ignore it):
+   *  background gap AFTER each input block except the last — for two inputs,
+   *  one entry. Absent = the codec's default single-cell separator. Lets a
+   *  bank test robustness to arbitrary block separation (e.g. HW5 P4: "do not
+   *  assume the blocks are separated by exactly one empty cell"). */
+  separations?: number[];
 }
 
 export interface AssignmentQuestion {
@@ -141,6 +147,10 @@ export interface AssignmentQuestion {
   buildMode: BuildMode;        // canvas mode for this question (CC, SC, FSM, turbot, …)
   representation: RepSystem;   // authoritative for grading (binary | tally; TM notation: tally→unary)
   allowed_components?: ComponentType[];
+  /** TM-mode acceptance strictness: when true, a run is accepted only if the
+   *  head halts on the output block's rightmost cell (standard position —
+   *  tmCodec `AcceptOptions`). Absent/false = position-agnostic (default). */
+  requireStandardHaltPosition?: boolean;
   cc_spec?: CCSpec;            // authoring spec; source of group widths + generates test_cases at save
   test_cases?: TestCase[];     // value-based grading cases (one bank, all modes — see TestCase)
   // Turbot-only fields (buildMode === 'turbot'). A turbot question's "circuit"
@@ -425,12 +435,14 @@ export function toSubscript(n: number): string {
   return String(n).split('').map(d => subscripts[parseInt(d)] || d).join('');
 }
 
-/** FSM history entry for one time step */
+/** FSM history entry for one time step. Single-bit symbols are carried as
+ *  numbers (the classic k=1 machine); k-bit input/output symbols ('10') are
+ *  carried as strings. */
 export interface FsmHistoryEntry {
   t: number;
   stateLabel: string;
-  input: number;
-  output: number;
+  input: number | string;
+  output: number | string;
   nextStateLabel: string;
 }
 
@@ -442,10 +454,12 @@ export interface ParsedTransition {
 
 // ─── TM helpers ─────────────────────────────────────────────────────
 // A Turing machine reuses the FSM editor (STATE components + transition
-// wires). Transition labels use the grammar "input:action" where action is a
-// single **dual action** — a write symbol (0/1, and `*` for binary machines)
-// followed by a move direction (R right, L left), e.g. "1:0R": every step
-// both writes and moves (spec §10.3). See CLAUDE_KB/engines/tm.md.
+// wires). Transition labels use the two-output grammar "read:write,move"
+// (spec §10.3): one read symbol (0/1, and `*` for binary machines) drives a
+// write symbol and a move direction (R right, L left), e.g. "1:0,R". The two
+// outputs execute as ONE atomic step — every step both writes and moves. The
+// legacy dual-action spelling "1:0R" is accepted as an alias and decays on
+// edit-save (engine/notation.ts). See CLAUDE_KB/engines/tm.md.
 
 /**
  * Tape alphabet. Unary machines use only `'0'` / `'1'`; binary machines may
@@ -474,7 +488,7 @@ export interface TmHistoryEntry {
   t: number;
   stateLabel: string;
   read: TMSymbol;        // symbol read from the cell under the head
-  action: string;        // raw dual-action token, e.g. "0R" (write '0', move right)
+  action: string;        // canonical action text, e.g. "0,R" (write '0', move right)
   headBefore: number;    // head position before the action
   nextStateLabel: string;
 }

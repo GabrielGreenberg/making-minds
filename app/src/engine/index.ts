@@ -14,13 +14,21 @@ export {
 export type { CCEvalResult } from './cc';
 export { evaluateSCSingleStep, evaluateSCSequence } from './sc';
 export type { SCSingleStepResult } from './sc';
-export { sortStateComponents, evaluateFSMSingleStep, evaluateFSMSequence } from './fsm';
-export type { FSMStepResult, FSMEvalResult } from './fsm';
+export {
+  sortStateComponents,
+  evaluateFSMSymbolStep,
+  evaluateFSMSymbolSequence,
+  evaluateFSMSingleStep,
+  evaluateFSMSequence,
+} from './fsm';
+export type {
+  FSMStepResult,
+  FSMEvalResult,
+  FSMSymbolStepResult,
+  FSMSymbolEvalResult,
+} from './fsm';
 export {
   readCell,
-  isSymbolForNotation,
-  parseTMAction,
-  parseTMTransition,
   applyAction,
   evaluateTMSingleStep,
   evaluateTMSequence,
@@ -32,8 +40,22 @@ export type {
   TMTape,
   TMStepResult,
   TMEvalResult,
-  ParsedTMTransition,
 } from './tm';
+export {
+  fsmNotation,
+  turbotFsmNotation,
+  tmNotation,
+  turbotInternalNotation,
+  turbotExternalNotation,
+  inputCharTokens,
+  validateTransitionTable,
+} from './notation';
+export type {
+  TransitionNotation,
+  ParsedTransition as ParsedTransitionLabel,
+  OutputField,
+  TableError,
+} from './notation';
 export { validateTMTable } from './tmValidate';
 export type { TMValidationError, TMValidationKind } from './tmValidate';
 export { encodeTM, acceptTM, decodeTM, notationForRepresentation } from './tmCodec';
@@ -49,6 +71,7 @@ export {
 export {
   axisForMode,
   stepCountFor,
+  timeOutputBits,
   encodeInput,
   decodeOutput,
   outputAccepted,
@@ -74,7 +97,6 @@ export {
   applyTurbotTapeAction,
   validateTurbotTM,
   validateTurbotFSM,
-  parseTurbotFSMLabel,
   TURBOT_FORWARD,
   TURBOT_TURN_RIGHT,
   TURBOT_TURN_LEFT,

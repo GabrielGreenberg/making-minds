@@ -1,5 +1,6 @@
 import { useRef, useState, useCallback, useEffect, useMemo } from 'react';
-import { useStore, selectTmNotation, selectEffectiveMode } from '../store';
+import { useStore, selectEffectiveMode, selectTransitionNotationForSource } from '../store';
+import { inputCharTokens } from '../engine';
 import type {
   CircuitComponent,
   Wire,
@@ -10,109 +11,31 @@ import type {
 } from '../types';
 import {
   GRID_SIZE,
-  COMP_WIDTH,
-  COMP_HEIGHT,
   PORT_RADIUS,
-  INPUT_OUTPUT_SIZE,
   STATE_RADIUS,
-  STATE_SIZE,
   isMemSourcePort,
   isMemSinkPort,
 } from '../types';
 import { v4 as uuid } from 'uuid';
-import { routeAllWires, validateSegmentPosition, type WireRouteInput } from '../wireRouter';
+import {
+  routeAllWires,
+  validateSegmentPosition,
+  findDivergencePoints,
+  SPLIT_DOT_RADIUS,
+  type WireRouteInput,
+  type DisplayedWirePath,
+} from '../wireRouter';
 
 // ─── Geometry helpers ─────────────────────────────────────────────
+// Rendered dimensions + port math live in componentGeometry.ts — the single
+// source of truth shared with wireRouter (obstacle bounds) and
+// tools/layoutCheck (the appearance oracle). Never redefine them here.
 
-function getCompDimensions(comp: CircuitComponent): { w: number; h: number } {
-  if (comp.type === 'INPUT' || comp.type === 'OUTPUT') {
-    return { w: INPUT_OUTPUT_SIZE, h: INPUT_OUTPUT_SIZE };
-  }
-  if (comp.type === 'NOT') {
-    return { w: 55, h: 50 };
-  }
-  if (comp.type === 'HA') {
-    return { w: COMP_WIDTH, h: COMP_HEIGHT + 10 };
-  }
-  if (comp.type === 'MEM') {
-    return { w: 50, h: 50 };
-  }
-  if (comp.type === 'STATE') {
-    if (comp.boxedCircuitId) return { w: 90, h: 50 };
-    return { w: STATE_SIZE, h: STATE_SIZE };
-  }
-  return { w: COMP_WIDTH, h: COMP_HEIGHT };
-}
-
-/** Unrotated port position (absolute coords). */
-function getPortPositionLocal(
-  comp: CircuitComponent,
-  portId: string
-): { x: number; y: number } {
-  const port = comp.ports.find((p) => p.id === portId);
-  if (!port) return { x: comp.x, y: comp.y };
-
-  // STATE: ports on left/right
-  if (comp.type === 'STATE') {
-    if (comp.boxedCircuitId) {
-      // Boxed FSM instance: ports at left/right center of the rectangle
-      const { w, h } = getCompDimensions(comp);
-      const midY = comp.y + h / 2;
-      switch (portId) {
-        case 'left':  return { x: comp.x,     y: midY };
-        case 'right': return { x: comp.x + w, y: midY };
-        default:      return { x: comp.x + w / 2, y: midY };
-      }
-    }
-    const cx = comp.x + STATE_RADIUS;
-    const cy = comp.y + STATE_RADIUS;
-    switch (portId) {
-      case 'in':
-      case 'left':  return { x: cx - STATE_RADIUS, y: cy };
-      case 'out':
-      case 'right': return { x: cx + STATE_RADIUS, y: cy };
-      default:      return { x: cx, y: cy };
-    }
-  }
-
-  const { w, h } = getCompDimensions(comp);
-  const portsOnSide = comp.ports.filter((p) => p.side === port.side);
-  const spacing = h / (portsOnSide.length + 1);
-
-  let localX = port.side === 'left' ? 0 : w;
-  const localY = spacing * (port.index + 1);
-
-  if (port.side === 'left' && (comp.type === 'OR' || comp.type === 'XOR')) {
-    const xorOffset = comp.type === 'XOR' ? 6 : 0;
-    localX = xorOffset + w * 0.07;
-  }
-
-  return { x: comp.x + localX, y: comp.y + localY };
-}
-
-/** Rotated port position (absolute coords). */
-function getPortPosition(
-  comp: CircuitComponent,
-  portId: string
-): { x: number; y: number } {
-  const local = getPortPositionLocal(comp, portId);
-  const rotation = comp.rotation ?? 0;
-  if (rotation === 0) return local;
-
-  const { w, h } = getCompDimensions(comp);
-  const cx = comp.x + w / 2;
-  const cy = comp.y + h / 2;
-  const dx = local.x - cx;
-  const dy = local.y - cy;
-  const rad = (rotation * Math.PI) / 180;
-  const cosA = Math.cos(rad);
-  const sinA = Math.sin(rad);
-
-  return {
-    x: cx + dx * cosA - dy * sinA,
-    y: cy + dx * sinA + dy * cosA,
-  };
-}
+import {
+  getComponentSize as getCompDimensions,
+  getPortPosition,
+  getPortPositionLocal,
+} from '../componentGeometry';
 
 const PORT_HIT_RADIUS = 20;
 
@@ -1219,55 +1142,41 @@ function FsmTransitionView({
   onSnapGuides: (guides: AlignGuide[]) => void;
 }) {
   const [editing, setEditing] = useState(false);
-  const [editLeft, setEditLeft] = useState('0');
-  const [editRight, setEditRight] = useState('0');
-  const [editWrite, setEditWrite] = useState('0');
-  // Second right-half sub-token: base-TM head move (R/L) or a turbot FSM's
-  // right-wheel motor bit (0/1).
-  const [editMove, setEditMove] = useState('R');
-  const [activeField, setActiveField] = useState<'left' | 'right'>('left');
-  // TM only: which half of the combined write+move action is being entered.
-  const [rightSubField, setRightSubField] = useState<'write' | 'move'>('write');
+  // Field 0 = the input symbol; field 1+i = notation.outputFields[i]. Every
+  // field is a fixed-width run of single-character tokens (an FSM question's
+  // k-bit symbol, a TM transition's write+move outputs, a turbot motor pair …),
+  // entered one character at a time.
+  const [editFields, setEditFields] = useState<string[]>(['0', '0']);
+  const [activeField, setActiveField] = useState(0);
+  const [charPos, setCharPos] = useState(0);
   const [dragging, setDragging] = useState(false);
   const editorRef = useRef<HTMLInputElement>(null);
 
-  // Base-TM transitions read a tape symbol and perform one dual action — a
-  // write followed by a move (R/L) — as a single atomic step; FSM transitions
-  // are input:output bits. The base-TM alphabet is tied to the question's
-  // representation (binary: 0/1/*; unary: 0/1). A TURBOT TM is different
-  // (textbook "Turbots: Operation"): single-action labels whose grammar
-  // depends on the SOURCE state's kind — internal reads the tape alphabet
-  // (same notation rule as the base TM) and writes a symbol OR moves;
-  // external senses B/E/F and moves forward (↑) or turns (↱/↰). Turbot-TM
-  // labels edit FSM-style (one char per half).
-  const isTurbotTM = useStore((s) => s.buildMode === 'turbot' && selectEffectiveMode(s) === 'TM');
-  // A turbot FSM's Mealy output is the FULL 2-bit motor code ("in:ij", e.g.
-  // "0:11") — unlike the base FSM's single output bit — so an FSM brain can
-  // issue every movement command, turns included.
-  const isTurbotFSM = useStore((s) => s.buildMode === 'turbot' && selectEffectiveMode(s) === 'FSM');
-  const isTM = useStore((s) => selectEffectiveMode(s) === 'TM') && !isTurbotTM;
-  // The right half holds two characters (base-TM write+move, or a turbot
-  // FSM's 2-bit motor code) and edits as two sub-fields.
-  const twoCharRight = isTM || isTurbotFSM;
-  const sourceExternal = useStore((s) =>
-    isTurbotTM &&
-    s.components.find((c) => c.id === wire.sourceComponentId)?.stateKind === 'external'
-  );
-  const tmNotation = useStore(selectTmNotation);
-  const tmSymbols = tmNotation === 'binary' ? ['0', '1', '*'] : ['0', '1'];
-  const leftTokens = isTurbotTM
-    ? (sourceExternal ? ['B', 'E', 'F'] : tmSymbols)
-    : isTM ? tmSymbols : ['0', '1'];
-  const rightTokens = isTurbotTM
-    ? (sourceExternal ? ['↑', '↱', '↰'] : [...tmSymbols, 'R', 'L'])
-    : ['0', '1'];
-  const writeTokens = isTurbotFSM ? ['0', '1'] : tmSymbols;
-  const moveTokens = isTurbotFSM ? ['0', '1'] : ['R', 'L'];
-  const defaultTransitionLabel = isTurbotTM
-    ? (sourceExternal ? 'E:↑' : '0:R')
-    : isTM ? '0:0R' : isTurbotFSM ? '0:11' : '0:0';
+  // The label's grammar comes from the notation seam (engine/notation.ts):
+  // the wire's SOURCE state picks the TransitionNotation — FSM sized to the
+  // question's input/output group counts, base TM (two-output write,move;
+  // alphabet tied to the question's representation), turbot-TM per state
+  // kind, turbot-FSM motor labels. Token lists, field widths, and the
+  // default label are all read from that one object; this component never
+  // dissects a label string itself.
+  const notation = useStore((s) =>
+    selectTransitionNotationForSource(s, s.components.find((c) => c.id === wire.sourceComponentId)));
+  const fieldWidths = [notation.inputWidth, ...notation.outputFields.map((f) => f.width)];
+  const fieldTokens = [inputCharTokens(notation), ...notation.outputFields.map((f) => f.tokens)];
+  // Separator rendered between output FIELDS (TM write,move) — mirrors the
+  // stored canonical form, so the label reads exactly as it is stored.
+  const outputSep = notation.outputSeparator ?? '';
+  const totalChars = fieldWidths.reduce((a, b) => a + b, 0) +
+    outputSep.length * (notation.outputFields.length - 1);
+  const lastField = fieldWidths.length - 1;
 
   const label = wire.transitionLabel || '?:?';
+  // Render canonical: a stored legacy alias (turbot-FSM '0:1', dual-action TM
+  // '1:0R') displays as its canonical form ('0:11' / '1:0,R') — the same
+  // string an edit-save would store.
+  const parsedLabel = notation.parse(wire.transitionLabel);
+  const displayLeft = parsedLabel?.input;
+  const displayRight = parsedLabel ? parsedLabel.outputs.join(outputSep) : undefined;
   const color = isSelected ? '#2a7fff' : '#333';
 
   useEffect(() => {
@@ -1276,83 +1185,75 @@ function FsmTransitionView({
     }
   }, [editing]);
 
-  const openEdit = (field: 'left' | 'right') => {
-    const current = wire.transitionLabel || defaultTransitionLabel;
-    const parts = current.split(':');
-    setEditLeft(leftTokens.includes(parts[0]) ? parts[0] : leftTokens[0]);
-    if (twoCharRight) {
-      const action = parts[1] ?? (isTM ? '0R' : '11');
-      setEditWrite(writeTokens.includes(action[0]) ? action[0] : writeTokens[0]);
-      setEditMove(moveTokens.includes(action[1]) ? action[1] : moveTokens[0]);
-      setRightSubField('write');
-    } else {
-      setEditRight(rightTokens.includes(parts[1]) ? parts[1] : rightTokens[0]);
-    }
-    setActiveField(field);
+  const openEdit = (field: number) => {
+    const seed = parsedLabel ?? notation.parse(notation.defaultLabel)!;
+    setEditFields([seed.input, ...seed.outputs]);
+    setActiveField(Math.min(field, lastField));
+    setCharPos(0);
     setEditing(true);
   };
 
-  const commitEdit = (left = editLeft, right = twoCharRight ? `${editWrite}${editMove}` : editRight) => {
+  const commitEdit = (fields = editFields) => {
     setEditing(false);
-    useStore.getState().setTransitionLabel(wire.id, `${left}:${right}`);
+    useStore.getState().setTransitionLabel(
+      wire.id,
+      notation.format({ input: fields[0], outputs: fields.slice(1) }),
+    );
+  };
+
+  const setCharAt = (fields: string[], field: number, pos: number, ch: string): string[] => {
+    const next = [...fields];
+    const chars = next[field].split('');
+    chars[pos] = ch;
+    next[field] = chars.join('');
+    return next;
   };
 
   const handleEditorKeyDown = (e: React.KeyboardEvent) => {
-    const key = e.key.length === 1 ? e.key.toUpperCase() : e.key;
-    if (twoCharRight) {
-      if (activeField === 'left' && leftTokens.includes(e.key)) {
-        e.preventDefault();
-        setEditLeft(e.key);
-        setActiveField('right');
-        setRightSubField('write');
-      } else if (activeField === 'right' && rightSubField === 'write' && writeTokens.includes(key)) {
-        e.preventDefault();
-        setEditWrite(key);
-        setRightSubField('move');
-      } else if (activeField === 'right' && rightSubField === 'move' && moveTokens.includes(key)) {
-        e.preventDefault();
-        // Commit immediately with the new move value so closure captures it
-        setEditing(false);
-        useStore.getState().setTransitionLabel(wire.id, `${editLeft}:${editWrite}${key}`);
-      } else if (e.key === 'Tab' || e.key === 'ArrowRight') {
-        e.preventDefault();
-        if (activeField === 'left') { setActiveField('right'); setRightSubField('write'); }
-        else if (rightSubField === 'write') { setRightSubField('move'); }
-        else { setActiveField('left'); }
-      } else if (e.key === 'ArrowLeft') {
-        e.preventDefault();
-        if (activeField === 'right' && rightSubField === 'move') { setRightSubField('write'); }
-        else if (activeField === 'right' && rightSubField === 'write') { setActiveField('left'); }
-        else { setActiveField('right'); setRightSubField('move'); }
-      } else if (e.key === 'Enter' || e.key === 'Escape') {
-        e.preventDefault();
-        commitEdit();
-      }
-      return;
-    }
+    let key = e.key.length === 1 ? e.key.toUpperCase() : e.key;
     // Turbot-TM external motor tokens aren't typable — accept aliases:
     // F/W/ArrowUp = forward (↑), R = right turn (↱), L = left turn (↰).
-    let rightKey = key;
-    if (isTurbotTM && sourceExternal && activeField === 'right') {
-      if (key === 'F' || key === 'W' || e.key === 'ArrowUp') rightKey = '↑';
-      else if (key === 'R') rightKey = '↱';
-      else if (key === 'L') rightKey = '↰';
+    if (notation.id === 'turbot-external' && activeField > 0) {
+      if (key === 'F' || key === 'W' || e.key === 'ArrowUp') key = '↑';
+      else if (key === 'R') key = '↱';
+      else if (key === 'L') key = '↰';
     }
-    if (activeField === 'left' && leftTokens.includes(key)) {
+    const advance = () => {
+      if (charPos + 1 < fieldWidths[activeField]) {
+        setCharPos(charPos + 1);
+        return true;
+      }
+      if (activeField < lastField) {
+        setActiveField(activeField + 1);
+        setCharPos(0);
+        return true;
+      }
+      return false; // past the last character
+    };
+    if (fieldTokens[activeField].includes(key)) {
       e.preventDefault();
-      setEditLeft(key);
-      setActiveField('right');
-    } else if (activeField === 'right' && rightTokens.includes(rightKey)) {
-      e.preventDefault();
-      // Commit immediately with the new right value so closure captures it
-      setEditing(false);
-      useStore.getState().setTransitionLabel(wire.id, `${editLeft}:${rightKey}`);
+      const next = setCharAt(editFields, activeField, charPos, key);
+      setEditFields(next);
+      // Typing the final character commits immediately (with the fresh value
+      // — the closure would otherwise capture the stale state).
+      if (!advance()) commitEdit(next);
     } else if (e.key === 'Tab' || e.key === 'ArrowRight') {
       e.preventDefault();
-      setActiveField(activeField === 'left' ? 'right' : 'left');
+      if (!advance()) {
+        setActiveField(0);
+        setCharPos(0);
+      }
     } else if (e.key === 'ArrowLeft') {
       e.preventDefault();
-      setActiveField(activeField === 'right' ? 'left' : 'right');
+      if (charPos > 0) {
+        setCharPos(charPos - 1);
+      } else if (activeField > 0) {
+        setActiveField(activeField - 1);
+        setCharPos(fieldWidths[activeField - 1] - 1);
+      } else {
+        setActiveField(lastField);
+        setCharPos(fieldWidths[lastField] - 1);
+      }
     } else if (e.key === 'Enter' || e.key === 'Escape') {
       e.preventDefault();
       commitEdit();
@@ -1473,44 +1374,64 @@ function FsmTransitionView({
       )}
       {/* Transition label — click either half to edit that field */}
       {!editing && (() => {
-        const parts = label.split(':');
-        const lPart = parts[0] ?? '?';
-        const rPart = parts[1] ?? '?';
-        const W = twoCharRight ? 44 : 36; // total width (2-char right half: TM write+move / turbot-FSM motor code)
         const H = 18;
+        if (displayLeft === undefined || displayRight === undefined) {
+          // Unparseable/stale label: show it verbatim as one box; a click
+          // opens the editor seeded from the notation's default.
+          const W = Math.max(36, 16 + 8 * label.length);
+          const x0 = labelPos.x - W / 2;
+          const y0 = labelPos.y - H / 2;
+          return (
+            <g>
+              <rect x={x0} y={y0} width={W} height={H} rx={3}
+                fill="white" fillOpacity={0.92} stroke="#ddd" strokeWidth={0.5} pointerEvents="none" />
+              <rect x={x0} y={y0} width={W} height={H} rx={3} fill="transparent" style={{ cursor: 'text' }}
+                onClick={(e) => { e.stopPropagation(); openEdit(0); }} />
+              <text x={labelPos.x} y={labelPos.y} textAnchor="middle" dominantBaseline="central"
+                fontSize="12" fontFamily="'SF Mono','Fira Code',monospace" fontWeight="600"
+                fill={color} pointerEvents="none">{label}</text>
+            </g>
+          );
+        }
+        // Width scales with the notation's character count (an FSM question's
+        // k-bit symbol, TM's 2-char action, a turbot motor pair).
+        const CHAR_W = 10;
+        const leftW = 8 + CHAR_W * displayLeft.length;
+        const rightW = 8 + CHAR_W * displayRight.length;
+        const W = leftW + rightW;
         const x0 = labelPos.x - W / 2;
         const y0 = labelPos.y - H / 2;
-        const halfW = W / 2;
+        const sepX = x0 + leftW;
         return (
           <g>
             {/* Background */}
             <rect x={x0} y={y0} width={W} height={H} rx={3}
               fill="white" fillOpacity={0.92} stroke="#ddd" strokeWidth={0.5} pointerEvents="none" />
             {/* Left half (input) — click target */}
-            <rect x={x0} y={y0} width={halfW} height={H} rx={3} fill="transparent" style={{ cursor: 'text' }}
-              onClick={(e) => { e.stopPropagation(); openEdit('left'); }} />
-            {/* Right half (output) — click target */}
-            <rect x={labelPos.x} y={y0} width={halfW} height={H} rx={3} fill="transparent" style={{ cursor: 'text' }}
-              onClick={(e) => { e.stopPropagation(); openEdit('right'); }} />
-            {/* Input digit */}
-            <text x={x0 + halfW / 2} y={labelPos.y} textAnchor="middle" dominantBaseline="central"
+            <rect x={x0} y={y0} width={leftW} height={H} rx={3} fill="transparent" style={{ cursor: 'text' }}
+              onClick={(e) => { e.stopPropagation(); openEdit(0); }} />
+            {/* Right half (outputs) — click target */}
+            <rect x={sepX} y={y0} width={rightW} height={H} rx={3} fill="transparent" style={{ cursor: 'text' }}
+              onClick={(e) => { e.stopPropagation(); openEdit(1); }} />
+            {/* Input symbol */}
+            <text x={x0 + leftW / 2} y={labelPos.y} textAnchor="middle" dominantBaseline="central"
               fontSize="12" fontFamily="'SF Mono','Fira Code',monospace" fontWeight="600"
-              fill={color} pointerEvents="none">{lPart}</text>
+              fill={color} pointerEvents="none">{displayLeft}</text>
             {/* Separator */}
-            <line x1={labelPos.x} y1={y0 + 3} x2={labelPos.x} y2={y0 + H - 3}
+            <line x1={sepX} y1={y0 + 3} x2={sepX} y2={y0 + H - 3}
               stroke="#ccc" strokeWidth={1} pointerEvents="none" />
-            {/* Output digit */}
-            <text x={x0 + halfW + halfW / 2} y={labelPos.y} textAnchor="middle" dominantBaseline="central"
+            {/* Output symbol(s) */}
+            <text x={sepX + rightW / 2} y={labelPos.y} textAnchor="middle" dominantBaseline="central"
               fontSize="12" fontFamily="'SF Mono','Fira Code',monospace" fontWeight="600"
-              fill={color} pointerEvents="none">{rPart}</text>
+              fill={color} pointerEvents="none">{displayRight}</text>
           </g>
         );
       })()}
       {editing && (
         <foreignObject
-          x={labelPos.x - (twoCharRight ? 32 : 28)}
+          x={labelPos.x - (14 + 7 * totalChars)}
           y={labelPos.y - 15}
-          width={twoCharRight ? 64 : 56}
+          width={28 + 14 * totalChars}
           height={30}
         >
           <div
@@ -1562,43 +1483,16 @@ function FsmTransitionView({
                 pointerEvents: 'none',
               }}
             />
-            {/* Input half */}
+            {/* Input half (field 0) */}
             <div
-              onClick={(e) => { e.stopPropagation(); setActiveField('left'); editorRef.current?.focus(); }}
+              onClick={(e) => { e.stopPropagation(); setActiveField(0); setCharPos(0); editorRef.current?.focus(); }}
               style={{
                 flex: 1,
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                background: activeField === 'left' ? '#2a7fff' : 'transparent',
-                color: activeField === 'left' ? 'white' : '#333',
-                fontFamily: "'SF Mono','Fira Code',monospace",
-                fontSize: 14,
-                fontWeight: 700,
-                cursor: 'default',
-                userSelect: 'none',
-              }}
-            >{editLeft}</div>
-            {/* Separator */}
-            <div style={{
-              width: 1, alignSelf: 'stretch', margin: '5px 1px',
-              background: '#ccc', flexShrink: 0,
-            }} />
-            {/* Output half — for TM this is the combined write+move action */}
-            <div
-              onClick={(e) => {
-                e.stopPropagation();
-                setActiveField('right');
-                if (twoCharRight) setRightSubField('write');
-                editorRef.current?.focus();
-              }}
-              style={{
-                flex: 1,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                background: activeField === 'right' ? '#2a7fff' : 'transparent',
-                color: activeField === 'right' ? 'white' : '#333',
+                background: activeField === 0 ? '#2a7fff' : 'transparent',
+                color: activeField === 0 ? 'white' : '#333',
                 fontFamily: "'SF Mono','Fira Code',monospace",
                 fontSize: 14,
                 fontWeight: 700,
@@ -1606,14 +1500,52 @@ function FsmTransitionView({
                 userSelect: 'none',
               }}
             >
-              {twoCharRight
-                ? (
-                  <>
-                    <span style={{ opacity: activeField === 'right' && rightSubField === 'move' ? 0.5 : 1 }}>{editWrite}</span>
-                    <span style={{ opacity: activeField === 'right' && rightSubField === 'write' ? 0.5 : 1 }}>{editMove}</span>
-                  </>
-                )
-                : editRight}
+              {editFields[0].split('').map((ch, i) => (
+                <span key={i} style={{ opacity: activeField === 0 && charPos !== i ? 0.5 : 1 }}>{ch}</span>
+              ))}
+            </div>
+            {/* Separator */}
+            <div style={{
+              width: 1, alignSelf: 'stretch', margin: '5px 1px',
+              background: '#ccc', flexShrink: 0,
+            }} />
+            {/* Output half — every output field's characters in sequence,
+                with the notation's separator between fields (a TM's
+                write,move; an FSM question's k output bits; a turbot motor
+                pair). The character being entered is full-opacity; its
+                field-mates dim, like the old TM sub-fields. */}
+            <div
+              onClick={(e) => {
+                e.stopPropagation();
+                setActiveField(Math.min(1, lastField));
+                setCharPos(0);
+                editorRef.current?.focus();
+              }}
+              style={{
+                flex: 1,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                background: activeField > 0 ? '#2a7fff' : 'transparent',
+                color: activeField > 0 ? 'white' : '#333',
+                fontFamily: "'SF Mono','Fira Code',monospace",
+                fontSize: 14,
+                fontWeight: 700,
+                cursor: 'default',
+                userSelect: 'none',
+              }}
+            >
+              {editFields.slice(1).flatMap((field, fi) => [
+                ...(fi > 0 && outputSep
+                  ? [<span key={`sep:${fi}`} style={{ opacity: 0.5 }}>{outputSep}</span>]
+                  : []),
+                ...field.split('').map((ch, i) => (
+                  <span
+                    key={`${fi}:${i}`}
+                    style={{ opacity: activeField > 0 && !(activeField === fi + 1 && charPos === i) ? 0.5 : 1 }}
+                  >{ch}</span>
+                )),
+              ])}
             </div>
           </div>
         </foreignObject>
@@ -3704,7 +3636,6 @@ export function CircuitCanvas() {
       const isSelfLoop = wire.sourceComponentId === wire.targetComponentId;
       const pairKey = [wire.sourceComponentId, wire.targetComponentId].sort().join('|');
       const totalBetweenPair = pairTotals.get(pairKey) || 1;
-      const sameDirectionCount = directedCounts.get(dirKey) || 1;
 
       let pathD: string;
       let labelPos: { x: number; y: number };
@@ -3749,21 +3680,31 @@ export function CircuitCanvas() {
         const perpX = -(tCy - sCy) / dist;
         const perpY = (tCx - sCx) / dist;
 
-        // Determine curve offset using direction-consistent convention:
-        // A→B (where A<B lexically) curves to one side, B→A to the other.
-        // This ensures bidirectional arcs always separate cleanly.
-        const isForward = wire.sourceComponentId < wire.targetComponentId;
-        const side = isForward ? 1 : -1;
+        // Determine curve offset.
+        //
+        // Opposite-direction sibling (some B→A wire alongside this A→B one):
+        // each arc bows to the LEFT of its own direction of travel. `perp` is
+        // the travel direction rotated 90° (travel-right on screen), and it
+        // flips with direction — so a negative own-frame offset lands A→B and
+        // B→A on opposite world sides deterministically, matching the
+        // hand-placed hw4-p11 convention (left→right arc on top, right→left
+        // arc underneath). The bow scales with state spacing (~30% of the
+        // center distance, clamped) so both arcs and their labels stay
+        // clearly distinct at typical 200–400px spacings.
+        const reverseKey = `${wire.targetComponentId}|${wire.sourceComponentId}`;
+        const hasOppositeSibling = (directedCounts.get(reverseKey) || 0) > 0;
 
         let offset: number;
-        if (totalBetweenPair === 1) {
+        if (hasOppositeSibling) {
+          const bowMag = Math.min(150, Math.max(50, dist * 0.3));
+          offset = -(bowMag + dirIdx * 25);
+        } else if (totalBetweenPair === 1) {
           // Only one transition between this pair → straight line
           offset = 0;
-        } else if (sameDirectionCount === 1 && totalBetweenPair === 2) {
-          // Exactly one in each direction → symmetric separation
-          offset = side * 30;
         } else {
-          // Multiple in same direction: stack them
+          // Multiple in the same direction (no reverse sibling): stack them
+          // to one side, chosen by lexical id order for determinism.
+          const side = wire.sourceComponentId < wire.targetComponentId ? 1 : -1;
           offset = side * (30 + dirIdx * 25);
         }
 
@@ -3925,7 +3866,10 @@ export function CircuitCanvas() {
     // Detect perpendicular crossings from the final displayed paths
     // (after routing + manual-segment adjustments) and bake the arc
     // directly into each horizontal wire's pathD so both wires remain
-    // visually continuous with no white gaps.
+    // visually continuous with no white gaps. The recomputed set REPLACES
+    // the router's result.crossings on wireData — displayed geometry is
+    // the truth here, and downstream consumers (the split-dot bump-skip)
+    // must see the same crossings the bumps were drawn from.
     for (const [wireId, wd] of data) {
       if (wd.isFsmTransition) continue;
       const crossings: { x: number; y: number }[] = [];
@@ -3947,6 +3891,7 @@ export function CircuitCanvas() {
           }
         }
       }
+      wd.crossings = crossings;
       if (crossings.length > 0) {
         wd.pathD = pathDWithBumps(wd.points, crossings);
       }
@@ -3957,28 +3902,34 @@ export function CircuitCanvas() {
   }, [wires, components]);
 
   // ─── Split dots ────────────────────────────────────────────────
+  // VISUAL_VOCAB: splitting one output to many inputs draws a dot at the
+  // JUNCTION — where the branches actually part ways on the displayed paths
+  // (shared trunks get their dot at the divergence elbow, not the source
+  // port). findDivergencePoints is pure (wireRouter.ts, corpus-tested in
+  // tools/routerCheck.ts); it consumes the CANVAS-side crossing set stored
+  // on wireData so dots never land on a rendered bump arc.
   const splitDots = useMemo(() => {
-    const outputUsage = new Map<string, number>();
+    const displayed: DisplayedWirePath[] = [];
+    const canvasCrossings: { x: number; y: number }[] = [];
     for (const w of wires) {
-      if (w.transitionLabel !== undefined) continue; // FSM transitions don't split
-      const key = `${w.sourceComponentId}:${w.sourcePortId}`;
-      outputUsage.set(key, (outputUsage.get(key) || 0) + 1);
+      const wd = wireData.get(w.id);
+      if (!wd || wd.isFsmTransition) continue; // FSM transitions don't split
+      displayed.push({
+        sourcePortKey: `${w.sourceComponentId}:${w.sourcePortId}`,
+        points: wd.points,
+      });
+      canvasCrossings.push(...wd.crossings);
     }
-    const dots: React.ReactElement[] = [];
-    for (const [key, count] of outputUsage) {
-      if (count > 1) {
-        const [compId, portId] = key.split(':');
-        const comp = components.find((c) => c.id === compId);
-        if (comp) {
-          const pos = getPortPosition(comp, portId);
-          dots.push(
-            <circle key={`split-${key}`} cx={pos.x} cy={pos.y} r={4} fill="#333" />
-          );
-        }
-      }
-    }
-    return dots;
-  }, [wires, components]);
+    return findDivergencePoints(displayed, canvasCrossings).map((p) => (
+      <circle
+        key={`split-${Math.round(p.x)},${Math.round(p.y)}`}
+        cx={p.x}
+        cy={p.y}
+        r={SPLIT_DOT_RADIUS}
+        fill="#333"
+      />
+    ));
+  }, [wires, wireData]);
 
   // ─── Comment anchors ───────────────────────────────────────────
   const commentAnchors = useMemo(() => {

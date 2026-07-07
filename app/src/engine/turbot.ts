@@ -36,7 +36,8 @@ import type {
 } from '../types';
 import { evaluateCCInputs } from './cc';
 import { evaluateSCSingleStep } from './sc';
-import { sortStateComponents } from './fsm';
+import { sortStateComponents, evaluateFSMSymbolStep } from './fsm';
+import { turbotFsmNotation, validateTransitionTable } from './notation';
 import { readCell } from './tm';
 
 // ─── Arena geometry ──────────────────────────────────────────────────
@@ -199,57 +200,29 @@ export function parseTurbotExternalLabel(label: string | undefined): TurbotTMExt
 // CC/SC output wires (i = left wheel, j = right wheel) — so an FSM brain can
 // issue every movement command, turns included. (The base FSM's one-bit
 // "in:out" grammar is a different machine; turbot questions use this one.)
-
-export interface TurbotFSMTransition {
-  input: 0 | 1;
-  motor: TurbotMotorCommand;
-}
-
-/** Parse a turbot-FSM transition label "sensor:ij" (e.g. "0:11", "1:00"). */
-export function parseTurbotFSMLabel(label: string | undefined): TurbotFSMTransition | null {
-  if (!label) return null;
-  const m = /^([01]):([01])([01])$/.exec(label);
-  if (!m) return null;
-  return {
-    input: m[1] === '1' ? 1 : 0,
-    motor: decodeMotorCommand([Number(m[2]), Number(m[3])]),
-  };
-}
+// The GRAMMAR lives in turbotFsmNotation (engine/notation.ts) — THE single
+// answer to "is this turbot-FSM brain label legal", shared with runBrainStep
+// and the store's label editor; legacy 1-bit outputs ('0:1' forward, '1:0'
+// stop) stay valid there as aliases of the canonical 2-bit spelling.
 
 /**
- * Validate a turbot FSM table: every transition label must be "sensor:ij"
- * (2-bit motor output), and — like the base FSM (machineValidation.ts) —
- * every state must handle both sensor inputs exactly once (total and
+ * Validate a turbot FSM table: every transition label must parse under
+ * turbotFsmNotation, and — like the base FSM (machineValidation.ts) — every
+ * state must handle both sensor inputs exactly once (total and
  * deterministic; an FSM brain has no halt, a missing transition is a dead
- * machine).
+ * machine). Delegates to the generic transition-table walker so the label
+ * grammar is never dissected here.
  */
 export function validateTurbotFSM(components: CircuitComponent[], wires: Wire[]): TurbotTMValidationError[] {
-  const errors: TurbotTMValidationError[] = [];
-  const states = components.filter((c) => c.type === 'STATE');
+  const states = sortStateComponents(components);
   if (states.length === 0) {
     return [{ stateLabel: '—', message: 'machine has no states' }];
   }
-  for (const s of states) {
-    const outgoing = wires.filter((w) => w.sourceComponentId === s.id);
-    for (const w of outgoing) {
-      if (!parseTurbotFSMLabel(w.transitionLabel)) {
-        errors.push({
-          stateLabel: s.label,
-          message: `state ${s.label} has an invalid transition label "${w.transitionLabel ?? ''}" (turbot FSM labels are sensor:ij, e.g. 0:11)`,
-        });
-      }
-    }
-    for (const bit of [0, 1] as const) {
-      const matching = outgoing.filter((w) => parseTurbotFSMLabel(w.transitionLabel)?.input === bit);
-      if (matching.length !== 1) {
-        errors.push({
-          stateLabel: s.label,
-          message: `state ${s.label} must have exactly one transition for input ${bit} (found ${matching.length})`,
-        });
-      }
-    }
-  }
-  return errors;
+  const byId = new Map(states.map((s) => [s.id, s]));
+  return validateTransitionTable(states, wires, () => turbotFsmNotation, 'total').map((e) => ({
+    stateLabel: (e.stateId && byId.get(e.stateId)?.label) || '—',
+    message: e.message,
+  }));
 }
 
 /** Apply an internal single action: a write leaves the head, a move leaves the cells. */
@@ -273,8 +246,9 @@ export interface TurbotTMValidationError {
  * SOURCE state's kind grammar, and each state may have at most one
  * transition per input token (deterministic). Mirrors validateTMTable's
  * role for the base TM (engine/tmValidate.ts), which cannot be reused here —
- * its dual-action grammar and single alphabet don't apply. `notation` is the
- * question's encoding: unary machines may not mention `*` in internal labels.
+ * its two-output label grammar and single alphabet don't apply. `notation` is
+ * the question's encoding: unary machines may not mention `*` in internal
+ * labels.
  */
 export function validateTurbotTM(
   components: CircuitComponent[],
@@ -394,20 +368,16 @@ export function runBrainStep(
 
   if (innerMode === 'FSM') {
     if (!brainState.stateId) return null;
-    // Turbot-FSM Mealy transitions output the full 2-bit motor command
-    // ("in:ij"), so an FSM brain can issue every movement, turns included.
-    for (const t of wires) {
-      if (t.sourceComponentId !== brainState.stateId) continue;
-      const parsed = parseTurbotFSMLabel(t.transitionLabel);
-      if (!parsed || parsed.input !== sensorBit) continue;
-      return {
-        motor: parsed.motor,
-        input: String(sensorBit),
-        action: parsed.motor,
-        brainState: { stateId: t.targetComponentId },
-      };
-    }
-    return null;
+    // Labels are read under turbotFsmNotation — THE single answer to "is
+    // this turbot-FSM brain label legal" (engine/notation.ts), shared with
+    // Stage-1 validation and the store's label editor. Legacy 1-bit outputs
+    // widen ('1' → '11' forward, '0' → '00' stop) and canonical 2-bit motor
+    // labels decode through the same wheel-bit table as circuit brains
+    // (spec §9.2), so an FSM brain can issue every movement, turns included.
+    const result = evaluateFSMSymbolStep(wires, brainState.stateId, String(sensorBit), turbotFsmNotation);
+    if (!result) return null;
+    const motor = decodeMotorCommand(result.output.split('').map(Number));
+    return { motor, input: String(sensorBit), action: motor, brainState: { stateId: result.nextStateId } };
   }
 
   // Turbot TM (textbook model): the current state's kind picks the op.
@@ -522,8 +492,17 @@ function isGoal(arena: ArenaConfig, x: number, y: number): boolean {
  * requires the turbot to have deliberately stopped on the goal cell (motor
  * "00" for circuit brains; halting, for a turbot TM); `pass-through` only
  * requires the goal to appear somewhere in the position trace;
- * `return-to-start` only checks the final position (facing is not checked —
- * the spec doesn't require a particular final orientation).
+ * `return-to-start` checks the final position (facing is not checked — the
+ * spec doesn't require a particular final orientation), AND — when the arena
+ * declares a goal cell — that the position trace visited it first.
+ *
+ * The goal-visit clause is what gives out-and-back navigation problems
+ * (hw3-p15 "Mad Max": block at UNKNOWN distance, drive to it, come home)
+ * their teeth: without it, ending on the start cell is satisfiable by a
+ * brain that never leaves — or walks any fixed distance and retraces it —
+ * so no arena family could reject a hardcoded (or trivial) brain. Authors
+ * mark the "out there" checkpoint (e.g. the cell before the block) as the
+ * goal; goal-less arenas keep the plain end-at-start reading of spec §12.5.
  */
 export function evaluateTurbotCriterion(
   arena: ArenaConfig,
@@ -536,7 +515,14 @@ export function evaluateTurbotCriterion(
     case 'pass-through':
       if (isGoal(arena, arena.start.x, arena.start.y)) return true;
       return run.history.some((h) => isGoal(arena, h.x, h.y));
-    case 'return-to-start':
-      return run.finalState.x === arena.start.x && run.finalState.y === arena.start.y;
+    case 'return-to-start': {
+      if (run.finalState.x !== arena.start.x || run.finalState.y !== arena.start.y) return false;
+      const hasGoal = arena.cells.some((row) => row.some((c) => c === 'goal'));
+      if (!hasGoal) return true;
+      // A goal on the start cell is visited by construction (arenaEditing
+      // allows that authoring pattern), mirroring pass-through's rule.
+      if (isGoal(arena, arena.start.x, arena.start.y)) return true;
+      return run.history.some((h) => isGoal(arena, h.x, h.y));
+    }
   }
 }

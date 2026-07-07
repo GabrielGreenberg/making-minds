@@ -1,0 +1,283 @@
+{
+  "question": {
+    "id": 8,
+    "label": "Problem 8",
+    "statement": "Design a finite-state machine that computes 2x on binary numerals.",
+    "buildMode": "FSM",
+    "representation": "binary",
+    "cc_spec": {
+      "inputs": [
+        {
+          "name": "x",
+          "width": 6
+        }
+      ],
+      "outputs": [
+        {
+          "name": "out",
+          "width": 7,
+          "formula": "2 * x"
+        }
+      ]
+    },
+    "test_cases": [
+      {
+        "inputs": [
+          0
+        ],
+        "outputs": [
+          0
+        ]
+      },
+      {
+        "inputs": [
+          1
+        ],
+        "outputs": [
+          2
+        ]
+      },
+      {
+        "inputs": [
+          2
+        ],
+        "outputs": [
+          4
+        ]
+      },
+      {
+        "inputs": [
+          3
+        ],
+        "outputs": [
+          6
+        ]
+      },
+      {
+        "inputs": [
+          4
+        ],
+        "outputs": [
+          8
+        ]
+      },
+      {
+        "inputs": [
+          5
+        ],
+        "outputs": [
+          10
+        ]
+      },
+      {
+        "inputs": [
+          7
+        ],
+        "outputs": [
+          14
+        ]
+      },
+      {
+        "inputs": [
+          8
+        ],
+        "outputs": [
+          16
+        ]
+      },
+      {
+        "inputs": [
+          11
+        ],
+        "outputs": [
+          22
+        ]
+      },
+      {
+        "inputs": [
+          15
+        ],
+        "outputs": [
+          30
+        ]
+      },
+      {
+        "inputs": [
+          16
+        ],
+        "outputs": [
+          32
+        ]
+      },
+      {
+        "inputs": [
+          23
+        ],
+        "outputs": [
+          46
+        ]
+      },
+      {
+        "inputs": [
+          31
+        ],
+        "outputs": [
+          62
+        ]
+      },
+      {
+        "inputs": [
+          32
+        ],
+        "outputs": [
+          64
+        ]
+      },
+      {
+        "inputs": [
+          47
+        ],
+        "outputs": [
+          94
+        ]
+      },
+      {
+        "inputs": [
+          63
+        ],
+        "outputs": [
+          126
+        ]
+      }
+    ]
+  },
+  "correct": {
+    "components": [
+      {
+        "id": "hw4-p8-s0",
+        "type": "STATE",
+        "x": 160,
+        "y": 220,
+        "label": "S₀",
+        "ports": [
+          {
+            "id": "left",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "right",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "hw4-p8-s1",
+        "type": "STATE",
+        "x": 420,
+        "y": 220,
+        "label": "S₁",
+        "ports": [
+          {
+            "id": "left",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "right",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      }
+    ],
+    "wires": [
+      {
+        "id": "hw4-p8-t1",
+        "sourceComponentId": "hw4-p8-s0",
+        "sourcePortId": "right",
+        "targetComponentId": "hw4-p8-s0",
+        "targetPortId": "left",
+        "value": 0,
+        "transitionLabel": "0:0"
+      },
+      {
+        "id": "hw4-p8-t2",
+        "sourceComponentId": "hw4-p8-s0",
+        "sourcePortId": "right",
+        "targetComponentId": "hw4-p8-s1",
+        "targetPortId": "left",
+        "value": 0,
+        "transitionLabel": "1:0"
+      },
+      {
+        "id": "hw4-p8-t3",
+        "sourceComponentId": "hw4-p8-s1",
+        "sourcePortId": "right",
+        "targetComponentId": "hw4-p8-s0",
+        "targetPortId": "left",
+        "value": 0,
+        "transitionLabel": "0:1"
+      },
+      {
+        "id": "hw4-p8-t4",
+        "sourceComponentId": "hw4-p8-s1",
+        "sourcePortId": "right",
+        "targetComponentId": "hw4-p8-s1",
+        "targetPortId": "left",
+        "value": 0,
+        "transitionLabel": "1:1"
+      }
+    ]
+  },
+  "broken": {
+    "components": [
+      {
+        "id": "hw4-p8-s0",
+        "type": "STATE",
+        "x": 160,
+        "y": 220,
+        "label": "S₀",
+        "ports": [
+          {
+            "id": "left",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "right",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      }
+    ],
+    "wires": [
+      {
+        "id": "hw4-p8-b1",
+        "sourceComponentId": "hw4-p8-s0",
+        "sourcePortId": "right",
+        "targetComponentId": "hw4-p8-s0",
+        "targetPortId": "left",
+        "value": 0,
+        "transitionLabel": "0:0"
+      },
+      {
+        "id": "hw4-p8-b2",
+        "sourceComponentId": "hw4-p8-s0",
+        "sourcePortId": "right",
+        "targetComponentId": "hw4-p8-s0",
+        "targetPortId": "left",
+        "value": 0,
+        "transitionLabel": "1:1"
+      }
+    ]
+  }
+}

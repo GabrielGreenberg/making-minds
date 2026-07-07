@@ -8,7 +8,9 @@
     "build": "tsc -b && vite build",
     "lint": "eslint .",
     "preview": "vite preview",
-    "grade": "tsx tools/grade.ts"
+    "grade": "tsx tools/grade.ts",
+    "coverage": "tsx tools/coverageCheck.ts",
+    "check": "tsx tools/codecCheck.ts && tsx tools/notationCheck.ts && tsx tools/tmCheck.ts && tsx tools/turbotCheck.ts && tsx tools/perceptionCheck.ts && tsx tools/scWindowCheck.ts && tsx tools/routerCheck.ts && tsx tools/bumpCheck.ts && tsx tools/pipelineCheck.ts && tsx tools/navResetCheck.ts && tsx tools/coverageCheck.ts"
   },
   "dependencies": {
     "react": "^19.2.4",

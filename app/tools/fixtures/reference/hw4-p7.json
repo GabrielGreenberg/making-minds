@@ -1,0 +1,439 @@
+{
+  "question": {
+    "id": 7,
+    "label": "Problem 7",
+    "statement": "Design a finite-state machine that computes x + 4 on binary numerals.",
+    "buildMode": "FSM",
+    "representation": "binary",
+    "cc_spec": {
+      "inputs": [
+        {
+          "name": "x",
+          "width": 6
+        }
+      ],
+      "outputs": [
+        {
+          "name": "out",
+          "width": 7,
+          "formula": "x + 4"
+        }
+      ]
+    },
+    "test_cases": [
+      {
+        "inputs": [
+          0
+        ],
+        "outputs": [
+          4
+        ]
+      },
+      {
+        "inputs": [
+          1
+        ],
+        "outputs": [
+          5
+        ]
+      },
+      {
+        "inputs": [
+          2
+        ],
+        "outputs": [
+          6
+        ]
+      },
+      {
+        "inputs": [
+          3
+        ],
+        "outputs": [
+          7
+        ]
+      },
+      {
+        "inputs": [
+          4
+        ],
+        "outputs": [
+          8
+        ]
+      },
+      {
+        "inputs": [
+          5
+        ],
+        "outputs": [
+          9
+        ]
+      },
+      {
+        "inputs": [
+          7
+        ],
+        "outputs": [
+          11
+        ]
+      },
+      {
+        "inputs": [
+          8
+        ],
+        "outputs": [
+          12
+        ]
+      },
+      {
+        "inputs": [
+          11
+        ],
+        "outputs": [
+          15
+        ]
+      },
+      {
+        "inputs": [
+          15
+        ],
+        "outputs": [
+          19
+        ]
+      },
+      {
+        "inputs": [
+          16
+        ],
+        "outputs": [
+          20
+        ]
+      },
+      {
+        "inputs": [
+          23
+        ],
+        "outputs": [
+          27
+        ]
+      },
+      {
+        "inputs": [
+          31
+        ],
+        "outputs": [
+          35
+        ]
+      },
+      {
+        "inputs": [
+          32
+        ],
+        "outputs": [
+          36
+        ]
+      },
+      {
+        "inputs": [
+          47
+        ],
+        "outputs": [
+          51
+        ]
+      },
+      {
+        "inputs": [
+          63
+        ],
+        "outputs": [
+          67
+        ]
+      }
+    ]
+  },
+  "correct": {
+    "components": [
+      {
+        "id": "s0",
+        "type": "STATE",
+        "x": 120,
+        "y": 240,
+        "label": "S₀",
+        "ports": [
+          {
+            "id": "left",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "right",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "s1",
+        "type": "STATE",
+        "x": 320,
+        "y": 240,
+        "label": "S₁",
+        "ports": [
+          {
+            "id": "left",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "right",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "s2",
+        "type": "STATE",
+        "x": 520,
+        "y": 240,
+        "label": "S₂",
+        "ports": [
+          {
+            "id": "left",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "right",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "s3",
+        "type": "STATE",
+        "x": 720,
+        "y": 240,
+        "label": "S₃",
+        "ports": [
+          {
+            "id": "left",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "right",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      }
+    ],
+    "wires": [
+      {
+        "id": "t1",
+        "sourceComponentId": "s0",
+        "sourcePortId": "right",
+        "targetComponentId": "s1",
+        "targetPortId": "left",
+        "value": 0,
+        "transitionLabel": "0:0"
+      },
+      {
+        "id": "t2",
+        "sourceComponentId": "s0",
+        "sourcePortId": "right",
+        "targetComponentId": "s1",
+        "targetPortId": "left",
+        "value": 0,
+        "transitionLabel": "1:1"
+      },
+      {
+        "id": "t3",
+        "sourceComponentId": "s1",
+        "sourcePortId": "right",
+        "targetComponentId": "s2",
+        "targetPortId": "left",
+        "value": 0,
+        "transitionLabel": "0:0"
+      },
+      {
+        "id": "t4",
+        "sourceComponentId": "s1",
+        "sourcePortId": "right",
+        "targetComponentId": "s2",
+        "targetPortId": "left",
+        "value": 0,
+        "transitionLabel": "1:1"
+      },
+      {
+        "id": "t5",
+        "sourceComponentId": "s2",
+        "sourcePortId": "right",
+        "targetComponentId": "s3",
+        "targetPortId": "left",
+        "value": 0,
+        "transitionLabel": "0:1"
+      },
+      {
+        "id": "t6",
+        "sourceComponentId": "s2",
+        "sourcePortId": "right",
+        "targetComponentId": "s2",
+        "targetPortId": "left",
+        "value": 0,
+        "transitionLabel": "1:0"
+      },
+      {
+        "id": "t7",
+        "sourceComponentId": "s3",
+        "sourcePortId": "right",
+        "targetComponentId": "s3",
+        "targetPortId": "left",
+        "value": 0,
+        "transitionLabel": "0:0"
+      },
+      {
+        "id": "t8",
+        "sourceComponentId": "s3",
+        "sourcePortId": "right",
+        "targetComponentId": "s3",
+        "targetPortId": "left",
+        "value": 0,
+        "transitionLabel": "1:1"
+      }
+    ]
+  },
+  "broken": {
+    "components": [
+      {
+        "id": "s0",
+        "type": "STATE",
+        "x": 120,
+        "y": 240,
+        "label": "S₀",
+        "ports": [
+          {
+            "id": "left",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "right",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "s1",
+        "type": "STATE",
+        "x": 320,
+        "y": 240,
+        "label": "S₁",
+        "ports": [
+          {
+            "id": "left",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "right",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "s2",
+        "type": "STATE",
+        "x": 520,
+        "y": 240,
+        "label": "S₂",
+        "ports": [
+          {
+            "id": "left",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "right",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      }
+    ],
+    "wires": [
+      {
+        "id": "t1",
+        "sourceComponentId": "s0",
+        "sourcePortId": "right",
+        "targetComponentId": "s1",
+        "targetPortId": "left",
+        "value": 0,
+        "transitionLabel": "0:0"
+      },
+      {
+        "id": "t2",
+        "sourceComponentId": "s0",
+        "sourcePortId": "right",
+        "targetComponentId": "s1",
+        "targetPortId": "left",
+        "value": 0,
+        "transitionLabel": "1:1"
+      },
+      {
+        "id": "t3",
+        "sourceComponentId": "s1",
+        "sourcePortId": "right",
+        "targetComponentId": "s2",
+        "targetPortId": "left",
+        "value": 0,
+        "transitionLabel": "0:1"
+      },
+      {
+        "id": "t4",
+        "sourceComponentId": "s1",
+        "sourcePortId": "right",
+        "targetComponentId": "s1",
+        "targetPortId": "left",
+        "value": 0,
+        "transitionLabel": "1:0"
+      },
+      {
+        "id": "t5",
+        "sourceComponentId": "s2",
+        "sourcePortId": "right",
+        "targetComponentId": "s2",
+        "targetPortId": "left",
+        "value": 0,
+        "transitionLabel": "0:0"
+      },
+      {
+        "id": "t6",
+        "sourceComponentId": "s2",
+        "sourcePortId": "right",
+        "targetComponentId": "s2",
+        "targetPortId": "left",
+        "value": 0,
+        "transitionLabel": "1:1"
+      }
+    ]
+  }
+}

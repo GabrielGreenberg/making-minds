@@ -1,0 +1,1613 @@
+{
+  "question": {
+    "id": 6,
+    "label": "Problem 6",
+    "statement": "Design a combinatorial circuit that computes 2(x+1): given a binary input x between 0 and 15 (IN1 = most significant bit), output the binary numeral for 2(x+1) (OUT1 = most significant bit). Only use ONE sub-part which computes +1 — box your +1 circuit once and reuse it, rather than incrementing twice.",
+    "buildMode": "CC",
+    "representation": "binary",
+    "cc_spec": {
+      "inputs": [
+        {
+          "name": "x",
+          "width": 4,
+          "max_value": 15
+        }
+      ],
+      "outputs": [
+        {
+          "name": "y",
+          "width": 6,
+          "formula": "2 * (x + 1)"
+        }
+      ]
+    },
+    "test_cases": [
+      {
+        "inputs": [
+          0
+        ],
+        "outputs": [
+          2
+        ]
+      },
+      {
+        "inputs": [
+          1
+        ],
+        "outputs": [
+          4
+        ]
+      },
+      {
+        "inputs": [
+          2
+        ],
+        "outputs": [
+          6
+        ]
+      },
+      {
+        "inputs": [
+          3
+        ],
+        "outputs": [
+          8
+        ]
+      },
+      {
+        "inputs": [
+          4
+        ],
+        "outputs": [
+          10
+        ]
+      },
+      {
+        "inputs": [
+          5
+        ],
+        "outputs": [
+          12
+        ]
+      },
+      {
+        "inputs": [
+          6
+        ],
+        "outputs": [
+          14
+        ]
+      },
+      {
+        "inputs": [
+          7
+        ],
+        "outputs": [
+          16
+        ]
+      },
+      {
+        "inputs": [
+          8
+        ],
+        "outputs": [
+          18
+        ]
+      },
+      {
+        "inputs": [
+          9
+        ],
+        "outputs": [
+          20
+        ]
+      },
+      {
+        "inputs": [
+          10
+        ],
+        "outputs": [
+          22
+        ]
+      },
+      {
+        "inputs": [
+          11
+        ],
+        "outputs": [
+          24
+        ]
+      },
+      {
+        "inputs": [
+          12
+        ],
+        "outputs": [
+          26
+        ]
+      },
+      {
+        "inputs": [
+          13
+        ],
+        "outputs": [
+          28
+        ]
+      },
+      {
+        "inputs": [
+          14
+        ],
+        "outputs": [
+          30
+        ]
+      },
+      {
+        "inputs": [
+          15
+        ],
+        "outputs": [
+          32
+        ]
+      }
+    ]
+  },
+  "correct": {
+    "components": [
+      {
+        "id": "p6-in1",
+        "type": "INPUT",
+        "x": 80,
+        "y": 80,
+        "label": "IN1",
+        "ports": [
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "p6-in2",
+        "type": "INPUT",
+        "x": 80,
+        "y": 180,
+        "label": "IN2",
+        "ports": [
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "p6-in3",
+        "type": "INPUT",
+        "x": 80,
+        "y": 280,
+        "label": "IN3",
+        "ports": [
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "p6-in4",
+        "type": "INPUT",
+        "x": 80,
+        "y": 380,
+        "label": "IN4",
+        "ports": [
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "p6-plus1",
+        "type": "BOXED",
+        "x": 300,
+        "y": 140,
+        "label": "+1",
+        "ports": [
+          {
+            "id": "in1",
+            "label": "in1",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "in2",
+            "label": "in2",
+            "side": "left",
+            "index": 1
+          },
+          {
+            "id": "in3",
+            "label": "in3",
+            "side": "left",
+            "index": 2
+          },
+          {
+            "id": "in4",
+            "label": "in4",
+            "side": "left",
+            "index": 3
+          },
+          {
+            "id": "out1",
+            "label": "out1",
+            "side": "right",
+            "index": 0
+          },
+          {
+            "id": "out2",
+            "label": "out2",
+            "side": "right",
+            "index": 1
+          },
+          {
+            "id": "out3",
+            "label": "out3",
+            "side": "right",
+            "index": 2
+          },
+          {
+            "id": "out4",
+            "label": "out4",
+            "side": "right",
+            "index": 3
+          },
+          {
+            "id": "out5",
+            "label": "out5",
+            "side": "right",
+            "index": 4
+          }
+        ],
+        "boxedCircuitId": "p6-plus1",
+        "internalCircuit": {
+          "components": [
+            {
+              "id": "p6-box-in1",
+              "type": "INPUT",
+              "x": 80,
+              "y": 80,
+              "label": "IN1",
+              "ports": [
+                {
+                  "id": "out",
+                  "label": "",
+                  "side": "right",
+                  "index": 0
+                }
+              ]
+            },
+            {
+              "id": "p6-box-in2",
+              "type": "INPUT",
+              "x": 80,
+              "y": 180,
+              "label": "IN2",
+              "ports": [
+                {
+                  "id": "out",
+                  "label": "",
+                  "side": "right",
+                  "index": 0
+                }
+              ]
+            },
+            {
+              "id": "p6-box-in3",
+              "type": "INPUT",
+              "x": 80,
+              "y": 280,
+              "label": "IN3",
+              "ports": [
+                {
+                  "id": "out",
+                  "label": "",
+                  "side": "right",
+                  "index": 0
+                }
+              ]
+            },
+            {
+              "id": "p6-box-in4",
+              "type": "INPUT",
+              "x": 80,
+              "y": 380,
+              "label": "IN4",
+              "ports": [
+                {
+                  "id": "out",
+                  "label": "",
+                  "side": "right",
+                  "index": 0
+                }
+              ]
+            },
+            {
+              "id": "p6-box-not0",
+              "type": "NOT",
+              "x": 240,
+              "y": 480,
+              "label": "",
+              "ports": [
+                {
+                  "id": "in",
+                  "label": "",
+                  "side": "left",
+                  "index": 0
+                },
+                {
+                  "id": "out",
+                  "label": "",
+                  "side": "right",
+                  "index": 0
+                }
+              ]
+            },
+            {
+              "id": "p6-box-ha1",
+              "type": "HA",
+              "x": 240,
+              "y": 300,
+              "label": "",
+              "ports": [
+                {
+                  "id": "in1",
+                  "label": "A",
+                  "side": "left",
+                  "index": 0
+                },
+                {
+                  "id": "in2",
+                  "label": "B",
+                  "side": "left",
+                  "index": 1
+                },
+                {
+                  "id": "sum",
+                  "label": "S",
+                  "side": "right",
+                  "index": 0
+                },
+                {
+                  "id": "carry",
+                  "label": "C",
+                  "side": "right",
+                  "index": 1
+                }
+              ]
+            },
+            {
+              "id": "p6-box-ha2",
+              "type": "HA",
+              "x": 400,
+              "y": 200,
+              "label": "",
+              "ports": [
+                {
+                  "id": "in1",
+                  "label": "A",
+                  "side": "left",
+                  "index": 0
+                },
+                {
+                  "id": "in2",
+                  "label": "B",
+                  "side": "left",
+                  "index": 1
+                },
+                {
+                  "id": "sum",
+                  "label": "S",
+                  "side": "right",
+                  "index": 0
+                },
+                {
+                  "id": "carry",
+                  "label": "C",
+                  "side": "right",
+                  "index": 1
+                }
+              ]
+            },
+            {
+              "id": "p6-box-ha3",
+              "type": "HA",
+              "x": 560,
+              "y": 100,
+              "label": "",
+              "ports": [
+                {
+                  "id": "in1",
+                  "label": "A",
+                  "side": "left",
+                  "index": 0
+                },
+                {
+                  "id": "in2",
+                  "label": "B",
+                  "side": "left",
+                  "index": 1
+                },
+                {
+                  "id": "sum",
+                  "label": "S",
+                  "side": "right",
+                  "index": 0
+                },
+                {
+                  "id": "carry",
+                  "label": "C",
+                  "side": "right",
+                  "index": 1
+                }
+              ]
+            },
+            {
+              "id": "p6-box-out1",
+              "type": "OUTPUT",
+              "x": 740,
+              "y": 60,
+              "label": "OUT1",
+              "ports": [
+                {
+                  "id": "in",
+                  "label": "",
+                  "side": "left",
+                  "index": 0
+                }
+              ]
+            },
+            {
+              "id": "p6-box-out2",
+              "type": "OUTPUT",
+              "x": 740,
+              "y": 160,
+              "label": "OUT2",
+              "ports": [
+                {
+                  "id": "in",
+                  "label": "",
+                  "side": "left",
+                  "index": 0
+                }
+              ]
+            },
+            {
+              "id": "p6-box-out3",
+              "type": "OUTPUT",
+              "x": 740,
+              "y": 260,
+              "label": "OUT3",
+              "ports": [
+                {
+                  "id": "in",
+                  "label": "",
+                  "side": "left",
+                  "index": 0
+                }
+              ]
+            },
+            {
+              "id": "p6-box-out4",
+              "type": "OUTPUT",
+              "x": 740,
+              "y": 360,
+              "label": "OUT4",
+              "ports": [
+                {
+                  "id": "in",
+                  "label": "",
+                  "side": "left",
+                  "index": 0
+                }
+              ]
+            },
+            {
+              "id": "p6-box-out5",
+              "type": "OUTPUT",
+              "x": 740,
+              "y": 460,
+              "label": "OUT5",
+              "ports": [
+                {
+                  "id": "in",
+                  "label": "",
+                  "side": "left",
+                  "index": 0
+                }
+              ]
+            }
+          ],
+          "wires": [
+            {
+              "id": "p6-box-w1",
+              "sourceComponentId": "p6-box-in4",
+              "sourcePortId": "out",
+              "targetComponentId": "p6-box-not0",
+              "targetPortId": "in",
+              "value": 0
+            },
+            {
+              "id": "p6-box-w2",
+              "sourceComponentId": "p6-box-not0",
+              "sourcePortId": "out",
+              "targetComponentId": "p6-box-out5",
+              "targetPortId": "in",
+              "value": 0
+            },
+            {
+              "id": "p6-box-w3",
+              "sourceComponentId": "p6-box-in3",
+              "sourcePortId": "out",
+              "targetComponentId": "p6-box-ha1",
+              "targetPortId": "in1",
+              "value": 0
+            },
+            {
+              "id": "p6-box-w4",
+              "sourceComponentId": "p6-box-in4",
+              "sourcePortId": "out",
+              "targetComponentId": "p6-box-ha1",
+              "targetPortId": "in2",
+              "value": 0
+            },
+            {
+              "id": "p6-box-w5",
+              "sourceComponentId": "p6-box-ha1",
+              "sourcePortId": "sum",
+              "targetComponentId": "p6-box-out4",
+              "targetPortId": "in",
+              "value": 0
+            },
+            {
+              "id": "p6-box-w6",
+              "sourceComponentId": "p6-box-in2",
+              "sourcePortId": "out",
+              "targetComponentId": "p6-box-ha2",
+              "targetPortId": "in1",
+              "value": 0
+            },
+            {
+              "id": "p6-box-w7",
+              "sourceComponentId": "p6-box-ha1",
+              "sourcePortId": "carry",
+              "targetComponentId": "p6-box-ha2",
+              "targetPortId": "in2",
+              "value": 0
+            },
+            {
+              "id": "p6-box-w8",
+              "sourceComponentId": "p6-box-ha2",
+              "sourcePortId": "sum",
+              "targetComponentId": "p6-box-out3",
+              "targetPortId": "in",
+              "value": 0
+            },
+            {
+              "id": "p6-box-w9",
+              "sourceComponentId": "p6-box-in1",
+              "sourcePortId": "out",
+              "targetComponentId": "p6-box-ha3",
+              "targetPortId": "in1",
+              "value": 0
+            },
+            {
+              "id": "p6-box-w10",
+              "sourceComponentId": "p6-box-ha2",
+              "sourcePortId": "carry",
+              "targetComponentId": "p6-box-ha3",
+              "targetPortId": "in2",
+              "value": 0
+            },
+            {
+              "id": "p6-box-w11",
+              "sourceComponentId": "p6-box-ha3",
+              "sourcePortId": "sum",
+              "targetComponentId": "p6-box-out2",
+              "targetPortId": "in",
+              "value": 0
+            },
+            {
+              "id": "p6-box-w12",
+              "sourceComponentId": "p6-box-ha3",
+              "sourcePortId": "carry",
+              "targetComponentId": "p6-box-out1",
+              "targetPortId": "in",
+              "value": 0
+            }
+          ]
+        }
+      },
+      {
+        "id": "p6-not-c0",
+        "type": "NOT",
+        "x": 300,
+        "y": 540,
+        "label": "",
+        "ports": [
+          {
+            "id": "in",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "p6-and-c0",
+        "type": "AND",
+        "x": 480,
+        "y": 520,
+        "label": "",
+        "ports": [
+          {
+            "id": "in1",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "in2",
+            "label": "",
+            "side": "left",
+            "index": 1
+          },
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "p6-out1",
+        "type": "OUTPUT",
+        "x": 660,
+        "y": 60,
+        "label": "OUT1",
+        "ports": [
+          {
+            "id": "in",
+            "label": "",
+            "side": "left",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "p6-out2",
+        "type": "OUTPUT",
+        "x": 660,
+        "y": 150,
+        "label": "OUT2",
+        "ports": [
+          {
+            "id": "in",
+            "label": "",
+            "side": "left",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "p6-out3",
+        "type": "OUTPUT",
+        "x": 660,
+        "y": 240,
+        "label": "OUT3",
+        "ports": [
+          {
+            "id": "in",
+            "label": "",
+            "side": "left",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "p6-out4",
+        "type": "OUTPUT",
+        "x": 660,
+        "y": 330,
+        "label": "OUT4",
+        "ports": [
+          {
+            "id": "in",
+            "label": "",
+            "side": "left",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "p6-out5",
+        "type": "OUTPUT",
+        "x": 660,
+        "y": 420,
+        "label": "OUT5",
+        "ports": [
+          {
+            "id": "in",
+            "label": "",
+            "side": "left",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "p6-out6",
+        "type": "OUTPUT",
+        "x": 660,
+        "y": 510,
+        "label": "OUT6",
+        "ports": [
+          {
+            "id": "in",
+            "label": "",
+            "side": "left",
+            "index": 0
+          }
+        ]
+      }
+    ],
+    "wires": [
+      {
+        "id": "p6-w1",
+        "sourceComponentId": "p6-in1",
+        "sourcePortId": "out",
+        "targetComponentId": "p6-plus1",
+        "targetPortId": "in1",
+        "value": 0
+      },
+      {
+        "id": "p6-w2",
+        "sourceComponentId": "p6-in2",
+        "sourcePortId": "out",
+        "targetComponentId": "p6-plus1",
+        "targetPortId": "in2",
+        "value": 0
+      },
+      {
+        "id": "p6-w3",
+        "sourceComponentId": "p6-in3",
+        "sourcePortId": "out",
+        "targetComponentId": "p6-plus1",
+        "targetPortId": "in3",
+        "value": 0
+      },
+      {
+        "id": "p6-w4",
+        "sourceComponentId": "p6-in4",
+        "sourcePortId": "out",
+        "targetComponentId": "p6-plus1",
+        "targetPortId": "in4",
+        "value": 0
+      },
+      {
+        "id": "p6-w5",
+        "sourceComponentId": "p6-in4",
+        "sourcePortId": "out",
+        "targetComponentId": "p6-not-c0",
+        "targetPortId": "in",
+        "value": 0
+      },
+      {
+        "id": "p6-w6",
+        "sourceComponentId": "p6-in4",
+        "sourcePortId": "out",
+        "targetComponentId": "p6-and-c0",
+        "targetPortId": "in1",
+        "value": 0
+      },
+      {
+        "id": "p6-w7",
+        "sourceComponentId": "p6-not-c0",
+        "sourcePortId": "out",
+        "targetComponentId": "p6-and-c0",
+        "targetPortId": "in2",
+        "value": 0
+      },
+      {
+        "id": "p6-w8",
+        "sourceComponentId": "p6-plus1",
+        "sourcePortId": "out1",
+        "targetComponentId": "p6-out1",
+        "targetPortId": "in",
+        "value": 0
+      },
+      {
+        "id": "p6-w9",
+        "sourceComponentId": "p6-plus1",
+        "sourcePortId": "out2",
+        "targetComponentId": "p6-out2",
+        "targetPortId": "in",
+        "value": 0
+      },
+      {
+        "id": "p6-w10",
+        "sourceComponentId": "p6-plus1",
+        "sourcePortId": "out3",
+        "targetComponentId": "p6-out3",
+        "targetPortId": "in",
+        "value": 0
+      },
+      {
+        "id": "p6-w11",
+        "sourceComponentId": "p6-plus1",
+        "sourcePortId": "out4",
+        "targetComponentId": "p6-out4",
+        "targetPortId": "in",
+        "value": 0
+      },
+      {
+        "id": "p6-w12",
+        "sourceComponentId": "p6-plus1",
+        "sourcePortId": "out5",
+        "targetComponentId": "p6-out5",
+        "targetPortId": "in",
+        "value": 0
+      },
+      {
+        "id": "p6-w13",
+        "sourceComponentId": "p6-and-c0",
+        "sourcePortId": "out",
+        "targetComponentId": "p6-out6",
+        "targetPortId": "in",
+        "value": 0
+      }
+    ]
+  },
+  "broken": {
+    "components": [
+      {
+        "id": "p6-in1",
+        "type": "INPUT",
+        "x": 80,
+        "y": 80,
+        "label": "IN1",
+        "ports": [
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "p6-in2",
+        "type": "INPUT",
+        "x": 80,
+        "y": 180,
+        "label": "IN2",
+        "ports": [
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "p6-in3",
+        "type": "INPUT",
+        "x": 80,
+        "y": 280,
+        "label": "IN3",
+        "ports": [
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "p6-in4",
+        "type": "INPUT",
+        "x": 80,
+        "y": 380,
+        "label": "IN4",
+        "ports": [
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "p6-plus1",
+        "type": "BOXED",
+        "x": 300,
+        "y": 140,
+        "label": "+1",
+        "ports": [
+          {
+            "id": "in1",
+            "label": "in1",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "in2",
+            "label": "in2",
+            "side": "left",
+            "index": 1
+          },
+          {
+            "id": "in3",
+            "label": "in3",
+            "side": "left",
+            "index": 2
+          },
+          {
+            "id": "in4",
+            "label": "in4",
+            "side": "left",
+            "index": 3
+          },
+          {
+            "id": "out1",
+            "label": "out1",
+            "side": "right",
+            "index": 0
+          },
+          {
+            "id": "out2",
+            "label": "out2",
+            "side": "right",
+            "index": 1
+          },
+          {
+            "id": "out3",
+            "label": "out3",
+            "side": "right",
+            "index": 2
+          },
+          {
+            "id": "out4",
+            "label": "out4",
+            "side": "right",
+            "index": 3
+          },
+          {
+            "id": "out5",
+            "label": "out5",
+            "side": "right",
+            "index": 4
+          }
+        ],
+        "boxedCircuitId": "p6-plus1",
+        "internalCircuit": {
+          "components": [
+            {
+              "id": "p6-box-in1",
+              "type": "INPUT",
+              "x": 80,
+              "y": 80,
+              "label": "IN1",
+              "ports": [
+                {
+                  "id": "out",
+                  "label": "",
+                  "side": "right",
+                  "index": 0
+                }
+              ]
+            },
+            {
+              "id": "p6-box-in2",
+              "type": "INPUT",
+              "x": 80,
+              "y": 180,
+              "label": "IN2",
+              "ports": [
+                {
+                  "id": "out",
+                  "label": "",
+                  "side": "right",
+                  "index": 0
+                }
+              ]
+            },
+            {
+              "id": "p6-box-in3",
+              "type": "INPUT",
+              "x": 80,
+              "y": 280,
+              "label": "IN3",
+              "ports": [
+                {
+                  "id": "out",
+                  "label": "",
+                  "side": "right",
+                  "index": 0
+                }
+              ]
+            },
+            {
+              "id": "p6-box-in4",
+              "type": "INPUT",
+              "x": 80,
+              "y": 380,
+              "label": "IN4",
+              "ports": [
+                {
+                  "id": "out",
+                  "label": "",
+                  "side": "right",
+                  "index": 0
+                }
+              ]
+            },
+            {
+              "id": "p6-box-not0",
+              "type": "NOT",
+              "x": 240,
+              "y": 480,
+              "label": "",
+              "ports": [
+                {
+                  "id": "in",
+                  "label": "",
+                  "side": "left",
+                  "index": 0
+                },
+                {
+                  "id": "out",
+                  "label": "",
+                  "side": "right",
+                  "index": 0
+                }
+              ]
+            },
+            {
+              "id": "p6-box-ha1",
+              "type": "HA",
+              "x": 240,
+              "y": 300,
+              "label": "",
+              "ports": [
+                {
+                  "id": "in1",
+                  "label": "A",
+                  "side": "left",
+                  "index": 0
+                },
+                {
+                  "id": "in2",
+                  "label": "B",
+                  "side": "left",
+                  "index": 1
+                },
+                {
+                  "id": "sum",
+                  "label": "S",
+                  "side": "right",
+                  "index": 0
+                },
+                {
+                  "id": "carry",
+                  "label": "C",
+                  "side": "right",
+                  "index": 1
+                }
+              ]
+            },
+            {
+              "id": "p6-box-ha2",
+              "type": "HA",
+              "x": 400,
+              "y": 200,
+              "label": "",
+              "ports": [
+                {
+                  "id": "in1",
+                  "label": "A",
+                  "side": "left",
+                  "index": 0
+                },
+                {
+                  "id": "in2",
+                  "label": "B",
+                  "side": "left",
+                  "index": 1
+                },
+                {
+                  "id": "sum",
+                  "label": "S",
+                  "side": "right",
+                  "index": 0
+                },
+                {
+                  "id": "carry",
+                  "label": "C",
+                  "side": "right",
+                  "index": 1
+                }
+              ]
+            },
+            {
+              "id": "p6-box-ha3",
+              "type": "HA",
+              "x": 560,
+              "y": 100,
+              "label": "",
+              "ports": [
+                {
+                  "id": "in1",
+                  "label": "A",
+                  "side": "left",
+                  "index": 0
+                },
+                {
+                  "id": "in2",
+                  "label": "B",
+                  "side": "left",
+                  "index": 1
+                },
+                {
+                  "id": "sum",
+                  "label": "S",
+                  "side": "right",
+                  "index": 0
+                },
+                {
+                  "id": "carry",
+                  "label": "C",
+                  "side": "right",
+                  "index": 1
+                }
+              ]
+            },
+            {
+              "id": "p6-box-out1",
+              "type": "OUTPUT",
+              "x": 740,
+              "y": 60,
+              "label": "OUT1",
+              "ports": [
+                {
+                  "id": "in",
+                  "label": "",
+                  "side": "left",
+                  "index": 0
+                }
+              ]
+            },
+            {
+              "id": "p6-box-out2",
+              "type": "OUTPUT",
+              "x": 740,
+              "y": 160,
+              "label": "OUT2",
+              "ports": [
+                {
+                  "id": "in",
+                  "label": "",
+                  "side": "left",
+                  "index": 0
+                }
+              ]
+            },
+            {
+              "id": "p6-box-out3",
+              "type": "OUTPUT",
+              "x": 740,
+              "y": 260,
+              "label": "OUT3",
+              "ports": [
+                {
+                  "id": "in",
+                  "label": "",
+                  "side": "left",
+                  "index": 0
+                }
+              ]
+            },
+            {
+              "id": "p6-box-out4",
+              "type": "OUTPUT",
+              "x": 740,
+              "y": 360,
+              "label": "OUT4",
+              "ports": [
+                {
+                  "id": "in",
+                  "label": "",
+                  "side": "left",
+                  "index": 0
+                }
+              ]
+            },
+            {
+              "id": "p6-box-out5",
+              "type": "OUTPUT",
+              "x": 740,
+              "y": 460,
+              "label": "OUT5",
+              "ports": [
+                {
+                  "id": "in",
+                  "label": "",
+                  "side": "left",
+                  "index": 0
+                }
+              ]
+            }
+          ],
+          "wires": [
+            {
+              "id": "p6-box-w1",
+              "sourceComponentId": "p6-box-in4",
+              "sourcePortId": "out",
+              "targetComponentId": "p6-box-not0",
+              "targetPortId": "in",
+              "value": 0
+            },
+            {
+              "id": "p6-box-w2",
+              "sourceComponentId": "p6-box-not0",
+              "sourcePortId": "out",
+              "targetComponentId": "p6-box-out5",
+              "targetPortId": "in",
+              "value": 0
+            },
+            {
+              "id": "p6-box-w3",
+              "sourceComponentId": "p6-box-in3",
+              "sourcePortId": "out",
+              "targetComponentId": "p6-box-ha1",
+              "targetPortId": "in1",
+              "value": 0
+            },
+            {
+              "id": "p6-box-w4",
+              "sourceComponentId": "p6-box-in4",
+              "sourcePortId": "out",
+              "targetComponentId": "p6-box-ha1",
+              "targetPortId": "in2",
+              "value": 0
+            },
+            {
+              "id": "p6-box-w5",
+              "sourceComponentId": "p6-box-ha1",
+              "sourcePortId": "sum",
+              "targetComponentId": "p6-box-out4",
+              "targetPortId": "in",
+              "value": 0
+            },
+            {
+              "id": "p6-box-w6",
+              "sourceComponentId": "p6-box-in2",
+              "sourcePortId": "out",
+              "targetComponentId": "p6-box-ha2",
+              "targetPortId": "in1",
+              "value": 0
+            },
+            {
+              "id": "p6-box-w7",
+              "sourceComponentId": "p6-box-ha1",
+              "sourcePortId": "carry",
+              "targetComponentId": "p6-box-ha2",
+              "targetPortId": "in2",
+              "value": 0
+            },
+            {
+              "id": "p6-box-w8",
+              "sourceComponentId": "p6-box-ha2",
+              "sourcePortId": "sum",
+              "targetComponentId": "p6-box-out3",
+              "targetPortId": "in",
+              "value": 0
+            },
+            {
+              "id": "p6-box-w9",
+              "sourceComponentId": "p6-box-in1",
+              "sourcePortId": "out",
+              "targetComponentId": "p6-box-ha3",
+              "targetPortId": "in1",
+              "value": 0
+            },
+            {
+              "id": "p6-box-w10",
+              "sourceComponentId": "p6-box-ha2",
+              "sourcePortId": "carry",
+              "targetComponentId": "p6-box-ha3",
+              "targetPortId": "in2",
+              "value": 0
+            },
+            {
+              "id": "p6-box-w11",
+              "sourceComponentId": "p6-box-ha3",
+              "sourcePortId": "sum",
+              "targetComponentId": "p6-box-out2",
+              "targetPortId": "in",
+              "value": 0
+            },
+            {
+              "id": "p6-box-w12",
+              "sourceComponentId": "p6-box-ha3",
+              "sourcePortId": "carry",
+              "targetComponentId": "p6-box-out1",
+              "targetPortId": "in",
+              "value": 0
+            }
+          ]
+        }
+      },
+      {
+        "id": "p6-not-c0",
+        "type": "NOT",
+        "x": 300,
+        "y": 540,
+        "label": "",
+        "ports": [
+          {
+            "id": "in",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "p6-and-c0",
+        "type": "AND",
+        "x": 480,
+        "y": 520,
+        "label": "",
+        "ports": [
+          {
+            "id": "in1",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "in2",
+            "label": "",
+            "side": "left",
+            "index": 1
+          },
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "p6-out1",
+        "type": "OUTPUT",
+        "x": 660,
+        "y": 60,
+        "label": "OUT1",
+        "ports": [
+          {
+            "id": "in",
+            "label": "",
+            "side": "left",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "p6-out2",
+        "type": "OUTPUT",
+        "x": 660,
+        "y": 150,
+        "label": "OUT2",
+        "ports": [
+          {
+            "id": "in",
+            "label": "",
+            "side": "left",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "p6-out3",
+        "type": "OUTPUT",
+        "x": 660,
+        "y": 240,
+        "label": "OUT3",
+        "ports": [
+          {
+            "id": "in",
+            "label": "",
+            "side": "left",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "p6-out4",
+        "type": "OUTPUT",
+        "x": 660,
+        "y": 330,
+        "label": "OUT4",
+        "ports": [
+          {
+            "id": "in",
+            "label": "",
+            "side": "left",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "p6-out5",
+        "type": "OUTPUT",
+        "x": 660,
+        "y": 420,
+        "label": "OUT5",
+        "ports": [
+          {
+            "id": "in",
+            "label": "",
+            "side": "left",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "p6-out6",
+        "type": "OUTPUT",
+        "x": 660,
+        "y": 510,
+        "label": "OUT6",
+        "ports": [
+          {
+            "id": "in",
+            "label": "",
+            "side": "left",
+            "index": 0
+          }
+        ]
+      }
+    ],
+    "wires": [
+      {
+        "id": "p6-w1",
+        "sourceComponentId": "p6-in1",
+        "sourcePortId": "out",
+        "targetComponentId": "p6-plus1",
+        "targetPortId": "in1",
+        "value": 0
+      },
+      {
+        "id": "p6-w2",
+        "sourceComponentId": "p6-in2",
+        "sourcePortId": "out",
+        "targetComponentId": "p6-plus1",
+        "targetPortId": "in2",
+        "value": 0
+      },
+      {
+        "id": "p6-w3",
+        "sourceComponentId": "p6-in3",
+        "sourcePortId": "out",
+        "targetComponentId": "p6-plus1",
+        "targetPortId": "in3",
+        "value": 0
+      },
+      {
+        "id": "p6-w4",
+        "sourceComponentId": "p6-in4",
+        "sourcePortId": "out",
+        "targetComponentId": "p6-plus1",
+        "targetPortId": "in4",
+        "value": 0
+      },
+      {
+        "id": "p6-w5",
+        "sourceComponentId": "p6-in4",
+        "sourcePortId": "out",
+        "targetComponentId": "p6-not-c0",
+        "targetPortId": "in",
+        "value": 0
+      },
+      {
+        "id": "p6-w6",
+        "sourceComponentId": "p6-in4",
+        "sourcePortId": "out",
+        "targetComponentId": "p6-and-c0",
+        "targetPortId": "in1",
+        "value": 0
+      },
+      {
+        "id": "p6-w7",
+        "sourceComponentId": "p6-not-c0",
+        "sourcePortId": "out",
+        "targetComponentId": "p6-and-c0",
+        "targetPortId": "in2",
+        "value": 0
+      },
+      {
+        "id": "p6-w8",
+        "sourceComponentId": "p6-and-c0",
+        "sourcePortId": "out",
+        "targetComponentId": "p6-out1",
+        "targetPortId": "in",
+        "value": 0
+      },
+      {
+        "id": "p6-w9",
+        "sourceComponentId": "p6-plus1",
+        "sourcePortId": "out2",
+        "targetComponentId": "p6-out2",
+        "targetPortId": "in",
+        "value": 0
+      },
+      {
+        "id": "p6-w10",
+        "sourceComponentId": "p6-plus1",
+        "sourcePortId": "out3",
+        "targetComponentId": "p6-out3",
+        "targetPortId": "in",
+        "value": 0
+      },
+      {
+        "id": "p6-w11",
+        "sourceComponentId": "p6-plus1",
+        "sourcePortId": "out4",
+        "targetComponentId": "p6-out4",
+        "targetPortId": "in",
+        "value": 0
+      },
+      {
+        "id": "p6-w12",
+        "sourceComponentId": "p6-plus1",
+        "sourcePortId": "out5",
+        "targetComponentId": "p6-out5",
+        "targetPortId": "in",
+        "value": 0
+      },
+      {
+        "id": "p6-w13",
+        "sourceComponentId": "p6-and-c0",
+        "sourcePortId": "out",
+        "targetComponentId": "p6-out6",
+        "targetPortId": "in",
+        "value": 0
+      }
+    ]
+  }
+}

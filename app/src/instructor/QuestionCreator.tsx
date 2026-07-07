@@ -68,7 +68,7 @@ const INNER_MODES: { mode: BuildMode; label: string }[] = [
 const CRITERIA: { value: TurbotSuccessCriterion; label: string; hint: string }[] = [
   { value: 'reach-and-stop', label: 'Reach goal and stop', hint: 'The turbot must halt itself (motor 00) on the goal cell.' },
   { value: 'pass-through', label: 'Pass through goal', hint: 'The turbot must visit the goal cell at some step.' },
-  { value: 'return-to-start', label: 'Return to start', hint: 'The turbot must end on its starting cell.' },
+  { value: 'return-to-start', label: 'Return to start', hint: 'The turbot must end on its starting cell — first visiting the goal cell, if the arena has one.' },
 ];
 
 type ArenaTool = 'block' | 'goal' | 'erase' | 'start';
@@ -118,6 +118,12 @@ export function QuestionCreator({ assignmentId, existingQuestion, onSave, onCanc
   // One representation system per question (governs grading + the live check).
   const [rep, setRep] = useState<RepSystem>(
     () => existingQuestion?.representation === 'tally' ? 'tally' : 'binary',
+  );
+
+  // TM-only acceptance strictness: require the head to halt on the output
+  // block's rightmost cell (standard position). Off = position-agnostic.
+  const [requireStandardHalt, setRequireStandardHalt] = useState<boolean>(
+    () => existingQuestion?.requireStandardHaltPosition ?? false,
   );
 
   const [inputs, setInputs] = useState<AuthoredInputGroup[]>(() =>
@@ -354,6 +360,8 @@ export function QuestionCreator({ assignmentId, existingQuestion, onSave, onCanc
       statement: statement.trim(),
       buildMode: mode,
       representation: rep,
+      // TM-only acceptance strictness; omitted (default) unless checked.
+      ...(mode === 'TM' && requireStandardHalt ? { requireStandardHaltPosition: true } : {}),
       cc_spec: bank.spec,
       test_cases: bank.test_cases,
     });
@@ -431,6 +439,17 @@ export function QuestionCreator({ assignmentId, existingQuestion, onSave, onCanc
             <h4 className="instructor-subhead">Representation</h4>
             <RepToggle value={rep} onChange={setRep} />
           </div>
+        )}
+        {mode === 'TM' && (
+          <label className="instructor-inline-field">
+            <input
+              type="checkbox"
+              checked={requireStandardHalt}
+              onChange={(e) => setRequireStandardHalt(e.target.checked)}
+            />
+            Require standard halt position (the head must halt on the output block&#8217;s
+            rightmost cell)
+          </label>
         )}
         {isOpen && (
           <p className="instructor-hint">

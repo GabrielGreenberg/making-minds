@@ -41,7 +41,8 @@ import type {
 } from '../types';
 import { evaluateCCInputs } from './cc';
 import { evaluateSCSequence } from './sc';
-import { evaluateFSMSequence } from './fsm';
+import { evaluateFSMSymbolSequence } from './fsm';
+import { fsmNotation } from './notation';
 import { evaluateTMSequence } from './tm';
 import { runTurbot, evaluateTurbotCriterion, validateTurbotTM, validateTurbotFSM } from './turbot';
 import { validatePerceptionMachine, runPerceptionCase } from './perception';
@@ -129,7 +130,9 @@ export function gradeQuestion(
 
   // Tape axis (TM): widths are content-relative — the tape codec lays values out
   // and locates the output block by content, so no cc_spec is required.
-  if (axis === 'tape') return gradeTape(question.id, circuit, cases, rep);
+  if (axis === 'tape') {
+    return gradeTape(question.id, circuit, cases, rep, question.requireStandardHaltPosition);
+  }
 
   // Space/time axes need the per-group widths from the authoring spec.
   const spec = question.cc_spec;
@@ -168,12 +171,15 @@ function gradeSpaceTimeCase(
     const steps = evaluateSCSequence(circuit.components, circuit.wires, enc.steps);
     raw = { axis: 'time', steps };
   } else {
-    // FSM — n=1: flatten the single wire to one input bit per step. Stage 1
-    // guarantees totality, so a valid FSM cannot halt mid-run; guard anyway.
-    const inputBits = enc.steps.map((s) => s[0]);
-    const r = evaluateFSMSequence(circuit.components, circuit.wires, inputBits);
+    // FSM — feed the FULL encoded row per step as one input symbol: symbol
+    // char i = input wire i (cc_spec declaration order = codec wire order).
+    // Stage 1 validated totality over this notation's whole alphabet, so a
+    // valid FSM cannot halt mid-run; guard anyway.
+    const notation = fsmNotation(layout.inputWidths.length, layout.outputWidths.length);
+    const symbols = enc.steps.map((s) => s.join(''));
+    const r = evaluateFSMSymbolSequence(circuit.components, circuit.wires, symbols, notation);
     if (r.halted) return reject(tc, 'machine halted before consuming the input');
-    raw = { axis: 'time', steps: r.outputBits.map((b) => [b]) };
+    raw = { axis: 'time', steps: r.outputs.map((sym) => sym.split('').map(Number)) };
   }
 
   // Acceptor (rep-level) before decoding; decode is total.
@@ -182,12 +188,16 @@ function gradeSpaceTimeCase(
   return { input: tc.inputs, expected: tc.outputs, got, pass: valuesEqual(got, tc.outputs) };
 }
 
-/** TM grading — the codec's tape axis, delegated to tmCodec. */
+/** TM grading — the codec's tape axis, delegated to tmCodec.
+ *  `requireStandardHaltPosition` (question-level, optional) tightens the
+ *  acceptor: the head must halt on the output block's rightmost cell.
+ *  Absent/false keeps the default position-agnostic acceptance. */
 function gradeTape(
   questionId: number,
   circuit: CircuitData,
   cases: TestCase[],
   rep: RepSystem,
+  requireStandardHaltPosition?: boolean,
 ): QuestionResult {
   const notation = notationForRepresentation(rep);
   const layout: CodecLayout = { axis: 'tape', rep, inputWidths: [], outputWidths: [] };
@@ -200,10 +210,12 @@ function gradeTape(
     const run = evaluateTMSequence(
       circuit.components,
       circuit.wires,
-      encodeTM(notation, tc.inputs),
+      // The case's optional layout hint (block separations) rides through
+      // untouched — the codec owns what it means; the grader stays agnostic.
+      encodeTM(notation, tc.inputs, tc.separations),
       notation,
     );
-    const rej = acceptTM(notation, run);
+    const rej = acceptTM(notation, run, { requireStandardHaltPosition });
     if (rej) return reject(tc, rej.reason);
     const got = decodeTM(notation, run.tape);
     return { input: tc.inputs, expected: tc.outputs, got: [got], pass: got === tc.outputs[0] };
@@ -263,8 +275,9 @@ function gradePerceptionCase(
 
 /**
  * Structural layout for a turbot brain's fixed sensor/motor interface, keyed
- * by inner mode. Only CC/SC read `inputWidths`/`outputWidths` in
- * validateMachine; FSM/TM ignore layout entirely (see machineValidation.ts).
+ * by inner mode. Only CC/SC brains reach validateMachine (FSM brains
+ * validate against turbotFsmNotation via validateTurbotFSM above; TM brains
+ * against validateTurbotTM), so only those two rows are read.
  */
 function turbotLayout(innerMode: BuildMode): CodecLayout {
   if (innerMode === 'SC') return { axis: 'time', rep: 'binary', inputWidths: [1], outputWidths: [1, 1] };
@@ -280,9 +293,11 @@ function gradeTurbot(question: AssignmentQuestion, circuit: CircuitData): Questi
   if (!cases || cases.length === 0) return skip(question.id, 'question has no turbot cases');
 
   // Stage 1: a TM brain is a *turbot TM* (per-state internal/external
-  // grammar, single actions) and an FSM brain a *turbot FSM* (2-bit motor
-  // outputs, "in:ij") — each with its own validator; CC/SC brains reuse the
-  // shared machine validation.
+  // grammar, single actions) with its own validator; an FSM brain validates
+  // through validateTurbotFSM, which delegates to turbotFsmNotation — the
+  // SAME notation runBrainStep executes and the store's label editor accepts
+  // (legacy 1-bit aliases and canonical 2-bit motor labels alike); CC/SC
+  // brains reuse the shared machine validation.
   // The question's encoding (representation) picks a turbot TM's internal
   // tape alphabet: binary {0,1,*}, unary (tally) {0,1}.
   const notation = notationForRepresentation(question.representation ?? 'binary');

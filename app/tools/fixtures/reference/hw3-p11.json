@@ -1,0 +1,2173 @@
+{
+  "question": {
+    "id": 11,
+    "label": "Problem 11",
+    "statement": "Change detector. Design a sequential machine (8 inputs, 1 output) that outputs 1 iff the current input differs in any way from the previous input.",
+    "buildMode": "SC",
+    "representation": "binary",
+    "perception": {
+      "rule": {
+        "kind": "change"
+      },
+      "width": 8
+    },
+    "perception_cases": [
+      {
+        "frames": [
+          [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ]
+        ],
+        "expected": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      {
+        "frames": [
+          [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            1,
+            0,
+            0,
+            1,
+            1,
+            0,
+            0,
+            1
+          ],
+          [
+            1,
+            0,
+            0,
+            1,
+            1,
+            0,
+            0,
+            1
+          ],
+          [
+            1,
+            0,
+            0,
+            1,
+            1,
+            0,
+            0,
+            1
+          ],
+          [
+            1,
+            0,
+            0,
+            1,
+            1,
+            0,
+            0,
+            1
+          ],
+          [
+            1,
+            0,
+            0,
+            1,
+            1,
+            0,
+            0,
+            1
+          ]
+        ],
+        "expected": [
+          0,
+          1,
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      {
+        "frames": [
+          [
+            1,
+            0,
+            0,
+            1,
+            1,
+            0,
+            0,
+            1
+          ],
+          [
+            1,
+            0,
+            0,
+            1,
+            1,
+            0,
+            0,
+            1
+          ],
+          [
+            1,
+            0,
+            0,
+            1,
+            1,
+            0,
+            0,
+            1
+          ],
+          [
+            1,
+            0,
+            0,
+            1,
+            1,
+            0,
+            0,
+            1
+          ],
+          [
+            1,
+            0,
+            0,
+            1,
+            1,
+            0,
+            0,
+            1
+          ],
+          [
+            1,
+            0,
+            0,
+            1,
+            1,
+            0,
+            0,
+            1
+          ]
+        ],
+        "expected": [
+          1,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      {
+        "frames": [
+          [
+            1,
+            0,
+            0,
+            1,
+            1,
+            0,
+            0,
+            1
+          ],
+          [
+            1,
+            0,
+            0,
+            1,
+            1,
+            0,
+            0,
+            1
+          ],
+          [
+            1,
+            0,
+            0,
+            1,
+            1,
+            0,
+            0,
+            1
+          ],
+          [
+            1,
+            0,
+            0,
+            1,
+            1,
+            0,
+            0,
+            1
+          ],
+          [
+            1,
+            0,
+            0,
+            1,
+            1,
+            0,
+            0,
+            1
+          ],
+          [
+            1,
+            0,
+            0,
+            1,
+            1,
+            0,
+            0,
+            1
+          ]
+        ],
+        "expected": [
+          1,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      {
+        "frames": [
+          [
+            0,
+            0,
+            1,
+            0,
+            1,
+            0,
+            1,
+            1
+          ],
+          [
+            0,
+            0,
+            1,
+            0,
+            1,
+            0,
+            1,
+            1
+          ],
+          [
+            0,
+            0,
+            1,
+            0,
+            1,
+            0,
+            1,
+            1
+          ],
+          [
+            1,
+            0,
+            0,
+            1,
+            1,
+            1,
+            0,
+            0
+          ],
+          [
+            1,
+            1,
+            0,
+            0,
+            0,
+            0,
+            1,
+            0
+          ],
+          [
+            1,
+            1,
+            0,
+            0,
+            0,
+            0,
+            1,
+            0
+          ],
+          [
+            1,
+            1,
+            0,
+            1,
+            0,
+            1,
+            0,
+            1
+          ],
+          [
+            1,
+            1,
+            0,
+            1,
+            0,
+            1,
+            0,
+            1
+          ]
+        ],
+        "expected": [
+          1,
+          0,
+          0,
+          1,
+          1,
+          0,
+          1,
+          0
+        ]
+      },
+      {
+        "frames": [
+          [
+            0,
+            1,
+            0,
+            0,
+            0,
+            1,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            1,
+            0,
+            1,
+            1,
+            0
+          ],
+          [
+            0,
+            0,
+            1,
+            1,
+            0,
+            1,
+            1,
+            0
+          ],
+          [
+            0,
+            0,
+            1,
+            1,
+            0,
+            1,
+            1,
+            0
+          ],
+          [
+            0,
+            0,
+            1,
+            1,
+            0,
+            1,
+            1,
+            0
+          ],
+          [
+            0,
+            0,
+            1,
+            1,
+            0,
+            1,
+            1,
+            0
+          ],
+          [
+            0,
+            0,
+            1,
+            1,
+            0,
+            1,
+            1,
+            0
+          ],
+          [
+            1,
+            1,
+            0,
+            0,
+            0,
+            1,
+            0,
+            1
+          ]
+        ],
+        "expected": [
+          1,
+          1,
+          1,
+          0,
+          0,
+          0,
+          0,
+          1
+        ]
+      },
+      {
+        "frames": [
+          [
+            1,
+            1,
+            1,
+            0,
+            0,
+            1,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            1,
+            1,
+            1,
+            1,
+            1,
+            0
+          ],
+          [
+            0,
+            0,
+            1,
+            1,
+            1,
+            1,
+            1,
+            0
+          ],
+          [
+            0,
+            0,
+            1,
+            1,
+            1,
+            1,
+            1,
+            0
+          ],
+          [
+            1,
+            1,
+            1,
+            1,
+            1,
+            0,
+            1,
+            0
+          ],
+          [
+            0,
+            1,
+            1,
+            0,
+            1,
+            0,
+            0,
+            1
+          ],
+          [
+            0,
+            1,
+            0,
+            1,
+            0,
+            1,
+            1,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            1,
+            0,
+            0,
+            0,
+            1
+          ]
+        ],
+        "expected": [
+          1,
+          1,
+          0,
+          0,
+          1,
+          1,
+          1,
+          1
+        ]
+      },
+      {
+        "frames": [
+          [
+            1,
+            1,
+            1,
+            1,
+            1,
+            0,
+            0,
+            0
+          ],
+          [
+            1,
+            1,
+            1,
+            1,
+            1,
+            0,
+            0,
+            0
+          ],
+          [
+            1,
+            1,
+            1,
+            0,
+            1,
+            0,
+            1,
+            0
+          ],
+          [
+            1,
+            1,
+            0,
+            0,
+            0,
+            0,
+            0,
+            1
+          ],
+          [
+            0,
+            1,
+            1,
+            1,
+            1,
+            0,
+            1,
+            0
+          ],
+          [
+            0,
+            1,
+            1,
+            1,
+            1,
+            0,
+            1,
+            0
+          ],
+          [
+            0,
+            0,
+            1,
+            0,
+            0,
+            1,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            1,
+            0,
+            0,
+            1,
+            0,
+            0
+          ]
+        ],
+        "expected": [
+          1,
+          0,
+          1,
+          1,
+          1,
+          0,
+          1,
+          0
+        ]
+      }
+    ]
+  },
+  "correct": {
+    "components": [
+      {
+        "id": "pch-1",
+        "type": "INPUT",
+        "x": 60,
+        "y": 60,
+        "label": "IN1",
+        "ports": [
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "pch-2",
+        "type": "INPUT",
+        "x": 60,
+        "y": 230,
+        "label": "IN2",
+        "ports": [
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "pch-3",
+        "type": "INPUT",
+        "x": 60,
+        "y": 400,
+        "label": "IN3",
+        "ports": [
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "pch-4",
+        "type": "INPUT",
+        "x": 60,
+        "y": 570,
+        "label": "IN4",
+        "ports": [
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "pch-5",
+        "type": "INPUT",
+        "x": 60,
+        "y": 740,
+        "label": "IN5",
+        "ports": [
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "pch-6",
+        "type": "INPUT",
+        "x": 60,
+        "y": 910,
+        "label": "IN6",
+        "ports": [
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "pch-7",
+        "type": "INPUT",
+        "x": 60,
+        "y": 1080,
+        "label": "IN7",
+        "ports": [
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "pch-8",
+        "type": "INPUT",
+        "x": 60,
+        "y": 1250,
+        "label": "IN8",
+        "ports": [
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "pch-9",
+        "type": "MEM",
+        "x": 200,
+        "y": 140,
+        "label": "M1",
+        "ports": [
+          {
+            "id": "mout",
+            "label": "M_OUT",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "min",
+            "label": "M_IN",
+            "side": "right",
+            "index": 0
+          }
+        ],
+        "memDirection": "right-to-left",
+        "storedValue": 0
+      },
+      {
+        "id": "pch-11",
+        "type": "XOR",
+        "x": 400,
+        "y": 60,
+        "label": "",
+        "ports": [
+          {
+            "id": "in1",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "in2",
+            "label": "",
+            "side": "left",
+            "index": 1
+          },
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "pch-14",
+        "type": "MEM",
+        "x": 200,
+        "y": 310,
+        "label": "M2",
+        "ports": [
+          {
+            "id": "mout",
+            "label": "M_OUT",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "min",
+            "label": "M_IN",
+            "side": "right",
+            "index": 0
+          }
+        ],
+        "memDirection": "right-to-left",
+        "storedValue": 0
+      },
+      {
+        "id": "pch-16",
+        "type": "XOR",
+        "x": 400,
+        "y": 230,
+        "label": "",
+        "ports": [
+          {
+            "id": "in1",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "in2",
+            "label": "",
+            "side": "left",
+            "index": 1
+          },
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "pch-19",
+        "type": "MEM",
+        "x": 200,
+        "y": 480,
+        "label": "M3",
+        "ports": [
+          {
+            "id": "mout",
+            "label": "M_OUT",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "min",
+            "label": "M_IN",
+            "side": "right",
+            "index": 0
+          }
+        ],
+        "memDirection": "right-to-left",
+        "storedValue": 0
+      },
+      {
+        "id": "pch-21",
+        "type": "XOR",
+        "x": 400,
+        "y": 400,
+        "label": "",
+        "ports": [
+          {
+            "id": "in1",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "in2",
+            "label": "",
+            "side": "left",
+            "index": 1
+          },
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "pch-24",
+        "type": "MEM",
+        "x": 200,
+        "y": 650,
+        "label": "M4",
+        "ports": [
+          {
+            "id": "mout",
+            "label": "M_OUT",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "min",
+            "label": "M_IN",
+            "side": "right",
+            "index": 0
+          }
+        ],
+        "memDirection": "right-to-left",
+        "storedValue": 0
+      },
+      {
+        "id": "pch-26",
+        "type": "XOR",
+        "x": 400,
+        "y": 570,
+        "label": "",
+        "ports": [
+          {
+            "id": "in1",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "in2",
+            "label": "",
+            "side": "left",
+            "index": 1
+          },
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "pch-29",
+        "type": "MEM",
+        "x": 200,
+        "y": 820,
+        "label": "M5",
+        "ports": [
+          {
+            "id": "mout",
+            "label": "M_OUT",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "min",
+            "label": "M_IN",
+            "side": "right",
+            "index": 0
+          }
+        ],
+        "memDirection": "right-to-left",
+        "storedValue": 0
+      },
+      {
+        "id": "pch-31",
+        "type": "XOR",
+        "x": 400,
+        "y": 740,
+        "label": "",
+        "ports": [
+          {
+            "id": "in1",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "in2",
+            "label": "",
+            "side": "left",
+            "index": 1
+          },
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "pch-34",
+        "type": "MEM",
+        "x": 200,
+        "y": 990,
+        "label": "M6",
+        "ports": [
+          {
+            "id": "mout",
+            "label": "M_OUT",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "min",
+            "label": "M_IN",
+            "side": "right",
+            "index": 0
+          }
+        ],
+        "memDirection": "right-to-left",
+        "storedValue": 0
+      },
+      {
+        "id": "pch-36",
+        "type": "XOR",
+        "x": 400,
+        "y": 910,
+        "label": "",
+        "ports": [
+          {
+            "id": "in1",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "in2",
+            "label": "",
+            "side": "left",
+            "index": 1
+          },
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "pch-39",
+        "type": "MEM",
+        "x": 200,
+        "y": 1160,
+        "label": "M7",
+        "ports": [
+          {
+            "id": "mout",
+            "label": "M_OUT",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "min",
+            "label": "M_IN",
+            "side": "right",
+            "index": 0
+          }
+        ],
+        "memDirection": "right-to-left",
+        "storedValue": 0
+      },
+      {
+        "id": "pch-41",
+        "type": "XOR",
+        "x": 400,
+        "y": 1080,
+        "label": "",
+        "ports": [
+          {
+            "id": "in1",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "in2",
+            "label": "",
+            "side": "left",
+            "index": 1
+          },
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "pch-44",
+        "type": "MEM",
+        "x": 200,
+        "y": 1330,
+        "label": "M8",
+        "ports": [
+          {
+            "id": "mout",
+            "label": "M_OUT",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "min",
+            "label": "M_IN",
+            "side": "right",
+            "index": 0
+          }
+        ],
+        "memDirection": "right-to-left",
+        "storedValue": 0
+      },
+      {
+        "id": "pch-46",
+        "type": "XOR",
+        "x": 400,
+        "y": 1250,
+        "label": "",
+        "ports": [
+          {
+            "id": "in1",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "in2",
+            "label": "",
+            "side": "left",
+            "index": 1
+          },
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "pch-49",
+        "type": "OR",
+        "x": 620,
+        "y": 145,
+        "label": "",
+        "ports": [
+          {
+            "id": "in1",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "in2",
+            "label": "",
+            "side": "left",
+            "index": 1
+          },
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "pch-52",
+        "type": "OR",
+        "x": 800,
+        "y": 273,
+        "label": "",
+        "ports": [
+          {
+            "id": "in1",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "in2",
+            "label": "",
+            "side": "left",
+            "index": 1
+          },
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "pch-55",
+        "type": "OR",
+        "x": 980,
+        "y": 422,
+        "label": "",
+        "ports": [
+          {
+            "id": "in1",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "in2",
+            "label": "",
+            "side": "left",
+            "index": 1
+          },
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "pch-58",
+        "type": "OR",
+        "x": 1160,
+        "y": 581,
+        "label": "",
+        "ports": [
+          {
+            "id": "in1",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "in2",
+            "label": "",
+            "side": "left",
+            "index": 1
+          },
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "pch-61",
+        "type": "OR",
+        "x": 1340,
+        "y": 746,
+        "label": "",
+        "ports": [
+          {
+            "id": "in1",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "in2",
+            "label": "",
+            "side": "left",
+            "index": 1
+          },
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "pch-64",
+        "type": "OR",
+        "x": 1520,
+        "y": 913,
+        "label": "",
+        "ports": [
+          {
+            "id": "in1",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "in2",
+            "label": "",
+            "side": "left",
+            "index": 1
+          },
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "pch-67",
+        "type": "OR",
+        "x": 1700,
+        "y": 1082,
+        "label": "",
+        "ports": [
+          {
+            "id": "in1",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "in2",
+            "label": "",
+            "side": "left",
+            "index": 1
+          },
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "pch-70",
+        "type": "OUTPUT",
+        "x": 1940,
+        "y": 1097,
+        "label": "OUT1",
+        "ports": [
+          {
+            "id": "in",
+            "label": "",
+            "side": "left",
+            "index": 0
+          }
+        ]
+      }
+    ],
+    "wires": [
+      {
+        "id": "pch-10",
+        "sourceComponentId": "pch-1",
+        "sourcePortId": "out",
+        "targetComponentId": "pch-9",
+        "targetPortId": "min",
+        "value": 0
+      },
+      {
+        "id": "pch-12",
+        "sourceComponentId": "pch-1",
+        "sourcePortId": "out",
+        "targetComponentId": "pch-11",
+        "targetPortId": "in1",
+        "value": 0
+      },
+      {
+        "id": "pch-13",
+        "sourceComponentId": "pch-9",
+        "sourcePortId": "mout",
+        "targetComponentId": "pch-11",
+        "targetPortId": "in2",
+        "value": 0
+      },
+      {
+        "id": "pch-15",
+        "sourceComponentId": "pch-2",
+        "sourcePortId": "out",
+        "targetComponentId": "pch-14",
+        "targetPortId": "min",
+        "value": 0
+      },
+      {
+        "id": "pch-17",
+        "sourceComponentId": "pch-2",
+        "sourcePortId": "out",
+        "targetComponentId": "pch-16",
+        "targetPortId": "in1",
+        "value": 0
+      },
+      {
+        "id": "pch-18",
+        "sourceComponentId": "pch-14",
+        "sourcePortId": "mout",
+        "targetComponentId": "pch-16",
+        "targetPortId": "in2",
+        "value": 0
+      },
+      {
+        "id": "pch-20",
+        "sourceComponentId": "pch-3",
+        "sourcePortId": "out",
+        "targetComponentId": "pch-19",
+        "targetPortId": "min",
+        "value": 0
+      },
+      {
+        "id": "pch-22",
+        "sourceComponentId": "pch-3",
+        "sourcePortId": "out",
+        "targetComponentId": "pch-21",
+        "targetPortId": "in1",
+        "value": 0
+      },
+      {
+        "id": "pch-23",
+        "sourceComponentId": "pch-19",
+        "sourcePortId": "mout",
+        "targetComponentId": "pch-21",
+        "targetPortId": "in2",
+        "value": 0
+      },
+      {
+        "id": "pch-25",
+        "sourceComponentId": "pch-4",
+        "sourcePortId": "out",
+        "targetComponentId": "pch-24",
+        "targetPortId": "min",
+        "value": 0
+      },
+      {
+        "id": "pch-27",
+        "sourceComponentId": "pch-4",
+        "sourcePortId": "out",
+        "targetComponentId": "pch-26",
+        "targetPortId": "in1",
+        "value": 0
+      },
+      {
+        "id": "pch-28",
+        "sourceComponentId": "pch-24",
+        "sourcePortId": "mout",
+        "targetComponentId": "pch-26",
+        "targetPortId": "in2",
+        "value": 0
+      },
+      {
+        "id": "pch-30",
+        "sourceComponentId": "pch-5",
+        "sourcePortId": "out",
+        "targetComponentId": "pch-29",
+        "targetPortId": "min",
+        "value": 0
+      },
+      {
+        "id": "pch-32",
+        "sourceComponentId": "pch-5",
+        "sourcePortId": "out",
+        "targetComponentId": "pch-31",
+        "targetPortId": "in1",
+        "value": 0
+      },
+      {
+        "id": "pch-33",
+        "sourceComponentId": "pch-29",
+        "sourcePortId": "mout",
+        "targetComponentId": "pch-31",
+        "targetPortId": "in2",
+        "value": 0
+      },
+      {
+        "id": "pch-35",
+        "sourceComponentId": "pch-6",
+        "sourcePortId": "out",
+        "targetComponentId": "pch-34",
+        "targetPortId": "min",
+        "value": 0
+      },
+      {
+        "id": "pch-37",
+        "sourceComponentId": "pch-6",
+        "sourcePortId": "out",
+        "targetComponentId": "pch-36",
+        "targetPortId": "in1",
+        "value": 0
+      },
+      {
+        "id": "pch-38",
+        "sourceComponentId": "pch-34",
+        "sourcePortId": "mout",
+        "targetComponentId": "pch-36",
+        "targetPortId": "in2",
+        "value": 0
+      },
+      {
+        "id": "pch-40",
+        "sourceComponentId": "pch-7",
+        "sourcePortId": "out",
+        "targetComponentId": "pch-39",
+        "targetPortId": "min",
+        "value": 0
+      },
+      {
+        "id": "pch-42",
+        "sourceComponentId": "pch-7",
+        "sourcePortId": "out",
+        "targetComponentId": "pch-41",
+        "targetPortId": "in1",
+        "value": 0
+      },
+      {
+        "id": "pch-43",
+        "sourceComponentId": "pch-39",
+        "sourcePortId": "mout",
+        "targetComponentId": "pch-41",
+        "targetPortId": "in2",
+        "value": 0
+      },
+      {
+        "id": "pch-45",
+        "sourceComponentId": "pch-8",
+        "sourcePortId": "out",
+        "targetComponentId": "pch-44",
+        "targetPortId": "min",
+        "value": 0
+      },
+      {
+        "id": "pch-47",
+        "sourceComponentId": "pch-8",
+        "sourcePortId": "out",
+        "targetComponentId": "pch-46",
+        "targetPortId": "in1",
+        "value": 0
+      },
+      {
+        "id": "pch-48",
+        "sourceComponentId": "pch-44",
+        "sourcePortId": "mout",
+        "targetComponentId": "pch-46",
+        "targetPortId": "in2",
+        "value": 0
+      },
+      {
+        "id": "pch-50",
+        "sourceComponentId": "pch-11",
+        "sourcePortId": "out",
+        "targetComponentId": "pch-49",
+        "targetPortId": "in1",
+        "value": 0
+      },
+      {
+        "id": "pch-51",
+        "sourceComponentId": "pch-16",
+        "sourcePortId": "out",
+        "targetComponentId": "pch-49",
+        "targetPortId": "in2",
+        "value": 0
+      },
+      {
+        "id": "pch-53",
+        "sourceComponentId": "pch-49",
+        "sourcePortId": "out",
+        "targetComponentId": "pch-52",
+        "targetPortId": "in1",
+        "value": 0
+      },
+      {
+        "id": "pch-54",
+        "sourceComponentId": "pch-21",
+        "sourcePortId": "out",
+        "targetComponentId": "pch-52",
+        "targetPortId": "in2",
+        "value": 0
+      },
+      {
+        "id": "pch-56",
+        "sourceComponentId": "pch-52",
+        "sourcePortId": "out",
+        "targetComponentId": "pch-55",
+        "targetPortId": "in1",
+        "value": 0
+      },
+      {
+        "id": "pch-57",
+        "sourceComponentId": "pch-26",
+        "sourcePortId": "out",
+        "targetComponentId": "pch-55",
+        "targetPortId": "in2",
+        "value": 0
+      },
+      {
+        "id": "pch-59",
+        "sourceComponentId": "pch-55",
+        "sourcePortId": "out",
+        "targetComponentId": "pch-58",
+        "targetPortId": "in1",
+        "value": 0
+      },
+      {
+        "id": "pch-60",
+        "sourceComponentId": "pch-31",
+        "sourcePortId": "out",
+        "targetComponentId": "pch-58",
+        "targetPortId": "in2",
+        "value": 0
+      },
+      {
+        "id": "pch-62",
+        "sourceComponentId": "pch-58",
+        "sourcePortId": "out",
+        "targetComponentId": "pch-61",
+        "targetPortId": "in1",
+        "value": 0
+      },
+      {
+        "id": "pch-63",
+        "sourceComponentId": "pch-36",
+        "sourcePortId": "out",
+        "targetComponentId": "pch-61",
+        "targetPortId": "in2",
+        "value": 0
+      },
+      {
+        "id": "pch-65",
+        "sourceComponentId": "pch-61",
+        "sourcePortId": "out",
+        "targetComponentId": "pch-64",
+        "targetPortId": "in1",
+        "value": 0
+      },
+      {
+        "id": "pch-66",
+        "sourceComponentId": "pch-41",
+        "sourcePortId": "out",
+        "targetComponentId": "pch-64",
+        "targetPortId": "in2",
+        "value": 0
+      },
+      {
+        "id": "pch-68",
+        "sourceComponentId": "pch-64",
+        "sourcePortId": "out",
+        "targetComponentId": "pch-67",
+        "targetPortId": "in1",
+        "value": 0
+      },
+      {
+        "id": "pch-69",
+        "sourceComponentId": "pch-46",
+        "sourcePortId": "out",
+        "targetComponentId": "pch-67",
+        "targetPortId": "in2",
+        "value": 0
+      },
+      {
+        "id": "pch-71",
+        "sourceComponentId": "pch-67",
+        "sourcePortId": "out",
+        "targetComponentId": "pch-70",
+        "targetPortId": "in",
+        "value": 0
+      }
+    ]
+  },
+  "broken": {
+    "components": [
+      {
+        "id": "pch-1",
+        "type": "INPUT",
+        "x": 60,
+        "y": 60,
+        "label": "IN1",
+        "ports": [
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "pch-2",
+        "type": "INPUT",
+        "x": 60,
+        "y": 170,
+        "label": "IN2",
+        "ports": [
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "pch-3",
+        "type": "INPUT",
+        "x": 60,
+        "y": 280,
+        "label": "IN3",
+        "ports": [
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "pch-4",
+        "type": "INPUT",
+        "x": 60,
+        "y": 390,
+        "label": "IN4",
+        "ports": [
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "pch-5",
+        "type": "INPUT",
+        "x": 60,
+        "y": 500,
+        "label": "IN5",
+        "ports": [
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "pch-6",
+        "type": "INPUT",
+        "x": 60,
+        "y": 610,
+        "label": "IN6",
+        "ports": [
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "pch-7",
+        "type": "INPUT",
+        "x": 60,
+        "y": 720,
+        "label": "IN7",
+        "ports": [
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "pch-8",
+        "type": "INPUT",
+        "x": 60,
+        "y": 830,
+        "label": "IN8",
+        "ports": [
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "pch-9",
+        "type": "OR",
+        "x": 263,
+        "y": 100,
+        "label": "",
+        "ports": [
+          {
+            "id": "in1",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "in2",
+            "label": "",
+            "side": "left",
+            "index": 1
+          },
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "pch-12",
+        "type": "OR",
+        "x": 443,
+        "y": 183,
+        "label": "",
+        "ports": [
+          {
+            "id": "in1",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "in2",
+            "label": "",
+            "side": "left",
+            "index": 1
+          },
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "pch-15",
+        "type": "OR",
+        "x": 623,
+        "y": 279,
+        "label": "",
+        "ports": [
+          {
+            "id": "in1",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "in2",
+            "label": "",
+            "side": "left",
+            "index": 1
+          },
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "pch-18",
+        "type": "OR",
+        "x": 803,
+        "y": 382,
+        "label": "",
+        "ports": [
+          {
+            "id": "in1",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "in2",
+            "label": "",
+            "side": "left",
+            "index": 1
+          },
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "pch-21",
+        "type": "OR",
+        "x": 983,
+        "y": 488,
+        "label": "",
+        "ports": [
+          {
+            "id": "in1",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "in2",
+            "label": "",
+            "side": "left",
+            "index": 1
+          },
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "pch-24",
+        "type": "OR",
+        "x": 1163,
+        "y": 597,
+        "label": "",
+        "ports": [
+          {
+            "id": "in1",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "in2",
+            "label": "",
+            "side": "left",
+            "index": 1
+          },
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "pch-27",
+        "type": "OR",
+        "x": 1343,
+        "y": 706,
+        "label": "",
+        "ports": [
+          {
+            "id": "in1",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "in2",
+            "label": "",
+            "side": "left",
+            "index": 1
+          },
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "pch-30",
+        "type": "OUTPUT",
+        "x": 1540,
+        "y": 721,
+        "label": "OUT1",
+        "ports": [
+          {
+            "id": "in",
+            "label": "",
+            "side": "left",
+            "index": 0
+          }
+        ]
+      }
+    ],
+    "wires": [
+      {
+        "id": "pch-10",
+        "sourceComponentId": "pch-1",
+        "sourcePortId": "out",
+        "targetComponentId": "pch-9",
+        "targetPortId": "in1",
+        "value": 0
+      },
+      {
+        "id": "pch-11",
+        "sourceComponentId": "pch-2",
+        "sourcePortId": "out",
+        "targetComponentId": "pch-9",
+        "targetPortId": "in2",
+        "value": 0
+      },
+      {
+        "id": "pch-13",
+        "sourceComponentId": "pch-9",
+        "sourcePortId": "out",
+        "targetComponentId": "pch-12",
+        "targetPortId": "in1",
+        "value": 0
+      },
+      {
+        "id": "pch-14",
+        "sourceComponentId": "pch-3",
+        "sourcePortId": "out",
+        "targetComponentId": "pch-12",
+        "targetPortId": "in2",
+        "value": 0
+      },
+      {
+        "id": "pch-16",
+        "sourceComponentId": "pch-12",
+        "sourcePortId": "out",
+        "targetComponentId": "pch-15",
+        "targetPortId": "in1",
+        "value": 0
+      },
+      {
+        "id": "pch-17",
+        "sourceComponentId": "pch-4",
+        "sourcePortId": "out",
+        "targetComponentId": "pch-15",
+        "targetPortId": "in2",
+        "value": 0
+      },
+      {
+        "id": "pch-19",
+        "sourceComponentId": "pch-15",
+        "sourcePortId": "out",
+        "targetComponentId": "pch-18",
+        "targetPortId": "in1",
+        "value": 0
+      },
+      {
+        "id": "pch-20",
+        "sourceComponentId": "pch-5",
+        "sourcePortId": "out",
+        "targetComponentId": "pch-18",
+        "targetPortId": "in2",
+        "value": 0
+      },
+      {
+        "id": "pch-22",
+        "sourceComponentId": "pch-18",
+        "sourcePortId": "out",
+        "targetComponentId": "pch-21",
+        "targetPortId": "in1",
+        "value": 0
+      },
+      {
+        "id": "pch-23",
+        "sourceComponentId": "pch-6",
+        "sourcePortId": "out",
+        "targetComponentId": "pch-21",
+        "targetPortId": "in2",
+        "value": 0
+      },
+      {
+        "id": "pch-25",
+        "sourceComponentId": "pch-21",
+        "sourcePortId": "out",
+        "targetComponentId": "pch-24",
+        "targetPortId": "in1",
+        "value": 0
+      },
+      {
+        "id": "pch-26",
+        "sourceComponentId": "pch-7",
+        "sourcePortId": "out",
+        "targetComponentId": "pch-24",
+        "targetPortId": "in2",
+        "value": 0
+      },
+      {
+        "id": "pch-28",
+        "sourceComponentId": "pch-24",
+        "sourcePortId": "out",
+        "targetComponentId": "pch-27",
+        "targetPortId": "in1",
+        "value": 0
+      },
+      {
+        "id": "pch-29",
+        "sourceComponentId": "pch-8",
+        "sourcePortId": "out",
+        "targetComponentId": "pch-27",
+        "targetPortId": "in2",
+        "value": 0
+      },
+      {
+        "id": "pch-31",
+        "sourceComponentId": "pch-27",
+        "sourcePortId": "out",
+        "targetComponentId": "pch-30",
+        "targetPortId": "in",
+        "value": 0
+      }
+    ]
+  }
+}

@@ -23,7 +23,8 @@ import {
   validateTurbotFSM,
   TURBOT_FORWARD,
 } from '../src/engine/turbot';
-import { gradeSubmission } from '../src/engine/grader';
+import { gradeSubmission, summarizeResult } from '../src/engine/grader';
+import { gradeSubmissions } from '../src/instructor/Gradebook';
 
 let failures = 0;
 function check(label: string, cond: boolean) {
@@ -162,6 +163,78 @@ const fsmBrain = fsmForwardBrain();
 const runFSM = runTurbot(fsmBrain.components, fsmBrain.wires, 'FSM', corridor(3, 2), 10);
 check('FSM brain: same forward-until-wall behavior', runFSM.haltedByMotor && runFSM.finalState.x === 2);
 
+// ── ONE validity function for turbot-FSM labels (P1.12) ─────────────
+// turbotFsmNotation (engine/notation.ts) is the single answer to "is this
+// turbot-FSM brain label legal" — grader Stage-1 (via validateTurbotFSM),
+// runBrainStep, and the store's label editor all read it. Legacy 1-bit
+// outputs ('0:1' forward, '1:0' stop) alias to the canonical 2-bit motor
+// spelling ('0:11'/'1:00'); a brain written in either spelling must validate
+// and run bit-identically, and canonical turn labels ('01' left / '10'
+// right) execute via the same wheel-bit table as circuit brains (spec §9.2).
+console.log('\n[engine: turbot-FSM one-notation validity]');
+function fsmForwardBrainLegacy(): { components: CircuitComponent[]; wires: Wire[] } {
+  const s0: CircuitComponent = { id: 's0', type: 'STATE', x: 0, y: 0, label: 'S₀', ports: getPortsForType('STATE') };
+  return {
+    components: [s0],
+    wires: [
+      { id: 't1', sourceComponentId: 's0', sourcePortId: 'right', targetComponentId: 's0', targetPortId: 'left', value: 0, transitionLabel: '0:1' },
+      { id: 't2', sourceComponentId: 's0', sourcePortId: 'right', targetComponentId: 's0', targetPortId: 'left', value: 0, transitionLabel: '1:0' },
+    ],
+  };
+}
+{
+  const legacy = fsmForwardBrainLegacy();
+  const runLegacy = runTurbot(legacy.components, legacy.wires, 'FSM', corridor(3, 2), 10);
+  check('legacy 1-bit alias labels behave bit-identically to the canonical 2-bit brain',
+    runLegacy.haltedByMotor && runLegacy.finalState.x === runFSM.finalState.x &&
+    runLegacy.history.length === runFSM.history.length);
+
+  const notationAssignment: AssignmentData = {
+    id: 'turbot-fsm-notation-smoke',
+    title: 'Turbot FSM notation smoke',
+    questions: [{
+      id: 1,
+      label: 'Q1 (turbot FSM)',
+      statement: 'Move forward until blocked, then stop on the goal.',
+      buildMode: 'turbot',
+      innerMode: 'FSM',
+      representation: 'binary',
+      turbot_cases: [{ arena: corridor(3, 2), maxSteps: 10, criterion: 'reach-and-stop' }],
+    }],
+  };
+  const gradeBrain = (circuit: { components: CircuitComponent[]; wires: Wire[] }) =>
+    gradeSubmission(notationAssignment, {
+      assignmentTitle: notationAssignment.title,
+      student: 'fsm-notation@example.com',
+      submittedAt: '2026-07-06T00:00:00Z',
+      answers: [{ questionId: 1, circuit }],
+    }).questions[0];
+  check('grader accepts the legacy-alias brain', gradeBrain(legacy).passed === 1);
+  check('grader accepts the canonical-label brain', gradeBrain(fsmForwardBrain()).passed === 1);
+
+  const canonWires = fsmForwardBrain().wires;
+  const badLabel = {
+    components: fsmForwardBrain().components,
+    wires: [{ ...canonWires[0] }, { ...canonWires[1], transitionLabel: '1:2' }],
+  };
+  const badResult = gradeBrain(badLabel);
+  check('an illegal turbot-FSM label fails Stage-1 with a reason',
+    badResult.passed === 0 && !!badResult.turbotCases?.[0]?.reason);
+
+  // Canonical turn labels now execute: '0:01' = right wheel only = pivot left.
+  const spinner: { components: CircuitComponent[]; wires: Wire[] } = {
+    components: [{ id: 's0', type: 'STATE', x: 0, y: 0, label: 'S₀', ports: getPortsForType('STATE') }],
+    wires: [
+      { id: 't1', sourceComponentId: 's0', sourcePortId: 'right', targetComponentId: 's0', targetPortId: 'left', value: 0, transitionLabel: '0:01' },
+      { id: 't2', sourceComponentId: 's0', sourcePortId: 'right', targetComponentId: 's0', targetPortId: 'left', value: 0, transitionLabel: '1:01' },
+    ],
+  };
+  const runSpin = runTurbot(spinner.components, spinner.wires, 'FSM', corridor(3, 2), 4);
+  check('canonical turn label pivots in place (left turns, no movement)',
+    runSpin.hitStepLimit && runSpin.finalState.x === 0 &&
+    runSpin.history.every((h) => h.action === 'left'));
+}
+
 // FSM brains can issue every motor command, turns included: in a 1×1 box the
 // turner senses B every cycle and pivots left (E → N → W → S → …) forever.
 const fsmTurner = fsmTurnerBrain();
@@ -198,12 +271,14 @@ check('2-bit-output FSM table validates',
 const oneBitFsm = {
   components: [{ id: 's0', type: 'STATE', x: 0, y: 0, label: 'S₀', ports: getPortsForType('STATE') } as CircuitComponent],
   wires: [
-    tWire('t1', 's0', 's0', '0:1'), // base-FSM single output bit — not turbot-FSM grammar
+    tWire('t1', 's0', 's0', '0:1'), // base-FSM single output bit — a legacy alias of '0:11'
     tWire('t2', 's0', 's0', '1:00'),
   ],
 };
-check('base-FSM one-bit label is rejected (and input 0 left unhandled)',
-  validateTurbotFSM(oneBitFsm.components, oneBitFsm.wires).length > 0);
+// Legacy 1-bit outputs are ALIASES of the canonical 2-bit motor spelling
+// (turbotFsmNotation, P1.12) — old localStorage machines keep validating.
+check('a legacy one-bit label is accepted as an alias (input 0 is handled)',
+  validateTurbotFSM(oneBitFsm.components, oneBitFsm.wires).length === 0);
 const partialFsm = {
   components: [{ id: 's0', type: 'STATE', x: 0, y: 0, label: 'S₀', ports: getPortsForType('STATE') } as CircuitComponent],
   wires: [tWire('t1', 's0', 's0', '0:11')],
@@ -472,6 +547,161 @@ const scMemorylessGraded = gradeSubmission(scAssignment, scSub('nomem@example.co
 check('memoryless SC turbot fails the L course',
   scMemorylessGraded.questions[0].passed === 0 &&
   (scMemorylessGraded.questions[0].turbotCases ?? []).length === 1);
+
+// ── multi-arena: navigation grading requires EVERY arena (P4.2) ──────
+// Navigation problems promise generality — Mad Max (hw3-p15) puts the block
+// at an UNKNOWN distance, so a question's `turbot_cases` is a FAMILY of
+// arenas and a brain hardcoded to one layout must fail the family. The
+// family here: 1×8 corridor, block at x = 3 / 5 / 7, the "sensing spot"
+// (goal cell) just before it at x = 2 / 4 / 6; criterion return-to-start
+// (whose goal-visit clause — the trace must reach the goal before coming
+// home — is what makes an out-and-back family discriminating at all: final
+// position alone is satisfied by a brain that never leaves).
+console.log('\n[multi-arena: hardcoded brains fail the family]');
+
+function madMaxArena(blockX: number): ArenaConfig {
+  return {
+    width: 8,
+    height: 1,
+    cells: [Array.from({ length: 8 }, (_, x) =>
+      (x === blockX ? 'block' : x === blockX - 1 ? 'goal' : 'empty'))],
+    start: { x: 0, y: 0, facing: 'E' },
+  };
+}
+
+// Hardcoded layout-solver: walk exactly n forward (blind — both sensor
+// inputs drive forward), two left turns, walk n back, stop. Solves every
+// layout whose sensing spot is within n cells; knows nothing about blocks.
+function hardcodedOutAndBack(n: number): { components: CircuitComponent[]; wires: Wire[] } {
+  const components: CircuitComponent[] = [];
+  const wires: Wire[] = [];
+  const motors = [
+    ...Array.from({ length: n }, () => '11'), // out n
+    '01', '01',                               // U-turn (two left pivots)
+    ...Array.from({ length: n }, () => '11'), // back n
+    '00',                                     // stop
+  ];
+  motors.forEach((motor, i) => {
+    const id = `s${i}`;
+    const next = i + 1 < motors.length ? `s${i + 1}` : id; // last state self-loops
+    components.push({ id, type: 'STATE', x: 0, y: 0, label: `S${i}`, ports: getPortsForType('STATE') });
+    wires.push(tWire(`${id}a`, id, next, `0:${motor}`), tWire(`${id}b`, id, next, `1:${motor}`));
+  });
+  return { components, wires };
+}
+
+// Sensor-reactive Mad Max: forward until block ahead, U-turn, forward until
+// boundary ahead, stop — 3 states, distance-agnostic.
+function madMaxBrain(): { components: CircuitComponent[]; wires: Wire[] } {
+  const s = (id: string, label: string): CircuitComponent =>
+    ({ id, type: 'STATE', x: 0, y: 0, label, ports: getPortsForType('STATE') });
+  return {
+    components: [s('s0', 'S₀'), s('s1', 'S₁'), s('s2', 'S₂')],
+    wires: [
+      tWire('m1', 's0', 's0', '0:11'), tWire('m2', 's0', 's1', '1:01'),
+      tWire('m3', 's1', 's2', '0:01'), tWire('m4', 's1', 's2', '1:01'),
+      tWire('m5', 's2', 's2', '0:11'), tWire('m6', 's2', 's2', '1:00'),
+    ],
+  };
+}
+
+// The trivial exploit: stop on the first cycle, never move.
+function lazyBrain(): { components: CircuitComponent[]; wires: Wire[] } {
+  return {
+    components: [{ id: 's0', type: 'STATE', x: 0, y: 0, label: 'S₀', ports: getPortsForType('STATE') }],
+    wires: [tWire('l1', 's0', 's0', '0:00'), tWire('l2', 's0', 's0', '1:00')],
+  };
+}
+
+function madMaxAssignment(blockXs: number[]): AssignmentData {
+  return {
+    id: 'madmax-family',
+    title: 'Mad Max family',
+    questions: [{
+      id: 1,
+      label: 'Q1 (Mad Max)',
+      statement: 'Drive to the block (unknown distance), then return to start and stop.',
+      buildMode: 'turbot',
+      innerMode: 'FSM',
+      representation: 'binary',
+      turbot_cases: blockXs.map((b) => ({ arena: madMaxArena(b), maxSteps: 30, criterion: 'return-to-start' as const })),
+    }],
+  };
+}
+function gradeFamily(blockXs: number[], circuit: { components: CircuitComponent[]; wires: Wire[] }) {
+  return gradeSubmission(madMaxAssignment(blockXs), {
+    assignmentTitle: 'Mad Max family',
+    student: 'family@example.com',
+    submittedAt: '2026-07-07T00:00:00Z',
+    answers: [{ questionId: 1, circuit }],
+  });
+}
+
+// (i) The hardcoded brain PASSES the 1-arena family — a single layout
+// cannot tell a layout-solver from a navigator.
+const hard2Solo = gradeFamily([3], hardcodedOutAndBack(2));
+check('hardcoded out-2-back-2 brain passes the 1-arena family (1/1)',
+  hard2Solo.questions[0].passed === 1 && hard2Solo.questions[0].total === 1 &&
+  summarizeResult(hard2Solo).questionsPassed === 1);
+
+// (ii) The SAME brain FAILS the 3-arena family: it never reaches the
+// sensing spot at distance 4 or 6.
+const hard2Family = gradeFamily([3, 5, 7], hardcodedOutAndBack(2));
+check('the same hardcoded brain fails the 3-arena family (1/3)',
+  hard2Family.questions[0].passed === 1 && hard2Family.questions[0].total === 3);
+check('a partially-passing family does not pass the question',
+  summarizeResult(hard2Family).questionsPassed === 0);
+
+// (iii) Per-arena results identify the failing arenas with full detail.
+const hard2Cases = hard2Family.questions[0].turbotCases ?? [];
+check('per-arena results: one TurbotCaseResult per arena (3)',
+  hard2Cases.length === 3);
+check('per-arena results: arena #1 passes, arenas #2 and #3 fail',
+  hard2Cases[0]?.pass === true && hard2Cases[1]?.pass === false && hard2Cases[2]?.pass === false);
+check('failing arenas carry steps + final pose (returned home without visiting the goal)',
+  hard2Cases.slice(1).every((c) =>
+    c.stepsTaken === 7 && c.finalPosition.x === 0 && c.finalPosition.y === 0 && c.hitStepLimit === false));
+
+// (iv) All-must-pass aggregation: a brain tuned to distance 4 clears two
+// layouts (its blind walk overshoots distance 2 but still crosses the goal)
+// yet 2/3 arenas is NOT a pass.
+const hard4Family = gradeFamily([3, 5, 7], hardcodedOutAndBack(4));
+check('distance-4 hardcoded brain passes exactly 2 of 3 arenas',
+  hard4Family.questions[0].passed === 2 && hard4Family.questions[0].total === 3 &&
+  hard4Family.questions[0].turbotCases?.[2]?.pass === false);
+check('2/3 arenas is not a pass (all arenas required)',
+  summarizeResult(hard4Family).questionsPassed === 0);
+
+// The sensor-reactive navigator the family is asking for passes everywhere.
+const madMaxFamily = gradeFamily([3, 5, 7], madMaxBrain());
+check('sensor-reactive Mad Max brain passes all 3 arenas',
+  madMaxFamily.questions[0].passed === 3 && madMaxFamily.questions[0].total === 3 &&
+  summarizeResult(madMaxFamily).questionsPassed === 1);
+
+// Criterion teeth: with a goal in the arena, return-to-start requires the
+// trace to VISIT it — the never-moving brain no longer passes vacuously.
+// (Goal-less arenas keep plain end-at-start: the boxed-arena check above.)
+const lazyFamily = gradeFamily([3, 5, 7], lazyBrain());
+check('stop-immediately brain fails every goal-ful return-to-start arena (0/3)',
+  lazyFamily.questions[0].passed === 0 && lazyFamily.questions[0].total === 3);
+
+// Gradebook logic consumes the SAME per-arena counts: the question grade is
+// all-or-nothing and every failing arena is counted (not just index 0).
+const gradebookGrades = gradeSubmissions(madMaxAssignment([3, 5, 7]), [{
+  assignmentId: 'madmax-family',
+  attempt: 1,
+  submittedAt: '2026-07-07T00:00:00Z',
+  submission: {
+    assignmentTitle: 'Mad Max family',
+    student: 'family@example.com',
+    submittedAt: '2026-07-07T00:00:00Z',
+    answers: [{ questionId: 1, circuit: hardcodedOutAndBack(2) }],
+  },
+}]);
+check('gradebook: hardcoded brain scores 0 on the family (question not passed)',
+  gradebookGrades[0].grades[0].passed === false && gradebookGrades[0].score === 0);
+check('gradebook: both failing arenas are counted (failedCount 2 of 3)',
+  gradebookGrades[0].grades[0].failedCount === 2);
 
 console.log(`\n${failures === 0 ? 'TURBOT CHECK OK' : `TURBOT CHECK FAILED (${failures} checks)`}`);
 process.exit(failures === 0 ? 0 : 1);
