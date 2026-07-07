@@ -180,15 +180,19 @@ before Phase 3 (perception returns to router-rendered CC/SC). Task ids unchanged
   not the source port; 9-case headless corpus.
   **Verified:** adversarial verifier refuted nothing (independent oracle
   reproduction, MEM route probe, dot corpus, no engine changes).
-  **⚠ PENDING acceptance (do this next session before S3):** the **browser
-  sweep** of the ~72 hw3 routes that MOVED under S1 was not run — the sweep
-  agent hit the model limit. Headless legs pass (oracle-clean, budget pinned),
-  but confirm in-browser that the moved MEM routes read cleanly (no false
-  merges / through-body) and the S2 dots render at elbows, before S3.
+  **Acceptance sweep (done 2026-07-06, iteration 17):** in-browser sweep of all
+  11 CC/SC fixtures with rendered-DOM geometry checks (CTM scale=1) — 237 wires
+  (203 across hw3-p1..p9), 0 false merges, 0 through-body, every fan-out dotted
+  at its divergence elbow (r=4 #333), no dot at any source port; cleanup
+  verified. Two candidates adjudicated non-violations (LOG 17): sub-pixel
+  (0.33px) trunk jitter on hw3-p9's own fan-out; one bump-adjacent dot skip at
+  hw3-p9 (1375,757) — algorithm-correct, readability nit fed into S3/S4.
   **S3–S5 remaining:** S3 foreign-lane A* cost + H4 near-merge round (kills the
-  1px-hug class generally); S4 fallback phase-0 + lane-nudge + per-wire
-  `usedFallback`; S5 (optional) perf. Each slice: gates green + layoutCheck
-  clean + browser spot-check per the memo's slice plan.
+  1px-hug class generally) — keep H4 thresholds ≥0.5px (sub-pixel elbow
+  rounding, see above) and decide whether lane separation moots the dot-skip
+  nit or the skip radius needs tuning; S4 fallback phase-0 + lane-nudge +
+  per-wire `usedFallback`; S5 (optional) perf. Each slice: gates green +
+  layoutCheck clean + browser spot-check per the memo's slice plan.
   **Gates Phase 3** (perception fixtures are CC/SC, back on the router).
 - [ ] **P3.1** **Design spike (decision required, design memo):** can perception
   targets (≥3 consecutive 1s; exactly 3; = a literal pattern; current≠previous;

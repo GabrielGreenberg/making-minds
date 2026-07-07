@@ -657,3 +657,44 @@ legend (◐), QUEUE (banner + P3.2/P3.3/P4.3/P5.1 reframed to interface tier;
 P2.5 deferred to the correct-answers project; P6.2 per-tier), HANDOFF (scope-
 shift banner + watch-out), /handoff command (operating-style directive),
 manifest meta. P1.8 router work is unaffected (it IS interface quality).
+
+## 2026-07-06 (iteration 17) — P1.8 S1/S2 acceptance: the browser sweep · 0 violations
+
+**Shipped:** the pending acceptance leg of P1.8 S1+S2 — the in-browser sweep of
+the ~72 hw3 routes that MOVED under the shared-geometry fix (iteration 16's
+sweep agent died on the model limit before running it). One delegated agent
+(128k tokens, 73 tool uses, ~21 min) built a `router-sweep` seed assignment
+from the 11 fixtures' correct machines (hw3-p1..p9 + hw2-p7 + hw1-p4), seeded
+it per recipe v3, and swept every question with rendered-DOM geometry
+extraction (CTM scale=1, SVG user px = rendered px) plus screenshot eyeballing:
+
+- **237 wires checked** (203 across hw3), **0 false merges, 0 through-body**.
+- **Dots:** every multi-branch fan-out dotted at the divergence ELBOW, never
+  the source port (hw3-p7: port (1480,85) undotted, both sequential 3-branch
+  split elbows dotted; hw1-p4: dot 111px downstream of IN1; hw3-p8: 15 dots
+  over 8 fan-outs in the densest lattice, no spurious/orphan). r=4 #333
+  throughout. hw2-p7 correctly renders zero dots (no fan-outs).
+- Docs-only iteration: no code changes. `npm run check` + tsc green; coverage
+  steady 41/56 exact · 15 pending (interface) · 0 regressed · 0 warnings.
+
+**Adjudicated non-violations (evidence in the sweep report):**
+1. hw3-p9 w49/w50 "merge" candidate = the fan-out's OWN shared trunk with a
+   0.33px integer-rounding jitter (trunk rides y=1036.67; the elbow vertex
+   rounds to 1037) — sub-pixel, invisible at zoom 1, the dot marks the split.
+   S3 note: keep H4 near-merge thresholds ≥0.5px so this class can't
+   false-positive.
+2. hw3-p9 split at (1375,757) renders as an UNDOTTED T-junction: the split sits
+   2px from w53's crossing bump, so `findDivergencePoints`' documented
+   bump-collision skip suppresses the dot — rendered output matches the
+   headless corpus exactly. Real but borderline readability nit → recorded as
+   S3/S4 input (does lane separation moot it, or does the skip radius need
+   tuning?).
+3. Eight "through-body" candidates were all OR/XOR left-port lead-ins (ports
+   inset ~11px inside the curved-body bbox by design) — whitelisted; zero real
+   body crossings anywhere.
+
+**Also:** removed HANDOFF's stale "background task in flight" note — the TM
+sim-state reset landed as `0ca35b3` and is documented in CLAUDE.md.
+
+**Next:** META-audit-queue (due — last ran iteration 11), then P1.8 S3
+(foreign-lane A* cost + H4 near-merge round).
