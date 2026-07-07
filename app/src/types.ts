@@ -128,6 +128,12 @@ export interface CCSpec {
 export interface TestCase {
   inputs: number[];
   outputs: number[];
+  /** Optional tape-layout hint (TM/tape axis only; other axes ignore it):
+   *  background gap AFTER each input block except the last — for two inputs,
+   *  one entry. Absent = the codec's default single-cell separator. Lets a
+   *  bank test robustness to arbitrary block separation (e.g. HW5 P4: "do not
+   *  assume the blocks are separated by exactly one empty cell"). */
+  separations?: number[];
 }
 
 export interface AssignmentQuestion {

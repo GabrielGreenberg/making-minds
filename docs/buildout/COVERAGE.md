@@ -104,7 +104,7 @@ _Note: HW4 #1–2 (state abstraction / multiple realizability) are analysis essa
 | hw5-p1  | x+1 T | arithmetic | ✅ | ✅ | ✅ | ✅ | ✅ | `reference/hw5-p1.json`; 3 states; bank x=1..8 (PDF domain — tally 0-blocks invisible); `requireStandardHaltPosition: true` (enforced since P2.3) |
 | hw5-p2  | x+3 T | arithmetic | ✅ | ✅ | ✅ | ✅ | ✅ | `reference/hw5-p2.json`; triple-append, 5 states; reuse pedagogy is flat-inlined (no TM boxing mechanism exists) |
 | hw5-p3  | 3x T | arithmetic | ✅ | ✅ | ✅ | ✅ | ✅ | `reference/hw5-p3.json`; 10 states; hand-authored bank x=1..8 |
-| hw5-p4  | x+y T (arbitrary separation) | arithmetic | ✅ | ✅ | ✅ | ✅ | ✅ | `reference/hw5-p4.json`; **gap-robust** 6-state shift-until-adjacent machine (initial build was gap=1-only — REFUTED by the verifier, rebuilt + proven on gaps 1–10 outside the codec; codec can't test the clause → P2.4) |
+| hw5-p4  | x+y T (arbitrary separation) | arithmetic | ✅ | ✅ | ✅ | ✅ | ✅ | `reference/hw5-p4.json`; **gap-robust** 6-state shift-until-adjacent machine; since P2.4 the bank itself varies gaps (16 cases each at 1/2/3/5 via `separations`) — a gap=1-only machine now fails 48/64 through the grader |
 | hw5-p5  | 3(x+y) T | arithmetic | ✅ | ✅ | ✅ | ✅ | ✅ | `reference/hw5-p5.json`; 12 states, 64-case bank |
 | hw5-p6  | x+3y T | arithmetic | ✅ | ✅ | ✅ | ✅ | ✅ | `reference/hw5-p6.json`; 11 states; broken = mirror 3x+y (87.5%) |
 | hw5-p7  | x+1 B (extra leftmost 0) | arithmetic | ✅ | ✅ | ✅ | ✅ | ✅ | `reference/hw5-p7.json`; 4 states; platform encodes MINIMAL digits so the machine grows the block itself (PDF's padded-block assumption noted, statement adjusted); broken fails all-ones inputs (37.5%) |

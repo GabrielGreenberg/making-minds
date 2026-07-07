@@ -143,17 +143,17 @@ before Phase 3 (perception returns to router-rendered CC/SC). Task ids unchanged
   "rightmost cell" reasons / standard-position machine passes flagged). This
   closes the first of CLAUDE.md's two deferred authoring follow-ups (only
   `allowed_components` = P1.5 remains).
-- [ ] **P2.4** _(discovered 2026-07-06, hw5-p4 refutation)_ **Codec: vary tally
-  block separation.** `encodeTM` hardcodes one 0-cell between argument blocks,
-  so the "arbitrary separation" robustness that hw5-p4's statement requires is
-  untestable through the grading pipeline (a gap=1-only machine passes the
-  whole bank; the reference is now genuinely robust but students' machines
-  aren't held to it). Add layout variation to the TM codec's two-arg encoding
-  (e.g. TMTestCase-level separation parameter or bank-generation variation),
-  regenerate hw5-p4/p5/p6's banks to include gap>1 cases, confirm the fixtures
-  still verify and a gap=1-only machine now FAILS.
-  **Acceptance:** hw5-p4's bank contains varied separations; the old
-  (refuted) gap=1-only machine fails it; 41/56 stays green.
+- [x] **P2.4** **Codec: vary tally block separation.** — _done 2026-07-06
+  (iteration 15)._ `TestCase.separations?: number[]` (gap after each block,
+  absent = legacy single cell), honored solely inside `encodeTM` (grader passes
+  it through opaquely; other axes ignore it; TM UI runs never touch encodeTM —
+  students hand-lay tapes, so no parity issue). hw5-p4's bank: 64 cases at gaps
+  1/2/3/5 (16 each; gap-1 cases omit the field so the default path stays
+  exercised). Teeth proven twice over: the pinned old machine AND the
+  verifier's independently-constructed gap=1-only adder both fail exactly the
+  48 varied cases through gradeQuestion; default-path verdicts byte-identical
+  across 6 fixtures vs a HEAD worktree. Six new tmCheck [separations] pins;
+  README documents the field. Spawned P2.5.
 
 ## Phase 3 — Perception
 
@@ -214,6 +214,16 @@ before Phase 3 (perception returns to router-rendered CC/SC). Task ids unchanged
   **Advances:** hw6-p2.
 
 ## Phase 5.5 — Small hardening (slot opportunistically before close-out)
+
+- [ ] **P2.5** _(discovered 2026-07-06, P2.4 probe)_ **Gap-robust hw5-p5/p6
+  reference machines.** Their statements don't promise arbitrary separation
+  (the PDF's clause is on P4 only) so the rows are honest as-is — but both
+  problems say "use your solution from (4)", whose adder IS gap-robust, and an
+  empirical probe showed both reference machines are gap=1-only. Rebuild their
+  adder stages on the p4 shift-until-adjacent construction and optionally
+  spread `separations` in their banks.
+  **Acceptance:** p5/p6 correct machines pass gap 2/3/5 probes; rows stay
+  verified.
 
 - [ ] **P1.5** _(discovered 2026-07-06, hw1-p2 critic)_ **Enforce
   `allowed_components` end-to-end.** The field exists on `AssignmentQuestion`

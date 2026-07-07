@@ -7,58 +7,69 @@ run `npm run coverage` and reconcile._
 ## Where we are
 
 Branch `buildout-infra`. **41 / 56 verified**, 15 pending, 0 regressed, 0
-warnings. Fourteen iterations done. **ALL arithmetic is complete** (HW1–HW5,
-appearance included), and `requireStandardHaltPosition` is live end-to-end
-(P2.3). Remaining pending: perception (hw2-p10..12, hw3-p11..12), navigation
-(hw2-p13..15, hw3-p13..15, hw4-p12..14), the HW6 turbot-TM capstone.
-Remaining walk: **P2.4 → P1.8 → P3.1 → P3.2/P3.3 → P4.2 → P4.3 → P5.1 →
-smalls (P1.5/P1.6/P1.11) → P6**.
+warnings. Fifteen iterations done. All arithmetic complete (HW1–HW5);
+`requireStandardHaltPosition` live (P2.3); the TM codec varies block
+separation so hw5-p4's robustness clause bites (P2.4). Remaining pending:
+perception (hw2-p10..12, hw3-p11..12), navigation (hw2-p13..15, hw3-p13..15,
+hw4-p12..14), HW6 capstone. Remaining walk: **P1.8 → P3.1 → P3.2/P3.3 → P4.2
+→ P4.3 → P5.1 → smalls (P1.5/P1.6/P1.11/P2.5) → P6**.
 
-## Do this next — P2.4: codec-level block-separation variation
+## Do this next — P1.8: wire-router design memo (+ fix if it fits)
 
-hw5-p4's statement (and the PDF) require an x+y machine to work for ANY number
-of 0-cells between the argument blocks, and the reference machine now genuinely
-does (gap-robust, proven on hand-laid tapes) — but `encodeTM` hardcodes exactly
-one separator cell, so the grading pipeline can never test a STUDENT machine's
-robustness: a gap=1-only machine passes the whole bank.
+Gates Phase 3 (perception fixtures are CC/SC — back on the router). The family
+(QUEUE P1.8, evidence from the hw3 layout battle, LOG iteration 4):
 
-1. Read `engine/tmCodec.ts` (encodeTM two-arg layout) + how TM test_cases carry
-   values (grader.ts tape branch; TMTestCase shape if any). Design the smallest
-   seam-respecting way to vary separation per case — e.g. an optional
-   per-test-case layout hint (`separations?: number[]` alongside inputs) that
-   encodeTM honors, defaulting to 1 — so banks can mix gaps without changing
-   the value-based contract. Watch: the codec is shared by grading AND the
-   UI question-run path (scWindowCheck pins SC/FSM; TM UI runs go through the
-   store's tape panel — check whether question runs encode via the same path
-   and keep them consistent).
-2. Regenerate hw5-p4's bank to include gap>1 cases (e.g. gaps 1,2,3,5 spread
-   across the 64 pairs); consider p5/p6 too IF their statements promise
-   arbitrary separation (read them — if they don't, leave them).
-3. Prove the teeth: the OLD refuted gap=1-only p4 machine (regression-pinned in
-   `scratchpad/prove_hw5_p4_v2.ts`) must now FAIL the new bank through the
-   normal grader; the current gap-robust correct machine must pass 100%.
-4. Pins: tmCheck or coverageCheck addition proving varied-separation encoding
-   round-trips (encode → run → accept → decode) at gap≠1.
-5. Gates: check/tsc/build/coverage — 41/56, 0 regressed (hw5-p4 stays verified
-   with its NEW bank; fraction may change — report).
+- (a) every wire into `MEM.min` takes a fixed obstacle-blind **fallback path**
+  because the min stub sits inside the router's phantom 75×70 MEM bounds
+  (rendered body is 50×50) — these fixed lanes caused all six HW3 appearance
+  failures;
+- (b) different-source wires can run collinear or 1px apart (reads as a
+  forbidden merge) — the A* lane cost doesn't know about foreign wires'
+  segments (incl. fallback lanes it can't see);
+- (c) the split junction dot is drawn only at the source port; multi-branch
+  trunks have undotted divergence elbows (VISUAL_VOCAB wants dots at splits).
 
-**Acceptance:** hw5-p4's bank contains varied separations; the old gap=1-only
-machine demonstrably fails via the grader; all gates green.
+Deep fix direction (weigh in the memo): align router obstacle bounds with
+rendered geometry (or make the min stub reachable so A* handles MEM wires);
+add a lane-separation cost for foreign collinear/near-parallel runs; dot
+divergence points. Improves every student's canvas, not just fixtures.
+
+1. **Design memo** `designs/wire-routing.md`: the family, evidence, the chosen
+   fix per sub-problem (a/b/c), what stays (the deterministic fallback as a
+   last resort?), compat contract (all 16 CC/SC fixtures must stay
+   layoutCheck-clean — the oracle in `tools/layoutCheck.ts` gates them in the
+   harness; hw3-p7/p9's right-to-left MEM chains and hw2-p6/p7/hw3-p4's
+   repositioned layouts must not regress), test plan (layoutCheck is the
+   regression oracle; add router-level unit pins), risks. Judge-panel the
+   design if the trade-offs look wide (the P1.12 memo pattern worked well).
+2. **Implement if it fits the iteration** (guardrail: green within the
+   iteration or split seam-first): the likely slices are (a) obstacle-bounds
+   alignment (small, high value), (b) lane-separation cost (medium), (c)
+   divergence dots (small, renderer-side). Each slice must keep
+   `npm run coverage` at 41/56 with layoutCheck green — if a slice makes a
+   previously-clean fixture dirty because routes CHANGED (better or worse),
+   re-run the browser sweep for the affected fixtures before accepting.
+3. Gates: check/tsc/build/coverage; browser spot-check of one MEM-heavy
+   fixture (hw3-p8) and one CC fixture (hw2-p7) after any route change.
+
+**Acceptance:** memo written; implemented slices leave all 16 CC/SC fixtures
+oracle-clean + spot-checked in-browser; gates green. If implementation splits,
+the memo + slice 1 is an acceptable iteration.
 
 ## Then
 
-P1.8 (wire-router design memo — gates Phase 3 perception) → P3.1
-(target-functions design memo) → P3.2/P3.3 perception fixtures → P4.2
-multi-arena grading → P4.3 navigation arenas → P5.1 capstone → smalls → P6.
+P3.1 (target-functions design memo — perception authoring) → P3.2/P3.3
+(perception fixtures) → P4.2 (multi-arena grading) → P4.3 (navigation arenas)
+→ P5.1 (Desert Ant capstone) → smalls → P6 close-out.
 
 ## Watch out for
 
-- **TM UI runs**: if the student-facing tape panel encodes inputs through the
-  same codec path, varied separations must not confuse the UI question-run
-  seeding (the P1.9 lesson: UI must feed exactly what the grader feeds — check
-  how TM question runs seed the tape; keep parity).
-- **notationCheck grep gate + tmCheck pins** (incl. the three new P2.3
-  standard-halt pins) must stay green.
+- **layoutCheck is the harness gate** for CC/SC fixtures — router changes that
+  alter routes will show up there first; a "violation" after a route change
+  may mean the oracle's replicated geometry drifted from the router (keep them
+  in sync — the oracle imports the real `routeAllWires`, so only the port/body
+  geometry constants can drift).
+- **hw4-p11/hw5 fixtures use STATE curves, not the router** — out of scope.
 - **Ops:** 529 → resume workflow; session limit → finish solo.
 - **Appearance recipe v3**; seeds from `app/public/` at `/making-minds/`.
 - `tsx` missing → `npm install`; no lockfile churn.

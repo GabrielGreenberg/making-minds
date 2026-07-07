@@ -560,3 +560,31 @@ closed; only `allowed_components` (P1.5) remains.
 **Next:** **P2.4** — codec-level block-separation variation so hw5-p4's
 arbitrary-gap clause has teeth against student machines. Then P1.8 (router
 memo, gating Phase 3).
+
+## 2026-07-06 (iteration 15) — P2.4: block-separation variation · hw5-p4's clause has teeth
+
+**Shipped:** `TestCase.separations?: number[]` — an optional per-case layout
+hint honored solely inside `encodeTM` (gap after each argument block; absent =
+the legacy single cell; other axes ignore it; grader passes it through
+opaquely). hw5-p4's bank regenerated: 64 cases spread deterministically across
+gaps 1/2/3/5 (16 each; the gap-1 cases omit the field so the default codec
+path stays exercised on the graded path). Six new tmCheck [separations] pins
+(layout, default-unchanged, round-trip at gap 3, gap=1-only fails raw + via
+gradeQuestion). README documents the field.
+
+**Verified (0 refutations):** the pinned old machine AND the verifier's OWN
+independently-constructed gap=1-only adder (different algorithm) both fail
+EXACTLY the 48 varied cases index-by-index; hand-decoded gap-5 tapes match the
+hint cell-for-cell; default-path verdicts byte-identical across six fixtures
+(TM/CC/SC/FSM) vs a HEAD worktree — and the same dump for hw5-p4 differs in
+exactly the 48 new cases, proving the comparison exercised the change.
+
+**Findings:** TM UI runs never touch encodeTM (students hand-lay tapes;
+store seeds blank) — so `separations` is grader-only by construction, no P1.9
+parity concern. hw5-p5/p6 reference machines are empirically gap=1-only; their
+statements don't promise robustness (the PDF's clause is on P4 only) but they
+"reuse" the p4 adder → queued **P2.5** (smalls bucket). Edge noted: encodeTM
+clamps separations entries to ≥1 (documented, untested — trivial).
+
+**Next:** **P1.8** — the wire-router design memo (fallback lanes, lane
+separation, junction dots at divergence elbows), gating Phase 3 perception.

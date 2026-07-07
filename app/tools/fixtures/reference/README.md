@@ -19,6 +19,12 @@ harness's adversarial assertions pass.
   (group widths), and `test_cases` (value-based `{inputs, outputs}`). For
   navigation (turbot) questions, use `innerMode` + `turbot_cases` instead of
   `cc_spec`/`test_cases`.
+  - TM cases may carry an optional `separations: number[]` layout hint — the
+    background gap AFTER each input block except the last (for two inputs, one
+    entry; absent = the standard single-cell separator). Use it when the
+    statement demands robustness to arbitrary block separation (hw5-p4 spreads
+    gaps 1/2/3/5 across its bank so a gap=1-only machine fails). Other axes
+    ignore the field.
 - **`correct`** — a machine that a student could build in the UI and that the
   real grader (`gradeQuestion`) passes on **every** case.
 - **`broken`** — a plausible-but-wrong machine that the grader **must fail**. This

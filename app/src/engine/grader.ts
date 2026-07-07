@@ -177,7 +177,9 @@ function gradeTape(
     const run = evaluateTMSequence(
       circuit.components,
       circuit.wires,
-      encodeTM(notation, tc.inputs),
+      // The case's optional layout hint (block separations) rides through
+      // untouched — the codec owns what it means; the grader stays agnostic.
+      encodeTM(notation, tc.inputs, tc.separations),
       notation,
     );
     const rej = acceptTM(notation, run, { requireStandardHaltPosition });

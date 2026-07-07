@@ -6,8 +6,10 @@
 // Covers the value-based codec pipeline (CLAUDE_KB/engines/tm.md): unary
 // increment (standard position), zero output (blank tape → 0), a binary
 // example, an ambiguous-transition table (validation fails every case), a
-// two-block tape (well-formedness failure), and the standard-halt-position
-// toggle.
+// two-block tape (well-formedness failure), the standard-halt-position
+// toggle, and the per-case `separations` layout hint (encodeTM honors a
+// widened block gap; a gap=1-only machine fails a separations-bearing case
+// end-to-end through the grader).
 
 import type {
   CircuitComponent,
@@ -138,6 +140,82 @@ check('legacy-alias machine runs identically (2 → 3, halts)',
   incLegacy.halted && acceptTM('unary', incLegacy) === null && decodeTM('unary', incLegacy.tape) === 3);
 check('legacy-alias history records the canonical action ("1,R")',
   incLegacy.history.length > 0 && incLegacy.history.every((h) => h.action === '1,R'));
+
+// ── separations: per-case block-gap layout hint ────────────────
+// TestCase.separations widens the background gap between input blocks (gap
+// AFTER each block except the last). encodeTM honors it; absent = the classic
+// single-cell separator. This is what makes "do not assume the blocks are
+// separated by exactly one empty cell" (HW5 P4) testable through the bank.
+console.log('\n[separations]');
+
+// Gap-robust unary adder (hw5-p4's construction): shift the x block left one
+// cell per round until it touches y, then park in standard position.
+function tmAdderGapRobust() {
+  return {
+    components: [comp('a0', 'S₀'), comp('a1', 'S₁'), comp('a2', 'S₂'), comp('a3', 'S₃'), comp('a4', 'S₄'), comp('a5', 'S₅')],
+    wires: [
+      wire('g1', 'a0', 'a1', '1:0,L'), // erase rightmost stroke of x
+      wire('g2', 'a1', 'a1', '1:1,L'), // walk left through the rest of x
+      wire('g3', 'a1', 'a2', '0:1,L'), // re-add the stroke one cell left of the block
+      wire('g4', 'a2', 'a3', '0:0,R'), // still a gap → another round
+      wire('g5', 'a2', 'a4', '1:1,R'), // y reached → single merged block
+      wire('g6', 'a3', 'a3', '1:1,R'), // walk right to the block's end
+      wire('g7', 'a3', 'a0', '0:0,L'), // step back onto rightmost stroke; repeat
+      wire('g8', 'a4', 'a4', '1:1,R'), // walk right to the merged block's end
+      wire('g9', 'a4', 'a5', '0:0,L'), // step back onto rightmost stroke (SP); halt
+    ],
+  };
+}
+// Gap=1-ONLY unary adder (the refuted machine): fill the single separator
+// cell, then erase one stroke to compensate. Correct iff the gap is exactly 1.
+function tmAdderGap1Only() {
+  return {
+    components: [comp('b0', 'S₀'), comp('b1', 'S₁'), comp('b2', 'S₂'), comp('b3', 'S₃'), comp('b4', 'S₄')],
+    wires: [
+      wire('h1', 'b0', 'b0', '1:1,L'), // walk left across x
+      wire('h2', 'b0', 'b1', '0:1,L'), // fill the separator (assumes gap=1!)
+      wire('h3', 'b1', 'b1', '1:1,L'), // walk left across y
+      wire('h4', 'b1', 'b2', '0:0,R'), // background past y; step back on
+      wire('h5', 'b2', 'b3', '1:0,R'), // erase one stroke (compensate)
+      wire('h6', 'b3', 'b3', '1:1,R'), // walk right to run's end
+      wire('h7', 'b3', 'b4', '0:0,L'), // step back onto rightmost stroke (SP)
+    ],
+  };
+}
+
+// encodeTM layout: gap 3 between the blocks, head still in standard position.
+const gap3 = encodeTM('unary', [2, 3], [3]);
+check('encodeTM separations [3]: blocks at 0-1 and 5-7, head on 7',
+  JSON.stringify(gap3) === JSON.stringify({ cells: { 0: '1', 1: '1', 5: '1', 6: '1', 7: '1' }, head: 7 }));
+check('encodeTM separations absent === [1] (default layout unchanged)',
+  JSON.stringify(encodeTM('unary', [2, 3])) === JSON.stringify(encodeTM('unary', [2, 3], [1])));
+
+// Full encode→run→accept→decode round-trip at gap 3.
+const robustG3 = evaluateTMSequence(tmAdderGapRobust().components, tmAdderGapRobust().wires, gap3, 'unary');
+check('gap-robust adder at gap 3: encode→run→accept→decode gives 2+3=5',
+  robustG3.halted && acceptTM('unary', robustG3) === null && decodeTM('unary', robustG3.tape) === 5);
+
+// The gap=1-only machine fails the same separations-bearing case…
+const gap1OnlyG3 = evaluateTMSequence(tmAdderGap1Only().components, tmAdderGap1Only().wires, gap3, 'unary');
+check('gap=1-only adder at gap 3: rejected or wrong value',
+  acceptTM('unary', gap1OnlyG3) !== null || decodeTM('unary', gap1OnlyG3.tape) !== 5);
+
+// …and end-to-end through the grader: separations rides inside the TestCase.
+const sepQuestion: AssignmentQuestion = {
+  id: 9, label: 'Q (sep)', statement: 'Unary x+y, arbitrary block separation', buildMode: 'TM',
+  representation: 'tally',
+  test_cases: [
+    { inputs: [2, 3], outputs: [5] },                     // default gap 1
+    { inputs: [2, 3], outputs: [5], separations: [3] },   // widened gap
+  ],
+};
+const sepRobust = gradeQuestion(sepQuestion, tmAdderGapRobust());
+check('grader: gap-robust adder passes both gap-1 and separations cases',
+  sepRobust.status === 'graded' && sepRobust.passed === 2 && sepRobust.total === 2);
+const sepGap1Only = gradeQuestion(sepQuestion, tmAdderGap1Only());
+check('grader: gap=1-only adder passes the default case but FAILS the separations case',
+  sepGap1Only.status === 'graded' && sepGap1Only.total === 2 && sepGap1Only.passed === 1 &&
+  sepGap1Only.cases[0].pass && !sepGap1Only.cases[1].pass && !!sepGap1Only.cases[1].reason);
 
 // ── acceptor edge cases (constructed tapes) ────────────────────
 console.log('\n[acceptor]');
