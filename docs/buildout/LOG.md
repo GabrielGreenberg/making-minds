@@ -771,3 +771,44 @@ with the notation seam or requireStandardHaltPosition — the audit found clean
 composition everywhere in the auto-merged dispatch.
 
 **Next:** P3.2 (CC perception fixture promotion), then P3.3, then P1.8 S3/S4.
+
+## 2026-07-06 (iteration 19) — P3.2: CC perception fixtures promoted · 44/56
+
+**Shipped:** hw2-p10 (edge, min-run 3), hw2-p11 (object, exact-run 3), hw2-p12
+(landmark, pattern 110010111 w9) promoted from main's devData samples Q9–Q11
+into exact-tier reference fixtures. 3-agent build workflow (each proved
+headlessly via gradeQuestion + layout oracle BEFORE writing; devData ships all
+components at (0,0), so positions were generated programmatically), manifest
+rows flipped by the main session, then an adversarial verifier CONFIRMED all
+claims 63/63 — independent re-grade (256/256, 256/256, 512/512 correct; broken
+fails 148/256, 46/256, 2/512, each re-derived by closed-form combinatorics),
+banks byte-identical to fresh `buildPerceptionCases` output, promotion
+topologically identical to devData, statements verbatim + lint-clean, grader
+provably in the perception branch (no codec cases). Harness: **44 exact · 12
+pending · 0 regressed**; `npm run check` + tsc + build green.
+
+**Appearance (browser):** p10/p12 CLEAN head to toe (dots at elbows r=4 #333,
+bumps on all crossings, no body hits; p12's zero fan-out correctly renders
+zero dots). p11 CLEAN except **six bumpless crossings** — a fan-out branch
+lanes at x=245, 5px left of the port-approach column, inside `pathDWithBumps`'
+R=5 bump-skip radius, so bumps physically can't render there.
+
+**The spiral, and the stop:** the position-only fix agent went down an
+annealing rabbit hole (207k tokens; best score 2 of 6 after 122 iterations,
+never written to disk) before I stood it down per the burning-effort rule. The
+class is STRUCTURAL — the router chooses lanes inside port-approach columns;
+positions only jiggle around it. That is precisely P1.8 S3's foreign-lane
+cost. Resolution: the fixture ships at its harness bar (oracle-clean, grading
+adversarially confirmed; residual documented in COVERAGE), the fix agent's
+predicate is preserved as `app/tools/bumpCheck.ts` (headless replication of
+the canvas crossing + skip rules on real routes; deliberately NOT in `npm run
+check` yet), and **S3's acceptance now includes bumpCheck clean on all CC/SC
+fixtures + wiring it into the harness**. Also fixed in passing: COVERAGE.md's
+stale bootstrap "Totals: 0/56" footer.
+
+**Delegation note:** build workflow 297k tokens/3 agents; verifier 94k;
+appearance 123k; the runaway fixer 207k — the stand-down was worth ~an
+iteration of budget. Watch fix-type agents for self-spawned background loops.
+
+**Next:** P3.3 — promote the SC perception fixtures (hw3-p11 change, hw3-p12
+motion k=3 ~80 gates; watch the oracle + bumpCheck on the big one) → 46/56.

@@ -190,8 +190,13 @@ before Phase 3 (perception returns to router-rendered CC/SC). Task ids unchanged
   **S3–S5 remaining:** S3 foreign-lane A* cost + H4 near-merge round (kills the
   1px-hug class generally) — keep H4 thresholds ≥0.5px (sub-pixel elbow
   rounding, see above) and decide whether lane separation moots the dot-skip
-  nit or the skip radius needs tuning; S4 fallback phase-0 + lane-nudge +
-  per-wire `usedFallback`; S5 (optional) perf. Each slice: gates green +
+  nit or the skip radius needs tuning; **S3 acceptance also includes the
+  bumpless-crossing class (iteration 19): `tools/bumpCheck.ts` clean on all
+  CC/SC fixtures — hw2-p11's 6 bumpless crossings are the pinned exhibit;
+  mechanism: router hug lanes sit at port±ELEMENT_MARGIN(=5), self-coincident
+  with the R=5 bump-skip radius, so break the coincidence (lane offset ≠
+  margin, or decouple the radii) — then wire bumpCheck into `npm run check`**; S4 fallback phase-0 + lane-nudge
+  + per-wire `usedFallback`; S5 (optional) perf. Each slice: gates green +
   layoutCheck clean + browser spot-check per the memo's slice plan.
   **Gates Phase 3** (perception fixtures are CC/SC, back on the router).
 - [x] **P3.1** **Design spike: perception target authoring.** — _closed as
@@ -210,16 +215,20 @@ before Phase 3 (perception returns to router-rendered CC/SC). Task ids unchanged
   rule / turbot criteria) with three grading branches — unification is a
   refactor question, not a capability question; revisit only if a fourth form
   appears (record: this queue + LOG iteration 18; no designs/ memo needed).
-- [ ] **P3.2** **Promote main's CC perception circuits into reference
-  fixtures** hw2-p10 (min-run 3, w8 = sample Q9), hw2-p11 (exact-run 3, w8 =
-  Q10), hw2-p12 (pattern 110010111, w9 = Q11 — main's pattern-width rule
-  settles the old 8-in-schematic vs 9-bit-pattern reconciliation: width
-  follows the pattern). Correct + incorrect circuits already exist in
-  `devData/sampleData.ts` — these rows can go **exact** tier for free (flip
-  the manifest tags; the scope-shift permits taking correct answers when
-  they're free). Layout oracle gates apply (CC fixtures).
-  **Acceptance:** 3 rows exact-verified in the harness; appearance checked.
-  **Advances:** hw2-p10..p12 (41→44).
+- [x] **P3.2** **Promote main's CC perception circuits into reference
+  fixtures.** — _done 2026-07-06 (iteration 19; 3-agent build workflow +
+  adversarial verifier (63/63 checks, banks byte-identical to
+  buildPerceptionCases, promotion topologically exact) + browser appearance
+  sweep)._ hw2-p10/p11/p12 exact-verified (correct 256/256, 256/256, 512/512;
+  broken fails 148/256, 46/256, 2/512) → **44/56**. Discovered: hw2-p11's
+  correct circuit renders SIX bumpless crossings — the router lanes a fan-out
+  branch inside the port-approach column, within `pathDWithBumps`' 5px
+  bump-skip radius; position-jiggling provably can't clear it (an annealing
+  probe stalled at 2), so it ships as a documented renderer-class residual.
+  New headless predicate `app/tools/bumpCheck.ts` (replicates the canvas
+  crossing+skip rules on real routes; NOT in `npm run check` yet — hw2-p11
+  currently fails it by design) → **P1.8 S3's acceptance now includes: bumpCheck
+  clean on all CC/SC fixtures, then wire it into the harness.**
 - [ ] **P3.3** **Promote main's SC perception circuits into reference
   fixtures** hw3-p11 (change, w8 = Q12), hw3-p12 (motion k=3, w8 = Q13, ~80
   gates — watch the router/layout oracle on this one; if it trips, that's

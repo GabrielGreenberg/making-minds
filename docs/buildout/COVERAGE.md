@@ -23,12 +23,13 @@ broken variant needed). Both also require appearance checked against
 [VISUAL_VOCAB.md](VISUAL_VOCAB.md). Tier lives on the manifest row; all 15
 remaining rows are tier `interface`.
 
-**As of 2026-07-06 (scope shift, post-iteration 16):** harness live with two
-tiers, **41/56 exact-verified** (ALL arithmetic: HW1–HW5 complete incl.
-appearance), 15 pending at the interface tier, 0 regressed. Remaining pending:
-perception (hw2-p10..12, hw3-p11..12), navigation (hw2/hw3/hw4 ×3 each), HW6
-turbot-TM capstone (1). **Do not chase correct answers for these** — the bar is
-a plausible attempt through the full pipeline.
+**As of 2026-07-06 (post-iteration 19):** harness live with two tiers,
+**44/56 exact-verified** (ALL arithmetic HW1–HW5 + CC perception hw2-p10..p12,
+promoted from main's devData samples at exact tier — correct answers were
+free), 12 pending at the interface tier, 0 regressed. Remaining pending:
+SC perception (hw3-p11..p12), navigation (hw2/hw3/hw4 ×3 each), HW6 turbot-TM
+capstone (1). **Do not chase correct answers for these** — the bar is a
+plausible attempt through the full pipeline (free correct machines excepted).
 
 ## Columns
 
@@ -50,7 +51,7 @@ validates + grades end-to-end) · `appr` = appearance matches VISUAL_VOCAB.
 | hw1-p16 | M: successor of tal(I), 1-in → 2-out | arithmetic | ✅ | ✅ | ✅ | ✅ | ✅ | `reference/hw1-p16.json`; canonical tally forces O1=1, O2=I (PDF's position-insensitive tal() nuance noted in LOG); broken emits non-canonical `01` |
 | hw1-p17 | N: successor of bin(I), 1-in → 2-out | arithmetic | ✅ | ✅ | ✅ | ✅ | ✅ | `reference/hw1-p17.json`; one 2-wide output group (OUT1 = MSB); broken = endianness swap |
 
-### HW2 — Computing with CCs  ·  7/13
+### HW2 — Computing with CCs  ·  10/13
 
 | id | problem | category | auth | build | grades | appr | status | notes |
 |----|---------|----------|:----:|:-----:|:------:|:----:|:------:|-------|
@@ -61,9 +62,9 @@ validates + grades end-to-end) · `appr` = appearance matches VISUAL_VOCAB.
 | hw2-p5  | 2x+1 [0-15] B | arithmetic | ✅ | ✅ | ✅ | ✅ | ✅ | `reference/hw2-p5.json`; shift + const-1 LSB (`OR(w, NOT w)`); broken = const-0 (computes 2x) |
 | hw2-p6  | 2(x+1) [0-15] B | arithmetic | ✅ | ✅ | ✅ | ✅ | ✅ | `reference/hw2-p6.json`; **BOXED `+1` reuse exercised** (internals = p1 circuit); broken diverges only at x=15 (narrowest near-miss) |
 | hw2-p7  | x+y [0-15] B | arithmetic | ✅ | ✅ | ✅ | ✅ | ✅ | `reference/hw2-p7.json`; ripple adder (7 HA + 3 OR), 256/256; layout re-computed by topo depth after appr failure (backward carry wires) — now 25/25 forward |
-| hw2-p10 | edge detector (≥3 consecutive 1s) | perception | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | 8-in→1-out; **DSL can't express — spike** |
-| hw2-p11 | object detector (exactly 3 consecutive 1s) | perception | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | 8-in→1-out |
-| hw2-p12 | landmark recognition (= 110010111) | perception | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | pattern 9 bits vs 8-in schematic — reconcile |
+| hw2-p10 | edge detector (≥3 consecutive 1s) | perception | ✅ | ✅ | ✅ | ✅ | ✅ | `reference/hw2-p10.json`; devData Q9 (min-run 3, w8) promoted at exact tier; 256-case exhaustive bank; broken (OR-all) fails 148/256 |
+| hw2-p11 | object detector (exactly 3 consecutive 1s) | perception | ✅ | ✅ | ✅ | ✅ | ✅ | `reference/hw2-p11.json`; devData Q10 (exact-run 3, w8); broken (= the ≥3 detector) fails 46/256; appr ✅ with ONE known renderer-class residual: 6 bumpless crossings (router lane hugs port column, inside pathDWithBumps' 5px skip) — P1.8 S3's exhibit, pinned by `tools/bumpCheck.ts` |
+| hw2-p12 | landmark recognition (= 110010111) | perception | ✅ | ✅ | ✅ | ✅ | ✅ | `reference/hw2-p12.json`; devData Q11 (pattern, w9 — width follows the pattern; 8-in schematic question resolved); 512-case bank; broken (AND-all) fails exactly the 2 pattern-adjacent cases |
 | hw2-p13 | spiral (CC turbot, pass-through) | navigation | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | |
 | hw2-p14 | full circle (CC turbot, pass-through) | navigation | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | |
 | hw2-p15 | zig-zag (CC turbot, pass-through) | navigation | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | |
@@ -134,4 +135,5 @@ _Note: HW6 #1 & #3 (flowchart / life-cycle prose) are excluded._
 
 ---
 
-**Totals:** 0 / 56 verified.
+**Totals:** 44 / 56 exact-verified · 12 pending (interface tier) — the harness
+JSON is authoritative; this line was stale bootstrap text until iteration 19.
