@@ -39,7 +39,14 @@ quality work.
 we're at 17). Run `npm run coverage`; reconcile COVERAGE + QUEUE against the
 harness JSON; prune/re-rank; audit for patch accumulation since iteration 11
 (P2.1–P2.4, the scope shift, P1.8 S1/S2 all landed in that window). Expect
-little row drift — iteration 17 changed no rows.
+little row drift — iteration 17 changed no rows. **Also: `origin/main` is 7
+commits ahead of this branch** (discovered end of iteration 17): PR #13 adds a
+whole SIXTH question mode ("open" free-text, manually reviewed) and PR #11
+reworks turbot samples + turbotCheck (grades FSM/SC-brained turbots). Merge
+`origin/main` into `buildout-infra` as part of the audit, re-run every gate
+(`check`/`tsc`/`build`/`coverage` — turbotCheck and pipelineCheck are the
+likely friction points), and audit whether QUEUE/COVERAGE need rows or task
+updates for the new mode before P1.8 S3 builds on stale code.
 
 **THEN P1.8 S3–S4** (per `designs/wire-routing.md` slice plan):
 - **S3** — foreign-lane A* cost + an H4 near-merge validation round using the
