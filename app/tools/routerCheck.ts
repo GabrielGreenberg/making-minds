@@ -26,6 +26,14 @@
 //      per fixture. New fixtures must route fallback-free or be added to the
 //      table DELIBERATELY; later slices (S3/S4) ratchet these numbers down.
 //      Every fixture must also stay oracle-clean (layoutCheck predicates).
+//
+//   4. DIVERGENCE DOTS — findDivergencePoints corpus (VISUAL_VOCAB: a split
+//      draws a dot at the JUNCTION). Trunk fanout dots the elbow where the
+//      branches part, stub-tip divergence subsumes the old always-at-the-port
+//      dot, extra collinear waypoints can't fake a junction, and a dot within
+//      collision range of a CANVAS-side crossing (whose bump arc the canvas
+//      bakes into pathD from displayed points — NOT the router's crossing
+//      set) is skipped.
 
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -35,7 +43,12 @@ import {
   getPortPosition,
   getPortPositionLocal,
 } from '../src/componentGeometry';
-import { resetFallbackCount, getFallbackCount } from '../src/wireRouter';
+import {
+  resetFallbackCount,
+  getFallbackCount,
+  findDivergencePoints,
+  type DisplayedWirePath,
+} from '../src/wireRouter';
 import { checkCircuitLayout, checkFixtureLayout } from './layoutCheck';
 import { comp, wire, circuit } from './builder';
 
@@ -184,6 +197,62 @@ console.log('\nFALLBACK BUDGET — CC/SC reference fixtures (canvas-identical ro
   check(`fallback total within budget (${total} <= ${MAX_TOTAL_FALLBACKS})`, total <= MAX_TOTAL_FALLBACKS);
   check('fallback residual distribution matches the pinned table', distributionOk);
   check('every CC/SC fixture is oracle-clean', allClean);
+}
+
+// ─── 4. Divergence dots — findDivergencePoints corpus ───────────────────────
+
+console.log('\nDIVERGENCE DOTS — junction dots on displayed fan-out paths');
+{
+  const p = (x: number, y: number) => ({ x, y });
+  const dw = (sourcePortKey: string, points: { x: number; y: number }[]): DisplayedWirePath =>
+    ({ sourcePortKey, points });
+  const KEY = 'src:out';
+
+  // Port at (100,100), stub tip at (112,100). A runs straight east; B shares
+  // the trunk to x=200 then turns north; C leaves the trunk at the stub tip.
+  const A = [p(100, 100), p(112, 100), p(300, 100)];
+  const B = [p(100, 100), p(112, 100), p(200, 100), p(200, 40)];
+  const C = [p(100, 100), p(112, 100), p(112, 180), p(240, 180)];
+
+  let dots = findDivergencePoints([dw(KEY, A), dw(KEY, B)]);
+  check('trunk fanout: one dot at the divergence elbow (200,100)',
+    dots.length === 1 && nearPt(dots[0], 200, 100));
+
+  dots = findDivergencePoints([dw(KEY, A), dw(KEY, C)]);
+  check('stub-tip divergence subsumes the port dot: dot at (112,100), not (100,100)',
+    dots.length === 1 && nearPt(dots[0], 112, 100));
+
+  dots = findDivergencePoints([dw(KEY, A), dw(KEY, B), dw(KEY, C)]);
+  const hasElbow = dots.some((d) => nearPt(d, 200, 100));
+  const hasStubTip = dots.some((d) => nearPt(d, 112, 100));
+  check('three-branch trunk: two junction dots, pairwise duplicates deduped',
+    dots.length === 2 && hasElbow && hasStubTip);
+
+  // Same trunk, different segmentation: an extra collinear waypoint mid-trunk
+  // (e.g. left by a manual drag elsewhere) must not read as a junction.
+  const B2 = [p(100, 100), p(112, 100), p(150, 100), p(200, 100), p(200, 40)];
+  dots = findDivergencePoints([dw(KEY, A), dw(KEY, B2)]);
+  check('extra collinear waypoints do not fake a junction (dot stays at 200,100)',
+    dots.length === 1 && nearPt(dots[0], 200, 100));
+
+  dots = findDivergencePoints([dw('s1:out', A), dw('s2:out', C)]);
+  check('different-source wires never get a junction dot', dots.length === 0);
+
+  dots = findDivergencePoints([dw(KEY, A)]);
+  check('a lone wire gets no dot', dots.length === 0);
+
+  dots = findDivergencePoints([dw(KEY, A), dw(KEY, A.map((q) => ({ ...q })))]);
+  check('identical paths never diverge (no dot)', dots.length === 0);
+
+  // Bump-collision skip: the skip consumes CANVAS-side crossings. A crossing
+  // near the (200,100) elbow (within bump 5 + dot 4 = 9px) suppresses the dot;
+  // a crossing farther along the trunk does not.
+  dots = findDivergencePoints([dw(KEY, A), dw(KEY, B)], [p(201, 102)]);
+  check('dot within bump radius of a canvas-side crossing is skipped', dots.length === 0);
+
+  dots = findDivergencePoints([dw(KEY, A), dw(KEY, B)], [p(215, 100)]);
+  check('crossing beyond bump-collision range leaves the dot',
+    dots.length === 1 && nearPt(dots[0], 200, 100));
 }
 
 console.log(`\n${failures === 0 ? 'ROUTER CHECK OK' : `ROUTER CHECK FAILED (${failures} checks)`}`);

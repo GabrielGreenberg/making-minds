@@ -17,7 +17,14 @@ import {
   isMemSinkPort,
 } from '../types';
 import { v4 as uuid } from 'uuid';
-import { routeAllWires, validateSegmentPosition, type WireRouteInput } from '../wireRouter';
+import {
+  routeAllWires,
+  validateSegmentPosition,
+  findDivergencePoints,
+  SPLIT_DOT_RADIUS,
+  type WireRouteInput,
+  type DisplayedWirePath,
+} from '../wireRouter';
 
 // ─── Geometry helpers ─────────────────────────────────────────────
 // Rendered dimensions + port math live in componentGeometry.ts — the single
@@ -3859,7 +3866,10 @@ export function CircuitCanvas() {
     // Detect perpendicular crossings from the final displayed paths
     // (after routing + manual-segment adjustments) and bake the arc
     // directly into each horizontal wire's pathD so both wires remain
-    // visually continuous with no white gaps.
+    // visually continuous with no white gaps. The recomputed set REPLACES
+    // the router's result.crossings on wireData — displayed geometry is
+    // the truth here, and downstream consumers (the split-dot bump-skip)
+    // must see the same crossings the bumps were drawn from.
     for (const [wireId, wd] of data) {
       if (wd.isFsmTransition) continue;
       const crossings: { x: number; y: number }[] = [];
@@ -3881,6 +3891,7 @@ export function CircuitCanvas() {
           }
         }
       }
+      wd.crossings = crossings;
       if (crossings.length > 0) {
         wd.pathD = pathDWithBumps(wd.points, crossings);
       }
@@ -3891,28 +3902,34 @@ export function CircuitCanvas() {
   }, [wires, components]);
 
   // ─── Split dots ────────────────────────────────────────────────
+  // VISUAL_VOCAB: splitting one output to many inputs draws a dot at the
+  // JUNCTION — where the branches actually part ways on the displayed paths
+  // (shared trunks get their dot at the divergence elbow, not the source
+  // port). findDivergencePoints is pure (wireRouter.ts, corpus-tested in
+  // tools/routerCheck.ts); it consumes the CANVAS-side crossing set stored
+  // on wireData so dots never land on a rendered bump arc.
   const splitDots = useMemo(() => {
-    const outputUsage = new Map<string, number>();
+    const displayed: DisplayedWirePath[] = [];
+    const canvasCrossings: { x: number; y: number }[] = [];
     for (const w of wires) {
-      if (w.transitionLabel !== undefined) continue; // FSM transitions don't split
-      const key = `${w.sourceComponentId}:${w.sourcePortId}`;
-      outputUsage.set(key, (outputUsage.get(key) || 0) + 1);
+      const wd = wireData.get(w.id);
+      if (!wd || wd.isFsmTransition) continue; // FSM transitions don't split
+      displayed.push({
+        sourcePortKey: `${w.sourceComponentId}:${w.sourcePortId}`,
+        points: wd.points,
+      });
+      canvasCrossings.push(...wd.crossings);
     }
-    const dots: React.ReactElement[] = [];
-    for (const [key, count] of outputUsage) {
-      if (count > 1) {
-        const [compId, portId] = key.split(':');
-        const comp = components.find((c) => c.id === compId);
-        if (comp) {
-          const pos = getPortPosition(comp, portId);
-          dots.push(
-            <circle key={`split-${key}`} cx={pos.x} cy={pos.y} r={4} fill="#333" />
-          );
-        }
-      }
-    }
-    return dots;
-  }, [wires, components]);
+    return findDivergencePoints(displayed, canvasCrossings).map((p) => (
+      <circle
+        key={`split-${Math.round(p.x)},${Math.round(p.y)}`}
+        cx={p.x}
+        cy={p.y}
+        r={SPLIT_DOT_RADIUS}
+        fill="#333"
+      />
+    ));
+  }, [wires, wireData]);
 
   // ─── Comment anchors ───────────────────────────────────────────
   const commentAnchors = useMemo(() => {

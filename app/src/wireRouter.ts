@@ -1132,6 +1132,113 @@ function findCrossingPoints(
   return crossings;
 }
 
+// ─── Divergence dots (renderer support — VISUAL_VOCAB junction dots) ────────
+
+/** VISUAL_VOCAB: a split is drawn as a dot at the junction — r=4, #333. */
+export const SPLIT_DOT_RADIUS = 4;
+
+/** Radius of the crossing bump arc. Must match pathDWithBumps' R in
+ *  CircuitCanvas.tsx — a dot within (bump + dot) radius of a crossing would
+ *  be drawn on top of the arc, so findDivergencePoints skips it. */
+const CROSSING_BUMP_RADIUS = 5;
+
+/** A displayed (rendered) wire path: what the student actually sees —
+ *  routed points AFTER manual segment offsets are applied. */
+export interface DisplayedWirePath {
+  /** "compId:portId" of the source port — fan-out wires share this key. */
+  sourcePortKey: string;
+  points: Point[];
+}
+
+/** Unit axis direction of an axis-aligned displayed segment (null if
+ *  zero-length or diagonal — displayed wire segments are always H/V). */
+function axisDir(from: Point, to: Point): { dx: number; dy: number } | null {
+  const dx = to.x - from.x;
+  const dy = to.y - from.y;
+  if (Math.abs(dy) < 0.5 && Math.abs(dx) >= 0.5) return { dx: Math.sign(dx), dy: 0 };
+  if (Math.abs(dx) < 0.5 && Math.abs(dy) >= 0.5) return { dx: 0, dy: Math.sign(dy) };
+  return null;
+}
+
+/** Walk two same-source displayed paths from their shared port and return the
+ *  point where they part ways, or null if one path is a prefix of the other
+ *  (or they are identical). Geometric, not pointwise: the two paths may
+ *  segment the shared trunk differently (extra collinear waypoints, manual
+ *  drags on later segments), so we advance along the COMMON direction by the
+ *  shorter remaining run and only declare divergence where directions differ. */
+function pairDivergencePoint(a: Point[], b: Point[]): Point | null {
+  if (a.length < 2 || b.length < 2) return null;
+  if (Math.abs(a[0].x - b[0].x) >= 0.5 || Math.abs(a[0].y - b[0].y) >= 0.5) return null;
+
+  let pos = { x: a[0].x, y: a[0].y };
+  let ai = 1;
+  let bi = 1;
+  const maxSteps = a.length + b.length + 4; // walk is strictly consuming; guard anyway
+  for (let step = 0; step < maxSteps; step++) {
+    // Skip waypoints already consumed (or zero-length segments).
+    while (ai < a.length && Math.abs(a[ai].x - pos.x) < 0.5 && Math.abs(a[ai].y - pos.y) < 0.5) ai++;
+    while (bi < b.length && Math.abs(b[bi].x - pos.x) < 0.5 && Math.abs(b[bi].y - pos.y) < 0.5) bi++;
+    if (ai >= a.length || bi >= b.length) return null; // ran off an end — no junction
+
+    const da = axisDir(pos, a[ai]);
+    const db = axisDir(pos, b[bi]);
+    if (!da || !db) return null; // degenerate/diagonal — bail, draw nothing
+    if (da.dx !== db.dx || da.dy !== db.dy) return { x: pos.x, y: pos.y }; // the junction
+
+    const lenA = Math.abs(a[ai].x - pos.x) + Math.abs(a[ai].y - pos.y);
+    const lenB = Math.abs(b[bi].x - pos.x) + Math.abs(b[bi].y - pos.y);
+    const advance = Math.min(lenA, lenB);
+    pos = { x: pos.x + da.dx * advance, y: pos.y + da.dy * advance };
+  }
+  return null;
+}
+
+/**
+ * Junction dots for fan-out wires (VISUAL_VOCAB: splitting one output to many
+ * inputs draws a dot at the junction). Pure — the canvas renders the result.
+ *
+ * Per source-port group, every wire pair contributes the point where the two
+ * displayed paths diverge; a shared trunk therefore gets its dot at the elbow
+ * where branches actually part, not at the source port (the stub-tip case
+ * subsumes the old always-at-the-port dot). Points are deduped, and any dot
+ * within collision range of a CANVAS-side crossing is skipped — the canvas
+ * recomputes crossings from displayed points and bakes bump arcs into pathD
+ * (superseding the router's own crossing set), so callers must pass THAT set
+ * or the skip would miss bumps introduced by manual segment drags.
+ */
+export function findDivergencePoints(
+  wires: DisplayedWirePath[],
+  crossings: Point[] = [],
+  skipRadius: number = CROSSING_BUMP_RADIUS + SPLIT_DOT_RADIUS,
+): Point[] {
+  const groups = new Map<string, DisplayedWirePath[]>();
+  for (const w of wires) {
+    const list = groups.get(w.sourcePortKey);
+    if (list) list.push(w);
+    else groups.set(w.sourcePortKey, [w]);
+  }
+
+  const dots: Point[] = [];
+  const seen = new Set<string>();
+  for (const group of groups.values()) {
+    if (group.length < 2) continue;
+    for (let i = 0; i < group.length; i++) {
+      for (let j = i + 1; j < group.length; j++) {
+        const p = pairDivergencePoint(group[i].points, group[j].points);
+        if (!p) continue;
+        const key = `${Math.round(p.x)},${Math.round(p.y)}`;
+        if (seen.has(key)) continue;
+        seen.add(key);
+        const onBump = crossings.some(
+          (c) => Math.hypot(c.x - p.x, c.y - p.y) <= skipRadius,
+        );
+        if (!onBump) dots.push(p);
+      }
+    }
+  }
+  return dots;
+}
+
 /** Check if a path passes through any element bounds */
 function isPathBlockedByBounds(path: Point[], bounds: Bounds[]): boolean {
   for (let i = 0; i < path.length - 1; i++) {
