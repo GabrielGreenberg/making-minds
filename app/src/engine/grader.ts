@@ -12,6 +12,10 @@
 // over wires/time/tape), which lives entirely in the codec:
 //   CC → space, SC/FSM → time, TM → tape (delegated to tmCodec).
 //
+// Two question kinds grade OUTSIDE the codec: turbots (positional arena
+// criteria — gradeTurbot) and perception questions (raw bit-level frames in,
+// one classification bit out per step — gradePerception, engine/perception.ts).
+//
 // Scoring is all-or-nothing at the question level: a question passes iff the
 // machine is valid AND every case passes. A case passes iff its output is
 // accepted and decodes to f(x). No partial credit — a rejected output and a wrong
@@ -26,6 +30,8 @@ import type {
   TestCase,
   TurbotTestCase,
   TurbotCaseResult,
+  PerceptionTestCase,
+  PerceptionCaseResult,
   RepSystem,
   BuildMode,
   TMNotation,
@@ -39,6 +45,7 @@ import { evaluateFSMSymbolSequence } from './fsm';
 import { fsmNotation } from './notation';
 import { evaluateTMSequence } from './tm';
 import { runTurbot, evaluateTurbotCriterion, validateTurbotTM, validateTurbotFSM } from './turbot';
+import { validatePerceptionMachine, runPerceptionCase } from './perception';
 import { validateMachine } from './machineValidation';
 import {
   axisForMode,
@@ -112,6 +119,7 @@ export function gradeQuestion(
   if (question.buildMode === 'open') return pendingOpen(question.id, responseText);
   if (!circuit) return skip(question.id, 'no circuit submitted');
   if (question.buildMode === 'turbot') return gradeTurbot(question, circuit);
+  if (question.perception) return gradePerception(question, circuit);
 
   const cases = question.test_cases;
   if (!cases || cases.length === 0) return skip(question.id, 'question has no test cases');
@@ -213,6 +221,56 @@ function gradeTape(
     return { input: tc.inputs, expected: tc.outputs, got: [got], pass: got === tc.outputs[0] };
   });
   return tally(questionId, results);
+}
+
+/**
+ * Perception grading — bit-level, outside the value codec (engine/perception.ts).
+ * The retina's raw frames go straight to the CC/SC engine and the single output
+ * bit is compared per time step; a case passes iff every step matches.
+ */
+function gradePerception(question: AssignmentQuestion, circuit: CircuitData): QuestionResult {
+  const spec = question.perception!;
+  const mode = question.buildMode;
+  if (mode !== 'CC' && mode !== 'SC') {
+    return skip(question.id, `perception questions must be CC or SC (got ${mode})`);
+  }
+
+  const cases = question.perception_cases;
+  if (!cases || cases.length === 0) return skip(question.id, 'question has no perception cases');
+
+  // Stage 1: the retina interface (width input wires, one output wire).
+  // Invalid ⇒ fail every case with the reason, never `skipped`.
+  const valid = validatePerceptionMachine(circuit, spec.width);
+  if (!valid.ok) {
+    const rejected: PerceptionCaseResult[] = cases.map((tc) => ({
+      pass: false,
+      frames: tc.frames,
+      expected: tc.expected,
+      got: [],
+      reason: valid.reason,
+    }));
+    return { questionId: question.id, status: 'graded', passed: 0, total: rejected.length, cases: [], perceptionCases: rejected };
+  }
+
+  const results = cases.map((tc) => gradePerceptionCase(circuit, mode, tc));
+  const passed = results.filter((c) => c.pass).length;
+  return { questionId: question.id, status: 'graded', passed, total: results.length, cases: [], perceptionCases: results };
+}
+
+function gradePerceptionCase(
+  circuit: CircuitData,
+  mode: 'CC' | 'SC',
+  tc: PerceptionTestCase,
+): PerceptionCaseResult {
+  const got = runPerceptionCase(circuit, mode, tc);
+  const mismatch = tc.expected.findIndex((e, t) => got[t] !== e);
+  return {
+    pass: mismatch < 0,
+    frames: tc.frames,
+    expected: tc.expected,
+    got,
+    failStep: mismatch < 0 ? undefined : mismatch + 1,
+  };
 }
 
 /**

@@ -55,9 +55,9 @@ import type { AssignmentQuestion, CircuitData, RepSystem } from '../src/types';
 import { gradeQuestion, type QuestionResult } from '../src/engine/grader';
 import { axisForMode, encodeInput, type CodecLayout } from '../src/engine/codec';
 import { validateMachine } from '../src/engine/machineValidation';
-import { sortStateComponents } from '../src/engine/fsm';
-import { turbotFsmNotation, validateTransitionTable } from '../src/engine/notation';
-import { validateTurbotTM } from '../src/engine/turbot';
+import { validateTurbotTM, validateTurbotFSM } from '../src/engine/turbot';
+import { validatePerceptionMachine } from '../src/engine/perception';
+import { notationForRepresentation } from '../src/engine/tmCodec';
 import { checkCircuitLayout } from './layoutCheck';
 import { comp, wire, circuit } from './builder';
 import {
@@ -122,8 +122,8 @@ function allPass(question: AssignmentQuestion, machine: CircuitData): boolean {
 // ─── Stage-1 validation mirror (interface tier) ──────────────────────────────
 // The grader reports a Stage-1-invalid machine as `graded` with 0/total (never
 // `skipped`), so the interface tier needs the validation verdict directly. This
-// mirrors the dispatch in grader.ts (gradeQuestion / gradeTape / gradeTurbot
-// Stage-1 blocks) — if that dispatch changes, change this too.
+// mirrors the dispatch in grader.ts (gradeQuestion / gradeTape / gradeTurbot /
+// gradePerception Stage-1 blocks) — if that dispatch changes, change this too.
 
 function validateStage1(
   question: AssignmentQuestion,
@@ -131,19 +131,20 @@ function validateStage1(
 ): { ok: boolean; reason?: string } {
   const rep: RepSystem = question.representation ?? 'binary';
 
+  // Open questions have no machine and no Stage 1 (gradeQuestion short-circuits
+  // to 'pending' before any validation); fixtures are never open questions.
+  if (question.buildMode === 'open') return { ok: true };
+
   if (question.buildMode === 'turbot') {
     const innerMode = question.innerMode;
     if (!innerMode) return { ok: false, reason: 'question has no inner mode set' };
-    if (innerMode === 'TM') {
-      const errors = validateTurbotTM(machine.components, machine.wires);
-      return errors.length === 0
-        ? { ok: true }
-        : { ok: false, reason: errors.map((e) => e.message).join(' ') };
-    }
-    if (innerMode === 'FSM') {
-      const states = sortStateComponents(machine.components);
-      if (states.length === 0) return { ok: false, reason: 'machine has no states' };
-      const errors = validateTransitionTable(states, machine.wires, () => turbotFsmNotation, 'total');
+    // The question's encoding picks a turbot TM's internal tape alphabet
+    // (binary {0,1,*}, unary {0,1}) — same mapping as gradeTurbot.
+    const notation = notationForRepresentation(question.representation ?? 'binary');
+    if (innerMode === 'TM' || innerMode === 'FSM') {
+      const errors = innerMode === 'TM'
+        ? validateTurbotTM(machine.components, machine.wires, notation)
+        : validateTurbotFSM(machine.components, machine.wires);
       return errors.length === 0
         ? { ok: true }
         : { ok: false, reason: errors.map((e) => e.message).join(' ') };
@@ -154,6 +155,12 @@ function validateStage1(
         ? { axis: 'time', rep: 'binary', inputWidths: [1], outputWidths: [1, 1] }
         : { axis: 'space', rep: 'binary', inputWidths: [1], outputWidths: [2] };
     return validateMachine(machine, innerMode, layout, rep);
+  }
+
+  // Perception questions: Stage 1 is the retina interface — `width` input
+  // wires, one output wire (gradePerception's validatePerceptionMachine).
+  if (question.perception) {
+    return validatePerceptionMachine(machine, question.perception.width);
   }
 
   const mode = question.buildMode;
