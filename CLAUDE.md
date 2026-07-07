@@ -14,18 +14,22 @@ Claude to load into context).
 >
 > A change isn't finished until the docs that describe it are too.
 
-_Last updated: 2026-07-07 (**sim-state reset on question navigation** — every question
-navigation path (`switchQuestion`, `openAssignment`, `loadAssignment`) now calls the new
-aggregate store action `resetAllSimState()` — which delegates to the per-mode global resets
-(`scGlobalReset`/`fsmGlobalReset`/`tmGlobalReset`/`turbotReset`) so each slice's field list
-lives in one place — instead of `turbotReset()` alone. Previously a run from one question
-leaked into the next: SC typed input rows, OUT strings, ARG/VAL decodes and the full
-Sequential Timeline (`scGlobalSequences`/`scHistory`/`scTimeStep`/`scInputSequence`), the
+_Last updated: 2026-07-07 (**sim-state reset on every canvas swap** — every path that swaps
+the live canvas now calls the aggregate store action `resetAllSimState()` — which delegates
+to the per-mode global resets (`scGlobalReset`/`fsmGlobalReset`/`tmGlobalReset`/`turbotReset`)
+so each slice's field list lives in one place: the assignment navigation paths
+(`switchQuestion`, `openAssignment`, `loadAssignment`, which previously called `turbotReset()`
+alone) AND the sandbox/workbook swaps (`enterSandbox`, `addTab`, `switchTab`, `removeTab`'s
+active-tab-change branch — removing a background tab deliberately leaves the live run
+untouched — `newWorkbook`, and both `importWorkbook` format branches). Previously a run from
+one canvas leaked into the next: SC typed input rows, OUT strings, ARG/VAL decodes and the
+full Sequential Timeline (`scGlobalSequences`/`scHistory`/`scTimeStep`/`scInputSequence`), the
 I/O `tableRows`, FSM run state, and the TM tape (the 2026-07-06 TM-reset fix, commit
-0ca35b3, was never merged to main — restored here). Question entry now hands back a fresh
+0ca35b3, was never merged to main — restored here). Canvas entry now hands back a fresh
 machine at t=1: MEM re-zeroed, input values cleared, circuit structure untouched. Pinned by
-the new committed store-level harness `app/tools/navResetCheck.ts` (42 checks; 15 fail
-without the fix). Earlier same day, **grade release** — students see NO grades (not even on submit)
+the committed store-level harness `app/tools/navResetCheck.ts` (86 checks — 42 assignment-nav
++ 44 sandbox; the sandbox half fails 28 checks without its fix). Earlier same day,
+**grade release** — students see NO grades (not even on submit)
 until the instructor releases them per assignment. Server: `grades_released` column beside the
 assignment row (policy, not content — never inside the AssignmentData JSON), new instructor
 endpoint `PUT /api/assignments/:id/grades-release` `{released: boolean}` (idempotent;
@@ -373,7 +377,7 @@ the engine.
 | Engine        | `app/src/engine/representation.ts`, `index.ts`                                 | value↔bits core (`valueToBits`/`isValidCodeword`/`bitsToValue`) + display helpers; barrel exports                                          |
 | Engine        | `app/src/engine/turbot.ts`                                                     | Turbot arena driver loop: `senseAhead`(bit)/`senseAheadSymbol`(B/E/F)/`applyMotorCommand`, `runBrainStep`/`initialBrainState` (one transition per call: CC/SC circuit brains, the **turbot FSM** — Mealy transitions with full 2-bit motor outputs `in:ij`, own validator `validateTurbotFSM` — or the **turbot TM** — per-state internal/external kinds, single tape actions, ↑/↱/↰ motor labels, own validator `validateTurbotTM`; internal alphabet per the question's encoding, a `TMNotation` param — binary {0,1,*}, unary {0,1}), and `runTurbot` (`stopped` = motor 00 or a TM halt). `evaluateTurbotCriterion` judges `reach-and-stop` / `pass-through` / `return-to-start` (spec §12.5) |
 | Engine        | `app/src/engine/perception.ts`                                                 | Perception (bit-level, outside the codec): `PerceptionRule` evaluators (`hasRunAtLeast`/`hasRunExactly`/`singleObjectAt`/`expectedPerceptionOutputs` — the pre-first-frame "previous input" is the blank frame, "up" = toward IN1), save-time bank generation `buildPerceptionCases` (CC: exhaustive 2^width, width ≤ 10; SC: deterministic frame-sequence battery), `validatePerceptionMachine` (width inputs + 1 output), and `runPerceptionCase` (CC frame eval / SC clocked sequence) |
-| Store         | `app/src/store.ts`                                                             | Zustand UI state; delegates simulation to `engine/`. Per-mode sim state incl. TM (`tmTape`/`tmStep`/`setTmCell`) and turbot (`turbotState`/`turbotStep`/`turbotRun`); ALL transient sim slices (SC/FSM/TM/turbot + I/O `tableRows`) are app-wide, not per-question, so every navigation path (`loadAssignment`/`openAssignment`/`switchQuestion`) flushes them via `resetAllSimState()` (delegates to `scGlobalReset`/`fsmGlobalReset`/`tmGlobalReset`/`turbotReset`; pinned by `tools/navResetCheck.ts`); selectors `selectTmNotation` (TM alphabet: open question's `representation`, sandbox falls back to `repSystem`), `selectTurbotArena`/`selectTurbotInnerMode`, and `selectEffectiveMode` (turbot → the question's `innerMode`; drives every editor-behavior branch), plus `assignmentView` ('overview' \| 'question') and `openResponse`/`setOpenResponse` (the open question's free-text answer, synced into `QuestionCircuit.responseText` at every canvas sync point)  |
+| Store         | `app/src/store.ts`                                                             | Zustand UI state; delegates simulation to `engine/`. Per-mode sim state incl. TM (`tmTape`/`tmStep`/`setTmCell`) and turbot (`turbotState`/`turbotStep`/`turbotRun`); ALL transient sim slices (SC/FSM/TM/turbot + I/O `tableRows`) are app-wide, not per-canvas, so every canvas swap — question navigation (`loadAssignment`/`openAssignment`/`switchQuestion`) and sandbox tab/workbook entry (`enterSandbox`/`addTab`/`switchTab`/active-tab `removeTab`/`newWorkbook`/`importWorkbook`; background-tab removal leaves the live run alone) — flushes them via `resetAllSimState()` (delegates to `scGlobalReset`/`fsmGlobalReset`/`tmGlobalReset`/`turbotReset`; pinned by `tools/navResetCheck.ts`); selectors `selectTmNotation` (TM alphabet: open question's `representation`, sandbox falls back to `repSystem`), `selectTurbotArena`/`selectTurbotInnerMode`, and `selectEffectiveMode` (turbot → the question's `innerMode`; drives every editor-behavior branch), plus `assignmentView` ('overview' \| 'question') and `openResponse`/`setOpenResponse` (the open question's free-text answer, synced into `QuestionCircuit.responseText` at every canvas sync point)  |
 | Routing       | `app/src/routing.ts`                                                           | `Route` union, `parseHash`/`routeToHash`, `navigate()`                                                                                     |
 | Storage       | `app/src/storage/workbookStore.ts`, `AssignmentStore.ts`, `submissionStore.ts` | The three localStorage-backed seams; `submissionStore` also owns manual review of open questions (`recordManualReview` + pure `applyManualReview`)                                                                                                        |
 | Auth          | `app/src/auth/`                                                                | `AuthGate.tsx`, `stubAuth.tsx`, `instructorRole.ts`                                                                                        |
