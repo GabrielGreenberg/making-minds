@@ -162,6 +162,78 @@ const fsmBrain = fsmForwardBrain();
 const runFSM = runTurbot(fsmBrain.components, fsmBrain.wires, 'FSM', corridor(3, 2), 10);
 check('FSM brain: same forward-until-wall behavior', runFSM.haltedByMotor && runFSM.finalState.x === 2);
 
+// ── ONE validity function for turbot-FSM labels (P1.12) ─────────────
+// turbotFsmNotation (engine/notation.ts) is the single answer to "is this
+// turbot-FSM brain label legal" — grader Stage-1 (via validateTurbotFSM),
+// runBrainStep, and the store's label editor all read it. Legacy 1-bit
+// outputs ('0:1' forward, '1:0' stop) alias to the canonical 2-bit motor
+// spelling ('0:11'/'1:00'); a brain written in either spelling must validate
+// and run bit-identically, and canonical turn labels ('01' left / '10'
+// right) execute via the same wheel-bit table as circuit brains (spec §9.2).
+console.log('\n[engine: turbot-FSM one-notation validity]');
+function fsmForwardBrainLegacy(): { components: CircuitComponent[]; wires: Wire[] } {
+  const s0: CircuitComponent = { id: 's0', type: 'STATE', x: 0, y: 0, label: 'S₀', ports: getPortsForType('STATE') };
+  return {
+    components: [s0],
+    wires: [
+      { id: 't1', sourceComponentId: 's0', sourcePortId: 'right', targetComponentId: 's0', targetPortId: 'left', value: 0, transitionLabel: '0:1' },
+      { id: 't2', sourceComponentId: 's0', sourcePortId: 'right', targetComponentId: 's0', targetPortId: 'left', value: 0, transitionLabel: '1:0' },
+    ],
+  };
+}
+{
+  const legacy = fsmForwardBrainLegacy();
+  const runLegacy = runTurbot(legacy.components, legacy.wires, 'FSM', corridor(3, 2), 10);
+  check('legacy 1-bit alias labels behave bit-identically to the canonical 2-bit brain',
+    runLegacy.haltedByMotor && runLegacy.finalState.x === runFSM.finalState.x &&
+    runLegacy.history.length === runFSM.history.length);
+
+  const notationAssignment: AssignmentData = {
+    id: 'turbot-fsm-notation-smoke',
+    title: 'Turbot FSM notation smoke',
+    questions: [{
+      id: 1,
+      label: 'Q1 (turbot FSM)',
+      statement: 'Move forward until blocked, then stop on the goal.',
+      buildMode: 'turbot',
+      innerMode: 'FSM',
+      representation: 'binary',
+      turbot_cases: [{ arena: corridor(3, 2), maxSteps: 10, criterion: 'reach-and-stop' }],
+    }],
+  };
+  const gradeBrain = (circuit: { components: CircuitComponent[]; wires: Wire[] }) =>
+    gradeSubmission(notationAssignment, {
+      assignmentTitle: notationAssignment.title,
+      student: 'fsm-notation@example.com',
+      submittedAt: '2026-07-06T00:00:00Z',
+      answers: [{ questionId: 1, circuit }],
+    }).questions[0];
+  check('grader accepts the legacy-alias brain', gradeBrain(legacy).passed === 1);
+  check('grader accepts the canonical-label brain', gradeBrain(fsmForwardBrain()).passed === 1);
+
+  const canonWires = fsmForwardBrain().wires;
+  const badLabel = {
+    components: fsmForwardBrain().components,
+    wires: [{ ...canonWires[0] }, { ...canonWires[1], transitionLabel: '1:2' }],
+  };
+  const badResult = gradeBrain(badLabel);
+  check('an illegal turbot-FSM label fails Stage-1 with a reason',
+    badResult.passed === 0 && !!badResult.turbotCases?.[0]?.reason);
+
+  // Canonical turn labels now execute: '0:01' = right wheel only = pivot left.
+  const spinner: { components: CircuitComponent[]; wires: Wire[] } = {
+    components: [{ id: 's0', type: 'STATE', x: 0, y: 0, label: 'S₀', ports: getPortsForType('STATE') }],
+    wires: [
+      { id: 't1', sourceComponentId: 's0', sourcePortId: 'right', targetComponentId: 's0', targetPortId: 'left', value: 0, transitionLabel: '0:01' },
+      { id: 't2', sourceComponentId: 's0', sourcePortId: 'right', targetComponentId: 's0', targetPortId: 'left', value: 0, transitionLabel: '1:01' },
+    ],
+  };
+  const runSpin = runTurbot(spinner.components, spinner.wires, 'FSM', corridor(3, 2), 4);
+  check('canonical turn label pivots in place (left turns, no movement)',
+    runSpin.hitStepLimit && runSpin.finalState.x === 0 &&
+    runSpin.history.every((h) => h.action === 'left'));
+}
+
 // FSM brains can issue every motor command, turns included: in a 1×1 box the
 // turner senses B every cycle and pivots left (E → N → W → S → …) forever.
 const fsmTurner = fsmTurnerBrain();
@@ -198,12 +270,14 @@ check('2-bit-output FSM table validates',
 const oneBitFsm = {
   components: [{ id: 's0', type: 'STATE', x: 0, y: 0, label: 'S₀', ports: getPortsForType('STATE') } as CircuitComponent],
   wires: [
-    tWire('t1', 's0', 's0', '0:1'), // base-FSM single output bit — not turbot-FSM grammar
+    tWire('t1', 's0', 's0', '0:1'), // base-FSM single output bit — a legacy alias of '0:11'
     tWire('t2', 's0', 's0', '1:00'),
   ],
 };
-check('base-FSM one-bit label is rejected (and input 0 left unhandled)',
-  validateTurbotFSM(oneBitFsm.components, oneBitFsm.wires).length > 0);
+// Legacy 1-bit outputs are ALIASES of the canonical 2-bit motor spelling
+// (turbotFsmNotation, P1.12) — old localStorage machines keep validating.
+check('a legacy one-bit label is accepted as an alias (input 0 is handled)',
+  validateTurbotFSM(oneBitFsm.components, oneBitFsm.wires).length === 0);
 const partialFsm = {
   components: [{ id: 's0', type: 'STATE', x: 0, y: 0, label: 'S₀', ports: getPortsForType('STATE') } as CircuitComponent],
   wires: [tWire('t1', 's0', 's0', '0:11')],

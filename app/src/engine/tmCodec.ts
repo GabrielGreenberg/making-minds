@@ -34,19 +34,24 @@ export interface AcceptOptions {
  * Encode input *values* as a standard-layout tape with the head in standard
  * position (the rightmost cell of the rightmost input's block).
  *
- * Layout: input blocks left-to-right, consecutive inputs separated by a single
- * `'0'`, background `'0'`s outside (none stored — the tape is sparse).
+ * Layout: input blocks left-to-right, consecutive inputs separated by
+ * background `'0'`s (unstored — the tape is sparse), background `'0'`s outside.
  *   - Unary: value `n>0` → a run of `n` `'1'`s; value `0` → a single (unstored)
  *     `'0'` slot.
  *   - Binary: value → `'*'` + binary digits (MSB-first) + `'*'`; value `0` → `*0*`.
+ *
+ * `separations` (optional, from `TestCase.separations`) is the gap AFTER each
+ * block except the last — for two inputs, one entry. Absent entries default to
+ * the standard single-cell separator; entries are clamped to >= 1 (a gap of 0
+ * would merge adjacent blocks into an unreadable layout).
  */
-export function encodeTM(notation: TMNotation, values: number[]): TMTape {
+export function encodeTM(notation: TMNotation, values: number[], separations?: number[]): TMTape {
   const cells: Record<number, TMSymbol> = {};
   let pos = 0;
   let head = 0;
 
   values.forEach((value, i) => {
-    if (i > 0) pos += 1; // single-'0' separator (unstored)
+    if (i > 0) pos += Math.max(1, Math.trunc(separations?.[i - 1] ?? 1)); // '0' separator run (unstored)
 
     if (notation === 'unary') {
       const n = Math.max(0, Math.trunc(value));

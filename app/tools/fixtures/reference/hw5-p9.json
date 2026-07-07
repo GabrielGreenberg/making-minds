@@ -1,0 +1,1959 @@
+{
+  "question": {
+    "id": 9,
+    "label": "Problem 9",
+    "statement": "Design a Turing machine that adds two binary numerals, reusing your add-one and subtract-one machines. The tape starts with the numeral of y between asterisk markers on the left and the numeral of x between asterisk markers on the right, with the head on the rightmost marker. The machine must transfer the value of x into the y block one unit at a time, then erase everything except a single well-formed block containing the binary numeral of x + y — clean up so that exactly one pair of markers remains on the tape.",
+    "buildMode": "TM",
+    "representation": "binary",
+    "cc_spec": {
+      "inputs": [
+        {
+          "name": "y",
+          "width": 6
+        },
+        {
+          "name": "x",
+          "width": 6
+        }
+      ],
+      "outputs": [
+        {
+          "name": "out",
+          "width": 7,
+          "formula": "x + y"
+        }
+      ]
+    },
+    "test_cases": [
+      {
+        "inputs": [
+          0,
+          0
+        ],
+        "outputs": [
+          0
+        ]
+      },
+      {
+        "inputs": [
+          0,
+          2
+        ],
+        "outputs": [
+          2
+        ]
+      },
+      {
+        "inputs": [
+          0,
+          4
+        ],
+        "outputs": [
+          4
+        ]
+      },
+      {
+        "inputs": [
+          0,
+          7
+        ],
+        "outputs": [
+          7
+        ]
+      },
+      {
+        "inputs": [
+          0,
+          11
+        ],
+        "outputs": [
+          11
+        ]
+      },
+      {
+        "inputs": [
+          0,
+          16
+        ],
+        "outputs": [
+          16
+        ]
+      },
+      {
+        "inputs": [
+          0,
+          31
+        ],
+        "outputs": [
+          31
+        ]
+      },
+      {
+        "inputs": [
+          0,
+          47
+        ],
+        "outputs": [
+          47
+        ]
+      },
+      {
+        "inputs": [
+          1,
+          0
+        ],
+        "outputs": [
+          1
+        ]
+      },
+      {
+        "inputs": [
+          1,
+          2
+        ],
+        "outputs": [
+          3
+        ]
+      },
+      {
+        "inputs": [
+          1,
+          4
+        ],
+        "outputs": [
+          5
+        ]
+      },
+      {
+        "inputs": [
+          1,
+          7
+        ],
+        "outputs": [
+          8
+        ]
+      },
+      {
+        "inputs": [
+          1,
+          11
+        ],
+        "outputs": [
+          12
+        ]
+      },
+      {
+        "inputs": [
+          1,
+          16
+        ],
+        "outputs": [
+          17
+        ]
+      },
+      {
+        "inputs": [
+          1,
+          31
+        ],
+        "outputs": [
+          32
+        ]
+      },
+      {
+        "inputs": [
+          1,
+          47
+        ],
+        "outputs": [
+          48
+        ]
+      },
+      {
+        "inputs": [
+          2,
+          0
+        ],
+        "outputs": [
+          2
+        ]
+      },
+      {
+        "inputs": [
+          2,
+          2
+        ],
+        "outputs": [
+          4
+        ]
+      },
+      {
+        "inputs": [
+          2,
+          4
+        ],
+        "outputs": [
+          6
+        ]
+      },
+      {
+        "inputs": [
+          2,
+          7
+        ],
+        "outputs": [
+          9
+        ]
+      },
+      {
+        "inputs": [
+          2,
+          11
+        ],
+        "outputs": [
+          13
+        ]
+      },
+      {
+        "inputs": [
+          2,
+          16
+        ],
+        "outputs": [
+          18
+        ]
+      },
+      {
+        "inputs": [
+          2,
+          31
+        ],
+        "outputs": [
+          33
+        ]
+      },
+      {
+        "inputs": [
+          2,
+          47
+        ],
+        "outputs": [
+          49
+        ]
+      },
+      {
+        "inputs": [
+          3,
+          0
+        ],
+        "outputs": [
+          3
+        ]
+      },
+      {
+        "inputs": [
+          3,
+          2
+        ],
+        "outputs": [
+          5
+        ]
+      },
+      {
+        "inputs": [
+          3,
+          4
+        ],
+        "outputs": [
+          7
+        ]
+      },
+      {
+        "inputs": [
+          3,
+          7
+        ],
+        "outputs": [
+          10
+        ]
+      },
+      {
+        "inputs": [
+          3,
+          11
+        ],
+        "outputs": [
+          14
+        ]
+      },
+      {
+        "inputs": [
+          3,
+          16
+        ],
+        "outputs": [
+          19
+        ]
+      },
+      {
+        "inputs": [
+          3,
+          31
+        ],
+        "outputs": [
+          34
+        ]
+      },
+      {
+        "inputs": [
+          3,
+          47
+        ],
+        "outputs": [
+          50
+        ]
+      },
+      {
+        "inputs": [
+          4,
+          0
+        ],
+        "outputs": [
+          4
+        ]
+      },
+      {
+        "inputs": [
+          4,
+          2
+        ],
+        "outputs": [
+          6
+        ]
+      },
+      {
+        "inputs": [
+          4,
+          4
+        ],
+        "outputs": [
+          8
+        ]
+      },
+      {
+        "inputs": [
+          4,
+          7
+        ],
+        "outputs": [
+          11
+        ]
+      },
+      {
+        "inputs": [
+          4,
+          11
+        ],
+        "outputs": [
+          15
+        ]
+      },
+      {
+        "inputs": [
+          4,
+          16
+        ],
+        "outputs": [
+          20
+        ]
+      },
+      {
+        "inputs": [
+          4,
+          31
+        ],
+        "outputs": [
+          35
+        ]
+      },
+      {
+        "inputs": [
+          4,
+          47
+        ],
+        "outputs": [
+          51
+        ]
+      },
+      {
+        "inputs": [
+          5,
+          0
+        ],
+        "outputs": [
+          5
+        ]
+      },
+      {
+        "inputs": [
+          5,
+          2
+        ],
+        "outputs": [
+          7
+        ]
+      },
+      {
+        "inputs": [
+          5,
+          4
+        ],
+        "outputs": [
+          9
+        ]
+      },
+      {
+        "inputs": [
+          5,
+          7
+        ],
+        "outputs": [
+          12
+        ]
+      },
+      {
+        "inputs": [
+          5,
+          11
+        ],
+        "outputs": [
+          16
+        ]
+      },
+      {
+        "inputs": [
+          5,
+          16
+        ],
+        "outputs": [
+          21
+        ]
+      },
+      {
+        "inputs": [
+          5,
+          31
+        ],
+        "outputs": [
+          36
+        ]
+      },
+      {
+        "inputs": [
+          5,
+          47
+        ],
+        "outputs": [
+          52
+        ]
+      },
+      {
+        "inputs": [
+          7,
+          0
+        ],
+        "outputs": [
+          7
+        ]
+      },
+      {
+        "inputs": [
+          7,
+          2
+        ],
+        "outputs": [
+          9
+        ]
+      },
+      {
+        "inputs": [
+          7,
+          4
+        ],
+        "outputs": [
+          11
+        ]
+      },
+      {
+        "inputs": [
+          7,
+          7
+        ],
+        "outputs": [
+          14
+        ]
+      },
+      {
+        "inputs": [
+          7,
+          11
+        ],
+        "outputs": [
+          18
+        ]
+      },
+      {
+        "inputs": [
+          7,
+          16
+        ],
+        "outputs": [
+          23
+        ]
+      },
+      {
+        "inputs": [
+          7,
+          31
+        ],
+        "outputs": [
+          38
+        ]
+      },
+      {
+        "inputs": [
+          7,
+          47
+        ],
+        "outputs": [
+          54
+        ]
+      },
+      {
+        "inputs": [
+          8,
+          0
+        ],
+        "outputs": [
+          8
+        ]
+      },
+      {
+        "inputs": [
+          8,
+          2
+        ],
+        "outputs": [
+          10
+        ]
+      },
+      {
+        "inputs": [
+          8,
+          4
+        ],
+        "outputs": [
+          12
+        ]
+      },
+      {
+        "inputs": [
+          8,
+          7
+        ],
+        "outputs": [
+          15
+        ]
+      },
+      {
+        "inputs": [
+          8,
+          11
+        ],
+        "outputs": [
+          19
+        ]
+      },
+      {
+        "inputs": [
+          8,
+          16
+        ],
+        "outputs": [
+          24
+        ]
+      },
+      {
+        "inputs": [
+          8,
+          31
+        ],
+        "outputs": [
+          39
+        ]
+      },
+      {
+        "inputs": [
+          8,
+          47
+        ],
+        "outputs": [
+          55
+        ]
+      },
+      {
+        "inputs": [
+          11,
+          0
+        ],
+        "outputs": [
+          11
+        ]
+      },
+      {
+        "inputs": [
+          11,
+          2
+        ],
+        "outputs": [
+          13
+        ]
+      },
+      {
+        "inputs": [
+          11,
+          4
+        ],
+        "outputs": [
+          15
+        ]
+      },
+      {
+        "inputs": [
+          11,
+          7
+        ],
+        "outputs": [
+          18
+        ]
+      },
+      {
+        "inputs": [
+          11,
+          11
+        ],
+        "outputs": [
+          22
+        ]
+      },
+      {
+        "inputs": [
+          11,
+          16
+        ],
+        "outputs": [
+          27
+        ]
+      },
+      {
+        "inputs": [
+          11,
+          31
+        ],
+        "outputs": [
+          42
+        ]
+      },
+      {
+        "inputs": [
+          11,
+          47
+        ],
+        "outputs": [
+          58
+        ]
+      },
+      {
+        "inputs": [
+          15,
+          0
+        ],
+        "outputs": [
+          15
+        ]
+      },
+      {
+        "inputs": [
+          15,
+          2
+        ],
+        "outputs": [
+          17
+        ]
+      },
+      {
+        "inputs": [
+          15,
+          4
+        ],
+        "outputs": [
+          19
+        ]
+      },
+      {
+        "inputs": [
+          15,
+          7
+        ],
+        "outputs": [
+          22
+        ]
+      },
+      {
+        "inputs": [
+          15,
+          11
+        ],
+        "outputs": [
+          26
+        ]
+      },
+      {
+        "inputs": [
+          15,
+          16
+        ],
+        "outputs": [
+          31
+        ]
+      },
+      {
+        "inputs": [
+          15,
+          31
+        ],
+        "outputs": [
+          46
+        ]
+      },
+      {
+        "inputs": [
+          15,
+          47
+        ],
+        "outputs": [
+          62
+        ]
+      },
+      {
+        "inputs": [
+          16,
+          0
+        ],
+        "outputs": [
+          16
+        ]
+      },
+      {
+        "inputs": [
+          16,
+          2
+        ],
+        "outputs": [
+          18
+        ]
+      },
+      {
+        "inputs": [
+          16,
+          4
+        ],
+        "outputs": [
+          20
+        ]
+      },
+      {
+        "inputs": [
+          16,
+          7
+        ],
+        "outputs": [
+          23
+        ]
+      },
+      {
+        "inputs": [
+          16,
+          11
+        ],
+        "outputs": [
+          27
+        ]
+      },
+      {
+        "inputs": [
+          16,
+          16
+        ],
+        "outputs": [
+          32
+        ]
+      },
+      {
+        "inputs": [
+          16,
+          31
+        ],
+        "outputs": [
+          47
+        ]
+      },
+      {
+        "inputs": [
+          16,
+          47
+        ],
+        "outputs": [
+          63
+        ]
+      },
+      {
+        "inputs": [
+          23,
+          0
+        ],
+        "outputs": [
+          23
+        ]
+      },
+      {
+        "inputs": [
+          23,
+          2
+        ],
+        "outputs": [
+          25
+        ]
+      },
+      {
+        "inputs": [
+          23,
+          4
+        ],
+        "outputs": [
+          27
+        ]
+      },
+      {
+        "inputs": [
+          23,
+          7
+        ],
+        "outputs": [
+          30
+        ]
+      },
+      {
+        "inputs": [
+          23,
+          11
+        ],
+        "outputs": [
+          34
+        ]
+      },
+      {
+        "inputs": [
+          23,
+          16
+        ],
+        "outputs": [
+          39
+        ]
+      },
+      {
+        "inputs": [
+          23,
+          31
+        ],
+        "outputs": [
+          54
+        ]
+      },
+      {
+        "inputs": [
+          23,
+          47
+        ],
+        "outputs": [
+          70
+        ]
+      },
+      {
+        "inputs": [
+          31,
+          0
+        ],
+        "outputs": [
+          31
+        ]
+      },
+      {
+        "inputs": [
+          31,
+          2
+        ],
+        "outputs": [
+          33
+        ]
+      },
+      {
+        "inputs": [
+          31,
+          4
+        ],
+        "outputs": [
+          35
+        ]
+      },
+      {
+        "inputs": [
+          31,
+          7
+        ],
+        "outputs": [
+          38
+        ]
+      },
+      {
+        "inputs": [
+          31,
+          11
+        ],
+        "outputs": [
+          42
+        ]
+      },
+      {
+        "inputs": [
+          31,
+          16
+        ],
+        "outputs": [
+          47
+        ]
+      },
+      {
+        "inputs": [
+          31,
+          31
+        ],
+        "outputs": [
+          62
+        ]
+      },
+      {
+        "inputs": [
+          31,
+          47
+        ],
+        "outputs": [
+          78
+        ]
+      },
+      {
+        "inputs": [
+          32,
+          0
+        ],
+        "outputs": [
+          32
+        ]
+      },
+      {
+        "inputs": [
+          32,
+          2
+        ],
+        "outputs": [
+          34
+        ]
+      },
+      {
+        "inputs": [
+          32,
+          4
+        ],
+        "outputs": [
+          36
+        ]
+      },
+      {
+        "inputs": [
+          32,
+          7
+        ],
+        "outputs": [
+          39
+        ]
+      },
+      {
+        "inputs": [
+          32,
+          11
+        ],
+        "outputs": [
+          43
+        ]
+      },
+      {
+        "inputs": [
+          32,
+          16
+        ],
+        "outputs": [
+          48
+        ]
+      },
+      {
+        "inputs": [
+          32,
+          31
+        ],
+        "outputs": [
+          63
+        ]
+      },
+      {
+        "inputs": [
+          32,
+          47
+        ],
+        "outputs": [
+          79
+        ]
+      },
+      {
+        "inputs": [
+          47,
+          0
+        ],
+        "outputs": [
+          47
+        ]
+      },
+      {
+        "inputs": [
+          47,
+          2
+        ],
+        "outputs": [
+          49
+        ]
+      },
+      {
+        "inputs": [
+          47,
+          4
+        ],
+        "outputs": [
+          51
+        ]
+      },
+      {
+        "inputs": [
+          47,
+          7
+        ],
+        "outputs": [
+          54
+        ]
+      },
+      {
+        "inputs": [
+          47,
+          11
+        ],
+        "outputs": [
+          58
+        ]
+      },
+      {
+        "inputs": [
+          47,
+          16
+        ],
+        "outputs": [
+          63
+        ]
+      },
+      {
+        "inputs": [
+          47,
+          31
+        ],
+        "outputs": [
+          78
+        ]
+      },
+      {
+        "inputs": [
+          47,
+          47
+        ],
+        "outputs": [
+          94
+        ]
+      },
+      {
+        "inputs": [
+          63,
+          0
+        ],
+        "outputs": [
+          63
+        ]
+      },
+      {
+        "inputs": [
+          63,
+          2
+        ],
+        "outputs": [
+          65
+        ]
+      },
+      {
+        "inputs": [
+          63,
+          4
+        ],
+        "outputs": [
+          67
+        ]
+      },
+      {
+        "inputs": [
+          63,
+          7
+        ],
+        "outputs": [
+          70
+        ]
+      },
+      {
+        "inputs": [
+          63,
+          11
+        ],
+        "outputs": [
+          74
+        ]
+      },
+      {
+        "inputs": [
+          63,
+          16
+        ],
+        "outputs": [
+          79
+        ]
+      },
+      {
+        "inputs": [
+          63,
+          31
+        ],
+        "outputs": [
+          94
+        ]
+      },
+      {
+        "inputs": [
+          63,
+          47
+        ],
+        "outputs": [
+          110
+        ]
+      }
+    ]
+  },
+  "correct": {
+    "components": [
+      {
+        "id": "hw5-p9-s0",
+        "type": "STATE",
+        "x": 140,
+        "y": 160,
+        "label": "S₀",
+        "ports": [
+          {
+            "id": "left",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "right",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "hw5-p9-s1",
+        "type": "STATE",
+        "x": 340,
+        "y": 160,
+        "label": "S₁",
+        "ports": [
+          {
+            "id": "left",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "right",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "hw5-p9-s2",
+        "type": "STATE",
+        "x": 540,
+        "y": 160,
+        "label": "S₂",
+        "ports": [
+          {
+            "id": "left",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "right",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "hw5-p9-s3",
+        "type": "STATE",
+        "x": 740,
+        "y": 160,
+        "label": "S₃",
+        "ports": [
+          {
+            "id": "left",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "right",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "hw5-p9-s4",
+        "type": "STATE",
+        "x": 940,
+        "y": 160,
+        "label": "S₄",
+        "ports": [
+          {
+            "id": "left",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "right",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "hw5-p9-s5",
+        "type": "STATE",
+        "x": 940,
+        "y": 420,
+        "label": "S₅",
+        "ports": [
+          {
+            "id": "left",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "right",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "hw5-p9-s6",
+        "type": "STATE",
+        "x": 740,
+        "y": 420,
+        "label": "S₆",
+        "ports": [
+          {
+            "id": "left",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "right",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "hw5-p9-s7",
+        "type": "STATE",
+        "x": 540,
+        "y": 420,
+        "label": "S₇",
+        "ports": [
+          {
+            "id": "left",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "right",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "hw5-p9-s8",
+        "type": "STATE",
+        "x": 340,
+        "y": 420,
+        "label": "S₈",
+        "ports": [
+          {
+            "id": "left",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "right",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "hw5-p9-s9",
+        "type": "STATE",
+        "x": 140,
+        "y": 420,
+        "label": "S₉",
+        "ports": [
+          {
+            "id": "left",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "right",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      }
+    ],
+    "wires": [
+      {
+        "id": "hw5-p9-t01",
+        "sourceComponentId": "hw5-p9-s0",
+        "sourcePortId": "right",
+        "targetComponentId": "hw5-p9-s0",
+        "targetPortId": "left",
+        "value": 0,
+        "transitionLabel": "0:0,R"
+      },
+      {
+        "id": "hw5-p9-t02",
+        "sourceComponentId": "hw5-p9-s0",
+        "sourcePortId": "right",
+        "targetComponentId": "hw5-p9-s0",
+        "targetPortId": "left",
+        "value": 0,
+        "transitionLabel": "1:1,R"
+      },
+      {
+        "id": "hw5-p9-t03",
+        "sourceComponentId": "hw5-p9-s0",
+        "sourcePortId": "right",
+        "targetComponentId": "hw5-p9-s1",
+        "targetPortId": "left",
+        "value": 0,
+        "transitionLabel": "*:*,L"
+      },
+      {
+        "id": "hw5-p9-t04",
+        "sourceComponentId": "hw5-p9-s1",
+        "sourcePortId": "right",
+        "targetComponentId": "hw5-p9-s1",
+        "targetPortId": "left",
+        "value": 0,
+        "transitionLabel": "0:1,L"
+      },
+      {
+        "id": "hw5-p9-t05",
+        "sourceComponentId": "hw5-p9-s1",
+        "sourcePortId": "right",
+        "targetComponentId": "hw5-p9-s2",
+        "targetPortId": "left",
+        "value": 0,
+        "transitionLabel": "1:0,L"
+      },
+      {
+        "id": "hw5-p9-t06",
+        "sourceComponentId": "hw5-p9-s2",
+        "sourcePortId": "right",
+        "targetComponentId": "hw5-p9-s2",
+        "targetPortId": "left",
+        "value": 0,
+        "transitionLabel": "0:0,L"
+      },
+      {
+        "id": "hw5-p9-t07",
+        "sourceComponentId": "hw5-p9-s2",
+        "sourcePortId": "right",
+        "targetComponentId": "hw5-p9-s2",
+        "targetPortId": "left",
+        "value": 0,
+        "transitionLabel": "1:1,L"
+      },
+      {
+        "id": "hw5-p9-t08",
+        "sourceComponentId": "hw5-p9-s2",
+        "sourcePortId": "right",
+        "targetComponentId": "hw5-p9-s3",
+        "targetPortId": "left",
+        "value": 0,
+        "transitionLabel": "*:*,L"
+      },
+      {
+        "id": "hw5-p9-t09",
+        "sourceComponentId": "hw5-p9-s3",
+        "sourcePortId": "right",
+        "targetComponentId": "hw5-p9-s3",
+        "targetPortId": "left",
+        "value": 0,
+        "transitionLabel": "0:0,L"
+      },
+      {
+        "id": "hw5-p9-t10",
+        "sourceComponentId": "hw5-p9-s3",
+        "sourcePortId": "right",
+        "targetComponentId": "hw5-p9-s4",
+        "targetPortId": "left",
+        "value": 0,
+        "transitionLabel": "*:*,L"
+      },
+      {
+        "id": "hw5-p9-t11",
+        "sourceComponentId": "hw5-p9-s4",
+        "sourcePortId": "right",
+        "targetComponentId": "hw5-p9-s4",
+        "targetPortId": "left",
+        "value": 0,
+        "transitionLabel": "1:0,L"
+      },
+      {
+        "id": "hw5-p9-t12",
+        "sourceComponentId": "hw5-p9-s4",
+        "sourcePortId": "right",
+        "targetComponentId": "hw5-p9-s6",
+        "targetPortId": "left",
+        "value": 0,
+        "transitionLabel": "0:1,R"
+      },
+      {
+        "id": "hw5-p9-t13",
+        "sourceComponentId": "hw5-p9-s4",
+        "sourcePortId": "right",
+        "targetComponentId": "hw5-p9-s5",
+        "targetPortId": "left",
+        "value": 0,
+        "transitionLabel": "*:1,L"
+      },
+      {
+        "id": "hw5-p9-t14",
+        "sourceComponentId": "hw5-p9-s5",
+        "sourcePortId": "right",
+        "targetComponentId": "hw5-p9-s6",
+        "targetPortId": "left",
+        "value": 0,
+        "transitionLabel": "0:*,R"
+      },
+      {
+        "id": "hw5-p9-t15",
+        "sourceComponentId": "hw5-p9-s6",
+        "sourcePortId": "right",
+        "targetComponentId": "hw5-p9-s6",
+        "targetPortId": "left",
+        "value": 0,
+        "transitionLabel": "0:0,R"
+      },
+      {
+        "id": "hw5-p9-t16",
+        "sourceComponentId": "hw5-p9-s6",
+        "sourcePortId": "right",
+        "targetComponentId": "hw5-p9-s6",
+        "targetPortId": "left",
+        "value": 0,
+        "transitionLabel": "1:1,R"
+      },
+      {
+        "id": "hw5-p9-t17",
+        "sourceComponentId": "hw5-p9-s6",
+        "sourcePortId": "right",
+        "targetComponentId": "hw5-p9-s7",
+        "targetPortId": "left",
+        "value": 0,
+        "transitionLabel": "*:*,R"
+      },
+      {
+        "id": "hw5-p9-t18",
+        "sourceComponentId": "hw5-p9-s7",
+        "sourcePortId": "right",
+        "targetComponentId": "hw5-p9-s7",
+        "targetPortId": "left",
+        "value": 0,
+        "transitionLabel": "0:0,R"
+      },
+      {
+        "id": "hw5-p9-t19",
+        "sourceComponentId": "hw5-p9-s7",
+        "sourcePortId": "right",
+        "targetComponentId": "hw5-p9-s0",
+        "targetPortId": "left",
+        "value": 0,
+        "transitionLabel": "*:*,R"
+      },
+      {
+        "id": "hw5-p9-t20",
+        "sourceComponentId": "hw5-p9-s1",
+        "sourcePortId": "right",
+        "targetComponentId": "hw5-p9-s8",
+        "targetPortId": "left",
+        "value": 0,
+        "transitionLabel": "*:0,R"
+      },
+      {
+        "id": "hw5-p9-t21",
+        "sourceComponentId": "hw5-p9-s8",
+        "sourcePortId": "right",
+        "targetComponentId": "hw5-p9-s8",
+        "targetPortId": "left",
+        "value": 0,
+        "transitionLabel": "1:0,R"
+      },
+      {
+        "id": "hw5-p9-t22",
+        "sourceComponentId": "hw5-p9-s8",
+        "sourcePortId": "right",
+        "targetComponentId": "hw5-p9-s8",
+        "targetPortId": "left",
+        "value": 0,
+        "transitionLabel": "0:0,R"
+      },
+      {
+        "id": "hw5-p9-t23",
+        "sourceComponentId": "hw5-p9-s8",
+        "sourcePortId": "right",
+        "targetComponentId": "hw5-p9-s9",
+        "targetPortId": "left",
+        "value": 0,
+        "transitionLabel": "*:0,L"
+      },
+      {
+        "id": "hw5-p9-t24",
+        "sourceComponentId": "hw5-p9-s9",
+        "sourcePortId": "right",
+        "targetComponentId": "hw5-p9-s9",
+        "targetPortId": "left",
+        "value": 0,
+        "transitionLabel": "0:0,L"
+      }
+    ]
+  },
+  "broken": {
+    "components": [
+      {
+        "id": "hw5-p9-s0",
+        "type": "STATE",
+        "x": 140,
+        "y": 160,
+        "label": "S₀",
+        "ports": [
+          {
+            "id": "left",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "right",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "hw5-p9-s1",
+        "type": "STATE",
+        "x": 340,
+        "y": 160,
+        "label": "S₁",
+        "ports": [
+          {
+            "id": "left",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "right",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "hw5-p9-s2",
+        "type": "STATE",
+        "x": 540,
+        "y": 160,
+        "label": "S₂",
+        "ports": [
+          {
+            "id": "left",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "right",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "hw5-p9-s3",
+        "type": "STATE",
+        "x": 740,
+        "y": 160,
+        "label": "S₃",
+        "ports": [
+          {
+            "id": "left",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "right",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "hw5-p9-s4",
+        "type": "STATE",
+        "x": 940,
+        "y": 160,
+        "label": "S₄",
+        "ports": [
+          {
+            "id": "left",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "right",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "hw5-p9-s5",
+        "type": "STATE",
+        "x": 940,
+        "y": 420,
+        "label": "S₅",
+        "ports": [
+          {
+            "id": "left",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "right",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "hw5-p9-s6",
+        "type": "STATE",
+        "x": 740,
+        "y": 420,
+        "label": "S₆",
+        "ports": [
+          {
+            "id": "left",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "right",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "hw5-p9-s7",
+        "type": "STATE",
+        "x": 540,
+        "y": 420,
+        "label": "S₇",
+        "ports": [
+          {
+            "id": "left",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "right",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      }
+    ],
+    "wires": [
+      {
+        "id": "hw5-p9-t01",
+        "sourceComponentId": "hw5-p9-s0",
+        "sourcePortId": "right",
+        "targetComponentId": "hw5-p9-s0",
+        "targetPortId": "left",
+        "value": 0,
+        "transitionLabel": "0:0,R"
+      },
+      {
+        "id": "hw5-p9-t02",
+        "sourceComponentId": "hw5-p9-s0",
+        "sourcePortId": "right",
+        "targetComponentId": "hw5-p9-s0",
+        "targetPortId": "left",
+        "value": 0,
+        "transitionLabel": "1:1,R"
+      },
+      {
+        "id": "hw5-p9-t03",
+        "sourceComponentId": "hw5-p9-s0",
+        "sourcePortId": "right",
+        "targetComponentId": "hw5-p9-s1",
+        "targetPortId": "left",
+        "value": 0,
+        "transitionLabel": "*:*,L"
+      },
+      {
+        "id": "hw5-p9-t04",
+        "sourceComponentId": "hw5-p9-s1",
+        "sourcePortId": "right",
+        "targetComponentId": "hw5-p9-s1",
+        "targetPortId": "left",
+        "value": 0,
+        "transitionLabel": "0:1,L"
+      },
+      {
+        "id": "hw5-p9-t05",
+        "sourceComponentId": "hw5-p9-s1",
+        "sourcePortId": "right",
+        "targetComponentId": "hw5-p9-s2",
+        "targetPortId": "left",
+        "value": 0,
+        "transitionLabel": "1:0,L"
+      },
+      {
+        "id": "hw5-p9-t06",
+        "sourceComponentId": "hw5-p9-s2",
+        "sourcePortId": "right",
+        "targetComponentId": "hw5-p9-s2",
+        "targetPortId": "left",
+        "value": 0,
+        "transitionLabel": "0:0,L"
+      },
+      {
+        "id": "hw5-p9-t07",
+        "sourceComponentId": "hw5-p9-s2",
+        "sourcePortId": "right",
+        "targetComponentId": "hw5-p9-s2",
+        "targetPortId": "left",
+        "value": 0,
+        "transitionLabel": "1:1,L"
+      },
+      {
+        "id": "hw5-p9-t08",
+        "sourceComponentId": "hw5-p9-s2",
+        "sourcePortId": "right",
+        "targetComponentId": "hw5-p9-s3",
+        "targetPortId": "left",
+        "value": 0,
+        "transitionLabel": "*:*,L"
+      },
+      {
+        "id": "hw5-p9-t09",
+        "sourceComponentId": "hw5-p9-s3",
+        "sourcePortId": "right",
+        "targetComponentId": "hw5-p9-s3",
+        "targetPortId": "left",
+        "value": 0,
+        "transitionLabel": "0:0,L"
+      },
+      {
+        "id": "hw5-p9-t10",
+        "sourceComponentId": "hw5-p9-s3",
+        "sourcePortId": "right",
+        "targetComponentId": "hw5-p9-s4",
+        "targetPortId": "left",
+        "value": 0,
+        "transitionLabel": "*:*,L"
+      },
+      {
+        "id": "hw5-p9-t11",
+        "sourceComponentId": "hw5-p9-s4",
+        "sourcePortId": "right",
+        "targetComponentId": "hw5-p9-s4",
+        "targetPortId": "left",
+        "value": 0,
+        "transitionLabel": "1:0,L"
+      },
+      {
+        "id": "hw5-p9-t12",
+        "sourceComponentId": "hw5-p9-s4",
+        "sourcePortId": "right",
+        "targetComponentId": "hw5-p9-s6",
+        "targetPortId": "left",
+        "value": 0,
+        "transitionLabel": "0:1,R"
+      },
+      {
+        "id": "hw5-p9-t13",
+        "sourceComponentId": "hw5-p9-s4",
+        "sourcePortId": "right",
+        "targetComponentId": "hw5-p9-s5",
+        "targetPortId": "left",
+        "value": 0,
+        "transitionLabel": "*:1,L"
+      },
+      {
+        "id": "hw5-p9-t14",
+        "sourceComponentId": "hw5-p9-s5",
+        "sourcePortId": "right",
+        "targetComponentId": "hw5-p9-s6",
+        "targetPortId": "left",
+        "value": 0,
+        "transitionLabel": "0:*,R"
+      },
+      {
+        "id": "hw5-p9-t15",
+        "sourceComponentId": "hw5-p9-s6",
+        "sourcePortId": "right",
+        "targetComponentId": "hw5-p9-s6",
+        "targetPortId": "left",
+        "value": 0,
+        "transitionLabel": "0:0,R"
+      },
+      {
+        "id": "hw5-p9-t16",
+        "sourceComponentId": "hw5-p9-s6",
+        "sourcePortId": "right",
+        "targetComponentId": "hw5-p9-s6",
+        "targetPortId": "left",
+        "value": 0,
+        "transitionLabel": "1:1,R"
+      },
+      {
+        "id": "hw5-p9-t17",
+        "sourceComponentId": "hw5-p9-s6",
+        "sourcePortId": "right",
+        "targetComponentId": "hw5-p9-s7",
+        "targetPortId": "left",
+        "value": 0,
+        "transitionLabel": "*:*,R"
+      },
+      {
+        "id": "hw5-p9-t18",
+        "sourceComponentId": "hw5-p9-s7",
+        "sourcePortId": "right",
+        "targetComponentId": "hw5-p9-s7",
+        "targetPortId": "left",
+        "value": 0,
+        "transitionLabel": "0:0,R"
+      },
+      {
+        "id": "hw5-p9-t19",
+        "sourceComponentId": "hw5-p9-s7",
+        "sourcePortId": "right",
+        "targetComponentId": "hw5-p9-s0",
+        "targetPortId": "left",
+        "value": 0,
+        "transitionLabel": "*:*,R"
+      }
+    ]
+  }
+}

@@ -6,13 +6,16 @@
 // Covers the value-based codec pipeline (CLAUDE_KB/engines/tm.md): unary
 // increment (standard position), zero output (blank tape → 0), a binary
 // example, an ambiguous-transition table (validation fails every case), a
-// two-block tape (well-formedness failure), and the standard-halt-position
-// toggle.
+// two-block tape (well-formedness failure), the standard-halt-position
+// toggle, and the per-case `separations` layout hint (encodeTM honors a
+// widened block gap; a gap=1-only machine fails a separations-bearing case
+// end-to-end through the grader).
 
 import type {
   CircuitComponent,
   Wire,
   AssignmentData,
+  AssignmentQuestion,
   SubmissionData,
   TMNotation,
   TMTape,
@@ -20,12 +23,12 @@ import type {
 import { getPortsForType } from '../src/types';
 import {
   evaluateTMSequence,
-  parseTMAction,
   type TMEvalResult,
 } from '../src/engine/tm';
+import { tmNotation } from '../src/engine/notation';
 import { encodeTM, acceptTM, decodeTM } from '../src/engine/tmCodec';
 import { validateTMTable } from '../src/engine/tmValidate';
-import { gradeSubmission } from '../src/engine/grader';
+import { gradeSubmission, gradeQuestion } from '../src/engine/grader';
 
 function comp(id: string, label: string): CircuitComponent {
   return { id, type: 'STATE', x: 0, y: 0, label, ports: getPortsForType('STATE') };
@@ -49,7 +52,30 @@ function check(label: string, cond: boolean) {
 function tmIncrement() {
   return {
     components: [comp('s0', 'S₀'), comp('s1', 'S₁')],
+    wires: [wire('t1', 's0', 's0', '1:1,R'), wire('t2', 's0', 's1', '0:1,R')],
+  };
+}
+
+// The SAME machine spelled with the legacy dual-action alias ('1:1R') — the
+// engine must execute it identically (the alias is accepted forever).
+function tmIncrementLegacy() {
+  return {
+    components: [comp('s0', 'S₀'), comp('s1', 'S₁')],
     wires: [wire('t1', 's0', 's0', '1:1R'), wire('t2', 's0', 's1', '0:1R')],
+  };
+}
+
+// Unary increment that HALTS IN STANDARD POSITION: after writing the new
+// stroke it steps back left onto it (blockEnd) before halting.
+//   S₀ on 1 → 1,R (stay); S₀ on 0 → 1,R (go S₁); S₁ on 0 → 0,L (go S₂, halts).
+function tmIncrementStandard() {
+  return {
+    components: [comp('s0', 'S₀'), comp('s1', 'S₁'), comp('s2', 'S₂')],
+    wires: [
+      wire('t1', 's0', 's0', '1:1,R'),
+      wire('t2', 's0', 's1', '0:1,R'),
+      wire('t3', 's1', 's2', '0:0,L'),
+    ],
   };
 }
 
@@ -58,7 +84,7 @@ function tmIncrement() {
 function tmZero() {
   return {
     components: [comp('s0', 'S₀')],
-    wires: [wire('t1', 's0', 's0', '1:0L')],
+    wires: [wire('t1', 's0', 's0', '1:0,L')],
   };
 }
 
@@ -68,11 +94,13 @@ function tmIdentity() {
   return { components: [comp('s0', 'S₀')], wires: [] as Wire[] };
 }
 
-// Ambiguous: two transitions out of S₀ on reading 1 (nondeterministic).
+// Ambiguous: two transitions out of S₀ on reading 1 (nondeterministic). One
+// is spelled canonically, one via the legacy alias — validation must see the
+// clash across spellings.
 function tmAmbiguous() {
   return {
     components: [comp('s0', 'S₀')],
-    wires: [wire('t1', 's0', 's0', '1:0R'), wire('t2', 's0', 's0', '1:1L')],
+    wires: [wire('t1', 's0', 's0', '1:0,R'), wire('t2', 's0', 's0', '1:1L')],
   };
 }
 
@@ -102,8 +130,92 @@ const id0 = run(tmIdentity(), 'binary', [0]);
 check('binary identity 0 → 0 (*0*)', acceptTM('binary', id0) === null && decodeTM('binary', id0.tape) === 0);
 
 check('encode/decode binary round-trip 11', decodeTM('binary', encodeTM('binary', [11])) === 11);
-check('parse: `*` write is binary-only',
-  parseTMAction('*R', 'binary') !== null && parseTMAction('*R', 'unary') === null);
+check('parse: `*` write is binary-only (canonical and legacy spellings)',
+  tmNotation('binary').parse('0:*,R') !== null && tmNotation('unary').parse('0:*,R') === null &&
+  tmNotation('binary').parse('0:*R') !== null && tmNotation('unary').parse('0:*R') === null);
+
+// Legacy dual-action alias: the SAME machine spelled '1:1R' runs identically.
+const incLegacy = run(tmIncrementLegacy(), 'unary', [2]);
+check('legacy-alias machine runs identically (2 → 3, halts)',
+  incLegacy.halted && acceptTM('unary', incLegacy) === null && decodeTM('unary', incLegacy.tape) === 3);
+check('legacy-alias history records the canonical action ("1,R")',
+  incLegacy.history.length > 0 && incLegacy.history.every((h) => h.action === '1,R'));
+
+// ── separations: per-case block-gap layout hint ────────────────
+// TestCase.separations widens the background gap between input blocks (gap
+// AFTER each block except the last). encodeTM honors it; absent = the classic
+// single-cell separator. This is what makes "do not assume the blocks are
+// separated by exactly one empty cell" (HW5 P4) testable through the bank.
+console.log('\n[separations]');
+
+// Gap-robust unary adder (hw5-p4's construction): shift the x block left one
+// cell per round until it touches y, then park in standard position.
+function tmAdderGapRobust() {
+  return {
+    components: [comp('a0', 'S₀'), comp('a1', 'S₁'), comp('a2', 'S₂'), comp('a3', 'S₃'), comp('a4', 'S₄'), comp('a5', 'S₅')],
+    wires: [
+      wire('g1', 'a0', 'a1', '1:0,L'), // erase rightmost stroke of x
+      wire('g2', 'a1', 'a1', '1:1,L'), // walk left through the rest of x
+      wire('g3', 'a1', 'a2', '0:1,L'), // re-add the stroke one cell left of the block
+      wire('g4', 'a2', 'a3', '0:0,R'), // still a gap → another round
+      wire('g5', 'a2', 'a4', '1:1,R'), // y reached → single merged block
+      wire('g6', 'a3', 'a3', '1:1,R'), // walk right to the block's end
+      wire('g7', 'a3', 'a0', '0:0,L'), // step back onto rightmost stroke; repeat
+      wire('g8', 'a4', 'a4', '1:1,R'), // walk right to the merged block's end
+      wire('g9', 'a4', 'a5', '0:0,L'), // step back onto rightmost stroke (SP); halt
+    ],
+  };
+}
+// Gap=1-ONLY unary adder (the refuted machine): fill the single separator
+// cell, then erase one stroke to compensate. Correct iff the gap is exactly 1.
+function tmAdderGap1Only() {
+  return {
+    components: [comp('b0', 'S₀'), comp('b1', 'S₁'), comp('b2', 'S₂'), comp('b3', 'S₃'), comp('b4', 'S₄')],
+    wires: [
+      wire('h1', 'b0', 'b0', '1:1,L'), // walk left across x
+      wire('h2', 'b0', 'b1', '0:1,L'), // fill the separator (assumes gap=1!)
+      wire('h3', 'b1', 'b1', '1:1,L'), // walk left across y
+      wire('h4', 'b1', 'b2', '0:0,R'), // background past y; step back on
+      wire('h5', 'b2', 'b3', '1:0,R'), // erase one stroke (compensate)
+      wire('h6', 'b3', 'b3', '1:1,R'), // walk right to run's end
+      wire('h7', 'b3', 'b4', '0:0,L'), // step back onto rightmost stroke (SP)
+    ],
+  };
+}
+
+// encodeTM layout: gap 3 between the blocks, head still in standard position.
+const gap3 = encodeTM('unary', [2, 3], [3]);
+check('encodeTM separations [3]: blocks at 0-1 and 5-7, head on 7',
+  JSON.stringify(gap3) === JSON.stringify({ cells: { 0: '1', 1: '1', 5: '1', 6: '1', 7: '1' }, head: 7 }));
+check('encodeTM separations absent === [1] (default layout unchanged)',
+  JSON.stringify(encodeTM('unary', [2, 3])) === JSON.stringify(encodeTM('unary', [2, 3], [1])));
+
+// Full encode→run→accept→decode round-trip at gap 3.
+const robustG3 = evaluateTMSequence(tmAdderGapRobust().components, tmAdderGapRobust().wires, gap3, 'unary');
+check('gap-robust adder at gap 3: encode→run→accept→decode gives 2+3=5',
+  robustG3.halted && acceptTM('unary', robustG3) === null && decodeTM('unary', robustG3.tape) === 5);
+
+// The gap=1-only machine fails the same separations-bearing case…
+const gap1OnlyG3 = evaluateTMSequence(tmAdderGap1Only().components, tmAdderGap1Only().wires, gap3, 'unary');
+check('gap=1-only adder at gap 3: rejected or wrong value',
+  acceptTM('unary', gap1OnlyG3) !== null || decodeTM('unary', gap1OnlyG3.tape) !== 5);
+
+// …and end-to-end through the grader: separations rides inside the TestCase.
+const sepQuestion: AssignmentQuestion = {
+  id: 9, label: 'Q (sep)', statement: 'Unary x+y, arbitrary block separation', buildMode: 'TM',
+  representation: 'tally',
+  test_cases: [
+    { inputs: [2, 3], outputs: [5] },                     // default gap 1
+    { inputs: [2, 3], outputs: [5], separations: [3] },   // widened gap
+  ],
+};
+const sepRobust = gradeQuestion(sepQuestion, tmAdderGapRobust());
+check('grader: gap-robust adder passes both gap-1 and separations cases',
+  sepRobust.status === 'graded' && sepRobust.passed === 2 && sepRobust.total === 2);
+const sepGap1Only = gradeQuestion(sepQuestion, tmAdderGap1Only());
+check('grader: gap=1-only adder passes the default case but FAILS the separations case',
+  sepGap1Only.status === 'graded' && sepGap1Only.total === 2 && sepGap1Only.passed === 1 &&
+  sepGap1Only.cases[0].pass && !sepGap1Only.cases[1].pass && !!sepGap1Only.cases[1].reason);
 
 // ── acceptor edge cases (constructed tapes) ────────────────────
 console.log('\n[acceptor]');
@@ -133,7 +245,7 @@ const ambErrors = validateTMTable(tmAmbiguous().components, tmAmbiguous().wires,
 check('ambiguous table → error', ambErrors.length > 0 && ambErrors[0].kind === 'ambiguous');
 const unparseable = validateTMTable([comp('s0', 'S₀')], [wire('t1', 's0', 's0', 'x:y')], 'unary');
 check('unparseable label → error', unparseable.length > 0 && unparseable[0].kind === 'unparseable');
-const starInUnary = validateTMTable([comp('s0', 'S₀')], [wire('t1', 's0', 's0', '*:0R')], 'unary');
+const starInUnary = validateTMTable([comp('s0', 'S₀')], [wire('t1', 's0', 's0', '*:0,R')], 'unary');
 check('`*` read in a unary machine → unparseable', starInUnary.length > 0 && starInUnary[0].kind === 'unparseable');
 
 // ── grader ─────────────────────────────────────────────────────
@@ -177,6 +289,30 @@ check('ambiguous table: graded, 0 passed, every case has a reason',
   ambiguous.questions[0].status === 'graded' &&
   ambiguous.questions[0].passed === 0 &&
   ambiguous.questions[0].cases.every((c) => !!c.reason));
+
+// ── requireStandardHaltPosition, end-to-end through the grader ─────
+// The question-level flag must have teeth: tmIncrement leaves the RIGHT tape
+// but halts one cell right of the block (it writes the final stroke and moves
+// R before halting) — exactly the machine the flag exists to catch.
+console.log('\n[grader: requireStandardHaltPosition]');
+const laxQuestion: AssignmentQuestion = assignment.questions[0];
+const strictQuestion: AssignmentQuestion = { ...laxQuestion, requireStandardHaltPosition: true };
+
+const laxOffPosition = gradeQuestion(laxQuestion, tmIncrement());
+check('flag ABSENT: right-tape/off-position machine passes all cases (default unchanged)',
+  laxOffPosition.status === 'graded' &&
+  laxOffPosition.passed === laxOffPosition.total && laxOffPosition.total === 3);
+
+const strictOffPosition = gradeQuestion(strictQuestion, tmIncrement());
+check('flag SET: same machine FAILS every case with a position reason',
+  strictOffPosition.status === 'graded' &&
+  strictOffPosition.passed === 0 && strictOffPosition.total === 3 &&
+  strictOffPosition.cases.every((c) => !!c.reason && c.reason.includes('rightmost cell')));
+
+const strictStandard = gradeQuestion(strictQuestion, tmIncrementStandard());
+check('flag SET: standard-position increment passes all cases',
+  strictStandard.status === 'graded' &&
+  strictStandard.passed === strictStandard.total && strictStandard.total === 3);
 
 console.log(`\n${failures === 0 ? 'TM CHECK OK' : `TM CHECK FAILED (${failures} checks)`}`);
 process.exit(failures === 0 ? 0 : 1);

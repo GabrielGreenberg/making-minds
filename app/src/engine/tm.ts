@@ -4,11 +4,13 @@
 //
 // A TM here is "the FSM editor + a tape": STATE components are the control
 // states and wires carry a `transitionLabel`. Where an FSM label is
-// `input:output`, a TM label is `input:action` (spec §10.3) where action is a
-// single **dual action**: a write symbol (`0`/`1`, plus `*` for binary
-// machines) followed by a move direction (`R` move right, `L` move left) —
-// e.g. `1:0R` reads 1, writes 0, then moves right. Every step both writes and
-// moves; there is no write-only or move-only step.
+// `input:output`, a TM label is `read:write,move` (spec §10.3, two-output
+// form) — one read symbol (`0`/`1`, plus `*` for binary machines) driving a
+// write symbol and a move direction (`R` right, `L` left), e.g. `1:0,R`
+// reads 1, writes 0, then moves right. The two outputs execute as ONE atomic
+// step: every transition both writes and moves; there is no write-only or
+// move-only step. Label SYNTAX (incl. the legacy dual-action alias `1:0R`)
+// lives in engine/notation.ts — this engine parses through that seam.
 //
 // This module is the PURE SIMULATION layer only (module 2 of CLAUDE_KB/engines/
 // tm.md). It assumes the transition table has already passed machine-table
@@ -26,22 +28,16 @@ import type {
   TMTape,
 } from '../types';
 import { sortStateComponents } from './fsm';
+import { tmNotation } from './notation';
 
 export type { TMTape } from '../types';
 
 export type TMMoveDir = 'L' | 'R';
 
 export interface TMAction {
-  raw: string;        // the two-character token, e.g. "0R" (write '0', move right)
+  raw: string;        // canonical action text, e.g. "0,R" (write '0', move right)
   write: TMSymbol;
   move: TMMoveDir;
-}
-
-/** True if `symbol` is a legal tape symbol for the given notation. */
-export function isSymbolForNotation(symbol: string, notation: TMNotation): symbol is TMSymbol {
-  if (symbol === '0' || symbol === '1') return true;
-  if (symbol === '*') return notation === 'binary';
-  return false;
 }
 
 /** Read the symbol under a given index ('0' for unwritten/background cells). */
@@ -50,45 +46,7 @@ export function readCell(tape: TMTape, index: number): TMSymbol {
 }
 
 /**
- * Parse a two-character dual action token (write symbol + move direction, e.g.
- * "0R", "1L", "*R") into a structured action, or null if invalid for the
- * notation. `*` is a legal write only for binary machines.
- */
-export function parseTMAction(token: string, notation: TMNotation): TMAction | null {
-  if (token.length !== 2) return null;
-  const write = token[0];
-  const move = token[1];
-  if (!isSymbolForNotation(write, notation)) return null;
-  if (move !== 'L' && move !== 'R') return null;
-  return { raw: token, write, move };
-}
-
-export interface ParsedTMTransition {
-  input: TMSymbol;
-  action: TMAction;
-}
-
-/**
- * Parse a transition label of the form "input:action" (e.g. "1:0R", "0:1L",
- * "*:0R"), notation-aware. The read symbol and the write half of the action
- * must both be legal for the machine's notation. Returns null on any
- * malformed/illegal label.
- */
-export function parseTMTransition(
-  label: string | undefined,
-  notation: TMNotation
-): ParsedTMTransition | null {
-  if (!label) return null;
-  const parts = label.split(':');
-  if (parts.length !== 2) return null;
-  if (!isSymbolForNotation(parts[0], notation)) return null;
-  const action = parseTMAction(parts[1], notation);
-  if (!action) return null;
-  return { input: parts[0], action };
-}
-
-/**
- * Apply a dual action (write, then move), returning a new tape (no mutation of
+ * Apply an action (write, then move — one atomic step), returning a new tape (no mutation of
  * the input). Writing background `'0'` deletes the key (normalise to
  * non-background) so a blank tape is `{}` and block scans walk only real marks.
  */
@@ -127,16 +85,24 @@ export function evaluateTMSingleStep(
   notation: TMNotation
 ): TMStepResult | null {
   const read = readCell(tape, tape.head);
+  const grammar = tmNotation(notation);
   const transitions = wires.filter((w) => w.sourceComponentId === currentStateId);
   for (const t of transitions) {
-    const parsed = parseTMTransition(t.transitionLabel, notation);
+    const parsed = grammar.parse(t.transitionLabel);
     if (!parsed) continue;
     if (parsed.input === read) {
+      // parse() guarantees outputs[0] is a legal write symbol for the
+      // notation and outputs[1] is 'R' | 'L'.
+      const action: TMAction = {
+        raw: parsed.outputs.join(grammar.outputSeparator ?? ''),
+        write: parsed.outputs[0] as TMSymbol,
+        move: parsed.outputs[1] as TMMoveDir,
+      };
       return {
         read,
-        action: parsed.action,
+        action,
         nextStateId: t.targetComponentId,
-        tape: applyAction(tape, parsed.action),
+        tape: applyAction(tape, action),
       };
     }
   }
@@ -161,7 +127,7 @@ export const DEFAULT_TM_MAX_STEPS = 10000;
  * whether the halted tape is well-formed.
  *
  * @param components - All circuit components (STATE nodes).
- * @param wires      - All wires; TM transition wires carry an `input:action` label.
+ * @param wires      - All wires; TM transition wires carry a `read:write,move` label.
  * @param initialTape - Starting tape (built by the codec's `encodeTM`).
  * @param notation   - Tape alphabet / action set ('unary' | 'binary').
  * @param maxSteps   - Safety bound against non-terminating machines.

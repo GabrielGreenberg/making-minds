@@ -35,8 +35,8 @@ import {
   GRID_SIZE,
   toSubscript,
 } from './types';
-import { topologicalSort, evaluateGate, evaluateCC, evaluateSCSingleStep, sortStateComponents, evaluateFSMSingleStep, evaluateTMSingleStep, notationForRepresentation } from './engine';
-import { senseAheadSymbol, applyMotorCommand, initialBrainState, runBrainStep, stateKindOf, TURBOT_FORWARD, type BrainState } from './engine/turbot';
+import { topologicalSort, evaluateGate, evaluateCC, evaluateSCSingleStep, sortStateComponents, evaluateFSMSymbolStep, evaluateTMSingleStep, notationForRepresentation, stepCountFor, encodeInput, bitsToTally, bitsToBinary, fsmNotation, turbotFsmNotation, tmNotation, turbotInternalNotation, turbotExternalNotation, type CodecLayout, type TransitionNotation } from './engine';
+import { senseAheadSymbol, applyMotorCommand, initialBrainState, runBrainStep, stateKindOf, type BrainState } from './engine/turbot';
 import { getAssignment, listAssignments } from './assignments';
 import {
   localWorkbookStore,
@@ -61,6 +61,98 @@ export function selectTmNotation(s: {
 }): TMNotation {
   const q = s.assignment?.questions[s.currentQuestionIndex];
   return notationForRepresentation(q ? q.representation : s.repSystem);
+}
+
+/**
+ * The codec layout of the open SC/FSM question (the grader's view of it), or
+ * null in the sandbox (no open question, or a question without a time-axis
+ * cc_spec). Everything question-run-specific — the run window, the exact input
+ * stream to feed — derives from this one selector.
+ */
+export function selectCodecLayout(s: {
+  assignment: AssignmentData | null;
+  currentQuestionIndex: number;
+}): CodecLayout | null {
+  const q = s.assignment?.questions[s.currentQuestionIndex];
+  if (!q?.cc_spec) return null;
+  if (q.buildMode !== 'SC' && q.buildMode !== 'FSM') return null;
+  return {
+    axis: 'time',
+    rep: q.representation,
+    inputWidths: q.cc_spec.inputs.map((g) => g.width),
+    outputWidths: q.cc_spec.outputs.map((g) => g.width),
+  };
+}
+
+/**
+ * The canonical run window (in time steps) for the open SC/FSM question — the
+ * grader's `stepCountFor` over the question's cc_spec group widths. Question
+ * runs (Run/Step and the A/V decode) must execute/present exactly this window
+ * so the student sees exactly what the grader grades. Returns null in the
+ * sandbox — sandbox runs keep their own lengths (SC: L + one 0-drain step per
+ * MEM; FSM: L).
+ */
+export function selectCodecWindow(s: {
+  assignment: AssignmentData | null;
+  currentQuestionIndex: number;
+}): number | null {
+  const layout = selectCodecLayout(s);
+  return layout ? stepCountFor(layout) : null;
+}
+
+/** Parse display-order digits as a numeral under `rep` — exactly how the A/V
+ *  ARG column reads typed input (tally "11" = 2; binary "110" = 6). Returns
+ *  null when the digits are not a valid codeword (tally with a 1 after a 0 —
+ *  the same strings the ARG column flags '/'). */
+function numeralValue(digits: number[], rep: RepSystem): number | null {
+  return rep === 'tally' ? bitsToTally(digits) : bitsToBinary(digits);
+}
+
+/**
+ * The EXACT input stream the grader would feed for the student's typed input:
+ * each input group's typed digits are read as a value and laid on the time
+ * axis by the codec's own `encodeInput` (LSB at t1 — so a tally value's ones
+ * arrive LAST, zeros leading; values wider than the group are clamped/masked
+ * by `valueToBits` exactly as the codec does). Returns null when codec feeding
+ * doesn't apply and the caller must fall back to raw typed bits: no open
+ * question (sandbox), the machine's input count differs from the question
+ * spec, or a typed string that is not a valid numeral for the representation.
+ */
+function codecInputSteps(
+  layout: CodecLayout | null,
+  numeralsPerGroup: number[][],
+): number[][] | null {
+  if (!layout || numeralsPerGroup.length !== layout.inputWidths.length) return null;
+  const values: number[] = [];
+  for (const numeral of numeralsPerGroup) {
+    const v = numeralValue(numeral, layout.rep);
+    if (v === null) return null;
+    values.push(v);
+  }
+  const enc = encodeInput(values, layout);
+  return enc.axis === 'time' ? enc.steps : null;
+}
+
+/**
+ * Split the FSM IN field's typed digits into per-GROUP sequences, indexed
+ * [group][timeStep] with t1 FIRST — the same chunking loadScGlobalSequence
+ * applies to SC input strings: reading right-to-left, each chunk of
+ * `numGroups` characters is one time step (rightmost chunk = t1), and within
+ * a chunk character i belongs to input group i. For the common 1-group case
+ * this is simply the typed digits reversed (rightmost char = t1). A group's
+ * display-order numeral (for the codec) is its sequence reversed back.
+ */
+function fsmGroupSequences(digits: number[], numGroups: number): number[][] {
+  const groups = Math.max(1, numGroups);
+  const stepsCount = Math.floor(digits.length / groups);
+  const seqs: number[][] = Array.from({ length: groups }, () => []);
+  for (let t = 0; t < stepsCount; t++) {
+    const chunkStart = (stepsCount - 1 - t) * groups; // rightmost chunk = t1
+    for (let i = 0; i < groups; i++) {
+      seqs[i].push(digits[chunkStart + i] ?? 0);
+    }
+  }
+  return seqs;
 }
 
 /** A blank arena for the sandbox / question-authoring preview (no assignment context). */
@@ -108,6 +200,57 @@ export function selectEffectiveMode(s: {
   currentQuestionIndex: number;
 }): BuildMode {
   return s.buildMode === 'turbot' ? selectTurbotInnerMode(s) : s.buildMode;
+}
+
+/**
+ * The FSM transition notation (engine/notation.ts) for the current editing
+ * surface. Turbot-FSM brains use the fixed sensor/motor notation (1-bit
+ * input, 2-bit motor output with the legacy 1-bit alias). An open FSM
+ * question derives symbol widths from its cc_spec group counts — symbol char
+ * i = input group i, exactly the alphabet the grader validates and feeds.
+ * The sandbox is the classic 1-bit machine. Notation instances are memoized
+ * in the engine, so this is selector-safe (stable identity).
+ */
+export function selectFsmNotation(s: {
+  buildMode: BuildMode;
+  assignment: AssignmentData | null;
+  currentQuestionIndex: number;
+}): TransitionNotation {
+  if (selectEffectiveMode(s) !== 'FSM') return fsmNotation(1, 1);
+  if (s.buildMode === 'turbot') return turbotFsmNotation;
+  const q = s.assignment?.questions[s.currentQuestionIndex];
+  if (q?.buildMode === 'FSM' && q.cc_spec) {
+    return fsmNotation(q.cc_spec.inputs.length, q.cc_spec.outputs.length);
+  }
+  return fsmNotation(1, 1);
+}
+
+/**
+ * The transition notation governing labels on wires leaving `source` — the
+ * ONE authority the label editor, setTransitionLabel, and addWire defaults
+ * all read (grammar per editing surface; per-state kind for turbot TMs).
+ */
+export function selectTransitionNotationForSource(
+  s: {
+    buildMode: BuildMode;
+    assignment: AssignmentData | null;
+    currentQuestionIndex: number;
+    repSystem: RepSystem;
+  },
+  source: CircuitComponent | undefined,
+): TransitionNotation {
+  const eff = selectEffectiveMode(s);
+  if (eff === 'TM') {
+    if (s.buildMode === 'turbot') {
+      // Internal states read/write the question's tape alphabet (binary
+      // {0,1,*}, unary {0,1}) — same encoding rule as the base TM.
+      return source && stateKindOf(source) === 'external'
+        ? turbotExternalNotation
+        : turbotInternalNotation(selectTmNotation(s));
+    }
+    return tmNotation(selectTmNotation(s));
+  }
+  return selectFsmNotation(s);
 }
 
 interface HistoryEntry {
@@ -919,21 +1062,13 @@ export const useStore = create<AppState>()((set, get) => ({
     }
 
     state.pushHistory();
-    // Default transition label by grammar: FSM "in:out"; base TM dual-action
-    // "in:writeMove"; turbot TM single-action by the SOURCE state's kind —
-    // internal "read:action", external "sense:motor"; turbot FSM 2-bit motor
-    // "in:ij" (default: sensor clear → both motors on, i.e. forward).
-    let defaultLabel: string | undefined;
-    if (isFsmTransition) {
-      const effMode = selectEffectiveMode(state);
-      if (state.buildMode === 'turbot' && effMode === 'TM') {
-        defaultLabel = stateKindOf(sourceComp!) === 'external' ? `E:${TURBOT_FORWARD}` : '0:R';
-      } else if (state.buildMode === 'turbot' && effMode === 'FSM') {
-        defaultLabel = '0:11';
-      } else {
-        defaultLabel = effMode === 'TM' ? '0:0R' : '0:0';
-      }
-    }
+    // Default transition label: the source state's notation owns it (FSM
+    // "in:out" sized to the question's group counts, base TM "in:writeMove",
+    // turbot TM per state kind, turbot FSM canonical 2-bit motor — default
+    // "0:11": sensor clear → both motors on, i.e. forward).
+    const defaultLabel = isFsmTransition
+      ? selectTransitionNotationForSource(state, sourceComp).defaultLabel
+      : undefined;
     const wire: Wire = {
       id: uuid(),
       sourceComponentId: sourceCompId,
@@ -1616,12 +1751,14 @@ export const useStore = create<AppState>()((set, get) => ({
       if (statesWithNoOutgoing.length > 1)
         return `Multiple terminal states found (${statesWithNoOutgoing.map((c) => c.label).join(', ')}). Only one state may have no outgoing transitions (S_B).`;
 
-      // Rule 1: Every state except S_B must have exactly 2 outgoing transitions (completeness)
+      // Rule 1: Every state except S_B must have exactly 2 outgoing transitions
+      // (completeness). Boxed FSMs are the classic 1-bit machines (spec §8.4),
+      // so labels are read under the 1-bit notation.
       const sB = statesWithNoOutgoing[0];
       for (const comp of fsmComps) {
         if (comp.id === sB.id) continue;
         const outgoing = internalWires.filter((w) => w.sourceComponentId === comp.id);
-        const inputs = outgoing.map((w) => w.transitionLabel!.split(':')[0]);
+        const inputs = outgoing.map((w) => fsmNotation(1, 1).parse(w.transitionLabel)?.input);
         if (!inputs.includes('0')) return `State ${comp.label} is missing a transition for input 0. Every non-terminal state must handle all inputs.`;
         if (!inputs.includes('1')) return `State ${comp.label} is missing a transition for input 1. Every non-terminal state must handle all inputs.`;
       }
@@ -2554,6 +2691,12 @@ export const useStore = create<AppState>()((set, get) => ({
     const state = get();
     const { components, wires, scTimeStep, scHistory, scInputSequence } = state;
 
+    // Question runs are bounded by the codec window — the exact step count
+    // the grader runs (engine stepCountFor). Steps past it would show state
+    // the grader never reads. Sandbox (window null): unbounded stepping.
+    const codecWindow = selectCodecWindow(state);
+    if (codecWindow !== null && scTimeStep > codecWindow) return;
+
     // Sorted component lists (consistent with the engine's ordering)
     const sortedInputs = components
       .filter((c) => c.type === 'INPUT')
@@ -2566,17 +2709,33 @@ export const useStore = create<AppState>()((set, get) => ({
       .sort((a, b) => (parseInt(a.label.replace(/\D/g, '')) || 0) - (parseInt(b.label.replace(/\D/g, '')) || 0));
 
     const tIdx = scTimeStep - 1;
-    // Past the end of a loaded input sequence, feed 0s (flush steps) so bits
-    // still held in MEM can drain to the outputs instead of re-reading the
-    // input component's last value.
     const seqLoaded = scInputSequence.some((s) => s.length > 0);
-    const inputBitVector = sortedInputs.map((inp, idx) =>
-      scInputSequence[idx]?.[tIdx] !== undefined
-        ? scInputSequence[idx][tIdx]
-        : seqLoaded
-          ? 0
-          : (inp.value ?? 0)
-    );
+    // Question runs feed EXACTLY the grader's input stream: the typed string
+    // is parsed as a value per input group (as the A/V ARG column reads it)
+    // and laid on the time axis by the codec's encodeInput — for tally the
+    // ones arrive LAST (zeros leading), not in typed order. Falls back to raw
+    // typed bits when the typed string is not a valid numeral (the ARG column
+    // flags those '/') or the machine's input count doesn't match the spec.
+    // scInputSequence is time-ordered (index 0 = t1 = rightmost typed char),
+    // so each group's display-order numeral is its sequence reversed.
+    const codecSteps = seqLoaded
+      ? codecInputSteps(
+          selectCodecLayout(state),
+          sortedInputs.map((_, idx) => (scInputSequence[idx] ?? []).slice().reverse()),
+        )
+      : null;
+    // Sandbox / fallback: past the end of a loaded input sequence, feed 0s
+    // (flush steps) so bits still held in MEM can drain to the outputs
+    // instead of re-reading the input component's last value.
+    const inputBitVector = codecSteps
+      ? sortedInputs.map((_, idx) => codecSteps[tIdx]?.[idx] ?? 0)
+      : sortedInputs.map((inp, idx) =>
+          scInputSequence[idx]?.[tIdx] !== undefined
+            ? scInputSequence[idx][tIdx]
+            : seqLoaded
+              ? 0
+              : (inp.value ?? 0)
+        );
     const memStoredValues = sortedMems.map((m) => m.storedValue ?? 0);
 
     // Delegate propagation to the engine (same logic used by the grader)
@@ -2667,14 +2826,24 @@ export const useStore = create<AppState>()((set, get) => ({
     if (state.scRunning) return;
     const intervalId = window.setInterval(() => {
       const s = get();
-      // Stop once all input is consumed AND the memory pipeline has been
-      // flushed (one extra 0-input step per MEM, so delayed bits — e.g. a
-      // serial adder's final carry — still reach the outputs).
-      const maxLen = Math.max(...s.scInputSequence.map((seq) => seq.length), 0);
-      const drain = s.components.filter((c) => c.type === 'MEM').length;
-      if (maxLen > 0 && s.scTimeStep > maxLen + drain) {
-        s.scPause();
-        return;
+      // Question runs execute exactly the codec window (the grader's run
+      // length — see selectCodecWindow), 0-padding past the typed input.
+      const codecWindow = selectCodecWindow(s);
+      if (codecWindow !== null) {
+        if (s.scTimeStep > codecWindow) {
+          s.scPause();
+          return;
+        }
+      } else {
+        // Sandbox: stop once all input is consumed AND the memory pipeline
+        // has been flushed (one extra 0-input step per MEM, so delayed bits —
+        // e.g. a serial adder's final carry — still reach the outputs).
+        const maxLen = Math.max(...s.scInputSequence.map((seq) => seq.length), 0);
+        const drain = s.components.filter((c) => c.type === 'MEM').length;
+        if (maxLen > 0 && s.scTimeStep > maxLen + drain) {
+          s.scPause();
+          return;
+        }
       }
       s.scStep();
     }, 300);
@@ -2934,27 +3103,24 @@ export const useStore = create<AppState>()((set, get) => ({
   fsmHalted: false,
 
   setTransitionLabel: (wireId, label) => {
-    // FSM labels are input:output bits; base-TM labels are input:action with
-    // a dual action (write symbol + move, spec §10.3). Turbot-TM labels are
-    // single-action and depend on the SOURCE state's kind: internal
-    // "read:(write|move)" over {0,1,*}+{R,L}, external "B|E|F : ↑|↱|↰".
-    const state0 = get();
-    let re: RegExp;
-    if (state0.buildMode === 'turbot' && selectEffectiveMode(state0) === 'TM') {
-      const wire0 = state0.wires.find((w) => w.id === wireId);
-      const source = state0.components.find((c) => c.id === wire0?.sourceComponentId);
-      re = source && stateKindOf(source) === 'external'
-        ? /^[BEF]:[↑↱↰]$/
-        : /^[01*]:[01*RL]$/;
-    } else {
-      re = selectEffectiveMode(state0) === 'TM' ? /^[01*]:[01*][RL]$/ : /^[01]:[01]$/;
-    }
-    if (!re.test(label)) return;
+    // The wire's SOURCE state picks the grammar (engine/notation.ts): FSM
+    // sized to the question's group counts, base-TM two-output (read:write,
+    // move), turbot-TM per state kind, turbot-FSM motor labels. A label the
+    // notation cannot parse is rejected; a parseable one is stored in
+    // CANONICAL form (notation.format), so legacy aliases — a turbot-FSM
+    // '0:1', a dual-action TM '1:0R' — decay to their canonical spelling
+    // ('0:11' / '1:0,R') on every edit-save.
     const state = get();
+    const wire = state.wires.find((w) => w.id === wireId);
+    const source = state.components.find((c) => c.id === wire?.sourceComponentId);
+    const notation = selectTransitionNotationForSource(state, source);
+    const parsed = notation.parse(label);
+    if (!parsed) return;
+    const canonical = notation.format(parsed);
     state.pushHistory();
     set({
       wires: state.wires.map((w) =>
-        w.id === wireId ? { ...w, transitionLabel: label } : w
+        w.id === wireId ? { ...w, transitionLabel: canonical } : w
       ),
     });
   },
@@ -2993,11 +3159,35 @@ export const useStore = create<AppState>()((set, get) => ({
     if (!currentState) return;
 
     const tIdx = fsmTimeStep - 1;
-    if (tIdx >= fsmInputSequence.length) return;
-    const inputBit = fsmInputSequence[tIdx];
+    // Question runs consume the full codec window (the grader's run length —
+    // see selectCodecWindow); the sandbox stops at the typed length.
+    const layout = selectCodecLayout(state);
+    const codecWindow = layout ? stepCountFor(layout) : null;
+    const numGroups = layout ? layout.inputWidths.length : 1;
+    const groupSeqs = fsmGroupSequences(fsmInputSequence, numGroups);
+    const typedSteps = groupSeqs[0]?.length ?? 0;
+    if (codecWindow !== null ? tIdx >= codecWindow : tIdx >= typedSteps) return;
+    // Question runs feed EXACTLY the grader's input stream: each group's
+    // typed digits are read as one numeral under the question's
+    // representation (typed "110" = binary 6 / tally 2), laid on the time
+    // axis by the codec's encodeInput (LSB at t1; a tally value's ones
+    // arrive last), and the FULL encoded row is joined into one k-char input
+    // symbol per step — the same join the grader executes (symbol char i =
+    // input group i). An invalid numeral (tally with a 1 after a 0) falls
+    // back to the raw typed digits. Sandbox and fallback both feed the typed
+    // digits with the RIGHTMOST character at t1 — the same right-to-left
+    // time direction as SC (P1.10; the old leftmost-first sandbox feed
+    // contradicted every other time surface).
+    const codecSteps = layout
+      ? codecInputSteps(layout, groupSeqs.map((g) => g.slice().reverse()))
+      : null;
+    const inputSymbol = codecSteps
+      ? (codecSteps[tIdx] ?? []).map(String).join('')
+      : groupSeqs.map((g) => String(g[tIdx] ?? 0)).join('');
 
     // Delegate transition logic to the engine (same logic used by the grader)
-    const result = evaluateFSMSingleStep(wires, currentStateId, inputBit);
+    const notation = selectFsmNotation(state);
+    const result = evaluateFSMSymbolStep(wires, currentStateId, inputSymbol, notation);
     if (!result) {
       set({ fsmHalted: true });
       return;
@@ -3007,8 +3197,10 @@ export const useStore = create<AppState>()((set, get) => ({
     const entry: FsmHistoryEntry = {
       t: fsmTimeStep,
       stateLabel: currentState.label,
-      input: inputBit,
-      output: result.output,
+      // Single-bit symbols stay numeric (the pinned k=1 history shape);
+      // multi-bit symbols are carried as strings.
+      input: inputSymbol.length === 1 ? Number(inputSymbol) : inputSymbol,
+      output: result.output.length === 1 ? Number(result.output) : result.output,
       nextStateLabel: nextState?.label || '?',
     };
 
@@ -3024,7 +3216,10 @@ export const useStore = create<AppState>()((set, get) => ({
     if (state.fsmRunning) return;
     const intervalId = window.setInterval(() => {
       const s = get();
-      if (s.fsmHalted || s.fsmTimeStep > s.fsmInputSequence.length) {
+      // Question runs execute exactly the codec window; sandbox runs stop at
+      // the typed input length (see selectCodecWindow).
+      const runEnd = selectCodecWindow(s) ?? s.fsmInputSequence.length;
+      if (s.fsmHalted || s.fsmTimeStep > runEnd) {
         s.fsmPause();
         return;
       }
@@ -3313,7 +3508,9 @@ export const useStore = create<AppState>()((set, get) => ({
     const newKind = stateKindOf(comp) === 'external' ? 'internal' : 'external';
     // The two kinds' label grammars are disjoint, so outgoing transitions
     // are re-labelled to the new kind's default rather than left invalid.
-    const defaultLabel = newKind === 'external' ? `E:${TURBOT_FORWARD}` : '0:R';
+    const defaultLabel = (newKind === 'external'
+      ? turbotExternalNotation
+      : turbotInternalNotation(selectTmNotation(state))).defaultLabel;
     set({
       components: state.components.map((c) =>
         c.id === id ? { ...c, stateKind: newKind } : c

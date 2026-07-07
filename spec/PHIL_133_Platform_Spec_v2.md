@@ -598,13 +598,27 @@ A Turing Machine consists of:
 
 ### 10.3 TM Transition Labels
 
-TM transitions use the format **input:action** where:
+> **⚠ Deliberate departure from the textbook.** The textbook writes TM
+> transitions as a dual-action token (`input:action`, e.g. `1:0R`). The
+> platform instead uses the **industry-standard two-output form**: one read
+> symbol driving **two separate outputs** — the symbol to write and the
+> direction to move. This is the single place the platform intentionally
+> departs from the textbook's notation. Execution is unchanged (write + move
+> remain one atomic step); only the label notation differs. The legacy
+> dual-action spelling is still accepted when read (old saved machines keep
+> working) and is rewritten to the new form whenever a label is edited.
 
-- Input is 0 or 1 (the value read from the current tape cell)
-- Action is a **dual action** — a write followed by a move, both performed as
-  one step: write is 1 (write 1) or 0 (write 0), followed by R (move right) or
-  L (move left), e.g. `1:0R` reads 1, writes 0, then moves right. Every
-  transition both writes and moves; there is no write-only or move-only step.
+TM transitions use the format **read:write,move** where:
+
+- Read is 0 or 1 (the value read from the current tape cell; also `*` on
+  binary machines)
+- Write is the symbol to write into the cell (0, 1, or `*` on binary machines)
+- Move is R (move right) or L (move left)
+
+e.g. `1:0,R` reads 1, writes 0, then moves right — as one step. Every
+transition both writes and moves; there is no write-only or move-only step.
+The editor presents one input field and two output fields (write, move); the
+machine table shows WRITE and MOVE as separate columns.
 
 ### 10.4 TM Operation Cycle
 
@@ -622,7 +636,7 @@ The upper-right panel shows:
 - Current time step
 - Current state
 - Read value
-- Write+Move action (the dual action taken this step)
+- Write and Move (the two outputs of the transition taken this step — executed as one atomic action)
 - Next state
 
 ### 10.6 TM Halting
