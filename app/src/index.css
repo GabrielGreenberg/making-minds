@@ -1714,6 +1714,21 @@ thead .sc-label-col {
   color: var(--text-secondary);
   font-style: italic;
 }
+/* Manual grading controls for a pending open question */
+.instructor-review { margin-top: 8px; max-width: 680px; }
+.instructor-review-verdict { margin: 0 0 6px; font-size: 13px; }
+.instructor-review-when { color: var(--text-secondary); font-size: 12px; font-weight: 400; }
+.instructor-review-controls { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.instructor-review-note {
+  flex: 1;
+  min-width: 200px;
+  padding: 5px 8px;
+  font-size: 13px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+}
+.instructor-review-btn { white-space: nowrap; }
+
 .instructor-detail { padding: 10px 4px; }
 .instructor-detail-q { margin-bottom: 12px; font-size: 13px; }
 .instructor-detail-table { border-collapse: collapse; margin-top: 6px; font-size: 12px; }
