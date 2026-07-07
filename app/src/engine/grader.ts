@@ -28,16 +28,17 @@ import type {
   TurbotCaseResult,
   RepSystem,
   BuildMode,
+  TMNotation,
   CaseResult,
   QuestionResult,
   SubmissionResult,
 } from '../types';
 import { evaluateCCInputs } from './cc';
 import { evaluateSCSequence } from './sc';
-import { evaluateFSMSymbolSequence, sortStateComponents } from './fsm';
-import { fsmNotation, turbotFsmNotation, validateTransitionTable } from './notation';
+import { evaluateFSMSymbolSequence } from './fsm';
+import { fsmNotation } from './notation';
 import { evaluateTMSequence } from './tm';
-import { runTurbot, evaluateTurbotCriterion, validateTurbotTM } from './turbot';
+import { runTurbot, evaluateTurbotCriterion, validateTurbotTM, validateTurbotFSM } from './turbot';
 import { validateMachine } from './machineValidation';
 import {
   axisForMode,
@@ -82,9 +83,33 @@ function tally(questionId: number, cases: CaseResult[]): QuestionResult {
 }
 
 /**
- * Grade a single question's circuit against its numeric test cases.
+ * Open questions cannot be autograded: the result is `pending` (manual review;
+ * an LLM-grading pass could later consume the same `response` field and
+ * replace the pending result with a scored one). Contributes 0/0 to the
+ * tallies so it never moves the autograded score.
  */
-export function gradeQuestion(question: AssignmentQuestion, circuit: CircuitData | undefined): QuestionResult {
+function pendingOpen(questionId: number, responseText: string | undefined): QuestionResult {
+  return {
+    questionId,
+    status: 'pending',
+    reason: 'open question — needs manual review',
+    response: responseText ?? '',
+    passed: 0,
+    total: 0,
+    cases: [],
+  };
+}
+
+/**
+ * Grade a single question's circuit against its numeric test cases.
+ * `responseText` is the free-text answer for open questions (unused otherwise).
+ */
+export function gradeQuestion(
+  question: AssignmentQuestion,
+  circuit: CircuitData | undefined,
+  responseText?: string,
+): QuestionResult {
+  if (question.buildMode === 'open') return pendingOpen(question.id, responseText);
   if (!circuit) return skip(question.id, 'no circuit submitted');
   if (question.buildMode === 'turbot') return gradeTurbot(question, circuit);
 
@@ -193,8 +218,8 @@ function gradeTape(
 /**
  * Structural layout for a turbot brain's fixed sensor/motor interface, keyed
  * by inner mode. Only CC/SC brains reach validateMachine (FSM brains
- * validate against turbotFsmNotation above; TM brains against
- * validateTurbotTM), so only those two rows are read.
+ * validate against turbotFsmNotation via validateTurbotFSM above; TM brains
+ * against validateTurbotTM), so only those two rows are read.
  */
 function turbotLayout(innerMode: BuildMode): CodecLayout {
   if (innerMode === 'SC') return { axis: 'time', rep: 'binary', inputWidths: [1], outputWidths: [1, 1] };
@@ -211,22 +236,19 @@ function gradeTurbot(question: AssignmentQuestion, circuit: CircuitData): Questi
 
   // Stage 1: a TM brain is a *turbot TM* (per-state internal/external
   // grammar, single actions) with its own validator; an FSM brain validates
-  // against turbotFsmNotation — the SAME notation runBrainStep executes and
-  // the store's label editor accepts (legacy 1-bit aliases and canonical
-  // 2-bit motor labels alike); CC/SC brains reuse the shared machine
-  // validation.
+  // through validateTurbotFSM, which delegates to turbotFsmNotation — the
+  // SAME notation runBrainStep executes and the store's label editor accepts
+  // (legacy 1-bit aliases and canonical 2-bit motor labels alike); CC/SC
+  // brains reuse the shared machine validation.
+  // The question's encoding (representation) picks a turbot TM's internal
+  // tape alphabet: binary {0,1,*}, unary (tally) {0,1}.
+  const notation = notationForRepresentation(question.representation ?? 'binary');
   let valid: { ok: boolean; reason?: string };
-  if (innerMode === 'TM') {
-    const errors = validateTurbotTM(circuit.components, circuit.wires);
+  if (innerMode === 'TM' || innerMode === 'FSM') {
+    const errors = innerMode === 'TM'
+      ? validateTurbotTM(circuit.components, circuit.wires, notation)
+      : validateTurbotFSM(circuit.components, circuit.wires);
     valid = errors.length === 0 ? { ok: true } : { ok: false, reason: errors.map((e) => e.message).join(' ') };
-  } else if (innerMode === 'FSM') {
-    const states = sortStateComponents(circuit.components);
-    if (states.length === 0) {
-      valid = { ok: false, reason: 'machine has no states' };
-    } else {
-      const errors = validateTransitionTable(states, circuit.wires, () => turbotFsmNotation, 'total');
-      valid = errors.length === 0 ? { ok: true } : { ok: false, reason: errors.map((e) => e.message).join(' ') };
-    }
   } else {
     valid = validateMachine(circuit, innerMode, turbotLayout(innerMode), question.representation ?? 'binary');
   }
@@ -241,13 +263,13 @@ function gradeTurbot(question: AssignmentQuestion, circuit: CircuitData): Questi
     return { questionId: question.id, status: 'graded', passed: 0, total: rejected.length, cases: [], turbotCases: rejected };
   }
 
-  const turbotCases = cases.map((tc) => gradeTurbotCase(circuit, innerMode, tc));
+  const turbotCases = cases.map((tc) => gradeTurbotCase(circuit, innerMode, tc, notation));
   const passed = turbotCases.filter((c) => c.pass).length;
   return { questionId: question.id, status: 'graded', passed, total: turbotCases.length, cases: [], turbotCases };
 }
 
-function gradeTurbotCase(circuit: CircuitData, innerMode: BuildMode, tc: TurbotTestCase): TurbotCaseResult {
-  const run = runTurbot(circuit.components, circuit.wires, innerMode, tc.arena, tc.maxSteps);
+function gradeTurbotCase(circuit: CircuitData, innerMode: BuildMode, tc: TurbotTestCase, notation: TMNotation): TurbotCaseResult {
+  const run = runTurbot(circuit.components, circuit.wires, innerMode, tc.arena, tc.maxSteps, notation);
   if (run.hitStepLimit) {
     return { pass: false, stepsTaken: tc.maxSteps, finalPosition: run.finalState, hitStepLimit: true, reason: 'exceeded max steps' };
   }
@@ -265,9 +287,12 @@ function gradeTurbotCase(circuit: CircuitData, innerMode: BuildMode, tc: TurbotT
  * assignment question to its submitted answer by question id.
  */
 export function gradeSubmission(assignment: AssignmentData, submission: SubmissionData): SubmissionResult {
-  const byId = new Map(submission.answers.map((a) => [a.questionId, a.circuit]));
+  const byId = new Map(submission.answers.map((a) => [a.questionId, a]));
 
-  const questions = assignment.questions.map((q) => gradeQuestion(q, byId.get(q.id)));
+  const questions = assignment.questions.map((q) => {
+    const answer = byId.get(q.id);
+    return gradeQuestion(q, answer?.circuit, answer?.responseText);
+  });
 
   const passed = questions.reduce((n, r) => n + r.passed, 0);
   const total = questions.reduce((n, r) => n + r.total, 0);

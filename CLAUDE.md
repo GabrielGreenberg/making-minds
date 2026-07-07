@@ -14,7 +14,66 @@ Claude to load into context).
 >
 > A change isn't finished until the docs that describe it are too.
 
-_Last updated: 2026-07-06 (**TM sim-state reset on question nav** — navigating between assignment
+_Last updated: 2026-07-06 (**merge: buildout-infra × origin/main** — combined the build-out
+branch's P2/P1.8 work with main's two PRs (open questions; turbot encoding/glossary + FSM/SC
+turbot grading). Both sides had independently implemented turbot-FSM 2-bit motors; the
+notation-seam implementation won: `turbotFsmNotation` (engine/notation.ts) remains the single
+validity answer for turbot-FSM brain labels (legacy 1-bit outputs stay valid as aliases), main's
+`validateTurbotFSM` now DELEGATES to the generic `validateTransitionTable` walker over it (its
+local `parseTurbotFSMLabel` regex is gone), and main's encoding-awareness landed on the seam:
+`turbotInternalNotation(tapeNotation)` is a memoized function whose alphabet/tokens come from
+`turbotTMReadSymbols`, so editor, validator, engine, and grader share one per-encoding answer.
+Both sides' entries follow. From origin/main: **open questions** — a sixth question mode, `buildMode: 'open'`,
+for free-text answers that cannot be autograded: the student workspace swaps the canvas for a
+writing panel (`OpenResponsePanel`; copy/cut/paste/drop are blocked in the textarea to
+discourage pasting in prepared text — a soft deterrent, not a security boundary) with the same
+chrome/nav/autosave/Submit as machine questions; the answer lives as `responseText` on
+`QuestionCircuit` (mirrored by the store's `openResponse` at every canvas sync point) and on
+the submission's answer; the grader returns a new `QuestionResult` status `'pending'`
+("open question — needs manual review") carrying the `response`, contributing 0/0 to tallies —
+designed so a future LLM-grading pass can consume the same field and replace the pending
+result (not implemented). The question creator gains an 'Open' mode (name + statement only);
+the gradebook marks open questions ✎ (excluded from the auto score — `SubmissionGrade.score`
+is now over autogradeable questions only), shows a "manual review" stat tile instead of a pass
+rate, and the attempt drill-down displays the full response; the grading CLI prints a word
+count. Sample Q9 (the binary-vs-tally design question) + sample responses; `pipelineCheck`
+asserts the pending path. Verified: tsc/build clean, all four tool checks pass, and a
+store-level Node harness drove the open-question student flow (type → switch → reload →
+submit → pending result). Earlier same day: **sample turbot questions for all four inner modes** — the seeded
+sample assignment now has eight questions: CC/SC/FSM/TM plus one turbot question per inner
+mode (Q5 CC corridor, Q6 SC 3×3 L-course needing a MEM turner, Q7 FSM corridor, Q8 TM textbook
+walker on a tally/unary question), each with correct/incorrect sample brains wired into the
+sample submissions and `pipelineCheck` (now 8/8 vs 0/8); mode chips in the student question
+list and the instructor assignment editor now name a turbot question's inner machine
+("turbot - TM") via the new `questionModeLabel` helper in `types.ts`. Also: **turbotCheck FSM/SC coverage** — the turbot smoke test now
+grades questions in all four inner modes: new FSM- and SC-brained graded questions beside the
+existing TM and CC ones, plus first engine coverage for SC brains — a MEM-latching turner that
+threads a 3×3 L-course (forward → turn left at the first wall → stop at the second), proving
+brain state carries across arena cycles. Same day, **turbot-FSM 2-bit motors** — an FSM-brained turbot's Mealy
+transitions now output the full 2-bit motor code (`in:ij`, e.g. `0:11`, `1:01` — same
+wheel-motor encoding as CC/SC output wires), so FSM brains can issue every movement command,
+turns included, closing the old stop/forward-only limitation. Post-merge this rides the
+notation seam: `validateTurbotFSM` (`engine/turbot.ts`, used by `gradeTurbot`'s Stage 1;
+every state must handle both sensor inputs exactly once) delegates to the generic
+`validateTransitionTable` walker over `turbotFsmNotation`, `runBrainStep`'s FSM branch
+executes via `evaluateFSMSymbolStep` under the same notation (so legacy 1-bit labels stay
+valid as aliases), and the notation-driven transition editor picks up the two motor bits
+from `turbotFsmNotation.outputFields` (new turbot-FSM default label `0:11`); the glossary's
+CC/SC/FSM rows merged into one motor-code table. Same day, **turbot encoding + glossary polish** — turbot questions now carry an
+authored **encoding** (binary | unary; the question creator's "Encoding" toggle, stored as the
+question's `representation`, no longer hardcoded to 'tally'): it picks a turbot-TM brain's
+internal tape alphabet (binary {0,1,*}, unary {0,1}) everywhere — the transition editor's token
+sets (no `*` enterable under unary; post-merge via `turbotInternalNotation(tapeNotation)`, now a
+memoized function on the notation seam), the glossary, `validateTurbotTM`/`parseTurbotInternalLabel`/
+`runBrainStep`/`runTurbot` (new `TMNotation` param, default binary), the store's live stepping,
+and grading (`gradeTurbot` maps `representation` → notation; a `*`-using table fails Stage 1 on a
+unary question — `turbotCheck` covers this). The Map glossary sits **level with the Map** when
+the data panel is wide enough and wraps below it when not (`.turbot-map-row` flex-wrap), and its
+output lines now name **motor states**, not movements: circuit brains "00 = both motors off /
+01 = right motor on / 10 = left motor on / 11 = both motors on"), and
+the turbot-TM arrows are glossed as ↑ = both motors on, ↱ = left motor on, ↰ = right motor on.
+The engine's `TURBOT_TM_READ_SYMBOLS`/`TURBOT_TM_INTERNAL_ACTIONS` constants became the
+notation-aware `turbotTMReadSymbols`/`turbotTMInternalActions`. Earlier 2026-07-05: a From buildout-infra: **TM sim-state reset on question nav** — navigating between assignment
 questions (`switchQuestion`, `openAssignment`, `loadAssignment`) now calls `tmGlobalReset()`
 alongside the existing `turbotReset()`, so the TM tape, head, step counter `t`, run history, and
 current state no longer leak from one TM question into the next; verified by a two-TM-question
@@ -146,7 +205,9 @@ end-to-end:
   tape — on binary questions; a turbot question's canvas is the normal editor for the question's
   `innerMode` brain, with the arena "Map" (grid + Step/Run/Pause/Reset + cycle/sensor readout) in
   the right data panel below the question statement, above the machine table and step history;
-  TM-brained turbots additionally show their internal tape read-only below the canvas) →
+  TM-brained turbots additionally show their internal tape read-only below the canvas; an
+  **open** question swaps the canvas for a free-text writing panel — same nav/autosave/Submit,
+  copy/paste blocked in the textarea) →
   navigate back to the list or between questions via the nav bar → instant local autosave →
   leave and resume (reload/Back returns you into the assignment) → Submit a timestamped snapshot.
   The editor chrome is minimal: no File/Edit menus (Home + Submit + session controls only).
@@ -158,21 +219,27 @@ end-to-end:
   (TM `tape`) — which lives in the **codec** (`engine/codec.ts` + `tmCodec.ts`). The old bit-based
   `test_vectors` are gone. **Turbots grade outside the codec**: a turbot's brain is a CC/SC/FSM
   circuit with a fixed 1-bit sensor / 2-bit motor interface, or a **turbot TM** (textbook model:
-  internal states do single-action tape ops on {0,1,*}; external states sense B/E/F and move
-  forward/turn; halting is its stop). `gradeTurbot` runs the brain in each `turbot_cases` arena
-  (`engine/turbot.ts` driver loop; turbot-TM tables validated by `validateTurbotTM`) and checks
+  internal states do single-action tape ops on the question's encoding's alphabet — binary
+  {0,1,*}, unary {0,1}; external states sense B/E/F and move forward/turn; halting is its stop).
+  `gradeTurbot` maps the question's `representation` to that notation and runs the brain in each
+  `turbot_cases` arena (`engine/turbot.ts` driver loop; turbot-TM tables validated by the
+  notation-aware `validateTurbotTM`) and checks
   the case's success criterion (reach-and-stop / pass-through / return-to-start) — positional
-  results (`TurbotCaseResult`), not value comparisons. Submissions **autograde on receipt** in
-  `SubmissionStore` and the result is persisted on the record (the exact shape a real server
-  endpoint will take).
+  results (`TurbotCaseResult`), not value comparisons. **Open questions aren't autograded at
+  all**: the answer travels as `responseText` on the submission and the grader returns a
+  `'pending'` result carrying it for manual review (an LLM-grading pass could later replace
+  that pending result — the seam is there, not implemented). Submissions **autograde on
+  receipt** in `SubmissionStore` and the result is persisted on the record (the exact shape a
+  real server endpoint will take).
 - **Instructor side** — role-gated `#/instructor` mode: dashboard, assignment editor, a **question
   creator**, and a **gradebook** that reflects stored autogrades, **grouped by student**: one row
   per student showing the **latest** submission's scores (only the latest counts for grading) and a
   per-student attempt count; expanding a student reveals the full submission history with
   failed-case drill-down per attempt (value questions: input/expected/got; turbot questions:
-  arena #, steps taken, final pose, failure reason). Sample data for all five modes can be seeded
+  arena #, steps taken, final pose, failure reason; open questions: the full text response,
+  marked ✎ and excluded from the auto score). Sample data for all six modes can be seeded
   to demo the pipeline.
-  The question creator is one shared form authoring **all five modes** (CC/SC/FSM/TM/turbot) —
+  The question creator is one shared form authoring **all six modes** (CC/SC/FSM/TM/turbot/open) —
   mode is an ordinary field, not a gate; question names are editable; there is no bit-width field
   and no example-preview table. CC/SC/FSM/TM questions compute exactly **one output**: the
   **Target function** section shows `f(x, y, …) = <formula>` over the declared input-group names,
@@ -180,9 +247,12 @@ end-to-end:
   input value**; SC/FSM/TM have no size field — they're tested on a **sampled** set of values
   across a range of input lengths (`buildQuestionBank` in `engine/testVectorGen.ts`, which also
   derives all group widths). **Turbot questions** replace the formula pipeline with an
-  inner-machine picker (CC/SC/FSM/TM), a clickable **arena editor** (paint blocks/goals, place +
-  rotate the turbot start; resizable up to 20×20; helpers in `instructor/arenaEditing.ts`), and a
+  inner-machine picker (CC/SC/FSM/TM), an **encoding** toggle (binary | unary, stored as the
+  question's `representation`; it picks a TM brain's internal tape alphabet), a clickable
+  **arena editor** (paint blocks/goals, place + rotate the turbot start; resizable up to 20×20;
+  helpers in `instructor/arenaEditing.ts`), and a
   success criterion + max-steps pair; goal-directed criteria require a goal cell before save.
+  **Open questions** are just a name + question text (no representation, formula, or bank).
 - **Reference-function DSL** — instructors don't hand-write test cases. They declare a question's
   input/output groups + one representation and specify the correct output with a small
   **affine/bitwise arithmetic mini-language** (the "reference function"); the system enumerates
@@ -199,16 +269,20 @@ The missing half is the **server** and productized submit/grade loop.
 
 - **Turbot polish** — the full turbot flow (engine, grader, store, student workspace, instructor
   authoring, gradebook, sample data) shipped 2026-07-05, including the textbook turbot TM
-  (internal/external states, single tape actions, B/E/F senses, ↑/↱/↰ motors). Known follow-ups:
+  (internal/external states, single tape actions, B/E/F senses, ↑/↱/↰ motors); FSM brains got
+  full 2-bit motor outputs 2026-07-06, and the sample assignment gained a turbot question per
+  inner mode the same day. Known follow-ups:
   multi-arena authoring UI (the `turbot_cases` data model already holds a list; the creator
-  authors one), an FSM-brain motor encoding richer than stop/forward (a single Mealy output bit
-  can't express turns — see `runBrainStep` in `engine/turbot.ts`), a sample TM-turbot question
-  in devData, and live-linking arena stepping to circuit-edit invalidation (currently the
+  authors one), and live-linking arena stepping to circuit-edit invalidation (currently the
   student Resets manually after editing mid-run, same as TM).
 - **Deferred authoring follow-ups** — mode-filtered `allowed_components` (an optional field on
   `AssignmentQuestion`, not yet exposed in the question creator's editor UI). The
   `requireStandardHaltPosition` TM acceptance toggle is done (2026-07-06): wired end-to-end
   through `gradeQuestion` and exposed as a TM-only checkbox in the question creator.
+- **Open-question grading follow-ups** — a way for the instructor to record a manual score on a
+  pending open question (today the gradebook only displays the response), and optional
+  LLM-assisted grading: the `pending` `QuestionResult` already carries the `response`, so an
+  LLM pass would replace it with a scored result server-side.
 
 **The backend phase (the big step):**
 
@@ -259,22 +333,22 @@ the engine.
 | Types         | `app/src/types.ts`                                                             | All domain types: `AssignmentData`, `AssignmentQuestion`, `SubmissionData`/`SubmissionRecord`, `CircuitData`, `CCSpec`, `SubmissionResult` |
 | Engine        | `app/src/engine/cc.ts`, `sc.ts`, `fsm.ts`                                      | Pure simulators per mode (topological eval for CC; clocked step for SC; transition-matching for FSM)                                       |
 | Engine        | `app/src/engine/tm.ts`, `tmValidate.ts`, `tmCodec.ts`                          | TM: notation-aware tape engine — **two-output** labels `read:write,move` (e.g. `1:0,R`; legacy `1:0R` parses as an alias), executed as one **atomic step** (every transition writes a symbol AND moves; grammar lives in `engine/notation.ts`); pre-engine table validation (ambiguous/unparseable, via the generic walker); encode/accept/decode (the codec `tape` axis; accept honors the question's optional `requireStandardHaltPosition` — head must halt on the output block's rightmost cell)          |
-| Engine        | `app/src/engine/grader.ts`                                                     | `gradeSubmission` / `gradeQuestion` — one value-based codec pipeline for CC/SC/FSM/TM against numeric `test_cases`, plus a separate `gradeTurbot` branch (arena success criteria, not the codec)          |
+| Engine        | `app/src/engine/grader.ts`                                                     | `gradeSubmission` / `gradeQuestion` — one value-based codec pipeline for CC/SC/FSM/TM against numeric `test_cases`, plus a separate `gradeTurbot` branch (arena success criteria, not the codec); open questions short-circuit to a `'pending'` result carrying the free-text `response` for manual (later maybe LLM) review          |
 | Engine        | `app/src/engine/codec.ts`, `machineValidation.ts`                              | The codec (`space`/`time` value↔bits; `tape` → `tmCodec`) and Stage-1 machine validation for all modes                                     |
 | Engine        | `app/src/engine/testVectorGen.ts`, `formulaEval.ts`                            | Authoring-time: affine-formula language → `buildQuestionBank(inputs, outputs, rep, mode)` → `{spec, test_cases}` (widths derived; SC/FSM/TM sampled). Legacy `generateTestCases(spec, rep, mode)` remains for the sample data |
 | Engine        | `app/src/engine/notation.ts`                                                   | Transition-label SYNTAX seam: `TransitionNotation` (parse/format/alphabet/editor token fields/default) for all four grammars — native k-bit `fsmNotation(inBits,outBits)` + `turbotFsmNotation` (1-bit alias → canonical 2-bit motor, decays on edit-save); TM/turbot grammars delegate to their engine parsers; generic `validateTransitionTable` walker. Label dissection is allowed ONLY here + the delegated parsers (notationCheck grep gate)  |
 | Engine        | `app/src/engine/representation.ts`, `index.ts`                                 | value↔bits core (`valueToBits`/`isValidCodeword`/`bitsToValue`) + display helpers; barrel exports                                          |
-| Engine        | `app/src/engine/turbot.ts`                                                     | Turbot arena driver loop: `senseAhead`(bit)/`senseAheadSymbol`(B/E/F)/`applyMotorCommand`, `runBrainStep`/`initialBrainState` (one transition per call: CC/SC/FSM circuit brains, or the **turbot TM** — per-state internal/external kinds, single tape actions, ↑/↱/↰ motor labels, own validator `validateTurbotTM`), and `runTurbot` (`stopped` = motor 00 or a TM halt). `evaluateTurbotCriterion` judges `reach-and-stop` / `pass-through` / `return-to-start` (spec §12.5) |
-| Store         | `app/src/store.ts`                                                             | Zustand UI state; delegates simulation to `engine/`. Per-mode sim state incl. TM (`tmTape`/`tmStep`/`setTmCell`) and turbot (`turbotState`/`turbotStep`/`turbotRun`); both the TM slice (via `tmGlobalReset` — tape/head/t/history/state) and the turbot slice (via `turbotReset`) are reset on question load/switch, so a stepped machine never leaks into the next question; selectors `selectTmNotation` (TM alphabet: open question's `representation`, sandbox falls back to `repSystem`), `selectTurbotArena`/`selectTurbotInnerMode`, and `selectEffectiveMode` (turbot → the question's `innerMode`; drives every editor-behavior branch), plus `assignmentView` ('overview' \| 'question')  |
+| Engine        | `app/src/engine/turbot.ts`                                                     | Turbot arena driver loop: `senseAhead`(bit)/`senseAheadSymbol`(B/E/F)/`applyMotorCommand`, `runBrainStep`/`initialBrainState` (one transition per call: CC/SC circuit brains, the **turbot FSM** — Mealy transitions with full 2-bit motor outputs `in:ij`, executed and validated through `turbotFsmNotation` (engine/notation.ts; `validateTurbotFSM` delegates to the generic walker, legacy 1-bit labels stay valid as aliases) — or the **turbot TM** — per-state internal/external kinds, single tape actions, ↑/↱/↰ motor labels, own validator `validateTurbotTM`; internal alphabet per the question's encoding, a `TMNotation` param — binary {0,1,*}, unary {0,1}), and `runTurbot` (`stopped` = motor 00 or a TM halt). `evaluateTurbotCriterion` judges `reach-and-stop` / `pass-through` / `return-to-start` (spec §12.5) |
+| Store         | `app/src/store.ts`                                                             | Zustand UI state; delegates simulation to `engine/`. Per-mode sim state incl. TM (`tmTape`/`tmStep`/`setTmCell`) and turbot (`turbotState`/`turbotStep`/`turbotRun`); both the TM slice (via `tmGlobalReset` — tape/head/t/history/state) and the turbot slice (via `turbotReset`) are reset on question load/switch, so a stepped machine never leaks into the next question; selectors `selectTmNotation` (TM alphabet: open question's `representation`, sandbox falls back to `repSystem`), `selectTurbotArena`/`selectTurbotInnerMode`, and `selectEffectiveMode` (turbot → the question's `innerMode`; drives every editor-behavior branch), plus `assignmentView` ('overview' \| 'question') and `openResponse`/`setOpenResponse` (the open question's free-text answer, synced into `QuestionCircuit.responseText` at every canvas sync point)  |
 | Routing       | `app/src/routing.ts`                                                           | `Route` union, `parseHash`/`routeToHash`, `navigate()`                                                                                     |
 | Wire layout   | `app/src/componentGeometry.ts`, `app/src/wireRouter.ts`                        | `componentGeometry` is the SINGLE source of truth for rendered component dimensions (`getComponentSize`; MEM 50×50) + port math (`getPortPosition(Local)`, incl. OR/XOR left-port inset and rotation), imported by `CircuitCanvas`, `wireRouter`, and `tools/layoutCheck` so renderer/router/oracle geometry can never desync; `wireRouter` is the cost-based A* orthogonal wire router (obstacle bounds from the shared geometry, L-path fallback instrumented via `get/resetFallbackCount` for `tools/routerCheck.ts`) plus the pure `findDivergencePoints` (VISUAL_VOCAB junction dots: fan-out split dots at the elbow where displayed paths part, skipping dots on canvas-side crossing bumps)          |
 | Storage       | `app/src/storage/workbookStore.ts`, `AssignmentStore.ts`, `submissionStore.ts` | The three localStorage-backed seams                                                                                                        |
 | Auth          | `app/src/auth/`                                                                | `AuthGate.tsx`, `stubAuth.tsx`, `instructorRole.ts`                                                                                        |
 | Assignments   | `app/src/assignments/index.ts`, `cc-basics.json`                               | Bundled registry (`listAssignments`/`getAssignment`) + the one bundled CC assignment                                                       |
 | Instructor UI | `app/src/instructor/`                                                          | `InstructorApp`, `InstructorGate`, `InstructorDashboard`, `AssignmentEditor`, `QuestionCreator` (incl. turbot arena editor; pure paint/resize/place helpers in `arenaEditing.ts`), `Gradebook(.ts/View.tsx)`                 |
-| Student UI    | `app/src/components/`                                                          | `CircuitCanvas`, `ComponentLibrary`, `DataTable`, `HomeScreen`, `AssignmentOverview` (question list), `MenuBar`, `SequentialTimeline`, `TMTapePanel` (clickable tape), `ArenaCanvas` (shared arena grid renderer), `TurbotArenaPanel` ("Map" + run controls, in the right data panel), `TurbotTapePanel` (turbot TM's read-only internal tape), `SimulationPanel`, `TabBar` (question nav bar in assignments) |
-| Dev/sample    | `app/src/devData/sampleData.ts`, `seed.ts`                                     | Builders + seeding for demo CC/SC/FSM/TM/turbot assignments and submissions                                                                |
-| Tools         | `app/tools/grade.ts`, `pipelineCheck.ts`, `codecCheck.ts`, `notationCheck.ts`, `tmCheck.ts`, `turbotCheck.ts`, `scWindowCheck.ts`, `routerCheck.ts`, `coverageCheck.ts`, `layoutCheck.ts` | Headless CLI grader, submit→grade pipeline check (all five modes), codec + rep-core unit checks, the transition-notation seam check (adapter≡parser equivalence, legacy byte-compat, k=2 asymmetric bit-order grade pin, arity/totality errors, label-dissection grep gate), TM engine/codec/grader smoke test, turbot engine/grader smoke test (incl. the turbot-FSM one-notation validity pins), the SC/FSM question-run contract check (grader window length + codec input-stream content parity, via real-store headless runs incl. the hw3-p7 fixture and a k=2 FSM store-run≡grader pin), the wire-router world-model pins (shared-geometry smoke, MEM.min A* reachability, per-fixture fallback budget ≤ 99, divergence-dot corpus), the reference-fixture coverage harness (two-tier ledger — `exact`: correct passes + broken fails, vs `interface`: a plausible attempt validates + grades end-to-end, score reported not asserted (scope shift 2026-07-06) — plus breadth/drain warnings + statement lint), and the canvas layout oracle (real `routeAllWires` route prediction: collinear/near-parallel overlaps, body crossings, box collisions; CLI + used by the harness for CC/SC fixtures) (`npx tsx`)          |
+| Student UI    | `app/src/components/`                                                          | `CircuitCanvas`, `ComponentLibrary`, `DataTable`, `HomeScreen`, `AssignmentOverview` (question list), `MenuBar`, `SequentialTimeline`, `TMTapePanel` (clickable tape), `ArenaCanvas` (shared arena grid renderer), `TurbotArenaPanel` ("Map" + run controls, in the right data panel), `TurbotTapePanel` (turbot TM's read-only internal tape), `OpenResponsePanel` (open question's writing panel; copy/cut/paste/drop blocked), `SimulationPanel`, `TabBar` (question nav bar in assignments) |
+| Dev/sample    | `app/src/devData/sampleData.ts`, `seed.ts`                                     | Builders + seeding for demo CC/SC/FSM/TM/turbot/open assignments and submissions (one turbot question per inner mode; `questionModeLabel` in `types.ts` names a turbot question's inner machine in mode chips)                                                                |
+| Tools         | `app/tools/grade.ts`, `pipelineCheck.ts`, `codecCheck.ts`, `notationCheck.ts`, `tmCheck.ts`, `turbotCheck.ts`, `scWindowCheck.ts`, `routerCheck.ts`, `coverageCheck.ts`, `layoutCheck.ts` | Headless CLI grader (prints a word count for pending open questions), submit→grade pipeline check (all six modes, incl. the open question's pending path), codec + rep-core unit checks, the transition-notation seam check (adapter≡parser equivalence incl. per-encoding turbot-internal, legacy byte-compat, k=2 asymmetric bit-order grade pin, arity/totality errors, label-dissection grep gate), TM engine/codec/grader smoke test, turbot engine/grader smoke test (all four inner modes graded — CC/SC/FSM/TM — incl. the turbot-FSM one-notation validity pins and the encoding-aware `*`-rejection pins), the SC/FSM question-run contract check (grader window length + codec input-stream content parity, via real-store headless runs incl. the hw3-p7 fixture and a k=2 FSM store-run≡grader pin), the wire-router world-model pins (shared-geometry smoke, MEM.min A* reachability, per-fixture fallback budget ≤ 99, divergence-dot corpus), the reference-fixture coverage harness (two-tier ledger — `exact`: correct passes + broken fails, vs `interface`: a plausible attempt validates + grades end-to-end, score reported not asserted (scope shift 2026-07-06) — plus breadth/drain warnings + statement lint), and the canvas layout oracle (real `routeAllWires` route prediction: collinear/near-parallel overlaps, body crossings, box collisions; CLI + used by the harness for CC/SC fixtures) (`npx tsx`)          |
 
 ## Reference-function DSL (instructor authoring)
 

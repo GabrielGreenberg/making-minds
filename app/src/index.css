@@ -1695,6 +1695,25 @@ thead .sc-label-col {
 .instructor-submission-row:hover { background: var(--panel-bg); }
 .instructor-pass { color: #2e7d32; font-weight: 700; }
 .instructor-fail { color: var(--danger); font-weight: 700; }
+.instructor-pending { color: #b07d1a; font-weight: 700; }
+
+/* An open question's free-text answer in the gradebook drill-down */
+.instructor-open-response {
+  margin: 6px 0 0;
+  padding: 8px 12px;
+  border-left: 3px solid #b07d1a;
+  background: #fdf8ee;
+  font-size: 13px;
+  line-height: 1.55;
+  white-space: pre-wrap;
+  max-width: 680px;
+}
+.instructor-open-response--empty {
+  border-left-color: #ccc;
+  background: #f7f7f7;
+  color: var(--text-secondary);
+  font-style: italic;
+}
 .instructor-detail { padding: 10px 4px; }
 .instructor-detail-q { margin-bottom: 12px; font-size: 13px; }
 .instructor-detail-table { border-collapse: collapse; margin-top: 6px; font-size: 12px; }
@@ -1980,6 +1999,19 @@ thead .sc-label-col {
 
 /* ─── Turbot arena panel (right data panel, "Map" section) ─── */
 
+/* The map column and the glossary share a wrapping row: level with each
+   other when the panel is wide enough, glossary below the map otherwise. */
+.turbot-map-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+}
+
+.turbot-map-col {
+  flex: 0 0 auto;
+  max-width: 100%;
+}
+
 .turbot-arena-scroll {
   overflow: auto;
   padding: 8px;
@@ -2006,11 +2038,12 @@ thead .sc-label-col {
   font-weight: 600;
 }
 
-/* Percept/motor glossary under the Map */
+/* Percept/motor glossary: beside the Map when it fits, below it when not */
 .turbot-glossary {
-  padding: 4px 8px 8px;
-  border-top: 1px dashed #e0e0e0;
-  margin-top: 4px;
+  /* The 220px basis is the wrap threshold: with less than that left beside
+     the map column, the glossary drops to its own full-width line. */
+  flex: 1 1 220px;
+  padding: 8px 8px;
 }
 
 .turbot-glossary-group + .turbot-glossary-group {
@@ -2044,4 +2077,82 @@ thead .sc-label-col {
   color: #444;
   line-height: 1.6;
   white-space: nowrap;
+}
+
+/* ── Open (free-text) question workspace ───────────────────────── */
+
+.open-response {
+  flex: 1;
+  overflow-y: auto;
+  background: var(--panel-bg);
+  display: flex;
+  justify-content: center;
+  padding: 32px 24px;
+}
+
+.open-response-card {
+  width: 100%;
+  max-width: 720px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  background: #fff;
+  border: 1px solid #e0e0e0;
+  border-radius: 10px;
+  padding: 24px 28px;
+  align-self: flex-start;
+}
+
+.open-response-head {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+}
+
+.open-response-label {
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.open-response-mode {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-secondary);
+  background: #f0f0f0;
+  border-radius: 4px;
+  padding: 2px 7px;
+}
+
+.open-response-statement {
+  font-size: 14px;
+  line-height: 1.55;
+  color: var(--text);
+  white-space: pre-wrap;
+}
+
+.open-response-textarea {
+  font-family: inherit;
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--text);
+  min-height: 260px;
+  resize: vertical;
+  padding: 12px 14px;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  outline: none;
+}
+
+.open-response-textarea:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px rgba(42, 127, 255, 0.15);
+}
+
+.open-response-foot {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+  color: var(--text-secondary);
 }

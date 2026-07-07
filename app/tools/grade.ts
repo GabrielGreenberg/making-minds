@@ -60,7 +60,10 @@ for (const file of submissionFiles) {
   console.log(`── ${result.student}  (${result.passed}/${result.total} cases) ──`);
 
   for (const qr of result.questions) {
-    if (qr.status === 'skipped') {
+    if (qr.status === 'pending') {
+      const words = qr.response?.trim() ? qr.response.trim().split(/\s+/).length : 0;
+      console.log(`  ✎ Q${qr.questionId}: open question — needs manual review (${words} words)`);
+    } else if (qr.status === 'skipped') {
       console.log(`  Q${qr.questionId}: skipped — ${qr.reason}`);
     } else {
       const mark = qr.passed === qr.total ? '✓' : '✗';

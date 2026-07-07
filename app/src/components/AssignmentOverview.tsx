@@ -1,6 +1,7 @@
 import { useStore } from '../store';
 import { navigate } from '../routing';
 import { getCurrentUserEmail, useAuth } from '../auth';
+import { questionModeLabel } from '../types';
 
 /**
  * The question list an assignment opens to. Clicking a question opens its
@@ -49,7 +50,7 @@ export function AssignmentOverview() {
                 onClick={() => navigate({ kind: 'assignment', id: assignment.id, questionIndex: i })}
               >
                 <span className="assignment-overview-label">{q.label}</span>
-                <span className="assignment-overview-mode">{q.buildMode}</span>
+                <span className="assignment-overview-mode">{questionModeLabel(q)}</span>
                 <span className="assignment-overview-statement">{q.statement}</span>
               </button>
             ))}

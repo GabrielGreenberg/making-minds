@@ -300,9 +300,11 @@ function selfCheck(label: string, cond: boolean): void {
 }
 
 // ─── 1. SELF-TEST ────────────────────────────────────────────────────────────
-// The sample assignment carries one question per mode (CC/SC/FSM/TM/turbot); the
-// correct submission must pass every case and the incorrect one must fail at
-// least one. If this breaks, nothing else the harness reports can be trusted.
+// The sample assignment carries questions across all modes (CC/SC/FSM/TM, one
+// turbot per inner mode, and an open question); the correct submission must
+// pass every case and the incorrect one must fail at least one (open questions
+// instead grade to 'pending' — manual review). If this breaks, nothing else
+// the harness reports can be trusted.
 
 function runSelfTest(): void {
   console.log('SELF-TEST — harness discriminates correct vs. broken (devData)');
@@ -313,6 +315,15 @@ function runSelfTest(): void {
   for (const q of assignment.questions) {
     const c = correct.get(q.id);
     const w = wrong.get(q.id);
+    if (q.buildMode === 'open') {
+      // Open questions are manually reviewed, not autograded: the pipeline's
+      // contract is a 'pending' 0/0 result (pipelineCheck pins the response
+      // payload), so there is no correct/broken discrimination to test here.
+      const r = gradeQuestion(q, c);
+      selfCheck(`${q.label} (${q.buildMode}) grades to pending (manual review, 0/0)`,
+        r.status === 'pending' && r.total === 0 && r.passed === 0);
+      continue;
+    }
     selfCheck(`${q.label} (${q.buildMode}) correct passes`, !!c && allPass(q, c));
     selfCheck(`${q.label} (${q.buildMode}) broken fails`, !!w && !allPass(q, w));
   }

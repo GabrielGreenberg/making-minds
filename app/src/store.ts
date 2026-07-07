@@ -242,9 +242,11 @@ export function selectTransitionNotationForSource(
   const eff = selectEffectiveMode(s);
   if (eff === 'TM') {
     if (s.buildMode === 'turbot') {
+      // Internal states read/write the question's tape alphabet (binary
+      // {0,1,*}, unary {0,1}) — same encoding rule as the base TM.
       return source && stateKindOf(source) === 'external'
         ? turbotExternalNotation
-        : turbotInternalNotation;
+        : turbotInternalNotation(selectTmNotation(s));
     }
     return tmNotation(selectTmNotation(s));
   }
@@ -361,6 +363,11 @@ interface AppState {
   currentQuestionIndex: number;
   // Per-question circuit + annotations, keyed by AssignmentQuestion.id.
   questionCircuits: Map<number, QuestionCircuit>;
+  // The live free-text answer for the current OPEN question (the text-panel
+  // analogue of components/wires for machine questions). Synced into
+  // questionCircuits.responseText at the same points the canvas is.
+  openResponse: string;
+  setOpenResponse: (text: string) => void;
   loadAssignment: (assignment: AssignmentData) => void;
   // Open a bundled assignment by id and show its workbook. Returns false if unknown.
   openAssignment: (id: string) => boolean;
@@ -1051,7 +1058,8 @@ export const useStore = create<AppState>()((set, get) => ({
     state.pushHistory();
     // Default transition label: the source state's notation owns it (FSM
     // "in:out" sized to the question's group counts, base TM "in:writeMove",
-    // turbot TM per state kind, turbot FSM canonical 2-bit motor).
+    // turbot TM per state kind, turbot FSM canonical 2-bit motor — default
+    // "0:11": sensor clear → both motors on, i.e. forward).
     const defaultLabel = isFsmTransition
       ? selectTransitionNotationForSource(state, sourceComp).defaultLabel
       : undefined;
@@ -1276,6 +1284,8 @@ export const useStore = create<AppState>()((set, get) => ({
   assignmentView: 'overview',
   currentQuestionIndex: 0,
   questionCircuits: new Map(),
+  openResponse: '',
+  setOpenResponse: (text) => set({ openResponse: text }),
   loadAssignment: (assignment) => {
     const questionCircuits = new Map<number, QuestionCircuit>();
     for (const q of assignment.questions) {
@@ -1290,6 +1300,7 @@ export const useStore = create<AppState>()((set, get) => ({
       textElements: [],
       comments: [],
       boxes: [],
+      openResponse: '',
       buildMode: assignment.questions[0]?.buildMode || 'CC',
     });
     get().tmGlobalReset();
@@ -1320,6 +1331,7 @@ export const useStore = create<AppState>()((set, get) => ({
       textElements: activeCircuit.textElements,
       comments: activeCircuit.comments,
       boxes: activeCircuit.boxes,
+      openResponse: activeCircuit.responseText ?? '',
       buildMode: activeQ?.buildMode || 'CC',
       workbookOpen: true,
     });
@@ -1340,6 +1352,7 @@ export const useStore = create<AppState>()((set, get) => ({
           textElements: state.textElements,
           comments: state.comments,
           boxes: state.boxes,
+          responseText: state.openResponse,
         });
         set({ questionCircuits: qc });
       }
@@ -1402,6 +1415,7 @@ export const useStore = create<AppState>()((set, get) => ({
       textElements: state.textElements,
       comments: state.comments,
       boxes: state.boxes,
+      responseText: state.openResponse,
     });
 
     const saved = updatedMap.get(nextQ.id) ?? emptyQuestionCircuit();
@@ -1413,6 +1427,7 @@ export const useStore = create<AppState>()((set, get) => ({
       textElements: saved.textElements,
       comments: saved.comments,
       boxes: saved.boxes,
+      openResponse: saved.responseText ?? '',
       buildMode: nextQ.buildMode,
     });
     get().tmGlobalReset();
@@ -1428,6 +1443,7 @@ export const useStore = create<AppState>()((set, get) => ({
       textElements: [],
       comments: [],
       boxes: [],
+      openResponse: '',
     });
   },
 
@@ -3398,7 +3414,7 @@ export const useStore = create<AppState>()((set, get) => ({
       ? initialBrainState(components, innerMode)
       : state.turbotBrainState;
     const sense = senseAheadSymbol(arena, turbotState);
-    const result = runBrainStep(components, wires, innerMode, sense, turbotBrainState);
+    const result = runBrainStep(components, wires, innerMode, sense, turbotBrainState, selectTmNotation(state));
     if (!result) {
       // No matching transition. For a turbot TM this is the normal stop
       // (it has no stop output — textbook); the panel words it accordingly.
@@ -3478,7 +3494,9 @@ export const useStore = create<AppState>()((set, get) => ({
     const newKind = stateKindOf(comp) === 'external' ? 'internal' : 'external';
     // The two kinds' label grammars are disjoint, so outgoing transitions
     // are re-labelled to the new kind's default rather than left invalid.
-    const defaultLabel = (newKind === 'external' ? turbotExternalNotation : turbotInternalNotation).defaultLabel;
+    const defaultLabel = (newKind === 'external'
+      ? turbotExternalNotation
+      : turbotInternalNotation(selectTmNotation(state))).defaultLabel;
     set({
       components: state.components.map((c) =>
         c.id === id ? { ...c, stateKind: newKind } : c
@@ -3553,6 +3571,7 @@ function syncedQuestionCircuits(s: AppState): Map<number, QuestionCircuit> {
       textElements: s.textElements,
       comments: s.comments,
       boxes: s.boxes,
+      responseText: s.openResponse,
     });
   }
   return circuits;
@@ -3581,6 +3600,7 @@ function saveAssignmentState() {
       textElements: s.textElements,
       comments: s.comments,
       boxes: s.boxes,
+      responseText: s.openResponse,
     });
   }
   localWorkbookStore.saveAssignmentState(a.id, {
@@ -3612,7 +3632,9 @@ useStore.subscribe((state, prev) => {
     state.wires !== prev.wires ||
     state.textElements !== prev.textElements ||
     state.comments !== prev.comments ||
-    state.boxes !== prev.boxes;
+    state.boxes !== prev.boxes ||
+    // the open-question text panel is that mode's "canvas"
+    state.openResponse !== prev.openResponse;
 
   let changed: boolean;
   if (state.assignment) {

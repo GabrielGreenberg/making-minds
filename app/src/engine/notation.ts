@@ -23,7 +23,7 @@
 // slice 3). notationCheck's grep gate enforces this.
 
 import type { CircuitComponent, Wire, TMNotation } from '../types';
-import { parseTurbotInternalLabel, parseTurbotExternalLabel } from './turbot';
+import { parseTurbotInternalLabel, parseTurbotExternalLabel, turbotTMReadSymbols } from './turbot';
 
 // NOTE on the import cycle: tm.ts → notation.ts → turbot.ts → tm.ts (and
 // fsm.ts → notation.ts). This is safe because notation.ts reads NO imported
@@ -129,7 +129,8 @@ export const turbotFsmNotation: TransitionNotation = {
   inputAlphabet: ['0', '1'],
   inputWidth: 1,
   outputFields: [{ name: 'motor', tokens: ['0', '1'], width: 2 }],
-  defaultLabel: '0:00',
+  // Default: sensor clear → both motors on, i.e. forward.
+  defaultLabel: '0:11',
   parse(label) {
     const wide = fsmNotation(1, 2).parse(label);
     if (wide) return { input: wide.input, outputs: wide.outputs };
@@ -199,24 +200,41 @@ export function tmNotation(notation: TMNotation): TransitionNotation {
 
 // ─── Turbot-TM internal / external (delegating adapters) ─────────────
 
-export const turbotInternalNotation: TransitionNotation = {
-  id: 'turbot-internal',
-  inputAlphabet: ['0', '1', '*'],
-  inputWidth: 1,
-  outputFields: [{ name: 'action', tokens: ['0', '1', '*', 'R', 'L'], width: 1 }],
-  defaultLabel: '0:R',
-  parse(label) {
-    const p = parseTurbotInternalLabel(label);
-    if (!p) return null;
-    return {
-      input: p.read,
-      outputs: [p.action.kind === 'move' ? p.action.dir : p.action.symbol],
-    };
-  },
-  format(t) {
-    return `${t.input}:${t.outputs.join('')}`;
-  },
-};
+const turbotInternalCache = new Map<TMNotation, TransitionNotation>();
+
+/**
+ * Turbot-TM internal states, under the question's encoding (its
+ * `representation`): binary machines read/write {0,1,*}, unary (tally)
+ * machines only {0,1} — the same alphabet rule as the base TM's tape
+ * (tmNotation). Alphabet and parse both come from the engine
+ * (turbotTMReadSymbols / parseTurbotInternalLabel), called at runtime only
+ * (see the import-cycle note above). Memoized per notation, selector-safe.
+ */
+export function turbotInternalNotation(tapeNotation: TMNotation = 'binary'): TransitionNotation {
+  const cached = turbotInternalCache.get(tapeNotation);
+  if (cached) return cached;
+  const symbols = turbotTMReadSymbols(tapeNotation);
+  const n: TransitionNotation = {
+    id: 'turbot-internal',
+    inputAlphabet: symbols,
+    inputWidth: 1,
+    outputFields: [{ name: 'action', tokens: [...symbols, 'R', 'L'], width: 1 }],
+    defaultLabel: '0:R',
+    parse(label) {
+      const p = parseTurbotInternalLabel(label, tapeNotation);
+      if (!p) return null;
+      return {
+        input: p.read,
+        outputs: [p.action.kind === 'move' ? p.action.dir : p.action.symbol],
+      };
+    },
+    format(t) {
+      return `${t.input}:${t.outputs.join('')}`;
+    },
+  };
+  turbotInternalCache.set(tapeNotation, n);
+  return n;
+}
 
 // Motor arrows spelled locally (see the import-cycle note above); the
 // adapter≡parser pins in notationCheck reject any drift from engine/turbot.ts.

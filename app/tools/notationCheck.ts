@@ -152,14 +152,25 @@ console.log('\n[adapter ≡ engine parser]');
 
 {
   const corpus = [...INTERNAL_LEGAL, ...EXTERNAL_LEGAL, ...TM_BINARY.canonical, ...TM_BINARY.legacy, ...MALFORMED];
-  const agree = corpus.every((label) => {
-    const engine = parseTurbotInternalLabel(label);
-    const seam = turbotInternalNotation.parse(label);
-    if (engine === null || seam === null) return engine === null && seam === null;
-    const token = engine.action.kind === 'move' ? engine.action.dir : engine.action.symbol;
-    return seam.input === engine.read && eq(seam.outputs, [token]);
-  });
-  check(`turbot-internal: adapter agrees with parseTurbotInternalLabel on ${corpus.length} labels`, agree);
+  for (const tape of ['binary', 'unary'] as TMNotation[]) {
+    const agree = corpus.every((label) => {
+      const engine = parseTurbotInternalLabel(label, tape);
+      const seam = turbotInternalNotation(tape).parse(label);
+      if (engine === null || seam === null) return engine === null && seam === null;
+      const token = engine.action.kind === 'move' ? engine.action.dir : engine.action.symbol;
+      return seam.input === engine.read && eq(seam.outputs, [token]);
+    });
+    check(`turbot-internal(${tape}): adapter agrees with parseTurbotInternalLabel on ${corpus.length} labels`, agree);
+  }
+  // The encoding picks the internal alphabet: unary machines may not mention *.
+  check('turbot-internal(unary): every *-label is rejected, *-free labels survive',
+    INTERNAL_LEGAL.every((label) =>
+      (turbotInternalNotation('unary').parse(label) === null) === label.includes('*')));
+  check('turbot-internal: editor tokens follow the encoding',
+    eq(turbotInternalNotation('binary').outputFields[0].tokens, ['0', '1', '*', 'R', 'L']) &&
+    eq(turbotInternalNotation('unary').outputFields[0].tokens, ['0', '1', 'R', 'L']) &&
+    eq(turbotInternalNotation('binary').inputAlphabet, ['0', '1', '*']) &&
+    eq(turbotInternalNotation('unary').inputAlphabet, ['0', '1']));
 }
 
 {
@@ -237,7 +248,9 @@ check('fsm(2,1): all 8 labels',
 check('fsm(2,2): sample', roundTrips(fsmNotation(2, 2), ['00:00', '01:10', '11:11', '10:01']));
 check('tm(binary): all 18 canonical labels', roundTrips(tmNotation('binary'), TM_BINARY.canonical));
 check('tm(unary): all 8 canonical labels', roundTrips(tmNotation('unary'), TM_UNARY.canonical));
-check('turbot-internal: all 15 labels', roundTrips(turbotInternalNotation, INTERNAL_LEGAL));
+check('turbot-internal: all 15 labels', roundTrips(turbotInternalNotation('binary'), INTERNAL_LEGAL));
+check('turbot-internal(unary): all 8 *-free labels',
+  roundTrips(turbotInternalNotation('unary'), INTERNAL_LEGAL.filter((l) => !l.includes('*'))));
 check('turbot-external: all 9 labels', roundTrips(turbotExternalNotation, EXTERNAL_LEGAL));
 check('turbot-fsm: canonical 2-bit labels',
   roundTrips(turbotFsmNotation, ['0:00', '0:01', '0:10', '0:11', '1:00', '1:11']));
