@@ -14,7 +14,39 @@ Claude to load into context).
 >
 > A change isn't finished until the docs that describe it are too.
 
-_Last updated: 2026-07-07 (**manual grading for open questions** — the instructor can now
+_Last updated: 2026-07-07 (**grade release** — students see NO grades (not even on submit)
+until the instructor releases them per assignment. Server: `grades_released` column beside the
+assignment row (policy, not content — never inside the AssignmentData JSON), new instructor
+endpoint `PUT /api/assignments/:id/grades-release` `{released: boolean}` (idempotent;
+unrelease re-hides), `gradesReleased` on assignment list/detail responses, and
+`studentRecord(record, released)` in `server/src/sanitize.ts` now withholds the result
+entirely until release (after release: scores only, still no per-case detail). Instructors
+always see everything immediately. serverCheck grew to 28 checks covering the full lifecycle
+(hidden on submit → 403 for student release → release → student sees scores → unrelease
+re-hides). Local prototype mirrors the rule behind a new seam (`app/src/storage/gradeRelease.ts`,
+localStorage flag): the student submit alert no longer shows the autograde, the home screen
+shows "Grade: n/m questions" beside a submitted assignment only once released, and the
+instructor gradebook header gets a "Release grades"/"Hide grades" toggle (with confirm).
+API client: `setGradesReleased`, `gradesReleased` on summaries/detail. Earlier same day,
+**server groundwork** — a complete API server package (`server/`,
+Express 5 + Node's built-in `node:sqlite`, zero native deps) implementing the whole backend
+seam set ahead of AWS access: dev auth (roster-email → bearer token; `AuthProvider` interface
+in `server/src/auth.ts` is where UCLA SSO plugs in via `MM_AUTH_MODE=sso`), assignment CRUD
+(instructor-gated), per-student workbook GET/PUT, and the submission endpoint — the server
+stamps identity/timestamp, grades on receipt with the SAME pure `app/src/engine/grader.ts` the
+browser uses (imported directly across packages), and persists the record. Redaction lives
+server-side (`server/src/sanitize.ts`): students get assignments without `test_cases` and
+results without per-case detail; instructors get everything. Storage is one SQLite file
+(users/sessions/assignments/workbooks/submissions; WAL). `npm run seed [-- --sample]` loads
+the toy roster + cc-basics (+ the sample assignment with graded demo submissions);
+`npm run check` (`server/tools/serverCheck.ts`) boots the real app on an ephemeral port
+against an in-memory DB and drives the full student→instructor flow over HTTP — 22 checks,
+all passing (incl. post-merge with perception/open questions). Browser half:
+`app/src/api/client.ts`, a typed function per endpoint ready to back future `Remote*` stores
+(nothing imports it yet — the app still runs on the Local* stores; the cutover needs the
+store seams to go async). Deployment is copy/paste-ready in `deploy/` (Lightsail setup
+README, systemd unit, Caddyfile for TLS; Cloudflare Pages settings incl. `VITE_API_BASE`).
+Same day, **manual grading for open questions** — the instructor can now
 record a verdict on a pending open question from the gradebook drill-down: ✓ Correct / ✗
 Incorrect buttons + an optional feedback note next to the displayed response. The verdict is a
 `ManualReview` (`{pass, note?, reviewedAt}`, new in `types.ts`) stored as `manual` on the
@@ -235,7 +267,15 @@ end-to-end:
   input per keystroke and a button previews up to 16 worked examples on demand (enumerating the
   whole space per keystroke was too slow). See the DSL section in Part 2.
 
-The missing half is the **server** and productized submit/grade loop.
+- **Server (built, not yet deployed)** — `server/` is a runnable API server implementing the
+  backend half of every seam: dev auth + sessions, assignment CRUD, workbook sync, and
+  submit-with-server-side-autograding (same `engine/grader.ts`, imported directly). It keeps
+  `test_cases` server-only and strips per-case detail from student results. SQLite storage,
+  seed script, and a 22-check HTTP smoke test (`cd server && npm run check`). Deployment
+  recipes for Lightsail + Cloudflare Pages sit in `deploy/`. See `server/README.md`.
+
+What's missing is the **deployment** (waiting on the UCLA AWS account), **UCLA SSO**, and the
+**frontend cutover** from the Local* stores to the API (via `app/src/api/client.ts`).
 
 ## What's next
 
@@ -264,13 +304,16 @@ The missing half is the **server** and productized submit/grade loop.
   server-side LLM pass would write; and surfacing the instructor's feedback note to the
   student (today it's instructor-only).
 
-**The backend phase (the big step):**
+**The backend phase (server code shipped 2026-07-07; what remains):**
 
-- **Real auth** — replace the mockup login with UCLA SSO; student vs. instructor roles from the token.
-- **Server persistence** — `RemoteWorkbookStore` behind the existing seam, syncing across
-  devices. (Supabase free tier looks sufficient.)
-- **Submission endpoint + server-side autograding** — submit → server runs `engine/grader` →
-  results stored; instructor gradebook reads them (the local pipeline already mirrors this).
+- **Deploy** — once the UCLA AWS account lands: Lightsail box for `server/` (+ Caddy TLS),
+  Cloudflare Pages for `app/` — step-by-step in `deploy/README.md`.
+- **Frontend cutover** — make the store seams async and back them with `app/src/api/client.ts`
+  (`RemoteWorkbookStore` / `RemoteAssignmentStore` / `RemoteSubmissionStore`), and swap the
+  mockup login for the API's `/auth` endpoints. Doesn't block on AWS — can be developed
+  against a local `npm run dev` server.
+- **Real auth** — implement the `SsoAuthProvider` in `server/src/auth.ts` once UCLA SSO
+  details exist; roles from the token. Roster ingestion in `server/src/seed.ts`.
 - **Real assignment content** — author the actual PHIL 133 homeworks (HW1–HW7).
 
 ---
@@ -326,6 +369,8 @@ the engine.
 | Assignments   | `app/src/assignments/index.ts`, `cc-basics.json`                               | Bundled registry (`listAssignments`/`getAssignment`) + the one bundled CC assignment                                                       |
 | Instructor UI | `app/src/instructor/`                                                          | `InstructorApp`, `InstructorGate`, `InstructorDashboard`, `AssignmentEditor`, `QuestionCreator` (incl. turbot arena editor; pure paint/resize/place helpers in `arenaEditing.ts`), `Gradebook(.ts/View.tsx)`                 |
 | Student UI    | `app/src/components/`                                                          | `CircuitCanvas`, `ComponentLibrary`, `DataTable`, `HomeScreen`, `AssignmentOverview` (question list), `MenuBar`, `SequentialTimeline`, `TMTapePanel` (clickable tape), `ArenaCanvas` (shared arena grid renderer), `TurbotArenaPanel` ("Map" + run controls, in the right data panel), `TurbotTapePanel` (turbot TM's read-only internal tape), `OpenResponsePanel` (open question's writing panel; copy/cut/paste/drop blocked), `SimulationPanel`, `TabBar` (question nav bar in assignments) |
+| API client    | `app/src/api/client.ts`                                                        | Typed browser client for the API server (one function per endpoint; token in localStorage). Not yet wired into the UI — the building block for the `Remote*` stores |
+| Server        | `server/src/app.ts`, `db.ts`, `auth.ts`, `sanitize.ts`, `config.ts`, `seed.ts` | The API server (Express 5 + `node:sqlite`): routes, storage, the `AuthProvider` seam (dev login now, UCLA SSO later), student-facing redaction, env config, DB seeding. Smoke test: `server/tools/serverCheck.ts` (`npm run check`). Deploy recipes in `deploy/` |
 | Dev/sample    | `app/src/devData/sampleData.ts`, `seed.ts`                                     | Builders + seeding for demo CC/SC/FSM/TM/turbot/perception/open assignments and submissions                                                                |
 | Tools         | `app/tools/grade.ts`, `pipelineCheck.ts`, `codecCheck.ts`, `tmCheck.ts`, `turbotCheck.ts`, `perceptionCheck.ts` | Headless CLI grader, submit→grade pipeline check (all modes, incl. perception and the open question's pending path), codec + rep-core unit checks, TM engine/codec/grader smoke test, turbot engine/grader smoke test, and perception rules/generation/grading smoke test (`npx tsx`)          |
 

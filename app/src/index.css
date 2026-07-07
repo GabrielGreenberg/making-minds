@@ -1507,6 +1507,14 @@ thead .sc-label-col {
   align-items: center;
   gap: 8px;
 }
+.instructor-release {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-left: auto;
+  font-size: 13px;
+  color: var(--text-dim, #666);
+}
 .instructor-page-title { font-size: 20px; }
 .instructor-section-title { font-size: 18px; }
 .instructor-subhead { font-size: 15px; color: var(--text); }

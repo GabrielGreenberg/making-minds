@@ -1,0 +1,26 @@
+{
+  "name": "making-minds-server",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "description": "API server for the Making Minds platform: auth, assignment CRUD, workbook sync, submission + server-side autograding. Reuses app/src/engine unchanged.",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "start": "tsx src/index.ts",
+    "seed": "tsx src/seed.ts",
+    "typecheck": "tsc --noEmit",
+    "check": "tsx tools/serverCheck.ts"
+  },
+  "dependencies": {
+    "express": "^5.1.0",
+    "tsx": "^4.22.4"
+  },
+  "devDependencies": {
+    "@types/express": "^5.0.0",
+    "@types/node": "^24.12.0",
+    "typescript": "~5.9.3"
+  },
+  "engines": {
+    "node": ">=22.5"
+  }
+}
