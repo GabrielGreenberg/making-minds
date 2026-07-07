@@ -5,6 +5,7 @@
     "statement": "Design a Turing machine that adds one in tally notation. The tape starts with a single block of strokes representing x, with the head on the rightmost stroke. The machine must halt leaving a single block of x + 1 strokes, with the head back on the rightmost stroke of the block.",
     "buildMode": "TM",
     "representation": "tally",
+    "requireStandardHaltPosition": true,
     "cc_spec": {
       "inputs": [
         {

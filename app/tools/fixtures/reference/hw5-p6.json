@@ -5,6 +5,7 @@
     "statement": "Design a Turing machine that computes x + 3y in tally notation, reusing your earlier constructions. The tape starts with the y block on the left and the x block on the right, with the head on the rightmost stroke of the x block, and the machine must halt leaving a single block of x + 3y strokes in standard position.",
     "buildMode": "TM",
     "representation": "tally",
+    "requireStandardHaltPosition": true,
     "cc_spec": {
       "inputs": [
         {

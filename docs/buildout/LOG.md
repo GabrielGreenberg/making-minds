@@ -535,3 +535,28 @@ gap from "no y at all".
 
 **Next:** **P2.3** (wire requireStandardHaltPosition — small, makes five
 fixture statements honest), then **P1.8** (router memo, gating Phase 3).
+
+## 2026-07-06 (iteration 14) — P2.3: requireStandardHaltPosition wired · statements now honest
+
+**Shipped:** the TM standard-halt-position toggle is live end-to-end: question
+field (types.ts) → `gradeTape` AcceptOptions → `acceptTM` (which always
+enforced it — nothing upstream ever set it). TM-only checkbox in
+QuestionCreator (emits the field only when checked; round-trip verified live
+in the browser). hw5-p1..p8 flagged to match their statements' promises; p9
+correctly unflagged (promises cleanup, not position). Three new end-to-end
+tmCheck pins prove the flag bites and the default path is untouched.
+
+**Verification highlights (0 refutations):** the verifier built its OWN
+wrong-position machine (right tape, head one cell left) — fails 0/8 flagged
+with position-named reasons, passes 8/8 unflagged; default-path regression via
+a HEAD worktree showed the full 56-row ledger byte-identical EXCEPT the one
+predicted improvement (hw5-p8 broken 15/16 → 16/16 — its survivor had the
+right tape in the wrong position, now caught); flag/statement mapping audited
+across all nine fixtures.
+
+**Bookkeeping:** first of CLAUDE.md's two deferred authoring follow-ups
+closed; only `allowed_components` (P1.5) remains.
+
+**Next:** **P2.4** — codec-level block-separation variation so hw5-p4's
+arbitrary-gap clause has teeth against student machines. Then P1.8 (router
+memo, gating Phase 3).

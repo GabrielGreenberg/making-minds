@@ -13,6 +13,7 @@ import type {
   CircuitComponent,
   Wire,
   AssignmentData,
+  AssignmentQuestion,
   SubmissionData,
   TMNotation,
   TMTape,
@@ -25,7 +26,7 @@ import {
 import { tmNotation } from '../src/engine/notation';
 import { encodeTM, acceptTM, decodeTM } from '../src/engine/tmCodec';
 import { validateTMTable } from '../src/engine/tmValidate';
-import { gradeSubmission } from '../src/engine/grader';
+import { gradeSubmission, gradeQuestion } from '../src/engine/grader';
 
 function comp(id: string, label: string): CircuitComponent {
   return { id, type: 'STATE', x: 0, y: 0, label, ports: getPortsForType('STATE') };
@@ -59,6 +60,20 @@ function tmIncrementLegacy() {
   return {
     components: [comp('s0', 'S₀'), comp('s1', 'S₁')],
     wires: [wire('t1', 's0', 's0', '1:1R'), wire('t2', 's0', 's1', '0:1R')],
+  };
+}
+
+// Unary increment that HALTS IN STANDARD POSITION: after writing the new
+// stroke it steps back left onto it (blockEnd) before halting.
+//   S₀ on 1 → 1,R (stay); S₀ on 0 → 1,R (go S₁); S₁ on 0 → 0,L (go S₂, halts).
+function tmIncrementStandard() {
+  return {
+    components: [comp('s0', 'S₀'), comp('s1', 'S₁'), comp('s2', 'S₂')],
+    wires: [
+      wire('t1', 's0', 's0', '1:1,R'),
+      wire('t2', 's0', 's1', '0:1,R'),
+      wire('t3', 's1', 's2', '0:0,L'),
+    ],
   };
 }
 
@@ -196,6 +211,30 @@ check('ambiguous table: graded, 0 passed, every case has a reason',
   ambiguous.questions[0].status === 'graded' &&
   ambiguous.questions[0].passed === 0 &&
   ambiguous.questions[0].cases.every((c) => !!c.reason));
+
+// ── requireStandardHaltPosition, end-to-end through the grader ─────
+// The question-level flag must have teeth: tmIncrement leaves the RIGHT tape
+// but halts one cell right of the block (it writes the final stroke and moves
+// R before halting) — exactly the machine the flag exists to catch.
+console.log('\n[grader: requireStandardHaltPosition]');
+const laxQuestion: AssignmentQuestion = assignment.questions[0];
+const strictQuestion: AssignmentQuestion = { ...laxQuestion, requireStandardHaltPosition: true };
+
+const laxOffPosition = gradeQuestion(laxQuestion, tmIncrement());
+check('flag ABSENT: right-tape/off-position machine passes all cases (default unchanged)',
+  laxOffPosition.status === 'graded' &&
+  laxOffPosition.passed === laxOffPosition.total && laxOffPosition.total === 3);
+
+const strictOffPosition = gradeQuestion(strictQuestion, tmIncrement());
+check('flag SET: same machine FAILS every case with a position reason',
+  strictOffPosition.status === 'graded' &&
+  strictOffPosition.passed === 0 && strictOffPosition.total === 3 &&
+  strictOffPosition.cases.every((c) => !!c.reason && c.reason.includes('rightmost cell')));
+
+const strictStandard = gradeQuestion(strictQuestion, tmIncrementStandard());
+check('flag SET: standard-position increment passes all cases',
+  strictStandard.status === 'graded' &&
+  strictStandard.passed === strictStandard.total && strictStandard.total === 3);
 
 console.log(`\n${failures === 0 ? 'TM CHECK OK' : `TM CHECK FAILED (${failures} checks)`}`);
 process.exit(failures === 0 ? 0 : 1);

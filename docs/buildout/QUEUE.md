@@ -132,20 +132,17 @@ before Phase 3 (perception returns to router-rendered CC/SC). Task ids unchanged
   the PDF domain x,y ≥ 1 (0-blocks invisible); p8's max(0,x−1) hand-authored
   (DSL can't express it); no TM boxing mechanism exists (reuse flat-inlined,
   grading functional). Spawned P2.3 + P2.4.
-- [ ] **P2.3** _(discovered 2026-07-06, hw5 critic)_ **Wire
-  `requireStandardHaltPosition` into grading + authoring.** The mechanism
-  exists and is pinned (tmCodec `AcceptOptions`, enforced + tested) but is a
-  DEAD FIELD end-to-end: `gradeTape` calls `acceptTM` with no options and the
-  field isn't read from `AssignmentQuestion`. Several HW5 statements promise
-  standard-position halting the grader silently ignores (hw5-p8's broken
-  variant even passes one case only because of this). Wire: question field →
-  gradeTape AcceptOptions; expose the toggle in QuestionCreator (it's the
-  CLAUDE.md deferred authoring follow-up); set it true on the HW5 fixtures
-  whose statements promise it and confirm they still verify (all correct
-  machines already halt in standard position by construction — the builders
-  future-proofed).
-  **Acceptance:** field honored by the grader (a wrong-position machine fails a
-  question with the flag); creator exposes it; HW5 rows re-verify green.
+- [x] **P2.3** **Wire `requireStandardHaltPosition` into grading +
+  authoring.** — _done 2026-07-06 (iteration 14)._ Question field → `gradeTape`
+  AcceptOptions → `acceptTM`; TM-only checkbox in QuestionCreator (round-trip
+  verified in-browser); hw5-p1..p8 flagged per their statements (p9 correctly
+  unflagged — it promises cleanup, not position; mapping fully audited by the
+  verifier). hw5-p8's broken fraction improved 15/16 → 16/16 exactly as
+  predicted; the HEAD-worktree ledger diff shows that as the ONLY change.
+  Three end-to-end tmCheck pins (flag absent passes / flag set fails with
+  "rightmost cell" reasons / standard-position machine passes flagged). This
+  closes the first of CLAUDE.md's two deferred authoring follow-ups (only
+  `allowed_components` = P1.5 remains).
 - [ ] **P2.4** _(discovered 2026-07-06, hw5-p4 refutation)_ **Codec: vary tally
   block separation.** `encodeTM` hardcodes one 0-cell between argument blocks,
   so the "arbitrary separation" robustness that hw5-p4's statement requires is

@@ -5,6 +5,7 @@
     "statement": "Design a Turing machine that computes x + 3 in tally notation, reusing your solution to the add-one problem. The tape starts with a single block of strokes representing x, with the head on the rightmost stroke, and the machine must halt leaving a single block of x + 3 strokes in standard position.",
     "buildMode": "TM",
     "representation": "tally",
+    "requireStandardHaltPosition": true,
     "cc_spec": {
       "inputs": [
         {

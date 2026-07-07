@@ -14,7 +14,16 @@ Claude to load into context).
 >
 > A change isn't finished until the docs that describe it are too.
 
-_Last updated: 2026-07-06 (**P2.1 — TM two-output notation** — TM transition labels moved
+_Last updated: 2026-07-06 (**P2.3 — standard-halt-position toggle wired end-to-end** —
+`requireStandardHaltPosition` is now an optional field on `AssignmentQuestion`; the grader's
+tape branch passes it into `acceptTM` (absent/false = position-agnostic, unchanged), and the
+question creator exposes it as a TM-only checkbox that round-trips through save/load. HW5
+fixtures p1–p8 — whose statements promise standard-position halting — are flagged (p9's does
+not); all stay verified, and hw5-p8's broken variant now fails 16/16 (was 15/16: one case
+slipped through only because position was unenforced). tmCheck pins the flag end-to-end
+through `gradeQuestion` (off-position machine passes without the flag, fails every case with
+it; a standard-position machine passes with it). Earlier same day: **P2.1 — TM two-output
+notation** — TM transition labels moved
 off the textbook's dual-action token (`1:0R`) to the industry-standard **two-output form**
 `read:write,move` (stored `1:0,R`; canvas renders read │ write,move with the comma shown;
 the label editor presents one input field + two output fields (write, move); the machine
@@ -192,9 +201,10 @@ The missing half is the **server** and productized submit/grade loop.
   can't express turns — see `runBrainStep` in `engine/turbot.ts`), a sample TM-turbot question
   in devData, and live-linking arena stepping to circuit-edit invalidation (currently the
   student Resets manually after editing mid-run, same as TM).
-- **Deferred authoring follow-ups** — the `requireStandardHaltPosition` TM acceptance toggle and
-  mode-filtered `allowed_components` (both optional fields on `AssignmentQuestion`, not yet
-  exposed in the question creator's editor UI).
+- **Deferred authoring follow-ups** — mode-filtered `allowed_components` (an optional field on
+  `AssignmentQuestion`, not yet exposed in the question creator's editor UI). The
+  `requireStandardHaltPosition` TM acceptance toggle is done (2026-07-06): wired end-to-end
+  through `gradeQuestion` and exposed as a TM-only checkbox in the question creator.
 
 **The backend phase (the big step):**
 
@@ -244,7 +254,7 @@ the engine.
 | ------------- | ------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------ |
 | Types         | `app/src/types.ts`                                                             | All domain types: `AssignmentData`, `AssignmentQuestion`, `SubmissionData`/`SubmissionRecord`, `CircuitData`, `CCSpec`, `SubmissionResult` |
 | Engine        | `app/src/engine/cc.ts`, `sc.ts`, `fsm.ts`                                      | Pure simulators per mode (topological eval for CC; clocked step for SC; transition-matching for FSM)                                       |
-| Engine        | `app/src/engine/tm.ts`, `tmValidate.ts`, `tmCodec.ts`                          | TM: notation-aware tape engine — **two-output** labels `read:write,move` (e.g. `1:0,R`; legacy `1:0R` parses as an alias), executed as one **atomic step** (every transition writes a symbol AND moves; grammar lives in `engine/notation.ts`); pre-engine table validation (ambiguous/unparseable, via the generic walker); encode/accept/decode (the codec `tape` axis)          |
+| Engine        | `app/src/engine/tm.ts`, `tmValidate.ts`, `tmCodec.ts`                          | TM: notation-aware tape engine — **two-output** labels `read:write,move` (e.g. `1:0,R`; legacy `1:0R` parses as an alias), executed as one **atomic step** (every transition writes a symbol AND moves; grammar lives in `engine/notation.ts`); pre-engine table validation (ambiguous/unparseable, via the generic walker); encode/accept/decode (the codec `tape` axis; accept honors the question's optional `requireStandardHaltPosition` — head must halt on the output block's rightmost cell)          |
 | Engine        | `app/src/engine/grader.ts`                                                     | `gradeSubmission` / `gradeQuestion` — one value-based codec pipeline for CC/SC/FSM/TM against numeric `test_cases`, plus a separate `gradeTurbot` branch (arena success criteria, not the codec)          |
 | Engine        | `app/src/engine/codec.ts`, `machineValidation.ts`                              | The codec (`space`/`time` value↔bits; `tape` → `tmCodec`) and Stage-1 machine validation for all modes                                     |
 | Engine        | `app/src/engine/testVectorGen.ts`, `formulaEval.ts`                            | Authoring-time: affine-formula language → `buildQuestionBank(inputs, outputs, rep, mode)` → `{spec, test_cases}` (widths derived; SC/FSM/TM sampled). Legacy `generateTestCases(spec, rep, mode)` remains for the sample data |
@@ -362,7 +372,10 @@ only — the grader never sees the formula; it runs against the generated numeri
   10 left motor on → turn right, 11 both on → forward.
 - **CC evaluation** — topological sort for gate order; propagation is instantaneous.
 - **Homework JSON** (spec §1.5) carries numeric `test_cases` (`{inputs, outputs}` of values); the
-  codec encodes/decodes per axis and the grader compares decoded outputs to expected.
+  codec encodes/decodes per axis and the grader compares decoded outputs to expected. TM
+  questions may additionally set `requireStandardHaltPosition: true` (authored via a TM-only
+  checkbox in the question creator) to reject runs whose head does not halt on the output
+  block's rightmost cell; absent/false, acceptance is position-agnostic.
 
 ## Things to watch
 

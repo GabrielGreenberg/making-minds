@@ -97,7 +97,9 @@ export function gradeQuestion(question: AssignmentQuestion, circuit: CircuitData
 
   // Tape axis (TM): widths are content-relative — the tape codec lays values out
   // and locates the output block by content, so no cc_spec is required.
-  if (axis === 'tape') return gradeTape(question.id, circuit, cases, rep);
+  if (axis === 'tape') {
+    return gradeTape(question.id, circuit, cases, rep, question.requireStandardHaltPosition);
+  }
 
   // Space/time axes need the per-group widths from the authoring spec.
   const spec = question.cc_spec;
@@ -153,12 +155,16 @@ function gradeSpaceTimeCase(
   return { input: tc.inputs, expected: tc.outputs, got, pass: valuesEqual(got, tc.outputs) };
 }
 
-/** TM grading — the codec's tape axis, delegated to tmCodec. */
+/** TM grading — the codec's tape axis, delegated to tmCodec.
+ *  `requireStandardHaltPosition` (question-level, optional) tightens the
+ *  acceptor: the head must halt on the output block's rightmost cell.
+ *  Absent/false keeps the default position-agnostic acceptance. */
 function gradeTape(
   questionId: number,
   circuit: CircuitData,
   cases: TestCase[],
   rep: RepSystem,
+  requireStandardHaltPosition?: boolean,
 ): QuestionResult {
   const notation = notationForRepresentation(rep);
   const layout: CodecLayout = { axis: 'tape', rep, inputWidths: [], outputWidths: [] };
@@ -174,7 +180,7 @@ function gradeTape(
       encodeTM(notation, tc.inputs),
       notation,
     );
-    const rej = acceptTM(notation, run);
+    const rej = acceptTM(notation, run, { requireStandardHaltPosition });
     if (rej) return reject(tc, rej.reason);
     const got = decodeTM(notation, run.tape);
     return { input: tc.inputs, expected: tc.outputs, got: [got], pass: got === tc.outputs[0] };

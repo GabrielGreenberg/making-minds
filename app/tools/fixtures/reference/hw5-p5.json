@@ -5,6 +5,7 @@
     "statement": "Design a Turing machine that computes three times the sum of its two inputs in tally notation, reusing your addition and tripling constructions. The tape starts with the y block on the left and the x block on the right, with the head on the rightmost stroke of the x block, and the machine must halt leaving a single block of 3(x + y) strokes in standard position.",
     "buildMode": "TM",
     "representation": "tally",
+    "requireStandardHaltPosition": true,
     "cc_spec": {
       "inputs": [
         {

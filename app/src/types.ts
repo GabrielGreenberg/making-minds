@@ -137,6 +137,10 @@ export interface AssignmentQuestion {
   buildMode: BuildMode;        // canvas mode for this question (CC, SC, FSM, turbot, …)
   representation: RepSystem;   // authoritative for grading (binary | tally; TM notation: tally→unary)
   allowed_components?: ComponentType[];
+  /** TM-mode acceptance strictness: when true, a run is accepted only if the
+   *  head halts on the output block's rightmost cell (standard position —
+   *  tmCodec `AcceptOptions`). Absent/false = position-agnostic (default). */
+  requireStandardHaltPosition?: boolean;
   cc_spec?: CCSpec;            // authoring spec; source of group widths + generates test_cases at save
   test_cases?: TestCase[];     // value-based grading cases (one bank, all modes — see TestCase)
   // Turbot-only fields (buildMode === 'turbot'). A turbot question's "circuit"

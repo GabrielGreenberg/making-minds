@@ -5,6 +5,7 @@
     "statement": "Design a Turing machine that multiplies its input by three in tally notation, building on your solution to the x + 3 problem. The tape starts with a single block of strokes representing x, with the head on the rightmost stroke, and the machine must halt leaving a single block of 3x strokes in standard position.",
     "buildMode": "TM",
     "representation": "tally",
+    "requireStandardHaltPosition": true,
     "cc_spec": {
       "inputs": [
         {

@@ -5,6 +5,7 @@
     "statement": "Design a Turing machine that subtracts one from a binary numeral, outputting zero when the input is zero. The tape starts with the numeral of x written between two asterisk markers, with the head on the right marker. The machine must halt leaving one well-formed block containing the binary numeral of x - 1 when x is at least one, and the numeral 0 when x is zero, ending with the head on the block's right marker.",
     "buildMode": "TM",
     "representation": "binary",
+    "requireStandardHaltPosition": true,
     "test_cases": [
       {
         "inputs": [

@@ -5,6 +5,7 @@
     "statement": "Design a Turing machine that adds one to a binary numeral. The tape starts with the numeral of x written between two asterisk markers, with the head on the right marker, and the machine must halt leaving one well-formed block containing the binary numeral of x + 1, with the head back on the block's right marker.",
     "buildMode": "TM",
     "representation": "binary",
+    "requireStandardHaltPosition": true,
     "cc_spec": {
       "inputs": [
         {

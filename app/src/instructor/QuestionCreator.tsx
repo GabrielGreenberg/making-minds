@@ -95,6 +95,12 @@ export function QuestionCreator({ assignmentId, existingQuestion, onSave, onCanc
     () => existingQuestion?.representation === 'tally' ? 'tally' : 'binary',
   );
 
+  // TM-only acceptance strictness: require the head to halt on the output
+  // block's rightmost cell (standard position). Off = position-agnostic.
+  const [requireStandardHalt, setRequireStandardHalt] = useState<boolean>(
+    () => existingQuestion?.requireStandardHaltPosition ?? false,
+  );
+
   const [inputs, setInputs] = useState<AuthoredInputGroup[]>(() =>
     existingQuestion?.cc_spec?.inputs.map((g) => ({
       name: g.name,
@@ -236,6 +242,8 @@ export function QuestionCreator({ assignmentId, existingQuestion, onSave, onCanc
       statement: statement.trim(),
       buildMode: mode,
       representation: rep,
+      // TM-only acceptance strictness; omitted (default) unless checked.
+      ...(mode === 'TM' && requireStandardHalt ? { requireStandardHaltPosition: true } : {}),
       cc_spec: bank.spec,
       test_cases: bank.test_cases,
     });
@@ -295,6 +303,17 @@ export function QuestionCreator({ assignmentId, existingQuestion, onSave, onCanc
             <h4 className="instructor-subhead">Representation</h4>
             <RepToggle value={rep} onChange={setRep} />
           </div>
+        )}
+        {mode === 'TM' && (
+          <label className="instructor-inline-field">
+            <input
+              type="checkbox"
+              checked={requireStandardHalt}
+              onChange={(e) => setRequireStandardHalt(e.target.checked)}
+            />
+            Require standard halt position (the head must halt on the output block&#8217;s
+            rightmost cell)
+          </label>
         )}
         {isTurbot && (
           <div className="instructor-section-head">

@@ -5,6 +5,7 @@
     "statement": "Design a Turing machine that adds two numbers in tally notation. The tape starts with two blocks of strokes: the block for y on the left and the block for x on the right, with the head on the rightmost stroke of the x block. The machine must halt leaving a single block of x + y strokes in standard position. Do not assume the two blocks are separated by exactly one empty cell; a robust machine should work when they are separated by any number of empty cells.",
     "buildMode": "TM",
     "representation": "tally",
+    "requireStandardHaltPosition": true,
     "cc_spec": {
       "inputs": [
         {

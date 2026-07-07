@@ -7,49 +7,58 @@ run `npm run coverage` and reconcile._
 ## Where we are
 
 Branch `buildout-infra`. **41 / 56 verified**, 15 pending, 0 regressed, 0
-warnings. Thirteen iterations done. **ALL arithmetic is complete** (HW1–HW5,
-appearance included). Remaining pending: perception (hw2-p10..12,
-hw3-p11..12), navigation (hw2-p13..15, hw3-p13..15, hw4-p12..14), the HW6
-turbot-TM capstone. Remaining walk: **P2.3 → P2.4 → P1.8 → P3.1 → P3.2/P3.3 →
-P4.2 → P4.3 → P5.1 → smalls (P1.5/P1.6/P1.11) → P6**.
+warnings. Fourteen iterations done. **ALL arithmetic is complete** (HW1–HW5,
+appearance included), and `requireStandardHaltPosition` is live end-to-end
+(P2.3). Remaining pending: perception (hw2-p10..12, hw3-p11..12), navigation
+(hw2-p13..15, hw3-p13..15, hw4-p12..14), the HW6 turbot-TM capstone.
+Remaining walk: **P2.4 → P1.8 → P3.1 → P3.2/P3.3 → P4.2 → P4.3 → P5.1 →
+smalls (P1.5/P1.6/P1.11) → P6**.
 
-## Do this next — P2.3: wire `requireStandardHaltPosition`
+## Do this next — P2.4: codec-level block-separation variation
 
-Small grading-fidelity task that makes five HW5 statements honest. The
-mechanism exists and is pinned (tmCodec `AcceptOptions.requireStandardHaltPosition`,
-enforced at acceptTM and tested by tmCheck) but is dead end-to-end:
+hw5-p4's statement (and the PDF) require an x+y machine to work for ANY number
+of 0-cells between the argument blocks, and the reference machine now genuinely
+does (gap-robust, proven on hand-laid tapes) — but `encodeTM` hardcodes exactly
+one separator cell, so the grading pipeline can never test a STUDENT machine's
+robustness: a gap=1-only machine passes the whole bank.
 
-1. Add the field to `AssignmentQuestion` (types.ts — check: QUEUE says it
-   already exists as an optional field from the original spec; verify) and
-   make `gradeTape` (grader.ts ~177) pass it through to `acceptTM`.
-2. Expose the toggle in `QuestionCreator` (the CLAUDE.md "deferred authoring
-   follow-ups" item — TM-mode only).
-3. Set it `true` on the HW5 fixtures whose statements promise standard
-   position (p1, p2, p3, p4, p5, p6 tally; p7 binary — check each statement);
-   re-run coverage — all should stay verified (builders future-proofed: every
-   correct machine already halts in standard position; hw5-p8's broken variant
-   should now fail its one surviving case, IMPROVING its breadth fraction).
-4. Add a tmCheck/pipelineCheck pin: a machine with the right tape but wrong
-   halt position FAILS a question with the flag set.
-5. Gates: check/tsc/build/coverage (41/56, 0 regressed).
+1. Read `engine/tmCodec.ts` (encodeTM two-arg layout) + how TM test_cases carry
+   values (grader.ts tape branch; TMTestCase shape if any). Design the smallest
+   seam-respecting way to vary separation per case — e.g. an optional
+   per-test-case layout hint (`separations?: number[]` alongside inputs) that
+   encodeTM honors, defaulting to 1 — so banks can mix gaps without changing
+   the value-based contract. Watch: the codec is shared by grading AND the
+   UI question-run path (scWindowCheck pins SC/FSM; TM UI runs go through the
+   store's tape panel — check whether question runs encode via the same path
+   and keep them consistent).
+2. Regenerate hw5-p4's bank to include gap>1 cases (e.g. gaps 1,2,3,5 spread
+   across the 64 pairs); consider p5/p6 too IF their statements promise
+   arbitrary separation (read them — if they don't, leave them).
+3. Prove the teeth: the OLD refuted gap=1-only p4 machine (regression-pinned in
+   `scratchpad/prove_hw5_p4_v2.ts`) must now FAIL the new bank through the
+   normal grader; the current gap-robust correct machine must pass 100%.
+4. Pins: tmCheck or coverageCheck addition proving varied-separation encoding
+   round-trips (encode → run → accept → decode) at gap≠1.
+5. Gates: check/tsc/build/coverage — 41/56, 0 regressed (hw5-p4 stays verified
+   with its NEW bank; fraction may change — report).
 
-**Acceptance:** the flag is honored by the grader + exposed in the creator;
-HW5 rows re-verify; a wrong-position machine demonstrably fails; CLAUDE.md's
-deferred-follow-up note updated.
+**Acceptance:** hw5-p4's bank contains varied separations; the old gap=1-only
+machine demonstrably fails via the grader; all gates green.
 
 ## Then
 
-P2.4 (codec: vary tally block separation so hw5-p4's robustness clause has
-teeth) → P1.8 (wire-router design memo — gates Phase 3) → P3.1
-(target-functions design memo) → perception fixtures → navigation → capstone.
+P1.8 (wire-router design memo — gates Phase 3 perception) → P3.1
+(target-functions design memo) → P3.2/P3.3 perception fixtures → P4.2
+multi-arena grading → P4.3 navigation arenas → P5.1 capstone → smalls → P6.
 
 ## Watch out for
 
-- **HW5 fixtures' correct machines all halt in standard position** — setting
-  the flag must not regress them; if one fails, the machine (not the flag) is
-  wrong.
-- **notationCheck grep gate** + **tmCheck** pin the TM grammar and engine.
+- **TM UI runs**: if the student-facing tape panel encodes inputs through the
+  same codec path, varied separations must not confuse the UI question-run
+  seeding (the P1.9 lesson: UI must feed exactly what the grader feeds — check
+  how TM question runs seed the tape; keep parity).
+- **notationCheck grep gate + tmCheck pins** (incl. the three new P2.3
+  standard-halt pins) must stay green.
 - **Ops:** 529 → resume workflow; session limit → finish solo.
-- **Appearance recipe v3**; seeds from `app/public/` at `/making-minds/`
-  (delete seed files from `app/dist/` too if a build ran after seeding).
+- **Appearance recipe v3**; seeds from `app/public/` at `/making-minds/`.
 - `tsx` missing → `npm install`; no lockfile churn.

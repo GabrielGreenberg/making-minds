@@ -101,7 +101,7 @@ _Note: HW4 #1–2 (state abstraction / multiple realizability) are analysis essa
 
 | id | problem | category | auth | build | grades | appr | status | notes |
 |----|---------|----------|:----:|:-----:|:------:|:----:|:------:|-------|
-| hw5-p1  | x+1 T | arithmetic | ✅ | ✅ | ✅ | ✅ | ✅ | `reference/hw5-p1.json`; 3 states; bank x=1..8 (PDF domain — tally 0-blocks invisible); halts in standard position (grader doesn't enforce yet → P2.3) |
+| hw5-p1  | x+1 T | arithmetic | ✅ | ✅ | ✅ | ✅ | ✅ | `reference/hw5-p1.json`; 3 states; bank x=1..8 (PDF domain — tally 0-blocks invisible); `requireStandardHaltPosition: true` (enforced since P2.3) |
 | hw5-p2  | x+3 T | arithmetic | ✅ | ✅ | ✅ | ✅ | ✅ | `reference/hw5-p2.json`; triple-append, 5 states; reuse pedagogy is flat-inlined (no TM boxing mechanism exists) |
 | hw5-p3  | 3x T | arithmetic | ✅ | ✅ | ✅ | ✅ | ✅ | `reference/hw5-p3.json`; 10 states; hand-authored bank x=1..8 |
 | hw5-p4  | x+y T (arbitrary separation) | arithmetic | ✅ | ✅ | ✅ | ✅ | ✅ | `reference/hw5-p4.json`; **gap-robust** 6-state shift-until-adjacent machine (initial build was gap=1-only — REFUTED by the verifier, rebuilt + proven on gaps 1–10 outside the codec; codec can't test the clause → P2.4) |
