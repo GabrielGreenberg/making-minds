@@ -215,16 +215,31 @@ export interface CaseResult {
 }
 
 /**
+ * An instructor's manual verdict on a `pending` (open) question. Recorded
+ * after submission via `SubmissionStore.recordManualReview` and stored on the
+ * QuestionResult (the result stays `pending` — the review annotates it rather
+ * than replacing it, so it can be re-reviewed and is distinguishable from an
+ * autograde). A future LLM-grading pass could write the same shape.
+ */
+export interface ManualReview {
+  pass: boolean;
+  note?: string;           // optional feedback / justification
+  reviewedAt: string;      // ISO timestamp
+}
+
+/**
  * Grading outcome for one question of a submission. `pending` is an open
  * question awaiting manual (or, later, LLM) review: the autograder cannot
  * score it, so it contributes nothing to the passed/total tallies and carries
- * the student's `response` for the reviewer instead.
+ * the student's `response` for the reviewer instead. Once reviewed, `manual`
+ * holds the instructor's verdict and the question counts toward the score.
  */
 export interface QuestionResult {
   questionId: number;
   status: 'graded' | 'skipped' | 'pending';
   reason?: string;         // why it was skipped / is pending
   response?: string;       // open questions: the student's free-text answer
+  manual?: ManualReview;   // open questions: the instructor's recorded verdict
   passed: number;          // test cases passed
   total: number;           // test cases total
   cases: CaseResult[];

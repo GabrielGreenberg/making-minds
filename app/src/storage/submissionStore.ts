@@ -13,6 +13,7 @@
 
 import type {
   AssignmentData,
+  ManualReview,
   QuestionCircuit,
   SubmissionData,
   SubmissionRecord,
@@ -49,6 +50,35 @@ export function buildSubmission(
   };
 }
 
+/**
+ * Record an instructor's verdict on a pending (open) question of one attempt.
+ * Pure: returns a new records array with the review set on the matching
+ * question's result, or null if no such pending question exists. The
+ * submission snapshot itself is untouched — only the grade side of the record
+ * (`result`), which the "server" owns and may amend, is updated; re-reviewing
+ * overwrites the previous verdict.
+ */
+export function applyManualReview(
+  records: SubmissionRecord[],
+  attempt: number,
+  questionId: number,
+  review: ManualReview,
+): SubmissionRecord[] | null {
+  const idx = records.findIndex((r) => r.attempt === attempt);
+  const result = records[idx]?.result;
+  if (!result) return null;
+  const qIdx = result.questions.findIndex(
+    (q) => q.questionId === questionId && q.status === 'pending',
+  );
+  if (qIdx < 0) return null;
+  const questions = result.questions.map((q, i) =>
+    i === qIdx ? { ...q, manual: review } : q,
+  );
+  return records.map((r, i) =>
+    i === idx ? { ...r, result: { ...result, questions } } : r,
+  );
+}
+
 export interface SubmissionStore {
   /** Append a new attempt and return the recorded (immutable) record. */
   submit(id: string, submission: SubmissionData): SubmissionRecord;
@@ -56,6 +86,18 @@ export interface SubmissionStore {
   getLatest(id: string): SubmissionRecord | null;
   /** Drop all stored submissions for an assignment (e.g. reseeding dev data). */
   clearSubmissions(id: string): void;
+  /**
+   * Record (or overwrite) the instructor's verdict on a pending open question
+   * of one stored attempt. Returns the updated record, or null if the attempt
+   * has no pending question with that id. An instructor/server capability —
+   * nothing student-facing calls this.
+   */
+  recordManualReview(
+    id: string,
+    attempt: number,
+    questionId: number,
+    review: { pass: boolean; note?: string },
+  ): SubmissionRecord | null;
 }
 
 const KEY_PREFIX = 'mm:sub:';
@@ -104,6 +146,27 @@ class LocalSubmissionStore implements SubmissionStore {
       // localStorage full or unavailable — silent fail (matches autosave).
     }
     return record;
+  }
+
+  recordManualReview(
+    id: string,
+    attempt: number,
+    questionId: number,
+    review: { pass: boolean; note?: string },
+  ): SubmissionRecord | null {
+    const all = this.listSubmissions(id);
+    const updated = applyManualReview(all, attempt, questionId, {
+      pass: review.pass,
+      note: review.note?.trim() || undefined,
+      reviewedAt: new Date().toISOString(),
+    });
+    if (!updated) return null;
+    try {
+      localStorage.setItem(KEY_PREFIX + id, JSON.stringify(updated));
+    } catch {
+      // localStorage full or unavailable — silent fail (matches submit).
+    }
+    return updated.find((r) => r.attempt === attempt) ?? null;
   }
 }
 
