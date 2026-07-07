@@ -232,7 +232,11 @@ before Phase 3 (perception returns to router-rendered CC/SC). Task ids unchanged
   (from the HW diagrams) + a plausible brain per row that validates, steps in
   the arena, and grades end-to-end. The HW4 zig-zag example machine is printed
   in the problem set — use it; for Way Finder / Mad Max, any good-faith brain
-  suffices. **Advances:** those 9 rows.
+  suffices. **Advances:** those 9 rows. _Note (iteration-18 merge): main's
+  PR #11 already grades FSM- and SC-brained turbots in turbotCheck and ships a
+  sample turbot question per inner mode — P4.3 authoring builds on that, and
+  turbot-FSM labels are canonical 2-bit (`0:11` default) via
+  `turbotFsmNotation`._
 - [ ] **P4.4** Add a **turbot sandbox** tab (currently turbot only exists inside
   assignments; `TabBar` lists CC/FSM/TM only). Optional but eases authoring/appr.
 - [ ] **P4.5** _(optional)_ Wire the perception/navigation **category taxonomy**
@@ -293,7 +297,8 @@ before Phase 3 (perception returns to router-rendered CC/SC). Task ids unchanged
 
 ## Phase 6 — Close out
 
-- [ ] **P6.1** Full-matrix appearance sweep against VISUAL_VOCAB (every mode).
+- [ ] **P6.1** Full-matrix appearance sweep against VISUAL_VOCAB (every mode —
+  now including the open-question response UI merged from main, iteration 18).
 - [ ] **P6.2** Reconcile CLAUDE.md status with COVERAGE; final `npm run check` +
   `tsc` + `build` all green; every COVERAGE row green **at its tier** (✅ exact
   for arithmetic, ◐ interface for perception/navigation).
@@ -302,7 +307,15 @@ before Phase 3 (perception returns to router-rendered CC/SC). Task ids unchanged
 
 ## Recurring meta-tasks  _(fire on cadence; keep the queue honest)_
 
-- [ ] **META-audit-queue** — _every ~5 iterations._ Run `npm run coverage`;
+- [ ] **META-audit-queue** — _every ~5 iterations; last ran iteration 18
+  (2026-07-06): merged `origin/main` (open-question sixth mode + turbot
+  grading rework, PRs #11/#13) as `e9122e0` with all gates green; harness
+  41/15/0 unchanged, COVERAGE already reconciled; no patch cluster since
+  iteration 11 (P2.1–P2.4 + P1.8 all routed through seams); one pin
+  adjudicated — main's new "1-bit turbot FSM label rejected" turbotCheck pin
+  contradicted the branch's documented P1.12 legacy-alias design and was
+  flipped to "accepted as alias" (execution bit-identical, old machines keep
+  validating)._ Run `npm run coverage`;
   reconcile COVERAGE + this queue against the harness JSON; prune dead/duplicate
   tasks; re-rank by dependency and value; confirm no drift. **Also audit for
   patch accumulation:** look for clusters of surgical fixes that landed since the

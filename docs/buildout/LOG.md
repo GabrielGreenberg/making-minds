@@ -698,3 +698,47 @@ sim-state reset landed as `0ca35b3` and is documented in CLAUDE.md.
 
 **Next:** META-audit-queue (due — last ran iteration 11), then P1.8 S3
 (foreign-lane A* cost + H4 near-merge round).
+
+## 2026-07-06 (iteration 18) — META-audit-queue: merged origin/main · gates green · no drift
+
+**Shipped:** the due queue audit (last ran iteration 11), whose main body was
+reconciling the branch with `origin/main`, which had moved 7 commits ahead:
+PR #13 adds a SIXTH question mode ("open" free-text, manually reviewed;
+`gradeQuestion` gains an optional `responseText` and short-circuits open
+questions to a `pending` 0/0 result) and PR #11 reworks turbot samples +
+turbotCheck (grades FSM- and SC-brained turbots, all four inner modes). Merge
+commit `e9122e0` (delegated agent, 184k tokens: 7 conflicted files resolved
+preserving BOTH sides; gates run green before commit; independently re-run
+after).
+
+**Key resolutions (full detail in the merge report):**
+- `engine/turbot.ts`: main's notation-threading (TMNotation param through
+  runBrainStep/runTurbot) kept; main's separate `parseTurbotFSMLabel` regex
+  grammar DELETED — `validateTurbotFSM` now delegates to the notation seam
+  (`validateTransitionTable` over `turbotFsmNotation`), so there is still
+  exactly ONE grammar answer and legacy 1-bit aliases keep validating.
+- **Pin adjudication (flag for Gabriel):** main's new turbotCheck pin asserted
+  1-bit turbot FSM labels are REJECTED; that contradicts the branch's
+  documented P1.12 legacy-alias design (alias → canonical 2-bit, decays on
+  edit-save, bit-identical execution). The alias design won; the pin now
+  asserts acceptance-as-alias. If strict rejection was deliberate on main,
+  say so and we'll flip it back with a localStorage migration plan.
+- `CircuitCanvas.tsx`: ours wholesale — main's label-editor changes targeted
+  the pre-notation editor; both its intents (2-bit turbot editing,
+  encoding-tied alphabet) already flow from the notation objects.
+  `turbotInternalNotation` is now TMNotation-aware (no `*` on unary questions,
+  one answer for editor/validator/engine/grader); turbot-FSM default label is
+  main's forward `0:11`.
+- `coverageCheck` taught the open-question contract (self-test asserts
+  `pending` 0/0), mirroring pipelineCheck.
+
+**Audit findings:** harness 41 exact · 15 pending (interface) · 0 regressed —
+COVERAGE.md already matches; no dead/duplicate queue tasks; no patch-cluster
+since iteration 11 (P2.1–P2.4 and P1.8 all went through seams/design memos);
+queue order stands (P1.8 S3 next). Noted for later phases: SubmissionGrade
+scores now denominate over autogradeable questions only, and a `pending`
+result carries the raw student response into `SubmissionRecord` (fine locally;
+part of the server-split surface). P6.1/P4.3 annotated.
+
+**Next:** P1.8 S3 — foreign-lane A* cost + H4 near-merge validation round
+(inputs from the iteration-17 sweep recorded in HANDOFF/QUEUE).
