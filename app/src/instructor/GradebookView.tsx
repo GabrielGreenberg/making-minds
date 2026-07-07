@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import type { AssignmentData, SubmissionRecord } from '../types';
+import type { AssignmentData, ManualReview, SubmissionRecord } from '../types';
 import { getAssignment } from '../assignments';
 import { localSubmissionStore } from '../storage/submissionStore';
 import { gradeSubmission } from '../engine/grader';
@@ -30,6 +30,10 @@ interface StudentGrades {
 export function GradebookView({ id }: { id: string }) {
   const [expandedStudent, setExpandedStudent] = useState<string | null>(null);
   const [released, setReleased] = useState(() => isGradesReleased(id));
+  // Bumped after a manual review is recorded so the view re-reads the store
+  // (marks, scores, and stats all reflect the new verdict immediately).
+  const [, setReviewVersion] = useState(0);
+  const onReviewed = () => setReviewVersion((v) => v + 1);
 
   const toggleRelease = () => {
     const next = !released;
@@ -106,20 +110,32 @@ export function GradebookView({ id }: { id: string }) {
           <span className="instructor-stat-value">{pct(stats.meanScore)}</span>
           <span className="instructor-stat-label">mean score</span>
         </div>
-        {assignment.questions.map((q) =>
-          q.buildMode === 'open' ? (
-            // Open questions aren't autograded — there is no pass rate.
-            <div className="instructor-stat" key={q.id}>
-              <span className="instructor-stat-value">✎</span>
-              <span className="instructor-stat-label">{q.label} manual review</span>
-            </div>
-          ) : (
+        {assignment.questions.map((q) => {
+          if (q.buildMode === 'open') {
+            // Open questions are graded by hand: show how many latest attempts
+            // still await review, or the manual pass rate once all are in.
+            const awaiting = students.filter(
+              (s) => s.latest.grades.find((g) => g.questionId === q.id)?.pending,
+            ).length;
+            return awaiting > 0 || students.length === 0 ? (
+              <div className="instructor-stat" key={q.id}>
+                <span className="instructor-stat-value">✎ {awaiting}</span>
+                <span className="instructor-stat-label">{q.label} to review</span>
+              </div>
+            ) : (
+              <div className="instructor-stat" key={q.id}>
+                <span className="instructor-stat-value">{pct(stats.passByQuestion[q.id] ?? 0)}</span>
+                <span className="instructor-stat-label">{q.label} pass rate (✎)</span>
+              </div>
+            );
+          }
+          return (
             <div className="instructor-stat" key={q.id}>
               <span className="instructor-stat-value">{pct(stats.passByQuestion[q.id] ?? 0)}</span>
               <span className="instructor-stat-label">{q.label} pass rate</span>
             </div>
-          ),
-        )}
+          );
+        })}
       </div>
 
       {records.length === 0 ? (
@@ -147,6 +163,7 @@ export function GradebookView({ id }: { id: string }) {
                 onToggle={() =>
                   setExpandedStudent(expandedStudent === s.student ? null : s.student)
                 }
+                onReviewed={onReviewed}
               />
             ))}
           </tbody>
@@ -170,13 +187,13 @@ function QuestionMarks({
         return (
           <td key={q.id}>
             {qg?.pending ? (
-              // Open question: nothing to autograde — expand the attempt to
-              // read the response.
+              // Open question awaiting review — expand the attempt to read the
+              // response and record a grade.
               <span className="instructor-pending" title="Open question — review the response below">✎</span>
             ) : qg?.passed ? (
-              <span className="instructor-pass">✓</span>
+              <span className="instructor-pass" title={qg.manual ? 'manually graded correct' : undefined}>✓</span>
             ) : (
-              <span className="instructor-fail">✗</span>
+              <span className="instructor-fail" title={qg?.manual ? 'manually graded incorrect' : undefined}>✗</span>
             )}
           </td>
         );
@@ -192,11 +209,13 @@ function StudentRow({
   assignment,
   expanded,
   onToggle,
+  onReviewed,
 }: {
   studentGrades: StudentGrades;
   assignment: AssignmentData;
   expanded: boolean;
   onToggle: () => void;
+  onReviewed: () => void;
 }) {
   const { student, all, latest } = studentGrades;
   const colSpan = 4 + assignment.questions.length;
@@ -237,6 +256,7 @@ function StudentRow({
                       attempt={attempt}
                       isLatest={attempt === all.length}
                       assignment={assignment}
+                      onReviewed={onReviewed}
                     />
                   ))}
               </tbody>
@@ -253,11 +273,13 @@ function AttemptRow({
   attempt,
   isLatest,
   assignment,
+  onReviewed,
 }: {
   grade: SubmissionGrade;
   attempt: number;
   isLatest: boolean;
   assignment: AssignmentData;
+  onReviewed: () => void;
 }) {
   const [showDetail, setShowDetail] = useState(false);
   const colSpan = 3 + assignment.questions.length;
@@ -276,7 +298,7 @@ function AttemptRow({
       {showDetail && (
         <tr className="instructor-submission-detail">
           <td colSpan={colSpan}>
-            <SubmissionDetail record={grade.record} assignment={assignment} />
+            <SubmissionDetail record={grade.record} assignment={assignment} onReviewed={onReviewed} />
           </td>
         </tr>
       )}
@@ -287,9 +309,11 @@ function AttemptRow({
 function SubmissionDetail({
   record,
   assignment,
+  onReviewed,
 }: {
   record: SubmissionRecord;
   assignment: AssignmentData;
+  onReviewed: () => void;
 }) {
   // Prefer the grade stored at submission time (it carries full per-case
   // detail); re-grade only for legacy records that predate autograde-on-submit.
@@ -308,13 +332,29 @@ function SubmissionDetail({
             record.submission.answers.find((a) => a.questionId === qr.questionId)?.responseText;
           return (
             <div className="instructor-detail-q" key={qr.questionId}>
-              <strong>{q?.label ?? `Q${qr.questionId}`}</strong>: open question — needs manual review
+              <strong>{q?.label ?? `Q${qr.questionId}`}</strong>: open question —{' '}
+              {qr.manual
+                ? qr.manual.pass
+                  ? 'marked correct'
+                  : 'marked incorrect'
+                : 'needs manual review'}
               {response?.trim() ? (
                 <blockquote className="instructor-open-response">{response}</blockquote>
               ) : (
                 <p className="instructor-open-response instructor-open-response--empty">
                   (no answer submitted)
                 </p>
+              )}
+              {/* Grading controls need a stored result to attach the verdict
+                  to; legacy records that predate autograde-on-submit have
+                  none, so they stay display-only. */}
+              {record.result && (
+                <ManualReviewControls
+                  record={record}
+                  questionId={qr.questionId}
+                  manual={qr.manual}
+                  onReviewed={onReviewed}
+                />
               )}
             </div>
           );
@@ -429,6 +469,61 @@ function SubmissionDetail({
           </div>
         );
       })}
+    </div>
+  );
+}
+
+/** Grade a pending open question: mark it correct/incorrect with an optional
+ *  note. Writes through `SubmissionStore.recordManualReview` (the verdict
+ *  lands on the stored record's result) and re-grading overwrites it. */
+function ManualReviewControls({
+  record,
+  questionId,
+  manual,
+  onReviewed,
+}: {
+  record: SubmissionRecord;
+  questionId: number;
+  manual: ManualReview | undefined;
+  onReviewed: () => void;
+}) {
+  const [note, setNote] = useState(manual?.note ?? '');
+
+  const save = (pass: boolean) => {
+    localSubmissionStore.recordManualReview(record.assignmentId, record.attempt, questionId, {
+      pass,
+      note,
+    });
+    onReviewed();
+  };
+
+  return (
+    <div className="instructor-review">
+      {manual && (
+        <p className="instructor-review-verdict">
+          {manual.pass ? (
+            <span className="instructor-pass">✓ correct</span>
+          ) : (
+            <span className="instructor-fail">✗ incorrect</span>
+          )}{' '}
+          <span className="instructor-review-when">reviewed {formatTime(manual.reviewedAt)}</span>
+        </p>
+      )}
+      <div className="instructor-review-controls">
+        <input
+          className="instructor-review-note"
+          type="text"
+          placeholder="Feedback note (optional)"
+          value={note}
+          onChange={(e) => setNote(e.target.value)}
+        />
+        <button className="instructor-btn instructor-review-btn" onClick={() => save(true)}>
+          ✓ Correct
+        </button>
+        <button className="instructor-btn instructor-review-btn" onClick={() => save(false)}>
+          ✗ Incorrect
+        </button>
+      </div>
     </div>
   );
 }

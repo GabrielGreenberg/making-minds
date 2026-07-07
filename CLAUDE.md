@@ -46,6 +46,21 @@ all passing (incl. post-merge with perception/open questions). Browser half:
 (nothing imports it yet — the app still runs on the Local* stores; the cutover needs the
 store seams to go async). Deployment is copy/paste-ready in `deploy/` (Lightsail setup
 README, systemd unit, Caddyfile for TLS; Cloudflare Pages settings incl. `VITE_API_BASE`).
+Same day, **manual grading for open questions** — the instructor can now
+record a verdict on a pending open question from the gradebook drill-down: ✓ Correct / ✗
+Incorrect buttons + an optional feedback note next to the displayed response. The verdict is a
+`ManualReview` (`{pass, note?, reviewedAt}`, new in `types.ts`) stored as `manual` on the
+record's pending `QuestionResult` — the result **stays `'pending'`** (annotated, not replaced,
+so it's re-reviewable and distinguishable from an autograde; a future LLM pass could write the
+same shape). Persistence goes through the submission seam: new
+`SubmissionStore.recordManualReview(id, attempt, questionId, {pass, note})` backed by the pure
+`applyManualReview(records, …)` helper in `submissionStore.ts` (returns a new array; rejects
+non-pending questions and unknown attempts). Once reviewed, the gradebook counts the question
+like any other: `toQuestionGrade` maps the verdict to passed/pending, so it enters the score
+(the score is now over autogradeable + reviewed questions; unreviewed stay excluded), the ✎
+mark becomes ✓/✗ (tooltip "manually graded"), and the open question's stat tile shows "✎ n to
+review" until every latest attempt is reviewed, then its manual pass rate. Legacy records with
+no stored result stay display-only. `pipelineCheck` grew a [manual review] section (7 checks).
 Earlier same day, **perception questions (CC + SC)** — the perception homeworks are
 now authorable and autogradable: a CC/SC question can be a **Perception** task (question
 creator's new "Task" toggle) whose machine reads its inputs as an array of stimulations (a
@@ -220,9 +235,12 @@ end-to-end:
   per-student attempt count; expanding a student reveals the full submission history with
   failed-case drill-down per attempt (value questions: input/expected/got; turbot questions:
   arena #, steps taken, final pose, failure reason; perception questions: input frames,
-  expected/got bit strings, first wrong step; open questions: the full text response,
-  marked ✎ and excluded from the auto score). Sample data for all six modes plus the five
-  perception problems can be seeded to demo the pipeline.
+  expected/got bit strings, first wrong step; open questions: the full text response with
+  **manual grading controls** — ✓ Correct / ✗ Incorrect + an optional note, recorded through
+  `SubmissionStore.recordManualReview` onto the stored result; unreviewed open questions are
+  marked ✎ and excluded from the score, reviewed ones count like any other question and the
+  ✎ stat tile tracks how many latest attempts still need review). Sample data for all six
+  modes plus the five perception problems can be seeded to demo the pipeline.
   The question creator is one shared form authoring **all six modes** (CC/SC/FSM/TM/turbot/open) —
   mode is an ordinary field, not a gate; question names are editable; there is no bit-width field
   and no example-preview table. CC/SC/FSM/TM questions compute exactly **one output**: the
@@ -279,10 +297,12 @@ What's missing is the **deployment** (waiting on the UCLA AWS account), **UCLA S
 - **Deferred authoring follow-ups** — the `requireStandardHaltPosition` TM acceptance toggle and
   mode-filtered `allowed_components` (both optional fields on `AssignmentQuestion`, not yet
   exposed in the question creator's editor UI).
-- **Open-question grading follow-ups** — a way for the instructor to record a manual score on a
-  pending open question (today the gradebook only displays the response), and optional
-  LLM-assisted grading: the `pending` `QuestionResult` already carries the `response`, so an
-  LLM pass would replace it with a scored result server-side.
+- **Open-question grading follow-ups** — manual grading shipped 2026-07-07 (gradebook
+  drill-down: correct/incorrect + note, stored as `ManualReview` on the pending result via
+  `SubmissionStore.recordManualReview`). Remaining: optional LLM-assisted grading — the
+  `pending` `QuestionResult` carries the `response` and `ManualReview` is the shape a
+  server-side LLM pass would write; and surfacing the instructor's feedback note to the
+  student (today it's instructor-only).
 
 **The backend phase (server code shipped 2026-07-07; what remains):**
 
@@ -344,7 +364,7 @@ the engine.
 | Engine        | `app/src/engine/perception.ts`                                                 | Perception (bit-level, outside the codec): `PerceptionRule` evaluators (`hasRunAtLeast`/`hasRunExactly`/`singleObjectAt`/`expectedPerceptionOutputs` — the pre-first-frame "previous input" is the blank frame, "up" = toward IN1), save-time bank generation `buildPerceptionCases` (CC: exhaustive 2^width, width ≤ 10; SC: deterministic frame-sequence battery), `validatePerceptionMachine` (width inputs + 1 output), and `runPerceptionCase` (CC frame eval / SC clocked sequence) |
 | Store         | `app/src/store.ts`                                                             | Zustand UI state; delegates simulation to `engine/`. Per-mode sim state incl. TM (`tmTape`/`tmStep`/`setTmCell`) and turbot (`turbotState`/`turbotStep`/`turbotRun`, reset on question load/switch); selectors `selectTmNotation` (TM alphabet: open question's `representation`, sandbox falls back to `repSystem`), `selectTurbotArena`/`selectTurbotInnerMode`, and `selectEffectiveMode` (turbot → the question's `innerMode`; drives every editor-behavior branch), plus `assignmentView` ('overview' \| 'question') and `openResponse`/`setOpenResponse` (the open question's free-text answer, synced into `QuestionCircuit.responseText` at every canvas sync point)  |
 | Routing       | `app/src/routing.ts`                                                           | `Route` union, `parseHash`/`routeToHash`, `navigate()`                                                                                     |
-| Storage       | `app/src/storage/workbookStore.ts`, `AssignmentStore.ts`, `submissionStore.ts` | The three localStorage-backed seams                                                                                                        |
+| Storage       | `app/src/storage/workbookStore.ts`, `AssignmentStore.ts`, `submissionStore.ts` | The three localStorage-backed seams; `submissionStore` also owns manual review of open questions (`recordManualReview` + pure `applyManualReview`)                                                                                                        |
 | Auth          | `app/src/auth/`                                                                | `AuthGate.tsx`, `stubAuth.tsx`, `instructorRole.ts`                                                                                        |
 | Assignments   | `app/src/assignments/index.ts`, `cc-basics.json`                               | Bundled registry (`listAssignments`/`getAssignment`) + the one bundled CC assignment                                                       |
 | Instructor UI | `app/src/instructor/`                                                          | `InstructorApp`, `InstructorGate`, `InstructorDashboard`, `AssignmentEditor`, `QuestionCreator` (incl. turbot arena editor; pure paint/resize/place helpers in `arenaEditing.ts`), `Gradebook(.ts/View.tsx)`                 |

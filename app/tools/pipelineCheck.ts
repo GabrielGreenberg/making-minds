@@ -10,12 +10,15 @@
 // question is asserted to come back `pending` (not autogradeable) with the
 // student's response attached for manual review.
 
+import type { SubmissionRecord } from '../src/types';
 import {
   buildSampleAssignment,
   buildCorrectSubmission,
   buildIncorrectSubmission,
 } from '../src/devData/sampleData';
 import { gradeSubmission, summarizeResult } from '../src/engine/grader';
+import { applyManualReview } from '../src/storage/submissionStore';
+import { gradeSubmissions } from '../src/instructor/Gradebook';
 
 const assignment = buildSampleAssignment();
 
@@ -67,6 +70,44 @@ for (const q of wrong.questions) {
 }
 const ws = summarizeResult(wrong);
 check('incorrect: 0/13 autograded questions', ws.questionsPassed === 0 && ws.questionsTotal === 13);
+
+// Manual review of the pending open question (the instructor grading seam):
+// the verdict lands on the stored record's result and the gradebook then
+// counts the question like any other.
+console.log('\n[manual review]');
+const openQ = assignment.questions.find((q) => q.buildMode === 'open')!;
+const machineQ = assignment.questions.find((q) => q.buildMode !== 'open')!;
+const review = { pass: true, note: 'well argued', reviewedAt: '2026-07-07T00:00:00.000Z' };
+const records: SubmissionRecord[] = [
+  {
+    assignmentId: 'sample',
+    attempt: 1,
+    submittedAt: '2026-07-07T00:00:00.000Z',
+    submission: buildCorrectSubmission(),
+    result: correct,
+  },
+];
+const reviewed = applyManualReview(records, 1, openQ.id, review);
+const reviewedQ = reviewed?.[0].result?.questions.find((q) => q.questionId === openQ.id);
+check('review lands on the pending question', reviewedQ?.manual?.pass === true);
+check('reviewed result stays pending (annotated, not replaced)', reviewedQ?.status === 'pending');
+check('original records are not mutated',
+  records[0].result!.questions.find((q) => q.questionId === openQ.id)!.manual === undefined);
+check('review of a non-pending question is rejected',
+  applyManualReview(records, 1, machineQ.id, review) === null);
+check('review of a missing attempt is rejected',
+  applyManualReview(records, 2, openQ.id, review) === null);
+if (reviewed) {
+  const [before] = gradeSubmissions(assignment, records);
+  const [after] = gradeSubmissions(assignment, reviewed);
+  const qg = after.grades.find((g) => g.questionId === openQ.id);
+  check('gradebook counts the reviewed question as passed',
+    qg?.pending === false && qg?.passed === true);
+  check('score now includes the reviewed open question',
+    before.score === 1 && after.score === 1 &&
+    after.grades.filter((g) => !g.pending).length ===
+      before.grades.filter((g) => !g.pending).length + 1);
+}
 
 console.log(`\n${failures === 0 ? 'PIPELINE OK' : `PIPELINE FAILED (${failures} checks)`}`);
 process.exit(failures === 0 ? 0 : 1);

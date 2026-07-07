@@ -6,29 +6,41 @@
 // gradebook UI needs. Reads from the SubmissionStore today; a server query drops
 // in at the call site (GradebookView) without changing these helpers.
 
-import type { AssignmentData, SubmissionRecord } from '../types';
+import type { AssignmentData, ManualReview, SubmissionRecord } from '../types';
 import { gradeSubmission, type QuestionResult } from '../engine/grader';
 
 export interface QuestionGrade {
   questionId: number;
-  passed: boolean; // all gradeable test vectors matched
+  passed: boolean; // all gradeable test vectors matched / manual verdict = correct
   failedCount: number; // number of test vectors that didn't match
-  pending: boolean; // open question — awaits manual review, excluded from the auto score
+  pending: boolean; // open question still awaiting manual review — excluded from the score
+  manual?: ManualReview; // open question: the instructor's recorded verdict
 }
 
 export interface SubmissionGrade {
   record: SubmissionRecord;
   grades: QuestionGrade[];
-  score: number; // fraction: passed questions / autogradeable questions (0..1)
+  score: number; // fraction: passed questions / scoreable questions (0..1)
 }
 
 function toQuestionGrade(r: QuestionResult): QuestionGrade {
+  // An open question with a recorded manual verdict counts like any other
+  // question (the verdict is its pass/fail); without one it stays pending.
+  if (r.status === 'pending') {
+    return {
+      questionId: r.questionId,
+      passed: r.manual?.pass ?? false,
+      failedCount: r.manual && !r.manual.pass ? 1 : 0,
+      pending: !r.manual,
+      manual: r.manual,
+    };
+  }
   const passed = r.status === 'graded' && r.total > 0 && r.passed === r.total;
   return {
     questionId: r.questionId,
     passed,
     failedCount: r.total - r.passed,
-    pending: r.status === 'pending',
+    pending: false,
   };
 }
 
@@ -42,8 +54,8 @@ export function gradeSubmissions(
     // autograde-on-submit existed.
     const result = record.result ?? gradeSubmission(assignment, record.submission);
     const grades = result.questions.map(toQuestionGrade);
-    // Pending (open) questions can't be autograded, so the auto score is over
-    // the machine questions only — manual/LLM review scores land elsewhere.
+    // Unreviewed open questions have no grade yet, so the score is over the
+    // autogradeable questions plus manually reviewed open questions.
     const gradeable = grades.filter((g) => !g.pending);
     const passedQuestions = gradeable.filter((g) => g.passed).length;
     const score = gradeable.length > 0 ? passedQuestions / gradeable.length : 0;
