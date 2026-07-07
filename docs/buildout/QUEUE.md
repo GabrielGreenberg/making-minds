@@ -195,7 +195,14 @@ before Phase 3 (perception returns to router-rendered CC/SC). Task ids unchanged
   CC/SC fixtures — hw2-p11's 6 bumpless crossings are the pinned exhibit;
   mechanism: router hug lanes sit at port±ELEMENT_MARGIN(=5), self-coincident
   with the R=5 bump-skip radius, so break the coincidence (lane offset ≠
-  margin, or decouple the radii) — then wire bumpCheck into `npm run check`**; S4 fallback phase-0 + lane-nudge
+  margin, or decouple the radii) — then wire bumpCheck into `npm run check`;
+  ALSO in scope (iteration 20): the structural XOR fallback floor — XOR
+  left-port inset(11.25) > STUB_LENGTH(12)−ELEMENT_MARGIN(5) blocks every
+  A* goal at an XOR in-port (the ENTIRE 147 budget is 3×XOR-in wires + 3
+  one-off doomed wires); fix candidates: exempt own-component bounds on
+  first/last approach edges, or lengthen stubs past inset+margin; expected
+  post-fix budget ≈ 3. AND the obstacle-model gap: INPUT toggle-tabs aren't
+  router obstacles (hw3-p12 pmo-36 elbows through IN2's tab)**; S4 fallback phase-0 + lane-nudge
   + per-wire `usedFallback`; S5 (optional) perf. Each slice: gates green +
   layoutCheck clean + browser spot-check per the memo's slice plan.
   **Gates Phase 3** (perception fixtures are CC/SC, back on the router).
@@ -229,12 +236,21 @@ before Phase 3 (perception returns to router-rendered CC/SC). Task ids unchanged
   crossing+skip rules on real routes; NOT in `npm run check` yet — hw2-p11
   currently fails it by design) → **P1.8 S3's acceptance now includes: bumpCheck
   clean on all CC/SC fixtures, then wire it into the harness.**
-- [ ] **P3.3** **Promote main's SC perception circuits into reference
-  fixtures** hw3-p11 (change, w8 = Q12), hw3-p12 (motion k=3, w8 = Q13, ~80
-  gates — watch the router/layout oracle on this one; if it trips, that's
-  evidence to pull P1.8 S3 forward). Same free-exact-tier note as P3.2.
-  **Acceptance:** 2 rows exact-verified; appearance checked.
-  **Advances:** hw3-p11, p12 (44→46).
+- [x] **P3.3** **Promote main's SC perception circuits into reference
+  fixtures.** — _done 2026-07-07 (iteration 20; 2-agent build workflow +
+  adversarial verifier + appearance sweep + one bounded diagnosis agent)._
+  hw3-p11 (change) + hw3-p12 (motion k=3, 146 comps — PLA-matrix layout with
+  ROTATED MEMs reached 0 router fallbacks) exact-verified → **46/56**; banks
+  byte-identical to buildPerceptionCases; temporal semantics adversarially
+  probed (same-frame discriminators prove MEM-temporality); p11 functional
+  in-browser runs semantically correct. **Big diagnostic win:** hw3-p11's 48
+  fallbacks (routerCheck initially FAILED) were root-caused as the router's
+  STRUCTURAL XOR FLOOR — XOR's left-port inset (11.25px) > STUB_LENGTH(12) −
+  ELEMENT_MARGIN(5), so every XOR-in wire costs exactly 3 fallbacks; the
+  ENTIRE pre-existing 99 pin is this class (3 × XOR-in wires per fixture).
+  Deliberately pinned `hw3-p11: 48` (budget 147) with the mechanism + fix
+  candidates documented in routerCheck's header → P1.8 S3 can now kill the
+  whole floor, not just trim it. Discovered → P1.15, P1.16, S3 obstacle note.
 
 ## Phase 4 — Navigation
 
@@ -308,6 +324,27 @@ before Phase 3 (perception returns to router-rendered CC/SC). Task ids unchanged
   one shared label-order helper used by both paths.
   **Acceptance:** single implementation; `npm run check` (incl. hw2-p6 fixture)
   green.
+- [ ] **P1.15** _(discovered 2026-07-07, P3.3 appearance sweep; REAL APP BUG)_
+  **SC/FSM sim state leaks across question navigation.** After running one SC
+  question, the next question's Global I/O, ARG/VAL, and Sequential Timeline
+  show the previous question's data — `switchQuestion` (store.ts ~1402) resets
+  only the TM and turbot slices. Same family as the TM leak fixed 2026-07-06
+  (commit 0ca35b3), which was a mode-specific patch. **Deep fix: ONE unified
+  all-modes sim reset on question load/switch/open** (kill the class — a new
+  mode's sim slice should be impossible to forget), replacing the accreting
+  per-mode reset calls. The appearance agent also flagged a background task
+  chip for Gabriel; coordinate before building (check `git log` for a fix
+  landing on main first).
+  **Acceptance:** a store harness proves no slice (CC/SC/FSM/TM/turbot sim
+  state) survives question navigation; existing tm/turbot reset pins stay
+  green.
+- [ ] **P1.16** _(discovered 2026-07-07, P3.3 appearance sweep; cosmetic)_
+  **Rotated-MEM label placement ignores rotation.** M1–M8 labels on hw3-p12's
+  270°-rotated MEMs are bisected by the vertical M_IN wire entering the N
+  port — label anchors assume horizontal port sides. Place labels clear of
+  the rotated port axis (componentGeometry knows the rotation).
+  **Acceptance:** hw3-p12 labels unbisected in-browser; no regression on
+  standard-orientation MEMs.
 - [ ] **P1.11** _(discovered 2026-07-06, P1.9 round-2 verifier; pre-existing,
   minor)_ **A/V ARG rendering for multi-group questions.** The ARG column
   renders the whole interleaved typed string as ONE numeral — typed "111101"

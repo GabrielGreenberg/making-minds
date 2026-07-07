@@ -23,13 +23,13 @@ broken variant needed). Both also require appearance checked against
 [VISUAL_VOCAB.md](VISUAL_VOCAB.md). Tier lives on the manifest row; all 15
 remaining rows are tier `interface`.
 
-**As of 2026-07-06 (post-iteration 19):** harness live with two tiers,
-**44/56 exact-verified** (ALL arithmetic HW1–HW5 + CC perception hw2-p10..p12,
-promoted from main's devData samples at exact tier — correct answers were
-free), 12 pending at the interface tier, 0 regressed. Remaining pending:
-SC perception (hw3-p11..p12), navigation (hw2/hw3/hw4 ×3 each), HW6 turbot-TM
-capstone (1). **Do not chase correct answers for these** — the bar is a
-plausible attempt through the full pipeline (free correct machines excepted).
+**As of 2026-07-07 (post-iteration 20):** harness live with two tiers,
+**46/56 exact-verified** (ALL arithmetic HW1–HW5 + ALL perception hw2-p10..p12
++ hw3-p11..p12, promoted from main's devData samples at exact tier — correct
+answers were free), 10 pending at the interface tier, 0 regressed. Remaining
+pending: navigation (hw2/hw3/hw4 ×3 each), HW6 turbot-TM capstone (1).
+**Do not chase correct answers for these** — the bar is a plausible attempt
+through the full pipeline (free correct machines excepted).
 
 ## Columns
 
@@ -69,7 +69,7 @@ validates + grades end-to-end) · `appr` = appearance matches VISUAL_VOCAB.
 | hw2-p14 | full circle (CC turbot, pass-through) | navigation | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | |
 | hw2-p15 | zig-zag (CC turbot, pass-through) | navigation | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | |
 
-### HW3 — Computing with SCs  ·  9/14
+### HW3 — Computing with SCs  ·  11/14
 
 | id | problem | category | auth | build | grades | appr | status | notes |
 |----|---------|----------|:----:|:-----:|:------:|:----:|:------:|-------|
@@ -82,8 +82,8 @@ validates + grades end-to-end) · `appr` = appearance matches VISUAL_VOCAB.
 | hw3-p7  | +3 T (feasible) | arithmetic | ✅ | ✅ | ✅ | ✅ | ✅ | `reference/hw3-p7.json`; window-aware counter (canonical tally: ones block must END at final step); every case exercises drain |
 | hw3-p8  | 2x T (feasible) | arithmetic | ✅ | ✅ | ✅ | ✅ | ✅ | `reference/hw3-p8.json`; window-aware (unbounded-stream version is FSM-infeasible — noted in LOG); 16-step runs |
 | hw3-p9  | x+y T (feasible) | arithmetic | ✅ | ✅ | ✅ | ✅ | ✅ | `reference/hw3-p9.json`; counter/latch over 81-case bank; layout uses the p7 right-to-left MEM-chain convention |
-| hw3-p11 | change detector (current ≠ previous) | perception | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | 8-in SC, spatio-temporal |
-| hw3-p12 | motion detector (object image moving up) | perception | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | 8-in SC, spatio-temporal |
+| hw3-p11 | change detector (current ≠ previous) | perception | ✅ | ✅ | ✅ | ✅ | ✅ | `reference/hw3-p11.json`; devData Q12 promoted at exact tier; per-lane XOR-vs-MEM + OR fold; broken (memoryless OR) fails 7/8; temporal semantics adversarially probed; bumpCheck CLEAN; its 48 router fallbacks = the structural XOR floor, deliberately pinned in routerCheck (see iteration-20 LOG) |
+| hw3-p12 | motion detector (object image moving up) | perception | ✅ | ✅ | ✅ | ✅ | ✅ | `reference/hw3-p12.json`; devData Q13 (motion k=3) promoted at exact tier; 146-comp PLA-matrix layout, ROTATED MEMs (sanctioned), 0 router fallbacks; broken fails 6/9; 17 bumpless crossings = P1.8 S3 class; 2 cosmetic appr findings logged (toggle-tab elbow — router obstacle gap; rotated-MEM label bisection) |
 | hw3-p13 | zig-zag: reach & keep going | navigation | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | SC turbot, pass-through |
 | hw3-p14 | three ahead: reach & stop | navigation | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | SC turbot, reach-and-stop |
 | hw3-p15 | Mad Max: block ahead unknown dist, return & stop | navigation | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | return-to-start; **multi-arena + memory** |
@@ -135,5 +135,5 @@ _Note: HW6 #1 & #3 (flowchart / life-cycle prose) are excluded._
 
 ---
 
-**Totals:** 44 / 56 exact-verified · 12 pending (interface tier) — the harness
-JSON is authoritative; this line was stale bootstrap text until iteration 19.
+**Totals:** 46 / 56 exact-verified · 10 pending (interface tier) — the harness
+JSON is authoritative.

@@ -1,0 +1,8881 @@
+{
+  "question": {
+    "id": 12,
+    "label": "Problem 12",
+    "statement": "Motion detector. Let an object image be a string of exactly three consecutive 1s. Design a sequential machine (8 inputs, 1 output) that outputs 1 iff there is an object image anywhere in the input moving upwards 1 unit per unit of time.",
+    "buildMode": "SC",
+    "representation": "binary",
+    "perception": {
+      "rule": {
+        "kind": "motion",
+        "objectLength": 3
+      },
+      "width": 8
+    },
+    "perception_cases": [
+      {
+        "frames": [
+          [
+            0,
+            0,
+            0,
+            0,
+            0,
+            1,
+            1,
+            1
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            1,
+            1,
+            1,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            1,
+            1,
+            1,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            1,
+            1,
+            1,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            1,
+            1,
+            1,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            1,
+            1,
+            1,
+            0,
+            0,
+            0,
+            0,
+            0
+          ]
+        ],
+        "expected": [
+          0,
+          1,
+          1,
+          1,
+          1,
+          1
+        ]
+      },
+      {
+        "frames": [
+          [
+            1,
+            1,
+            1,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            1,
+            1,
+            1,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            1,
+            1,
+            1,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            1,
+            1,
+            1,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            1,
+            1,
+            1,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            0,
+            1,
+            1,
+            1
+          ]
+        ],
+        "expected": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      {
+        "frames": [
+          [
+            0,
+            0,
+            1,
+            1,
+            1,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            1,
+            1,
+            1,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            1,
+            1,
+            1,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            1,
+            1,
+            1,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            1,
+            1,
+            1,
+            0,
+            0,
+            0
+          ]
+        ],
+        "expected": [
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      {
+        "frames": [
+          [
+            0,
+            0,
+            0,
+            0,
+            0,
+            1,
+            1,
+            1
+          ],
+          [
+            0,
+            0,
+            0,
+            1,
+            1,
+            1,
+            0,
+            0
+          ],
+          [
+            0,
+            1,
+            1,
+            1,
+            0,
+            0,
+            0,
+            0
+          ]
+        ],
+        "expected": [
+          0,
+          0,
+          0
+        ]
+      },
+      {
+        "frames": [
+          [
+            0,
+            0,
+            0,
+            0,
+            1,
+            1,
+            1,
+            1
+          ],
+          [
+            0,
+            0,
+            0,
+            1,
+            1,
+            1,
+            1,
+            0
+          ],
+          [
+            0,
+            0,
+            1,
+            1,
+            1,
+            1,
+            0,
+            0
+          ],
+          [
+            0,
+            1,
+            1,
+            1,
+            1,
+            0,
+            0,
+            0
+          ],
+          [
+            1,
+            1,
+            1,
+            1,
+            0,
+            0,
+            0,
+            0
+          ]
+        ],
+        "expected": [
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      {
+        "frames": [
+          [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            0,
+            1,
+            1,
+            1
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            1,
+            1,
+            1,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            1,
+            1,
+            1,
+            0,
+            0,
+            0,
+            0,
+            0
+          ]
+        ],
+        "expected": [
+          0,
+          0,
+          1,
+          0,
+          0
+        ]
+      },
+      {
+        "frames": [
+          [
+            1,
+            0,
+            0,
+            0,
+            0,
+            1,
+            1,
+            1
+          ],
+          [
+            1,
+            0,
+            0,
+            0,
+            1,
+            1,
+            1,
+            0
+          ],
+          [
+            1,
+            0,
+            0,
+            1,
+            1,
+            1,
+            0,
+            0
+          ],
+          [
+            1,
+            0,
+            1,
+            1,
+            1,
+            0,
+            0,
+            0
+          ],
+          [
+            1,
+            1,
+            1,
+            1,
+            0,
+            0,
+            0,
+            0
+          ]
+        ],
+        "expected": [
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      {
+        "frames": [
+          [
+            1,
+            0,
+            0,
+            1,
+            1,
+            0,
+            0,
+            0
+          ],
+          [
+            1,
+            0,
+            0,
+            0,
+            0,
+            0,
+            1,
+            0
+          ],
+          [
+            1,
+            0,
+            0,
+            1,
+            1,
+            0,
+            1,
+            1
+          ],
+          [
+            0,
+            0,
+            1,
+            0,
+            1,
+            0,
+            1,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            1,
+            1
+          ],
+          [
+            0,
+            1,
+            0,
+            1,
+            1,
+            0,
+            0,
+            1
+          ]
+        ],
+        "expected": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      {
+        "frames": [
+          [
+            0,
+            1,
+            1,
+            0,
+            1,
+            0,
+            1,
+            1
+          ],
+          [
+            0,
+            1,
+            0,
+            1,
+            1,
+            0,
+            0,
+            1
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            0,
+            1,
+            1,
+            1
+          ],
+          [
+            0,
+            0,
+            1,
+            0,
+            0,
+            1,
+            1,
+            0
+          ],
+          [
+            1,
+            0,
+            0,
+            1,
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            1,
+            1,
+            1,
+            0,
+            1,
+            1
+          ]
+        ],
+        "expected": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      }
+    ]
+  },
+  "correct": {
+    "components": [
+      {
+        "id": "pmo-1",
+        "type": "INPUT",
+        "x": 241,
+        "y": 60,
+        "label": "IN1",
+        "ports": [
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "pmo-2",
+        "type": "INPUT",
+        "x": 336,
+        "y": 60,
+        "label": "IN2",
+        "ports": [
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "pmo-3",
+        "type": "INPUT",
+        "x": 676,
+        "y": 60,
+        "label": "IN3",
+        "ports": [
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "pmo-4",
+        "type": "INPUT",
+        "x": 1016,
+        "y": 60,
+        "label": "IN4",
+        "ports": [
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "pmo-5",
+        "type": "INPUT",
+        "x": 1356,
+        "y": 60,
+        "label": "IN5",
+        "ports": [
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "pmo-6",
+        "type": "INPUT",
+        "x": 1696,
+        "y": 60,
+        "label": "IN6",
+        "ports": [
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "pmo-7",
+        "type": "INPUT",
+        "x": 2036,
+        "y": 60,
+        "label": "IN7",
+        "ports": [
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "pmo-8",
+        "type": "INPUT",
+        "x": 2376,
+        "y": 60,
+        "label": "IN8",
+        "ports": [
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "pmo-9",
+        "type": "MEM",
+        "x": 288,
+        "y": 850,
+        "label": "M1",
+        "ports": [
+          {
+            "id": "mout",
+            "label": "M_OUT",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "min",
+            "label": "M_IN",
+            "side": "right",
+            "index": 0
+          }
+        ],
+        "memDirection": "right-to-left",
+        "storedValue": 0,
+        "rotation": 270
+      },
+      {
+        "id": "pmo-11",
+        "type": "MEM",
+        "x": 383,
+        "y": 850,
+        "label": "M2",
+        "ports": [
+          {
+            "id": "mout",
+            "label": "M_OUT",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "min",
+            "label": "M_IN",
+            "side": "right",
+            "index": 0
+          }
+        ],
+        "memDirection": "right-to-left",
+        "storedValue": 0,
+        "rotation": 270
+      },
+      {
+        "id": "pmo-13",
+        "type": "MEM",
+        "x": 723,
+        "y": 850,
+        "label": "M3",
+        "ports": [
+          {
+            "id": "mout",
+            "label": "M_OUT",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "min",
+            "label": "M_IN",
+            "side": "right",
+            "index": 0
+          }
+        ],
+        "memDirection": "right-to-left",
+        "storedValue": 0,
+        "rotation": 270
+      },
+      {
+        "id": "pmo-15",
+        "type": "MEM",
+        "x": 1063,
+        "y": 850,
+        "label": "M4",
+        "ports": [
+          {
+            "id": "mout",
+            "label": "M_OUT",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "min",
+            "label": "M_IN",
+            "side": "right",
+            "index": 0
+          }
+        ],
+        "memDirection": "right-to-left",
+        "storedValue": 0,
+        "rotation": 270
+      },
+      {
+        "id": "pmo-17",
+        "type": "MEM",
+        "x": 1403,
+        "y": 850,
+        "label": "M5",
+        "ports": [
+          {
+            "id": "mout",
+            "label": "M_OUT",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "min",
+            "label": "M_IN",
+            "side": "right",
+            "index": 0
+          }
+        ],
+        "memDirection": "right-to-left",
+        "storedValue": 0,
+        "rotation": 270
+      },
+      {
+        "id": "pmo-19",
+        "type": "MEM",
+        "x": 1743,
+        "y": 850,
+        "label": "M6",
+        "ports": [
+          {
+            "id": "mout",
+            "label": "M_OUT",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "min",
+            "label": "M_IN",
+            "side": "right",
+            "index": 0
+          }
+        ],
+        "memDirection": "right-to-left",
+        "storedValue": 0,
+        "rotation": 270
+      },
+      {
+        "id": "pmo-21",
+        "type": "MEM",
+        "x": 2083,
+        "y": 850,
+        "label": "M7",
+        "ports": [
+          {
+            "id": "mout",
+            "label": "M_OUT",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "min",
+            "label": "M_IN",
+            "side": "right",
+            "index": 0
+          }
+        ],
+        "memDirection": "right-to-left",
+        "storedValue": 0,
+        "rotation": 270
+      },
+      {
+        "id": "pmo-23",
+        "type": "MEM",
+        "x": 2423,
+        "y": 850,
+        "label": "M8",
+        "ports": [
+          {
+            "id": "mout",
+            "label": "M_OUT",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "min",
+            "label": "M_IN",
+            "side": "right",
+            "index": 0
+          }
+        ],
+        "memDirection": "right-to-left",
+        "storedValue": 0,
+        "rotation": 270
+      },
+      {
+        "id": "pmo-25",
+        "type": "NOT",
+        "x": 1160,
+        "y": 270,
+        "label": "",
+        "ports": [
+          {
+            "id": "in",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "pmo-27",
+        "type": "NOT",
+        "x": 1500,
+        "y": 270,
+        "label": "",
+        "ports": [
+          {
+            "id": "in",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "pmo-29",
+        "type": "NOT",
+        "x": 1840,
+        "y": 270,
+        "label": "",
+        "ports": [
+          {
+            "id": "in",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "pmo-31",
+        "type": "NOT",
+        "x": 2180,
+        "y": 270,
+        "label": "",
+        "ports": [
+          {
+            "id": "in",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "pmo-33",
+        "type": "NOT",
+        "x": 2520,
+        "y": 270,
+        "label": "",
+        "ports": [
+          {
+            "id": "in",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "pmo-35",
+        "type": "AND",
+        "x": 620,
+        "y": 230,
+        "label": "",
+        "ports": [
+          {
+            "id": "in1",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "in2",
+            "label": "",
+            "side": "left",
+            "index": 1
+          },
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "pmo-38",
+        "type": "AND",
+        "x": 960,
+        "y": 230,
+        "label": "",
+        "ports": [
+          {
+            "id": "in1",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "in2",
+            "label": "",
+            "side": "left",
+            "index": 1
+          },
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "pmo-41",
+        "type": "AND",
+        "x": 1300,
+        "y": 230,
+        "label": "",
+        "ports": [
+          {
+            "id": "in1",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "in2",
+            "label": "",
+            "side": "left",
+            "index": 1
+          },
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "pmo-44",
+        "type": "AND",
+        "x": 1640,
+        "y": 230,
+        "label": "",
+        "ports": [
+          {
+            "id": "in1",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "in2",
+            "label": "",
+            "side": "left",
+            "index": 1
+          },
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "pmo-47",
+        "type": "AND",
+        "x": 1980,
+        "y": 230,
+        "label": "",
+        "ports": [
+          {
+            "id": "in1",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "in2",
+            "label": "",
+            "side": "left",
+            "index": 1
+          },
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "pmo-50",
+        "type": "AND",
+        "x": 2320,
+        "y": 230,
+        "label": "",
+        "ports": [
+          {
+            "id": "in1",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "in2",
+            "label": "",
+            "side": "left",
+            "index": 1
+          },
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "pmo-53",
+        "type": "AND",
+        "x": 2660,
+        "y": 230,
+        "label": "",
+        "ports": [
+          {
+            "id": "in1",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "in2",
+            "label": "",
+            "side": "left",
+            "index": 1
+          },
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "pmo-56",
+        "type": "NOT",
+        "x": 480,
+        "y": 1012,
+        "label": "",
+        "ports": [
+          {
+            "id": "in",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "pmo-58",
+        "type": "NOT",
+        "x": 1500,
+        "y": 1050,
+        "label": "",
+        "ports": [
+          {
+            "id": "in",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "pmo-60",
+        "type": "NOT",
+        "x": 1840,
+        "y": 1050,
+        "label": "",
+        "ports": [
+          {
+            "id": "in",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "pmo-62",
+        "type": "NOT",
+        "x": 2180,
+        "y": 1050,
+        "label": "",
+        "ports": [
+          {
+            "id": "in",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "pmo-64",
+        "type": "NOT",
+        "x": 2520,
+        "y": 1050,
+        "label": "",
+        "ports": [
+          {
+            "id": "in",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "pmo-66",
+        "type": "AND",
+        "x": 620,
+        "y": 1010,
+        "label": "",
+        "ports": [
+          {
+            "id": "in1",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "in2",
+            "label": "",
+            "side": "left",
+            "index": 1
+          },
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "pmo-69",
+        "type": "AND",
+        "x": 960,
+        "y": 1010,
+        "label": "",
+        "ports": [
+          {
+            "id": "in1",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "in2",
+            "label": "",
+            "side": "left",
+            "index": 1
+          },
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "pmo-72",
+        "type": "AND",
+        "x": 1300,
+        "y": 1010,
+        "label": "",
+        "ports": [
+          {
+            "id": "in1",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "in2",
+            "label": "",
+            "side": "left",
+            "index": 1
+          },
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "pmo-75",
+        "type": "AND",
+        "x": 1640,
+        "y": 1010,
+        "label": "",
+        "ports": [
+          {
+            "id": "in1",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "in2",
+            "label": "",
+            "side": "left",
+            "index": 1
+          },
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "pmo-78",
+        "type": "AND",
+        "x": 1980,
+        "y": 1010,
+        "label": "",
+        "ports": [
+          {
+            "id": "in1",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "in2",
+            "label": "",
+            "side": "left",
+            "index": 1
+          },
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "pmo-81",
+        "type": "AND",
+        "x": 2320,
+        "y": 1010,
+        "label": "",
+        "ports": [
+          {
+            "id": "in1",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "in2",
+            "label": "",
+            "side": "left",
+            "index": 1
+          },
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "pmo-84",
+        "type": "AND",
+        "x": 2660,
+        "y": 1010,
+        "label": "",
+        "ports": [
+          {
+            "id": "in1",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "in2",
+            "label": "",
+            "side": "left",
+            "index": 1
+          },
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "pmo-87",
+        "type": "AND",
+        "x": 2965,
+        "y": 620,
+        "label": "",
+        "ports": [
+          {
+            "id": "in1",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "in2",
+            "label": "",
+            "side": "left",
+            "index": 1
+          },
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "pmo-90",
+        "type": "NOT",
+        "x": 480,
+        "y": 342,
+        "label": "",
+        "ports": [
+          {
+            "id": "in",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "pmo-92",
+        "type": "NOT",
+        "x": 1500,
+        "y": 380,
+        "label": "",
+        "ports": [
+          {
+            "id": "in",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "pmo-94",
+        "type": "NOT",
+        "x": 1840,
+        "y": 380,
+        "label": "",
+        "ports": [
+          {
+            "id": "in",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "pmo-96",
+        "type": "NOT",
+        "x": 2180,
+        "y": 380,
+        "label": "",
+        "ports": [
+          {
+            "id": "in",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "pmo-98",
+        "type": "NOT",
+        "x": 2520,
+        "y": 380,
+        "label": "",
+        "ports": [
+          {
+            "id": "in",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "pmo-100",
+        "type": "AND",
+        "x": 620,
+        "y": 340,
+        "label": "",
+        "ports": [
+          {
+            "id": "in1",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "in2",
+            "label": "",
+            "side": "left",
+            "index": 1
+          },
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "pmo-103",
+        "type": "AND",
+        "x": 960,
+        "y": 340,
+        "label": "",
+        "ports": [
+          {
+            "id": "in1",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "in2",
+            "label": "",
+            "side": "left",
+            "index": 1
+          },
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "pmo-106",
+        "type": "AND",
+        "x": 1300,
+        "y": 340,
+        "label": "",
+        "ports": [
+          {
+            "id": "in1",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "in2",
+            "label": "",
+            "side": "left",
+            "index": 1
+          },
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "pmo-109",
+        "type": "AND",
+        "x": 1640,
+        "y": 340,
+        "label": "",
+        "ports": [
+          {
+            "id": "in1",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "in2",
+            "label": "",
+            "side": "left",
+            "index": 1
+          },
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "pmo-112",
+        "type": "AND",
+        "x": 1980,
+        "y": 340,
+        "label": "",
+        "ports": [
+          {
+            "id": "in1",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "in2",
+            "label": "",
+            "side": "left",
+            "index": 1
+          },
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "pmo-115",
+        "type": "AND",
+        "x": 2320,
+        "y": 340,
+        "label": "",
+        "ports": [
+          {
+            "id": "in1",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "in2",
+            "label": "",
+            "side": "left",
+            "index": 1
+          },
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "pmo-118",
+        "type": "AND",
+        "x": 2660,
+        "y": 340,
+        "label": "",
+        "ports": [
+          {
+            "id": "in1",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "in2",
+            "label": "",
+            "side": "left",
+            "index": 1
+          },
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "pmo-121",
+        "type": "NOT",
+        "x": 480,
+        "y": 1122,
+        "label": "",
+        "ports": [
+          {
+            "id": "in",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "pmo-123",
+        "type": "NOT",
+        "x": 480,
+        "y": 1176,
+        "label": "",
+        "ports": [
+          {
+            "id": "in",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "pmo-125",
+        "type": "NOT",
+        "x": 1840,
+        "y": 1160,
+        "label": "",
+        "ports": [
+          {
+            "id": "in",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "pmo-127",
+        "type": "NOT",
+        "x": 2180,
+        "y": 1160,
+        "label": "",
+        "ports": [
+          {
+            "id": "in",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "pmo-129",
+        "type": "NOT",
+        "x": 2520,
+        "y": 1160,
+        "label": "",
+        "ports": [
+          {
+            "id": "in",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "pmo-131",
+        "type": "AND",
+        "x": 620,
+        "y": 1120,
+        "label": "",
+        "ports": [
+          {
+            "id": "in1",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "in2",
+            "label": "",
+            "side": "left",
+            "index": 1
+          },
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "pmo-134",
+        "type": "AND",
+        "x": 960,
+        "y": 1120,
+        "label": "",
+        "ports": [
+          {
+            "id": "in1",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "in2",
+            "label": "",
+            "side": "left",
+            "index": 1
+          },
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "pmo-137",
+        "type": "AND",
+        "x": 1300,
+        "y": 1120,
+        "label": "",
+        "ports": [
+          {
+            "id": "in1",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "in2",
+            "label": "",
+            "side": "left",
+            "index": 1
+          },
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "pmo-140",
+        "type": "AND",
+        "x": 1640,
+        "y": 1120,
+        "label": "",
+        "ports": [
+          {
+            "id": "in1",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "in2",
+            "label": "",
+            "side": "left",
+            "index": 1
+          },
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "pmo-143",
+        "type": "AND",
+        "x": 1980,
+        "y": 1120,
+        "label": "",
+        "ports": [
+          {
+            "id": "in1",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "in2",
+            "label": "",
+            "side": "left",
+            "index": 1
+          },
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "pmo-146",
+        "type": "AND",
+        "x": 2320,
+        "y": 1120,
+        "label": "",
+        "ports": [
+          {
+            "id": "in1",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "in2",
+            "label": "",
+            "side": "left",
+            "index": 1
+          },
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "pmo-149",
+        "type": "AND",
+        "x": 2660,
+        "y": 1120,
+        "label": "",
+        "ports": [
+          {
+            "id": "in1",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "in2",
+            "label": "",
+            "side": "left",
+            "index": 1
+          },
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "pmo-152",
+        "type": "AND",
+        "x": 2965,
+        "y": 730,
+        "label": "",
+        "ports": [
+          {
+            "id": "in1",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "in2",
+            "label": "",
+            "side": "left",
+            "index": 1
+          },
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "pmo-155",
+        "type": "NOT",
+        "x": 480,
+        "y": 452,
+        "label": "",
+        "ports": [
+          {
+            "id": "in",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "pmo-157",
+        "type": "NOT",
+        "x": 480,
+        "y": 506,
+        "label": "",
+        "ports": [
+          {
+            "id": "in",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "pmo-159",
+        "type": "NOT",
+        "x": 1840,
+        "y": 490,
+        "label": "",
+        "ports": [
+          {
+            "id": "in",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "pmo-161",
+        "type": "NOT",
+        "x": 2180,
+        "y": 490,
+        "label": "",
+        "ports": [
+          {
+            "id": "in",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "pmo-163",
+        "type": "NOT",
+        "x": 2520,
+        "y": 490,
+        "label": "",
+        "ports": [
+          {
+            "id": "in",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "pmo-165",
+        "type": "AND",
+        "x": 620,
+        "y": 450,
+        "label": "",
+        "ports": [
+          {
+            "id": "in1",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "in2",
+            "label": "",
+            "side": "left",
+            "index": 1
+          },
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "pmo-168",
+        "type": "AND",
+        "x": 960,
+        "y": 450,
+        "label": "",
+        "ports": [
+          {
+            "id": "in1",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "in2",
+            "label": "",
+            "side": "left",
+            "index": 1
+          },
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "pmo-171",
+        "type": "AND",
+        "x": 1300,
+        "y": 450,
+        "label": "",
+        "ports": [
+          {
+            "id": "in1",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "in2",
+            "label": "",
+            "side": "left",
+            "index": 1
+          },
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "pmo-174",
+        "type": "AND",
+        "x": 1640,
+        "y": 450,
+        "label": "",
+        "ports": [
+          {
+            "id": "in1",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "in2",
+            "label": "",
+            "side": "left",
+            "index": 1
+          },
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "pmo-177",
+        "type": "AND",
+        "x": 1980,
+        "y": 450,
+        "label": "",
+        "ports": [
+          {
+            "id": "in1",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "in2",
+            "label": "",
+            "side": "left",
+            "index": 1
+          },
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "pmo-180",
+        "type": "AND",
+        "x": 2320,
+        "y": 450,
+        "label": "",
+        "ports": [
+          {
+            "id": "in1",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "in2",
+            "label": "",
+            "side": "left",
+            "index": 1
+          },
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "pmo-183",
+        "type": "AND",
+        "x": 2660,
+        "y": 450,
+        "label": "",
+        "ports": [
+          {
+            "id": "in1",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "in2",
+            "label": "",
+            "side": "left",
+            "index": 1
+          },
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "pmo-186",
+        "type": "NOT",
+        "x": 480,
+        "y": 1232,
+        "label": "",
+        "ports": [
+          {
+            "id": "in",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "pmo-188",
+        "type": "NOT",
+        "x": 480,
+        "y": 1286,
+        "label": "",
+        "ports": [
+          {
+            "id": "in",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "pmo-190",
+        "type": "NOT",
+        "x": 820,
+        "y": 1270,
+        "label": "",
+        "ports": [
+          {
+            "id": "in",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "pmo-192",
+        "type": "NOT",
+        "x": 2180,
+        "y": 1270,
+        "label": "",
+        "ports": [
+          {
+            "id": "in",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "pmo-194",
+        "type": "NOT",
+        "x": 2520,
+        "y": 1270,
+        "label": "",
+        "ports": [
+          {
+            "id": "in",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "pmo-196",
+        "type": "AND",
+        "x": 620,
+        "y": 1230,
+        "label": "",
+        "ports": [
+          {
+            "id": "in1",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "in2",
+            "label": "",
+            "side": "left",
+            "index": 1
+          },
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "pmo-199",
+        "type": "AND",
+        "x": 960,
+        "y": 1230,
+        "label": "",
+        "ports": [
+          {
+            "id": "in1",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "in2",
+            "label": "",
+            "side": "left",
+            "index": 1
+          },
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "pmo-202",
+        "type": "AND",
+        "x": 1300,
+        "y": 1230,
+        "label": "",
+        "ports": [
+          {
+            "id": "in1",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "in2",
+            "label": "",
+            "side": "left",
+            "index": 1
+          },
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "pmo-205",
+        "type": "AND",
+        "x": 1640,
+        "y": 1230,
+        "label": "",
+        "ports": [
+          {
+            "id": "in1",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "in2",
+            "label": "",
+            "side": "left",
+            "index": 1
+          },
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "pmo-208",
+        "type": "AND",
+        "x": 1980,
+        "y": 1230,
+        "label": "",
+        "ports": [
+          {
+            "id": "in1",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "in2",
+            "label": "",
+            "side": "left",
+            "index": 1
+          },
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "pmo-211",
+        "type": "AND",
+        "x": 2320,
+        "y": 1230,
+        "label": "",
+        "ports": [
+          {
+            "id": "in1",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "in2",
+            "label": "",
+            "side": "left",
+            "index": 1
+          },
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "pmo-214",
+        "type": "AND",
+        "x": 2660,
+        "y": 1230,
+        "label": "",
+        "ports": [
+          {
+            "id": "in1",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "in2",
+            "label": "",
+            "side": "left",
+            "index": 1
+          },
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "pmo-217",
+        "type": "AND",
+        "x": 2965,
+        "y": 840,
+        "label": "",
+        "ports": [
+          {
+            "id": "in1",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "in2",
+            "label": "",
+            "side": "left",
+            "index": 1
+          },
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "pmo-220",
+        "type": "NOT",
+        "x": 480,
+        "y": 562,
+        "label": "",
+        "ports": [
+          {
+            "id": "in",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "pmo-222",
+        "type": "NOT",
+        "x": 480,
+        "y": 616,
+        "label": "",
+        "ports": [
+          {
+            "id": "in",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "pmo-224",
+        "type": "NOT",
+        "x": 820,
+        "y": 600,
+        "label": "",
+        "ports": [
+          {
+            "id": "in",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "pmo-226",
+        "type": "NOT",
+        "x": 2180,
+        "y": 600,
+        "label": "",
+        "ports": [
+          {
+            "id": "in",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "pmo-228",
+        "type": "NOT",
+        "x": 2520,
+        "y": 600,
+        "label": "",
+        "ports": [
+          {
+            "id": "in",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "pmo-230",
+        "type": "AND",
+        "x": 620,
+        "y": 560,
+        "label": "",
+        "ports": [
+          {
+            "id": "in1",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "in2",
+            "label": "",
+            "side": "left",
+            "index": 1
+          },
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "pmo-233",
+        "type": "AND",
+        "x": 960,
+        "y": 560,
+        "label": "",
+        "ports": [
+          {
+            "id": "in1",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "in2",
+            "label": "",
+            "side": "left",
+            "index": 1
+          },
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "pmo-236",
+        "type": "AND",
+        "x": 1300,
+        "y": 560,
+        "label": "",
+        "ports": [
+          {
+            "id": "in1",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "in2",
+            "label": "",
+            "side": "left",
+            "index": 1
+          },
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "pmo-239",
+        "type": "AND",
+        "x": 1640,
+        "y": 560,
+        "label": "",
+        "ports": [
+          {
+            "id": "in1",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "in2",
+            "label": "",
+            "side": "left",
+            "index": 1
+          },
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "pmo-242",
+        "type": "AND",
+        "x": 1980,
+        "y": 560,
+        "label": "",
+        "ports": [
+          {
+            "id": "in1",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "in2",
+            "label": "",
+            "side": "left",
+            "index": 1
+          },
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "pmo-245",
+        "type": "AND",
+        "x": 2320,
+        "y": 560,
+        "label": "",
+        "ports": [
+          {
+            "id": "in1",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "in2",
+            "label": "",
+            "side": "left",
+            "index": 1
+          },
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "pmo-248",
+        "type": "AND",
+        "x": 2660,
+        "y": 560,
+        "label": "",
+        "ports": [
+          {
+            "id": "in1",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "in2",
+            "label": "",
+            "side": "left",
+            "index": 1
+          },
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "pmo-251",
+        "type": "NOT",
+        "x": 480,
+        "y": 1342,
+        "label": "",
+        "ports": [
+          {
+            "id": "in",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "pmo-253",
+        "type": "NOT",
+        "x": 480,
+        "y": 1396,
+        "label": "",
+        "ports": [
+          {
+            "id": "in",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "pmo-255",
+        "type": "NOT",
+        "x": 820,
+        "y": 1380,
+        "label": "",
+        "ports": [
+          {
+            "id": "in",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "pmo-257",
+        "type": "NOT",
+        "x": 1160,
+        "y": 1380,
+        "label": "",
+        "ports": [
+          {
+            "id": "in",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "pmo-259",
+        "type": "NOT",
+        "x": 2520,
+        "y": 1380,
+        "label": "",
+        "ports": [
+          {
+            "id": "in",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "pmo-261",
+        "type": "AND",
+        "x": 620,
+        "y": 1340,
+        "label": "",
+        "ports": [
+          {
+            "id": "in1",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "in2",
+            "label": "",
+            "side": "left",
+            "index": 1
+          },
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "pmo-264",
+        "type": "AND",
+        "x": 960,
+        "y": 1340,
+        "label": "",
+        "ports": [
+          {
+            "id": "in1",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "in2",
+            "label": "",
+            "side": "left",
+            "index": 1
+          },
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "pmo-267",
+        "type": "AND",
+        "x": 1300,
+        "y": 1340,
+        "label": "",
+        "ports": [
+          {
+            "id": "in1",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "in2",
+            "label": "",
+            "side": "left",
+            "index": 1
+          },
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "pmo-270",
+        "type": "AND",
+        "x": 1640,
+        "y": 1340,
+        "label": "",
+        "ports": [
+          {
+            "id": "in1",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "in2",
+            "label": "",
+            "side": "left",
+            "index": 1
+          },
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "pmo-273",
+        "type": "AND",
+        "x": 1980,
+        "y": 1340,
+        "label": "",
+        "ports": [
+          {
+            "id": "in1",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "in2",
+            "label": "",
+            "side": "left",
+            "index": 1
+          },
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "pmo-276",
+        "type": "AND",
+        "x": 2320,
+        "y": 1340,
+        "label": "",
+        "ports": [
+          {
+            "id": "in1",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "in2",
+            "label": "",
+            "side": "left",
+            "index": 1
+          },
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "pmo-279",
+        "type": "AND",
+        "x": 2660,
+        "y": 1340,
+        "label": "",
+        "ports": [
+          {
+            "id": "in1",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "in2",
+            "label": "",
+            "side": "left",
+            "index": 1
+          },
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "pmo-282",
+        "type": "AND",
+        "x": 2965,
+        "y": 950,
+        "label": "",
+        "ports": [
+          {
+            "id": "in1",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "in2",
+            "label": "",
+            "side": "left",
+            "index": 1
+          },
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "pmo-285",
+        "type": "NOT",
+        "x": 480,
+        "y": 672,
+        "label": "",
+        "ports": [
+          {
+            "id": "in",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "pmo-287",
+        "type": "NOT",
+        "x": 480,
+        "y": 726,
+        "label": "",
+        "ports": [
+          {
+            "id": "in",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "pmo-289",
+        "type": "NOT",
+        "x": 820,
+        "y": 710,
+        "label": "",
+        "ports": [
+          {
+            "id": "in",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "pmo-291",
+        "type": "NOT",
+        "x": 1160,
+        "y": 710,
+        "label": "",
+        "ports": [
+          {
+            "id": "in",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "pmo-293",
+        "type": "NOT",
+        "x": 2520,
+        "y": 710,
+        "label": "",
+        "ports": [
+          {
+            "id": "in",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "pmo-295",
+        "type": "AND",
+        "x": 620,
+        "y": 670,
+        "label": "",
+        "ports": [
+          {
+            "id": "in1",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "in2",
+            "label": "",
+            "side": "left",
+            "index": 1
+          },
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "pmo-298",
+        "type": "AND",
+        "x": 960,
+        "y": 670,
+        "label": "",
+        "ports": [
+          {
+            "id": "in1",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "in2",
+            "label": "",
+            "side": "left",
+            "index": 1
+          },
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "pmo-301",
+        "type": "AND",
+        "x": 1300,
+        "y": 670,
+        "label": "",
+        "ports": [
+          {
+            "id": "in1",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "in2",
+            "label": "",
+            "side": "left",
+            "index": 1
+          },
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "pmo-304",
+        "type": "AND",
+        "x": 1640,
+        "y": 670,
+        "label": "",
+        "ports": [
+          {
+            "id": "in1",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "in2",
+            "label": "",
+            "side": "left",
+            "index": 1
+          },
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "pmo-307",
+        "type": "AND",
+        "x": 1980,
+        "y": 670,
+        "label": "",
+        "ports": [
+          {
+            "id": "in1",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "in2",
+            "label": "",
+            "side": "left",
+            "index": 1
+          },
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "pmo-310",
+        "type": "AND",
+        "x": 2320,
+        "y": 670,
+        "label": "",
+        "ports": [
+          {
+            "id": "in1",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "in2",
+            "label": "",
+            "side": "left",
+            "index": 1
+          },
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "pmo-313",
+        "type": "AND",
+        "x": 2660,
+        "y": 670,
+        "label": "",
+        "ports": [
+          {
+            "id": "in1",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "in2",
+            "label": "",
+            "side": "left",
+            "index": 1
+          },
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "pmo-316",
+        "type": "NOT",
+        "x": 480,
+        "y": 1452,
+        "label": "",
+        "ports": [
+          {
+            "id": "in",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "pmo-318",
+        "type": "NOT",
+        "x": 480,
+        "y": 1506,
+        "label": "",
+        "ports": [
+          {
+            "id": "in",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "pmo-320",
+        "type": "NOT",
+        "x": 820,
+        "y": 1490,
+        "label": "",
+        "ports": [
+          {
+            "id": "in",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "pmo-322",
+        "type": "NOT",
+        "x": 1160,
+        "y": 1490,
+        "label": "",
+        "ports": [
+          {
+            "id": "in",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "pmo-324",
+        "type": "NOT",
+        "x": 1500,
+        "y": 1490,
+        "label": "",
+        "ports": [
+          {
+            "id": "in",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "pmo-326",
+        "type": "AND",
+        "x": 620,
+        "y": 1450,
+        "label": "",
+        "ports": [
+          {
+            "id": "in1",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "in2",
+            "label": "",
+            "side": "left",
+            "index": 1
+          },
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "pmo-329",
+        "type": "AND",
+        "x": 960,
+        "y": 1450,
+        "label": "",
+        "ports": [
+          {
+            "id": "in1",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "in2",
+            "label": "",
+            "side": "left",
+            "index": 1
+          },
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "pmo-332",
+        "type": "AND",
+        "x": 1300,
+        "y": 1450,
+        "label": "",
+        "ports": [
+          {
+            "id": "in1",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "in2",
+            "label": "",
+            "side": "left",
+            "index": 1
+          },
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "pmo-335",
+        "type": "AND",
+        "x": 1640,
+        "y": 1450,
+        "label": "",
+        "ports": [
+          {
+            "id": "in1",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "in2",
+            "label": "",
+            "side": "left",
+            "index": 1
+          },
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "pmo-338",
+        "type": "AND",
+        "x": 1980,
+        "y": 1450,
+        "label": "",
+        "ports": [
+          {
+            "id": "in1",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "in2",
+            "label": "",
+            "side": "left",
+            "index": 1
+          },
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "pmo-341",
+        "type": "AND",
+        "x": 2320,
+        "y": 1450,
+        "label": "",
+        "ports": [
+          {
+            "id": "in1",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "in2",
+            "label": "",
+            "side": "left",
+            "index": 1
+          },
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "pmo-344",
+        "type": "AND",
+        "x": 2660,
+        "y": 1450,
+        "label": "",
+        "ports": [
+          {
+            "id": "in1",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "in2",
+            "label": "",
+            "side": "left",
+            "index": 1
+          },
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "pmo-347",
+        "type": "AND",
+        "x": 2965,
+        "y": 1060,
+        "label": "",
+        "ports": [
+          {
+            "id": "in1",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "in2",
+            "label": "",
+            "side": "left",
+            "index": 1
+          },
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "pmo-350",
+        "type": "OR",
+        "x": 3190,
+        "y": 675,
+        "label": "",
+        "ports": [
+          {
+            "id": "in1",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "in2",
+            "label": "",
+            "side": "left",
+            "index": 1
+          },
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "pmo-353",
+        "type": "OR",
+        "x": 3235,
+        "y": 758,
+        "label": "",
+        "ports": [
+          {
+            "id": "in1",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "in2",
+            "label": "",
+            "side": "left",
+            "index": 1
+          },
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "pmo-356",
+        "type": "OR",
+        "x": 3280,
+        "y": 854,
+        "label": "",
+        "ports": [
+          {
+            "id": "in1",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "in2",
+            "label": "",
+            "side": "left",
+            "index": 1
+          },
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "pmo-359",
+        "type": "OR",
+        "x": 3325,
+        "y": 957,
+        "label": "",
+        "ports": [
+          {
+            "id": "in1",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "in2",
+            "label": "",
+            "side": "left",
+            "index": 1
+          },
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "pmo-362",
+        "type": "OUTPUT",
+        "x": 3540,
+        "y": 972,
+        "label": "OUT1",
+        "ports": [
+          {
+            "id": "in",
+            "label": "",
+            "side": "left",
+            "index": 0
+          }
+        ]
+      }
+    ],
+    "wires": [
+      {
+        "id": "pmo-10",
+        "sourceComponentId": "pmo-1",
+        "sourcePortId": "out",
+        "targetComponentId": "pmo-9",
+        "targetPortId": "min",
+        "value": 0
+      },
+      {
+        "id": "pmo-12",
+        "sourceComponentId": "pmo-2",
+        "sourcePortId": "out",
+        "targetComponentId": "pmo-11",
+        "targetPortId": "min",
+        "value": 0
+      },
+      {
+        "id": "pmo-14",
+        "sourceComponentId": "pmo-3",
+        "sourcePortId": "out",
+        "targetComponentId": "pmo-13",
+        "targetPortId": "min",
+        "value": 0
+      },
+      {
+        "id": "pmo-16",
+        "sourceComponentId": "pmo-4",
+        "sourcePortId": "out",
+        "targetComponentId": "pmo-15",
+        "targetPortId": "min",
+        "value": 0
+      },
+      {
+        "id": "pmo-18",
+        "sourceComponentId": "pmo-5",
+        "sourcePortId": "out",
+        "targetComponentId": "pmo-17",
+        "targetPortId": "min",
+        "value": 0
+      },
+      {
+        "id": "pmo-20",
+        "sourceComponentId": "pmo-6",
+        "sourcePortId": "out",
+        "targetComponentId": "pmo-19",
+        "targetPortId": "min",
+        "value": 0
+      },
+      {
+        "id": "pmo-22",
+        "sourceComponentId": "pmo-7",
+        "sourcePortId": "out",
+        "targetComponentId": "pmo-21",
+        "targetPortId": "min",
+        "value": 0
+      },
+      {
+        "id": "pmo-24",
+        "sourceComponentId": "pmo-8",
+        "sourcePortId": "out",
+        "targetComponentId": "pmo-23",
+        "targetPortId": "min",
+        "value": 0
+      },
+      {
+        "id": "pmo-26",
+        "sourceComponentId": "pmo-4",
+        "sourcePortId": "out",
+        "targetComponentId": "pmo-25",
+        "targetPortId": "in",
+        "value": 0
+      },
+      {
+        "id": "pmo-28",
+        "sourceComponentId": "pmo-5",
+        "sourcePortId": "out",
+        "targetComponentId": "pmo-27",
+        "targetPortId": "in",
+        "value": 0
+      },
+      {
+        "id": "pmo-30",
+        "sourceComponentId": "pmo-6",
+        "sourcePortId": "out",
+        "targetComponentId": "pmo-29",
+        "targetPortId": "in",
+        "value": 0
+      },
+      {
+        "id": "pmo-32",
+        "sourceComponentId": "pmo-7",
+        "sourcePortId": "out",
+        "targetComponentId": "pmo-31",
+        "targetPortId": "in",
+        "value": 0
+      },
+      {
+        "id": "pmo-34",
+        "sourceComponentId": "pmo-8",
+        "sourcePortId": "out",
+        "targetComponentId": "pmo-33",
+        "targetPortId": "in",
+        "value": 0
+      },
+      {
+        "id": "pmo-36",
+        "sourceComponentId": "pmo-1",
+        "sourcePortId": "out",
+        "targetComponentId": "pmo-35",
+        "targetPortId": "in1",
+        "value": 0
+      },
+      {
+        "id": "pmo-37",
+        "sourceComponentId": "pmo-2",
+        "sourcePortId": "out",
+        "targetComponentId": "pmo-35",
+        "targetPortId": "in2",
+        "value": 0
+      },
+      {
+        "id": "pmo-39",
+        "sourceComponentId": "pmo-35",
+        "sourcePortId": "out",
+        "targetComponentId": "pmo-38",
+        "targetPortId": "in1",
+        "value": 0
+      },
+      {
+        "id": "pmo-40",
+        "sourceComponentId": "pmo-3",
+        "sourcePortId": "out",
+        "targetComponentId": "pmo-38",
+        "targetPortId": "in2",
+        "value": 0
+      },
+      {
+        "id": "pmo-42",
+        "sourceComponentId": "pmo-38",
+        "sourcePortId": "out",
+        "targetComponentId": "pmo-41",
+        "targetPortId": "in1",
+        "value": 0
+      },
+      {
+        "id": "pmo-43",
+        "sourceComponentId": "pmo-25",
+        "sourcePortId": "out",
+        "targetComponentId": "pmo-41",
+        "targetPortId": "in2",
+        "value": 0
+      },
+      {
+        "id": "pmo-45",
+        "sourceComponentId": "pmo-41",
+        "sourcePortId": "out",
+        "targetComponentId": "pmo-44",
+        "targetPortId": "in1",
+        "value": 0
+      },
+      {
+        "id": "pmo-46",
+        "sourceComponentId": "pmo-27",
+        "sourcePortId": "out",
+        "targetComponentId": "pmo-44",
+        "targetPortId": "in2",
+        "value": 0
+      },
+      {
+        "id": "pmo-48",
+        "sourceComponentId": "pmo-44",
+        "sourcePortId": "out",
+        "targetComponentId": "pmo-47",
+        "targetPortId": "in1",
+        "value": 0
+      },
+      {
+        "id": "pmo-49",
+        "sourceComponentId": "pmo-29",
+        "sourcePortId": "out",
+        "targetComponentId": "pmo-47",
+        "targetPortId": "in2",
+        "value": 0
+      },
+      {
+        "id": "pmo-51",
+        "sourceComponentId": "pmo-47",
+        "sourcePortId": "out",
+        "targetComponentId": "pmo-50",
+        "targetPortId": "in1",
+        "value": 0
+      },
+      {
+        "id": "pmo-52",
+        "sourceComponentId": "pmo-31",
+        "sourcePortId": "out",
+        "targetComponentId": "pmo-50",
+        "targetPortId": "in2",
+        "value": 0
+      },
+      {
+        "id": "pmo-54",
+        "sourceComponentId": "pmo-50",
+        "sourcePortId": "out",
+        "targetComponentId": "pmo-53",
+        "targetPortId": "in1",
+        "value": 0
+      },
+      {
+        "id": "pmo-55",
+        "sourceComponentId": "pmo-33",
+        "sourcePortId": "out",
+        "targetComponentId": "pmo-53",
+        "targetPortId": "in2",
+        "value": 0
+      },
+      {
+        "id": "pmo-57",
+        "sourceComponentId": "pmo-9",
+        "sourcePortId": "mout",
+        "targetComponentId": "pmo-56",
+        "targetPortId": "in",
+        "value": 0
+      },
+      {
+        "id": "pmo-59",
+        "sourceComponentId": "pmo-17",
+        "sourcePortId": "mout",
+        "targetComponentId": "pmo-58",
+        "targetPortId": "in",
+        "value": 0
+      },
+      {
+        "id": "pmo-61",
+        "sourceComponentId": "pmo-19",
+        "sourcePortId": "mout",
+        "targetComponentId": "pmo-60",
+        "targetPortId": "in",
+        "value": 0
+      },
+      {
+        "id": "pmo-63",
+        "sourceComponentId": "pmo-21",
+        "sourcePortId": "mout",
+        "targetComponentId": "pmo-62",
+        "targetPortId": "in",
+        "value": 0
+      },
+      {
+        "id": "pmo-65",
+        "sourceComponentId": "pmo-23",
+        "sourcePortId": "mout",
+        "targetComponentId": "pmo-64",
+        "targetPortId": "in",
+        "value": 0
+      },
+      {
+        "id": "pmo-67",
+        "sourceComponentId": "pmo-56",
+        "sourcePortId": "out",
+        "targetComponentId": "pmo-66",
+        "targetPortId": "in1",
+        "value": 0
+      },
+      {
+        "id": "pmo-68",
+        "sourceComponentId": "pmo-11",
+        "sourcePortId": "mout",
+        "targetComponentId": "pmo-66",
+        "targetPortId": "in2",
+        "value": 0
+      },
+      {
+        "id": "pmo-70",
+        "sourceComponentId": "pmo-66",
+        "sourcePortId": "out",
+        "targetComponentId": "pmo-69",
+        "targetPortId": "in1",
+        "value": 0
+      },
+      {
+        "id": "pmo-71",
+        "sourceComponentId": "pmo-13",
+        "sourcePortId": "mout",
+        "targetComponentId": "pmo-69",
+        "targetPortId": "in2",
+        "value": 0
+      },
+      {
+        "id": "pmo-73",
+        "sourceComponentId": "pmo-69",
+        "sourcePortId": "out",
+        "targetComponentId": "pmo-72",
+        "targetPortId": "in1",
+        "value": 0
+      },
+      {
+        "id": "pmo-74",
+        "sourceComponentId": "pmo-15",
+        "sourcePortId": "mout",
+        "targetComponentId": "pmo-72",
+        "targetPortId": "in2",
+        "value": 0
+      },
+      {
+        "id": "pmo-76",
+        "sourceComponentId": "pmo-72",
+        "sourcePortId": "out",
+        "targetComponentId": "pmo-75",
+        "targetPortId": "in1",
+        "value": 0
+      },
+      {
+        "id": "pmo-77",
+        "sourceComponentId": "pmo-58",
+        "sourcePortId": "out",
+        "targetComponentId": "pmo-75",
+        "targetPortId": "in2",
+        "value": 0
+      },
+      {
+        "id": "pmo-79",
+        "sourceComponentId": "pmo-75",
+        "sourcePortId": "out",
+        "targetComponentId": "pmo-78",
+        "targetPortId": "in1",
+        "value": 0
+      },
+      {
+        "id": "pmo-80",
+        "sourceComponentId": "pmo-60",
+        "sourcePortId": "out",
+        "targetComponentId": "pmo-78",
+        "targetPortId": "in2",
+        "value": 0
+      },
+      {
+        "id": "pmo-82",
+        "sourceComponentId": "pmo-78",
+        "sourcePortId": "out",
+        "targetComponentId": "pmo-81",
+        "targetPortId": "in1",
+        "value": 0
+      },
+      {
+        "id": "pmo-83",
+        "sourceComponentId": "pmo-62",
+        "sourcePortId": "out",
+        "targetComponentId": "pmo-81",
+        "targetPortId": "in2",
+        "value": 0
+      },
+      {
+        "id": "pmo-85",
+        "sourceComponentId": "pmo-81",
+        "sourcePortId": "out",
+        "targetComponentId": "pmo-84",
+        "targetPortId": "in1",
+        "value": 0
+      },
+      {
+        "id": "pmo-86",
+        "sourceComponentId": "pmo-64",
+        "sourcePortId": "out",
+        "targetComponentId": "pmo-84",
+        "targetPortId": "in2",
+        "value": 0
+      },
+      {
+        "id": "pmo-88",
+        "sourceComponentId": "pmo-53",
+        "sourcePortId": "out",
+        "targetComponentId": "pmo-87",
+        "targetPortId": "in1",
+        "value": 0
+      },
+      {
+        "id": "pmo-89",
+        "sourceComponentId": "pmo-84",
+        "sourcePortId": "out",
+        "targetComponentId": "pmo-87",
+        "targetPortId": "in2",
+        "value": 0
+      },
+      {
+        "id": "pmo-91",
+        "sourceComponentId": "pmo-1",
+        "sourcePortId": "out",
+        "targetComponentId": "pmo-90",
+        "targetPortId": "in",
+        "value": 0
+      },
+      {
+        "id": "pmo-93",
+        "sourceComponentId": "pmo-5",
+        "sourcePortId": "out",
+        "targetComponentId": "pmo-92",
+        "targetPortId": "in",
+        "value": 0
+      },
+      {
+        "id": "pmo-95",
+        "sourceComponentId": "pmo-6",
+        "sourcePortId": "out",
+        "targetComponentId": "pmo-94",
+        "targetPortId": "in",
+        "value": 0
+      },
+      {
+        "id": "pmo-97",
+        "sourceComponentId": "pmo-7",
+        "sourcePortId": "out",
+        "targetComponentId": "pmo-96",
+        "targetPortId": "in",
+        "value": 0
+      },
+      {
+        "id": "pmo-99",
+        "sourceComponentId": "pmo-8",
+        "sourcePortId": "out",
+        "targetComponentId": "pmo-98",
+        "targetPortId": "in",
+        "value": 0
+      },
+      {
+        "id": "pmo-101",
+        "sourceComponentId": "pmo-90",
+        "sourcePortId": "out",
+        "targetComponentId": "pmo-100",
+        "targetPortId": "in1",
+        "value": 0
+      },
+      {
+        "id": "pmo-102",
+        "sourceComponentId": "pmo-2",
+        "sourcePortId": "out",
+        "targetComponentId": "pmo-100",
+        "targetPortId": "in2",
+        "value": 0
+      },
+      {
+        "id": "pmo-104",
+        "sourceComponentId": "pmo-100",
+        "sourcePortId": "out",
+        "targetComponentId": "pmo-103",
+        "targetPortId": "in1",
+        "value": 0
+      },
+      {
+        "id": "pmo-105",
+        "sourceComponentId": "pmo-3",
+        "sourcePortId": "out",
+        "targetComponentId": "pmo-103",
+        "targetPortId": "in2",
+        "value": 0
+      },
+      {
+        "id": "pmo-107",
+        "sourceComponentId": "pmo-103",
+        "sourcePortId": "out",
+        "targetComponentId": "pmo-106",
+        "targetPortId": "in1",
+        "value": 0
+      },
+      {
+        "id": "pmo-108",
+        "sourceComponentId": "pmo-4",
+        "sourcePortId": "out",
+        "targetComponentId": "pmo-106",
+        "targetPortId": "in2",
+        "value": 0
+      },
+      {
+        "id": "pmo-110",
+        "sourceComponentId": "pmo-106",
+        "sourcePortId": "out",
+        "targetComponentId": "pmo-109",
+        "targetPortId": "in1",
+        "value": 0
+      },
+      {
+        "id": "pmo-111",
+        "sourceComponentId": "pmo-92",
+        "sourcePortId": "out",
+        "targetComponentId": "pmo-109",
+        "targetPortId": "in2",
+        "value": 0
+      },
+      {
+        "id": "pmo-113",
+        "sourceComponentId": "pmo-109",
+        "sourcePortId": "out",
+        "targetComponentId": "pmo-112",
+        "targetPortId": "in1",
+        "value": 0
+      },
+      {
+        "id": "pmo-114",
+        "sourceComponentId": "pmo-94",
+        "sourcePortId": "out",
+        "targetComponentId": "pmo-112",
+        "targetPortId": "in2",
+        "value": 0
+      },
+      {
+        "id": "pmo-116",
+        "sourceComponentId": "pmo-112",
+        "sourcePortId": "out",
+        "targetComponentId": "pmo-115",
+        "targetPortId": "in1",
+        "value": 0
+      },
+      {
+        "id": "pmo-117",
+        "sourceComponentId": "pmo-96",
+        "sourcePortId": "out",
+        "targetComponentId": "pmo-115",
+        "targetPortId": "in2",
+        "value": 0
+      },
+      {
+        "id": "pmo-119",
+        "sourceComponentId": "pmo-115",
+        "sourcePortId": "out",
+        "targetComponentId": "pmo-118",
+        "targetPortId": "in1",
+        "value": 0
+      },
+      {
+        "id": "pmo-120",
+        "sourceComponentId": "pmo-98",
+        "sourcePortId": "out",
+        "targetComponentId": "pmo-118",
+        "targetPortId": "in2",
+        "value": 0
+      },
+      {
+        "id": "pmo-122",
+        "sourceComponentId": "pmo-9",
+        "sourcePortId": "mout",
+        "targetComponentId": "pmo-121",
+        "targetPortId": "in",
+        "value": 0
+      },
+      {
+        "id": "pmo-124",
+        "sourceComponentId": "pmo-11",
+        "sourcePortId": "mout",
+        "targetComponentId": "pmo-123",
+        "targetPortId": "in",
+        "value": 0
+      },
+      {
+        "id": "pmo-126",
+        "sourceComponentId": "pmo-19",
+        "sourcePortId": "mout",
+        "targetComponentId": "pmo-125",
+        "targetPortId": "in",
+        "value": 0
+      },
+      {
+        "id": "pmo-128",
+        "sourceComponentId": "pmo-21",
+        "sourcePortId": "mout",
+        "targetComponentId": "pmo-127",
+        "targetPortId": "in",
+        "value": 0
+      },
+      {
+        "id": "pmo-130",
+        "sourceComponentId": "pmo-23",
+        "sourcePortId": "mout",
+        "targetComponentId": "pmo-129",
+        "targetPortId": "in",
+        "value": 0
+      },
+      {
+        "id": "pmo-132",
+        "sourceComponentId": "pmo-121",
+        "sourcePortId": "out",
+        "targetComponentId": "pmo-131",
+        "targetPortId": "in1",
+        "value": 0
+      },
+      {
+        "id": "pmo-133",
+        "sourceComponentId": "pmo-123",
+        "sourcePortId": "out",
+        "targetComponentId": "pmo-131",
+        "targetPortId": "in2",
+        "value": 0
+      },
+      {
+        "id": "pmo-135",
+        "sourceComponentId": "pmo-131",
+        "sourcePortId": "out",
+        "targetComponentId": "pmo-134",
+        "targetPortId": "in1",
+        "value": 0
+      },
+      {
+        "id": "pmo-136",
+        "sourceComponentId": "pmo-13",
+        "sourcePortId": "mout",
+        "targetComponentId": "pmo-134",
+        "targetPortId": "in2",
+        "value": 0
+      },
+      {
+        "id": "pmo-138",
+        "sourceComponentId": "pmo-134",
+        "sourcePortId": "out",
+        "targetComponentId": "pmo-137",
+        "targetPortId": "in1",
+        "value": 0
+      },
+      {
+        "id": "pmo-139",
+        "sourceComponentId": "pmo-15",
+        "sourcePortId": "mout",
+        "targetComponentId": "pmo-137",
+        "targetPortId": "in2",
+        "value": 0
+      },
+      {
+        "id": "pmo-141",
+        "sourceComponentId": "pmo-137",
+        "sourcePortId": "out",
+        "targetComponentId": "pmo-140",
+        "targetPortId": "in1",
+        "value": 0
+      },
+      {
+        "id": "pmo-142",
+        "sourceComponentId": "pmo-17",
+        "sourcePortId": "mout",
+        "targetComponentId": "pmo-140",
+        "targetPortId": "in2",
+        "value": 0
+      },
+      {
+        "id": "pmo-144",
+        "sourceComponentId": "pmo-140",
+        "sourcePortId": "out",
+        "targetComponentId": "pmo-143",
+        "targetPortId": "in1",
+        "value": 0
+      },
+      {
+        "id": "pmo-145",
+        "sourceComponentId": "pmo-125",
+        "sourcePortId": "out",
+        "targetComponentId": "pmo-143",
+        "targetPortId": "in2",
+        "value": 0
+      },
+      {
+        "id": "pmo-147",
+        "sourceComponentId": "pmo-143",
+        "sourcePortId": "out",
+        "targetComponentId": "pmo-146",
+        "targetPortId": "in1",
+        "value": 0
+      },
+      {
+        "id": "pmo-148",
+        "sourceComponentId": "pmo-127",
+        "sourcePortId": "out",
+        "targetComponentId": "pmo-146",
+        "targetPortId": "in2",
+        "value": 0
+      },
+      {
+        "id": "pmo-150",
+        "sourceComponentId": "pmo-146",
+        "sourcePortId": "out",
+        "targetComponentId": "pmo-149",
+        "targetPortId": "in1",
+        "value": 0
+      },
+      {
+        "id": "pmo-151",
+        "sourceComponentId": "pmo-129",
+        "sourcePortId": "out",
+        "targetComponentId": "pmo-149",
+        "targetPortId": "in2",
+        "value": 0
+      },
+      {
+        "id": "pmo-153",
+        "sourceComponentId": "pmo-118",
+        "sourcePortId": "out",
+        "targetComponentId": "pmo-152",
+        "targetPortId": "in1",
+        "value": 0
+      },
+      {
+        "id": "pmo-154",
+        "sourceComponentId": "pmo-149",
+        "sourcePortId": "out",
+        "targetComponentId": "pmo-152",
+        "targetPortId": "in2",
+        "value": 0
+      },
+      {
+        "id": "pmo-156",
+        "sourceComponentId": "pmo-1",
+        "sourcePortId": "out",
+        "targetComponentId": "pmo-155",
+        "targetPortId": "in",
+        "value": 0
+      },
+      {
+        "id": "pmo-158",
+        "sourceComponentId": "pmo-2",
+        "sourcePortId": "out",
+        "targetComponentId": "pmo-157",
+        "targetPortId": "in",
+        "value": 0
+      },
+      {
+        "id": "pmo-160",
+        "sourceComponentId": "pmo-6",
+        "sourcePortId": "out",
+        "targetComponentId": "pmo-159",
+        "targetPortId": "in",
+        "value": 0
+      },
+      {
+        "id": "pmo-162",
+        "sourceComponentId": "pmo-7",
+        "sourcePortId": "out",
+        "targetComponentId": "pmo-161",
+        "targetPortId": "in",
+        "value": 0
+      },
+      {
+        "id": "pmo-164",
+        "sourceComponentId": "pmo-8",
+        "sourcePortId": "out",
+        "targetComponentId": "pmo-163",
+        "targetPortId": "in",
+        "value": 0
+      },
+      {
+        "id": "pmo-166",
+        "sourceComponentId": "pmo-155",
+        "sourcePortId": "out",
+        "targetComponentId": "pmo-165",
+        "targetPortId": "in1",
+        "value": 0
+      },
+      {
+        "id": "pmo-167",
+        "sourceComponentId": "pmo-157",
+        "sourcePortId": "out",
+        "targetComponentId": "pmo-165",
+        "targetPortId": "in2",
+        "value": 0
+      },
+      {
+        "id": "pmo-169",
+        "sourceComponentId": "pmo-165",
+        "sourcePortId": "out",
+        "targetComponentId": "pmo-168",
+        "targetPortId": "in1",
+        "value": 0
+      },
+      {
+        "id": "pmo-170",
+        "sourceComponentId": "pmo-3",
+        "sourcePortId": "out",
+        "targetComponentId": "pmo-168",
+        "targetPortId": "in2",
+        "value": 0
+      },
+      {
+        "id": "pmo-172",
+        "sourceComponentId": "pmo-168",
+        "sourcePortId": "out",
+        "targetComponentId": "pmo-171",
+        "targetPortId": "in1",
+        "value": 0
+      },
+      {
+        "id": "pmo-173",
+        "sourceComponentId": "pmo-4",
+        "sourcePortId": "out",
+        "targetComponentId": "pmo-171",
+        "targetPortId": "in2",
+        "value": 0
+      },
+      {
+        "id": "pmo-175",
+        "sourceComponentId": "pmo-171",
+        "sourcePortId": "out",
+        "targetComponentId": "pmo-174",
+        "targetPortId": "in1",
+        "value": 0
+      },
+      {
+        "id": "pmo-176",
+        "sourceComponentId": "pmo-5",
+        "sourcePortId": "out",
+        "targetComponentId": "pmo-174",
+        "targetPortId": "in2",
+        "value": 0
+      },
+      {
+        "id": "pmo-178",
+        "sourceComponentId": "pmo-174",
+        "sourcePortId": "out",
+        "targetComponentId": "pmo-177",
+        "targetPortId": "in1",
+        "value": 0
+      },
+      {
+        "id": "pmo-179",
+        "sourceComponentId": "pmo-159",
+        "sourcePortId": "out",
+        "targetComponentId": "pmo-177",
+        "targetPortId": "in2",
+        "value": 0
+      },
+      {
+        "id": "pmo-181",
+        "sourceComponentId": "pmo-177",
+        "sourcePortId": "out",
+        "targetComponentId": "pmo-180",
+        "targetPortId": "in1",
+        "value": 0
+      },
+      {
+        "id": "pmo-182",
+        "sourceComponentId": "pmo-161",
+        "sourcePortId": "out",
+        "targetComponentId": "pmo-180",
+        "targetPortId": "in2",
+        "value": 0
+      },
+      {
+        "id": "pmo-184",
+        "sourceComponentId": "pmo-180",
+        "sourcePortId": "out",
+        "targetComponentId": "pmo-183",
+        "targetPortId": "in1",
+        "value": 0
+      },
+      {
+        "id": "pmo-185",
+        "sourceComponentId": "pmo-163",
+        "sourcePortId": "out",
+        "targetComponentId": "pmo-183",
+        "targetPortId": "in2",
+        "value": 0
+      },
+      {
+        "id": "pmo-187",
+        "sourceComponentId": "pmo-9",
+        "sourcePortId": "mout",
+        "targetComponentId": "pmo-186",
+        "targetPortId": "in",
+        "value": 0
+      },
+      {
+        "id": "pmo-189",
+        "sourceComponentId": "pmo-11",
+        "sourcePortId": "mout",
+        "targetComponentId": "pmo-188",
+        "targetPortId": "in",
+        "value": 0
+      },
+      {
+        "id": "pmo-191",
+        "sourceComponentId": "pmo-13",
+        "sourcePortId": "mout",
+        "targetComponentId": "pmo-190",
+        "targetPortId": "in",
+        "value": 0
+      },
+      {
+        "id": "pmo-193",
+        "sourceComponentId": "pmo-21",
+        "sourcePortId": "mout",
+        "targetComponentId": "pmo-192",
+        "targetPortId": "in",
+        "value": 0
+      },
+      {
+        "id": "pmo-195",
+        "sourceComponentId": "pmo-23",
+        "sourcePortId": "mout",
+        "targetComponentId": "pmo-194",
+        "targetPortId": "in",
+        "value": 0
+      },
+      {
+        "id": "pmo-197",
+        "sourceComponentId": "pmo-186",
+        "sourcePortId": "out",
+        "targetComponentId": "pmo-196",
+        "targetPortId": "in1",
+        "value": 0
+      },
+      {
+        "id": "pmo-198",
+        "sourceComponentId": "pmo-188",
+        "sourcePortId": "out",
+        "targetComponentId": "pmo-196",
+        "targetPortId": "in2",
+        "value": 0
+      },
+      {
+        "id": "pmo-200",
+        "sourceComponentId": "pmo-196",
+        "sourcePortId": "out",
+        "targetComponentId": "pmo-199",
+        "targetPortId": "in1",
+        "value": 0
+      },
+      {
+        "id": "pmo-201",
+        "sourceComponentId": "pmo-190",
+        "sourcePortId": "out",
+        "targetComponentId": "pmo-199",
+        "targetPortId": "in2",
+        "value": 0
+      },
+      {
+        "id": "pmo-203",
+        "sourceComponentId": "pmo-199",
+        "sourcePortId": "out",
+        "targetComponentId": "pmo-202",
+        "targetPortId": "in1",
+        "value": 0
+      },
+      {
+        "id": "pmo-204",
+        "sourceComponentId": "pmo-15",
+        "sourcePortId": "mout",
+        "targetComponentId": "pmo-202",
+        "targetPortId": "in2",
+        "value": 0
+      },
+      {
+        "id": "pmo-206",
+        "sourceComponentId": "pmo-202",
+        "sourcePortId": "out",
+        "targetComponentId": "pmo-205",
+        "targetPortId": "in1",
+        "value": 0
+      },
+      {
+        "id": "pmo-207",
+        "sourceComponentId": "pmo-17",
+        "sourcePortId": "mout",
+        "targetComponentId": "pmo-205",
+        "targetPortId": "in2",
+        "value": 0
+      },
+      {
+        "id": "pmo-209",
+        "sourceComponentId": "pmo-205",
+        "sourcePortId": "out",
+        "targetComponentId": "pmo-208",
+        "targetPortId": "in1",
+        "value": 0
+      },
+      {
+        "id": "pmo-210",
+        "sourceComponentId": "pmo-19",
+        "sourcePortId": "mout",
+        "targetComponentId": "pmo-208",
+        "targetPortId": "in2",
+        "value": 0
+      },
+      {
+        "id": "pmo-212",
+        "sourceComponentId": "pmo-208",
+        "sourcePortId": "out",
+        "targetComponentId": "pmo-211",
+        "targetPortId": "in1",
+        "value": 0
+      },
+      {
+        "id": "pmo-213",
+        "sourceComponentId": "pmo-192",
+        "sourcePortId": "out",
+        "targetComponentId": "pmo-211",
+        "targetPortId": "in2",
+        "value": 0
+      },
+      {
+        "id": "pmo-215",
+        "sourceComponentId": "pmo-211",
+        "sourcePortId": "out",
+        "targetComponentId": "pmo-214",
+        "targetPortId": "in1",
+        "value": 0
+      },
+      {
+        "id": "pmo-216",
+        "sourceComponentId": "pmo-194",
+        "sourcePortId": "out",
+        "targetComponentId": "pmo-214",
+        "targetPortId": "in2",
+        "value": 0
+      },
+      {
+        "id": "pmo-218",
+        "sourceComponentId": "pmo-183",
+        "sourcePortId": "out",
+        "targetComponentId": "pmo-217",
+        "targetPortId": "in1",
+        "value": 0
+      },
+      {
+        "id": "pmo-219",
+        "sourceComponentId": "pmo-214",
+        "sourcePortId": "out",
+        "targetComponentId": "pmo-217",
+        "targetPortId": "in2",
+        "value": 0
+      },
+      {
+        "id": "pmo-221",
+        "sourceComponentId": "pmo-1",
+        "sourcePortId": "out",
+        "targetComponentId": "pmo-220",
+        "targetPortId": "in",
+        "value": 0
+      },
+      {
+        "id": "pmo-223",
+        "sourceComponentId": "pmo-2",
+        "sourcePortId": "out",
+        "targetComponentId": "pmo-222",
+        "targetPortId": "in",
+        "value": 0
+      },
+      {
+        "id": "pmo-225",
+        "sourceComponentId": "pmo-3",
+        "sourcePortId": "out",
+        "targetComponentId": "pmo-224",
+        "targetPortId": "in",
+        "value": 0
+      },
+      {
+        "id": "pmo-227",
+        "sourceComponentId": "pmo-7",
+        "sourcePortId": "out",
+        "targetComponentId": "pmo-226",
+        "targetPortId": "in",
+        "value": 0
+      },
+      {
+        "id": "pmo-229",
+        "sourceComponentId": "pmo-8",
+        "sourcePortId": "out",
+        "targetComponentId": "pmo-228",
+        "targetPortId": "in",
+        "value": 0
+      },
+      {
+        "id": "pmo-231",
+        "sourceComponentId": "pmo-220",
+        "sourcePortId": "out",
+        "targetComponentId": "pmo-230",
+        "targetPortId": "in1",
+        "value": 0
+      },
+      {
+        "id": "pmo-232",
+        "sourceComponentId": "pmo-222",
+        "sourcePortId": "out",
+        "targetComponentId": "pmo-230",
+        "targetPortId": "in2",
+        "value": 0
+      },
+      {
+        "id": "pmo-234",
+        "sourceComponentId": "pmo-230",
+        "sourcePortId": "out",
+        "targetComponentId": "pmo-233",
+        "targetPortId": "in1",
+        "value": 0
+      },
+      {
+        "id": "pmo-235",
+        "sourceComponentId": "pmo-224",
+        "sourcePortId": "out",
+        "targetComponentId": "pmo-233",
+        "targetPortId": "in2",
+        "value": 0
+      },
+      {
+        "id": "pmo-237",
+        "sourceComponentId": "pmo-233",
+        "sourcePortId": "out",
+        "targetComponentId": "pmo-236",
+        "targetPortId": "in1",
+        "value": 0
+      },
+      {
+        "id": "pmo-238",
+        "sourceComponentId": "pmo-4",
+        "sourcePortId": "out",
+        "targetComponentId": "pmo-236",
+        "targetPortId": "in2",
+        "value": 0
+      },
+      {
+        "id": "pmo-240",
+        "sourceComponentId": "pmo-236",
+        "sourcePortId": "out",
+        "targetComponentId": "pmo-239",
+        "targetPortId": "in1",
+        "value": 0
+      },
+      {
+        "id": "pmo-241",
+        "sourceComponentId": "pmo-5",
+        "sourcePortId": "out",
+        "targetComponentId": "pmo-239",
+        "targetPortId": "in2",
+        "value": 0
+      },
+      {
+        "id": "pmo-243",
+        "sourceComponentId": "pmo-239",
+        "sourcePortId": "out",
+        "targetComponentId": "pmo-242",
+        "targetPortId": "in1",
+        "value": 0
+      },
+      {
+        "id": "pmo-244",
+        "sourceComponentId": "pmo-6",
+        "sourcePortId": "out",
+        "targetComponentId": "pmo-242",
+        "targetPortId": "in2",
+        "value": 0
+      },
+      {
+        "id": "pmo-246",
+        "sourceComponentId": "pmo-242",
+        "sourcePortId": "out",
+        "targetComponentId": "pmo-245",
+        "targetPortId": "in1",
+        "value": 0
+      },
+      {
+        "id": "pmo-247",
+        "sourceComponentId": "pmo-226",
+        "sourcePortId": "out",
+        "targetComponentId": "pmo-245",
+        "targetPortId": "in2",
+        "value": 0
+      },
+      {
+        "id": "pmo-249",
+        "sourceComponentId": "pmo-245",
+        "sourcePortId": "out",
+        "targetComponentId": "pmo-248",
+        "targetPortId": "in1",
+        "value": 0
+      },
+      {
+        "id": "pmo-250",
+        "sourceComponentId": "pmo-228",
+        "sourcePortId": "out",
+        "targetComponentId": "pmo-248",
+        "targetPortId": "in2",
+        "value": 0
+      },
+      {
+        "id": "pmo-252",
+        "sourceComponentId": "pmo-9",
+        "sourcePortId": "mout",
+        "targetComponentId": "pmo-251",
+        "targetPortId": "in",
+        "value": 0
+      },
+      {
+        "id": "pmo-254",
+        "sourceComponentId": "pmo-11",
+        "sourcePortId": "mout",
+        "targetComponentId": "pmo-253",
+        "targetPortId": "in",
+        "value": 0
+      },
+      {
+        "id": "pmo-256",
+        "sourceComponentId": "pmo-13",
+        "sourcePortId": "mout",
+        "targetComponentId": "pmo-255",
+        "targetPortId": "in",
+        "value": 0
+      },
+      {
+        "id": "pmo-258",
+        "sourceComponentId": "pmo-15",
+        "sourcePortId": "mout",
+        "targetComponentId": "pmo-257",
+        "targetPortId": "in",
+        "value": 0
+      },
+      {
+        "id": "pmo-260",
+        "sourceComponentId": "pmo-23",
+        "sourcePortId": "mout",
+        "targetComponentId": "pmo-259",
+        "targetPortId": "in",
+        "value": 0
+      },
+      {
+        "id": "pmo-262",
+        "sourceComponentId": "pmo-251",
+        "sourcePortId": "out",
+        "targetComponentId": "pmo-261",
+        "targetPortId": "in1",
+        "value": 0
+      },
+      {
+        "id": "pmo-263",
+        "sourceComponentId": "pmo-253",
+        "sourcePortId": "out",
+        "targetComponentId": "pmo-261",
+        "targetPortId": "in2",
+        "value": 0
+      },
+      {
+        "id": "pmo-265",
+        "sourceComponentId": "pmo-261",
+        "sourcePortId": "out",
+        "targetComponentId": "pmo-264",
+        "targetPortId": "in1",
+        "value": 0
+      },
+      {
+        "id": "pmo-266",
+        "sourceComponentId": "pmo-255",
+        "sourcePortId": "out",
+        "targetComponentId": "pmo-264",
+        "targetPortId": "in2",
+        "value": 0
+      },
+      {
+        "id": "pmo-268",
+        "sourceComponentId": "pmo-264",
+        "sourcePortId": "out",
+        "targetComponentId": "pmo-267",
+        "targetPortId": "in1",
+        "value": 0
+      },
+      {
+        "id": "pmo-269",
+        "sourceComponentId": "pmo-257",
+        "sourcePortId": "out",
+        "targetComponentId": "pmo-267",
+        "targetPortId": "in2",
+        "value": 0
+      },
+      {
+        "id": "pmo-271",
+        "sourceComponentId": "pmo-267",
+        "sourcePortId": "out",
+        "targetComponentId": "pmo-270",
+        "targetPortId": "in1",
+        "value": 0
+      },
+      {
+        "id": "pmo-272",
+        "sourceComponentId": "pmo-17",
+        "sourcePortId": "mout",
+        "targetComponentId": "pmo-270",
+        "targetPortId": "in2",
+        "value": 0
+      },
+      {
+        "id": "pmo-274",
+        "sourceComponentId": "pmo-270",
+        "sourcePortId": "out",
+        "targetComponentId": "pmo-273",
+        "targetPortId": "in1",
+        "value": 0
+      },
+      {
+        "id": "pmo-275",
+        "sourceComponentId": "pmo-19",
+        "sourcePortId": "mout",
+        "targetComponentId": "pmo-273",
+        "targetPortId": "in2",
+        "value": 0
+      },
+      {
+        "id": "pmo-277",
+        "sourceComponentId": "pmo-273",
+        "sourcePortId": "out",
+        "targetComponentId": "pmo-276",
+        "targetPortId": "in1",
+        "value": 0
+      },
+      {
+        "id": "pmo-278",
+        "sourceComponentId": "pmo-21",
+        "sourcePortId": "mout",
+        "targetComponentId": "pmo-276",
+        "targetPortId": "in2",
+        "value": 0
+      },
+      {
+        "id": "pmo-280",
+        "sourceComponentId": "pmo-276",
+        "sourcePortId": "out",
+        "targetComponentId": "pmo-279",
+        "targetPortId": "in1",
+        "value": 0
+      },
+      {
+        "id": "pmo-281",
+        "sourceComponentId": "pmo-259",
+        "sourcePortId": "out",
+        "targetComponentId": "pmo-279",
+        "targetPortId": "in2",
+        "value": 0
+      },
+      {
+        "id": "pmo-283",
+        "sourceComponentId": "pmo-248",
+        "sourcePortId": "out",
+        "targetComponentId": "pmo-282",
+        "targetPortId": "in1",
+        "value": 0
+      },
+      {
+        "id": "pmo-284",
+        "sourceComponentId": "pmo-279",
+        "sourcePortId": "out",
+        "targetComponentId": "pmo-282",
+        "targetPortId": "in2",
+        "value": 0
+      },
+      {
+        "id": "pmo-286",
+        "sourceComponentId": "pmo-1",
+        "sourcePortId": "out",
+        "targetComponentId": "pmo-285",
+        "targetPortId": "in",
+        "value": 0
+      },
+      {
+        "id": "pmo-288",
+        "sourceComponentId": "pmo-2",
+        "sourcePortId": "out",
+        "targetComponentId": "pmo-287",
+        "targetPortId": "in",
+        "value": 0
+      },
+      {
+        "id": "pmo-290",
+        "sourceComponentId": "pmo-3",
+        "sourcePortId": "out",
+        "targetComponentId": "pmo-289",
+        "targetPortId": "in",
+        "value": 0
+      },
+      {
+        "id": "pmo-292",
+        "sourceComponentId": "pmo-4",
+        "sourcePortId": "out",
+        "targetComponentId": "pmo-291",
+        "targetPortId": "in",
+        "value": 0
+      },
+      {
+        "id": "pmo-294",
+        "sourceComponentId": "pmo-8",
+        "sourcePortId": "out",
+        "targetComponentId": "pmo-293",
+        "targetPortId": "in",
+        "value": 0
+      },
+      {
+        "id": "pmo-296",
+        "sourceComponentId": "pmo-285",
+        "sourcePortId": "out",
+        "targetComponentId": "pmo-295",
+        "targetPortId": "in1",
+        "value": 0
+      },
+      {
+        "id": "pmo-297",
+        "sourceComponentId": "pmo-287",
+        "sourcePortId": "out",
+        "targetComponentId": "pmo-295",
+        "targetPortId": "in2",
+        "value": 0
+      },
+      {
+        "id": "pmo-299",
+        "sourceComponentId": "pmo-295",
+        "sourcePortId": "out",
+        "targetComponentId": "pmo-298",
+        "targetPortId": "in1",
+        "value": 0
+      },
+      {
+        "id": "pmo-300",
+        "sourceComponentId": "pmo-289",
+        "sourcePortId": "out",
+        "targetComponentId": "pmo-298",
+        "targetPortId": "in2",
+        "value": 0
+      },
+      {
+        "id": "pmo-302",
+        "sourceComponentId": "pmo-298",
+        "sourcePortId": "out",
+        "targetComponentId": "pmo-301",
+        "targetPortId": "in1",
+        "value": 0
+      },
+      {
+        "id": "pmo-303",
+        "sourceComponentId": "pmo-291",
+        "sourcePortId": "out",
+        "targetComponentId": "pmo-301",
+        "targetPortId": "in2",
+        "value": 0
+      },
+      {
+        "id": "pmo-305",
+        "sourceComponentId": "pmo-301",
+        "sourcePortId": "out",
+        "targetComponentId": "pmo-304",
+        "targetPortId": "in1",
+        "value": 0
+      },
+      {
+        "id": "pmo-306",
+        "sourceComponentId": "pmo-5",
+        "sourcePortId": "out",
+        "targetComponentId": "pmo-304",
+        "targetPortId": "in2",
+        "value": 0
+      },
+      {
+        "id": "pmo-308",
+        "sourceComponentId": "pmo-304",
+        "sourcePortId": "out",
+        "targetComponentId": "pmo-307",
+        "targetPortId": "in1",
+        "value": 0
+      },
+      {
+        "id": "pmo-309",
+        "sourceComponentId": "pmo-6",
+        "sourcePortId": "out",
+        "targetComponentId": "pmo-307",
+        "targetPortId": "in2",
+        "value": 0
+      },
+      {
+        "id": "pmo-311",
+        "sourceComponentId": "pmo-307",
+        "sourcePortId": "out",
+        "targetComponentId": "pmo-310",
+        "targetPortId": "in1",
+        "value": 0
+      },
+      {
+        "id": "pmo-312",
+        "sourceComponentId": "pmo-7",
+        "sourcePortId": "out",
+        "targetComponentId": "pmo-310",
+        "targetPortId": "in2",
+        "value": 0
+      },
+      {
+        "id": "pmo-314",
+        "sourceComponentId": "pmo-310",
+        "sourcePortId": "out",
+        "targetComponentId": "pmo-313",
+        "targetPortId": "in1",
+        "value": 0
+      },
+      {
+        "id": "pmo-315",
+        "sourceComponentId": "pmo-293",
+        "sourcePortId": "out",
+        "targetComponentId": "pmo-313",
+        "targetPortId": "in2",
+        "value": 0
+      },
+      {
+        "id": "pmo-317",
+        "sourceComponentId": "pmo-9",
+        "sourcePortId": "mout",
+        "targetComponentId": "pmo-316",
+        "targetPortId": "in",
+        "value": 0
+      },
+      {
+        "id": "pmo-319",
+        "sourceComponentId": "pmo-11",
+        "sourcePortId": "mout",
+        "targetComponentId": "pmo-318",
+        "targetPortId": "in",
+        "value": 0
+      },
+      {
+        "id": "pmo-321",
+        "sourceComponentId": "pmo-13",
+        "sourcePortId": "mout",
+        "targetComponentId": "pmo-320",
+        "targetPortId": "in",
+        "value": 0
+      },
+      {
+        "id": "pmo-323",
+        "sourceComponentId": "pmo-15",
+        "sourcePortId": "mout",
+        "targetComponentId": "pmo-322",
+        "targetPortId": "in",
+        "value": 0
+      },
+      {
+        "id": "pmo-325",
+        "sourceComponentId": "pmo-17",
+        "sourcePortId": "mout",
+        "targetComponentId": "pmo-324",
+        "targetPortId": "in",
+        "value": 0
+      },
+      {
+        "id": "pmo-327",
+        "sourceComponentId": "pmo-316",
+        "sourcePortId": "out",
+        "targetComponentId": "pmo-326",
+        "targetPortId": "in1",
+        "value": 0
+      },
+      {
+        "id": "pmo-328",
+        "sourceComponentId": "pmo-318",
+        "sourcePortId": "out",
+        "targetComponentId": "pmo-326",
+        "targetPortId": "in2",
+        "value": 0
+      },
+      {
+        "id": "pmo-330",
+        "sourceComponentId": "pmo-326",
+        "sourcePortId": "out",
+        "targetComponentId": "pmo-329",
+        "targetPortId": "in1",
+        "value": 0
+      },
+      {
+        "id": "pmo-331",
+        "sourceComponentId": "pmo-320",
+        "sourcePortId": "out",
+        "targetComponentId": "pmo-329",
+        "targetPortId": "in2",
+        "value": 0
+      },
+      {
+        "id": "pmo-333",
+        "sourceComponentId": "pmo-329",
+        "sourcePortId": "out",
+        "targetComponentId": "pmo-332",
+        "targetPortId": "in1",
+        "value": 0
+      },
+      {
+        "id": "pmo-334",
+        "sourceComponentId": "pmo-322",
+        "sourcePortId": "out",
+        "targetComponentId": "pmo-332",
+        "targetPortId": "in2",
+        "value": 0
+      },
+      {
+        "id": "pmo-336",
+        "sourceComponentId": "pmo-332",
+        "sourcePortId": "out",
+        "targetComponentId": "pmo-335",
+        "targetPortId": "in1",
+        "value": 0
+      },
+      {
+        "id": "pmo-337",
+        "sourceComponentId": "pmo-324",
+        "sourcePortId": "out",
+        "targetComponentId": "pmo-335",
+        "targetPortId": "in2",
+        "value": 0
+      },
+      {
+        "id": "pmo-339",
+        "sourceComponentId": "pmo-335",
+        "sourcePortId": "out",
+        "targetComponentId": "pmo-338",
+        "targetPortId": "in1",
+        "value": 0
+      },
+      {
+        "id": "pmo-340",
+        "sourceComponentId": "pmo-19",
+        "sourcePortId": "mout",
+        "targetComponentId": "pmo-338",
+        "targetPortId": "in2",
+        "value": 0
+      },
+      {
+        "id": "pmo-342",
+        "sourceComponentId": "pmo-338",
+        "sourcePortId": "out",
+        "targetComponentId": "pmo-341",
+        "targetPortId": "in1",
+        "value": 0
+      },
+      {
+        "id": "pmo-343",
+        "sourceComponentId": "pmo-21",
+        "sourcePortId": "mout",
+        "targetComponentId": "pmo-341",
+        "targetPortId": "in2",
+        "value": 0
+      },
+      {
+        "id": "pmo-345",
+        "sourceComponentId": "pmo-341",
+        "sourcePortId": "out",
+        "targetComponentId": "pmo-344",
+        "targetPortId": "in1",
+        "value": 0
+      },
+      {
+        "id": "pmo-346",
+        "sourceComponentId": "pmo-23",
+        "sourcePortId": "mout",
+        "targetComponentId": "pmo-344",
+        "targetPortId": "in2",
+        "value": 0
+      },
+      {
+        "id": "pmo-348",
+        "sourceComponentId": "pmo-313",
+        "sourcePortId": "out",
+        "targetComponentId": "pmo-347",
+        "targetPortId": "in1",
+        "value": 0
+      },
+      {
+        "id": "pmo-349",
+        "sourceComponentId": "pmo-344",
+        "sourcePortId": "out",
+        "targetComponentId": "pmo-347",
+        "targetPortId": "in2",
+        "value": 0
+      },
+      {
+        "id": "pmo-351",
+        "sourceComponentId": "pmo-87",
+        "sourcePortId": "out",
+        "targetComponentId": "pmo-350",
+        "targetPortId": "in1",
+        "value": 0
+      },
+      {
+        "id": "pmo-352",
+        "sourceComponentId": "pmo-152",
+        "sourcePortId": "out",
+        "targetComponentId": "pmo-350",
+        "targetPortId": "in2",
+        "value": 0
+      },
+      {
+        "id": "pmo-354",
+        "sourceComponentId": "pmo-350",
+        "sourcePortId": "out",
+        "targetComponentId": "pmo-353",
+        "targetPortId": "in1",
+        "value": 0
+      },
+      {
+        "id": "pmo-355",
+        "sourceComponentId": "pmo-217",
+        "sourcePortId": "out",
+        "targetComponentId": "pmo-353",
+        "targetPortId": "in2",
+        "value": 0
+      },
+      {
+        "id": "pmo-357",
+        "sourceComponentId": "pmo-353",
+        "sourcePortId": "out",
+        "targetComponentId": "pmo-356",
+        "targetPortId": "in1",
+        "value": 0
+      },
+      {
+        "id": "pmo-358",
+        "sourceComponentId": "pmo-282",
+        "sourcePortId": "out",
+        "targetComponentId": "pmo-356",
+        "targetPortId": "in2",
+        "value": 0
+      },
+      {
+        "id": "pmo-360",
+        "sourceComponentId": "pmo-356",
+        "sourcePortId": "out",
+        "targetComponentId": "pmo-359",
+        "targetPortId": "in1",
+        "value": 0
+      },
+      {
+        "id": "pmo-361",
+        "sourceComponentId": "pmo-347",
+        "sourcePortId": "out",
+        "targetComponentId": "pmo-359",
+        "targetPortId": "in2",
+        "value": 0
+      },
+      {
+        "id": "pmo-363",
+        "sourceComponentId": "pmo-359",
+        "sourcePortId": "out",
+        "targetComponentId": "pmo-362",
+        "targetPortId": "in",
+        "value": 0
+      }
+    ]
+  },
+  "broken": {
+    "components": [
+      {
+        "id": "pmo-1",
+        "type": "INPUT",
+        "x": 241,
+        "y": 60,
+        "label": "IN1",
+        "ports": [
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "pmo-2",
+        "type": "INPUT",
+        "x": 336,
+        "y": 60,
+        "label": "IN2",
+        "ports": [
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "pmo-3",
+        "type": "INPUT",
+        "x": 676,
+        "y": 60,
+        "label": "IN3",
+        "ports": [
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "pmo-4",
+        "type": "INPUT",
+        "x": 1016,
+        "y": 60,
+        "label": "IN4",
+        "ports": [
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "pmo-5",
+        "type": "INPUT",
+        "x": 1356,
+        "y": 60,
+        "label": "IN5",
+        "ports": [
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "pmo-6",
+        "type": "INPUT",
+        "x": 1696,
+        "y": 60,
+        "label": "IN6",
+        "ports": [
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "pmo-7",
+        "type": "INPUT",
+        "x": 2036,
+        "y": 60,
+        "label": "IN7",
+        "ports": [
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "pmo-8",
+        "type": "INPUT",
+        "x": 2376,
+        "y": 60,
+        "label": "IN8",
+        "ports": [
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "pmo-9",
+        "type": "NOT",
+        "x": 1160,
+        "y": 270,
+        "label": "",
+        "ports": [
+          {
+            "id": "in",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "pmo-11",
+        "type": "NOT",
+        "x": 1500,
+        "y": 270,
+        "label": "",
+        "ports": [
+          {
+            "id": "in",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "pmo-13",
+        "type": "NOT",
+        "x": 1840,
+        "y": 270,
+        "label": "",
+        "ports": [
+          {
+            "id": "in",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "pmo-15",
+        "type": "NOT",
+        "x": 2180,
+        "y": 270,
+        "label": "",
+        "ports": [
+          {
+            "id": "in",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "pmo-17",
+        "type": "NOT",
+        "x": 2520,
+        "y": 270,
+        "label": "",
+        "ports": [
+          {
+            "id": "in",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "pmo-19",
+        "type": "AND",
+        "x": 620,
+        "y": 230,
+        "label": "",
+        "ports": [
+          {
+            "id": "in1",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "in2",
+            "label": "",
+            "side": "left",
+            "index": 1
+          },
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "pmo-22",
+        "type": "AND",
+        "x": 960,
+        "y": 230,
+        "label": "",
+        "ports": [
+          {
+            "id": "in1",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "in2",
+            "label": "",
+            "side": "left",
+            "index": 1
+          },
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "pmo-25",
+        "type": "AND",
+        "x": 1300,
+        "y": 230,
+        "label": "",
+        "ports": [
+          {
+            "id": "in1",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "in2",
+            "label": "",
+            "side": "left",
+            "index": 1
+          },
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "pmo-28",
+        "type": "AND",
+        "x": 1640,
+        "y": 230,
+        "label": "",
+        "ports": [
+          {
+            "id": "in1",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "in2",
+            "label": "",
+            "side": "left",
+            "index": 1
+          },
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "pmo-31",
+        "type": "AND",
+        "x": 1980,
+        "y": 230,
+        "label": "",
+        "ports": [
+          {
+            "id": "in1",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "in2",
+            "label": "",
+            "side": "left",
+            "index": 1
+          },
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "pmo-34",
+        "type": "AND",
+        "x": 2320,
+        "y": 230,
+        "label": "",
+        "ports": [
+          {
+            "id": "in1",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "in2",
+            "label": "",
+            "side": "left",
+            "index": 1
+          },
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "pmo-37",
+        "type": "AND",
+        "x": 2660,
+        "y": 230,
+        "label": "",
+        "ports": [
+          {
+            "id": "in1",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "in2",
+            "label": "",
+            "side": "left",
+            "index": 1
+          },
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "pmo-40",
+        "type": "NOT",
+        "x": 480,
+        "y": 342,
+        "label": "",
+        "ports": [
+          {
+            "id": "in",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "pmo-42",
+        "type": "NOT",
+        "x": 1500,
+        "y": 380,
+        "label": "",
+        "ports": [
+          {
+            "id": "in",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "pmo-44",
+        "type": "NOT",
+        "x": 1840,
+        "y": 380,
+        "label": "",
+        "ports": [
+          {
+            "id": "in",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "pmo-46",
+        "type": "NOT",
+        "x": 2180,
+        "y": 380,
+        "label": "",
+        "ports": [
+          {
+            "id": "in",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "pmo-48",
+        "type": "NOT",
+        "x": 2520,
+        "y": 380,
+        "label": "",
+        "ports": [
+          {
+            "id": "in",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "pmo-50",
+        "type": "AND",
+        "x": 620,
+        "y": 340,
+        "label": "",
+        "ports": [
+          {
+            "id": "in1",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "in2",
+            "label": "",
+            "side": "left",
+            "index": 1
+          },
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "pmo-53",
+        "type": "AND",
+        "x": 960,
+        "y": 340,
+        "label": "",
+        "ports": [
+          {
+            "id": "in1",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "in2",
+            "label": "",
+            "side": "left",
+            "index": 1
+          },
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "pmo-56",
+        "type": "AND",
+        "x": 1300,
+        "y": 340,
+        "label": "",
+        "ports": [
+          {
+            "id": "in1",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "in2",
+            "label": "",
+            "side": "left",
+            "index": 1
+          },
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "pmo-59",
+        "type": "AND",
+        "x": 1640,
+        "y": 340,
+        "label": "",
+        "ports": [
+          {
+            "id": "in1",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "in2",
+            "label": "",
+            "side": "left",
+            "index": 1
+          },
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "pmo-62",
+        "type": "AND",
+        "x": 1980,
+        "y": 340,
+        "label": "",
+        "ports": [
+          {
+            "id": "in1",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "in2",
+            "label": "",
+            "side": "left",
+            "index": 1
+          },
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "pmo-65",
+        "type": "AND",
+        "x": 2320,
+        "y": 340,
+        "label": "",
+        "ports": [
+          {
+            "id": "in1",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "in2",
+            "label": "",
+            "side": "left",
+            "index": 1
+          },
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "pmo-68",
+        "type": "AND",
+        "x": 2660,
+        "y": 340,
+        "label": "",
+        "ports": [
+          {
+            "id": "in1",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "in2",
+            "label": "",
+            "side": "left",
+            "index": 1
+          },
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "pmo-71",
+        "type": "NOT",
+        "x": 480,
+        "y": 452,
+        "label": "",
+        "ports": [
+          {
+            "id": "in",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "pmo-73",
+        "type": "NOT",
+        "x": 480,
+        "y": 506,
+        "label": "",
+        "ports": [
+          {
+            "id": "in",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "pmo-75",
+        "type": "NOT",
+        "x": 1840,
+        "y": 490,
+        "label": "",
+        "ports": [
+          {
+            "id": "in",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "pmo-77",
+        "type": "NOT",
+        "x": 2180,
+        "y": 490,
+        "label": "",
+        "ports": [
+          {
+            "id": "in",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "pmo-79",
+        "type": "NOT",
+        "x": 2520,
+        "y": 490,
+        "label": "",
+        "ports": [
+          {
+            "id": "in",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "pmo-81",
+        "type": "AND",
+        "x": 620,
+        "y": 450,
+        "label": "",
+        "ports": [
+          {
+            "id": "in1",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "in2",
+            "label": "",
+            "side": "left",
+            "index": 1
+          },
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "pmo-84",
+        "type": "AND",
+        "x": 960,
+        "y": 450,
+        "label": "",
+        "ports": [
+          {
+            "id": "in1",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "in2",
+            "label": "",
+            "side": "left",
+            "index": 1
+          },
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "pmo-87",
+        "type": "AND",
+        "x": 1300,
+        "y": 450,
+        "label": "",
+        "ports": [
+          {
+            "id": "in1",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "in2",
+            "label": "",
+            "side": "left",
+            "index": 1
+          },
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "pmo-90",
+        "type": "AND",
+        "x": 1640,
+        "y": 450,
+        "label": "",
+        "ports": [
+          {
+            "id": "in1",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "in2",
+            "label": "",
+            "side": "left",
+            "index": 1
+          },
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "pmo-93",
+        "type": "AND",
+        "x": 1980,
+        "y": 450,
+        "label": "",
+        "ports": [
+          {
+            "id": "in1",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "in2",
+            "label": "",
+            "side": "left",
+            "index": 1
+          },
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "pmo-96",
+        "type": "AND",
+        "x": 2320,
+        "y": 450,
+        "label": "",
+        "ports": [
+          {
+            "id": "in1",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "in2",
+            "label": "",
+            "side": "left",
+            "index": 1
+          },
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "pmo-99",
+        "type": "AND",
+        "x": 2660,
+        "y": 450,
+        "label": "",
+        "ports": [
+          {
+            "id": "in1",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "in2",
+            "label": "",
+            "side": "left",
+            "index": 1
+          },
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "pmo-102",
+        "type": "NOT",
+        "x": 480,
+        "y": 562,
+        "label": "",
+        "ports": [
+          {
+            "id": "in",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "pmo-104",
+        "type": "NOT",
+        "x": 480,
+        "y": 616,
+        "label": "",
+        "ports": [
+          {
+            "id": "in",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "pmo-106",
+        "type": "NOT",
+        "x": 820,
+        "y": 600,
+        "label": "",
+        "ports": [
+          {
+            "id": "in",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "pmo-108",
+        "type": "NOT",
+        "x": 2180,
+        "y": 600,
+        "label": "",
+        "ports": [
+          {
+            "id": "in",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "pmo-110",
+        "type": "NOT",
+        "x": 2520,
+        "y": 600,
+        "label": "",
+        "ports": [
+          {
+            "id": "in",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "pmo-112",
+        "type": "AND",
+        "x": 620,
+        "y": 560,
+        "label": "",
+        "ports": [
+          {
+            "id": "in1",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "in2",
+            "label": "",
+            "side": "left",
+            "index": 1
+          },
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "pmo-115",
+        "type": "AND",
+        "x": 960,
+        "y": 560,
+        "label": "",
+        "ports": [
+          {
+            "id": "in1",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "in2",
+            "label": "",
+            "side": "left",
+            "index": 1
+          },
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "pmo-118",
+        "type": "AND",
+        "x": 1300,
+        "y": 560,
+        "label": "",
+        "ports": [
+          {
+            "id": "in1",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "in2",
+            "label": "",
+            "side": "left",
+            "index": 1
+          },
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "pmo-121",
+        "type": "AND",
+        "x": 1640,
+        "y": 560,
+        "label": "",
+        "ports": [
+          {
+            "id": "in1",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "in2",
+            "label": "",
+            "side": "left",
+            "index": 1
+          },
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "pmo-124",
+        "type": "AND",
+        "x": 1980,
+        "y": 560,
+        "label": "",
+        "ports": [
+          {
+            "id": "in1",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "in2",
+            "label": "",
+            "side": "left",
+            "index": 1
+          },
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "pmo-127",
+        "type": "AND",
+        "x": 2320,
+        "y": 560,
+        "label": "",
+        "ports": [
+          {
+            "id": "in1",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "in2",
+            "label": "",
+            "side": "left",
+            "index": 1
+          },
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "pmo-130",
+        "type": "AND",
+        "x": 2660,
+        "y": 560,
+        "label": "",
+        "ports": [
+          {
+            "id": "in1",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "in2",
+            "label": "",
+            "side": "left",
+            "index": 1
+          },
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "pmo-133",
+        "type": "NOT",
+        "x": 480,
+        "y": 672,
+        "label": "",
+        "ports": [
+          {
+            "id": "in",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "pmo-135",
+        "type": "NOT",
+        "x": 480,
+        "y": 726,
+        "label": "",
+        "ports": [
+          {
+            "id": "in",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "pmo-137",
+        "type": "NOT",
+        "x": 820,
+        "y": 710,
+        "label": "",
+        "ports": [
+          {
+            "id": "in",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "pmo-139",
+        "type": "NOT",
+        "x": 1160,
+        "y": 710,
+        "label": "",
+        "ports": [
+          {
+            "id": "in",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "pmo-141",
+        "type": "NOT",
+        "x": 2520,
+        "y": 710,
+        "label": "",
+        "ports": [
+          {
+            "id": "in",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "pmo-143",
+        "type": "AND",
+        "x": 620,
+        "y": 670,
+        "label": "",
+        "ports": [
+          {
+            "id": "in1",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "in2",
+            "label": "",
+            "side": "left",
+            "index": 1
+          },
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "pmo-146",
+        "type": "AND",
+        "x": 960,
+        "y": 670,
+        "label": "",
+        "ports": [
+          {
+            "id": "in1",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "in2",
+            "label": "",
+            "side": "left",
+            "index": 1
+          },
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "pmo-149",
+        "type": "AND",
+        "x": 1300,
+        "y": 670,
+        "label": "",
+        "ports": [
+          {
+            "id": "in1",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "in2",
+            "label": "",
+            "side": "left",
+            "index": 1
+          },
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "pmo-152",
+        "type": "AND",
+        "x": 1640,
+        "y": 670,
+        "label": "",
+        "ports": [
+          {
+            "id": "in1",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "in2",
+            "label": "",
+            "side": "left",
+            "index": 1
+          },
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "pmo-155",
+        "type": "AND",
+        "x": 1980,
+        "y": 670,
+        "label": "",
+        "ports": [
+          {
+            "id": "in1",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "in2",
+            "label": "",
+            "side": "left",
+            "index": 1
+          },
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "pmo-158",
+        "type": "AND",
+        "x": 2320,
+        "y": 670,
+        "label": "",
+        "ports": [
+          {
+            "id": "in1",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "in2",
+            "label": "",
+            "side": "left",
+            "index": 1
+          },
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "pmo-161",
+        "type": "AND",
+        "x": 2660,
+        "y": 670,
+        "label": "",
+        "ports": [
+          {
+            "id": "in1",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "in2",
+            "label": "",
+            "side": "left",
+            "index": 1
+          },
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "pmo-164",
+        "type": "NOT",
+        "x": 480,
+        "y": 782,
+        "label": "",
+        "ports": [
+          {
+            "id": "in",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "pmo-166",
+        "type": "NOT",
+        "x": 480,
+        "y": 836,
+        "label": "",
+        "ports": [
+          {
+            "id": "in",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "pmo-168",
+        "type": "NOT",
+        "x": 820,
+        "y": 820,
+        "label": "",
+        "ports": [
+          {
+            "id": "in",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "pmo-170",
+        "type": "NOT",
+        "x": 1160,
+        "y": 820,
+        "label": "",
+        "ports": [
+          {
+            "id": "in",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "pmo-172",
+        "type": "NOT",
+        "x": 1500,
+        "y": 820,
+        "label": "",
+        "ports": [
+          {
+            "id": "in",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "pmo-174",
+        "type": "AND",
+        "x": 620,
+        "y": 780,
+        "label": "",
+        "ports": [
+          {
+            "id": "in1",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "in2",
+            "label": "",
+            "side": "left",
+            "index": 1
+          },
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "pmo-177",
+        "type": "AND",
+        "x": 960,
+        "y": 780,
+        "label": "",
+        "ports": [
+          {
+            "id": "in1",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "in2",
+            "label": "",
+            "side": "left",
+            "index": 1
+          },
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "pmo-180",
+        "type": "AND",
+        "x": 1300,
+        "y": 780,
+        "label": "",
+        "ports": [
+          {
+            "id": "in1",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "in2",
+            "label": "",
+            "side": "left",
+            "index": 1
+          },
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "pmo-183",
+        "type": "AND",
+        "x": 1640,
+        "y": 780,
+        "label": "",
+        "ports": [
+          {
+            "id": "in1",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "in2",
+            "label": "",
+            "side": "left",
+            "index": 1
+          },
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "pmo-186",
+        "type": "AND",
+        "x": 1980,
+        "y": 780,
+        "label": "",
+        "ports": [
+          {
+            "id": "in1",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "in2",
+            "label": "",
+            "side": "left",
+            "index": 1
+          },
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "pmo-189",
+        "type": "AND",
+        "x": 2320,
+        "y": 780,
+        "label": "",
+        "ports": [
+          {
+            "id": "in1",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "in2",
+            "label": "",
+            "side": "left",
+            "index": 1
+          },
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "pmo-192",
+        "type": "AND",
+        "x": 2660,
+        "y": 780,
+        "label": "",
+        "ports": [
+          {
+            "id": "in1",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "in2",
+            "label": "",
+            "side": "left",
+            "index": 1
+          },
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "pmo-195",
+        "type": "OR",
+        "x": 2885,
+        "y": 285,
+        "label": "",
+        "ports": [
+          {
+            "id": "in1",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "in2",
+            "label": "",
+            "side": "left",
+            "index": 1
+          },
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "pmo-198",
+        "type": "OR",
+        "x": 2930,
+        "y": 368,
+        "label": "",
+        "ports": [
+          {
+            "id": "in1",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "in2",
+            "label": "",
+            "side": "left",
+            "index": 1
+          },
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "pmo-201",
+        "type": "OR",
+        "x": 2975,
+        "y": 464,
+        "label": "",
+        "ports": [
+          {
+            "id": "in1",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "in2",
+            "label": "",
+            "side": "left",
+            "index": 1
+          },
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "pmo-204",
+        "type": "OR",
+        "x": 3020,
+        "y": 567,
+        "label": "",
+        "ports": [
+          {
+            "id": "in1",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "in2",
+            "label": "",
+            "side": "left",
+            "index": 1
+          },
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "pmo-207",
+        "type": "OR",
+        "x": 3065,
+        "y": 674,
+        "label": "",
+        "ports": [
+          {
+            "id": "in1",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "in2",
+            "label": "",
+            "side": "left",
+            "index": 1
+          },
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "pmo-210",
+        "type": "OUTPUT",
+        "x": 3280,
+        "y": 689,
+        "label": "OUT1",
+        "ports": [
+          {
+            "id": "in",
+            "label": "",
+            "side": "left",
+            "index": 0
+          }
+        ]
+      }
+    ],
+    "wires": [
+      {
+        "id": "pmo-10",
+        "sourceComponentId": "pmo-4",
+        "sourcePortId": "out",
+        "targetComponentId": "pmo-9",
+        "targetPortId": "in",
+        "value": 0
+      },
+      {
+        "id": "pmo-12",
+        "sourceComponentId": "pmo-5",
+        "sourcePortId": "out",
+        "targetComponentId": "pmo-11",
+        "targetPortId": "in",
+        "value": 0
+      },
+      {
+        "id": "pmo-14",
+        "sourceComponentId": "pmo-6",
+        "sourcePortId": "out",
+        "targetComponentId": "pmo-13",
+        "targetPortId": "in",
+        "value": 0
+      },
+      {
+        "id": "pmo-16",
+        "sourceComponentId": "pmo-7",
+        "sourcePortId": "out",
+        "targetComponentId": "pmo-15",
+        "targetPortId": "in",
+        "value": 0
+      },
+      {
+        "id": "pmo-18",
+        "sourceComponentId": "pmo-8",
+        "sourcePortId": "out",
+        "targetComponentId": "pmo-17",
+        "targetPortId": "in",
+        "value": 0
+      },
+      {
+        "id": "pmo-20",
+        "sourceComponentId": "pmo-1",
+        "sourcePortId": "out",
+        "targetComponentId": "pmo-19",
+        "targetPortId": "in1",
+        "value": 0
+      },
+      {
+        "id": "pmo-21",
+        "sourceComponentId": "pmo-2",
+        "sourcePortId": "out",
+        "targetComponentId": "pmo-19",
+        "targetPortId": "in2",
+        "value": 0
+      },
+      {
+        "id": "pmo-23",
+        "sourceComponentId": "pmo-19",
+        "sourcePortId": "out",
+        "targetComponentId": "pmo-22",
+        "targetPortId": "in1",
+        "value": 0
+      },
+      {
+        "id": "pmo-24",
+        "sourceComponentId": "pmo-3",
+        "sourcePortId": "out",
+        "targetComponentId": "pmo-22",
+        "targetPortId": "in2",
+        "value": 0
+      },
+      {
+        "id": "pmo-26",
+        "sourceComponentId": "pmo-22",
+        "sourcePortId": "out",
+        "targetComponentId": "pmo-25",
+        "targetPortId": "in1",
+        "value": 0
+      },
+      {
+        "id": "pmo-27",
+        "sourceComponentId": "pmo-9",
+        "sourcePortId": "out",
+        "targetComponentId": "pmo-25",
+        "targetPortId": "in2",
+        "value": 0
+      },
+      {
+        "id": "pmo-29",
+        "sourceComponentId": "pmo-25",
+        "sourcePortId": "out",
+        "targetComponentId": "pmo-28",
+        "targetPortId": "in1",
+        "value": 0
+      },
+      {
+        "id": "pmo-30",
+        "sourceComponentId": "pmo-11",
+        "sourcePortId": "out",
+        "targetComponentId": "pmo-28",
+        "targetPortId": "in2",
+        "value": 0
+      },
+      {
+        "id": "pmo-32",
+        "sourceComponentId": "pmo-28",
+        "sourcePortId": "out",
+        "targetComponentId": "pmo-31",
+        "targetPortId": "in1",
+        "value": 0
+      },
+      {
+        "id": "pmo-33",
+        "sourceComponentId": "pmo-13",
+        "sourcePortId": "out",
+        "targetComponentId": "pmo-31",
+        "targetPortId": "in2",
+        "value": 0
+      },
+      {
+        "id": "pmo-35",
+        "sourceComponentId": "pmo-31",
+        "sourcePortId": "out",
+        "targetComponentId": "pmo-34",
+        "targetPortId": "in1",
+        "value": 0
+      },
+      {
+        "id": "pmo-36",
+        "sourceComponentId": "pmo-15",
+        "sourcePortId": "out",
+        "targetComponentId": "pmo-34",
+        "targetPortId": "in2",
+        "value": 0
+      },
+      {
+        "id": "pmo-38",
+        "sourceComponentId": "pmo-34",
+        "sourcePortId": "out",
+        "targetComponentId": "pmo-37",
+        "targetPortId": "in1",
+        "value": 0
+      },
+      {
+        "id": "pmo-39",
+        "sourceComponentId": "pmo-17",
+        "sourcePortId": "out",
+        "targetComponentId": "pmo-37",
+        "targetPortId": "in2",
+        "value": 0
+      },
+      {
+        "id": "pmo-41",
+        "sourceComponentId": "pmo-1",
+        "sourcePortId": "out",
+        "targetComponentId": "pmo-40",
+        "targetPortId": "in",
+        "value": 0
+      },
+      {
+        "id": "pmo-43",
+        "sourceComponentId": "pmo-5",
+        "sourcePortId": "out",
+        "targetComponentId": "pmo-42",
+        "targetPortId": "in",
+        "value": 0
+      },
+      {
+        "id": "pmo-45",
+        "sourceComponentId": "pmo-6",
+        "sourcePortId": "out",
+        "targetComponentId": "pmo-44",
+        "targetPortId": "in",
+        "value": 0
+      },
+      {
+        "id": "pmo-47",
+        "sourceComponentId": "pmo-7",
+        "sourcePortId": "out",
+        "targetComponentId": "pmo-46",
+        "targetPortId": "in",
+        "value": 0
+      },
+      {
+        "id": "pmo-49",
+        "sourceComponentId": "pmo-8",
+        "sourcePortId": "out",
+        "targetComponentId": "pmo-48",
+        "targetPortId": "in",
+        "value": 0
+      },
+      {
+        "id": "pmo-51",
+        "sourceComponentId": "pmo-40",
+        "sourcePortId": "out",
+        "targetComponentId": "pmo-50",
+        "targetPortId": "in1",
+        "value": 0
+      },
+      {
+        "id": "pmo-52",
+        "sourceComponentId": "pmo-2",
+        "sourcePortId": "out",
+        "targetComponentId": "pmo-50",
+        "targetPortId": "in2",
+        "value": 0
+      },
+      {
+        "id": "pmo-54",
+        "sourceComponentId": "pmo-50",
+        "sourcePortId": "out",
+        "targetComponentId": "pmo-53",
+        "targetPortId": "in1",
+        "value": 0
+      },
+      {
+        "id": "pmo-55",
+        "sourceComponentId": "pmo-3",
+        "sourcePortId": "out",
+        "targetComponentId": "pmo-53",
+        "targetPortId": "in2",
+        "value": 0
+      },
+      {
+        "id": "pmo-57",
+        "sourceComponentId": "pmo-53",
+        "sourcePortId": "out",
+        "targetComponentId": "pmo-56",
+        "targetPortId": "in1",
+        "value": 0
+      },
+      {
+        "id": "pmo-58",
+        "sourceComponentId": "pmo-4",
+        "sourcePortId": "out",
+        "targetComponentId": "pmo-56",
+        "targetPortId": "in2",
+        "value": 0
+      },
+      {
+        "id": "pmo-60",
+        "sourceComponentId": "pmo-56",
+        "sourcePortId": "out",
+        "targetComponentId": "pmo-59",
+        "targetPortId": "in1",
+        "value": 0
+      },
+      {
+        "id": "pmo-61",
+        "sourceComponentId": "pmo-42",
+        "sourcePortId": "out",
+        "targetComponentId": "pmo-59",
+        "targetPortId": "in2",
+        "value": 0
+      },
+      {
+        "id": "pmo-63",
+        "sourceComponentId": "pmo-59",
+        "sourcePortId": "out",
+        "targetComponentId": "pmo-62",
+        "targetPortId": "in1",
+        "value": 0
+      },
+      {
+        "id": "pmo-64",
+        "sourceComponentId": "pmo-44",
+        "sourcePortId": "out",
+        "targetComponentId": "pmo-62",
+        "targetPortId": "in2",
+        "value": 0
+      },
+      {
+        "id": "pmo-66",
+        "sourceComponentId": "pmo-62",
+        "sourcePortId": "out",
+        "targetComponentId": "pmo-65",
+        "targetPortId": "in1",
+        "value": 0
+      },
+      {
+        "id": "pmo-67",
+        "sourceComponentId": "pmo-46",
+        "sourcePortId": "out",
+        "targetComponentId": "pmo-65",
+        "targetPortId": "in2",
+        "value": 0
+      },
+      {
+        "id": "pmo-69",
+        "sourceComponentId": "pmo-65",
+        "sourcePortId": "out",
+        "targetComponentId": "pmo-68",
+        "targetPortId": "in1",
+        "value": 0
+      },
+      {
+        "id": "pmo-70",
+        "sourceComponentId": "pmo-48",
+        "sourcePortId": "out",
+        "targetComponentId": "pmo-68",
+        "targetPortId": "in2",
+        "value": 0
+      },
+      {
+        "id": "pmo-72",
+        "sourceComponentId": "pmo-1",
+        "sourcePortId": "out",
+        "targetComponentId": "pmo-71",
+        "targetPortId": "in",
+        "value": 0
+      },
+      {
+        "id": "pmo-74",
+        "sourceComponentId": "pmo-2",
+        "sourcePortId": "out",
+        "targetComponentId": "pmo-73",
+        "targetPortId": "in",
+        "value": 0
+      },
+      {
+        "id": "pmo-76",
+        "sourceComponentId": "pmo-6",
+        "sourcePortId": "out",
+        "targetComponentId": "pmo-75",
+        "targetPortId": "in",
+        "value": 0
+      },
+      {
+        "id": "pmo-78",
+        "sourceComponentId": "pmo-7",
+        "sourcePortId": "out",
+        "targetComponentId": "pmo-77",
+        "targetPortId": "in",
+        "value": 0
+      },
+      {
+        "id": "pmo-80",
+        "sourceComponentId": "pmo-8",
+        "sourcePortId": "out",
+        "targetComponentId": "pmo-79",
+        "targetPortId": "in",
+        "value": 0
+      },
+      {
+        "id": "pmo-82",
+        "sourceComponentId": "pmo-71",
+        "sourcePortId": "out",
+        "targetComponentId": "pmo-81",
+        "targetPortId": "in1",
+        "value": 0
+      },
+      {
+        "id": "pmo-83",
+        "sourceComponentId": "pmo-73",
+        "sourcePortId": "out",
+        "targetComponentId": "pmo-81",
+        "targetPortId": "in2",
+        "value": 0
+      },
+      {
+        "id": "pmo-85",
+        "sourceComponentId": "pmo-81",
+        "sourcePortId": "out",
+        "targetComponentId": "pmo-84",
+        "targetPortId": "in1",
+        "value": 0
+      },
+      {
+        "id": "pmo-86",
+        "sourceComponentId": "pmo-3",
+        "sourcePortId": "out",
+        "targetComponentId": "pmo-84",
+        "targetPortId": "in2",
+        "value": 0
+      },
+      {
+        "id": "pmo-88",
+        "sourceComponentId": "pmo-84",
+        "sourcePortId": "out",
+        "targetComponentId": "pmo-87",
+        "targetPortId": "in1",
+        "value": 0
+      },
+      {
+        "id": "pmo-89",
+        "sourceComponentId": "pmo-4",
+        "sourcePortId": "out",
+        "targetComponentId": "pmo-87",
+        "targetPortId": "in2",
+        "value": 0
+      },
+      {
+        "id": "pmo-91",
+        "sourceComponentId": "pmo-87",
+        "sourcePortId": "out",
+        "targetComponentId": "pmo-90",
+        "targetPortId": "in1",
+        "value": 0
+      },
+      {
+        "id": "pmo-92",
+        "sourceComponentId": "pmo-5",
+        "sourcePortId": "out",
+        "targetComponentId": "pmo-90",
+        "targetPortId": "in2",
+        "value": 0
+      },
+      {
+        "id": "pmo-94",
+        "sourceComponentId": "pmo-90",
+        "sourcePortId": "out",
+        "targetComponentId": "pmo-93",
+        "targetPortId": "in1",
+        "value": 0
+      },
+      {
+        "id": "pmo-95",
+        "sourceComponentId": "pmo-75",
+        "sourcePortId": "out",
+        "targetComponentId": "pmo-93",
+        "targetPortId": "in2",
+        "value": 0
+      },
+      {
+        "id": "pmo-97",
+        "sourceComponentId": "pmo-93",
+        "sourcePortId": "out",
+        "targetComponentId": "pmo-96",
+        "targetPortId": "in1",
+        "value": 0
+      },
+      {
+        "id": "pmo-98",
+        "sourceComponentId": "pmo-77",
+        "sourcePortId": "out",
+        "targetComponentId": "pmo-96",
+        "targetPortId": "in2",
+        "value": 0
+      },
+      {
+        "id": "pmo-100",
+        "sourceComponentId": "pmo-96",
+        "sourcePortId": "out",
+        "targetComponentId": "pmo-99",
+        "targetPortId": "in1",
+        "value": 0
+      },
+      {
+        "id": "pmo-101",
+        "sourceComponentId": "pmo-79",
+        "sourcePortId": "out",
+        "targetComponentId": "pmo-99",
+        "targetPortId": "in2",
+        "value": 0
+      },
+      {
+        "id": "pmo-103",
+        "sourceComponentId": "pmo-1",
+        "sourcePortId": "out",
+        "targetComponentId": "pmo-102",
+        "targetPortId": "in",
+        "value": 0
+      },
+      {
+        "id": "pmo-105",
+        "sourceComponentId": "pmo-2",
+        "sourcePortId": "out",
+        "targetComponentId": "pmo-104",
+        "targetPortId": "in",
+        "value": 0
+      },
+      {
+        "id": "pmo-107",
+        "sourceComponentId": "pmo-3",
+        "sourcePortId": "out",
+        "targetComponentId": "pmo-106",
+        "targetPortId": "in",
+        "value": 0
+      },
+      {
+        "id": "pmo-109",
+        "sourceComponentId": "pmo-7",
+        "sourcePortId": "out",
+        "targetComponentId": "pmo-108",
+        "targetPortId": "in",
+        "value": 0
+      },
+      {
+        "id": "pmo-111",
+        "sourceComponentId": "pmo-8",
+        "sourcePortId": "out",
+        "targetComponentId": "pmo-110",
+        "targetPortId": "in",
+        "value": 0
+      },
+      {
+        "id": "pmo-113",
+        "sourceComponentId": "pmo-102",
+        "sourcePortId": "out",
+        "targetComponentId": "pmo-112",
+        "targetPortId": "in1",
+        "value": 0
+      },
+      {
+        "id": "pmo-114",
+        "sourceComponentId": "pmo-104",
+        "sourcePortId": "out",
+        "targetComponentId": "pmo-112",
+        "targetPortId": "in2",
+        "value": 0
+      },
+      {
+        "id": "pmo-116",
+        "sourceComponentId": "pmo-112",
+        "sourcePortId": "out",
+        "targetComponentId": "pmo-115",
+        "targetPortId": "in1",
+        "value": 0
+      },
+      {
+        "id": "pmo-117",
+        "sourceComponentId": "pmo-106",
+        "sourcePortId": "out",
+        "targetComponentId": "pmo-115",
+        "targetPortId": "in2",
+        "value": 0
+      },
+      {
+        "id": "pmo-119",
+        "sourceComponentId": "pmo-115",
+        "sourcePortId": "out",
+        "targetComponentId": "pmo-118",
+        "targetPortId": "in1",
+        "value": 0
+      },
+      {
+        "id": "pmo-120",
+        "sourceComponentId": "pmo-4",
+        "sourcePortId": "out",
+        "targetComponentId": "pmo-118",
+        "targetPortId": "in2",
+        "value": 0
+      },
+      {
+        "id": "pmo-122",
+        "sourceComponentId": "pmo-118",
+        "sourcePortId": "out",
+        "targetComponentId": "pmo-121",
+        "targetPortId": "in1",
+        "value": 0
+      },
+      {
+        "id": "pmo-123",
+        "sourceComponentId": "pmo-5",
+        "sourcePortId": "out",
+        "targetComponentId": "pmo-121",
+        "targetPortId": "in2",
+        "value": 0
+      },
+      {
+        "id": "pmo-125",
+        "sourceComponentId": "pmo-121",
+        "sourcePortId": "out",
+        "targetComponentId": "pmo-124",
+        "targetPortId": "in1",
+        "value": 0
+      },
+      {
+        "id": "pmo-126",
+        "sourceComponentId": "pmo-6",
+        "sourcePortId": "out",
+        "targetComponentId": "pmo-124",
+        "targetPortId": "in2",
+        "value": 0
+      },
+      {
+        "id": "pmo-128",
+        "sourceComponentId": "pmo-124",
+        "sourcePortId": "out",
+        "targetComponentId": "pmo-127",
+        "targetPortId": "in1",
+        "value": 0
+      },
+      {
+        "id": "pmo-129",
+        "sourceComponentId": "pmo-108",
+        "sourcePortId": "out",
+        "targetComponentId": "pmo-127",
+        "targetPortId": "in2",
+        "value": 0
+      },
+      {
+        "id": "pmo-131",
+        "sourceComponentId": "pmo-127",
+        "sourcePortId": "out",
+        "targetComponentId": "pmo-130",
+        "targetPortId": "in1",
+        "value": 0
+      },
+      {
+        "id": "pmo-132",
+        "sourceComponentId": "pmo-110",
+        "sourcePortId": "out",
+        "targetComponentId": "pmo-130",
+        "targetPortId": "in2",
+        "value": 0
+      },
+      {
+        "id": "pmo-134",
+        "sourceComponentId": "pmo-1",
+        "sourcePortId": "out",
+        "targetComponentId": "pmo-133",
+        "targetPortId": "in",
+        "value": 0
+      },
+      {
+        "id": "pmo-136",
+        "sourceComponentId": "pmo-2",
+        "sourcePortId": "out",
+        "targetComponentId": "pmo-135",
+        "targetPortId": "in",
+        "value": 0
+      },
+      {
+        "id": "pmo-138",
+        "sourceComponentId": "pmo-3",
+        "sourcePortId": "out",
+        "targetComponentId": "pmo-137",
+        "targetPortId": "in",
+        "value": 0
+      },
+      {
+        "id": "pmo-140",
+        "sourceComponentId": "pmo-4",
+        "sourcePortId": "out",
+        "targetComponentId": "pmo-139",
+        "targetPortId": "in",
+        "value": 0
+      },
+      {
+        "id": "pmo-142",
+        "sourceComponentId": "pmo-8",
+        "sourcePortId": "out",
+        "targetComponentId": "pmo-141",
+        "targetPortId": "in",
+        "value": 0
+      },
+      {
+        "id": "pmo-144",
+        "sourceComponentId": "pmo-133",
+        "sourcePortId": "out",
+        "targetComponentId": "pmo-143",
+        "targetPortId": "in1",
+        "value": 0
+      },
+      {
+        "id": "pmo-145",
+        "sourceComponentId": "pmo-135",
+        "sourcePortId": "out",
+        "targetComponentId": "pmo-143",
+        "targetPortId": "in2",
+        "value": 0
+      },
+      {
+        "id": "pmo-147",
+        "sourceComponentId": "pmo-143",
+        "sourcePortId": "out",
+        "targetComponentId": "pmo-146",
+        "targetPortId": "in1",
+        "value": 0
+      },
+      {
+        "id": "pmo-148",
+        "sourceComponentId": "pmo-137",
+        "sourcePortId": "out",
+        "targetComponentId": "pmo-146",
+        "targetPortId": "in2",
+        "value": 0
+      },
+      {
+        "id": "pmo-150",
+        "sourceComponentId": "pmo-146",
+        "sourcePortId": "out",
+        "targetComponentId": "pmo-149",
+        "targetPortId": "in1",
+        "value": 0
+      },
+      {
+        "id": "pmo-151",
+        "sourceComponentId": "pmo-139",
+        "sourcePortId": "out",
+        "targetComponentId": "pmo-149",
+        "targetPortId": "in2",
+        "value": 0
+      },
+      {
+        "id": "pmo-153",
+        "sourceComponentId": "pmo-149",
+        "sourcePortId": "out",
+        "targetComponentId": "pmo-152",
+        "targetPortId": "in1",
+        "value": 0
+      },
+      {
+        "id": "pmo-154",
+        "sourceComponentId": "pmo-5",
+        "sourcePortId": "out",
+        "targetComponentId": "pmo-152",
+        "targetPortId": "in2",
+        "value": 0
+      },
+      {
+        "id": "pmo-156",
+        "sourceComponentId": "pmo-152",
+        "sourcePortId": "out",
+        "targetComponentId": "pmo-155",
+        "targetPortId": "in1",
+        "value": 0
+      },
+      {
+        "id": "pmo-157",
+        "sourceComponentId": "pmo-6",
+        "sourcePortId": "out",
+        "targetComponentId": "pmo-155",
+        "targetPortId": "in2",
+        "value": 0
+      },
+      {
+        "id": "pmo-159",
+        "sourceComponentId": "pmo-155",
+        "sourcePortId": "out",
+        "targetComponentId": "pmo-158",
+        "targetPortId": "in1",
+        "value": 0
+      },
+      {
+        "id": "pmo-160",
+        "sourceComponentId": "pmo-7",
+        "sourcePortId": "out",
+        "targetComponentId": "pmo-158",
+        "targetPortId": "in2",
+        "value": 0
+      },
+      {
+        "id": "pmo-162",
+        "sourceComponentId": "pmo-158",
+        "sourcePortId": "out",
+        "targetComponentId": "pmo-161",
+        "targetPortId": "in1",
+        "value": 0
+      },
+      {
+        "id": "pmo-163",
+        "sourceComponentId": "pmo-141",
+        "sourcePortId": "out",
+        "targetComponentId": "pmo-161",
+        "targetPortId": "in2",
+        "value": 0
+      },
+      {
+        "id": "pmo-165",
+        "sourceComponentId": "pmo-1",
+        "sourcePortId": "out",
+        "targetComponentId": "pmo-164",
+        "targetPortId": "in",
+        "value": 0
+      },
+      {
+        "id": "pmo-167",
+        "sourceComponentId": "pmo-2",
+        "sourcePortId": "out",
+        "targetComponentId": "pmo-166",
+        "targetPortId": "in",
+        "value": 0
+      },
+      {
+        "id": "pmo-169",
+        "sourceComponentId": "pmo-3",
+        "sourcePortId": "out",
+        "targetComponentId": "pmo-168",
+        "targetPortId": "in",
+        "value": 0
+      },
+      {
+        "id": "pmo-171",
+        "sourceComponentId": "pmo-4",
+        "sourcePortId": "out",
+        "targetComponentId": "pmo-170",
+        "targetPortId": "in",
+        "value": 0
+      },
+      {
+        "id": "pmo-173",
+        "sourceComponentId": "pmo-5",
+        "sourcePortId": "out",
+        "targetComponentId": "pmo-172",
+        "targetPortId": "in",
+        "value": 0
+      },
+      {
+        "id": "pmo-175",
+        "sourceComponentId": "pmo-164",
+        "sourcePortId": "out",
+        "targetComponentId": "pmo-174",
+        "targetPortId": "in1",
+        "value": 0
+      },
+      {
+        "id": "pmo-176",
+        "sourceComponentId": "pmo-166",
+        "sourcePortId": "out",
+        "targetComponentId": "pmo-174",
+        "targetPortId": "in2",
+        "value": 0
+      },
+      {
+        "id": "pmo-178",
+        "sourceComponentId": "pmo-174",
+        "sourcePortId": "out",
+        "targetComponentId": "pmo-177",
+        "targetPortId": "in1",
+        "value": 0
+      },
+      {
+        "id": "pmo-179",
+        "sourceComponentId": "pmo-168",
+        "sourcePortId": "out",
+        "targetComponentId": "pmo-177",
+        "targetPortId": "in2",
+        "value": 0
+      },
+      {
+        "id": "pmo-181",
+        "sourceComponentId": "pmo-177",
+        "sourcePortId": "out",
+        "targetComponentId": "pmo-180",
+        "targetPortId": "in1",
+        "value": 0
+      },
+      {
+        "id": "pmo-182",
+        "sourceComponentId": "pmo-170",
+        "sourcePortId": "out",
+        "targetComponentId": "pmo-180",
+        "targetPortId": "in2",
+        "value": 0
+      },
+      {
+        "id": "pmo-184",
+        "sourceComponentId": "pmo-180",
+        "sourcePortId": "out",
+        "targetComponentId": "pmo-183",
+        "targetPortId": "in1",
+        "value": 0
+      },
+      {
+        "id": "pmo-185",
+        "sourceComponentId": "pmo-172",
+        "sourcePortId": "out",
+        "targetComponentId": "pmo-183",
+        "targetPortId": "in2",
+        "value": 0
+      },
+      {
+        "id": "pmo-187",
+        "sourceComponentId": "pmo-183",
+        "sourcePortId": "out",
+        "targetComponentId": "pmo-186",
+        "targetPortId": "in1",
+        "value": 0
+      },
+      {
+        "id": "pmo-188",
+        "sourceComponentId": "pmo-6",
+        "sourcePortId": "out",
+        "targetComponentId": "pmo-186",
+        "targetPortId": "in2",
+        "value": 0
+      },
+      {
+        "id": "pmo-190",
+        "sourceComponentId": "pmo-186",
+        "sourcePortId": "out",
+        "targetComponentId": "pmo-189",
+        "targetPortId": "in1",
+        "value": 0
+      },
+      {
+        "id": "pmo-191",
+        "sourceComponentId": "pmo-7",
+        "sourcePortId": "out",
+        "targetComponentId": "pmo-189",
+        "targetPortId": "in2",
+        "value": 0
+      },
+      {
+        "id": "pmo-193",
+        "sourceComponentId": "pmo-189",
+        "sourcePortId": "out",
+        "targetComponentId": "pmo-192",
+        "targetPortId": "in1",
+        "value": 0
+      },
+      {
+        "id": "pmo-194",
+        "sourceComponentId": "pmo-8",
+        "sourcePortId": "out",
+        "targetComponentId": "pmo-192",
+        "targetPortId": "in2",
+        "value": 0
+      },
+      {
+        "id": "pmo-196",
+        "sourceComponentId": "pmo-37",
+        "sourcePortId": "out",
+        "targetComponentId": "pmo-195",
+        "targetPortId": "in1",
+        "value": 0
+      },
+      {
+        "id": "pmo-197",
+        "sourceComponentId": "pmo-68",
+        "sourcePortId": "out",
+        "targetComponentId": "pmo-195",
+        "targetPortId": "in2",
+        "value": 0
+      },
+      {
+        "id": "pmo-199",
+        "sourceComponentId": "pmo-195",
+        "sourcePortId": "out",
+        "targetComponentId": "pmo-198",
+        "targetPortId": "in1",
+        "value": 0
+      },
+      {
+        "id": "pmo-200",
+        "sourceComponentId": "pmo-99",
+        "sourcePortId": "out",
+        "targetComponentId": "pmo-198",
+        "targetPortId": "in2",
+        "value": 0
+      },
+      {
+        "id": "pmo-202",
+        "sourceComponentId": "pmo-198",
+        "sourcePortId": "out",
+        "targetComponentId": "pmo-201",
+        "targetPortId": "in1",
+        "value": 0
+      },
+      {
+        "id": "pmo-203",
+        "sourceComponentId": "pmo-130",
+        "sourcePortId": "out",
+        "targetComponentId": "pmo-201",
+        "targetPortId": "in2",
+        "value": 0
+      },
+      {
+        "id": "pmo-205",
+        "sourceComponentId": "pmo-201",
+        "sourcePortId": "out",
+        "targetComponentId": "pmo-204",
+        "targetPortId": "in1",
+        "value": 0
+      },
+      {
+        "id": "pmo-206",
+        "sourceComponentId": "pmo-161",
+        "sourcePortId": "out",
+        "targetComponentId": "pmo-204",
+        "targetPortId": "in2",
+        "value": 0
+      },
+      {
+        "id": "pmo-208",
+        "sourceComponentId": "pmo-204",
+        "sourcePortId": "out",
+        "targetComponentId": "pmo-207",
+        "targetPortId": "in1",
+        "value": 0
+      },
+      {
+        "id": "pmo-209",
+        "sourceComponentId": "pmo-192",
+        "sourcePortId": "out",
+        "targetComponentId": "pmo-207",
+        "targetPortId": "in2",
+        "value": 0
+      },
+      {
+        "id": "pmo-211",
+        "sourceComponentId": "pmo-207",
+        "sourcePortId": "out",
+        "targetComponentId": "pmo-210",
+        "targetPortId": "in",
+        "value": 0
+      }
+    ]
+  }
+}

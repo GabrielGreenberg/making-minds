@@ -151,12 +151,20 @@ console.log('\nMEM ROUTING — A* reaches MEM.min in a clean field (no fallback)
 }
 
 // ─── 3. Fallback budget across the CC/SC reference fixtures ─────────────────
-// Pinned S1 state (bounds fix): 99 total, residuals exactly in the eight
-// fixtures below (was 283 before MEM got real 50×50 bounds). S3/S4 are
-// expected to LOWER these — update the table deliberately, never upward
-// without a design decision.
+// Pinned S1 state (bounds fix): 99 total across the eight original fixtures
+// (was 283 before MEM got real 50×50 bounds), + 48 for hw3-p11 (added
+// iteration 20, a DELIBERATE pin: root-caused as the router's structural XOR
+// floor — XOR's left-port inset (11.25px) exceeds STUB_LENGTH(12) −
+// ELEMENT_MARGIN(5), so every wire targeting an XOR in-port has its A* goal
+// stub tip inside the expanded obstacle bounds → exactly 3 fallbacks per
+// XOR-in wire; hw3-p11-correct has 16 such wires. The WHOLE table is this
+// class: 3 × XOR-in wires per fixture, plus one doomed non-XOR wire each in
+// hw3-p1/p8/p9). S3/S4 are expected to LOWER these — fix candidates: exempt
+// own-component bounds on first/last approach edges, or lengthen the stub
+// past inset+margin. Update the table deliberately, never upward without a
+// design decision.
 
-const MAX_TOTAL_FALLBACKS = 99;
+const MAX_TOTAL_FALLBACKS = 147;
 const EXPECTED_FALLBACKS: Record<string, number> = {
   'hw2-p3': 6,
   'hw2-p7': 24,
@@ -166,6 +174,7 @@ const EXPECTED_FALLBACKS: Record<string, number> = {
   'hw3-p6': 6,
   'hw3-p8': 3,
   'hw3-p9': 9,
+  'hw3-p11': 48, // structural XOR floor (16 XOR-in wires × 3) — see header note
   // every other CC/SC fixture: 0
 };
 

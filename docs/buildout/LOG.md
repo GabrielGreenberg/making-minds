@@ -812,3 +812,53 @@ iteration of budget. Watch fix-type agents for self-spawned background loops.
 
 **Next:** P3.3 — promote the SC perception fixtures (hw3-p11 change, hw3-p12
 motion k=3 ~80 gates; watch the oracle + bumpCheck on the big one) → 46/56.
+
+## 2026-07-07 (iteration 20) — P3.3: SC perception fixtures · 46/56 · the XOR fallback floor named
+
+**Shipped:** hw3-p11 (change detector) + hw3-p12 (motion detector, k=3) promoted
+from devData Q12/Q13 into exact-tier fixtures. 2-agent build workflow; the p12
+agent solved the hardest layout yet (146 comps/217 wires): ASAP columns
+exhausted the A* budget into 240 fallbacks, so it designed a PLA-matrix layout
+(literal-zone columns, product-block rows, 270°-ROTATED MEMs giving straight
+vertical lanes) → **0 fallbacks**, oracle clean. Adversarial verifier CONFIRMED
+both fixtures (banks byte-identical; independent rule reimplementation matches
+every expectation; temporal probes — same current frame, different output —
+prove the comparison is MEM-temporal, not combinational; broken variants fail
+7/8 and 6/9, both above the sampled-bank WARN bar). Appearance: p11 CLEAN head
+to toe; p12 CLEAN with 17 bumpless crossings exactly matching the documented
+S3 class + 2 cosmetic findings (below). Functional in-browser runs: both
+semantically correct. Harness: **46 exact · 10 pending · 0 regressed · 0
+warnings**; all gates green.
+
+**The routerCheck failure that became a diagnosis:** flipping the manifest rows
+exposed hw3-p11's correct circuit taking 48 fallbacks (pinned 0; budget 147 vs
+99) — caught by the gate AND independently by the verifier. A bounded fix agent
+(hard stop rule, honored) proved a re-layout CANNOT fix it: **the structural
+XOR floor** — XOR's left-port inset (6 + 75·0.07 = 11.25px) exceeds
+STUB_LENGTH(12) − ELEMENT_MARGIN(5), so the A* goal stub tip sits 4.25px inside
+the expanded obstacle bounds and EVERY XOR-in wire costs exactly 3 fallbacks
+(clean-field probe: 3 at every rotation; AND/OR: 0). The entire pre-existing 99
+pin decomposes as 3 × XOR-in wires per fixture (+ one doomed non-XOR wire each
+in hw3-p1/p8/p9). hw3-p12's zero is because it has NO XORs. Deliberately
+pinned `hw3-p11: 48` / budget 147 with the mechanism + fix candidates (exempt
+own-component bounds on approach edges, or lengthen stubs past inset+margin)
+in routerCheck's header. **P1.8 S3 can now kill the whole floor (expected
+post-fix budget ≈ 3), not just trim hug-lanes.**
+
+**Discovered (enqueued):**
+- **P1.15 (real app bug):** SC/FSM sim state leaks across question navigation
+  (switchQuestion resets only TM+turbot) — same family as yesterday's TM leak;
+  deep fix = ONE unified all-modes sim reset. Appearance agent also flagged a
+  chip for Gabriel; coordinate before building.
+- **P1.16 (cosmetic):** rotated-MEM labels bisected by the N-port wire (label
+  anchors ignore rotation).
+- **S3 scope:** INPUT toggle-tabs missing from the router obstacle model
+  (pmo-36 elbows through IN2's tab).
+
+**Notes:** rotated MEMs (270°) validated end-to-end — port math, wiring, text
+upright; a sanctioned first-class geometry field (matches the standing
+orientation-flexible MEM directive). Verifier statement note: rule clauses
+verbatim from hw3.pdf, framing per house style.
+
+**Next:** P1.8 S3 (foreign-lane cost + H4 near-merge + the XOR floor + bumpCheck
+into the gate) — now with three pinned exhibits and a full mechanism map.
