@@ -67,6 +67,6 @@
     { "id": "hw5-p8",  "hw": "HW5", "problem": "8",  "mode": "TM",  "category": "arithmetic",  "title": "x-1 B (0 if x=0)",                       "fixture": "reference/hw5-p8.json", "status": "verified" },
     { "id": "hw5-p9",  "hw": "HW5", "problem": "9",  "mode": "TM",  "category": "arithmetic",  "title": "x+y B (reuse x+1, x-1; clean up tape)",  "fixture": "reference/hw5-p9.json", "status": "verified" },
 
-    { "id": "hw6-p2",  "hw": "HW6", "problem": "2",  "mode": "TM-turbot", "category": "navigation", "title": "Desert Ant: find food (NE), pass over, return to start", "fixture": null, "status": "pending", "tier": "interface", "notes": "TM-brained turbot; 30x30, <=20 tape cells; unknown start + food; multi-arena" }
+    { "id": "hw6-p2",  "hw": "HW6", "problem": "2",  "mode": "TM-turbot", "category": "navigation", "title": "Desert Ant: find food (NE), pass over, return to start", "fixture": "reference/hw6-p2.json", "status": "pending", "tier": "interface", "notes": "TM-brained turbot; 30x30, <=20 tape cells; unknown start + food; multi-arena" }
   ]
 }

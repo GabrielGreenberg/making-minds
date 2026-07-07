@@ -1095,3 +1095,40 @@ it could collide with the uncommitted in-tree fix.
 
 **Next:** P5.1 — the Desert Ant capstone (hw6-p2), the LAST row: 30×30 arena
 family + a plausible turbot-TM brain (≤20 tape cells) at interface tier.
+
+## 2026-07-07 (iteration 25) — P5.1: the Desert Ant lands · THE LEDGER IS COMPLETE AT-TIER (56/56)
+
+**Shipped:** hw6-p2, the final row. One build agent read hw6.pdf and authored
+3× 30×30 walled arenas (food varied within the NE quadrant, start varied;
+food strictly NE in every member) under return-to-start with goal = food —
+the P4.2 goal-visit clause makes "find food, pass over it, return" exactly
+checkable. The brain is the good-faith capstone the tier asks for: a 20-state
+turbot-TM diagonal-staircase forager (6 internal / 14 external states, 45
+transitions) with unary leg-counting on tape and EXACT dead-reckoned return —
+all three arenas end at start, halted; the on-diagonal member finds the food.
+**Honest score 1/3, reported not asserted.** Tape span audited ≤20 (worst
+exactly 20); the engine doesn't enforce the budget (sparse tape) — the
+statement carries it, disclosed.
+
+**Verification:** adversarial verifier CONFIRMED (independent runBrainStep
+re-simulation matched the engine's traces on all three arenas; PDF fidelity
+incl. the two disclosed adaptations — blank starting tape per the engine's
+textbook model, "as quickly as possible" not asserted). Appearance PASS
+(circle/square state shapes DOM-verified per node, turbot grammars rendered
+exactly, live read-only tape panel, machine table + dimmed internal history).
+All gates green BY EXIT CODE: tsc, npm run check, build, server check;
+harness **46 exact · 10 interface · 0 pending · 0 regressed · 0 warnings**.
+
+**Discovered (enqueued):** P5.2 instructor arena editor caps at 20×20 (can't
+author the capstone's own arena in the UI); P5.3 criterion failures without
+step-limit carry reason: undefined (gradebook shows reason-less arenas);
+P6.1 note: 30×30 Map renders correctly but cramped in the 259px data panel
+(no auto-scroll to the turbot).
+
+**Milestone:** every machine-buildable problem in HW1–HW6 now has a verified
+reference fixture at its tier. The /handoff completion criterion ("every row
+green at its tier, all checks pass") is MET — the loop parks itself per its
+charter. Remaining queued work (close-out): P1.5 allowed_components (the one
+grading-integrity gap), P1.6, P1.11, P1.16, P1.8 leftovers, P5.2, P5.3,
+P6.1–P6.4. Resume with /loop /handoff (or /handoff per-iteration) when
+wanted.

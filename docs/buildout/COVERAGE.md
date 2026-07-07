@@ -23,12 +23,14 @@ broken variant needed). Both also require appearance checked against
 [VISUAL_VOCAB.md](VISUAL_VOCAB.md). Tier lives on the manifest row; all 10
 remaining rows are tier `interface`.
 
-**As of 2026-07-07 (post-iteration 24):** **46 exact + 9 interface = 55/56
-at-tier**, 1 pending (hw6-p2, the Desert Ant capstone), 0 regressed, 0
-warnings. ALL navigation rows landed at interface tier with honest reported
-scores; the step-limit/criterion grader fix (criterionRequiresStop —
-pass-through is trace-satisfiable per HW2 §III's Pac-Man rule) landed with
-them. Only the capstone remains.
+**As of 2026-07-07 (post-iteration 25): THE LEDGER IS COMPLETE AT-TIER.**
+**46 exact + 10 interface = 56/56**, 0 pending, 0 regressed, 0 warnings.
+Every machine-buildable problem in HW1–HW6 has a verified reference fixture:
+all arithmetic + perception at the exact tier (correct passes every case,
+broken fails), all navigation + the Desert Ant capstone at the interface tier
+(plausible attempt validates Stage-1 and grades end-to-end; scores reported,
+never asserted — the correct-answers project remains future work). Close-out
+tasks (P1.5 and friends, P6.x) remain in QUEUE.
 
 ## Columns
 
@@ -124,15 +126,15 @@ _Note: HW4 #1–2 (state abstraction / multiple realizability) are analysis essa
 
 _Note: HW5 #10–11 (multiplication strategy / multi-function machine) are prose/flowchart — excluded._
 
-### HW6 — Navigation with Turbots (TM-brained)  ·  0/1
+### HW6 — Navigation with Turbots (TM-brained)  ·  1/1 (interface) ✅-at-tier
 
 | id | problem | category | auth | build | grades | appr | status | notes |
 |----|---------|----------|:----:|:-----:|:------:|:----:|:------:|-------|
-| hw6-p2 | Desert Ant: find food (NE), pass over, return to start | navigation | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | TM-turbot; 30×30, ≤20 tape cells; unknown start+food; **multi-arena** |
+| hw6-p2 | Desert Ant: find food (NE), pass over, return to start | navigation | ✅ | ✅ | ◐ | ✅ | ◐ | `reference/hw6-p2.json`; 3× 30×30 walled arenas (food varied in the NE quadrant, start varied); criterion return-to-start with goal = food (P4.2 clause); 20-state turbot-TM staircase forager, tape span ≤20 (worst exactly 20; budget is statement-level — engine tape is unbounded), exact dead-reckoned return; honest score 1/3 (passes the on-diagonal member); adversarially confirmed incl. independent trace re-simulation |
 
 _Note: HW6 #1 & #3 (flowchart / life-cycle prose) are excluded._
 
 ---
 
-**Totals:** 46 exact + 9 interface = 55 / 56 at-tier · 1 pending (hw6-p2) —
-the harness JSON is authoritative.
+**Totals:** 46 exact + 10 interface = **56 / 56 at-tier** · 0 pending · 0
+regressed — the harness JSON is authoritative.

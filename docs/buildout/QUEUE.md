@@ -341,13 +341,35 @@ HANDOFF's "do this next = P4.3". Task ids unchanged. -->
 
 ## Phase 5 — TM-turbot capstone
 
-- [ ] **P5.1** **Desert Ant** (hw6-p2): TM-brained turbot, 30×30 arena, ≤20 tape
-  cells, food in NE quadrant. **Interface tier — the capstone is an INTERFACE
-  proof, not a solved Desert Ant:** the 30×30 arena family authors and renders,
-  a plausible turbot-TM brain (within the 20-cell tape budget) validates, steps,
-  and grades across the family end-to-end. Whether it finds the food is
-  reported, not required — a correct Desert Ant is the future correct-answers
-  project's flagship, not this one's. **Advances:** hw6-p2.
+- [x] **P5.1** **Desert Ant capstone (hw6-p2).** — _done 2026-07-07
+  (iteration 25; one build agent + adversarial verifier + appearance check)._
+  THE LAST ROW: 3× 30×30 walled arenas (food varied in the NE quadrant,
+  start varied, food strictly NE of start in every member), criterion
+  return-to-start with goal = food per the P4.2 clause (the PDF demands
+  find-then-return; pass-through would ignore the return half). Brain: a
+  20-state turbot-TM diagonal-staircase forager with unary leg-counting and
+  EXACT dead-reckoned return (all three arenas end at start, halted); tape
+  span audited ≤20 (worst exactly 20 — the engine doesn't enforce the
+  budget, the statement carries it); honest score **1/3**, reported not
+  asserted. Verifier confirmed with an independent runBrainStep re-simulation;
+  appearance PASS (6 circle-internal / 14 square-external states DOM-verified,
+  live TurbotTapePanel, machine table + dimmed internal history rows).
+  **LEDGER COMPLETE AT-TIER: 46 exact + 10 interface = 56/56.**
+  Discovered → P5.2, P5.3, P6.1 note (below).
+- [ ] **P5.2** _(discovered 2026-07-07, capstone build)_ **Instructor arena
+  editor caps at 20×20** (`MAX_ARENA_SIZE`) but the capstone needs 30×30 —
+  fixtures hand-author the data (works; ArenaCanvas renders any size), but an
+  instructor can't author the PDF's own arena in the UI. Raise the cap or
+  make it a config with scroll-aware editing.
+  **Acceptance:** a 30×30 arena is authorable in QuestionCreator; existing
+  arenas unaffected.
+- [ ] **P5.3** _(discovered 2026-07-07, capstone verifier)_ **Criterion
+  failures without step-limit carry `reason: undefined`** — gradeTurbotCase
+  only emits reason text on hitStepLimit, so a clean halt-at-start-without-
+  goal-visit shows a reason-less failed arena in the gradebook drill-down.
+  Emit a criterion-named reason on every criterion failure.
+  **Acceptance:** every failing TurbotCaseResult carries a human-readable
+  reason; turbotCheck pins it; existing pins green.
 
 ## Phase 5.5 — Small hardening (slot opportunistically before close-out)
 

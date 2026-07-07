@@ -14,7 +14,15 @@ Claude to load into context).
 >
 > A change isn't finished until the docs that describe it are too.
 
-_Last updated: 2026-07-07 (**turbot navigation: nine reference questions + the step-limit/criterion
+_Last updated: 2026-07-07 (**coverage buildout COMPLETE at-tier: 56/56** — the Desert Ant
+capstone (hw6-p2) landed as the final reference fixture: 3× 30×30 walled arenas (food varied
+in the NE quadrant), return-to-start with goal = food, and a 20-state turbot-TM
+diagonal-staircase forager with exact dead-reckoned return (tape span ≤20; honest score 1/3,
+reported not asserted). The reference-fixture ledger now covers every machine-buildable
+problem in HW1–HW6: 46 rows exact-verified (correct passes every case, broken fails) + 10
+navigation/capstone rows interface-verified (plausible attempt validates + grades end-to-end).
+Close-out items remain queued in docs/buildout/QUEUE.md (allowed_components enforcement is the
+one open grading-integrity gap). Earlier same day, **turbot navigation: nine reference questions + the step-limit/criterion
 fix** — the buildout landed interface-tier reference fixtures for every HW2/HW3/HW4 navigation
 problem (arena families transcribed from the PDFs; plausible CC/SC/FSM brains with honest
 reported scores), which exposed and fixed a real grading defect: `gradeTurbotCase` failed any
