@@ -374,7 +374,12 @@ before Phase 3 (perception returns to router-rendered CC/SC). Task ids unchanged
   one shared label-order helper used by both paths.
   **Acceptance:** single implementation; `npm run check` (incl. hw2-p6 fixture)
   green.
-- [ ] **P1.15** _(discovered 2026-07-07, P3.3 appearance sweep; REAL APP BUG)_
+- [x] **P1.15** — _done 2026-07-07 by a concurrent session (commit `e95f74f`),
+  exactly the prescribed deep fix: ONE aggregate `resetAllSimState()` (delegating
+  to per-mode global resets) on all three navigation paths; pinned by the new
+  `app/tools/navResetCheck.ts` (42 checks, 15 fail without the fix) — exceeds
+  this task's acceptance criterion. Original discovery entry follows._
+  _(discovered 2026-07-07, P3.3 appearance sweep; REAL APP BUG)_
   **SC/FSM sim state leaks across question navigation.** After running one SC
   question, the next question's Global I/O, ARG/VAL, and Sequential Timeline
   show the previous question's data — `switchQuestion` (store.ts ~1402) resets

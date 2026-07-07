@@ -52,6 +52,27 @@ Exhibit (pinned in turbotCheck's new `[multi-arena]` section, 12 checks): a hard
 out-2-back-2 FSM passes the 1-arena family but fails the 3-arena family 1/3, out-4-back-4
 gets 2/3 ≠ pass, the 3-state sensor-reactive Mad Max FSM passes 3/3, the lazy stop-now brain
 0/3; two headless Gradebook-logic pins. Earlier same day,
+**buildout-infra merged into main** — the fixture build-out
+branch (21 loop iterations, previously never merged back) landed on main: the two-tier
+reference-fixture coverage harness (`coverageCheck.ts` + hand-verified fixtures under
+`app/tools/fixtures/reference/`; ledger **46/56 at the exact tier** — all HW1–HW5 arithmetic
+AND all five perception problems; the 10 open rows are navigation/capstone at tier
+`interface` per the 2026-07-06 scope shift); the transition-label **syntax seam**
+`engine/notation.ts` (k-bit FSM symbols, the TM **two-output** label `read:write,move` — a
+deliberate textbook departure, legacy `1:0R` stays a parse alias — and the turbot-FSM 1-bit
+alias grammar, all behind `TransitionNotation`; label dissection outside the seam is banned
+by notationCheck's grep gate); the canonical SC/FSM codec run window (grading-fairness fix,
+pinned by `scWindowCheck.ts`); `requireStandardHaltPosition` wired end-to-end plus per-case
+TM block-separation variation; shared component geometry (`componentGeometry.ts`) + the
+cost-based A* orthogonal wire router (`wireRouter.ts`, divergence dots; `routerCheck`/
+`layoutCheck`/`bumpCheck` — bumpCheck deliberately NOT a gate yet, and routerCheck's fallback
+budget deliberately repinned 99 → 147 for hw3-p11's structural XOR floor of 48); separate
+opposite-direction FSM transition arcs; and the build-out loop infrastructure
+(`docs/buildout/` memos — HANDOFF/QUEUE/LOG/COVERAGE + design memos — and the `/handoff`
+command). The branch's 2026-07-06 TM-reset-on-navigation store change (0ca35b3) is subsumed
+by the same-day `resetAllSimState()` below — navResetCheck still pins the behavior.
+`buildout-infra` stays alive as the loop's working branch (it merges main each iteration);
+its in-flight wireRouter S3 work was NOT part of this merge. Earlier same day,
 **sim-state reset on question navigation** — every question
 navigation path (`switchQuestion`, `openAssignment`, `loadAssignment`) now calls the new
 aggregate store action `resetAllSimState()` — which delegates to the per-mode global resets

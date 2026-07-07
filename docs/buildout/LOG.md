@@ -988,3 +988,22 @@ gate run).
 
 **Next:** P4.3 authors the real nav arenas — Mad Max arenas should mark the
 sensing spot (cell before the block) as the goal so return-to-start bites.
+
+## 2026-07-07 (iteration 22, close) — P4.2 merged · S3 + P1.15 landed concurrently · all gates green
+
+The P4.2 worktree branch merged as `d34d037` (conflicts only in CLAUDE.md +
+LOG — both sides' narratives kept). This iteration's tree hosted THREE
+concurrent lines that all landed cleanly: the loop's P4.2 (goal-visit clause +
+[multi-arena] pins), the chip session's P1.8 S3 (own-endpoint exemption;
+fallbacks 147→2; bumpCheck all-clean and wired into `npm run check`; H4
+conflict-feedback re-routing; scaled A* cap), and Gabriel's P1.15
+(`resetAllSimState()` + navResetCheck, closed in QUEUE — it exceeds the
+acceptance criterion). Post-merge gates: app tsc/check/build green (coverage
+46 exact · 10 pending · 0 regressed), server typecheck + serverCheck green
+(server/ needed its own `npm install` — noted for ops). P1.8 leftovers still
+queued: INPUT toggle-tab obstacles, hw3-p9 dot-skip nit; S4 is unowned again.
+
+**Next:** P4.3 — navigation arenas + plausible brains (9 rows: hw2-p13..15,
+hw3-p13..15, hw4-p12..14; zig-zag FSM printed in HW4 = free; multi-arena
+families per P4.2's grader semantics — mark the sensing spot as the goal on
+return-to-start arenas).
