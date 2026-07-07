@@ -32,18 +32,21 @@ interface Props {
   onCancel: () => void;
 }
 
-// All four machine modes are authorable through this one form: the group
-// shapes, the DSL, and the representation toggle are all mode-agnostic. Only
-// the input-size field differs: CC (the one finite, exhaustively tested space)
-// asks for each group's max input value; SC/FSM/TM input spaces are unbounded,
-// so they are tested on a fixed sample of values across a range of input
-// lengths and have no size field at all.
+// All modes are authorable through this one form: the group shapes, the DSL,
+// and the representation toggle are all mode-agnostic. Only the input-size
+// field differs: CC (the one finite, exhaustively tested space) asks for each
+// group's max input value; SC/FSM/TM input spaces are unbounded, so they are
+// tested on a fixed sample of values across a range of input lengths and have
+// no size field at all. 'Open' is the odd one out: a free-text question is
+// just a name + statement — no representation, formula, or test bank — and is
+// reviewed manually instead of autograded.
 const MODES: { mode: BuildMode; label: string }[] = [
   { mode: 'CC', label: 'CC' },
   { mode: 'SC', label: 'SC' },
   { mode: 'FSM', label: 'FSM' },
   { mode: 'TM', label: 'TM' },
   { mode: 'turbot', label: 'Turbot' },
+  { mode: 'open', label: 'Open' },
 ];
 
 // A turbot's brain is one of the four machine kinds (spec §9.3); the arena
@@ -153,7 +156,8 @@ export function QuestionCreator({ assignmentId, existingQuestion, onSave, onCanc
 
   // ── Live, per-keystroke validation (all O(#groups), no space enumeration) ──
   const isTurbot = mode === 'turbot';
-  const structuralErrors = isTurbot ? [] : validateGroups(inputs, outputs, rep, mode);
+  const isOpen = mode === 'open';
+  const structuralErrors = isTurbot || isOpen ? [] : validateGroups(inputs, outputs, rep, mode);
   const structurallyValid = structuralErrors.length === 0;
   const isCC = mode === 'CC';
   const tooLarge = isCC && countCombos(inputs) > MAX_COMBOS;
@@ -168,7 +172,7 @@ export function QuestionCreator({ assignmentId, existingQuestion, onSave, onCanc
 
   // Single-input evaluation: cheap, and enough to catch formula syntax/reference
   // errors. Only run when the group shapes are valid.
-  const probe = structurallyValid && !isTurbot
+  const probe = structurallyValid && !isTurbot && !isOpen
     ? probeFormulas(inputs, outputs, rep, probeValues, mode)
     : null;
   const formulasOk = probe ? probe.outputErrors.every((e) => e == null) : false;
@@ -181,12 +185,15 @@ export function QuestionCreator({ assignmentId, existingQuestion, onSave, onCanc
     ? 'This success criterion needs at least one goal cell in the arena.'
     : null;
 
+  // Open questions are just a name + statement; nothing else gates saving.
   const saveable =
     label.trim().length > 0 &&
     statement.trim().length > 0 &&
-    (isTurbot
-      ? maxSteps >= 1 && !arenaError
-      : structurallyValid && !tooLarge && formulasOk);
+    (isOpen
+      ? true
+      : isTurbot
+        ? maxSteps >= 1 && !arenaError
+        : structurallyValid && !tooLarge && formulasOk);
 
   // ── Group editing helpers ──────────────────────────────────────
   const updateInput = (i: number, patch: Partial<AuthoredInputGroup>) =>
@@ -199,6 +206,20 @@ export function QuestionCreator({ assignmentId, existingQuestion, onSave, onCanc
     const newId =
       existingQuestion?.id ??
       existingQsForId.reduce((max, q) => Math.max(max, q.id), 0) + 1;
+
+    // Open questions carry only their prompt — no test bank, no grading
+    // machinery. The representation field is meaningless for them; store the
+    // default so the type stays uniform.
+    if (mode === 'open') {
+      onSave({
+        id: newId,
+        label: label.trim(),
+        statement: statement.trim(),
+        buildMode: 'open',
+        representation: 'binary',
+      });
+      return;
+    }
 
     // Turbot questions carry an arena + criterion, not a generated test bank.
     // The authored encoding still matters: it picks a turbot-TM brain's
@@ -290,11 +311,17 @@ export function QuestionCreator({ assignmentId, existingQuestion, onSave, onCanc
             ))}
           </div>
         </div>
-        {!isTurbot && (
+        {!isTurbot && !isOpen && (
           <div className="instructor-section-head">
             <h4 className="instructor-subhead">Representation</h4>
             <RepToggle value={rep} onChange={setRep} />
           </div>
+        )}
+        {isOpen && (
+          <p className="instructor-hint">
+            An open question is answered in free text and is not autograded — review the
+            responses in the gradebook. (LLM-assisted grading may plug in here later.)
+          </p>
         )}
         {isTurbot && (
           <>
@@ -428,7 +455,7 @@ export function QuestionCreator({ assignmentId, existingQuestion, onSave, onCanc
       )}
 
       {/* Inputs */}
-      {!isTurbot && (
+      {!isTurbot && !isOpen && (
       <>
       <section className="instructor-creator-section">
         <div className="instructor-section-head">
@@ -520,16 +547,22 @@ export function QuestionCreator({ assignmentId, existingQuestion, onSave, onCanc
       </>
       )}
 
-      {/* Statement */}
+      {/* Statement — for an open question this IS the question. */}
       <section className="instructor-creator-section">
         <label className="instructor-field">
-          <span className="instructor-field-label">Instructions shown to students</span>
+          <span className="instructor-field-label">
+            {isOpen ? 'Question shown to students' : 'Instructions shown to students'}
+          </span>
           <textarea
             className="instructor-textarea"
-            rows={4}
+            rows={isOpen ? 8 : 4}
             value={statement}
             onChange={(e) => setStatement(e.target.value)}
-            placeholder="Describe the function the student's circuit must compute…"
+            placeholder={
+              isOpen
+                ? 'Write the question the student answers in prose (mention the expected length, e.g. ~1 paragraph)…'
+                : "Describe the function the student's circuit must compute…"
+            }
           />
         </label>
       </section>

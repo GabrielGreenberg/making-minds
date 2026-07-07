@@ -7,6 +7,7 @@ import { SimulationToolbar } from './components/SimulationPanel';
 import { SequentialTimeline } from './components/SequentialTimeline';
 import { TMTapePanel } from './components/TMTapePanel';
 import { TurbotTapePanel } from './components/TurbotTapePanel';
+import { OpenResponsePanel } from './components/OpenResponsePanel';
 import { HomeScreen } from './components/HomeScreen';
 import { AssignmentOverview } from './components/AssignmentOverview';
 import { InstructorApp } from './instructor/InstructorApp';
@@ -31,6 +32,18 @@ function App() {
   // An open assignment shows its question list first; a question's dedicated
   // canvas (below) is entered by picking a question (#/a/:id/q/:i).
   if (assignment && assignmentView === 'overview') return <AssignmentOverview />;
+
+  // Open (free-text) questions: same chrome (menu + question nav), but the
+  // workspace is a writing panel — no palette, canvas, or data tables.
+  if (buildMode === 'open') {
+    return (
+      <div className="app">
+        <MenuBar />
+        <TabBar />
+        <OpenResponsePanel />
+      </div>
+    );
+  }
 
   return (
     <div className="app">

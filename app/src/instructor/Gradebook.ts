@@ -13,32 +13,40 @@ export interface QuestionGrade {
   questionId: number;
   passed: boolean; // all gradeable test vectors matched
   failedCount: number; // number of test vectors that didn't match
+  pending: boolean; // open question — awaits manual review, excluded from the auto score
 }
 
 export interface SubmissionGrade {
   record: SubmissionRecord;
   grades: QuestionGrade[];
-  score: number; // fraction: passed questions / total questions (0..1)
+  score: number; // fraction: passed questions / autogradeable questions (0..1)
 }
 
 function toQuestionGrade(r: QuestionResult): QuestionGrade {
   const passed = r.status === 'graded' && r.total > 0 && r.passed === r.total;
-  return { questionId: r.questionId, passed, failedCount: r.total - r.passed };
+  return {
+    questionId: r.questionId,
+    passed,
+    failedCount: r.total - r.passed,
+    pending: r.status === 'pending',
+  };
 }
 
 export function gradeSubmissions(
   assignment: AssignmentData,
   records: SubmissionRecord[],
 ): SubmissionGrade[] {
-  const totalQuestions = assignment.questions.length;
   return records.map((record) => {
     // Prefer the grade computed at submission time (the "server" autogrades on
     // receipt). Fall back to grading on the fly for legacy records saved before
     // autograde-on-submit existed.
     const result = record.result ?? gradeSubmission(assignment, record.submission);
     const grades = result.questions.map(toQuestionGrade);
-    const passedQuestions = grades.filter((g) => g.passed).length;
-    const score = totalQuestions > 0 ? passedQuestions / totalQuestions : 0;
+    // Pending (open) questions can't be autograded, so the auto score is over
+    // the machine questions only — manual/LLM review scores land elsewhere.
+    const gradeable = grades.filter((g) => !g.pending);
+    const passedQuestions = gradeable.filter((g) => g.passed).length;
+    const score = gradeable.length > 0 ? passedQuestions / gradeable.length : 0;
     return { record, grades, score };
   });
 }

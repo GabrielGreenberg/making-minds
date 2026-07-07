@@ -220,6 +220,11 @@ interface AppState {
   currentQuestionIndex: number;
   // Per-question circuit + annotations, keyed by AssignmentQuestion.id.
   questionCircuits: Map<number, QuestionCircuit>;
+  // The live free-text answer for the current OPEN question (the text-panel
+  // analogue of components/wires for machine questions). Synced into
+  // questionCircuits.responseText at the same points the canvas is.
+  openResponse: string;
+  setOpenResponse: (text: string) => void;
   loadAssignment: (assignment: AssignmentData) => void;
   // Open a bundled assignment by id and show its workbook. Returns false if unknown.
   openAssignment: (id: string) => boolean;
@@ -1144,6 +1149,8 @@ export const useStore = create<AppState>()((set, get) => ({
   assignmentView: 'overview',
   currentQuestionIndex: 0,
   questionCircuits: new Map(),
+  openResponse: '',
+  setOpenResponse: (text) => set({ openResponse: text }),
   loadAssignment: (assignment) => {
     const questionCircuits = new Map<number, QuestionCircuit>();
     for (const q of assignment.questions) {
@@ -1158,6 +1165,7 @@ export const useStore = create<AppState>()((set, get) => ({
       textElements: [],
       comments: [],
       boxes: [],
+      openResponse: '',
       buildMode: assignment.questions[0]?.buildMode || 'CC',
     });
     get().turbotReset();
@@ -1187,6 +1195,7 @@ export const useStore = create<AppState>()((set, get) => ({
       textElements: activeCircuit.textElements,
       comments: activeCircuit.comments,
       boxes: activeCircuit.boxes,
+      openResponse: activeCircuit.responseText ?? '',
       buildMode: activeQ?.buildMode || 'CC',
       workbookOpen: true,
     });
@@ -1206,6 +1215,7 @@ export const useStore = create<AppState>()((set, get) => ({
           textElements: state.textElements,
           comments: state.comments,
           boxes: state.boxes,
+          responseText: state.openResponse,
         });
         set({ questionCircuits: qc });
       }
@@ -1268,6 +1278,7 @@ export const useStore = create<AppState>()((set, get) => ({
       textElements: state.textElements,
       comments: state.comments,
       boxes: state.boxes,
+      responseText: state.openResponse,
     });
 
     const saved = updatedMap.get(nextQ.id) ?? emptyQuestionCircuit();
@@ -1279,6 +1290,7 @@ export const useStore = create<AppState>()((set, get) => ({
       textElements: saved.textElements,
       comments: saved.comments,
       boxes: saved.boxes,
+      openResponse: saved.responseText ?? '',
       buildMode: nextQ.buildMode,
     });
     get().turbotReset();
@@ -1293,6 +1305,7 @@ export const useStore = create<AppState>()((set, get) => ({
       textElements: [],
       comments: [],
       boxes: [],
+      openResponse: '',
     });
   },
 
@@ -3358,6 +3371,7 @@ function syncedQuestionCircuits(s: AppState): Map<number, QuestionCircuit> {
       textElements: s.textElements,
       comments: s.comments,
       boxes: s.boxes,
+      responseText: s.openResponse,
     });
   }
   return circuits;
@@ -3386,6 +3400,7 @@ function saveAssignmentState() {
       textElements: s.textElements,
       comments: s.comments,
       boxes: s.boxes,
+      responseText: s.openResponse,
     });
   }
   localWorkbookStore.saveAssignmentState(a.id, {
@@ -3417,7 +3432,9 @@ useStore.subscribe((state, prev) => {
     state.wires !== prev.wires ||
     state.textElements !== prev.textElements ||
     state.comments !== prev.comments ||
-    state.boxes !== prev.boxes;
+    state.boxes !== prev.boxes ||
+    // the open-question text panel is that mode's "canvas"
+    state.openResponse !== prev.openResponse;
 
   let changed: boolean;
   if (state.assignment) {
