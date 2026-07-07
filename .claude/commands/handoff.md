@@ -23,6 +23,14 @@ Run git/npm from the repo; `app/` is the working dir for npm. Work on a
   (`docs/buildout/designs/<slug>.md`) **before** implementation. Guardrail: depth
   must land with the harness green within an iteration or two — split (seam
   first, migrate next) rather than spiral.
+- **Interface over correctness (current phase — user directive 2026-07-06).**
+  For perception/navigation rows the bar is the harness's tier `interface`: a
+  plausible attempt that passes Stage-1 validation and grades end-to-end. Its
+  score is reported, never asserted; no broken variant is required. Do NOT
+  budget tokens for finding exactly-correct solutions — that is the separate,
+  future correct-answers project. If a task seems to demand a correct answer to
+  proceed, re-read NORTH_STAR's tiers; if it genuinely does, stop and ask the
+  user instead of searching.
 - **Delegate liberally to conserve this session's context.** Your context is the
   scarcest resource in the loop; an iteration that burns it on file dumps dies
   before updating the memos. Use **Workflows** (and Explore agents) for anything

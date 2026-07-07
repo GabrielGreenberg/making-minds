@@ -1,7 +1,11 @@
 # Problem Coverage Matrix
 
 _The definition of done and the progress ledger. One row per machine-buildable
-problem in HW1–HW6. The project is done when every **status** is ✅._
+problem in HW1–HW6. The project is done when every row is green **at its tier**:
+✅ exact for the arithmetic rows (already met), ◐ interface for perception &
+navigation (a plausible attempt that validates + grades end-to-end; correctness
+NOT required — user directive 2026-07-06; exact answers are a separate future
+project)._
 
 **Source of truth:** the coverage harness (`app/tools/coverageCheck.ts`) is
 authoritative; this table is the human-readable mirror. Regenerate it from the
@@ -10,20 +14,27 @@ harness each iteration: run `npm run coverage` (from `app/`), read the
 match. `app/tools/fixtures/coverage-manifest.json` holds the same rows in
 machine-readable form (fixture paths live there).
 
-**Legend** — status: ⬜ pending · 🟨 in progress · ✅ verified · ⛔ blocked/regressed.
-A row is ✅ only when the manifest row has a fixture and the harness reports it
-`verified` (correct passes every case, broken variant fails), AND appearance has
-been checked against [VISUAL_VOCAB.md](VISUAL_VOCAB.md).
+**Legend** — status: ⬜ pending · 🟨 in progress · ✅ exact-verified · ◐
+interface-verified · ⛔ blocked/regressed.
+✅ = harness `verified` at tier **exact** (correct passes every case, broken
+variant fails). ◐ = harness `interface` at tier **interface** (plausible attempt
+passes Stage-1 validation + grades end-to-end; score reported, not asserted; no
+broken variant needed). Both also require appearance checked against
+[VISUAL_VOCAB.md](VISUAL_VOCAB.md). Tier lives on the manifest row; all 15
+remaining rows are tier `interface`.
 
-**As of 2026-07-06 (iteration 13):** harness live, **41/56 verified** (ALL
-arithmetic: HW1–HW5 complete incl. appearance), 15 pending, 0 regressed.
-Remaining pending: perception (hw2-p10..12, hw3-p11..12), navigation
-(hw2/hw3/hw4 ×3 each), HW6 turbot-TM capstone (1).
+**As of 2026-07-06 (scope shift, post-iteration 16):** harness live with two
+tiers, **41/56 exact-verified** (ALL arithmetic: HW1–HW5 complete incl.
+appearance), 15 pending at the interface tier, 0 regressed. Remaining pending:
+perception (hw2-p10..12, hw3-p11..12), navigation (hw2/hw3/hw4 ×3 each), HW6
+turbot-TM capstone (1). **Do not chase correct answers for these** — the bar is
+a plausible attempt through the full pipeline.
 
 ## Columns
 
-`auth` = authorable · `build` = reference solution builds in UI · `grades` =
-harness verified (correct✓ + broken✗) · `appr` = appearance matches VISUAL_VOCAB.
+`auth` = authorable · `build` = reference machine builds in UI · `grades` =
+harness green at the row's tier (exact: correct✓ + broken✗; interface: attempt
+validates + grades end-to-end) · `appr` = appearance matches VISUAL_VOCAB.
 
 ---
 

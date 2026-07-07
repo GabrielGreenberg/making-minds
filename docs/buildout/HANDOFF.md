@@ -16,6 +16,20 @@ landed as commits `4e62a7e` and `bdf13b1`, verified headless with 0 refutations.
 **Model note:** the session switched to opus-4-8 mid-P1.8 (the Fable 5 credit
 limit was hit during S1's browser sweep). Everything is committed and pushed.
 
+## ⚠ SCOPE SHIFT (user directive 2026-07-06) — read before picking work
+
+**Interface over correctness.** For everything that remains (perception +
+navigation, all 15 pending rows), the bar is that the *interface* exists: the
+question authors, a **plausible attempt** builds in the editor, passes Stage-1
+validation, and grades end-to-end. The attempt's score is reported, **not
+asserted** — do NOT spend tokens hunting exactly-correct solutions (Way Finder,
+Mad Max, Desert Ant, motion detector). That is a separate future
+"correct-answers project". Enforced in the harness as tier `interface` (all 15
+pending manifest rows are tagged; state ◐); NORTH_STAR and QUEUE carry the full
+statement. The 41 exact rows stay exact as regression pins. P2.5 is deferred to
+the correct-answers project. P1.8 (router) is unaffected — that IS interface
+quality work.
+
 ## Do this next — finish P1.8 S1 acceptance, then S3/S4
 
 **FIRST (S1's one pending acceptance item):** browser-sweep the ~72 hw3 routes
@@ -52,6 +66,10 @@ after.
 
 ## Watch out for
 
+- **Interface tier, not answer-chasing** (see SCOPE SHIFT above): if you notice
+  an iteration burning effort trying to make an attempt *pass* its cases,
+  stop — report the score and move on. Only statement lint, Stage-1 validity,
+  end-to-end grading, layout, and appearance gate an interface row.
 - **`routerCheck` pins the fallback budget (99) + exact distribution** — S3/S4
   deliberately ratchet it down, so those pins are EXPECTED to change; edit the
   `EXPECTED_FALLBACKS` table intentionally, don't just relax the bound.

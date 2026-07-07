@@ -13,11 +13,24 @@
 //     (breadth WARN, statement lint, layout oracle) actually fires.
 //
 //  2. LEDGER — reads fixtures/coverage-manifest.json (one row per
-//     machine-buildable problem in HW1–HW6). For every row that has a reference
-//     fixture, it runs the REAL grader and asserts the correct machine passes
-//     every case while the deliberately-broken variant does not (the grader must
-//     discriminate, not rubber-stamp). Rows without a fixture are `pending` — the
-//     expected state until the loop fills them in, and NOT a failure.
+//     machine-buildable problem in HW1–HW6). Rows come in two TIERS:
+//
+//     - tier "exact" (default) — the correct machine passes every case while
+//       the deliberately-broken variant does not (the grader must discriminate,
+//       not rubber-stamp). The bar for arithmetic, where correct solutions are
+//       cheap; verified rows stay exact as regression pins.
+//     - tier "interface" — the CURRENT bar for perception/navigation (user
+//       directive 2026-07-06): the point is that the INTERFACE exists, not that
+//       the answer is right. The fixture's machine is a *plausible attempt*; the
+//       row is green ("interface") when the machine passes Stage-1 validation
+//       (the editor/engine can express a well-formed machine of this shape) and
+//       the real grader runs it end-to-end to a per-case result. Its SCORE is
+//       reported but NOT asserted; no broken variant is required. Getting
+//       exactly-correct answers is a separate, future project — do not spend
+//       tokens chasing them.
+//
+//     Rows without a fixture are `pending` — the expected state until the loop
+//     fills them in, and NOT a failure.
 //
 //     On top of the pass/fail spine, each fixtured row runs through four bars:
 //       - broken-breadth (WARN)     — how much of the bank the broken variant
@@ -38,9 +51,13 @@
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join, isAbsolute } from 'node:path';
-import type { AssignmentQuestion, CircuitData } from '../src/types';
+import type { AssignmentQuestion, CircuitData, RepSystem } from '../src/types';
 import { gradeQuestion, type QuestionResult } from '../src/engine/grader';
-import { encodeInput, type CodecLayout } from '../src/engine/codec';
+import { axisForMode, encodeInput, type CodecLayout } from '../src/engine/codec';
+import { validateMachine } from '../src/engine/machineValidation';
+import { sortStateComponents } from '../src/engine/fsm';
+import { turbotFsmNotation, validateTransitionTable } from '../src/engine/notation';
+import { validateTurbotTM } from '../src/engine/turbot';
 import { checkCircuitLayout } from './layoutCheck';
 import { comp, wire, circuit } from './builder';
 import {
@@ -66,6 +83,8 @@ interface ManifestRow {
   fixture: string | null;
   /** Bookkeeping mirror of the real state; the harness is authoritative. */
   status: string;
+  /** Verification tier — see header. Absent = 'exact'. */
+  tier?: 'exact' | 'interface';
   notes?: string;
 }
 
@@ -74,17 +93,19 @@ interface Manifest {
   rows: ManifestRow[];
 }
 
-// A reference fixture is self-contained: the authored question plus a correct
-// machine and (strongly encouraged) a deliberately-broken one. For navigation
-// (turbot) questions, arena *generality* is expressed by putting several arenas
-// in question.turbot_cases — the grader already requires every case to pass.
+// A reference fixture is self-contained: the authored question plus a machine.
+// For tier "exact", `correct` is a correct solution and `broken` (strongly
+// encouraged) a deliberately-wrong one. For tier "interface", `correct` is a
+// *plausible attempt* — its score is reported, not asserted — and `broken` is
+// optional/ignored. For navigation (turbot) questions, arena *generality* is
+// expressed by putting several arenas in question.turbot_cases.
 interface ReferenceFixture {
   question: AssignmentQuestion;
   correct: CircuitData;
   broken?: CircuitData;
 }
 
-type RowState = 'verified' | 'regressed' | 'pending';
+type RowState = 'verified' | 'interface' | 'regressed' | 'pending';
 
 // ─── Grading helper ──────────────────────────────────────────────────────────
 
@@ -96,6 +117,59 @@ function isFullPass(r: QuestionResult): boolean {
 /** True iff the machine is graded and passes every one of its cases. */
 function allPass(question: AssignmentQuestion, machine: CircuitData): boolean {
   return isFullPass(gradeQuestion(question, machine));
+}
+
+// ─── Stage-1 validation mirror (interface tier) ──────────────────────────────
+// The grader reports a Stage-1-invalid machine as `graded` with 0/total (never
+// `skipped`), so the interface tier needs the validation verdict directly. This
+// mirrors the dispatch in grader.ts (gradeQuestion / gradeTape / gradeTurbot
+// Stage-1 blocks) — if that dispatch changes, change this too.
+
+function validateStage1(
+  question: AssignmentQuestion,
+  machine: CircuitData,
+): { ok: boolean; reason?: string } {
+  const rep: RepSystem = question.representation ?? 'binary';
+
+  if (question.buildMode === 'turbot') {
+    const innerMode = question.innerMode;
+    if (!innerMode) return { ok: false, reason: 'question has no inner mode set' };
+    if (innerMode === 'TM') {
+      const errors = validateTurbotTM(machine.components, machine.wires);
+      return errors.length === 0
+        ? { ok: true }
+        : { ok: false, reason: errors.map((e) => e.message).join(' ') };
+    }
+    if (innerMode === 'FSM') {
+      const states = sortStateComponents(machine.components);
+      if (states.length === 0) return { ok: false, reason: 'machine has no states' };
+      const errors = validateTransitionTable(states, machine.wires, () => turbotFsmNotation, 'total');
+      return errors.length === 0
+        ? { ok: true }
+        : { ok: false, reason: errors.map((e) => e.message).join(' ') };
+    }
+    // CC/SC brains: the fixed 1-bit sensor / 2-bit motor layout (grader's turbotLayout).
+    const layout: CodecLayout =
+      innerMode === 'SC'
+        ? { axis: 'time', rep: 'binary', inputWidths: [1], outputWidths: [1, 1] }
+        : { axis: 'space', rep: 'binary', inputWidths: [1], outputWidths: [2] };
+    return validateMachine(machine, innerMode, layout, rep);
+  }
+
+  const mode = question.buildMode;
+  const axis = axisForMode(mode);
+  if (axis === 'tape') {
+    return validateMachine(machine, 'TM', { axis: 'tape', rep, inputWidths: [], outputWidths: [] }, rep);
+  }
+  const spec = question.cc_spec;
+  if (!spec) return { ok: false, reason: 'question has no cc_spec (group widths unknown)' };
+  const layout: CodecLayout = {
+    axis,
+    rep,
+    inputWidths: spec.inputs.map((g) => g.width),
+    outputWidths: spec.outputs.map((g) => g.width),
+  };
+  return validateMachine(machine, mode, layout, rep);
 }
 
 // ─── Bar 1: broken-breadth ───────────────────────────────────────────────────
@@ -389,6 +463,34 @@ function runTripwires(): void {
     badLayout.state === 'regressed' && badLayout.detail.includes('collinear-overlap'),
   );
 
+  // (d) interface tier: a valid-but-WRONG machine (XOR on the OR bank, fails
+  // 1/9) must land in the green 'interface' state — correctness is explicitly
+  // not required at this tier.
+  const ifaceRow: ManifestRow = { ...tripwireRow('tripwire-iface-ok', 'SC'), tier: 'interface' };
+  const ifaceOk = evaluateInterfaceFixture(ifaceRow, {
+    question: tripwireQuestion(cleanStatement),
+    correct: broken, // deliberately: the wrong machine, no broken variant
+  });
+  selfCheck(
+    "interface tripwire: valid-but-wrong machine, no broken variant → 'interface' (green)",
+    ifaceOk.state === 'interface' && ifaceOk.detail.includes('8/9'),
+  );
+
+  // (e) …but the tier is not a rubber stamp: a Stage-1-INVALID machine (one
+  // INPUT for a two-group SC question) must regress.
+  const invalidMachine = circuit(
+    [comp('inx', 'INPUT', 'IN1', 100, 80), comp('out1', 'OUTPUT', 'OUT1', 400, 150)],
+    [wire('w1', 'inx', 'out', 'out1', 'in')],
+  );
+  const ifaceBad = evaluateInterfaceFixture(
+    { ...tripwireRow('tripwire-iface-invalid', 'SC'), tier: 'interface' },
+    { question: tripwireQuestion(cleanStatement), correct: invalidMachine },
+  );
+  selfCheck(
+    'interface tripwire: Stage-1-invalid machine → REGRESSED',
+    ifaceBad.state === 'regressed' && ifaceBad.detail.includes('Stage-1'),
+  );
+
   console.log('');
 }
 
@@ -466,6 +568,48 @@ function evaluateFixture(row: ManifestRow, fx: ReferenceFixture): RowResult {
   };
 }
 
+/**
+ * Interface-tier bars (see header): the machine must be a WELL-FORMED machine
+ * of the question's mode (Stage-1 validation — the proof that the editor/engine
+ * can express this shape) and the real grader must run it end-to-end to a
+ * per-case result. Its score is reported, never asserted. Statement lint and
+ * the layout oracle still apply (they are interface quality); breadth/drain
+ * bars and the broken variant do not.
+ */
+function evaluateInterfaceFixture(row: ManifestRow, fx: ReferenceFixture): RowResult {
+  const problems: string[] = [];
+
+  problems.push(...lintStatement(fx.question.statement));
+
+  const valid = validateStage1(fx.question, fx.correct);
+  if (!valid.ok) {
+    problems.push(`interface: machine fails Stage-1 validation (${valid.reason ?? 'invalid machine'})`);
+  }
+
+  const result = gradeQuestion(fx.question, fx.correct);
+  if (result.status !== 'graded' || result.total === 0) {
+    const why = result.status === 'skipped' ? (result.reason ?? 'skipped') : 'empty bank';
+    problems.push(`interface: pipeline did not grade end-to-end (${why})`);
+  }
+
+  problems.push(...layoutProblems(row.mode, fx));
+
+  const state: RowState = problems.length > 0 ? 'regressed' : 'interface';
+  const score =
+    result.status === 'graded' && result.total > 0
+      ? `attempt scores ${result.passed}/${result.total}`
+      : 'no score';
+  return {
+    row,
+    state,
+    detail:
+      state === 'interface'
+        ? `interface OK — valid machine, grades end-to-end (${score}; correctness not required)`
+        : problems.join('; '),
+    warnings: [],
+  };
+}
+
 function evaluateRow(row: ManifestRow): RowResult {
   if (!row.fixture) {
     return { row, state: 'pending', detail: 'no reference fixture yet', warnings: [] };
@@ -492,7 +636,7 @@ function evaluateRow(row: ManifestRow): RowResult {
     };
   }
 
-  return evaluateFixture(row, fx);
+  return row.tier === 'interface' ? evaluateInterfaceFixture(row, fx) : evaluateFixture(row, fx);
 }
 
 function loadManifest(): Manifest {
@@ -512,12 +656,15 @@ function runLedger(): { results: RowResult[]; regressions: number } {
     byHw.set(r.row.hw, list);
   }
 
-  console.log('COVERAGE LEDGER — reference-verified vs. pending (HW1–HW6)');
+  console.log('COVERAGE LEDGER — exact ✓ / interface ◐ / pending · (HW1–HW6)');
   for (const [hw, rows] of byHw) {
     const verified = rows.filter((r) => r.state === 'verified').length;
-    console.log(`\n  ${hw}  (${verified}/${rows.length} verified)`);
+    const iface = rows.filter((r) => r.state === 'interface').length;
+    const green = iface > 0 ? `${verified} exact + ${iface} interface` : `${verified}`;
+    console.log(`\n  ${hw}  (${green} / ${rows.length})`);
     for (const r of rows) {
-      const mark = r.state === 'verified' ? '✓' : r.state === 'regressed' ? '✗' : '·';
+      const mark =
+        r.state === 'verified' ? '✓' : r.state === 'interface' ? '◐' : r.state === 'regressed' ? '✗' : '·';
       const fraction =
         r.brokenFailed !== undefined && r.bankSize
           ? `  [broken fails ${fractionLabel(r.brokenFailed, r.bankSize)}]`
@@ -531,6 +678,7 @@ function runLedger(): { results: RowResult[]; regressions: number } {
   }
 
   const verified = results.filter((r) => r.state === 'verified').length;
+  const interfaceOnly = results.filter((r) => r.state === 'interface').length;
   const pending = results.filter((r) => r.state === 'pending').length;
   const regressions = results.filter((r) => r.state === 'regressed').length;
   const breadthWarnings = results.reduce(
@@ -543,13 +691,14 @@ function runLedger(): { results: RowResult[]; regressions: number } {
   );
 
   console.log(
-    `\n  totals: ${verified} verified · ${pending} pending · ${regressions} regressed · ${results.length} in scope`,
+    `\n  totals: ${verified} exact-verified · ${interfaceOnly} interface-verified · ${pending} pending · ${regressions} regressed · ${results.length} in scope`,
   );
   console.log(`  warnings: ${breadthWarnings} breadth warnings · ${drainWarnings} drain warnings`);
 
   // Machine-readable summary for a loop iteration to reconcile COVERAGE.md.
   const summary = {
     verified,
+    interface: interfaceOnly,
     pending,
     regressed: regressions,
     total: results.length,

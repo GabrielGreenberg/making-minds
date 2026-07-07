@@ -632,3 +632,28 @@ pickup in a fresh session. Pushed at this point.
 
 **Next:** browser-sweep S1's moved routes (pending acceptance), then P1.8 S3/S4,
 then P3.1 (target-functions design memo).
+
+---
+
+## Scope shift — interface over correctness (user directive, 2026-07-06, between iterations 16 and 17)
+
+Gabriel: what matters is that the model can build a **plausible** machine for
+each homework problem — that the interface exists (author, build, simulate,
+grade). Exactly-correct answers are a **different, future project**; do not
+spend large token budgets chasing them.
+
+**Embedded as a second harness tier.** `coverageCheck.ts` now has tier
+`interface` (all 15 pending perception/navigation manifest rows tagged): green
+("◐ interface") when the fixture's machine passes Stage-1 validation (mirrored
+from the grader's dispatch — CC/SC/FSM/TM/turbot-inner) and `gradeQuestion`
+runs end-to-end; the attempt's score is printed, not asserted; broken variant
+optional; statement lint + layout oracle still hard. Two new tripwires prove
+the tier both accepts a valid-but-wrong machine and regresses a
+Stage-1-invalid one. The 41 exact rows are untouched pins (41 exact + 0
+interface + 15 pending, 0 regressed; tsc clean).
+
+**Docs updated:** NORTH_STAR (goal + two-tier definition of done), COVERAGE
+legend (◐), QUEUE (banner + P3.2/P3.3/P4.3/P5.1 reframed to interface tier;
+P2.5 deferred to the correct-answers project; P6.2 per-tier), HANDOFF (scope-
+shift banner + watch-out), /handoff command (operating-style directive),
+manifest meta. P1.8 router work is unaffected (it IS interface quality).

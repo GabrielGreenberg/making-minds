@@ -4,11 +4,19 @@ _The mission. Rarely edited. If a session wants to change this, stop and ask the
 
 ## The goal
 
-Make the Making Minds UI able to **construct a machine that solves every
+Make the Making Minds UI able to **construct a machine for every
 machine-buildable problem in the course** — across every machine type and problem
 category in PHIL 133 — and keep it that way. Success is measured concretely: for
-each problem in the real homeworks, a person can build a solution in the app and
-the real autograder passes it, while the visual vocabulary matches the textbook.
+each problem in the real homeworks, a person can build a **plausible solution
+attempt** in the app and the real autograder runs it end-to-end, while the visual
+vocabulary matches the textbook.
+
+**Interface first, correctness later (user directive 2026-07-06).** What matters
+now is that the *interface* exists — that a TM, a turbot, a perception question
+can be authored, built, simulated, and graded. Producing exactly-correct answers
+to every homework problem is a **separate, future project**. Do not spend large
+token budgets hunting correct solutions; a good-faith plausible attempt that
+exercises the full pipeline is the bar (see the two verification tiers below).
 
 ## Central design principle — depth over patches
 
@@ -49,13 +57,26 @@ one row per machine-buildable problem in HW1–HW6. A row is **green** when all 
 
 - **authorable** — the question exists (instructor UI can express it, or it's a
   bundled assignment with correct value-based `test_cases`);
-- **buildable** — a reference solution can be constructed in the student UI;
-- **grades ✓** — the real `gradeQuestion` passes the correct machine on every
-  case AND fails a deliberately-broken variant (adversarial — see the harness);
+- **buildable** — a reference machine can be constructed in the student UI;
+- **grades ✓** — at the row's **tier** (below);
 - **appearance ✓** — the rendering matches [VISUAL_VOCAB.md](VISUAL_VOCAB.md).
 
-The project is done when every row is green and all checks (`npm run coverage`,
-`check`, `tsc`, `build`) pass. Reference solutions live as fixtures under
+**Two verification tiers** (harness-enforced via `tier` in the manifest):
+
+- **exact** — the reference machine passes every case AND a deliberately-broken
+  variant fails. The bar for arithmetic (already met, 41 rows); those rows stay
+  exact as regression pins.
+- **interface** — the fixture's machine is a **plausible attempt**: it must pass
+  Stage-1 validation (the editor/engine can express a well-formed machine of
+  this shape) and grade end-to-end to per-case results; its score is reported,
+  **not asserted**, and no broken variant is required. The bar for all
+  perception and navigation rows. Statement lint and the layout oracle still
+  apply — they are interface quality.
+
+**The project is done when every row is green at its tier** and all checks
+(`npm run coverage`, `check`, `tsc`, `build`) pass. Upgrading interface rows to
+exact (a correct Way Finder, a correct Desert Ant…) is the future
+**correct-answers project** — explicitly out of scope here. Reference solutions live as fixtures under
 `app/tools/fixtures/reference/` and are the shared source of truth for the
 harness and (via export/import) the UI.
 

@@ -8,6 +8,16 @@ task names an **acceptance** criterion and the **COVERAGE** rows it advances._
 **Rule:** finish one mode/category *vertical* before broadening. Default walk:
 CC → SC → FSM → TM → turbot; within a mode: arithmetic → perception → navigation.
 
+**⚠ Scope shift (user directive 2026-07-06) — interface over correctness.** All
+remaining fixture rows (perception + navigation) are tier **interface**: the
+deliverable is that the question is authorable and a **plausible attempt**
+builds, validates, and grades end-to-end. Its score is reported, not asserted;
+no broken variant is needed. Do NOT spend tokens hunting exactly-correct
+solutions (Way Finder, Mad Max, Desert Ant, motion detector…) — that is the
+future correct-answers project. If a correct machine happens to be trivial
+(e.g. the HW4 zig-zag example FSM is printed in the problem set), take it, but
+never at the cost of an answer-search.
+
 ---
 
 ## Phase 0 — Stand up the system  _(this branch)_
@@ -193,8 +203,13 @@ before Phase 3 (perception returns to router-rendered CC/SC). Task ids unchanged
   perception problems warrant. Write `designs/target-functions.md` + the
   decision into this queue before building. **Advances:** unblocks P3.2–3.3.
 - [ ] **P3.2** CC perception (hw2-p10…p12), incl. reconciling the 8-in schematic
-  with the 9-bit landmark pattern. **Advances:** hw2-p10..p12.
+  with the 9-bit landmark pattern. **Interface tier:** the deliverable is the
+  *authoring capability* (P3.1's decision) + a plausible attempt per row that
+  validates and grades end-to-end; correctness optional (these CC detectors may
+  be cheap to get right — take it only if it's genuinely cheap).
+  **Advances:** hw2-p10..p12.
 - [ ] **P3.3** SC perception (hw3-p11, p12) — spatio-temporal, 8 parallel inputs.
+  **Interface tier:** same bar; do not chase a correct motion detector.
   **Advances:** hw3-p11, p12.
 
 ## Phase 4 — Navigation
@@ -208,8 +223,12 @@ before Phase 3 (perception returns to router-rendered CC/SC). Task ids unchanged
   (Mad Max, Way Finder, Desert Ant): put a *family* of arenas in `turbot_cases`;
   confirm the grader requires all to pass. **Acceptance:** a single-layout-only
   solution fails the family.
-- [ ] **P4.3** Author the specific arenas + reference brains: CC nav (hw2-p13…p15),
-  SC nav (hw3-p13…p15), FSM nav (hw4-p12…p14). **Advances:** those 9 rows.
+- [ ] **P4.3** Author the specific arenas + plausible brains: CC nav (hw2-p13…p15),
+  SC nav (hw3-p13…p15), FSM nav (hw4-p12…p14). **Interface tier:** the arenas
+  (from the HW diagrams) + a plausible brain per row that validates, steps in
+  the arena, and grades end-to-end. The HW4 zig-zag example machine is printed
+  in the problem set — use it; for Way Finder / Mad Max, any good-faith brain
+  suffices. **Advances:** those 9 rows.
 - [ ] **P4.4** Add a **turbot sandbox** tab (currently turbot only exists inside
   assignments; `TabBar` lists CC/FSM/TM only). Optional but eases authoring/appr.
 - [ ] **P4.5** _(optional)_ Wire the perception/navigation **category taxonomy**
@@ -218,12 +237,18 @@ before Phase 3 (perception returns to router-rendered CC/SC). Task ids unchanged
 ## Phase 5 — TM-turbot capstone
 
 - [ ] **P5.1** **Desert Ant** (hw6-p2): TM-brained turbot, 30×30 arena, ≤20 tape
-  cells, unknown start + food in NE quadrant; verified over a family of configs.
-  **Advances:** hw6-p2.
+  cells, food in NE quadrant. **Interface tier — the capstone is an INTERFACE
+  proof, not a solved Desert Ant:** the 30×30 arena family authors and renders,
+  a plausible turbot-TM brain (within the 20-cell tape budget) validates, steps,
+  and grades across the family end-to-end. Whether it finds the food is
+  reported, not required — a correct Desert Ant is the future correct-answers
+  project's flagship, not this one's. **Advances:** hw6-p2.
 
 ## Phase 5.5 — Small hardening (slot opportunistically before close-out)
 
-- [ ] **P2.5** _(discovered 2026-07-06, P2.4 probe)_ **Gap-robust hw5-p5/p6
+- [ ] **P2.5** _(discovered 2026-07-06, P2.4 probe; **DEFERRED to the
+  correct-answers project** per the 2026-07-06 scope shift — this is
+  answer-quality work, not interface work)_ **Gap-robust hw5-p5/p6
   reference machines.** Their statements don't promise arbitrary separation
   (the PDF's clause is on P4 only) so the rows are honest as-is — but both
   problems say "use your solution from (4)", whose adder IS gap-robust, and an
@@ -266,7 +291,8 @@ before Phase 3 (perception returns to router-rendered CC/SC). Task ids unchanged
 
 - [ ] **P6.1** Full-matrix appearance sweep against VISUAL_VOCAB (every mode).
 - [ ] **P6.2** Reconcile CLAUDE.md status with COVERAGE; final `npm run check` +
-  `tsc` + `build` all green; every COVERAGE row ✅.
+  `tsc` + `build` all green; every COVERAGE row green **at its tier** (✅ exact
+  for arithmetic, ◐ interface for perception/navigation).
 
 ---
 
