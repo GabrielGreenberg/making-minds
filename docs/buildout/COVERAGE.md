@@ -15,11 +15,10 @@ A row is ✅ only when the manifest row has a fixture and the harness reports it
 `verified` (correct passes every case, broken variant fails), AND appearance has
 been checked against [VISUAL_VOCAB.md](VISUAL_VOCAB.md).
 
-**As of 2026-07-06 (iteration 10):** harness live, **32/56 verified** (all
-HW1–HW4 arithmetic, appearance included — the P1.13 arc fix cleared the last
-three appr cells), 24 pending, 0 regressed. Remaining pending: perception
-(hw2-p10..12, hw3-p11..12), navigation (hw2/hw3/hw4 ×3 each), HW5 TM (9),
-HW6 turbot-TM (1).
+**As of 2026-07-06 (iteration 13):** harness live, **41/56 verified** (ALL
+arithmetic: HW1–HW5 complete incl. appearance), 15 pending, 0 regressed.
+Remaining pending: perception (hw2-p10..12, hw3-p11..12), navigation
+(hw2/hw3/hw4 ×3 each), HW6 turbot-TM capstone (1).
 
 ## Columns
 
@@ -98,19 +97,19 @@ _Note: HW3 #10 (x·y B) is an impossibility argument (not SC-computable) — exc
 
 _Note: HW4 #1–2 (state abstraction / multiple realizability) are analysis essays — excluded._
 
-### HW5 — Computing with TMs  ·  0/9
+### HW5 — Computing with TMs  ·  9/9 ✅
 
 | id | problem | category | auth | build | grades | appr | status | notes |
 |----|---------|----------|:----:|:-----:|:------:|:----:|:------:|-------|
-| hw5-p1  | x+1 T | arithmetic | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | standard-position rules |
-| hw5-p2  | x+3 T | arithmetic | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | reuse x+1 |
-| hw5-p3  | 3x T | arithmetic | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | reuse x+3 |
-| hw5-p4  | x+y T (arbitrary separation) | arithmetic | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | blocks not adjacent |
-| hw5-p5  | 3(x+y) T | arithmetic | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | |
-| hw5-p6  | x+3y T | arithmetic | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | |
-| hw5-p7  | x+1 B (extra leftmost 0) | arithmetic | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | std-position + well-formed output |
-| hw5-p8  | x−1 B (0 if x=0) | arithmetic | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | |
-| hw5-p9  | x+y B (clean up tape) | arithmetic | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | reuse x+1, x−1 |
+| hw5-p1  | x+1 T | arithmetic | ✅ | ✅ | ✅ | ✅ | ✅ | `reference/hw5-p1.json`; 3 states; bank x=1..8 (PDF domain — tally 0-blocks invisible); halts in standard position (grader doesn't enforce yet → P2.3) |
+| hw5-p2  | x+3 T | arithmetic | ✅ | ✅ | ✅ | ✅ | ✅ | `reference/hw5-p2.json`; triple-append, 5 states; reuse pedagogy is flat-inlined (no TM boxing mechanism exists) |
+| hw5-p3  | 3x T | arithmetic | ✅ | ✅ | ✅ | ✅ | ✅ | `reference/hw5-p3.json`; 10 states; hand-authored bank x=1..8 |
+| hw5-p4  | x+y T (arbitrary separation) | arithmetic | ✅ | ✅ | ✅ | ✅ | ✅ | `reference/hw5-p4.json`; **gap-robust** 6-state shift-until-adjacent machine (initial build was gap=1-only — REFUTED by the verifier, rebuilt + proven on gaps 1–10 outside the codec; codec can't test the clause → P2.4) |
+| hw5-p5  | 3(x+y) T | arithmetic | ✅ | ✅ | ✅ | ✅ | ✅ | `reference/hw5-p5.json`; 12 states, 64-case bank |
+| hw5-p6  | x+3y T | arithmetic | ✅ | ✅ | ✅ | ✅ | ✅ | `reference/hw5-p6.json`; 11 states; broken = mirror 3x+y (87.5%) |
+| hw5-p7  | x+1 B (extra leftmost 0) | arithmetic | ✅ | ✅ | ✅ | ✅ | ✅ | `reference/hw5-p7.json`; 4 states; platform encodes MINIMAL digits so the machine grows the block itself (PDF's padded-block assumption noted, statement adjusted); broken fails all-ones inputs (37.5%) |
+| hw5-p8  | x−1 B (0 if x=0) | arithmetic | ✅ | ✅ | ✅ | ✅ | ✅ | `reference/hw5-p8.json`; bank hand-authored (max(0,x−1) inexpressible in the DSL); broken = inverted borrow (94%) |
+| hw5-p9  | x+y B (clean up tape) | arithmetic | ✅ | ✅ | ✅ | ✅ | ✅ | `reference/hw5-p9.json`; 10 states, 128 cases; cleanup pedagogy has real codec teeth (extra `*` markers reject) — broken fails on exactly that |
 
 _Note: HW5 #10–11 (multiplication strategy / multi-function machine) are prose/flowchart — excluded._
 

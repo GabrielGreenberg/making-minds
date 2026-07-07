@@ -498,3 +498,40 @@ drew. HW5 fixtures (next) author directly in the new notation.
 Batch workflow; spec agent must nail TM codec conventions (tape axis,
 `requireStandardHaltPosition`, boxing-for-reuse questions) from engine/tmCodec
 + hw5.pdf; builders author labels in the NEW notation.
+
+## 2026-07-06 (iteration 13) — P2.2: HW5 TM arithmetic · 41/56, all arithmetic done
+
+**Shipped:** nine TM fixtures (`hw5-p1..p9`) in the new two-output notation —
+tally x+1/x+3/3x/x+y/3(x+y)/x+3y (3–12 states each) and binary x+1/x−1/x+y
+(with real tape-cleanup teeth: the codec rejects extra `*` markers, and p9's
+broken variant fails on exactly that). **41/56 verified, 0 regressed,
+appearance 9/9** (two-output labels, tape strip, READ|WRITE|MOVE tables, `*`
+rendering on binary — all confirmed in-browser; the P1.13 arc auto-offsets held
+across 24-arc machines with zero coincident paths).
+
+**The adversarial layer caught a real one:** hw5-p4's first "correct" machine
+was REFUTED — it assumed the codec's fixed one-cell block separation while the
+statement (and PDF) require ARBITRARY separation. Rebuilt as a 6-state
+shift-until-adjacent machine and proven outside the codec on hand-laid tapes
+(8 pairs × gaps {1,2,3,5,10} = 40/40; the old machine fails all 32 gap>1
+cells, regression-pinned in the prove script). Termination leans on the
+documented domain x,y ≥ 1 — a gap-robust machine cannot distinguish a wider
+gap from "no y at all".
+
+**Platform-vs-PDF findings (recorded, queued where actionable):**
+- `requireStandardHaltPosition` is a DEAD FIELD end-to-end (mechanism exists +
+  pinned in tmCodec; grader never sets it; not on the question type) → P2.3.
+  Several HW5 statements promise standard position the grader ignores.
+- The codec can't test arbitrary block separation (encodeTM hardcodes gap=1)
+  → P2.4 (bank layout variation).
+- Tally domain: buildQuestionBank samples 0..8 but tally 0-blocks are
+  invisible on tape — HW5 banks hand-set to the PDF's x,y ≥ 1. p8's
+  max(0, x−1) is DSL-inexpressible → hand-authored bank (documented).
+- p7: the PDF's "extra leftmost 0" assumption doesn't hold on this platform
+  (encodeTM writes minimal digits) — the reference machine grows the block
+  itself; statement adjusted, machine handles both layouts.
+- No TM boxing mechanism exists — the five "reuse" problems are flat-inlined;
+  grading is functional so this is pedagogy-only.
+
+**Next:** **P2.3** (wire requireStandardHaltPosition — small, makes five
+fixture statements honest), then **P1.8** (router memo, gating Phase 3).

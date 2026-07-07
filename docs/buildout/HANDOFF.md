@@ -6,61 +6,50 @@ run `npm run coverage` and reconcile._
 
 ## Where we are
 
-Branch `buildout-infra`. **32 / 56 verified**, 24 pending, 0 regressed, 0
-warnings. Twelve iterations done. Arithmetic verticals HW1–HW4 complete. P2.1
-landed: TM transitions are now the two-output form (`read:write,move`, stored
-`1:0,R`; legacy `1:0R` aliases forever, decays on edit-save). Remaining walk:
-**P2.2 → P1.8 → P3.1 → P3.2/P3.3 → P4.2 → P4.3 → P5.1 → smalls → P6**.
+Branch `buildout-infra`. **41 / 56 verified**, 15 pending, 0 regressed, 0
+warnings. Thirteen iterations done. **ALL arithmetic is complete** (HW1–HW5,
+appearance included). Remaining pending: perception (hw2-p10..12,
+hw3-p11..12), navigation (hw2-p13..15, hw3-p13..15, hw4-p12..14), the HW6
+turbot-TM capstone. Remaining walk: **P2.3 → P2.4 → P1.8 → P3.1 → P3.2/P3.3 →
+P4.2 → P4.3 → P5.1 → smalls (P1.5/P1.6/P1.11) → P6**.
 
-## Do this next — P2.2: HW5 TM arithmetic fixtures (hw5-p1…p9)
+## Do this next — P2.3: wire `requireStandardHaltPosition`
 
-Nine TM fixtures — tally: p1 `x+1`, p2 `x+3` (reuse x+1), p3 `3x` (reuse x+3),
-p4 `x+y` (arbitrary block separation), p5 `3(x+y)`, p6 `x+3y`; binary: p7 `x+1`
-(extra leftmost 0), p8 `x-1` (0 if x=0), p9 `x+y` (reuse; clean up tape).
-Standard batch workflow (spec → parallel build+prove → wire → adversarial
-verify + gates + appearance → critic). TM-specific prep:
+Small grading-fidelity task that makes five HW5 statements honest. The
+mechanism exists and is pinned (tmCodec `AcceptOptions.requireStandardHaltPosition`,
+enforced at acceptTM and tested by tmCheck) but is dead end-to-end:
 
-- **Spec agent must nail the TM codec conventions** from
-  `engine/tmCodec.ts` + `engine/tm.ts` + the devData TM sample: how a value
-  lays onto the tape (position, direction, blanks), how accept/decode reads the
-  final tape, halting semantics (missing transition = halt), the
-  `requireStandardHaltPosition` acceptance toggle on AssignmentQuestion
-  (exposed? grader-honored? — QUEUE says expose/verify where problems demand
-  standard-position halting), and how TWO tape arguments encode for x+y
-  (block separation — p4 says ARBITRARY separation, so the bank/codec must
-  vary it or the spec agent must report how the codec lays two values).
-- **Labels in the NEW two-output notation** (`1:0,R`) — builders author via
-  `tmNotation(rep)`; tape alphabet representation-tied (`*` binary only).
-- **Reuse questions** (p2 from p1, p3 from p2, p9 from p7/p8): grading is
-  functional — boxing/reuse is pedagogy, not a grading requirement (note in
-  issues if skipped, per the hw2-p6 precedent). BUT check whether TM boxing
-  even exists as a mechanism before promising it.
-- **hw5.pdf** for exact statements (clean prose — the lint bites); pin full
-  row ids `hw5-pN`.
-- **Broken variants** must fail broadly (sampled banks; breadth bar warns
-  <25%).
-- **Appearance:** TM canvas = FSM-style state editor + tape strip below
-  (`TMTapePanel`); machine table READ|WRITE|MOVE|NEXT columns; VISUAL_VOCAB
-  §TM (two-output form just recorded). FSM arc auto-offsets apply to TM state
-  diagrams too (same renderer) — no hand-placed control points unless a sweep
-  fails.
+1. Add the field to `AssignmentQuestion` (types.ts — check: QUEUE says it
+   already exists as an optional field from the original spec; verify) and
+   make `gradeTape` (grader.ts ~177) pass it through to `acceptTM`.
+2. Expose the toggle in `QuestionCreator` (the CLAUDE.md "deferred authoring
+   follow-ups" item — TM-mode only).
+3. Set it `true` on the HW5 fixtures whose statements promise standard
+   position (p1, p2, p3, p4, p5, p6 tally; p7 binary — check each statement);
+   re-run coverage — all should stay verified (builders future-proofed: every
+   correct machine already halts in standard position; hw5-p8's broken variant
+   should now fail its one surviving case, IMPROVING its breadth fraction).
+4. Add a tmCheck/pipelineCheck pin: a machine with the right tape but wrong
+   halt position FAILS a question with the flag set.
+5. Gates: check/tsc/build/coverage (41/56, 0 regressed).
 
-**Acceptance:** `npm run coverage` → 41/56, 0 regressed, no unexplained
-warnings; hw5-p1..p9 fully ✅ incl. appearance; gates green.
+**Acceptance:** the flag is honored by the grader + exposed in the creator;
+HW5 rows re-verify; a wrong-position machine demonstrably fails; CLAUDE.md's
+deferred-follow-up note updated.
 
 ## Then
 
-P1.8 (wire-router design memo — gates Phase 3) → P3.1 (target-functions memo)
-→ perception fixtures → P4.2/P4.3 navigation → P5.1 capstone → smalls → P6.
+P2.4 (codec: vary tally block separation so hw5-p4's robustness clause has
+teeth) → P1.8 (wire-router design memo — gates Phase 3) → P3.1
+(target-functions design memo) → perception fixtures → navigation → capstone.
 
 ## Watch out for
 
-- **`requireStandardHaltPosition`** is a deferred authoring follow-up
-  (CLAUDE.md) — if HW5 problems need it, exposing it may become part of P2.2
-  (small QuestionCreator + grader surface; check what exists first).
-- **notationCheck grep gate**: TM label handling must stay in the seam.
-- **tmCheck + notationCheck pin the new grammar** — fixture labels must be
-  canonical (`1:0,R`).
+- **HW5 fixtures' correct machines all halt in standard position** — setting
+  the flag must not regress them; if one fails, the machine (not the flag) is
+  wrong.
+- **notationCheck grep gate** + **tmCheck** pin the TM grammar and engine.
 - **Ops:** 529 → resume workflow; session limit → finish solo.
-- **Appearance recipe v3**; seeds from `app/public/` at `/making-minds/`.
+- **Appearance recipe v3**; seeds from `app/public/` at `/making-minds/`
+  (delete seed files from `app/dist/` too if a build ran after seeding).
 - `tsx` missing → `npm install`; no lockfile churn.

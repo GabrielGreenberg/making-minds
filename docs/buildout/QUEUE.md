@@ -123,11 +123,40 @@ before Phase 3 (perception returns to router-rendered CC/SC). Task ids unchanged
   editor + rep-tied `*` + live sim verified in-browser. Recorded in
   VISUAL_VOCAB §TM, spec §10.3, NORTH_STAR (departure now past tense), design
   memo postscript. All gates green; 32/56 / 0 regressed.
-- [ ] **P2.2** Reference solutions for **HW5 TM arithmetic** — tally (hw5-p1…p6),
-  binary (hw5-p7…p9). Expose/verify standard-position halting acceptance
-  (`requireStandardHaltPosition`) where the problems require it; TM boxing if
-  reuse (x+3 from x+1, …) demands it.
-  **Advances:** hw5-p1..p9.
+- [x] **P2.2** Reference solutions for **HW5 TM arithmetic**. — _done
+  2026-07-06 (iteration 13; 23-agent batch + one fix agent)._ Nine fixtures in
+  the new two-output notation; **41/56**; appearance 9/9; ONE refutation caught
+  and cured: hw5-p4's first correct machine was gap=1-only — rebuilt as a
+  6-state gap-robust shift-until-adjacent machine, proven on hand-laid tapes at
+  gaps 1–10 (old machine's failure regression-pinned). Tally banks hand-set to
+  the PDF domain x,y ≥ 1 (0-blocks invisible); p8's max(0,x−1) hand-authored
+  (DSL can't express it); no TM boxing mechanism exists (reuse flat-inlined,
+  grading functional). Spawned P2.3 + P2.4.
+- [ ] **P2.3** _(discovered 2026-07-06, hw5 critic)_ **Wire
+  `requireStandardHaltPosition` into grading + authoring.** The mechanism
+  exists and is pinned (tmCodec `AcceptOptions`, enforced + tested) but is a
+  DEAD FIELD end-to-end: `gradeTape` calls `acceptTM` with no options and the
+  field isn't read from `AssignmentQuestion`. Several HW5 statements promise
+  standard-position halting the grader silently ignores (hw5-p8's broken
+  variant even passes one case only because of this). Wire: question field →
+  gradeTape AcceptOptions; expose the toggle in QuestionCreator (it's the
+  CLAUDE.md deferred authoring follow-up); set it true on the HW5 fixtures
+  whose statements promise it and confirm they still verify (all correct
+  machines already halt in standard position by construction — the builders
+  future-proofed).
+  **Acceptance:** field honored by the grader (a wrong-position machine fails a
+  question with the flag); creator exposes it; HW5 rows re-verify green.
+- [ ] **P2.4** _(discovered 2026-07-06, hw5-p4 refutation)_ **Codec: vary tally
+  block separation.** `encodeTM` hardcodes one 0-cell between argument blocks,
+  so the "arbitrary separation" robustness that hw5-p4's statement requires is
+  untestable through the grading pipeline (a gap=1-only machine passes the
+  whole bank; the reference is now genuinely robust but students' machines
+  aren't held to it). Add layout variation to the TM codec's two-arg encoding
+  (e.g. TMTestCase-level separation parameter or bank-generation variation),
+  regenerate hw5-p4/p5/p6's banks to include gap>1 cases, confirm the fixtures
+  still verify and a gap=1-only machine now FAILS.
+  **Acceptance:** hw5-p4's bank contains varied separations; the old
+  (refuted) gap=1-only machine fails it; 41/56 stays green.
 
 ## Phase 3 — Perception
 

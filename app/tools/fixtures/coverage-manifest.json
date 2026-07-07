@@ -57,15 +57,15 @@
     { "id": "hw4-p13", "hw": "HW4", "problem": "13", "mode": "FSM", "category": "navigation",  "title": "three ahead: reach goal & stop",         "fixture": null, "status": "pending", "notes": "FSM turbot; requires 2-bit motor" },
     { "id": "hw4-p14", "hw": "HW4", "problem": "14", "mode": "FSM", "category": "navigation",  "title": "way finder: any non-branching maze",     "fixture": null, "status": "pending", "notes": "general maze solver; needs multi-arena generality" },
 
-    { "id": "hw5-p1",  "hw": "HW5", "problem": "1",  "mode": "TM",  "category": "arithmetic",  "title": "x+1 T",                                  "fixture": null, "status": "pending", "notes": "tally; standard-position rules" },
-    { "id": "hw5-p2",  "hw": "HW5", "problem": "2",  "mode": "TM",  "category": "arithmetic",  "title": "x+3 T (reuse x+1)",                      "fixture": null, "status": "pending" },
-    { "id": "hw5-p3",  "hw": "HW5", "problem": "3",  "mode": "TM",  "category": "arithmetic",  "title": "3x T (reuse x+3)",                       "fixture": null, "status": "pending" },
-    { "id": "hw5-p4",  "hw": "HW5", "problem": "4",  "mode": "TM",  "category": "arithmetic",  "title": "x+y T (arbitrary block separation)",     "fixture": null, "status": "pending" },
-    { "id": "hw5-p5",  "hw": "HW5", "problem": "5",  "mode": "TM",  "category": "arithmetic",  "title": "3(x+y) T",                               "fixture": null, "status": "pending" },
-    { "id": "hw5-p6",  "hw": "HW5", "problem": "6",  "mode": "TM",  "category": "arithmetic",  "title": "x+3y T",                                 "fixture": null, "status": "pending" },
-    { "id": "hw5-p7",  "hw": "HW5", "problem": "7",  "mode": "TM",  "category": "arithmetic",  "title": "x+1 B (extra leftmost 0)",               "fixture": null, "status": "pending", "notes": "binary; standard-position + well-formed output" },
-    { "id": "hw5-p8",  "hw": "HW5", "problem": "8",  "mode": "TM",  "category": "arithmetic",  "title": "x-1 B (0 if x=0)",                       "fixture": null, "status": "pending" },
-    { "id": "hw5-p9",  "hw": "HW5", "problem": "9",  "mode": "TM",  "category": "arithmetic",  "title": "x+y B (reuse x+1, x-1; clean up tape)",  "fixture": null, "status": "pending" },
+    { "id": "hw5-p1",  "hw": "HW5", "problem": "1",  "mode": "TM",  "category": "arithmetic",  "title": "x+1 T",                                  "fixture": "reference/hw5-p1.json", "status": "verified", "notes": "tally; standard-position rules" },
+    { "id": "hw5-p2",  "hw": "HW5", "problem": "2",  "mode": "TM",  "category": "arithmetic",  "title": "x+3 T (reuse x+1)",                      "fixture": "reference/hw5-p2.json", "status": "verified" },
+    { "id": "hw5-p3",  "hw": "HW5", "problem": "3",  "mode": "TM",  "category": "arithmetic",  "title": "3x T (reuse x+3)",                       "fixture": "reference/hw5-p3.json", "status": "verified" },
+    { "id": "hw5-p4",  "hw": "HW5", "problem": "4",  "mode": "TM",  "category": "arithmetic",  "title": "x+y T (arbitrary block separation)",     "fixture": "reference/hw5-p4.json", "status": "verified" },
+    { "id": "hw5-p5",  "hw": "HW5", "problem": "5",  "mode": "TM",  "category": "arithmetic",  "title": "3(x+y) T",                               "fixture": "reference/hw5-p5.json", "status": "verified" },
+    { "id": "hw5-p6",  "hw": "HW5", "problem": "6",  "mode": "TM",  "category": "arithmetic",  "title": "x+3y T",                                 "fixture": "reference/hw5-p6.json", "status": "verified" },
+    { "id": "hw5-p7",  "hw": "HW5", "problem": "7",  "mode": "TM",  "category": "arithmetic",  "title": "x+1 B (extra leftmost 0)",               "fixture": "reference/hw5-p7.json", "status": "verified", "notes": "binary; standard-position + well-formed output" },
+    { "id": "hw5-p8",  "hw": "HW5", "problem": "8",  "mode": "TM",  "category": "arithmetic",  "title": "x-1 B (0 if x=0)",                       "fixture": "reference/hw5-p8.json", "status": "verified" },
+    { "id": "hw5-p9",  "hw": "HW5", "problem": "9",  "mode": "TM",  "category": "arithmetic",  "title": "x+y B (reuse x+1, x-1; clean up tape)",  "fixture": "reference/hw5-p9.json", "status": "verified" },
 
     { "id": "hw6-p2",  "hw": "HW6", "problem": "2",  "mode": "TM-turbot", "category": "navigation", "title": "Desert Ant: find food (NE), pass over, return to start", "fixture": null, "status": "pending", "notes": "TM-brained turbot; 30x30, <=20 tape cells; unknown start + food; multi-arena" }
   ]
