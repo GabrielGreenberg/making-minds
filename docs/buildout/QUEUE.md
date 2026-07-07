@@ -194,27 +194,38 @@ before Phase 3 (perception returns to router-rendered CC/SC). Task ids unchanged
   per-wire `usedFallback`; S5 (optional) perf. Each slice: gates green +
   layoutCheck clean + browser spot-check per the memo's slice plan.
   **Gates Phase 3** (perception fixtures are CC/SC, back on the router).
-- [ ] **P3.1** **Design spike (decision required, design memo):** can perception
-  targets (≥3 consecutive 1s; exactly 3; = a literal pattern; current≠previous;
-  motion) be authored? The family: a question's **target function** currently has
-  exactly one representation — an arithmetic formula over integer values. The
-  deep framing is a unified target-function abstraction with multiple
-  *specification forms* (arithmetic formula | pattern predicate | explicit
-  table…) behind one interface that `buildQuestionBank`/the grader consume —
-  perception then becomes a second form, not a bolted-on question type. Compare
-  that against (a) extending the DSL with predicate operators and (b) a separate
-  truth-table question type; pick the deepest option the actual HW2/HW3
-  perception problems warrant. Write `designs/target-functions.md` + the
-  decision into this queue before building. **Advances:** unblocks P3.2–3.3.
-- [ ] **P3.2** CC perception (hw2-p10…p12), incl. reconciling the 8-in schematic
-  with the 9-bit landmark pattern. **Interface tier:** the deliverable is the
-  *authoring capability* (P3.1's decision) + a plausible attempt per row that
-  validates and grades end-to-end; correctness optional (these CC detectors may
-  be cheap to get right — take it only if it's genuinely cheap).
-  **Advances:** hw2-p10..p12.
-- [ ] **P3.3** SC perception (hw3-p11, p12) — spatio-temporal, 8 parallel inputs.
-  **Interface tier:** same bar; do not chase a correct motion detector.
-  **Advances:** hw3-p11, p12.
+- [x] **P3.1** **Design spike: perception target authoring.** — _closed as
+  OVERTAKEN 2026-07-06 (iteration 18 audit)._ Gabriel shipped perception
+  questions on main (PR #12, merged as `b36aed6`): `engine/perception.ts` +
+  `gradePerception` — a separate perception question kind (`perception: {rule,
+  width}` + generated bit-vector `perception_cases`), fully outside the value
+  codec and the notation seam. Rules: `min-run k` / `exact-run k` / `pattern`
+  (CC, exhaustive 2^width banks, width ≤ 10), `change` / `motion k` (SC,
+  deterministic seeded battery). QuestionCreator has a function|perception
+  Task toggle; samples Q9–Q13 ship correct AND incorrect netlist circuits,
+  pinned by perceptionCheck (now wired into `npm run check`) + pipelineCheck.
+  This is the de-facto decision P3.1 was to make (it chose "separate question
+  kind" over the unified target-function abstraction). **Residual, deferred:**
+  there are now THREE target-function forms (arithmetic formula / perception
+  rule / turbot criteria) with three grading branches — unification is a
+  refactor question, not a capability question; revisit only if a fourth form
+  appears (record: this queue + LOG iteration 18; no designs/ memo needed).
+- [ ] **P3.2** **Promote main's CC perception circuits into reference
+  fixtures** hw2-p10 (min-run 3, w8 = sample Q9), hw2-p11 (exact-run 3, w8 =
+  Q10), hw2-p12 (pattern 110010111, w9 = Q11 — main's pattern-width rule
+  settles the old 8-in-schematic vs 9-bit-pattern reconciliation: width
+  follows the pattern). Correct + incorrect circuits already exist in
+  `devData/sampleData.ts` — these rows can go **exact** tier for free (flip
+  the manifest tags; the scope-shift permits taking correct answers when
+  they're free). Layout oracle gates apply (CC fixtures).
+  **Acceptance:** 3 rows exact-verified in the harness; appearance checked.
+  **Advances:** hw2-p10..p12 (41→44).
+- [ ] **P3.3** **Promote main's SC perception circuits into reference
+  fixtures** hw3-p11 (change, w8 = Q12), hw3-p12 (motion k=3, w8 = Q13, ~80
+  gates — watch the router/layout oracle on this one; if it trips, that's
+  evidence to pull P1.8 S3 forward). Same free-exact-tier note as P3.2.
+  **Acceptance:** 2 rows exact-verified; appearance checked.
+  **Advances:** hw3-p11, p12 (44→46).
 
 ## Phase 4 — Navigation
 
@@ -309,7 +320,9 @@ before Phase 3 (perception returns to router-rendered CC/SC). Task ids unchanged
 
 - [ ] **META-audit-queue** — _every ~5 iterations; last ran iteration 18
   (2026-07-06): merged `origin/main` (open-question sixth mode + turbot
-  grading rework, PRs #11/#13) as `e9122e0` with all gates green; harness
+  grading rework, PRs #11/#13) as `e9122e0`, then main's perception-questions
+  feature (PR #12) as `b36aed6` — which closed P3.1 as overtaken and rescoped
+  P3.2/P3.3 to fixture promotion; all gates green after each; harness
   41/15/0 unchanged, COVERAGE already reconciled; no patch cluster since
   iteration 11 (P2.1–P2.4 + P1.8 all routed through seams); one pin
   adjudicated — main's new "1-bit turbot FSM label rejected" turbotCheck pin

@@ -742,3 +742,32 @@ part of the server-split surface). P6.1/P4.3 annotated.
 
 **Next:** P1.8 S3 — foreign-lane A* cost + H4 near-merge validation round
 (inputs from the iteration-17 sweep recorded in HANDOFF/QUEUE).
+
+## 2026-07-06 (iteration 18, continued) — merge #2: main's perception questions · P3.1 overtaken
+
+Main moved AGAIN mid-audit (PR #12, `worktree-perception-questions`): merged as
+`b36aed6` (same delegated agent, resumed with its merge-#1 context; only
+CLAUDE.md conflicted textually). Gates green (perceptionCheck now wired into
+`npm run check` — main had never added it; coverageCheck's Stage-1 mirror
+brought to parity with gradeQuestion's full post-merge dispatch: open →
+perception → turbot → codec). Independently re-verified.
+
+**The big queue consequence:** main's `engine/perception.ts` covers ALL FIVE
+queued perception rows exactly — hw2-p10 (min-run 3) / p11 (exact-run 3) / p12
+(pattern 110010111, w9 — width follows the pattern, settling the old 8-vs-9
+reconciliation) / hw3-p11 (change) / p12 (motion k=3) — as samples Q9–Q13 with
+correct AND incorrect circuits pinned 13/13 vs 0/13. So:
+- **P3.1 closed as overtaken** (de-facto decision: separate perception question
+  kind, outside the codec/notation seams). Residual recorded: three
+  target-function forms now exist (formula / perception rule / turbot
+  criteria); unification is a deferred refactor question.
+- **P3.2/P3.3 rescoped to fixture promotion** (devData circuits → reference
+  fixtures; correct answers are FREE here, so the rows go exact tier —
+  41→46 when done). Watch: Q13's motion detector is ~80 gates; if the layout
+  oracle trips on it, that's evidence to pull P1.8 S3 forward.
+
+Perception grades outside the value codec (raw bit-vector frames); no contact
+with the notation seam or requireStandardHaltPosition — the audit found clean
+composition everywhere in the auto-merged dispatch.
+
+**Next:** P3.2 (CC perception fixture promotion), then P3.3, then P1.8 S3/S4.

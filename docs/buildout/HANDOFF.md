@@ -7,100 +7,105 @@ run `npm run coverage` and reconcile._
 ## Where we are
 
 Branch `buildout-infra` (pushed to `origin`). **41 / 56 exact-verified**, 15
-pending (all tier `interface`), 0 regressed, 0 warnings. Eighteen iterations
-done. All arithmetic complete (HW1–HW5). P1.8 S1+S2 (shared geometry +
-divergence dots) landed AND browser-accepted (iteration 17: 237 wires, 0
-violations). Iteration 18 ran META-audit-queue, whose main body was **merging
-`origin/main`** (7 commits ahead) as `e9122e0`: main brought a SIXTH question
-mode — "open" free-text, manually reviewed, `gradeQuestion(question, circuit,
-responseText?)` short-circuits it to a `pending` 0/0 result — and a turbot
-rework (turbotCheck grades all four inner modes; TMNotation threaded through
-runBrainStep/runTurbot). All gates re-verified green post-merge, independently
-of the merge agent.
+pending (tier `interface` in the manifest — but see next paragraph: 5 of them
+are about to be free exact rows), 0 regressed, 0 warnings. Eighteen iterations
+done. All arithmetic complete (HW1–HW5). P1.8 S1+S2 landed and
+browser-accepted (iteration 17: 237 wires, 0 violations).
 
-**One adjudication to flag to Gabriel:** main's new turbotCheck pin asserted
-1-bit turbot FSM labels are REJECTED; the branch's documented P1.12 design
-says they alias to canonical 2-bit (decay on edit-save, bit-identical
-execution, old localStorage machines keep validating). The alias design won —
-main's separate `parseTurbotFSMLabel` grammar was deleted and
-`validateTurbotFSM` now delegates to the notation seam. If strict rejection
-was deliberate, flip it back WITH a migration plan (LOG iteration 18).
+Iteration 18 = META-audit-queue, which became a DOUBLE merge of `origin/main`
+(Gabriel ships features on main in parallel — check `git fetch` + `rev-list
+HEAD..origin/main` at the START of every iteration from now on):
+- `e9122e0` — open free-text questions (sixth mode; `gradeQuestion(question,
+  circuit, responseText?)` short-circuits to `pending` 0/0) + turbot grading
+  rework (turbotCheck grades all four inner modes).
+- `b36aed6` — **perception questions (PR #12)**: `engine/perception.ts` +
+  `gradePerception`, a separate question kind outside the value codec and the
+  notation seam. Rules `min-run`/`exact-run`/`pattern` (CC) and
+  `change`/`motion` (SC); banks generated at save; QuestionCreator gets a
+  function|perception Task toggle; devData Q9–Q13 ship correct AND incorrect
+  circuits covering EXACTLY hw2-p10/p11/p12 + hw3-p11/p12, pinned by
+  perceptionCheck (now wired into `npm run check`) + pipelineCheck 13/13 vs
+  0/13.
+All gates independently re-verified green after each merge. **P3.1 closed as
+overtaken** (main's shipped design IS the decision); P3.2/P3.3 rescoped to
+fixture promotion. Two adjudications flagged for Gabriel in LOG iteration 18:
+the 1-bit turbot-label pin flip (alias design won) and the perception
+target-function residual (three forms now; unification deferred).
 
 ## ⚠ SCOPE SHIFT (user directive 2026-07-06) — read before picking work
 
 **Interface over correctness.** For everything that remains (perception +
-navigation, all 15 pending rows), the bar is that the *interface* exists: the
-question authors, a **plausible attempt** builds in the editor, passes Stage-1
-validation, and grades end-to-end. The attempt's score is reported, **not
-asserted** — do NOT spend tokens hunting exactly-correct solutions (Way Finder,
-Mad Max, Desert Ant, motion detector). That is a separate future
-"correct-answers project". Enforced in the harness as tier `interface` (all 15
-pending manifest rows are tagged; state ◐); NORTH_STAR and QUEUE carry the full
-statement. The 41 exact rows stay exact as regression pins. P2.5 is deferred to
-the correct-answers project. P1.8 (router) is unaffected — that IS interface
-quality work.
+navigation), the bar is that the *interface* exists: the question authors, a
+**plausible attempt** builds in the editor, passes Stage-1 validation, and
+grades end-to-end. The attempt's score is reported, **not asserted** — do NOT
+budget tokens hunting exactly-correct solutions (Way Finder, Mad Max, Desert
+Ant). That is the separate future "correct-answers project". Harness tier
+`interface` (◐) enforces it. The 41 exact rows stay exact as regression pins.
+**Exception that now applies:** when a correct machine is FREE (main's
+perception samples), take it — P3.2/P3.3 rows go exact tier at no search cost.
 
-## Do this next — P1.8 S3, then S4
+## Do this next — P3.2: promote CC perception fixtures (then P3.3)
 
-**P1.8 S3** (per `designs/wire-routing.md` slice plan): foreign-lane A* cost +
-an H4 near-merge validation round using the oracle's own `collinearOverlap`
-predicate; this kills the 1px-hug class generally (not just where fixtures
-were hand-tuned). W_LANE calibration capped at two sweep rounds before falling
-back to H4-only. Two inputs from the iteration-17 sweep: (a) the bump-adjacent
-dot-skip T-junction (hw3-p9 (1375,757)) is algorithm-correct but momentarily
-ambiguous to read — decide whether S3's lane separation makes it moot or the
-skip radius needs tuning; (b) elbow vertices integer-round while trunks ride
-fractional y — keep H4 near-merge thresholds ≥0.5px so sub-pixel jitter
-doesn't false-positive.
+**P3.2** — promote main's devData CC perception circuits into reference
+fixtures: hw2-p10 (min-run 3, w8 = sample Q9), hw2-p11 (exact-run 3, w8 =
+Q10), hw2-p12 (pattern 110010111, w9 = Q11). Correct + incorrect circuits are
+in `src/devData/sampleData.ts` (netlist-built); fixture format per
+`app/tools/fixtures/reference/README.md`; prove with `gradeQuestion` headless
+BEFORE writing the fixture; flip those manifest rows' tier to exact. Layout
+oracle hard-gates (CC fixtures) — positions may need a re-layout pass like
+earlier batches. Appearance check per VISUAL_VOCAB + recipe v3.
+**Acceptance:** harness 44 exact / 12 pending / 0 regressed; gates green.
 
-**Then S4:** fallback phase-0 (route residual fallbacks first so A* sees
-them) + lane-nudged fallback + per-wire `usedFallback`/violation flags.
-Regression-pin a pre-fix HW3 layout → zero oracle violations.
+**Then P3.3** — same for SC: hw3-p11 (change, w8 = Q12), hw3-p12 (motion k=3,
+w8, ~80 gates = Q13). 44→46. ⚠ If the layout oracle trips on Q13's big motion
+circuit, that is evidence to pull P1.8 S3 forward — fix positions if cheap,
+otherwise switch to S3 and come back.
 
-Each slice: `npm run check` (incl. `routerCheck`) + `tsc` + `build` +
-`coverage` (41/56, 0 regressed) + layoutCheck clean + browser spot-check.
+**Then P1.8 S3/S4** (per `designs/wire-routing.md`): S3 foreign-lane A* cost +
+H4 near-merge round using the oracle's `collinearOverlap` (inputs from the
+iteration-17 sweep: keep H4 thresholds ≥0.5px — elbows integer-round over
+fractional trunks; decide whether lane separation moots the hw3-p9 (1375,757)
+bump-adjacent dot-skip or the skip radius needs tuning; W_LANE calibration
+capped at two sweep rounds). S4 fallback phase-0 + lane-nudge + per-wire
+`usedFallback`; regression-pin a pre-fix HW3 layout.
 
 ## Then
 
-P3.1 (target-functions design memo — perception authoring) → P3.2/P3.3
-perception fixtures → P4.2 multi-arena grading → P4.3 nav arenas (main's
-turbot rework already grades all four inner modes — build on it) → P5.1
-capstone → smalls (P1.5 allowed_components, P1.6 cc.ts label-order, P1.11 ARG
-multi-group) → P6 close-out. META-audit-queue next due ~iteration 23.
+P4.2 multi-arena grading → P4.3 nav arenas (main's turbot rework grades all
+four inner modes — build on it; turbot-FSM labels are canonical 2-bit via
+`turbotFsmNotation`, default `0:11`) → P5.1 capstone → smalls (P1.5
+allowed_components, P1.6 cc.ts label-order, P1.11 ARG multi-group) → P6
+close-out. META-audit-queue next due ~iteration 23.
 
 ## Watch out for
 
-- **Interface tier, not answer-chasing** (see SCOPE SHIFT above): if you notice
-  an iteration burning effort trying to make an attempt *pass* its cases,
-  stop — report the score and move on. Only statement lint, Stage-1 validity,
-  end-to-end grading, layout, and appearance gate an interface row.
-- **Open questions post-merge:** `gradeQuestion` has an optional third param
-  (`responseText`); open questions return `pending` BEFORE Stage-1 — they are
-  outside coverage scope (the 56 rows are all autogradeable) and
-  coverageCheck's self-test pins the contract. `SubmissionGrade` scores
-  denominate over autogradeable questions only.
+- **Fetch main first:** Gabriel ships to main from parallel sessions —
+  `git fetch origin main` + check `HEAD..origin/main` at the start of every
+  iteration; merge before building on stale code.
+- **Interface tier, not answer-chasing** — except when correct machines are
+  free (see SCOPE SHIFT). Only statement lint, Stage-1 validity, end-to-end
+  grading, layout, and appearance gate an interface row.
+- **Perception questions grade OUTSIDE the codec** (raw bit-vector frames,
+  IN1-first; SC `change`/`motion` treat pre-t1 as blank, matching MEM init).
+  coverageCheck's Stage-1 mirror now matches gradeQuestion's full dispatch
+  (open → perception → turbot → codec) — keep them in lockstep.
 - **`routerCheck` pins the fallback budget (99) + exact distribution** — S3/S4
-  deliberately ratchet it down, so those pins are EXPECTED to change; edit the
-  `EXPECTED_FALLBACKS` table intentionally, don't just relax the bound.
-- **layoutCheck imports `componentGeometry`** — geometry changes flow to
-  the oracle automatically; a "violation" after a router change is real, not
-  oracle drift.
-- **`componentGeometry.ts` is the single source** for dims + port math — never
-  reintroduce a local copy in CircuitCanvas/wireRouter/layoutCheck.
-- **`turbotFsmNotation` is the single turbot-FSM grammar answer** (post-merge:
-  main's separate regex parser was deleted); default label is `0:11`;
-  `turbotInternalNotation` is TMNotation-aware (no `*` on unary questions).
-- **notationCheck grep gate**, **scWindowCheck (45+)**, **tmCheck** (incl. the
-  P2.3 standard-halt + P2.4 separations pins) all stay green.
-- The iteration-16 side effect — `validateSegmentPosition` inherited the
-  shrunken MEM bottom drag-halo / STATE obstacle bounds from the shared
-  geometry — is benign but still unswept in-browser; spot-check if you touch
-  drag validation.
-- **Ops:** 529 → `Workflow({scriptPath, resumeFromRunId})`; model/credit limit
-  can kill an agent mid-workflow — commit landed slices first. A serial browser
-  sweep fits ONE delegated agent (iteration 17: 11 fixtures, 128k tokens),
-  not a fan-out workflow.
-- **Appearance recipe v3**; seeds from `app/public/` at `/making-minds/`; clean
-  seed keys twice + delete the `app/public/*-seed.json` (and any `app/dist/`
-  copy if a build ran).
+  deliberately ratchet it down; edit `EXPECTED_FALLBACKS` intentionally.
+- **layoutCheck imports `componentGeometry`** — a violation after a router
+  change is real, not oracle drift. **`componentGeometry.ts` is the single
+  source** for dims + port math.
+- **`turbotFsmNotation` is the single turbot-FSM grammar answer** (main's
+  separate regex parser was deleted in the merge); 1-bit labels are
+  accepted-as-alias BY DESIGN (P1.12) — main's contrary pin was flipped;
+  flag to Gabriel if strictness was intended.
+- **notationCheck grep gate**, **scWindowCheck (45+)**, **tmCheck**,
+  **perceptionCheck** all stay green.
+- The iteration-16 `validateSegmentPosition` drag-halo side effect: benign,
+  still unswept; spot-check if touching drag validation.
+- **Ops:** 529 → `Workflow({scriptPath, resumeFromRunId})`; commit landed
+  slices before long agent runs; a serial browser sweep fits ONE delegated
+  agent, not a fan-out workflow.
+- **Appearance recipe v3**; seeds from `app/public/` at `/making-minds/`;
+  clean seed keys twice + delete `app/public/*-seed.json` (and any `app/dist/`
+  copy).
 - `tsx` missing → `npm install`; no lockfile churn.
