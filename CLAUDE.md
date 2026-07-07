@@ -14,7 +14,21 @@ Claude to load into context).
 >
 > A change isn't finished until the docs that describe it are too.
 
-_Last updated: 2026-07-07 (**server groundwork** — a complete API server package (`server/`,
+_Last updated: 2026-07-07 (**grade release** — students see NO grades (not even on submit)
+until the instructor releases them per assignment. Server: `grades_released` column beside the
+assignment row (policy, not content — never inside the AssignmentData JSON), new instructor
+endpoint `PUT /api/assignments/:id/grades-release` `{released: boolean}` (idempotent;
+unrelease re-hides), `gradesReleased` on assignment list/detail responses, and
+`studentRecord(record, released)` in `server/src/sanitize.ts` now withholds the result
+entirely until release (after release: scores only, still no per-case detail). Instructors
+always see everything immediately. serverCheck grew to 28 checks covering the full lifecycle
+(hidden on submit → 403 for student release → release → student sees scores → unrelease
+re-hides). Local prototype mirrors the rule behind a new seam (`app/src/storage/gradeRelease.ts`,
+localStorage flag): the student submit alert no longer shows the autograde, the home screen
+shows "Grade: n/m questions" beside a submitted assignment only once released, and the
+instructor gradebook header gets a "Release grades"/"Hide grades" toggle (with confirm).
+API client: `setGradesReleased`, `gradesReleased` on summaries/detail. Earlier same day,
+**server groundwork** — a complete API server package (`server/`,
 Express 5 + Node's built-in `node:sqlite`, zero native deps) implementing the whole backend
 seam set ahead of AWS access: dev auth (roster-email → bearer token; `AuthProvider` interface
 in `server/src/auth.ts` is where UCLA SSO plugs in via `MM_AUTH_MODE=sso`), assignment CRUD

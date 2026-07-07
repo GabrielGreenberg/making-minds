@@ -38,7 +38,14 @@ export function stripResultDetail(result: SubmissionResult): SubmissionResult {
   return { ...result, questions: result.questions.map(stripQuestionResult) };
 }
 
-/** A student's own submission record, with instructor-only detail removed. */
-export function studentRecord(record: SubmissionRecord): SubmissionRecord {
-  return { ...record, result: record.result ? stripResultDetail(record.result) : undefined };
+/**
+ * A student's own submission record. Grades are withheld entirely until the
+ * instructor releases them for the assignment ("release grades"); once
+ * released, the student sees scores but never the per-case detail.
+ */
+export function studentRecord(record: SubmissionRecord, gradesReleased: boolean): SubmissionRecord {
+  return {
+    ...record,
+    result: gradesReleased && record.result ? stripResultDetail(record.result) : undefined,
+  };
 }

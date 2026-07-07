@@ -36,6 +36,7 @@ export interface AssignmentSummary {
   id: string;
   title: string;
   questionCount: number;
+  gradesReleased: boolean;
 }
 
 const API_BASE: string = (import.meta.env?.VITE_API_BASE as string | undefined) ?? '';
@@ -121,12 +122,13 @@ export async function listAssignments(): Promise<AssignmentSummary[]> {
 }
 
 /** Students receive the assignment with `test_cases` stripped server-side. */
-export async function getAssignment(id: string): Promise<AssignmentData> {
-  const { assignment } = await request<{ assignment: AssignmentData }>(
+export async function getAssignment(
+  id: string,
+): Promise<{ assignment: AssignmentData; gradesReleased: boolean }> {
+  return request<{ assignment: AssignmentData; gradesReleased: boolean }>(
     'GET',
     `/assignments/${encodeURIComponent(id)}`,
   );
-  return assignment;
 }
 
 export async function putAssignment(assignment: AssignmentData): Promise<void> {
@@ -135,6 +137,14 @@ export async function putAssignment(assignment: AssignmentData): Promise<void> {
 
 export async function deleteAssignment(id: string): Promise<void> {
   await request('DELETE', `/assignments/${encodeURIComponent(id)}`);
+}
+
+/**
+ * Instructor only: release (or hide again) grades for an assignment. Students
+ * see no grades at all — including on submit — until this is flipped on.
+ */
+export async function setGradesReleased(id: string, released: boolean): Promise<void> {
+  await request('PUT', `/assignments/${encodeURIComponent(id)}/grades-release`, { released });
 }
 
 // ── workbooks (autosave) ─────────────────────────────────────────

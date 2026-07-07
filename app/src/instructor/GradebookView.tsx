@@ -5,6 +5,7 @@ import { localSubmissionStore } from '../storage/submissionStore';
 import { gradeSubmission } from '../engine/grader';
 import { navigate } from '../routing';
 import { gradeSubmissions, computeStats, type SubmissionGrade } from './Gradebook';
+import { isGradesReleased, setGradesReleased } from '../storage/gradeRelease';
 
 function formatTime(iso: string): string {
   const d = new Date(iso);
@@ -28,6 +29,19 @@ interface StudentGrades {
 
 export function GradebookView({ id }: { id: string }) {
   const [expandedStudent, setExpandedStudent] = useState<string | null>(null);
+  const [released, setReleased] = useState(() => isGradesReleased(id));
+
+  const toggleRelease = () => {
+    const next = !released;
+    if (
+      next &&
+      !confirm('Release grades? Students will be able to see their scores for this assignment.')
+    ) {
+      return;
+    }
+    setGradesReleased(id, next);
+    setReleased(next);
+  };
 
   const assignment = getAssignment(id);
   if (!assignment) {
@@ -67,6 +81,15 @@ export function GradebookView({ id }: { id: string }) {
           ← Dashboard
         </button>
         <h3 className="instructor-section-title">{assignment.title} — Submissions</h3>
+        <span
+          className="instructor-release"
+          title="Students see no grades for this assignment until you release them."
+        >
+          {released ? 'Grades released to students' : 'Grades hidden from students'}
+          <button className="instructor-btn" onClick={toggleRelease}>
+            {released ? 'Hide grades' : 'Release grades'}
+          </button>
+        </span>
       </div>
 
       {/* Summary (over each student's latest submission) */}

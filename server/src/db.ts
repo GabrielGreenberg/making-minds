@@ -74,6 +74,12 @@ export class Db {
       CREATE INDEX IF NOT EXISTS idx_submissions_asg
         ON submissions (assignment_id, email, attempt);
     `);
+    // Column added after the initial schema; ALTER is a no-op error on re-run.
+    try {
+      this.db.exec('ALTER TABLE assignments ADD COLUMN grades_released INTEGER NOT NULL DEFAULT 0;');
+    } catch {
+      // already present
+    }
   }
 
   close(): void {
@@ -150,6 +156,30 @@ export class Db {
 
   removeAssignment(id: string): void {
     this.db.prepare('DELETE FROM assignments WHERE id = ?').run(id);
+  }
+
+  // Grade release is a per-assignment flag OUTSIDE the AssignmentData JSON —
+  // it's grading policy, not assignment content, and it must never ride along
+  // to the client inside the assignment object.
+  getGradesReleased(id: string): boolean {
+    const row = this.db
+      .prepare('SELECT grades_released FROM assignments WHERE id = ?')
+      .get(id) as unknown as { grades_released: number } | undefined;
+    return row ? row.grades_released !== 0 : false;
+  }
+
+  setGradesReleased(id: string, released: boolean): void {
+    this.db
+      .prepare('UPDATE assignments SET grades_released = ? WHERE id = ?')
+      .run(released ? 1 : 0, id);
+  }
+
+  /** ids → released flag, for decorating assignment list summaries. */
+  listGradesReleased(): Map<string, boolean> {
+    const rows = this.db
+      .prepare('SELECT id, grades_released FROM assignments')
+      .all() as unknown as { id: string; grades_released: number }[];
+    return new Map(rows.map((r) => [r.id, r.grades_released !== 0]));
   }
 
   // ── workbooks ──────────────────────────────────────────────────

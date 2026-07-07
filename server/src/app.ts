@@ -8,10 +8,13 @@
 //   GET    /api/assignments/:id                student: answers stripped; instructor: full
 //   PUT    /api/assignments/:id                instructor: create/update
 //   DELETE /api/assignments/:id                instructor
+//   PUT    /api/assignments/:id/grades-release instructor: {released: boolean} —
+//                                              students see no grades at all until released
 //   GET    /api/workbooks/:assignmentId        the caller's saved canvas state
 //   PUT    /api/workbooks/:assignmentId        autosave target
 //   POST   /api/assignments/:id/submissions    submit → server autogrades → record
-//   GET    /api/assignments/:id/submissions    student: own attempts (scores only);
+//   GET    /api/assignments/:id/submissions    student: own attempts (no grades until
+//                                              released, then scores only);
 //                                              instructor: all attempts, full detail
 //   GET    /api/health                         unauthenticated liveness probe
 //
@@ -98,9 +101,13 @@ export function createApp(config: ServerConfig, db: Db) {
 
   // ── assignments ────────────────────────────────────────────────
   app.get('/api/assignments', auth, (_req, res) => {
-    const summaries = db
-      .listAssignments()
-      .map((a) => ({ id: a.id, title: a.title, questionCount: a.questions.length }));
+    const released = db.listGradesReleased();
+    const summaries = db.listAssignments().map((a) => ({
+      id: a.id,
+      title: a.title,
+      questionCount: a.questions.length,
+      gradesReleased: released.get(a.id) ?? false,
+    }));
     res.json({ assignments: summaries });
   });
 
@@ -112,6 +119,7 @@ export function createApp(config: ServerConfig, db: Db) {
     }
     res.json({
       assignment: req.user!.role === 'instructor' ? assignment : stripAnswers(assignment),
+      gradesReleased: db.getGradesReleased(assignment.id),
     });
   });
 
@@ -133,6 +141,25 @@ export function createApp(config: ServerConfig, db: Db) {
   app.delete('/api/assignments/:id', auth, requireInstructor, (req, res) => {
     db.removeAssignment(String(req.params.id));
     res.json({ ok: true });
+  });
+
+  // ── grade release (instructor) ─────────────────────────────────
+  // Students never see grades — not even on submit — until the instructor
+  // flips this per-assignment flag. Idempotent; unrelease (released: false)
+  // hides grades again.
+  app.put('/api/assignments/:id/grades-release', auth, requireInstructor, (req, res) => {
+    const id = String(req.params.id);
+    if (!db.getAssignment(id)) {
+      res.status(404).json({ error: 'unknown assignment' });
+      return;
+    }
+    const released = (req.body ?? {}).released;
+    if (typeof released !== 'boolean') {
+      res.status(400).json({ error: 'body must be {released: boolean}' });
+      return;
+    }
+    db.setGradesReleased(id, released);
+    res.json({ ok: true, gradesReleased: released });
   });
 
   // ── workbooks (per-student autosave) ───────────────────────────
@@ -172,9 +199,13 @@ export function createApp(config: ServerConfig, db: Db) {
     };
     const result = gradeSubmission(assignment, submission);
     const record = db.addSubmission(assignment.id, req.user!.email, submission, result);
-    // Students get their scores, never the per-case answer detail.
+    // The grade is computed and stored NOW, but students don't see it until
+    // the instructor releases grades — and even then, scores only.
     res.status(201).json({
-      record: req.user!.role === 'instructor' ? record : studentRecord(record),
+      record:
+        req.user!.role === 'instructor'
+          ? record
+          : studentRecord(record, db.getGradesReleased(assignment.id)),
     });
   });
 
@@ -183,8 +214,9 @@ export function createApp(config: ServerConfig, db: Db) {
       res.json({ records: db.listSubmissions(String(req.params.id)) });
       return;
     }
+    const released = db.getGradesReleased(String(req.params.id));
     const own = db.listSubmissions(String(req.params.id), req.user!.email);
-    res.json({ records: own.map(studentRecord) });
+    res.json({ records: own.map((r) => studentRecord(r, released)) });
   });
 
   // ── errors ─────────────────────────────────────────────────────

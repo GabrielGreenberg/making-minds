@@ -58,10 +58,11 @@ All routes are under `/api`, JSON in/out, auth via `Authorization: Bearer <token
 | `GET /api/assignments/:id`              | logged in  | full assignment; **students get `test_cases` stripped**              |
 | `PUT /api/assignments/:id`              | instructor | create/update (body = full `AssignmentData`, id must match URL)      |
 | `DELETE /api/assignments/:id`           | instructor | remove                                                               |
+| `PUT /api/assignments/:id/grades-release` | instructor | `{released: boolean}` — grades are hidden from students until released; unrelease hides them again |
 | `GET /api/workbooks/:assignmentId`      | logged in  | the caller's saved canvas state (`{state}` — null if none)           |
 | `PUT /api/workbooks/:assignmentId`      | logged in  | autosave target (body = `AssignmentState`)                           |
-| `POST /api/assignments/:id/submissions` | logged in  | `{answers}` → server stamps identity/time, **grades**, returns `{record}`; students get scores only, no per-case detail |
-| `GET /api/assignments/:id/submissions`  | logged in  | student: own attempts (detail stripped); instructor: all attempts, full detail (the gradebook feed) |
+| `POST /api/assignments/:id/submissions` | logged in  | `{answers}` → server stamps identity/time, **grades**, stores, returns `{record}`; the student's copy carries **no grade** until grades are released (then scores only, never per-case detail) |
+| `GET /api/assignments/:id/submissions`  | logged in  | student: own attempts — no grades before release, scores-only after; instructor: all attempts, full detail (the gradebook feed) |
 
 The browser counterpart is `app/src/api/client.ts` — a typed function per
 endpoint, ready to back `Remote*` implementations of the `WorkbookStore` /
@@ -74,7 +75,7 @@ endpoint, ready to back `Remote*` implementations of the `WorkbookStore` /
 | `src/config.ts`         | env-driven `ServerConfig`                                               |
 | `src/db.ts`             | `node:sqlite` schema + typed accessors (users, sessions, assignments, workbooks, submissions) |
 | `src/auth.ts`           | the auth seam: `AuthProvider` interface, `DevAuthProvider`, session issue/lookup, `requireAuth`/`requireInstructor` middleware. UCLA SSO plugs in here (`MM_AUTH_MODE=sso`) |
-| `src/sanitize.ts`       | student-facing redaction: `stripAnswers` (no `test_cases`), `stripResultDetail` (scores only) |
+| `src/sanitize.ts`       | student-facing redaction: `stripAnswers` (no `test_cases`), `stripResultDetail` (scores only), `studentRecord` (no grade at all until grades are released) |
 | `src/app.ts`            | the Express app (factory, no `listen`) — all routes                     |
 | `src/index.ts`          | entry point: config → db → listen, graceful shutdown                    |
 | `src/seed.ts`           | seed roster + bundled/sample assignments (`npm run seed [-- --sample]`) |

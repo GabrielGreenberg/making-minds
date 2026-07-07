@@ -166,19 +166,13 @@ const submitOk = await api<{ record: SubmissionRecord }>(
   `/assignments/${SAMPLE_ASSIGNMENT_ID}/submissions`,
   { token: sTok, body: { answers: correct.answers } },
 );
-const okResult = submitOk.json.record?.result;
 check(
-  'correct submission grades all-pass',
-  submitOk.status === 201 && !!okResult && okResult.passed === okResult.total && okResult.total > 0,
-  JSON.stringify({ status: submitOk.status, passed: okResult?.passed, total: okResult?.total }),
+  'submit succeeds with NO grade shown (grades not released)',
+  submitOk.status === 201 && submitOk.json.record?.result === undefined,
 );
 check(
   'server stamps identity',
   submitOk.json.record.submission.student === student.email.toLowerCase(),
-);
-check(
-  'student result has no per-case detail',
-  okResult!.questions.every((q) => q.cases.length === 0 && (q.turbotCases ?? []).length === 0),
 );
 
 const wrong = buildIncorrectSubmission(student.email);
@@ -187,32 +181,98 @@ const submitBad = await api<{ record: SubmissionRecord }>(
   `/assignments/${SAMPLE_ASSIGNMENT_ID}/submissions`,
   { token: sTok, body: { answers: wrong.answers } },
 );
-const badResult = submitBad.json.record?.result;
 check(
-  'incorrect submission fails cases',
-  submitBad.status === 201 && !!badResult && badResult.passed < badResult.total,
+  'second submit also withholds the grade',
+  submitBad.status === 201 && submitBad.json.record?.result === undefined,
 );
 check('attempt increments', submitBad.json.record.attempt === 2);
 
-// ── gradebook views ──────────────────────────────────────────────
-const own = await api<{ records: SubmissionRecord[] }>(
+// ── gradebook views + grade release ──────────────────────────────
+const ownHidden = await api<{ records: SubmissionRecord[] }>(
   'GET',
   `/assignments/${SAMPLE_ASSIGNMENT_ID}/submissions`,
   { token: sTok },
 );
-check('student sees own attempts', own.json.records.length === 2);
+check(
+  'student sees own attempts but no grades before release',
+  ownHidden.json.records.length === 2 && ownHidden.json.records.every((r) => r.result === undefined),
+);
 
 const all = await api<{ records: SubmissionRecord[] }>(
   'GET',
   `/assignments/${SAMPLE_ASSIGNMENT_ID}/submissions`,
   { token: iTok },
 );
+const iFirst = all.json.records.find((r) => r.attempt === 1)?.result;
+const iSecond = all.json.records.find((r) => r.attempt === 2)?.result;
+check(
+  'instructor sees grades immediately (correct all-pass, incorrect fails)',
+  !!iFirst &&
+    iFirst.passed === iFirst.total &&
+    iFirst.total > 0 &&
+    !!iSecond &&
+    iSecond.passed < iSecond.total,
+  JSON.stringify({ first: [iFirst?.passed, iFirst?.total], second: [iSecond?.passed, iSecond?.total] }),
+);
 check(
   'instructor sees per-case detail',
-  all.json.records.length === 2 &&
-    all.json.records.some((r) =>
-      r.result?.questions.some((q) => q.cases.length > 0 || (q.turbotCases ?? []).length > 0),
-    ),
+  all.json.records.some((r) =>
+    r.result?.questions.some((q) => q.cases.length > 0 || (q.turbotCases ?? []).length > 0),
+  ),
+);
+
+const releaseForbidden = await api('PUT', `/assignments/${SAMPLE_ASSIGNMENT_ID}/grades-release`, {
+  token: sTok,
+  body: { released: true },
+});
+check('student cannot release grades', releaseForbidden.status === 403);
+
+const release = await api<{ gradesReleased: boolean }>(
+  'PUT',
+  `/assignments/${SAMPLE_ASSIGNMENT_ID}/grades-release`,
+  { token: iTok, body: { released: true } },
+);
+check('instructor releases grades', release.status === 200 && release.json.gradesReleased === true);
+
+const listReleased = await api<{ assignments: { id: string; gradesReleased: boolean }[] }>(
+  'GET',
+  '/assignments',
+  { token: sTok },
+);
+check(
+  'assignment list reports gradesReleased',
+  listReleased.json.assignments.find((a) => a.id === SAMPLE_ASSIGNMENT_ID)?.gradesReleased === true,
+);
+
+const ownReleased = await api<{ records: SubmissionRecord[] }>(
+  'GET',
+  `/assignments/${SAMPLE_ASSIGNMENT_ID}/submissions`,
+  { token: sTok },
+);
+const sFirst = ownReleased.json.records.find((r) => r.attempt === 1)?.result;
+check(
+  'after release, student sees scores',
+  !!sFirst && sFirst.passed === sFirst.total && sFirst.total > 0,
+);
+check(
+  'after release, still no per-case detail for students',
+  ownReleased.json.records.every((r) =>
+    (r.result?.questions ?? []).every((q) => q.cases.length === 0 && (q.turbotCases ?? []).length === 0),
+  ),
+);
+
+await api('PUT', `/assignments/${SAMPLE_ASSIGNMENT_ID}/grades-release`, {
+  token: iTok,
+  body: { released: false },
+});
+const ownRehidden = await api<{ records: SubmissionRecord[] }>(
+  'GET',
+  `/assignments/${SAMPLE_ASSIGNMENT_ID}/submissions`,
+  { token: sTok },
+);
+check(
+  'unrelease hides grades again',
+  ownRehidden.json.records.every((r) => r.result === undefined),
 );
 
 // ── logout ───────────────────────────────────────────────────────
