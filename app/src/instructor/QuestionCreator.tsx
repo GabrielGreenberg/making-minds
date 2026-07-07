@@ -68,7 +68,7 @@ const INNER_MODES: { mode: BuildMode; label: string }[] = [
 const CRITERIA: { value: TurbotSuccessCriterion; label: string; hint: string }[] = [
   { value: 'reach-and-stop', label: 'Reach goal and stop', hint: 'The turbot must halt itself (motor 00) on the goal cell.' },
   { value: 'pass-through', label: 'Pass through goal', hint: 'The turbot must visit the goal cell at some step.' },
-  { value: 'return-to-start', label: 'Return to start', hint: 'The turbot must end on its starting cell.' },
+  { value: 'return-to-start', label: 'Return to start', hint: 'The turbot must end on its starting cell — first visiting the goal cell, if the arena has one.' },
 ];
 
 type ArenaTool = 'block' | 'goal' | 'erase' | 'start';

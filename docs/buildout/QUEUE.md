@@ -278,10 +278,27 @@ before Phase 3 (perception returns to router-rendered CC/SC). Task ids unchanged
   grade-release/manual-review duplication (server-authoritative + local
   mirror). Gabriel's call on timing — enqueue-only; probably his next
   parallel-session slice.
-- [ ] **P4.2** **Multi-arena navigation grading** for unknown distance/position
+- [x] **P4.2** **Multi-arena navigation grading** for unknown distance/position
   (Mad Max, Way Finder, Desert Ant): put a *family* of arenas in `turbot_cases`;
   confirm the grader requires all to pass. **Acceptance:** a single-layout-only
-  solution fails the family.
+  solution fails the family. — _done 2026-07-07 (worktree)._ Aggregation was
+  already right (`gradeTurbot` grades EVERY case; a question passes iff
+  passed === total in both `summarizeResult` and the gradebook's
+  `toQuestionGrade`; GradebookView maps ALL turbotCases with 1-based arena
+  indices). The real hole was the **criterion**: spec-letter `return-to-start`
+  checked only the final position, so a stop-immediately brain — or any fixed
+  out-and-back — passed EVERY Mad-Max-style arena (proved headlessly first:
+  4 brains × 3 arenas, all vacuous passes). Fixed deep in
+  `evaluateTurbotCriterion`: when the arena declares a goal cell,
+  return-to-start also requires the trace to VISIT it (goal-less arenas
+  unchanged; goal-on-start degenerates gracefully, mirroring pass-through).
+  Spec §12.5 + creator hint updated. The exhibit now discriminates: hardcoded
+  out-2-back-2 passes the 1-arena family 1/1 but fails the 3-arena family 1/3
+  (block at x=3/5/7, goal just before it); out-4-back-4 gets 2/3 ≠ pass; the
+  3-state sensor-reactive Mad Max FSM passes 3/3; lazy stop-now brain 0/3.
+  12 pins in turbotCheck `[multi-arena]` (incl. two headless Gradebook-logic
+  pins: score 0, failedCount 2). P4.3's Mad Max arenas should mark the
+  sensing spot (cell before the block) as the goal.
 - [ ] **P4.3** Author the specific arenas + plausible brains: CC nav (hw2-p13…p15),
   SC nav (hw3-p13…p15), FSM nav (hw4-p12…p14). **Interface tier:** the arenas
   (from the HW diagrams) + a plausible brain per row that validates, steps in

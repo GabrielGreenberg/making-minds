@@ -86,7 +86,7 @@ validates + grades end-to-end) · `appr` = appearance matches VISUAL_VOCAB.
 | hw3-p12 | motion detector (object image moving up) | perception | ✅ | ✅ | ✅ | ✅ | ✅ | `reference/hw3-p12.json`; devData Q13 (motion k=3) promoted at exact tier; 146-comp PLA-matrix layout, ROTATED MEMs (sanctioned), 0 router fallbacks; broken fails 6/9; 17 bumpless crossings = P1.8 S3 class; 2 cosmetic appr findings logged (toggle-tab elbow — router obstacle gap; rotated-MEM label bisection) |
 | hw3-p13 | zig-zag: reach & keep going | navigation | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | SC turbot, pass-through |
 | hw3-p14 | three ahead: reach & stop | navigation | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | SC turbot, reach-and-stop |
-| hw3-p15 | Mad Max: block ahead unknown dist, return & stop | navigation | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | return-to-start; **multi-arena + memory** |
+| hw3-p15 | Mad Max: block ahead unknown dist, return & stop | navigation | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | return-to-start; **multi-arena + memory**; P4.2 gave the criterion teeth — mark the sensing spot (cell before the block) as the GOAL so the trace must visit it before returning (else any out-and-back, or never moving, passes) |
 
 _Note: HW3 #10 (x·y B) is an impossibility argument (not SC-computable) — excluded._
 
