@@ -32,7 +32,20 @@ solutions (Way Finder, Mad Max, Desert Ant) — future correct-answers project.
 **Exception:** free correct machines (devData/problem-set-printed) — take
 them; the HW4 zig-zag FSM is PRINTED in the problem set.
 
-## Do this next — P1.8 S3 (router: lanes + the XOR floor)
+## Do this next — FIRST merge origin/main (8 commits, discovered at iteration-20 close), THEN P1.8 S3
+
+**The merge is not optional and not small:** main now carries the BACKEND
+phase's opening moves — PR #15 "server groundwork" (API server, typed client,
+deploy recipes for Lightsail + Cloudflare Pages), PR #14 instructor manual
+grading for open questions, and grade-release gating (students see no grades
+until released). These touch the persistence/submission/grading seams the
+buildout depends on. Same drill as iteration 18: delegate the merge to one
+agent (both-sides-preserved, gates green before commit, report semantic
+collisions + what the server groundwork means for the harness/tools), verify
+independently, THEN proceed to S3 (below) if budget remains — otherwise S3 is
+the next iteration.
+
+## P1.8 S3 (router: lanes + the XOR floor)
 
 Per `designs/wire-routing.md` + three pinned exhibits, S3 now has a full
 mechanism map. Scope:
