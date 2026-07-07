@@ -2,10 +2,10 @@
 
 _The definition of done and the progress ledger. One row per machine-buildable
 problem in HW1–HW6. The project is done when every row is green **at its tier**:
-✅ exact for the arithmetic rows (already met), ◐ interface for perception &
-navigation (a plausible attempt that validates + grades end-to-end; correctness
-NOT required — user directive 2026-07-06; exact answers are a separate future
-project)._
+✅ exact for the arithmetic rows (already met) and for perception (landed at
+exact — correct machines were free), ◐ interface for navigation (a plausible
+attempt that validates + grades end-to-end; correctness NOT required — user
+directive 2026-07-06; exact answers are a separate future project)._
 
 **Source of truth:** the coverage harness (`app/tools/coverageCheck.ts`) is
 authoritative; this table is the human-readable mirror. Regenerate it from the
@@ -20,10 +20,10 @@ interface-verified · ⛔ blocked/regressed.
 variant fails). ◐ = harness `interface` at tier **interface** (plausible attempt
 passes Stage-1 validation + grades end-to-end; score reported, not asserted; no
 broken variant needed). Both also require appearance checked against
-[VISUAL_VOCAB.md](VISUAL_VOCAB.md). Tier lives on the manifest row; all 15
+[VISUAL_VOCAB.md](VISUAL_VOCAB.md). Tier lives on the manifest row; all 10
 remaining rows are tier `interface`.
 
-**As of 2026-07-07 (post-iteration 20):** harness live with two tiers,
+**As of 2026-07-07 (post-iteration 22; audited iteration 23):** harness live with two tiers,
 **46/56 exact-verified** (ALL arithmetic HW1–HW5 + ALL perception hw2-p10..p12
 + hw3-p11..p12, promoted from main's devData samples at exact tier — correct
 answers were free), 10 pending at the interface tier, 0 regressed. Remaining
@@ -63,7 +63,7 @@ validates + grades end-to-end) · `appr` = appearance matches VISUAL_VOCAB.
 | hw2-p6  | 2(x+1) [0-15] B | arithmetic | ✅ | ✅ | ✅ | ✅ | ✅ | `reference/hw2-p6.json`; **BOXED `+1` reuse exercised** (internals = p1 circuit); broken diverges only at x=15 (narrowest near-miss) |
 | hw2-p7  | x+y [0-15] B | arithmetic | ✅ | ✅ | ✅ | ✅ | ✅ | `reference/hw2-p7.json`; ripple adder (7 HA + 3 OR), 256/256; layout re-computed by topo depth after appr failure (backward carry wires) — now 25/25 forward |
 | hw2-p10 | edge detector (≥3 consecutive 1s) | perception | ✅ | ✅ | ✅ | ✅ | ✅ | `reference/hw2-p10.json`; devData Q9 (min-run 3, w8) promoted at exact tier; 256-case exhaustive bank; broken (OR-all) fails 148/256 |
-| hw2-p11 | object detector (exactly 3 consecutive 1s) | perception | ✅ | ✅ | ✅ | ✅ | ✅ | `reference/hw2-p11.json`; devData Q10 (exact-run 3, w8); broken (= the ≥3 detector) fails 46/256; appr ✅ with ONE known renderer-class residual: 6 bumpless crossings (router lane hugs port column, inside pathDWithBumps' 5px skip) — P1.8 S3's exhibit, pinned by `tools/bumpCheck.ts` |
+| hw2-p11 | object detector (exactly 3 consecutive 1s) | perception | ✅ | ✅ | ✅ | ✅ | ✅ | `reference/hw2-p11.json`; devData Q10 (exact-run 3, w8); broken (= the ≥3 detector) fails 46/256; appr ✅ (its 6-bumpless-crossing renderer residual — router lane hugging the port column, inside pathDWithBumps' 5px skip — was P1.8 S3's exhibit; resolved by S3's own-endpoint exemption + H4 round, bump-clean since `d0214ec`, pinned by `tools/bumpCheck.ts` in `npm run check`) |
 | hw2-p12 | landmark recognition (= 110010111) | perception | ✅ | ✅ | ✅ | ✅ | ✅ | `reference/hw2-p12.json`; devData Q11 (pattern, w9 — width follows the pattern; 8-in schematic question resolved); 512-case bank; broken (AND-all) fails exactly the 2 pattern-adjacent cases |
 | hw2-p13 | spiral (CC turbot, pass-through) | navigation | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | |
 | hw2-p14 | full circle (CC turbot, pass-through) | navigation | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | |
@@ -83,7 +83,7 @@ validates + grades end-to-end) · `appr` = appearance matches VISUAL_VOCAB.
 | hw3-p8  | 2x T (feasible) | arithmetic | ✅ | ✅ | ✅ | ✅ | ✅ | `reference/hw3-p8.json`; window-aware (unbounded-stream version is FSM-infeasible — noted in LOG); 16-step runs |
 | hw3-p9  | x+y T (feasible) | arithmetic | ✅ | ✅ | ✅ | ✅ | ✅ | `reference/hw3-p9.json`; counter/latch over 81-case bank; layout uses the p7 right-to-left MEM-chain convention |
 | hw3-p11 | change detector (current ≠ previous) | perception | ✅ | ✅ | ✅ | ✅ | ✅ | `reference/hw3-p11.json`; devData Q12 promoted at exact tier; per-lane XOR-vs-MEM + OR fold; broken (memoryless OR) fails 7/8; temporal semantics adversarially probed; bumpCheck CLEAN; routed fallback-free since the own-endpoint exemption erased the structural XOR floor (2026-07-07, P1.8 S3; was 48 pinned fallbacks) |
-| hw3-p12 | motion detector (object image moving up) | perception | ✅ | ✅ | ✅ | ✅ | ✅ | `reference/hw3-p12.json`; devData Q13 (motion k=3) promoted at exact tier; 146-comp PLA-matrix layout, ROTATED MEMs (sanctioned), 0 router fallbacks; broken fails 6/9; 17 bumpless crossings = P1.8 S3 class; 2 cosmetic appr findings logged (toggle-tab elbow — router obstacle gap; rotated-MEM label bisection) |
+| hw3-p12 | motion detector (object image moving up) | perception | ✅ | ✅ | ✅ | ✅ | ✅ | `reference/hw3-p12.json`; devData Q13 (motion k=3) promoted at exact tier; 146-comp PLA-matrix layout, ROTATED MEMs (sanctioned), 0 router fallbacks; broken fails 6/9; its 17 bumpless crossings (P1.8 S3 class) resolved by S3 — bump-clean since `d0214ec`; 2 cosmetic appr findings still open (toggle-tab elbow — router obstacle gap, P1.8 leftover; rotated-MEM label bisection, P1.16) |
 | hw3-p13 | zig-zag: reach & keep going | navigation | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | SC turbot, pass-through |
 | hw3-p14 | three ahead: reach & stop | navigation | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | SC turbot, reach-and-stop |
 | hw3-p15 | Mad Max: block ahead unknown dist, return & stop | navigation | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | return-to-start; **multi-arena + memory**; P4.2 gave the criterion teeth — mark the sensing spot (cell before the block) as the GOAL so the trace must visit it before returning (else any out-and-back, or never moving, passes) |

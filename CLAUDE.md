@@ -454,7 +454,7 @@ end-to-end:
   backend half of every seam: dev auth + sessions, assignment CRUD, workbook sync, and
   submit-with-server-side-autograding (same `engine/grader.ts`, imported directly). It keeps
   `test_cases` server-only and strips per-case detail from student results. SQLite storage,
-  seed script, and a 22-check HTTP smoke test (`cd server && npm run check`). Deployment
+  seed script, and a 28-check HTTP smoke test (`cd server && npm run check`). Deployment
   recipes for Lightsail + Cloudflare Pages sit in `deploy/`. See `server/README.md`.
 
 What's missing is the **deployment** (waiting on the UCLA AWS account), **UCLA SSO**, and the
@@ -464,6 +464,12 @@ What's missing is the **deployment** (waiting on the UCLA AWS account), **UCLA S
 
 **Near-term (still no backend):**
 
+- **Reference-fixture buildout** (branch `buildout-infra`, memos in `docs/buildout/`) —
+  **46/56 exact-verified**: all HW1–HW5 arithmetic AND all five perception problems have
+  hand-verified reference fixtures behind the two-tier coverage harness. Remaining: the 9
+  navigation rows (CC/SC/FSM turbots, P4.3) + the HW6 Desert Ant capstone, all at the
+  **interface** tier (plausible attempt validates + grades end-to-end; correctness not
+  required — 2026-07-06 scope shift).
 - **Turbot polish** — the full turbot flow (engine, grader, store, student workspace, instructor
   authoring, gradebook, sample data) shipped 2026-07-05, including the textbook turbot TM
   (internal/external states, single tape actions, B/E/F senses, ↑/↱/↰ motors); FSM brains got

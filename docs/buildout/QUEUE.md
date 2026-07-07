@@ -254,9 +254,10 @@ before Phase 3 (perception returns to router-rendered CC/SC). Task ids unchanged
   bump-skip radius; position-jiggling provably can't clear it (an annealing
   probe stalled at 2), so it ships as a documented renderer-class residual.
   New headless predicate `app/tools/bumpCheck.ts` (replicates the canvas
-  crossing+skip rules on real routes; NOT in `npm run check` yet — hw2-p11
-  currently fails it by design) → **P1.8 S3's acceptance now includes: bumpCheck
-  clean on all CC/SC fixtures, then wire it into the harness.**
+  crossing+skip rules on real routes; at the time NOT in `npm run check` —
+  hw2-p11 failed it by design) → fed into P1.8 S3's acceptance. _Since
+  resolved: S3 (`d0214ec`) made ALL CC/SC fixtures bump-clean (incl. hw2-p11's
+  exhibit) and wired bumpCheck into `npm run check`._
 - [x] **P3.3** **Promote main's SC perception circuits into reference
   fixtures.** — _done 2026-07-07 (iteration 20; 2-agent build workflow +
   adversarial verifier + appearance sweep + one bounded diagnosis agent)._
@@ -269,9 +270,11 @@ before Phase 3 (perception returns to router-rendered CC/SC). Task ids unchanged
   STRUCTURAL XOR FLOOR — XOR's left-port inset (11.25px) > STUB_LENGTH(12) −
   ELEMENT_MARGIN(5), so every XOR-in wire costs exactly 3 fallbacks; the
   ENTIRE pre-existing 99 pin is this class (3 × XOR-in wires per fixture).
-  Deliberately pinned `hw3-p11: 48` (budget 147) with the mechanism + fix
-  candidates documented in routerCheck's header → P1.8 S3 can now kill the
-  whole floor, not just trim it. Discovered → P1.15, P1.16, S3 obstacle note.
+  Deliberately pinned `hw3-p11: 48` (budget 147, then current) with the
+  mechanism + fix candidates documented in routerCheck's header → P1.8 S3 could
+  kill the whole floor, not just trim it. _It did: S3's own-endpoint exemption
+  (`d0214ec`) erased the XOR floor — budget repinned 147 → 2._ Discovered →
+  P1.15, P1.16, S3 obstacle note.
 
 ## Phase 4 — Navigation
 
@@ -280,18 +283,10 @@ before Phase 3 (perception returns to router-rendered CC/SC). Task ids unchanged
   (`0:01` = pivot left) executable and pinned in turbotCheck; legacy 1-bit
   labels alias + decay. Remaining surface work (palette/glossary vocabulary
   for 2-bit outputs in the turbot editor) rides P4.3's authoring pass._
-- [ ] **P6.3** _(enqueued iteration 21, merge-#3 report)_ **Server↔engine
-  grading parity pin:** serverCheck and pipelineCheck should share a fixture —
-  same submission graded via HTTP (server/src, engine imported cross-package)
-  and via direct `gradeSubmission` must yield identical results; plus fold
-  `server: typecheck + check` into the repo's CI/gate story. Guards the
-  Evaluation seam's "same code grades on server" promise as both sides evolve.
-- [ ] **P6.4** _(enqueued iteration 21)_ **Remote-store cutover** (backend
-  phase): async `Remote*` stores backed by `api/client.ts` (currently 1:1,
-  imported by NOTHING) replacing the localStorage seams; retires the
-  grade-release/manual-review duplication (server-authoritative + local
-  mirror). Gabriel's call on timing — enqueue-only; probably his next
-  parallel-session slice.
+<!-- P6.3/P6.4 (enqueued here mid-Phase-4 at iteration 21) moved to Phase 6 by
+META-audit-queue 2026-07-07 (iteration 23): both are close-out/backend tasks and
+were sitting ABOVE P4.3 as the file's top unblocked todos, contradicting
+HANDOFF's "do this next = P4.3". Task ids unchanged. -->
 - [x] **P4.2** **Multi-arena navigation grading** for unknown distance/position
   (Mad Max, Way Finder, Desert Ant): put a *family* of arenas in `turbot_cases`;
   confirm the grader requires all to pass. **Acceptance:** a single-layout-only
@@ -378,7 +373,11 @@ before Phase 3 (perception returns to router-rendered CC/SC). Task ids unchanged
   exactly the prescribed deep fix: ONE aggregate `resetAllSimState()` (delegating
   to per-mode global resets) on all three navigation paths; pinned by the new
   `app/tools/navResetCheck.ts` (42 checks, 15 fail without the fix) — exceeds
-  this task's acceptance criterion. Original discovery entry follows._
+  this task's acceptance criterion. The same session then extended the
+  fresh-machine contract to every sandbox canvas swap (`c93fe6e`:
+  enterSandbox/addTab/switchTab/removeTab/newWorkbook/importWorkbook);
+  navResetCheck is now 86 checks (42 nav + 44 sandbox), in `npm run check`.
+  Original discovery entry follows._
   _(discovered 2026-07-07, P3.3 appearance sweep; REAL APP BUG)_
   **SC/FSM sim state leaks across question navigation.** After running one SC
   question, the next question's Global I/O, ARG/VAL, and Sequential Timeline
@@ -414,13 +413,39 @@ before Phase 3 (perception returns to router-rendered CC/SC). Task ids unchanged
 - [ ] **P6.2** Reconcile CLAUDE.md status with COVERAGE; final `npm run check` +
   `tsc` + `build` all green; every COVERAGE row green **at its tier** (✅ exact
   for arithmetic, ◐ interface for perception/navigation).
+- [ ] **P6.3** _(enqueued iteration 21, merge-#3 report; re-homed here from
+  Phase 4 by the iteration-23 audit)_ **Server↔engine grading parity pin:**
+  serverCheck and pipelineCheck should share a fixture — same submission graded
+  via HTTP (server/src, engine imported cross-package) and via direct
+  `gradeSubmission` must yield identical results; plus fold
+  `server: typecheck + check` into the repo's CI/gate story. Guards the
+  Evaluation seam's "same code grades on server" promise as both sides evolve.
+- [ ] **P6.4** _(enqueued iteration 21; re-homed here from Phase 4 by the
+  iteration-23 audit)_ **Remote-store cutover** (backend phase): async
+  `Remote*` stores backed by `api/client.ts` (currently 1:1, imported by
+  NOTHING) replacing the localStorage seams; retires the
+  grade-release/manual-review duplication (server-authoritative + local
+  mirror). Gabriel's call on timing — enqueue-only; probably his next
+  parallel-session slice.
 
 ---
 
 ## Recurring meta-tasks  _(fire on cadence; keep the queue honest)_
 
-- [ ] **META-audit-queue** — _every ~5 iterations; last ran iteration 18
-  (2026-07-06): merged `origin/main` (open-question sixth mode + turbot
+- [ ] **META-audit-queue** — _every ~5 iterations; last ran iteration 23
+  (2026-07-07): post-S3 doc reconciliation — verified harness 46/10/0/0,
+  bumpCheck CLEAN + routerCheck budget 2, turbotCheck [multi-arena] and
+  navResetCheck (86, in `npm run check`) green, toggle-tab obstacle gap
+  confirmed still open; rewrote the stale live-defect notes S3 outdated
+  (COVERAGE hw2-p11/hw3-p12, manifest hw3-p12, QUEUE P3.2/P3.3), recorded the
+  out-of-band sandbox fresh-machine extension `c93fe6e` (navResetCheck 42→86)
+  + Vite PORT `7914966` in P1.15/HANDOFF/LOG, re-homed P6.3/P6.4 from Phase 4
+  to Phase 6 (they sat above P4.3 as top todos), fixed CLAUDE.md's serverCheck
+  count (22→28) + added the buildout-status bullet; LOG iterations 19–22 +
+  out-of-band entries verified coherent/non-duplicated; NO patch cluster (the
+  window's fixes were seam-routed deep fixes: S3 model unification, P4.2
+  criterion, P1.15 aggregate reset + its sandbox extension). Previous run
+  iteration 18 (2026-07-06): merged `origin/main` (open-question sixth mode + turbot
   grading rework, PRs #11/#13) as `e9122e0`, then main's perception-questions
   feature (PR #12) as `b36aed6` — which closed P3.1 as overtaken and rescoped
   P3.2/P3.3 to fixture promotion; all gates green after each; harness

@@ -1007,3 +1007,43 @@ queued: INPUT toggle-tab obstacles, hw3-p9 dot-skip nit; S4 is unowned again.
 hw3-p13..15, hw4-p12..14; zig-zag FSM printed in HW4 = free; multi-arena
 families per P4.2's grader semantics — mark the sensing spot as the goal on
 return-to-start arenas).
+
+## 2026-07-07 (iteration 23) — META-audit-queue: post-S3 doc reconciliation · no drift in the ledger, plenty in the prose
+
+**Ground truth re-verified:** harness 46 exact · 10 pending · 0 regressed · 0
+warnings; `bumpCheck` no-arg sweep CLEAN (every CC/SC fixture 0 bumpless,
+incl. hw2-p11 and hw3-p12); `routerCheck` budget 2 ≤ 2 with the own-endpoint
+exemption + distribution pins green; `turbotCheck` [multi-arena] 12 checks and
+`navResetCheck` (86) green, both in `npm run check`; no toggle-tab obstacle
+handling anywhere in wireRouter/componentGeometry (the P1.8 leftover is
+genuinely open — the S3 session did NOT quietly do more than the memo says).
+
+**Out-of-band landings recorded** (previously only in CLAUDE.md's changelog):
+the P1.15 session also extended the fresh-machine contract to every sandbox
+canvas swap (`c93fe6e` — enterSandbox/addTab/switchTab/removeTab/newWorkbook/
+importWorkbook; navResetCheck 42 → **86** checks) and made Vite honor an
+assigned `PORT` env var (`7914966`, parallel sessions' dev servers). Landed
+via the final merges (`4c3dbc8`/`4432a96`).
+
+**Drift fixed:** S3's landing had outdated four live-defect notes — COVERAGE
+hw2-p11 ("6 bumpless crossings … S3's exhibit") and hw3-p12 ("17 bumpless
+crossings = S3 class"), the manifest's hw3-p12 note, and QUEUE P3.2/P3.3's
+"NOT in `npm run check` yet" / "S3 can now kill the floor" — all rewritten
+past-tense (resolved by `d0214ec`; history kept). COVERAGE header: "15
+remaining rows" → 10; legend now says perception landed at exact. HANDOFF/QUEUE
+P1.15: navResetCheck count 42 → 86. **Queue order fixed:** P6.3/P6.4 (enqueued
+mid-Phase-4 at iteration 21) sat ABOVE P4.3 as the file's top unblocked todos —
+re-homed to Phase 6 (ids unchanged, reorder comment left in place). CLAUDE.md:
+server bullet's smoke-test count 22 → 28 (serverCheck grew with grade-release);
+added a buildout-status line (46/56 exact; 9 navigation rows + HW6 capstone
+remain at interface tier). LOG 19–22 + out-of-band entries verified coherent,
+non-duplicated, conflict-marker-free (the iteration-22 close block exists
+exactly once).
+
+**Patch-accumulation scan:** none. The window's fixes were seam-routed deep
+fixes (S3 = router world model unified with the oracle; P4.2 = criterion fixed
+in `evaluateTurbotCriterion`; P1.15 = ONE aggregate reset, then its sandbox
+extension completing the same contract). No unifying task needed.
+
+**Next:** P4.3 — navigation arenas + plausible brains (unchanged); audit due
+again ~iteration 28.

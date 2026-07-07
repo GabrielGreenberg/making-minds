@@ -8,8 +8,8 @@ run `npm run coverage` and reconcile._
 
 Branch `buildout-infra`. **46 / 56 exact-verified**, 10 pending (tier
 `interface` — 9 navigation + the HW6 capstone), 0 regressed, 0 warnings.
-Twenty-two iterations done. All arithmetic AND all perception complete at
-exact tier. **P4.2 landed (iteration 22, merge `d34d037`):** turbot arena
+Twenty-three iterations done (23 = the META audit). All arithmetic AND all
+perception complete at exact tier. **P4.2 landed (iteration 22, merge `d34d037`):** turbot arena
 families genuinely discriminate — `evaluateTurbotCriterion`'s return-to-start
 gained a goal-visit clause (a stop-immediately or fixed out-and-back brain no
 longer vacuously passes; spec §12.5), all-or-nothing aggregation verified,
@@ -17,7 +17,9 @@ turbotCheck gained a 12-check [multi-arena] section, gradebook drill-down
 verified N-arena. Concurrently landed by other sessions the same morning:
 **P1.8 S3** (`d0214ec` — own-endpoint exemption, fallbacks 147→2, bumpCheck
 all-clean + wired into `npm run check`, H4 conflict-feedback re-routing) and
-**P1.15** (`e95f74f` — `resetAllSimState()` + navResetCheck 42 checks). Merge `8dc2ff5` (iteration 21) brought main's
+**P1.15** (`e95f74f` — `resetAllSimState()`; extended to every sandbox canvas
+swap by `c93fe6e`, navResetCheck now 86 checks) and a Vite PORT-env honor
+(`7914966`, parallel dev servers). Merge `8dc2ff5` (iteration 21) brought main's
 **backend-phase opening wave**: an Express+sqlite API server that grades
 server-side with the SAME `engine/grader.ts` (test cases stripped from client
 payloads; results withheld until release), instructor manual grading for open
@@ -75,8 +77,11 @@ P5.1 Desert Ant capstone (interface proof) → P4.4 turbot sandbox tab
 ARG multi-group, P1.16 rotated-MEM labels, P1.8 leftovers: INPUT toggle-tab
 obstacles + hw3-p9 dot-skip nit; S4 fallback-phase-0 is unowned — optional
 now that fallbacks are 2) → P6 close-out incl. P6.3 server↔engine parity pin
-and P6.4 Remote-store cutover (Gabriel's timing). **META-audit-queue is DUE
-(iteration 23)** — run it next iteration or the one after P4.3.
+and P6.4 Remote-store cutover (Gabriel's timing; both re-homed to Phase 6 in
+the queue). META-audit-queue RAN at iteration 23 (2026-07-07): docs
+reconciled post-S3 (stale live-defect notes rewritten, out-of-band landings
+recorded, P6.3/P6.4 re-homed, CLAUDE.md serverCheck count fixed); no patch
+cluster; next audit due ~iteration 28.
 
 ## Watch out for
 
