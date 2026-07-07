@@ -2,9 +2,9 @@
  * layoutCheck — the LAYOUT ORACLE for reference-fixture machines (CC/SC only).
  *
  * Re-creates exactly what CircuitCanvas.tsx does on first render:
- *   - port positions via the canvas's getPortPositionLocal/getPortPosition
- *     (render dimensions: INPUT/OUTPUT 40x40, NOT 55x50, HA 75x80, MEM 50x50,
- *      gates 75x70; OR/XOR left-port inset)
+ *   - port positions and rendered dimensions via src/componentGeometry.ts —
+ *     the SAME module the canvas and wireRouter import (structural guarantee:
+ *     the oracle's geometry can never desync from the renderer's again)
  *   - routeAllWires(routeInputs, components, undefined)  [no previousPaths]
  *
  * Then reports, per machine:
@@ -29,62 +29,8 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { resolve } from 'node:path';
 import { routeAllWires, type WireRouteInput } from '../src/wireRouter';
+import { getComponentSize, getPortPosition } from '../src/componentGeometry';
 import type { CircuitComponent, Wire, CircuitData } from '../src/types';
-
-// ─── Render geometry (mirrors CircuitCanvas.tsx exactly) ───────────────────
-
-const INPUT_OUTPUT_SIZE = 40;
-const COMP_WIDTH = 75;
-const COMP_HEIGHT = 70;
-const STATE_SIZE = 60;
-
-function getCompDimensions(comp: CircuitComponent): { w: number; h: number } {
-  if (comp.type === 'INPUT' || comp.type === 'OUTPUT') {
-    return { w: INPUT_OUTPUT_SIZE, h: INPUT_OUTPUT_SIZE };
-  }
-  if (comp.type === 'NOT') return { w: 55, h: 50 };
-  if (comp.type === 'HA') return { w: COMP_WIDTH, h: COMP_HEIGHT + 10 };
-  if (comp.type === 'MEM') return { w: 50, h: 50 };
-  if (comp.type === 'STATE') {
-    if (comp.boxedCircuitId) return { w: 90, h: 50 };
-    return { w: STATE_SIZE, h: STATE_SIZE };
-  }
-  return { w: COMP_WIDTH, h: COMP_HEIGHT };
-}
-
-function getPortPositionLocal(comp: CircuitComponent, portId: string): { x: number; y: number } {
-  const port = comp.ports.find((p) => p.id === portId);
-  if (!port) return { x: comp.x, y: comp.y };
-
-  const { w, h } = getCompDimensions(comp);
-  const portsOnSide = comp.ports.filter((p) => p.side === port.side);
-  const spacing = h / (portsOnSide.length + 1);
-
-  let localX = port.side === 'left' ? 0 : w;
-  const localY = spacing * (port.index + 1);
-
-  if (port.side === 'left' && (comp.type === 'OR' || comp.type === 'XOR')) {
-    const xorOffset = comp.type === 'XOR' ? 6 : 0;
-    localX = xorOffset + w * 0.07;
-  }
-  return { x: comp.x + localX, y: comp.y + localY };
-}
-
-function getPortPosition(comp: CircuitComponent, portId: string): { x: number; y: number } {
-  const local = getPortPositionLocal(comp, portId);
-  const rotation = comp.rotation ?? 0;
-  if (rotation === 0) return local;
-  const { w, h } = getCompDimensions(comp);
-  const cx = comp.x + w / 2;
-  const cy = comp.y + h / 2;
-  const dx = local.x - cx;
-  const dy = local.y - cy;
-  const rad = (rotation * Math.PI) / 180;
-  return {
-    x: cx + dx * Math.cos(rad) - dy * Math.sin(rad),
-    y: cy + dx * Math.sin(rad) + dy * Math.cos(rad),
-  };
-}
 
 // ─── Segment machinery ──────────────────────────────────────────────────────
 
@@ -216,7 +162,7 @@ export function checkCircuitLayout(machine: CircuitData, machineName = 'machine'
     for (const c of components) {
       if (s.index === 0 && c.id === s.sourceCompId) continue; // own source stub
       if (s.index === s.count - 1 && c.id === s.targetCompId) continue; // own target stub
-      const { w, h } = getCompDimensions(c);
+      const { w, h } = getComponentSize(c);
       const rect = { left: c.x, top: c.y, right: c.x + w, bottom: c.y + h };
       if (segThroughRect(s, rect)) {
         violations.push({
@@ -232,7 +178,7 @@ export function checkCircuitLayout(machine: CircuitData, machineName = 'machine'
   for (let i = 0; i < components.length; i++) {
     for (let j = i + 1; j < components.length; j++) {
       const a = components[i], b = components[j];
-      const da = getCompDimensions(a), db = getCompDimensions(b);
+      const da = getComponentSize(a), db = getComponentSize(b);
       const overlap =
         a.x < b.x + db.w && b.x < a.x + da.w &&
         a.y < b.y + db.h && b.y < a.y + da.h;

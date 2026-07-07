@@ -21,6 +21,7 @@
  */
 
 import type { CircuitComponent } from './types';
+import { getComponentSize } from './componentGeometry';
 
 // ─── Constants ──────────────────────────────────────────────────────
 
@@ -101,15 +102,15 @@ interface SearchState {
 
 // ─── Geometry Helpers ───────────────────────────────────────────────
 
-function getCompDimensions(comp: CircuitComponent): { w: number; h: number } {
-  if (comp.type === 'INPUT' || comp.type === 'OUTPUT') return { w: 40, h: 40 };
-  if (comp.type === 'NOT') return { w: 55, h: 50 };
-  if (comp.type === 'HA') return { w: 75, h: 80 };
-  return { w: 75, h: 70 };
-}
+// Obstacle bounds come from the SHARED rendered geometry (componentGeometry.ts)
+// — the same table the canvas renders from and the layout oracle checks
+// against. The router must never keep its own copy: a private table once let
+// MEM default to phantom 75×70 bounds (rendered: 50×50), which blocked every
+// edge at MEM.min's stub tip and forced all incident wires onto the
+// obstacle-blind fallback.
 
 function getCompBounds(comp: CircuitComponent): Bounds {
-  const { w, h } = getCompDimensions(comp);
+  const { w, h } = getComponentSize(comp);
   const rotation = comp.rotation ?? 0;
   if (rotation === 0) {
     return { left: comp.x, top: comp.y, right: comp.x + w, bottom: comp.y + h };
@@ -684,6 +685,21 @@ function aStarSearch(
 
 // ─── Fallback: simple L-path when A* fails ──────────────────────────
 
+// Instrumentation: how many times the obstacle-blind fallback fired since the
+// last reset. The fallback is the router admitting defeat — tools/routerCheck.ts
+// pins a budget on it across the reference fixtures so world-model regressions
+// (like the phantom MEM 75×70 bounds this counter was added to catch) show up
+// as a failing check instead of silently ugly layouts.
+let fallbackCount = 0;
+
+export function resetFallbackCount(): void {
+  fallbackCount = 0;
+}
+
+export function getFallbackCount(): number {
+  return fallbackCount;
+}
+
 function fallbackPath(
   srcStub: Point, dstStub: Point, srcDir: Dir, dstDir: Dir
 ): Point[] {
@@ -913,6 +929,7 @@ export function routeAllWires(
 
       // Fallback if A* fails
       if (!pathPoints || pathPoints.length === 0) {
+        fallbackCount++;
         pathPoints = fallbackPath(srcStub, dstStub, srcDir, dstDir);
       }
 
@@ -1022,6 +1039,7 @@ export function routeAllWires(
       );
 
       if (!pathPoints || pathPoints.length === 0) {
+        fallbackCount++;
         pathPoints = fallbackPath(srcStub, dstStub, srcDir, dstDir);
       }
 
