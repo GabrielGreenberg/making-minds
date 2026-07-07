@@ -3,6 +3,7 @@ import { listAssignments } from '../assignments';
 import { navigate } from '../routing';
 import { getCurrentUserEmail, useAuth } from '../auth';
 import { summarizeResult } from '../engine/grader';
+import { isGradesReleased } from '../storage/gradeRelease';
 
 function formatSubmittedAt(iso: string): string {
   const d = new Date(iso);
@@ -25,14 +26,13 @@ export function HomeScreen() {
     if (!ok) return;
     const rec = submitAssignment(id, getCurrentUserEmail());
     if (!rec) return;
-    // The submission is autograded on receipt — report the result to the student.
-    if (rec.result) {
-      const s = summarizeResult(rec.result);
-      const detail = s.questionsTotal > 0
-        ? `Autograded: ${s.questionsPassed}/${s.questionsTotal} questions passed (${s.vectorsPassed}/${s.vectorsTotal} test cases).`
-        : 'No autogradable questions in this assignment yet.';
-      alert(`Submitted "${title}" (attempt ${rec.attempt}).\n${detail}`);
-    }
+    // The submission is autograded on receipt, but the grade is NEVER shown at
+    // submit time — students see grades only after the instructor releases
+    // them for the assignment (see storage/gradeRelease.ts).
+    alert(
+      `Submitted "${title}" (attempt ${rec.attempt}).\n` +
+        'Your work has been recorded. Grades will appear here once your instructor releases them.',
+    );
   };
 
   return (
@@ -74,6 +74,12 @@ export function HomeScreen() {
                       title={`Attempt ${sub.attempt}`}
                     >
                       ✓ Submitted {formatSubmittedAt(sub.submittedAt)}
+                      {isGradesReleased(a.id) && sub.result && (() => {
+                        const s = summarizeResult(sub.result);
+                        return s.questionsTotal > 0
+                          ? ` · Grade: ${s.questionsPassed}/${s.questionsTotal} questions`
+                          : '';
+                      })()}
                     </span>
                   ) : (
                     <span className="home-tile-status">Not submitted</span>

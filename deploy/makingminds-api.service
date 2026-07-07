@@ -1,0 +1,33 @@
+# systemd unit for the Making Minds API server on the Lightsail box.
+# Install: sudo cp deploy/makingminds-api.service /etc/systemd/system/
+#          sudo systemctl daemon-reload && sudo systemctl enable --now makingminds-api
+# Logs:    journalctl -u makingminds-api -f
+
+[Unit]
+Description=Making Minds API server (PHIL 133)
+After=network.target
+
+[Service]
+Type=simple
+User=makingminds
+WorkingDirectory=/srv/making-minds/server
+ExecStart=/usr/bin/npm start
+Restart=always
+RestartSec=3
+
+# Configuration — edit for the real deployment.
+Environment=NODE_ENV=production
+Environment=PORT=8133
+Environment=MM_DB_PATH=/srv/making-minds/data/making-minds.sqlite
+# The Cloudflare Pages origin(s), comma-separated:
+Environment=MM_CORS_ORIGINS=https://making-minds.pages.dev
+Environment=MM_AUTH_MODE=dev
+
+# Hardening
+NoNewPrivileges=true
+ProtectSystem=full
+ReadWritePaths=/srv/making-minds/data
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

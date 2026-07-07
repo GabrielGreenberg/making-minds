@@ -1,0 +1,17 @@
+# Caddy reverse proxy for the API server — terminates TLS (automatic
+# Let's Encrypt certificates) and forwards to the Node process on :8133.
+#
+# Install: sudo cp deploy/Caddyfile /etc/caddy/Caddyfile && sudo systemctl reload caddy
+# Replace the hostname with the real API domain (a DNS A record pointing at
+# the Lightsail static IP must exist first).
+
+api.making-minds.example.edu {
+	encode gzip
+
+	# Only the API lives here; the frontend is on Cloudflare Pages.
+	reverse_proxy 127.0.0.1:8133
+
+	log {
+		output file /var/log/caddy/makingminds-api.log
+	}
+}

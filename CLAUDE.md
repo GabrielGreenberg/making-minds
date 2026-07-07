@@ -14,7 +14,66 @@ Claude to load into context).
 >
 > A change isn't finished until the docs that describe it are too.
 
-_Last updated: 2026-07-07 (**merge #2: perception questions (CC + SC)** — merged main's PR #12: the perception homeworks are
+_Last updated: 2026-07-07 (**merge #3: server groundwork + grade release + manual grading**
+— merged main's PR #15 (API server + typed client + deploy recipes), PR #14 (instructor manual
+grading of open questions), and the grade-release gate. All three compose cleanly with the
+branch: the server/client sit BEHIND the existing seams (`api/client.ts` is deliberately
+unwired; the server grades with the SAME pure `engine/grader.ts`), grade release is display
+POLICY outside the grading pipeline (submissions still autograde on receipt — pipelineCheck/
+coverageCheck read autogrades directly and are unaffected), and manual review ANNOTATES the
+pending result (status stays `'pending'`, 0/0 — the open-question contract the coverage
+self-test pins holds unchanged). Since merge #2 the branch also promoted all five perception
+fixtures to the exact tier (hw2-p10..p12, hw3-p11/p12 — ledger 46/56), added
+`tools/bumpCheck.ts` (headless bump-renderability predicate; not in `npm run check`), and
+deliberately repinned routerCheck's fallback budget 99 → 147 (hw3-p11's structural XOR floor
+of 48; see the tool header). Main's entries follow. From origin/main: **grade release** — students see NO grades (not even on submit)
+until the instructor releases them per assignment. Server: `grades_released` column beside the
+assignment row (policy, not content — never inside the AssignmentData JSON), new instructor
+endpoint `PUT /api/assignments/:id/grades-release` `{released: boolean}` (idempotent;
+unrelease re-hides), `gradesReleased` on assignment list/detail responses, and
+`studentRecord(record, released)` in `server/src/sanitize.ts` now withholds the result
+entirely until release (after release: scores only, still no per-case detail). Instructors
+always see everything immediately. serverCheck grew to 28 checks covering the full lifecycle
+(hidden on submit → 403 for student release → release → student sees scores → unrelease
+re-hides). Local prototype mirrors the rule behind a new seam (`app/src/storage/gradeRelease.ts`,
+localStorage flag): the student submit alert no longer shows the autograde, the home screen
+shows "Grade: n/m questions" beside a submitted assignment only once released, and the
+instructor gradebook header gets a "Release grades"/"Hide grades" toggle (with confirm).
+API client: `setGradesReleased`, `gradesReleased` on summaries/detail. Earlier same day,
+**server groundwork** — a complete API server package (`server/`,
+Express 5 + Node's built-in `node:sqlite`, zero native deps) implementing the whole backend
+seam set ahead of AWS access: dev auth (roster-email → bearer token; `AuthProvider` interface
+in `server/src/auth.ts` is where UCLA SSO plugs in via `MM_AUTH_MODE=sso`), assignment CRUD
+(instructor-gated), per-student workbook GET/PUT, and the submission endpoint — the server
+stamps identity/timestamp, grades on receipt with the SAME pure `app/src/engine/grader.ts` the
+browser uses (imported directly across packages), and persists the record. Redaction lives
+server-side (`server/src/sanitize.ts`): students get assignments without `test_cases` and
+results without per-case detail; instructors get everything. Storage is one SQLite file
+(users/sessions/assignments/workbooks/submissions; WAL). `npm run seed [-- --sample]` loads
+the toy roster + cc-basics (+ the sample assignment with graded demo submissions);
+`npm run check` (`server/tools/serverCheck.ts`) boots the real app on an ephemeral port
+against an in-memory DB and drives the full student→instructor flow over HTTP — 22 checks,
+all passing (incl. post-merge with perception/open questions). Browser half:
+`app/src/api/client.ts`, a typed function per endpoint ready to back future `Remote*` stores
+(nothing imports it yet — the app still runs on the Local* stores; the cutover needs the
+store seams to go async). Deployment is copy/paste-ready in `deploy/` (Lightsail setup
+README, systemd unit, Caddyfile for TLS; Cloudflare Pages settings incl. `VITE_API_BASE`).
+Same day, **manual grading for open questions** — the instructor can now
+record a verdict on a pending open question from the gradebook drill-down: ✓ Correct / ✗
+Incorrect buttons + an optional feedback note next to the displayed response. The verdict is a
+`ManualReview` (`{pass, note?, reviewedAt}`, new in `types.ts`) stored as `manual` on the
+record's pending `QuestionResult` — the result **stays `'pending'`** (annotated, not replaced,
+so it's re-reviewable and distinguishable from an autograde; a future LLM pass could write the
+same shape). Persistence goes through the submission seam: new
+`SubmissionStore.recordManualReview(id, attempt, questionId, {pass, note})` backed by the pure
+`applyManualReview(records, …)` helper in `submissionStore.ts` (returns a new array; rejects
+non-pending questions and unknown attempts). Once reviewed, the gradebook counts the question
+like any other: `toQuestionGrade` maps the verdict to passed/pending, so it enters the score
+(the score is now over autogradeable + reviewed questions; unreviewed stay excluded), the ✎
+mark becomes ✓/✗ (tooltip "manually graded"), and the open question's stat tile shows "✎ n to
+review" until every latest attempt is reviewed, then its manual pass rate. Legacy records with
+no stored result stay display-only. `pipelineCheck` grew a [manual review] section (7 checks).
+Earlier same day, **merge #2: perception questions (CC + SC)** — merged main's PR #12: the perception homeworks are
 now authorable and autogradable: a CC/SC question can be a **Perception** task (question
 creator's new "Task" toggle) whose machine reads its inputs as an array of stimulations (a
 retina) and outputs one classification bit. Grading is **bit-level, outside the value codec**
@@ -273,9 +332,12 @@ end-to-end:
   per-student attempt count; expanding a student reveals the full submission history with
   failed-case drill-down per attempt (value questions: input/expected/got; turbot questions:
   arena #, steps taken, final pose, failure reason; perception questions: input frames,
-  expected/got bit strings, first wrong step; open questions: the full text response,
-  marked ✎ and excluded from the auto score). Sample data for all six modes plus the five
-  perception problems can be seeded to demo the pipeline.
+  expected/got bit strings, first wrong step; open questions: the full text response with
+  **manual grading controls** — ✓ Correct / ✗ Incorrect + an optional note, recorded through
+  `SubmissionStore.recordManualReview` onto the stored result; unreviewed open questions are
+  marked ✎ and excluded from the score, reviewed ones count like any other question and the
+  ✎ stat tile tracks how many latest attempts still need review). Sample data for all six
+  modes plus the five perception problems can be seeded to demo the pipeline.
   The question creator is one shared form authoring **all six modes** (CC/SC/FSM/TM/turbot/open) —
   mode is an ordinary field, not a gate; question names are editable; there is no bit-width field
   and no example-preview table. CC/SC/FSM/TM questions compute exactly **one output**: the
@@ -302,7 +364,15 @@ end-to-end:
   input per keystroke and a button previews up to 16 worked examples on demand (enumerating the
   whole space per keystroke was too slow). See the DSL section in Part 2.
 
-The missing half is the **server** and productized submit/grade loop.
+- **Server (built, not yet deployed)** — `server/` is a runnable API server implementing the
+  backend half of every seam: dev auth + sessions, assignment CRUD, workbook sync, and
+  submit-with-server-side-autograding (same `engine/grader.ts`, imported directly). It keeps
+  `test_cases` server-only and strips per-case detail from student results. SQLite storage,
+  seed script, and a 22-check HTTP smoke test (`cd server && npm run check`). Deployment
+  recipes for Lightsail + Cloudflare Pages sit in `deploy/`. See `server/README.md`.
+
+What's missing is the **deployment** (waiting on the UCLA AWS account), **UCLA SSO**, and the
+**frontend cutover** from the Local* stores to the API (via `app/src/api/client.ts`).
 
 ## What's next
 
@@ -325,18 +395,23 @@ The missing half is the **server** and productized submit/grade loop.
   `AssignmentQuestion`, not yet exposed in the question creator's editor UI). The
   `requireStandardHaltPosition` TM acceptance toggle is done (2026-07-06): wired end-to-end
   through `gradeQuestion` and exposed as a TM-only checkbox in the question creator.
-- **Open-question grading follow-ups** — a way for the instructor to record a manual score on a
-  pending open question (today the gradebook only displays the response), and optional
-  LLM-assisted grading: the `pending` `QuestionResult` already carries the `response`, so an
-  LLM pass would replace it with a scored result server-side.
+- **Open-question grading follow-ups** — manual grading shipped 2026-07-07 (gradebook
+  drill-down: correct/incorrect + note, stored as `ManualReview` on the pending result via
+  `SubmissionStore.recordManualReview`). Remaining: optional LLM-assisted grading — the
+  `pending` `QuestionResult` carries the `response` and `ManualReview` is the shape a
+  server-side LLM pass would write; and surfacing the instructor's feedback note to the
+  student (today it's instructor-only).
 
-**The backend phase (the big step):**
+**The backend phase (server code shipped 2026-07-07; what remains):**
 
-- **Real auth** — replace the mockup login with UCLA SSO; student vs. instructor roles from the token.
-- **Server persistence** — `RemoteWorkbookStore` behind the existing seam, syncing across
-  devices. (Supabase free tier looks sufficient.)
-- **Submission endpoint + server-side autograding** — submit → server runs `engine/grader` →
-  results stored; instructor gradebook reads them (the local pipeline already mirrors this).
+- **Deploy** — once the UCLA AWS account lands: Lightsail box for `server/` (+ Caddy TLS),
+  Cloudflare Pages for `app/` — step-by-step in `deploy/README.md`.
+- **Frontend cutover** — make the store seams async and back them with `app/src/api/client.ts`
+  (`RemoteWorkbookStore` / `RemoteAssignmentStore` / `RemoteSubmissionStore`), and swap the
+  mockup login for the API's `/auth` endpoints. Doesn't block on AWS — can be developed
+  against a local `npm run dev` server.
+- **Real auth** — implement the `SsoAuthProvider` in `server/src/auth.ts` once UCLA SSO
+  details exist; roles from the token. Roster ingestion in `server/src/seed.ts`.
 - **Real assignment content** — author the actual PHIL 133 homeworks (HW1–HW7).
 
 ---
@@ -389,13 +464,15 @@ the engine.
 | Store         | `app/src/store.ts`                                                             | Zustand UI state; delegates simulation to `engine/`. Per-mode sim state incl. TM (`tmTape`/`tmStep`/`setTmCell`) and turbot (`turbotState`/`turbotStep`/`turbotRun`); both the TM slice (via `tmGlobalReset` — tape/head/t/history/state) and the turbot slice (via `turbotReset`) are reset on question load/switch, so a stepped machine never leaks into the next question; selectors `selectTmNotation` (TM alphabet: open question's `representation`, sandbox falls back to `repSystem`), `selectTurbotArena`/`selectTurbotInnerMode`, and `selectEffectiveMode` (turbot → the question's `innerMode`; drives every editor-behavior branch), plus `assignmentView` ('overview' \| 'question') and `openResponse`/`setOpenResponse` (the open question's free-text answer, synced into `QuestionCircuit.responseText` at every canvas sync point)  |
 | Routing       | `app/src/routing.ts`                                                           | `Route` union, `parseHash`/`routeToHash`, `navigate()`                                                                                     |
 | Wire layout   | `app/src/componentGeometry.ts`, `app/src/wireRouter.ts`                        | `componentGeometry` is the SINGLE source of truth for rendered component dimensions (`getComponentSize`; MEM 50×50) + port math (`getPortPosition(Local)`, incl. OR/XOR left-port inset and rotation), imported by `CircuitCanvas`, `wireRouter`, and `tools/layoutCheck` so renderer/router/oracle geometry can never desync; `wireRouter` is the cost-based A* orthogonal wire router (obstacle bounds from the shared geometry, L-path fallback instrumented via `get/resetFallbackCount` for `tools/routerCheck.ts`) plus the pure `findDivergencePoints` (VISUAL_VOCAB junction dots: fan-out split dots at the elbow where displayed paths part, skipping dots on canvas-side crossing bumps)          |
-| Storage       | `app/src/storage/workbookStore.ts`, `AssignmentStore.ts`, `submissionStore.ts` | The three localStorage-backed seams                                                                                                        |
+| Storage       | `app/src/storage/workbookStore.ts`, `AssignmentStore.ts`, `submissionStore.ts` | The three localStorage-backed seams; `submissionStore` also owns manual review of open questions (`recordManualReview` + pure `applyManualReview`)                                                                                                        |
 | Auth          | `app/src/auth/`                                                                | `AuthGate.tsx`, `stubAuth.tsx`, `instructorRole.ts`                                                                                        |
 | Assignments   | `app/src/assignments/index.ts`, `cc-basics.json`                               | Bundled registry (`listAssignments`/`getAssignment`) + the one bundled CC assignment                                                       |
 | Instructor UI | `app/src/instructor/`                                                          | `InstructorApp`, `InstructorGate`, `InstructorDashboard`, `AssignmentEditor`, `QuestionCreator` (incl. turbot arena editor; pure paint/resize/place helpers in `arenaEditing.ts`), `Gradebook(.ts/View.tsx)`                 |
 | Student UI    | `app/src/components/`                                                          | `CircuitCanvas`, `ComponentLibrary`, `DataTable`, `HomeScreen`, `AssignmentOverview` (question list), `MenuBar`, `SequentialTimeline`, `TMTapePanel` (clickable tape), `ArenaCanvas` (shared arena grid renderer), `TurbotArenaPanel` ("Map" + run controls, in the right data panel), `TurbotTapePanel` (turbot TM's read-only internal tape), `OpenResponsePanel` (open question's writing panel; copy/cut/paste/drop blocked), `SimulationPanel`, `TabBar` (question nav bar in assignments) |
+| API client    | `app/src/api/client.ts`                                                        | Typed browser client for the API server (one function per endpoint; token in localStorage). Not yet wired into the UI — the building block for the `Remote*` stores |
+| Server        | `server/src/app.ts`, `db.ts`, `auth.ts`, `sanitize.ts`, `config.ts`, `seed.ts` | The API server (Express 5 + `node:sqlite`): routes, storage, the `AuthProvider` seam (dev login now, UCLA SSO later), student-facing redaction + grade-release withholding, env config, DB seeding. Smoke test: `server/tools/serverCheck.ts` (`npm run check` in `server/`). Deploy recipes in `deploy/` |
 | Dev/sample    | `app/src/devData/sampleData.ts`, `seed.ts`                                     | Builders + seeding for demo CC/SC/FSM/TM/turbot/perception/open assignments and submissions (one turbot question per inner mode; netlist-built perception circuits; `questionModeLabel` in `types.ts` names a turbot question's inner machine / a perception task in mode chips)                                                                |
-| Tools         | `app/tools/grade.ts`, `pipelineCheck.ts`, `codecCheck.ts`, `notationCheck.ts`, `tmCheck.ts`, `turbotCheck.ts`, `perceptionCheck.ts`, `scWindowCheck.ts`, `routerCheck.ts`, `coverageCheck.ts`, `layoutCheck.ts` | Headless CLI grader (prints a word count for pending open questions), submit→grade pipeline check (all modes, incl. perception and the open question's pending path; 13/13 vs 0/13), codec + rep-core unit checks, the transition-notation seam check (adapter≡parser equivalence incl. per-encoding turbot-internal, legacy byte-compat, k=2 asymmetric bit-order grade pin, arity/totality errors, label-dissection grep gate), TM engine/codec/grader smoke test, turbot engine/grader smoke test (all four inner modes graded — CC/SC/FSM/TM — incl. the turbot-FSM one-notation validity pins and the encoding-aware `*`-rejection pins), the perception rules/generation/grading smoke test, the SC/FSM question-run contract check (grader window length + codec input-stream content parity, via real-store headless runs incl. the hw3-p7 fixture and a k=2 FSM store-run≡grader pin), the wire-router world-model pins (shared-geometry smoke, MEM.min A* reachability, per-fixture fallback budget ≤ 99, divergence-dot corpus), the reference-fixture coverage harness (two-tier ledger — `exact`: correct passes + broken fails, vs `interface`: a plausible attempt validates + grades end-to-end, score reported not asserted (scope shift 2026-07-06) — plus breadth/drain warnings + statement lint; its Stage-1 mirror tracks the grader's full dispatch: open/perception/turbot/codec), and the canvas layout oracle (real `routeAllWires` route prediction: collinear/near-parallel overlaps, body crossings, box collisions; CLI + used by the harness for CC/SC fixtures) (`npx tsx`)          |
+| Tools         | `app/tools/grade.ts`, `pipelineCheck.ts`, `codecCheck.ts`, `notationCheck.ts`, `tmCheck.ts`, `turbotCheck.ts`, `perceptionCheck.ts`, `scWindowCheck.ts`, `routerCheck.ts`, `coverageCheck.ts`, `layoutCheck.ts`, `bumpCheck.ts` | Headless CLI grader (prints a word count for pending open questions), submit→grade pipeline check (all modes, incl. perception and the open question's pending path; 13/13 vs 0/13), codec + rep-core unit checks, the transition-notation seam check (adapter≡parser equivalence incl. per-encoding turbot-internal, legacy byte-compat, k=2 asymmetric bit-order grade pin, arity/totality errors, label-dissection grep gate), TM engine/codec/grader smoke test, turbot engine/grader smoke test (all four inner modes graded — CC/SC/FSM/TM — incl. the turbot-FSM one-notation validity pins and the encoding-aware `*`-rejection pins), the perception rules/generation/grading smoke test, the SC/FSM question-run contract check (grader window length + codec input-stream content parity, via real-store headless runs incl. the hw3-p7 fixture and a k=2 FSM store-run≡grader pin), the wire-router world-model pins (shared-geometry smoke, MEM.min A* reachability, fallback budget repinned to 147 total with per-fixture caps — hw3-p11 carries a structural XOR floor of 48 (16 XOR-in wires × 3), see the tool header — plus the divergence-dot corpus), the reference-fixture coverage harness (two-tier ledger — `exact`: correct passes + broken fails, vs `interface`: a plausible attempt validates + grades end-to-end, score reported not asserted (scope shift 2026-07-06) — plus breadth/drain warnings + statement lint; its Stage-1 mirror tracks the grader's full dispatch: open/perception/turbot/codec), and the canvas layout oracle (real `routeAllWires` route prediction: collinear/near-parallel overlaps, body crossings, box collisions; CLI + used by the harness for CC/SC fixtures), and the bump-renderability predicate `bumpCheck.ts` (replicates the canvas crossing-bump draw/skip rules headlessly; NOT in `npm run check`) (`npx tsx`)          |
 
 ## Reference-function DSL (instructor authoring)
 
