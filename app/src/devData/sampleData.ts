@@ -479,6 +479,20 @@ export function buildSampleAssignment(): AssignmentData {
     ],
   };
 
+  // Open (free-text) question: answered in prose, not autograded — the grader
+  // marks it `pending` and the gradebook shows the response for manual review.
+  const openQuestion: AssignmentQuestion = {
+    id: 9,
+    label: 'Q9 (Open)',
+    statement:
+      'Representational systems. Suppose you were designing a calculator for solving a ' +
+      'high-stakes problem. (Perhaps "you" are Nature, the "calculator" is the Brain, and ' +
+      'the "problem" is Survival.) Would you design it to calculate in binary or in tally? ' +
+      'Why? Use specific examples to justify your answer. ~1 paragraph.',
+    buildMode: 'open',
+    representation: 'binary', // meaningless for open questions; type uniformity
+  };
+
   return {
     id: SAMPLE_ASSIGNMENT_ID,
     title: SAMPLE_ASSIGNMENT_TITLE,
@@ -491,20 +505,36 @@ export function buildSampleAssignment(): AssignmentData {
       turbotScQuestion,
       turbotFsmQuestion,
       turbotTmQuestion,
+      openQuestion,
     ],
   };
 }
 
 // ── Sample submissions ─────────────────────────────────────────
-// One answer per question, in question-id order (1..8):
+// One answer per machine question, in question-id order (1..8):
 // CC, SC, FSM, TM, Turbot-CC, Turbot-SC, Turbot-FSM, Turbot-TM.
+// Q9 (open) gets a free-text response instead of a circuit.
 
-function submission(student: string, circuits: CircuitData[]): SubmissionData {
+const SAMPLE_OPEN_RESPONSE =
+  'I would design it to calculate in binary. A tally representation grows linearly with the ' +
+  'value — representing 1,000,000 takes a million strokes — while binary grows with the ' +
+  'logarithm, so twenty bits suffice. For a brain solving survival under tight energy and ' +
+  'time budgets, compact codes mean fewer components, faster operations, and less to go ' +
+  'wrong: an adder over 20 wires beats one over a million.';
+
+function submission(
+  student: string,
+  circuits: CircuitData[],
+  openResponse: string = SAMPLE_OPEN_RESPONSE,
+): SubmissionData {
   return {
     assignmentTitle: SAMPLE_ASSIGNMENT_TITLE,
     student,
     submittedAt: '2026-06-27T12:00:00.000Z', // stamped by caller in real flow
-    answers: circuits.map((circuit, i) => ({ questionId: i + 1, circuit })),
+    answers: [
+      ...circuits.map((circuit, i) => ({ questionId: i + 1, circuit })),
+      { questionId: 9, circuit: { components: [], wires: [] }, responseText: openResponse },
+    ],
   };
 }
 
@@ -527,9 +557,9 @@ export function buildCorrectSubmission(student = 'correct@example.com'): Submiss
   return submission(student, allCorrect());
 }
 
-/** All-incorrect submission (should score 0/8). */
+/** All-incorrect submission (should score 0/8; the open answer is left blank). */
 export function buildIncorrectSubmission(student = 'wrong@example.com'): SubmissionData {
-  return submission(student, allIncorrect());
+  return submission(student, allIncorrect(), '');
 }
 
 /**

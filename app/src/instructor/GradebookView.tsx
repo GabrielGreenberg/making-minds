@@ -83,12 +83,20 @@ export function GradebookView({ id }: { id: string }) {
           <span className="instructor-stat-value">{pct(stats.meanScore)}</span>
           <span className="instructor-stat-label">mean score</span>
         </div>
-        {assignment.questions.map((q) => (
-          <div className="instructor-stat" key={q.id}>
-            <span className="instructor-stat-value">{pct(stats.passByQuestion[q.id] ?? 0)}</span>
-            <span className="instructor-stat-label">{q.label} pass rate</span>
-          </div>
-        ))}
+        {assignment.questions.map((q) =>
+          q.buildMode === 'open' ? (
+            // Open questions aren't autograded — there is no pass rate.
+            <div className="instructor-stat" key={q.id}>
+              <span className="instructor-stat-value">✎</span>
+              <span className="instructor-stat-label">{q.label} manual review</span>
+            </div>
+          ) : (
+            <div className="instructor-stat" key={q.id}>
+              <span className="instructor-stat-value">{pct(stats.passByQuestion[q.id] ?? 0)}</span>
+              <span className="instructor-stat-label">{q.label} pass rate</span>
+            </div>
+          ),
+        )}
       </div>
 
       {records.length === 0 ? (
@@ -138,7 +146,11 @@ function QuestionMarks({
         const qg = grade.grades.find((x) => x.questionId === q.id);
         return (
           <td key={q.id}>
-            {qg?.passed ? (
+            {qg?.pending ? (
+              // Open question: nothing to autograde — expand the attempt to
+              // read the response.
+              <span className="instructor-pending" title="Open question — review the response below">✎</span>
+            ) : qg?.passed ? (
               <span className="instructor-pass">✓</span>
             ) : (
               <span className="instructor-fail">✗</span>
@@ -264,6 +276,26 @@ function SubmissionDetail({
     <div className="instructor-detail">
       {result.questions.map((qr) => {
         const q = assignment.questions.find((x) => x.id === qr.questionId);
+        // Open question: nothing was autograded — show the student's response
+        // for manual review. (Older results may predate the `response` field on
+        // QuestionResult; fall back to the submission's answer.)
+        if (qr.status === 'pending') {
+          const response =
+            qr.response ??
+            record.submission.answers.find((a) => a.questionId === qr.questionId)?.responseText;
+          return (
+            <div className="instructor-detail-q" key={qr.questionId}>
+              <strong>{q?.label ?? `Q${qr.questionId}`}</strong>: open question — needs manual review
+              {response?.trim() ? (
+                <blockquote className="instructor-open-response">{response}</blockquote>
+              ) : (
+                <p className="instructor-open-response instructor-open-response--empty">
+                  (no answer submitted)
+                </p>
+              )}
+            </div>
+          );
+        }
         if (qr.status === 'skipped') {
           return (
             <div className="instructor-detail-q" key={qr.questionId}>
