@@ -588,3 +588,47 @@ clamps separations entries to ≥1 (documented, untested — trivial).
 
 **Next:** **P1.8** — the wire-router design memo (fallback lanes, lane
 separation, junction dots at divergence elbows), gating Phase 3 perception.
+
+## 2026-07-06 (iteration 16) — P1.8: wire-router model fix · S1+S2 landed (design memo + 2 slices)
+
+**Design (judge panel, 2 angles):** MODEL-FIX beat POST-PASS 77–65 — fix the
+router's world model rather than institutionalize a repair layer. The winning
+design agent pre-validated its riskiest claim against the real oracle (all 23
+fixtures clean post-bounds-fix; fallbacks 283→99 with the exact residual
+distribution). Memo: `designs/wire-routing.md` (5 slices). Judge surfaced five
+things both designs missed (continuity bias already mostly dead; two crossing
+pipelines; zoom-space thresholds; the oracle replicates port math too, not just
+dims; `validateSegmentPosition` shares the phantom bounds) — folded into the
+memo + slice acceptance.
+
+**Shipped (2 staged commits, gates green each):**
+- **S1** (`4e62a7e`): `src/componentGeometry.ts` owns rendered dimensions
+  (MEM 50×50 — the phantom 75×70 default was why every MEM.min wire took the
+  obstacle-blind fallback lane) AND port math; CircuitCanvas / wireRouter /
+  layoutCheck all import it (local copies deleted → the oracle can't structurally
+  desync). Fallbacks **283→99** across 23 CC/SC fixtures, all oracle-clean,
+  exact predicted distribution. New `tools/routerCheck.ts` in `npm run check`
+  pins the budget, distribution, MEM.min A*-reachability, and geometry parity.
+- **S2** (`bdf13b1`): `findDivergencePoints` — multi-branch splits get a dot at
+  the divergence elbow (consuming canvas-side crossings for bump-collision
+  skip), source-port dot subsumed; 9-case headless corpus; browser-verified a
+  fan-out dots at the trunk elbow, not the port.
+
+**Verified (0 refutations):** independent oracle reproduction (23 fixtures
+clean, 99 fallbacks, pre-fix 283 baseline reproduced from a worktree), synthetic
+MEM-feedback route probe (min wire A*-routed, not fallback), own divergence-dot
+corpus, no engine/grader changes.
+
+**⚠ Left undone (model/credit limit mid-sweep):** the **browser sweep** of the
+~72 hw3 routes that MOVED under S1 did not run (sweep agent hit the Fable 5
+limit). Headless legs all pass; the visual confirmation of the moved MEM routes
++ S2 dots is the first task next session, before S3. Side effect flagged by the
+verifier: the shared-geometry swap also shrank MEM's bottom drag-halo and STATE
+obstacle bounds in `validateSegmentPosition` (no CC/SC fixture has STATE; no
+gate impact) — a beneficial but unswept user-facing drag-validation change.
+
+**Handoff note:** user switched to opus-4-8 and asked to push everything for
+pickup in a fresh session. Pushed at this point.
+
+**Next:** browser-sweep S1's moved routes (pending acceptance), then P1.8 S3/S4,
+then P3.1 (target-functions design memo).

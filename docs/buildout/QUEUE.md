@@ -157,21 +157,29 @@ before Phase 3 (perception returns to router-rendered CC/SC). Task ids unchanged
 
 ## Phase 3 — Perception
 
-- [ ] **P1.8** _(discovered 2026-07-06, hw3 appearance sweep)_ **Renderer: wire
-  lanes and junction dots** — design memo first (`designs/wire-routing.md`).
-  Family: the auto-router (a) sends every wire into `MEM.min` down a fixed
-  obstacle-blind fallback path because the min stub sits inside the router's
-  phantom 75×70 MEM bounds (rendered body is 50×50) — these fixed lanes caused
-  all six HW3 appearance failures; (b) can run different-source wires collinear
-  or 1px apart (reads as a forbidden merge); (c) draws the split junction dot
-  only at the source port, leaving multi-branch divergence elbows undotted.
-  Deep fix: align router obstacle bounds with rendered geometry (or make
-  min-stub reachable), add a lane-separation cost for foreign collinear runs,
-  and dot divergence points. Improves every student's canvas, not just fixtures.
-  **Acceptance:** memo written; hw3 fixtures still oracle-clean under the
-  (P1.7-promoted) layout oracle. _(Audit 2026-07-06: FSM/TM transitions render
-  as curves between STATE circles, bypassing the router — this task gates
-  Phase 3 perception (CC/SC), not P1.4/P2.)_
+- [~] **P1.8** **Renderer: wire lanes and junction dots.** — _design memo done
+  (`designs/wire-routing.md`, judge-panel: MODEL-FIX won 77–65); S1+S2 landed
+  2026-07-06 (iteration 16, commits `4e62a7e`, `bdf13b1`); S3–S5 remain._
+  **S1 (done):** new `src/componentGeometry.ts` owns rendered dimensions (MEM
+  now 50×50, killing the phantom 75×70) + port math, imported by CircuitCanvas
+  / wireRouter / layoutCheck (oracle can't desync). Fallbacks 283→99 across the
+  23 CC/SC fixtures, all oracle-clean; `tools/routerCheck.ts` (in `npm run
+  check`) pins the budget + distribution + MEM.min A*-reachability.
+  **S2 (done):** `findDivergencePoints` — multi-branch splits dotted at the
+  divergence elbow (consuming canvas-side crossings for bump-collision skip),
+  not the source port; 9-case headless corpus.
+  **Verified:** adversarial verifier refuted nothing (independent oracle
+  reproduction, MEM route probe, dot corpus, no engine changes).
+  **⚠ PENDING acceptance (do this next session before S3):** the **browser
+  sweep** of the ~72 hw3 routes that MOVED under S1 was not run — the sweep
+  agent hit the model limit. Headless legs pass (oracle-clean, budget pinned),
+  but confirm in-browser that the moved MEM routes read cleanly (no false
+  merges / through-body) and the S2 dots render at elbows, before S3.
+  **S3–S5 remaining:** S3 foreign-lane A* cost + H4 near-merge round (kills the
+  1px-hug class generally); S4 fallback phase-0 + lane-nudge + per-wire
+  `usedFallback`; S5 (optional) perf. Each slice: gates green + layoutCheck
+  clean + browser spot-check per the memo's slice plan.
+  **Gates Phase 3** (perception fixtures are CC/SC, back on the router).
 - [ ] **P3.1** **Design spike (decision required, design memo):** can perception
   targets (≥3 consecutive 1s; exactly 3; = a literal pattern; current≠previous;
   motion) be authored? The family: a question's **target function** currently has

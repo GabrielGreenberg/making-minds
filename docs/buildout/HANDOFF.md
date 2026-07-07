@@ -6,70 +6,72 @@ run `npm run coverage` and reconcile._
 
 ## Where we are
 
-Branch `buildout-infra`. **41 / 56 verified**, 15 pending, 0 regressed, 0
-warnings. Fifteen iterations done. All arithmetic complete (HW1–HW5);
-`requireStandardHaltPosition` live (P2.3); the TM codec varies block
-separation so hw5-p4's robustness clause bites (P2.4). Remaining pending:
-perception (hw2-p10..12, hw3-p11..12), navigation (hw2-p13..15, hw3-p13..15,
-hw4-p12..14), HW6 capstone. Remaining walk: **P1.8 → P3.1 → P3.2/P3.3 → P4.2
-→ P4.3 → P5.1 → smalls (P1.5/P1.6/P1.11/P2.5) → P6**.
+Branch `buildout-infra` (pushed to `origin`). **41 / 56 verified**, 15 pending,
+0 regressed, 0 warnings. Sixteen iterations done. All arithmetic complete
+(HW1–HW5). The wire-router **model fix** is underway (P1.8): the design memo
+(`designs/wire-routing.md`) plus slices **S1** (shared geometry — MEM is 50×50
+now, fallbacks 283→99, all fixtures oracle-clean) and **S2** (divergence dots)
+landed as commits `4e62a7e` and `bdf13b1`, verified headless with 0 refutations.
 
-## Do this next — P1.8: wire-router design memo (+ fix if it fits)
+**Model note:** the session switched to opus-4-8 mid-P1.8 (the Fable 5 credit
+limit was hit during S1's browser sweep). Everything is committed and pushed.
 
-Gates Phase 3 (perception fixtures are CC/SC — back on the router). The family
-(QUEUE P1.8, evidence from the hw3 layout battle, LOG iteration 4):
+## Do this next — finish P1.8 S1 acceptance, then S3/S4
 
-- (a) every wire into `MEM.min` takes a fixed obstacle-blind **fallback path**
-  because the min stub sits inside the router's phantom 75×70 MEM bounds
-  (rendered body is 50×50) — these fixed lanes caused all six HW3 appearance
-  failures;
-- (b) different-source wires can run collinear or 1px apart (reads as a
-  forbidden merge) — the A* lane cost doesn't know about foreign wires'
-  segments (incl. fallback lanes it can't see);
-- (c) the split junction dot is drawn only at the source port; multi-branch
-  trunks have undotted divergence elbows (VISUAL_VOCAB wants dots at splits).
+**FIRST (S1's one pending acceptance item):** browser-sweep the ~72 hw3 routes
+that MOVED under S1. The sweep agent hit the model limit before running it.
+Headless legs all pass (23 fixtures oracle-clean, fallback budget 99 pinned in
+`routerCheck`), but confirm in-browser that the moved MEM routes read cleanly
+(no false merges, no through-body) and S2's divergence dots render at elbows.
+Recipe v3: assignment `router-sweep` with the nine hw3 fixtures + hw2-p7 +
+hw1-p4 (fan-out, for dots), served from `app/public/` at `/making-minds/`,
+seeded on Home after reload, click-navigate. If any moved route reads as a
+merge, that's an S1 regression to fix before proceeding (the oracle passed, so
+it would be a zoom/rendering-space issue the memo flags, not an oracle miss).
 
-Deep fix direction (weigh in the memo): align router obstacle bounds with
-rendered geometry (or make the min stub reachable so A* handles MEM wires);
-add a lane-separation cost for foreign collinear/near-parallel runs; dot
-divergence points. Improves every student's canvas, not just fixtures.
-
-1. **Design memo** `designs/wire-routing.md`: the family, evidence, the chosen
-   fix per sub-problem (a/b/c), what stays (the deterministic fallback as a
-   last resort?), compat contract (all 16 CC/SC fixtures must stay
-   layoutCheck-clean — the oracle in `tools/layoutCheck.ts` gates them in the
-   harness; hw3-p7/p9's right-to-left MEM chains and hw2-p6/p7/hw3-p4's
-   repositioned layouts must not regress), test plan (layoutCheck is the
-   regression oracle; add router-level unit pins), risks. Judge-panel the
-   design if the trade-offs look wide (the P1.12 memo pattern worked well).
-2. **Implement if it fits the iteration** (guardrail: green within the
-   iteration or split seam-first): the likely slices are (a) obstacle-bounds
-   alignment (small, high value), (b) lane-separation cost (medium), (c)
-   divergence dots (small, renderer-side). Each slice must keep
-   `npm run coverage` at 41/56 with layoutCheck green — if a slice makes a
-   previously-clean fixture dirty because routes CHANGED (better or worse),
-   re-run the browser sweep for the affected fixtures before accepting.
-3. Gates: check/tsc/build/coverage; browser spot-check of one MEM-heavy
-   fixture (hw3-p8) and one CC fixture (hw2-p7) after any route change.
-
-**Acceptance:** memo written; implemented slices leave all 16 CC/SC fixtures
-oracle-clean + spot-checked in-browser; gates green. If implementation splits,
-the memo + slice 1 is an acceptable iteration.
+**THEN P1.8 S3–S4** (per `designs/wire-routing.md` slice plan):
+- **S3** — foreign-lane A* cost + an H4 near-merge validation round using the
+  oracle's own `collinearOverlap` predicate; this kills the 1px-hug class
+  generally (not just where fixtures were hand-tuned). Budget the browser-sweep
+  effort here; W_LANE calibration capped at two sweep rounds before falling
+  back to H4-only.
+- **S4** — fallback phase-0 (route residual fallbacks first so A* sees them) +
+  lane-nudged fallback + per-wire `usedFallback`/violation flags. Regression-pin
+  a pre-fix HW3 layout → zero oracle violations.
+Each slice: `npm run check` (incl. `routerCheck`) + `tsc` + `build` +
+`coverage` (41/56, 0 regressed) + layoutCheck clean + browser spot-check.
 
 ## Then
 
 P3.1 (target-functions design memo — perception authoring) → P3.2/P3.3
-(perception fixtures) → P4.2 (multi-arena grading) → P4.3 (navigation arenas)
-→ P5.1 (Desert Ant capstone) → smalls → P6 close-out.
+perception fixtures → P4.2 multi-arena grading → P4.3 nav arenas → P5.1
+capstone → smalls (P1.5 allowed_components, P1.6 cc.ts label-order, P1.11 ARG
+multi-group, P2.5 gap-robust hw5-p5/p6) → P6 close-out. META-audit-queue is
+due around iteration 17 (last ran iteration 11) — consider it next or the one
+after.
 
 ## Watch out for
 
-- **layoutCheck is the harness gate** for CC/SC fixtures — router changes that
-  alter routes will show up there first; a "violation" after a route change
-  may mean the oracle's replicated geometry drifted from the router (keep them
-  in sync — the oracle imports the real `routeAllWires`, so only the port/body
-  geometry constants can drift).
-- **hw4-p11/hw5 fixtures use STATE curves, not the router** — out of scope.
-- **Ops:** 529 → resume workflow; session limit → finish solo.
-- **Appearance recipe v3**; seeds from `app/public/` at `/making-minds/`.
+- **`routerCheck` pins the fallback budget (99) + exact distribution** — S3/S4
+  deliberately ratchet it down, so those pins are EXPECTED to change; edit the
+  `EXPECTED_FALLBACKS` table intentionally, don't just relax the bound.
+- **layoutCheck now imports `componentGeometry`** — geometry changes flow to
+  the oracle automatically; a "violation" after a router change is real, not
+  oracle drift.
+- **`componentGeometry.ts` is the single source** for dims + port math — never
+  reintroduce a local copy in CircuitCanvas/wireRouter/layoutCheck.
+- **notationCheck grep gate**, **scWindowCheck (45+)**, **tmCheck** (incl. the
+  P2.3 standard-halt + P2.4 separations pins) all stay green.
+- **Ops:** 529 → `Workflow({scriptPath, resumeFromRunId})`; model/credit limit
+  can kill an agent mid-workflow — commit landed slices first (the S1/S2 agent
+  did, which is why they survived).
+- **Appearance recipe v3**; seeds from `app/public/` at `/making-minds/`; clean
+  seed keys twice + delete the `app/public/*-seed.json` (and any `app/dist/`
+  copy if a build ran).
 - `tsx` missing → `npm install`; no lockfile churn.
+
+## Background task in flight
+
+The user started `task_dbe95a5e` ("Reset TM sim state on question switch") in a
+separate local session — unrelated to P1.8, running independently. Check its
+outcome before touching the TM store slice.
