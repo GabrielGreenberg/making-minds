@@ -1292,6 +1292,7 @@ export const useStore = create<AppState>()((set, get) => ({
       boxes: [],
       buildMode: assignment.questions[0]?.buildMode || 'CC',
     });
+    get().tmGlobalReset();
     get().turbotReset();
   },
   openAssignment: (id) => {
@@ -1322,6 +1323,7 @@ export const useStore = create<AppState>()((set, get) => ({
       buildMode: activeQ?.buildMode || 'CC',
       workbookOpen: true,
     });
+    get().tmGlobalReset();
     get().turbotReset();
     return true;
   },
@@ -1413,6 +1415,7 @@ export const useStore = create<AppState>()((set, get) => ({
       boxes: saved.boxes,
       buildMode: nextQ.buildMode,
     });
+    get().tmGlobalReset();
     get().turbotReset();
   },
   closeAssignment: () => {
