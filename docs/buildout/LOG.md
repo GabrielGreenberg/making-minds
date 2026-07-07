@@ -944,3 +944,47 @@ router) and identical at baseline. New diagnostics: `getFallbackWireIds()`.
 
 Left for the loop (QUEUE P1.8 updated): INPUT toggle-tab obstacles, the
 hw3-p9 dot-skip nit re-evaluation; S4/S5 unowned again.
+---
+
+## 2026-07-07 (iteration 22, isolated worktree) — P4.2: multi-arena navigation grading has teeth
+
+**Shipped (worktree `worktree-agent-ac8e957c58510426e`, fast-forwarded onto
+buildout-infra tip 6350641):**
+
+- **What was already right:** `gradeTurbot` grades EVERY `turbot_cases` entry
+  (one `TurbotCaseResult` each — pass/steps/final pose/step-limit/reason);
+  question passing is all-or-nothing (`summarizeResult` and the gradebook's
+  `toQuestionGrade` both require passed === total); GradebookView's turbot
+  drill-down maps ALL cases with 1-based arena indices — no index-0
+  hardcoding anywhere.
+- **The surprise (proved headlessly BEFORE any code change):** the suggested
+  Mad Max exhibit had NO teeth under the spec-letter criterion.
+  `return-to-start` checked only the final position, so in a 3-arena family
+  (1×8 corridor, block at x=3/5/7) a hardcoded out-2-back-2 brain, an
+  out-4-back-4 brain, AND a stop-immediately brain all passed 3/3. Arena
+  count was irrelevant: every return-to-start family was vacuously passable.
+- **The fix (engine seam, deep):** `evaluateTurbotCriterion` — when the arena
+  declares a goal cell, return-to-start now also requires the position trace
+  to VISIT it (the "out there" checkpoint, e.g. the cell before Mad Max's
+  block). Goal-less arenas keep plain end-at-start (spec letter; boxed-arena
+  check untouched); goal-on-start degenerates gracefully (mirrors
+  pass-through). Spec §12.5 records the rule; the creator's criterion hint
+  now states it.
+- **Exhibit after the fix:** hardcoded out-2-back-2 passes the 1-arena family
+  1/1 (q=PASS) but fails the 3-arena family 1/3 — arenas #2/#3 fail (returned
+  home, steps=7, final (0,0)W, goal never visited); out-4-back-4 gets 2/3 ≠
+  pass; the 3-state sensor-reactive FSM (forward till B, U-turn, forward till
+  B, stop) passes 3/3; lazy stop-now brain 0/3.
+- **Pins:** turbotCheck `[multi-arena]`, 12 checks — (i) hardcoded passes
+  1-arena family, (ii) same brain fails 3-arena family, (iii) per-arena
+  results present + failing arenas identified with detail, (iv) 2/3 ≠ pass
+  aggregation, plus general-brain 3/3, lazy 0/3, and two headless
+  Gradebook-logic pins (`gradeSubmissions`: score 0, failedCount 2 of 3).
+
+**Verified:** tsc clean; `npm run check` green end-to-end (turbotCheck 61
+checks; COVERAGE OK unchanged — 46 exact · 10 pending · 0 regressed);
+build clean; server typecheck + serverCheck 28 (engine changed → cross-package
+gate run).
+
+**Next:** P4.3 authors the real nav arenas — Mad Max arenas should mark the
+sensing spot (cell before the block) as the goal so return-to-start bites.

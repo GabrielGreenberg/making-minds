@@ -699,7 +699,12 @@ The platform supports automatic grading of student submissions. The evaluation s
 - Success criteria vary by problem type:
   - **Reach goal and stop:** turbot must be on the goal cell and output 00 (stop)
   - **Reach goal and keep going:** turbot must pass through the goal cell (checked at each step)
-  - **Return to start:** turbot must end at its starting position
+  - **Return to start:** turbot must end at its starting position. If the
+    arena declares a goal cell, the turbot's trace must also *visit* it before
+    ending at the start — this is what makes out-and-back problems at unknown
+    distance (Mad Max) gradable: without a visit requirement, a turbot that
+    never moves (or blindly retraces any fixed walk) would pass. Goal-less
+    arenas keep the plain end-at-start reading.
 - The grader reports: success/failure, number of steps taken, final position
 
 ### 12.6 TM Evaluation (Phase 5+)

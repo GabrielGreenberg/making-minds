@@ -492,8 +492,17 @@ function isGoal(arena: ArenaConfig, x: number, y: number): boolean {
  * requires the turbot to have deliberately stopped on the goal cell (motor
  * "00" for circuit brains; halting, for a turbot TM); `pass-through` only
  * requires the goal to appear somewhere in the position trace;
- * `return-to-start` only checks the final position (facing is not checked —
- * the spec doesn't require a particular final orientation).
+ * `return-to-start` checks the final position (facing is not checked — the
+ * spec doesn't require a particular final orientation), AND — when the arena
+ * declares a goal cell — that the position trace visited it first.
+ *
+ * The goal-visit clause is what gives out-and-back navigation problems
+ * (hw3-p15 "Mad Max": block at UNKNOWN distance, drive to it, come home)
+ * their teeth: without it, ending on the start cell is satisfiable by a
+ * brain that never leaves — or walks any fixed distance and retraces it —
+ * so no arena family could reject a hardcoded (or trivial) brain. Authors
+ * mark the "out there" checkpoint (e.g. the cell before the block) as the
+ * goal; goal-less arenas keep the plain end-at-start reading of spec §12.5.
  */
 export function evaluateTurbotCriterion(
   arena: ArenaConfig,
@@ -506,7 +515,14 @@ export function evaluateTurbotCriterion(
     case 'pass-through':
       if (isGoal(arena, arena.start.x, arena.start.y)) return true;
       return run.history.some((h) => isGoal(arena, h.x, h.y));
-    case 'return-to-start':
-      return run.finalState.x === arena.start.x && run.finalState.y === arena.start.y;
+    case 'return-to-start': {
+      if (run.finalState.x !== arena.start.x || run.finalState.y !== arena.start.y) return false;
+      const hasGoal = arena.cells.some((row) => row.some((c) => c === 'goal'));
+      if (!hasGoal) return true;
+      // A goal on the start cell is visited by construction (arenaEditing
+      // allows that authoring pattern), mirroring pass-through's rule.
+      if (isGoal(arena, arena.start.x, arena.start.y)) return true;
+      return run.history.some((h) => isGoal(arena, h.x, h.y));
+    }
   }
 }
