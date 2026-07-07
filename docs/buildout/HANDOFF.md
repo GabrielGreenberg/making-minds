@@ -18,22 +18,19 @@ gating (display policy in its own localStorage seam), deploy recipes, and
 `server npm run check` (28 checks, green). `api/client.ts` maps 1:1 to future
 Remote* stores and is imported by nothing yet.
 
-## ⚠ TREE CONTENTION — read before touching anything
+## TREE CONTENTION — RESOLVED (S3 landed 2026-07-07)
 
-A concurrent local Claude session (spawned 2026-07-07 ~9:05AM from the
-iteration-20 XOR-floor diagnosis chip) is editing `app/src/wireRouter.ts` IN
-THIS SAME CHECKOUT — implementing **P1.8 S3** (own-endpoint exemption).
-Protocol until its work lands:
-- `git status --short` FIRST; treat foreign modified files as theirs — never
-  `git add` them, never `git checkout` over them.
-- Gates on the shared tree are NONDETERMINISTIC while their WIP is unstaged —
-  run gates in an isolated worktree (or a `git checkout-index` copy, as the
-  iteration-21 merge agent did).
-- Do NOT start S3/S4. When their commit lands (watch `git log` for
-  wireRouter.ts changes), check it against the S3 acceptance list (QUEUE
-  P1.8): repinned EXPECTED_FALLBACKS (expected ≈3), bumpCheck clean on all
-  CC/SC fixtures + wired into `npm run check`, INPUT toggle-tab obstacles, H4
-  near-merge round. Enqueue whatever it leaves undone.
+The concurrent chip session's work LANDED on buildout-infra the same day
+(commit "Router world model unified with the layout oracle" —
+wireRouter.ts + routerCheck.ts + bumpCheck.ts + package.json + docs). The
+tree is no longer contended; normal protocol resumes. Its commit was checked
+against the S3 acceptance list (QUEUE P1.8, updated in place): EXPECTED_FALLBACKS
+repinned to 2 total (better than the expected ≈3), bumpCheck clean on ALL
+CC/SC fixtures AND wired into `npm run check` (no-arg manifest sweep), H4
+near-merge/bump-drawability round done (with conflict-feedback re-routing).
+LEFT UNDONE and still queued under P1.8: INPUT toggle-tab obstacles; the
+hw3-p9 dot-skip nit re-evaluation. S4 (fallback phase-0 + lane-nudge +
+`usedFallback`) is unowned again — the loop may take it.
 - Durable memory saved: `project-shared-worktree-concurrency`.
 
 ## ⚠ SCOPE SHIFT (user directive 2026-07-06)

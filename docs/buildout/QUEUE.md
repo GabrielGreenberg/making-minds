@@ -167,14 +167,19 @@ before Phase 3 (perception returns to router-rendered CC/SC). Task ids unchanged
 
 ## Phase 3 — Perception
 
-- [~] **P1.8** **Renderer: wire lanes and junction dots.** — _⚠ S3 TAKEN BY A
-  CONCURRENT SESSION (2026-07-07, ~9:05AM): a separate local Claude session
-  (spawned from the iteration-20 diagnosis chip) is implementing the
-  own-endpoint exemption in wireRouter.ts IN THIS SAME WORKING TREE. The loop
-  must NOT start S3/S4 until that lands; it must repin EXPECTED_FALLBACKS
-  (expected ≈3) and should adopt the S3 acceptance list below (bumpCheck,
-  toggle-tab obstacles, H4 round) — check its commit against that list and
-  enqueue whatever it leaves undone._ — _design memo done
+- [~] **P1.8** **Renderer: wire lanes and junction dots.** — _S3 LANDED
+  2026-07-07 (the concurrent chip session; commit "Router world model unified
+  with the layout oracle", wireRouter.ts + routerCheck.ts + bumpCheck.ts).
+  Checked against the acceptance list below: own-endpoint exemption ✓ (budget
+  147 → 2, better than the expected ≈3 — hw3-p1/p8's one-off doomed wires
+  cured too, hw3-p9's w21 pinned at 2 as genuinely cramped), foreign-lane A*
+  cost + near-parallel H1 ✓ (oracle's 3px rule in the cost model + validation),
+  H4 bump-drawability round ✓ (undrawable crossings weighted 10× in
+  countCrossings + H4 validation with conflict-feedback avoid points — ALL
+  CC/SC fixtures now bump-clean incl. hw2-p11's pinned exhibit), bumpCheck
+  wired into `npm run check` ✓ (no-arg = manifest sweep). LEFT UNDONE →
+  re-enqueued below: INPUT toggle-tab obstacles; the hw3-p9 dot-skip nit
+  wasn't re-evaluated._ — _design memo done
   (`designs/wire-routing.md`, judge-panel: MODEL-FIX won 77–65); S1+S2 landed
   2026-07-06 (iteration 16, commits `4e62a7e`, `bdf13b1`); S3–S5 remain._
   **S1 (done):** new `src/componentGeometry.ts` owns rendered dimensions (MEM
@@ -194,24 +199,33 @@ before Phase 3 (perception returns to router-rendered CC/SC). Task ids unchanged
   verified. Two candidates adjudicated non-violations (LOG 17): sub-pixel
   (0.33px) trunk jitter on hw3-p9's own fan-out; one bump-adjacent dot skip at
   hw3-p9 (1375,757) — algorithm-correct, readability nit fed into S3/S4.
-  **S3–S5 remaining:** S3 foreign-lane A* cost + H4 near-merge round (kills the
-  1px-hug class generally) — keep H4 thresholds ≥0.5px (sub-pixel elbow
-  rounding, see above) and decide whether lane separation moots the dot-skip
-  nit or the skip radius needs tuning; **S3 acceptance also includes the
-  bumpless-crossing class (iteration 19): `tools/bumpCheck.ts` clean on all
-  CC/SC fixtures — hw2-p11's 6 bumpless crossings are the pinned exhibit;
-  mechanism: router hug lanes sit at port±ELEMENT_MARGIN(=5), self-coincident
-  with the R=5 bump-skip radius, so break the coincidence (lane offset ≠
-  margin, or decouple the radii) — then wire bumpCheck into `npm run check`;
-  ALSO in scope (iteration 20): the structural XOR fallback floor — XOR
-  left-port inset(11.25) > STUB_LENGTH(12)−ELEMENT_MARGIN(5) blocks every
-  A* goal at an XOR in-port (the ENTIRE 147 budget is 3×XOR-in wires + 3
-  one-off doomed wires); fix candidates: exempt own-component bounds on
-  first/last approach edges, or lengthen stubs past inset+margin; expected
-  post-fix budget ≈ 3. AND the obstacle-model gap: INPUT toggle-tabs aren't
-  router obstacles (hw3-p12 pmo-36 elbows through IN2's tab)**; S4 fallback phase-0 + lane-nudge
-  + per-wire `usedFallback`; S5 (optional) perf. Each slice: gates green +
-  layoutCheck clean + browser spot-check per the memo's slice plan.
+  **S3 (done 2026-07-07, chip session):** the router's legality model now
+  EQUALS the oracle's — own-endpoint exemption (grid edges carry `blockedBy`
+  component attribution; a wire's own source/target bounds don't block edges
+  incident to its stub-tip nodes, nor its first/last simplified segments in
+  the H2 revalidation — pre-fix, EVERY wire re-tripped H2 and the whole
+  circuit silently rerouted twice per route call; routing is ~3× faster now),
+  near-parallel (<3px) foreign tracks priced as overlap in A* (per-search
+  interval index) and flagged by H1 (fan-out trunks exempt, both per the
+  oracle), bump-undrawable crossings weighted 10× in countCrossings + a new
+  H4 validation round that feeds exact conflict points back into the re-route
+  as overlap-priced avoid points (rip-up-and-reroute memory; edge-fragment
+  cost tests are blind to crossings at grid-line intersections), and the A*
+  iteration cap scales with grid size (flat 5000 starved honest ~7k-iteration
+  paths on the ~30k-node HW3 fixtures). Fallback budget 147 → 2 (hw3-p9 w21
+  pinned, genuinely cramped: its only goal approach costs overlap-scale and
+  proving it needs ~240k iterations; its fallback is oracle-clean);
+  routerCheck pins XOR-in reachability beside MEM.min and prints offender
+  wire ids (`getFallbackWireIds`); bumpCheck: all CC/SC fixtures CLEAN (incl.
+  the 8 pre-existing failures) + no-arg manifest sweep wired into
+  `npm run check`.
+  **S3 leftover (still open):** the obstacle-model gap — INPUT toggle-tabs
+  aren't router obstacles (hw3-p12 pmo-36 elbows through IN2's tab); and
+  re-evaluate the hw3-p9 (1375,757) dot-skip nit now that near-parallel lane
+  separation exists (does it moot the nit, or does the skip radius need
+  tuning?); **S4 remaining:** fallback phase-0 + lane-nudge + per-wire
+  `usedFallback`; S5 (optional) perf. Each slice: gates green + layoutCheck
+  clean + browser spot-check per the memo's slice plan.
   **Gates Phase 3** (perception fixtures are CC/SC, back on the router).
 - [x] **P3.1** **Design spike: perception target authoring.** — _closed as
   OVERTAKEN 2026-07-06 (iteration 18 audit)._ Gabriel shipped perception

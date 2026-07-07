@@ -895,3 +895,52 @@ WIP is present; saved as a durable memory
 
 **Next:** P4.2 multi-arena navigation grading (engine/grader/turbot — disjoint
 from wireRouter.ts), built and gated in an isolated worktree.
+
+## 2026-07-07 (out-of-band chip session) — P1.8 S3: router world model unified with the oracle · fallbacks 147 → 2 · bumpCheck all-clean + in `npm run check`
+
+The iteration-20 diagnosis chip session landed S3 directly on buildout-infra.
+Root cause confirmed and generalized: the router treated a wire's OWN endpoint
+components as foreign obstacles. Two consequences: (1) XOR's curved-face
+left-port inset (11.25px) > STUB_LENGTH(12) − ELEMENT_MARGIN(5) put every
+XOR-in stub tip inside its own expanded bounds — goal born A*-unreachable, 3
+fallbacks per wire, the ENTIRE 147 budget; (2) EVERY wire's stub segment
+crosses its own margin sliver, so the H2 revalidation flagged every wire every
+round — the "validation pass" silently rerouted the whole circuit twice per
+route call (baseline routerCheck 32.6s → 10.4s after the fix; the canvas gets
+the same ~3× win).
+
+The fix makes the router's legality model EQUAL the layout oracle's:
+- **Own-endpoint exemption** — grid edges carry `blockedBy` component indices
+  (attribution, not a boolean); edges incident to a wire's stub-tip nodes
+  ignore that wire's own source/target bounds; H2 exempts the first/last
+  simplified segments against the own components (= layoutCheck's own-stub
+  exemption). Foreign components always block (doomed-wire tripwire intact).
+- **Near-parallel = overlap** (oracle's 3px collinear-overlap rule): priced
+  W_OVERLAP in A* via a per-search interval index; H1 validation flags it;
+  same-source fan-out trunks exempt in both (H1 previously also flagged every
+  fan-out trunk — more futile rerouting).
+- **Bump drawability** — crossings the canvas can't arc (within
+  CROSSING_BUMP_RADIUS=5 of the horizontal segment's ends) weighted 10× in
+  countCrossings; new H4 validation round detects bumpless crossings on final
+  simplified paths and feeds the exact conflict points back into the re-route
+  as overlap-priced avoid points (rip-up-and-reroute memory — fragment-local
+  cost tests are provably blind to crossings at grid-line intersections:
+  hw2-p7-broken bw9×bw11 re-picked its path deterministically until the
+  feedback existed).
+- **Scaled iteration cap** — max(5000, grid nodes): the flat 5000 starved
+  honest ~7k-iteration paths on the ~30k-node hw3-p8/p9 grids (capacity
+  failures masquerading as unreachability, +3 fallbacks each).
+
+Verified: routerCheck 2 ≤ 2 with per-fixture distribution pinned ({hw3-p9: 2}
+— w21's only goal approach costs overlap-scale, ~240k iterations to prove;
+its fallback is oracle-clean), XOR-in + MEM.min clean-field reachability pins,
+every CC/SC fixture oracle-clean AND bump-clean — including the 8 fixtures
+whose bumpless crossings PREDATE this work (hw1-p4, hw2-p1, hw2-p11, hw3-p2,
+hw3-p4, hw3-p8, hw3-p9, hw3-p12) — bumpCheck grew a no-arg all-CC/SC manifest
+sweep and joined `npm run check`, full `npm run check` green, coverage
+unchanged (46 exact / 0 regressed / 0 warnings), tsc clean. hw4/hw5
+layoutCheck CLI failures are out-of-scope-by-design (FSM/TM bypass the
+router) and identical at baseline. New diagnostics: `getFallbackWireIds()`.
+
+Left for the loop (QUEUE P1.8 updated): INPUT toggle-tab obstacles, the
+hw3-p9 dot-skip nit re-evaluation; S4/S5 unowned again.

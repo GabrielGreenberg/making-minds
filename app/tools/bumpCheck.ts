@@ -14,10 +14,16 @@
  *
  * Any detected crossing not drawn by any segment = BUMPLESS (defect).
  *
- * usage: cd app/ && npx tsx <this file> <fixture.json>
+ * usage: cd app/ && npx tsx <this file> [fixture.json]
+ *   With a fixture argument: check that one fixture (correct + broken).
+ *   With no argument: sweep EVERY CC/SC reference fixture from the coverage
+ *   manifest (part of `npm run check` — pins the all-clean state reached when
+ *   the router learned the bump-drawability rule: weighted undrawable
+ *   crossings + the H4 validation round with conflict-feedback re-routing).
  */
 import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { dirname, join, resolve } from 'node:path';
 import { routeAllWires, type WireRouteInput } from '/Users/gabriel/Programming/making-minds/app/src/wireRouter';
 import { getPortPosition } from '/Users/gabriel/Programming/making-minds/app/src/componentGeometry';
 
@@ -97,15 +103,34 @@ function checkMachine(machine: any, name: string): { bumpless: string[]; totalCr
   return { bumpless, totalCrossings };
 }
 
-const fixturePath = resolve(process.argv[2]);
-const fx = JSON.parse(readFileSync(fixturePath, 'utf8'));
+function checkFixture(fixturePath: string, label?: string): boolean {
+  const fx = JSON.parse(readFileSync(fixturePath, 'utf8'));
+  let anyBad = false;
+  for (const key of ['correct', 'broken']) {
+    const m = fx[key];
+    if (!m) continue;
+    const { bumpless, totalCrossings } = checkMachine(m, key);
+    const prefix = label ? `${label} ` : '';
+    console.log(`${prefix}${key}: ${totalCrossings} crossings detected, ${bumpless.length} bumpless`);
+    for (const line of bumpless) { console.log('  ' + line); anyBad = true; }
+  }
+  return anyBad;
+}
+
 let anyBad = false;
-for (const key of ['correct', 'broken']) {
-  const m = fx[key];
-  if (!m) continue;
-  const { bumpless, totalCrossings } = checkMachine(m, key);
-  console.log(`${key}: ${totalCrossings} crossings detected, ${bumpless.length} bumpless`);
-  for (const line of bumpless) { console.log('  ' + line); anyBad = true; }
+if (process.argv[2]) {
+  anyBad = checkFixture(resolve(process.argv[2]));
+} else {
+  // Sweep every CC/SC reference fixture (same manifest gate as routerCheck —
+  // FSM/TM transitions bypass the router, so the predicate is undefined there).
+  const HERE = dirname(fileURLToPath(import.meta.url));
+  const manifest = JSON.parse(
+    readFileSync(join(HERE, 'fixtures', 'coverage-manifest.json'), 'utf8'),
+  ) as { rows: { id: string; mode: string; fixture: string | null }[] };
+  for (const row of manifest.rows) {
+    if (!row.fixture || (row.mode !== 'CC' && row.mode !== 'SC')) continue;
+    if (checkFixture(join(HERE, 'fixtures', row.fixture), row.id)) anyBad = true;
+  }
 }
 console.log(anyBad ? 'BUMP PREDICATE: FAIL' : 'BUMP PREDICATE: CLEAN');
 process.exit(anyBad ? 1 : 0);

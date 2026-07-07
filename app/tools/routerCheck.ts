@@ -12,19 +12,23 @@
 //      all three consumers move together — but they must move to values that
 //      match the drawn SVG bodies, and these pins are the tripwire.
 //
-//   2. MEM.min REACHABILITY — the root cause of the HW3 appearance failures:
-//      the router's private geometry table had no MEM case, so MEM fell to a
-//      phantom 75×70 obstacle and every wire incident on MEM.min's stub was
-//      born blocked, taking the obstacle-blind fallback. Pin: in a clean
-//      field, a MEM wire routes via A* (zero fallbacks) and is oracle-clean.
-//      Plus a tripwire proving the fallback counter actually fires (a counter
-//      that cannot count is not instrumenting anything).
+//   2. MEM.min + XOR.in REACHABILITY — two historical ways a wire was born
+//      blocked. MEM: the router's private geometry table had no MEM case, so
+//      MEM fell to a phantom 75×70 obstacle. XOR: the left-port inset
+//      (11.25px) exceeds STUB_LENGTH(12) − ELEMENT_MARGIN(5), so the stub tip
+//      sits inside the XOR's OWN expanded bounds — fixed by the own-endpoint
+//      exemption (a wire may touch its own endpoints' bounds at its stub
+//      tips; wireRouter.ts). Pins: in a clean field, MEM and XOR wires route
+//      via A* (zero fallbacks) and are oracle-clean. Plus a tripwire proving
+//      the fallback counter still fires when a FOREIGN component (never
+//      exempt) buries a stub tip.
 //
 //   3. FALLBACK BUDGET — route every CC/SC reference fixture exactly as the
-//      canvas would and pin the fallbackPath invocation counts: ≤ 99 total
-//      (was 283 before the bounds fix), with the residual distribution pinned
-//      per fixture. New fixtures must route fallback-free or be added to the
-//      table DELIBERATELY; later slices (S3/S4) ratchet these numbers down.
+//      canvas would and pin the fallbackPath invocation counts: 2 total
+//      (was 283 before the MEM bounds fix, 147 before the own-endpoint
+//      exemption killed the structural XOR floor), with the residual
+//      distribution pinned per fixture. New fixtures must route
+//      fallback-free or be added to the table DELIBERATELY.
 //      Every fixture must also stay oracle-clean (layoutCheck predicates).
 //
 //   4. DIVERGENCE DOTS — findDivergencePoints corpus (VISUAL_VOCAB: a split
@@ -46,6 +50,7 @@ import {
 import {
   resetFallbackCount,
   getFallbackCount,
+  getFallbackWireIds,
   findDivergencePoints,
   type DisplayedWirePath,
 } from '../src/wireRouter';
@@ -134,9 +139,32 @@ console.log('\nMEM ROUTING — A* reaches MEM.min in a clean field (no fallback)
   check('MEM wires route via A* (0 fallbacks)', getFallbackCount() === 0);
   check('MEM machine is oracle-clean', violations.length === 0);
 
+  // XOR reachability: the left-port inset (11.25px) puts the stub tip
+  // 4.25px inside the XOR's own expanded bounds. Pre-exemption this made
+  // every XOR-in wire structurally unreachable (3 fallbacks each, the whole
+  // pinned budget); the own-endpoint exemption must keep the goal reachable.
+  const xorMachine = circuit(
+    [
+      comp('xin1', 'INPUT', 'IN1', 100, 100),
+      comp('xin2', 'INPUT', 'IN2', 100, 250),
+      comp('x1', 'XOR', 'XOR', 400, 150),
+      comp('xout1', 'OUTPUT', 'OUT1', 700, 170),
+    ],
+    [
+      wire('xw1', 'xin1', 'out', 'x1', 'in1'),
+      wire('xw2', 'xin2', 'out', 'x1', 'in2'),
+      wire('xw3', 'x1', 'out', 'xout1', 'in'),
+    ],
+  );
+  resetFallbackCount();
+  const xorViolations = checkCircuitLayout(xorMachine, 'xor-in');
+  check('XOR-in wires route via A* (0 fallbacks — own-endpoint exemption)', getFallbackCount() === 0);
+  check('XOR machine is oracle-clean', xorViolations.length === 0);
+
   // Tripwire: a genuinely doomed wire MUST increment the counter. The
-  // OUTPUT's stub tip is buried inside a foreign AND's expanded bounds, so
-  // every incident edge is blocked and A* has to give up.
+  // OUTPUT's stub tip is buried inside a FOREIGN AND's expanded bounds —
+  // foreign components are never exempt — so every incident edge is blocked
+  // and A* has to give up.
   const doomed = circuit(
     [
       comp('in2', 'INPUT', 'IN1', 100, 100),
@@ -151,30 +179,26 @@ console.log('\nMEM ROUTING — A* reaches MEM.min in a clean field (no fallback)
 }
 
 // ─── 3. Fallback budget across the CC/SC reference fixtures ─────────────────
-// Pinned S1 state (bounds fix): 99 total across the eight original fixtures
-// (was 283 before MEM got real 50×50 bounds), + 48 for hw3-p11 (added
-// iteration 20, a DELIBERATE pin: root-caused as the router's structural XOR
-// floor — XOR's left-port inset (11.25px) exceeds STUB_LENGTH(12) −
-// ELEMENT_MARGIN(5), so every wire targeting an XOR in-port has its A* goal
-// stub tip inside the expanded obstacle bounds → exactly 3 fallbacks per
-// XOR-in wire; hw3-p11-correct has 16 such wires. The WHOLE table is this
-// class: 3 × XOR-in wires per fixture, plus one doomed non-XOR wire each in
-// hw3-p1/p8/p9). S3/S4 are expected to LOWER these — fix candidates: exempt
-// own-component bounds on first/last approach edges, or lengthen the stub
-// past inset+margin. Update the table deliberately, never upward without a
+// Pinned state: 2 total. The own-endpoint exemption (wireRouter.ts) erased
+// the structural XOR floor that used to account for the ENTIRE 147-fallback
+// budget (3 per XOR-in wire — stub tip born inside the XOR's own expanded
+// bounds — plus capacity misses from the old flat 5000-iteration A* cap,
+// which now scales with the grid). History: 283 → 99 (MEM 50×50 bounds fix)
+// → 147 (hw3-p11 added, 16 XOR-in wires) → 2 (own-endpoint exemption +
+// near-parallel overlap costs + scaled iteration cap).
+//
+// The residual is hw3-p9's w21 (MEM.mout → HA.in1 in the monster correct
+// machine): its only goal approach is occupied by a foreign parallel track,
+// so the cheapest legal path costs overlap-scale (~100k) and proving that
+// would take ~240k iterations — the scaled cap (grid nodes ≈ 35k) cuts the
+// search off and the wire takes an oracle-clean fallback instead. That is
+// the fallback lane doing its job on a genuinely cramped layout, not a
+// world-model bug. Update the table deliberately, never upward without a
 // design decision.
 
-const MAX_TOTAL_FALLBACKS = 147;
+const MAX_TOTAL_FALLBACKS = 2;
 const EXPECTED_FALLBACKS: Record<string, number> = {
-  'hw2-p3': 6,
-  'hw2-p7': 24,
-  'hw3-p1': 15,
-  'hw3-p2': 24,
-  'hw3-p5': 12,
-  'hw3-p6': 6,
-  'hw3-p8': 3,
-  'hw3-p9': 9,
-  'hw3-p11': 48, // structural XOR floor (16 XOR-in wires × 3) — see header note
+  'hw3-p9': 2, // w21, genuinely cramped goal approach — see header note
   // every other CC/SC fixture: 0
 };
 
@@ -196,7 +220,7 @@ console.log('\nFALLBACK BUDGET — CC/SC reference fixtures (canvas-identical ro
     const expected = EXPECTED_FALLBACKS[row.id] ?? 0;
     if (n !== expected) {
       distributionOk = false;
-      console.log(`    ${row.id}: ${n} fallbacks (pinned ${expected}) — if deliberate, update EXPECTED_FALLBACKS`);
+      console.log(`    ${row.id}: ${n} fallbacks (pinned ${expected}) — wires: ${getFallbackWireIds().join(', ')} — if deliberate, update EXPECTED_FALLBACKS`);
     }
     if (violations.length > 0) {
       allClean = false;

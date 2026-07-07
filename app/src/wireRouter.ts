@@ -30,6 +30,12 @@ const STUB_LENGTH = 12;      // Fixed stub length from port face (px)
 const ELEMENT_MARGIN = 5;    // Clearance around element bounding boxes (px)
 const MIN_CHANNEL_WIDTH = 16; // Minimum gap between routing channels
 
+/** Radius of the crossing bump arc. Must match pathDWithBumps' R in
+ *  CircuitCanvas.tsx. Two consumers: countCrossings weights crossings that
+ *  land in a horizontal segment's bump-undrawable end band, and
+ *  findDivergencePoints skips dots that would be drawn on top of an arc. */
+const CROSSING_BUMP_RADIUS = 5;
+
 // Cost weights — must satisfy: W_OVERLAP >> W_CROSSING >> W_BEND >> W_LENGTH
 const W_LENGTH = 1.0;
 const W_BEND = 50.0;
@@ -68,7 +74,12 @@ interface GridEdge {
   a: number; // node id
   b: number; // node id
   length: number;
-  blocked: boolean;
+  /** Indices (into the expandedBounds/components array) of every component
+   *  whose expanded bounds this edge passes through; empty = unobstructed.
+   *  Attribution instead of a boolean so the search can exempt a wire's OWN
+   *  endpoint components on the approach edges at its stub tips (see
+   *  OWN-ENDPOINT EXEMPTION below). */
+  blockedBy: number[];
 }
 
 /** Sparse routing grid built from element geometry */
@@ -85,8 +96,10 @@ interface RoutingGrid {
 export interface OccupancyState {
   /** Set of edge IDs occupied by wires. Value = source port key (for fan-out sharing) */
   occupiedEdges: Map<number, string>;
-  /** All routed wire segments for crossing detection */
-  segments: { x1: number; y1: number; x2: number; y2: number; wireId: string }[];
+  /** All routed wire segments for crossing detection and near-parallel
+   *  avoidance (sourcePortKey exempts fan-out siblings, which legitimately
+   *  share their trunk) */
+  segments: { x1: number; y1: number; x2: number; y2: number; wireId: string; sourcePortKey: string }[];
   /** Bend points used by wires. Key = "x,y", value = wireId */
   occupiedBends: Map<string, string>;
 }
@@ -108,6 +121,13 @@ interface SearchState {
 // MEM default to phantom 75×70 bounds (rendered: 50×50), which blocked every
 // edge at MEM.min's stub tip and forced all incident wires onto the
 // obstacle-blind fallback.
+//
+// A wire's OWN endpoint components are not obstacles to it at its stub tips:
+// the stub necessarily crosses its own component's margin (and, for inset
+// ports like XOR's, the tip can sit inside the expanded bounds outright), so
+// both the A* blocking model and the H2 revalidation exempt the wire's own
+// source/target bounds on the approach — the same exemption the layout
+// oracle applies to a wire's own stubs. Foreign components always block.
 
 function getCompBounds(comp: CircuitComponent): Bounds {
   const { w, h } = getComponentSize(comp);
@@ -133,6 +153,17 @@ function expandBounds(b: Bounds, margin: number): Bounds {
     right: b.right + margin,
     bottom: b.bottom + margin,
   };
+}
+
+/** Indices of every bounds entry an axis-aligned segment passes through */
+function boundsBlocking(
+  x1: number, y1: number, x2: number, y2: number, allBounds: Bounds[]
+): number[] {
+  const blockedBy: number[] = [];
+  for (let i = 0; i < allBounds.length; i++) {
+    if (segmentIntersectsBounds(x1, y1, x2, y2, allBounds[i])) blockedBy.push(i);
+  }
+  return blockedBy;
 }
 
 /** Check if an axis-aligned segment intersects bounds */
@@ -200,7 +231,20 @@ function getStubEndpoint(port: Point, dir: Dir): Point {
   }
 }
 
-/** Count perpendicular crossings between a segment and existing segments */
+/** A crossing the canvas cannot draw a bump for counts as this many ordinary
+ *  crossings. pathDWithBumps (CircuitCanvas.tsx) skips crossings within
+ *  CROSSING_BUMP_RADIUS of the owning horizontal segment's ends, so a
+ *  crossing landing in that dead band renders as a bare + — a VISUAL_VOCAB
+ *  violation, much worse than a bumped crossing but not overlap-grade. */
+const UNDRAWABLE_CROSSING_FACTOR = 10;
+
+/** Count perpendicular crossings between a segment and existing segments,
+ *  weighted: a crossing in the bump-undrawable band of an EXISTING
+ *  horizontal segment (whose extent is known) counts
+ *  UNDRAWABLE_CROSSING_FACTOR×. The mirror case — an existing vertical
+ *  crossing near the ends of the run being routed — can't be judged
+ *  mid-search (the final merged segment's extent isn't known yet), so it
+ *  stays an ordinary crossing. */
 function countCrossings(
   x1: number, y1: number, x2: number, y2: number,
   segments: OccupancyState['segments']
@@ -223,13 +267,15 @@ function countCrossings(
         count++;
       }
     } else if (isVert && sHoriz) {
-      // vertical new vs horizontal existing
+      // vertical new vs horizontal existing (bump drawn on the horizontal wire)
       const minHx = Math.min(seg.x1, seg.x2);
       const maxHx = Math.max(seg.x1, seg.x2);
       const minVy = Math.min(y1, y2);
       const maxVy = Math.max(y1, y2);
       if (x1 > minHx + 1 && x1 < maxHx - 1 && seg.y1 > minVy + 1 && seg.y1 < maxVy - 1) {
-        count++;
+        const drawable =
+          x1 > minHx + CROSSING_BUMP_RADIUS && x1 < maxHx - CROSSING_BUMP_RADIUS;
+        count += drawable ? 1 : UNDRAWABLE_CROSSING_FACTOR;
       }
     }
   }
@@ -357,13 +403,13 @@ function buildGrid(
         const currNode = nodes[nid];
         const length = Math.abs(currNode.x - prevNode.x);
 
-        // Check if this edge passes through any element bounds
-        const blocked = expandedBounds.some(b =>
-          segmentIntersectsBounds(prevNode.x, prevNode.y, currNode.x, currNode.y, b)
+        // Record which element bounds this edge passes through
+        const blockedBy = boundsBlocking(
+          prevNode.x, prevNode.y, currNode.x, currNode.y, expandedBounds
         );
 
         const eid = edgeId++;
-        edges.push({ id: eid, a: prevId, b: nid, length, blocked });
+        edges.push({ id: eid, a: prevId, b: nid, length, blockedBy });
         adj.get(prevId)!.push({ neighbor: nid, edge: eid });
         adj.get(nid)!.push({ neighbor: prevId, edge: eid });
       }
@@ -383,12 +429,12 @@ function buildGrid(
         const currNode = nodes[nid];
         const length = Math.abs(currNode.y - prevNode.y);
 
-        const blocked = expandedBounds.some(b =>
-          segmentIntersectsBounds(prevNode.x, prevNode.y, currNode.x, currNode.y, b)
+        const blockedBy = boundsBlocking(
+          prevNode.x, prevNode.y, currNode.x, currNode.y, expandedBounds
         );
 
         const eid = edgeId++;
-        edges.push({ id: eid, a: prevId, b: nid, length, blocked });
+        edges.push({ id: eid, a: prevId, b: nid, length, blockedBy });
         adj.get(prevId)!.push({ neighbor: nid, edge: eid });
         adj.get(nid)!.push({ neighbor: prevId, edge: eid });
       }
@@ -442,12 +488,10 @@ function ensureNodeOnGrid(grid: RoutingGrid, p: Point, expandedBounds: Bounds[])
     if (filtered.length > 0) {
       const nearest = filtered[0];
       const length = Math.abs(nearest.x - rx) + Math.abs(nearest.y - ry);
-      const blocked = expandedBounds.some(b =>
-        segmentIntersectsBounds(rx, ry, nearest.x, nearest.y, b)
-      );
+      const blockedBy = boundsBlocking(rx, ry, nearest.x, nearest.y, expandedBounds);
 
       const eid = grid.edges.length;
-      grid.edges.push({ id: eid, a: newId, b: nearest.id, length, blocked });
+      grid.edges.push({ id: eid, a: newId, b: nearest.id, length, blockedBy });
       grid.adj.get(newId)!.push({ neighbor: nearest.id, edge: eid });
       grid.adj.get(nearest.id)!.push({ neighbor: newId, edge: eid });
     }
@@ -536,6 +580,13 @@ function edgeMatchesPreviousPath(
   return prevEdges.has(key);
 }
 
+/** A wire's own endpoint components, as indices into the expandedBounds
+ *  array (-1 = unknown). See OWN-ENDPOINT EXEMPTION in aStarSearch. */
+export interface OwnComponents {
+  sourceIdx: number;
+  targetIdx: number;
+}
+
 function aStarSearch(
   grid: RoutingGrid,
   startNodeId: number,
@@ -546,14 +597,24 @@ function aStarSearch(
   sourcePortKey: string, // for fan-out: wires from same port can share edges
   ownStubs?: { x1: number; y1: number; x2: number; y2: number }[], // own stub segments to avoid overlapping
   previousPath?: Point[], // previous path for continuity bias (§7.2)
-  maxIterations: number = 5000
+  ownComps?: OwnComponents, // own-endpoint exemption at the stub-tip nodes
+  avoidPoints?: Point[] // conflict feedback from validation: overlap-priced locations
 ): Point[] | null {
   const goalNode = grid.nodes[goalNodeId];
   const startNode = grid.nodes[startNodeId];
   if (!goalNode || !startNode) return null;
 
+  // Iteration cap: a safety valve against the degenerate case (a goal whose
+  // only approach costs W_OVERLAP turns A* into full-grid Dijkstra), NOT a
+  // path-length limit — so it must scale with the search space. A flat cap
+  // silently dooms honest long paths on large circuits: the reference HW3
+  // fixtures build ~30k-node grids where real routes need ~7k iterations,
+  // starving under the old flat 5000.
+  const maxIterations = Math.max(5000, grid.nodes.length);
+
   const requiredArrivalDir = goalDir; // Must arrive heading in goalDir direction (into the stub)
   const prevEdges = buildPreviousPathEdges(previousPath);
+  const nearIndex = buildNearParallelIndex(occupancy.segments, sourcePortKey);
 
   const heuristic = (nodeId: number): number => {
     const n = grid.nodes[nodeId];
@@ -606,7 +667,26 @@ function aStarSearch(
 
     for (const { neighbor, edge } of neighbors) {
       const e = grid.edges[edge];
-      if (e.blocked) continue;
+      // OWN-ENDPOINT EXEMPTION: a wire's landing at its own source/target is
+      // legitimate geometry — the same rule the layout oracle applies when it
+      // exempts a wire's own stubs from body-pass-through (layoutCheck.ts).
+      // Inset ports (XOR's curved face pulls left ports 11.25px inward) put
+      // the stub tip INSIDE the component's own expanded bounds, so without
+      // this exemption every edge incident on the goal node is blocked and
+      // the wire is born unreachable. Scope is deliberately narrow: only
+      // edges INCIDENT to this wire's start/goal stub-tip nodes, and only
+      // for the matching endpoint component — a path still can't cut through
+      // its own component's body elsewhere, and foreign components block the
+      // approach edges as before (the doomed-wire tripwire in routerCheck).
+      if (e.blockedBy.length > 0) {
+        const incidentStart = e.a === startNodeId || e.b === startNodeId;
+        const incidentGoal = e.a === goalNodeId || e.b === goalNodeId;
+        const passable = ownComps !== undefined && e.blockedBy.every((ci) =>
+          (incidentStart && ci === ownComps.sourceIdx) ||
+          (incidentGoal && ci === ownComps.targetIdx)
+        );
+        if (!passable) continue;
+      }
 
       const neighborNode = grid.nodes[neighbor];
       const currentNode = grid.nodes[current.node];
@@ -632,9 +712,18 @@ function aStarSearch(
         }
       }
 
-      // Overlap cost
+      // Overlap cost — same grid edge reused by a different source port
       const occupantPort = occupancy.occupiedEdges.get(edge);
       if (occupantPort !== undefined && occupantPort !== sourcePortKey) {
+        cost += W_OVERLAP;
+      } else if (edgeNearOverlaps(nearIndex,
+                                  currentNode.x, currentNode.y,
+                                  neighborNode.x, neighborNode.y)) {
+        // Near-parallel overlap (the oracle's collinear-overlap rule): a
+        // track within NEAR_PARALLEL_TOL of a DIFFERENT source's parallel
+        // segment renders as one visually-merged wire — the same offense as
+        // exact overlap, so the same cost. Fan-out siblings are exempt
+        // (shared trunks are legitimate).
         cost += W_OVERLAP;
       }
 
@@ -656,6 +745,27 @@ function aStarSearch(
         occupancy.segments
       );
       cost += crossings * W_CROSSING;
+
+      // Conflict feedback (rip-up-and-reroute memory): the validation pass
+      // pinpointed defects at these exact locations on this wire's previous
+      // path — defects the edge-local cost model cannot see (e.g. a bump-
+      // undrawable crossing sitting exactly on a grid-line intersection, at
+      // the blind boundary of the fragment-interior tests). Price any edge
+      // passing through such a point like an overlap so the re-route
+      // actually moves off it instead of deterministically re-picking it.
+      if (avoidPoints) {
+        for (const p of avoidPoints) {
+          const onEdge =
+            Math.min(currentNode.x, neighborNode.x) - 1 < p.x &&
+            p.x < Math.max(currentNode.x, neighborNode.x) + 1 &&
+            Math.min(currentNode.y, neighborNode.y) - 1 < p.y &&
+            p.y < Math.max(currentNode.y, neighborNode.y) + 1;
+          if (onEdge) {
+            cost += W_OVERLAP;
+            break;
+          }
+        }
+      }
 
       // Continuity bonus: discount edges that match the previous path (§7.2)
       if (prevEdges.size > 0) {
@@ -691,13 +801,23 @@ function aStarSearch(
 // (like the phantom MEM 75×70 bounds this counter was added to catch) show up
 // as a failing check instead of silently ugly layouts.
 let fallbackCount = 0;
+let fallbackWireIds: string[] = [];
 
 export function resetFallbackCount(): void {
   fallbackCount = 0;
+  fallbackWireIds = [];
 }
 
 export function getFallbackCount(): number {
   return fallbackCount;
+}
+
+/** Wire ids that took the fallback since the last reset (one entry per
+ *  invocation, so a wire re-failing in validation rounds appears repeatedly).
+ *  Diagnostic companion to getFallbackCount — routerCheck prints these so a
+ *  budget regression names its wires. */
+export function getFallbackWireIds(): string[] {
+  return [...fallbackWireIds];
 }
 
 function fallbackPath(
@@ -842,6 +962,16 @@ export function routeAllWires(
   // Compute expanded bounds for all components
   const expandedBounds = components.map(c => expandBounds(getCompBounds(c), ELEMENT_MARGIN));
 
+  // Component id → index into components/expandedBounds, for the
+  // own-endpoint exemption (a wire may touch its own endpoints' bounds
+  // at its stub tips; see aStarSearch).
+  const compIndexById = new Map<string, number>();
+  components.forEach((c, i) => compIndexById.set(c.id, i));
+  const ownCompsFor = (input: WireRouteInput): OwnComponents => ({
+    sourceIdx: compIndexById.get(input.sourceComp.id) ?? -1,
+    targetIdx: compIndexById.get(input.targetComp.id) ?? -1,
+  });
+
   // Collect all port positions and stub endpoints for grid construction
   const allPortPositions: Point[] = [];
   const allStubEndpoints: Point[] = [];
@@ -924,12 +1054,14 @@ export function routeAllWires(
         srcDir, oppositeDir(dstDir),
         occupancy, input.sourcePortKey,
         ownStubs,
-        prevInnerPath
+        prevInnerPath,
+        ownCompsFor(input)
       );
 
       // Fallback if A* fails
       if (!pathPoints || pathPoints.length === 0) {
         fallbackCount++;
+        fallbackWireIds.push(input.wireId);
         pathPoints = fallbackPath(srcStub, dstStub, srcDir, dstDir);
       }
 
@@ -962,8 +1094,12 @@ export function routeAllWires(
   }
 
   // ─── Validation pass (§7.1): check all wires for hard constraint violations ───
-  // Re-route any wire whose path now violates H1 (overlap) or H2 (element crossing).
-  // Cap at 2 rounds to bound computation time.
+  // Re-route any wire whose path violates H1 (overlap), H2 (element crossing),
+  // H3 (shared bend), or H4 (bump-undrawable crossing). Cap at 2 rounds to
+  // bound computation time. H4 conflicts accumulate per wire across rounds
+  // and feed back into the re-route as overlap-priced avoid points
+  // (rip-up-and-reroute memory — see aStarSearch).
+  const avoidByWire = new Map<string, Point[]>();
   for (let round = 0; round < 2; round++) {
     let anyRerouted = false;
     for (const item of indexedInputs) {
@@ -971,10 +1107,21 @@ export function routeAllWires(
       if (!result) continue;
 
       const path = result.points;
-      // Check H2: does the path pass through any element bounds?
-      const h2Violation = isPathBlockedByBounds(path, expandedBounds);
+      // Check H2: does the path pass through any element bounds? The wire's
+      // own landing at its endpoints is exempt (same rule as the A* search
+      // and the layout oracle): the first simplified segment leaves the
+      // source port and the last arrives at the target port, and each always
+      // crosses its own component's margin sliver — that's the stub doing
+      // its job, not a violation. Without the exemption EVERY wire re-trips
+      // H2 and the whole circuit is silently rerouted each validation round.
+      const ownComps = ownCompsFor(item.input);
+      const h2Violation = isPathBlockedByBounds(path, expandedBounds, ownComps);
 
-      // Check H1: does the path overlap any other wire's segment (different source port)?
+      // Check H1: does the path overlap any other wire's segment? Same rule
+      // as the oracle: near-parallel counts (within NEAR_PARALLEL_TOL), and
+      // fan-out siblings from the same source port are exempt — their shared
+      // trunk is legitimate, not an overlap (without that exemption every
+      // fan-out wire re-trips H1 and gets futilely rerouted each round).
       // Also check if the inner path overlaps its own stubs (self-stub overlap).
       let h1Violation = false;
       const selfStubs = [
@@ -983,10 +1130,11 @@ export function routeAllWires(
       ];
       for (let i = 0; i < path.length - 1 && !h1Violation; i++) {
         const a = path[i], b = path[i + 1];
-        // Check against other wires
+        // Check against other wires (different source port only)
         for (const seg of occupancy.segments) {
           if (seg.wireId === item.input.wireId) continue;
-          if (segmentsOverlap(a.x, a.y, b.x, b.y, seg.x1, seg.y1, seg.x2, seg.y2)) {
+          if (seg.sourcePortKey === item.input.sourcePortKey) continue;
+          if (segmentsNearOverlap(a.x, a.y, b.x, b.y, seg.x1, seg.y1, seg.x2, seg.y2)) {
             h1Violation = true;
             break;
           }
@@ -1018,7 +1166,40 @@ export function routeAllWires(
         }
       }
 
-      if (!h2Violation && !h1Violation && !h3Violation) continue;
+      // Check H4: bump-undrawable crossings. pathDWithBumps draws the bump on
+      // the HORIZONTAL wire and skips crossings within CROSSING_BUMP_RADIUS
+      // of that segment's ends — a crossing in the dead band renders as a
+      // bare +. The vertical partner is the wire that can move (its re-route
+      // sees the weighted crossing cost, and only it can be judged against
+      // the horizontal's now-known extent), so each wire checks its own
+      // vertical segments against the other wires' SIMPLIFIED paths (real
+      // segment ends, not grid fragments — occupancy holds fragments).
+      let h4Violation = false;
+      for (let i = 0; i < path.length - 1; i++) {
+        const a = path[i], b = path[i + 1];
+        if (Math.abs(a.x - b.x) >= 0.5 || Math.abs(a.y - b.y) < 0.5) continue; // vertical only
+        const minVy = Math.min(a.y, b.y), maxVy = Math.max(a.y, b.y);
+        for (const other of results) {
+          if (!other || other.wireId === item.input.wireId) continue;
+          const op = other.points;
+          for (let j = 0; j < op.length - 1; j++) {
+            const oa = op[j], ob = op[j + 1];
+            if (Math.abs(oa.y - ob.y) >= 0.5) continue; // horizontal only
+            const minHx = Math.min(oa.x, ob.x), maxHx = Math.max(oa.x, ob.x);
+            if (a.x > minHx + 1 && a.x < maxHx - 1 && oa.y > minVy + 1 && oa.y < maxVy - 1 &&
+                (a.x <= minHx + CROSSING_BUMP_RADIUS || a.x >= maxHx - CROSSING_BUMP_RADIUS)) {
+              h4Violation = true;
+              // Remember the exact conflict point so the re-route is priced
+              // off it (the cost model alone can't see boundary crossings).
+              const avoid = avoidByWire.get(item.input.wireId) ?? [];
+              avoid.push({ x: a.x, y: oa.y });
+              avoidByWire.set(item.input.wireId, avoid);
+            }
+          }
+        }
+      }
+
+      if (!h2Violation && !h1Violation && !h3Violation && !h4Violation) continue;
 
       // Remove this wire's occupancy before re-routing
       removeOccupancy(occupancy, item.input.wireId);
@@ -1035,11 +1216,15 @@ export function routeAllWires(
         grid, startNodeId, goalNodeId,
         srcDir, oppositeDir(dstDir),
         occupancy, item.input.sourcePortKey,
-        reOwnStubs
+        reOwnStubs,
+        undefined,
+        ownComps,
+        avoidByWire.get(item.input.wireId)
       );
 
       if (!pathPoints || pathPoints.length === 0) {
         fallbackCount++;
+        fallbackWireIds.push(item.input.wireId);
         pathPoints = fallbackPath(srcStub, dstStub, srcDir, dstDir);
       }
 
@@ -1063,6 +1248,97 @@ export function routeAllWires(
   return results;
 }
 
+
+/** Tracks within this distance of a parallel foreign track render as one
+ *  visually-merged wire — the SAME tolerance the layout oracle uses for its
+ *  collinear-overlap violation (layoutCheck.ts). Near-coincident grid lines
+ *  (port/stub coordinates of unrelated components landing within a couple of
+ *  px) are where this bites: exact-collinearity checks are blind to them. */
+const NEAR_PARALLEL_TOL = 3;
+
+/** The layout oracle's collinear-overlap rule: two same-axis segments whose
+ *  lines sit within NEAR_PARALLEL_TOL of each other and share more than 1px
+ *  of span. Exact overlap is the distance-0 case, so this subsumes
+ *  segmentsOverlap for cross-wire checks. */
+function segmentsNearOverlap(
+  ax1: number, ay1: number, ax2: number, ay2: number,
+  bx1: number, by1: number, bx2: number, by2: number
+): boolean {
+  const aHoriz = Math.abs(ay1 - ay2) < 0.5;
+  const bHoriz = Math.abs(by1 - by2) < 0.5;
+  if (aHoriz && bHoriz && Math.abs(ay1 - by1) < NEAR_PARALLEL_TOL) {
+    const lo = Math.max(Math.min(ax1, ax2), Math.min(bx1, bx2));
+    const hi = Math.min(Math.max(ax1, ax2), Math.max(bx1, bx2));
+    return hi - lo > 1;
+  }
+  const aVert = Math.abs(ax1 - ax2) < 0.5;
+  const bVert = Math.abs(bx1 - bx2) < 0.5;
+  if (aVert && bVert && Math.abs(ax1 - bx1) < NEAR_PARALLEL_TOL) {
+    const lo = Math.max(Math.min(ay1, ay2), Math.min(by1, by2));
+    const hi = Math.min(Math.max(ay1, ay2), Math.max(by1, by2));
+    return hi - lo > 1;
+  }
+  return false;
+}
+
+/** Foreign-segment interval index for near-parallel lookups inside ONE A*
+ *  search (occupancy is frozen while a search runs, so the index is built
+ *  once per search). Horizontal segments bucket by rounded line-y, vertical
+ *  by rounded line-x; a relaxed edge then checks the ±NEAR_PARALLEL_TOL
+ *  buckets instead of scanning every occupied segment — the near-parallel
+ *  cost sits in the A* hot loop, where an O(segments) scan per edge
+ *  relaxation multiplies into seconds on the big reference fixtures. */
+interface NearParallelIndex {
+  horizByY: Map<number, { line: number; lo: number; hi: number }[]>;
+  vertByX: Map<number, { line: number; lo: number; hi: number }[]>;
+}
+
+function buildNearParallelIndex(
+  segments: OccupancyState['segments'],
+  ownPortKey: string
+): NearParallelIndex {
+  const horizByY = new Map<number, { line: number; lo: number; hi: number }[]>();
+  const vertByX = new Map<number, { line: number; lo: number; hi: number }[]>();
+  const add = (
+    map: NearParallelIndex['horizByY'],
+    line: number, a: number, b: number
+  ) => {
+    const key = Math.round(line);
+    const entry = { line, lo: Math.min(a, b), hi: Math.max(a, b) };
+    const list = map.get(key);
+    if (list) list.push(entry);
+    else map.set(key, [entry]);
+  };
+  for (const seg of segments) {
+    if (seg.sourcePortKey === ownPortKey) continue; // fan-out trunks are legitimate
+    if (Math.abs(seg.y1 - seg.y2) < 0.5) add(horizByY, seg.y1, seg.x1, seg.x2);
+    else if (Math.abs(seg.x1 - seg.x2) < 0.5) add(vertByX, seg.x1, seg.y1, seg.y2);
+  }
+  return { horizByY, vertByX };
+}
+
+/** Does an axis-aligned edge near-overlap any indexed foreign segment?
+ *  Same predicate as segmentsNearOverlap, served from the bucket index. */
+function edgeNearOverlaps(
+  index: NearParallelIndex,
+  x1: number, y1: number, x2: number, y2: number
+): boolean {
+  const horiz = Math.abs(y1 - y2) < 0.5;
+  const map = horiz ? index.horizByY : index.vertByX;
+  const line = horiz ? y1 : x1;
+  const lo = horiz ? Math.min(x1, x2) : Math.min(y1, y2);
+  const hi = horiz ? Math.max(x1, x2) : Math.max(y1, y2);
+  const center = Math.round(line);
+  for (let key = center - NEAR_PARALLEL_TOL; key <= center + NEAR_PARALLEL_TOL; key++) {
+    const list = map.get(key);
+    if (!list) continue;
+    for (const entry of list) {
+      if (Math.abs(entry.line - line) >= NEAR_PARALLEL_TOL) continue;
+      if (Math.min(entry.hi, hi) - Math.max(entry.lo, lo) > 1) return true;
+    }
+  }
+  return false;
+}
 
 /** Check if two collinear axis-aligned segments overlap (for H1 validation) */
 function segmentsOverlap(
@@ -1136,11 +1412,6 @@ function findCrossingPoints(
 
 /** VISUAL_VOCAB: a split is drawn as a dot at the junction — r=4, #333. */
 export const SPLIT_DOT_RADIUS = 4;
-
-/** Radius of the crossing bump arc. Must match pathDWithBumps' R in
- *  CircuitCanvas.tsx — a dot within (bump + dot) radius of a crossing would
- *  be drawn on top of the arc, so findDivergencePoints skips it. */
-const CROSSING_BUMP_RADIUS = 5;
 
 /** A displayed (rendered) wire path: what the student actually sees —
  *  routed points AFTER manual segment offsets are applied. */
@@ -1239,13 +1510,30 @@ export function findDivergencePoints(
   return dots;
 }
 
-/** Check if a path passes through any element bounds */
-function isPathBlockedByBounds(path: Point[], bounds: Bounds[]): boolean {
+/** Check if a path passes through any element bounds.
+ *
+ *  With `ownComps`, the wire's own endpoint components are exempt on the
+ *  first and last segments — mirroring the layout oracle's own-stub
+ *  exemption (layoutCheck.ts). On a SIMPLIFIED path the first segment is
+ *  the source stub merged with its collinear approach run (A* forces the
+ *  first move along the stub direction and the arrival along the target
+ *  stub axis, so stub + approach always merge), likewise the last — so
+ *  exempting exactly these two segments covers the whole own-endpoint
+ *  landing and nothing more. */
+function isPathBlockedByBounds(
+  path: Point[],
+  bounds: Bounds[],
+  ownComps?: OwnComponents
+): boolean {
   for (let i = 0; i < path.length - 1; i++) {
     const a = path[i];
     const b = path[i + 1];
-    for (const bound of bounds) {
-      if (segmentIntersectsBounds(a.x, a.y, b.x, b.y, bound)) return true;
+    for (let bi = 0; bi < bounds.length; bi++) {
+      if (ownComps) {
+        if (i === 0 && bi === ownComps.sourceIdx) continue;
+        if (i === path.length - 2 && bi === ownComps.targetIdx) continue;
+      }
+      if (segmentIntersectsBounds(a.x, a.y, b.x, b.y, bounds[bi])) return true;
     }
   }
   return false;
@@ -1265,6 +1553,7 @@ function updateOccupancy(
       x1: path[i].x, y1: path[i].y,
       x2: path[i + 1].x, y2: path[i + 1].y,
       wireId,
+      sourcePortKey,
     });
   }
 
