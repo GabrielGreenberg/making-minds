@@ -23,13 +23,12 @@ broken variant needed). Both also require appearance checked against
 [VISUAL_VOCAB.md](VISUAL_VOCAB.md). Tier lives on the manifest row; all 10
 remaining rows are tier `interface`.
 
-**As of 2026-07-07 (post-iteration 22; audited iteration 23):** harness live with two tiers,
-**46/56 exact-verified** (ALL arithmetic HW1–HW5 + ALL perception hw2-p10..p12
-+ hw3-p11..p12, promoted from main's devData samples at exact tier — correct
-answers were free), 10 pending at the interface tier, 0 regressed. Remaining
-pending: navigation (hw2/hw3/hw4 ×3 each), HW6 turbot-TM capstone (1).
-**Do not chase correct answers for these** — the bar is a plausible attempt
-through the full pipeline (free correct machines excepted).
+**As of 2026-07-07 (post-iteration 24):** **46 exact + 9 interface = 55/56
+at-tier**, 1 pending (hw6-p2, the Desert Ant capstone), 0 regressed, 0
+warnings. ALL navigation rows landed at interface tier with honest reported
+scores; the step-limit/criterion grader fix (criterionRequiresStop —
+pass-through is trace-satisfiable per HW2 §III's Pac-Man rule) landed with
+them. Only the capstone remains.
 
 ## Columns
 
@@ -51,7 +50,7 @@ validates + grades end-to-end) · `appr` = appearance matches VISUAL_VOCAB.
 | hw1-p16 | M: successor of tal(I), 1-in → 2-out | arithmetic | ✅ | ✅ | ✅ | ✅ | ✅ | `reference/hw1-p16.json`; canonical tally forces O1=1, O2=I (PDF's position-insensitive tal() nuance noted in LOG); broken emits non-canonical `01` |
 | hw1-p17 | N: successor of bin(I), 1-in → 2-out | arithmetic | ✅ | ✅ | ✅ | ✅ | ✅ | `reference/hw1-p17.json`; one 2-wide output group (OUT1 = MSB); broken = endianness swap |
 
-### HW2 — Computing with CCs  ·  10/13
+### HW2 — Computing with CCs  ·  13/13 (10 exact + 3 interface) ✅-at-tier
 
 | id | problem | category | auth | build | grades | appr | status | notes |
 |----|---------|----------|:----:|:-----:|:------:|:----:|:------:|-------|
@@ -65,11 +64,11 @@ validates + grades end-to-end) · `appr` = appearance matches VISUAL_VOCAB.
 | hw2-p10 | edge detector (≥3 consecutive 1s) | perception | ✅ | ✅ | ✅ | ✅ | ✅ | `reference/hw2-p10.json`; devData Q9 (min-run 3, w8) promoted at exact tier; 256-case exhaustive bank; broken (OR-all) fails 148/256 |
 | hw2-p11 | object detector (exactly 3 consecutive 1s) | perception | ✅ | ✅ | ✅ | ✅ | ✅ | `reference/hw2-p11.json`; devData Q10 (exact-run 3, w8); broken (= the ≥3 detector) fails 46/256; appr ✅ (its 6-bumpless-crossing renderer residual — router lane hugging the port column, inside pathDWithBumps' 5px skip — was P1.8 S3's exhibit; resolved by S3's own-endpoint exemption + H4 round, bump-clean since `d0214ec`, pinned by `tools/bumpCheck.ts` in `npm run check`) |
 | hw2-p12 | landmark recognition (= 110010111) | perception | ✅ | ✅ | ✅ | ✅ | ✅ | `reference/hw2-p12.json`; devData Q11 (pattern, w9 — width follows the pattern; 8-in schematic question resolved); 512-case bank; broken (AND-all) fails exactly the 2 pattern-adjacent cases |
-| hw2-p13 | spiral (CC turbot, pass-through) | navigation | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | |
-| hw2-p14 | full circle (CC turbot, pass-through) | navigation | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | |
-| hw2-p15 | zig-zag (CC turbot, pass-through) | navigation | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | |
+| hw2-p13 | spiral (CC turbot, pass-through) | navigation | ✅ | ✅ | ◐ | ✅ | ◐ | `reference/hw2-p13.json`; 2-arena spiral family; textbook left-turn reflex brain scores 2/2 (post step-limit fix); interface tier |
+| hw2-p14 | full circle (CC turbot, pass-through) | navigation | ✅ | ✅ | ◐ | ✅ | ◐ | `reference/hw2-p14.json`; 2 bordered rooms, goal a full lap behind; reflex brain 2/2; interface tier |
+| hw2-p15 | zig-zag (CC turbot, pass-through) | navigation | ✅ | ✅ | ◐ | ✅ | ◐ | `reference/hw2-p15.json`; 2 Z-corridors; memoryless reflex scores 0/2 — the course answer (no CC can take the opposite turn); honest interface exhibit |
 
-### HW3 — Computing with SCs  ·  11/14
+### HW3 — Computing with SCs  ·  14/14 (11 exact + 3 interface) ✅-at-tier
 
 | id | problem | category | auth | build | grades | appr | status | notes |
 |----|---------|----------|:----:|:-----:|:------:|:----:|:------:|-------|
@@ -84,13 +83,13 @@ validates + grades end-to-end) · `appr` = appearance matches VISUAL_VOCAB.
 | hw3-p9  | x+y T (feasible) | arithmetic | ✅ | ✅ | ✅ | ✅ | ✅ | `reference/hw3-p9.json`; counter/latch over 81-case bank; layout uses the p7 right-to-left MEM-chain convention |
 | hw3-p11 | change detector (current ≠ previous) | perception | ✅ | ✅ | ✅ | ✅ | ✅ | `reference/hw3-p11.json`; devData Q12 promoted at exact tier; per-lane XOR-vs-MEM + OR fold; broken (memoryless OR) fails 7/8; temporal semantics adversarially probed; bumpCheck CLEAN; routed fallback-free since the own-endpoint exemption erased the structural XOR floor (2026-07-07, P1.8 S3; was 48 pinned fallbacks) |
 | hw3-p12 | motion detector (object image moving up) | perception | ✅ | ✅ | ✅ | ✅ | ✅ | `reference/hw3-p12.json`; devData Q13 (motion k=3) promoted at exact tier; 146-comp PLA-matrix layout, ROTATED MEMs (sanctioned), 0 router fallbacks; broken fails 6/9; its 17 bumpless crossings (P1.8 S3 class) resolved by S3 — bump-clean since `d0214ec`; 2 cosmetic appr findings still open (toggle-tab elbow — router obstacle gap, P1.8 leftover; rotated-MEM label bisection, P1.16) |
-| hw3-p13 | zig-zag: reach & keep going | navigation | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | SC turbot, pass-through |
-| hw3-p14 | three ahead: reach & stop | navigation | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | SC turbot, reach-and-stop |
-| hw3-p15 | Mad Max: block ahead unknown dist, return & stop | navigation | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | return-to-start; **multi-arena + memory**; P4.2 gave the criterion teeth — mark the sensing spot (cell before the block) as the GOAL so the trace must visit it before returning (else any out-and-back, or never moving, passes) |
+| hw3-p13 | zig-zag: reach goal & keep going | navigation | ✅ | ✅ | ◐ | ✅ | ◐ | `reference/hw3-p13.json`; PDF 9×9 staircase + 6×6 family member; SC XOR-toggle alternating-turn brain 2/2; MEM rotated 270° after a router-budget fix (0 fallbacks) |
+| hw3-p14 | three ahead: reach goal & stop | navigation | ✅ | ✅ | ◐ | ✅ | ◐ | `reference/hw3-p14.json`; 3 open-field embeddings (N/E/S facings); 3-stage MEM shift-register timer, correct by construction — 3/3 free |
+| hw3-p15 | Mad Max: block ahead unknown distance, return & stop | navigation | ✅ | ✅ | ◐ | ✅ | ◐ | `reference/hw3-p15.json`; REAL generality family (distances 3/4/8, facings N/E/S; goal = sensing spot per P4.2); good-faith SC attempt 1/3 (overshoots to far wall) — honest bank for the correct-answers project |
 
 _Note: HW3 #10 (x·y B) is an impossibility argument (not SC-computable) — excluded._
 
-### HW4 — Computing with FSMs  ·  9/12 (arithmetic complete)
+### HW4 — Computing with FSMs  ·  12/12 (9 exact + 3 interface) ✅-at-tier (arithmetic complete)
 
 | id | problem | category | auth | build | grades | appr | status | notes |
 |----|---------|----------|:----:|:-----:|:------:|:----:|:------:|-------|
@@ -103,9 +102,9 @@ _Note: HW3 #10 (x·y B) is an impossibility argument (not SC-computable) — exc
 | hw4-p9  | 2x+1 B | arithmetic | ✅ | ✅ | ✅ | ✅ | ✅ | `reference/hw4-p9.json`; 3-state; appr ✅ after P1.13 (202px separation) |
 | hw4-p10 | 2(x+1) B | arithmetic | ✅ | ✅ | ✅ | ✅ | ✅ | `reference/hw4-p10.json`; 3-state delayed increment; appr ✅ after P1.13 |
 | hw4-p11 | x+y B | arithmetic | ✅ | ✅ | ✅ | ✅ | ✅ | `reference/hw4-p11.json`; 2-state serial adder, k=2 labels `xy:o` via the P1.12 notation seam; 128/128 correct, broken 57%; hand-placed `fsmControlPt` dodges the P1.13 arc defect; k=2 label editor verified in-browser |
-| hw4-p12 | zig-zag: reach & keep going | navigation | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | FSM turbot; **needs 2-bit motor F/S/R/L** |
-| hw4-p13 | three ahead: reach & stop | navigation | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | FSM turbot; needs 2-bit motor |
-| hw4-p14 | way finder: any non-branching maze | navigation | ⬜ | ⬜ | ⬜ | ⬜ | ⬜ | general solver; **multi-arena** |
+| hw4-p12 | zig-zag: reach goal & keep going | navigation | ✅ | ✅ | ◐ | ✅ | ◐ | `reference/hw4-p12.json`; 4-state FSM in the PDF's printed notation (NOTE: hw4.pdf prints the notation + one example machine, NOT a full zig-zag solution — record corrected); 2/2 |
+| hw4-p13 | three ahead: reach goal & stop | navigation | ✅ | ✅ | ◐ | ✅ | ◐ | `reference/hw4-p13.json`; 4-state counter FSM (3× forward then stop); 2/2, stops ON the goal |
+| hw4-p14 | way finder: any non-branching maze | navigation | ✅ | ✅ | ◐ | ✅ | ◐ | `reference/hw4-p14.json`; try-left/else-right-right/else-stop follower; 3 pairwise-distinct mazes (corners both directions); 3/3 |
 
 _Note: HW4 #1–2 (state abstraction / multiple realizability) are analysis essays — excluded._
 
@@ -135,5 +134,5 @@ _Note: HW6 #1 & #3 (flowchart / life-cycle prose) are excluded._
 
 ---
 
-**Totals:** 46 / 56 exact-verified · 10 pending (interface tier) — the harness
-JSON is authoritative.
+**Totals:** 46 exact + 9 interface = 55 / 56 at-tier · 1 pending (hw6-p2) —
+the harness JSON is authoritative.

@@ -705,6 +705,20 @@ The platform supports automatic grading of student submissions. The evaluation s
     distance (Mad Max) gradable: without a visit requirement, a turbot that
     never moves (or blindly retraces any fixed walk) would pass. Goal-less
     arenas keep the plain end-at-start reading.
+- The step limit bounds *simulation*, not success. Criteria split on what a
+  step-limited (truncated) run means:
+  - **Stop-requiring criteria** (reach-and-stop; return-to-start) judge how
+    the run *ends*, so a turbot that never came to rest within the budget
+    fails outright ("exceeded max steps") — its final position is just where
+    simulation was cut off.
+  - **Trace-satisfiable criteria** (pass-through) are judged on the position
+    trace the simulation produced, step limit or no: the turbot completes
+    navigation by *crossing* the goal and need not stop (HW2 §III's Pac-Man
+    rule). This is structural, not lenient — a memoryless CC brain can never
+    emit motor 00, so every CC pass-through run ends at the step limit; the
+    limit failing such runs would auto-fail the textbook's own answers. A
+    truncated run whose trace never crossed the goal still fails, for the
+    criterion's reason (not the step limit's).
 - The grader reports: success/failure, number of steps taken, final position
 
 ### 12.6 TM Evaluation (Phase 5+)

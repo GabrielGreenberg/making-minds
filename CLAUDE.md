@@ -14,7 +14,20 @@ Claude to load into context).
 >
 > A change isn't finished until the docs that describe it are too.
 
-_Last updated: 2026-07-07 (**sim-state reset extended to every sandbox canvas swap** — the
+_Last updated: 2026-07-07 (**turbot navigation: nine reference questions + the step-limit/criterion
+fix** — the buildout landed interface-tier reference fixtures for every HW2/HW3/HW4 navigation
+problem (arena families transcribed from the PDFs; plausible CC/SC/FSM brains with honest
+reported scores), which exposed and fixed a real grading defect: `gradeTurbotCase` failed any
+step-limited run BEFORE consulting the criterion, making pass-through questions (HW2 §III's
+Pac-Man rule — crossing the goal completes navigation, no stop needed) unpassable for
+memoryless CC brains. New engine seam `criterionRequiresStop(criterion)` (engine/turbot.ts,
+beside evaluateTurbotCriterion): pass-through is judged on the trace with the step limit
+bounding only the simulation; reach-and-stop / return-to-start keep exact prior behavior.
+Honest reasons name the unsatisfied criterion, spec §12.5 records the rule, turbotCheck gains
+a 7-pin [pass-through step-limit] section, and `TurbotCaseResult.pass === true` with
+`hitStepLimit === true` is now a legitimate shape (UI note: render as "simulated full budget",
+not an error). Coverage ledger: 46 exact + 9 interface = 55/56 at-tier; only the HW6 Desert
+Ant capstone remains. Earlier same day, **sim-state reset extended to every sandbox canvas swap** — the
 sandbox had the same leak class the question-navigation fix (below) closed: `switchTab`
 swapped the canvas but reset no transient sim state, so one tab's SC/FSM/TM run or turbot
 pose rendered against the next tab's circuit. Every sandbox/workbook canvas swap now calls

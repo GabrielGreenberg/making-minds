@@ -548,6 +548,89 @@ check('memoryless SC turbot fails the L course',
   scMemorylessGraded.questions[0].passed === 0 &&
   (scMemorylessGraded.questions[0].turbotCases ?? []).length === 1);
 
+// ── pass-through vs the step limit (P4.3) ───────────────────────────
+// The step limit bounds SIMULATION; whether a truncated run fails is the
+// criterion's call (criterionRequiresStop, engine/turbot.ts). pass-through
+// is trace-satisfiable — HW2 §III's Pac-Man rule: the turbot completes
+// navigation by CROSSING the goal and "need not stop" — and a memoryless CC
+// brain can never emit motor 00, so every CC pass-through run ends at the
+// step limit. Truncation must not trump a criterion the trace satisfied.
+// Stop-requiring criteria (reach-and-stop; return-to-start) keep failing
+// outright on truncation: the turbot never came to rest.
+console.log('\n[pass-through step-limit]');
+{
+  const gradeOneCase = (
+    innerMode: 'CC' | 'FSM',
+    circuit: { components: CircuitComponent[]; wires: Wire[] },
+    arena: ArenaConfig,
+    criterion: 'reach-and-stop' | 'pass-through' | 'return-to-start',
+    maxSteps: number
+  ) => {
+    const a: AssignmentData = {
+      id: 'step-limit-smoke',
+      title: 'Step-limit smoke',
+      questions: [{
+        id: 1,
+        label: 'Q1 (step limit)',
+        statement: 'Criterion vs step limit.',
+        buildMode: 'turbot',
+        innerMode,
+        representation: 'binary',
+        turbot_cases: [{ arena, maxSteps, criterion }],
+      }],
+    };
+    const r = gradeSubmission(a, {
+      assignmentTitle: a.title,
+      student: 'steplimit@example.com',
+      submittedAt: '2026-07-07T00:00:00Z',
+      answers: [{ questionId: 1, circuit }],
+    }).questions[0];
+    return { passed: r.passed, case: r.turbotCases?.[0] };
+  };
+
+  // (i) A never-stopping brain whose trace crosses the goal PASSES a
+  // pass-through arena despite hitStepLimit. The FSM turner (never emits 00)
+  // walks over the mid-corridor goal, then pivots at the east wall forever.
+  const turnerPass = gradeOneCase('FSM', fsmTurnerBrain(), corridor(4, 2), 'pass-through', 12);
+  check('never-stopping FSM turner passes pass-through despite the step limit',
+    turnerPass.passed === 1 && turnerPass.case?.pass === true && turnerPass.case?.hitStepLimit === true);
+  check('a criterion-satisfied step-limited case carries no misleading reason',
+    turnerPass.case?.reason === undefined);
+  // The hw2-p13 exhibit shape: a memoryless CC reflex brain truncated long
+  // before any wall (it CANNOT stop within budget) still passes on the trace.
+  const ccPass = gradeOneCase('CC', ccForwardBrain(), corridor(1000, 2), 'pass-through', 5);
+  check('memoryless CC brain truncated mid-corridor passes pass-through on the trace',
+    ccPass.passed === 1 && ccPass.case?.pass === true && ccPass.case?.hitStepLimit === true);
+
+  // (ii) A never-stopping brain that never crosses the goal still FAILS —
+  // and the reason names the criterion, not the step limit (the limit is
+  // not why it failed; the trace is). A block seals the goal off: the
+  // turner pivots at the start forever.
+  const sealedArena: ArenaConfig = {
+    width: 3,
+    height: 1,
+    cells: [['empty', 'block', 'goal']],
+    start: { x: 0, y: 0, facing: 'E' },
+  };
+  const turnerFail = gradeOneCase('FSM', fsmTurnerBrain(), sealedArena, 'pass-through', 12);
+  check('never-stopping turner that never crosses the goal still fails',
+    turnerFail.passed === 0 && turnerFail.case?.pass === false && turnerFail.case?.hitStepLimit === true);
+  check('the failure reason names the criterion, not the step limit',
+    turnerFail.case?.reason === "'pass-through' criterion not satisfied within max steps");
+
+  // (iii) reach-and-stop + hitStepLimit still fails even though the trace
+  // visited the goal: the criterion judges the END of the run.
+  const reachFail = gradeOneCase('FSM', fsmTurnerBrain(), corridor(4, 2), 'reach-and-stop', 12);
+  check('reach-and-stop still fails a step-limited run even with the goal in-trace',
+    reachFail.passed === 0 && reachFail.case?.hitStepLimit === true && reachFail.case?.reason === 'exceeded max steps');
+
+  // (iv) return-to-start + hitStepLimit still fails — even pivoting in place
+  // ON the start cell: truncation means the turbot never came to rest there.
+  const returnFail = gradeOneCase('FSM', fsmTurnerBrain(), boxed1x1, 'return-to-start', 8);
+  check('return-to-start still fails a step-limited run even sitting on the start',
+    returnFail.passed === 0 && returnFail.case?.hitStepLimit === true && returnFail.case?.reason === 'exceeded max steps');
+}
+
 // ── multi-arena: navigation grading requires EVERY arena (P4.2) ──────
 // Navigation problems promise generality — Mad Max (hw3-p15) puts the block
 // at an UNKNOWN distance, so a question's `turbot_cases` is a FAMILY of

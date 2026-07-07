@@ -1,0 +1,632 @@
+{
+  "question": {
+    "id": 15,
+    "label": "Problem 15",
+    "statement": "Mad Max. A block sits directly ahead of the turbot, an unknown distance away. Build a sequential circuit brain that drives the turbot out to the block, then turns around, returns to the starting point, and stops there. There are no blocks or markers at the starting point. The brain has one sensor input and two outputs, one for each wheel.",
+    "buildMode": "turbot",
+    "representation": "binary",
+    "innerMode": "SC",
+    "turbot_cases": [
+      {
+        "arena": {
+          "width": 3,
+          "height": 5,
+          "cells": [
+            [
+              "empty",
+              "block",
+              "empty"
+            ],
+            [
+              "empty",
+              "goal",
+              "empty"
+            ],
+            [
+              "empty",
+              "empty",
+              "empty"
+            ],
+            [
+              "empty",
+              "empty",
+              "empty"
+            ],
+            [
+              "empty",
+              "empty",
+              "empty"
+            ]
+          ],
+          "start": {
+            "x": 1,
+            "y": 4,
+            "facing": "N"
+          }
+        },
+        "maxSteps": 40,
+        "criterion": "return-to-start"
+      },
+      {
+        "arena": {
+          "width": 8,
+          "height": 3,
+          "cells": [
+            [
+              "empty",
+              "empty",
+              "empty",
+              "empty",
+              "empty",
+              "empty",
+              "empty",
+              "empty"
+            ],
+            [
+              "empty",
+              "empty",
+              "empty",
+              "empty",
+              "empty",
+              "empty",
+              "goal",
+              "block"
+            ],
+            [
+              "empty",
+              "empty",
+              "empty",
+              "empty",
+              "empty",
+              "empty",
+              "empty",
+              "empty"
+            ]
+          ],
+          "start": {
+            "x": 2,
+            "y": 1,
+            "facing": "E"
+          }
+        },
+        "maxSteps": 40,
+        "criterion": "return-to-start"
+      },
+      {
+        "arena": {
+          "width": 3,
+          "height": 12,
+          "cells": [
+            [
+              "empty",
+              "empty",
+              "empty"
+            ],
+            [
+              "empty",
+              "empty",
+              "empty"
+            ],
+            [
+              "empty",
+              "empty",
+              "empty"
+            ],
+            [
+              "empty",
+              "empty",
+              "empty"
+            ],
+            [
+              "empty",
+              "empty",
+              "empty"
+            ],
+            [
+              "empty",
+              "empty",
+              "empty"
+            ],
+            [
+              "empty",
+              "empty",
+              "empty"
+            ],
+            [
+              "empty",
+              "empty",
+              "empty"
+            ],
+            [
+              "empty",
+              "empty",
+              "empty"
+            ],
+            [
+              "empty",
+              "empty",
+              "empty"
+            ],
+            [
+              "empty",
+              "goal",
+              "empty"
+            ],
+            [
+              "empty",
+              "block",
+              "empty"
+            ]
+          ],
+          "start": {
+            "x": 1,
+            "y": 2,
+            "facing": "S"
+          }
+        },
+        "maxSteps": 40,
+        "criterion": "return-to-start"
+      }
+    ]
+  },
+  "correct": {
+    "components": [
+      {
+        "id": "hw3-p15-in1",
+        "type": "INPUT",
+        "x": 80,
+        "y": 360,
+        "label": "IN1",
+        "ports": [
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "hw3-p15-m1",
+        "type": "MEM",
+        "x": 200,
+        "y": 60,
+        "label": "M1",
+        "ports": [
+          {
+            "id": "mout",
+            "label": "M_OUT",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "min",
+            "label": "M_IN",
+            "side": "right",
+            "index": 0
+          }
+        ],
+        "memDirection": "right-to-left",
+        "storedValue": 0
+      },
+      {
+        "id": "hw3-p15-m2",
+        "type": "MEM",
+        "x": 200,
+        "y": 620,
+        "label": "M2",
+        "ports": [
+          {
+            "id": "mout",
+            "label": "M_OUT",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "min",
+            "label": "M_IN",
+            "side": "right",
+            "index": 0
+          }
+        ],
+        "memDirection": "right-to-left",
+        "storedValue": 0
+      },
+      {
+        "id": "hw3-p15-nota",
+        "type": "NOT",
+        "x": 380,
+        "y": 100,
+        "label": "",
+        "ports": [
+          {
+            "id": "in",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "hw3-p15-andl",
+        "type": "AND",
+        "x": 380,
+        "y": 220,
+        "label": "",
+        "ports": [
+          {
+            "id": "in1",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "in2",
+            "label": "",
+            "side": "left",
+            "index": 1
+          },
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "hw3-p15-nots",
+        "type": "NOT",
+        "x": 380,
+        "y": 360,
+        "label": "",
+        "ports": [
+          {
+            "id": "in",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "hw3-p15-notb",
+        "type": "NOT",
+        "x": 380,
+        "y": 500,
+        "label": "",
+        "ports": [
+          {
+            "id": "in",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "hw3-p15-ora",
+        "type": "OR",
+        "x": 380,
+        "y": 780,
+        "label": "",
+        "ports": [
+          {
+            "id": "in1",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "in2",
+            "label": "",
+            "side": "left",
+            "index": 1
+          },
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "hw3-p15-andnn",
+        "type": "AND",
+        "x": 560,
+        "y": 100,
+        "label": "",
+        "ports": [
+          {
+            "id": "in1",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "in2",
+            "label": "",
+            "side": "left",
+            "index": 1
+          },
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "hw3-p15-notl",
+        "type": "NOT",
+        "x": 560,
+        "y": 220,
+        "label": "",
+        "ports": [
+          {
+            "id": "in",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "hw3-p15-andr",
+        "type": "AND",
+        "x": 560,
+        "y": 420,
+        "label": "",
+        "ports": [
+          {
+            "id": "in1",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "in2",
+            "label": "",
+            "side": "left",
+            "index": 1
+          },
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "hw3-p15-andb",
+        "type": "AND",
+        "x": 740,
+        "y": 260,
+        "label": "",
+        "ports": [
+          {
+            "id": "in1",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "in2",
+            "label": "",
+            "side": "left",
+            "index": 1
+          },
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "hw3-p15-out1",
+        "type": "OUTPUT",
+        "x": 940,
+        "y": 240,
+        "label": "OUT1",
+        "ports": [
+          {
+            "id": "in",
+            "label": "",
+            "side": "left",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "hw3-p15-out2",
+        "type": "OUTPUT",
+        "x": 940,
+        "y": 440,
+        "label": "OUT2",
+        "ports": [
+          {
+            "id": "in",
+            "label": "",
+            "side": "left",
+            "index": 0
+          }
+        ]
+      }
+    ],
+    "wires": [
+      {
+        "id": "hw3-p15-w1",
+        "sourceComponentId": "hw3-p15-in1",
+        "sourcePortId": "out",
+        "targetComponentId": "hw3-p15-nots",
+        "targetPortId": "in",
+        "value": 0
+      },
+      {
+        "id": "hw3-p15-w2",
+        "sourceComponentId": "hw3-p15-in1",
+        "sourcePortId": "out",
+        "targetComponentId": "hw3-p15-andl",
+        "targetPortId": "in2",
+        "value": 0
+      },
+      {
+        "id": "hw3-p15-w3",
+        "sourceComponentId": "hw3-p15-in1",
+        "sourcePortId": "out",
+        "targetComponentId": "hw3-p15-andb",
+        "targetPortId": "in2",
+        "value": 0
+      },
+      {
+        "id": "hw3-p15-w4",
+        "sourceComponentId": "hw3-p15-m1",
+        "sourcePortId": "mout",
+        "targetComponentId": "hw3-p15-nota",
+        "targetPortId": "in",
+        "value": 0
+      },
+      {
+        "id": "hw3-p15-w5",
+        "sourceComponentId": "hw3-p15-m1",
+        "sourcePortId": "mout",
+        "targetComponentId": "hw3-p15-andl",
+        "targetPortId": "in1",
+        "value": 0
+      },
+      {
+        "id": "hw3-p15-w6",
+        "sourceComponentId": "hw3-p15-m1",
+        "sourcePortId": "mout",
+        "targetComponentId": "hw3-p15-ora",
+        "targetPortId": "in1",
+        "value": 0
+      },
+      {
+        "id": "hw3-p15-w7",
+        "sourceComponentId": "hw3-p15-m2",
+        "sourcePortId": "mout",
+        "targetComponentId": "hw3-p15-notb",
+        "targetPortId": "in",
+        "value": 0
+      },
+      {
+        "id": "hw3-p15-w8",
+        "sourceComponentId": "hw3-p15-m2",
+        "sourcePortId": "mout",
+        "targetComponentId": "hw3-p15-ora",
+        "targetPortId": "in2",
+        "value": 0
+      },
+      {
+        "id": "hw3-p15-w9",
+        "sourceComponentId": "hw3-p15-andl",
+        "sourcePortId": "out",
+        "targetComponentId": "hw3-p15-notl",
+        "targetPortId": "in",
+        "value": 0
+      },
+      {
+        "id": "hw3-p15-w10",
+        "sourceComponentId": "hw3-p15-notl",
+        "sourcePortId": "out",
+        "targetComponentId": "hw3-p15-out1",
+        "targetPortId": "in",
+        "value": 0
+      },
+      {
+        "id": "hw3-p15-w11",
+        "sourceComponentId": "hw3-p15-nots",
+        "sourcePortId": "out",
+        "targetComponentId": "hw3-p15-andr",
+        "targetPortId": "in1",
+        "value": 0
+      },
+      {
+        "id": "hw3-p15-w12",
+        "sourceComponentId": "hw3-p15-notb",
+        "sourcePortId": "out",
+        "targetComponentId": "hw3-p15-andr",
+        "targetPortId": "in2",
+        "value": 0
+      },
+      {
+        "id": "hw3-p15-w13",
+        "sourceComponentId": "hw3-p15-andr",
+        "sourcePortId": "out",
+        "targetComponentId": "hw3-p15-out2",
+        "targetPortId": "in",
+        "value": 0
+      },
+      {
+        "id": "hw3-p15-w14",
+        "sourceComponentId": "hw3-p15-ora",
+        "sourcePortId": "out",
+        "targetComponentId": "hw3-p15-m1",
+        "targetPortId": "min",
+        "value": 0
+      },
+      {
+        "id": "hw3-p15-w15",
+        "sourceComponentId": "hw3-p15-nota",
+        "sourcePortId": "out",
+        "targetComponentId": "hw3-p15-andnn",
+        "targetPortId": "in1",
+        "value": 0
+      },
+      {
+        "id": "hw3-p15-w16",
+        "sourceComponentId": "hw3-p15-notb",
+        "sourcePortId": "out",
+        "targetComponentId": "hw3-p15-andnn",
+        "targetPortId": "in2",
+        "value": 0
+      },
+      {
+        "id": "hw3-p15-w17",
+        "sourceComponentId": "hw3-p15-andnn",
+        "sourcePortId": "out",
+        "targetComponentId": "hw3-p15-andb",
+        "targetPortId": "in1",
+        "value": 0
+      },
+      {
+        "id": "hw3-p15-w18",
+        "sourceComponentId": "hw3-p15-andb",
+        "sourcePortId": "out",
+        "targetComponentId": "hw3-p15-m2",
+        "targetPortId": "min",
+        "value": 0
+      }
+    ]
+  }
+}

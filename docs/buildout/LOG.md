@@ -1047,3 +1047,51 @@ extension completing the same contract). No unifying task needed.
 
 **Next:** P4.3 — navigation arenas + plausible brains (unchanged); audit due
 again ~iteration 28.
+
+## 2026-07-07 (iteration 24) — P4.3: all nine navigation rows land · 55/56 at-tier · pass-through grader fixed
+
+**Shipped:** the last fixture batch. 9-agent workflow (hw2-p14's agent died on
+an API overload; the workflow resume re-ran ONLY it — 8 cached results
+returned instantly), interface tier throughout: arena families transcribed
+from the HW PDFs, plausible brains proven headlessly (Stage-1 + end-to-end
+grade + lint + oracle/bumpCheck where the manifest mode is CC/SC). Harness:
+**46 exact · 9 interface · 1 pending · 0 regressed · 0 warnings** — the first
+◐ rows, scores REPORTED: 2/2, 2/2, 0/2, 2/2, 3/3, 1/3, 2/2, 2/2, 3/3.
+
+**The batch's discovery — and the iteration's real fix:** gradeTurbotCase
+failed ANY hitStepLimit run BEFORE consulting the criterion, so pass-through
+questions (HW2 §III: crossing the goal completes navigation, "think of
+Pac-Man") were structurally unpassable for memoryless CC brains (they can
+never emit motor 00). hw2-p13's textbook reflex crossed the goal at step 14
+and scored 0/2. Deep fix at the engine seam: `criterionRequiresStop()`
+classifies criteria (pass-through = trace-satisfiable; the step limit bounds
+SIMULATION, not success — spec §12.5 records it); stop-requiring criteria
+byte-identical (all 12 [multi-arena] pins untouched); 7 new [pass-through
+step-limit] pins; honest reasons (criterion named, not the limit); server
+gates green. Post-fix, hw2-p13/p14 report 2/2; hw2-p15 stays 0/2 — the course
+answer (no memoryless CC takes the Z's opposite turn), an honest exhibit.
+
+**Adversarial verification:** all 9 CONFIRMED + the grader change CONFIRMED
+with independent probes (reach-and-stop + limit still fails; goal-less
+pass-through fails with the criterion reason). It also caught what the main
+session's own gate run MASKED — piping `npm run check` through grep swallowed
+routerCheck's exit 1 (hw3-p13's MEM feedback pair took 2 congestion-starved
+fallbacks). Ops lesson recorded: judge gates by exit code, never a piped
+tail. Fix: ONE move+rotate (M1 → 270°, the hw3-p12 technique), 0 fallbacks,
+no pin edits. Record corrections from the verifier: hw4.pdf prints the FSM
+notation + ONE example machine (not a full zig-zag solution); hw3.pdf's
+"combinatorial" header is a PDF typo (Note 1 says SC).
+
+**Appearance (browser):** 9/9 CLEAN — arenas simulate (step/run/pause/reset,
+sensor/motor readouts, stops ON goals where the brain stops), FSM rows
+conform (canonical 0:11 labels, separated opposite arcs, no initial-state
+marker). Three pre-existing app-wide observations folded into P6.1's scope
+(arena-turbot color vs vocab, no live-state highlight during arena runs, SC
+palette header label).
+
+**Concurrency note:** Gabriel started the task_2cd0dbea chip (this very
+pass-through fix) mid-iteration — redundant, flagged to him in-session before
+it could collide with the uncommitted in-tree fix.
+
+**Next:** P5.1 — the Desert Ant capstone (hw6-p2), the LAST row: 30×30 arena
+family + a plausible turbot-TM brain (≤20 tape cells) at interface tier.

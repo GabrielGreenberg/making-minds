@@ -44,7 +44,7 @@ import { evaluateSCSequence } from './sc';
 import { evaluateFSMSymbolSequence } from './fsm';
 import { fsmNotation } from './notation';
 import { evaluateTMSequence } from './tm';
-import { runTurbot, evaluateTurbotCriterion, validateTurbotTM, validateTurbotFSM } from './turbot';
+import { runTurbot, evaluateTurbotCriterion, criterionRequiresStop, validateTurbotTM, validateTurbotFSM } from './turbot';
 import { validatePerceptionMachine, runPerceptionCase } from './perception';
 import { validateMachine } from './machineValidation';
 import {
@@ -328,16 +328,28 @@ function gradeTurbot(question: AssignmentQuestion, circuit: CircuitData): Questi
 
 function gradeTurbotCase(circuit: CircuitData, innerMode: BuildMode, tc: TurbotTestCase, notation: TMNotation): TurbotCaseResult {
   const run = runTurbot(circuit.components, circuit.wires, innerMode, tc.arena, tc.maxSteps, notation);
-  if (run.hitStepLimit) {
+  // The step limit bounds SIMULATION; whether a truncated run also fails is
+  // the criterion's call (criterionRequiresStop, engine/turbot.ts). Stop-
+  // requiring criteria (reach-and-stop, return-to-start) judge how the run
+  // ends, so a turbot that never came to rest fails outright. pass-through
+  // is trace-satisfiable (HW2 §III: cross the goal, "need not stop"), so a
+  // step-limited run is still judged on the trace it produced.
+  if (run.hitStepLimit && criterionRequiresStop(tc.criterion)) {
     return { pass: false, stepsTaken: tc.maxSteps, finalPosition: run.finalState, hitStepLimit: true, reason: 'exceeded max steps' };
   }
   const pass = evaluateTurbotCriterion(tc.arena, run, tc.criterion);
-  // A halted-but-not-stopped brain (a dead FSM — a turbot TM's halt counts
-  // as its stop) gets the explanatory reason on failure.
-  const reason = !pass && run.haltedByBrain && !run.stopped
-    ? 'brain halted without a matching transition'
-    : undefined;
-  return { pass, stepsTaken: run.history.length, finalPosition: run.finalState, hitStepLimit: false, reason };
+  // Failure reasons: a step-limited trace that never satisfied its criterion
+  // names the criterion (the limit is not why it failed); a halted-but-not-
+  // stopped brain (a dead FSM — a turbot TM's halt counts as its stop) gets
+  // the explanatory reason.
+  const reason = pass
+    ? undefined
+    : run.hitStepLimit
+      ? `'${tc.criterion}' criterion not satisfied within max steps`
+      : run.haltedByBrain && !run.stopped
+        ? 'brain halted without a matching transition'
+        : undefined;
+  return { pass, stepsTaken: run.history.length, finalPosition: run.finalState, hitStepLimit: run.hitStepLimit, reason };
 }
 
 /**

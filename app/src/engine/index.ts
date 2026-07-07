@@ -91,6 +91,7 @@ export {
   runBrainStep,
   runTurbot,
   evaluateTurbotCriterion,
+  criterionRequiresStop,
   stateKindOf,
   parseTurbotInternalLabel,
   parseTurbotExternalLabel,

@@ -308,16 +308,32 @@ HANDOFF's "do this next = P4.3". Task ids unchanged. -->
   12 pins in turbotCheck `[multi-arena]` (incl. two headless Gradebook-logic
   pins: score 0, failedCount 2). P4.3's Mad Max arenas should mark the
   sensing spot (cell before the block) as the goal.
-- [ ] **P4.3** Author the specific arenas + plausible brains: CC nav (hw2-p13…p15),
-  SC nav (hw3-p13…p15), FSM nav (hw4-p12…p14). **Interface tier:** the arenas
-  (from the HW diagrams) + a plausible brain per row that validates, steps in
-  the arena, and grades end-to-end. The HW4 zig-zag example machine is printed
-  in the problem set — use it; for Way Finder / Mad Max, any good-faith brain
-  suffices. **Advances:** those 9 rows. _Note (iteration-18 merge): main's
-  PR #11 already grades FSM- and SC-brained turbots in turbotCheck and ships a
-  sample turbot question per inner mode — P4.3 authoring builds on that, and
-  turbot-FSM labels are canonical 2-bit (`0:11` default) via
-  `turbotFsmNotation`._
+- [x] **P4.3** **Navigation arenas + plausible brains.** — _done 2026-07-07
+  (iteration 24; 9-agent build workflow (1 resumed through an API-overload
+  death) + grader-fix agent + adversarial verifier + appearance sweep + one
+  bounded layout fix)._ All nine rows landed at tier interface with honest
+  reported scores (2/2, 2/2, 0/2, 2/2, 3/3, 1/3, 2/2, 2/2, 3/3): arena
+  families from the PDFs (hw3-p15 distances 3/4/8 + goal = sensing spot per
+  P4.2; hw4-p14 three distinct mazes), brains good-faith (hw2-p15's 0/2 IS
+  the course answer — no memoryless CC takes the opposite turn; hw3-p15's
+  1/3 recorded as an honest bank for the correct-answers project).
+  **Discovered + fixed in-flight: the step-limit/criterion defect** —
+  gradeTurbotCase failed ANY hitStepLimit run before consulting the
+  criterion, making pass-through (HW2 §III "Pac-Man" rule: crossing the goal
+  completes it, no stop needed) structurally unpassable for CC brains. Deep
+  fix at the engine seam: `criterionRequiresStop(criterion)` beside
+  evaluateTurbotCriterion (pass-through = trace-satisfiable; reach-and-stop /
+  return-to-start unchanged), honest reasons, spec §12.5 records "the step
+  limit bounds simulation, not success"; 7 new turbotCheck pins + the 12
+  [multi-arena] pins untouched; server gates green (engine is cross-imported).
+  Verifier corrections recorded: hw4.pdf prints the FSM NOTATION + one example
+  machine, not a full zig-zag solution (queue's earlier "printed FSM" claim
+  corrected); hw3.pdf's section header says "combinatorial" but its Note 1
+  says SC (PDF typo — fixtures follow the note). hw3-p13's MEM feedback pair
+  initially took 2 router fallbacks (congestion-starved A* budget) — fixed by
+  ONE move+rotate (MEM 270°), no pin edits. ⚠ The task_2cd0dbea chip
+  (pass-through grading) became REDUNDANT mid-iteration — the fix was already
+  in-tree when Gabriel started the chip session; flagged to him in-session.
 - [ ] **P4.4** Add a **turbot sandbox** tab (currently turbot only exists inside
   assignments; `TabBar` lists CC/FSM/TM only). Optional but eases authoring/appr.
 - [ ] **P4.5** _(optional)_ Wire the perception/navigation **category taxonomy**
@@ -409,6 +425,12 @@ HANDOFF's "do this next = P4.3". Task ids unchanged. -->
 ## Phase 6 — Close out
 
 - [ ] **P6.1** Full-matrix appearance sweep against VISUAL_VOCAB (every mode —
+  include the three app-wide polish observations from the iteration-24 sweep:
+  arena turbot renders red `#c73535` vs VISUAL_VOCAB's "yellow triangle"
+  (decide which is right, fix the loser); the FSM brain canvas doesn't
+  green-highlight the live state during ARENA runs (`fsmCurrentStateId` is
+  only set by the FSM sim slice — the readout works); SC palette header reads
+  "Turbot · Logic Circuit" while chips correctly say "turbot - SC" —
   now including the open-question response UI merged from main, iteration 18).
 - [ ] **P6.2** Reconcile CLAUDE.md status with COVERAGE; final `npm run check` +
   `tsc` + `build` all green; every COVERAGE row green **at its tier** (✅ exact
