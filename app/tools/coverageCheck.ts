@@ -54,7 +54,11 @@ import { dirname, join, isAbsolute } from 'node:path';
 import type { AssignmentQuestion, CircuitData, RepSystem } from '../src/types';
 import { gradeQuestion, type QuestionResult } from '../src/engine/grader';
 import { axisForMode, encodeInput, type CodecLayout } from '../src/engine/codec';
-import { validateMachine } from '../src/engine/machineValidation';
+import {
+  validateMachine,
+  validateAllowedComponents,
+  isComponentTypeAllowed,
+} from '../src/engine/machineValidation';
 import { validateTurbotTM, validateTurbotFSM } from '../src/engine/turbot';
 import { validatePerceptionMachine } from '../src/engine/perception';
 import { notationForRepresentation } from '../src/engine/tmCodec';
@@ -134,6 +138,11 @@ function validateStage1(
   // Open questions have no machine and no Stage 1 (gradeQuestion short-circuits
   // to 'pending' before any validation); fixtures are never open questions.
   if (question.buildMode === 'open') return { ok: true };
+
+  // Question-wide component restriction — every grading branch checks it first
+  // (allowed_components semantics live in machineValidation.ts).
+  const restriction = validateAllowedComponents(machine, question.allowed_components);
+  if (!restriction.ok) return restriction;
 
   if (question.buildMode === 'turbot') {
     const innerMode = question.innerMode;
@@ -507,6 +516,103 @@ function runTripwires(): void {
   selfCheck(
     'interface tripwire: Stage-1-invalid machine → REGRESSED',
     ifaceBad.state === 'regressed' && ifaceBad.detail.includes('Stage-1'),
+  );
+
+  // (f) allowed_components (P1.5): the question-level component restriction
+  // must actually bite. hw1-p2 ("reconstruct OR — no OR gates") is the
+  // motivating fixture: its field allows only INPUT/OUTPUT/NOT/AND, so a
+  // machine with the CORRECT function but an OR gate must fail Stage 1
+  // (semantics in engine/machineValidation.ts).
+  const hw1p2 = JSON.parse(
+    readFileSync(resolveFixture('reference/hw1-p2.json'), 'utf8'),
+  ) as ReferenceFixture;
+  const orMachine = circuit(
+    [
+      comp('inx', 'INPUT', 'IN1', 100, 80),
+      comp('iny', 'INPUT', 'IN2', 100, 220),
+      comp('g1', 'OR', 'OR', 320, 130),
+      comp('out1', 'OUTPUT', 'OUT1', 540, 150),
+    ],
+    [
+      wire('w1', 'inx', 'out', 'g1', 'in1'),
+      wire('w2', 'iny', 'out', 'g1', 'in2'),
+      wire('w3', 'g1', 'out', 'out1', 'in'),
+    ],
+  );
+  const orGraded = gradeQuestion(hw1p2.question, orMachine);
+  selfCheck(
+    'allowed_components: correct-function OR machine FAILS hw1-p2 (0/4, reason names OR)',
+    orGraded.status === 'graded' && orGraded.total === 4 && orGraded.passed === 0 &&
+      (orGraded.cases[0]?.reason ?? '').includes('OR'),
+  );
+  const unrestricted = { ...hw1p2.question };
+  delete unrestricted.allowed_components;
+  selfCheck(
+    'allowed_components: absent field = permissive (same OR machine passes 4/4)',
+    allPass(unrestricted, orMachine),
+  );
+  selfCheck(
+    'allowed_components: conforming DeMorgan machine still passes hw1-p2 under the restriction',
+    allPass(hw1p2.question, hw1p2.correct),
+  );
+
+  // Boxed-internal smuggling: an OR inside a BOXED internal circuit is caught
+  // by the recursive walk (the wrapper is packaging; internals are vocabulary).
+  const smuggler = circuit(
+    [
+      comp('inx', 'INPUT', 'IN1', 100, 80),
+      comp('iny', 'INPUT', 'IN2', 100, 220),
+      comp('box', 'BOXED', 'OR', 320, 130, {
+        internalCircuit: circuit(
+          [
+            comp('b-in1', 'INPUT', 'IN1', 0, 0),
+            comp('b-in2', 'INPUT', 'IN2', 0, 60),
+            comp('b-or', 'OR', 'OR', 120, 30),
+            comp('b-out', 'OUTPUT', 'OUT1', 240, 30),
+          ],
+          [
+            wire('bw1', 'b-in1', 'out', 'b-or', 'in1'),
+            wire('bw2', 'b-in2', 'out', 'b-or', 'in2'),
+            wire('bw3', 'b-or', 'out', 'b-out', 'in'),
+          ],
+        ),
+      }),
+      comp('out1', 'OUTPUT', 'OUT1', 540, 150),
+    ],
+    [],
+  );
+  const smuggled = gradeQuestion(hw1p2.question, smuggler);
+  selfCheck(
+    'allowed_components: boxed-internal OR smuggling caught (0/4, reason names OR)',
+    smuggled.status === 'graded' && smuggled.total === 4 && smuggled.passed === 0 &&
+      (smuggled.cases[0]?.reason ?? '').includes('OR'),
+  );
+
+  // The palette filter's pure predicate (ComponentLibrary reads this).
+  selfCheck(
+    'allowed_components: palette predicate — OR hidden, NOT/INPUT/OUTPUT shown, no field = all shown',
+    !isComponentTypeAllowed('OR', hw1p2.question.allowed_components) &&
+      isComponentTypeAllowed('NOT', hw1p2.question.allowed_components) &&
+      isComponentTypeAllowed('INPUT', hw1p2.question.allowed_components) &&
+      isComponentTypeAllowed('OUTPUT', hw1p2.question.allowed_components) &&
+      isComponentTypeAllowed('OR', undefined) &&
+      isComponentTypeAllowed('OR', []),
+  );
+
+  // The interface-tier Stage-1 mirror enforces the restriction too.
+  const ifaceRestricted = evaluateInterfaceFixture(
+    { ...tripwireRow('tripwire-iface-restricted', 'SC'), tier: 'interface' },
+    {
+      question: {
+        ...tripwireQuestion(cleanStatement),
+        allowed_components: ['INPUT', 'OUTPUT', 'NOT', 'AND'],
+      },
+      correct, // the OR tripwire machine — violates the restriction
+    },
+  );
+  selfCheck(
+    'allowed_components: interface-tier mirror rejects a violating machine → REGRESSED',
+    ifaceRestricted.state === 'regressed' && ifaceRestricted.detail.includes('Stage-1'),
   );
 
   console.log('');

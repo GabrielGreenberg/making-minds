@@ -385,7 +385,29 @@ HANDOFF's "do this next = P4.3". Task ids unchanged. -->
   **Acceptance:** p5/p6 correct machines pass gap 2/3/5 probes; rows stay
   verified.
 
-- [ ] **P1.5** _(discovered 2026-07-06, hw1-p2 critic)_ **Enforce
+- [x] **P1.5** — _done 2026-07-07 (chip session)._ One semantics, owned by
+  `engine/machineValidation.ts` (`validateAllowedComponents` + palette
+  predicate `isComponentTypeAllowed`, doc comment = the authority; spec §1.5
+  records it): absent/empty = unrestricted (back-compat); present = only the
+  listed types plus always-allowed infrastructure (INPUT/OUTPUT; STATE — the
+  whole FSM/TM vocabulary, restriction targets the CC/SC gate vocabulary);
+  BOXED is packaging, internals recursed (a boxed OR can't smuggle an OR into
+  hw1-p2). All three touchpoints: (1) grading — Stage 1 in every grader branch
+  (gradeQuestion/gradeTurbot/gradePerception + coverageCheck's validateStage1
+  mirror), violating machine fails every case naming the type(s); (2) palette —
+  ComponentLibrary filters entries AND library boxes via the store's new
+  `selectAllowedComponents`; (3) authoring — QuestionCreator "Restrict
+  available components" toggle + AND/OR/NOT/MEM checkboxes (CC/SC incl.
+  perception + turbot CC/SC brains), saves `['INPUT','OUTPUT',...gates]`
+  matching the HW1 fixtures' shape, round-trips. Acceptance proven as six
+  permanent coverageCheck self-test pins: correct-function OR machine fails
+  hw1-p2 0/4 (reason names OR) · absent field = same machine passes 4/4 ·
+  DeMorgan correct still passes · boxed-internal smuggling caught 0/4 ·
+  palette predicate · interface-tier mirror regresses a violator. hw1-p2's
+  fixture field already matched the semantics (no fixture edit); harness
+  46 exact · 10 interface · 0 regressed; all gates + server gates green.
+  Original discovery entry follows._
+  _(discovered 2026-07-06, hw1-p2 critic)_ **Enforce
   `allowed_components` end-to-end.** The field exists on `AssignmentQuestion`
   (types.ts:139) but is read by NOTHING — a student can pass hw1-p2 ("no OR
   gate") using an OR gate. The family: question-level component restrictions

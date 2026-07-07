@@ -1,4 +1,5 @@
-import { useStore, selectEffectiveMode } from '../store';
+import { useStore, selectEffectiveMode, selectAllowedComponents } from '../store';
+import { isComponentTypeAllowed, disallowedComponentTypes } from '../engine/machineValidation';
 import type { ComponentType } from '../types';
 
 interface LibraryEntry {
@@ -191,8 +192,23 @@ export function ComponentLibrary() {
   const selectedTool = useStore((s) => s.selectedTool);
   const setSelectedTool = useStore((s) => s.setSelectedTool);
 
+  // The open question's component restriction (null = unrestricted). Entries
+  // outside the allowed set are hidden — annotations (TEXT/COMMENT) are not
+  // circuit components and always stay. The grader's Stage-1 check enforces
+  // the same rule (engine/machineValidation.ts owns the semantics).
+  const allowedComponents = useStore(selectAllowedComponents);
+
   // TM shares the FSM editor palette (STATE nodes + transition wires).
-  const items = effectiveMode === 'FSM' || effectiveMode === 'TM' ? FSM_LIBRARY_ITEMS : CC_LIBRARY_ITEMS;
+  const allItems = effectiveMode === 'FSM' || effectiveMode === 'TM' ? FSM_LIBRARY_ITEMS : CC_LIBRARY_ITEMS;
+  const items = allItems.filter(
+    (item) =>
+      item.type === 'TEXT' ||
+      item.type === 'COMMENT' ||
+      isComponentTypeAllowed(item.type, allowedComponents),
+  );
+  const visibleLegacyBoxes = boxedLibrary.filter(
+    (b) => disallowedComponentTypes(b.circuit, allowedComponents).length === 0,
+  );
 
   // Group by section
   const sections = new Map<string, LibraryEntry[]>();
@@ -268,10 +284,13 @@ export function ComponentLibrary() {
         </div>
       </div>}
 
-      {/* Box Menu — show CC boxes in CC mode, FSM boxes in FSM mode */}
+      {/* Box Menu — show CC boxes in CC mode, FSM boxes in FSM mode. Under a
+          component restriction, a box whose internals contain a disallowed
+          type is hidden too (a boxed OR must not smuggle an OR in). */}
       {(() => {
         const visibleBoxes = confirmedBoxLibrary.filter((b) =>
-          effectiveMode === 'FSM' ? b.kind === 'FSM' : (b.kind ?? 'CC') === 'CC'
+          (effectiveMode === 'FSM' ? b.kind === 'FSM' : (b.kind ?? 'CC') === 'CC') &&
+          disallowedComponentTypes(b.internalComponents, allowedComponents).length === 0
         );
         if (visibleBoxes.length === 0) return null;
         return (
@@ -291,11 +310,11 @@ export function ComponentLibrary() {
         );
       })()}
 
-      {/* Legacy boxed library */}
-      {boxedLibrary.length > 0 && (
+      {/* Legacy boxed library (same restriction rule as the Box Menu above) */}
+      {visibleLegacyBoxes.length > 0 && (
         <div>
           <div className="library-section-title">Boxed</div>
-          {boxedLibrary.map((b, i) => (
+          {visibleLegacyBoxes.map((b, i) => (
             <div
               key={i}
               className="library-item"

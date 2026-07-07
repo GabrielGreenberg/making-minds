@@ -14,15 +14,33 @@ Claude to load into context).
 >
 > A change isn't finished until the docs that describe it are too.
 
-_Last updated: 2026-07-07 (**coverage buildout COMPLETE at-tier: 56/56** — the Desert Ant
+_Last updated: 2026-07-07 (**P1.5 — `allowed_components` enforced end-to-end** — the
+question-level component restriction (optional on `AssignmentQuestion`) now has ONE semantics,
+owned by `engine/machineValidation.ts` (`validateAllowedComponents` + palette predicate
+`isComponentTypeAllowed`): absent/empty = unrestricted (back-compat); present = only the listed
+types plus always-allowed infrastructure (INPUT/OUTPUT — the I/O interface; STATE — the whole
+FSM/TM vocabulary, since the restriction targets the CC/SC gate vocabulary); BOXED is packaging,
+recursed into, so a boxed OR can't smuggle an OR into hw1-p2 ("reconstruct OR without OR").
+Enforced at all three touchpoints: (1) grading — Stage 1 in every grader branch
+(`gradeQuestion`/`gradeTurbot`/`gradePerception`, mirrored by coverageCheck's `validateStage1`);
+a violating machine fails every case with the offending type(s) named; (2) student UI — the
+palette (`ComponentLibrary`, via the store's `selectAllowedComponents`) hides disallowed gates
+and any library box whose internals contain one; (3) authoring — `QuestionCreator` gains a
+"Restrict available components" toggle + AND/OR/NOT/MEM checkboxes for gate-vocabulary questions
+(CC/SC incl. perception, turbot CC/SC brains), round-tripping through save/load. Six new
+coverageCheck self-test pins (correct-function OR machine fails hw1-p2 0/4 · absent field
+permissive · DeMorgan still passes · boxed smuggling caught · palette predicate ·
+interface-tier mirror); harness unchanged at 46 exact · 10 interface · 0 regressed; spec §1.5
+records the semantics. This closes the LAST deferred authoring follow-up. Earlier same day:
+**coverage buildout COMPLETE at-tier: 56/56** — the Desert Ant
 capstone (hw6-p2) landed as the final reference fixture: 3× 30×30 walled arenas (food varied
 in the NE quadrant), return-to-start with goal = food, and a 20-state turbot-TM
 diagonal-staircase forager with exact dead-reckoned return (tape span ≤20; honest score 1/3,
 reported not asserted). The reference-fixture ledger now covers every machine-buildable
 problem in HW1–HW6: 46 rows exact-verified (correct passes every case, broken fails) + 10
 navigation/capstone rows interface-verified (plausible attempt validates + grades end-to-end).
-Close-out items remain queued in docs/buildout/QUEUE.md (allowed_components enforcement is the
-one open grading-integrity gap). Earlier same day, **turbot navigation: nine reference questions + the step-limit/criterion
+Close-out items remain queued in docs/buildout/QUEUE.md (allowed_components enforcement was the
+one open grading-integrity gap — closed later the same day by P1.5, above). Earlier same day, **turbot navigation: nine reference questions + the step-limit/criterion
 fix** — the buildout landed interface-tier reference fixtures for every HW2/HW3/HW4 navigation
 problem (arena families transcribed from the PDFs; plausible CC/SC/FSM brains with honest
 reported scores), which exposed and fixed a real grading defect: `gradeTurbotCase` failed any
@@ -504,10 +522,14 @@ What's missing is the **deployment** (waiting on the UCLA AWS account), **UCLA S
   player for SC perception (today students hand-enter per-wire input sequences in the normal SC
   timeline to test their circuit), instructor-editable/custom frame sequences for SC banks (the
   battery is fixed), and richer rules (downward/any-direction motion, multi-object scenes).
-- **Deferred authoring follow-ups** — mode-filtered `allowed_components` (an optional field on
-  `AssignmentQuestion`, not yet exposed in the question creator's editor UI). The
-  `requireStandardHaltPosition` TM acceptance toggle is done (2026-07-06): wired end-to-end
-  through `gradeQuestion` and exposed as a TM-only checkbox in the question creator.
+- **Deferred authoring follow-ups — both done.** `requireStandardHaltPosition` (2026-07-06):
+  wired end-to-end through `gradeQuestion` and exposed as a TM-only checkbox in the question
+  creator. `allowed_components` (2026-07-07, P1.5): one semantics in
+  `engine/machineValidation.ts` (absent/empty = unrestricted; present = listed types only, plus
+  always-allowed INPUT/OUTPUT/STATE; BOXED internals recursed so a boxed gate can't smuggle a
+  banned one), enforced as Stage-1 grading in every grader branch, filtered out of the student
+  palette (`ComponentLibrary` via `selectAllowedComponents`), and authored via a
+  "Restrict available components" toggle + gate checkboxes in the question creator.
 - **Open-question grading follow-ups** — manual grading shipped 2026-07-07 (gradebook
   drill-down: correct/incorrect + note, stored as `ManualReview` on the pending result via
   `SubmissionStore.recordManualReview`). Remaining: optional LLM-assisted grading — the
@@ -568,7 +590,7 @@ the engine.
 | Engine        | `app/src/engine/cc.ts`, `sc.ts`, `fsm.ts`                                      | Pure simulators per mode (topological eval for CC; clocked step for SC; transition-matching for FSM)                                       |
 | Engine        | `app/src/engine/tm.ts`, `tmValidate.ts`, `tmCodec.ts`                          | TM: notation-aware tape engine — **two-output** labels `read:write,move` (e.g. `1:0,R`; legacy `1:0R` parses as an alias), executed as one **atomic step** (every transition writes a symbol AND moves; grammar lives in `engine/notation.ts`); pre-engine table validation (ambiguous/unparseable, via the generic walker); encode/accept/decode (the codec `tape` axis; accept honors the question's optional `requireStandardHaltPosition` — head must halt on the output block's rightmost cell)          |
 | Engine        | `app/src/engine/grader.ts`                                                     | `gradeSubmission` / `gradeQuestion` — one value-based codec pipeline for CC/SC/FSM/TM against numeric `test_cases`, plus a separate `gradeTurbot` branch (arena success criteria, not the codec); open questions short-circuit to a `'pending'` result carrying the free-text `response` for manual (later maybe LLM) review          |
-| Engine        | `app/src/engine/codec.ts`, `machineValidation.ts`                              | The codec (`space`/`time` value↔bits; `tape` → `tmCodec`) and Stage-1 machine validation for all modes                                     |
+| Engine        | `app/src/engine/codec.ts`, `machineValidation.ts`                              | The codec (`space`/`time` value↔bits; `tape` → `tmCodec`) and Stage-1 machine validation for all modes, incl. the `allowed_components` restriction semantics (`validateAllowedComponents`/`isComponentTypeAllowed` — absent/empty = unrestricted; INPUT/OUTPUT/STATE always allowed; BOXED internals recursed)                                     |
 | Engine        | `app/src/engine/testVectorGen.ts`, `formulaEval.ts`                            | Authoring-time: affine-formula language → `buildQuestionBank(inputs, outputs, rep, mode)` → `{spec, test_cases}` (widths derived; SC/FSM/TM sampled). Legacy `generateTestCases(spec, rep, mode)` remains for the sample data |
 | Engine        | `app/src/engine/notation.ts`                                                   | Transition-label SYNTAX seam: `TransitionNotation` (parse/format/alphabet/editor token fields/default) for all four grammars — native k-bit `fsmNotation(inBits,outBits)` + `turbotFsmNotation` (1-bit alias → canonical 2-bit motor, decays on edit-save); TM/turbot grammars delegate to their engine parsers; generic `validateTransitionTable` walker. Label dissection is allowed ONLY here + the delegated parsers (notationCheck grep gate)  |
 | Engine        | `app/src/engine/representation.ts`, `index.ts`                                 | value↔bits core (`valueToBits`/`isValidCodeword`/`bitsToValue`) + display helpers; barrel exports                                          |
@@ -691,7 +713,11 @@ only — the grader never sees the formula; it runs against the generated numeri
   codec encodes/decodes per axis and the grader compares decoded outputs to expected. TM
   questions may additionally set `requireStandardHaltPosition: true` (authored via a TM-only
   checkbox in the question creator) to reject runs whose head does not halt on the output
-  block's rightmost cell; absent/false, acceptance is position-agnostic.
+  block's rightmost cell; absent/false, acceptance is position-agnostic. Any question may set
+  `allowed_components` to restrict the component vocabulary (semantics in
+  `engine/machineValidation.ts`: listed types only + always-allowed INPUT/OUTPUT/STATE, boxed
+  internals recursed; absent/empty = unrestricted) — enforced at Stage-1 grading, in the student
+  palette, and authored via the question creator's "Restrict available components" toggle.
 
 ## Things to watch
 

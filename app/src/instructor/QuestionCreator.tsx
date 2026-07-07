@@ -2,6 +2,7 @@ import { useState } from 'react';
 import type {
   AssignmentQuestion,
   BuildMode,
+  ComponentType,
   RepSystem,
   ArenaConfig,
   TurbotSuccessCriterion,
@@ -71,6 +72,19 @@ const CRITERIA: { value: TurbotSuccessCriterion; label: string; hint: string }[]
   { value: 'return-to-start', label: 'Return to start', hint: 'The turbot must end on its starting cell — first visiting the goal cell, if the arena has one.' },
 ];
 
+// The restrictable gate vocabulary (`allowed_components`, semantics in
+// engine/machineValidation.ts): the CC/SC palette's placeable circuit
+// components, in palette order. INPUT/OUTPUT are infrastructure — always
+// allowed, so not offered as checkboxes (they're saved into the field
+// explicitly for readability, matching the HW1 fixtures). FSM/TM canvases
+// have a STATE-only vocabulary, so the restriction isn't offered there.
+const RESTRICTABLE_GATES: { type: ComponentType; label: string }[] = [
+  { type: 'AND', label: 'AND' },
+  { type: 'OR', label: 'OR' },
+  { type: 'NOT', label: 'NOT' },
+  { type: 'MEM', label: 'MEM' },
+];
+
 type ArenaTool = 'block' | 'goal' | 'erase' | 'start';
 
 const ARENA_TOOLS: { tool: ArenaTool; label: string }[] = [
@@ -125,6 +139,20 @@ export function QuestionCreator({ assignmentId, existingQuestion, onSave, onCanc
   const [requireStandardHalt, setRequireStandardHalt] = useState<boolean>(
     () => existingQuestion?.requireStandardHaltPosition ?? false,
   );
+
+  // Component restriction (`allowed_components`). Off = unrestricted (the
+  // field is omitted). On = students may use only the checked gates (plus
+  // INPUT/OUTPUT, which are always allowed — see engine/machineValidation.ts).
+  const [restrictComponents, setRestrictComponents] = useState<boolean>(
+    () => (existingQuestion?.allowed_components?.length ?? 0) > 0,
+  );
+  const [allowedGates, setAllowedGates] = useState<ComponentType[]>(() => {
+    const existing = existingQuestion?.allowed_components;
+    const vocabulary = RESTRICTABLE_GATES.map((g) => g.type);
+    return existing && existing.length > 0
+      ? vocabulary.filter((t) => existing.includes(t))
+      : vocabulary; // default when first enabled: everything checked
+  });
 
   const [inputs, setInputs] = useState<AuthoredInputGroup[]>(() =>
     existingQuestion?.cc_spec?.inputs.map((g) => ({
@@ -208,6 +236,15 @@ export function QuestionCreator({ assignmentId, existingQuestion, onSave, onCanc
   const isOpen = mode === 'open';
   const canPerceive = mode === 'CC' || mode === 'SC';
   const isPerception = canPerceive && task === 'perception';
+
+  // The restriction applies to gate-vocabulary canvases: CC/SC questions
+  // (function or perception) and turbot questions whose brain is CC/SC.
+  const canRestrictComponents =
+    mode === 'CC' || mode === 'SC' || (isTurbot && (innerMode === 'CC' || innerMode === 'SC'));
+  const allowedComponentsField: Pick<AssignmentQuestion, 'allowed_components'> =
+    canRestrictComponents && restrictComponents
+      ? { allowed_components: ['INPUT', 'OUTPUT', ...allowedGates] }
+      : {};
 
   // The rule kind must match the mode's family; coerce when the mode flips.
   const kindChoices = mode === 'CC' || mode === 'SC' ? PERCEPTION_KINDS[mode] : [];
@@ -313,6 +350,7 @@ export function QuestionCreator({ assignmentId, existingQuestion, onSave, onCanc
         statement: statement.trim(),
         buildMode: 'turbot',
         representation: rep,
+        ...allowedComponentsField,
         innerMode,
         turbot_cases: [{ arena, maxSteps, criterion }],
       });
@@ -335,6 +373,7 @@ export function QuestionCreator({ assignmentId, existingQuestion, onSave, onCanc
         statement: statement.trim(),
         buildMode: mode,
         representation: 'binary',
+        ...allowedComponentsField,
         perception: { rule, width: effWidth },
         perception_cases,
       });
@@ -362,6 +401,8 @@ export function QuestionCreator({ assignmentId, existingQuestion, onSave, onCanc
       representation: rep,
       // TM-only acceptance strictness; omitted (default) unless checked.
       ...(mode === 'TM' && requireStandardHalt ? { requireStandardHaltPosition: true } : {}),
+      // Component restriction; omitted (default = unrestricted) unless enabled.
+      ...allowedComponentsField,
       cc_spec: bank.spec,
       test_cases: bank.test_cases,
     });
@@ -496,6 +537,40 @@ export function QuestionCreator({ assignmentId, existingQuestion, onSave, onCanc
                 ))}
               </div>
             </div>
+          </>
+        )}
+        {canRestrictComponents && (
+          <>
+            <label className="instructor-inline-field">
+              <input
+                type="checkbox"
+                checked={restrictComponents}
+                onChange={(e) => setRestrictComponents(e.target.checked)}
+              />
+              Restrict available components (students may build only with the checked
+              components; inputs and outputs are always available, and boxed circuits
+              may not contain anything else)
+            </label>
+            {restrictComponents && (
+              <div className="instructor-criterion-row">
+                {RESTRICTABLE_GATES.map((g) => (
+                  <label key={g.type} className="instructor-inline-field">
+                    <input
+                      type="checkbox"
+                      checked={allowedGates.includes(g.type)}
+                      onChange={(e) =>
+                        setAllowedGates(
+                          RESTRICTABLE_GATES.map((r) => r.type).filter((t) =>
+                            t === g.type ? e.target.checked : allowedGates.includes(t),
+                          ),
+                        )
+                      }
+                    />
+                    {g.label}
+                  </label>
+                ))}
+              </div>
+            )}
           </>
         )}
       </section>

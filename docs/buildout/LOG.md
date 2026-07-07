@@ -1132,3 +1132,33 @@ charter. Remaining queued work (close-out): P1.5 allowed_components (the one
 grading-integrity gap), P1.6, P1.11, P1.16, P1.8 leftovers, P5.2, P5.3,
 P6.1–P6.4. Resume with /loop /handoff (or /handoff per-iteration) when
 wanted.
+
+## 2026-07-07 (iteration 26) — P1.5: allowed_components enforced end-to-end · the integrity gap closes
+
+**Shipped:** the three-touchpoint slice the queue prescribed. Semantics owned
+by `engine/machineValidation.ts` (absent/empty = unrestricted; INPUT/OUTPUT +
+STATE always allowed; BOXED internals RECURSED — a boxed OR can't smuggle an
+OR); Stage-1 enforcement in all three grader branches (codec, turbot all
+inner modes, perception); `selectAllowedComponents` store selector; palette
+filters entries AND violating boxed circuits; QuestionCreator gains a
+"Restrict available components" toggle + per-gate checkboxes that round-trip.
+hw1-p2's fixture field already matched the semantics — no fixture edit. Six
+permanent coverageCheck pins (OR-machine fails 0/4 with the reason naming OR;
+absent-field permissive 4/4; DeMorgan still passes; boxed smuggling caught;
+palette predicate; interface-tier mirror). Browser legs verified by the build
+agent (creator round-trip; student palette hides OR+MEM on the restricted
+question, restores on navigation; sandbox unfiltered). All gates green by
+exit code, app + server; harness steady 46 exact · 10 interface · 0
+regressed. Spec §1.5 + CLAUDE.md updated (the LAST deferred authoring
+follow-up closes).
+
+**Ops:** the build agent died on an API overload mid-report after finishing
+the build — resumed via SendMessage with full context, re-verified fresh, and
+reported. The resume-don't-redo pattern keeps working.
+
+**Left open (recorded):** XOR/HA not offered as creator checkboxes (not
+student-placeable); canvas drop handler not separately guarded (palette hides
+the source; grader is the backstop).
+
+**Next:** the smalls sweep — P1.6, P1.11, P1.16, P5.2, P5.3, P1.8 leftovers
+(toggle-tab obstacles + dot-skip nit) as one parallel batch, then P6.1.

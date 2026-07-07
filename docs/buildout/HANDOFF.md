@@ -4,7 +4,7 @@ _Read this first. It says exactly where we are and what to do next. Rewrite it a
 the end of every iteration. If it conflicts with the harness, the harness wins —
 run `npm run coverage` and reconcile._
 
-## Where we are — 🏁 THE LEDGER IS COMPLETE AT-TIER
+## Where we are — 🏁 LEDGER COMPLETE AT-TIER · close-out in progress
 
 Branch `buildout-infra`. **46 exact + 10 interface = 56/56 at-tier**, 0
 pending, 0 regressed, 0 warnings. Twenty-five iterations. Every
@@ -17,29 +17,28 @@ machine-buildable problem in HW1–HW6 has a verified reference fixture:
   capstone's 1/3). Exactly-correct answers remain the separate future
   correct-answers project.
 
-The /handoff completion criterion is met; the loop PARKED itself after this
-iteration (no auto-reschedule). Resume with `/loop /handoff` (or run
-`/handoff` once per task) for the close-out queue below.
+Gabriel resumed the loop for close-out (iteration 26+). The grading-integrity
+gap (P1.5) is CLOSED; the remaining queue is polish + final sweeps.
 
 ## What remains in the queue (close-out, in order)
 
-1. **P1.5 allowed_components** — the ONE remaining grading-integrity gap: the
-   field is unenforced (a student can pass hw1-p2's "no OR gate" using an OR
-   gate). Three-touchpoint slice: Stage-1 check in machineValidation +
-   ComponentLibrary palette filter + QuestionCreator authoring.
-2. **Smalls:** P1.6 cc.ts label-order helper; P1.11 ARG multi-group
-   rendering; P1.16 rotated-MEM label placement; P5.2 arena-editor 20×20 cap
-   (capstone's 30×30 not UI-authorable); P5.3 reason-less criterion failures;
-   P1.8 leftovers (INPUT toggle-tab obstacles; hw3-p9 dot-skip nit; S4
-   optional).
-3. **P6.1** full-matrix appearance sweep (scope includes: arena-turbot red
-   `#c73535` vs VISUAL_VOCAB's yellow — decide which is right; FSM
-   live-state highlight during arena runs; SC palette header label; 30×30
-   Map panel UX).
+1. ~~P1.5~~ **DONE (iteration 26)** — allowed_components enforced end-to-end
+   (Stage-1 all grader branches + palette + creator; 6 pins; boxed recursion).
+2. **NEXT — the smalls sweep (one batch iteration):** P1.6 cc.ts label-order
+   helper; P1.11 ARG multi-group rendering; P1.16 rotated-MEM label
+   placement; P5.2 arena-editor 20×20 cap (capstone's 30×30 not
+   UI-authorable); P5.3 reason-less criterion failures; P1.8 leftovers (INPUT
+   toggle-tab obstacles in the router obstacle model; hw3-p9 (1375,757)
+   dot-skip nit re-evaluation; S4 optional). Each is small and independent —
+   a parallel workflow (one agent per small, gates + verifier after) fits one
+   iteration; browser-check the UI-visible ones (P1.16, P5.2).
+3. **P6.1** full-matrix appearance sweep (scope: arena-turbot red vs
+   VISUAL_VOCAB yellow — decide; FSM live-state highlight during arena runs;
+   SC palette header label; 30×30 Map panel UX).
 4. **P6.2** final reconciliation (all gates + CLAUDE.md honest + this file).
 5. **P6.3** server↔engine grading parity pin + server in CI. **P6.4**
    Remote-store cutover (Gabriel's timing).
-META-audit-queue due ~iteration 28 if the loop resumes.
+META-audit-queue due ~iteration 28.
 
 ## Watch out for (standing)
 

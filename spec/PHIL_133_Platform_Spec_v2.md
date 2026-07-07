@@ -146,7 +146,15 @@ Homework files use a separate JSON schema:
 
 - **type** constrains the build mode (CC, SC, FSM, turbot, TM)
 - **representation** sets the default tally/binary interpretation
-- **allowed_components** optionally restricts the component library for that problem
+- **allowed_components** optionally restricts the component library for that problem.
+  Semantics (implemented in `engine/machineValidation.ts`, enforced as Stage-1 grading,
+  the student palette, and instructor authoring): absent or empty = all components
+  allowed; present = the machine may contain ONLY the listed types, plus always-allowed
+  infrastructure — INPUT/OUTPUT (every machine's I/O interface) and STATE (the whole
+  FSM/TM vocabulary; the restriction targets the CC/SC gate vocabulary). Boxed circuits
+  are packaging, not vocabulary: their internals are checked recursively, so a boxed OR
+  cannot smuggle an OR into a "no OR gates" problem (HW1 P2). A violating machine fails
+  every test case (Stage-1 rejection naming the offending type(s)).
 - **test_vectors** defines input sequences and expected output sequences for automatic grading
 - **grading_mode:**
   - `exhaustive` — for CCs, the grader tests all 2^n input combinations

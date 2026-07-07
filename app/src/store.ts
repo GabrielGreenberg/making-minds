@@ -64,6 +64,22 @@ export function selectTmNotation(s: {
 }
 
 /**
+ * The open question's component restriction (`allowed_components`), or null
+ * when unrestricted — sandbox (no assignment), or the field absent/empty
+ * (absent/empty = all allowed; semantics in engine/machineValidation.ts).
+ * The palette (ComponentLibrary) filters its entries through this via
+ * `isComponentTypeAllowed`, so a disallowed gate can never be placed; the
+ * grader's Stage-1 check is the enforcement backstop.
+ */
+export function selectAllowedComponents(s: {
+  assignment: AssignmentData | null;
+  currentQuestionIndex: number;
+}): ComponentType[] | null {
+  const allowed = s.assignment?.questions[s.currentQuestionIndex]?.allowed_components;
+  return allowed && allowed.length > 0 ? allowed : null;
+}
+
+/**
  * The codec layout of the open SC/FSM question (the grader's view of it), or
  * null in the sandbox (no open question, or a question without a time-axis
  * cc_spec). Everything question-run-specific — the run window, the exact input

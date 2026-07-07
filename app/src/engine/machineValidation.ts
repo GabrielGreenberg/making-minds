@@ -17,7 +17,7 @@
 //   TM   delegated to validateTMTable (≤ one transition per read symbol; labels
 //        parse) — see engine/tmValidate.ts.
 
-import type { CircuitData, BuildMode, RepSystem } from '../types';
+import type { CircuitData, CircuitComponent, ComponentType, BuildMode, RepSystem } from '../types';
 import type { CodecLayout } from './codec';
 import { sortStateComponents } from './fsm';
 import { fsmNotation, validateTransitionTable } from './notation';
@@ -30,6 +30,91 @@ export interface MachineValidation {
 }
 
 const OK: MachineValidation = { ok: true };
+
+// ─── allowed_components — question-level component restriction ───────────────
+//
+// SEMANTICS (the one authority; spec §1.5). `AssignmentQuestion.allowed_components`
+// restricts which component types a submitted machine may contain:
+//
+//   - ABSENT or EMPTY  ⇒ unrestricted — all components allowed (back-compat:
+//     every pre-existing question/fixture without the field is unaffected).
+//   - PRESENT          ⇒ the machine may contain ONLY the listed types, plus
+//     always-allowed infrastructure:
+//       INPUT / OUTPUT — every machine's I/O interface (their *counts* are
+//         enforced by the per-mode interface checks below). Questions may list
+//         them explicitly (hw1-p2 does) but need not.
+//       STATE — the entire vocabulary of FSM/TM canvases. A type-level
+//         restriction targets the CC/SC gate vocabulary; banning the only node
+//         type of a state machine would just brick the mode.
+//   - BOXED is packaging, not vocabulary: the wrapper itself is always allowed,
+//     but its internal circuit is checked RECURSIVELY — a boxed OR cannot
+//     smuggle an OR into a "no OR gates" question (hw1-p2's pedagogy).
+//
+// Enforced as part of Stage 1 in every grading branch (grader.ts: gradeQuestion
+// for CC/SC/FSM/TM, gradeTurbot for brains, gradePerception; mirrored by
+// coverageCheck's validateStage1), so a violating machine fails every case.
+// The student palette (ComponentLibrary) and the instructor authoring UI
+// (QuestionCreator) read the same helpers.
+
+/** Infrastructure types that are always allowed regardless of the restriction
+ *  (see semantics above). BOXED is handled separately — recursed into, never
+ *  itself an offender. */
+const ALWAYS_ALLOWED_COMPONENTS: ReadonlySet<ComponentType> = new Set([
+  'INPUT',
+  'OUTPUT',
+  'STATE',
+]);
+
+/** May a component of `type` appear under this restriction? (Pure; the student
+ *  palette filter uses this per entry.) `allowed` absent/empty = unrestricted. */
+export function isComponentTypeAllowed(
+  type: ComponentType,
+  allowed: readonly ComponentType[] | undefined | null,
+): boolean {
+  if (!allowed || allowed.length === 0) return true;
+  if (ALWAYS_ALLOWED_COMPONENTS.has(type)) return true;
+  if (type === 'BOXED') return true; // packaging; internals are checked instead
+  return allowed.includes(type);
+}
+
+/** All disallowed types present in `components`, first-seen order, deduped —
+ *  recursing into BOXED internals (nested boxes included). Empty = conforming. */
+export function disallowedComponentTypes(
+  components: readonly CircuitComponent[],
+  allowed: readonly ComponentType[] | undefined | null,
+): ComponentType[] {
+  if (!allowed || allowed.length === 0) return [];
+  const offenders: ComponentType[] = [];
+  const seen = new Set<ComponentType>();
+  const walk = (comps: readonly CircuitComponent[]): void => {
+    for (const c of comps) {
+      if (c.type === 'BOXED') {
+        walk(c.internalCircuit?.components ?? []);
+        continue;
+      }
+      if (!isComponentTypeAllowed(c.type, allowed) && !seen.has(c.type)) {
+        seen.add(c.type);
+        offenders.push(c.type);
+      }
+    }
+  };
+  walk(components);
+  return offenders;
+}
+
+/** Stage-1 check for the restriction (see semantics above). Runs before the
+ *  per-mode interface checks in every grading branch. */
+export function validateAllowedComponents(
+  circuit: CircuitData,
+  allowed: readonly ComponentType[] | undefined | null,
+): MachineValidation {
+  const offenders = disallowedComponentTypes(circuit.components, allowed);
+  if (offenders.length === 0) return OK;
+  return {
+    ok: false,
+    reason: `machine uses disallowed component type(s): ${offenders.join(', ')} — this question allows only: ${allowed!.join(', ')} (boxed circuits are checked inside)`,
+  };
+}
 
 function sum(ns: number[]): number {
   return ns.reduce((a, b) => a + b, 0);
