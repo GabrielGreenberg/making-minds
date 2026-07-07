@@ -14,7 +14,31 @@ Claude to load into context).
 >
 > A change isn't finished until the docs that describe it are too.
 
-_Last updated: 2026-07-06 (**open questions** — a sixth question mode, `buildMode: 'open'`,
+_Last updated: 2026-07-07 (**perception questions (CC + SC)** — the perception homeworks are
+now authorable and autogradable: a CC/SC question can be a **Perception** task (question
+creator's new "Task" toggle) whose machine reads its inputs as an array of stimulations (a
+retina) and outputs one classification bit. Grading is **bit-level, outside the value codec**
+(new `engine/perception.ts` + `gradePerception` branch in `grader.ts`): cases carry raw
+`frames` (bit-vectors, IN1 first; an SC case is one frame per clock tick) and the `expected`
+output bit per step, generated at save from an authored `PerceptionRule` — CC rules `min-run`
+(≥k consecutive 1s, "edge detector"), `exact-run` (a maximal run of exactly k, "object
+detector"), `pattern` (input = an exact bit string, "landmark recognition"; width = pattern
+length); SC rules `change` (current frame ≠ previous frame) and `motion` (an exactly-k object
+image moving **up** — toward IN1 — 1 unit per tick). CC banks enumerate all 2^width frames
+(width capped at 10); SC banks are a fixed deterministic battery of frame sequences (climbs,
+drifts, statics, jumps, noise, random streams). SC timing convention: the "previous input"
+before the first frame is the all-zero frame — exactly what fresh MEM blocks hold. New types
+(`PerceptionRule`/`PerceptionSpec`/`PerceptionTestCase`/`PerceptionCaseResult`,
+`perception`/`perception_cases` on `AssignmentQuestion`, `perceptionCases` on
+`QuestionResult`); structural Stage 1 = width input wires + 1 output wire; a case passes iff
+every step matches. Students need **zero new UI** — a perception question opens the ordinary
+CC/SC canvas (mode chips read "CC - perception"); the gradebook drill-down shows failed
+stimuli (frames → expected/got bit strings + first wrong step). Sample assignment grew to 13
+questions (Q9–Q13 = the five textbook perception problems) with correct/incorrect sample
+circuits built by a small netlist builder in `sampleData.ts` (the motion detector is ~80
+gates); new `tools/perceptionCheck.ts` (44 checks) and `pipelineCheck` now 13/13 vs 0/13.
+Merged with the same-day open-questions work: sample ids are machine Q1–Q8, perception
+Q9–Q13, open Q14. Earlier, 2026-07-06: **open questions** — a sixth question mode, `buildMode: 'open'`,
 for free-text answers that cannot be autograded: the student workspace swaps the canvas for a
 writing panel (`OpenResponsePanel`; copy/cut/paste/drop are blocked in the textarea to
 discourage pasting in prepared text — a soft deterrent, not a security boundary) with the same
@@ -27,10 +51,11 @@ result (not implemented). The question creator gains an 'Open' mode (name + stat
 the gradebook marks open questions ✎ (excluded from the auto score — `SubmissionGrade.score`
 is now over autogradeable questions only), shows a "manual review" stat tile instead of a pass
 rate, and the attempt drill-down displays the full response; the grading CLI prints a word
-count. Sample Q9 (the binary-vs-tally design question) + sample responses; `pipelineCheck`
-asserts the pending path. Verified: tsc/build clean, all four tool checks pass, and a
-store-level Node harness drove the open-question student flow (type → switch → reload →
-submit → pending result). Earlier same day: **sample turbot questions for all four inner modes** — the seeded
+count. A sample open question (the binary-vs-tally design question, now Q14) + sample
+responses; `pipelineCheck` asserts the pending path. Verified: tsc/build clean, all tool
+checks pass, and a store-level Node harness drove the open-question student flow (type →
+switch → reload → submit → pending result). Earlier same day: **sample turbot questions for
+all four inner modes** — the seeded
 sample assignment now has eight questions: CC/SC/FSM/TM plus one turbot question per inner
 mode (Q5 CC corridor, Q6 SC 3×3 L-course needing a MEM turner, Q7 FSM corridor, Q8 TM textbook
 walker on a tally/unary question), each with correct/incorrect sample brains wired into the
@@ -146,7 +171,12 @@ end-to-end:
   `turbot_cases` arena (`engine/turbot.ts` driver loop; turbot-TM tables validated by the
   notation-aware `validateTurbotTM`) and checks
   the case's success criterion (reach-and-stop / pass-through / return-to-start) — positional
-  results (`TurbotCaseResult`), not value comparisons. **Open questions aren't autograded at
+  results (`TurbotCaseResult`), not value comparisons. **Perception questions also grade outside
+  the codec** (`engine/perception.ts`, `gradePerception`): a CC/SC question with a `perception`
+  spec is graded bit-level against `perception_cases` — raw input frames in (one frame per SC
+  clock tick; the pre-first-frame "previous input" is the all-zero frame, matching MEM init),
+  one output bit compared per step, a case passing iff every step matches
+  (`PerceptionCaseResult`). **Open questions aren't autograded at
   all**: the answer travels as `responseText` on the submission and the grader returns a
   `'pending'` result carrying it for manual review (an LLM-grading pass could later replace
   that pending result — the seam is there, not implemented). Submissions **autograde on
@@ -157,9 +187,10 @@ end-to-end:
   per student showing the **latest** submission's scores (only the latest counts for grading) and a
   per-student attempt count; expanding a student reveals the full submission history with
   failed-case drill-down per attempt (value questions: input/expected/got; turbot questions:
-  arena #, steps taken, final pose, failure reason; open questions: the full text response,
-  marked ✎ and excluded from the auto score). Sample data for all six modes can be seeded
-  to demo the pipeline.
+  arena #, steps taken, final pose, failure reason; perception questions: input frames,
+  expected/got bit strings, first wrong step; open questions: the full text response,
+  marked ✎ and excluded from the auto score). Sample data for all six modes plus the five
+  perception problems can be seeded to demo the pipeline.
   The question creator is one shared form authoring **all six modes** (CC/SC/FSM/TM/turbot/open) —
   mode is an ordinary field, not a gate; question names are editable; there is no bit-width field
   and no example-preview table. CC/SC/FSM/TM questions compute exactly **one output**: the
@@ -173,6 +204,10 @@ end-to-end:
   **arena editor** (paint blocks/goals, place + rotate the turbot start; resizable up to 20×20;
   helpers in `instructor/arenaEditing.ts`), and a
   success criterion + max-steps pair; goal-directed criteria require a goal cell before save.
+  **Perception questions** (CC/SC only) are a "Task" toggle on the same form: pick a rule
+  (CC: ≥k run / exactly-k run / exact pattern; SC: change / upward motion), a retina size
+  (2–10 wires; a pattern's width is its length), and the bit-level case bank generates at save
+  (`buildPerceptionCases`); representation is implicitly binary bits.
   **Open questions** are just a name + question text (no representation, formula, or bank).
 - **Reference-function DSL** — instructors don't hand-write test cases. They declare a question's
   input/output groups + one representation and specify the correct output with a small
@@ -196,6 +231,11 @@ The missing half is the **server** and productized submit/grade loop.
   multi-arena authoring UI (the `turbot_cases` data model already holds a list; the creator
   authors one), and live-linking arena stepping to circuit-edit invalidation (currently the
   student Resets manually after editing mid-run, same as TM).
+- **Perception polish** — the CC/SC perception flow (rules, bit-level grading, authoring,
+  gradebook drill-down, samples) shipped 2026-07-06. Known follow-ups: a student-facing frame
+  player for SC perception (today students hand-enter per-wire input sequences in the normal SC
+  timeline to test their circuit), instructor-editable/custom frame sequences for SC banks (the
+  battery is fixed), and richer rules (downward/any-direction motion, multi-object scenes).
 - **Deferred authoring follow-ups** — the `requireStandardHaltPosition` TM acceptance toggle and
   mode-filtered `allowed_components` (both optional fields on `AssignmentQuestion`, not yet
   exposed in the question creator's editor UI).
@@ -258,6 +298,7 @@ the engine.
 | Engine        | `app/src/engine/testVectorGen.ts`, `formulaEval.ts`                            | Authoring-time: affine-formula language → `buildQuestionBank(inputs, outputs, rep, mode)` → `{spec, test_cases}` (widths derived; SC/FSM/TM sampled). Legacy `generateTestCases(spec, rep, mode)` remains for the sample data |
 | Engine        | `app/src/engine/representation.ts`, `index.ts`                                 | value↔bits core (`valueToBits`/`isValidCodeword`/`bitsToValue`) + display helpers; barrel exports                                          |
 | Engine        | `app/src/engine/turbot.ts`                                                     | Turbot arena driver loop: `senseAhead`(bit)/`senseAheadSymbol`(B/E/F)/`applyMotorCommand`, `runBrainStep`/`initialBrainState` (one transition per call: CC/SC circuit brains, the **turbot FSM** — Mealy transitions with full 2-bit motor outputs `in:ij`, own validator `validateTurbotFSM` — or the **turbot TM** — per-state internal/external kinds, single tape actions, ↑/↱/↰ motor labels, own validator `validateTurbotTM`; internal alphabet per the question's encoding, a `TMNotation` param — binary {0,1,*}, unary {0,1}), and `runTurbot` (`stopped` = motor 00 or a TM halt). `evaluateTurbotCriterion` judges `reach-and-stop` / `pass-through` / `return-to-start` (spec §12.5) |
+| Engine        | `app/src/engine/perception.ts`                                                 | Perception (bit-level, outside the codec): `PerceptionRule` evaluators (`hasRunAtLeast`/`hasRunExactly`/`singleObjectAt`/`expectedPerceptionOutputs` — the pre-first-frame "previous input" is the blank frame, "up" = toward IN1), save-time bank generation `buildPerceptionCases` (CC: exhaustive 2^width, width ≤ 10; SC: deterministic frame-sequence battery), `validatePerceptionMachine` (width inputs + 1 output), and `runPerceptionCase` (CC frame eval / SC clocked sequence) |
 | Store         | `app/src/store.ts`                                                             | Zustand UI state; delegates simulation to `engine/`. Per-mode sim state incl. TM (`tmTape`/`tmStep`/`setTmCell`) and turbot (`turbotState`/`turbotStep`/`turbotRun`, reset on question load/switch); selectors `selectTmNotation` (TM alphabet: open question's `representation`, sandbox falls back to `repSystem`), `selectTurbotArena`/`selectTurbotInnerMode`, and `selectEffectiveMode` (turbot → the question's `innerMode`; drives every editor-behavior branch), plus `assignmentView` ('overview' \| 'question') and `openResponse`/`setOpenResponse` (the open question's free-text answer, synced into `QuestionCircuit.responseText` at every canvas sync point)  |
 | Routing       | `app/src/routing.ts`                                                           | `Route` union, `parseHash`/`routeToHash`, `navigate()`                                                                                     |
 | Storage       | `app/src/storage/workbookStore.ts`, `AssignmentStore.ts`, `submissionStore.ts` | The three localStorage-backed seams                                                                                                        |
@@ -265,8 +306,8 @@ the engine.
 | Assignments   | `app/src/assignments/index.ts`, `cc-basics.json`                               | Bundled registry (`listAssignments`/`getAssignment`) + the one bundled CC assignment                                                       |
 | Instructor UI | `app/src/instructor/`                                                          | `InstructorApp`, `InstructorGate`, `InstructorDashboard`, `AssignmentEditor`, `QuestionCreator` (incl. turbot arena editor; pure paint/resize/place helpers in `arenaEditing.ts`), `Gradebook(.ts/View.tsx)`                 |
 | Student UI    | `app/src/components/`                                                          | `CircuitCanvas`, `ComponentLibrary`, `DataTable`, `HomeScreen`, `AssignmentOverview` (question list), `MenuBar`, `SequentialTimeline`, `TMTapePanel` (clickable tape), `ArenaCanvas` (shared arena grid renderer), `TurbotArenaPanel` ("Map" + run controls, in the right data panel), `TurbotTapePanel` (turbot TM's read-only internal tape), `OpenResponsePanel` (open question's writing panel; copy/cut/paste/drop blocked), `SimulationPanel`, `TabBar` (question nav bar in assignments) |
-| Dev/sample    | `app/src/devData/sampleData.ts`, `seed.ts`                                     | Builders + seeding for demo CC/SC/FSM/TM/turbot/open assignments and submissions                                                                |
-| Tools         | `app/tools/grade.ts`, `pipelineCheck.ts`, `codecCheck.ts`, `tmCheck.ts`, `turbotCheck.ts` | Headless CLI grader, submit→grade pipeline check (all six modes, incl. the open question's pending path), codec + rep-core unit checks, TM engine/codec/grader smoke test, and turbot engine/grader smoke test (`npx tsx`)          |
+| Dev/sample    | `app/src/devData/sampleData.ts`, `seed.ts`                                     | Builders + seeding for demo CC/SC/FSM/TM/turbot/perception/open assignments and submissions                                                                |
+| Tools         | `app/tools/grade.ts`, `pipelineCheck.ts`, `codecCheck.ts`, `tmCheck.ts`, `turbotCheck.ts`, `perceptionCheck.ts` | Headless CLI grader, submit→grade pipeline check (all modes, incl. perception and the open question's pending path), codec + rep-core unit checks, TM engine/codec/grader smoke test, turbot engine/grader smoke test, and perception rules/generation/grading smoke test (`npx tsx`)          |
 
 ## Reference-function DSL (instructor authoring)
 

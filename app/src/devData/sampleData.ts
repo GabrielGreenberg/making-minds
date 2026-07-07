@@ -1,6 +1,6 @@
 // Sample assignment + artificial submissions for exercising the full pipeline
 // (submit → store → autograde → instructor gradebook) across CC, SC, FSM, TM,
-// and turbot.
+// turbot, perception, and open questions.
 //
 // Pure and framework-agnostic: builds `AssignmentData` and `SubmissionData`
 // values only — no storage, no React. The browser dev seed (devData/seed.ts) and
@@ -23,15 +23,17 @@ import type {
   CCSpec,
   CircuitComponent,
   CircuitData,
+  PerceptionRule,
   RepSystem,
   SubmissionData,
   Wire,
 } from '../types';
 import { getPortsForType } from '../types';
 import { generateTestCases } from '../engine/testVectorGen';
+import { buildPerceptionCases, perceptionModeFor } from '../engine/perception';
 
 export const SAMPLE_ASSIGNMENT_ID = 'sample-mixed';
-const SAMPLE_ASSIGNMENT_TITLE = 'Sample — CC / SC / FSM / TM / Turbot';
+const SAMPLE_ASSIGNMENT_TITLE = 'Sample — CC / SC / FSM / TM / Turbot / Perception / Open';
 
 // ── small builders ─────────────────────────────────────────────
 
@@ -305,6 +307,198 @@ export function turbotTmIncorrect(): CircuitData {
   };
 }
 
+// ── Perception circuits: a tiny netlist builder ────────────────
+// The perception samples are too big to wire by hand (the motion detector is
+// ~80 gates), so they're generated: refs are (component, port) pairs, gates
+// take refs and return their output ref, and and/or fold over 2-input gates.
+// Splitting (one output → many inputs) is legal wiring, so refs can be reused.
+
+interface NetRef {
+  comp: string;
+  port: string;
+}
+
+class Netlist {
+  components: CircuitComponent[] = [];
+  wires: Wire[] = [];
+  private n = 0;
+  private prefix: string;
+  constructor(prefix: string) {
+    this.prefix = prefix;
+  }
+
+  private id(): string {
+    return `${this.prefix}-${++this.n}`;
+  }
+
+  connect(src: NetRef, tgt: NetRef): void {
+    this.wires.push(wire(this.id(), src.comp, src.port, tgt.comp, tgt.port));
+  }
+
+  input(label: string): NetRef {
+    const id = this.id();
+    this.components.push(comp(id, 'INPUT', label));
+    return { comp: id, port: 'out' };
+  }
+
+  output(label: string, from: NetRef): void {
+    const id = this.id();
+    this.components.push(comp(id, 'OUTPUT', label));
+    this.connect(from, { comp: id, port: 'in' });
+  }
+
+  /** A MEM register fed by `store`; the returned ref reads last cycle's value. */
+  mem(label: string, store: NetRef): NetRef {
+    const id = this.id();
+    this.components.push(comp(id, 'MEM', label, { memDirection: 'right-to-left', storedValue: 0 }));
+    this.connect(store, { comp: id, port: 'min' });
+    return { comp: id, port: 'mout' };
+  }
+
+  gate(type: 'AND' | 'OR' | 'XOR', a: NetRef, b: NetRef): NetRef {
+    const id = this.id();
+    this.components.push(comp(id, type, ''));
+    this.connect(a, { comp: id, port: 'in1' });
+    this.connect(b, { comp: id, port: 'in2' });
+    return { comp: id, port: 'out' };
+  }
+
+  not(a: NetRef): NetRef {
+    const id = this.id();
+    this.components.push(comp(id, 'NOT', ''));
+    this.connect(a, { comp: id, port: 'in' });
+    return { comp: id, port: 'out' };
+  }
+
+  and(refs: NetRef[]): NetRef {
+    return refs.reduce((a, b) => this.gate('AND', a, b));
+  }
+
+  or(refs: NetRef[]): NetRef {
+    return refs.reduce((a, b) => this.gate('OR', a, b));
+  }
+
+  circuit(): CircuitData {
+    return { components: this.components, wires: this.wires };
+  }
+}
+
+function retina(net: Netlist, width: number): NetRef[] {
+  return Array.from({ length: width }, (_, i) => net.input(`IN${i + 1}`));
+}
+
+// ── CC perception: edge detector (≥3 consecutive 1s over 8 inputs) ──
+// OUT1 = OR over every 3-window of AND(window bits).
+
+export function perceptionEdgeCorrect(): CircuitData {
+  const net = new Netlist('ped');
+  const ins = retina(net, 8);
+  const windows = Array.from({ length: 6 }, (_, p) => net.and([ins[p], ins[p + 1], ins[p + 2]]));
+  net.output('OUT1', net.or(windows));
+  return net.circuit();
+}
+
+// Wrong: fires on ANY stimulation (OR of all inputs) — e.g. fails on 10000000.
+export function perceptionEdgeIncorrect(): CircuitData {
+  const net = new Netlist('ped');
+  const ins = retina(net, 8);
+  net.output('OUT1', net.or(ins));
+  return net.circuit();
+}
+
+// ── CC perception: object detector (EXACTLY 3 consecutive 1s) ──
+// A maximal run of exactly 3: the window is all 1s and both neighbours
+// (where they exist) are 0.
+
+export function perceptionObjectCorrect(): CircuitData {
+  const net = new Netlist('pob');
+  const ins = retina(net, 8);
+  const terms = Array.from({ length: 6 }, (_, p) => {
+    const lits = [ins[p], ins[p + 1], ins[p + 2]];
+    if (p > 0) lits.push(net.not(ins[p - 1]));
+    if (p + 3 < 8) lits.push(net.not(ins[p + 3]));
+    return net.and(lits);
+  });
+  net.output('OUT1', net.or(terms));
+  return net.circuit();
+}
+
+// Wrong: the ≥3 edge detector — fails on a run of four (11110000).
+export function perceptionObjectIncorrect(): CircuitData {
+  return perceptionEdgeCorrect();
+}
+
+// ── CC perception: landmark recognition (input = 110010111, 9 inputs) ──
+// AND over all nine literals, negating the wires the pattern holds at 0.
+
+const LANDMARK = '110010111';
+
+export function perceptionLandmarkCorrect(): CircuitData {
+  const net = new Netlist('plm');
+  const ins = retina(net, LANDMARK.length);
+  net.output('OUT1', net.and(ins.map((r, i) => (LANDMARK[i] === '1' ? r : net.not(r)))));
+  return net.circuit();
+}
+
+// Wrong: AND over all inputs — fires on 111111111, misses the landmark.
+export function perceptionLandmarkIncorrect(): CircuitData {
+  const net = new Netlist('plm');
+  const ins = retina(net, LANDMARK.length);
+  net.output('OUT1', net.and(ins));
+  return net.circuit();
+}
+
+// ── SC perception: change detector (frame differs from previous frame) ──
+// One MEM per wire remembers last cycle's frame; XOR each wire against its
+// memory and OR the differences. MEMs start at 0, so the "previous input"
+// before the first frame is the blank frame — exactly the grading convention.
+
+export function perceptionChangeCorrect(): CircuitData {
+  const net = new Netlist('pch');
+  const ins = retina(net, 8);
+  const diffs = ins.map((r, i) => net.gate('XOR', r, net.mem(`M${i + 1}`, r)));
+  net.output('OUT1', net.or(diffs));
+  return net.circuit();
+}
+
+// Wrong: memoryless OR of the current frame — fails on a held nonzero frame
+// (says "change" forever) and on a change to the blank frame.
+export function perceptionChangeIncorrect(): CircuitData {
+  const net = new Netlist('pch');
+  const ins = retina(net, 8);
+  net.output('OUT1', net.or(ins));
+  return net.circuit();
+}
+
+// ── SC perception: motion detector (3-long object moving up 1/step) ──
+// matchNow(p) recognises "the frame is exactly one object at position p"
+// (AND over all 8 literals); matchPrev(q) recognises the same on the MEM
+// copy of the previous frame. Upward motion = object now at p, before at p+1.
+
+export function perceptionMotionCorrect(): CircuitData {
+  const net = new Netlist('pmo');
+  const ins = retina(net, 8);
+  const mems = ins.map((r, i) => net.mem(`M${i + 1}`, r));
+  const exactObjectAt = (wires: NetRef[], p: number): NetRef =>
+    net.and(wires.map((r, i) => (i >= p && i < p + 3 ? r : net.not(r))));
+  const terms = Array.from({ length: 5 }, (_, p) =>
+    net.gate('AND', exactObjectAt(ins, p), exactObjectAt(mems, p + 1)),
+  );
+  net.output('OUT1', net.or(terms));
+  return net.circuit();
+}
+
+// Wrong: detects an object in the CURRENT frame only (no memory of where it
+// was) — a static object reads as "moving".
+export function perceptionMotionIncorrect(): CircuitData {
+  const net = new Netlist('pmo');
+  const ins = retina(net, 8);
+  const exactObjectAt = (p: number): NetRef =>
+    net.and(ins.map((r, i) => (i >= p && i < p + 3 ? r : net.not(r))));
+  net.output('OUT1', net.or(Array.from({ length: 6 }, (_, p) => exactObjectAt(p))));
+  return net.circuit();
+}
+
 // ── Sample assignment (test cases generated from DSL formulas + rep) ──
 // Each question is value-based: the codec encodes inputs to the mode's axis,
 // runs the circuit, decodes the output, and compares to f(x).
@@ -479,11 +673,65 @@ export function buildSampleAssignment(): AssignmentData {
     ],
   };
 
+  // Perception questions (bit-level grading, outside the codec): the five
+  // problems from the perception homework specs — three CC (one frame) and
+  // two SC (a frame per clock tick).
+  const perceptionQuestion = (
+    id: number,
+    label: string,
+    statement: string,
+    rule: PerceptionRule,
+    width: number,
+  ): AssignmentQuestion => ({
+    id,
+    label,
+    statement,
+    buildMode: perceptionModeFor(rule),
+    representation: 'binary',
+    perception: { rule, width },
+    perception_cases: buildPerceptionCases({ rule, width }),
+  });
+
+  const edgeQuestion = perceptionQuestion(
+    9,
+    'Q9 (CC perception)',
+    'Edge detector. Design a machine (8 inputs, 1 output) that outputs 1 iff there is a string of at least three consecutive 1s anywhere in the input.',
+    { kind: 'min-run', runLength: 3 },
+    8,
+  );
+  const objectQuestion = perceptionQuestion(
+    10,
+    'Q10 (CC perception)',
+    'Object detector. Design a machine (8 inputs, 1 output) that outputs 1 iff there is a string of exactly three consecutive 1s anywhere in the input.',
+    { kind: 'exact-run', runLength: 3 },
+    8,
+  );
+  const landmarkQuestion = perceptionQuestion(
+    11,
+    'Q11 (CC perception)',
+    'Landmark recognition. Design a machine (9 inputs, 1 output) that outputs 1 iff the input = 110010111.',
+    { kind: 'pattern', pattern: LANDMARK },
+    LANDMARK.length,
+  );
+  const changeQuestion = perceptionQuestion(
+    12,
+    'Q12 (SC perception)',
+    'Change detector. Design a sequential machine (8 inputs, 1 output) that outputs 1 iff the current input differs in any way from the previous input.',
+    { kind: 'change' },
+    8,
+  );
+  const motionQuestion = perceptionQuestion(
+    13,
+    'Q13 (SC perception)',
+    'Motion detector. Let an object image be a string of exactly three consecutive 1s. Design a sequential machine (8 inputs, 1 output) that outputs 1 iff there is an object image anywhere in the input moving upwards 1 unit per unit of time.',
+    { kind: 'motion', objectLength: 3 },
+    8,
+  );
   // Open (free-text) question: answered in prose, not autograded — the grader
   // marks it `pending` and the gradebook shows the response for manual review.
   const openQuestion: AssignmentQuestion = {
-    id: 9,
-    label: 'Q9 (Open)',
+    id: 14,
+    label: 'Q14 (Open)',
     statement:
       'Representational systems. Suppose you were designing a calculator for solving a ' +
       'high-stakes problem. (Perhaps "you" are Nature, the "calculator" is the Brain, and ' +
@@ -505,15 +753,21 @@ export function buildSampleAssignment(): AssignmentData {
       turbotScQuestion,
       turbotFsmQuestion,
       turbotTmQuestion,
+      edgeQuestion,
+      objectQuestion,
+      landmarkQuestion,
+      changeQuestion,
+      motionQuestion,
       openQuestion,
     ],
   };
 }
 
 // ── Sample submissions ─────────────────────────────────────────
-// One answer per machine question, in question-id order (1..8):
-// CC, SC, FSM, TM, Turbot-CC, Turbot-SC, Turbot-FSM, Turbot-TM.
-// Q9 (open) gets a free-text response instead of a circuit.
+// One answer per machine question, in question-id order (1..13):
+// CC, SC, FSM, TM, Turbot-CC, Turbot-SC, Turbot-FSM, Turbot-TM,
+// then perception: edge, object, landmark, change, motion.
+// Q14 (open) gets a free-text response instead of a circuit.
 
 const SAMPLE_OPEN_RESPONSE =
   'I would design it to calculate in binary. A tally representation grows linearly with the ' +
@@ -533,7 +787,7 @@ function submission(
     submittedAt: '2026-06-27T12:00:00.000Z', // stamped by caller in real flow
     answers: [
       ...circuits.map((circuit, i) => ({ questionId: i + 1, circuit })),
-      { questionId: 9, circuit: { components: [], wires: [] }, responseText: openResponse },
+      { questionId: 14, circuit: { components: [], wires: [] }, responseText: openResponse },
     ],
   };
 }
@@ -542,6 +796,8 @@ function allCorrect(): CircuitData[] {
   return [
     ccCorrect(), scCorrect(), fsmCorrect(), tmCorrect(),
     turbotCorrect(), turbotScCorrect(), turbotFsmCorrect(), turbotTmCorrect(),
+    perceptionEdgeCorrect(), perceptionObjectCorrect(), perceptionLandmarkCorrect(),
+    perceptionChangeCorrect(), perceptionMotionCorrect(),
   ];
 }
 
@@ -549,15 +805,17 @@ function allIncorrect(): CircuitData[] {
   return [
     ccIncorrect(), scIncorrect(), fsmIncorrect(), tmIncorrect(),
     turbotIncorrect(), turbotScIncorrect(), turbotFsmIncorrect(), turbotTmIncorrect(),
+    perceptionEdgeIncorrect(), perceptionObjectIncorrect(), perceptionLandmarkIncorrect(),
+    perceptionChangeIncorrect(), perceptionMotionIncorrect(),
   ];
 }
 
-/** All-correct submission (should score 8/8). */
+/** All-correct submission (should score 13/13). */
 export function buildCorrectSubmission(student = 'correct@example.com'): SubmissionData {
   return submission(student, allCorrect());
 }
 
-/** All-incorrect submission (should score 0/8; the open answer is left blank). */
+/** All-incorrect submission (should score 0/13; the open answer is left blank). */
 export function buildIncorrectSubmission(student = 'wrong@example.com'): SubmissionData {
   return submission(student, allIncorrect(), '');
 }
@@ -574,11 +832,12 @@ export function buildSampleSubmissions(): SubmissionData[] {
     const bad = allIncorrect();
     return submission(student, good.map((c, i) => (correctIds.includes(i + 1) ? c : bad[i])));
   };
+  const all = Array.from({ length: 13 }, (_, i) => i + 1);
   return [
-    mixed('ada@example.com', [1, 2, 3, 4, 5, 6, 7, 8]), // 8/8
-    mixed('alan@example.com', [1, 3, 4, 5, 6, 7, 8]), // 7/8 (SC wrong)
-    mixed('grace@example.com', [1, 2, 5, 6]), // 4/8
-    mixed('claude@example.com', []), // 0/8
-    mixed('', [1, 2, 3, 4, 5, 6, 7, 8]), // Anonymous, 8/8
+    mixed('ada@example.com', all), // 13/13
+    mixed('alan@example.com', all.filter((id) => id !== 2)), // 12/13 (SC wrong)
+    mixed('grace@example.com', [1, 2, 5, 6, 9, 12]), // 6/13
+    mixed('claude@example.com', []), // 0/13
+    mixed('', all), // Anonymous, 13/13
   ];
 }
