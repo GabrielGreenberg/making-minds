@@ -1,6 +1,6 @@
 // Sample assignment + artificial submissions for exercising the full pipeline
 // (submit → store → autograde → instructor gradebook) across CC, SC, FSM, TM,
-// and turbot.
+// turbot, perception, and open questions.
 //
 // Pure and framework-agnostic: builds `AssignmentData` and `SubmissionData`
 // values only — no storage, no React. The browser dev seed (devData/seed.ts) and
@@ -33,7 +33,7 @@ import { generateTestCases } from '../engine/testVectorGen';
 import { buildPerceptionCases, perceptionModeFor } from '../engine/perception';
 
 export const SAMPLE_ASSIGNMENT_ID = 'sample-mixed';
-const SAMPLE_ASSIGNMENT_TITLE = 'Sample — CC / SC / FSM / TM / Turbot / Perception';
+const SAMPLE_ASSIGNMENT_TITLE = 'Sample — CC / SC / FSM / TM / Turbot / Perception / Open';
 
 // ── small builders ─────────────────────────────────────────────
 
@@ -727,6 +727,19 @@ export function buildSampleAssignment(): AssignmentData {
     { kind: 'motion', objectLength: 3 },
     8,
   );
+  // Open (free-text) question: answered in prose, not autograded — the grader
+  // marks it `pending` and the gradebook shows the response for manual review.
+  const openQuestion: AssignmentQuestion = {
+    id: 14,
+    label: 'Q14 (Open)',
+    statement:
+      'Representational systems. Suppose you were designing a calculator for solving a ' +
+      'high-stakes problem. (Perhaps "you" are Nature, the "calculator" is the Brain, and ' +
+      'the "problem" is Survival.) Would you design it to calculate in binary or in tally? ' +
+      'Why? Use specific examples to justify your answer. ~1 paragraph.',
+    buildMode: 'open',
+    representation: 'binary', // meaningless for open questions; type uniformity
+  };
 
   return {
     id: SAMPLE_ASSIGNMENT_ID,
@@ -745,21 +758,37 @@ export function buildSampleAssignment(): AssignmentData {
       landmarkQuestion,
       changeQuestion,
       motionQuestion,
+      openQuestion,
     ],
   };
 }
 
 // ── Sample submissions ─────────────────────────────────────────
-// One answer per question, in question-id order (1..13):
+// One answer per machine question, in question-id order (1..13):
 // CC, SC, FSM, TM, Turbot-CC, Turbot-SC, Turbot-FSM, Turbot-TM,
 // then perception: edge, object, landmark, change, motion.
+// Q14 (open) gets a free-text response instead of a circuit.
 
-function submission(student: string, circuits: CircuitData[]): SubmissionData {
+const SAMPLE_OPEN_RESPONSE =
+  'I would design it to calculate in binary. A tally representation grows linearly with the ' +
+  'value — representing 1,000,000 takes a million strokes — while binary grows with the ' +
+  'logarithm, so twenty bits suffice. For a brain solving survival under tight energy and ' +
+  'time budgets, compact codes mean fewer components, faster operations, and less to go ' +
+  'wrong: an adder over 20 wires beats one over a million.';
+
+function submission(
+  student: string,
+  circuits: CircuitData[],
+  openResponse: string = SAMPLE_OPEN_RESPONSE,
+): SubmissionData {
   return {
     assignmentTitle: SAMPLE_ASSIGNMENT_TITLE,
     student,
     submittedAt: '2026-06-27T12:00:00.000Z', // stamped by caller in real flow
-    answers: circuits.map((circuit, i) => ({ questionId: i + 1, circuit })),
+    answers: [
+      ...circuits.map((circuit, i) => ({ questionId: i + 1, circuit })),
+      { questionId: 14, circuit: { components: [], wires: [] }, responseText: openResponse },
+    ],
   };
 }
 
@@ -786,9 +815,9 @@ export function buildCorrectSubmission(student = 'correct@example.com'): Submiss
   return submission(student, allCorrect());
 }
 
-/** All-incorrect submission (should score 0/13). */
+/** All-incorrect submission (should score 0/13; the open answer is left blank). */
 export function buildIncorrectSubmission(student = 'wrong@example.com'): SubmissionData {
-  return submission(student, allIncorrect());
+  return submission(student, allIncorrect(), '');
 }
 
 /**
@@ -803,11 +832,12 @@ export function buildSampleSubmissions(): SubmissionData[] {
     const bad = allIncorrect();
     return submission(student, good.map((c, i) => (correctIds.includes(i + 1) ? c : bad[i])));
   };
+  const all = Array.from({ length: 13 }, (_, i) => i + 1);
   return [
-    mixed('ada@example.com', [1, 2, 3, 4, 5, 6, 7, 8]), // 8/8
-    mixed('alan@example.com', [1, 3, 4, 5, 6, 7, 8]), // 7/8 (SC wrong)
-    mixed('grace@example.com', [1, 2, 5, 6]), // 4/8
-    mixed('claude@example.com', []), // 0/8
-    mixed('', [1, 2, 3, 4, 5, 6, 7, 8]), // Anonymous, 8/8
+    mixed('ada@example.com', all), // 13/13
+    mixed('alan@example.com', all.filter((id) => id !== 2)), // 12/13 (SC wrong)
+    mixed('grace@example.com', [1, 2, 5, 6, 9, 12]), // 6/13
+    mixed('claude@example.com', []), // 0/13
+    mixed('', all), // Anonymous, 13/13
   ];
 }

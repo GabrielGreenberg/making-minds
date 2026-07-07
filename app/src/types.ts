@@ -1,6 +1,10 @@
 // Core types for the Making Minds platform
 
-export type BuildMode = 'CC' | 'SC' | 'FSM' | 'turbot' | 'TM';
+// 'open' is the one non-machine mode: a free-text ("open question") answer with
+// no canvas, no engine, and no autograding — reviewed manually by the
+// instructor (or, later, by an LLM). Its student answer travels as
+// `responseText`, not a circuit, and the grader marks it `pending`.
+export type BuildMode = 'CC' | 'SC' | 'FSM' | 'turbot' | 'TM' | 'open';
 export type RepSystem = 'tally' | 'binary' | 'plus';
 export type DisplayMode = 'IO' | 'AV';
 export type Scope = 'local' | 'global';
@@ -184,7 +188,9 @@ export interface SubmissionData {
   assignmentTitle: string;
   student?: string;        // free-form identity; auth-agnostic, falls back to filename
   submittedAt: string;     // ISO timestamp
-  answers: { questionId: number; circuit: CircuitData }[];
+  // Open questions carry their free-text answer in `responseText` (their
+  // circuit is empty); machine questions carry only the circuit.
+  answers: { questionId: number; circuit: CircuitData; responseText?: string }[];
 }
 
 // ─── Autograding results ─────────────────────────────────────────
@@ -208,11 +214,17 @@ export interface CaseResult {
   reason?: string;
 }
 
-/** Grading outcome for one question of a submission. */
+/**
+ * Grading outcome for one question of a submission. `pending` is an open
+ * question awaiting manual (or, later, LLM) review: the autograder cannot
+ * score it, so it contributes nothing to the passed/total tallies and carries
+ * the student's `response` for the reviewer instead.
+ */
 export interface QuestionResult {
   questionId: number;
-  status: 'graded' | 'skipped';
-  reason?: string;         // why it was skipped
+  status: 'graded' | 'skipped' | 'pending';
+  reason?: string;         // why it was skipped / is pending
+  response?: string;       // open questions: the student's free-text answer
   passed: number;          // test cases passed
   total: number;           // test cases total
   cases: CaseResult[];
@@ -246,13 +258,16 @@ export interface SubmissionRecord {
   result?: SubmissionResult; // autograde computed at receipt (see SubmissionStore)
 }
 
-/** Saved canvas state for one assignment question (circuit + annotations). */
+/** Saved canvas state for one assignment question (circuit + annotations).
+ *  Open questions reuse the same container with `responseText` holding the
+ *  student's free-text answer (their canvas fields stay empty). */
 export interface QuestionCircuit {
   components: CircuitComponent[];
   wires: Wire[];
   textElements: TextElement[];
   comments: CommentElement[];
   boxes: BoxDefinition[];
+  responseText?: string;
 }
 
 /** A student's in-progress work for one assignment — the persisted payload. */

@@ -89,9 +89,33 @@ function tally(questionId: number, cases: CaseResult[]): QuestionResult {
 }
 
 /**
- * Grade a single question's circuit against its numeric test cases.
+ * Open questions cannot be autograded: the result is `pending` (manual review;
+ * an LLM-grading pass could later consume the same `response` field and
+ * replace the pending result with a scored one). Contributes 0/0 to the
+ * tallies so it never moves the autograded score.
  */
-export function gradeQuestion(question: AssignmentQuestion, circuit: CircuitData | undefined): QuestionResult {
+function pendingOpen(questionId: number, responseText: string | undefined): QuestionResult {
+  return {
+    questionId,
+    status: 'pending',
+    reason: 'open question — needs manual review',
+    response: responseText ?? '',
+    passed: 0,
+    total: 0,
+    cases: [],
+  };
+}
+
+/**
+ * Grade a single question's circuit against its numeric test cases.
+ * `responseText` is the free-text answer for open questions (unused otherwise).
+ */
+export function gradeQuestion(
+  question: AssignmentQuestion,
+  circuit: CircuitData | undefined,
+  responseText?: string,
+): QuestionResult {
+  if (question.buildMode === 'open') return pendingOpen(question.id, responseText);
   if (!circuit) return skip(question.id, 'no circuit submitted');
   if (question.buildMode === 'turbot') return gradeTurbot(question, circuit);
   if (question.perception) return gradePerception(question, circuit);
@@ -306,9 +330,12 @@ function gradeTurbotCase(circuit: CircuitData, innerMode: BuildMode, tc: TurbotT
  * assignment question to its submitted answer by question id.
  */
 export function gradeSubmission(assignment: AssignmentData, submission: SubmissionData): SubmissionResult {
-  const byId = new Map(submission.answers.map((a) => [a.questionId, a.circuit]));
+  const byId = new Map(submission.answers.map((a) => [a.questionId, a]));
 
-  const questions = assignment.questions.map((q) => gradeQuestion(q, byId.get(q.id)));
+  const questions = assignment.questions.map((q) => {
+    const answer = byId.get(q.id);
+    return gradeQuestion(q, answer?.circuit, answer?.responseText);
+  });
 
   const passed = questions.reduce((n, r) => n + r.passed, 0);
   const total = questions.reduce((n, r) => n + r.total, 0);

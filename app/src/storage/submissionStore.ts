@@ -25,7 +25,8 @@ import { gradeSubmission } from '../engine/grader';
  * Build a submission snapshot from an assignment definition and the student's
  * per-question canvases. Pure (no storage/clock), so it's testable and works
  * identically whether the circuits come from live store state or persisted
- * state. Only the gradeable circuit (components + wires) is included per answer.
+ * state. Only the gradeable circuit (components + wires) is included per answer;
+ * an open question's answer carries its free-text `responseText` instead.
  */
 export function buildSubmission(
   def: AssignmentData,
@@ -38,7 +39,12 @@ export function buildSubmission(
     submittedAt: opts.submittedAt,
     answers: def.questions.map((q) => {
       const c = questionCircuits.get(q.id) ?? emptyQuestionCircuit();
-      return { questionId: q.id, circuit: { components: c.components, wires: c.wires } };
+      const answer: SubmissionData['answers'][number] = {
+        questionId: q.id,
+        circuit: { components: c.components, wires: c.wires },
+      };
+      if (q.buildMode === 'open') answer.responseText = c.responseText ?? '';
+      return answer;
     }),
   };
 }
