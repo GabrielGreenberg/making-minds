@@ -6,3 +6,8 @@ dist-ssr
 .claude/
 
 notes/
+
+# server database files
+*.sqlite
+*.sqlite-wal
+*.sqlite-shm
