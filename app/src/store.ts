@@ -560,6 +560,12 @@ interface AppState {
   // (square, sense/move ops). Outgoing transition labels are reset to the new
   // kind's default since the grammars are disjoint.
   toggleStateKind: (id: string) => void;
+
+  // Flush EVERY mode's transient sim state (SC/FSM/TM/turbot + the I/O table).
+  // Question navigation must call this — the sim slices are shared app-wide,
+  // not per-question, so anything left in them shows up against the next
+  // question's circuit.
+  resetAllSimState: () => void;
 }
 
 function snapToGrid(val: number): number {
@@ -1303,8 +1309,7 @@ export const useStore = create<AppState>()((set, get) => ({
       openResponse: '',
       buildMode: assignment.questions[0]?.buildMode || 'CC',
     });
-    get().tmGlobalReset();
-    get().turbotReset();
+    get().resetAllSimState();
   },
   openAssignment: (id) => {
     const def = getAssignment(id);
@@ -1335,8 +1340,7 @@ export const useStore = create<AppState>()((set, get) => ({
       buildMode: activeQ?.buildMode || 'CC',
       workbookOpen: true,
     });
-    get().tmGlobalReset();
-    get().turbotReset();
+    get().resetAllSimState();
     return true;
   },
   goHome: () => {
@@ -1430,8 +1434,7 @@ export const useStore = create<AppState>()((set, get) => ({
       openResponse: saved.responseText ?? '',
       buildMode: nextQ.buildMode,
     });
-    get().tmGlobalReset();
-    get().turbotReset();
+    get().resetAllSimState();
   },
   closeAssignment: () => {
     set({
@@ -3484,6 +3487,17 @@ export const useStore = create<AppState>()((set, get) => ({
       turbotHalted: false,
       turbotStopReason: null,
     });
+  },
+
+  // One aggregate reset for question navigation. Delegates to the per-mode
+  // global resets so each slice's field list lives in exactly one place;
+  // turbotReset runs last because it re-derives brain state from the (possibly
+  // just-remapped) live components.
+  resetAllSimState: () => {
+    get().scGlobalReset();
+    get().fsmGlobalReset();
+    get().tmGlobalReset();
+    get().turbotReset();
   },
 
   toggleStateKind: (id) => {
