@@ -85,15 +85,13 @@ export interface LayoutViolation {
 }
 
 /**
- * Route one machine exactly as the canvas would and return every layout
- * violation. Pure geometry — grading is the coverage harness's job.
+ * Build route inputs for a machine exactly like CircuitCanvas (wire array
+ * order). Exported so routerCheck can route fixture machines directly and
+ * inspect the per-wire results (usedFallback / violation flags).
  */
-export function checkCircuitLayout(machine: CircuitData, machineName = 'machine'): LayoutViolation[] {
+export function buildRouteInputs(machine: CircuitData): WireRouteInput[] {
   const components = machine.components as CircuitComponent[];
   const wires = machine.wires as Wire[];
-  const violations: LayoutViolation[] = [];
-
-  // Build route inputs exactly like CircuitCanvas (wire array order).
   const routeInputs: WireRouteInput[] = [];
   for (const w of wires) {
     const sourceComp = components.find((c) => c.id === w.sourceComponentId);
@@ -116,7 +114,18 @@ export function checkCircuitLayout(machine: CircuitData, machineName = 'machine'
       sourcePortKey: `${w.sourceComponentId}:${w.sourcePortId}`,
     });
   }
+  return routeInputs;
+}
 
+/**
+ * Route one machine exactly as the canvas would and return every layout
+ * violation. Pure geometry — grading is the coverage harness's job.
+ */
+export function checkCircuitLayout(machine: CircuitData, machineName = 'machine'): LayoutViolation[] {
+  const components = machine.components as CircuitComponent[];
+  const violations: LayoutViolation[] = [];
+
+  const routeInputs = buildRouteInputs(machine);
   const results = routeAllWires(routeInputs, components, undefined);
 
   // Enumerate segments.

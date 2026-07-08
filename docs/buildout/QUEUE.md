@@ -167,7 +167,17 @@ before Phase 3 (perception returns to router-rendered CC/SC). Task ids unchanged
 
 ## Phase 3 — Perception
 
-- [~] **P1.8** **Renderer: wire lanes and junction dots.** — _S3 LANDED
+- [x] **P1.8** **Renderer: wire lanes and junction dots — COMPLETE** _(S4
+  landed 2026-07-08, iteration 31: fallback phase-0 pre-classification
+  (`isEndpointDoomed`, doomed wires route first and register occupancy; route
+  corpus byte-identical across all 62 fixture machines), per-wire
+  `usedFallback`/`violation` flags from a read-only H-predicate sweep +
+  subtle canvas surfacing (amber dashed halo + tooltip on violations only),
+  and a routerCheck §6 regression pin: the P1.3-era hw3-p4 layout (recovered
+  from git 0d0c5e5) routes violation-free today. Lane-nudge skipped with
+  evidence (sole residual fallback hw3-p9-w21 is oracle-clean); S5 perf
+  declined — routing is ~3× faster since S3 and nothing demands more)._
+  **Renderer: wire lanes and junction dots.** — _S3 LANDED
   2026-07-07 (the concurrent chip session; commit "Router world model unified
   with the layout oracle", wireRouter.ts + routerCheck.ts + bumpCheck.ts).
   Checked against the acceptance list below: own-endpoint exemption ✓ (budget

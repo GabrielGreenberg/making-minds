@@ -38,6 +38,20 @@
 //      collision range of a CANVAS-side crossing (whose bump arc the canvas
 //      bakes into pathD from displayed points — NOT the router's crossing
 //      set) is skipped.
+//
+//   5. ROUTE-QUALITY FLAGS — WireRouteResult.usedFallback / .violation (S4:
+//      warn-don't-block). The doomed tripwire wire carries BOTH flags (its
+//      phase-0 fallback L-path cuts through the foreign blocker); hw3-p9's
+//      residual w21 carries usedFallback with NO violation (its fallback is
+//      oracle-clean — which is exactly why the S4 lane-nudge was skipped);
+//      A*-routed wires carry neither.
+//
+//   6. PRE-FIX LAYOUT — the historical hw3-p4 layout (P1.3-era positions,
+//      git 0d0c5e5; 4 collinear-overlap pairs under the pre-P1.8 router —
+//      it was repositioned in P1.7 to dodge them) must route oracle-clean
+//      under TODAY's router with no repositioning. Fallbacks allowed,
+//      violations not: the pin asserts the world-model fix solved the actual
+//      historical failure rather than the fixture nudge hiding it.
 
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -48,14 +62,22 @@ import {
   getPortPositionLocal,
 } from '../src/componentGeometry';
 import {
+  routeAllWires,
   resetFallbackCount,
   getFallbackCount,
   getFallbackWireIds,
   findDivergencePoints,
   type DisplayedWirePath,
 } from '../src/wireRouter';
-import { checkCircuitLayout, checkFixtureLayout } from './layoutCheck';
+import { buildRouteInputs, checkCircuitLayout, checkFixtureLayout } from './layoutCheck';
 import { comp, wire, circuit } from './builder';
+import type { CircuitData, CircuitComponent } from '../src/types';
+
+/** Route a machine exactly as the canvas/oracle would and return the raw
+ *  per-wire results (for the flag pins — checkCircuitLayout hides them). */
+function routeMachine(machine: CircuitData) {
+  return routeAllWires(buildRouteInputs(machine), machine.components as CircuitComponent[], undefined);
+}
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const FIXTURES = join(HERE, 'fixtures');
@@ -286,6 +308,105 @@ console.log('\nDIVERGENCE DOTS — junction dots on displayed fan-out paths');
   dots = findDivergencePoints([dw(KEY, A), dw(KEY, B)], [p(215, 100)]);
   check('crossing beyond bump-collision range leaves the dot',
     dots.length === 1 && nearPt(dots[0], 200, 100));
+}
+
+// ─── 5. Route-quality flags — usedFallback / violation ──────────────────────
+
+console.log('\nROUTE-QUALITY FLAGS — usedFallback / violation on WireRouteResult');
+{
+  // hw3-p9: the one fixture with residual fallbacks. w21's FINAL route must
+  // be flagged usedFallback; and it must be violation-free — the recorded
+  // rationale for skipping the S4 lane-nudge. Every A*-routed wire in the
+  // same machine carries neither flag.
+  const p9 = JSON.parse(
+    readFileSync(join(FIXTURES, 'reference', 'hw3-p9.json'), 'utf8'),
+  ) as { correct: CircuitData };
+  resetFallbackCount();
+  const p9Results = routeMachine(p9.correct);
+  const w21 = p9Results.find((r) => r.wireId === 'hw3-p9-w21');
+  const otherFlagged = p9Results.filter(
+    (r) => r.wireId !== 'hw3-p9-w21' && (r.usedFallback || r.violation),
+  );
+  check('hw3-p9 w21 (residual fallback) is flagged usedFallback',
+    w21?.usedFallback === true);
+  check('hw3-p9 w21 fallback is oracle-clean (no violation — lane-nudge not needed)',
+    w21 !== undefined && w21.violation === undefined);
+  check('no other hw3-p9 wire carries a flag', otherFlagged.length === 0);
+
+  // Doomed tripwire (same layout as §2): the OUTPUT's stub tip is buried in
+  // a FOREIGN AND's bounds, so phase 0 sends the wire straight to the
+  // fallback — and its L-path cuts through the blocker's rendered body, so
+  // the final oracle-predicate sweep must flag a violation too.
+  const doomed = circuit(
+    [
+      comp('in2', 'INPUT', 'IN1', 100, 100),
+      comp('blocker', 'AND', 'AND', 330, 85),
+      comp('out2', 'OUTPUT', 'OUT1', 400, 100),
+    ],
+    [wire('w3', 'in2', 'out', 'out2', 'in')],
+  );
+  resetFallbackCount();
+  const doomedResults = routeMachine(doomed);
+  const w3 = doomedResults.find((r) => r.wireId === 'w3');
+  check('doomed wire is flagged usedFallback (phase-0 fallback)',
+    w3?.usedFallback === true);
+  check('doomed wire carries a body-pass-through violation naming the blocker',
+    w3?.violation !== undefined && w3.violation.includes('blocker'));
+  check('doomed wire falls back exactly once (phase 0; validation skips doomed wires)',
+    getFallbackCount() === 1);
+}
+
+// ─── 6. Pre-fix layout regression pin ────────────────────────────────────────
+// The P1.3-era hw3-p4 component positions (git 0d0c5e5). Under the pre-P1.8
+// router this layout produced 4 collinear-overlap pairs (LOG 2026-07-06,
+// iteration 7) and was repositioned to dodge them — the fixture nudge, not a
+// router fix. Today's router must route the ORIGINAL layout clean: displace
+// the current fixture's components back to the historical positions and run
+// the full oracle. Fallbacks are allowed (reported only); violations are not.
+
+console.log('\nPRE-FIX LAYOUT — historical hw3-p4 (P1.3 positions) routes oracle-clean today');
+{
+  const PREFIX_POSITIONS: Record<string, Record<string, { x: number; y: number }>> = {
+    correct: {
+      'hw3-p4-in1': { x: 80, y: 320 },
+      'hw3-p4-m1': { x: 360, y: 60 },
+      'hw3-p4-m2': { x: 680, y: 60 },
+      'hw3-p4-not1': { x: 360, y: 220 },
+      'hw3-p4-or1': { x: 520, y: 140 },
+      'hw3-p4-or2': { x: 600, y: 320 },
+    },
+    broken: {
+      'hw3-p4-in1': { x: 80, y: 320 },
+      'hw3-p4-m1': { x: 360, y: 60 },
+      'hw3-p4-out1': { x: 760, y: 320 },
+    },
+  };
+
+  const fx = JSON.parse(
+    readFileSync(join(FIXTURES, 'reference', 'hw3-p4.json'), 'utf8'),
+  ) as { correct: CircuitData; broken: CircuitData };
+
+  for (const key of ['correct', 'broken'] as const) {
+    const machine = JSON.parse(JSON.stringify(fx[key])) as CircuitData;
+    let displaced = 0;
+    for (const c of machine.components as CircuitComponent[]) {
+      const pos = PREFIX_POSITIONS[key][c.id];
+      if (pos && (c.x !== pos.x || c.y !== pos.y)) {
+        c.x = pos.x;
+        c.y = pos.y;
+        displaced++;
+      }
+    }
+    check(`${key}: historical displacement applied (fixture has drifted from P1.7 positions)`,
+      displaced === Object.keys(PREFIX_POSITIONS[key]).length);
+
+    resetFallbackCount();
+    const violations = checkCircuitLayout(machine, `hw3-p4-prefix-${key}`);
+    for (const v of violations) console.log(`    [${v.kind}] ${v.machine}: ${v.detail}`);
+    const n = getFallbackCount();
+    if (n > 0) console.log(`    (${key}: ${n} fallback(s) — allowed here: ${getFallbackWireIds().join(', ')})`);
+    check(`${key}: zero oracle violations on the pre-fix layout`, violations.length === 0);
+  }
 }
 
 console.log(`\n${failures === 0 ? 'ROUTER CHECK OK' : `ROUTER CHECK FAILED (${failures} checks)`}`);

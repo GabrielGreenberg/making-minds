@@ -1338,3 +1338,35 @@ parityCheck), app tsc/check/build (coverage 56/56 at-tier, 0 warnings).
 **Next:** nothing loop-actionable remains. Open: P6.1b (turbot color —
 Gabriel), P6.4 (Remote-store cutover — Gabriel), the CI job proposal
 (Gabriel), optional S4/P4.4/P4.5. The loop parks.
+
+## 2026-07-08 (iteration 31) — P1.8 S4: the router program completes
+
+**Shipped (re-scoped to post-S3 reality — S4 was designed at 99+ fallbacks,
+built at 2):** phase-0 fallback pre-classification (`isEndpointDoomed` finds
+stub tips buried in FOREIGN bounds; doomed wires take the L-path FIRST and
+register occupancy so every later A* sees their lanes; validation skips them
+— reroutes could only re-fail identically) with the route corpus proven
+BYTE-IDENTICAL across all 62 CC/SC fixture machines; per-wire
+`usedFallback`/`violation` flags from a final read-only sweep using the
+router's own H-predicates (tools/ can't be imported from src/), surfaced as
+a hover tooltip + faint amber dashed halo on violations only (wire color
+stays semantic — browser-verified live); routerCheck §6 pins that the
+P1.3-era hw3-p4 layout (recovered from git history, 4 collinear pairs
+pre-P1.8) routes violation-free today; §5 pins the flags. Lane-nudge
+SKIPPED with evidence: the suite's sole fallback (hw3-p9-w21) is
+oracle-clean, nothing to nudge. No existing pin changed — additions only.
+All gates exit 0 (app + server; 56/56 at-tier).
+
+**P1.8 closes fully** — from the phantom 75×70 MEM and 283 obstacle-blind
+fallbacks (iteration 16) to a unified world model with 2 understood,
+flagged, pinned residuals: geometry seam (S1), divergence dots (S2),
+own-endpoint exemption + H4 + bumpCheck gate (S3, chip session), phase-0 +
+flags + regression pin (S4). S5 (perf) declined — S3 already made routing
+~3× faster and nothing demands more.
+
+**Note:** the S4 agent left the dev server on :5173 running after its live
+check; harmless, next browser task will reuse or restart it.
+
+**Next:** P4.4 (turbot sandbox tab) — the last substantive optional — then
+P4.5 (category taxonomy, may close as unwarranted). Gabriel-gated: P6.1b,
+P6.4, the CI job.
