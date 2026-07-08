@@ -513,13 +513,20 @@ HANDOFF's "do this next = P4.3". Task ids unchanged. -->
   per-group ARG; stale "46/56, 9 navigation remaining" What's-next bullet
   rewritten). Stale COVERAGE notes fixed (hw1-p2 "unenforced", hw3-p12 "still
   open" appr findings, header). HANDOFF rewritten to the close-out state.
-- [ ] **P6.3** _(enqueued iteration 21, merge-#3 report; re-homed here from
-  Phase 4 by the iteration-23 audit)_ **Server↔engine grading parity pin:**
-  serverCheck and pipelineCheck should share a fixture — same submission graded
-  via HTTP (server/src, engine imported cross-package) and via direct
-  `gradeSubmission` must yield identical results; plus fold
-  `server: typecheck + check` into the repo's CI/gate story. Guards the
-  Evaluation seam's "same code grades on server" promise as both sides evolve.
+- [x] **P6.3** **Server↔engine grading-parity pin.** — _done 2026-07-08
+  (iteration 30)._ `server/tools/parityCheck.ts` (31 checks, chained into
+  `server npm run check`): six-mode fixture assignment (CC/SC/FSM/TM axes +
+  turbot with failing criterion-reasons on the wire + perception + open)
+  submitted through the REAL booted server and deep-compared path-by-path
+  against in-process `gradeSubmission` — byte-identical as JSON values; only
+  server-owned envelope fields (ids/timestamps/mirrors) asserted rather than
+  compared, each documented. **HEADLINE: the pin found and fixed two real
+  student-facing answer leaks** — sanitize.ts predated perception and shipped
+  `perception_cases` (the answer key) in student assignment copies AND
+  `perceptionCases` detail in post-release records; fixed, adversarially
+  confirmed (pin fails 2 checks against the pre-fix file). CI note: no checks
+  run in CI today (deploy.yml builds only); a server-checks job needs Node
+  ≥22.5 — proposed YAML recorded in LOG iteration 30, GABRIEL'S CALL to add.
 - [ ] **P6.4** _(enqueued iteration 21; re-homed here from Phase 4 by the
   iteration-23 audit)_ **Remote-store cutover** (backend phase): async
   `Remote*` stores backed by `api/client.ts` (currently 1:1, imported by

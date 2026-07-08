@@ -1295,3 +1295,46 @@ as iteration 24). Not edited.
 
 **Verdict: the close-out is DONE pending only Gabriel-gated items
 (P6.1b / P6.3 / P6.4).** No loop-actionable work remains; the loop parks.
+
+## 2026-07-08 (iteration 30) — P6.3: the parity pin lands · and catches two real answer leaks
+
+**Shipped:** `server/tools/parityCheck.ts` (31 checks, in `server npm run
+check`): a six-mode fixture assignment (hw2-p7 CC, hw3-p6 SC, hw4-p11 FSM,
+hw5-p9 TM, hw6-p2 turbot — failing arenas put criterion-named reasons +
+hitStepLimit on the wire, hw2-p12 perception, devData open) submitted twice
+(correct + broken/never-stopping variants) through the REAL booted server
+(API-authored assignment, student POST, instructor GET) and deep-compared
+path-by-path against in-process `gradeSubmission`. **Grading parity:
+byte-identical.** Envelope normalization limited to JSON round-trip + five
+documented server-owned fields; nothing inside `result` is normalized.
+
+**HEADLINE:** the sanitization half of the pin caught TWO real student-facing
+answer leaks — `sanitize.ts` predated the perception feature: (1) student
+assignment copies shipped `perception_cases` = the expected-classification
+answer key; (2) post-release student records shipped per-case
+`perceptionCases` detail. Both fixed in sanitize.ts; the pin fails 2 checks
+against the pre-fix file (adversarially confirmed). This is exactly the
+divergence class P6.3 was queued to guard — it fired on the first run.
+
+**CI:** today's only workflow is the Pages deploy (build only, Node 20). A
+server-checks job needs Node ≥22.5 (`node:sqlite`). Proposed job (NOT
+applied — Gabriel's CI, his call):
+```yaml
+  server-checks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22 }
+      - run: npm ci
+        working-directory: server
+      - run: npm run typecheck && npm run check
+        working-directory: server
+```
+
+**Gates:** all exit 0 — server typecheck + check (28 serverCheck + 31
+parityCheck), app tsc/check/build (coverage 56/56 at-tier, 0 warnings).
+
+**Next:** nothing loop-actionable remains. Open: P6.1b (turbot color —
+Gabriel), P6.4 (Remote-store cutover — Gabriel), the CI job proposal
+(Gabriel), optional S4/P4.4/P4.5. The loop parks.
