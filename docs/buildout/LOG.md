@@ -1399,3 +1399,22 @@ no Map. Gates all exit 0 (app tsc/check/build, server check).
 **Next:** P4.5 — the category-taxonomy optional gets a warranted-or-close
 review; then the queue is purely Gabriel-gated (P6.1b color, P6.4 cutover,
 CI job).
+
+## 2026-07-08 (iteration 33) — P4.5 closed as unwarranted · the queue empties
+
+**Reviewed, not built:** a read-only Explore pass answered P4.5's
+build/trim/close question with evidence: `ActiveTask` is write-only (stored,
+persisted, migrated — consumed by zero code paths), and both of the spec-era
+motivating uses are covered by deeper mechanisms that landed since — palette
+gating by `allowed_components` (P1.5), category organization by the coverage
+manifest's per-row `category`. Building it would duplicate both; trimming it
+touches the persisted WorksheetData shape (Gabriel's call — the exact
+removal list is in the review report). CLOSED, field left inert.
+
+**The queue is now purely Gabriel-gated:** P6.1b (turbot red vs vocab
+yellow), P6.4 (Remote-store cutover), the CI server-checks job proposal
+(LOG iteration 30). Recurring META tasks fire only if the loop resumes.
+Every buildable, verifiable, loop-actionable task in the queue is done:
+56/56 at-tier, 0 regressed, all gates green on both packages.
+
+**The loop parks.**

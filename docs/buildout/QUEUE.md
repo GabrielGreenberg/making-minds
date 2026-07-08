@@ -358,8 +358,17 @@ HANDOFF's "do this next = P4.3". Task ids unchanged. -->
   four brain kinds. BONUS pre-existing bug fixed + pinned: active-tab
   `removeTab` never swapped the survivor's buildMode (a CC sheet kept the
   turbot workspace). navResetCheck 117/117 (+12 sandbox-turbot checks).
-- [ ] **P4.5** _(optional)_ Wire the perception/navigation **category taxonomy**
-  (`ActiveTask` is typed but unused) to organize questions / gate palettes.
+- [x] **P4.5** — _CLOSED AS UNWARRANTED 2026-07-08 (iteration 33, read-only
+  review)._ `ActiveTask` is WRITE-ONLY (set in addTab/setActiveTask,
+  persisted, migrated — read by NOTHING: no selector, no UI branch, no
+  filter). Both motivating uses are covered by deeper mechanisms that landed
+  since the spec era: palette gating = `allowed_components` (P1.5, per-
+  question Stage-1 + palette filter); category organization = the coverage
+  manifest's per-row `category` (harness metadata — AssignmentQuestion has no
+  category field and no UI wants one until real course content demands it).
+  Building the taxonomy would duplicate both. The inert field is LEFT IN
+  PLACE (removing a persisted WorksheetData field is Gabriel's call; exact
+  trim list recorded in the iteration-33 review report if ever wanted).
 
 ## Phase 5 — TM-turbot capstone
 
