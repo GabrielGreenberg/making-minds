@@ -23,14 +23,16 @@ broken variant needed). Both also require appearance checked against
 [VISUAL_VOCAB.md](VISUAL_VOCAB.md). Tier lives on the manifest row; all 10
 remaining rows are tier `interface`.
 
-**As of 2026-07-07 (post-iteration 25): THE LEDGER IS COMPLETE AT-TIER.**
-**46 exact + 10 interface = 56/56**, 0 pending, 0 regressed, 0 warnings.
+**As of 2026-07-08 (iteration 29, final reconciliation): THE LEDGER IS COMPLETE
+AT-TIER.** **46 exact + 10 interface = 56/56**, 0 pending, 0 regressed, 0
+warnings — re-confirmed row-by-row against the harness JSON by script.
 Every machine-buildable problem in HW1–HW6 has a verified reference fixture:
 all arithmetic + perception at the exact tier (correct passes every case,
 broken fails), all navigation + the Desert Ant capstone at the interface tier
 (plausible attempt validates Stage-1 and grades end-to-end; scores reported,
 never asserted — the correct-answers project remains future work). Close-out
-tasks (P1.5 and friends, P6.x) remain in QUEUE.
+remainder in QUEUE: P6.1b/P6.3/P6.4 (all Gabriel-gated) + optionals (P1.8 S4,
+P4.4, P4.5).
 
 ## Columns
 
@@ -45,7 +47,7 @@ validates + grades end-to-end) · `appr` = appearance matches VISUAL_VOCAB.
 | id | problem | category | auth | build | grades | appr | status | notes |
 |----|---------|----------|:----:|:-----:|:------:|:----:|:------:|-------|
 | hw1-p1  | NAND | logic | ✅ | ✅ | ✅ | ✅ | ✅ | fixture `reference/hw1-p1.json`; proven headlessly (4/4 correct, 0/4 broken), appearance checked 2026-07-06 |
-| hw1-p2  | reconstruct OR (no OR gate, DeMorgan) | logic | ✅ | ✅ | ✅ | ✅ | ✅ | `reference/hw1-p2.json`; correct = DeMorgan (no OR), broken = NAND near-miss; `allowed_components` set on the question but **unenforced** (→ QUEUE P1.5) |
+| hw1-p2  | reconstruct OR (no OR gate, DeMorgan) | logic | ✅ | ✅ | ✅ | ✅ | ✅ | `reference/hw1-p2.json`; correct = DeMorgan (no OR), broken = NAND near-miss; `allowed_components` **enforced end-to-end since P1.5** (2026-07-07: Stage-1 in every grader branch + palette filter + creator UI; 6 permanent coverageCheck pins incl. boxed-OR smuggling) |
 | hw1-p3  | splitting outputs (2-in → 2-out) | logic | ✅ | ✅ | ✅ | ✅ | ✅ | `reference/hw1-p3.json`; AND splits to OUT1 + NOT→OUT2; junction dot verified |
 | hw1-p4  | XOR | logic | ✅ | ✅ | ✅ | ✅ | ✅ | `reference/hw1-p4.json`; primitives (2 NOT, 2 AND, OR); broken = plain OR fails on (1,1) |
 | hw1-p5  | combining circuits (2-in → 2-out) | logic | ✅ | ✅ | ✅ | ✅ | ✅ | `reference/hw1-p5.json`; half-adder (sum `x ^ y`, carry `x & y`); crossing bump verified |
@@ -84,7 +86,7 @@ validates + grades end-to-end) · `appr` = appearance matches VISUAL_VOCAB.
 | hw3-p8  | 2x T (feasible) | arithmetic | ✅ | ✅ | ✅ | ✅ | ✅ | `reference/hw3-p8.json`; window-aware (unbounded-stream version is FSM-infeasible — noted in LOG); 16-step runs |
 | hw3-p9  | x+y T (feasible) | arithmetic | ✅ | ✅ | ✅ | ✅ | ✅ | `reference/hw3-p9.json`; counter/latch over 81-case bank; layout uses the p7 right-to-left MEM-chain convention |
 | hw3-p11 | change detector (current ≠ previous) | perception | ✅ | ✅ | ✅ | ✅ | ✅ | `reference/hw3-p11.json`; devData Q12 promoted at exact tier; per-lane XOR-vs-MEM + OR fold; broken (memoryless OR) fails 7/8; temporal semantics adversarially probed; bumpCheck CLEAN; routed fallback-free since the own-endpoint exemption erased the structural XOR floor (2026-07-07, P1.8 S3; was 48 pinned fallbacks) |
-| hw3-p12 | motion detector (object image moving up) | perception | ✅ | ✅ | ✅ | ✅ | ✅ | `reference/hw3-p12.json`; devData Q13 (motion k=3) promoted at exact tier; 146-comp PLA-matrix layout, ROTATED MEMs (sanctioned), 0 router fallbacks; broken fails 6/9; its 17 bumpless crossings (P1.8 S3 class) resolved by S3 — bump-clean since `d0214ec`; 2 cosmetic appr findings still open (toggle-tab elbow — router obstacle gap, P1.8 leftover; rotated-MEM label bisection, P1.16) |
+| hw3-p12 | motion detector (object image moving up) | perception | ✅ | ✅ | ✅ | ✅ | ✅ | `reference/hw3-p12.json`; devData Q13 (motion k=3) promoted at exact tier; 146-comp PLA-matrix layout, ROTATED MEMs (sanctioned), 0 router fallbacks; broken fails 6/9; its 17 bumpless crossings (P1.8 S3 class) resolved by S3 — bump-clean since `d0214ec`; both cosmetic appr findings RESOLVED in the iteration-27 smalls sweep (toggle-tab elbow → `getComponentBounds` footprint seam makes INPUT tabs router obstacles; rotated-MEM label bisection → rotation-aware `getLabelAnchor`, M1–M8 verified 30px clear in-browser; re-confirmed by the iteration-28 sweep: 0 label/wire intersections across 451 paths) |
 | hw3-p13 | zig-zag: reach goal & keep going | navigation | ✅ | ✅ | ◐ | ✅ | ◐ | `reference/hw3-p13.json`; PDF 9×9 staircase + 6×6 family member; SC XOR-toggle alternating-turn brain 2/2; MEM rotated 270° after a router-budget fix (0 fallbacks) |
 | hw3-p14 | three ahead: reach goal & stop | navigation | ✅ | ✅ | ◐ | ✅ | ◐ | `reference/hw3-p14.json`; 3 open-field embeddings (N/E/S facings); 3-stage MEM shift-register timer, correct by construction — 3/3 free |
 | hw3-p15 | Mad Max: block ahead unknown distance, return & stop | navigation | ✅ | ✅ | ◐ | ✅ | ◐ | `reference/hw3-p15.json`; REAL generality family (distances 3/4/8, facings N/E/S; goal = sensing spot per P4.2); good-faith SC attempt 1/3 (overshoots to far wall) — honest bank for the correct-answers project |

@@ -1235,3 +1235,63 @@ call, one-line fix either way.
 
 **Next:** META-audit-queue (due — last ran iteration 23), then P6.2 final
 reconciliation; P6.3/P6.4 remain parked for Gabriel's timing.
+
+## 2026-07-08 (iteration 29) — META-audit-queue + P6.2: final reconciliation · close-out DONE pending Gabriel
+
+**Audit window `7deba50..HEAD` (iterations 24–28).** Docs-only iteration; no
+app/tools code touched, nothing committed (per instruction).
+
+**Gates, all fresh, judged BY EXIT CODE:** app `tsc -p tsconfig.app.json` 0 ·
+each check tool run INDIVIDUALLY (codecCheck, notationCheck, tmCheck,
+turbotCheck, perceptionCheck, scWindowCheck, routerCheck, bumpCheck,
+pipelineCheck, navResetCheck, coverageCheck) all 0 · `npm run build` 0 ·
+server `typecheck` 0 + `serverCheck` 0 (28 checks). Pin spot-runs confirmed in
+output, not just by exit: turbotCheck's `[multi-arena]` (12), `[pass-through
+step-limit]` (7), and criterion-reason sections; coverageCheck's six
+allowed_components pins; navResetCheck 86/86; bumpCheck manifest sweep CLEAN;
+routerCheck budget 2 ≤ 2 with distribution pin.
+
+**P6.2 definition of done — MET.** Harness 46 exact · 10 interface · 0
+pending · 0 regressed · 0 warnings; COVERAGE.md cross-checked against the
+harness JSON **row-by-row by script** (56 rows, status-at-tier + grades
+column + manifest tier all agree; 0 mismatches; totals lines agree).
+Branch ahead of origin/main by 7 (the window); origin/main 0 ahead; tree
+clean.
+
+**Doc drift found and fixed (the audit's whole yield — the ledger itself had
+none):** (1) CLAUDE.md had NOT been updated for iterations 27–28 — new
+header entry (smalls sweep + P6.1 + this reconciliation, date bumped) and
+key-files rows caught up: engine/turbot row gained `criterionRequiresStop` +
+`explainTurbotCriterionFailure`, wire-layout row `getComponentBounds` +
+`getLabelAnchor`, store row `selectAllowedComponents` + `selectLiveFsmStateId`,
+student-UI row `outputDisplay.ts` per-group ARG, tools row the new turbotCheck/
+coverageCheck pin sections; the What's-next buildout bullet still said "46/56,
+9 navigation rows remaining" → rewritten to 56/56-at-tier + close-out state.
+(2) COVERAGE.md: hw1-p2 note still said allowed_components "unenforced (→
+P1.5)"; hw3-p12 note still listed both iteration-27-fixed appr findings as
+"still open"; header block refreshed. (3) QUEUE: P1.8's "S3 leftover (still
+open)" text predated iterations 27–28 (both leftovers resolved) → rewritten,
+only optional S4/S5 remain; P2.5 closed as DEFERRED (correct-answers project);
+P6.2 closed; META-reconcile-claude retired into META-audit-queue (duplicate;
+its parenthetical was stale). (4) HANDOFF rewritten to the close-out state.
+
+**Queue honesty (post-audit open set, exact):** P6.1b (Gabriel), P6.3, P6.4
+(Gabriel), P1.8 S4 + P4.4 + P4.5 (optionals), META-audit-queue +
+META-visual-vocab (recurring). Nothing else dangling.
+
+**Patch-accumulation scan (24–28): NO cluster.** Every fix in the window is
+seam-routed: criterionRequiresStop landed beside evaluateTurbotCriterion as
+the criterion-semantics seam (P5.3's explainTurbotCriterionFailure is a
+read-only clause mirror at the SAME seam — deliberate co-location, not
+accretion); P1.5 is one semantics in machineValidation.ts enforced at three
+touchpoints; the smalls sweep's fixes each replaced a duplication with a
+shared owner (sortByLabel, getComponentBounds, getLabelAnchor); P6.1's
+selectLiveFsmStateId unified two highlight paths. No unifying task needed.
+
+**Memory check:** project-shared-worktree-concurrency still ACCURATE (shared
+checkout + chip-spawned sessions remain real; the fetch-main + foreign-WIP
+discipline is still in HANDOFF's standing list and earned its keep as recently
+as iteration 24). Not edited.
+
+**Verdict: the close-out is DONE pending only Gabriel-gated items
+(P6.1b / P6.3 / P6.4).** No loop-actionable work remains; the loop parks.

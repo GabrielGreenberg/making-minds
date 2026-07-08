@@ -4,10 +4,10 @@ _Read this first. It says exactly where we are and what to do next. Rewrite it a
 the end of every iteration. If it conflicts with the harness, the harness wins —
 run `npm run coverage` and reconcile._
 
-## Where we are — 🏁 LEDGER COMPLETE AT-TIER · close-out in progress
+## Where we are — 🏁 CLOSE-OUT DONE pending Gabriel-gated items
 
 Branch `buildout-infra`. **46 exact + 10 interface = 56/56 at-tier**, 0
-pending, 0 regressed, 0 warnings. Twenty-five iterations. Every
+pending, 0 regressed, 0 warnings. Twenty-nine iterations. Every
 machine-buildable problem in HW1–HW6 has a verified reference fixture:
 - **Exact tier (46):** all arithmetic (HW1–HW5) + all perception — correct
   machine passes every case, broken variant fails, appearance checked.
@@ -17,28 +17,27 @@ machine-buildable problem in HW1–HW6 has a verified reference fixture:
   capstone's 1/3). Exactly-correct answers remain the separate future
   correct-answers project.
 
-Gabriel resumed the loop for close-out (iteration 26+). The grading-integrity
-gap (P1.5) is CLOSED; the remaining queue is polish + final sweeps.
+**Iteration 29 (2026-07-08) ran the combined META-audit-queue + P6.2 final
+reconciliation:** all gates fresh BY EXIT CODE (app tsc 0 · every check tool
+individually 0 · build 0 · server typecheck 0 + serverCheck 0), COVERAGE.md
+cross-checked against the harness JSON row-by-row by script (0 mismatches),
+CLAUDE.md caught up (iterations 27–28 documented; key-files rows honest),
+queue pruned honest, NO patch-accumulation cluster in the window (all fixes
+seam-routed). **There is no loop-actionable work left.**
 
-## What remains in the queue (close-out, in order)
+## What remains (exactly this — all gated or optional)
 
-1. ~~P1.5~~ **DONE (iteration 26)** — allowed_components enforced end-to-end
-   (Stage-1 all grader branches + palette + creator; 6 pins; boxed recursion).
-2. ~~The smalls sweep~~ **DONE (iteration 27)** — P1.6, P1.11, P1.16, P5.2,
-   P5.3, and the P1.8 toggle-tab leftover (landed as the `getComponentBounds`
-   footprint seam) all fixed, gate-verified, and browser-checked. The hw3-p9
-   dot-skip verdict was lost to a truncated report → folded into P6.1.
-3. ~~P6.1~~ **DONE (iteration 28)** — full matrix CLEAN (all modes); polish
-   fixes landed (live-state selector, turbot header, Map follow-scroll);
-   hw3-p9 dot-skip RESOLVED (dot renders — S3 fixed the adjacency). ONE open
-   sub-item: **P6.1b, arena turbot red vs vocab yellow — GABRIEL'S CALL,
-   one-line fix either way once answered.**
-4. **NEXT — META-audit-queue (due; last ran iteration 23), then P6.2** final
-   reconciliation (all gates + CLAUDE.md honest + this file; every row green
-   at tier).
-5. **P6.3** server↔engine grading parity pin + server in CI. **P6.4**
-   Remote-store cutover (Gabriel's timing).
-META-audit-queue due ~iteration 28.
+1. **P6.1b** _(GABRIEL'S CALL)_ arena turbot red `#c73535` vs VISUAL_VOCAB
+   yellow — one-line fix either way once answered (asked 2026-07-07).
+2. **P6.3** server↔engine grading parity pin + fold server gates into CI.
+3. **P6.4** _(GABRIEL'S TIMING)_ Remote-store cutover to `api/client.ts`.
+4. **Optionals, unowned:** P1.8 S4 (router fallback phase-0 + lane-nudge +
+   per-wire `usedFallback`; S5 perf), P4.4 (turbot sandbox tab), P4.5
+   (category taxonomy).
+5. **Recurring META:** META-audit-queue (~every 5 iterations; last ran 29;
+   now also owns CLAUDE.md honesty — META-reconcile-claude retired as a
+   duplicate), META-visual-vocab (before any new mode's appearance work).
+P2.5 is CLOSED as deferred (correct-answers project — not loop-open).
 
 ## Watch out for (standing)
 

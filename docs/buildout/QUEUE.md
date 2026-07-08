@@ -219,13 +219,15 @@ before Phase 3 (perception returns to router-rendered CC/SC). Task ids unchanged
   wire ids (`getFallbackWireIds`); bumpCheck: all CC/SC fixtures CLEAN (incl.
   the 8 pre-existing failures) + no-arg manifest sweep wired into
   `npm run check`.
-  **S3 leftover (still open):** the obstacle-model gap — INPUT toggle-tabs
-  aren't router obstacles (hw3-p12 pmo-36 elbows through IN2's tab); and
-  re-evaluate the hw3-p9 (1375,757) dot-skip nit now that near-parallel lane
-  separation exists (does it moot the nit, or does the skip radius need
-  tuning?); **S4 remaining:** fallback phase-0 + lane-nudge + per-wire
-  `usedFallback`; S5 (optional) perf. Each slice: gates green + layoutCheck
-  clean + browser spot-check per the memo's slice plan.
+  **S3 leftovers — BOTH RESOLVED:** the obstacle-model gap closed in the
+  iteration-27 smalls sweep (new `getComponentBounds` footprint seam in
+  componentGeometry — body + adjuncts incl. INPUT's 14×20 toggle-tab; the
+  router's local body-only copy deleted); the hw3-p9 (1375,757) dot-skip nit
+  resolved POSITIVE in the iteration-28 sweep (the divergence dot now renders
+  at the junction — S3's re-routing fixed the bump adjacency, no skip-radius
+  tuning needed). **S4 remaining (OPTIONAL, unowned):** fallback phase-0 +
+  lane-nudge + per-wire `usedFallback`; S5 (optional) perf. Each slice: gates
+  green + layoutCheck clean + browser spot-check per the memo's slice plan.
   **Gates Phase 3** (perception fixtures are CC/SC, back on the router).
 - [x] **P3.1** **Design spike: perception target authoring.** — _closed as
   OVERTAKEN 2026-07-06 (iteration 18 audit)._ Gabriel shipped perception
@@ -373,7 +375,11 @@ HANDOFF's "do this next = P4.3". Task ids unchanged. -->
 
 ## Phase 5.5 — Small hardening (slot opportunistically before close-out)
 
-- [ ] **P2.5** _(discovered 2026-07-06, P2.4 probe; **DEFERRED to the
+- [x] **P2.5** — _closed as DEFERRED 2026-07-08 (iteration-29 audit): this is
+  answer-quality work belonging to the future correct-answers project, not
+  this build-out (2026-07-06 scope shift); the rows are honest as-is. NOT
+  loop-open — re-open there, not here. Original entry follows._
+  _(discovered 2026-07-06, P2.4 probe; **DEFERRED to the
   correct-answers project** per the 2026-07-06 scope shift — this is
   answer-quality work, not interface work)_ **Gap-robust hw5-p5/p6
   reference machines.** Their statements don't promise arbitrary separation
@@ -491,9 +497,22 @@ HANDOFF's "do this next = P4.3". Task ids unchanged. -->
   red `#c73535` (index.css) vs VISUAL_VOCAB §Turbot "yellow triangle". Decide
   which is right and fix the loser (one-line CSS change or one-line vocab
   edit). Asked 2026-07-07; flag-only until answered.
-- [ ] **P6.2** Reconcile CLAUDE.md status with COVERAGE; final `npm run check` +
+- [x] **P6.2** Reconcile CLAUDE.md status with COVERAGE; final `npm run check` +
   `tsc` + `build` all green; every COVERAGE row green **at its tier** (✅ exact
-  for arithmetic, ◐ interface for perception/navigation).
+  for arithmetic, ◐ interface for perception/navigation). — _done 2026-07-08
+  (iteration 29, combined with META-audit-queue)._ All gates fresh BY EXIT
+  CODE: app tsc 0, every check tool run individually 0 (codec/notation/tm/
+  turbot/perception/scWindow/router/bump/pipeline/navReset/coverage), build 0,
+  server typecheck 0 + serverCheck 0. Harness 46 exact · 10 interface · 0
+  pending · 0 regressed · 0 warnings; COVERAGE.md cross-checked against the
+  harness JSON row-by-row BY SCRIPT (56/56 status-at-tier + manifest tier
+  agreement, 0 mismatches). CLAUDE.md brought honest (iterations 27–28 were
+  undocumented: smalls-sweep + P6.1 entries added; key-files rows gained
+  criterionRequiresStop/explainTurbotCriterionFailure, getComponentBounds/
+  getLabelAnchor, selectLiveFsmStateId/selectAllowedComponents, outputDisplay
+  per-group ARG; stale "46/56, 9 navigation remaining" What's-next bullet
+  rewritten). Stale COVERAGE notes fixed (hw1-p2 "unenforced", hw3-p12 "still
+  open" appr findings, header). HANDOFF rewritten to the close-out state.
 - [ ] **P6.3** _(enqueued iteration 21, merge-#3 report; re-homed here from
   Phase 4 by the iteration-23 audit)_ **Server↔engine grading parity pin:**
   serverCheck and pipelineCheck should share a fixture — same submission graded
@@ -513,8 +532,26 @@ HANDOFF's "do this next = P4.3". Task ids unchanged. -->
 
 ## Recurring meta-tasks  _(fire on cadence; keep the queue honest)_
 
-- [ ] **META-audit-queue** — _every ~5 iterations; last ran iteration 23
-  (2026-07-07): post-S3 doc reconciliation — verified harness 46/10/0/0,
+- [ ] **META-audit-queue** — _every ~5 iterations; last ran iteration 29
+  (2026-07-08, combined with P6.2 — see P6.2's done note for the gate/ledger
+  evidence): window 24–28 audited; spot-ran every closed task's pins by exit
+  code (turbotCheck [multi-arena] + [pass-through step-limit] + criterion-
+  reason sections, coverageCheck's 6 allowed_components pins, navResetCheck 86,
+  bumpCheck manifest sweep CLEAN, routerCheck budget 2≤2); queue honesty:
+  P6.2 closed, P2.5 closed as DEFERRED (correct-answers project, not
+  loop-open), P1.8's stale "S3 leftover still open" text rewritten (both
+  leftovers resolved iterations 27–28; only optional S4/S5 remain),
+  META-reconcile-claude folded into this entry as a duplicate (its job is
+  this audit's step 3; its "currently claims all built" note was years stale)
+  → open items now EXACTLY: P6.1b + P6.3 + P6.4 (Gabriel-gated), P1.8 S4 +
+  P4.4 + P4.5 (optionals), and the two META recurrers; patch-accumulation
+  scan over 24–28: NO cluster — every window fix was seam-routed
+  (criterionRequiresStop beside evaluateTurbotCriterion, P1.5's one-semantics
+  machineValidation slice, sortByLabel unification, getComponentBounds/
+  getLabelAnchor in componentGeometry, explainTurbotCriterionFailure clause
+  mirror, selectLiveFsmStateId single source; the three criterion functions
+  are deliberate co-location at one seam, not accretion). Previous run
+  iteration 23 (2026-07-07): post-S3 doc reconciliation — verified harness 46/10/0/0,
   bumpCheck CLEAN + routerCheck budget 2, turbotCheck [multi-arena] and
   navResetCheck (86, in `npm run check`) green, toggle-tab obstacle gap
   confirmed still open; rewrote the stale live-defect notes S3 outdated
@@ -537,13 +574,13 @@ HANDOFF's "do this next = P4.3". Task ids unchanged. -->
   flipped to "accepted as alias" (execution bit-identical, old machines keep
   validating)._ Run `npm run coverage`;
   reconcile COVERAGE + this queue against the harness JSON; prune dead/duplicate
-  tasks; re-rank by dependency and value; confirm no drift. **Also audit for
+  tasks; re-rank by dependency and value; confirm no drift; **keep CLAUDE.md's
+  status honest against COVERAGE** (absorbed from the retired
+  META-reconcile-claude entry, iteration-29 audit — downgrade any claim a
+  reference solution can't back up). **Also audit for
   patch accumulation:** look for clusters of surgical fixes that landed since the
   last audit and share a family — if found, enqueue one unifying architectural
   task (with a design memo) to replace the cluster's trajectory. Log what changed.
 - [ ] **META-visual-vocab** — before starting a new mode's appearance work, re-read
   the relevant `mm_textbook.pdf` chapter + `spec/…/Mock_Ups-*.jpg`; refresh
   VISUAL_VOCAB.
-- [ ] **META-reconcile-claude** — keep `CLAUDE.md`'s status section honest against
-  COVERAGE (it currently claims "all built"; downgrade any claim a reference
-  solution can't back up).
