@@ -1201,3 +1201,37 @@ evidence + a CC sanity pass; tree clean of strays.
 red vs vocab yellow — Gabriel's call; FSM live-state highlight during arena
 runs; SC palette header; 30×30 Map panel UX; hw3-p9 dot-skip once-over), with
 META-audit-queue due the iteration after (~28).
+
+## 2026-07-08 (iteration 28) — P6.1: full-matrix appearance sweep · all 8 rows CLEAN
+
+**Shipped:** the three accumulated polish fixes (live-state selector
+`selectLiveFsmStateId` — one source of truth for the canvas highlight, arena
+and FSM sim both feed it, leak-free across navigation; turbot palette header
+names the inner machine via a turbot-scoped label map, sandbox naming kept
+deliberate + documented; follow-the-turbot auto-scroll with a wheel guard)
+and the full-matrix sweep validating every mode against VISUAL_VOCAB: CC
+(dense hw2-p7 + hw1-p4), SC (hw3-p6 window semantics DOM-verified), FSM
+(hw4-p11 k=2), TM (hw5-p9 two-output notation exact), turbot × CC/SC/FSM/TM,
+perception ×2 (rotated-MEM labels re-confirmed: 0 intersections across 451
+wire paths), open question (zero grading leakage), sandbox tabs (sim reset
+proven with real runs). Gates green over the fixes (tsc/check/build exit 0;
+totals steady 46+10/0/0).
+
+**Resolved en passant:** the hw3-p9 dot-skip verdict (lost in iteration 27) —
+the divergence dot NOW RENDERS at (1375.33, 756.67); S3's re-routing fixed
+the bump adjacency without relocating the junction. The "all-gray 30×30 Map"
+scare was a screenshot-compression artifact, disproven by DOM fills.
+
+**Ops:** the sweep agent stalled twice on dev-server drops overnight; the
+recovery pattern that worked: ask the stalled agent for a CHECKPOINT ONLY
+(small ask, completes reliably), then launch a fresh continuation agent
+scoped to the checkpoint's remainder, reusing the existing seed. Gabriel
+spotted the drop before the fallback wake did — the loop's stall detection
+(waiting on a notification that never comes) is its weakest sense; checkpoint
+early when an agent's task is inherently long and serial.
+
+**Open:** P6.1b — arena turbot red #c73535 vs VISUAL_VOCAB yellow; Gabriel's
+call, one-line fix either way.
+
+**Next:** META-audit-queue (due — last ran iteration 23), then P6.2 final
+reconciliation; P6.3/P6.4 remain parked for Gabriel's timing.

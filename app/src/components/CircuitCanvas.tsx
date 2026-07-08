@@ -1,5 +1,5 @@
 import { useRef, useState, useCallback, useEffect, useMemo } from 'react';
-import { useStore, selectEffectiveMode, selectTransitionNotationForSource } from '../store';
+import { useStore, selectEffectiveMode, selectLiveFsmStateId, selectTransitionNotationForSource } from '../store';
 import { inputCharTokens } from '../engine';
 import type {
   CircuitComponent,
@@ -384,7 +384,10 @@ function CircuitComponentView({
   isSelected: boolean;
 }) {
   const { w, h } = getCompDimensions(comp);
-  const fsmCurrentStateId = useStore((s) => s.fsmCurrentStateId);
+  // The live FSM control state for the green highlight — one selector fed by
+  // whichever sim is active (FSM sim or a turbot arena run with an FSM
+  // brain), never a direct read of one slice's field.
+  const liveFsmStateId = useStore(selectLiveFsmStateId);
 
   const rot = comp.rotation ?? 0;
   const cx = comp.x + w / 2;
@@ -779,7 +782,7 @@ function CircuitComponentView({
         );
 
       case 'STATE': {
-        const isCurrentState = fsmCurrentStateId === comp.id;
+        const isCurrentState = liveFsmStateId === comp.id;
         const strokeColor = isCurrentState ? '#4caf50' : isSelected ? '#2a7fff' : '#333';
 
         // Boxed FSM instance: render as a labeled rectangle

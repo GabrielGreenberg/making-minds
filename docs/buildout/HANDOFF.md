@@ -28,13 +28,14 @@ gap (P1.5) is CLOSED; the remaining queue is polish + final sweeps.
    P5.3, and the P1.8 toggle-tab leftover (landed as the `getComponentBounds`
    footprint seam) all fixed, gate-verified, and browser-checked. The hw3-p9
    dot-skip verdict was lost to a truncated report → folded into P6.1.
-3. **NEXT — P6.1** full-matrix appearance sweep, every mode incl. open +
-   perception + turbot, against VISUAL_VOCAB. Accumulated scope: arena-turbot
-   red `#c73535` vs VISUAL_VOCAB "yellow triangle" (ASK GABRIEL which is
-   right before fixing); FSM live-state highlight during arena runs; SC
-   palette header label; 30×30 Map panel UX; hw3-p9 (1375,757) dot-skip
-   visual once-over (verdict lost in iteration 27).
-4. **P6.2** final reconciliation (all gates + CLAUDE.md honest + this file).
+3. ~~P6.1~~ **DONE (iteration 28)** — full matrix CLEAN (all modes); polish
+   fixes landed (live-state selector, turbot header, Map follow-scroll);
+   hw3-p9 dot-skip RESOLVED (dot renders — S3 fixed the adjacency). ONE open
+   sub-item: **P6.1b, arena turbot red vs vocab yellow — GABRIEL'S CALL,
+   one-line fix either way once answered.**
+4. **NEXT — META-audit-queue (due; last ran iteration 23), then P6.2** final
+   reconciliation (all gates + CLAUDE.md honest + this file; every row green
+   at tier).
 5. **P6.3** server↔engine grading parity pin + server in CI. **P6.4**
    Remote-store cutover (Gabriel's timing).
 META-audit-queue due ~iteration 28.

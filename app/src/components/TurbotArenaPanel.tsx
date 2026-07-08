@@ -4,6 +4,7 @@
 // machine/history tables. The simulation itself lives in the store's turbot
 // slice; the canvas column stays the inner machine's normal editor.
 
+import { useEffect, useRef } from 'react';
 import { useStore, selectTurbotArena, selectTurbotInnerMode, selectTmNotation } from '../store';
 import {
   senseAhead,
@@ -103,6 +104,54 @@ export function TurbotArenaPanel() {
 
   const innerMode = useStore(selectTurbotInnerMode);
   const notation = useStore(selectTmNotation);
+
+  // Follow the turbot: a big arena (30×30 ≈ 844px of grid) far outgrows the
+  // Map's scroll container, so every pose change nudges the container's
+  // scroll just enough to keep the turbot cell in view. Scoped to the Map's
+  // own scrollport — the outer data panel is never scrolled.
+  const scrollRef = useRef<HTMLDivElement | null>(null);
+  // Manual-scroll guard: don't fight the user. Skip auto-follow while a
+  // pointer is held down on the container (scrollbar drag) or right after a
+  // wheel scroll.
+  const manualScroll = useRef({ pointerDown: false, lastWheelAt: 0 });
+
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    const onPointerDown = () => { manualScroll.current.pointerDown = true; };
+    const onPointerUp = () => { manualScroll.current.pointerDown = false; };
+    const onWheel = () => { manualScroll.current.lastWheelAt = Date.now(); };
+    el.addEventListener('pointerdown', onPointerDown);
+    window.addEventListener('pointerup', onPointerUp);
+    el.addEventListener('wheel', onWheel, { passive: true });
+    return () => {
+      el.removeEventListener('pointerdown', onPointerDown);
+      window.removeEventListener('pointerup', onPointerUp);
+      el.removeEventListener('wheel', onWheel);
+    };
+  }, []);
+
+  useEffect(() => {
+    const container = scrollRef.current;
+    if (!container) return;
+    if (manualScroll.current.pointerDown) return;
+    if (Date.now() - manualScroll.current.lastWheelAt < 1500) return;
+    // Locate the turbot's rendered cell (robust to cell borders/padding,
+    // unlike arithmetic from cellSize alone; ArenaCanvas stays presentational).
+    const cell = container.querySelector('.arena-turbot')?.closest('.arena-cell');
+    if (!(cell instanceof HTMLElement)) return;
+    const c = container.getBoundingClientRect();
+    const t = cell.getBoundingClientRect();
+    const margin = 12; // keep a sliver of the neighboring cells visible
+    let dx = 0;
+    let dy = 0;
+    if (t.left < c.left + margin) dx = t.left - (c.left + margin);
+    else if (t.right > c.right - margin) dx = t.right - (c.right - margin);
+    if (t.top < c.top + margin) dy = t.top - (c.top + margin);
+    else if (t.bottom > c.bottom - margin) dy = t.bottom - (c.bottom - margin);
+    if (dx !== 0 || dy !== 0) container.scrollBy({ left: dx, top: dy, behavior: 'smooth' });
+  }, [turbotState.x, turbotState.y]);
+
   const cycle = turbotHistory.length;
   // Circuit brains see the 1-bit sensor; a turbot TM's external states
   // sense B (block) / E (empty) / F (food).
@@ -125,7 +174,7 @@ export function TurbotArenaPanel() {
           flex-wrap drops the glossary below the map when it isn't. */}
       <div className="turbot-map-row">
         <div className="turbot-map-col">
-          <div className="turbot-arena-scroll">
+          <div className="turbot-arena-scroll" ref={scrollRef}>
             <ArenaCanvas arena={arena} turbot={turbotState} cellSize={28} />
           </div>
           <div className="turbot-arena-controls">

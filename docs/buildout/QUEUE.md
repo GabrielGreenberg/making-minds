@@ -468,14 +468,29 @@ HANDOFF's "do this next = P4.3". Task ids unchanged. -->
 
 ## Phase 6 — Close out
 
-- [ ] **P6.1** Full-matrix appearance sweep against VISUAL_VOCAB (every mode —
-  include the three app-wide polish observations from the iteration-24 sweep:
-  arena turbot renders red `#c73535` vs VISUAL_VOCAB's "yellow triangle"
-  (decide which is right, fix the loser); the FSM brain canvas doesn't
-  green-highlight the live state during ARENA runs (`fsmCurrentStateId` is
-  only set by the FSM sim slice — the readout works); SC palette header reads
-  "Turbot · Logic Circuit" while chips correctly say "turbot - SC" —
-  now including the open-question response UI merged from main, iteration 18).
+- [x] **P6.1** **Full-matrix appearance sweep.** — _done 2026-07-08
+  (iteration 28; polish-fix agent + two-stage sweep — the first sweep agent
+  stalled twice on dev-server drops, checkpointed via SendMessage, and a
+  continuation agent finished the remainder from the checkpoint)._ All 8
+  matrix rows CLEAN across every mode (CC/SC/FSM/TM, all four turbot inner
+  modes, both perception types, open question, sandbox tabs): two-output TM
+  labels render exactly per spec §10.3; k=2 FSM labels + separated arcs; MEM
+  conventions; arena Maps + glossaries; open-question shows zero grading
+  leakage; sandbox tab switches reset sim state (verified with real runs).
+  Polish fixes landed and browser-validated: `selectLiveFsmStateId` (ONE
+  live-state source — arena stepping now green-highlights the brain canvas,
+  no cross-context leaks), turbot palette header names the inner machine
+  (sandbox's shared "Logic Circuit" label kept + documented as deliberate),
+  follow-the-turbot Map auto-scroll (340px scroller, wheel guard ~1.5s).
+  Resolved en passant: the hw3-p9 (1375,757) dot-skip — the divergence dot
+  NOW RENDERS at the historic junction (S3 fixed the bump adjacency; verdict
+  positive). The "all-gray 30×30 Map" scare was a JPEG-downscale artifact
+  (DOM: blocks #9e9e9e vs transparent empty cells).
+  **ONE ITEM STILL OPEN → P6.1b.**
+- [ ] **P6.1b** _(pending GABRIEL's decision)_ **Arena turbot color:** renders
+  red `#c73535` (index.css) vs VISUAL_VOCAB §Turbot "yellow triangle". Decide
+  which is right and fix the loser (one-line CSS change or one-line vocab
+  edit). Asked 2026-07-07; flag-only until answered.
 - [ ] **P6.2** Reconcile CLAUDE.md status with COVERAGE; final `npm run check` +
   `tsc` + `build` all green; every COVERAGE row green **at its tier** (✅ exact
   for arithmetic, ◐ interface for perception/navigation).

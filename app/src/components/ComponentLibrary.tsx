@@ -116,11 +116,22 @@ function PaletteIcon({ type }: { type: string }) {
   }
 }
 
+// Sandbox tab headers: CC and SC deliberately share 'Logic Circuit' — the SC
+// tab is the same circuit workspace, just with MEM available.
 const MACHINE_LABELS: Record<string, string> = {
   CC: 'Logic Circuit',
   SC: 'Logic Circuit',
   FSM: 'Finite State Machine',
   TM: 'Turing Machine',
+};
+
+// A turbot header names the INNER MACHINE the student is editing, where the
+// CC/SC distinction is real — consistent with questionModeLabel's
+// "turbot - SC" chips on the assignment overview. Only the turbot context
+// overrides SC; the sandbox labels above keep their semantics.
+const TURBOT_BRAIN_LABELS: Record<string, string> = {
+  ...MACHINE_LABELS,
+  SC: 'Sequential Circuit',
 };
 
 function ConfirmedBoxItem({ box, numIn, numOut, isSelected, kind }: {
@@ -227,7 +238,7 @@ export function ComponentLibrary() {
     <div className="component-library">
       <div className="library-machine-label">
         {buildMode === 'turbot'
-          ? `Turbot · ${MACHINE_LABELS[effectiveMode] || 'Logic Circuit'}`
+          ? `Turbot · ${TURBOT_BRAIN_LABELS[effectiveMode] || 'Logic Circuit'}`
           : MACHINE_LABELS[buildMode] || 'Logic Circuit'}
       </div>
       {/* Component sections (non-Annotate) */}

@@ -2038,6 +2038,10 @@ thead .sc-label-col {
 .turbot-arena-scroll {
   overflow: auto;
   padding: 8px;
+  /* Big arenas (30×30 ≈ 844px of grid) clip here instead of swallowing the
+     whole data panel; TurbotArenaPanel auto-scrolls this container to keep
+     the turbot in view during step/run. Small arenas are unaffected. */
+  max-height: 340px;
 }
 
 .turbot-arena-controls {

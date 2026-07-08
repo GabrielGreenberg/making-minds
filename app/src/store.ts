@@ -219,6 +219,34 @@ export function selectEffectiveMode(s: {
 }
 
 /**
+ * The currently-live FSM control state (component id) — the ONE source of
+ * truth for the canvas's green state highlight, fed by whichever simulation
+ * is active. An FSM sim run carries it in fsmCurrentStateId; a turbot arena
+ * run carries it inside the brain state (the turbot slice — turbotStep /
+ * turbotRun — never writes fsmCurrentStateId, so there is exactly one writer
+ * per sim and this selector picks the active one). The arena branch is gated
+ * on the run having started (history non-empty) to match the FSM sim's
+ * no-highlight-at-rest behavior — turbotReset re-seeds brainState.stateId to
+ * S₀, which would otherwise light up before any step. TM canvases have no
+ * live-state highlight (deliberate: the Current-state readout and machine
+ * table carry it), so TM contexts return null here.
+ */
+export function selectLiveFsmStateId(s: {
+  buildMode: BuildMode;
+  assignment: AssignmentData | null;
+  currentQuestionIndex: number;
+  fsmCurrentStateId: string | null;
+  turbotBrainState: BrainState;
+  turbotHistory: TurbotHistoryEntry[];
+}): string | null {
+  if (s.buildMode === 'turbot') {
+    if (selectTurbotInnerMode(s) !== 'FSM') return null;
+    return s.turbotHistory.length > 0 ? s.turbotBrainState.stateId ?? null : null;
+  }
+  return s.fsmCurrentStateId;
+}
+
+/**
  * The FSM transition notation (engine/notation.ts) for the current editing
  * surface. Turbot-FSM brains use the fixed sensor/motor notation (1-bit
  * input, 2-bit motor output with the legacy 1-bit alias). An open FSM
