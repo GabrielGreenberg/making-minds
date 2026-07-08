@@ -4,6 +4,7 @@ import { navigate } from '../routing';
 import { getCurrentUserEmail, useAuth } from '../auth';
 import { summarizeResult } from '../engine/grader';
 import { isGradesReleased } from '../storage/gradeRelease';
+import { useAsyncValue } from '../useAsyncValue';
 
 function formatSubmittedAt(iso: string): string {
   const d = new Date(iso);
@@ -16,15 +17,16 @@ export function HomeScreen() {
   const submitAssignment = useStore((s) => s.submitAssignment);
   const { user, logout } = useAuth();
 
-  const assignments = listAssignments();
+  const { value: assignmentList, loading } = useAsyncValue(() => listAssignments(), []);
+  const assignments = assignmentList ?? [];
 
-  const handleSubmit = (id: string, title: string) => {
+  const handleSubmit = async (id: string, title: string) => {
     const ok = confirm(
       `Submit "${title}"? This records a snapshot of your saved work.\n\n` +
       'Note: only your most recent submission is graded — submitting again replaces any earlier submission for grading purposes.'
     );
     if (!ok) return;
-    const rec = submitAssignment(id, getCurrentUserEmail());
+    const rec = await submitAssignment(id, getCurrentUserEmail());
     if (!rec) return;
     // The submission is autograded on receipt, but the grade is NEVER shown at
     // submit time — students see grades only after the instructor releases
@@ -86,7 +88,7 @@ export function HomeScreen() {
                   )}
                   <button
                     className="home-tile-submit"
-                    onClick={() => handleSubmit(a.id, a.title)}
+                    onClick={() => void handleSubmit(a.id, a.title)}
                   >
                     Submit
                   </button>
@@ -94,7 +96,7 @@ export function HomeScreen() {
               );
             })}
             {assignments.length === 0 && (
-              <p className="home-empty">No assignments available.</p>
+              <p className="home-empty">{loading ? 'Loading…' : 'No assignments available.'}</p>
             )}
           </div>
         </section>

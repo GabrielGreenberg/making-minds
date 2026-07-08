@@ -79,13 +79,15 @@ export function applyManualReview(
   );
 }
 
+// Promise-returning (a remote backend is intrinsically async); the local
+// implementation resolves immediately. Note `clearSubmissions` is NOT on the
+// seam — it's a dev-only capability of the local store (devData/seed.ts pins
+// the concrete class); a server never exposes "delete all submissions".
 export interface SubmissionStore {
   /** Append a new attempt and return the recorded (immutable) record. */
-  submit(id: string, submission: SubmissionData): SubmissionRecord;
-  listSubmissions(id: string): SubmissionRecord[];
-  getLatest(id: string): SubmissionRecord | null;
-  /** Drop all stored submissions for an assignment (e.g. reseeding dev data). */
-  clearSubmissions(id: string): void;
+  submit(id: string, submission: SubmissionData): Promise<SubmissionRecord>;
+  listSubmissions(id: string): Promise<SubmissionRecord[]>;
+  getLatest(id: string): Promise<SubmissionRecord | null>;
   /**
    * Record (or overwrite) the instructor's verdict on a pending open question
    * of one stored attempt. Returns the updated record, or null if the attempt
@@ -97,13 +99,14 @@ export interface SubmissionStore {
     attempt: number,
     questionId: number,
     review: { pass: boolean; note?: string },
-  ): SubmissionRecord | null;
+  ): Promise<SubmissionRecord | null>;
 }
 
 const KEY_PREFIX = 'mm:sub:';
 
 class LocalSubmissionStore implements SubmissionStore {
-  listSubmissions(id: string): SubmissionRecord[] {
+  /** Synchronous read shared by the async interface methods. */
+  private read(id: string): SubmissionRecord[] {
     try {
       const raw = localStorage.getItem(KEY_PREFIX + id);
       if (!raw) return [];
@@ -114,12 +117,20 @@ class LocalSubmissionStore implements SubmissionStore {
     }
   }
 
-  getLatest(id: string): SubmissionRecord | null {
-    const all = this.listSubmissions(id);
+  async listSubmissions(id: string): Promise<SubmissionRecord[]> {
+    return this.read(id);
+  }
+
+  async getLatest(id: string): Promise<SubmissionRecord | null> {
+    const all = this.read(id);
     return all.length ? all[all.length - 1] : null;
   }
 
-  clearSubmissions(id: string): void {
+  /**
+   * Drop all stored submissions for an assignment (e.g. reseeding dev data).
+   * Deliberately OFF the `SubmissionStore` seam — dev/local-mode only.
+   */
+  async clearSubmissions(id: string): Promise<void> {
     try {
       localStorage.removeItem(KEY_PREFIX + id);
     } catch {
@@ -127,11 +138,11 @@ class LocalSubmissionStore implements SubmissionStore {
     }
   }
 
-  submit(id: string, submission: SubmissionData): SubmissionRecord {
-    const all = this.listSubmissions(id);
+  async submit(id: string, submission: SubmissionData): Promise<SubmissionRecord> {
+    const all = this.read(id);
     // Autograde on receipt: the "server" holds the test vectors, so it can grade
     // the moment the submission lands and persist the result on the record.
-    const def = getAssignment(id);
+    const def = await getAssignment(id);
     const result = def ? gradeSubmission(def, submission) : undefined;
     const record: SubmissionRecord = {
       assignmentId: id,
@@ -148,13 +159,13 @@ class LocalSubmissionStore implements SubmissionStore {
     return record;
   }
 
-  recordManualReview(
+  async recordManualReview(
     id: string,
     attempt: number,
     questionId: number,
     review: { pass: boolean; note?: string },
-  ): SubmissionRecord | null {
-    const all = this.listSubmissions(id);
+  ): Promise<SubmissionRecord | null> {
+    const all = this.read(id);
     const updated = applyManualReview(all, attempt, questionId, {
       pass: review.pass,
       note: review.note?.trim() || undefined,
@@ -170,4 +181,6 @@ class LocalSubmissionStore implements SubmissionStore {
   }
 }
 
-export const localSubmissionStore: SubmissionStore = new LocalSubmissionStore();
+// Exported as the concrete class (not the interface) so dev-only capabilities
+// off the seam (`clearSubmissions`) stay reachable for devData/seed.ts.
+export const localSubmissionStore = new LocalSubmissionStore();

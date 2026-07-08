@@ -1445,3 +1445,31 @@ tree (store.ts call sites, GradebookView, the async-ready checks).
 
 **Next:** remote-stores S1 (the seam flip) per the memo's slice plan; then
 S2–S4, one iteration each, gates green per slice.
+
+## 2026-07-08 (iteration 35) — remote-stores S1: the async seam flip lands
+
+**Shipped per the memo (§3.1):** WorkbookStore / AssignmentStore /
+SubmissionStore are Promise-returning; Local impls async-wrapped with zero
+logic change; `storage/backend.ts` (backendMode flag only — store instances
+move in S3); store plumbing done right (openAssignment flush-on-entry +
+sequence guard + Promise.all; submissions hydrate on App mount inside
+AuthGate instead of module init; autosave single-flight with trailing
+rerun); `useAsyncValue` hook across the five async views. Deviations, all
+narrowing: QuestionCreator takes the parent's assignment as a prop (two
+re-fetches eliminated); submitAssignment sets the returned record directly;
+scWindowCheck needed ZERO awaits (only drives the sync loadAssignment path).
+18 files vs the memo's census — no hard-stop ballooning.
+
+**Verified:** navResetCheck 117→120 (backendMode pin + two interleaved-open
+pins: open A then immediately B — both resolve, B owns the state); all gates
+exit 0 (app tsc/check/build with coverage exactly 46+10/0/0; server
+typecheck + check). Browser smoke clean incl. the flip's likeliest breakage:
+place components → Saved → localStorage written → RELOAD → all restored.
+
+**Note:** CLAUDE.md intentionally lags — the memo scopes the narrative/doc
+updates to S4 (batching four slices of churn into one honest rewrite). The
+buildout memos (this LOG, HANDOFF, QUEUE) stay per-iteration as always.
+
+**Next:** S2 — grade-release + manual-review onto the seam (delete
+gradeRelease.ts's parallel store; add the server review route the judge
+identified as a GAP), per the memo's slice plan.

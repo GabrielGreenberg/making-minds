@@ -23,7 +23,7 @@ export function AssignmentOverview() {
       'Note: only your most recent submission is graded — submitting again replaces any earlier submission for grading purposes.'
     );
     if (!ok) return;
-    submitAssignment(assignment.id, getCurrentUserEmail());
+    void submitAssignment(assignment.id, getCurrentUserEmail());
   };
 
   return (

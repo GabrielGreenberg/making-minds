@@ -6,6 +6,7 @@ import { gradeSubmission } from '../engine/grader';
 import { navigate } from '../routing';
 import { gradeSubmissions, computeStats, type SubmissionGrade } from './Gradebook';
 import { isGradesReleased, setGradesReleased } from '../storage/gradeRelease';
+import { useAsyncValue } from '../useAsyncValue';
 
 function formatTime(iso: string): string {
   const d = new Date(iso);
@@ -30,10 +31,22 @@ interface StudentGrades {
 export function GradebookView({ id }: { id: string }) {
   const [expandedStudent, setExpandedStudent] = useState<string | null>(null);
   const [released, setReleased] = useState(() => isGradesReleased(id));
-  // Bumped after a manual review is recorded so the view re-reads the store
-  // (marks, scores, and stats all reflect the new verdict immediately).
-  const [, setReviewVersion] = useState(0);
-  const onReviewed = () => setReviewVersion((v) => v + 1);
+
+  // The assignment and its submissions come from the async seams; after a
+  // manual review is recorded, reload() re-reads them (marks, scores, and
+  // stats all reflect the new verdict immediately).
+  const {
+    value: data,
+    loading,
+    reload,
+  } = useAsyncValue(async () => {
+    const [assignment, records] = await Promise.all([
+      getAssignment(id),
+      localSubmissionStore.listSubmissions(id),
+    ]);
+    return { assignment, records };
+  }, [id]);
+  const onReviewed = reload;
 
   const toggleRelease = () => {
     const next = !released;
@@ -47,7 +60,10 @@ export function GradebookView({ id }: { id: string }) {
     setReleased(next);
   };
 
-  const assignment = getAssignment(id);
+  if (!data) {
+    return <p className="instructor-empty">{loading ? 'Loading…' : 'Failed to load submissions.'}</p>;
+  }
+  const { assignment, records } = data;
   if (!assignment) {
     return (
       <div className="instructor-error">
@@ -59,7 +75,6 @@ export function GradebookView({ id }: { id: string }) {
     );
   }
 
-  const records = localSubmissionStore.listSubmissions(id);
   const grades = gradeSubmissions(assignment, records);
 
   // Group by student. Only the LATEST submission counts toward the grade;
@@ -489,8 +504,8 @@ function ManualReviewControls({
 }) {
   const [note, setNote] = useState(manual?.note ?? '');
 
-  const save = (pass: boolean) => {
-    localSubmissionStore.recordManualReview(record.assignmentId, record.attempt, questionId, {
+  const save = async (pass: boolean) => {
+    await localSubmissionStore.recordManualReview(record.assignmentId, record.attempt, questionId, {
       pass,
       note,
     });
@@ -517,10 +532,10 @@ function ManualReviewControls({
           value={note}
           onChange={(e) => setNote(e.target.value)}
         />
-        <button className="instructor-btn instructor-review-btn" onClick={() => save(true)}>
+        <button className="instructor-btn instructor-review-btn" onClick={() => void save(true)}>
           ✓ Correct
         </button>
-        <button className="instructor-btn instructor-review-btn" onClick={() => save(false)}>
+        <button className="instructor-btn instructor-review-btn" onClick={() => void save(false)}>
           ✗ Incorrect
         </button>
       </div>

@@ -5,15 +5,17 @@
 // live behind this mutable store. The UI talks to the `AssignmentStore`
 // interface, never to localStorage directly, so a server CRUD API drops in later
 // at the same seam. Mirrors the WorkbookStore / SubmissionStore pattern.
+// Promise-returning (a remote backend is intrinsically async); the local
+// implementation resolves immediately.
 
 import type { AssignmentData } from '../types';
 import type { AssignmentSummary } from '../assignments';
 
 export interface AssignmentStore {
-  list(): AssignmentSummary[];
-  get(id: string): AssignmentData | undefined;
-  save(assignment: AssignmentData): void; // create or update
-  remove(id: string): void;
+  list(): Promise<AssignmentSummary[]>;
+  get(id: string): Promise<AssignmentData | undefined>;
+  save(assignment: AssignmentData): Promise<void>; // create or update
+  remove(id: string): Promise<void>;
 }
 
 // Distinct from `mm:asg:<id>` (student work) and `mm:sub:<id>` (submissions).
@@ -33,14 +35,8 @@ class LocalAssignmentStore implements AssignmentStore {
     return ids;
   }
 
-  list(): AssignmentSummary[] {
-    return this.ids()
-      .map((id) => this.get(id))
-      .filter((a): a is AssignmentData => a != null)
-      .map((a) => ({ id: a.id, title: a.title, questionCount: a.questions.length }));
-  }
-
-  get(id: string): AssignmentData | undefined {
+  /** Synchronous read shared by the async interface methods. */
+  private read(id: string): AssignmentData | undefined {
     try {
       const raw = localStorage.getItem(KEY_PREFIX + id);
       if (!raw) return undefined;
@@ -50,7 +46,18 @@ class LocalAssignmentStore implements AssignmentStore {
     }
   }
 
-  save(assignment: AssignmentData): void {
+  async list(): Promise<AssignmentSummary[]> {
+    return this.ids()
+      .map((id) => this.read(id))
+      .filter((a): a is AssignmentData => a != null)
+      .map((a) => ({ id: a.id, title: a.title, questionCount: a.questions.length }));
+  }
+
+  async get(id: string): Promise<AssignmentData | undefined> {
+    return this.read(id);
+  }
+
+  async save(assignment: AssignmentData): Promise<void> {
     try {
       localStorage.setItem(KEY_PREFIX + assignment.id, JSON.stringify(assignment));
     } catch {
@@ -58,7 +65,7 @@ class LocalAssignmentStore implements AssignmentStore {
     }
   }
 
-  remove(id: string): void {
+  async remove(id: string): Promise<void> {
     try {
       localStorage.removeItem(KEY_PREFIX + id);
     } catch {

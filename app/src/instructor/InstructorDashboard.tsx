@@ -1,4 +1,3 @@
-import { useState } from 'react';
 import {
   listAssignments,
   getAssignment,
@@ -7,9 +6,11 @@ import {
 } from '../assignments';
 import { localAssignmentStore } from '../storage/AssignmentStore';
 import { localSubmissionStore } from '../storage/submissionStore';
+import { backendMode } from '../storage/backend';
 import { downloadJson } from '../download';
 import { navigate } from '../routing';
 import { seedSampleData } from '../devData/seed';
+import { useAsyncValue } from '../useAsyncValue';
 
 /**
  * Instructor dashboard: lists every assignment (bundled + instructor-authored)
@@ -17,34 +18,42 @@ import { seedSampleData } from '../devData/seed';
  * assignments are read-only (no Edit/Delete); custom ones are fully editable.
  */
 export function InstructorDashboard() {
-  // Local counter to force a re-render after a mutation (create/delete), since
-  // the assignment list comes from stores, not React state.
-  const [, force] = useState(0);
-  const rerender = () => force((n) => n + 1);
+  // The list and per-row submission counts come from the async seams; after a
+  // mutation (create/delete/seed), reload() re-fetches.
+  const {
+    value: rows,
+    loading,
+    reload,
+  } = useAsyncValue(async () => {
+    const summaries = await listAssignments();
+    const submissionLists = await Promise.all(
+      summaries.map((a) => localSubmissionStore.listSubmissions(a.id)),
+    );
+    return summaries.map((a, i) => ({ ...a, submissionCount: submissionLists[i].length }));
+  }, []);
+  const assignments = rows ?? [];
 
-  const assignments = listAssignments();
-
-  const handleNew = () => {
+  const handleNew = async () => {
     const title = window.prompt('Assignment title:');
     if (title == null) return; // cancelled
-    const created = createAssignment(title);
+    const created = await createAssignment(title);
     navigate({ kind: 'instructor-edit', id: created.id });
   };
 
-  const handleExport = (id: string) => {
-    const data = getAssignment(id);
+  const handleExport = async (id: string) => {
+    const data = await getAssignment(id);
     if (data) downloadJson(`assignment-${id}.json`, data);
   };
 
-  const handleDelete = (id: string, title: string) => {
+  const handleDelete = async (id: string, title: string) => {
     if (!window.confirm(`Delete "${title}"? This cannot be undone.`)) return;
-    localAssignmentStore.remove(id);
-    rerender();
+    await localAssignmentStore.remove(id);
+    reload();
   };
 
-  const handleSeed = () => {
-    const { submissionCount } = seedSampleData();
-    rerender();
+  const handleSeed = async () => {
+    const { submissionCount } = await seedSampleData();
+    reload();
     window.alert(
       `Loaded the sample CC/SC/FSM assignment and ${submissionCount} autograded submissions. ` +
         'Open its Submissions to see the grades.',
@@ -56,17 +65,21 @@ export function InstructorDashboard() {
       <div className="instructor-page-head">
         <h2 className="instructor-page-title">Assignments</h2>
         <div className="instructor-head-actions">
-          <button className="instructor-btn" onClick={handleSeed} title="Dev: seed a sample assignment and autograded submissions">
-            Load sample data
-          </button>
-          <button className="instructor-btn instructor-btn--primary" onClick={handleNew}>
+          {backendMode === 'local' && (
+            <button className="instructor-btn" onClick={() => void handleSeed()} title="Dev: seed a sample assignment and autograded submissions">
+              Load sample data
+            </button>
+          )}
+          <button className="instructor-btn instructor-btn--primary" onClick={() => void handleNew()}>
             New Assignment
           </button>
         </div>
       </div>
 
       {assignments.length === 0 ? (
-        <p className="instructor-empty">No assignments yet. Create one to get started.</p>
+        <p className="instructor-empty">
+          {loading ? 'Loading…' : 'No assignments yet. Create one to get started.'}
+        </p>
       ) : (
         <table className="instructor-table">
           <thead>
@@ -80,7 +93,6 @@ export function InstructorDashboard() {
           <tbody>
             {assignments.map((a) => {
               const bundled = isBundledAssignment(a.id);
-              const submissionCount = localSubmissionStore.listSubmissions(a.id).length;
               return (
                 <tr key={a.id}>
                   <td>
@@ -92,7 +104,7 @@ export function InstructorDashboard() {
                     )}
                   </td>
                   <td>{a.questionCount}</td>
-                  <td>{submissionCount}</td>
+                  <td>{a.submissionCount}</td>
                   <td className="instructor-table-actions">
                     {!bundled && (
                       <button
@@ -108,13 +120,13 @@ export function InstructorDashboard() {
                     >
                       Submissions
                     </button>
-                    <button className="instructor-btn" onClick={() => handleExport(a.id)}>
+                    <button className="instructor-btn" onClick={() => void handleExport(a.id)}>
                       Export JSON
                     </button>
                     {!bundled && (
                       <button
                         className="instructor-btn instructor-btn--danger"
-                        onClick={() => handleDelete(a.id, a.title)}
+                        onClick={() => void handleDelete(a.id, a.title)}
                       >
                         Delete
                       </button>

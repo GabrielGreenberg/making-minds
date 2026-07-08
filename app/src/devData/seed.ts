@@ -21,16 +21,21 @@ export { SAMPLE_ASSIGNMENT_ID };
  * clears any prior sample submissions first so repeated clicks don't pile up.
  * Returns the assignment id and how many submissions were recorded.
  */
-export function seedSampleData(): { assignmentId: string; submissionCount: number } {
+export async function seedSampleData(): Promise<{
+  assignmentId: string;
+  submissionCount: number;
+}> {
   const assignment = buildSampleAssignment();
-  localAssignmentStore.save(assignment);
+  await localAssignmentStore.save(assignment);
 
-  localSubmissionStore.clearSubmissions(SAMPLE_ASSIGNMENT_ID);
+  // clearSubmissions is deliberately OFF the SubmissionStore seam (a server
+  // never exposes it); seeding pins the concrete local store, dev-only.
+  await localSubmissionStore.clearSubmissions(SAMPLE_ASSIGNMENT_ID);
 
   const submissions = buildSampleSubmissions();
   for (const s of submissions) {
     // Stamp a real submit time; the store autogrades against the saved assignment.
-    localSubmissionStore.submit(SAMPLE_ASSIGNMENT_ID, {
+    await localSubmissionStore.submit(SAMPLE_ASSIGNMENT_ID, {
       ...s,
       submittedAt: new Date().toISOString(),
     });
@@ -40,7 +45,7 @@ export function seedSampleData(): { assignmentId: string; submissionCount: numbe
 }
 
 /** Remove the sample assignment and all its submissions. */
-export function clearSampleData(): void {
-  localSubmissionStore.clearSubmissions(SAMPLE_ASSIGNMENT_ID);
-  localAssignmentStore.remove(SAMPLE_ASSIGNMENT_ID);
+export async function clearSampleData(): Promise<void> {
+  await localSubmissionStore.clearSubmissions(SAMPLE_ASSIGNMENT_ID);
+  await localAssignmentStore.remove(SAMPLE_ASSIGNMENT_ID);
 }

@@ -41,6 +41,7 @@ const { useStore, selectTurbotArena } = await import('../src/store');
 const { buildSampleAssignment, scCorrect, fsmCorrect, tmCorrect, turbotCorrect, SAMPLE_ASSIGNMENT_ID } =
   await import('../src/devData/sampleData');
 const { localAssignmentStore } = await import('../src/storage/AssignmentStore');
+const { backendMode } = await import('../src/storage/backend');
 
 let passed = 0;
 let failed = 0;
@@ -104,6 +105,10 @@ function plantSimJunk() {
 
 const assignment = buildSampleAssignment();
 const store = useStore.getState();
+
+// ── backend mode: the Node harness must run against the Local stores ──
+console.log('[backend mode]');
+check('backendMode resolves to local under the Node harness', backendMode === 'local');
 
 // ── loadAssignment lands fresh ──────────────────────────────────
 console.log('[loadAssignment]');
@@ -178,11 +183,26 @@ checkAllSimFresh('after re-load');
 
 // ── openAssignment flushes planted junk ─────────────────────────
 console.log('[openAssignment flushes junk]');
-localAssignmentStore.save(assignment);
+await localAssignmentStore.save(assignment);
 useStore.getState().closeAssignment();
 plantSimJunk();
-check('openAssignment succeeds', useStore.getState().openAssignment(SAMPLE_ASSIGNMENT_ID) === true);
+check('openAssignment succeeds', (await useStore.getState().openAssignment(SAMPLE_ASSIGNMENT_ID)) === true);
 checkAllSimFresh('after open');
+
+// ── interleaved opens: the newest open wins ─────────────────────
+// Open A and immediately open B without awaiting A. A's seam reads resolve
+// after B's open has started, so A's resolve is stale and must apply nothing
+// (the openAssignmentSeq guard) — B owns the final state.
+console.log('[openAssignment interleaving: last open wins]');
+const assignmentB = { ...buildSampleAssignment(), id: `${SAMPLE_ASSIGNMENT_ID}-b`, title: 'Sample B' };
+await localAssignmentStore.save(assignmentB);
+useStore.getState().closeAssignment();
+const openA = useStore.getState().openAssignment(SAMPLE_ASSIGNMENT_ID);
+const openB = useStore.getState().openAssignment(assignmentB.id);
+const [okA, okB] = await Promise.all([openA, openB]);
+check('both interleaved opens resolve true (stale open is a silent no-op)', okA === true && okB === true);
+check('the newest open owns the final state (B wins)',
+  useStore.getState().assignment?.id === assignmentB.id && useStore.getState().workbookOpen);
 
 // ═════ Sandbox tabs share the same fresh-machine contract ═══════
 

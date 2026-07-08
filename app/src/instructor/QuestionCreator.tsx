@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import type {
+  AssignmentData,
   AssignmentQuestion,
   BuildMode,
   ComponentType,
@@ -14,7 +15,6 @@ import {
   MAX_PERCEPTION_WIDTH,
   MIN_PERCEPTION_WIDTH,
 } from '../engine/perception';
-import { getAssignment } from '../assignments';
 import { ArenaCanvas } from '../components/ArenaCanvas';
 import { blankArena, resizeArena, setArenaCell, placeStart, MAX_ARENA_SIZE } from './arenaEditing';
 import {
@@ -34,7 +34,10 @@ import {
 } from './ccPreview';
 
 interface Props {
-  assignmentId: string;
+  // The assignment being edited. The creator reads its question list for the
+  // default label and new-question id allocation; the parent editor already
+  // holds the fetched value, so no seam read happens here.
+  assignment: AssignmentData;
   existingQuestion?: AssignmentQuestion;
   onSave: (q: AssignmentQuestion) => void;
   onCancel: () => void;
@@ -123,7 +126,7 @@ const PERCEPTION_KINDS: Record<'CC' | 'SC', { kind: PerceptionKind; label: strin
   ],
 };
 
-export function QuestionCreator({ assignmentId, existingQuestion, onSave, onCancel }: Props) {
+export function QuestionCreator({ assignment, existingQuestion, onSave, onCancel }: Props) {
   // Mode is an ordinary field of the shared form: new questions default to CC,
   // existing ones keep their mode. Switching it must NOT reset the groups/formulas
   // below — they're valid regardless of mode (the whole point of the shared shape).
@@ -171,8 +174,7 @@ export function QuestionCreator({ assignmentId, existingQuestion, onSave, onCanc
   const outputs: AuthoredOutputGroup[] = [{ name: 'f', formula }];
   const [label, setLabel] = useState(() => {
     if (existingQuestion) return existingQuestion.label;
-    const count = getAssignment(assignmentId)?.questions.length ?? 0;
-    return `Problem ${count + 1}`;
+    return `Problem ${assignment.questions.length + 1}`;
   });
   const [statement, setStatement] = useState(existingQuestion?.statement ?? '');
 
@@ -320,7 +322,7 @@ export function QuestionCreator({ assignmentId, existingQuestion, onSave, onCanc
   const handleSave = () => {
     if (!saveable) return;
 
-    const existingQsForId = getAssignment(assignmentId)?.questions ?? [];
+    const existingQsForId = assignment.questions;
     const newId =
       existingQuestion?.id ??
       existingQsForId.reduce((max, q) => Math.max(max, q.id), 0) + 1;

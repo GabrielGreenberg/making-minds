@@ -473,8 +473,11 @@ interface AppState {
   openResponse: string;
   setOpenResponse: (text: string) => void;
   loadAssignment: (assignment: AssignmentData) => void;
-  // Open a bundled assignment by id and show its workbook. Returns false if unknown.
-  openAssignment: (id: string) => boolean;
+  // Open an assignment by id and show its workbook. Resolves false if the id is
+  // unknown. A stale open (one superseded by a newer navigation while its seam
+  // reads were in flight) resolves true and applies nothing — the newer open
+  // owns the outcome.
+  openAssignment: (id: string) => Promise<boolean>;
   switchQuestion: (index: number) => void;
   closeAssignment: () => void;
   // Navigation between the catalog (Home) and the editor.
@@ -487,10 +490,14 @@ interface AppState {
   // Submission export (null when no assignment is loaded)
   exportSubmission: (student?: string) => string | null;
   // Latest recorded submission per assignment id (reactive; for status badges).
+  // Starts empty; hydrated from the submission seam via hydrateSubmissions().
   submissions: Record<string, SubmissionRecord>;
+  // Refresh `submissions` from the seam. Called on auth-ready (App mount) —
+  // the async replacement for the old sync-at-module-init hydration.
+  hydrateSubmissions: () => Promise<void>;
   // Record an immutable snapshot for an assignment. Works whether the assignment
-  // is open (live state) or not (persisted state). Returns null if id is unknown.
-  submitAssignment: (id: string, student?: string) => SubmissionRecord | null;
+  // is open (live state) or not (persisted state). Resolves null if id is unknown.
+  submitAssignment: (id: string, student?: string) => Promise<SubmissionRecord | null>;
   // exportWorkbook and importWorkbook are in the Workbook section above
 
   // Rotation
@@ -779,6 +786,11 @@ const defaultTabId = 'tab-1';
 // which is the signal that they want this combo evaluated again.
 let suppressAutoAddRow = false;
 
+// Monotonic token for openAssignment: each open bumps it, and an open whose
+// seam reads resolve after a newer open started applies nothing — a stale
+// resolve must never clobber a newer navigation.
+let openAssignmentSeq = 0;
+
 export const useStore = create<AppState>()((set, get) => ({
   autoSaveStatus: 'saved' as const,
 
@@ -786,7 +798,20 @@ export const useStore = create<AppState>()((set, get) => ({
   workbookOpen: false,
   workbookTitle: 'Untitled Workbook',
   workbookFileHandle: null,
-  submissions: loadSubmissions(),
+  submissions: {},
+
+  hydrateSubmissions: async () => {
+    const assignments = await listAssignments();
+    const latests = await Promise.all(
+      assignments.map((a) => localSubmissionStore.getLatest(a.id)),
+    );
+    const out: Record<string, SubmissionRecord> = {};
+    assignments.forEach((a, i) => {
+      const latest = latests[i];
+      if (latest) out[a.id] = latest;
+    });
+    set({ submissions: out });
+  },
 
   closeWorkbook: () => {
     set({
@@ -1429,18 +1454,26 @@ export const useStore = create<AppState>()((set, get) => ({
     });
     get().resetAllSimState();
   },
-  openAssignment: (id) => {
-    const def = getAssignment(id);
-    if (!def) return false;
+  openAssignment: async (id) => {
+    // Flush any pending debounced save for the canvas we're leaving so its
+    // last edit is persisted before another workbook takes over the live state.
+    flushAutoSave();
     // Same assignment already in memory → resume without wiping in-progress work.
     if (get().assignment?.id === id) {
       set({ workbookOpen: true });
       return true;
     }
+    const seq = ++openAssignmentSeq;
+    const [def, saved] = await Promise.all([
+      getAssignment(id),
+      localWorkbookStore.loadAssignmentState(id),
+    ]);
+    // Superseded while in flight — drop this resolve (see the AppState note).
+    if (seq !== openAssignmentSeq) return true;
+    if (!def) return false;
     get().loadAssignment(def);
 
     // Restore any saved work for this assignment (merged by question id).
-    const saved = localWorkbookStore.loadAssignmentState(id);
     const { questionCircuits, currentQuestionIndex } = restoreQuestionCircuits(def, saved);
     const activeQ = def.questions[currentQuestionIndex];
     const activeCircuit = activeQ
@@ -1478,8 +1511,10 @@ export const useStore = create<AppState>()((set, get) => ({
         });
         set({ questionCircuits: qc });
       }
-      // Flush immediately so a quick Home click persists (don't wait for debounce).
-      saveAssignmentState();
+      // Flush immediately so a quick Home click persists (don't wait for
+      // debounce). Fire-and-forget: the local seam writes synchronously before
+      // its first suspension.
+      void saveAssignmentState();
     } else {
       const tc = new Map(state.tabCircuits);
       tc.set(state.activeTabId, {
@@ -1603,8 +1638,8 @@ export const useStore = create<AppState>()((set, get) => ({
     });
     return JSON.stringify(submission, null, 2);
   },
-  submitAssignment: (id, student) => {
-    const def = getAssignment(id);
+  submitAssignment: async (id, student) => {
+    const def = await getAssignment(id);
     if (!def) return null;
     const state = get();
     // Build from live state if this assignment is open; otherwise from the
@@ -1612,12 +1647,13 @@ export const useStore = create<AppState>()((set, get) => ({
     const circuits =
       state.assignment?.id === id
         ? syncedQuestionCircuits(state)
-        : restoreQuestionCircuits(def, localWorkbookStore.loadAssignmentState(id)).questionCircuits;
+        : restoreQuestionCircuits(def, await localWorkbookStore.loadAssignmentState(id))
+            .questionCircuits;
     const submission = buildSubmission(def, circuits, {
       student,
       submittedAt: new Date().toISOString(),
     });
-    const record = localSubmissionStore.submit(id, submission);
+    const record = await localSubmissionStore.submit(id, submission);
     set({ submissions: { ...get().submissions, [id]: record } });
     return record;
   },
@@ -3741,17 +3777,10 @@ function syncedQuestionCircuits(s: AppState): Map<number, QuestionCircuit> {
   return circuits;
 }
 
-/** Hydrate the latest-submission-per-assignment map from the submission store. */
-function loadSubmissions(): Record<string, SubmissionRecord> {
-  const out: Record<string, SubmissionRecord> = {};
-  for (const a of listAssignments()) {
-    const latest = localSubmissionStore.getLatest(a.id);
-    if (latest) out[a.id] = latest;
-  }
-  return out;
-}
-
-function saveAssignmentState() {
+// Persist the open assignment's workbook through the WorkbookStore seam.
+// The state snapshot and the seam call happen synchronously (before the first
+// suspension), so unload-time flushes still land with the local store.
+async function saveAssignmentState(): Promise<void> {
   const s = useStore.getState();
   const a = s.assignment;
   if (!a) return;
@@ -3767,17 +3796,28 @@ function saveAssignmentState() {
       responseText: s.openResponse,
     });
   }
-  localWorkbookStore.saveAssignmentState(a.id, {
+  await localWorkbookStore.saveAssignmentState(a.id, {
     currentQuestionIndex: s.currentQuestionIndex,
     questionCircuits: Object.fromEntries(qc) as Record<number, QuestionCircuit>,
   });
 }
 
-function performAutoSave() {
+// Single-flight guard: at most one save is in the seam at a time; a save
+// requested while one is in flight reruns once after it settles (trailing
+// edge), so the latest state always lands and writes can't interleave.
+let autoSaveInFlight = false;
+let autoSaveTrailing = false;
+
+async function performAutoSave(): Promise<void> {
+  if (autoSaveInFlight) {
+    autoSaveTrailing = true;
+    return;
+  }
+  autoSaveInFlight = true;
   try {
     useStore.setState({ autoSaveStatus: 'saving' });
     if (useStore.getState().assignment) {
-      saveAssignmentState();
+      await saveAssignmentState();
     } else {
       localStorage.setItem(AUTO_SAVE_KEY, JSON.stringify(getAutoSaveData()));
     }
@@ -3785,6 +3825,12 @@ function performAutoSave() {
   } catch {
     // localStorage full or unavailable — silent fail
     useStore.setState({ autoSaveStatus: 'saved' });
+  } finally {
+    autoSaveInFlight = false;
+    if (autoSaveTrailing) {
+      autoSaveTrailing = false;
+      void performAutoSave();
+    }
   }
 }
 
@@ -3821,7 +3867,9 @@ useStore.subscribe((state, prev) => {
 
   useStore.setState({ autoSaveStatus: 'unsaved' });
   if (autoSaveTimer) clearTimeout(autoSaveTimer);
-  autoSaveTimer = setTimeout(performAutoSave, AUTO_SAVE_DELAY);
+  autoSaveTimer = setTimeout(() => {
+    void performAutoSave();
+  }, AUTO_SAVE_DELAY);
 });
 
 // Flush a pending debounced save immediately — e.g. when the tab is closing or
@@ -3831,7 +3879,9 @@ function flushAutoSave() {
   if (!autoSaveTimer) return;
   clearTimeout(autoSaveTimer);
   autoSaveTimer = null;
-  performAutoSave();
+  // Fire-and-forget: with the local seam the write itself is synchronous
+  // (before the first suspension), so it lands even mid-unload.
+  void performAutoSave();
 }
 window.addEventListener('beforeunload', flushAutoSave);
 window.addEventListener('pagehide', flushAutoSave);

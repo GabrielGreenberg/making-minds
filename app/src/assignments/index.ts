@@ -31,18 +31,18 @@ export function isBundledAssignment(id: string): boolean {
  * Bundled assignments come first, then instructor-authored ones. If an id
  * appears in both, the bundled (authoritative, read-only) one wins.
  */
-export function listAssignments(): AssignmentSummary[] {
+export async function listAssignments(): Promise<AssignmentSummary[]> {
   const bundled: AssignmentSummary[] = ASSIGNMENTS.map((a) => ({
     id: a.id,
     title: a.title,
     questionCount: a.questions.length,
   }));
-  const custom = localAssignmentStore.list().filter((a) => !BUNDLED_IDS.has(a.id));
+  const custom = (await localAssignmentStore.list()).filter((a) => !BUNDLED_IDS.has(a.id));
   return [...bundled, ...custom];
 }
 
 /** Full definition for one assignment, or undefined if the id is unknown. */
-export function getAssignment(id: string): AssignmentData | undefined {
+export async function getAssignment(id: string): Promise<AssignmentData | undefined> {
   const bundled = ASSIGNMENTS.find((a) => a.id === id);
   if (bundled) return bundled;
   return localAssignmentStore.get(id);
@@ -63,11 +63,11 @@ function slugify(title: string): string {
  * base-36 timestamp suffix so re-using a title never collides with an existing
  * assignment (bundled or custom).
  */
-export function createAssignment(title: string): AssignmentData {
+export async function createAssignment(title: string): Promise<AssignmentData> {
   const suffix = Date.now().toString(36).slice(-4);
   let id = `${slugify(title)}-${suffix}`;
   // Extremely unlikely, but guarantee uniqueness against anything that exists.
-  while (isBundledAssignment(id) || localAssignmentStore.get(id)) {
+  while (isBundledAssignment(id) || (await localAssignmentStore.get(id))) {
     id = `${slugify(title)}-${suffix}-${Math.floor(performance.now()).toString(36)}`;
   }
   const assignment: AssignmentData = {
@@ -75,6 +75,6 @@ export function createAssignment(title: string): AssignmentData {
     title: title.trim() || 'Untitled assignment',
     questions: [],
   };
-  localAssignmentStore.save(assignment);
+  await localAssignmentStore.save(assignment);
   return assignment;
 }
