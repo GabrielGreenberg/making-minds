@@ -52,11 +52,9 @@ green.
 
 ## Then
 
-**S4** (error/backoff UX, per-email crash buffer, fill-empty localStorage
-migration, online-only-submit UX — and the BATCHED DOC REWRITE: CLAUDE.md
-narrative + seams table + key-files rows for the whole cutover). After S4:
-the queue is empty again except optionals (ActiveTask trim if Gabriel wants
-it) and the recurring METAs (~iteration 39 next audit).
+After S4 lands, P6.4 closes and the queue is empty again except optionals
+(ActiveTask trim if Gabriel wants it) and the recurring METAs (~iteration 39
+next audit — it should double as the cutover's final reconciliation).
 
 ## Watch out for
 
