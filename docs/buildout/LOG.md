@@ -1520,3 +1520,36 @@ CLAUDE.md narrative still batched to S4 (one dangling gradeRelease.ts
 pointer patched in place).
 
 **Next:** S3 — Remote impls + backend switch + auth, per the memo.
+
+## 2026-07-08 (iteration 37) — remote-stores S3: the remote implementations land
+
+**Shipped per the memo:** `storage/remoteStores.ts` (three Remote impls as
+direct api/client calls; 404→null; grader-free zone), `storage/backend.ts`
+now the SOLE exporter of store instances by backendMode (all construction
+sites migrated; documented exceptions: devData/seed off-seam, navResetCheck
+pins local), the S2 punt resolved (`recordManualReview` gained `student`;
+Local ignores it byte-identically), and the full auth flow: one AuthProvider
+by mode — remote login → bearer token → me() session restore → 401 hook
+clears to login; `initRouting()` moved into AuthGate (idempotent);
+`stubAuth.tsx` DELETED. Two decisions: bundled assignments are
+local-mode-only (the client bundle's answer bank never doubles a sanitized
+server copy); a real static import cycle (backend→submission→assignments→
+backend, TDZ crash) broken via call-time import.
+
+**New teeth:** `tools/remoteStoreCheck.ts` (31 pins, in `npm run check` — 12
+tools now): boots the real server, drives the Remote seams headlessly —
+grader grep gate, 401 paths, answer-stripped student payloads, submit is
+answers-only (spoofed identity/timestamp IGNORED — the server's word),
+release/review round-trips.
+
+**Verified:** all gates exit 0 (app + server; coverage exactly 46+10/0/0);
+local browser smoke byte-identical; REMOTE browser smoke end-to-end on a
+temp server+DB (login/session-restore/server workbook round-trip/submit
+attempt-1 grade-withheld/instructor review+release/student sees scores
+only). Smoke infra torn down; an untracked "Vite Remote Mode" launch config
+was added for future remote smokes.
+
+**Next:** S4 — the cutover's last slice: fill-empty localStorage migration,
+per-email crash buffer + keepalive flush, boot health-probe retry screen,
+loading/error sweep, and the BATCHED DOC REWRITE (CLAUDE.md narrative +
+seams table + QUEUE close of P6.4).

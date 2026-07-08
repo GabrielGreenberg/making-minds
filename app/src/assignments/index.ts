@@ -1,17 +1,25 @@
 // Assignment registry.
 //
 // Merges two sources behind a stable API: bundled assignments (built in at
-// compile time, read-only) and instructor-authored assignments (mutable, stored
-// behind the `AssignmentStore` seam). `listAssignments`/`getAssignment` stay
-// stable; only their implementation changes when assignments move server-side.
+// compile time, read-only) and instructor-authored assignments (mutable,
+// stored behind the `AssignmentStore` seam). `listAssignments`/`getAssignment`
+// stay stable; the implementation switches with the backend.
+//
+// Bundled assignments are a LOCAL-mode concept only: in remote mode every
+// assignment is a server row (served role-sanitized — students never receive
+// `test_cases`), and shipping the bundled JSON's answer bank alongside would
+// defeat that ("Things to watch": test cases must not ship to the client in
+// production). With an empty bundled set, everything below reduces to the
+// store, i.e. the server.
 
 import type { AssignmentData } from '../types';
-import { localAssignmentStore } from '../storage/AssignmentStore';
+import { assignmentStore, backendMode } from '../storage/backend';
 import ccBasics from './cc-basics.json';
 
 // JSON is inferred with widened types (e.g. buildMode: string), so assert to
 // the domain type. Add new assignments by importing their JSON here.
-const ASSIGNMENTS: AssignmentData[] = [ccBasics as unknown as AssignmentData];
+const ASSIGNMENTS: AssignmentData[] =
+  backendMode === 'local' ? [ccBasics as unknown as AssignmentData] : [];
 
 const BUNDLED_IDS = new Set(ASSIGNMENTS.map((a) => a.id));
 
@@ -42,10 +50,10 @@ export async function listAssignments(): Promise<AssignmentSummary[]> {
       id: a.id,
       title: a.title,
       questionCount: a.questions.length,
-      gradesReleased: await localAssignmentStore.getGradesReleased(a.id),
+      gradesReleased: await assignmentStore.getGradesReleased(a.id),
     })),
   );
-  const custom = (await localAssignmentStore.list()).filter((a) => !BUNDLED_IDS.has(a.id));
+  const custom = (await assignmentStore.list()).filter((a) => !BUNDLED_IDS.has(a.id));
   return [...bundled, ...custom];
 }
 
@@ -53,7 +61,7 @@ export async function listAssignments(): Promise<AssignmentSummary[]> {
 export async function getAssignment(id: string): Promise<AssignmentData | undefined> {
   const bundled = ASSIGNMENTS.find((a) => a.id === id);
   if (bundled) return bundled;
-  return (await localAssignmentStore.get(id))?.assignment;
+  return (await assignmentStore.get(id))?.assignment;
 }
 
 /** Turn a title into a url-safe slug; empty input falls back to "assignment". */
@@ -75,7 +83,7 @@ export async function createAssignment(title: string): Promise<AssignmentData> {
   const suffix = Date.now().toString(36).slice(-4);
   let id = `${slugify(title)}-${suffix}`;
   // Extremely unlikely, but guarantee uniqueness against anything that exists.
-  while (isBundledAssignment(id) || (await localAssignmentStore.get(id))) {
+  while (isBundledAssignment(id) || (await assignmentStore.get(id))) {
     id = `${slugify(title)}-${suffix}-${Math.floor(performance.now()).toString(36)}`;
   }
   const assignment: AssignmentData = {
@@ -83,6 +91,6 @@ export async function createAssignment(title: string): Promise<AssignmentData> {
     title: title.trim() || 'Untitled assignment',
     questions: [],
   };
-  await localAssignmentStore.save(assignment);
+  await assignmentStore.save(assignment);
   return assignment;
 }

@@ -18,7 +18,6 @@ import type {
   SubmissionRecord,
 } from '../types';
 import { emptyQuestionCircuit } from './workbookStore';
-import { getAssignment } from '../assignments';
 import { gradeSubmission } from '../engine/grader';
 import { applyManualReview } from './manualReview';
 
@@ -70,9 +69,16 @@ export interface SubmissionStore {
    * of one stored attempt. Returns the updated record, or null if the attempt
    * has no pending question with that id. An instructor/server capability —
    * nothing student-facing calls this.
+   *
+   * `student` identifies WHOSE attempt: the server counts attempt numbers per
+   * (assignment, student), so the attempt alone is ambiguous remotely. The
+   * local store numbers attempts per assignment and ignores it (its lookup by
+   * attempt is already unique) — the parameter exists so both implementations
+   * share one signature.
    */
   recordManualReview(
     id: string,
+    student: string,
     attempt: number,
     questionId: number,
     review: { pass: boolean; note?: string },
@@ -119,6 +125,11 @@ class LocalSubmissionStore implements SubmissionStore {
     const all = this.read(id);
     // Autograde on receipt: the "server" holds the test vectors, so it can grade
     // the moment the submission lands and persist the result on the record.
+    // The registry is imported at CALL time, not module time: statically,
+    // assignments/index.ts → storage/backend.ts → this module is a cycle, and
+    // whichever module a headless tool loads first would hit a TDZ on the
+    // other's exports. This is the cycle's one runtime edge, so defer it.
+    const { getAssignment } = await import('../assignments');
     const def = await getAssignment(id);
     const result = def ? gradeSubmission(def, submission) : undefined;
     const record: SubmissionRecord = {
@@ -138,10 +149,14 @@ class LocalSubmissionStore implements SubmissionStore {
 
   async recordManualReview(
     id: string,
+    _student: string,
     attempt: number,
     questionId: number,
     review: { pass: boolean; note?: string },
   ): Promise<SubmissionRecord | null> {
+    // `_student` is unused locally: local attempt numbers are unique per
+    // assignment (see the interface note), so the attempt alone identifies
+    // the record — behavior is byte-identical to the pre-S3 seam.
     const all = this.read(id);
     const updated = applyManualReview(all, attempt, questionId, {
       pass: review.pass,

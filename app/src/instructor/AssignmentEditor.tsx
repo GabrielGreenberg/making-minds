@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import type { AssignmentData, AssignmentQuestion } from '../types';
 import { questionModeLabel } from '../types';
 import { getAssignment, isBundledAssignment } from '../assignments';
-import { localAssignmentStore } from '../storage/AssignmentStore';
+import { assignmentStore } from '../storage/backend';
 import { downloadJson } from '../download';
 import { navigate } from '../routing';
 import { QuestionCreator } from './QuestionCreator';
@@ -52,10 +52,11 @@ export function AssignmentEditor({ id }: { id: string }) {
     );
   }
 
-  // Persist and reflect a new assignment value. Fire-and-forget: the local
-  // seam writes synchronously before its first suspension.
+  // Persist and reflect a new assignment value. Fire-and-forget: the draft
+  // updates immediately either way (local writes land synchronously; a
+  // remote PUT settles in the background).
   const commit = (next: AssignmentData) => {
-    void localAssignmentStore.save(next);
+    void assignmentStore.save(next);
     setDraft(next);
   };
 

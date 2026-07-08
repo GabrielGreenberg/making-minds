@@ -1,8 +1,7 @@
 import { useState } from 'react';
 import type { AssignmentData, ManualReview, SubmissionRecord } from '../types';
 import { getAssignment } from '../assignments';
-import { localAssignmentStore } from '../storage/AssignmentStore';
-import { localSubmissionStore } from '../storage/submissionStore';
+import { assignmentStore, submissionStore } from '../storage/backend';
 import { gradeSubmission } from '../engine/grader';
 import { navigate } from '../routing';
 import { gradeSubmissions, computeStats, type SubmissionGrade } from './Gradebook';
@@ -42,8 +41,8 @@ export function GradebookView({ id }: { id: string }) {
   } = useAsyncValue(async () => {
     const [assignment, records, released] = await Promise.all([
       getAssignment(id),
-      localSubmissionStore.listSubmissions(id),
-      localAssignmentStore.getGradesReleased(id),
+      submissionStore.listSubmissions(id),
+      assignmentStore.getGradesReleased(id),
     ]);
     return { assignment, records, released };
   }, [id]);
@@ -58,7 +57,7 @@ export function GradebookView({ id }: { id: string }) {
     ) {
       return;
     }
-    await localAssignmentStore.setGradesReleased(id, next);
+    await assignmentStore.setGradesReleased(id, next);
     reload();
   };
 
@@ -507,10 +506,16 @@ function ManualReviewControls({
   const [note, setNote] = useState(manual?.note ?? '');
 
   const save = async (pass: boolean) => {
-    await localSubmissionStore.recordManualReview(record.assignmentId, record.attempt, questionId, {
-      pass,
-      note,
-    });
+    // The student email disambiguates WHOSE attempt server-side (remote
+    // attempt numbers count per student); the local store ignores it, so
+    // legacy anonymous local records still review fine.
+    await submissionStore.recordManualReview(
+      record.assignmentId,
+      record.submission.student ?? '',
+      record.attempt,
+      questionId,
+      { pass, note },
+    );
     onReviewed();
   };
 

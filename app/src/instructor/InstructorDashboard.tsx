@@ -4,9 +4,7 @@ import {
   createAssignment,
   isBundledAssignment,
 } from '../assignments';
-import { localAssignmentStore } from '../storage/AssignmentStore';
-import { localSubmissionStore } from '../storage/submissionStore';
-import { backendMode } from '../storage/backend';
+import { assignmentStore, submissionStore, backendMode } from '../storage/backend';
 import { downloadJson } from '../download';
 import { navigate } from '../routing';
 import { seedSampleData } from '../devData/seed';
@@ -27,7 +25,7 @@ export function InstructorDashboard() {
   } = useAsyncValue(async () => {
     const summaries = await listAssignments();
     const submissionLists = await Promise.all(
-      summaries.map((a) => localSubmissionStore.listSubmissions(a.id)),
+      summaries.map((a) => submissionStore.listSubmissions(a.id)),
     );
     return summaries.map((a, i) => ({ ...a, submissionCount: submissionLists[i].length }));
   }, []);
@@ -47,7 +45,7 @@ export function InstructorDashboard() {
 
   const handleDelete = async (id: string, title: string) => {
     if (!window.confirm(`Delete "${title}"? This cannot be undone.`)) return;
-    await localAssignmentStore.remove(id);
+    await assignmentStore.remove(id);
     reload();
   };
 

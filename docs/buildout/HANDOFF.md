@@ -4,7 +4,7 @@ _Read this first. It says exactly where we are and what to do next. Rewrite it a
 the end of every iteration. If it conflicts with the harness, the harness wins —
 run `npm run coverage` and reconcile._
 
-## Where we are — ledger complete · remote-stores cutover S2/4 done
+## Where we are — ledger complete · remote-stores cutover S3/4 done
 
 Branch `buildout-infra`. **46 exact + 10 interface = 56/56 at-tier**, 0
 pending, 0 regressed, 0 warnings — the coverage ledger has been complete
@@ -27,16 +27,28 @@ iterations). The active program is **P6.4, the Remote-store cutover**, per
   release toggle + review verdicts survive reload; pre-release stays
   grade-silent.
 
-## Do this next — remote-stores S3 (the remote implementations)
+- **S3 DONE (iteration 37):** Remote{Workbook,Assignment,Submission}Store
+  over api/client.ts (no cache; grader-free, grep-gated);
+  `storage/backend.ts` is the sole store-instance exporter by mode; full
+  auth flow (remote login → bearer → me() restore → 401 hook; stubAuth
+  DELETED; initRouting inside AuthGate, idempotent); recordManualReview
+  gained `student` (Local byte-identical); bundled assignments are
+  local-mode-only by design; a TDZ import cycle broken. remoteStoreCheck
+  (31 pins, in npm run check — 12 tools) drives the Remote seams against
+  the booted server headlessly. Remote browser smoke ran END-TO-END.
 
-Per the memo's S3: `Remote*` store implementations calling `api/client.ts`
-directly; `storage/backend.ts` exports the mode-switched store instances;
-auth/token flow wired (login → bearer → stores; `initRouting` moves inside
-AuthGate per the memo); RemoteSubmissionStore threads the student email into
-`reviewSubmission` (S2's noted punt — the seam signature may grow; keep Local
-in lockstep). Acceptance per the memo's S3 criteria + `remoteStoreCheck`
-groundwork if the memo scopes it here (check §test-plan). Local mode must
-remain byte-identical; the harness stays local and green.
+## Do this next — remote-stores S4 (the last slice)
+
+Per the memo's S4: fill-empty localStorage migration (`migrateLocalData`,
+idempotence pinned in remoteStoreCheck); per-email crash buffer + keepalive
+flush; boot health-probe + retry screen; the loading/error/backoff UX sweep
+('error' autosave status); online-only-submit UX (server stamps time,
+visible retry). AND the BATCHED DOC REWRITE the memo scoped here: CLAUDE.md
+(seams table — localStorage entries become 'Local impl behind backend.ts
+switch; Remote live', auth row, key-files rows for remoteStores/backend/
+manualReview/remoteStoreCheck, Part 1 narrative), plus QUEUE close of P6.4
+when S4 lands. Local mode byte-identical; all gates + the 12-tool chain
+green.
 
 ## Then
 

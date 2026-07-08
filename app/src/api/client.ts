@@ -1,14 +1,14 @@
 // Typed HTTP client for the Making Minds API server (server/).
 //
 // This is the browser half of the server seams: every function maps 1:1 to a
-// server endpoint (see server/src/app.ts). Nothing imports it yet — the app
-// still runs on the Local* stores — but it is the ready-made building block for
-// the Remote* store implementations when we cut over:
+// server endpoint (see server/src/app.ts). The Remote* stores
+// (storage/remoteStores.ts) and the remote AuthProvider (src/auth) are its
+// consumers, selected by `backendMode` (storage/backend.ts):
 //
 //   RemoteWorkbookStore   → getWorkbook / putWorkbook
 //   RemoteAssignmentStore → listAssignments / getAssignment / putAssignment / deleteAssignment
 //   RemoteSubmissionStore → submitAssignment / listSubmissions / reviewSubmission
-//   real auth             → login / logout / me (replacing src/auth/stubAuth)
+//   remote auth           → login / logout / me
 //
 // Configuration: VITE_API_BASE (e.g. "https://api.phil133.example.edu") set at
 // build time on Cloudflare Pages; empty default means same-origin "/api", which
@@ -39,7 +39,18 @@ export interface AssignmentSummary {
   gradesReleased: boolean;
 }
 
-const API_BASE: string = (import.meta.env?.VITE_API_BASE as string | undefined) ?? '';
+let apiBase: string = (import.meta.env?.VITE_API_BASE as string | undefined) ?? '';
+
+/**
+ * Harness-only override: point the client at an ephemeral test server
+ * (tools/remoteStoreCheck.ts boots the real server on port 0 and injects its
+ * URL here). The browser build never calls this — the base comes from
+ * VITE_API_BASE at build time.
+ */
+export function setApiBase(url: string): void {
+  apiBase = url;
+}
+
 const TOKEN_KEY = 'mm:auth:token';
 
 export function getToken(): string | null {
@@ -70,9 +81,19 @@ export class ApiError extends Error {
   }
 }
 
+// Invoked on ANY 401 response (expired/revoked session, cleared roster row…)
+// before the ApiError is thrown. The remote AuthProvider registers a handler
+// that clears the token and drops back to the login screen, so a dead session
+// can't leave the app half-working.
+let onUnauthorized: (() => void) | null = null;
+
+export function setOnUnauthorized(handler: (() => void) | null): void {
+  onUnauthorized = handler;
+}
+
 async function request<T>(method: string, path: string, body?: unknown): Promise<T> {
   const token = getToken();
-  const res = await fetch(`${API_BASE}/api${path}`, {
+  const res = await fetch(`${apiBase}/api${path}`, {
     method,
     headers: {
       'Content-Type': 'application/json',
@@ -82,6 +103,7 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
   });
   const json = (await res.json().catch(() => ({}))) as Record<string, unknown>;
   if (!res.ok) {
+    if (res.status === 401) onUnauthorized?.();
     throw new ApiError(res.status, typeof json.error === 'string' ? json.error : res.statusText);
   }
   return json as T;

@@ -150,8 +150,17 @@ export function navigate(route: Route, opts?: { replace?: boolean }): void {
 /** Custom event fired by `navigate` so hash-reading hooks can re-render. */
 export const ROUTE_EVENT = 'mm:route';
 
-/** Wire up Back/Forward and apply the initial URL. Call once at startup. */
+// initRouting runs once per page load. It is called from an AuthGate effect
+// (only after a user exists — a deep link must not fire an unauthenticated
+// openAssignment), so guard against re-entry: StrictMode double-fires
+// effects, and logout → login would otherwise re-arm the popstate listener
+// and re-apply the route.
+let routingStarted = false;
+
+/** Wire up Back/Forward and apply the initial URL. Idempotent; called by AuthGate once a user exists. */
 export function initRouting(): void {
+  if (routingStarted) return;
+  routingStarted = true;
   window.addEventListener('popstate', () => applyRoute(parseHash(location.hash)));
   applyRoute(parseHash(location.hash));
 }

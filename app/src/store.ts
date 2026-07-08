@@ -39,12 +39,11 @@ import {
 import { topologicalSort, evaluateGate, evaluateCC, evaluateSCSingleStep, sortStateComponents, evaluateFSMSymbolStep, evaluateTMSingleStep, notationForRepresentation, stepCountFor, encodeInput, bitsToTally, bitsToBinary, fsmNotation, turbotFsmNotation, tmNotation, turbotInternalNotation, turbotExternalNotation, type CodecLayout, type TransitionNotation } from './engine';
 import { senseAheadSymbol, applyMotorCommand, initialBrainState, runBrainStep, stateKindOf, type BrainState } from './engine/turbot';
 import { getAssignment, listAssignments } from './assignments';
-import {
-  localWorkbookStore,
-  emptyQuestionCircuit,
-  restoreQuestionCircuits,
-} from './storage/workbookStore';
-import { localSubmissionStore, buildSubmission } from './storage/submissionStore';
+import { emptyQuestionCircuit, restoreQuestionCircuits } from './storage/workbookStore';
+import { buildSubmission } from './storage/submissionStore';
+// Store INSTANCES come from the backend seam (local vs. remote is decided
+// there, nowhere else); the modules above supply only pure helpers + types.
+import { workbookStore, submissionStore } from './storage/backend';
 
 /**
  * TM tape notation (alphabet) for the current context. Inside an assignment
@@ -803,7 +802,7 @@ export const useStore = create<AppState>()((set, get) => ({
   hydrateSubmissions: async () => {
     const assignments = await listAssignments();
     const latests = await Promise.all(
-      assignments.map((a) => localSubmissionStore.getLatest(a.id)),
+      assignments.map((a) => submissionStore.getLatest(a.id)),
     );
     const out: Record<string, SubmissionRecord> = {};
     assignments.forEach((a, i) => {
@@ -1466,7 +1465,7 @@ export const useStore = create<AppState>()((set, get) => ({
     const seq = ++openAssignmentSeq;
     const [def, saved] = await Promise.all([
       getAssignment(id),
-      localWorkbookStore.loadAssignmentState(id),
+      workbookStore.loadAssignmentState(id),
     ]);
     // Superseded while in flight — drop this resolve (see the AppState note).
     if (seq !== openAssignmentSeq) return true;
@@ -1647,13 +1646,13 @@ export const useStore = create<AppState>()((set, get) => ({
     const circuits =
       state.assignment?.id === id
         ? syncedQuestionCircuits(state)
-        : restoreQuestionCircuits(def, await localWorkbookStore.loadAssignmentState(id))
+        : restoreQuestionCircuits(def, await workbookStore.loadAssignmentState(id))
             .questionCircuits;
     const submission = buildSubmission(def, circuits, {
       student,
       submittedAt: new Date().toISOString(),
     });
-    const record = await localSubmissionStore.submit(id, submission);
+    const record = await submissionStore.submit(id, submission);
     set({ submissions: { ...get().submissions, [id]: record } });
     return record;
   },
@@ -3796,7 +3795,7 @@ async function saveAssignmentState(): Promise<void> {
       responseText: s.openResponse,
     });
   }
-  await localWorkbookStore.saveAssignmentState(a.id, {
+  await workbookStore.saveAssignmentState(a.id, {
     currentQuestionIndex: s.currentQuestionIndex,
     questionCircuits: Object.fromEntries(qc) as Record<number, QuestionCircuit>,
   });
