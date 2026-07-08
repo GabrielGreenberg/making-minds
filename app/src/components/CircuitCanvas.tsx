@@ -33,6 +33,7 @@ import {
 
 import {
   getComponentSize as getCompDimensions,
+  getLabelAnchor,
   getPortPosition,
   getPortPositionLocal,
 } from '../componentGeometry';
@@ -689,18 +690,29 @@ function CircuitComponentView({
               stroke={isSelected ? '#2a7fff' : '#333'}
               strokeWidth={isSelected ? 2 : 1.5}
             />
-            {/* Label above — bold */}
-            <text
-              x={cx}
-              y={comp.y - 5}
-              textAnchor="middle"
-              fontSize="12"
-              fill="#333"
-              fontWeight="700"
-              transform={counterRotateLabel()}
-            >
-              {comp.label}
-            </text>
+            {/* Name label — bold, off the local top side. The anchor rotates
+                with the component (componentGeometry.getLabelAnchor), so a
+                90°/270°-rotated MEM's label sits beside the block instead of
+                straddling the now-vertical M_IN/M_OUT wire at top-center.
+                Coordinates are world coords: counterRotateLabel() cancels the
+                group rotation about the same center. */}
+            {(() => {
+              const anchor = getLabelAnchor(comp);
+              return (
+                <text
+                  x={anchor.x}
+                  y={anchor.y}
+                  textAnchor={anchor.textAnchor}
+                  dominantBaseline={anchor.dominantBaseline}
+                  fontSize="12"
+                  fill="#333"
+                  fontWeight="700"
+                  transform={counterRotateLabel()}
+                >
+                  {comp.label}
+                </text>
+              );
+            })()}
             {/* Left arrow inside block */}
             <path
               d={chevron(comp.x + arrowInset + groupShift, cy, leftDir)}

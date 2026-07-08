@@ -24,17 +24,16 @@ gap (P1.5) is CLOSED; the remaining queue is polish + final sweeps.
 
 1. ~~P1.5~~ **DONE (iteration 26)** — allowed_components enforced end-to-end
    (Stage-1 all grader branches + palette + creator; 6 pins; boxed recursion).
-2. **NEXT — the smalls sweep (one batch iteration):** P1.6 cc.ts label-order
-   helper; P1.11 ARG multi-group rendering; P1.16 rotated-MEM label
-   placement; P5.2 arena-editor 20×20 cap (capstone's 30×30 not
-   UI-authorable); P5.3 reason-less criterion failures; P1.8 leftovers (INPUT
-   toggle-tab obstacles in the router obstacle model; hw3-p9 (1375,757)
-   dot-skip nit re-evaluation; S4 optional). Each is small and independent —
-   a parallel workflow (one agent per small, gates + verifier after) fits one
-   iteration; browser-check the UI-visible ones (P1.16, P5.2).
-3. **P6.1** full-matrix appearance sweep (scope: arena-turbot red vs
-   VISUAL_VOCAB yellow — decide; FSM live-state highlight during arena runs;
-   SC palette header label; 30×30 Map panel UX).
+2. ~~The smalls sweep~~ **DONE (iteration 27)** — P1.6, P1.11, P1.16, P5.2,
+   P5.3, and the P1.8 toggle-tab leftover (landed as the `getComponentBounds`
+   footprint seam) all fixed, gate-verified, and browser-checked. The hw3-p9
+   dot-skip verdict was lost to a truncated report → folded into P6.1.
+3. **NEXT — P6.1** full-matrix appearance sweep, every mode incl. open +
+   perception + turbot, against VISUAL_VOCAB. Accumulated scope: arena-turbot
+   red `#c73535` vs VISUAL_VOCAB "yellow triangle" (ASK GABRIEL which is
+   right before fixing); FSM live-state highlight during arena runs; SC
+   palette header label; 30×30 Map panel UX; hw3-p9 (1375,757) dot-skip
+   visual once-over (verdict lost in iteration 27).
 4. **P6.2** final reconciliation (all gates + CLAUDE.md honest + this file).
 5. **P6.3** server↔engine grading parity pin + server in CI. **P6.4**
    Remote-store cutover (Gabriel's timing).

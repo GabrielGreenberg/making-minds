@@ -6,7 +6,10 @@
 import type { ArenaCell, ArenaConfig, TurbotOrientation } from '../types';
 
 export const MIN_ARENA_SIZE = 1;
-export const MAX_ARENA_SIZE = 20;
+// Authoring-side cap only — ArenaCanvas renders any size. 30 is a hard floor
+// on this constant: the Desert Ant capstone (HW7) needs a 30×30 arena. The
+// editor scrolls when the grid overflows the panel, so larger caps are cheap.
+export const MAX_ARENA_SIZE = 30;
 
 export function blankArena(width = 5, height = 5): ArenaConfig {
   return {

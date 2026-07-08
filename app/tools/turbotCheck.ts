@@ -744,6 +744,12 @@ check('per-arena results: arena #1 passes, arenas #2 and #3 fail',
 check('failing arenas carry steps + final pose (returned home without visiting the goal)',
   hard2Cases.slice(1).every((c) =>
     c.stepsTaken === 7 && c.finalPosition.x === 0 && c.finalPosition.y === 0 && c.hitStepLimit === false));
+// P5.3: a clean halt-at-start that skipped the goal is a criterion failure
+// and must SAY so — no reason-less failed arenas in the drill-down.
+check('failing family arenas carry the criterion-named goal-visit reason',
+  hard2Cases.slice(1).every((c) =>
+    c.reason === "'return-to-start' criterion not satisfied: goal cell never visited"));
+check('the passing family arena carries no reason', hard2Cases[0]?.reason === undefined);
 
 // (iv) All-must-pass aggregation: a brain tuned to distance 4 clears two
 // layouts (its blind walk overshoots distance 2 but still crosses the goal)
@@ -785,6 +791,75 @@ check('gradebook: hardcoded brain scores 0 on the family (question not passed)',
   gradebookGrades[0].grades[0].passed === false && gradebookGrades[0].score === 0);
 check('gradebook: both failing arenas are counted (failedCount 2 of 3)',
   gradebookGrades[0].grades[0].failedCount === 2);
+
+// ── failure reasons: every failing arena explains itself (P5.3) ──────
+// A clean halt that just doesn't satisfy its criterion (no step limit, no
+// dead brain) used to yield reason: undefined — the Desert Ant shape
+// (hw6-p2 members 2/3: halt at the start, goal never visited). Now every
+// failing TurbotCaseResult names its criterion via
+// explainTurbotCriterionFailure; passing cases still carry none.
+console.log('\n[failure reasons name the criterion]');
+{
+  const gradeOne = (
+    circuit: { components: CircuitComponent[]; wires: Wire[] },
+    arena: ArenaConfig,
+    criterion: 'reach-and-stop' | 'pass-through' | 'return-to-start'
+  ) => {
+    const a: AssignmentData = {
+      id: 'reason-smoke',
+      title: 'Reason smoke',
+      questions: [{
+        id: 1,
+        label: 'Q1 (reasons)',
+        statement: 'Every failing arena explains itself.',
+        buildMode: 'turbot',
+        innerMode: 'FSM',
+        representation: 'binary',
+        turbot_cases: [{ arena, maxSteps: 50, criterion }],
+      }],
+    };
+    return gradeSubmission(a, {
+      assignmentTitle: a.title,
+      student: 'reasons@example.com',
+      submittedAt: '2026-07-07T00:00:00Z',
+      answers: [{ questionId: 1, circuit }],
+    }).questions[0].turbotCases![0];
+  };
+
+  // reach-and-stop, clean stop off the goal: the forward brain drives past
+  // the mid-corridor goal and parks at the far wall.
+  const offGoal = gradeOne(fsmForwardBrain(), corridor(4, 1), 'reach-and-stop');
+  check('clean stop off the goal fails reach-and-stop with a named reason',
+    offGoal.pass === false && offGoal.hitStepLimit === false &&
+    offGoal.reason === "'reach-and-stop' criterion not satisfied: stopped off the goal cell");
+
+  // pass-through, clean stop short of the goal: the lazy brain stops on
+  // cycle 1 without ever crossing it.
+  const neverCrossed = gradeOne(lazyBrain(), corridor(3, 2), 'pass-through');
+  check('clean stop short of the goal fails pass-through with a named reason',
+    neverCrossed.pass === false && neverCrossed.hitStepLimit === false &&
+    neverCrossed.reason === "'pass-through' criterion not satisfied: goal cell never crossed");
+
+  // return-to-start, clean stop away from home: the forward brain parks at
+  // the far wall instead of returning.
+  const notHome = gradeOne(fsmForwardBrain(), corridor(4, 2), 'return-to-start');
+  check('clean stop away from the start fails return-to-start with a named reason',
+    notHome.pass === false && notHome.hitStepLimit === false &&
+    notHome.reason === "'return-to-start' criterion not satisfied: did not end on the start cell");
+
+  // return-to-start, home but the goal-visit clause unmet (the Desert Ant
+  // shape): the lazy brain halts at the start without visiting the goal.
+  const noVisit = gradeOne(lazyBrain(), madMaxArena(3), 'return-to-start');
+  check('halt-at-start without a goal visit carries the goal-visit reason',
+    noVisit.pass === false && noVisit.hitStepLimit === false &&
+    noVisit.reason === "'return-to-start' criterion not satisfied: goal cell never visited");
+
+  // Passing cases carry no reason: the forward brain reaches and stops on
+  // the pre-wall goal.
+  const cleanPass = gradeOne(fsmForwardBrain(), corridor(4, 3), 'reach-and-stop');
+  check('a cleanly passing case carries no reason',
+    cleanPass.pass === true && cleanPass.reason === undefined);
+}
 
 console.log(`\n${failures === 0 ? 'TURBOT CHECK OK' : `TURBOT CHECK FAILED (${failures} checks)`}`);
 process.exit(failures === 0 ? 0 : 1);

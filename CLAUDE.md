@@ -381,7 +381,7 @@ cycle/sensor/motor readout) mounted above the normal canvas, `selectEffectiveMod
 question's canvas edits its `innerMode` brain (palette, transition grammar, STATE interactions,
 toolbar reset all follow it), and a DataTable turbot branch (machine table for FSM/TM brains +
 movement history); (4) instructor authoring — 'Turbot' mode in `QuestionCreator` with an
-inner-machine picker, clickable arena editor (blocks/goals/start+facing, resizable ≤20×20),
+inner-machine picker, clickable arena editor (blocks/goals/start+facing, resizable ≤30×30),
 criterion + max-steps; gradebook drill-down shows per-arena steps/final-pose/reason; (5) sample
 Q5 turbot question + correct/incorrect sample brains; `pipelineCheck` now covers all five modes.
 Verified: tsc/build clean; `turbotCheck`/`tmCheck`/`codecCheck`/`pipelineCheck` all pass; a
@@ -473,7 +473,7 @@ end-to-end:
   derives all group widths). **Turbot questions** replace the formula pipeline with an
   inner-machine picker (CC/SC/FSM/TM), an **encoding** toggle (binary | unary, stored as the
   question's `representation`; it picks a TM brain's internal tape alphabet), a clickable
-  **arena editor** (paint blocks/goals, place + rotate the turbot start; resizable up to 20×20;
+  **arena editor** (paint blocks/goals, place + rotate the turbot start; resizable up to 30×30;
   helpers in `instructor/arenaEditing.ts`), and a
   success criterion + max-steps pair; goal-directed criteria require a goal cell before save.
   **Perception questions** (CC/SC only) are a "Task" toggle on the same form: pick a rule

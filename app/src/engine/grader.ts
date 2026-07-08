@@ -44,7 +44,7 @@ import { evaluateSCSequence } from './sc';
 import { evaluateFSMSymbolSequence } from './fsm';
 import { fsmNotation } from './notation';
 import { evaluateTMSequence } from './tm';
-import { runTurbot, evaluateTurbotCriterion, criterionRequiresStop, validateTurbotTM, validateTurbotFSM } from './turbot';
+import { runTurbot, evaluateTurbotCriterion, explainTurbotCriterionFailure, criterionRequiresStop, validateTurbotTM, validateTurbotFSM } from './turbot';
 import { validatePerceptionMachine, runPerceptionCase } from './perception';
 import { validateMachine, validateAllowedComponents } from './machineValidation';
 import {
@@ -351,17 +351,20 @@ function gradeTurbotCase(circuit: CircuitData, innerMode: BuildMode, tc: TurbotT
     return { pass: false, stepsTaken: tc.maxSteps, finalPosition: run.finalState, hitStepLimit: true, reason: 'exceeded max steps' };
   }
   const pass = evaluateTurbotCriterion(tc.arena, run, tc.criterion);
-  // Failure reasons: a step-limited trace that never satisfied its criterion
-  // names the criterion (the limit is not why it failed); a halted-but-not-
-  // stopped brain (a dead FSM — a turbot TM's halt counts as its stop) gets
-  // the explanatory reason.
+  // Failure reasons — EVERY failing case carries one: a step-limited trace
+  // that never satisfied its criterion names the criterion (the limit is not
+  // why it failed); a halted-but-not-stopped brain (a dead FSM — a turbot
+  // TM's halt counts as its stop) gets the explanatory reason; any other
+  // failure (a clean stop that just doesn't satisfy the criterion, e.g.
+  // halting at the start without visiting the goal) is explained in the
+  // criterion's own terms by explainTurbotCriterionFailure.
   const reason = pass
     ? undefined
     : run.hitStepLimit
       ? `'${tc.criterion}' criterion not satisfied within max steps`
       : run.haltedByBrain && !run.stopped
         ? 'brain halted without a matching transition'
-        : undefined;
+        : explainTurbotCriterionFailure(tc.arena, run, tc.criterion);
   return { pass, stepsTaken: run.history.length, finalPosition: run.finalState, hitStepLimit: run.hitStepLimit, reason };
 }
 

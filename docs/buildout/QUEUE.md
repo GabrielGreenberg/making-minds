@@ -356,14 +356,14 @@ HANDOFF's "do this next = P4.3". Task ids unchanged. -->
   live TurbotTapePanel, machine table + dimmed internal history rows).
   **LEDGER COMPLETE AT-TIER: 46 exact + 10 interface = 56/56.**
   Discovered → P5.2, P5.3, P6.1 note (below).
-- [ ] **P5.2** _(discovered 2026-07-07, capstone build)_ **Instructor arena
+- [x] **P5.2** _(done 2026-07-07, iteration-27 smalls sweep — see LOG)_ _(discovered 2026-07-07, capstone build)_ **Instructor arena
   editor caps at 20×20** (`MAX_ARENA_SIZE`) but the capstone needs 30×30 —
   fixtures hand-author the data (works; ArenaCanvas renders any size), but an
   instructor can't author the PDF's own arena in the UI. Raise the cap or
   make it a config with scroll-aware editing.
   **Acceptance:** a 30×30 arena is authorable in QuestionCreator; existing
   arenas unaffected.
-- [ ] **P5.3** _(discovered 2026-07-07, capstone verifier)_ **Criterion
+- [x] **P5.3** _(done 2026-07-07, iteration-27 smalls sweep — see LOG)_ _(discovered 2026-07-07, capstone verifier)_ **Criterion
   failures without step-limit carry `reason: undefined`** — gradeTurbotCase
   only emits reason text on hitStepLimit, so a clean halt-at-start-without-
   goal-visit shows a reason-less failed arena in the gradebook drill-down.
@@ -420,7 +420,7 @@ HANDOFF's "do this next = P4.3". Task ids unchanged. -->
   **Acceptance:** a correct-function OR-using machine FAILS hw1-p2 grading (add
   a second broken variant or a harness case proving it); palette hides OR on
   hw1-p2; creator can author the restriction; all gates green.
-- [ ] **P1.6** _(discovered 2026-07-06, hw2 critic)_ **Unify the IN/OUT
+- [x] **P1.6** _(done 2026-07-07, iteration-27 smalls sweep — see LOG)_ _(discovered 2026-07-06, hw2 critic)_ **Unify the IN/OUT
   label-ordering convention in `engine/cc.ts`.** Two separate implementations of
   the same convention: the top-level path orders I/O components via
   `sortByLabel`, while `evaluateBoxedCircuit` binds boxed internals via
@@ -452,14 +452,14 @@ HANDOFF's "do this next = P4.3". Task ids unchanged. -->
   **Acceptance:** a store harness proves no slice (CC/SC/FSM/TM/turbot sim
   state) survives question navigation; existing tm/turbot reset pins stay
   green.
-- [ ] **P1.16** _(discovered 2026-07-07, P3.3 appearance sweep; cosmetic)_
+- [x] **P1.16** _(done 2026-07-07, iteration-27 smalls sweep — see LOG)_ _(discovered 2026-07-07, P3.3 appearance sweep; cosmetic)_
   **Rotated-MEM label placement ignores rotation.** M1–M8 labels on hw3-p12's
   270°-rotated MEMs are bisected by the vertical M_IN wire entering the N
   port — label anchors assume horizontal port sides. Place labels clear of
   the rotated port axis (componentGeometry knows the rotation).
   **Acceptance:** hw3-p12 labels unbisected in-browser; no regression on
   standard-orientation MEMs.
-- [ ] **P1.11** _(discovered 2026-07-06, P1.9 round-2 verifier; pre-existing,
+- [x] **P1.11** _(done 2026-07-07, iteration-27 smalls sweep — see LOG)_ _(discovered 2026-07-06, P1.9 round-2 verifier; pre-existing,
   minor)_ **A/V ARG rendering for multi-group questions.** The ARG column
   renders the whole interleaved typed string as ONE numeral — typed "111101"
   (x=2, y=3 on hw3-p9) shows ARG '/' while VAL correctly shows 5. Render

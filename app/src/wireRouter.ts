@@ -21,7 +21,7 @@
  */
 
 import type { CircuitComponent } from './types';
-import { getComponentSize } from './componentGeometry';
+import { getComponentBounds } from './componentGeometry';
 
 // ─── Constants ──────────────────────────────────────────────────────
 
@@ -116,11 +116,13 @@ interface SearchState {
 // ─── Geometry Helpers ───────────────────────────────────────────────
 
 // Obstacle bounds come from the SHARED rendered geometry (componentGeometry.ts)
-// — the same table the canvas renders from and the layout oracle checks
+// — the same module the canvas renders from and the layout oracle checks
 // against. The router must never keep its own copy: a private table once let
 // MEM default to phantom 75×70 bounds (rendered: 50×50), which blocked every
 // edge at MEM.min's stub tip and forced all incident wires onto the
-// obstacle-blind fallback.
+// obstacle-blind fallback. Bounds are the rendered FOOTPRINT
+// (getComponentBounds), not the body box: INPUT's left toggle tab draws
+// outside the body, and a wire that only avoids the body still crosses it.
 //
 // A wire's OWN endpoint components are not obstacles to it at its stub tips:
 // the stub necessarily crosses its own component's margin (and, for inset
@@ -129,21 +131,7 @@ interface SearchState {
 // source/target bounds on the approach — the same exemption the layout
 // oracle applies to a wire's own stubs. Foreign components always block.
 
-function getCompBounds(comp: CircuitComponent): Bounds {
-  const { w, h } = getComponentSize(comp);
-  const rotation = comp.rotation ?? 0;
-  if (rotation === 0) {
-    return { left: comp.x, top: comp.y, right: comp.x + w, bottom: comp.y + h };
-  }
-  const cx = comp.x + w / 2;
-  const cy = comp.y + h / 2;
-  const rad = (rotation * Math.PI) / 180;
-  const cosA = Math.abs(Math.cos(rad));
-  const sinA = Math.abs(Math.sin(rad));
-  const halfW = (w * cosA + h * sinA) / 2;
-  const halfH = (w * sinA + h * cosA) / 2;
-  return { left: cx - halfW, top: cy - halfH, right: cx + halfW, bottom: cy + halfH };
-}
+const getCompBounds = (comp: CircuitComponent): Bounds => getComponentBounds(comp);
 
 /** Expand bounds by margin on all sides */
 function expandBounds(b: Bounds, margin: number): Bounds {

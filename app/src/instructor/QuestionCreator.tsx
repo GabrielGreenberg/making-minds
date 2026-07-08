@@ -625,7 +625,12 @@ export function QuestionCreator({ assignmentId, existingQuestion, onSave, onCanc
                 />
               </label>
             </div>
-            <ArenaCanvas arena={arena} onCellClick={handleArenaClick} />
+            {/* Scroll container: a max-size (30×30) arena is ~1200px square at the
+                default cell size, well past the editor panel — let it scroll in
+                both axes instead of blowing out the form layout. */}
+            <div style={{ overflow: 'auto', maxWidth: '100%', maxHeight: '60vh' }}>
+              <ArenaCanvas arena={arena} onCellClick={handleArenaClick} />
+            </div>
             {arenaError && <p className="instructor-preview-warning">{arenaError}</p>}
           </section>
 

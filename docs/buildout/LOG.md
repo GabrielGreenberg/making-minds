@@ -1162,3 +1162,42 @@ the source; grader is the backstop).
 
 **Next:** the smalls sweep — P1.6, P1.11, P1.16, P5.2, P5.3, P1.8 leftovers
 (toggle-tab obstacles + dot-skip nit) as one parallel batch, then P6.1.
+
+## 2026-07-07 (iteration 27) — the smalls sweep: six close-out fixes in one batch
+
+**Shipped (6-agent file-disjoint workflow; 2 agents died on connection errors
+and re-ran via workflow resume with 4 cached):**
+- **P1.6** cc.ts label-order: ONE shared `sortByLabel` for both the top-level
+  and boxed-internal paths; re-grades byte-identical (hw2-p6, hw1-p16).
+- **P1.11** per-group ARG: pure builders in `outputDisplay.ts` reusing the
+  codec's own value parse; hw3-p9 typed "111101" now shows ARG "2, 3" (VAL 5),
+  invalid numerals still '/'; single-group rendering byte-identical; sandbox
+  untouched. (Pre-existing, out of scope: CC multi-group global ARG.)
+- **P1.16** rotated-MEM labels: root cause was the label's rotate+counter-
+  rotate cancelling to a world-fixed top-center anchor that 90°/270° rotations
+  park a port on. New shared `getLabelAnchor` in componentGeometry (rotates
+  with the component, snapped 90°; rot-0 byte-identical). Browser: hw3-p12's
+  M1–M8 now 30px clear of the M_IN wire; hw3-p11 classic placement unchanged.
+- **P5.2** arena editor: MAX_ARENA_SIZE 20→30 (capstone floor documented) +
+  a scroll container for the ~1200px grid; browser-verified at 30×30 incl.
+  corner painting, clamping of 31, save round-trip.
+- **P5.3** criterion-failure reasons: `explainTurbotCriterionFailure` beside
+  evaluateTurbotCriterion (read-only clause mirror); every failing
+  TurbotCaseResult now names its criterion + detail; Desert Ant members 2/3
+  read "'return-to-start' criterion not satisfied: goal cell never visited";
+  pinned per criterion in turbotCheck.
+- **P1.8 leftovers:** toggle-tab obstacles landed DEEP — new
+  `getComponentBounds` footprint seam in componentGeometry (body + adjuncts;
+  INPUT's 14×20 tab), wireRouter's local body-only copy deleted in favor of
+  it. The hw3-p9 dot-skip re-evaluation verdict was LOST to a truncated
+  report → folded into P6.1's visual sweep. S4 remains optional/unowned.
+
+**Verification:** all gates exit 0 over the six changes together (tsc, check
+with totals steady 46 exact · 10 interface · 0 regressed, build, server
+typecheck + check); browser agent PASSed all three UI-visible fixes with DOM
+evidence + a CC sanity pass; tree clean of strays.
+
+**Next:** P6.1 full-matrix appearance sweep (accumulated scope: arena-turbot
+red vs vocab yellow — Gabriel's call; FSM live-state highlight during arena
+runs; SC palette header; 30×30 Map panel UX; hw3-p9 dot-skip once-over), with
+META-audit-queue due the iteration after (~28).
