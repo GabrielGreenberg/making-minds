@@ -1418,3 +1418,30 @@ Every buildable, verifiable, loop-actionable task in the queue is done:
 56/56 at-tier, 0 regressed, all gates green on both packages.
 
 **The loop parks.**
+
+## 2026-07-08 (iteration 34) — Gabriel un-gates the queue · P6.4 design memo lands
+
+**Gabriel's three answers (AskUserQuestion):** (1) turbot stays RED — vocab
+fixed, P6.1b closed; (2) the CI server-checks job is IN deploy.yml (Node 22,
+server npm ci + typecheck + check — activates when merged to main); (3) the
+loop starts P6.4 now.
+
+**P6.4 design memo (judge panel, 3 angles):** ASYNC-FIRST seam migration won
+82–72–58 over adapter-minimal and offline-first-sync
+(`designs/remote-stores.md`). The decision: the three store seams become
+Promise-returning; LocalStorage impls wrap trivially; Remote impls call
+api/client.ts directly — no cache abstraction to leak; `storage/backend.ts`
+switches modes; migration = fill-empty upload of existing localStorage
+workbooks. Grafted from the losers: per-email crash-buffer journal keys
+(shared browsers), boot health-probe + retry screen, tools/remoteStoreCheck
+(injectable transport + booted-server round-trip pins + migration
+idempotence), a grep gate forbidding grader imports in remote-store modules,
+online-only submit with server-stamped time and visible retry, 409/If-Match
+deferred until LWW actually bites. **Judge corrected the task's premise by
+reading the code: manual review is a server GAP (no review route in
+server/src/app.ts), not a local/server duplication** — the slice plan adds
+the route. Every cited line in the winning design was verified against the
+tree (store.ts call sites, GradebookView, the async-ready checks).
+
+**Next:** remote-stores S1 (the seam flip) per the memo's slice plan; then
+S2–S4, one iteration each, gates green per slice.

@@ -556,15 +556,18 @@ HANDOFF's "do this next = P4.3". Task ids unchanged. -->
   confirmed (pin fails 2 checks against the pre-fix file). CI note: no checks
   run in CI today (deploy.yml builds only); a server-checks job needs Node
   ≥22.5 — proposed YAML recorded in LOG iteration 30, GABRIEL'S CALL to add.
-- [ ] **P6.4** _(enqueued iteration 21; re-homed here from Phase 4 by the
-  iteration-23 audit)_ **Remote-store cutover** (backend phase): async
-  `Remote*` stores backed by `api/client.ts` (currently 1:1, imported by
-  NOTHING) replacing the localStorage seams; retires the
-  grade-release/manual-review duplication (server-authoritative + local
-  mirror). Gabriel's call on timing — enqueue-only; probably his next
-  parallel-session slice.
-
----
+- [~] **P6.4** **Remote-store cutover** — _design memo DONE 2026-07-08
+  (iteration 34, judge panel 3 angles): **ASYNC-FIRST seam migration won
+  82–72–58** (`designs/remote-stores.md`) — the three store seams go
+  Promise-returning, Remote impls call api/client.ts directly (no cache
+  layer), `storage/backend.ts` mode switch, fill-empty localStorage
+  migration; grafts: per-email crash-buffer journal, boot health-probe +
+  retry screen, `tools/remoteStoreCheck.ts` (injectable transport + booted
+  server), grep gate forbidding grader imports in remote modules,
+  online-only-submit (server stamps time; visible retry). Judge CORRECTED
+  the premise: manual review is a server GAP (no review route exists), not
+  a duplication — S-slices add the route. Implementation = the memo's
+  S1–S4, each an iteration landing green._
 
 ## Recurring meta-tasks  _(fire on cadence; keep the queue honest)_
 
