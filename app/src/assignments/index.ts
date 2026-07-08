@@ -19,6 +19,8 @@ export interface AssignmentSummary {
   id: string;
   title: string;
   questionCount: number;
+  /** Whether the instructor has released grades for this assignment. */
+  gradesReleased: boolean;
 }
 
 /** True if `id` is a bundled (read-only) assignment, not an instructor-authored one. */
@@ -32,11 +34,17 @@ export function isBundledAssignment(id: string): boolean {
  * appears in both, the bundled (authoritative, read-only) one wins.
  */
 export async function listAssignments(): Promise<AssignmentSummary[]> {
-  const bundled: AssignmentSummary[] = ASSIGNMENTS.map((a) => ({
-    id: a.id,
-    title: a.title,
-    questionCount: a.questions.length,
-  }));
+  // Bundled assignments live outside the AssignmentStore, but their release
+  // flag still lives ON the seam (release is policy keyed by id, not a
+  // property of a stored row) — so bundled summaries ask the store for it.
+  const bundled: AssignmentSummary[] = await Promise.all(
+    ASSIGNMENTS.map(async (a) => ({
+      id: a.id,
+      title: a.title,
+      questionCount: a.questions.length,
+      gradesReleased: await localAssignmentStore.getGradesReleased(a.id),
+    })),
+  );
   const custom = (await localAssignmentStore.list()).filter((a) => !BUNDLED_IDS.has(a.id));
   return [...bundled, ...custom];
 }
@@ -45,7 +53,7 @@ export async function listAssignments(): Promise<AssignmentSummary[]> {
 export async function getAssignment(id: string): Promise<AssignmentData | undefined> {
   const bundled = ASSIGNMENTS.find((a) => a.id === id);
   if (bundled) return bundled;
-  return localAssignmentStore.get(id);
+  return (await localAssignmentStore.get(id))?.assignment;
 }
 
 /** Turn a title into a url-safe slug; empty input falls back to "assignment". */

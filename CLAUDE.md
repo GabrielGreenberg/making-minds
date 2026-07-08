@@ -210,8 +210,11 @@ unrelease re-hides), `gradesReleased` on assignment list/detail responses, and
 entirely until release (after release: scores only, still no per-case detail). Instructors
 always see everything immediately. serverCheck grew to 28 checks covering the full lifecycle
 (hidden on submit → 403 for student release → release → student sees scores → unrelease
-re-hides). Local prototype mirrors the rule behind a new seam (`app/src/storage/gradeRelease.ts`,
-localStorage flag): the student submit alert no longer shows the autograde, the home screen
+re-hides). Local prototype mirrors the rule behind a seam (originally
+`app/src/storage/gradeRelease.ts`; since remote-stores S2 (2026-07-08) the flag lives ON the
+`AssignmentStore` seam — `getGradesReleased`/`setGradesReleased` + `gradesReleased` on
+list/get, with `mm:release:` as the local impl's private key — and gradeRelease.ts is
+deleted): the student submit alert no longer shows the autograde, the home screen
 shows "Grade: n/m questions" beside a submitted assignment only once released, and the
 instructor gradebook header gets a "Release grades"/"Hide grades" toggle (with confirm).
 API client: `setGradesReleased`, `gradesReleased` on summaries/detail. Earlier same day,

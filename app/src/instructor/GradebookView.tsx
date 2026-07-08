@@ -1,11 +1,11 @@
 import { useState } from 'react';
 import type { AssignmentData, ManualReview, SubmissionRecord } from '../types';
 import { getAssignment } from '../assignments';
+import { localAssignmentStore } from '../storage/AssignmentStore';
 import { localSubmissionStore } from '../storage/submissionStore';
 import { gradeSubmission } from '../engine/grader';
 import { navigate } from '../routing';
 import { gradeSubmissions, computeStats, type SubmissionGrade } from './Gradebook';
-import { isGradesReleased, setGradesReleased } from '../storage/gradeRelease';
 import { useAsyncValue } from '../useAsyncValue';
 
 function formatTime(iso: string): string {
@@ -30,25 +30,27 @@ interface StudentGrades {
 
 export function GradebookView({ id }: { id: string }) {
   const [expandedStudent, setExpandedStudent] = useState<string | null>(null);
-  const [released, setReleased] = useState(() => isGradesReleased(id));
 
-  // The assignment and its submissions come from the async seams; after a
-  // manual review is recorded, reload() re-reads them (marks, scores, and
-  // stats all reflect the new verdict immediately).
+  // The assignment, its submissions, AND the release flag come from the async
+  // seams; after a mutation through a seam (manual review recorded, release
+  // toggled) reload() re-reads them, so marks, scores, stats, and the release
+  // banner all reflect the stored state — no shadow copy to drift.
   const {
     value: data,
     loading,
     reload,
   } = useAsyncValue(async () => {
-    const [assignment, records] = await Promise.all([
+    const [assignment, records, released] = await Promise.all([
       getAssignment(id),
       localSubmissionStore.listSubmissions(id),
+      localAssignmentStore.getGradesReleased(id),
     ]);
-    return { assignment, records };
+    return { assignment, records, released };
   }, [id]);
   const onReviewed = reload;
+  const released = data?.released ?? false;
 
-  const toggleRelease = () => {
+  const toggleRelease = async () => {
     const next = !released;
     if (
       next &&
@@ -56,8 +58,8 @@ export function GradebookView({ id }: { id: string }) {
     ) {
       return;
     }
-    setGradesReleased(id, next);
-    setReleased(next);
+    await localAssignmentStore.setGradesReleased(id, next);
+    reload();
   };
 
   if (!data) {
@@ -105,7 +107,7 @@ export function GradebookView({ id }: { id: string }) {
           title="Students see no grades for this assignment until you release them."
         >
           {released ? 'Grades released to students' : 'Grades hidden from students'}
-          <button className="instructor-btn" onClick={toggleRelease}>
+          <button className="instructor-btn" onClick={() => void toggleRelease()}>
             {released ? 'Hide grades' : 'Release grades'}
           </button>
         </span>

@@ -3,7 +3,6 @@ import { listAssignments } from '../assignments';
 import { navigate } from '../routing';
 import { getCurrentUserEmail, useAuth } from '../auth';
 import { summarizeResult } from '../engine/grader';
-import { isGradesReleased } from '../storage/gradeRelease';
 import { useAsyncValue } from '../useAsyncValue';
 
 function formatSubmittedAt(iso: string): string {
@@ -30,7 +29,7 @@ export function HomeScreen() {
     if (!rec) return;
     // The submission is autograded on receipt, but the grade is NEVER shown at
     // submit time — students see grades only after the instructor releases
-    // them for the assignment (see storage/gradeRelease.ts).
+    // them for the assignment (the release flag on the AssignmentStore seam).
     alert(
       `Submitted "${title}" (attempt ${rec.attempt}).\n` +
         'Your work has been recorded. Grades will appear here once your instructor releases them.',
@@ -76,7 +75,7 @@ export function HomeScreen() {
                       title={`Attempt ${sub.attempt}`}
                     >
                       ✓ Submitted {formatSubmittedAt(sub.submittedAt)}
-                      {isGradesReleased(a.id) && sub.result && (() => {
+                      {a.gradesReleased && sub.result && (() => {
                         const s = summarizeResult(sub.result);
                         return s.questionsTotal > 0
                           ? ` · Grade: ${s.questionsPassed}/${s.questionsTotal} questions`

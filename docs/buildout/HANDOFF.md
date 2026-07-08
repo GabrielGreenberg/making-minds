@@ -4,60 +4,63 @@ _Read this first. It says exactly where we are and what to do next. Rewrite it a
 the end of every iteration. If it conflicts with the harness, the harness wins —
 run `npm run coverage` and reconcile._
 
-## Where we are — 🏁 CLOSE-OUT DONE pending Gabriel-gated items
+## Where we are — ledger complete · remote-stores cutover S2/4 done
 
 Branch `buildout-infra`. **46 exact + 10 interface = 56/56 at-tier**, 0
-pending, 0 regressed, 0 warnings. Twenty-nine iterations. Every
-machine-buildable problem in HW1–HW6 has a verified reference fixture:
-- **Exact tier (46):** all arithmetic (HW1–HW5) + all perception — correct
-  machine passes every case, broken variant fails, appearance checked.
-- **Interface tier (10):** all navigation + the Desert Ant capstone —
-  plausible attempts validate Stage-1 and grade end-to-end; scores reported,
-  never asserted (2/2, 2/2, 0/2, 2/2, 3/3, 1/3, 2/2, 2/2, 3/3, and the
-  capstone's 1/3). Exactly-correct answers remain the separate future
-  correct-answers project.
+pending, 0 regressed, 0 warnings — the coverage ledger has been complete
+since iteration 25 and every close-out task through P6.3 is done (thirty-six
+iterations). The active program is **P6.4, the Remote-store cutover**, per
+`designs/remote-stores.md` (async-first won the judge panel 82–72–58):
 
-**Iteration 29 (2026-07-08) ran the combined META-audit-queue + P6.2 final
-reconciliation:** all gates fresh BY EXIT CODE (app tsc 0 · every check tool
-individually 0 · build 0 · server typecheck 0 + serverCheck 0), COVERAGE.md
-cross-checked against the harness JSON row-by-row by script (0 mismatches),
-CLAUDE.md caught up (iterations 27–28 documented; key-files rows honest),
-queue pruned honest, NO patch-accumulation cluster in the window (all fixes
-seam-routed). **There is no loop-actionable work left.**
+- **S1 DONE (iteration 35):** the three storage seams are Promise-returning;
+  Local impls async-wrapped, zero behavior change; `storage/backend.ts`
+  backendMode flag; sequence-guarded openAssignment; single-flight autosave;
+  `useAsyncValue` in the five async views; navResetCheck 120.
+- **S2 DONE (iteration 36):** grade-release lives ON the AssignmentStore seam
+  (summaries carry `gradesReleased`; `storage/gradeRelease.ts` DELETED, key
+  format byte-compatible); manual review's pure `applyManualReview` moved to
+  the leaf `storage/manualReview.ts` (server-importable); the server gained
+  the review route the design judge identified as a GAP
+  (`POST /api/assignments/:id/submissions/:attempt/review`, instructor-only,
+  server-stamps reviewedAt); serverCheck 35, parityCheck 36 (incl. a true
+  parity pin: server-applied review ≡ in-process). Browser-verified:
+  release toggle + review verdicts survive reload; pre-release stays
+  grade-silent.
 
-## What remains (exactly this — all gated or optional)
+## Do this next — remote-stores S3 (the remote implementations)
 
-1. **P6.1b** _(GABRIEL'S CALL)_ arena turbot red `#c73535` vs VISUAL_VOCAB
-   yellow — one-line fix either way once answered (asked 2026-07-07).
-2. **P6.3** server↔engine grading parity pin + fold server gates into CI.
-3. **P6.4** _(GABRIEL'S TIMING)_ Remote-store cutover to `api/client.ts`.
-4. **Optionals, unowned:** P1.8 S4 (router fallback phase-0 + lane-nudge +
-   per-wire `usedFallback`; S5 perf), P4.4 (turbot sandbox tab), P4.5
-   (category taxonomy).
-5. **Recurring META:** META-audit-queue (~every 5 iterations; last ran 29;
-   now also owns CLAUDE.md honesty — META-reconcile-claude retired as a
-   duplicate), META-visual-vocab (before any new mode's appearance work).
-P2.5 is CLOSED as deferred (correct-answers project — not loop-open).
+Per the memo's S3: `Remote*` store implementations calling `api/client.ts`
+directly; `storage/backend.ts` exports the mode-switched store instances;
+auth/token flow wired (login → bearer → stores; `initRouting` moves inside
+AuthGate per the memo); RemoteSubmissionStore threads the student email into
+`reviewSubmission` (S2's noted punt — the seam signature may grow; keep Local
+in lockstep). Acceptance per the memo's S3 criteria + `remoteStoreCheck`
+groundwork if the memo scopes it here (check §test-plan). Local mode must
+remain byte-identical; the harness stays local and green.
 
-## Watch out for (standing)
+## Then
+
+**S4** (error/backoff UX, per-email crash buffer, fill-empty localStorage
+migration, online-only-submit UX — and the BATCHED DOC REWRITE: CLAUDE.md
+narrative + seams table + key-files rows for the whole cutover). After S4:
+the queue is empty again except optionals (ActiveTask trim if Gabriel wants
+it) and the recurring METAs (~iteration 39 next audit).
+
+## Watch out for
 
 - **Fetch main + `git status` for foreign WIP at the START of every
   iteration** (memory: project-shared-worktree-concurrency).
 - **Judge gates by EXIT CODE**, never a piped tail.
-- **Runaway fix agents:** hard bar + stop rule in every fix-agent prompt.
-- **Interface tier:** scores reported, never asserted; free correct machines
-  excepted. ◐ rows never count toward exact totals.
-- **routerCheck budget = 2**; new fixtures route fallback-free or get pinned
-  deliberately; MEM rotation 270° is the standard feedback-lane fix.
-- **criterionRequiresStop** is the criterion-semantics seam (step limit
-  bounds simulation, not success).
-- **Perception grades OUTSIDE the codec**; coverageCheck's Stage-1 mirror in
-  lockstep with gradeQuestion's dispatch (open → perception → turbot →
-  codec).
-- **Server:** engine changes must keep `server npm run check` green;
-  `server/` needs its own `npm install`.
-- **Appearance recipe v3**; seeds from `app/public/` at `/making-minds/`;
-  clean keys twice (a debounced autosave can re-write a seed key once —
-  remove again on a fresh Home load); delete seed JSONs + dist copies.
-- 529/overload → `Workflow({scriptPath, resumeFromRunId})`; `tsx` missing →
-  `npm install`; no lockfile churn.
+- **The memo is the spec** for S3/S4 — deviations allowed when narrowing;
+  report them. HARD STOP if a slice balloons structurally.
+- **CLAUDE.md intentionally lags until S4** (memo decision — batched
+  narrative); the buildout memos stay per-iteration.
+- **parityCheck + serverCheck are the cutover's teeth** (36 + 35 checks) —
+  extend, never weaken; the review parity pin guards the shared
+  `applyManualReview`.
+- **Local-mode byte-compatibility** is S1–S3's invariant: same localStorage
+  keys, same visible flows; the harness drives local mode headlessly.
+- **Runaway agents:** hard bar + stop rule; checkpoint-then-continue for
+  long serial work; resume-don't-redo after API deaths.
+- **Ops:** 529/overload → workflow resume; `server/` needs its own
+  `npm install`; appearance recipe v3; no lockfile churn.

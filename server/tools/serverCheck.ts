@@ -275,6 +275,74 @@ check(
   ownRehidden.json.records.every((r) => r.result === undefined),
 );
 
+// ── manual review (instructor-only; grades still unreleased here) ─
+const openQ = iAsg.json.assignment.questions.find((q) => q.buildMode === 'open')!;
+const reviewPath = `/assignments/${SAMPLE_ASSIGNMENT_ID}/submissions/1/review`;
+const reviewBody = {
+  student: student.email,
+  questionId: openQ.id,
+  pass: true,
+  note: 'clear justification',
+};
+
+const reviewForbidden = await api('POST', reviewPath, { token: sTok, body: reviewBody });
+check('student cannot review submissions (403)', reviewForbidden.status === 403);
+
+const reviewOk = await api<{ record: SubmissionRecord }>('POST', reviewPath, {
+  token: iTok,
+  body: reviewBody,
+});
+const reviewedQ = reviewOk.json.record?.result?.questions.find((q) => q.questionId === openQ.id);
+check(
+  'instructor review → 201 with the verdict on the returned record',
+  reviewOk.status === 201 && reviewedQ?.manual?.pass === true && reviewedQ.manual.note === 'clear justification',
+);
+
+const reviewMalformed = await api('POST', reviewPath, {
+  token: iTok,
+  body: { student: student.email, questionId: openQ.id }, // no pass verdict
+});
+check('malformed review body → 400', reviewMalformed.status === 400);
+
+const reviewNotPending = await api('POST', reviewPath, {
+  token: iTok,
+  body: { ...reviewBody, questionId: iAsg.json.assignment.questions[0].id }, // autograded, not pending
+});
+check('review of a non-pending question → 404', reviewNotPending.status === 404);
+
+const allReviewed = await api<{ records: SubmissionRecord[] }>(
+  'GET',
+  `/assignments/${SAMPLE_ASSIGNMENT_ID}/submissions`,
+  { token: iTok },
+);
+const storedVerdict = allReviewed.json.records
+  .find((r) => r.attempt === 1)
+  ?.result?.questions.find((q) => q.questionId === openQ.id)?.manual;
+check(
+  'verdict persisted on the stored record (instructor GET)',
+  storedVerdict?.pass === true && !Number.isNaN(Date.parse(storedVerdict?.reviewedAt ?? '')),
+);
+
+const ownAfterReview = await api<{ records: SubmissionRecord[] }>(
+  'GET',
+  `/assignments/${SAMPLE_ASSIGNMENT_ID}/submissions`,
+  { token: sTok },
+);
+check(
+  'review leaks nothing to the student pre-release (results still withheld)',
+  ownAfterReview.json.records.every((r) => r.result === undefined),
+);
+
+const reReview = await api<{ record: SubmissionRecord }>('POST', reviewPath, {
+  token: iTok,
+  body: { student: student.email, questionId: openQ.id, pass: false, note: 'on reflection, no' },
+});
+const reReviewedQ = reReview.json.record?.result?.questions.find((q) => q.questionId === openQ.id);
+check(
+  're-review overwrites the previous verdict',
+  reReview.status === 201 && reReviewedQ?.manual?.pass === false && reReviewedQ.manual.note === 'on reflection, no',
+);
+
 // ── logout ───────────────────────────────────────────────────────
 await api('POST', '/auth/logout', { token: sTok });
 const afterLogout = await api('GET', '/auth/me', { token: sTok });

@@ -1473,3 +1473,50 @@ buildout memos (this LOG, HANDOFF, QUEUE) stay per-iteration as always.
 **Next:** S2 — grade-release + manual-review onto the seam (delete
 gradeRelease.ts's parallel store; add the server review route the judge
 identified as a GAP), per the memo's slice plan.
+
+## 2026-07-08 (iteration 36) — remote-stores S2: release + review onto the seam; the server review GAP closes
+
+**Shipped per the memo (§3.2):** grade release now lives ON the
+`AssignmentStore` seam — `gradesReleased` on list summaries and on
+`get(id) → {assignment, gradesReleased} | null`, plus
+`setGradesReleased`/`getGradesReleased`; the local impl folds the old
+`mm:release:` key byte-for-byte (and clears it on `remove`, so a reused id
+can't inherit a stale release). **`storage/gradeRelease.ts` is DELETED.**
+HomeScreen reads the summary's flag; GradebookView folds released into its
+`useAsyncValue` fetch and toggles through the seam + `reload()` (the shadow
+`useState` copy is gone). Server: **the review route the judge flagged as a
+GAP now exists** — `POST /api/assignments/:id/submissions/:attempt/review`
+(instructor-only; body `{student, questionId, pass, note?}` since attempt
+numbers count per (assignment, student)); it runs the SAME pure
+`applyManualReview`, stamps `reviewedAt`, persists via new
+`db.updateSubmissionResult`, returns 201 `{record}`; student visibility rides
+the existing release gate + `studentRecord` sanitization. `api/client.ts`
+gains `reviewSubmission(...)` 1:1 (still imported by nothing — S3).
+
+**Deviations, both narrowing:** (1) `applyManualReview` moved to leaf
+`storage/manualReview.ts` (re-exported from submissionStore) — the server
+can't import the localStorage-backed module (no DOM lib in its tsconfig);
+same one-implementation contract, honest module graph. (2) seam gains
+`getGradesReleased(id)` beyond the memo's sketch — bundled assignments live
+outside the store locally, but release is policy keyed by id; the registry
+uses it to decorate bundled summaries.
+
+**Verified:** serverCheck 28→35 (7 review pins: student 403, instructor 201
+with verdict, malformed 400, non-pending 404, verdict persisted on stored
+record, nothing leaks pre-release, re-review overwrites); parityCheck 31→36
+(5 pins: 201, server-stamped reviewedAt, **PARITY: server-applied review ≡
+in-process applyManualReview** deep-compare with the server's stamp injected,
+post-release student sees the verdict, reviewed records still leak no
+per-case detail). All gates exit 0 (app tsc / check with coverage exactly
+46+10/0/0 / build; server typecheck / check). Browser smoke: pre-release
+submit alert grade-silent; release toggle round-trips `mm:release:` and
+survives reload; review ✎→✓ persists across reload (verdict + note); Home
+shows "Grade: n/m" only while released; zero console errors.
+
+**Punted to S3:** RemoteSubmissionStore must thread the student email into
+`reviewSubmission` (read it off the gradebook record — the seam's
+`recordManualReview(id, attempt, ...)` signature may need to grow then).
+CLAUDE.md narrative still batched to S4 (one dangling gradeRelease.ts
+pointer patched in place).
+
+**Next:** S3 — Remote impls + backend switch + auth, per the memo.

@@ -7,7 +7,7 @@
 //
 //   RemoteWorkbookStore   → getWorkbook / putWorkbook
 //   RemoteAssignmentStore → listAssignments / getAssignment / putAssignment / deleteAssignment
-//   RemoteSubmissionStore → submitAssignment / listSubmissions
+//   RemoteSubmissionStore → submitAssignment / listSubmissions / reviewSubmission
 //   real auth             → login / logout / me (replacing src/auth/stubAuth)
 //
 // Configuration: VITE_API_BASE (e.g. "https://api.phil133.example.edu") set at
@@ -186,4 +186,27 @@ export async function listSubmissions(assignmentId: string): Promise<SubmissionR
     `/assignments/${encodeURIComponent(assignmentId)}/submissions`,
   );
   return records;
+}
+
+/**
+ * Instructor only: record (or overwrite) a manual verdict on a pending open
+ * question of one stored attempt. `student` identifies whose attempt — server
+ * attempt numbers count per (assignment, student), so the attempt alone is
+ * ambiguous. The server stamps `reviewedAt` and applies the same pure
+ * `applyManualReview` the local store uses; returns the updated (full,
+ * instructor-view) record.
+ */
+export async function reviewSubmission(
+  assignmentId: string,
+  student: string,
+  attempt: number,
+  questionId: number,
+  review: { pass: boolean; note?: string },
+): Promise<SubmissionRecord> {
+  const { record } = await request<{ record: SubmissionRecord }>(
+    'POST',
+    `/assignments/${encodeURIComponent(assignmentId)}/submissions/${attempt}/review`,
+    { student, questionId, pass: review.pass, note: review.note },
+  );
+  return record;
 }

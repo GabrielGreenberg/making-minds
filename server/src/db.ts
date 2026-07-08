@@ -258,6 +258,25 @@ export class Db {
     }));
   }
 
+  /**
+   * Overwrite the stored grade of one attempt — the manual-review write path.
+   * The submission snapshot is immutable; `result` is the grade side of the
+   * record, which the server owns and may amend (a review annotates the
+   * stored SubmissionResult via the pure applyManualReview).
+   */
+  updateSubmissionResult(
+    assignmentId: string,
+    email: string,
+    attempt: number,
+    result: SubmissionResult,
+  ): void {
+    this.db
+      .prepare(
+        'UPDATE submissions SET result = ? WHERE assignment_id = ? AND email = ? AND attempt = ?',
+      )
+      .run(JSON.stringify(result), assignmentId, email, attempt);
+  }
+
   clearSubmissions(assignmentId: string): void {
     this.db.prepare('DELETE FROM submissions WHERE assignment_id = ?').run(assignmentId);
   }

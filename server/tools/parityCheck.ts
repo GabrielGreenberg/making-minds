@@ -25,6 +25,11 @@
 //      unsanitized view) — and compare the grade payloads deeply.
 //   4. Pin the student-facing sanitization boundary on the same records
 //      (perception-aware — extends, not duplicates, serverCheck: see below).
+//   5. Pin manual-review parity: the review endpoint's stored record must
+//      deeply equal the pure `applyManualReview` applied in-process to the
+//      same records (reviewedAt is server-stamped, so the server's stamp is
+//      injected into the in-process side — the submittedAt pattern) — and the
+//      released student view carries the verdict but still no per-case detail.
 //
 // ── What is (and is not) normalized in the comparison ──────────────────────
 // The compared payload is `record.result` (the SubmissionResult) plus the
@@ -68,6 +73,7 @@ import { Db } from '../src/db';
 import type { ServerConfig } from '../src/config';
 import { TOY_ACCOUNTS } from '../../app/src/auth/accounts';
 import { gradeSubmission } from '../../app/src/engine/grader';
+import { applyManualReview } from '../../app/src/storage/manualReview';
 import { buildSampleAssignment } from '../../app/src/devData/sampleData';
 import { comp, transition, circuit } from '../../app/tools/builder';
 import type {
@@ -425,6 +431,61 @@ const recordLeaks = postRelease.json.records.flatMap((r) =>
   findLeaks(r.result, new Set(['cases', 'turbotCases', 'perceptionCases', 'expected', 'frames', 'got'])),
 );
 check('post-release student records leak no per-case detail (incl. perception)', recordLeaks.length === 0, recordLeaks.join(', '));
+
+// ── Manual-review parity: review endpoint ≡ pure applyManualReview ──────────
+// The endpoint (POST .../submissions/:attempt/review) claims to be the same
+// pure function the local SubmissionStore runs — one contract, two homes.
+// Prove it: review attempt 1's open question (id 7) over HTTP, apply
+// applyManualReview in-process to the SAME pre-review instructor records with
+// the server's reviewedAt stamp injected (the one server-owned field), and
+// deep-compare the full stored record.
+const REVIEW_NOTE = 'Strong answer; cites the component-count asymmetry.';
+const reviewRes = await api<{ record: SubmissionRecord }>(
+  'POST',
+  `/assignments/${ASSIGNMENT_ID}/submissions/1/review`,
+  { token: iTok, body: { student: studentEmail, questionId: 7, pass: true, note: REVIEW_NOTE } },
+);
+check('review endpoint records the verdict (201)', reviewRes.status === 201);
+
+const serverStamp =
+  reviewRes.json.record?.result?.questions.find((q) => q.questionId === 7)?.manual?.reviewedAt ?? '';
+check("reviewedAt is the server's word (valid ISO date)", !Number.isNaN(Date.parse(serverStamp)));
+
+const inProcess = applyManualReview(canon(all.json.records), 1, 7, {
+  pass: true,
+  note: REVIEW_NOTE,
+  reviewedAt: serverStamp,
+});
+const afterReview = await api<{ records: SubmissionRecord[] }>(
+  'GET',
+  `/assignments/${ASSIGNMENT_ID}/submissions`,
+  { token: iTok },
+);
+const dReview = diffPaths(
+  canon(inProcess?.find((r) => r.attempt === 1)),
+  canon(afterReview.json.records.find((r) => r.attempt === 1)),
+);
+check('PARITY: server-applied review ≡ in-process applyManualReview', dReview.length === 0, dReview.join(' | '));
+
+// The verdict is the open question's grade: post-release the student sees it
+// (pass + note survive studentRecord's roll-up) — but the reviewed record
+// still leaks no per-case detail of any shape.
+const sAfterReview = await api<{ records: SubmissionRecord[] }>(
+  'GET',
+  `/assignments/${ASSIGNMENT_ID}/submissions`,
+  { token: sTok },
+);
+const sOpen = sAfterReview.json.records
+  .find((r) => r.attempt === 1)
+  ?.result?.questions.find((q) => q.questionId === 7);
+check(
+  'post-release student sees the open-question verdict',
+  sOpen?.manual?.pass === true && sOpen.manual.note === REVIEW_NOTE,
+);
+const reviewLeaks = sAfterReview.json.records.flatMap((r) =>
+  findLeaks(r.result, new Set(['cases', 'turbotCases', 'perceptionCases', 'expected', 'frames', 'got'])),
+);
+check('reviewed student records still leak no per-case detail', reviewLeaks.length === 0, reviewLeaks.join(', '));
 
 server.close();
 db.close();

@@ -13,7 +13,6 @@
 
 import type {
   AssignmentData,
-  ManualReview,
   QuestionCircuit,
   SubmissionData,
   SubmissionRecord,
@@ -21,6 +20,13 @@ import type {
 import { emptyQuestionCircuit } from './workbookStore';
 import { getAssignment } from '../assignments';
 import { gradeSubmission } from '../engine/grader';
+import { applyManualReview } from './manualReview';
+
+// The pure review helper lives in storage/manualReview.ts (a types-only leaf)
+// so the server's review endpoint can import it without pulling this
+// localStorage-backed module into its graph; re-exported here so app-side
+// consumers keep one import path.
+export { applyManualReview } from './manualReview';
 
 /**
  * Build a submission snapshot from an assignment definition and the student's
@@ -48,35 +54,6 @@ export function buildSubmission(
       return answer;
     }),
   };
-}
-
-/**
- * Record an instructor's verdict on a pending (open) question of one attempt.
- * Pure: returns a new records array with the review set on the matching
- * question's result, or null if no such pending question exists. The
- * submission snapshot itself is untouched — only the grade side of the record
- * (`result`), which the "server" owns and may amend, is updated; re-reviewing
- * overwrites the previous verdict.
- */
-export function applyManualReview(
-  records: SubmissionRecord[],
-  attempt: number,
-  questionId: number,
-  review: ManualReview,
-): SubmissionRecord[] | null {
-  const idx = records.findIndex((r) => r.attempt === attempt);
-  const result = records[idx]?.result;
-  if (!result) return null;
-  const qIdx = result.questions.findIndex(
-    (q) => q.questionId === questionId && q.status === 'pending',
-  );
-  if (qIdx < 0) return null;
-  const questions = result.questions.map((q, i) =>
-    i === qIdx ? { ...q, manual: review } : q,
-  );
-  return records.map((r, i) =>
-    i === idx ? { ...r, result: { ...result, questions } } : r,
-  );
 }
 
 // Promise-returning (a remote backend is intrinsically async); the local

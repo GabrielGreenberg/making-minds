@@ -16,6 +16,10 @@
 //   GET    /api/assignments/:id/submissions    student: own attempts (no grades until
 //                                              released, then scores only);
 //                                              instructor: all attempts, full detail
+//   POST   /api/assignments/:id/submissions/:attempt/review
+//                                              instructor: manual verdict on a pending
+//                                              open question — {student, questionId,
+//                                              pass, note?} → updated record
 //   GET    /api/health                         unauthenticated liveness probe
 //
 // Grading happens HERE, with the same pure engine the browser uses
@@ -27,6 +31,7 @@ import express from 'express';
 import type { Request, Response, NextFunction } from 'express';
 import type { AssignmentData, AssignmentState, SubmissionData } from '../../app/src/types';
 import { gradeSubmission } from '../../app/src/engine/grader';
+import { applyManualReview } from '../../app/src/storage/manualReview';
 import type { ServerConfig } from './config';
 import { Db } from './db';
 import {
@@ -217,6 +222,56 @@ export function createApp(config: ServerConfig, db: Db) {
     const released = db.getGradesReleased(String(req.params.id));
     const own = db.listSubmissions(String(req.params.id), req.user!.email);
     res.json({ records: own.map((r) => studentRecord(r, released)) });
+  });
+
+  // ── manual review (instructor) ─────────────────────────────────
+  // Record (or overwrite) the instructor's verdict on a pending open question
+  // of one stored attempt, via the SAME pure `applyManualReview` the local
+  // SubmissionStore uses (app/src/storage/manualReview.ts) — the server is the
+  // other implementation of one contract, not a mirror. `student` rides in the
+  // body because attempt numbers count per (assignment, student). The server
+  // stamps `reviewedAt` (its word, like submission timestamps); the verdict
+  // lands on the stored record's `result` and reaches students only through
+  // the release gate + `studentRecord` sanitization like any other grade.
+  app.post('/api/assignments/:id/submissions/:attempt/review', auth, requireInstructor, (req, res) => {
+    const assignmentId = String(req.params.id);
+    if (!db.getAssignment(assignmentId)) {
+      res.status(404).json({ error: 'unknown assignment' });
+      return;
+    }
+    const attempt = Number(req.params.attempt);
+    const body = (req.body ?? {}) as {
+      student?: unknown;
+      questionId?: unknown;
+      pass?: unknown;
+      note?: unknown;
+    };
+    if (
+      !Number.isInteger(attempt) ||
+      attempt < 1 ||
+      typeof body.student !== 'string' ||
+      body.student.length === 0 ||
+      typeof body.questionId !== 'number' ||
+      typeof body.pass !== 'boolean' ||
+      (body.note !== undefined && typeof body.note !== 'string')
+    ) {
+      res.status(400).json({ error: 'body must be {student, questionId, pass, note?}' });
+      return;
+    }
+    const email = body.student.toLowerCase();
+    const records = db.listSubmissions(assignmentId, email);
+    const updated = applyManualReview(records, attempt, body.questionId, {
+      pass: body.pass,
+      note: body.note?.trim() || undefined,
+      reviewedAt: new Date().toISOString(),
+    });
+    if (!updated) {
+      res.status(404).json({ error: 'no pending open question for that attempt' });
+      return;
+    }
+    const record = updated.find((r) => r.attempt === attempt)!;
+    db.updateSubmissionResult(assignmentId, email, attempt, record.result!);
+    res.status(201).json({ record });
   });
 
   // ── errors ─────────────────────────────────────────────────────
