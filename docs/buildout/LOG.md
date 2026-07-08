@@ -1370,3 +1370,32 @@ check; harmless, next browser task will reuse or restart it.
 **Next:** P4.4 (turbot sandbox tab) — the last substantive optional — then
 P4.5 (category taxonomy, may close as unwarranted). Gabriel-gated: P6.1b,
 P6.4, the CI job.
+
+## 2026-07-08 (iteration 32) — P4.4: the turbot sandbox tab · mode parity through the seams
+
+**Shipped:** "Turbot ›" in the sandbox + menu (CC/SC/FSM/TM brain picker,
+matching the menu's portal style). The deep route paid off exactly as
+intended: the tab reuses the question flow's selector seams wholesale —
+`SandboxTab` optionally carries innerMode+arena, `selectTurbotInnerMode`/
+`selectTurbotArena` fall back to the active sandbox tab when no assignment
+is open, and the entire workspace (palette, grammar, STATE kinds, Map, TM
+tape panel, glossary) lights up with ZERO new UI branches. Arena editing
+made the cut (genuinely cheap: `arenaEditing.ts` helpers + ArenaCanvas's
+onCellClick behind a sandbox-only "Edit map" toggle — paint/goal/start/
+rotate/resize with sim auto-reset). Persistence rides the existing autosave
++ WorksheetData export/import with a load migration.
+
+**Bug found in passing (pre-existing, now pinned):** active-tab `removeTab`
+never swapped in the survivor's buildMode/activeTask — with turbot tabs this
+left a CC sheet rendering the whole turbot workspace. Fixed to match
+switchTab; navResetCheck pins it (117/117, +12 sandbox-turbot checks).
+
+**Verified:** browser evidence across all four brain kinds (CC NOT-reflex
+stepped to the wall and halted on motor 00; TM external state stepped;
+FSM default 0:11; SC shows MEM + the correct header); tab-switch resets with
+circuit preservation; reload restores the edited arena + brain; CC tabs show
+no Map. Gates all exit 0 (app tsc/check/build, server check).
+
+**Next:** P4.5 — the category-taxonomy optional gets a warranted-or-close
+review; then the queue is purely Gabriel-gated (P6.1b color, P6.4 cutover,
+CI job).

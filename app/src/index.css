@@ -2050,6 +2050,42 @@ thead .sc-label-col {
   padding: 2px 8px 4px;
 }
 
+/* Sandbox Map editing (TurbotArenaPanel "Edit map" mode) */
+.map-edit-toggle {
+  margin-left: 8px;
+  padding: 1px 8px;
+  font-size: 9px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  border: 1px solid #bbb;
+  border-radius: 8px;
+  background: #f8f8f8;
+  color: #555;
+  cursor: pointer;
+  font-family: inherit;
+}
+.map-edit-toggle:hover {
+  background: #eee;
+  border-color: #999;
+}
+
+.action-btn.map-tool-active,
+.action-btn.map-tool-active:hover:not(:disabled) {
+  background: #1565c0;
+  border-color: #1565c0;
+  color: #fff;
+}
+
+.map-size-input {
+  width: 44px;
+  font-size: 10px;
+  font-family: inherit;
+  padding: 1px 3px;
+  border: 1px solid #ccc;
+  border-radius: 3px;
+}
+
 .turbot-arena-status {
   display: flex;
   flex-wrap: wrap;

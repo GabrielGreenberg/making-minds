@@ -4,7 +4,7 @@
 // machine/history tables. The simulation itself lives in the store's turbot
 // slice; the canvas column stays the inner machine's normal editor.
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useStore, selectTurbotArena, selectTurbotInnerMode, selectTmNotation } from '../store';
 import {
   senseAhead,
@@ -14,8 +14,21 @@ import {
   TURBOT_TURN_RIGHT,
   TURBOT_TURN_LEFT,
 } from '../engine/turbot';
+import { setArenaCell, placeStart, resizeArena, MAX_ARENA_SIZE } from '../instructor/arenaEditing';
 import type { BuildMode, TMNotation } from '../types';
 import { ArenaCanvas } from './ArenaCanvas';
+
+// Sandbox map editing reuses the instructor arena editor's tool set (pure
+// helpers in instructor/arenaEditing.ts; ArenaCanvas supplies the clickable
+// grid). Inside a question the arena is instructor-authored and read-only.
+type MapTool = 'block' | 'goal' | 'erase' | 'start';
+
+const MAP_TOOLS: { tool: MapTool; label: string; hint: string }[] = [
+  { tool: 'block', label: 'Block', hint: 'Paint walls' },
+  { tool: 'goal',  label: 'Goal',  hint: 'Paint goal (food) cells' },
+  { tool: 'erase', label: 'Erase', hint: 'Clear cells' },
+  { tool: 'start', label: 'Start', hint: 'Move the turbot start; click its cell again to rotate' },
+];
 
 /**
  * The percept/motor glossary: what the brain can read and output, so
@@ -105,6 +118,22 @@ export function TurbotArenaPanel() {
   const innerMode = useStore(selectTurbotInnerMode);
   const notation = useStore(selectTmNotation);
 
+  // Sandbox turbot tabs own their arena, so the Map is editable there;
+  // a question's arena is part of the assignment and stays read-only.
+  const isSandbox = useStore((s) => s.assignment === null);
+  const setTabArena = useStore((s) => s.setTabArena);
+  const [editingMap, setEditingMap] = useState(false);
+  const [mapTool, setMapTool] = useState<MapTool>('block');
+
+  const handleMapClick = (x: number, y: number) => {
+    switch (mapTool) {
+      case 'block': setTabArena(setArenaCell(arena, x, y, 'block')); break;
+      case 'goal':  setTabArena(setArenaCell(arena, x, y, 'goal')); break;
+      case 'erase': setTabArena(setArenaCell(arena, x, y, 'empty')); break;
+      case 'start': setTabArena(placeStart(arena, x, y)); break;
+    }
+  };
+
   // Follow the turbot: a big arena (30×30 ≈ 844px of grid) far outgrows the
   // Map's scroll container, so every pose change nudges the container's
   // scroll just enough to keep the turbot cell in view. Scoped to the Map's
@@ -169,32 +198,92 @@ export function TurbotArenaPanel() {
     <div className="table-section">
       <div className="table-section-label">
         <span>Map</span>
+        {isSandbox && (
+          <button
+            className="map-edit-toggle"
+            onClick={() => {
+              if (!editingMap && turbotRunning) turbotPause();
+              setEditingMap((e) => !e);
+            }}
+            title={editingMap ? 'Back to running the turbot' : 'Paint blocks/goals and place the start'}
+          >
+            {editingMap ? 'Done' : 'Edit map'}
+          </button>
+        )}
       </div>
       {/* Map column + glossary sit level when the panel is wide enough;
           flex-wrap drops the glossary below the map when it isn't. */}
       <div className="turbot-map-row">
         <div className="turbot-map-col">
           <div className="turbot-arena-scroll" ref={scrollRef}>
-            <ArenaCanvas arena={arena} turbot={turbotState} cellSize={28} />
+            <ArenaCanvas
+              arena={arena}
+              turbot={turbotState}
+              cellSize={28}
+              onCellClick={editingMap ? handleMapClick : undefined}
+            />
           </div>
-          <div className="turbot-arena-controls">
-            <button className="action-btn" onClick={turbotStep} disabled={turbotRunning || turbotHalted}>
-              Step
-            </button>
-            {turbotRunning ? (
-              <button className="action-btn" onClick={turbotPause}>Pause</button>
-            ) : (
-              <button className="action-btn" onClick={turbotRun} disabled={turbotHalted}>Run</button>
-            )}
-            <button className="action-btn" onClick={turbotReset} disabled={turbotRunning}>
-              Reset
-            </button>
-          </div>
-          <div className="turbot-arena-status">
-            <span>cycle {cycle}</span>
-            <span>sensor: {sensor}</span>
-            {stopLabel && <span className="turbot-arena-stop">{stopLabel}</span>}
-          </div>
+          {editingMap ? (
+            <>
+              <div className="turbot-arena-controls">
+                {MAP_TOOLS.map((t) => (
+                  <button
+                    key={t.tool}
+                    className={'action-btn' + (mapTool === t.tool ? ' map-tool-active' : '')}
+                    onClick={() => setMapTool(t.tool)}
+                    title={t.hint}
+                  >
+                    {t.label}
+                  </button>
+                ))}
+              </div>
+              <div className="turbot-arena-status">
+                <label>
+                  {'W '}
+                  <input
+                    type="number"
+                    className="map-size-input"
+                    min={1}
+                    max={MAX_ARENA_SIZE}
+                    value={arena.width}
+                    onChange={(e) => setTabArena(resizeArena(arena, Number(e.target.value), arena.height))}
+                  />
+                </label>
+                <label>
+                  {'H '}
+                  <input
+                    type="number"
+                    className="map-size-input"
+                    min={1}
+                    max={MAX_ARENA_SIZE}
+                    value={arena.height}
+                    onChange={(e) => setTabArena(resizeArena(arena, arena.width, Number(e.target.value)))}
+                  />
+                </label>
+              </div>
+            </>
+          ) : (
+            <>
+              <div className="turbot-arena-controls">
+                <button className="action-btn" onClick={turbotStep} disabled={turbotRunning || turbotHalted}>
+                  Step
+                </button>
+                {turbotRunning ? (
+                  <button className="action-btn" onClick={turbotPause}>Pause</button>
+                ) : (
+                  <button className="action-btn" onClick={turbotRun} disabled={turbotHalted}>Run</button>
+                )}
+                <button className="action-btn" onClick={turbotReset} disabled={turbotRunning}>
+                  Reset
+                </button>
+              </div>
+              <div className="turbot-arena-status">
+                <span>cycle {cycle}</span>
+                <span>sensor: {sensor}</span>
+                {stopLabel && <span className="turbot-arena-stop">{stopLabel}</span>}
+              </div>
+            </>
+          )}
         </div>
         <TurbotGlossary innerMode={innerMode} notation={notation} />
       </div>

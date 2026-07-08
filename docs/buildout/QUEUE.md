@@ -346,8 +346,18 @@ HANDOFF's "do this next = P4.3". Task ids unchanged. -->
   ONE move+rotate (MEM 270°), no pin edits. ⚠ The task_2cd0dbea chip
   (pass-through grading) became REDUNDANT mid-iteration — the fix was already
   in-tree when Gabriel started the chip session; flagged to him in-session.
-- [ ] **P4.4** Add a **turbot sandbox** tab (currently turbot only exists inside
-  assignments; `TabBar` lists CC/FSM/TM only). Optional but eases authoring/appr.
+- [x] **P4.4** **Turbot sandbox tab.** — _done 2026-07-08 (iteration 32)._
+  Sandbox + menu gains "Turbot ›" with a CC/SC/FSM/TM brain picker; the tab
+  is the FULL turbot workspace with zero new UI branches — `SandboxTab`
+  carries optional innerMode+arena and the existing selectors
+  (`selectTurbotInnerMode`/`selectTurbotArena`/`selectEffectiveMode`) fall
+  back to the active sandbox tab; default 10×8 bordered arena; "Edit map"
+  toggle reuses `arenaEditing.ts` + ArenaCanvas clicks (paint/goal/start/
+  rotate/resize, sim auto-reset per edit); persistence rides autosave +
+  WorksheetData round-trip with load migration. Browser-verified across all
+  four brain kinds. BONUS pre-existing bug fixed + pinned: active-tab
+  `removeTab` never swapped the survivor's buildMode (a CC sheet kept the
+  turbot workspace). navResetCheck 117/117 (+12 sandbox-turbot checks).
 - [ ] **P4.5** _(optional)_ Wire the perception/navigation **category taxonomy**
   (`ActiveTask` is typed but unused) to organize questions / gate palettes.
 

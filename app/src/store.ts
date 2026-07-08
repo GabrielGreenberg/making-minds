@@ -23,6 +23,7 @@ import type {
   TMSymbol,
   TMNotation,
   TmHistoryEntry,
+  ArenaCell,
   ArenaConfig,
   TurbotState,
   TurbotHistoryEntry,
@@ -182,25 +183,76 @@ export function defaultArenaConfig(): ArenaConfig {
 }
 
 /**
- * The active turbot question's primary arena (its first `turbot_cases` entry
- * — the one the student sees and simulates against; see engine/turbot.ts).
- * Falls back to a blank arena outside an assignment/turbot context.
+ * The starter arena a sandbox turbot tab is born with: a 10×8 field walled in
+ * by blocks, one goal in the far (NE) corner, the turbot starting in the near
+ * (SW) corner facing east. Big enough to be worth driving around in, bounded
+ * so a runaway brain visibly hits walls rather than marching off-grid.
+ * Editable in place via the Map's "Edit map" mode (setTabArena).
+ */
+export function sandboxDefaultArena(): ArenaConfig {
+  const width = 10;
+  const height = 8;
+  const cells: ArenaCell[][] = Array.from({ length: height }, (_, y) =>
+    Array.from({ length: width }, (_, x) =>
+      x === 0 || y === 0 || x === width - 1 || y === height - 1 ? 'block' : 'empty',
+    ),
+  );
+  cells[1][width - 2] = 'goal'; // NE inner corner
+  return { width, height, cells, start: { x: 1, y: height - 2, facing: 'E' } };
+}
+
+/** One sandbox worksheet tab. `innerMode`/`arena` are carried only by turbot tabs. */
+export interface SandboxTab {
+  id: string;
+  title: string;
+  buildMode: BuildMode;
+  activeTask: ActiveTask;
+  innerMode?: BuildMode;
+  arena?: ArenaConfig;
+}
+
+// Stable fallback identity so selectors returning it don't churn subscribers.
+const FALLBACK_ARENA: ArenaConfig = defaultArenaConfig();
+
+/** The active sandbox tab, or undefined outside the sandbox (assignment open). */
+function activeSandboxTab(s: {
+  assignment: AssignmentData | null;
+  tabs?: SandboxTab[];
+  activeTabId?: string;
+}): SandboxTab | undefined {
+  if (s.assignment) return undefined;
+  return s.tabs?.find((t) => t.id === s.activeTabId);
+}
+
+/**
+ * The active turbot context's arena. Inside an assignment: the open turbot
+ * question's primary arena (its first `turbot_cases` entry — the one the
+ * student sees and simulates against; see engine/turbot.ts). In the sandbox:
+ * the active turbot tab's own arena (seeded by addTab, edited via
+ * setTabArena). Falls back to a blank arena outside any turbot context.
  */
 export function selectTurbotArena(s: {
   assignment: AssignmentData | null;
   currentQuestionIndex: number;
+  tabs?: SandboxTab[];
+  activeTabId?: string;
 }): ArenaConfig {
   const q = s.assignment?.questions[s.currentQuestionIndex];
-  return q?.turbot_cases?.[0]?.arena ?? defaultArenaConfig();
+  return q?.turbot_cases?.[0]?.arena ?? activeSandboxTab(s)?.arena ?? FALLBACK_ARENA;
 }
 
-/** The inner-circuit editor mode (CC/SC/FSM/TM) for the active turbot question. */
+/**
+ * The inner-circuit editor mode (CC/SC/FSM/TM) for the active turbot context —
+ * the open turbot question's `innerMode`, or the sandbox turbot tab's.
+ */
 export function selectTurbotInnerMode(s: {
   assignment: AssignmentData | null;
   currentQuestionIndex: number;
+  tabs?: SandboxTab[];
+  activeTabId?: string;
 }): BuildMode {
   const q = s.assignment?.questions[s.currentQuestionIndex];
-  return q?.innerMode ?? 'CC';
+  return q?.innerMode ?? activeSandboxTab(s)?.innerMode ?? 'CC';
 }
 
 /**
@@ -214,6 +266,8 @@ export function selectEffectiveMode(s: {
   buildMode: BuildMode;
   assignment: AssignmentData | null;
   currentQuestionIndex: number;
+  tabs?: SandboxTab[];
+  activeTabId?: string;
 }): BuildMode {
   return s.buildMode === 'turbot' ? selectTurbotInnerMode(s) : s.buildMode;
 }
@@ -235,6 +289,8 @@ export function selectLiveFsmStateId(s: {
   buildMode: BuildMode;
   assignment: AssignmentData | null;
   currentQuestionIndex: number;
+  tabs?: SandboxTab[];
+  activeTabId?: string;
   fsmCurrentStateId: string | null;
   turbotBrainState: BrainState;
   turbotHistory: TurbotHistoryEntry[];
@@ -259,6 +315,8 @@ export function selectFsmNotation(s: {
   buildMode: BuildMode;
   assignment: AssignmentData | null;
   currentQuestionIndex: number;
+  tabs?: SandboxTab[];
+  activeTabId?: string;
 }): TransitionNotation {
   if (selectEffectiveMode(s) !== 'FSM') return fsmNotation(1, 1);
   if (s.buildMode === 'turbot') return turbotFsmNotation;
@@ -280,6 +338,8 @@ export function selectTransitionNotationForSource(
     assignment: AssignmentData | null;
     currentQuestionIndex: number;
     repSystem: RepSystem;
+    tabs?: SandboxTab[];
+    activeTabId?: string;
   },
   source: CircuitComponent | undefined,
 ): TransitionNotation {
@@ -474,12 +534,14 @@ interface AppState {
   paste: () => void;
 
   // Tabs (worksheets)
-  tabs: { id: string; title: string; buildMode: BuildMode; activeTask: ActiveTask }[];
+  tabs: SandboxTab[];
   activeTabId: string;
-  addTab: (title: string, buildMode: BuildMode, activeTask?: ActiveTask) => void;
+  addTab: (title: string, buildMode: BuildMode, activeTask?: ActiveTask, innerMode?: BuildMode) => void;
   switchTab: (id: string) => void;
   removeTab: (id: string) => void;
   renameTab: (id: string, title: string) => void;
+  /** Sandbox turbot tabs only: replace the active tab's arena (Map editing). */
+  setTabArena: (arena: ArenaConfig) => void;
   tabCircuits: Map<string, { components: CircuitComponent[]; wires: Wire[]; textElements: TextElement[]; comments: CommentElement[]; boxes: BoxDefinition[] }>;
 
   // Batch move (for efficient multi-component drag)
@@ -798,6 +860,9 @@ export const useStore = create<AppState>()((set, get) => ({
         textElements: circuit.textElements,
         comments: circuit.comments,
         boxes: circuit.boxes,
+        // Turbot tabs: the brain kind + sandbox arena travel with the sheet.
+        ...(tab.innerMode ? { innerMode: tab.innerMode } : {}),
+        ...(tab.arena ? { arena: tab.arena } : {}),
       };
     });
 
@@ -846,6 +911,11 @@ export const useStore = create<AppState>()((set, get) => ({
             title: ws.title,
             buildMode: ws.buildMode || 'CC' as BuildMode,
             activeTask: ws.activeTask || 'arithmetic' as ActiveTask,
+            // Turbot worksheets: restore brain kind + arena (seed defaults for
+            // files predating / hand-authored without them).
+            ...(ws.buildMode === 'turbot'
+              ? { innerMode: ws.innerMode ?? 'CC' as BuildMode, arena: ws.arena ?? sandboxDefaultArena() }
+              : {}),
           };
         });
 
@@ -2224,7 +2294,7 @@ export const useStore = create<AppState>()((set, get) => ({
   activeTabId: defaultTabId,
   tabCircuits: new Map(),
 
-  addTab: (title, buildMode, activeTask) => {
+  addTab: (title, buildMode, activeTask, innerMode) => {
     const state = get();
     const newId = uuid();
     const task = activeTask || 'arithmetic';
@@ -2237,8 +2307,14 @@ export const useStore = create<AppState>()((set, get) => ({
       comments: state.comments,
       boxes: state.boxes,
     });
+    // A turbot tab carries its brain kind and its own arena — the sandbox
+    // analog of a turbot question's innerMode + turbot_cases[0].arena, read
+    // through the SAME selectors (selectTurbotInnerMode/selectTurbotArena).
+    const turbotFields = buildMode === 'turbot'
+      ? { innerMode: innerMode ?? 'CC' as BuildMode, arena: sandboxDefaultArena() }
+      : {};
     set({
-      tabs: [...state.tabs, { id: newId, title, buildMode, activeTask: task }],
+      tabs: [...state.tabs, { id: newId, title, buildMode, activeTask: task, ...turbotFields }],
       activeTabId: newId,
       tabCircuits: updatedTabCircuits,
       components: [],
@@ -2303,6 +2379,11 @@ export const useStore = create<AppState>()((set, get) => ({
         textElements: saved.textElements,
         comments: saved.comments,
         boxes: saved.boxes,
+        // The surviving tab's mode must come along with its canvas — leaving
+        // the removed tab's buildMode live would render the new tab's circuit
+        // under the wrong workspace (e.g. a CC sheet showing the turbot Map).
+        buildMode: newTabs[0].buildMode || 'CC',
+        activeTask: newTabs[0].activeTask || 'arithmetic',
       });
       get().resetAllSimState();
     } else {
@@ -2316,6 +2397,20 @@ export const useStore = create<AppState>()((set, get) => ({
     set((state) => ({
       tabs: state.tabs.map((t) => (t.id === id ? { ...t, title } : t)),
     }));
+  },
+
+  setTabArena: (arena) => {
+    const state = get();
+    const tab = state.tabs.find((t) => t.id === state.activeTabId);
+    // Arena editing exists only for sandbox turbot tabs — a question's arena
+    // is instructor-authored and immutable here.
+    if (state.assignment || tab?.buildMode !== 'turbot') return;
+    set({
+      tabs: state.tabs.map((t) => (t.id === tab.id ? { ...t, arena } : t)),
+    });
+    // The pose may now be out of bounds / inside a wall; restart from the
+    // edited arena's start (same manual-reset semantics as circuit edits).
+    get().turbotReset();
   },
 
   // Batch move — single state update for moving multiple components
@@ -3812,10 +3907,15 @@ function loadAutoSave() {
           tabCircuits.set(k, v as TabCircuitData);
         }
       }
-      // Ensure tabs have activeTask field (migration for old auto-saves)
-      const tabs = (data.tabs || []).map((t: { id: string; title: string; buildMode: BuildMode; activeTask?: ActiveTask }) => ({
+      // Ensure tabs have activeTask (migration for old auto-saves) and that
+      // turbot tabs carry a brain kind + arena (belt-and-braces: addTab always
+      // seeds them, so this only fires on hand-edited/truncated saves).
+      const tabs: SandboxTab[] = (data.tabs || []).map((t: SandboxTab) => ({
         ...t,
         activeTask: t.activeTask || 'arithmetic',
+        ...(t.buildMode === 'turbot'
+          ? { innerMode: t.innerMode ?? 'CC', arena: t.arena ?? sandboxDefaultArena() }
+          : {}),
       }));
       const activeId = data.activeTabId || tabs[0]?.id || defaultTabId;
       const activeCircuit = tabCircuits.get(activeId) || { components: [], wires: [], textElements: [], comments: [], boxes: [] };
