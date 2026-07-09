@@ -35,15 +35,25 @@ is in QUEUE's P6.4 close and LOG iterations 35–38:
   and QUEUE's P6.4 closed. Local mode stayed byte-identical throughout
   (zero /api traffic, pinned + browser-checked).
 
-## Do this next
+## Do this next — META-audit-queue (still pending)
 
-The queue is empty of committed work. Open items are exactly: **P6.1b**
-(arena-turbot color — GABRIEL'S CALL), optionals (ActiveTask trim), and the
-recurring METAs. **~Iteration 39 = META-audit-queue**, which should double as
-the cutover's final reconciliation: spot-run the S1–S4 pins by exit code
-(remoteStoreCheck 56, navResetCheck 120, serverCheck 35 + parityCheck 36),
-verify CLAUDE.md's new claims against the harness, and do the
-patch-accumulation scan over iterations 30–38.
+The queue is empty of committed work. Open items are exactly: optionals
+(ActiveTask trim — Gabriel's call) and the recurring METAs. P6.1b was
+resolved iteration 34 (turbot stays red; VISUAL_VOCAB updated). The CI
+server-checks job is in `deploy.yml`, activating on merge to main.
+
+**META-audit-queue was ATTEMPTED at iteration 39 but its agent died on a
+credit limit before doing any work — RE-RUN IT.** It should double as the
+cutover's final reconciliation: verify CLAUDE.md's S4 doc-rewrite claims
+against the code (seams table 'Remote LIVE', test-cases-caveat-solved,
+grader-free remoteStores, sanitize strips test_cases + perception_cases),
+patch-accumulation scan over iterations 30–38, prune stale watch-outs.
+
+**Verified-green baseline (2026-07-08, this handoff):** all gates fresh by
+exit code — app tsc 0 · `npm run check` 0 (12 tools; remoteStoreCheck 56,
+navResetCheck 120, coverage 46+10/0/0) · build 0 · server typecheck 0 ·
+check 0 (serverCheck 35 + parityCheck 36). Everything through S4 (`4de5aba`)
+is committed and pushed.
 
 ## Then
 

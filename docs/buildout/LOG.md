@@ -1628,3 +1628,26 @@ LWW is the memo's accepted trade-off. Recorded in journal.ts's header.
 **Next:** P6.4 done — the queue holds only P6.1b (Gabriel's call),
 optionals, and the recurring METAs (~iteration 39 audit doubles as the
 cutover's final reconciliation).
+
+## 2026-07-08 (iteration 39) — handoff checkpoint (META-audit deferred)
+
+The Remote-store cutover is complete (P6.4, S1–S4, iterations 35–38). This
+iteration attempted META-audit-queue as the cutover's final reconciliation,
+but the audit agent died on a credit limit before doing any work. Gabriel is
+continuing in a fresh session, so this is a clean handoff checkpoint rather
+than a full audit.
+
+**Verified-green baseline (re-run by hand at handoff, all exit 0):** app tsc ·
+`npm run check` (12 tools — remoteStoreCheck 56, navResetCheck 120, coverage
+46 exact + 10 interface + 0 pending + 0 regressed + 0 warnings) · build ·
+server typecheck · server check (serverCheck 35 + parityCheck 36). Tree
+clean; everything through S4 (`4de5aba`) committed and pushed.
+
+**Also fixed here:** HANDOFF listed P6.1b as an open Gabriel-gated item — it
+was resolved iteration 34 (turbot stays red, vocab updated). Corrected.
+
+**Next session:** re-run META-audit-queue (verify the S4 doc-rewrite claims
+against the code; patch-accumulation scan over 30–38; prune stale
+watch-outs), then the loop's owned work is done — only optionals + the
+product remainder (deploy / UCLA SSO / real HW content, none loop-owned)
+remain.
