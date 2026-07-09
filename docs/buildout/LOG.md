@@ -1651,3 +1651,95 @@ against the code; patch-accumulation scan over 30–38; prune stale
 watch-outs), then the loop's owned work is done — only optionals + the
 product remainder (deploy / UCLA SSO / real HW content, none loop-owned)
 remain.
+
+## 2026-07-08 (iteration 40) — META-audit-queue: the cutover's final reconciliation · the loop closes
+
+**Shipped:** the re-run of META-audit-queue that iteration 39 deferred (its
+agent had died on a credit limit), run as a 3-verifier + completeness-critic
+Workflow (`w3f13pebm`) — **plus a real gate-integrity fix the audit surfaced**
+(see finding 0). This iteration touched one line of tooling code
+(`bumpCheck.ts`) beyond the doc reconciliation.
+
+**Findings:**
+
+0. **THE GATE WAS SILENTLY RED — `bumpCheck.ts` had hardcoded foreign absolute
+   imports.** Running `npm run check` honestly by exit code (per HANDOFF's own
+   "judge gates by EXIT CODE" watch-out) exposed it: `app/tools/bumpCheck.ts:27-28`
+   imported `wireRouter`/`componentGeometry` from
+   `/Users/gabriel/Programming/making-minds/app/src/...` — a *different machine's*
+   checkout path (note the hyphenated `making-minds` and `/Users/gabriel/`, vs this
+   box's `/Users/gabrielgreenberg/.../makingminds/`). Introduced in commit `70af455`
+   (P3.2, ~iteration 19) and unnoticed for ~21 iterations because bumpCheck runs 8th
+   of 12 and everything before it passes, so a piped-tail glance reads "green"; it
+   only resolves on the authoring machine (or a run there). Every sibling tool
+   (`routerCheck`, `layoutCheck`) imports relative `../src/...`; fixed bumpCheck to
+   match. `npm run check` now genuinely exits 0 (12 tools). The prior baselines'
+   "npm run check green" were true only on Gabriel's other checkout — a portability
+   hole in the loop's own gate. Grep confirms these were the ONLY absolute imports
+   anywhere in `app/` + `server/`. Also confirmed the documented `server/` needs its
+   own `npm install` (remoteStoreCheck/serverCheck/parityCheck need express) — ran
+   `cd server && npm ci`, no lockfile churn.
+
+1. **CLAUDE.md's S4 doc-rewrite claims — all four CONFIRMED against code.**
+   (a) `storage/backend.ts:21-33` is the sole `VITE_API_BASE` mode switch and the
+   sole exporter of the three store instances; `remoteStores.ts` is cache-free
+   direct `api/client.ts` delegation (the only direct-import bypasses —
+   `migrateLocal.ts`, `devData/seed.ts` — are the exact exceptions backend.ts
+   documents). (b) `server/src/sanitize.ts:24-45` strips `test_cases` +
+   `perception_cases` from student assignments and per-case detail (incl.
+   `perceptionCases`) from results; `assignments/index.ts:21-22` empties the
+   bundled set remotely. (c) `remoteStores`/`journal`/`migrateLocal` import no
+   grader; `remoteStoreCheck.ts:76-88` greps exactly those modules (+ backend,
+   client) for grader imports. (d) `parityCheck.ts:297-298/431-433` pins the
+   perception-aware redaction. The seams table's "Remote LIVE", the
+   test-cases-caveat-SOLVED note, and the grader-free claim are all honest.
+
+2. **Patch-accumulation scan, iterations 30–39: NO cluster.** Of the ~11 in-scope
+   commits, seven are the remote-stores cutover (S1–S4 + design memo + P6.3 parity
+   groundwork) — an explicitly architectural, judged, memo-first program that
+   DELETED duplications (gradeRelease.ts; the five views' force-rerender ceremony,
+   replaced by one `useAsyncValue`) and collapsed `applyManualReview` to one leaf
+   module. The other two substantive commits (P1.8-S4 router flags, P4.4 turbot
+   sandbox tab) are seam-routed depth. The only genuinely surgical bits — the two
+   sanitize answer leaks and the removeTab mode-swap — are each guarded by a
+   standing pin (parityCheck; navResetCheck) and share no family. Two commits
+   (P4.5, P6.1b) are deliberate non-builds. Disciplined depth-over-patches; no
+   unifying task warranted.
+
+3. **Staleness (the one substantive bug + nice-to-haves):** **P6.1b was
+   stale-open** — listed `[ ]` in QUEUE.md AND as "remaining" in CLAUDE.md's
+   "What's next", though it was resolved iteration 34 (Gabriel chose the
+   implemented red `#c73535`; VISUAL_VOCAB updated; LOG it.34 + HANDOFF already
+   recorded it done). The critic caught the CLAUDE.md copy that all three
+   doc-scoped agents missed. Fixed both. Also annotated the now-false P6.3 CI note
+   (deploy.yml HAS the server-checks job since it.34) and generalized HANDOFF's
+   untracked "Vite Remote Mode"/5177 CORS hint to "match the Vite dev origin."
+
+**Verified (all by exit code, AFTER the bumpCheck fix + server `npm ci`):**
+coverage 46 exact + 10 interface + 0 pending + 0 regressed + 0 warnings; app tsc
+0; `npm run check` 0 (12 tools); build 0; server typecheck 0 + check 0. Counts
+re-confirmed: remoteStoreCheck 56, navResetCheck 120, serverCheck 35, parityCheck
+36. Coverage-manifest tier field agrees with COVERAGE.md for all 10 interface rows
+(critic-checked). No reference-solution overreach — interface rows honestly report
+unasserted scores.
+
+**Surprise:** the gate was silently red (finding 0). The doc-staleness half of the
+audit came back nearly empty (one stale-open P6.1b on two surfaces) — but *running*
+the gate honestly, rather than trusting the "verified green" the last three
+handoffs asserted, is what earned this iteration its keep. Lesson re-learned the
+hard way that HANDOFF already preaches: judge gates by exit code, never a piped
+tail — a portability break in tool #8 of 12 hides behind seven passing tools. The
+patch-accumulation family analysis is the second durable artifact: it documents
+*why* the 30–39 window is not accretion, so a future audit needn't re-derive it.
+
+**Enqueued (optional, non-blocking):** a portability grep-gate — assert no
+`app/tools/*` or `server/tools/*` file imports from an absolute `/Users/` path — so
+this class of silent gate-break can't recur. One occurrence over the project's life,
+so it's a nice-to-have, not urgent; recorded in QUEUE Phase 5.5.
+
+**Next:** nothing loop-owned. The ledger is complete at-tier (56/56) and this
+reconciliation closes the cutover. Open QUEUE items are only the two recurring
+METAs, with no new material to audit. **The loop reports done and stops.**
+Product remainder (deploy / UCLA SSO / real HW content) and the correct-answers
+project (interface → exact) are separate, human-initiated efforts — re-open the
+loop only when one of those produces new buildable coverage.

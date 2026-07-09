@@ -637,8 +637,13 @@ server-side `AuthProvider` swap; the client flow is done), and **real assignment
   fails); all navigation + the Desert Ant capstone at the **interface** tier (plausible attempt
   validates + grades end-to-end; scores reported, never asserted — 2026-07-06 scope shift;
   exactly-correct answers are a separate future project). Close-out queue (see
-  `docs/buildout/QUEUE.md`): everything through P6.4 (the Remote-store cutover) is DONE;
-  remaining are P6.1b arena-turbot color (Gabriel's call) plus optionals.
+  `docs/buildout/QUEUE.md`): everything through P6.4 (the Remote-store cutover) is DONE,
+  including P6.1b (resolved iteration 34 — Gabriel chose the implemented red `#c73535`
+  over the mockups' yellow; VISUAL_VOCAB updated to record it). No loop-owned buildout
+  work remains — the ledger is complete at-tier and the queue holds only the two
+  recurring META tasks plus one optional non-blocking hardening item (P-TOOLS-1, a
+  harness-tool portability grep-gate); product remainder (deploy / UCLA SSO / real HW
+  content) is human/backend-gated, below.
 - **Turbot polish** — the full turbot flow (engine, grader, store, student workspace, instructor
   authoring, gradebook, sample data) shipped 2026-07-05, including the textbook turbot TM
   (internal/external states, single tape actions, B/E/F senses, ↑/↱/↰ motors); FSM brains got

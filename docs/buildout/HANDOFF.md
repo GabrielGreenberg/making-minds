@@ -35,25 +35,50 @@ is in QUEUE's P6.4 close and LOG iterations 35–38:
   and QUEUE's P6.4 closed. Local mode stayed byte-identical throughout
   (zero /api traffic, pinned + browser-checked).
 
-## Do this next — META-audit-queue (still pending)
+## Do this next — nothing. The buildout is COMPLETE at-tier.
 
-The queue is empty of committed work. Open items are exactly: optionals
-(ActiveTask trim — Gabriel's call) and the recurring METAs. P6.1b was
-resolved iteration 34 (turbot stays red; VISUAL_VOCAB updated). The CI
-server-checks job is in `deploy.yml`, activating on merge to main.
+**No loop-owned work remains.** Iteration 40 (this pass) ran the META-audit-queue
+as the cutover's final reconciliation and it came back clean:
 
-**META-audit-queue was ATTEMPTED at iteration 39 but its agent died on a
-credit limit before doing any work — RE-RUN IT.** It should double as the
-cutover's final reconciliation: verify CLAUDE.md's S4 doc-rewrite claims
-against the code (seams table 'Remote LIVE', test-cases-caveat-solved,
-grader-free remoteStores, sanitize strips test_cases + perception_cases),
-patch-accumulation scan over iterations 30–38, prune stale watch-outs.
+- **All four P6.4 remote-store doc claims CONFIRMED against code** (a 3-verifier +
+  critic workflow): backend.ts is the sole `VITE_API_BASE` mode switch and sole
+  store-instance exporter; sanitize.ts strips `test_cases` + `perception_cases`
+  from student assignments and per-case detail from results; remoteStores/journal/
+  migrateLocal are grader-free with remoteStoreCheck's grep gate over exactly those
+  modules; parityCheck pins the redaction. CLAUDE.md's S4 rewrite is accurate.
+- **Patch-accumulation scan over iterations 30–39: NO cluster.** The window is the
+  memo-driven remote-stores program (S1–S4 + design memo + P6.3 parity groundwork)
+  plus P1.8-S4 and P4.4 — all seam-routed depth. The two surgical bits (the two
+  sanitize leaks, the removeTab mode-swap) are each guarded by a standing pin and
+  share no family. No unifying task warranted.
+- **Staleness pruned:** P6.1b was stale-open in QUEUE + CLAUDE.md though resolved
+  it.34 → flipped `[x]`; the P6.3 "no CI checks / Gabriel's call" note was false
+  (deploy.yml has the server-checks job) → annotated; HANDOFF's untracked
+  "Vite Remote Mode"/5177 CORS hint → generalized (below).
 
-**Verified-green baseline (2026-07-08, this handoff):** all gates fresh by
-exit code — app tsc 0 · `npm run check` 0 (12 tools; remoteStoreCheck 56,
-navResetCheck 120, coverage 46+10/0/0) · build 0 · server typecheck 0 ·
-check 0 (serverCheck 35 + parityCheck 36). Everything through S4 (`4de5aba`)
-is committed and pushed.
+The open QUEUE items are the two recurring METAs plus ONE optional, non-blocking
+hardening item (**P-TOOLS-1**, a portability grep-gate motivated by the bumpCheck
+bug — explicitly "do not reopen the loop just for this"). The METAs fire on cadence
+but have **no new material to audit** — the ledger is complete and no fresh
+loop-owned work is being produced. The next agent should **report done and STOP the
+loop**; do not schedule an empty iteration. Re-open the loop only if new buildable
+coverage appears (e.g. real HW content that yields constructed machines) or the
+correct-answers project (upgrading the 10 interface rows to exact) is chartered —
+both are separate, human-initiated efforts. If a real iteration does occur, fold
+P-TOOLS-1 into it.
+
+**Verified-green baseline (2026-07-08, iteration 40) — now GENUINELY green:**
+all gates fresh by exit code — app tsc 0 · `npm run check` 0 (12 tools;
+remoteStoreCheck 56, navResetCheck 120, coverage 46+10/0/0) · build 0 · server
+typecheck 0 · check 0 (serverCheck 35 + parityCheck 36). ⚠ This required a
+one-line tooling fix: `app/tools/bumpCheck.ts:27-28` had hardcoded absolute
+imports from a foreign checkout (`/Users/gabriel/.../making-minds/...`),
+introduced ~iteration 19 (`70af455`) — so `npm run check` had been **silently
+red on this machine for ~21 iterations**, hidden behind seven passing tools. The
+prior handoffs' "check green" were true only on the authoring checkout. Fixed to
+relative `../src/...` (matching every sibling tool). Also: `server/` needs its
+own `npm install` before the server-booting checks pass (`cd server && npm ci`,
+no lockfile churn) — this is a per-machine setup step, not a code issue.
 
 ## Then
 
@@ -80,6 +105,10 @@ client flow done), and authoring the real HW1–HW7 content.
 - **Runaway agents:** hard bar + stop rule; checkpoint-then-continue for
   long serial work; resume-don't-redo after API deaths.
 - **Ops:** 529/overload → workflow resume; `server/` needs its own
-  `npm install`; appearance recipe v3; no lockfile churn; remote browser
-  smokes need the API server started with `MM_CORS_ORIGINS=http://localhost:5177`
-  (the "Vite Remote Mode" launch config's origin) or every POST preflight 403s.
+  `npm install` (remoteStoreCheck/serverCheck/parityCheck all fail with express
+  `ERR_MODULE_NOT_FOUND` until then); appearance recipe v3; no lockfile churn;
+  remote browser smokes need the API server started with `MM_CORS_ORIGINS` set to
+  match the Vite dev origin (e.g. `http://localhost:5173`) or every POST preflight
+  403s. (An untracked "Vite Remote Mode" launch config on port 5177 was used in
+  iteration 37; it is NOT in `.claude/launch.json` — set the origin to whatever
+  port your remote-mode Vite actually serves.)

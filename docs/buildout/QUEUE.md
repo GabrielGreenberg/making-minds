@@ -404,6 +404,23 @@ HANDOFF's "do this next = P4.3". Task ids unchanged. -->
 
 ## Phase 5.5 — Small hardening (slot opportunistically before close-out)
 
+- [ ] **P-TOOLS-1 (portability grep-gate)** — _(discovered iteration 40, META-audit;
+  OPTIONAL / non-blocking)_ **No harness tool may import from an absolute machine
+  path.** Family: a check tool with a hardcoded absolute import silently breaks
+  `npm run check` on every machine except the author's, and it hides behind the
+  earlier-passing tools in the chain (this is exactly what `bumpCheck.ts`'s
+  `/Users/gabriel/.../making-minds/...` imports did from ~iteration 19 to 40 — the
+  gate read "green" on a piped tail while being red by exit code off the authoring
+  checkout). The bug itself is FIXED (iteration 40, relativized to `../src/...`).
+  The deep fix is prevention: a tiny grep gate — a self-test in an existing tool, or
+  a standalone assertion in the chain — that FAILS if any `app/tools/*` /
+  `server/tools/*` source contains `from '/Users` (or any absolute FS import). One
+  occurrence over the project's life, so this is a nice-to-have, not urgent; but the
+  stakes (a silently-red gate is the loop's worst failure mode) make it cheap
+  insurance. **Acceptance:** a synthetic tripwire proves the gate bites; `npm run
+  check` stays green; the gate names the offending file. Do NOT reopen the loop just
+  for this — fold it into the next real iteration if one occurs.
+
 - [x] **P2.5** — _closed as DEFERRED 2026-07-08 (iteration-29 audit): this is
   answer-quality work belonging to the future correct-answers project, not
   this build-out (2026-07-06 scope shift); the rows are honest as-is. NOT
@@ -522,10 +539,12 @@ HANDOFF's "do this next = P4.3". Task ids unchanged. -->
   positive). The "all-gray 30×30 Map" scare was a JPEG-downscale artifact
   (DOM: blocks #9e9e9e vs transparent empty cells).
   **ONE ITEM STILL OPEN → P6.1b.**
-- [ ] **P6.1b** _(pending GABRIEL's decision)_ **Arena turbot color:** renders
-  red `#c73535` (index.css) vs VISUAL_VOCAB §Turbot "yellow triangle". Decide
-  which is right and fix the loser (one-line CSS change or one-line vocab
-  edit). Asked 2026-07-07; flag-only until answered.
+- [x] **P6.1b** — _resolved iteration 34 (2026-07-08, commit `0c54886`)._ Gabriel
+  chose the **implemented red** (`#c73535`, index.css unchanged) over the mockups'
+  yellow triangle; `VISUAL_VOCAB.md` §Turbot updated to record the decision. Was
+  flagged 2026-07-07 pending his call. Original entry: arena turbot rendered red
+  `#c73535` (index.css) vs VISUAL_VOCAB §Turbot "yellow triangle" — decide which is
+  right and fix the loser.
 - [x] **P6.2** Reconcile CLAUDE.md status with COVERAGE; final `npm run check` +
   `tsc` + `build` all green; every COVERAGE row green **at its tier** (✅ exact
   for arithmetic, ◐ interface for perception/navigation). — _done 2026-07-08
@@ -553,9 +572,10 @@ HANDOFF's "do this next = P4.3". Task ids unchanged. -->
   student-facing answer leaks** — sanitize.ts predated perception and shipped
   `perception_cases` (the answer key) in student assignment copies AND
   `perceptionCases` detail in post-release records; fixed, adversarially
-  confirmed (pin fails 2 checks against the pre-fix file). CI note: no checks
-  run in CI today (deploy.yml builds only); a server-checks job needs Node
-  ≥22.5 — proposed YAML recorded in LOG iteration 30, GABRIEL'S CALL to add.
+  confirmed (pin fails 2 checks against the pre-fix file). CI note (resolved
+  it.34, commit `0c54886`): a `server-checks` job now runs in `deploy.yml` on push
+  to main (Node 22, `npm run typecheck && npm run check`) — the proposed YAML from
+  LOG iteration 30 was added.
 - [x] **P6.4** **Remote-store cutover** — _DONE 2026-07-08, S1–S4 complete
   (iterations 35–38), per `designs/remote-stores.md` (ASYNC-FIRST won the
   iteration-34 judge panel 82–72–58; the judge's premise correction — manual
@@ -603,7 +623,27 @@ HANDOFF's "do this next = P4.3". Task ids unchanged. -->
 
 ## Recurring meta-tasks  _(fire on cadence; keep the queue honest)_
 
-- [ ] **META-audit-queue** — _every ~5 iterations; last ran iteration 29
+- [ ] **META-audit-queue** — _every ~5 iterations; last ran **iteration 40**
+  (2026-07-08) — the cutover's final reconciliation, via a 3-verifier + critic
+  workflow. **All four P6.4 remote-store doc claims CONFIRMED against code**
+  (backend.ts sole VITE_API_BASE switch + sole store-instance exporter;
+  sanitize.ts strips test_cases + perception_cases from student assignments and
+  per-case detail from results; grader-free remoteStores/journal/migrateLocal
+  with remoteStoreCheck's grep gate over exactly those modules; parityCheck pins
+  the redaction). **Patch-accumulation scan over iterations 30–39: NO cluster** —
+  the window is the memo-driven remote-stores program (S1–S4 + design memo +
+  P6.3 parity groundwork) plus P1.8-S4 and P4.4, all seam-routed depth; the two
+  surgical bits (the two sanitize leaks, the removeTab mode-swap) are each
+  guarded by a standing pin and share no family. **Staleness fixed:** P6.1b was
+  stale-open in QUEUE + CLAUDE.md though resolved it.34 (flipped `[x]`); the P6.3
+  "no CI checks / Gabriel's call" note was false (deploy.yml has the server-checks
+  job — annotated); HANDOFF's untracked "Vite Remote Mode"/5177 CORS hint
+  generalized. Counts re-verified by exit code: remoteStoreCheck 56, navResetCheck
+  120, serverCheck 35, parityCheck 36 (all AFTER fixing a silently-red gate —
+  bumpCheck.ts's foreign absolute imports, finding 0 in LOG iteration 40 — and a
+  server `npm ci`). Open items now: the two META recurrers plus ONE optional,
+  non-blocking hardening item (P-TOOLS-1, the portability grep-gate the bumpCheck
+  bug motivated). The buildout is COMPLETE at-tier. Previous run: iteration 29
   (2026-07-08, combined with P6.2 — see P6.2's done note for the gate/ledger
   evidence): window 24–28 audited; spot-ran every closed task's pins by exit
   code (turbotCheck [multi-arena] + [pass-through step-limit] + criterion-

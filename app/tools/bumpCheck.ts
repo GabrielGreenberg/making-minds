@@ -24,8 +24,8 @@
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join, resolve } from 'node:path';
-import { routeAllWires, type WireRouteInput } from '/Users/gabriel/Programming/making-minds/app/src/wireRouter';
-import { getPortPosition } from '/Users/gabriel/Programming/making-minds/app/src/componentGeometry';
+import { routeAllWires, type WireRouteInput } from '../src/wireRouter';
+import { getPortPosition } from '../src/componentGeometry';
 
 const R = 5;
 type Pt = { x: number; y: number };
