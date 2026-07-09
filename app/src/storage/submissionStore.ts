@@ -13,14 +13,19 @@
 
 import type {
   AssignmentData,
-  ManualReview,
   QuestionCircuit,
   SubmissionData,
   SubmissionRecord,
 } from '../types';
 import { emptyQuestionCircuit } from './workbookStore';
-import { getAssignment } from '../assignments';
 import { gradeSubmission } from '../engine/grader';
+import { applyManualReview } from './manualReview';
+
+// The pure review helper lives in storage/manualReview.ts (a types-only leaf)
+// so the server's review endpoint can import it without pulling this
+// localStorage-backed module into its graph; re-exported here so app-side
+// consumers keep one import path.
+export { applyManualReview } from './manualReview';
 
 /**
  * Build a submission snapshot from an assignment definition and the student's
@@ -50,60 +55,41 @@ export function buildSubmission(
   };
 }
 
-/**
- * Record an instructor's verdict on a pending (open) question of one attempt.
- * Pure: returns a new records array with the review set on the matching
- * question's result, or null if no such pending question exists. The
- * submission snapshot itself is untouched — only the grade side of the record
- * (`result`), which the "server" owns and may amend, is updated; re-reviewing
- * overwrites the previous verdict.
- */
-export function applyManualReview(
-  records: SubmissionRecord[],
-  attempt: number,
-  questionId: number,
-  review: ManualReview,
-): SubmissionRecord[] | null {
-  const idx = records.findIndex((r) => r.attempt === attempt);
-  const result = records[idx]?.result;
-  if (!result) return null;
-  const qIdx = result.questions.findIndex(
-    (q) => q.questionId === questionId && q.status === 'pending',
-  );
-  if (qIdx < 0) return null;
-  const questions = result.questions.map((q, i) =>
-    i === qIdx ? { ...q, manual: review } : q,
-  );
-  return records.map((r, i) =>
-    i === idx ? { ...r, result: { ...result, questions } } : r,
-  );
-}
-
+// Promise-returning (a remote backend is intrinsically async); the local
+// implementation resolves immediately. Note `clearSubmissions` is NOT on the
+// seam — it's a dev-only capability of the local store (devData/seed.ts pins
+// the concrete class); a server never exposes "delete all submissions".
 export interface SubmissionStore {
   /** Append a new attempt and return the recorded (immutable) record. */
-  submit(id: string, submission: SubmissionData): SubmissionRecord;
-  listSubmissions(id: string): SubmissionRecord[];
-  getLatest(id: string): SubmissionRecord | null;
-  /** Drop all stored submissions for an assignment (e.g. reseeding dev data). */
-  clearSubmissions(id: string): void;
+  submit(id: string, submission: SubmissionData): Promise<SubmissionRecord>;
+  listSubmissions(id: string): Promise<SubmissionRecord[]>;
+  getLatest(id: string): Promise<SubmissionRecord | null>;
   /**
    * Record (or overwrite) the instructor's verdict on a pending open question
    * of one stored attempt. Returns the updated record, or null if the attempt
    * has no pending question with that id. An instructor/server capability —
    * nothing student-facing calls this.
+   *
+   * `student` identifies WHOSE attempt: the server counts attempt numbers per
+   * (assignment, student), so the attempt alone is ambiguous remotely. The
+   * local store numbers attempts per assignment and ignores it (its lookup by
+   * attempt is already unique) — the parameter exists so both implementations
+   * share one signature.
    */
   recordManualReview(
     id: string,
+    student: string,
     attempt: number,
     questionId: number,
     review: { pass: boolean; note?: string },
-  ): SubmissionRecord | null;
+  ): Promise<SubmissionRecord | null>;
 }
 
 const KEY_PREFIX = 'mm:sub:';
 
 class LocalSubmissionStore implements SubmissionStore {
-  listSubmissions(id: string): SubmissionRecord[] {
+  /** Synchronous read shared by the async interface methods. */
+  private read(id: string): SubmissionRecord[] {
     try {
       const raw = localStorage.getItem(KEY_PREFIX + id);
       if (!raw) return [];
@@ -114,12 +100,20 @@ class LocalSubmissionStore implements SubmissionStore {
     }
   }
 
-  getLatest(id: string): SubmissionRecord | null {
-    const all = this.listSubmissions(id);
+  async listSubmissions(id: string): Promise<SubmissionRecord[]> {
+    return this.read(id);
+  }
+
+  async getLatest(id: string): Promise<SubmissionRecord | null> {
+    const all = this.read(id);
     return all.length ? all[all.length - 1] : null;
   }
 
-  clearSubmissions(id: string): void {
+  /**
+   * Drop all stored submissions for an assignment (e.g. reseeding dev data).
+   * Deliberately OFF the `SubmissionStore` seam — dev/local-mode only.
+   */
+  async clearSubmissions(id: string): Promise<void> {
     try {
       localStorage.removeItem(KEY_PREFIX + id);
     } catch {
@@ -127,11 +121,16 @@ class LocalSubmissionStore implements SubmissionStore {
     }
   }
 
-  submit(id: string, submission: SubmissionData): SubmissionRecord {
-    const all = this.listSubmissions(id);
+  async submit(id: string, submission: SubmissionData): Promise<SubmissionRecord> {
+    const all = this.read(id);
     // Autograde on receipt: the "server" holds the test vectors, so it can grade
     // the moment the submission lands and persist the result on the record.
-    const def = getAssignment(id);
+    // The registry is imported at CALL time, not module time: statically,
+    // assignments/index.ts → storage/backend.ts → this module is a cycle, and
+    // whichever module a headless tool loads first would hit a TDZ on the
+    // other's exports. This is the cycle's one runtime edge, so defer it.
+    const { getAssignment } = await import('../assignments');
+    const def = await getAssignment(id);
     const result = def ? gradeSubmission(def, submission) : undefined;
     const record: SubmissionRecord = {
       assignmentId: id,
@@ -148,13 +147,17 @@ class LocalSubmissionStore implements SubmissionStore {
     return record;
   }
 
-  recordManualReview(
+  async recordManualReview(
     id: string,
+    _student: string,
     attempt: number,
     questionId: number,
     review: { pass: boolean; note?: string },
-  ): SubmissionRecord | null {
-    const all = this.listSubmissions(id);
+  ): Promise<SubmissionRecord | null> {
+    // `_student` is unused locally: local attempt numbers are unique per
+    // assignment (see the interface note), so the attempt alone identifies
+    // the record — behavior is byte-identical to the pre-S3 seam.
+    const all = this.read(id);
     const updated = applyManualReview(all, attempt, questionId, {
       pass: review.pass,
       note: review.note?.trim() || undefined,
@@ -170,4 +173,6 @@ class LocalSubmissionStore implements SubmissionStore {
   }
 }
 
-export const localSubmissionStore: SubmissionStore = new LocalSubmissionStore();
+// Exported as the concrete class (not the interface) so dev-only capabilities
+// off the seam (`clearSubmissions`) stay reachable for devData/seed.ts.
+export const localSubmissionStore = new LocalSubmissionStore();

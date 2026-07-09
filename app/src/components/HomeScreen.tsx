@@ -3,7 +3,7 @@ import { listAssignments } from '../assignments';
 import { navigate } from '../routing';
 import { getCurrentUserEmail, useAuth } from '../auth';
 import { summarizeResult } from '../engine/grader';
-import { isGradesReleased } from '../storage/gradeRelease';
+import { useAsyncValue } from '../useAsyncValue';
 
 function formatSubmittedAt(iso: string): string {
   const d = new Date(iso);
@@ -16,19 +16,34 @@ export function HomeScreen() {
   const submitAssignment = useStore((s) => s.submitAssignment);
   const { user, logout } = useAuth();
 
-  const assignments = listAssignments();
+  const { value: assignmentList, loading, error, reload } = useAsyncValue(
+    () => listAssignments(),
+    [],
+  );
+  const assignments = assignmentList ?? [];
 
-  const handleSubmit = (id: string, title: string) => {
+  const handleSubmit = async (id: string, title: string) => {
     const ok = confirm(
       `Submit "${title}"? This records a snapshot of your saved work.\n\n` +
       'Note: only your most recent submission is graded — submitting again replaces any earlier submission for grading purposes.'
     );
     if (!ok) return;
-    const rec = submitAssignment(id, getCurrentUserEmail());
+    let rec;
+    try {
+      rec = await submitAssignment(id, getCurrentUserEmail());
+    } catch {
+      // Online-only submit: a failure records nothing and asks for a visible
+      // retry — never a silent (late) queue. The work itself is autosaved.
+      alert(
+        'Submission failed — the server could not be reached, and nothing was recorded.\n\n' +
+        'Your work is still saved. Please try Submit again in a moment.'
+      );
+      return;
+    }
     if (!rec) return;
     // The submission is autograded on receipt, but the grade is NEVER shown at
     // submit time — students see grades only after the instructor releases
-    // them for the assignment (see storage/gradeRelease.ts).
+    // them for the assignment (the release flag on the AssignmentStore seam).
     alert(
       `Submitted "${title}" (attempt ${rec.attempt}).\n` +
         'Your work has been recorded. Grades will appear here once your instructor releases them.',
@@ -74,7 +89,7 @@ export function HomeScreen() {
                       title={`Attempt ${sub.attempt}`}
                     >
                       ✓ Submitted {formatSubmittedAt(sub.submittedAt)}
-                      {isGradesReleased(a.id) && sub.result && (() => {
+                      {a.gradesReleased && sub.result && (() => {
                         const s = summarizeResult(sub.result);
                         return s.questionsTotal > 0
                           ? ` · Grade: ${s.questionsPassed}/${s.questionsTotal} questions`
@@ -86,15 +101,21 @@ export function HomeScreen() {
                   )}
                   <button
                     className="home-tile-submit"
-                    onClick={() => handleSubmit(a.id, a.title)}
+                    onClick={() => void handleSubmit(a.id, a.title)}
                   >
                     Submit
                   </button>
                 </div>
               );
             })}
-            {assignments.length === 0 && (
-              <p className="home-empty">No assignments available.</p>
+            {assignments.length === 0 && !error && (
+              <p className="home-empty">{loading ? 'Loading…' : 'No assignments available.'}</p>
+            )}
+            {error && !loading && (
+              <p className="home-empty">
+                Couldn’t load assignments — the server may be unreachable.{' '}
+                <button className="menu-link-button" onClick={reload}>Retry</button>
+              </p>
             )}
           </div>
         </section>

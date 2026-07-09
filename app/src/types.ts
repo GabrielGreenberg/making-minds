@@ -312,6 +312,10 @@ export interface WorksheetData {
   textElements: TextElement[];
   comments: CommentElement[];
   boxes: BoxDefinition[];
+  /** Turbot worksheets only: which machine kind the brain circuit is. */
+  innerMode?: BuildMode;
+  /** Turbot worksheets only: the sandbox arena the Map runs the brain in. */
+  arena?: ArenaConfig;
 }
 
 export interface WorkbookData {

@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, type CSSProperties } from 'react';
 import { createPortal } from 'react-dom';
 import { useStore } from '../store';
 import { navigate } from '../routing';
@@ -9,6 +9,24 @@ const MACHINE_OPTIONS: { mode: BuildMode; label: string }[] = [
   { mode: 'FSM', label: 'Finite State Machine' },
   { mode: 'TM',  label: 'Turing Machine' },
 ];
+
+// A turbot's brain is one of the four machine kinds (spec §9.3). The CC/SC
+// distinction is real inside a turbot (it picks the brain's step semantics),
+// so — unlike the sandbox machine list above, where SC is just "a Logic
+// Circuit with MEM" — the brain picker names all four.
+const TURBOT_BRAIN_OPTIONS: { mode: BuildMode; label: string }[] = [
+  { mode: 'CC',  label: 'Logic Circuit brain' },
+  { mode: 'SC',  label: 'Sequential Circuit brain' },
+  { mode: 'FSM', label: 'Finite State Machine brain' },
+  { mode: 'TM',  label: 'Turing Machine brain' },
+];
+
+const menuItemStyle: CSSProperties = {
+  padding: '9px 16px',
+  fontSize: 13,
+  cursor: 'pointer',
+  userSelect: 'none',
+};
 
 function EditableTabTitle({
   tabId,
@@ -79,13 +97,19 @@ function EditableTabTitle({
 
 function AddTabButton() {
   const [open, setOpen] = useState(false);
+  // Two-page menu: the machine list, then (after picking "Turbot") the
+  // brain-kind list for the turbot's inner machine.
+  const [brainPicker, setBrainPicker] = useState(false);
   const [menuPos, setMenuPos] = useState({ top: 0, left: 0 });
   const btnRef = useRef<HTMLButtonElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
   const { tabs, addTab } = useStore();
 
   useEffect(() => {
-    if (!open) return;
+    if (!open) {
+      setBrainPicker(false);
+      return;
+    }
     const handler = (e: Event) => {
       const target = e.target as Node;
       if (btnRef.current?.contains(target) || menuRef.current?.contains(target)) return;
@@ -106,6 +130,12 @@ function AddTabButton() {
   const handleSelect = (mode: BuildMode, label: string) => {
     const count = tabs.filter((t) => t.buildMode === mode).length + 1;
     addTab(`${label} ${count}`, mode, 'arithmetic');
+    setOpen(false);
+  };
+
+  const handleSelectTurbot = (innerMode: BuildMode) => {
+    const count = tabs.filter((t) => t.buildMode === 'turbot').length + 1;
+    addTab(`Turbot ${count}`, 'turbot', 'turbot', innerMode);
     setOpen(false);
   };
 
@@ -135,22 +165,52 @@ function AddTabButton() {
             overflow: 'hidden',
           }}
         >
-          {MACHINE_OPTIONS.map((opt) => (
-            <div
-              key={opt.mode}
-              onPointerDown={() => handleSelect(opt.mode, opt.label)}
-              style={{
-                padding: '9px 16px',
-                fontSize: 13,
-                cursor: 'pointer',
-                userSelect: 'none',
-              }}
-              onMouseEnter={(e) => (e.currentTarget.style.background = '#f0f0f0')}
-              onMouseLeave={(e) => (e.currentTarget.style.background = 'white')}
-            >
-              {opt.label}
-            </div>
-          ))}
+          {!brainPicker ? (
+            <>
+              {MACHINE_OPTIONS.map((opt) => (
+                <div
+                  key={opt.mode}
+                  onPointerDown={() => handleSelect(opt.mode, opt.label)}
+                  style={menuItemStyle}
+                  onMouseEnter={(e) => (e.currentTarget.style.background = '#f0f0f0')}
+                  onMouseLeave={(e) => (e.currentTarget.style.background = 'white')}
+                >
+                  {opt.label}
+                </div>
+              ))}
+              <div
+                onPointerDown={() => setBrainPicker(true)}
+                style={{ ...menuItemStyle, display: 'flex', justifyContent: 'space-between', gap: 12 }}
+                onMouseEnter={(e) => (e.currentTarget.style.background = '#f0f0f0')}
+                onMouseLeave={(e) => (e.currentTarget.style.background = 'white')}
+              >
+                <span>Turbot</span>
+                <span style={{ color: '#999' }}>{'›'}</span>
+              </div>
+            </>
+          ) : (
+            <>
+              <div
+                onPointerDown={() => setBrainPicker(false)}
+                style={{ ...menuItemStyle, color: '#666', borderBottom: '1px solid #eee' }}
+                onMouseEnter={(e) => (e.currentTarget.style.background = '#f0f0f0')}
+                onMouseLeave={(e) => (e.currentTarget.style.background = 'white')}
+              >
+                {'‹'} Turbot — pick its brain
+              </div>
+              {TURBOT_BRAIN_OPTIONS.map((opt) => (
+                <div
+                  key={opt.mode}
+                  onPointerDown={() => handleSelectTurbot(opt.mode)}
+                  style={menuItemStyle}
+                  onMouseEnter={(e) => (e.currentTarget.style.background = '#f0f0f0')}
+                  onMouseLeave={(e) => (e.currentTarget.style.background = 'white')}
+                >
+                  {opt.label}
+                </div>
+              ))}
+            </>
+          )}
         </div>,
         document.body
       )}

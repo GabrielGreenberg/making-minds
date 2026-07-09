@@ -1,0 +1,282 @@
+{
+  "question": {
+    "id": 13,
+    "label": "Problem 13",
+    "statement": "Three ahead: the goal lies exactly three cells straight ahead of the turbot in an open field. Design a finite-state machine brain that drives the turbot forward onto the goal and stops there. The sensor reads the cell ahead (0 = empty, 1 = blocked); each transition outputs the two-bit motor command (11 = forward, 00 = stop, 10 = turn right, 01 = turn left).",
+    "buildMode": "turbot",
+    "representation": "binary",
+    "innerMode": "FSM",
+    "turbot_cases": [
+      {
+        "arena": {
+          "width": 7,
+          "height": 6,
+          "cells": [
+            [
+              "empty",
+              "empty",
+              "empty",
+              "empty",
+              "empty",
+              "empty",
+              "empty"
+            ],
+            [
+              "empty",
+              "empty",
+              "empty",
+              "goal",
+              "empty",
+              "empty",
+              "empty"
+            ],
+            [
+              "empty",
+              "empty",
+              "empty",
+              "empty",
+              "empty",
+              "empty",
+              "empty"
+            ],
+            [
+              "empty",
+              "empty",
+              "empty",
+              "empty",
+              "empty",
+              "empty",
+              "empty"
+            ],
+            [
+              "empty",
+              "empty",
+              "empty",
+              "empty",
+              "empty",
+              "empty",
+              "empty"
+            ],
+            [
+              "empty",
+              "empty",
+              "empty",
+              "empty",
+              "empty",
+              "empty",
+              "empty"
+            ]
+          ],
+          "start": {
+            "x": 3,
+            "y": 4,
+            "facing": "N"
+          }
+        },
+        "maxSteps": 20,
+        "criterion": "reach-and-stop"
+      },
+      {
+        "arena": {
+          "width": 6,
+          "height": 3,
+          "cells": [
+            [
+              "empty",
+              "empty",
+              "empty",
+              "empty",
+              "empty",
+              "empty"
+            ],
+            [
+              "empty",
+              "empty",
+              "empty",
+              "empty",
+              "goal",
+              "empty"
+            ],
+            [
+              "empty",
+              "empty",
+              "empty",
+              "empty",
+              "empty",
+              "empty"
+            ]
+          ],
+          "start": {
+            "x": 1,
+            "y": 1,
+            "facing": "E"
+          }
+        },
+        "maxSteps": 20,
+        "criterion": "reach-and-stop"
+      }
+    ]
+  },
+  "correct": {
+    "components": [
+      {
+        "id": "hw4-p13-s0",
+        "type": "STATE",
+        "x": 140,
+        "y": 220,
+        "label": "S₀",
+        "ports": [
+          {
+            "id": "left",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "right",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "hw4-p13-s1",
+        "type": "STATE",
+        "x": 340,
+        "y": 220,
+        "label": "S₁",
+        "ports": [
+          {
+            "id": "left",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "right",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "hw4-p13-s2",
+        "type": "STATE",
+        "x": 540,
+        "y": 220,
+        "label": "S₂",
+        "ports": [
+          {
+            "id": "left",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "right",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "hw4-p13-s3",
+        "type": "STATE",
+        "x": 740,
+        "y": 220,
+        "label": "S₃",
+        "ports": [
+          {
+            "id": "left",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "right",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      }
+    ],
+    "wires": [
+      {
+        "id": "hw4-p13-t0a",
+        "sourceComponentId": "hw4-p13-s0",
+        "sourcePortId": "right",
+        "targetComponentId": "hw4-p13-s1",
+        "targetPortId": "left",
+        "value": 0,
+        "transitionLabel": "0:11"
+      },
+      {
+        "id": "hw4-p13-t0b",
+        "sourceComponentId": "hw4-p13-s0",
+        "sourcePortId": "right",
+        "targetComponentId": "hw4-p13-s1",
+        "targetPortId": "left",
+        "value": 0,
+        "transitionLabel": "1:11"
+      },
+      {
+        "id": "hw4-p13-t1a",
+        "sourceComponentId": "hw4-p13-s1",
+        "sourcePortId": "right",
+        "targetComponentId": "hw4-p13-s2",
+        "targetPortId": "left",
+        "value": 0,
+        "transitionLabel": "0:11"
+      },
+      {
+        "id": "hw4-p13-t1b",
+        "sourceComponentId": "hw4-p13-s1",
+        "sourcePortId": "right",
+        "targetComponentId": "hw4-p13-s2",
+        "targetPortId": "left",
+        "value": 0,
+        "transitionLabel": "1:11"
+      },
+      {
+        "id": "hw4-p13-t2a",
+        "sourceComponentId": "hw4-p13-s2",
+        "sourcePortId": "right",
+        "targetComponentId": "hw4-p13-s3",
+        "targetPortId": "left",
+        "value": 0,
+        "transitionLabel": "0:11"
+      },
+      {
+        "id": "hw4-p13-t2b",
+        "sourceComponentId": "hw4-p13-s2",
+        "sourcePortId": "right",
+        "targetComponentId": "hw4-p13-s3",
+        "targetPortId": "left",
+        "value": 0,
+        "transitionLabel": "1:11"
+      },
+      {
+        "id": "hw4-p13-t3a",
+        "sourceComponentId": "hw4-p13-s3",
+        "sourcePortId": "right",
+        "targetComponentId": "hw4-p13-s3",
+        "targetPortId": "left",
+        "value": 0,
+        "transitionLabel": "0:00"
+      },
+      {
+        "id": "hw4-p13-t3b",
+        "sourceComponentId": "hw4-p13-s3",
+        "sourcePortId": "right",
+        "targetComponentId": "hw4-p13-s3",
+        "targetPortId": "left",
+        "value": 0,
+        "transitionLabel": "1:00"
+      }
+    ]
+  }
+}

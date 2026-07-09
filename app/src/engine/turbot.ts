@@ -526,3 +526,51 @@ export function evaluateTurbotCriterion(
     }
   }
 }
+
+/**
+ * Explain WHY a run failed its criterion, in the criterion's own terms —
+ * the human-readable counterpart of evaluateTurbotCriterion, mirroring its
+ * clauses exactly (read-only: no criterion semantics live here). Call it
+ * only on a failing run; every branch names the criterion so a gradebook
+ * drill-down never shows a reason-less failed arena.
+ */
+export function explainTurbotCriterionFailure(
+  arena: ArenaConfig,
+  run: TurbotRunResult,
+  criterion: TurbotSuccessCriterion
+): string {
+  const unmet = (detail: string) => `'${criterion}' criterion not satisfied: ${detail}`;
+  switch (criterion) {
+    case 'reach-and-stop':
+      if (!run.stopped) return unmet('the turbot never came to rest');
+      return unmet('stopped off the goal cell');
+    case 'pass-through':
+      return unmet('goal cell never crossed');
+    case 'return-to-start':
+      if (run.finalState.x !== arena.start.x || run.finalState.y !== arena.start.y) {
+        return unmet('did not end on the start cell');
+      }
+      // The remaining clause: a goal-ful arena whose trace skipped the goal.
+      return unmet('goal cell never visited');
+  }
+}
+
+/**
+ * Whether a criterion judges how the run ENDS — and so requires the turbot
+ * to come to rest within the step budget. For these (`reach-and-stop`,
+ * `return-to-start`) a run truncated by the step limit fails outright: the
+ * turbot never stopped, so its "final position" is just where simulation was
+ * cut off, not where it came to rest.
+ *
+ * `pass-through` is TRACE-satisfiable: the goal need only appear somewhere
+ * in the position trace (HW2 §III's Pac-Man rule — the turbot completes
+ * navigation by crossing the goal and "need not stop"). For it, the step
+ * limit only bounds how much trace the simulator produces; a run that hits
+ * the limit is still judged by the criterion on that trace. This matters
+ * structurally: a memoryless CC brain can never emit motor 00, so every CC
+ * pass-through run ends at the step limit — the textbook's own reflex
+ * answers would auto-fail if truncation trumped the criterion.
+ */
+export function criterionRequiresStop(criterion: TurbotSuccessCriterion): boolean {
+  return criterion !== 'pass-through';
+}

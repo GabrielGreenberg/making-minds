@@ -3,12 +3,26 @@
 // The UI/store talk to the `WorkbookStore` interface, never to localStorage
 // directly, so a server-backed implementation can be dropped in later without
 // touching the store. Mirrors the headless-engine/grader seam pattern.
+//
+// The interface is Promise-returning (a remote backend is intrinsically
+// async); the local implementation resolves immediately — its bodies run
+// synchronously before the first suspension, so an unload-time flush still
+// lands the localStorage write.
 
 import type { AssignmentData, AssignmentState, QuestionCircuit } from '../types';
 
 export interface WorkbookStore {
-  loadAssignmentState(id: string): AssignmentState | null;
-  saveAssignmentState(id: string, state: AssignmentState): void;
+  loadAssignmentState(id: string): Promise<AssignmentState | null>;
+  /**
+   * `opts.keepalive` marks an unload-time save: the remote impl lets the
+   * request outlive the page (browser keepalive fetch, ~64KB body cap). The
+   * local impl ignores it — its write is synchronous anyway.
+   */
+  saveAssignmentState(
+    id: string,
+    state: AssignmentState,
+    opts?: { keepalive?: boolean },
+  ): Promise<void>;
 }
 
 /** Fresh, empty canvas state for one question. */
@@ -39,10 +53,13 @@ export function restoreQuestionCircuits(
   return { questionCircuits, currentQuestionIndex };
 }
 
-const KEY_PREFIX = 'mm:asg:';
+// Exported for the fill-empty migration (migrateLocal.ts), which scans
+// localStorage for existing prototype workbooks on first remote login.
+export const WORKBOOK_KEY_PREFIX = 'mm:asg:';
+const KEY_PREFIX = WORKBOOK_KEY_PREFIX;
 
 class LocalWorkbookStore implements WorkbookStore {
-  loadAssignmentState(id: string): AssignmentState | null {
+  async loadAssignmentState(id: string): Promise<AssignmentState | null> {
     try {
       const raw = localStorage.getItem(KEY_PREFIX + id);
       if (!raw) return null;
@@ -64,7 +81,7 @@ class LocalWorkbookStore implements WorkbookStore {
     }
   }
 
-  saveAssignmentState(id: string, state: AssignmentState): void {
+  async saveAssignmentState(id: string, state: AssignmentState): Promise<void> {
     try {
       localStorage.setItem(KEY_PREFIX + id, JSON.stringify(state));
     } catch {

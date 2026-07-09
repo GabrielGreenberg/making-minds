@@ -91,20 +91,32 @@ export function evaluateGate(type: ComponentType, inputs: number[], comp?: Circu
   }
 }
 
+/**
+ * The ONE IN/OUT label-ordering convention: select a circuit's INPUT (or
+ * OUTPUT) components and order them by the numeric suffix of their permanent
+ * label ("IN2" → 2; unparseable → 0). Both the top-level grading path
+ * (`evaluateCCInputs`) and boxed-circuit internal binding
+ * (`evaluateBoxedCircuit`) MUST bind bit vectors through this helper so the
+ * two can never desync.
+ */
+function sortByLabel(components: CircuitComponent[], prefix: 'IN' | 'OUT'): CircuitComponent[] {
+  return components
+    .filter((c) => (prefix === 'IN' ? c.type === 'INPUT' : c.type === 'OUTPUT'))
+    .sort((a, b) => {
+      const na = parseInt(a.label.replace(prefix, '')) || 0;
+      const nb = parseInt(b.label.replace(prefix, '')) || 0;
+      return na - nb;
+    });
+}
+
 /** Simulate the internal circuit of a BOXED component */
 export function evaluateBoxedCircuit(comp: CircuitComponent | undefined, externalInputs: number[]): number[] {
   if (!comp?.internalCircuit) return externalInputs.map(() => 0);
   const { components: intComps, wires: intWires } = comp.internalCircuit;
   if (intComps.length === 0) return externalInputs.map(() => 0);
 
-  // Set INPUT component values from external inputs
-  const inputComps = intComps
-    .filter((c) => c.type === 'INPUT')
-    .sort((a, b) => {
-      const na = parseInt(a.label.replace('IN', '')) || 0;
-      const nb = parseInt(b.label.replace('IN', '')) || 0;
-      return na - nb;
-    });
+  // Set INPUT component values from external inputs (bound in label order)
+  const inputComps = sortByLabel(intComps, 'IN');
   const preppedComps = intComps.map((c) => {
     const idx = inputComps.indexOf(c);
     if (idx >= 0) {
@@ -149,13 +161,7 @@ export function evaluateBoxedCircuit(comp: CircuitComponent | undefined, externa
   }
 
   // Collect outputs from OUTPUT components, sorted by label
-  const outputComps = preppedComps
-    .filter((c) => c.type === 'OUTPUT')
-    .sort((a, b) => {
-      const na = parseInt(a.label.replace('OUT', '')) || 0;
-      const nb = parseInt(b.label.replace('OUT', '')) || 0;
-      return na - nb;
-    });
+  const outputComps = sortByLabel(preppedComps, 'OUT');
 
   return outputComps.map((oc) => portValues.get(`${oc.id}:in`) ?? 0);
 }
@@ -264,21 +270,11 @@ export function evaluateCC(
   return { portValues, wireValues };
 }
 
-/** Order INPUT (or OUTPUT) components by their numeric label suffix. */
-function sortByLabel(components: CircuitComponent[], prefix: 'IN' | 'OUT'): CircuitComponent[] {
-  return components
-    .filter((c) => (prefix === 'IN' ? c.type === 'INPUT' : c.type === 'OUTPUT'))
-    .sort((a, b) => {
-      const na = parseInt(a.label.replace(prefix, '')) || 0;
-      const nb = parseInt(b.label.replace(prefix, '')) || 0;
-      return na - nb;
-    });
-}
-
 /**
  * Headless grading primitive: set INPUT values from a bit vector (ordered by
- * IN-label), evaluate the circuit, and return OUTPUT bits (ordered by
- * OUT-label). Input/output ordering matches the canvas exactly.
+ * IN-label via the shared `sortByLabel` convention), evaluate the circuit, and
+ * return OUTPUT bits (ordered by OUT-label). Input/output ordering matches the
+ * canvas exactly.
  *
  * `components`/`wires` are not mutated; a shallow copy carries the input values.
  */

@@ -1,11 +1,11 @@
 import { useState } from 'react';
 import type { AssignmentData, ManualReview, SubmissionRecord } from '../types';
 import { getAssignment } from '../assignments';
-import { localSubmissionStore } from '../storage/submissionStore';
+import { assignmentStore, submissionStore } from '../storage/backend';
 import { gradeSubmission } from '../engine/grader';
 import { navigate } from '../routing';
 import { gradeSubmissions, computeStats, type SubmissionGrade } from './Gradebook';
-import { isGradesReleased, setGradesReleased } from '../storage/gradeRelease';
+import { useAsyncValue } from '../useAsyncValue';
 
 function formatTime(iso: string): string {
   const d = new Date(iso);
@@ -29,13 +29,27 @@ interface StudentGrades {
 
 export function GradebookView({ id }: { id: string }) {
   const [expandedStudent, setExpandedStudent] = useState<string | null>(null);
-  const [released, setReleased] = useState(() => isGradesReleased(id));
-  // Bumped after a manual review is recorded so the view re-reads the store
-  // (marks, scores, and stats all reflect the new verdict immediately).
-  const [, setReviewVersion] = useState(0);
-  const onReviewed = () => setReviewVersion((v) => v + 1);
 
-  const toggleRelease = () => {
+  // The assignment, its submissions, AND the release flag come from the async
+  // seams; after a mutation through a seam (manual review recorded, release
+  // toggled) reload() re-reads them, so marks, scores, stats, and the release
+  // banner all reflect the stored state — no shadow copy to drift.
+  const {
+    value: data,
+    loading,
+    reload,
+  } = useAsyncValue(async () => {
+    const [assignment, records, released] = await Promise.all([
+      getAssignment(id),
+      submissionStore.listSubmissions(id),
+      assignmentStore.getGradesReleased(id),
+    ]);
+    return { assignment, records, released };
+  }, [id]);
+  const onReviewed = reload;
+  const released = data?.released ?? false;
+
+  const toggleRelease = async () => {
     const next = !released;
     if (
       next &&
@@ -43,11 +57,14 @@ export function GradebookView({ id }: { id: string }) {
     ) {
       return;
     }
-    setGradesReleased(id, next);
-    setReleased(next);
+    await assignmentStore.setGradesReleased(id, next);
+    reload();
   };
 
-  const assignment = getAssignment(id);
+  if (!data) {
+    return <p className="instructor-empty">{loading ? 'Loading…' : 'Failed to load submissions.'}</p>;
+  }
+  const { assignment, records } = data;
   if (!assignment) {
     return (
       <div className="instructor-error">
@@ -59,7 +76,6 @@ export function GradebookView({ id }: { id: string }) {
     );
   }
 
-  const records = localSubmissionStore.listSubmissions(id);
   const grades = gradeSubmissions(assignment, records);
 
   // Group by student. Only the LATEST submission counts toward the grade;
@@ -90,7 +106,7 @@ export function GradebookView({ id }: { id: string }) {
           title="Students see no grades for this assignment until you release them."
         >
           {released ? 'Grades released to students' : 'Grades hidden from students'}
-          <button className="instructor-btn" onClick={toggleRelease}>
+          <button className="instructor-btn" onClick={() => void toggleRelease()}>
             {released ? 'Hide grades' : 'Release grades'}
           </button>
         </span>
@@ -489,11 +505,17 @@ function ManualReviewControls({
 }) {
   const [note, setNote] = useState(manual?.note ?? '');
 
-  const save = (pass: boolean) => {
-    localSubmissionStore.recordManualReview(record.assignmentId, record.attempt, questionId, {
-      pass,
-      note,
-    });
+  const save = async (pass: boolean) => {
+    // The student email disambiguates WHOSE attempt server-side (remote
+    // attempt numbers count per student); the local store ignores it, so
+    // legacy anonymous local records still review fine.
+    await submissionStore.recordManualReview(
+      record.assignmentId,
+      record.submission.student ?? '',
+      record.attempt,
+      questionId,
+      { pass, note },
+    );
     onReviewed();
   };
 
@@ -517,10 +539,10 @@ function ManualReviewControls({
           value={note}
           onChange={(e) => setNote(e.target.value)}
         />
-        <button className="instructor-btn instructor-review-btn" onClick={() => save(true)}>
+        <button className="instructor-btn instructor-review-btn" onClick={() => void save(true)}>
           ✓ Correct
         </button>
-        <button className="instructor-btn instructor-review-btn" onClick={() => save(false)}>
+        <button className="instructor-btn instructor-review-btn" onClick={() => void save(false)}>
           ✗ Incorrect
         </button>
       </div>

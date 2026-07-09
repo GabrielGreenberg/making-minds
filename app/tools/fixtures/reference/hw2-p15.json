@@ -1,0 +1,274 @@
+{
+ "question": {
+  "id": 15,
+  "label": "Problem 15",
+  "statement": "Zig-zag. The turbot starts at the bottom of a Z-shaped corridor, facing along its first leg; the goal lies at the far end, past two turns in opposite directions. Navigation is completed the moment the turbot crosses over the goal cell — it does not need to stop on it. Can this course be completed by a combinatorial circuit embedded in a turbot? If so, give the circuit. If not, explain why in a short paragraph.",
+  "buildMode": "turbot",
+  "representation": "binary",
+  "innerMode": "CC",
+  "turbot_cases": [
+   {
+    "arena": {
+     "width": 7,
+     "height": 5,
+     "cells": [
+      [
+       "block",
+       "goal",
+       "block",
+       "block",
+       "block",
+       "block",
+       "block"
+      ],
+      [
+       "block",
+       "empty",
+       "block",
+       "block",
+       "block",
+       "block",
+       "block"
+      ],
+      [
+       "block",
+       "empty",
+       "empty",
+       "empty",
+       "empty",
+       "empty",
+       "block"
+      ],
+      [
+       "block",
+       "block",
+       "block",
+       "block",
+       "block",
+       "empty",
+       "block"
+      ],
+      [
+       "block",
+       "block",
+       "block",
+       "block",
+       "block",
+       "empty",
+       "block"
+      ]
+     ],
+     "start": {
+      "x": 5,
+      "y": 4,
+      "facing": "N"
+     }
+    },
+    "maxSteps": 60,
+    "criterion": "pass-through"
+   },
+   {
+    "arena": {
+     "width": 6,
+     "height": 6,
+     "cells": [
+      [
+       "block",
+       "goal",
+       "block",
+       "block",
+       "block",
+       "block"
+      ],
+      [
+       "block",
+       "empty",
+       "block",
+       "block",
+       "block",
+       "block"
+      ],
+      [
+       "block",
+       "empty",
+       "empty",
+       "empty",
+       "empty",
+       "block"
+      ],
+      [
+       "block",
+       "block",
+       "block",
+       "block",
+       "empty",
+       "block"
+      ],
+      [
+       "block",
+       "block",
+       "block",
+       "block",
+       "empty",
+       "block"
+      ],
+      [
+       "block",
+       "block",
+       "block",
+       "block",
+       "empty",
+       "block"
+      ]
+     ],
+     "start": {
+      "x": 4,
+      "y": 5,
+      "facing": "N"
+     }
+    },
+    "maxSteps": 60,
+    "criterion": "pass-through"
+   }
+  ]
+ },
+ "correct": {
+  "components": [
+   {
+    "id": "p15-in1",
+    "type": "INPUT",
+    "x": 80,
+    "y": 160,
+    "label": "IN1",
+    "ports": [
+     {
+      "id": "out",
+      "label": "",
+      "side": "right",
+      "index": 0
+     }
+    ]
+   },
+   {
+    "id": "p15-not",
+    "type": "NOT",
+    "x": 260,
+    "y": 160,
+    "label": "",
+    "ports": [
+     {
+      "id": "in",
+      "label": "",
+      "side": "left",
+      "index": 0
+     },
+     {
+      "id": "out",
+      "label": "",
+      "side": "right",
+      "index": 0
+     }
+    ]
+   },
+   {
+    "id": "p15-or",
+    "type": "OR",
+    "x": 420,
+    "y": 220,
+    "label": "",
+    "ports": [
+     {
+      "id": "in1",
+      "label": "",
+      "side": "left",
+      "index": 0
+     },
+     {
+      "id": "in2",
+      "label": "",
+      "side": "left",
+      "index": 1
+     },
+     {
+      "id": "out",
+      "label": "",
+      "side": "right",
+      "index": 0
+     }
+    ]
+   },
+   {
+    "id": "p15-out1",
+    "type": "OUTPUT",
+    "x": 580,
+    "y": 120,
+    "label": "OUT1",
+    "ports": [
+     {
+      "id": "in",
+      "label": "",
+      "side": "left",
+      "index": 0
+     }
+    ]
+   },
+   {
+    "id": "p15-out2",
+    "type": "OUTPUT",
+    "x": 580,
+    "y": 260,
+    "label": "OUT2",
+    "ports": [
+     {
+      "id": "in",
+      "label": "",
+      "side": "left",
+      "index": 0
+     }
+    ]
+   }
+  ],
+  "wires": [
+   {
+    "id": "p15-w1",
+    "sourceComponentId": "p15-in1",
+    "sourcePortId": "out",
+    "targetComponentId": "p15-not",
+    "targetPortId": "in",
+    "value": 0
+   },
+   {
+    "id": "p15-w2",
+    "sourceComponentId": "p15-in1",
+    "sourcePortId": "out",
+    "targetComponentId": "p15-or",
+    "targetPortId": "in2",
+    "value": 0
+   },
+   {
+    "id": "p15-w3",
+    "sourceComponentId": "p15-not",
+    "sourcePortId": "out",
+    "targetComponentId": "p15-out1",
+    "targetPortId": "in",
+    "value": 0
+   },
+   {
+    "id": "p15-w4",
+    "sourceComponentId": "p15-not",
+    "sourcePortId": "out",
+    "targetComponentId": "p15-or",
+    "targetPortId": "in1",
+    "value": 0
+   },
+   {
+    "id": "p15-w5",
+    "sourceComponentId": "p15-or",
+    "sourcePortId": "out",
+    "targetComponentId": "p15-out2",
+    "targetPortId": "in",
+    "value": 0
+   }
+  ]
+ }
+}

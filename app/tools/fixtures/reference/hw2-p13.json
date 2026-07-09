@@ -1,0 +1,323 @@
+{
+  "question": {
+    "id": 13,
+    "label": "Problem 13",
+    "statement": "Spiral. The turbot starts at the outer end of a one-cell-wide spiral corridor, facing along it, and the goal lies at the corridor’s inner end. Build a combinatorial-circuit brain that drives the turbot around the spiral and over the goal. Navigation is complete when the turbot crosses the goal cell — it does not need to stop there.",
+    "buildMode": "turbot",
+    "representation": "binary",
+    "innerMode": "CC",
+    "turbot_cases": [
+      {
+        "arena": {
+          "width": 7,
+          "height": 6,
+          "cells": [
+            [
+              "block",
+              "block",
+              "block",
+              "block",
+              "block",
+              "block",
+              "block"
+            ],
+            [
+              "block",
+              "empty",
+              "empty",
+              "empty",
+              "empty",
+              "empty",
+              "block"
+            ],
+            [
+              "block",
+              "empty",
+              "block",
+              "block",
+              "block",
+              "empty",
+              "block"
+            ],
+            [
+              "block",
+              "empty",
+              "goal",
+              "block",
+              "block",
+              "empty",
+              "block"
+            ],
+            [
+              "block",
+              "block",
+              "block",
+              "block",
+              "block",
+              "empty",
+              "block"
+            ],
+            [
+              "block",
+              "block",
+              "block",
+              "block",
+              "block",
+              "empty",
+              "block"
+            ]
+          ],
+          "start": {
+            "x": 5,
+            "y": 5,
+            "facing": "N"
+          }
+        },
+        "maxSteps": 40,
+        "criterion": "pass-through"
+      },
+      {
+        "arena": {
+          "width": 9,
+          "height": 8,
+          "cells": [
+            [
+              "block",
+              "block",
+              "block",
+              "block",
+              "block",
+              "block",
+              "block",
+              "block",
+              "block"
+            ],
+            [
+              "block",
+              "empty",
+              "empty",
+              "empty",
+              "empty",
+              "empty",
+              "empty",
+              "empty",
+              "block"
+            ],
+            [
+              "block",
+              "empty",
+              "block",
+              "block",
+              "block",
+              "block",
+              "block",
+              "empty",
+              "block"
+            ],
+            [
+              "block",
+              "empty",
+              "block",
+              "goal",
+              "empty",
+              "empty",
+              "block",
+              "empty",
+              "block"
+            ],
+            [
+              "block",
+              "empty",
+              "block",
+              "block",
+              "block",
+              "empty",
+              "block",
+              "empty",
+              "block"
+            ],
+            [
+              "block",
+              "empty",
+              "block",
+              "block",
+              "block",
+              "empty",
+              "block",
+              "empty",
+              "block"
+            ],
+            [
+              "block",
+              "empty",
+              "empty",
+              "empty",
+              "empty",
+              "empty",
+              "block",
+              "empty",
+              "block"
+            ],
+            [
+              "block",
+              "block",
+              "block",
+              "block",
+              "block",
+              "block",
+              "block",
+              "block",
+              "block"
+            ]
+          ],
+          "start": {
+            "x": 7,
+            "y": 6,
+            "facing": "N"
+          }
+        },
+        "maxSteps": 80,
+        "criterion": "pass-through"
+      }
+    ]
+  },
+  "correct": {
+    "components": [
+      {
+        "id": "sp-in1",
+        "type": "INPUT",
+        "x": 60,
+        "y": 160,
+        "label": "IN1",
+        "ports": [
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "sp-not",
+        "type": "NOT",
+        "x": 220,
+        "y": 80,
+        "label": "",
+        "ports": [
+          {
+            "id": "in",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "sp-or",
+        "type": "OR",
+        "x": 380,
+        "y": 240,
+        "label": "",
+        "ports": [
+          {
+            "id": "in1",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "in2",
+            "label": "",
+            "side": "left",
+            "index": 1
+          },
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "sp-out1",
+        "type": "OUTPUT",
+        "x": 540,
+        "y": 80,
+        "label": "OUT1",
+        "ports": [
+          {
+            "id": "in",
+            "label": "",
+            "side": "left",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "sp-out2",
+        "type": "OUTPUT",
+        "x": 540,
+        "y": 240,
+        "label": "OUT2",
+        "ports": [
+          {
+            "id": "in",
+            "label": "",
+            "side": "left",
+            "index": 0
+          }
+        ]
+      }
+    ],
+    "wires": [
+      {
+        "id": "sp-w1",
+        "sourceComponentId": "sp-in1",
+        "sourcePortId": "out",
+        "targetComponentId": "sp-not",
+        "targetPortId": "in",
+        "value": 0
+      },
+      {
+        "id": "sp-w2",
+        "sourceComponentId": "sp-not",
+        "sourcePortId": "out",
+        "targetComponentId": "sp-out1",
+        "targetPortId": "in",
+        "value": 0
+      },
+      {
+        "id": "sp-w3",
+        "sourceComponentId": "sp-not",
+        "sourcePortId": "out",
+        "targetComponentId": "sp-or",
+        "targetPortId": "in1",
+        "value": 0
+      },
+      {
+        "id": "sp-w4",
+        "sourceComponentId": "sp-in1",
+        "sourcePortId": "out",
+        "targetComponentId": "sp-or",
+        "targetPortId": "in2",
+        "value": 0
+      },
+      {
+        "id": "sp-w5",
+        "sourceComponentId": "sp-or",
+        "sourcePortId": "out",
+        "targetComponentId": "sp-out2",
+        "targetPortId": "in",
+        "value": 0
+      }
+    ]
+  }
+}

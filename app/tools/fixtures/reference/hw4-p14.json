@@ -1,0 +1,426 @@
+{
+  "question": {
+    "id": 14,
+    "label": "Problem 14",
+    "statement": "Way Finder: the turbot starts at one end of a non-branching maze — a path that never branches and is never wider than one cell across, except on corners where two one-cell-wide paths may intersect. Design a finite-state machine brain that makes its way all the way through any such maze: the layout is not known in advance, so the brain must feel its way with its sensor. Navigation is completed the moment the turbot crosses the goal cell near the far end — it does not need to stop on the goal, and may come to rest once the path finally runs out.",
+    "buildMode": "turbot",
+    "representation": "binary",
+    "innerMode": "FSM",
+    "turbot_cases": [
+      {
+        "arena": {
+          "width": 7,
+          "height": 7,
+          "cells": [
+            [
+              "block",
+              "block",
+              "block",
+              "block",
+              "block",
+              "block",
+              "block"
+            ],
+            [
+              "block",
+              "empty",
+              "empty",
+              "empty",
+              "block",
+              "block",
+              "block"
+            ],
+            [
+              "block",
+              "block",
+              "block",
+              "empty",
+              "block",
+              "block",
+              "block"
+            ],
+            [
+              "block",
+              "block",
+              "block",
+              "empty",
+              "empty",
+              "goal",
+              "block"
+            ],
+            [
+              "block",
+              "block",
+              "block",
+              "block",
+              "block",
+              "empty",
+              "block"
+            ],
+            [
+              "block",
+              "block",
+              "block",
+              "block",
+              "block",
+              "empty",
+              "block"
+            ],
+            [
+              "block",
+              "block",
+              "block",
+              "block",
+              "block",
+              "block",
+              "block"
+            ]
+          ],
+          "start": {
+            "x": 1,
+            "y": 1,
+            "facing": "E"
+          }
+        },
+        "maxSteps": 60,
+        "criterion": "pass-through"
+      },
+      {
+        "arena": {
+          "width": 9,
+          "height": 6,
+          "cells": [
+            [
+              "block",
+              "block",
+              "block",
+              "block",
+              "block",
+              "block",
+              "block",
+              "block",
+              "block"
+            ],
+            [
+              "block",
+              "empty",
+              "empty",
+              "empty",
+              "empty",
+              "block",
+              "block",
+              "block",
+              "block"
+            ],
+            [
+              "block",
+              "block",
+              "block",
+              "block",
+              "empty",
+              "block",
+              "block",
+              "block",
+              "block"
+            ],
+            [
+              "block",
+              "block",
+              "block",
+              "block",
+              "empty",
+              "block",
+              "block",
+              "block",
+              "block"
+            ],
+            [
+              "block",
+              "block",
+              "block",
+              "block",
+              "empty",
+              "goal",
+              "empty",
+              "empty",
+              "block"
+            ],
+            [
+              "block",
+              "block",
+              "block",
+              "block",
+              "block",
+              "block",
+              "block",
+              "block",
+              "block"
+            ]
+          ],
+          "start": {
+            "x": 1,
+            "y": 1,
+            "facing": "E"
+          }
+        },
+        "maxSteps": 60,
+        "criterion": "pass-through"
+      },
+      {
+        "arena": {
+          "width": 11,
+          "height": 6,
+          "cells": [
+            [
+              "block",
+              "block",
+              "block",
+              "block",
+              "block",
+              "block",
+              "block",
+              "block",
+              "block",
+              "block",
+              "block"
+            ],
+            [
+              "block",
+              "empty",
+              "block",
+              "block",
+              "block",
+              "block",
+              "block",
+              "block",
+              "block",
+              "block",
+              "block"
+            ],
+            [
+              "block",
+              "empty",
+              "block",
+              "empty",
+              "empty",
+              "empty",
+              "empty",
+              "block",
+              "empty",
+              "empty",
+              "block"
+            ],
+            [
+              "block",
+              "empty",
+              "block",
+              "empty",
+              "block",
+              "block",
+              "empty",
+              "block",
+              "goal",
+              "block",
+              "block"
+            ],
+            [
+              "block",
+              "empty",
+              "empty",
+              "empty",
+              "block",
+              "block",
+              "empty",
+              "empty",
+              "empty",
+              "block",
+              "block"
+            ],
+            [
+              "block",
+              "block",
+              "block",
+              "block",
+              "block",
+              "block",
+              "block",
+              "block",
+              "block",
+              "block",
+              "block"
+            ]
+          ],
+          "start": {
+            "x": 1,
+            "y": 1,
+            "facing": "S"
+          }
+        },
+        "maxSteps": 80,
+        "criterion": "pass-through"
+      }
+    ]
+  },
+  "correct": {
+    "components": [
+      {
+        "id": "hw4-p14-s0",
+        "type": "STATE",
+        "x": 160,
+        "y": 240,
+        "label": "S₀",
+        "ports": [
+          {
+            "id": "left",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "right",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "hw4-p14-s1",
+        "type": "STATE",
+        "x": 400,
+        "y": 100,
+        "label": "S₁",
+        "ports": [
+          {
+            "id": "left",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "right",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "hw4-p14-s2",
+        "type": "STATE",
+        "x": 640,
+        "y": 240,
+        "label": "S₂",
+        "ports": [
+          {
+            "id": "left",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "right",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "hw4-p14-s3",
+        "type": "STATE",
+        "x": 400,
+        "y": 380,
+        "label": "S₃",
+        "ports": [
+          {
+            "id": "left",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "right",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      }
+    ],
+    "wires": [
+      {
+        "id": "hw4-p14-t1",
+        "sourceComponentId": "hw4-p14-s0",
+        "sourcePortId": "right",
+        "targetComponentId": "hw4-p14-s0",
+        "targetPortId": "left",
+        "value": 0,
+        "transitionLabel": "0:11"
+      },
+      {
+        "id": "hw4-p14-t2",
+        "sourceComponentId": "hw4-p14-s0",
+        "sourcePortId": "right",
+        "targetComponentId": "hw4-p14-s1",
+        "targetPortId": "left",
+        "value": 0,
+        "transitionLabel": "1:01"
+      },
+      {
+        "id": "hw4-p14-t3",
+        "sourceComponentId": "hw4-p14-s1",
+        "sourcePortId": "right",
+        "targetComponentId": "hw4-p14-s0",
+        "targetPortId": "left",
+        "value": 0,
+        "transitionLabel": "0:11"
+      },
+      {
+        "id": "hw4-p14-t4",
+        "sourceComponentId": "hw4-p14-s1",
+        "sourcePortId": "right",
+        "targetComponentId": "hw4-p14-s2",
+        "targetPortId": "left",
+        "value": 0,
+        "transitionLabel": "1:10"
+      },
+      {
+        "id": "hw4-p14-t5",
+        "sourceComponentId": "hw4-p14-s2",
+        "sourcePortId": "right",
+        "targetComponentId": "hw4-p14-s3",
+        "targetPortId": "left",
+        "value": 0,
+        "transitionLabel": "1:10"
+      },
+      {
+        "id": "hw4-p14-t6",
+        "sourceComponentId": "hw4-p14-s2",
+        "sourcePortId": "right",
+        "targetComponentId": "hw4-p14-s0",
+        "targetPortId": "left",
+        "value": 0,
+        "transitionLabel": "0:11"
+      },
+      {
+        "id": "hw4-p14-t7",
+        "sourceComponentId": "hw4-p14-s3",
+        "sourcePortId": "right",
+        "targetComponentId": "hw4-p14-s0",
+        "targetPortId": "left",
+        "value": 0,
+        "transitionLabel": "0:11"
+      },
+      {
+        "id": "hw4-p14-t8",
+        "sourceComponentId": "hw4-p14-s3",
+        "sourcePortId": "right",
+        "targetComponentId": "hw4-p14-s3",
+        "targetPortId": "left",
+        "value": 0,
+        "transitionLabel": "1:00"
+      }
+    ]
+  }
+}

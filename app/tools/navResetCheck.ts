@@ -37,10 +37,11 @@ const backing = new Map<string, string>();
   visibilityState: 'visible',
 };
 
-const { useStore } = await import('../src/store');
-const { buildSampleAssignment, scCorrect, fsmCorrect, tmCorrect, SAMPLE_ASSIGNMENT_ID } =
+const { useStore, selectTurbotArena } = await import('../src/store');
+const { buildSampleAssignment, scCorrect, fsmCorrect, tmCorrect, turbotCorrect, SAMPLE_ASSIGNMENT_ID } =
   await import('../src/devData/sampleData');
 const { localAssignmentStore } = await import('../src/storage/AssignmentStore');
+const { backendMode } = await import('../src/storage/backend');
 
 let passed = 0;
 let failed = 0;
@@ -104,6 +105,10 @@ function plantSimJunk() {
 
 const assignment = buildSampleAssignment();
 const store = useStore.getState();
+
+// ── backend mode: the Node harness must run against the Local stores ──
+console.log('[backend mode]');
+check('backendMode resolves to local under the Node harness', backendMode === 'local');
 
 // ── loadAssignment lands fresh ──────────────────────────────────
 console.log('[loadAssignment]');
@@ -178,11 +183,26 @@ checkAllSimFresh('after re-load');
 
 // ── openAssignment flushes planted junk ─────────────────────────
 console.log('[openAssignment flushes junk]');
-localAssignmentStore.save(assignment);
+await localAssignmentStore.save(assignment);
 useStore.getState().closeAssignment();
 plantSimJunk();
-check('openAssignment succeeds', useStore.getState().openAssignment(SAMPLE_ASSIGNMENT_ID) === true);
+check('openAssignment succeeds', (await useStore.getState().openAssignment(SAMPLE_ASSIGNMENT_ID)) === true);
 checkAllSimFresh('after open');
+
+// ── interleaved opens: the newest open wins ─────────────────────
+// Open A and immediately open B without awaiting A. A's seam reads resolve
+// after B's open has started, so A's resolve is stale and must apply nothing
+// (the openAssignmentSeq guard) — B owns the final state.
+console.log('[openAssignment interleaving: last open wins]');
+const assignmentB = { ...buildSampleAssignment(), id: `${SAMPLE_ASSIGNMENT_ID}-b`, title: 'Sample B' };
+await localAssignmentStore.save(assignmentB);
+useStore.getState().closeAssignment();
+const openA = useStore.getState().openAssignment(SAMPLE_ASSIGNMENT_ID);
+const openB = useStore.getState().openAssignment(assignmentB.id);
+const [okA, okB] = await Promise.all([openA, openB]);
+check('both interleaved opens resolve true (stale open is a silent no-op)', okA === true && okB === true);
+check('the newest open owns the final state (B wins)',
+  useStore.getState().assignment?.id === assignmentB.id && useStore.getState().workbookOpen);
 
 // ═════ Sandbox tabs share the same fresh-machine contract ═══════
 
@@ -284,6 +304,66 @@ useStore.getState().importWorkbook(JSON.stringify({
 }));
 check('import landed on the imported worksheet', useStore.getState().activeTabId === 'ws-1');
 checkAllSimFresh('after importWorkbook');
+
+// ── Sandbox turbot tab: run, switch away, switch back ───────────
+// The turbot tab is the sandbox analog of a turbot question: the tab record
+// carries innerMode + its own arena, read through the same selectors the
+// question path uses, and tab switches hold the fresh-machine contract.
+console.log('[sandbox turbot tab]');
+const baseTabId = useStore.getState().activeTabId;
+useStore.getState().addTab('Turbot 1', 'turbot', 'turbot', 'CC');
+const turbotTabId = useStore.getState().activeTabId;
+{
+  const s = useStore.getState();
+  const tab = s.tabs.find((t) => t.id === turbotTabId);
+  check('turbot tab carries buildMode/innerMode', tab?.buildMode === 'turbot' && tab?.innerMode === 'CC');
+  check('turbot tab was seeded with the bordered sandbox arena',
+    tab?.arena?.width === 10 && tab?.arena?.height === 8 &&
+    tab?.arena?.cells[0][0] === 'block' && tab?.arena?.cells.some((row) => row.includes('goal')) === true);
+  check('selectTurbotArena reads the tab arena in the sandbox',
+    selectTurbotArena(s) === tab?.arena);
+  check('turbot pose starts at the tab arena start',
+    s.turbotState.x === tab?.arena?.start.x && s.turbotState.y === tab?.arena?.start.y &&
+    s.turbotState.facing === tab?.arena?.start.facing);
+  checkAllSimFresh('fresh turbot tab');
+}
+// Drive the sample walk-until-blocked CC brain a few cycles in the tab arena.
+useStore.setState({ components: turbotCorrect().components, wires: turbotCorrect().wires });
+for (let i = 0; i < 3; i++) useStore.getState().turbotStep();
+{
+  const s = useStore.getState();
+  const start = selectTurbotArena(s).start;
+  check('turbot run recorded history', s.turbotHistory.length === 3);
+  check('turbot moved off the start', s.turbotState.x !== start.x || s.turbotState.y !== start.y);
+}
+useStore.getState().switchTab(baseTabId);
+checkAllSimFresh('after leaving the turbot tab');
+useStore.getState().switchTab(turbotTabId);
+checkAllSimFresh('after re-entering the turbot tab');
+{
+  const s = useStore.getState();
+  const start = selectTurbotArena(s).start;
+  check('re-entered turbot tab: pose back at the arena start',
+    s.turbotState.x === start.x && s.turbotState.y === start.y);
+  check('re-entered turbot tab: brain circuit preserved',
+    s.components.length === 4 && s.wires.length === 3);
+}
+
+// ── removeTab (active turbot tab): survivor's mode comes back ───
+// Removing the ACTIVE tab is a canvas swap; the surviving tab's buildMode
+// must swap in with its circuit (previously buildMode leaked from the removed
+// tab, leaving e.g. an SC sheet rendered as a turbot workspace).
+console.log('[removeTab active turbot tab restores the survivor mode]');
+useStore.getState().addTab('Turbot 2', 'turbot', 'turbot', 'FSM');
+check('second turbot tab is active', useStore.getState().buildMode === 'turbot');
+useStore.getState().removeTab(useStore.getState().activeTabId);
+{
+  const s = useStore.getState();
+  const survivor = s.tabs.find((t) => t.id === s.activeTabId);
+  check('removal landed on the first surviving tab', survivor?.id === s.tabs[0].id);
+  check('survivor buildMode swapped in with its canvas', s.buildMode === survivor?.buildMode);
+  checkAllSimFresh('after removing the active turbot tab');
+}
 
 await flushTimers();
 console.log(`\nnavResetCheck: ${passed} passed, ${failed} failed`);

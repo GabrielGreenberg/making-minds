@@ -1795,6 +1795,29 @@ thead .sc-label-col {
 .login-account-role--student { background: #e3f2fd; color: #1565c0; }
 .login-account-role--instructor { background: #ede7f6; color: #5e35b1; }
 
+/* Remote-mode login (email form; local mode shows the toy-account buttons) */
+.login-form { display: flex; gap: 8px; }
+.login-email {
+  flex: 1;
+  padding: 9px 12px;
+  font-size: 14px;
+  border: 1px solid var(--menu-border);
+  border-radius: 6px;
+}
+.login-email:focus { outline: none; border-color: var(--accent); }
+.login-submit {
+  padding: 9px 16px;
+  font-size: 14px;
+  font-weight: 600;
+  color: #fff;
+  background: var(--accent);
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+}
+.login-submit:disabled { opacity: 0.55; cursor: default; }
+.login-error { margin-top: 12px; font-size: 13px; color: #c62828; }
+
 /* Session controls — shown in the menu bar, home screen, and instructor header */
 .session-chip {
   font-size: 13px;
@@ -2038,12 +2061,52 @@ thead .sc-label-col {
 .turbot-arena-scroll {
   overflow: auto;
   padding: 8px;
+  /* Big arenas (30×30 ≈ 844px of grid) clip here instead of swallowing the
+     whole data panel; TurbotArenaPanel auto-scrolls this container to keep
+     the turbot in view during step/run. Small arenas are unaffected. */
+  max-height: 340px;
 }
 
 .turbot-arena-controls {
   display: flex;
   gap: 6px;
   padding: 2px 8px 4px;
+}
+
+/* Sandbox Map editing (TurbotArenaPanel "Edit map" mode) */
+.map-edit-toggle {
+  margin-left: 8px;
+  padding: 1px 8px;
+  font-size: 9px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  border: 1px solid #bbb;
+  border-radius: 8px;
+  background: #f8f8f8;
+  color: #555;
+  cursor: pointer;
+  font-family: inherit;
+}
+.map-edit-toggle:hover {
+  background: #eee;
+  border-color: #999;
+}
+
+.action-btn.map-tool-active,
+.action-btn.map-tool-active:hover:not(:disabled) {
+  background: #1565c0;
+  border-color: #1565c0;
+  color: #fff;
+}
+
+.map-size-input {
+  width: 44px;
+  font-size: 10px;
+  font-family: inherit;
+  padding: 1px 3px;
+  border: 1px solid #ccc;
+  border-radius: 3px;
 }
 
 .turbot-arena-status {

@@ -44,9 +44,9 @@ import { evaluateSCSequence } from './sc';
 import { evaluateFSMSymbolSequence } from './fsm';
 import { fsmNotation } from './notation';
 import { evaluateTMSequence } from './tm';
-import { runTurbot, evaluateTurbotCriterion, validateTurbotTM, validateTurbotFSM } from './turbot';
+import { runTurbot, evaluateTurbotCriterion, explainTurbotCriterionFailure, criterionRequiresStop, validateTurbotTM, validateTurbotFSM } from './turbot';
 import { validatePerceptionMachine, runPerceptionCase } from './perception';
-import { validateMachine } from './machineValidation';
+import { validateMachine, validateAllowedComponents } from './machineValidation';
 import {
   axisForMode,
   encodeInput,
@@ -123,6 +123,12 @@ export function gradeQuestion(
 
   const cases = question.test_cases;
   if (!cases || cases.length === 0) return skip(question.id, 'question has no test cases');
+
+  // Stage 1 (question-wide): the component restriction, before any per-mode
+  // interface check — covers both the tape and space/time branches below.
+  // Semantics + helpers live in machineValidation.ts (allowed_components).
+  const restriction = validateAllowedComponents(circuit, question.allowed_components);
+  if (!restriction.ok) return failEvery(question.id, cases, restriction.reason!);
 
   const mode = question.buildMode;
   const rep: RepSystem = question.representation ?? 'binary';
@@ -238,9 +244,11 @@ function gradePerception(question: AssignmentQuestion, circuit: CircuitData): Qu
   const cases = question.perception_cases;
   if (!cases || cases.length === 0) return skip(question.id, 'question has no perception cases');
 
-  // Stage 1: the retina interface (width input wires, one output wire).
-  // Invalid ⇒ fail every case with the reason, never `skipped`.
-  const valid = validatePerceptionMachine(circuit, spec.width);
+  // Stage 1: the question-wide component restriction, then the retina
+  // interface (width input wires, one output wire). Invalid ⇒ fail every case
+  // with the reason, never `skipped`.
+  const restriction = validateAllowedComponents(circuit, question.allowed_components);
+  const valid = restriction.ok ? validatePerceptionMachine(circuit, spec.width) : restriction;
   if (!valid.ok) {
     const rejected: PerceptionCaseResult[] = cases.map((tc) => ({
       pass: false,
@@ -301,8 +309,13 @@ function gradeTurbot(question: AssignmentQuestion, circuit: CircuitData): Questi
   // The question's encoding (representation) picks a turbot TM's internal
   // tape alphabet: binary {0,1,*}, unary (tally) {0,1}.
   const notation = notationForRepresentation(question.representation ?? 'binary');
+  // Stage 1 starts with the question-wide component restriction (vacuous for
+  // STATE-vocabulary FSM/TM brains — STATE is infrastructure — but uniform).
+  const restriction = validateAllowedComponents(circuit, question.allowed_components);
   let valid: { ok: boolean; reason?: string };
-  if (innerMode === 'TM' || innerMode === 'FSM') {
+  if (!restriction.ok) {
+    valid = restriction;
+  } else if (innerMode === 'TM' || innerMode === 'FSM') {
     const errors = innerMode === 'TM'
       ? validateTurbotTM(circuit.components, circuit.wires, notation)
       : validateTurbotFSM(circuit.components, circuit.wires);
@@ -328,16 +341,31 @@ function gradeTurbot(question: AssignmentQuestion, circuit: CircuitData): Questi
 
 function gradeTurbotCase(circuit: CircuitData, innerMode: BuildMode, tc: TurbotTestCase, notation: TMNotation): TurbotCaseResult {
   const run = runTurbot(circuit.components, circuit.wires, innerMode, tc.arena, tc.maxSteps, notation);
-  if (run.hitStepLimit) {
+  // The step limit bounds SIMULATION; whether a truncated run also fails is
+  // the criterion's call (criterionRequiresStop, engine/turbot.ts). Stop-
+  // requiring criteria (reach-and-stop, return-to-start) judge how the run
+  // ends, so a turbot that never came to rest fails outright. pass-through
+  // is trace-satisfiable (HW2 §III: cross the goal, "need not stop"), so a
+  // step-limited run is still judged on the trace it produced.
+  if (run.hitStepLimit && criterionRequiresStop(tc.criterion)) {
     return { pass: false, stepsTaken: tc.maxSteps, finalPosition: run.finalState, hitStepLimit: true, reason: 'exceeded max steps' };
   }
   const pass = evaluateTurbotCriterion(tc.arena, run, tc.criterion);
-  // A halted-but-not-stopped brain (a dead FSM — a turbot TM's halt counts
-  // as its stop) gets the explanatory reason on failure.
-  const reason = !pass && run.haltedByBrain && !run.stopped
-    ? 'brain halted without a matching transition'
-    : undefined;
-  return { pass, stepsTaken: run.history.length, finalPosition: run.finalState, hitStepLimit: false, reason };
+  // Failure reasons — EVERY failing case carries one: a step-limited trace
+  // that never satisfied its criterion names the criterion (the limit is not
+  // why it failed); a halted-but-not-stopped brain (a dead FSM — a turbot
+  // TM's halt counts as its stop) gets the explanatory reason; any other
+  // failure (a clean stop that just doesn't satisfy the criterion, e.g.
+  // halting at the start without visiting the goal) is explained in the
+  // criterion's own terms by explainTurbotCriterionFailure.
+  const reason = pass
+    ? undefined
+    : run.hitStepLimit
+      ? `'${tc.criterion}' criterion not satisfied within max steps`
+      : run.haltedByBrain && !run.stopped
+        ? 'brain halted without a matching transition'
+        : explainTurbotCriterionFailure(tc.arena, run, tc.criterion);
+  return { pass, stepsTaken: run.history.length, finalPosition: run.finalState, hitStepLimit: run.hitStepLimit, reason };
 }
 
 /**

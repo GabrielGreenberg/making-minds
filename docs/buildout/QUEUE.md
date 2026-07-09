@@ -167,7 +167,17 @@ before Phase 3 (perception returns to router-rendered CC/SC). Task ids unchanged
 
 ## Phase 3 — Perception
 
-- [~] **P1.8** **Renderer: wire lanes and junction dots.** — _S3 LANDED
+- [x] **P1.8** **Renderer: wire lanes and junction dots — COMPLETE** _(S4
+  landed 2026-07-08, iteration 31: fallback phase-0 pre-classification
+  (`isEndpointDoomed`, doomed wires route first and register occupancy; route
+  corpus byte-identical across all 62 fixture machines), per-wire
+  `usedFallback`/`violation` flags from a read-only H-predicate sweep +
+  subtle canvas surfacing (amber dashed halo + tooltip on violations only),
+  and a routerCheck §6 regression pin: the P1.3-era hw3-p4 layout (recovered
+  from git 0d0c5e5) routes violation-free today. Lane-nudge skipped with
+  evidence (sole residual fallback hw3-p9-w21 is oracle-clean); S5 perf
+  declined — routing is ~3× faster since S3 and nothing demands more)._
+  **Renderer: wire lanes and junction dots.** — _S3 LANDED
   2026-07-07 (the concurrent chip session; commit "Router world model unified
   with the layout oracle", wireRouter.ts + routerCheck.ts + bumpCheck.ts).
   Checked against the acceptance list below: own-endpoint exemption ✓ (budget
@@ -219,13 +229,15 @@ before Phase 3 (perception returns to router-rendered CC/SC). Task ids unchanged
   wire ids (`getFallbackWireIds`); bumpCheck: all CC/SC fixtures CLEAN (incl.
   the 8 pre-existing failures) + no-arg manifest sweep wired into
   `npm run check`.
-  **S3 leftover (still open):** the obstacle-model gap — INPUT toggle-tabs
-  aren't router obstacles (hw3-p12 pmo-36 elbows through IN2's tab); and
-  re-evaluate the hw3-p9 (1375,757) dot-skip nit now that near-parallel lane
-  separation exists (does it moot the nit, or does the skip radius need
-  tuning?); **S4 remaining:** fallback phase-0 + lane-nudge + per-wire
-  `usedFallback`; S5 (optional) perf. Each slice: gates green + layoutCheck
-  clean + browser spot-check per the memo's slice plan.
+  **S3 leftovers — BOTH RESOLVED:** the obstacle-model gap closed in the
+  iteration-27 smalls sweep (new `getComponentBounds` footprint seam in
+  componentGeometry — body + adjuncts incl. INPUT's 14×20 toggle-tab; the
+  router's local body-only copy deleted); the hw3-p9 (1375,757) dot-skip nit
+  resolved POSITIVE in the iteration-28 sweep (the divergence dot now renders
+  at the junction — S3's re-routing fixed the bump adjacency, no skip-radius
+  tuning needed). **S4 remaining (OPTIONAL, unowned):** fallback phase-0 +
+  lane-nudge + per-wire `usedFallback`; S5 (optional) perf. Each slice: gates
+  green + layoutCheck clean + browser spot-check per the memo's slice plan.
   **Gates Phase 3** (perception fixtures are CC/SC, back on the router).
 - [x] **P3.1** **Design spike: perception target authoring.** — _closed as
   OVERTAKEN 2026-07-06 (iteration 18 audit)._ Gabriel shipped perception
@@ -254,9 +266,10 @@ before Phase 3 (perception returns to router-rendered CC/SC). Task ids unchanged
   bump-skip radius; position-jiggling provably can't clear it (an annealing
   probe stalled at 2), so it ships as a documented renderer-class residual.
   New headless predicate `app/tools/bumpCheck.ts` (replicates the canvas
-  crossing+skip rules on real routes; NOT in `npm run check` yet — hw2-p11
-  currently fails it by design) → **P1.8 S3's acceptance now includes: bumpCheck
-  clean on all CC/SC fixtures, then wire it into the harness.**
+  crossing+skip rules on real routes; at the time NOT in `npm run check` —
+  hw2-p11 failed it by design) → fed into P1.8 S3's acceptance. _Since
+  resolved: S3 (`d0214ec`) made ALL CC/SC fixtures bump-clean (incl. hw2-p11's
+  exhibit) and wired bumpCheck into `npm run check`._
 - [x] **P3.3** **Promote main's SC perception circuits into reference
   fixtures.** — _done 2026-07-07 (iteration 20; 2-agent build workflow +
   adversarial verifier + appearance sweep + one bounded diagnosis agent)._
@@ -269,9 +282,11 @@ before Phase 3 (perception returns to router-rendered CC/SC). Task ids unchanged
   STRUCTURAL XOR FLOOR — XOR's left-port inset (11.25px) > STUB_LENGTH(12) −
   ELEMENT_MARGIN(5), so every XOR-in wire costs exactly 3 fallbacks; the
   ENTIRE pre-existing 99 pin is this class (3 × XOR-in wires per fixture).
-  Deliberately pinned `hw3-p11: 48` (budget 147) with the mechanism + fix
-  candidates documented in routerCheck's header → P1.8 S3 can now kill the
-  whole floor, not just trim it. Discovered → P1.15, P1.16, S3 obstacle note.
+  Deliberately pinned `hw3-p11: 48` (budget 147, then current) with the
+  mechanism + fix candidates documented in routerCheck's header → P1.8 S3 could
+  kill the whole floor, not just trim it. _It did: S3's own-endpoint exemption
+  (`d0214ec`) erased the XOR floor — budget repinned 147 → 2._ Discovered →
+  P1.15, P1.16, S3 obstacle note.
 
 ## Phase 4 — Navigation
 
@@ -280,18 +295,10 @@ before Phase 3 (perception returns to router-rendered CC/SC). Task ids unchanged
   (`0:01` = pivot left) executable and pinned in turbotCheck; legacy 1-bit
   labels alias + decay. Remaining surface work (palette/glossary vocabulary
   for 2-bit outputs in the turbot editor) rides P4.3's authoring pass._
-- [ ] **P6.3** _(enqueued iteration 21, merge-#3 report)_ **Server↔engine
-  grading parity pin:** serverCheck and pipelineCheck should share a fixture —
-  same submission graded via HTTP (server/src, engine imported cross-package)
-  and via direct `gradeSubmission` must yield identical results; plus fold
-  `server: typecheck + check` into the repo's CI/gate story. Guards the
-  Evaluation seam's "same code grades on server" promise as both sides evolve.
-- [ ] **P6.4** _(enqueued iteration 21)_ **Remote-store cutover** (backend
-  phase): async `Remote*` stores backed by `api/client.ts` (currently 1:1,
-  imported by NOTHING) replacing the localStorage seams; retires the
-  grade-release/manual-review duplication (server-authoritative + local
-  mirror). Gabriel's call on timing — enqueue-only; probably his next
-  parallel-session slice.
+<!-- P6.3/P6.4 (enqueued here mid-Phase-4 at iteration 21) moved to Phase 6 by
+META-audit-queue 2026-07-07 (iteration 23): both are close-out/backend tasks and
+were sitting ABOVE P4.3 as the file's top unblocked todos, contradicting
+HANDOFF's "do this next = P4.3". Task ids unchanged. -->
 - [x] **P4.2** **Multi-arena navigation grading** for unknown distance/position
   (Mad Max, Way Finder, Desert Ant): put a *family* of arenas in `turbot_cases`;
   confirm the grader requires all to pass. **Acceptance:** a single-layout-only
@@ -313,34 +320,112 @@ before Phase 3 (perception returns to router-rendered CC/SC). Task ids unchanged
   12 pins in turbotCheck `[multi-arena]` (incl. two headless Gradebook-logic
   pins: score 0, failedCount 2). P4.3's Mad Max arenas should mark the
   sensing spot (cell before the block) as the goal.
-- [ ] **P4.3** Author the specific arenas + plausible brains: CC nav (hw2-p13…p15),
-  SC nav (hw3-p13…p15), FSM nav (hw4-p12…p14). **Interface tier:** the arenas
-  (from the HW diagrams) + a plausible brain per row that validates, steps in
-  the arena, and grades end-to-end. The HW4 zig-zag example machine is printed
-  in the problem set — use it; for Way Finder / Mad Max, any good-faith brain
-  suffices. **Advances:** those 9 rows. _Note (iteration-18 merge): main's
-  PR #11 already grades FSM- and SC-brained turbots in turbotCheck and ships a
-  sample turbot question per inner mode — P4.3 authoring builds on that, and
-  turbot-FSM labels are canonical 2-bit (`0:11` default) via
-  `turbotFsmNotation`._
-- [ ] **P4.4** Add a **turbot sandbox** tab (currently turbot only exists inside
-  assignments; `TabBar` lists CC/FSM/TM only). Optional but eases authoring/appr.
-- [ ] **P4.5** _(optional)_ Wire the perception/navigation **category taxonomy**
-  (`ActiveTask` is typed but unused) to organize questions / gate palettes.
+- [x] **P4.3** **Navigation arenas + plausible brains.** — _done 2026-07-07
+  (iteration 24; 9-agent build workflow (1 resumed through an API-overload
+  death) + grader-fix agent + adversarial verifier + appearance sweep + one
+  bounded layout fix)._ All nine rows landed at tier interface with honest
+  reported scores (2/2, 2/2, 0/2, 2/2, 3/3, 1/3, 2/2, 2/2, 3/3): arena
+  families from the PDFs (hw3-p15 distances 3/4/8 + goal = sensing spot per
+  P4.2; hw4-p14 three distinct mazes), brains good-faith (hw2-p15's 0/2 IS
+  the course answer — no memoryless CC takes the opposite turn; hw3-p15's
+  1/3 recorded as an honest bank for the correct-answers project).
+  **Discovered + fixed in-flight: the step-limit/criterion defect** —
+  gradeTurbotCase failed ANY hitStepLimit run before consulting the
+  criterion, making pass-through (HW2 §III "Pac-Man" rule: crossing the goal
+  completes it, no stop needed) structurally unpassable for CC brains. Deep
+  fix at the engine seam: `criterionRequiresStop(criterion)` beside
+  evaluateTurbotCriterion (pass-through = trace-satisfiable; reach-and-stop /
+  return-to-start unchanged), honest reasons, spec §12.5 records "the step
+  limit bounds simulation, not success"; 7 new turbotCheck pins + the 12
+  [multi-arena] pins untouched; server gates green (engine is cross-imported).
+  Verifier corrections recorded: hw4.pdf prints the FSM NOTATION + one example
+  machine, not a full zig-zag solution (queue's earlier "printed FSM" claim
+  corrected); hw3.pdf's section header says "combinatorial" but its Note 1
+  says SC (PDF typo — fixtures follow the note). hw3-p13's MEM feedback pair
+  initially took 2 router fallbacks (congestion-starved A* budget) — fixed by
+  ONE move+rotate (MEM 270°), no pin edits. ⚠ The task_2cd0dbea chip
+  (pass-through grading) became REDUNDANT mid-iteration — the fix was already
+  in-tree when Gabriel started the chip session; flagged to him in-session.
+- [x] **P4.4** **Turbot sandbox tab.** — _done 2026-07-08 (iteration 32)._
+  Sandbox + menu gains "Turbot ›" with a CC/SC/FSM/TM brain picker; the tab
+  is the FULL turbot workspace with zero new UI branches — `SandboxTab`
+  carries optional innerMode+arena and the existing selectors
+  (`selectTurbotInnerMode`/`selectTurbotArena`/`selectEffectiveMode`) fall
+  back to the active sandbox tab; default 10×8 bordered arena; "Edit map"
+  toggle reuses `arenaEditing.ts` + ArenaCanvas clicks (paint/goal/start/
+  rotate/resize, sim auto-reset per edit); persistence rides autosave +
+  WorksheetData round-trip with load migration. Browser-verified across all
+  four brain kinds. BONUS pre-existing bug fixed + pinned: active-tab
+  `removeTab` never swapped the survivor's buildMode (a CC sheet kept the
+  turbot workspace). navResetCheck 117/117 (+12 sandbox-turbot checks).
+- [x] **P4.5** — _CLOSED AS UNWARRANTED 2026-07-08 (iteration 33, read-only
+  review)._ `ActiveTask` is WRITE-ONLY (set in addTab/setActiveTask,
+  persisted, migrated — read by NOTHING: no selector, no UI branch, no
+  filter). Both motivating uses are covered by deeper mechanisms that landed
+  since the spec era: palette gating = `allowed_components` (P1.5, per-
+  question Stage-1 + palette filter); category organization = the coverage
+  manifest's per-row `category` (harness metadata — AssignmentQuestion has no
+  category field and no UI wants one until real course content demands it).
+  Building the taxonomy would duplicate both. The inert field is LEFT IN
+  PLACE (removing a persisted WorksheetData field is Gabriel's call; exact
+  trim list recorded in the iteration-33 review report if ever wanted).
 
 ## Phase 5 — TM-turbot capstone
 
-- [ ] **P5.1** **Desert Ant** (hw6-p2): TM-brained turbot, 30×30 arena, ≤20 tape
-  cells, food in NE quadrant. **Interface tier — the capstone is an INTERFACE
-  proof, not a solved Desert Ant:** the 30×30 arena family authors and renders,
-  a plausible turbot-TM brain (within the 20-cell tape budget) validates, steps,
-  and grades across the family end-to-end. Whether it finds the food is
-  reported, not required — a correct Desert Ant is the future correct-answers
-  project's flagship, not this one's. **Advances:** hw6-p2.
+- [x] **P5.1** **Desert Ant capstone (hw6-p2).** — _done 2026-07-07
+  (iteration 25; one build agent + adversarial verifier + appearance check)._
+  THE LAST ROW: 3× 30×30 walled arenas (food varied in the NE quadrant,
+  start varied, food strictly NE of start in every member), criterion
+  return-to-start with goal = food per the P4.2 clause (the PDF demands
+  find-then-return; pass-through would ignore the return half). Brain: a
+  20-state turbot-TM diagonal-staircase forager with unary leg-counting and
+  EXACT dead-reckoned return (all three arenas end at start, halted); tape
+  span audited ≤20 (worst exactly 20 — the engine doesn't enforce the
+  budget, the statement carries it); honest score **1/3**, reported not
+  asserted. Verifier confirmed with an independent runBrainStep re-simulation;
+  appearance PASS (6 circle-internal / 14 square-external states DOM-verified,
+  live TurbotTapePanel, machine table + dimmed internal history rows).
+  **LEDGER COMPLETE AT-TIER: 46 exact + 10 interface = 56/56.**
+  Discovered → P5.2, P5.3, P6.1 note (below).
+- [x] **P5.2** _(done 2026-07-07, iteration-27 smalls sweep — see LOG)_ _(discovered 2026-07-07, capstone build)_ **Instructor arena
+  editor caps at 20×20** (`MAX_ARENA_SIZE`) but the capstone needs 30×30 —
+  fixtures hand-author the data (works; ArenaCanvas renders any size), but an
+  instructor can't author the PDF's own arena in the UI. Raise the cap or
+  make it a config with scroll-aware editing.
+  **Acceptance:** a 30×30 arena is authorable in QuestionCreator; existing
+  arenas unaffected.
+- [x] **P5.3** _(done 2026-07-07, iteration-27 smalls sweep — see LOG)_ _(discovered 2026-07-07, capstone verifier)_ **Criterion
+  failures without step-limit carry `reason: undefined`** — gradeTurbotCase
+  only emits reason text on hitStepLimit, so a clean halt-at-start-without-
+  goal-visit shows a reason-less failed arena in the gradebook drill-down.
+  Emit a criterion-named reason on every criterion failure.
+  **Acceptance:** every failing TurbotCaseResult carries a human-readable
+  reason; turbotCheck pins it; existing pins green.
 
 ## Phase 5.5 — Small hardening (slot opportunistically before close-out)
 
-- [ ] **P2.5** _(discovered 2026-07-06, P2.4 probe; **DEFERRED to the
+- [ ] **P-TOOLS-1 (portability grep-gate)** — _(discovered iteration 40, META-audit;
+  OPTIONAL / non-blocking)_ **No harness tool may import from an absolute machine
+  path.** Family: a check tool with a hardcoded absolute import silently breaks
+  `npm run check` on every machine except the author's, and it hides behind the
+  earlier-passing tools in the chain (this is exactly what `bumpCheck.ts`'s
+  `/Users/gabriel/.../making-minds/...` imports did from ~iteration 19 to 40 — the
+  gate read "green" on a piped tail while being red by exit code off the authoring
+  checkout). The bug itself is FIXED (iteration 40, relativized to `../src/...`).
+  The deep fix is prevention: a tiny grep gate — a self-test in an existing tool, or
+  a standalone assertion in the chain — that FAILS if any `app/tools/*` /
+  `server/tools/*` source contains `from '/Users` (or any absolute FS import). One
+  occurrence over the project's life, so this is a nice-to-have, not urgent; but the
+  stakes (a silently-red gate is the loop's worst failure mode) make it cheap
+  insurance. **Acceptance:** a synthetic tripwire proves the gate bites; `npm run
+  check` stays green; the gate names the offending file. Do NOT reopen the loop just
+  for this — fold it into the next real iteration if one occurs.
+
+- [x] **P2.5** — _closed as DEFERRED 2026-07-08 (iteration-29 audit): this is
+  answer-quality work belonging to the future correct-answers project, not
+  this build-out (2026-07-06 scope shift); the rows are honest as-is. NOT
+  loop-open — re-open there, not here. Original entry follows._
+  _(discovered 2026-07-06, P2.4 probe; **DEFERRED to the
   correct-answers project** per the 2026-07-06 scope shift — this is
   answer-quality work, not interface work)_ **Gap-robust hw5-p5/p6
   reference machines.** Their statements don't promise arbitrary separation
@@ -352,7 +437,29 @@ before Phase 3 (perception returns to router-rendered CC/SC). Task ids unchanged
   **Acceptance:** p5/p6 correct machines pass gap 2/3/5 probes; rows stay
   verified.
 
-- [ ] **P1.5** _(discovered 2026-07-06, hw1-p2 critic)_ **Enforce
+- [x] **P1.5** — _done 2026-07-07 (chip session)._ One semantics, owned by
+  `engine/machineValidation.ts` (`validateAllowedComponents` + palette
+  predicate `isComponentTypeAllowed`, doc comment = the authority; spec §1.5
+  records it): absent/empty = unrestricted (back-compat); present = only the
+  listed types plus always-allowed infrastructure (INPUT/OUTPUT; STATE — the
+  whole FSM/TM vocabulary, restriction targets the CC/SC gate vocabulary);
+  BOXED is packaging, internals recursed (a boxed OR can't smuggle an OR into
+  hw1-p2). All three touchpoints: (1) grading — Stage 1 in every grader branch
+  (gradeQuestion/gradeTurbot/gradePerception + coverageCheck's validateStage1
+  mirror), violating machine fails every case naming the type(s); (2) palette —
+  ComponentLibrary filters entries AND library boxes via the store's new
+  `selectAllowedComponents`; (3) authoring — QuestionCreator "Restrict
+  available components" toggle + AND/OR/NOT/MEM checkboxes (CC/SC incl.
+  perception + turbot CC/SC brains), saves `['INPUT','OUTPUT',...gates]`
+  matching the HW1 fixtures' shape, round-trips. Acceptance proven as six
+  permanent coverageCheck self-test pins: correct-function OR machine fails
+  hw1-p2 0/4 (reason names OR) · absent field = same machine passes 4/4 ·
+  DeMorgan correct still passes · boxed-internal smuggling caught 0/4 ·
+  palette predicate · interface-tier mirror regresses a violator. hw1-p2's
+  fixture field already matched the semantics (no fixture edit); harness
+  46 exact · 10 interface · 0 regressed; all gates + server gates green.
+  Original discovery entry follows._
+  _(discovered 2026-07-06, hw1-p2 critic)_ **Enforce
   `allowed_components` end-to-end.** The field exists on `AssignmentQuestion`
   (types.ts:139) but is read by NOTHING — a student can pass hw1-p2 ("no OR
   gate") using an OR gate. The family: question-level component restrictions
@@ -365,7 +472,7 @@ before Phase 3 (perception returns to router-rendered CC/SC). Task ids unchanged
   **Acceptance:** a correct-function OR-using machine FAILS hw1-p2 grading (add
   a second broken variant or a harness case proving it); palette hides OR on
   hw1-p2; creator can author the restriction; all gates green.
-- [ ] **P1.6** _(discovered 2026-07-06, hw2 critic)_ **Unify the IN/OUT
+- [x] **P1.6** _(done 2026-07-07, iteration-27 smalls sweep — see LOG)_ _(discovered 2026-07-06, hw2 critic)_ **Unify the IN/OUT
   label-ordering convention in `engine/cc.ts`.** Two separate implementations of
   the same convention: the top-level path orders I/O components via
   `sortByLabel`, while `evaluateBoxedCircuit` binds boxed internals via
@@ -378,7 +485,11 @@ before Phase 3 (perception returns to router-rendered CC/SC). Task ids unchanged
   exactly the prescribed deep fix: ONE aggregate `resetAllSimState()` (delegating
   to per-mode global resets) on all three navigation paths; pinned by the new
   `app/tools/navResetCheck.ts` (42 checks, 15 fail without the fix) — exceeds
-  this task's acceptance criterion. Original discovery entry follows._
+  this task's acceptance criterion. The same session then extended the
+  fresh-machine contract to every sandbox canvas swap (`c93fe6e`:
+  enterSandbox/addTab/switchTab/removeTab/newWorkbook/importWorkbook);
+  navResetCheck is now 86 checks (42 nav + 44 sandbox), in `npm run check`.
+  Original discovery entry follows._
   _(discovered 2026-07-07, P3.3 appearance sweep; REAL APP BUG)_
   **SC/FSM sim state leaks across question navigation.** After running one SC
   question, the next question's Global I/O, ARG/VAL, and Sequential Timeline
@@ -393,14 +504,14 @@ before Phase 3 (perception returns to router-rendered CC/SC). Task ids unchanged
   **Acceptance:** a store harness proves no slice (CC/SC/FSM/TM/turbot sim
   state) survives question navigation; existing tm/turbot reset pins stay
   green.
-- [ ] **P1.16** _(discovered 2026-07-07, P3.3 appearance sweep; cosmetic)_
+- [x] **P1.16** _(done 2026-07-07, iteration-27 smalls sweep — see LOG)_ _(discovered 2026-07-07, P3.3 appearance sweep; cosmetic)_
   **Rotated-MEM label placement ignores rotation.** M1–M8 labels on hw3-p12's
   270°-rotated MEMs are bisected by the vertical M_IN wire entering the N
   port — label anchors assume horizontal port sides. Place labels clear of
   the rotated port axis (componentGeometry knows the rotation).
   **Acceptance:** hw3-p12 labels unbisected in-browser; no regression on
   standard-orientation MEMs.
-- [ ] **P1.11** _(discovered 2026-07-06, P1.9 round-2 verifier; pre-existing,
+- [x] **P1.11** _(done 2026-07-07, iteration-27 smalls sweep — see LOG)_ _(discovered 2026-07-06, P1.9 round-2 verifier; pre-existing,
   minor)_ **A/V ARG rendering for multi-group questions.** The ARG column
   renders the whole interleaved typed string as ONE numeral — typed "111101"
   (x=2, y=3 on hw3-p9) shows ARG '/' while VAL correctly shows 5. Render
@@ -409,18 +520,161 @@ before Phase 3 (perception returns to router-rendered CC/SC). Task ids unchanged
 
 ## Phase 6 — Close out
 
-- [ ] **P6.1** Full-matrix appearance sweep against VISUAL_VOCAB (every mode —
-  now including the open-question response UI merged from main, iteration 18).
-- [ ] **P6.2** Reconcile CLAUDE.md status with COVERAGE; final `npm run check` +
+- [x] **P6.1** **Full-matrix appearance sweep.** — _done 2026-07-08
+  (iteration 28; polish-fix agent + two-stage sweep — the first sweep agent
+  stalled twice on dev-server drops, checkpointed via SendMessage, and a
+  continuation agent finished the remainder from the checkpoint)._ All 8
+  matrix rows CLEAN across every mode (CC/SC/FSM/TM, all four turbot inner
+  modes, both perception types, open question, sandbox tabs): two-output TM
+  labels render exactly per spec §10.3; k=2 FSM labels + separated arcs; MEM
+  conventions; arena Maps + glossaries; open-question shows zero grading
+  leakage; sandbox tab switches reset sim state (verified with real runs).
+  Polish fixes landed and browser-validated: `selectLiveFsmStateId` (ONE
+  live-state source — arena stepping now green-highlights the brain canvas,
+  no cross-context leaks), turbot palette header names the inner machine
+  (sandbox's shared "Logic Circuit" label kept + documented as deliberate),
+  follow-the-turbot Map auto-scroll (340px scroller, wheel guard ~1.5s).
+  Resolved en passant: the hw3-p9 (1375,757) dot-skip — the divergence dot
+  NOW RENDERS at the historic junction (S3 fixed the bump adjacency; verdict
+  positive). The "all-gray 30×30 Map" scare was a JPEG-downscale artifact
+  (DOM: blocks #9e9e9e vs transparent empty cells).
+  **ONE ITEM STILL OPEN → P6.1b.**
+- [x] **P6.1b** — _resolved iteration 34 (2026-07-08, commit `0c54886`)._ Gabriel
+  chose the **implemented red** (`#c73535`, index.css unchanged) over the mockups'
+  yellow triangle; `VISUAL_VOCAB.md` §Turbot updated to record the decision. Was
+  flagged 2026-07-07 pending his call. Original entry: arena turbot rendered red
+  `#c73535` (index.css) vs VISUAL_VOCAB §Turbot "yellow triangle" — decide which is
+  right and fix the loser.
+- [x] **P6.2** Reconcile CLAUDE.md status with COVERAGE; final `npm run check` +
   `tsc` + `build` all green; every COVERAGE row green **at its tier** (✅ exact
-  for arithmetic, ◐ interface for perception/navigation).
-
----
+  for arithmetic, ◐ interface for perception/navigation). — _done 2026-07-08
+  (iteration 29, combined with META-audit-queue)._ All gates fresh BY EXIT
+  CODE: app tsc 0, every check tool run individually 0 (codec/notation/tm/
+  turbot/perception/scWindow/router/bump/pipeline/navReset/coverage), build 0,
+  server typecheck 0 + serverCheck 0. Harness 46 exact · 10 interface · 0
+  pending · 0 regressed · 0 warnings; COVERAGE.md cross-checked against the
+  harness JSON row-by-row BY SCRIPT (56/56 status-at-tier + manifest tier
+  agreement, 0 mismatches). CLAUDE.md brought honest (iterations 27–28 were
+  undocumented: smalls-sweep + P6.1 entries added; key-files rows gained
+  criterionRequiresStop/explainTurbotCriterionFailure, getComponentBounds/
+  getLabelAnchor, selectLiveFsmStateId/selectAllowedComponents, outputDisplay
+  per-group ARG; stale "46/56, 9 navigation remaining" What's-next bullet
+  rewritten). Stale COVERAGE notes fixed (hw1-p2 "unenforced", hw3-p12 "still
+  open" appr findings, header). HANDOFF rewritten to the close-out state.
+- [x] **P6.3** **Server↔engine grading-parity pin.** — _done 2026-07-08
+  (iteration 30)._ `server/tools/parityCheck.ts` (31 checks, chained into
+  `server npm run check`): six-mode fixture assignment (CC/SC/FSM/TM axes +
+  turbot with failing criterion-reasons on the wire + perception + open)
+  submitted through the REAL booted server and deep-compared path-by-path
+  against in-process `gradeSubmission` — byte-identical as JSON values; only
+  server-owned envelope fields (ids/timestamps/mirrors) asserted rather than
+  compared, each documented. **HEADLINE: the pin found and fixed two real
+  student-facing answer leaks** — sanitize.ts predated perception and shipped
+  `perception_cases` (the answer key) in student assignment copies AND
+  `perceptionCases` detail in post-release records; fixed, adversarially
+  confirmed (pin fails 2 checks against the pre-fix file). CI note (resolved
+  it.34, commit `0c54886`): a `server-checks` job now runs in `deploy.yml` on push
+  to main (Node 22, `npm run typecheck && npm run check`) — the proposed YAML from
+  LOG iteration 30 was added.
+- [x] **P6.4** **Remote-store cutover** — _DONE 2026-07-08, S1–S4 complete
+  (iterations 35–38), per `designs/remote-stores.md` (ASYNC-FIRST won the
+  iteration-34 judge panel 82–72–58; the judge's premise correction — manual
+  review is a server GAP, not a duplication — held: S2 added the route).
+  Evidence trail, one slice per iteration, every slice landing all-green:_
+  - _**S1 (it. 35, `0557e58`):** the async seam flip —
+    all three storage seams Promise-returning, Local impls async-wrapped
+    (zero behavior change), sequence-guarded `openAssignment` + flush-on-open
+    + single-flight autosave, `hydrateSubmissions()` on auth-ready,
+    `useAsyncValue` in the five views; navResetCheck grew the
+    `backendMode === 'local'` pin + the open-A/open-B interleaving pin (120)._
+  - _**S2 (it. 36, `1ddc76f`):** release + review onto the seams —
+    grade-release absorbed into `AssignmentStore` (`gradeRelease.ts`
+    deleted, `mm:release:` byte-compatible); `applyManualReview` moved to
+    leaf `storage/manualReview.ts`; the server review route
+    (`POST …/submissions/:attempt/review`) reuses it; serverCheck 35,
+    parityCheck 36 incl. the server≡in-process review pin._
+  - _**S3 (it. 37, `25a2a58`):** Remote impls + backend switch + auth —
+    `Remote{Workbook,Assignment,Submission}Store` as direct api/client
+    calls; `storage/backend.ts` sole store-instance exporter; remote auth
+    (email login → bearer → `me()` restore → 401 hook; `initRouting` into
+    AuthGate; `stubAuth.tsx` deleted); bundled assignments local-mode-only;
+    `tools/remoteStoreCheck.ts` (31 pins) joined the 12-tool chain;
+    remote browser smoke end-to-end._
+  - _**S4 (it. 38):** migration + resilience + the batched doc rewrite —
+    `storage/migrateLocal.ts` (fill-empty first-remote-login upload,
+    `mm:migrated:<email>` guard, server data never overwritten);
+    `storage/journal.ts` (per-email crash buffer `mm:journal:<email>:<id>`,
+    written on unload flushes + failed remote saves, keepalive unload PUT,
+    replayed by the next `openAssignment`); `auth/HealthGate.tsx` (boot
+    health probe + auto-retrying outage screen); autosave `'error'` status
+    with exponential backoff; online-only-submit failure alerts (records
+    nothing, visible retry); remoteStoreCheck 31 → **56** (health probe
+    live/503/dead-port, the migration decision table + guard/guard-less
+    idempotence + student-role exclusion, journal keying/replay/clear,
+    grep gate extended over journal/migrateLocal). Browser-verified:
+    server-down boot → retry screen → automatic recovery; an outage-era
+    edit survives a hard tab kill via journal replay and re-uploads; local
+    mode byte-identical with zero /api traffic. CLAUDE.md batched rewrite
+    landed (Part 1 narrative + both-modes status, seams table with remote
+    LIVE, key-files rows for backend/remoteStores/manualReview/journal/
+    migrateLocal/auth/useAsyncValue/remoteStoreCheck, Things-to-watch
+    honesty pass: test-cases caveat SOLVED remotely, localStorage caveat
+    mode-scoped, LWW note, deploy knobs pointer)._
 
 ## Recurring meta-tasks  _(fire on cadence; keep the queue honest)_
 
-- [ ] **META-audit-queue** — _every ~5 iterations; last ran iteration 18
-  (2026-07-06): merged `origin/main` (open-question sixth mode + turbot
+- [ ] **META-audit-queue** — _every ~5 iterations; last ran **iteration 40**
+  (2026-07-08) — the cutover's final reconciliation, via a 3-verifier + critic
+  workflow. **All four P6.4 remote-store doc claims CONFIRMED against code**
+  (backend.ts sole VITE_API_BASE switch + sole store-instance exporter;
+  sanitize.ts strips test_cases + perception_cases from student assignments and
+  per-case detail from results; grader-free remoteStores/journal/migrateLocal
+  with remoteStoreCheck's grep gate over exactly those modules; parityCheck pins
+  the redaction). **Patch-accumulation scan over iterations 30–39: NO cluster** —
+  the window is the memo-driven remote-stores program (S1–S4 + design memo +
+  P6.3 parity groundwork) plus P1.8-S4 and P4.4, all seam-routed depth; the two
+  surgical bits (the two sanitize leaks, the removeTab mode-swap) are each
+  guarded by a standing pin and share no family. **Staleness fixed:** P6.1b was
+  stale-open in QUEUE + CLAUDE.md though resolved it.34 (flipped `[x]`); the P6.3
+  "no CI checks / Gabriel's call" note was false (deploy.yml has the server-checks
+  job — annotated); HANDOFF's untracked "Vite Remote Mode"/5177 CORS hint
+  generalized. Counts re-verified by exit code: remoteStoreCheck 56, navResetCheck
+  120, serverCheck 35, parityCheck 36 (all AFTER fixing a silently-red gate —
+  bumpCheck.ts's foreign absolute imports, finding 0 in LOG iteration 40 — and a
+  server `npm ci`). Open items now: the two META recurrers plus ONE optional,
+  non-blocking hardening item (P-TOOLS-1, the portability grep-gate the bumpCheck
+  bug motivated). The buildout is COMPLETE at-tier. Previous run: iteration 29
+  (2026-07-08, combined with P6.2 — see P6.2's done note for the gate/ledger
+  evidence): window 24–28 audited; spot-ran every closed task's pins by exit
+  code (turbotCheck [multi-arena] + [pass-through step-limit] + criterion-
+  reason sections, coverageCheck's 6 allowed_components pins, navResetCheck 86,
+  bumpCheck manifest sweep CLEAN, routerCheck budget 2≤2); queue honesty:
+  P6.2 closed, P2.5 closed as DEFERRED (correct-answers project, not
+  loop-open), P1.8's stale "S3 leftover still open" text rewritten (both
+  leftovers resolved iterations 27–28; only optional S4/S5 remain),
+  META-reconcile-claude folded into this entry as a duplicate (its job is
+  this audit's step 3; its "currently claims all built" note was years stale)
+  → open items now EXACTLY: P6.1b + P6.3 + P6.4 (Gabriel-gated), P1.8 S4 +
+  P4.4 + P4.5 (optionals), and the two META recurrers; patch-accumulation
+  scan over 24–28: NO cluster — every window fix was seam-routed
+  (criterionRequiresStop beside evaluateTurbotCriterion, P1.5's one-semantics
+  machineValidation slice, sortByLabel unification, getComponentBounds/
+  getLabelAnchor in componentGeometry, explainTurbotCriterionFailure clause
+  mirror, selectLiveFsmStateId single source; the three criterion functions
+  are deliberate co-location at one seam, not accretion). Previous run
+  iteration 23 (2026-07-07): post-S3 doc reconciliation — verified harness 46/10/0/0,
+  bumpCheck CLEAN + routerCheck budget 2, turbotCheck [multi-arena] and
+  navResetCheck (86, in `npm run check`) green, toggle-tab obstacle gap
+  confirmed still open; rewrote the stale live-defect notes S3 outdated
+  (COVERAGE hw2-p11/hw3-p12, manifest hw3-p12, QUEUE P3.2/P3.3), recorded the
+  out-of-band sandbox fresh-machine extension `c93fe6e` (navResetCheck 42→86)
+  + Vite PORT `7914966` in P1.15/HANDOFF/LOG, re-homed P6.3/P6.4 from Phase 4
+  to Phase 6 (they sat above P4.3 as top todos), fixed CLAUDE.md's serverCheck
+  count (22→28) + added the buildout-status bullet; LOG iterations 19–22 +
+  out-of-band entries verified coherent/non-duplicated; NO patch cluster (the
+  window's fixes were seam-routed deep fixes: S3 model unification, P4.2
+  criterion, P1.15 aggregate reset + its sandbox extension). Previous run
+  iteration 18 (2026-07-06): merged `origin/main` (open-question sixth mode + turbot
   grading rework, PRs #11/#13) as `e9122e0`, then main's perception-questions
   feature (PR #12) as `b36aed6` — which closed P3.1 as overtaken and rescoped
   P3.2/P3.3 to fixture promotion; all gates green after each; harness
@@ -431,13 +685,13 @@ before Phase 3 (perception returns to router-rendered CC/SC). Task ids unchanged
   flipped to "accepted as alias" (execution bit-identical, old machines keep
   validating)._ Run `npm run coverage`;
   reconcile COVERAGE + this queue against the harness JSON; prune dead/duplicate
-  tasks; re-rank by dependency and value; confirm no drift. **Also audit for
+  tasks; re-rank by dependency and value; confirm no drift; **keep CLAUDE.md's
+  status honest against COVERAGE** (absorbed from the retired
+  META-reconcile-claude entry, iteration-29 audit — downgrade any claim a
+  reference solution can't back up). **Also audit for
   patch accumulation:** look for clusters of surgical fixes that landed since the
   last audit and share a family — if found, enqueue one unifying architectural
   task (with a design memo) to replace the cluster's trajectory. Log what changed.
 - [ ] **META-visual-vocab** — before starting a new mode's appearance work, re-read
   the relevant `mm_textbook.pdf` chapter + `spec/…/Mock_Ups-*.jpg`; refresh
   VISUAL_VOCAB.
-- [ ] **META-reconcile-claude** — keep `CLAUDE.md`'s status section honest against
-  COVERAGE (it currently claims "all built"; downgrade any claim a reference
-  solution can't back up).

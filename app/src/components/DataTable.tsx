@@ -1,7 +1,7 @@
 import { useMemo, useState, useCallback, useRef, useEffect } from 'react';
 import { useStore, selectTmNotation, selectEffectiveMode, selectCodecWindow, selectFsmNotation } from '../store';
 import { bitsToTally, bitsToBinary, tmNotation, timeOutputBits } from '../engine';
-import { outputDisplayString } from './outputDisplay';
+import { outputDisplayString, argGroupCountFor, argDisplayString } from './outputDisplay';
 import { TurbotArenaPanel } from './TurbotArenaPanel';
 import type { TMSymbol } from '../types';
 
@@ -300,6 +300,14 @@ export function DataTable() {
       const numB = parseInt(b.label.replace('IN', ''));
       return numA - numB;
     });
+
+  // A/V ARG for SC QUESTION runs: a multi-group question's typed string
+  // interleaves one char per input group per step, so it is read as one value
+  // PER GROUP ("2, 3") — the same per-group parse the store's codec feed
+  // applies — never as one whole-string numeral. null (sandbox, non-SC
+  // question, or machine/spec input-count mismatch — where the run itself
+  // falls back to raw typed bits) keeps the classic whole-string read.
+  const argGroupCount = argGroupCountFor(openQuestion, inputs.length);
 
   const outputs = components
     .filter((c) => c.type === 'OUTPUT')
@@ -1502,7 +1510,9 @@ export function DataTable() {
                 {avRows.length > 0 ? avRows.map((row, i) => (
                   <tr key={i}>
                     <td style={{ border: 'none', background: 'transparent' }} />
-                    <td><span className="mono-value">{interpret(row.inputBits)}</span></td>
+                    <td><span className="mono-value">{isSC && argGroupCount !== null
+                      ? argDisplayString(row.inputBits, argGroupCount, interpret)
+                      : interpret(row.inputBits)}</span></td>
                     <td><span className="mono-value">{interpret(row.outputBits)}</span></td>
                   </tr>
                 )) : (

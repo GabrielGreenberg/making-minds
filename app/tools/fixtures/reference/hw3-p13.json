@@ -1,0 +1,475 @@
+{
+  "question": {
+    "id": 13,
+    "label": "Problem 13",
+    "statement": "Zig-zag: reach the goal and keep going. A staircase corridor climbs from the turbot’s starting cell to the goal, walled in by blocks on every side; at the end of each leg the corridor turns, alternating left and right. Program the turbot’s sequential-circuit brain to follow the corridor all the way to the goal and keep going — it need not stop. The goal is invisible to the sensor: it reads as an empty cell. The brain has one sensor input and two outputs, one for each wheel.",
+    "buildMode": "turbot",
+    "representation": "binary",
+    "innerMode": "SC",
+    "turbot_cases": [
+      {
+        "arena": {
+          "width": 9,
+          "height": 9,
+          "cells": [
+            [
+              "block",
+              "goal",
+              "block",
+              "block",
+              "block",
+              "block",
+              "block",
+              "block",
+              "block"
+            ],
+            [
+              "block",
+              "empty",
+              "block",
+              "block",
+              "block",
+              "block",
+              "block",
+              "block",
+              "block"
+            ],
+            [
+              "block",
+              "empty",
+              "empty",
+              "empty",
+              "block",
+              "block",
+              "block",
+              "block",
+              "block"
+            ],
+            [
+              "block",
+              "block",
+              "block",
+              "empty",
+              "block",
+              "block",
+              "block",
+              "block",
+              "block"
+            ],
+            [
+              "block",
+              "block",
+              "block",
+              "empty",
+              "empty",
+              "empty",
+              "block",
+              "block",
+              "block"
+            ],
+            [
+              "block",
+              "block",
+              "block",
+              "block",
+              "block",
+              "empty",
+              "block",
+              "block",
+              "block"
+            ],
+            [
+              "block",
+              "block",
+              "block",
+              "block",
+              "block",
+              "empty",
+              "empty",
+              "empty",
+              "block"
+            ],
+            [
+              "block",
+              "block",
+              "block",
+              "block",
+              "block",
+              "block",
+              "block",
+              "empty",
+              "block"
+            ],
+            [
+              "block",
+              "block",
+              "block",
+              "block",
+              "block",
+              "block",
+              "block",
+              "empty",
+              "block"
+            ]
+          ],
+          "start": {
+            "x": 7,
+            "y": 8,
+            "facing": "N"
+          }
+        },
+        "maxSteps": 40,
+        "criterion": "pass-through"
+      },
+      {
+        "arena": {
+          "width": 6,
+          "height": 6,
+          "cells": [
+            [
+              "goal",
+              "block",
+              "block",
+              "block",
+              "block",
+              "block"
+            ],
+            [
+              "empty",
+              "empty",
+              "empty",
+              "block",
+              "block",
+              "block"
+            ],
+            [
+              "block",
+              "block",
+              "empty",
+              "block",
+              "block",
+              "block"
+            ],
+            [
+              "block",
+              "block",
+              "empty",
+              "empty",
+              "empty",
+              "block"
+            ],
+            [
+              "block",
+              "block",
+              "block",
+              "block",
+              "empty",
+              "block"
+            ],
+            [
+              "block",
+              "block",
+              "block",
+              "block",
+              "empty",
+              "block"
+            ]
+          ],
+          "start": {
+            "x": 4,
+            "y": 5,
+            "facing": "N"
+          }
+        },
+        "maxSteps": 30,
+        "criterion": "pass-through"
+      }
+    ]
+  },
+  "correct": {
+    "components": [
+      {
+        "id": "hw3-p13-in1",
+        "type": "INPUT",
+        "x": 80,
+        "y": 160,
+        "label": "IN1",
+        "ports": [
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "hw3-p13-not-s",
+        "type": "NOT",
+        "x": 240,
+        "y": 160,
+        "label": "",
+        "ports": [
+          {
+            "id": "in",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "hw3-p13-xor-m",
+        "type": "XOR",
+        "x": 240,
+        "y": 400,
+        "label": "",
+        "ports": [
+          {
+            "id": "in1",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "in2",
+            "label": "",
+            "side": "left",
+            "index": 1
+          },
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "hw3-p13-not-m",
+        "type": "NOT",
+        "x": 240,
+        "y": 560,
+        "label": "",
+        "ports": [
+          {
+            "id": "in",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "hw3-p13-or-i",
+        "type": "OR",
+        "x": 520,
+        "y": 140,
+        "label": "",
+        "ports": [
+          {
+            "id": "in1",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "in2",
+            "label": "",
+            "side": "left",
+            "index": 1
+          },
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "hw3-p13-or-j",
+        "type": "OR",
+        "x": 520,
+        "y": 320,
+        "label": "",
+        "ports": [
+          {
+            "id": "in1",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "in2",
+            "label": "",
+            "side": "left",
+            "index": 1
+          },
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "hw3-p13-out1",
+        "type": "OUTPUT",
+        "x": 720,
+        "y": 155,
+        "label": "OUT1",
+        "ports": [
+          {
+            "id": "in",
+            "label": "",
+            "side": "left",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "hw3-p13-out2",
+        "type": "OUTPUT",
+        "x": 720,
+        "y": 335,
+        "label": "OUT2",
+        "ports": [
+          {
+            "id": "in",
+            "label": "",
+            "side": "left",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "hw3-p13-m1",
+        "type": "MEM",
+        "x": 330,
+        "y": 520,
+        "label": "M1",
+        "ports": [
+          {
+            "id": "mout",
+            "label": "M_OUT",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "min",
+            "label": "M_IN",
+            "side": "right",
+            "index": 0
+          }
+        ],
+        "memDirection": "right-to-left",
+        "storedValue": 0,
+        "rotation": 270
+      }
+    ],
+    "wires": [
+      {
+        "id": "hw3-p13-w1",
+        "sourceComponentId": "hw3-p13-in1",
+        "sourcePortId": "out",
+        "targetComponentId": "hw3-p13-not-s",
+        "targetPortId": "in",
+        "value": 0
+      },
+      {
+        "id": "hw3-p13-w2",
+        "sourceComponentId": "hw3-p13-in1",
+        "sourcePortId": "out",
+        "targetComponentId": "hw3-p13-xor-m",
+        "targetPortId": "in1",
+        "value": 0
+      },
+      {
+        "id": "hw3-p13-w3",
+        "sourceComponentId": "hw3-p13-m1",
+        "sourcePortId": "mout",
+        "targetComponentId": "hw3-p13-xor-m",
+        "targetPortId": "in2",
+        "value": 0
+      },
+      {
+        "id": "hw3-p13-w4",
+        "sourceComponentId": "hw3-p13-m1",
+        "sourcePortId": "mout",
+        "targetComponentId": "hw3-p13-not-m",
+        "targetPortId": "in",
+        "value": 0
+      },
+      {
+        "id": "hw3-p13-w5",
+        "sourceComponentId": "hw3-p13-m1",
+        "sourcePortId": "mout",
+        "targetComponentId": "hw3-p13-or-i",
+        "targetPortId": "in2",
+        "value": 0
+      },
+      {
+        "id": "hw3-p13-w6",
+        "sourceComponentId": "hw3-p13-not-s",
+        "sourcePortId": "out",
+        "targetComponentId": "hw3-p13-or-i",
+        "targetPortId": "in1",
+        "value": 0
+      },
+      {
+        "id": "hw3-p13-w7",
+        "sourceComponentId": "hw3-p13-not-s",
+        "sourcePortId": "out",
+        "targetComponentId": "hw3-p13-or-j",
+        "targetPortId": "in1",
+        "value": 0
+      },
+      {
+        "id": "hw3-p13-w8",
+        "sourceComponentId": "hw3-p13-not-m",
+        "sourcePortId": "out",
+        "targetComponentId": "hw3-p13-or-j",
+        "targetPortId": "in2",
+        "value": 0
+      },
+      {
+        "id": "hw3-p13-w9",
+        "sourceComponentId": "hw3-p13-or-i",
+        "sourcePortId": "out",
+        "targetComponentId": "hw3-p13-out1",
+        "targetPortId": "in",
+        "value": 0
+      },
+      {
+        "id": "hw3-p13-w10",
+        "sourceComponentId": "hw3-p13-or-j",
+        "sourcePortId": "out",
+        "targetComponentId": "hw3-p13-out2",
+        "targetPortId": "in",
+        "value": 0
+      },
+      {
+        "id": "hw3-p13-w11",
+        "sourceComponentId": "hw3-p13-xor-m",
+        "sourcePortId": "out",
+        "targetComponentId": "hw3-p13-m1",
+        "targetPortId": "min",
+        "value": 0
+      }
+    ]
+  }
+}

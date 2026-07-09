@@ -13,6 +13,7 @@ import { AssignmentOverview } from './components/AssignmentOverview';
 import { InstructorApp } from './instructor/InstructorApp';
 import { useInstructorRoute } from './instructor/useInstructorRoute';
 import { useStore, selectEffectiveMode } from './store';
+import { useEffect } from 'react';
 
 function App() {
   const instructorRoute = useInstructorRoute();
@@ -21,6 +22,18 @@ function App() {
   const effectiveMode = useStore(selectEffectiveMode);
   const assignment = useStore((s) => s.assignment);
   const assignmentView = useStore((s) => s.assignmentView);
+
+  // Hydrate the latest-submission map from the submission seam once the app is
+  // up (App renders inside AuthGate, so mount = auth-ready). Replaces the old
+  // sync-at-module-init hydration; idempotent, so StrictMode's double effect
+  // is harmless.
+  useEffect(() => {
+    // A transient fetch failure just leaves the latest-submission map empty
+    // (cards read "Not submitted" until the next mount); don't crash the shell.
+    useStore.getState().hydrateSubmissions().catch((e: unknown) => {
+      console.warn('submission hydration failed:', e);
+    });
+  }, []);
 
   // Instructor frontend: a separate mode of the same SPA, gated behind the
   // instructor role. It bypasses the student Zustand store and reads the hash

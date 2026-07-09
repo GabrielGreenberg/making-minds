@@ -1,0 +1,404 @@
+{
+  "question": {
+    "id": 14,
+    "label": "Problem 14",
+    "statement": "Three ahead. The goal lies exactly three cells directly ahead of the turbot, but it is invisible to the sensor — it reads as an empty cell. Build a sequential circuit brain that drives the turbot forward onto the goal and stops there. The brain has one sensor input and two outputs, one for each wheel.",
+    "buildMode": "turbot",
+    "representation": "binary",
+    "innerMode": "SC",
+    "turbot_cases": [
+      {
+        "arena": {
+          "width": 6,
+          "height": 6,
+          "cells": [
+            [
+              "empty",
+              "empty",
+              "empty",
+              "empty",
+              "empty",
+              "empty"
+            ],
+            [
+              "empty",
+              "empty",
+              "goal",
+              "empty",
+              "empty",
+              "empty"
+            ],
+            [
+              "empty",
+              "empty",
+              "empty",
+              "empty",
+              "empty",
+              "empty"
+            ],
+            [
+              "empty",
+              "empty",
+              "empty",
+              "empty",
+              "empty",
+              "empty"
+            ],
+            [
+              "empty",
+              "empty",
+              "empty",
+              "empty",
+              "empty",
+              "empty"
+            ],
+            [
+              "empty",
+              "empty",
+              "empty",
+              "empty",
+              "empty",
+              "empty"
+            ]
+          ],
+          "start": {
+            "x": 2,
+            "y": 4,
+            "facing": "N"
+          }
+        },
+        "maxSteps": 20,
+        "criterion": "reach-and-stop"
+      },
+      {
+        "arena": {
+          "width": 7,
+          "height": 5,
+          "cells": [
+            [
+              "empty",
+              "empty",
+              "empty",
+              "empty",
+              "empty",
+              "empty",
+              "empty"
+            ],
+            [
+              "empty",
+              "empty",
+              "empty",
+              "empty",
+              "empty",
+              "empty",
+              "empty"
+            ],
+            [
+              "empty",
+              "empty",
+              "empty",
+              "empty",
+              "goal",
+              "empty",
+              "empty"
+            ],
+            [
+              "empty",
+              "empty",
+              "empty",
+              "empty",
+              "empty",
+              "empty",
+              "empty"
+            ],
+            [
+              "empty",
+              "empty",
+              "empty",
+              "empty",
+              "empty",
+              "empty",
+              "empty"
+            ]
+          ],
+          "start": {
+            "x": 1,
+            "y": 2,
+            "facing": "E"
+          }
+        },
+        "maxSteps": 20,
+        "criterion": "reach-and-stop"
+      },
+      {
+        "arena": {
+          "width": 4,
+          "height": 6,
+          "cells": [
+            [
+              "empty",
+              "empty",
+              "empty",
+              "empty"
+            ],
+            [
+              "empty",
+              "empty",
+              "empty",
+              "empty"
+            ],
+            [
+              "empty",
+              "empty",
+              "empty",
+              "empty"
+            ],
+            [
+              "empty",
+              "empty",
+              "empty",
+              "empty"
+            ],
+            [
+              "empty",
+              "goal",
+              "empty",
+              "empty"
+            ],
+            [
+              "empty",
+              "empty",
+              "empty",
+              "empty"
+            ]
+          ],
+          "start": {
+            "x": 1,
+            "y": 1,
+            "facing": "S"
+          }
+        },
+        "maxSteps": 20,
+        "criterion": "reach-and-stop"
+      }
+    ]
+  },
+  "correct": {
+    "components": [
+      {
+        "id": "p14-in1",
+        "type": "INPUT",
+        "x": 60,
+        "y": 300,
+        "label": "IN1",
+        "ports": [
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "p14-not-s",
+        "type": "NOT",
+        "x": 220,
+        "y": 300,
+        "label": "",
+        "ports": [
+          {
+            "id": "in",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "p14-m1",
+        "type": "MEM",
+        "x": 380,
+        "y": 300,
+        "label": "M1",
+        "ports": [
+          {
+            "id": "mout",
+            "label": "M_OUT",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "min",
+            "label": "M_IN",
+            "side": "right",
+            "index": 0
+          }
+        ],
+        "memDirection": "left-to-right",
+        "storedValue": 0
+      },
+      {
+        "id": "p14-m2",
+        "type": "MEM",
+        "x": 540,
+        "y": 300,
+        "label": "M2",
+        "ports": [
+          {
+            "id": "mout",
+            "label": "M_OUT",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "min",
+            "label": "M_IN",
+            "side": "right",
+            "index": 0
+          }
+        ],
+        "memDirection": "left-to-right",
+        "storedValue": 0
+      },
+      {
+        "id": "p14-m3",
+        "type": "MEM",
+        "x": 700,
+        "y": 300,
+        "label": "M3",
+        "ports": [
+          {
+            "id": "mout",
+            "label": "M_OUT",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "min",
+            "label": "M_IN",
+            "side": "right",
+            "index": 0
+          }
+        ],
+        "memDirection": "left-to-right",
+        "storedValue": 0
+      },
+      {
+        "id": "p14-not-m",
+        "type": "NOT",
+        "x": 860,
+        "y": 300,
+        "label": "",
+        "ports": [
+          {
+            "id": "in",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "p14-out1",
+        "type": "OUTPUT",
+        "x": 1020,
+        "y": 220,
+        "label": "OUT1",
+        "ports": [
+          {
+            "id": "in",
+            "label": "",
+            "side": "left",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "p14-out2",
+        "type": "OUTPUT",
+        "x": 1020,
+        "y": 380,
+        "label": "OUT2",
+        "ports": [
+          {
+            "id": "in",
+            "label": "",
+            "side": "left",
+            "index": 0
+          }
+        ]
+      }
+    ],
+    "wires": [
+      {
+        "id": "p14-w1",
+        "sourceComponentId": "p14-in1",
+        "sourcePortId": "out",
+        "targetComponentId": "p14-not-s",
+        "targetPortId": "in",
+        "value": 0
+      },
+      {
+        "id": "p14-w2",
+        "sourceComponentId": "p14-not-s",
+        "sourcePortId": "out",
+        "targetComponentId": "p14-m1",
+        "targetPortId": "mout",
+        "value": 0
+      },
+      {
+        "id": "p14-w3",
+        "sourceComponentId": "p14-m1",
+        "sourcePortId": "min",
+        "targetComponentId": "p14-m2",
+        "targetPortId": "mout",
+        "value": 0
+      },
+      {
+        "id": "p14-w4",
+        "sourceComponentId": "p14-m2",
+        "sourcePortId": "min",
+        "targetComponentId": "p14-m3",
+        "targetPortId": "mout",
+        "value": 0
+      },
+      {
+        "id": "p14-w5",
+        "sourceComponentId": "p14-m3",
+        "sourcePortId": "min",
+        "targetComponentId": "p14-not-m",
+        "targetPortId": "in",
+        "value": 0
+      },
+      {
+        "id": "p14-w6",
+        "sourceComponentId": "p14-not-m",
+        "sourcePortId": "out",
+        "targetComponentId": "p14-out1",
+        "targetPortId": "in",
+        "value": 0
+      },
+      {
+        "id": "p14-w7",
+        "sourceComponentId": "p14-not-m",
+        "sourcePortId": "out",
+        "targetComponentId": "p14-out2",
+        "targetPortId": "in",
+        "value": 0
+      }
+    ]
+  }
+}

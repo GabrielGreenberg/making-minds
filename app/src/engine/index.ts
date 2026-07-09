@@ -77,7 +77,12 @@ export {
   outputAccepted,
 } from './codec';
 export type { Axis, CodecLayout, EncodedInput, RawOutput } from './codec';
-export { validateMachine } from './machineValidation';
+export {
+  validateMachine,
+  validateAllowedComponents,
+  disallowedComponentTypes,
+  isComponentTypeAllowed,
+} from './machineValidation';
 export type { MachineValidation } from './machineValidation';
 export { generateTestCases } from './testVectorGen';
 export { gradeQuestion, gradeSubmission, summarizeResult } from './grader';
@@ -91,6 +96,7 @@ export {
   runBrainStep,
   runTurbot,
   evaluateTurbotCriterion,
+  criterionRequiresStop,
   stateKindOf,
   parseTurbotInternalLabel,
   parseTurbotExternalLabel,

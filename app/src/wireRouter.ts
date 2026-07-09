@@ -21,7 +21,7 @@
  */
 
 import type { CircuitComponent } from './types';
-import { getComponentSize } from './componentGeometry';
+import { getComponentBounds, getComponentSize } from './componentGeometry';
 
 // ─── Constants ──────────────────────────────────────────────────────
 
@@ -116,11 +116,13 @@ interface SearchState {
 // ─── Geometry Helpers ───────────────────────────────────────────────
 
 // Obstacle bounds come from the SHARED rendered geometry (componentGeometry.ts)
-// — the same table the canvas renders from and the layout oracle checks
+// — the same module the canvas renders from and the layout oracle checks
 // against. The router must never keep its own copy: a private table once let
 // MEM default to phantom 75×70 bounds (rendered: 50×50), which blocked every
 // edge at MEM.min's stub tip and forced all incident wires onto the
-// obstacle-blind fallback.
+// obstacle-blind fallback. Bounds are the rendered FOOTPRINT
+// (getComponentBounds), not the body box: INPUT's left toggle tab draws
+// outside the body, and a wire that only avoids the body still crosses it.
 //
 // A wire's OWN endpoint components are not obstacles to it at its stub tips:
 // the stub necessarily crosses its own component's margin (and, for inset
@@ -129,21 +131,7 @@ interface SearchState {
 // source/target bounds on the approach — the same exemption the layout
 // oracle applies to a wire's own stubs. Foreign components always block.
 
-function getCompBounds(comp: CircuitComponent): Bounds {
-  const { w, h } = getComponentSize(comp);
-  const rotation = comp.rotation ?? 0;
-  if (rotation === 0) {
-    return { left: comp.x, top: comp.y, right: comp.x + w, bottom: comp.y + h };
-  }
-  const cx = comp.x + w / 2;
-  const cy = comp.y + h / 2;
-  const rad = (rotation * Math.PI) / 180;
-  const cosA = Math.abs(Math.cos(rad));
-  const sinA = Math.abs(Math.sin(rad));
-  const halfW = (w * cosA + h * sinA) / 2;
-  const halfH = (w * sinA + h * cosA) / 2;
-  return { left: cx - halfW, top: cy - halfH, right: cx + halfW, bottom: cy + halfH };
-}
+const getCompBounds = (comp: CircuitComponent): Bounds => getComponentBounds(comp);
 
 /** Expand bounds by margin on all sides */
 function expandBounds(b: Bounds, margin: number): Bounds {
@@ -820,6 +808,25 @@ export function getFallbackWireIds(): string[] {
   return [...fallbackWireIds];
 }
 
+/** Doomed-endpoint check (phase 0): every grid edge incident to a stub-tip
+ *  node is blocked by a FOREIGN component's expanded bounds, so no A* search
+ *  can ever leave (or reach) it. O(incident edges) — the cheap, complete-for-
+ *  this-class half of fallback prediction; iteration-exhaustion fallbacks are
+ *  only knowable after the search runs and stay in the main loop. The wire's
+ *  own endpoint component is exempt, mirroring the search's own-endpoint
+ *  exemption (a stub necessarily crosses its own component's margin). */
+function isEndpointDoomed(grid: RoutingGrid, nodeId: number, ownIdx: number): boolean {
+  const neighbors = grid.adj.get(nodeId);
+  if (!neighbors || neighbors.length === 0) return true;
+  for (const { edge } of neighbors) {
+    const e = grid.edges[edge];
+    if (e.blockedBy.length === 0 || e.blockedBy.every((ci) => ci === ownIdx)) {
+      return false; // at least one passable way in/out
+    }
+  }
+  return true;
+}
+
 function fallbackPath(
   srcStub: Point, dstStub: Point, srcDir: Dir, dstDir: Dir
 ): Point[] {
@@ -942,6 +949,17 @@ export interface WireRouteResult {
   wireId: string;
   points: Point[];
   crossings?: Point[]; // crossing points for bridge/hop rendering (§8)
+  /** True when the FINAL route came from the obstacle-blind fallback L-path
+   *  (a wire that fell back mid-routing but was successfully A*-rerouted in
+   *  a validation round is not flagged). Warn-don't-block: the canvas may
+   *  surface this, the router never hard-fails a student's circuit. */
+  usedFallback?: boolean;
+  /** Set by the final read-only oracle-predicate sweep when the routed path
+   *  still violates the appearance bar the layout oracle enforces —
+   *  a near-parallel overlap with a different-source wire (the oracle's
+   *  collinear-overlap rule) or a pass through a foreign component's
+   *  rendered body. Diagnostic only; routing output is unchanged. */
+  violation?: string;
 }
 
 /**
@@ -1024,8 +1042,48 @@ export function routeAllWires(
 
   const results: WireRouteResult[] = new Array(inputs.length);
 
+  // ─── Phase 0: doomed wires take the fallback FIRST ───
+  // A wire whose stub tip is buried inside a FOREIGN component's expanded
+  // bounds (every incident edge blocked, own-endpoint exemption aside) can
+  // never be solved by A* — it will take the fallback no matter when it
+  // routes. Routing it before the main loop registers its L-path in
+  // occupancy, so every subsequent A* search sees the fallback lane as an
+  // occupied track (crossing/near-parallel/overlap costs) instead of routing
+  // blind through it and only colliding in the validation rounds.
+  // Iteration-exhaustion fallbacks can't be predicted here; the validation
+  // pass below (H1 near-overlap vs occupancy, which includes fallback
+  // segments) remains the interaction net for those.
+  const doomedWireIds = new Set<string>();
   for (const group of sortedGroups) {
     for (const item of group) {
+      const { input, stubs } = item;
+      const { srcStub, dstStub, srcDir, dstDir } = stubs;
+      // Stub tips are always grid-line intersections (buildGrid feeds every
+      // stub endpoint into the line sets), so this is a pure lookup — no
+      // grid mutation, no route-order sensitivity.
+      const startNodeId = ensureNodeOnGrid(grid, srcStub, expandedBounds);
+      const goalNodeId = ensureNodeOnGrid(grid, dstStub, expandedBounds);
+      const ownComps = ownCompsFor(input);
+      if (!isEndpointDoomed(grid, startNodeId, ownComps.sourceIdx) &&
+          !isEndpointDoomed(grid, goalNodeId, ownComps.targetIdx)) continue;
+
+      doomedWireIds.add(input.wireId);
+      fallbackCount++;
+      fallbackWireIds.push(input.wireId);
+      const pathPoints = fallbackPath(srcStub, dstStub, srcDir, dstDir);
+      const fullPath = [input.sourcePos, srcStub, ...pathPoints, dstStub, input.targetPos];
+      updateOccupancy(grid, fullPath, occupancy, input.sourcePortKey, input.wireId);
+      results[item.index] = {
+        wireId: input.wireId,
+        points: simplifyPath(fullPath),
+        usedFallback: true,
+      };
+    }
+  }
+
+  for (const group of sortedGroups) {
+    for (const item of group) {
+      if (results[item.index]) continue; // routed in phase 0 (doomed → fallback)
       const { input, stubs } = item;
       const { srcStub, dstStub, srcDir, dstDir } = stubs;
 
@@ -1058,11 +1116,14 @@ export function routeAllWires(
         ownCompsFor(input)
       );
 
-      // Fallback if A* fails
+      // Fallback if A* fails (iteration exhaustion — genuinely blocked wires
+      // were already handled in phase 0)
+      let usedFallback = false;
       if (!pathPoints || pathPoints.length === 0) {
         fallbackCount++;
         fallbackWireIds.push(input.wireId);
         pathPoints = fallbackPath(srcStub, dstStub, srcDir, dstDir);
+        usedFallback = true;
       }
 
       // Prepend source stub, append destination stub
@@ -1089,7 +1150,11 @@ export function routeAllWires(
       // many tiny segments that are individually useless to drag.
       const dedupedPath = simplifyPath(fullPath);
 
-      results[item.index] = { wireId: input.wireId, points: dedupedPath };
+      results[item.index] = {
+        wireId: input.wireId,
+        points: dedupedPath,
+        ...(usedFallback ? { usedFallback: true } : {}),
+      };
     }
   }
 
@@ -1105,6 +1170,10 @@ export function routeAllWires(
     for (const item of indexedInputs) {
       const result = results[item.index];
       if (!result) continue;
+      // A doomed wire (phase 0) is structurally unreachable — rerouting can
+      // only re-fail into the byte-identical fallback path, so skip it
+      // instead of burning a full A* search per round.
+      if (doomedWireIds.has(item.input.wireId)) continue;
 
       const path = result.points;
       // Check H2: does the path pass through any element bounds? The wire's
@@ -1222,10 +1291,12 @@ export function routeAllWires(
         avoidByWire.get(item.input.wireId)
       );
 
+      let usedFallback = false;
       if (!pathPoints || pathPoints.length === 0) {
         fallbackCount++;
         fallbackWireIds.push(item.input.wireId);
         pathPoints = fallbackPath(srcStub, dstStub, srcDir, dstDir);
+        usedFallback = true;
       }
 
       const fullPath = [
@@ -1233,7 +1304,11 @@ export function routeAllWires(
       ];
       updateOccupancy(grid, fullPath, occupancy, item.input.sourcePortKey, item.input.wireId);
       const dedupedPath = simplifyPath(fullPath);
-      results[item.index] = { wireId: item.input.wireId, points: dedupedPath };
+      results[item.index] = {
+        wireId: item.input.wireId,
+        points: dedupedPath,
+        ...(usedFallback ? { usedFallback: true } : {}),
+      };
       anyRerouted = true;
     }
     if (!anyRerouted) break;
@@ -1243,6 +1318,68 @@ export function routeAllWires(
   for (const result of results) {
     if (!result) continue;
     result.crossings = findCrossingPoints(result.points, occupancy.segments, result.wireId);
+  }
+
+  // ─── Final read-only oracle-predicate sweep (warn, don't block) ───
+  // Flag each wire whose FINAL path still violates the appearance rules the
+  // layout oracle (tools/layoutCheck.ts) enforces — the same predicates,
+  // evaluated router-side because src/ cannot import from tools/:
+  //   (a) near-parallel overlap with a DIFFERENT-source wire —
+  //       segmentsNearOverlap IS the oracle's collinear-overlap rule
+  //       (same axis, lines within NEAR_PARALLEL_TOL, shared span > 1px);
+  //       fan-out siblings are exempt (shared trunks are legitimate);
+  //   (b) a segment through a FOREIGN component's rendered body rect (the
+  //       oracle's rect: getComponentSize at the component origin), with the
+  //       wire's own source/target exempt on its first/last segment — the
+  //       stub landing.
+  // Routes are never modified here; the flags surface in tooling
+  // (routerCheck) and as canvas tooltips/highlights.
+  const bodyRects = components.map((c) => {
+    const { w, h } = getComponentSize(c);
+    return { left: c.x, top: c.y, right: c.x + w, bottom: c.y + h };
+  });
+  for (const item of indexedInputs) {
+    const result = results[item.index];
+    if (!result) continue;
+    const path = result.points;
+    let violation: string | undefined;
+
+    // (a) near-parallel overlap vs other wires (fan-out siblings exempt)
+    outer:
+    for (let i = 0; i < path.length - 1; i++) {
+      const a = path[i], b = path[i + 1];
+      for (const other of indexedInputs) {
+        if (other.input.wireId === item.input.wireId) continue;
+        if (other.input.sourcePortKey === item.input.sourcePortKey) continue;
+        const op = results[other.index]?.points;
+        if (!op) continue;
+        for (let j = 0; j < op.length - 1; j++) {
+          if (segmentsNearOverlap(a.x, a.y, b.x, b.y,
+                                  op[j].x, op[j].y, op[j + 1].x, op[j + 1].y)) {
+            violation = `near-overlap with ${other.input.wireId}`;
+            break outer;
+          }
+        }
+      }
+    }
+
+    // (b) segment through a foreign component's rendered body
+    if (!violation) {
+      const ownComps = ownCompsFor(item.input);
+      for (let i = 0; i < path.length - 1 && !violation; i++) {
+        for (let bi = 0; bi < bodyRects.length; bi++) {
+          if (i === 0 && bi === ownComps.sourceIdx) continue;
+          if (i === path.length - 2 && bi === ownComps.targetIdx) continue;
+          if (segmentIntersectsBounds(
+                path[i].x, path[i].y, path[i + 1].x, path[i + 1].y, bodyRects[bi])) {
+            violation = `body-pass-through ${components[bi].id}`;
+            break;
+          }
+        }
+      }
+    }
+
+    if (violation) result.violation = violation;
   }
 
   return results;

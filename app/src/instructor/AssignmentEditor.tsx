@@ -1,12 +1,13 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { AssignmentData, AssignmentQuestion } from '../types';
 import { questionModeLabel } from '../types';
 import { getAssignment, isBundledAssignment } from '../assignments';
-import { localAssignmentStore } from '../storage/AssignmentStore';
+import { assignmentStore } from '../storage/backend';
 import { downloadJson } from '../download';
 import { navigate } from '../routing';
 import { QuestionCreator } from './QuestionCreator';
 import { summarizeQuestion } from './ccSummary';
+import { useAsyncValue } from '../useAsyncValue';
 
 /**
  * Assignment editor: edit the title and the ordered question list of an
@@ -14,13 +15,20 @@ import { summarizeQuestion } from './ccSummary';
  * AssignmentStore. Bundled assignments are read-only and cannot be opened here.
  */
 export function AssignmentEditor({ id }: { id: string }) {
-  const [assignment, setAssignment] = useState<AssignmentData | undefined>(() =>
-    getAssignment(id),
-  );
+  const { value: loaded, loading } = useAsyncValue(() => getAssignment(id), [id]);
+  // Local edits layered over the fetched value: `commit` persists through the
+  // seam and updates the draft, so the editor reflects mutations immediately
+  // without re-fetching.
+  const [draft, setDraft] = useState<AssignmentData | null>(null);
+  useEffect(() => setDraft(null), [id]);
+  const assignment = draft ?? loaded;
   // null = creator closed; { existing? } = creator open (editing or adding).
   const [creator, setCreator] = useState<{ existing?: AssignmentQuestion } | null>(null);
 
   if (!assignment) {
+    if (loading) {
+      return <p className="instructor-empty">Loading…</p>;
+    }
     return (
       <div className="instructor-error">
         <p>Assignment not found.</p>
@@ -44,10 +52,12 @@ export function AssignmentEditor({ id }: { id: string }) {
     );
   }
 
-  // Persist and reflect a new assignment value.
+  // Persist and reflect a new assignment value. Fire-and-forget: the draft
+  // updates immediately either way (local writes land synchronously; a
+  // remote PUT settles in the background).
   const commit = (next: AssignmentData) => {
-    localAssignmentStore.save(next);
-    setAssignment(next);
+    void assignmentStore.save(next);
+    setDraft(next);
   };
 
   const handleTitleBlur = (value: string) => {
@@ -81,7 +91,7 @@ export function AssignmentEditor({ id }: { id: string }) {
   if (creator) {
     return (
       <QuestionCreator
-        assignmentId={id}
+        assignment={assignment}
         existingQuestion={creator.existing}
         onSave={handleSaveQuestion}
         onCancel={() => setCreator(null)}

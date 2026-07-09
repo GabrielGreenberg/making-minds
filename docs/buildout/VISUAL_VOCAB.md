@@ -117,9 +117,11 @@ _(textbook ch. 22, pp. 99–103; mockup `Mock_Ups-9.jpg`)_
 
 - Split view: **arena (Map)** above / **internal circuitry** below (the brain is a
   CC/SC/FSM/TM editor). "Map" label upper-left of the arena.
-- Arena cells: **turbot = yellow triangle** pointing in its facing direction;
-  **block = gray square** (impassable); **food/goal = green circle**. Arena boundary
-  is an implicit wall. One item per cell.
+- Arena cells: **turbot = red triangle** (`#c73535`) pointing in its facing
+  direction (decision 2026-07-08, P6.1b: the implemented red won over the
+  mockups' yellow — Gabriel's call); **block = gray square** (impassable);
+  **food/goal = green circle**. Arena boundary is an implicit wall. One item
+  per cell.
 - **Sensor (1 bit):** 0 = empty ahead, 1 = block/boundary ahead. Food reads as
   passable/empty (the goal is invisible to the turbot — HW3 Note 2).
 - **Motor (2 bits)** `ij` (i = left wheel, j = right wheel): `00` stop, `01` turn

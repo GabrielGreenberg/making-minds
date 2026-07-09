@@ -1,5 +1,5 @@
 import { useRef, useState, useCallback, useEffect, useMemo } from 'react';
-import { useStore, selectEffectiveMode, selectTransitionNotationForSource } from '../store';
+import { useStore, selectEffectiveMode, selectLiveFsmStateId, selectTransitionNotationForSource } from '../store';
 import { inputCharTokens } from '../engine';
 import type {
   CircuitComponent,
@@ -33,6 +33,7 @@ import {
 
 import {
   getComponentSize as getCompDimensions,
+  getLabelAnchor,
   getPortPosition,
   getPortPositionLocal,
 } from '../componentGeometry';
@@ -383,7 +384,10 @@ function CircuitComponentView({
   isSelected: boolean;
 }) {
   const { w, h } = getCompDimensions(comp);
-  const fsmCurrentStateId = useStore((s) => s.fsmCurrentStateId);
+  // The live FSM control state for the green highlight — one selector fed by
+  // whichever sim is active (FSM sim or a turbot arena run with an FSM
+  // brain), never a direct read of one slice's field.
+  const liveFsmStateId = useStore(selectLiveFsmStateId);
 
   const rot = comp.rotation ?? 0;
   const cx = comp.x + w / 2;
@@ -689,18 +693,29 @@ function CircuitComponentView({
               stroke={isSelected ? '#2a7fff' : '#333'}
               strokeWidth={isSelected ? 2 : 1.5}
             />
-            {/* Label above — bold */}
-            <text
-              x={cx}
-              y={comp.y - 5}
-              textAnchor="middle"
-              fontSize="12"
-              fill="#333"
-              fontWeight="700"
-              transform={counterRotateLabel()}
-            >
-              {comp.label}
-            </text>
+            {/* Name label — bold, off the local top side. The anchor rotates
+                with the component (componentGeometry.getLabelAnchor), so a
+                90°/270°-rotated MEM's label sits beside the block instead of
+                straddling the now-vertical M_IN/M_OUT wire at top-center.
+                Coordinates are world coords: counterRotateLabel() cancels the
+                group rotation about the same center. */}
+            {(() => {
+              const anchor = getLabelAnchor(comp);
+              return (
+                <text
+                  x={anchor.x}
+                  y={anchor.y}
+                  textAnchor={anchor.textAnchor}
+                  dominantBaseline={anchor.dominantBaseline}
+                  fontSize="12"
+                  fill="#333"
+                  fontWeight="700"
+                  transform={counterRotateLabel()}
+                >
+                  {comp.label}
+                </text>
+              );
+            })()}
             {/* Left arrow inside block */}
             <path
               d={chevron(comp.x + arrowInset + groupShift, cy, leftDir)}
@@ -767,7 +782,7 @@ function CircuitComponentView({
         );
 
       case 'STATE': {
-        const isCurrentState = fsmCurrentStateId === comp.id;
+        const isCurrentState = liveFsmStateId === comp.id;
         const strokeColor = isCurrentState ? '#4caf50' : isSelected ? '#2a7fff' : '#333';
 
         // Boxed FSM instance: render as a labeled rectangle
@@ -991,6 +1006,8 @@ function WireView({
   fromPos,
   toPos,
   showValues,
+  usedFallback,
+  violation,
 }: {
   wire: Wire;
   pathD: string;
@@ -999,14 +1016,28 @@ function WireView({
   fromPos: { x: number; y: number };
   toPos: { x: number; y: number };
   showValues: boolean;
+  usedFallback?: boolean;
+  violation?: string;
 }) {
   const isBlankWire = wire.value === -1;
   const color = isBlankWire ? '#333' : wire.value === 1 ? '#e53935' : '#333';
   const strokeW = isSelected ? 3 : 2;
   const valStr = isBlankWire ? '' : String(wire.value);
 
+  // Route-quality indicator (warn, don't block — wire-routing design memo):
+  // flagged wires stay fully functional; a hover tooltip names the flag, and
+  // a violation additionally gets a faint dashed amber halo under the wire.
+  // Deliberately NOT red/black dashes: wire color is semantic (black=0,
+  // red=1 per VISUAL_VOCAB) and must stay untouched.
+  const routeFlagTitle = violation
+    ? `Routing warning: ${violation} — try dragging a wire segment`
+    : usedFallback
+      ? 'Routing note: this wire used the simple fallback path'
+      : undefined;
+
   return (
     <g data-wire-id={wire.id} style={{ cursor: 'pointer' }}>
+      {routeFlagTitle && <title>{routeFlagTitle}</title>}
       {/* Invisible wider path for easier clicking */}
       <path
         d={pathD}
@@ -1015,6 +1046,20 @@ function WireView({
         strokeWidth={14}
         data-wire-id={wire.id}
       />
+      {violation && (
+        <path
+          d={pathD}
+          fill="none"
+          stroke="#f5a623"
+          strokeWidth={6}
+          strokeDasharray="4,6"
+          strokeLinejoin="round"
+          strokeLinecap="round"
+          opacity={0.35}
+          pointerEvents="none"
+          data-wire-violation={wire.id}
+        />
+      )}
       <path
         d={pathD}
         fill="none"
@@ -3579,7 +3624,7 @@ export function CircuitCanvas() {
   }, [showGrid]);
 
   // ─── Wire data ref (for event handlers that need current wire paths) ──
-  const wireDataRef = useRef<Map<string, { pathD: string; points: { x: number; y: number }[]; basePoints: { x: number; y: number }[]; crossings: { x: number; y: number }[]; from: { x: number; y: number }; to: { x: number; y: number }; isFsmTransition?: boolean; labelPos?: { x: number; y: number } }>>(new Map());
+  const wireDataRef = useRef<Map<string, { pathD: string; points: { x: number; y: number }[]; basePoints: { x: number; y: number }[]; crossings: { x: number; y: number }[]; from: { x: number; y: number }; to: { x: number; y: number }; isFsmTransition?: boolean; labelPos?: { x: number; y: number }; usedFallback?: boolean; violation?: string }>>(new Map());
 
   // ─── Previous paths ref for continuity bias (§7.2) ──
   const previousPathsRef = useRef<Map<string, { x: number; y: number }[]>>(new Map());
@@ -3592,7 +3637,7 @@ export function CircuitCanvas() {
 
   // ─── Compute all wire paths (A* grid-based router) ──────────────
   const wireData = useMemo(() => {
-    const data = new Map<string, { pathD: string; points: { x: number; y: number }[]; basePoints: { x: number; y: number }[]; crossings: { x: number; y: number }[]; from: { x: number; y: number }; to: { x: number; y: number }; isFsmTransition?: boolean; labelPos?: { x: number; y: number }; controlPt?: { x: number; y: number } }>();
+    const data = new Map<string, { pathD: string; points: { x: number; y: number }[]; basePoints: { x: number; y: number }[]; crossings: { x: number; y: number }[]; from: { x: number; y: number }; to: { x: number; y: number }; isFsmTransition?: boolean; labelPos?: { x: number; y: number }; controlPt?: { x: number; y: number }; usedFallback?: boolean; violation?: string }>();
 
     // Separate FSM transitions from regular wires
     const fsmWires: Wire[] = [];
@@ -3856,6 +3901,11 @@ export function CircuitCanvas() {
         crossings: result.crossings ?? [],
         from: input.sourcePos,
         to: input.targetPos,
+        // Route-quality flags (warn, don't block — spec/wire-routing memo):
+        // usedFallback = obstacle-blind L-path; violation = the router's final
+        // oracle-predicate sweep still sees an appearance defect.
+        usedFallback: result.usedFallback,
+        violation: result.violation,
       });
       nextPreviousPaths.set(wire.id, basePoints);
     }
@@ -4127,6 +4177,8 @@ export function CircuitCanvas() {
                 fromPos={wd.from}
                 toPos={wd.to}
                 showValues={showWireValues}
+                usedFallback={wd.usedFallback}
+                violation={wd.violation}
               />
             );
           })}

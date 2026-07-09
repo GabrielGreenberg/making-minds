@@ -1,11 +1,13 @@
 // What students are allowed to see.
 //
-// The DB stores full AssignmentData — including `test_cases`, which are the
-// answers ("Things to watch": test cases must not ship to the client in
-// production). Instructors get the full object; students get a copy with
-// `test_cases` removed. `turbot_cases` stay: the student UI renders the arena
-// (the Map) from them, and an arena + success criterion is part of the question
-// statement, not the answer key.
+// The DB stores full AssignmentData — including `test_cases` and (for
+// perception questions) `perception_cases`, both of which are the answers
+// ("Things to watch": test cases must not ship to the client in production;
+// a perception case's `expected` bits are the classification key). Instructors
+// get the full object; students get a copy with both banks removed.
+// `turbot_cases` stay: the student UI renders the arena (the Map) from them,
+// and an arena + success criterion is part of the question statement, not the
+// answer key.
 //
 // Grading detail is instructor-only too: students never see per-case
 // input/expected/got (spec: "Failing cases are recorded for the INSTRUCTOR
@@ -23,14 +25,23 @@ export function stripAnswers(assignment: AssignmentData): AssignmentData {
   return {
     ...assignment,
     questions: assignment.questions.map((q) => {
-      const { test_cases: _hidden, ...rest } = q;
-      return { ...rest, test_cases: [] };
+      const { test_cases: _hidden, perception_cases: _alsoHidden, ...rest } = q;
+      // Perception questions keep their `perception` spec (retina width + rule
+      // — that's the statement) but lose the generated case bank (the key).
+      return { ...rest, test_cases: [], perception_cases: [] };
     }),
   };
 }
 
 function stripQuestionResult(qr: QuestionResult): QuestionResult {
-  return { ...qr, cases: [], turbotCases: qr.turbotCases ? [] : undefined };
+  return {
+    ...qr,
+    cases: [],
+    turbotCases: qr.turbotCases ? [] : undefined,
+    // perceptionCases carry frames + expected + got — the perception answer
+    // key. Leaked to students until 2026-07-08; pinned by tools/parityCheck.ts.
+    perceptionCases: qr.perceptionCases ? [] : undefined,
+  };
 }
 
 /** Grade as shown to the student: scores only, no per-case detail. */

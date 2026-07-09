@@ -1,0 +1,312 @@
+{
+  "question": {
+    "id": 14,
+    "label": "Problem 14",
+    "statement": "Full circle. The turbot sits inside a walled rectangular room with no obstacles, on the bottom row of open cells, facing along the wall — and the goal lies in the cell directly behind it. Build a combinatorial-circuit brain that drives the turbot one full lap around the inside of the room and back over the goal. Navigation is completed when the turbot crosses over the goal — it does not need to stop on it. (Think of Pac-Man.)",
+    "buildMode": "turbot",
+    "representation": "binary",
+    "innerMode": "CC",
+    "turbot_cases": [
+      {
+        "arena": {
+          "width": 7,
+          "height": 6,
+          "cells": [
+            [
+              "block",
+              "block",
+              "block",
+              "block",
+              "block",
+              "block",
+              "block"
+            ],
+            [
+              "block",
+              "empty",
+              "empty",
+              "empty",
+              "empty",
+              "empty",
+              "block"
+            ],
+            [
+              "block",
+              "empty",
+              "empty",
+              "empty",
+              "empty",
+              "empty",
+              "block"
+            ],
+            [
+              "block",
+              "empty",
+              "empty",
+              "empty",
+              "empty",
+              "empty",
+              "block"
+            ],
+            [
+              "block",
+              "empty",
+              "empty",
+              "goal",
+              "empty",
+              "empty",
+              "block"
+            ],
+            [
+              "block",
+              "block",
+              "block",
+              "block",
+              "block",
+              "block",
+              "block"
+            ]
+          ],
+          "start": {
+            "x": 4,
+            "y": 4,
+            "facing": "E"
+          }
+        },
+        "maxSteps": 40,
+        "criterion": "pass-through"
+      },
+      {
+        "arena": {
+          "width": 9,
+          "height": 7,
+          "cells": [
+            [
+              "block",
+              "block",
+              "block",
+              "block",
+              "block",
+              "block",
+              "block",
+              "block",
+              "block"
+            ],
+            [
+              "block",
+              "empty",
+              "empty",
+              "empty",
+              "empty",
+              "empty",
+              "empty",
+              "empty",
+              "block"
+            ],
+            [
+              "block",
+              "empty",
+              "empty",
+              "empty",
+              "empty",
+              "empty",
+              "empty",
+              "empty",
+              "block"
+            ],
+            [
+              "block",
+              "empty",
+              "empty",
+              "empty",
+              "empty",
+              "empty",
+              "empty",
+              "empty",
+              "block"
+            ],
+            [
+              "block",
+              "empty",
+              "empty",
+              "empty",
+              "empty",
+              "empty",
+              "empty",
+              "empty",
+              "block"
+            ],
+            [
+              "block",
+              "empty",
+              "empty",
+              "empty",
+              "empty",
+              "goal",
+              "empty",
+              "empty",
+              "block"
+            ],
+            [
+              "block",
+              "block",
+              "block",
+              "block",
+              "block",
+              "block",
+              "block",
+              "block",
+              "block"
+            ]
+          ],
+          "start": {
+            "x": 6,
+            "y": 5,
+            "facing": "E"
+          }
+        },
+        "maxSteps": 60,
+        "criterion": "pass-through"
+      }
+    ]
+  },
+  "correct": {
+    "components": [
+      {
+        "id": "p14-in1",
+        "type": "INPUT",
+        "x": 80,
+        "y": 220,
+        "label": "IN1",
+        "ports": [
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "p14-not",
+        "type": "NOT",
+        "x": 240,
+        "y": 120,
+        "label": "",
+        "ports": [
+          {
+            "id": "in",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "p14-or",
+        "type": "OR",
+        "x": 400,
+        "y": 280,
+        "label": "",
+        "ports": [
+          {
+            "id": "in1",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "in2",
+            "label": "",
+            "side": "left",
+            "index": 1
+          },
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "p14-out1",
+        "type": "OUTPUT",
+        "x": 560,
+        "y": 120,
+        "label": "OUT1",
+        "ports": [
+          {
+            "id": "in",
+            "label": "",
+            "side": "left",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "p14-out2",
+        "type": "OUTPUT",
+        "x": 560,
+        "y": 280,
+        "label": "OUT2",
+        "ports": [
+          {
+            "id": "in",
+            "label": "",
+            "side": "left",
+            "index": 0
+          }
+        ]
+      }
+    ],
+    "wires": [
+      {
+        "id": "p14-w1",
+        "sourceComponentId": "p14-in1",
+        "sourcePortId": "out",
+        "targetComponentId": "p14-not",
+        "targetPortId": "in",
+        "value": 0
+      },
+      {
+        "id": "p14-w2",
+        "sourceComponentId": "p14-not",
+        "sourcePortId": "out",
+        "targetComponentId": "p14-out1",
+        "targetPortId": "in",
+        "value": 0
+      },
+      {
+        "id": "p14-w3",
+        "sourceComponentId": "p14-not",
+        "sourcePortId": "out",
+        "targetComponentId": "p14-or",
+        "targetPortId": "in1",
+        "value": 0
+      },
+      {
+        "id": "p14-w4",
+        "sourceComponentId": "p14-in1",
+        "sourcePortId": "out",
+        "targetComponentId": "p14-or",
+        "targetPortId": "in2",
+        "value": 0
+      },
+      {
+        "id": "p14-w5",
+        "sourceComponentId": "p14-or",
+        "sourcePortId": "out",
+        "targetComponentId": "p14-out2",
+        "targetPortId": "in",
+        "value": 0
+      }
+    ]
+  }
+}

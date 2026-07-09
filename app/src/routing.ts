@@ -72,8 +72,15 @@ export function routeToHash(route: Route): string {
   }
 }
 
+// Monotonic token bumped per applyRoute call: the assignment branch resolves
+// asynchronously (openAssignment awaits the storage seams), and its
+// continuation must not apply view state if a newer navigation has since been
+// applied.
+let applySeq = 0;
+
 /** Drive the store to match a route. The only place navigation state is applied. */
 function applyRoute(route: Route): void {
+  applySeq++;
   const store = useStore.getState();
   switch (route.kind) {
     case 'instructor':
@@ -92,27 +99,32 @@ function applyRoute(route: Route): void {
       store.enterSandbox();
       return;
     case 'assignment': {
-      const ok = store.openAssignment(route.id);
-      if (!ok) {
-        // Unknown assignment id (e.g. a stale deep link) — repair the URL to Home
-        // without leaving a broken entry in history.
-        navigate({ kind: 'home' }, { replace: true });
-        return;
-      }
-      if (route.questionIndex != null) {
-        const { assignment, currentQuestionIndex } = useStore.getState();
-        if (
-          assignment &&
-          route.questionIndex < assignment.questions.length &&
-          route.questionIndex !== currentQuestionIndex
-        ) {
-          store.switchQuestion(route.questionIndex);
+      const seq = applySeq;
+      void store.openAssignment(route.id).then((ok) => {
+        // A newer navigation was applied while the open was in flight — it
+        // owns the UI now; applying this route's view state would clobber it.
+        if (seq !== applySeq) return;
+        if (!ok) {
+          // Unknown assignment id (e.g. a stale deep link) — repair the URL to
+          // Home without leaving a broken entry in history.
+          navigate({ kind: 'home' }, { replace: true });
+          return;
         }
-        useStore.setState({ assignmentView: 'question' });
-      } else {
-        // No question in the URL → the assignment's question list.
-        useStore.setState({ assignmentView: 'overview' });
-      }
+        if (route.questionIndex != null) {
+          const { assignment, currentQuestionIndex, switchQuestion } = useStore.getState();
+          if (
+            assignment &&
+            route.questionIndex < assignment.questions.length &&
+            route.questionIndex !== currentQuestionIndex
+          ) {
+            switchQuestion(route.questionIndex);
+          }
+          useStore.setState({ assignmentView: 'question' });
+        } else {
+          // No question in the URL → the assignment's question list.
+          useStore.setState({ assignmentView: 'overview' });
+        }
+      });
       return;
     }
   }
@@ -138,8 +150,17 @@ export function navigate(route: Route, opts?: { replace?: boolean }): void {
 /** Custom event fired by `navigate` so hash-reading hooks can re-render. */
 export const ROUTE_EVENT = 'mm:route';
 
-/** Wire up Back/Forward and apply the initial URL. Call once at startup. */
+// initRouting runs once per page load. It is called from an AuthGate effect
+// (only after a user exists — a deep link must not fire an unauthenticated
+// openAssignment), so guard against re-entry: StrictMode double-fires
+// effects, and logout → login would otherwise re-arm the popstate listener
+// and re-apply the route.
+let routingStarted = false;
+
+/** Wire up Back/Forward and apply the initial URL. Idempotent; called by AuthGate once a user exists. */
 export function initRouting(): void {
+  if (routingStarted) return;
+  routingStarted = true;
   window.addEventListener('popstate', () => applyRoute(parseHash(location.hash)));
   applyRoute(parseHash(location.hash));
 }

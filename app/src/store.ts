@@ -10,6 +10,7 @@ import type {
   Wire,
   ComponentType,
   AssignmentData,
+  AssignmentState,
   TextElement,
   CommentElement,
   BoxDefinition,
@@ -23,6 +24,7 @@ import type {
   TMSymbol,
   TMNotation,
   TmHistoryEntry,
+  ArenaCell,
   ArenaConfig,
   TurbotState,
   TurbotHistoryEntry,
@@ -38,12 +40,13 @@ import {
 import { topologicalSort, evaluateGate, evaluateCC, evaluateSCSingleStep, sortStateComponents, evaluateFSMSymbolStep, evaluateTMSingleStep, notationForRepresentation, stepCountFor, encodeInput, bitsToTally, bitsToBinary, fsmNotation, turbotFsmNotation, tmNotation, turbotInternalNotation, turbotExternalNotation, type CodecLayout, type TransitionNotation } from './engine';
 import { senseAheadSymbol, applyMotorCommand, initialBrainState, runBrainStep, stateKindOf, type BrainState } from './engine/turbot';
 import { getAssignment, listAssignments } from './assignments';
-import {
-  localWorkbookStore,
-  emptyQuestionCircuit,
-  restoreQuestionCircuits,
-} from './storage/workbookStore';
-import { localSubmissionStore, buildSubmission } from './storage/submissionStore';
+import { emptyQuestionCircuit, restoreQuestionCircuits } from './storage/workbookStore';
+import { buildSubmission } from './storage/submissionStore';
+// Store INSTANCES come from the backend seam (local vs. remote is decided
+// there, nowhere else); the modules above supply only pure helpers + types.
+import { workbookStore, submissionStore, backendMode } from './storage/backend';
+import { writeJournal, clearJournal, reconcileJournal } from './storage/journal';
+import { getSessionUser } from './auth/session';
 
 /**
  * TM tape notation (alphabet) for the current context. Inside an assignment
@@ -61,6 +64,22 @@ export function selectTmNotation(s: {
 }): TMNotation {
   const q = s.assignment?.questions[s.currentQuestionIndex];
   return notationForRepresentation(q ? q.representation : s.repSystem);
+}
+
+/**
+ * The open question's component restriction (`allowed_components`), or null
+ * when unrestricted — sandbox (no assignment), or the field absent/empty
+ * (absent/empty = all allowed; semantics in engine/machineValidation.ts).
+ * The palette (ComponentLibrary) filters its entries through this via
+ * `isComponentTypeAllowed`, so a disallowed gate can never be placed; the
+ * grader's Stage-1 check is the enforcement backstop.
+ */
+export function selectAllowedComponents(s: {
+  assignment: AssignmentData | null;
+  currentQuestionIndex: number;
+}): ComponentType[] | null {
+  const allowed = s.assignment?.questions[s.currentQuestionIndex]?.allowed_components;
+  return allowed && allowed.length > 0 ? allowed : null;
 }
 
 /**
@@ -166,25 +185,76 @@ export function defaultArenaConfig(): ArenaConfig {
 }
 
 /**
- * The active turbot question's primary arena (its first `turbot_cases` entry
- * — the one the student sees and simulates against; see engine/turbot.ts).
- * Falls back to a blank arena outside an assignment/turbot context.
+ * The starter arena a sandbox turbot tab is born with: a 10×8 field walled in
+ * by blocks, one goal in the far (NE) corner, the turbot starting in the near
+ * (SW) corner facing east. Big enough to be worth driving around in, bounded
+ * so a runaway brain visibly hits walls rather than marching off-grid.
+ * Editable in place via the Map's "Edit map" mode (setTabArena).
+ */
+export function sandboxDefaultArena(): ArenaConfig {
+  const width = 10;
+  const height = 8;
+  const cells: ArenaCell[][] = Array.from({ length: height }, (_, y) =>
+    Array.from({ length: width }, (_, x) =>
+      x === 0 || y === 0 || x === width - 1 || y === height - 1 ? 'block' : 'empty',
+    ),
+  );
+  cells[1][width - 2] = 'goal'; // NE inner corner
+  return { width, height, cells, start: { x: 1, y: height - 2, facing: 'E' } };
+}
+
+/** One sandbox worksheet tab. `innerMode`/`arena` are carried only by turbot tabs. */
+export interface SandboxTab {
+  id: string;
+  title: string;
+  buildMode: BuildMode;
+  activeTask: ActiveTask;
+  innerMode?: BuildMode;
+  arena?: ArenaConfig;
+}
+
+// Stable fallback identity so selectors returning it don't churn subscribers.
+const FALLBACK_ARENA: ArenaConfig = defaultArenaConfig();
+
+/** The active sandbox tab, or undefined outside the sandbox (assignment open). */
+function activeSandboxTab(s: {
+  assignment: AssignmentData | null;
+  tabs?: SandboxTab[];
+  activeTabId?: string;
+}): SandboxTab | undefined {
+  if (s.assignment) return undefined;
+  return s.tabs?.find((t) => t.id === s.activeTabId);
+}
+
+/**
+ * The active turbot context's arena. Inside an assignment: the open turbot
+ * question's primary arena (its first `turbot_cases` entry — the one the
+ * student sees and simulates against; see engine/turbot.ts). In the sandbox:
+ * the active turbot tab's own arena (seeded by addTab, edited via
+ * setTabArena). Falls back to a blank arena outside any turbot context.
  */
 export function selectTurbotArena(s: {
   assignment: AssignmentData | null;
   currentQuestionIndex: number;
+  tabs?: SandboxTab[];
+  activeTabId?: string;
 }): ArenaConfig {
   const q = s.assignment?.questions[s.currentQuestionIndex];
-  return q?.turbot_cases?.[0]?.arena ?? defaultArenaConfig();
+  return q?.turbot_cases?.[0]?.arena ?? activeSandboxTab(s)?.arena ?? FALLBACK_ARENA;
 }
 
-/** The inner-circuit editor mode (CC/SC/FSM/TM) for the active turbot question. */
+/**
+ * The inner-circuit editor mode (CC/SC/FSM/TM) for the active turbot context —
+ * the open turbot question's `innerMode`, or the sandbox turbot tab's.
+ */
 export function selectTurbotInnerMode(s: {
   assignment: AssignmentData | null;
   currentQuestionIndex: number;
+  tabs?: SandboxTab[];
+  activeTabId?: string;
 }): BuildMode {
   const q = s.assignment?.questions[s.currentQuestionIndex];
-  return q?.innerMode ?? 'CC';
+  return q?.innerMode ?? activeSandboxTab(s)?.innerMode ?? 'CC';
 }
 
 /**
@@ -198,8 +268,40 @@ export function selectEffectiveMode(s: {
   buildMode: BuildMode;
   assignment: AssignmentData | null;
   currentQuestionIndex: number;
+  tabs?: SandboxTab[];
+  activeTabId?: string;
 }): BuildMode {
   return s.buildMode === 'turbot' ? selectTurbotInnerMode(s) : s.buildMode;
+}
+
+/**
+ * The currently-live FSM control state (component id) — the ONE source of
+ * truth for the canvas's green state highlight, fed by whichever simulation
+ * is active. An FSM sim run carries it in fsmCurrentStateId; a turbot arena
+ * run carries it inside the brain state (the turbot slice — turbotStep /
+ * turbotRun — never writes fsmCurrentStateId, so there is exactly one writer
+ * per sim and this selector picks the active one). The arena branch is gated
+ * on the run having started (history non-empty) to match the FSM sim's
+ * no-highlight-at-rest behavior — turbotReset re-seeds brainState.stateId to
+ * S₀, which would otherwise light up before any step. TM canvases have no
+ * live-state highlight (deliberate: the Current-state readout and machine
+ * table carry it), so TM contexts return null here.
+ */
+export function selectLiveFsmStateId(s: {
+  buildMode: BuildMode;
+  assignment: AssignmentData | null;
+  currentQuestionIndex: number;
+  tabs?: SandboxTab[];
+  activeTabId?: string;
+  fsmCurrentStateId: string | null;
+  turbotBrainState: BrainState;
+  turbotHistory: TurbotHistoryEntry[];
+}): string | null {
+  if (s.buildMode === 'turbot') {
+    if (selectTurbotInnerMode(s) !== 'FSM') return null;
+    return s.turbotHistory.length > 0 ? s.turbotBrainState.stateId ?? null : null;
+  }
+  return s.fsmCurrentStateId;
 }
 
 /**
@@ -215,6 +317,8 @@ export function selectFsmNotation(s: {
   buildMode: BuildMode;
   assignment: AssignmentData | null;
   currentQuestionIndex: number;
+  tabs?: SandboxTab[];
+  activeTabId?: string;
 }): TransitionNotation {
   if (selectEffectiveMode(s) !== 'FSM') return fsmNotation(1, 1);
   if (s.buildMode === 'turbot') return turbotFsmNotation;
@@ -236,6 +340,8 @@ export function selectTransitionNotationForSource(
     assignment: AssignmentData | null;
     currentQuestionIndex: number;
     repSystem: RepSystem;
+    tabs?: SandboxTab[];
+    activeTabId?: string;
   },
   source: CircuitComponent | undefined,
 ): TransitionNotation {
@@ -264,7 +370,9 @@ interface HistoryEntry {
 
 interface AppState {
   // Auto-save status
-  autoSaveStatus: 'saved' | 'unsaved' | 'saving';
+  // 'error' is remote-only: a seam save failed (server unreachable); the
+  // crash buffer holds the state and a backoff retry is scheduled.
+  autoSaveStatus: 'saved' | 'unsaved' | 'saving' | 'error';
 
   // Workbook
   workbookOpen: boolean;
@@ -369,8 +477,11 @@ interface AppState {
   openResponse: string;
   setOpenResponse: (text: string) => void;
   loadAssignment: (assignment: AssignmentData) => void;
-  // Open a bundled assignment by id and show its workbook. Returns false if unknown.
-  openAssignment: (id: string) => boolean;
+  // Open an assignment by id and show its workbook. Resolves false if the id is
+  // unknown. A stale open (one superseded by a newer navigation while its seam
+  // reads were in flight) resolves true and applies nothing — the newer open
+  // owns the outcome.
+  openAssignment: (id: string) => Promise<boolean>;
   switchQuestion: (index: number) => void;
   closeAssignment: () => void;
   // Navigation between the catalog (Home) and the editor.
@@ -383,10 +494,14 @@ interface AppState {
   // Submission export (null when no assignment is loaded)
   exportSubmission: (student?: string) => string | null;
   // Latest recorded submission per assignment id (reactive; for status badges).
+  // Starts empty; hydrated from the submission seam via hydrateSubmissions().
   submissions: Record<string, SubmissionRecord>;
+  // Refresh `submissions` from the seam. Called on auth-ready (App mount) —
+  // the async replacement for the old sync-at-module-init hydration.
+  hydrateSubmissions: () => Promise<void>;
   // Record an immutable snapshot for an assignment. Works whether the assignment
-  // is open (live state) or not (persisted state). Returns null if id is unknown.
-  submitAssignment: (id: string, student?: string) => SubmissionRecord | null;
+  // is open (live state) or not (persisted state). Resolves null if id is unknown.
+  submitAssignment: (id: string, student?: string) => Promise<SubmissionRecord | null>;
   // exportWorkbook and importWorkbook are in the Workbook section above
 
   // Rotation
@@ -430,12 +545,14 @@ interface AppState {
   paste: () => void;
 
   // Tabs (worksheets)
-  tabs: { id: string; title: string; buildMode: BuildMode; activeTask: ActiveTask }[];
+  tabs: SandboxTab[];
   activeTabId: string;
-  addTab: (title: string, buildMode: BuildMode, activeTask?: ActiveTask) => void;
+  addTab: (title: string, buildMode: BuildMode, activeTask?: ActiveTask, innerMode?: BuildMode) => void;
   switchTab: (id: string) => void;
   removeTab: (id: string) => void;
   renameTab: (id: string, title: string) => void;
+  /** Sandbox turbot tabs only: replace the active tab's arena (Map editing). */
+  setTabArena: (arena: ArenaConfig) => void;
   tabCircuits: Map<string, { components: CircuitComponent[]; wires: Wire[]; textElements: TextElement[]; comments: CommentElement[]; boxes: BoxDefinition[] }>;
 
   // Batch move (for efficient multi-component drag)
@@ -673,6 +790,11 @@ const defaultTabId = 'tab-1';
 // which is the signal that they want this combo evaluated again.
 let suppressAutoAddRow = false;
 
+// Monotonic token for openAssignment: each open bumps it, and an open whose
+// seam reads resolve after a newer open started applies nothing — a stale
+// resolve must never clobber a newer navigation.
+let openAssignmentSeq = 0;
+
 export const useStore = create<AppState>()((set, get) => ({
   autoSaveStatus: 'saved' as const,
 
@@ -680,7 +802,20 @@ export const useStore = create<AppState>()((set, get) => ({
   workbookOpen: false,
   workbookTitle: 'Untitled Workbook',
   workbookFileHandle: null,
-  submissions: loadSubmissions(),
+  submissions: {},
+
+  hydrateSubmissions: async () => {
+    const assignments = await listAssignments();
+    const latests = await Promise.all(
+      assignments.map((a) => submissionStore.getLatest(a.id)),
+    );
+    const out: Record<string, SubmissionRecord> = {};
+    assignments.forEach((a, i) => {
+      const latest = latests[i];
+      if (latest) out[a.id] = latest;
+    });
+    set({ submissions: out });
+  },
 
   closeWorkbook: () => {
     set({
@@ -754,6 +889,9 @@ export const useStore = create<AppState>()((set, get) => ({
         textElements: circuit.textElements,
         comments: circuit.comments,
         boxes: circuit.boxes,
+        // Turbot tabs: the brain kind + sandbox arena travel with the sheet.
+        ...(tab.innerMode ? { innerMode: tab.innerMode } : {}),
+        ...(tab.arena ? { arena: tab.arena } : {}),
       };
     });
 
@@ -802,6 +940,11 @@ export const useStore = create<AppState>()((set, get) => ({
             title: ws.title,
             buildMode: ws.buildMode || 'CC' as BuildMode,
             activeTask: ws.activeTask || 'arithmetic' as ActiveTask,
+            // Turbot worksheets: restore brain kind + arena (seed defaults for
+            // files predating / hand-authored without them).
+            ...(ws.buildMode === 'turbot'
+              ? { innerMode: ws.innerMode ?? 'CC' as BuildMode, arena: ws.arena ?? sandboxDefaultArena() }
+              : {}),
           };
         });
 
@@ -1315,18 +1458,38 @@ export const useStore = create<AppState>()((set, get) => ({
     });
     get().resetAllSimState();
   },
-  openAssignment: (id) => {
-    const def = getAssignment(id);
-    if (!def) return false;
+  openAssignment: async (id) => {
+    // Flush any pending debounced save for the canvas we're leaving so its
+    // last edit is persisted before another workbook takes over the live state.
+    flushAutoSave();
     // Same assignment already in memory → resume without wiping in-progress work.
     if (get().assignment?.id === id) {
       set({ workbookOpen: true });
       return true;
     }
+    const seq = ++openAssignmentSeq;
+    const [def, fetched] = await Promise.all([
+      getAssignment(id),
+      workbookStore.loadAssignmentState(id),
+    ]);
+    // Superseded while in flight — drop this resolve (see the AppState note).
+    if (seq !== openAssignmentSeq) return true;
+    if (!def) return false;
+
+    // Remote mode: replay the crash buffer, if one survived a hard tab kill
+    // (storage/journal.ts) — it supersedes the fetched server state and is
+    // re-uploaded. Local mode: `fetched` passes through untouched.
+    let saved = fetched;
+    if (backendMode === 'remote') {
+      const email = getSessionUser()?.email;
+      if (email) {
+        saved = await reconcileJournal(email, id, fetched, workbookStore);
+        if (seq !== openAssignmentSeq) return true;
+      }
+    }
     get().loadAssignment(def);
 
     // Restore any saved work for this assignment (merged by question id).
-    const saved = localWorkbookStore.loadAssignmentState(id);
     const { questionCircuits, currentQuestionIndex } = restoreQuestionCircuits(def, saved);
     const activeQ = def.questions[currentQuestionIndex];
     const activeCircuit = activeQ
@@ -1364,8 +1527,12 @@ export const useStore = create<AppState>()((set, get) => ({
         });
         set({ questionCircuits: qc });
       }
-      // Flush immediately so a quick Home click persists (don't wait for debounce).
-      saveAssignmentState();
+      // Flush immediately so a quick Home click persists (don't wait for
+      // debounce). Fire-and-forget: the local seam writes synchronously before
+      // its first suspension. A remote failure buffers to the crash journal;
+      // the debounced autosave (armed by the set() above) retries with the
+      // error chip + backoff through the normal performAutoSave path.
+      void saveAssignmentState().catch(() => writeOpenAssignmentJournal());
     } else {
       const tc = new Map(state.tabCircuits);
       tc.set(state.activeTabId, {
@@ -1489,8 +1656,8 @@ export const useStore = create<AppState>()((set, get) => ({
     });
     return JSON.stringify(submission, null, 2);
   },
-  submitAssignment: (id, student) => {
-    const def = getAssignment(id);
+  submitAssignment: async (id, student) => {
+    const def = await getAssignment(id);
     if (!def) return null;
     const state = get();
     // Build from live state if this assignment is open; otherwise from the
@@ -1498,12 +1665,13 @@ export const useStore = create<AppState>()((set, get) => ({
     const circuits =
       state.assignment?.id === id
         ? syncedQuestionCircuits(state)
-        : restoreQuestionCircuits(def, localWorkbookStore.loadAssignmentState(id)).questionCircuits;
+        : restoreQuestionCircuits(def, await workbookStore.loadAssignmentState(id))
+            .questionCircuits;
     const submission = buildSubmission(def, circuits, {
       student,
       submittedAt: new Date().toISOString(),
     });
-    const record = localSubmissionStore.submit(id, submission);
+    const record = await submissionStore.submit(id, submission);
     set({ submissions: { ...get().submissions, [id]: record } });
     return record;
   },
@@ -2180,7 +2348,7 @@ export const useStore = create<AppState>()((set, get) => ({
   activeTabId: defaultTabId,
   tabCircuits: new Map(),
 
-  addTab: (title, buildMode, activeTask) => {
+  addTab: (title, buildMode, activeTask, innerMode) => {
     const state = get();
     const newId = uuid();
     const task = activeTask || 'arithmetic';
@@ -2193,8 +2361,14 @@ export const useStore = create<AppState>()((set, get) => ({
       comments: state.comments,
       boxes: state.boxes,
     });
+    // A turbot tab carries its brain kind and its own arena — the sandbox
+    // analog of a turbot question's innerMode + turbot_cases[0].arena, read
+    // through the SAME selectors (selectTurbotInnerMode/selectTurbotArena).
+    const turbotFields = buildMode === 'turbot'
+      ? { innerMode: innerMode ?? 'CC' as BuildMode, arena: sandboxDefaultArena() }
+      : {};
     set({
-      tabs: [...state.tabs, { id: newId, title, buildMode, activeTask: task }],
+      tabs: [...state.tabs, { id: newId, title, buildMode, activeTask: task, ...turbotFields }],
       activeTabId: newId,
       tabCircuits: updatedTabCircuits,
       components: [],
@@ -2259,6 +2433,11 @@ export const useStore = create<AppState>()((set, get) => ({
         textElements: saved.textElements,
         comments: saved.comments,
         boxes: saved.boxes,
+        // The surviving tab's mode must come along with its canvas — leaving
+        // the removed tab's buildMode live would render the new tab's circuit
+        // under the wrong workspace (e.g. a CC sheet showing the turbot Map).
+        buildMode: newTabs[0].buildMode || 'CC',
+        activeTask: newTabs[0].activeTask || 'arithmetic',
       });
       get().resetAllSimState();
     } else {
@@ -2272,6 +2451,20 @@ export const useStore = create<AppState>()((set, get) => ({
     set((state) => ({
       tabs: state.tabs.map((t) => (t.id === id ? { ...t, title } : t)),
     }));
+  },
+
+  setTabArena: (arena) => {
+    const state = get();
+    const tab = state.tabs.find((t) => t.id === state.activeTabId);
+    // Arena editing exists only for sandbox turbot tabs — a question's arena
+    // is instructor-authored and immutable here.
+    if (state.assignment || tab?.buildMode !== 'turbot') return;
+    set({
+      tabs: state.tabs.map((t) => (t.id === tab.id ? { ...t, arena } : t)),
+    });
+    // The pose may now be out of bounds / inside a wall; restart from the
+    // edited arena's start (same manual-reset semantics as circuit edits).
+    get().turbotReset();
   },
 
   // Batch move — single state update for moving multiple components
@@ -3602,50 +3795,104 @@ function syncedQuestionCircuits(s: AppState): Map<number, QuestionCircuit> {
   return circuits;
 }
 
-/** Hydrate the latest-submission-per-assignment map from the submission store. */
-function loadSubmissions(): Record<string, SubmissionRecord> {
-  const out: Record<string, SubmissionRecord> = {};
-  for (const a of listAssignments()) {
-    const latest = localSubmissionStore.getLatest(a.id);
-    if (latest) out[a.id] = latest;
-  }
-  return out;
+/** The open assignment's persistable workbook state (live canvas folded in). */
+function snapshotAssignmentState(s: AppState): AssignmentState {
+  return {
+    currentQuestionIndex: s.currentQuestionIndex,
+    questionCircuits: Object.fromEntries(syncedQuestionCircuits(s)) as Record<
+      number,
+      QuestionCircuit
+    >,
+  };
 }
 
-function saveAssignmentState() {
+// Persist the open assignment's workbook through the WorkbookStore seam.
+// The state snapshot and the seam call happen synchronously (before the first
+// suspension), so unload-time flushes still land with the local store; remote
+// unload flushes additionally pass `keepalive` so the PUT can outlive the
+// page. Returns the saved assignment's id (null when no assignment is open).
+async function saveAssignmentState(keepalive = false): Promise<string | null> {
   const s = useStore.getState();
   const a = s.assignment;
-  if (!a) return;
-  const qc = new Map(s.questionCircuits);
-  const q = a.questions[s.currentQuestionIndex];
-  if (q) {
-    qc.set(q.id, {
-      components: s.components,
-      wires: s.wires,
-      textElements: s.textElements,
-      comments: s.comments,
-      boxes: s.boxes,
-      responseText: s.openResponse,
-    });
-  }
-  localWorkbookStore.saveAssignmentState(a.id, {
-    currentQuestionIndex: s.currentQuestionIndex,
-    questionCircuits: Object.fromEntries(qc) as Record<number, QuestionCircuit>,
-  });
+  if (!a) return null;
+  await workbookStore.saveAssignmentState(a.id, snapshotAssignmentState(s), { keepalive });
+  return a.id;
 }
 
-function performAutoSave() {
+// ── Remote-mode crash buffer (storage/journal.ts) ──────────────────
+// Synchronously buffer the open assignment's unsaved state under the
+// logged-in user's journal key. Called on unload-time flushes and on failed
+// remote saves; a no-op in local mode, when nothing is unsaved, or with no
+// assignment open. Cleared by the next confirmed seam save; replayed by the
+// next openAssignment (reconcileJournal).
+function writeOpenAssignmentJournal(): void {
+  if (backendMode !== 'remote') return;
+  const s = useStore.getState();
+  if (!s.assignment || s.autoSaveStatus === 'saved') return;
+  const email = getSessionUser()?.email;
+  if (!email) return;
+  writeJournal(email, s.assignment.id, snapshotAssignmentState(s));
+}
+
+// Single-flight guard: at most one save is in the seam at a time; a save
+// requested while one is in flight reruns once after it settles (trailing
+// edge), so the latest state always lands and writes can't interleave.
+let autoSaveInFlight = false;
+let autoSaveTrailing = false;
+
+// Remote-mode retry backoff: a failed seam save schedules a retry (through
+// the normal debounce slot, so a fresh edit simply supersedes it), doubling
+// the delay up to a cap; any success resets it.
+const AUTO_SAVE_BACKOFF_INITIAL = 2000;
+const AUTO_SAVE_BACKOFF_MAX = 30000;
+let autoSaveBackoff = AUTO_SAVE_BACKOFF_INITIAL;
+
+async function performAutoSave(keepalive = false): Promise<void> {
+  if (autoSaveInFlight) {
+    autoSaveTrailing = true;
+    return;
+  }
+  autoSaveInFlight = true;
   try {
     useStore.setState({ autoSaveStatus: 'saving' });
+    let savedAssignmentId: string | null = null;
     if (useStore.getState().assignment) {
-      saveAssignmentState();
+      savedAssignmentId = await saveAssignmentState(keepalive);
     } else {
       localStorage.setItem(AUTO_SAVE_KEY, JSON.stringify(getAutoSaveData()));
     }
     useStore.setState({ autoSaveStatus: 'saved' });
+    autoSaveBackoff = AUTO_SAVE_BACKOFF_INITIAL;
+    if (backendMode === 'remote' && savedAssignmentId) {
+      // Confirmed on the server — the crash buffer for this assignment is
+      // now obsolete (a newer edit's own flush would rewrite it anyway).
+      const email = getSessionUser()?.email;
+      if (email) clearJournal(email, savedAssignmentId);
+    }
   } catch {
-    // localStorage full or unavailable — silent fail
-    useStore.setState({ autoSaveStatus: 'saved' });
+    if (backendMode === 'remote') {
+      // Server unreachable (or the write failed): buffer the state locally,
+      // show the error chip, and retry with backoff. The student's work is
+      // in the journal even if the tab dies before a retry lands.
+      useStore.setState({ autoSaveStatus: 'error' });
+      writeOpenAssignmentJournal();
+      if (autoSaveTimer) clearTimeout(autoSaveTimer);
+      autoSaveTimer = setTimeout(() => {
+        autoSaveTimer = null;
+        void performAutoSave();
+      }, autoSaveBackoff);
+      autoSaveBackoff = Math.min(autoSaveBackoff * 2, AUTO_SAVE_BACKOFF_MAX);
+    } else {
+      // Local mode: localStorage full or unavailable — silent fail (unchanged
+      // prototype behavior; same residual-loss class as the docs note).
+      useStore.setState({ autoSaveStatus: 'saved' });
+    }
+  } finally {
+    autoSaveInFlight = false;
+    if (autoSaveTrailing) {
+      autoSaveTrailing = false;
+      void performAutoSave();
+    }
   }
 }
 
@@ -3682,22 +3929,34 @@ useStore.subscribe((state, prev) => {
 
   useStore.setState({ autoSaveStatus: 'unsaved' });
   if (autoSaveTimer) clearTimeout(autoSaveTimer);
-  autoSaveTimer = setTimeout(performAutoSave, AUTO_SAVE_DELAY);
+  autoSaveTimer = setTimeout(() => {
+    void performAutoSave();
+  }, AUTO_SAVE_DELAY);
 });
 
 // Flush a pending debounced save immediately — e.g. when the tab is closing or
 // hidden — so the most recent edit (even just moving a component) is persisted
 // rather than lost in the debounce window.
-function flushAutoSave() {
+//
+// Unload paths (`journal: true`) additionally write the remote crash buffer
+// FIRST — synchronously, so it lands even if the tab dies mid-teardown and
+// regardless of whether the debounce timer is armed (an already-in-flight
+// remote save can die with the tab too). `keepalive: true` (beforeunload/
+// pagehide only; a merely-hidden tab keeps a normal fetch) lets the remote
+// PUT outlive the page — best-effort at ~64KB, the journal is the safety net.
+function flushAutoSave(opts?: { journal?: boolean; keepalive?: boolean }) {
+  if (opts?.journal) writeOpenAssignmentJournal();
   if (!autoSaveTimer) return;
   clearTimeout(autoSaveTimer);
   autoSaveTimer = null;
-  performAutoSave();
+  // Fire-and-forget: with the local seam the write itself is synchronous
+  // (before the first suspension), so it lands even mid-unload.
+  void performAutoSave(opts?.keepalive === true);
 }
-window.addEventListener('beforeunload', flushAutoSave);
-window.addEventListener('pagehide', flushAutoSave);
+window.addEventListener('beforeunload', () => flushAutoSave({ journal: true, keepalive: true }));
+window.addEventListener('pagehide', () => flushAutoSave({ journal: true, keepalive: true }));
 document.addEventListener('visibilitychange', () => {
-  if (document.visibilityState === 'hidden') flushAutoSave();
+  if (document.visibilityState === 'hidden') flushAutoSave({ journal: true });
 });
 
 /**
@@ -3768,10 +4027,15 @@ function loadAutoSave() {
           tabCircuits.set(k, v as TabCircuitData);
         }
       }
-      // Ensure tabs have activeTask field (migration for old auto-saves)
-      const tabs = (data.tabs || []).map((t: { id: string; title: string; buildMode: BuildMode; activeTask?: ActiveTask }) => ({
+      // Ensure tabs have activeTask (migration for old auto-saves) and that
+      // turbot tabs carry a brain kind + arena (belt-and-braces: addTab always
+      // seeds them, so this only fires on hand-edited/truncated saves).
+      const tabs: SandboxTab[] = (data.tabs || []).map((t: SandboxTab) => ({
         ...t,
         activeTask: t.activeTask || 'arithmetic',
+        ...(t.buildMode === 'turbot'
+          ? { innerMode: t.innerMode ?? 'CC', arena: t.arena ?? sandboxDefaultArena() }
+          : {}),
       }));
       const activeId = data.activeTabId || tabs[0]?.id || defaultTabId;
       const activeCircuit = tabCircuits.get(activeId) || { components: [], wires: [], textElements: [], comments: [], boxes: [] };

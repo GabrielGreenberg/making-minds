@@ -1,0 +1,351 @@
+{
+  "question": {
+    "id": 12,
+    "label": "Problem 12",
+    "statement": "Design a finite-state machine brain that drives the turbot up the zig-zag course: follow the stair-stepped corridor all the way to the goal and keep going until the course offers no way on. The sensor reads the cell ahead (0 = empty, 1 = blocked); each transition outputs the two-bit motor command (11 = forward, 10 = turn right, 01 = turn left, 00 = stop).",
+    "buildMode": "turbot",
+    "representation": "binary",
+    "innerMode": "FSM",
+    "turbot_cases": [
+      {
+        "arena": {
+          "width": 9,
+          "height": 9,
+          "cells": [
+            [
+              "block",
+              "goal",
+              "block",
+              "block",
+              "block",
+              "block",
+              "block",
+              "block",
+              "block"
+            ],
+            [
+              "block",
+              "empty",
+              "block",
+              "block",
+              "block",
+              "block",
+              "block",
+              "block",
+              "block"
+            ],
+            [
+              "block",
+              "empty",
+              "empty",
+              "empty",
+              "block",
+              "block",
+              "block",
+              "block",
+              "block"
+            ],
+            [
+              "block",
+              "block",
+              "block",
+              "empty",
+              "block",
+              "block",
+              "block",
+              "block",
+              "block"
+            ],
+            [
+              "block",
+              "block",
+              "block",
+              "empty",
+              "empty",
+              "empty",
+              "block",
+              "block",
+              "block"
+            ],
+            [
+              "block",
+              "block",
+              "block",
+              "block",
+              "block",
+              "empty",
+              "block",
+              "block",
+              "block"
+            ],
+            [
+              "block",
+              "block",
+              "block",
+              "block",
+              "block",
+              "empty",
+              "empty",
+              "empty",
+              "block"
+            ],
+            [
+              "block",
+              "block",
+              "block",
+              "block",
+              "block",
+              "block",
+              "block",
+              "empty",
+              "block"
+            ],
+            [
+              "block",
+              "block",
+              "block",
+              "block",
+              "block",
+              "block",
+              "block",
+              "empty",
+              "block"
+            ]
+          ],
+          "start": {
+            "x": 7,
+            "y": 8,
+            "facing": "N"
+          }
+        },
+        "maxSteps": 60,
+        "criterion": "pass-through"
+      },
+      {
+        "arena": {
+          "width": 6,
+          "height": 6,
+          "cells": [
+            [
+              "block",
+              "goal",
+              "block",
+              "block",
+              "block",
+              "block"
+            ],
+            [
+              "block",
+              "empty",
+              "empty",
+              "block",
+              "block",
+              "block"
+            ],
+            [
+              "block",
+              "block",
+              "empty",
+              "block",
+              "block",
+              "block"
+            ],
+            [
+              "block",
+              "block",
+              "empty",
+              "empty",
+              "empty",
+              "block"
+            ],
+            [
+              "block",
+              "block",
+              "block",
+              "block",
+              "empty",
+              "block"
+            ],
+            [
+              "block",
+              "block",
+              "block",
+              "block",
+              "empty",
+              "block"
+            ]
+          ],
+          "start": {
+            "x": 4,
+            "y": 5,
+            "facing": "N"
+          }
+        },
+        "maxSteps": 40,
+        "criterion": "pass-through"
+      }
+    ]
+  },
+  "correct": {
+    "components": [
+      {
+        "id": "hw4-p12-s0",
+        "type": "STATE",
+        "x": 195,
+        "y": 195,
+        "label": "S₀",
+        "ports": [
+          {
+            "id": "left",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "right",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "hw4-p12-s1",
+        "type": "STATE",
+        "x": 515,
+        "y": 195,
+        "label": "S₁",
+        "ports": [
+          {
+            "id": "left",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "right",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "hw4-p12-s2",
+        "type": "STATE",
+        "x": 515,
+        "y": 455,
+        "label": "S₂",
+        "ports": [
+          {
+            "id": "left",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "right",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
+        "id": "hw4-p12-s3",
+        "type": "STATE",
+        "x": 195,
+        "y": 455,
+        "label": "S₃",
+        "ports": [
+          {
+            "id": "left",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "right",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      }
+    ],
+    "wires": [
+      {
+        "id": "hw4-p12-t1",
+        "sourceComponentId": "hw4-p12-s0",
+        "sourcePortId": "right",
+        "targetComponentId": "hw4-p12-s0",
+        "targetPortId": "left",
+        "value": 0,
+        "transitionLabel": "0:11"
+      },
+      {
+        "id": "hw4-p12-t2",
+        "sourceComponentId": "hw4-p12-s0",
+        "sourcePortId": "right",
+        "targetComponentId": "hw4-p12-s1",
+        "targetPortId": "left",
+        "value": 0,
+        "transitionLabel": "1:01"
+      },
+      {
+        "id": "hw4-p12-t3",
+        "sourceComponentId": "hw4-p12-s1",
+        "sourcePortId": "right",
+        "targetComponentId": "hw4-p12-s2",
+        "targetPortId": "left",
+        "value": 0,
+        "transitionLabel": "0:11"
+      },
+      {
+        "id": "hw4-p12-t4",
+        "sourceComponentId": "hw4-p12-s1",
+        "sourcePortId": "right",
+        "targetComponentId": "hw4-p12-s1",
+        "targetPortId": "left",
+        "value": 0,
+        "transitionLabel": "1:00"
+      },
+      {
+        "id": "hw4-p12-t5",
+        "sourceComponentId": "hw4-p12-s2",
+        "sourcePortId": "right",
+        "targetComponentId": "hw4-p12-s2",
+        "targetPortId": "left",
+        "value": 0,
+        "transitionLabel": "0:11"
+      },
+      {
+        "id": "hw4-p12-t6",
+        "sourceComponentId": "hw4-p12-s2",
+        "sourcePortId": "right",
+        "targetComponentId": "hw4-p12-s3",
+        "targetPortId": "left",
+        "value": 0,
+        "transitionLabel": "1:10"
+      },
+      {
+        "id": "hw4-p12-t7",
+        "sourceComponentId": "hw4-p12-s3",
+        "sourcePortId": "right",
+        "targetComponentId": "hw4-p12-s0",
+        "targetPortId": "left",
+        "value": 0,
+        "transitionLabel": "0:11"
+      },
+      {
+        "id": "hw4-p12-t8",
+        "sourceComponentId": "hw4-p12-s3",
+        "sourcePortId": "right",
+        "targetComponentId": "hw4-p12-s3",
+        "targetPortId": "left",
+        "value": 0,
+        "transitionLabel": "1:00"
+      }
+    ]
+  }
+}

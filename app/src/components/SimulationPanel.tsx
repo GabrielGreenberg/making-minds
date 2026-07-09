@@ -121,10 +121,18 @@ export function SimulationToolbar() {
           )}
           <span
             className="autosave-indicator"
-            style={{ marginLeft: 0 }}
-            title={autoSaveStatus === 'saved' ? 'All changes saved' : autoSaveStatus === 'saving' ? 'Saving...' : 'Unsaved changes'}
+            style={{ marginLeft: 0, ...(autoSaveStatus === 'error' ? { color: '#c62828' } : {}) }}
+            title={
+              autoSaveStatus === 'saved' ? 'All changes saved'
+              : autoSaveStatus === 'saving' ? 'Saving...'
+              : autoSaveStatus === 'error' ? 'The server could not be reached — your work is kept in this browser and saving will retry automatically'
+              : 'Unsaved changes'
+            }
           >
-            {autoSaveStatus === 'saved' ? '✓ Saved' : autoSaveStatus === 'saving' ? 'Saving...' : '• Unsaved'}
+            {autoSaveStatus === 'saved' ? '✓ Saved'
+              : autoSaveStatus === 'saving' ? 'Saving...'
+              : autoSaveStatus === 'error' ? '⚠ Not saved — retrying'
+              : '• Unsaved'}
           </span>
         </div>
       </div>

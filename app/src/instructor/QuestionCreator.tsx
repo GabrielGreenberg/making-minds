@@ -1,7 +1,9 @@
 import { useState } from 'react';
 import type {
+  AssignmentData,
   AssignmentQuestion,
   BuildMode,
+  ComponentType,
   RepSystem,
   ArenaConfig,
   TurbotSuccessCriterion,
@@ -13,7 +15,6 @@ import {
   MAX_PERCEPTION_WIDTH,
   MIN_PERCEPTION_WIDTH,
 } from '../engine/perception';
-import { getAssignment } from '../assignments';
 import { ArenaCanvas } from '../components/ArenaCanvas';
 import { blankArena, resizeArena, setArenaCell, placeStart, MAX_ARENA_SIZE } from './arenaEditing';
 import {
@@ -33,7 +34,10 @@ import {
 } from './ccPreview';
 
 interface Props {
-  assignmentId: string;
+  // The assignment being edited. The creator reads its question list for the
+  // default label and new-question id allocation; the parent editor already
+  // holds the fetched value, so no seam read happens here.
+  assignment: AssignmentData;
   existingQuestion?: AssignmentQuestion;
   onSave: (q: AssignmentQuestion) => void;
   onCancel: () => void;
@@ -69,6 +73,19 @@ const CRITERIA: { value: TurbotSuccessCriterion; label: string; hint: string }[]
   { value: 'reach-and-stop', label: 'Reach goal and stop', hint: 'The turbot must halt itself (motor 00) on the goal cell.' },
   { value: 'pass-through', label: 'Pass through goal', hint: 'The turbot must visit the goal cell at some step.' },
   { value: 'return-to-start', label: 'Return to start', hint: 'The turbot must end on its starting cell — first visiting the goal cell, if the arena has one.' },
+];
+
+// The restrictable gate vocabulary (`allowed_components`, semantics in
+// engine/machineValidation.ts): the CC/SC palette's placeable circuit
+// components, in palette order. INPUT/OUTPUT are infrastructure — always
+// allowed, so not offered as checkboxes (they're saved into the field
+// explicitly for readability, matching the HW1 fixtures). FSM/TM canvases
+// have a STATE-only vocabulary, so the restriction isn't offered there.
+const RESTRICTABLE_GATES: { type: ComponentType; label: string }[] = [
+  { type: 'AND', label: 'AND' },
+  { type: 'OR', label: 'OR' },
+  { type: 'NOT', label: 'NOT' },
+  { type: 'MEM', label: 'MEM' },
 ];
 
 type ArenaTool = 'block' | 'goal' | 'erase' | 'start';
@@ -109,7 +126,7 @@ const PERCEPTION_KINDS: Record<'CC' | 'SC', { kind: PerceptionKind; label: strin
   ],
 };
 
-export function QuestionCreator({ assignmentId, existingQuestion, onSave, onCancel }: Props) {
+export function QuestionCreator({ assignment, existingQuestion, onSave, onCancel }: Props) {
   // Mode is an ordinary field of the shared form: new questions default to CC,
   // existing ones keep their mode. Switching it must NOT reset the groups/formulas
   // below — they're valid regardless of mode (the whole point of the shared shape).
@@ -125,6 +142,20 @@ export function QuestionCreator({ assignmentId, existingQuestion, onSave, onCanc
   const [requireStandardHalt, setRequireStandardHalt] = useState<boolean>(
     () => existingQuestion?.requireStandardHaltPosition ?? false,
   );
+
+  // Component restriction (`allowed_components`). Off = unrestricted (the
+  // field is omitted). On = students may use only the checked gates (plus
+  // INPUT/OUTPUT, which are always allowed — see engine/machineValidation.ts).
+  const [restrictComponents, setRestrictComponents] = useState<boolean>(
+    () => (existingQuestion?.allowed_components?.length ?? 0) > 0,
+  );
+  const [allowedGates, setAllowedGates] = useState<ComponentType[]>(() => {
+    const existing = existingQuestion?.allowed_components;
+    const vocabulary = RESTRICTABLE_GATES.map((g) => g.type);
+    return existing && existing.length > 0
+      ? vocabulary.filter((t) => existing.includes(t))
+      : vocabulary; // default when first enabled: everything checked
+  });
 
   const [inputs, setInputs] = useState<AuthoredInputGroup[]>(() =>
     existingQuestion?.cc_spec?.inputs.map((g) => ({
@@ -143,8 +174,7 @@ export function QuestionCreator({ assignmentId, existingQuestion, onSave, onCanc
   const outputs: AuthoredOutputGroup[] = [{ name: 'f', formula }];
   const [label, setLabel] = useState(() => {
     if (existingQuestion) return existingQuestion.label;
-    const count = getAssignment(assignmentId)?.questions.length ?? 0;
-    return `Problem ${count + 1}`;
+    return `Problem ${assignment.questions.length + 1}`;
   });
   const [statement, setStatement] = useState(existingQuestion?.statement ?? '');
 
@@ -208,6 +238,15 @@ export function QuestionCreator({ assignmentId, existingQuestion, onSave, onCanc
   const isOpen = mode === 'open';
   const canPerceive = mode === 'CC' || mode === 'SC';
   const isPerception = canPerceive && task === 'perception';
+
+  // The restriction applies to gate-vocabulary canvases: CC/SC questions
+  // (function or perception) and turbot questions whose brain is CC/SC.
+  const canRestrictComponents =
+    mode === 'CC' || mode === 'SC' || (isTurbot && (innerMode === 'CC' || innerMode === 'SC'));
+  const allowedComponentsField: Pick<AssignmentQuestion, 'allowed_components'> =
+    canRestrictComponents && restrictComponents
+      ? { allowed_components: ['INPUT', 'OUTPUT', ...allowedGates] }
+      : {};
 
   // The rule kind must match the mode's family; coerce when the mode flips.
   const kindChoices = mode === 'CC' || mode === 'SC' ? PERCEPTION_KINDS[mode] : [];
@@ -283,7 +322,7 @@ export function QuestionCreator({ assignmentId, existingQuestion, onSave, onCanc
   const handleSave = () => {
     if (!saveable) return;
 
-    const existingQsForId = getAssignment(assignmentId)?.questions ?? [];
+    const existingQsForId = assignment.questions;
     const newId =
       existingQuestion?.id ??
       existingQsForId.reduce((max, q) => Math.max(max, q.id), 0) + 1;
@@ -313,6 +352,7 @@ export function QuestionCreator({ assignmentId, existingQuestion, onSave, onCanc
         statement: statement.trim(),
         buildMode: 'turbot',
         representation: rep,
+        ...allowedComponentsField,
         innerMode,
         turbot_cases: [{ arena, maxSteps, criterion }],
       });
@@ -335,6 +375,7 @@ export function QuestionCreator({ assignmentId, existingQuestion, onSave, onCanc
         statement: statement.trim(),
         buildMode: mode,
         representation: 'binary',
+        ...allowedComponentsField,
         perception: { rule, width: effWidth },
         perception_cases,
       });
@@ -362,6 +403,8 @@ export function QuestionCreator({ assignmentId, existingQuestion, onSave, onCanc
       representation: rep,
       // TM-only acceptance strictness; omitted (default) unless checked.
       ...(mode === 'TM' && requireStandardHalt ? { requireStandardHaltPosition: true } : {}),
+      // Component restriction; omitted (default = unrestricted) unless enabled.
+      ...allowedComponentsField,
       cc_spec: bank.spec,
       test_cases: bank.test_cases,
     });
@@ -498,6 +541,40 @@ export function QuestionCreator({ assignmentId, existingQuestion, onSave, onCanc
             </div>
           </>
         )}
+        {canRestrictComponents && (
+          <>
+            <label className="instructor-inline-field">
+              <input
+                type="checkbox"
+                checked={restrictComponents}
+                onChange={(e) => setRestrictComponents(e.target.checked)}
+              />
+              Restrict available components (students may build only with the checked
+              components; inputs and outputs are always available, and boxed circuits
+              may not contain anything else)
+            </label>
+            {restrictComponents && (
+              <div className="instructor-criterion-row">
+                {RESTRICTABLE_GATES.map((g) => (
+                  <label key={g.type} className="instructor-inline-field">
+                    <input
+                      type="checkbox"
+                      checked={allowedGates.includes(g.type)}
+                      onChange={(e) =>
+                        setAllowedGates(
+                          RESTRICTABLE_GATES.map((r) => r.type).filter((t) =>
+                            t === g.type ? e.target.checked : allowedGates.includes(t),
+                          ),
+                        )
+                      }
+                    />
+                    {g.label}
+                  </label>
+                ))}
+              </div>
+            )}
+          </>
+        )}
       </section>
 
       {/* Turbot: arena editor + success criterion (replaces the value-based
@@ -550,7 +627,12 @@ export function QuestionCreator({ assignmentId, existingQuestion, onSave, onCanc
                 />
               </label>
             </div>
-            <ArenaCanvas arena={arena} onCellClick={handleArenaClick} />
+            {/* Scroll container: a max-size (30×30) arena is ~1200px square at the
+                default cell size, well past the editor panel — let it scroll in
+                both axes instead of blowing out the form layout. */}
+            <div style={{ overflow: 'auto', maxWidth: '100%', maxHeight: '60vh' }}>
+              <ArenaCanvas arena={arena} onCellClick={handleArenaClick} />
+            </div>
             {arenaError && <p className="instructor-preview-warning">{arenaError}</p>}
           </section>
 
