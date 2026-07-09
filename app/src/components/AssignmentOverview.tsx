@@ -23,7 +23,14 @@ export function AssignmentOverview() {
       'Note: only your most recent submission is graded — submitting again replaces any earlier submission for grading purposes.'
     );
     if (!ok) return;
-    void submitAssignment(assignment.id, getCurrentUserEmail());
+    // Online-only submit: a failure records nothing and asks for a visible
+    // retry — never a silent (late) queue. See MenuBar's handler.
+    void submitAssignment(assignment.id, getCurrentUserEmail()).catch(() => {
+      alert(
+        'Submission failed — the server could not be reached, and nothing was recorded.\n\n' +
+        'Your work is still saved. Please try Submit again in a moment.'
+      );
+    });
   };
 
   return (

@@ -16,7 +16,10 @@ export function HomeScreen() {
   const submitAssignment = useStore((s) => s.submitAssignment);
   const { user, logout } = useAuth();
 
-  const { value: assignmentList, loading } = useAsyncValue(() => listAssignments(), []);
+  const { value: assignmentList, loading, error, reload } = useAsyncValue(
+    () => listAssignments(),
+    [],
+  );
   const assignments = assignmentList ?? [];
 
   const handleSubmit = async (id: string, title: string) => {
@@ -25,7 +28,18 @@ export function HomeScreen() {
       'Note: only your most recent submission is graded — submitting again replaces any earlier submission for grading purposes.'
     );
     if (!ok) return;
-    const rec = await submitAssignment(id, getCurrentUserEmail());
+    let rec;
+    try {
+      rec = await submitAssignment(id, getCurrentUserEmail());
+    } catch {
+      // Online-only submit: a failure records nothing and asks for a visible
+      // retry — never a silent (late) queue. The work itself is autosaved.
+      alert(
+        'Submission failed — the server could not be reached, and nothing was recorded.\n\n' +
+        'Your work is still saved. Please try Submit again in a moment.'
+      );
+      return;
+    }
     if (!rec) return;
     // The submission is autograded on receipt, but the grade is NEVER shown at
     // submit time — students see grades only after the instructor releases
@@ -94,8 +108,14 @@ export function HomeScreen() {
                 </div>
               );
             })}
-            {assignments.length === 0 && (
+            {assignments.length === 0 && !error && (
               <p className="home-empty">{loading ? 'Loading…' : 'No assignments available.'}</p>
+            )}
+            {error && !loading && (
+              <p className="home-empty">
+                Couldn’t load assignments — the server may be unreachable.{' '}
+                <button className="menu-link-button" onClick={reload}>Retry</button>
+              </p>
             )}
           </div>
         </section>

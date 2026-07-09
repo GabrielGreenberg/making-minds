@@ -4,6 +4,7 @@ import type { AuthUser, AuthContextValue } from './types';
 import { SESSION_KEY, findAccount, readPersistedAccount } from './accounts';
 import { setSessionUser, getSessionUser } from './session';
 import { backendMode } from '../storage/backend';
+import { migrateLocalData } from '../storage/migrateLocal';
 import * as api from '../api/client';
 
 // The auth layer, both modes behind one set of exports (AuthProvider /
@@ -67,6 +68,21 @@ function LocalAuthProvider({ children }: { children: ReactNode }) {
   );
 }
 
+/**
+ * First-remote-login migration: fill-empty upload of any prototype
+ * localStorage data (see storage/migrateLocal.ts). Awaited BEFORE the user is
+ * set, so nothing behind AuthGate can read a server workbook that migration
+ * is about to fill. Failure is non-fatal (login proceeds; the guard stays
+ * unset so the next login retries).
+ */
+async function runMigration(u: { email: string; role: 'student' | 'instructor' }): Promise<void> {
+  try {
+    await migrateLocalData(u);
+  } catch (e) {
+    console.warn('local-data migration failed (will retry next login):', e);
+  }
+}
+
 function RemoteAuthProvider({ children }: { children: ReactNode }) {
   const [user, setUserState] = useState<AuthUser | null>(null);
   // Only an existing token needs resolving; with none we go straight to login.
@@ -89,17 +105,21 @@ function RemoteAuthProvider({ children }: { children: ReactNode }) {
     if (!token) return;
     let cancelled = false;
     api.me().then(
-      (u) => {
+      async (u) => {
+        if (cancelled) return;
+        await runMigration(u);
         if (!cancelled) {
           setUser(u);
           setLoading(false);
         }
       },
-      () => {
-        // Dead/foreign token (the 401 hook has already cleared it) or the
-        // server is unreachable — either way, resolve to logged-out.
+      (e: unknown) => {
+        // A 401 (dead/foreign token) has already been cleared by the hook
+        // above; any OTHER failure (transient network blip past the health
+        // gate) keeps the token so a reload can restore the session — either
+        // way, resolve this boot to logged-out.
         if (!cancelled) {
-          api.setToken(null);
+          if (e instanceof api.ApiError && e.status === 401) api.setToken(null);
           setUser(null);
           setLoading(false);
         }
@@ -114,6 +134,7 @@ function RemoteAuthProvider({ children }: { children: ReactNode }) {
     async (email: string) => {
       try {
         const u = await api.login(email);
+        await runMigration(u);
         setUser(u);
         return true;
       } catch {

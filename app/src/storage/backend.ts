@@ -3,10 +3,11 @@
 // of the store INSTANCES. Consumers import `workbookStore` /
 // `assignmentStore` / `submissionStore` from here and never construct a
 // Local*/Remote* store themselves, so the whole app switches backends on this
-// one constant. (Two deliberate exceptions pin the concrete LOCAL stores
-// directly: devData/seed.ts, which needs the off-seam dev-only
-// `clearSubmissions`, and tools/navResetCheck.ts, which asserts the Node
-// harness resolves to 'local'.)
+// one constant. (Three deliberate exceptions pin concrete stores directly:
+// devData/seed.ts needs the off-seam dev-only `clearSubmissions`,
+// tools/navResetCheck.ts asserts the Node harness resolves to 'local', and
+// storage/migrateLocal.ts reads the LOCAL stores and writes the REMOTE ones
+// by definition — it is the bridge between them.)
 //
 // The `import.meta.env?.` guard (same pattern as api/client.ts) keeps Node/tsx
 // harness runs resolving to 'local' — import.meta.env only exists under Vite.

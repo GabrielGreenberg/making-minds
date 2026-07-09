@@ -19,6 +19,18 @@
 //     instructor reads server grades → manual review through the seam →
 //     release/unrelease gates what the student's records carry
 //
+// S4 additions (the cutover's resilience slice):
+//
+//   - the boot health probe: api.health() true against the live server,
+//     false on a 503 answer AND on a dead port (HealthGate's retry screen)
+//   - the fill-empty migration decision table (storage/migrateLocal.ts):
+//     server-null + local-present → upload; server-present → NEVER touch;
+//     per-email guard key; idempotent with and without the guard; student
+//     role never publishes locally carried authored assignments
+//   - the crash-buffer journal (storage/journal.ts): keyed per email (shared
+//     lab browsers), replay supersedes the fetched server state, re-uploads
+//     through the seam, and clears itself on the confirmed upload
+//
 // Exits non-zero on the first tally of failures.
 
 // The api client reads the bearer token from localStorage (lazily, per call);
@@ -29,6 +41,11 @@ const backing = new Map<string, string>();
   setItem: (k: string, v: string) => void backing.set(k, String(v)),
   removeItem: (k: string) => void backing.delete(k),
   clear: () => backing.clear(),
+  // length/key(i): migrateLocalData scans localStorage by prefix.
+  get length() {
+    return backing.size;
+  },
+  key: (i: number) => Array.from(backing.keys())[i] ?? null,
 };
 
 const { readFileSync } = await import('node:fs');
@@ -56,7 +73,13 @@ function check(label: string, ok: boolean, detail?: string) {
 // House pattern from notationCheck: the modules a remote student's browser
 // necessarily loads for storage I/O must not import the engine grader —
 // grading stays where the test cases are (the server).
-for (const rel of ['../src/storage/remoteStores.ts', '../src/storage/backend.ts', '../src/api/client.ts']) {
+for (const rel of [
+  '../src/storage/remoteStores.ts',
+  '../src/storage/backend.ts',
+  '../src/api/client.ts',
+  '../src/storage/journal.ts',
+  '../src/storage/migrateLocal.ts',
+]) {
   const source = readFileSync(new URL(rel, import.meta.url), 'utf8');
   check(
     `grep gate: ${rel.replace('../src/', '')} imports no grader`,
@@ -238,6 +261,127 @@ const dead = await remoteSubmissionStore
   .then(() => null as api.ApiError | null)
   .catch((e: unknown) => (e instanceof api.ApiError ? e : null));
 check('dead token rejects with ApiError(401) and fires the hook', dead?.status === 401 && unauthorizedFires === 2);
+
+// ═══ S4: health probe · fill-empty migration · crash-buffer journal ═══
+
+// ── health probe (auth/HealthGate.tsx's boot decision) ───────────
+const liveBase = `http://127.0.0.1:${typeof address === 'object' && address ? address.port : 0}`;
+check('health() true against the live server', (await api.health()) === true);
+
+const { createServer } = await import('node:http');
+const sick = createServer((_req, res) => {
+  res.statusCode = 503;
+  res.end('{"ok":false}');
+});
+sick.listen(0);
+await new Promise<void>((resolve) => sick.on('listening', resolve));
+const sickAddress = sick.address();
+const sickPort = typeof sickAddress === 'object' && sickAddress ? sickAddress.port : 0;
+api.setApiBase(`http://127.0.0.1:${sickPort}`);
+check('health() false when the server answers 503', (await api.health()) === false);
+await new Promise<void>((resolve) => sick.close(() => resolve()));
+check('health() false against a dead port (connection refused)', (await api.health()) === false);
+api.setApiBase(liveBase);
+
+// ── fill-empty migration (storage/migrateLocal.ts) ───────────────
+// The decision table: server-null + local-present → upload; server-present →
+// never touch; guard key per email; idempotent with AND without the guard.
+const { migrateLocalData } = await import('../src/storage/migrateLocal');
+const { localAssignmentStore } = await import('../src/storage/AssignmentStore');
+
+await api.login(instructor.email);
+const wbLocal = {
+  currentQuestionIndex: 1,
+  questionCircuits: { 5: { components: [], wires: [], textElements: [], comments: [], boxes: [] } },
+};
+const wbServerPre = {
+  currentQuestionIndex: 4,
+  questionCircuits: { 9: { components: [], wires: [], textElements: [], comments: [], boxes: [] } },
+};
+// Local prototype data in the shimmed browser localStorage:
+backing.set('mm:asg:' + SAMPLE_ASSIGNMENT_ID, JSON.stringify(wbLocal)); // instructor has NO server copy
+backing.set('mm:asg:wb-taken', JSON.stringify({ ...wbLocal, currentQuestionIndex: 2 }));
+await remoteWorkbookStore.saveAssignmentState('wb-taken', wbServerPre); // server-present
+const localOnlyAsg = { ...buildSampleAssignment(), id: 'migrated-local-asg', title: 'Authored Locally' };
+await localAssignmentStore.save(localOnlyAsg); // writes mm:inst-asg:migrated-local-asg to the shim
+await localAssignmentStore.save({ ...buildSampleAssignment(), title: 'LOCAL EDIT, MUST NOT WIN' }); // id collides with the seeded server row
+
+const mig1 = await migrateLocalData({ email: instructor.email, role: 'instructor' });
+check('migration ran and uploaded exactly the two server-empty items',
+  mig1.ran && mig1.workbooksUploaded === 1 && mig1.assignmentsUploaded === 1,
+  JSON.stringify(mig1));
+const migratedWb = await remoteWorkbookStore.loadAssignmentState(SAMPLE_ASSIGNMENT_ID);
+check('server-null + local-present → workbook uploaded',
+  migratedWb?.currentQuestionIndex === 1 && migratedWb.questionCircuits[5] != null);
+const untouchedWb = await remoteWorkbookStore.loadAssignmentState('wb-taken');
+check('server-present workbook NEVER touched',
+  untouchedWb?.currentQuestionIndex === 4 && untouchedWb.questionCircuits[9] != null);
+check('local-only authored assignment uploaded',
+  (await remoteAssignmentStore.get('migrated-local-asg'))?.assignment.title === 'Authored Locally');
+check('server-present assignment NEVER touched (local title edit loses)',
+  (await remoteAssignmentStore.get(SAMPLE_ASSIGNMENT_ID))?.assignment.title !== 'LOCAL EDIT, MUST NOT WIN');
+const guardKey = 'mm:migrated:' + instructor.email.toLowerCase();
+check('per-email guard key set after a successful pass', backing.has(guardKey));
+
+// Idempotence via the guard: mutate local, re-run → nothing re-uploads.
+backing.set('mm:asg:' + SAMPLE_ASSIGNMENT_ID, JSON.stringify({ ...wbLocal, currentQuestionIndex: 3 }));
+const mig2 = await migrateLocalData({ email: instructor.email, role: 'instructor' });
+check('second run is a guard-key no-op', mig2.ran === false && mig2.workbooksUploaded === 0);
+check('…and the server copy is unchanged',
+  (await remoteWorkbookStore.loadAssignmentState(SAMPLE_ASSIGNMENT_ID))?.currentQuestionIndex === 1);
+
+// Idempotence WITHOUT the guard: fill-empty itself never overwrites.
+backing.delete(guardKey);
+const mig3 = await migrateLocalData({ email: instructor.email, role: 'instructor' });
+check('guard-less re-run uploads nothing (everything is server-present now)',
+  mig3.ran && mig3.workbooksUploaded === 0 && mig3.assignmentsUploaded === 0,
+  JSON.stringify(mig3));
+check('…wb-taken still carries the pre-migration server state',
+  (await remoteWorkbookStore.loadAssignmentState('wb-taken'))?.currentQuestionIndex === 4);
+
+// Student role: workbooks migrate per-user; authored assignments do NOT.
+await api.login(student.email);
+await localAssignmentStore.save({ ...buildSampleAssignment(), id: 'student-carried-asg', title: 'Not Mine To Publish' });
+const migS = await migrateLocalData({ email: student.email, role: 'student' });
+check('student migration runs without throwing (assignments skipped by role)',
+  migS.ran && migS.assignmentsUploaded === 0, JSON.stringify(migS));
+check('student’s existing server workbook untouched (per-user fill-empty)',
+  (await remoteWorkbookStore.loadAssignmentState(SAMPLE_ASSIGNMENT_ID))?.currentQuestionIndex === 2);
+api.setToken(iTok);
+check('the student-carried authored assignment never reached the server',
+  (await remoteAssignmentStore.get('student-carried-asg')) === null);
+
+// ── crash-buffer journal (storage/journal.ts) ────────────────────
+const { writeJournal, readJournal, clearJournal, reconcileJournal } = await import(
+  '../src/storage/journal'
+);
+const jState = {
+  currentQuestionIndex: 7,
+  questionCircuits: { 3: { components: [], wires: [], textElements: [], comments: [], boxes: [] } },
+};
+writeJournal('alice@example.com', 'jr-asg', jState);
+check('journal keyed per email: another user reads null',
+  readJournal('bob@example.com', 'jr-asg') === null);
+check('journal round-trips for its own (email, assignment)',
+  readJournal('alice@example.com', 'jr-asg')?.currentQuestionIndex === 7);
+clearJournal('alice@example.com', 'jr-asg');
+check('clearJournal removes the buffer', readJournal('alice@example.com', 'jr-asg') === null);
+
+// Replay: a surviving buffer supersedes the fetched server state, is
+// re-uploaded through the seam, and is cleared on the confirmed upload.
+api.setToken(sTok);
+const jServer = { ...jState, currentQuestionIndex: 0 };
+await remoteWorkbookStore.saveAssignmentState('jr-asg', jServer);
+writeJournal(student.email, 'jr-asg', jState);
+const replayed = await reconcileJournal(student.email, 'jr-asg', jServer, remoteWorkbookStore);
+check('reconcile returns the buffered state (replay wins over the fetched copy)',
+  replayed?.currentQuestionIndex === 7);
+check('replay uploaded the buffer to the server',
+  (await remoteWorkbookStore.loadAssignmentState('jr-asg'))?.currentQuestionIndex === 7);
+check('replay cleared the journal key', readJournal(student.email, 'jr-asg') === null);
+const passthrough = await reconcileJournal(student.email, 'jr-asg', jServer, remoteWorkbookStore);
+check('no buffer → the fetched state passes through untouched',
+  passthrough === jServer);
 
 server.close();
 db.close();

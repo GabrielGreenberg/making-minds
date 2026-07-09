@@ -10,6 +10,7 @@ import type {
   Wire,
   ComponentType,
   AssignmentData,
+  AssignmentState,
   TextElement,
   CommentElement,
   BoxDefinition,
@@ -43,7 +44,9 @@ import { emptyQuestionCircuit, restoreQuestionCircuits } from './storage/workboo
 import { buildSubmission } from './storage/submissionStore';
 // Store INSTANCES come from the backend seam (local vs. remote is decided
 // there, nowhere else); the modules above supply only pure helpers + types.
-import { workbookStore, submissionStore } from './storage/backend';
+import { workbookStore, submissionStore, backendMode } from './storage/backend';
+import { writeJournal, clearJournal, reconcileJournal } from './storage/journal';
+import { getSessionUser } from './auth/session';
 
 /**
  * TM tape notation (alphabet) for the current context. Inside an assignment
@@ -367,7 +370,9 @@ interface HistoryEntry {
 
 interface AppState {
   // Auto-save status
-  autoSaveStatus: 'saved' | 'unsaved' | 'saving';
+  // 'error' is remote-only: a seam save failed (server unreachable); the
+  // crash buffer holds the state and a backoff retry is scheduled.
+  autoSaveStatus: 'saved' | 'unsaved' | 'saving' | 'error';
 
   // Workbook
   workbookOpen: boolean;
@@ -1463,13 +1468,25 @@ export const useStore = create<AppState>()((set, get) => ({
       return true;
     }
     const seq = ++openAssignmentSeq;
-    const [def, saved] = await Promise.all([
+    const [def, fetched] = await Promise.all([
       getAssignment(id),
       workbookStore.loadAssignmentState(id),
     ]);
     // Superseded while in flight — drop this resolve (see the AppState note).
     if (seq !== openAssignmentSeq) return true;
     if (!def) return false;
+
+    // Remote mode: replay the crash buffer, if one survived a hard tab kill
+    // (storage/journal.ts) — it supersedes the fetched server state and is
+    // re-uploaded. Local mode: `fetched` passes through untouched.
+    let saved = fetched;
+    if (backendMode === 'remote') {
+      const email = getSessionUser()?.email;
+      if (email) {
+        saved = await reconcileJournal(email, id, fetched, workbookStore);
+        if (seq !== openAssignmentSeq) return true;
+      }
+    }
     get().loadAssignment(def);
 
     // Restore any saved work for this assignment (merged by question id).
@@ -1512,8 +1529,10 @@ export const useStore = create<AppState>()((set, get) => ({
       }
       // Flush immediately so a quick Home click persists (don't wait for
       // debounce). Fire-and-forget: the local seam writes synchronously before
-      // its first suspension.
-      void saveAssignmentState();
+      // its first suspension. A remote failure buffers to the crash journal;
+      // the debounced autosave (armed by the set() above) retries with the
+      // error chip + backoff through the normal performAutoSave path.
+      void saveAssignmentState().catch(() => writeOpenAssignmentJournal());
     } else {
       const tc = new Map(state.tabCircuits);
       tc.set(state.activeTabId, {
@@ -3776,29 +3795,43 @@ function syncedQuestionCircuits(s: AppState): Map<number, QuestionCircuit> {
   return circuits;
 }
 
+/** The open assignment's persistable workbook state (live canvas folded in). */
+function snapshotAssignmentState(s: AppState): AssignmentState {
+  return {
+    currentQuestionIndex: s.currentQuestionIndex,
+    questionCircuits: Object.fromEntries(syncedQuestionCircuits(s)) as Record<
+      number,
+      QuestionCircuit
+    >,
+  };
+}
+
 // Persist the open assignment's workbook through the WorkbookStore seam.
 // The state snapshot and the seam call happen synchronously (before the first
-// suspension), so unload-time flushes still land with the local store.
-async function saveAssignmentState(): Promise<void> {
+// suspension), so unload-time flushes still land with the local store; remote
+// unload flushes additionally pass `keepalive` so the PUT can outlive the
+// page. Returns the saved assignment's id (null when no assignment is open).
+async function saveAssignmentState(keepalive = false): Promise<string | null> {
   const s = useStore.getState();
   const a = s.assignment;
-  if (!a) return;
-  const qc = new Map(s.questionCircuits);
-  const q = a.questions[s.currentQuestionIndex];
-  if (q) {
-    qc.set(q.id, {
-      components: s.components,
-      wires: s.wires,
-      textElements: s.textElements,
-      comments: s.comments,
-      boxes: s.boxes,
-      responseText: s.openResponse,
-    });
-  }
-  await workbookStore.saveAssignmentState(a.id, {
-    currentQuestionIndex: s.currentQuestionIndex,
-    questionCircuits: Object.fromEntries(qc) as Record<number, QuestionCircuit>,
-  });
+  if (!a) return null;
+  await workbookStore.saveAssignmentState(a.id, snapshotAssignmentState(s), { keepalive });
+  return a.id;
+}
+
+// ── Remote-mode crash buffer (storage/journal.ts) ──────────────────
+// Synchronously buffer the open assignment's unsaved state under the
+// logged-in user's journal key. Called on unload-time flushes and on failed
+// remote saves; a no-op in local mode, when nothing is unsaved, or with no
+// assignment open. Cleared by the next confirmed seam save; replayed by the
+// next openAssignment (reconcileJournal).
+function writeOpenAssignmentJournal(): void {
+  if (backendMode !== 'remote') return;
+  const s = useStore.getState();
+  if (!s.assignment || s.autoSaveStatus === 'saved') return;
+  const email = getSessionUser()?.email;
+  if (!email) return;
+  writeJournal(email, s.assignment.id, snapshotAssignmentState(s));
 }
 
 // Single-flight guard: at most one save is in the seam at a time; a save
@@ -3807,7 +3840,14 @@ async function saveAssignmentState(): Promise<void> {
 let autoSaveInFlight = false;
 let autoSaveTrailing = false;
 
-async function performAutoSave(): Promise<void> {
+// Remote-mode retry backoff: a failed seam save schedules a retry (through
+// the normal debounce slot, so a fresh edit simply supersedes it), doubling
+// the delay up to a cap; any success resets it.
+const AUTO_SAVE_BACKOFF_INITIAL = 2000;
+const AUTO_SAVE_BACKOFF_MAX = 30000;
+let autoSaveBackoff = AUTO_SAVE_BACKOFF_INITIAL;
+
+async function performAutoSave(keepalive = false): Promise<void> {
   if (autoSaveInFlight) {
     autoSaveTrailing = true;
     return;
@@ -3815,15 +3855,38 @@ async function performAutoSave(): Promise<void> {
   autoSaveInFlight = true;
   try {
     useStore.setState({ autoSaveStatus: 'saving' });
+    let savedAssignmentId: string | null = null;
     if (useStore.getState().assignment) {
-      await saveAssignmentState();
+      savedAssignmentId = await saveAssignmentState(keepalive);
     } else {
       localStorage.setItem(AUTO_SAVE_KEY, JSON.stringify(getAutoSaveData()));
     }
     useStore.setState({ autoSaveStatus: 'saved' });
+    autoSaveBackoff = AUTO_SAVE_BACKOFF_INITIAL;
+    if (backendMode === 'remote' && savedAssignmentId) {
+      // Confirmed on the server — the crash buffer for this assignment is
+      // now obsolete (a newer edit's own flush would rewrite it anyway).
+      const email = getSessionUser()?.email;
+      if (email) clearJournal(email, savedAssignmentId);
+    }
   } catch {
-    // localStorage full or unavailable — silent fail
-    useStore.setState({ autoSaveStatus: 'saved' });
+    if (backendMode === 'remote') {
+      // Server unreachable (or the write failed): buffer the state locally,
+      // show the error chip, and retry with backoff. The student's work is
+      // in the journal even if the tab dies before a retry lands.
+      useStore.setState({ autoSaveStatus: 'error' });
+      writeOpenAssignmentJournal();
+      if (autoSaveTimer) clearTimeout(autoSaveTimer);
+      autoSaveTimer = setTimeout(() => {
+        autoSaveTimer = null;
+        void performAutoSave();
+      }, autoSaveBackoff);
+      autoSaveBackoff = Math.min(autoSaveBackoff * 2, AUTO_SAVE_BACKOFF_MAX);
+    } else {
+      // Local mode: localStorage full or unavailable — silent fail (unchanged
+      // prototype behavior; same residual-loss class as the docs note).
+      useStore.setState({ autoSaveStatus: 'saved' });
+    }
   } finally {
     autoSaveInFlight = false;
     if (autoSaveTrailing) {
@@ -3874,18 +3937,26 @@ useStore.subscribe((state, prev) => {
 // Flush a pending debounced save immediately — e.g. when the tab is closing or
 // hidden — so the most recent edit (even just moving a component) is persisted
 // rather than lost in the debounce window.
-function flushAutoSave() {
+//
+// Unload paths (`journal: true`) additionally write the remote crash buffer
+// FIRST — synchronously, so it lands even if the tab dies mid-teardown and
+// regardless of whether the debounce timer is armed (an already-in-flight
+// remote save can die with the tab too). `keepalive: true` (beforeunload/
+// pagehide only; a merely-hidden tab keeps a normal fetch) lets the remote
+// PUT outlive the page — best-effort at ~64KB, the journal is the safety net.
+function flushAutoSave(opts?: { journal?: boolean; keepalive?: boolean }) {
+  if (opts?.journal) writeOpenAssignmentJournal();
   if (!autoSaveTimer) return;
   clearTimeout(autoSaveTimer);
   autoSaveTimer = null;
   // Fire-and-forget: with the local seam the write itself is synchronous
   // (before the first suspension), so it lands even mid-unload.
-  void performAutoSave();
+  void performAutoSave(opts?.keepalive === true);
 }
-window.addEventListener('beforeunload', flushAutoSave);
-window.addEventListener('pagehide', flushAutoSave);
+window.addEventListener('beforeunload', () => flushAutoSave({ journal: true, keepalive: true }));
+window.addEventListener('pagehide', () => flushAutoSave({ journal: true, keepalive: true }));
 document.addEventListener('visibilitychange', () => {
-  if (document.visibilityState === 'hidden') flushAutoSave();
+  if (document.visibilityState === 'hidden') flushAutoSave({ journal: true });
 });
 
 /**

@@ -21,6 +21,7 @@ export function InstructorDashboard() {
   const {
     value: rows,
     loading,
+    error,
     reload,
   } = useAsyncValue(async () => {
     const summaries = await listAssignments();
@@ -76,7 +77,14 @@ export function InstructorDashboard() {
 
       {assignments.length === 0 ? (
         <p className="instructor-empty">
-          {loading ? 'Loading…' : 'No assignments yet. Create one to get started.'}
+          {loading ? 'Loading…'
+            : error ? (
+                <>
+                  Couldn’t load assignments — the server may be unreachable.{' '}
+                  <button className="menu-link-button" onClick={reload}>Retry</button>
+                </>
+              )
+            : 'No assignments yet. Create one to get started.'}
         </p>
       ) : (
         <table className="instructor-table">

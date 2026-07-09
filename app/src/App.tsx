@@ -28,7 +28,11 @@ function App() {
   // sync-at-module-init hydration; idempotent, so StrictMode's double effect
   // is harmless.
   useEffect(() => {
-    void useStore.getState().hydrateSubmissions();
+    // A transient fetch failure just leaves the latest-submission map empty
+    // (cards read "Not submitted" until the next mount); don't crash the shell.
+    useStore.getState().hydrateSubmissions().catch((e: unknown) => {
+      console.warn('submission hydration failed:', e);
+    });
   }, []);
 
   // Instructor frontend: a separate mode of the same SPA, gated behind the

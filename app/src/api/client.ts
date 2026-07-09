@@ -91,7 +91,12 @@ export function setOnUnauthorized(handler: (() => void) | null): void {
   onUnauthorized = handler;
 }
 
-async function request<T>(method: string, path: string, body?: unknown): Promise<T> {
+async function request<T>(
+  method: string,
+  path: string,
+  body?: unknown,
+  opts?: { keepalive?: boolean },
+): Promise<T> {
   const token = getToken();
   const res = await fetch(`${apiBase}/api${path}`, {
     method,
@@ -100,6 +105,10 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
     },
     body: body === undefined ? undefined : JSON.stringify(body),
+    // Unload-time saves only: lets the request outlive the page. Browsers cap
+    // keepalive bodies (~64KB), so this is best-effort — the crash-buffer
+    // journal (storage/journal.ts) is the real safety net.
+    ...(opts?.keepalive ? { keepalive: true } : {}),
   });
   const json = (await res.json().catch(() => ({}))) as Record<string, unknown>;
   if (!res.ok) {
@@ -107,6 +116,29 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
     throw new ApiError(res.status, typeof json.error === 'string' ? json.error : res.statusText);
   }
   return json as T;
+}
+
+// ── health ───────────────────────────────────────────────────────
+
+/**
+ * Boot-time liveness probe (unauthenticated). True only for a 2xx from
+ * GET /api/health; any network failure, timeout, or error status is `false` —
+ * the caller (auth/HealthGate.tsx) shows the retry screen, never a white
+ * screen or a silent local fallback.
+ */
+export async function health(timeoutMs = 4000): Promise<boolean> {
+  try {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+    try {
+      const res = await fetch(`${apiBase}/api/health`, { signal: controller.signal });
+      return res.ok;
+    } finally {
+      clearTimeout(timer);
+    }
+  } catch {
+    return false;
+  }
 }
 
 // ── auth ─────────────────────────────────────────────────────────
@@ -179,8 +211,12 @@ export async function getWorkbook(assignmentId: string): Promise<AssignmentState
   return state;
 }
 
-export async function putWorkbook(assignmentId: string, state: AssignmentState): Promise<void> {
-  await request('PUT', `/workbooks/${encodeURIComponent(assignmentId)}`, state);
+export async function putWorkbook(
+  assignmentId: string,
+  state: AssignmentState,
+  opts?: { keepalive?: boolean },
+): Promise<void> {
+  await request('PUT', `/workbooks/${encodeURIComponent(assignmentId)}`, state, opts);
 }
 
 // ── submissions ──────────────────────────────────────────────────

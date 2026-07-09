@@ -41,7 +41,10 @@ export interface AssignmentStore {
 }
 
 // Distinct from `mm:asg:<id>` (student work) and `mm:sub:<id>` (submissions).
-const KEY_PREFIX = 'mm:inst-asg:';
+// Exported for the fill-empty migration (migrateLocal.ts), which scans
+// localStorage for locally authored assignments on first remote login.
+export const INSTRUCTOR_ASG_KEY_PREFIX = 'mm:inst-asg:';
+const KEY_PREFIX = INSTRUCTOR_ASG_KEY_PREFIX;
 // Same key the pre-seam storage/gradeRelease.ts module used, so existing
 // local release flags keep working byte-for-byte.
 const RELEASE_PREFIX = 'mm:release:';

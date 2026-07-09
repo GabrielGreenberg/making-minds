@@ -1553,3 +1553,78 @@ was added for future remote smokes.
 per-email crash buffer + keepalive flush, boot health-probe retry screen,
 loading/error sweep, and the BATCHED DOC REWRITE (CLAUDE.md narrative +
 seams table + QUEUE close of P6.4).
+
+## 2026-07-08 (iteration 38) — remote-stores S4: migration, resilience, and the batched doc rewrite — P6.4 CLOSES
+
+**Shipped per the memo (final slice):** `storage/migrateLocal.ts` — fill-empty
+first-remote-login migration (per-user guard `mm:migrated:<email>`; local
+`mm:asg:*` workbooks + instructor-only `mm:inst-asg:*` assignments uploaded
+ONLY where the server side is empty; server data never overwritten; local
+keys never deleted; submissions/release/reviews deliberately not migrated;
+awaited in the AuthProvider before the user is set, failure non-fatal).
+`storage/journal.ts` — the per-email crash buffer (`mm:journal:<email>:<id>`):
+written synchronously on every unload-path flush (beforeunload/pagehide/
+visibility-hidden; the first two also send the PUT `keepalive`) and on any
+failed remote save; cleared by every confirmed save; REPLAYED by the next
+`openAssignment` — the buffer supersedes the fetched server copy and
+re-uploads, so a hard tab kill loses at most nothing (an outage-era edit
+included). `auth/HealthGate.tsx` — remote boot probes `GET /api/health`
+before anything (even session restore) renders; a down server gets a
+friendly auto-retrying screen (manual Retry too), never a white screen or a
+silent local fallback; once up, stays up (mid-session failures surface via
+the autosave chip/submit alerts). UX sweep: autosave status gained `'error'`
+("⚠ Not saved — retrying") with exponential backoff through the debounce
+slot (2s→30s cap, reset on success; local mode's silent-fail behavior
+byte-identical); submit is online-only — all three submit sites alert on
+failure and record NOTHING (server stamps time; no offline queue by
+design); Home/Dashboard lists show error+Retry instead of a silent empty
+state; `me()` no longer clears the token on non-401 failures (an outage is
+not a dead session). Seam touch: `WorkbookStore.saveAssignmentState` gained
+an optional `{keepalive}` (local impl ignores it).
+
+**New teeth:** remoteStoreCheck 31 → **56 pins**: `health()` true-live /
+false-503 / false-dead-port; the migration decision table (server-null +
+local-present → upload; server-present → NEVER touch; guard set; guard
+no-op idempotence AND guard-less fill-empty idempotence; student role never
+publishes carried authored assignments; per-user workbook fill-empty); the
+journal (keyed per email; replay supersedes + re-uploads + clears;
+no-buffer pass-through); grep gate extended over journal.ts/migrateLocal.ts.
+
+**Verified:** all gates exit 0 fresh — app tsc / `npm run check` (12 tools;
+coverage 46+10/0/0) / build; server typecheck / check (serverCheck 35 +
+parityCheck 36). Browser smokes on a temp server+DB: (1) remote boot with
+the server DOWN → retry screen → server up → automatic recovery to login;
+(2) login (migration guard set) → edit saves → server killed → second edit
+→ error chip + journal written → reload while down → retry screen → server
+up → session auto-restored, deep link reopens the question, BOTH edits
+present (the second only ever existed in the journal), journal cleared,
+and a further reload proves the replay re-uploaded (server copy has both);
+(3) local mode: toy login, edit persists through reload via localStorage,
+zero /api traffic in the network log. Smoke infra torn down.
+
+**The batched doc rewrite (scoped here by the memo):** CLAUDE.md — new Part 1
+narrative entry covering S1–S4; "Where we are now" rewritten to the
+two-backends-one-switch reality (student flow, grading, and server bullets
+mode-annotated; "what's missing" = deploy + SSO + content); "What's next"
+closes the cutover; the seams table now has explicit Local/Remote-LIVE
+columns; key-files rows added for backend.ts/remoteStores.ts/manualReview.ts/
+journal.ts/migrateLocal.ts, the auth directory (HealthGate, per-mode
+provider, session cache), useAsyncValue, and remoteStoreCheck (56); the
+Server row names the review route + health probe + 35/36 counts; "Things to
+watch" honesty pass — the test-cases-ship-to-client caveat is SOLVED in
+remote mode (and local's bundling is documented as dev-only, gate-enforced),
+the localStorage caveat is mode-scoped, plus the accepted LWW note and the
+deploy-knobs pointer (deploy/README.md already documents VITE_API_BASE /
+MM_CORS_ORIGINS / copy-the-file backups — no new deploy docs needed).
+QUEUE: P6.4 closed with the S1–S4 evidence trail. HANDOFF rewritten.
+
+**Deviation from the memo:** the journal replay intentionally supersedes a
+present server copy (the memo's §2 wording said "fill-empty reconcile");
+its own §5 ("crash buffer + reconcile recovers hard kills") and the
+hard-kill acceptance scenario require replay-wins — a buffer only exists
+when it is newer than this browser's last confirmed save, and multi-device
+LWW is the memo's accepted trade-off. Recorded in journal.ts's header.
+
+**Next:** P6.4 done — the queue holds only P6.1b (Gabriel's call),
+optionals, and the recurring METAs (~iteration 39 audit doubles as the
+cutover's final reconciliation).

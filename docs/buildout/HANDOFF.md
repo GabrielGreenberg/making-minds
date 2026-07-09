@@ -4,73 +4,72 @@ _Read this first. It says exactly where we are and what to do next. Rewrite it a
 the end of every iteration. If it conflicts with the harness, the harness wins —
 run `npm run coverage` and reconcile._
 
-## Where we are — ledger complete · remote-stores cutover S3/4 done
+## Where we are — ledger complete · P6.4 remote-store cutover COMPLETE (S1–S4)
 
 Branch `buildout-infra`. **46 exact + 10 interface = 56/56 at-tier**, 0
-pending, 0 regressed, 0 warnings — the coverage ledger has been complete
-since iteration 25 and every close-out task through P6.3 is done (thirty-six
-iterations). The active program is **P6.4, the Remote-store cutover**, per
-`designs/remote-stores.md` (async-first won the judge panel 82–72–58):
+pending, 0 regressed, 0 warnings. The Remote-store cutover
+(`designs/remote-stores.md`, async-first, judge 82–72–58) is DONE — all four
+slices landed all-green, one per iteration (35–38); the full evidence trail
+is in QUEUE's P6.4 close and LOG iterations 35–38:
 
-- **S1 DONE (iteration 35):** the three storage seams are Promise-returning;
-  Local impls async-wrapped, zero behavior change; `storage/backend.ts`
-  backendMode flag; sequence-guarded openAssignment; single-flight autosave;
-  `useAsyncValue` in the five async views; navResetCheck 120.
-- **S2 DONE (iteration 36):** grade-release lives ON the AssignmentStore seam
-  (summaries carry `gradesReleased`; `storage/gradeRelease.ts` DELETED, key
-  format byte-compatible); manual review's pure `applyManualReview` moved to
-  the leaf `storage/manualReview.ts` (server-importable); the server gained
-  the review route the design judge identified as a GAP
-  (`POST /api/assignments/:id/submissions/:attempt/review`, instructor-only,
-  server-stamps reviewedAt); serverCheck 35, parityCheck 36 (incl. a true
-  parity pin: server-applied review ≡ in-process). Browser-verified:
-  release toggle + review verdicts survive reload; pre-release stays
-  grade-silent.
+- **S1 (35):** async seam flip — Promise-returning seams, async-wrapped Local
+  impls (zero behavior change), sequence-guarded openAssignment, single-flight
+  autosave, `useAsyncValue` views; navResetCheck 120.
+- **S2 (36):** release + review on the seams — `gradeRelease.ts` deleted
+  (flag on `AssignmentStore`, key byte-compatible), pure `applyManualReview`
+  in leaf `storage/manualReview.ts`, server review route; serverCheck 35,
+  parityCheck 36.
+- **S3 (37):** Remote impls + backend switch + auth — `Remote*` stores as
+  direct api/client calls (grader-free, grep-gated), `storage/backend.ts`
+  sole store-instance exporter, remote login/session/401 flow, stubAuth
+  deleted, bundled assignments local-mode-only; remoteStoreCheck joined the
+  chain (12 tools).
+- **S4 (38):** migration + resilience + the batched doc rewrite —
+  `storage/migrateLocal.ts` (fill-empty first-login upload, per-email guard),
+  `storage/journal.ts` (per-email crash buffer; keepalive unload flush;
+  replay-on-open — an outage-era edit survives a hard tab kill, browser-
+  verified), `auth/HealthGate.tsx` (boot probe + auto-retrying outage
+  screen), autosave `'error'` + backoff, online-only-submit alerts;
+  remoteStoreCheck 31 → **56 pins**; CLAUDE.md fully reconciled (narrative,
+  both-modes status, seams table, key files, Things-to-watch honesty pass)
+  and QUEUE's P6.4 closed. Local mode stayed byte-identical throughout
+  (zero /api traffic, pinned + browser-checked).
 
-- **S3 DONE (iteration 37):** Remote{Workbook,Assignment,Submission}Store
-  over api/client.ts (no cache; grader-free, grep-gated);
-  `storage/backend.ts` is the sole store-instance exporter by mode; full
-  auth flow (remote login → bearer → me() restore → 401 hook; stubAuth
-  DELETED; initRouting inside AuthGate, idempotent); recordManualReview
-  gained `student` (Local byte-identical); bundled assignments are
-  local-mode-only by design; a TDZ import cycle broken. remoteStoreCheck
-  (31 pins, in npm run check — 12 tools) drives the Remote seams against
-  the booted server headlessly. Remote browser smoke ran END-TO-END.
+## Do this next
 
-## Do this next — remote-stores S4 (the last slice)
-
-Per the memo's S4: fill-empty localStorage migration (`migrateLocalData`,
-idempotence pinned in remoteStoreCheck); per-email crash buffer + keepalive
-flush; boot health-probe + retry screen; the loading/error/backoff UX sweep
-('error' autosave status); online-only-submit UX (server stamps time,
-visible retry). AND the BATCHED DOC REWRITE the memo scoped here: CLAUDE.md
-(seams table — localStorage entries become 'Local impl behind backend.ts
-switch; Remote live', auth row, key-files rows for remoteStores/backend/
-manualReview/remoteStoreCheck, Part 1 narrative), plus QUEUE close of P6.4
-when S4 lands. Local mode byte-identical; all gates + the 12-tool chain
-green.
+The queue is empty of committed work. Open items are exactly: **P6.1b**
+(arena-turbot color — GABRIEL'S CALL), optionals (ActiveTask trim), and the
+recurring METAs. **~Iteration 39 = META-audit-queue**, which should double as
+the cutover's final reconciliation: spot-run the S1–S4 pins by exit code
+(remoteStoreCheck 56, navResetCheck 120, serverCheck 35 + parityCheck 36),
+verify CLAUDE.md's new claims against the harness, and do the
+patch-accumulation scan over iterations 30–38.
 
 ## Then
 
-After S4 lands, P6.4 closes and the queue is empty again except optionals
-(ActiveTask trim if Gabriel wants it) and the recurring METAs (~iteration 39
-next audit — it should double as the cutover's final reconciliation).
+Product remainder (not loop-owned): deploy per `deploy/README.md` (waiting on
+the UCLA AWS account; CF Pages `VITE_API_BASE`, Lightsail `MM_CORS_ORIGINS`,
+SQLite backup = copy the file), UCLA SSO (server-side `AuthProvider` swap —
+client flow done), and authoring the real HW1–HW7 content.
 
 ## Watch out for
 
 - **Fetch main + `git status` for foreign WIP at the START of every
   iteration** (memory: project-shared-worktree-concurrency).
 - **Judge gates by EXIT CODE**, never a piped tail.
-- **The memo is the spec** for S3/S4 — deviations allowed when narrowing;
-  report them. HARD STOP if a slice balloons structurally.
-- **CLAUDE.md intentionally lags until S4** (memo decision — batched
-  narrative); the buildout memos stay per-iteration.
-- **parityCheck + serverCheck are the cutover's teeth** (36 + 35 checks) —
-  extend, never weaken; the review parity pin guards the shared
-  `applyManualReview`.
-- **Local-mode byte-compatibility** is S1–S3's invariant: same localStorage
-  keys, same visible flows; the harness drives local mode headlessly.
+- **remoteStoreCheck (56) + parityCheck (36) + serverCheck (35) are the
+  cutover's teeth** — extend, never weaken; the grep gate keeps the grader
+  out of the remote-store module graph; the review parity pin guards the
+  shared `applyManualReview`.
+- **Local-mode byte-compatibility** is the cutover's standing invariant:
+  same localStorage keys, same visible flows; the harness drives local mode
+  headlessly (navResetCheck pins `backendMode === 'local'` under Node).
+- **Journal replay is deliberately replay-wins** (supersedes a present
+  server copy; LOG 38 records the memo deviation + rationale) — don't
+  "fix" it back to fill-empty without re-reading journal.ts's header.
 - **Runaway agents:** hard bar + stop rule; checkpoint-then-continue for
   long serial work; resume-don't-redo after API deaths.
 - **Ops:** 529/overload → workflow resume; `server/` needs its own
-  `npm install`; appearance recipe v3; no lockfile churn.
+  `npm install`; appearance recipe v3; no lockfile churn; remote browser
+  smokes need the API server started with `MM_CORS_ORIGINS=http://localhost:5177`
+  (the "Vite Remote Mode" launch config's origin) or every POST preflight 403s.

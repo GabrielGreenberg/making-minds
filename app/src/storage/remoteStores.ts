@@ -57,8 +57,12 @@ class RemoteWorkbookStore implements WorkbookStore {
     return getWorkbook(id);
   }
 
-  saveAssignmentState(id: string, state: AssignmentState): Promise<void> {
-    return putWorkbook(id, state);
+  saveAssignmentState(
+    id: string,
+    state: AssignmentState,
+    opts?: { keepalive?: boolean },
+  ): Promise<void> {
+    return putWorkbook(id, state, opts);
   }
 }
 

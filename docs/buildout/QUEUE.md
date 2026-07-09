@@ -556,18 +556,50 @@ HANDOFF's "do this next = P4.3". Task ids unchanged. -->
   confirmed (pin fails 2 checks against the pre-fix file). CI note: no checks
   run in CI today (deploy.yml builds only); a server-checks job needs Node
   ≥22.5 — proposed YAML recorded in LOG iteration 30, GABRIEL'S CALL to add.
-- [~] **P6.4** **Remote-store cutover** — _design memo DONE 2026-07-08
-  (iteration 34, judge panel 3 angles): **ASYNC-FIRST seam migration won
-  82–72–58** (`designs/remote-stores.md`) — the three store seams go
-  Promise-returning, Remote impls call api/client.ts directly (no cache
-  layer), `storage/backend.ts` mode switch, fill-empty localStorage
-  migration; grafts: per-email crash-buffer journal, boot health-probe +
-  retry screen, `tools/remoteStoreCheck.ts` (injectable transport + booted
-  server), grep gate forbidding grader imports in remote modules,
-  online-only-submit (server stamps time; visible retry). Judge CORRECTED
-  the premise: manual review is a server GAP (no review route exists), not
-  a duplication — S-slices add the route. Implementation = the memo's
-  S1–S4, each an iteration landing green._
+- [x] **P6.4** **Remote-store cutover** — _DONE 2026-07-08, S1–S4 complete
+  (iterations 35–38), per `designs/remote-stores.md` (ASYNC-FIRST won the
+  iteration-34 judge panel 82–72–58; the judge's premise correction — manual
+  review is a server GAP, not a duplication — held: S2 added the route).
+  Evidence trail, one slice per iteration, every slice landing all-green:_
+  - _**S1 (it. 35, `0557e58`):** the async seam flip —
+    all three storage seams Promise-returning, Local impls async-wrapped
+    (zero behavior change), sequence-guarded `openAssignment` + flush-on-open
+    + single-flight autosave, `hydrateSubmissions()` on auth-ready,
+    `useAsyncValue` in the five views; navResetCheck grew the
+    `backendMode === 'local'` pin + the open-A/open-B interleaving pin (120)._
+  - _**S2 (it. 36, `1ddc76f`):** release + review onto the seams —
+    grade-release absorbed into `AssignmentStore` (`gradeRelease.ts`
+    deleted, `mm:release:` byte-compatible); `applyManualReview` moved to
+    leaf `storage/manualReview.ts`; the server review route
+    (`POST …/submissions/:attempt/review`) reuses it; serverCheck 35,
+    parityCheck 36 incl. the server≡in-process review pin._
+  - _**S3 (it. 37, `25a2a58`):** Remote impls + backend switch + auth —
+    `Remote{Workbook,Assignment,Submission}Store` as direct api/client
+    calls; `storage/backend.ts` sole store-instance exporter; remote auth
+    (email login → bearer → `me()` restore → 401 hook; `initRouting` into
+    AuthGate; `stubAuth.tsx` deleted); bundled assignments local-mode-only;
+    `tools/remoteStoreCheck.ts` (31 pins) joined the 12-tool chain;
+    remote browser smoke end-to-end._
+  - _**S4 (it. 38):** migration + resilience + the batched doc rewrite —
+    `storage/migrateLocal.ts` (fill-empty first-remote-login upload,
+    `mm:migrated:<email>` guard, server data never overwritten);
+    `storage/journal.ts` (per-email crash buffer `mm:journal:<email>:<id>`,
+    written on unload flushes + failed remote saves, keepalive unload PUT,
+    replayed by the next `openAssignment`); `auth/HealthGate.tsx` (boot
+    health probe + auto-retrying outage screen); autosave `'error'` status
+    with exponential backoff; online-only-submit failure alerts (records
+    nothing, visible retry); remoteStoreCheck 31 → **56** (health probe
+    live/503/dead-port, the migration decision table + guard/guard-less
+    idempotence + student-role exclusion, journal keying/replay/clear,
+    grep gate extended over journal/migrateLocal). Browser-verified:
+    server-down boot → retry screen → automatic recovery; an outage-era
+    edit survives a hard tab kill via journal replay and re-uploads; local
+    mode byte-identical with zero /api traffic. CLAUDE.md batched rewrite
+    landed (Part 1 narrative + both-modes status, seams table with remote
+    LIVE, key-files rows for backend/remoteStores/manualReview/journal/
+    migrateLocal/auth/useAsyncValue/remoteStoreCheck, Things-to-watch
+    honesty pass: test-cases caveat SOLVED remotely, localStorage caveat
+    mode-scoped, LWW note, deploy knobs pointer)._
 
 ## Recurring meta-tasks  _(fire on cadence; keep the queue honest)_
 
