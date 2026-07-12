@@ -1,0 +1,3726 @@
+{
+  "id": "hw5",
+  "title": "HW5. Computing with TMs",
+  "questions": [
+    {
+      "id": 1,
+      "label": "Problem 1",
+      "statement": "Design a Turing machine that adds one in tally notation. The tape starts with a single block of strokes representing x, with the head on the rightmost stroke. The machine must halt leaving a single block of x + 1 strokes, with the head back on the rightmost stroke of the block.",
+      "buildMode": "TM",
+      "representation": "tally",
+      "requireStandardHaltPosition": true,
+      "cc_spec": {
+        "inputs": [
+          {
+            "name": "x",
+            "width": 8
+          }
+        ],
+        "outputs": [
+          {
+            "name": "out",
+            "width": 9,
+            "formula": "x + 1"
+          }
+        ]
+      },
+      "test_cases": [
+        {
+          "inputs": [
+            1
+          ],
+          "outputs": [
+            2
+          ]
+        },
+        {
+          "inputs": [
+            2
+          ],
+          "outputs": [
+            3
+          ]
+        },
+        {
+          "inputs": [
+            3
+          ],
+          "outputs": [
+            4
+          ]
+        },
+        {
+          "inputs": [
+            4
+          ],
+          "outputs": [
+            5
+          ]
+        },
+        {
+          "inputs": [
+            5
+          ],
+          "outputs": [
+            6
+          ]
+        },
+        {
+          "inputs": [
+            6
+          ],
+          "outputs": [
+            7
+          ]
+        },
+        {
+          "inputs": [
+            7
+          ],
+          "outputs": [
+            8
+          ]
+        },
+        {
+          "inputs": [
+            8
+          ],
+          "outputs": [
+            9
+          ]
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "label": "Problem 2",
+      "statement": "Design a Turing machine that computes x + 3 in tally notation, reusing your solution to the add-one problem. The tape starts with a single block of strokes representing x, with the head on the rightmost stroke, and the machine must halt leaving a single block of x + 3 strokes in standard position.",
+      "buildMode": "TM",
+      "representation": "tally",
+      "requireStandardHaltPosition": true,
+      "cc_spec": {
+        "inputs": [
+          {
+            "name": "x",
+            "width": 8
+          }
+        ],
+        "outputs": [
+          {
+            "name": "out",
+            "width": 11,
+            "formula": "x + 3"
+          }
+        ]
+      },
+      "test_cases": [
+        {
+          "inputs": [
+            0
+          ],
+          "outputs": [
+            3
+          ]
+        },
+        {
+          "inputs": [
+            1
+          ],
+          "outputs": [
+            4
+          ]
+        },
+        {
+          "inputs": [
+            2
+          ],
+          "outputs": [
+            5
+          ]
+        },
+        {
+          "inputs": [
+            3
+          ],
+          "outputs": [
+            6
+          ]
+        },
+        {
+          "inputs": [
+            4
+          ],
+          "outputs": [
+            7
+          ]
+        },
+        {
+          "inputs": [
+            5
+          ],
+          "outputs": [
+            8
+          ]
+        },
+        {
+          "inputs": [
+            6
+          ],
+          "outputs": [
+            9
+          ]
+        },
+        {
+          "inputs": [
+            7
+          ],
+          "outputs": [
+            10
+          ]
+        },
+        {
+          "inputs": [
+            8
+          ],
+          "outputs": [
+            11
+          ]
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "label": "Problem 3",
+      "statement": "Design a Turing machine that multiplies its input by three in tally notation, building on your solution to the x + 3 problem. The tape starts with a single block of strokes representing x, with the head on the rightmost stroke, and the machine must halt leaving a single block of 3x strokes in standard position.",
+      "buildMode": "TM",
+      "representation": "tally",
+      "requireStandardHaltPosition": true,
+      "cc_spec": {
+        "inputs": [
+          {
+            "name": "x",
+            "width": 8
+          }
+        ],
+        "outputs": [
+          {
+            "name": "out",
+            "width": 24,
+            "formula": "3 * x"
+          }
+        ]
+      },
+      "test_cases": [
+        {
+          "inputs": [
+            1
+          ],
+          "outputs": [
+            3
+          ]
+        },
+        {
+          "inputs": [
+            2
+          ],
+          "outputs": [
+            6
+          ]
+        },
+        {
+          "inputs": [
+            3
+          ],
+          "outputs": [
+            9
+          ]
+        },
+        {
+          "inputs": [
+            4
+          ],
+          "outputs": [
+            12
+          ]
+        },
+        {
+          "inputs": [
+            5
+          ],
+          "outputs": [
+            15
+          ]
+        },
+        {
+          "inputs": [
+            6
+          ],
+          "outputs": [
+            18
+          ]
+        },
+        {
+          "inputs": [
+            7
+          ],
+          "outputs": [
+            21
+          ]
+        },
+        {
+          "inputs": [
+            8
+          ],
+          "outputs": [
+            24
+          ]
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "label": "Problem 4",
+      "statement": "Design a Turing machine that adds two numbers in tally notation. The tape starts with two blocks of strokes: the block for y on the left and the block for x on the right, with the head on the rightmost stroke of the x block. The machine must halt leaving a single block of x + y strokes in standard position. Do not assume the two blocks are separated by exactly one empty cell; a robust machine should work when they are separated by any number of empty cells.",
+      "buildMode": "TM",
+      "representation": "tally",
+      "requireStandardHaltPosition": true,
+      "cc_spec": {
+        "inputs": [
+          {
+            "name": "y",
+            "width": 8
+          },
+          {
+            "name": "x",
+            "width": 8
+          }
+        ],
+        "outputs": [
+          {
+            "name": "out",
+            "width": 16,
+            "formula": "x + y"
+          }
+        ]
+      },
+      "test_cases": [
+        {
+          "inputs": [
+            1,
+            1
+          ],
+          "outputs": [
+            2
+          ]
+        },
+        {
+          "inputs": [
+            1,
+            2
+          ],
+          "outputs": [
+            3
+          ],
+          "separations": [
+            2
+          ]
+        },
+        {
+          "inputs": [
+            1,
+            3
+          ],
+          "outputs": [
+            4
+          ],
+          "separations": [
+            3
+          ]
+        },
+        {
+          "inputs": [
+            1,
+            4
+          ],
+          "outputs": [
+            5
+          ],
+          "separations": [
+            5
+          ]
+        },
+        {
+          "inputs": [
+            1,
+            5
+          ],
+          "outputs": [
+            6
+          ]
+        },
+        {
+          "inputs": [
+            1,
+            6
+          ],
+          "outputs": [
+            7
+          ],
+          "separations": [
+            2
+          ]
+        },
+        {
+          "inputs": [
+            1,
+            7
+          ],
+          "outputs": [
+            8
+          ],
+          "separations": [
+            3
+          ]
+        },
+        {
+          "inputs": [
+            1,
+            8
+          ],
+          "outputs": [
+            9
+          ],
+          "separations": [
+            5
+          ]
+        },
+        {
+          "inputs": [
+            2,
+            1
+          ],
+          "outputs": [
+            3
+          ]
+        },
+        {
+          "inputs": [
+            2,
+            2
+          ],
+          "outputs": [
+            4
+          ],
+          "separations": [
+            2
+          ]
+        },
+        {
+          "inputs": [
+            2,
+            3
+          ],
+          "outputs": [
+            5
+          ],
+          "separations": [
+            3
+          ]
+        },
+        {
+          "inputs": [
+            2,
+            4
+          ],
+          "outputs": [
+            6
+          ],
+          "separations": [
+            5
+          ]
+        },
+        {
+          "inputs": [
+            2,
+            5
+          ],
+          "outputs": [
+            7
+          ]
+        },
+        {
+          "inputs": [
+            2,
+            6
+          ],
+          "outputs": [
+            8
+          ],
+          "separations": [
+            2
+          ]
+        },
+        {
+          "inputs": [
+            2,
+            7
+          ],
+          "outputs": [
+            9
+          ],
+          "separations": [
+            3
+          ]
+        },
+        {
+          "inputs": [
+            2,
+            8
+          ],
+          "outputs": [
+            10
+          ],
+          "separations": [
+            5
+          ]
+        },
+        {
+          "inputs": [
+            3,
+            1
+          ],
+          "outputs": [
+            4
+          ]
+        },
+        {
+          "inputs": [
+            3,
+            2
+          ],
+          "outputs": [
+            5
+          ],
+          "separations": [
+            2
+          ]
+        },
+        {
+          "inputs": [
+            3,
+            3
+          ],
+          "outputs": [
+            6
+          ],
+          "separations": [
+            3
+          ]
+        },
+        {
+          "inputs": [
+            3,
+            4
+          ],
+          "outputs": [
+            7
+          ],
+          "separations": [
+            5
+          ]
+        },
+        {
+          "inputs": [
+            3,
+            5
+          ],
+          "outputs": [
+            8
+          ]
+        },
+        {
+          "inputs": [
+            3,
+            6
+          ],
+          "outputs": [
+            9
+          ],
+          "separations": [
+            2
+          ]
+        },
+        {
+          "inputs": [
+            3,
+            7
+          ],
+          "outputs": [
+            10
+          ],
+          "separations": [
+            3
+          ]
+        },
+        {
+          "inputs": [
+            3,
+            8
+          ],
+          "outputs": [
+            11
+          ],
+          "separations": [
+            5
+          ]
+        },
+        {
+          "inputs": [
+            4,
+            1
+          ],
+          "outputs": [
+            5
+          ]
+        },
+        {
+          "inputs": [
+            4,
+            2
+          ],
+          "outputs": [
+            6
+          ],
+          "separations": [
+            2
+          ]
+        },
+        {
+          "inputs": [
+            4,
+            3
+          ],
+          "outputs": [
+            7
+          ],
+          "separations": [
+            3
+          ]
+        },
+        {
+          "inputs": [
+            4,
+            4
+          ],
+          "outputs": [
+            8
+          ],
+          "separations": [
+            5
+          ]
+        },
+        {
+          "inputs": [
+            4,
+            5
+          ],
+          "outputs": [
+            9
+          ]
+        },
+        {
+          "inputs": [
+            4,
+            6
+          ],
+          "outputs": [
+            10
+          ],
+          "separations": [
+            2
+          ]
+        },
+        {
+          "inputs": [
+            4,
+            7
+          ],
+          "outputs": [
+            11
+          ],
+          "separations": [
+            3
+          ]
+        },
+        {
+          "inputs": [
+            4,
+            8
+          ],
+          "outputs": [
+            12
+          ],
+          "separations": [
+            5
+          ]
+        },
+        {
+          "inputs": [
+            5,
+            1
+          ],
+          "outputs": [
+            6
+          ]
+        },
+        {
+          "inputs": [
+            5,
+            2
+          ],
+          "outputs": [
+            7
+          ],
+          "separations": [
+            2
+          ]
+        },
+        {
+          "inputs": [
+            5,
+            3
+          ],
+          "outputs": [
+            8
+          ],
+          "separations": [
+            3
+          ]
+        },
+        {
+          "inputs": [
+            5,
+            4
+          ],
+          "outputs": [
+            9
+          ],
+          "separations": [
+            5
+          ]
+        },
+        {
+          "inputs": [
+            5,
+            5
+          ],
+          "outputs": [
+            10
+          ]
+        },
+        {
+          "inputs": [
+            5,
+            6
+          ],
+          "outputs": [
+            11
+          ],
+          "separations": [
+            2
+          ]
+        },
+        {
+          "inputs": [
+            5,
+            7
+          ],
+          "outputs": [
+            12
+          ],
+          "separations": [
+            3
+          ]
+        },
+        {
+          "inputs": [
+            5,
+            8
+          ],
+          "outputs": [
+            13
+          ],
+          "separations": [
+            5
+          ]
+        },
+        {
+          "inputs": [
+            6,
+            1
+          ],
+          "outputs": [
+            7
+          ]
+        },
+        {
+          "inputs": [
+            6,
+            2
+          ],
+          "outputs": [
+            8
+          ],
+          "separations": [
+            2
+          ]
+        },
+        {
+          "inputs": [
+            6,
+            3
+          ],
+          "outputs": [
+            9
+          ],
+          "separations": [
+            3
+          ]
+        },
+        {
+          "inputs": [
+            6,
+            4
+          ],
+          "outputs": [
+            10
+          ],
+          "separations": [
+            5
+          ]
+        },
+        {
+          "inputs": [
+            6,
+            5
+          ],
+          "outputs": [
+            11
+          ]
+        },
+        {
+          "inputs": [
+            6,
+            6
+          ],
+          "outputs": [
+            12
+          ],
+          "separations": [
+            2
+          ]
+        },
+        {
+          "inputs": [
+            6,
+            7
+          ],
+          "outputs": [
+            13
+          ],
+          "separations": [
+            3
+          ]
+        },
+        {
+          "inputs": [
+            6,
+            8
+          ],
+          "outputs": [
+            14
+          ],
+          "separations": [
+            5
+          ]
+        },
+        {
+          "inputs": [
+            7,
+            1
+          ],
+          "outputs": [
+            8
+          ]
+        },
+        {
+          "inputs": [
+            7,
+            2
+          ],
+          "outputs": [
+            9
+          ],
+          "separations": [
+            2
+          ]
+        },
+        {
+          "inputs": [
+            7,
+            3
+          ],
+          "outputs": [
+            10
+          ],
+          "separations": [
+            3
+          ]
+        },
+        {
+          "inputs": [
+            7,
+            4
+          ],
+          "outputs": [
+            11
+          ],
+          "separations": [
+            5
+          ]
+        },
+        {
+          "inputs": [
+            7,
+            5
+          ],
+          "outputs": [
+            12
+          ]
+        },
+        {
+          "inputs": [
+            7,
+            6
+          ],
+          "outputs": [
+            13
+          ],
+          "separations": [
+            2
+          ]
+        },
+        {
+          "inputs": [
+            7,
+            7
+          ],
+          "outputs": [
+            14
+          ],
+          "separations": [
+            3
+          ]
+        },
+        {
+          "inputs": [
+            7,
+            8
+          ],
+          "outputs": [
+            15
+          ],
+          "separations": [
+            5
+          ]
+        },
+        {
+          "inputs": [
+            8,
+            1
+          ],
+          "outputs": [
+            9
+          ]
+        },
+        {
+          "inputs": [
+            8,
+            2
+          ],
+          "outputs": [
+            10
+          ],
+          "separations": [
+            2
+          ]
+        },
+        {
+          "inputs": [
+            8,
+            3
+          ],
+          "outputs": [
+            11
+          ],
+          "separations": [
+            3
+          ]
+        },
+        {
+          "inputs": [
+            8,
+            4
+          ],
+          "outputs": [
+            12
+          ],
+          "separations": [
+            5
+          ]
+        },
+        {
+          "inputs": [
+            8,
+            5
+          ],
+          "outputs": [
+            13
+          ]
+        },
+        {
+          "inputs": [
+            8,
+            6
+          ],
+          "outputs": [
+            14
+          ],
+          "separations": [
+            2
+          ]
+        },
+        {
+          "inputs": [
+            8,
+            7
+          ],
+          "outputs": [
+            15
+          ],
+          "separations": [
+            3
+          ]
+        },
+        {
+          "inputs": [
+            8,
+            8
+          ],
+          "outputs": [
+            16
+          ],
+          "separations": [
+            5
+          ]
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "label": "Problem 5",
+      "statement": "Design a Turing machine that computes three times the sum of its two inputs in tally notation, reusing your addition and tripling constructions. The tape starts with the y block on the left and the x block on the right, with the head on the rightmost stroke of the x block, and the machine must halt leaving a single block of 3(x + y) strokes in standard position.",
+      "buildMode": "TM",
+      "representation": "tally",
+      "requireStandardHaltPosition": true,
+      "cc_spec": {
+        "inputs": [
+          {
+            "name": "y",
+            "width": 8
+          },
+          {
+            "name": "x",
+            "width": 8
+          }
+        ],
+        "outputs": [
+          {
+            "name": "out",
+            "width": 48,
+            "formula": "3 * (x + y)"
+          }
+        ]
+      },
+      "test_cases": [
+        {
+          "inputs": [
+            1,
+            1
+          ],
+          "outputs": [
+            6
+          ]
+        },
+        {
+          "inputs": [
+            1,
+            2
+          ],
+          "outputs": [
+            9
+          ]
+        },
+        {
+          "inputs": [
+            1,
+            3
+          ],
+          "outputs": [
+            12
+          ]
+        },
+        {
+          "inputs": [
+            1,
+            4
+          ],
+          "outputs": [
+            15
+          ]
+        },
+        {
+          "inputs": [
+            1,
+            5
+          ],
+          "outputs": [
+            18
+          ]
+        },
+        {
+          "inputs": [
+            1,
+            6
+          ],
+          "outputs": [
+            21
+          ]
+        },
+        {
+          "inputs": [
+            1,
+            7
+          ],
+          "outputs": [
+            24
+          ]
+        },
+        {
+          "inputs": [
+            1,
+            8
+          ],
+          "outputs": [
+            27
+          ]
+        },
+        {
+          "inputs": [
+            2,
+            1
+          ],
+          "outputs": [
+            9
+          ]
+        },
+        {
+          "inputs": [
+            2,
+            2
+          ],
+          "outputs": [
+            12
+          ]
+        },
+        {
+          "inputs": [
+            2,
+            3
+          ],
+          "outputs": [
+            15
+          ]
+        },
+        {
+          "inputs": [
+            2,
+            4
+          ],
+          "outputs": [
+            18
+          ]
+        },
+        {
+          "inputs": [
+            2,
+            5
+          ],
+          "outputs": [
+            21
+          ]
+        },
+        {
+          "inputs": [
+            2,
+            6
+          ],
+          "outputs": [
+            24
+          ]
+        },
+        {
+          "inputs": [
+            2,
+            7
+          ],
+          "outputs": [
+            27
+          ]
+        },
+        {
+          "inputs": [
+            2,
+            8
+          ],
+          "outputs": [
+            30
+          ]
+        },
+        {
+          "inputs": [
+            3,
+            1
+          ],
+          "outputs": [
+            12
+          ]
+        },
+        {
+          "inputs": [
+            3,
+            2
+          ],
+          "outputs": [
+            15
+          ]
+        },
+        {
+          "inputs": [
+            3,
+            3
+          ],
+          "outputs": [
+            18
+          ]
+        },
+        {
+          "inputs": [
+            3,
+            4
+          ],
+          "outputs": [
+            21
+          ]
+        },
+        {
+          "inputs": [
+            3,
+            5
+          ],
+          "outputs": [
+            24
+          ]
+        },
+        {
+          "inputs": [
+            3,
+            6
+          ],
+          "outputs": [
+            27
+          ]
+        },
+        {
+          "inputs": [
+            3,
+            7
+          ],
+          "outputs": [
+            30
+          ]
+        },
+        {
+          "inputs": [
+            3,
+            8
+          ],
+          "outputs": [
+            33
+          ]
+        },
+        {
+          "inputs": [
+            4,
+            1
+          ],
+          "outputs": [
+            15
+          ]
+        },
+        {
+          "inputs": [
+            4,
+            2
+          ],
+          "outputs": [
+            18
+          ]
+        },
+        {
+          "inputs": [
+            4,
+            3
+          ],
+          "outputs": [
+            21
+          ]
+        },
+        {
+          "inputs": [
+            4,
+            4
+          ],
+          "outputs": [
+            24
+          ]
+        },
+        {
+          "inputs": [
+            4,
+            5
+          ],
+          "outputs": [
+            27
+          ]
+        },
+        {
+          "inputs": [
+            4,
+            6
+          ],
+          "outputs": [
+            30
+          ]
+        },
+        {
+          "inputs": [
+            4,
+            7
+          ],
+          "outputs": [
+            33
+          ]
+        },
+        {
+          "inputs": [
+            4,
+            8
+          ],
+          "outputs": [
+            36
+          ]
+        },
+        {
+          "inputs": [
+            5,
+            1
+          ],
+          "outputs": [
+            18
+          ]
+        },
+        {
+          "inputs": [
+            5,
+            2
+          ],
+          "outputs": [
+            21
+          ]
+        },
+        {
+          "inputs": [
+            5,
+            3
+          ],
+          "outputs": [
+            24
+          ]
+        },
+        {
+          "inputs": [
+            5,
+            4
+          ],
+          "outputs": [
+            27
+          ]
+        },
+        {
+          "inputs": [
+            5,
+            5
+          ],
+          "outputs": [
+            30
+          ]
+        },
+        {
+          "inputs": [
+            5,
+            6
+          ],
+          "outputs": [
+            33
+          ]
+        },
+        {
+          "inputs": [
+            5,
+            7
+          ],
+          "outputs": [
+            36
+          ]
+        },
+        {
+          "inputs": [
+            5,
+            8
+          ],
+          "outputs": [
+            39
+          ]
+        },
+        {
+          "inputs": [
+            6,
+            1
+          ],
+          "outputs": [
+            21
+          ]
+        },
+        {
+          "inputs": [
+            6,
+            2
+          ],
+          "outputs": [
+            24
+          ]
+        },
+        {
+          "inputs": [
+            6,
+            3
+          ],
+          "outputs": [
+            27
+          ]
+        },
+        {
+          "inputs": [
+            6,
+            4
+          ],
+          "outputs": [
+            30
+          ]
+        },
+        {
+          "inputs": [
+            6,
+            5
+          ],
+          "outputs": [
+            33
+          ]
+        },
+        {
+          "inputs": [
+            6,
+            6
+          ],
+          "outputs": [
+            36
+          ]
+        },
+        {
+          "inputs": [
+            6,
+            7
+          ],
+          "outputs": [
+            39
+          ]
+        },
+        {
+          "inputs": [
+            6,
+            8
+          ],
+          "outputs": [
+            42
+          ]
+        },
+        {
+          "inputs": [
+            7,
+            1
+          ],
+          "outputs": [
+            24
+          ]
+        },
+        {
+          "inputs": [
+            7,
+            2
+          ],
+          "outputs": [
+            27
+          ]
+        },
+        {
+          "inputs": [
+            7,
+            3
+          ],
+          "outputs": [
+            30
+          ]
+        },
+        {
+          "inputs": [
+            7,
+            4
+          ],
+          "outputs": [
+            33
+          ]
+        },
+        {
+          "inputs": [
+            7,
+            5
+          ],
+          "outputs": [
+            36
+          ]
+        },
+        {
+          "inputs": [
+            7,
+            6
+          ],
+          "outputs": [
+            39
+          ]
+        },
+        {
+          "inputs": [
+            7,
+            7
+          ],
+          "outputs": [
+            42
+          ]
+        },
+        {
+          "inputs": [
+            7,
+            8
+          ],
+          "outputs": [
+            45
+          ]
+        },
+        {
+          "inputs": [
+            8,
+            1
+          ],
+          "outputs": [
+            27
+          ]
+        },
+        {
+          "inputs": [
+            8,
+            2
+          ],
+          "outputs": [
+            30
+          ]
+        },
+        {
+          "inputs": [
+            8,
+            3
+          ],
+          "outputs": [
+            33
+          ]
+        },
+        {
+          "inputs": [
+            8,
+            4
+          ],
+          "outputs": [
+            36
+          ]
+        },
+        {
+          "inputs": [
+            8,
+            5
+          ],
+          "outputs": [
+            39
+          ]
+        },
+        {
+          "inputs": [
+            8,
+            6
+          ],
+          "outputs": [
+            42
+          ]
+        },
+        {
+          "inputs": [
+            8,
+            7
+          ],
+          "outputs": [
+            45
+          ]
+        },
+        {
+          "inputs": [
+            8,
+            8
+          ],
+          "outputs": [
+            48
+          ]
+        }
+      ]
+    },
+    {
+      "id": 6,
+      "label": "Problem 6",
+      "statement": "Design a Turing machine that computes x + 3y in tally notation, reusing your earlier constructions. The tape starts with the y block on the left and the x block on the right, with the head on the rightmost stroke of the x block, and the machine must halt leaving a single block of x + 3y strokes in standard position.",
+      "buildMode": "TM",
+      "representation": "tally",
+      "requireStandardHaltPosition": true,
+      "cc_spec": {
+        "inputs": [
+          {
+            "name": "y",
+            "width": 8
+          },
+          {
+            "name": "x",
+            "width": 8
+          }
+        ],
+        "outputs": [
+          {
+            "name": "out",
+            "width": 32,
+            "formula": "x + 3 * y"
+          }
+        ]
+      },
+      "test_cases": [
+        {
+          "inputs": [
+            1,
+            1
+          ],
+          "outputs": [
+            4
+          ]
+        },
+        {
+          "inputs": [
+            1,
+            2
+          ],
+          "outputs": [
+            5
+          ]
+        },
+        {
+          "inputs": [
+            1,
+            3
+          ],
+          "outputs": [
+            6
+          ]
+        },
+        {
+          "inputs": [
+            1,
+            4
+          ],
+          "outputs": [
+            7
+          ]
+        },
+        {
+          "inputs": [
+            1,
+            5
+          ],
+          "outputs": [
+            8
+          ]
+        },
+        {
+          "inputs": [
+            1,
+            6
+          ],
+          "outputs": [
+            9
+          ]
+        },
+        {
+          "inputs": [
+            1,
+            7
+          ],
+          "outputs": [
+            10
+          ]
+        },
+        {
+          "inputs": [
+            1,
+            8
+          ],
+          "outputs": [
+            11
+          ]
+        },
+        {
+          "inputs": [
+            2,
+            1
+          ],
+          "outputs": [
+            7
+          ]
+        },
+        {
+          "inputs": [
+            2,
+            2
+          ],
+          "outputs": [
+            8
+          ]
+        },
+        {
+          "inputs": [
+            2,
+            3
+          ],
+          "outputs": [
+            9
+          ]
+        },
+        {
+          "inputs": [
+            2,
+            4
+          ],
+          "outputs": [
+            10
+          ]
+        },
+        {
+          "inputs": [
+            2,
+            5
+          ],
+          "outputs": [
+            11
+          ]
+        },
+        {
+          "inputs": [
+            2,
+            6
+          ],
+          "outputs": [
+            12
+          ]
+        },
+        {
+          "inputs": [
+            2,
+            7
+          ],
+          "outputs": [
+            13
+          ]
+        },
+        {
+          "inputs": [
+            2,
+            8
+          ],
+          "outputs": [
+            14
+          ]
+        },
+        {
+          "inputs": [
+            3,
+            1
+          ],
+          "outputs": [
+            10
+          ]
+        },
+        {
+          "inputs": [
+            3,
+            2
+          ],
+          "outputs": [
+            11
+          ]
+        },
+        {
+          "inputs": [
+            3,
+            3
+          ],
+          "outputs": [
+            12
+          ]
+        },
+        {
+          "inputs": [
+            3,
+            4
+          ],
+          "outputs": [
+            13
+          ]
+        },
+        {
+          "inputs": [
+            3,
+            5
+          ],
+          "outputs": [
+            14
+          ]
+        },
+        {
+          "inputs": [
+            3,
+            6
+          ],
+          "outputs": [
+            15
+          ]
+        },
+        {
+          "inputs": [
+            3,
+            7
+          ],
+          "outputs": [
+            16
+          ]
+        },
+        {
+          "inputs": [
+            3,
+            8
+          ],
+          "outputs": [
+            17
+          ]
+        },
+        {
+          "inputs": [
+            4,
+            1
+          ],
+          "outputs": [
+            13
+          ]
+        },
+        {
+          "inputs": [
+            4,
+            2
+          ],
+          "outputs": [
+            14
+          ]
+        },
+        {
+          "inputs": [
+            4,
+            3
+          ],
+          "outputs": [
+            15
+          ]
+        },
+        {
+          "inputs": [
+            4,
+            4
+          ],
+          "outputs": [
+            16
+          ]
+        },
+        {
+          "inputs": [
+            4,
+            5
+          ],
+          "outputs": [
+            17
+          ]
+        },
+        {
+          "inputs": [
+            4,
+            6
+          ],
+          "outputs": [
+            18
+          ]
+        },
+        {
+          "inputs": [
+            4,
+            7
+          ],
+          "outputs": [
+            19
+          ]
+        },
+        {
+          "inputs": [
+            4,
+            8
+          ],
+          "outputs": [
+            20
+          ]
+        },
+        {
+          "inputs": [
+            5,
+            1
+          ],
+          "outputs": [
+            16
+          ]
+        },
+        {
+          "inputs": [
+            5,
+            2
+          ],
+          "outputs": [
+            17
+          ]
+        },
+        {
+          "inputs": [
+            5,
+            3
+          ],
+          "outputs": [
+            18
+          ]
+        },
+        {
+          "inputs": [
+            5,
+            4
+          ],
+          "outputs": [
+            19
+          ]
+        },
+        {
+          "inputs": [
+            5,
+            5
+          ],
+          "outputs": [
+            20
+          ]
+        },
+        {
+          "inputs": [
+            5,
+            6
+          ],
+          "outputs": [
+            21
+          ]
+        },
+        {
+          "inputs": [
+            5,
+            7
+          ],
+          "outputs": [
+            22
+          ]
+        },
+        {
+          "inputs": [
+            5,
+            8
+          ],
+          "outputs": [
+            23
+          ]
+        },
+        {
+          "inputs": [
+            6,
+            1
+          ],
+          "outputs": [
+            19
+          ]
+        },
+        {
+          "inputs": [
+            6,
+            2
+          ],
+          "outputs": [
+            20
+          ]
+        },
+        {
+          "inputs": [
+            6,
+            3
+          ],
+          "outputs": [
+            21
+          ]
+        },
+        {
+          "inputs": [
+            6,
+            4
+          ],
+          "outputs": [
+            22
+          ]
+        },
+        {
+          "inputs": [
+            6,
+            5
+          ],
+          "outputs": [
+            23
+          ]
+        },
+        {
+          "inputs": [
+            6,
+            6
+          ],
+          "outputs": [
+            24
+          ]
+        },
+        {
+          "inputs": [
+            6,
+            7
+          ],
+          "outputs": [
+            25
+          ]
+        },
+        {
+          "inputs": [
+            6,
+            8
+          ],
+          "outputs": [
+            26
+          ]
+        },
+        {
+          "inputs": [
+            7,
+            1
+          ],
+          "outputs": [
+            22
+          ]
+        },
+        {
+          "inputs": [
+            7,
+            2
+          ],
+          "outputs": [
+            23
+          ]
+        },
+        {
+          "inputs": [
+            7,
+            3
+          ],
+          "outputs": [
+            24
+          ]
+        },
+        {
+          "inputs": [
+            7,
+            4
+          ],
+          "outputs": [
+            25
+          ]
+        },
+        {
+          "inputs": [
+            7,
+            5
+          ],
+          "outputs": [
+            26
+          ]
+        },
+        {
+          "inputs": [
+            7,
+            6
+          ],
+          "outputs": [
+            27
+          ]
+        },
+        {
+          "inputs": [
+            7,
+            7
+          ],
+          "outputs": [
+            28
+          ]
+        },
+        {
+          "inputs": [
+            7,
+            8
+          ],
+          "outputs": [
+            29
+          ]
+        },
+        {
+          "inputs": [
+            8,
+            1
+          ],
+          "outputs": [
+            25
+          ]
+        },
+        {
+          "inputs": [
+            8,
+            2
+          ],
+          "outputs": [
+            26
+          ]
+        },
+        {
+          "inputs": [
+            8,
+            3
+          ],
+          "outputs": [
+            27
+          ]
+        },
+        {
+          "inputs": [
+            8,
+            4
+          ],
+          "outputs": [
+            28
+          ]
+        },
+        {
+          "inputs": [
+            8,
+            5
+          ],
+          "outputs": [
+            29
+          ]
+        },
+        {
+          "inputs": [
+            8,
+            6
+          ],
+          "outputs": [
+            30
+          ]
+        },
+        {
+          "inputs": [
+            8,
+            7
+          ],
+          "outputs": [
+            31
+          ]
+        },
+        {
+          "inputs": [
+            8,
+            8
+          ],
+          "outputs": [
+            32
+          ]
+        }
+      ]
+    },
+    {
+      "id": 7,
+      "label": "Problem 7",
+      "statement": "Design a Turing machine that adds one to a binary numeral. The tape starts with the numeral of x written between two asterisk markers, with the head on the right marker, and the machine must halt leaving one well-formed block containing the binary numeral of x + 1, with the head back on the block's right marker.",
+      "buildMode": "TM",
+      "representation": "binary",
+      "requireStandardHaltPosition": true,
+      "cc_spec": {
+        "inputs": [
+          {
+            "name": "x",
+            "width": 6
+          }
+        ],
+        "outputs": [
+          {
+            "name": "out",
+            "width": 7,
+            "formula": "x + 1"
+          }
+        ]
+      },
+      "test_cases": [
+        {
+          "inputs": [
+            0
+          ],
+          "outputs": [
+            1
+          ]
+        },
+        {
+          "inputs": [
+            1
+          ],
+          "outputs": [
+            2
+          ]
+        },
+        {
+          "inputs": [
+            2
+          ],
+          "outputs": [
+            3
+          ]
+        },
+        {
+          "inputs": [
+            3
+          ],
+          "outputs": [
+            4
+          ]
+        },
+        {
+          "inputs": [
+            4
+          ],
+          "outputs": [
+            5
+          ]
+        },
+        {
+          "inputs": [
+            5
+          ],
+          "outputs": [
+            6
+          ]
+        },
+        {
+          "inputs": [
+            7
+          ],
+          "outputs": [
+            8
+          ]
+        },
+        {
+          "inputs": [
+            8
+          ],
+          "outputs": [
+            9
+          ]
+        },
+        {
+          "inputs": [
+            11
+          ],
+          "outputs": [
+            12
+          ]
+        },
+        {
+          "inputs": [
+            15
+          ],
+          "outputs": [
+            16
+          ]
+        },
+        {
+          "inputs": [
+            16
+          ],
+          "outputs": [
+            17
+          ]
+        },
+        {
+          "inputs": [
+            23
+          ],
+          "outputs": [
+            24
+          ]
+        },
+        {
+          "inputs": [
+            31
+          ],
+          "outputs": [
+            32
+          ]
+        },
+        {
+          "inputs": [
+            32
+          ],
+          "outputs": [
+            33
+          ]
+        },
+        {
+          "inputs": [
+            47
+          ],
+          "outputs": [
+            48
+          ]
+        },
+        {
+          "inputs": [
+            63
+          ],
+          "outputs": [
+            64
+          ]
+        }
+      ]
+    },
+    {
+      "id": 8,
+      "label": "Problem 8",
+      "statement": "Design a Turing machine that subtracts one from a binary numeral, outputting zero when the input is zero. The tape starts with the numeral of x written between two asterisk markers, with the head on the right marker. The machine must halt leaving one well-formed block containing the binary numeral of x - 1 when x is at least one, and the numeral 0 when x is zero, ending with the head on the block's right marker.",
+      "buildMode": "TM",
+      "representation": "binary",
+      "requireStandardHaltPosition": true,
+      "test_cases": [
+        {
+          "inputs": [
+            0
+          ],
+          "outputs": [
+            0
+          ]
+        },
+        {
+          "inputs": [
+            1
+          ],
+          "outputs": [
+            0
+          ]
+        },
+        {
+          "inputs": [
+            2
+          ],
+          "outputs": [
+            1
+          ]
+        },
+        {
+          "inputs": [
+            3
+          ],
+          "outputs": [
+            2
+          ]
+        },
+        {
+          "inputs": [
+            4
+          ],
+          "outputs": [
+            3
+          ]
+        },
+        {
+          "inputs": [
+            5
+          ],
+          "outputs": [
+            4
+          ]
+        },
+        {
+          "inputs": [
+            7
+          ],
+          "outputs": [
+            6
+          ]
+        },
+        {
+          "inputs": [
+            8
+          ],
+          "outputs": [
+            7
+          ]
+        },
+        {
+          "inputs": [
+            11
+          ],
+          "outputs": [
+            10
+          ]
+        },
+        {
+          "inputs": [
+            15
+          ],
+          "outputs": [
+            14
+          ]
+        },
+        {
+          "inputs": [
+            16
+          ],
+          "outputs": [
+            15
+          ]
+        },
+        {
+          "inputs": [
+            23
+          ],
+          "outputs": [
+            22
+          ]
+        },
+        {
+          "inputs": [
+            31
+          ],
+          "outputs": [
+            30
+          ]
+        },
+        {
+          "inputs": [
+            32
+          ],
+          "outputs": [
+            31
+          ]
+        },
+        {
+          "inputs": [
+            47
+          ],
+          "outputs": [
+            46
+          ]
+        },
+        {
+          "inputs": [
+            63
+          ],
+          "outputs": [
+            62
+          ]
+        }
+      ],
+      "notes": "Bank hand-authored: f(x) = max(0, x - 1) is inexpressible in the authoring DSL (negative intermediate on x = 0), so the standard 16-value binary TM sample is mapped through the floor directly; cc_spec intentionally omitted (the tape axis grades from representation + test_cases alone)."
+    },
+    {
+      "id": 9,
+      "label": "Problem 9",
+      "statement": "Design a Turing machine that adds two binary numerals, reusing your add-one and subtract-one machines. The tape starts with the numeral of y between asterisk markers on the left and the numeral of x between asterisk markers on the right, with the head on the rightmost marker. The machine must transfer the value of x into the y block one unit at a time, then erase everything except a single well-formed block containing the binary numeral of x + y — clean up so that exactly one pair of markers remains on the tape.",
+      "buildMode": "TM",
+      "representation": "binary",
+      "cc_spec": {
+        "inputs": [
+          {
+            "name": "y",
+            "width": 6
+          },
+          {
+            "name": "x",
+            "width": 6
+          }
+        ],
+        "outputs": [
+          {
+            "name": "out",
+            "width": 7,
+            "formula": "x + y"
+          }
+        ]
+      },
+      "test_cases": [
+        {
+          "inputs": [
+            0,
+            0
+          ],
+          "outputs": [
+            0
+          ]
+        },
+        {
+          "inputs": [
+            0,
+            2
+          ],
+          "outputs": [
+            2
+          ]
+        },
+        {
+          "inputs": [
+            0,
+            4
+          ],
+          "outputs": [
+            4
+          ]
+        },
+        {
+          "inputs": [
+            0,
+            7
+          ],
+          "outputs": [
+            7
+          ]
+        },
+        {
+          "inputs": [
+            0,
+            11
+          ],
+          "outputs": [
+            11
+          ]
+        },
+        {
+          "inputs": [
+            0,
+            16
+          ],
+          "outputs": [
+            16
+          ]
+        },
+        {
+          "inputs": [
+            0,
+            31
+          ],
+          "outputs": [
+            31
+          ]
+        },
+        {
+          "inputs": [
+            0,
+            47
+          ],
+          "outputs": [
+            47
+          ]
+        },
+        {
+          "inputs": [
+            1,
+            0
+          ],
+          "outputs": [
+            1
+          ]
+        },
+        {
+          "inputs": [
+            1,
+            2
+          ],
+          "outputs": [
+            3
+          ]
+        },
+        {
+          "inputs": [
+            1,
+            4
+          ],
+          "outputs": [
+            5
+          ]
+        },
+        {
+          "inputs": [
+            1,
+            7
+          ],
+          "outputs": [
+            8
+          ]
+        },
+        {
+          "inputs": [
+            1,
+            11
+          ],
+          "outputs": [
+            12
+          ]
+        },
+        {
+          "inputs": [
+            1,
+            16
+          ],
+          "outputs": [
+            17
+          ]
+        },
+        {
+          "inputs": [
+            1,
+            31
+          ],
+          "outputs": [
+            32
+          ]
+        },
+        {
+          "inputs": [
+            1,
+            47
+          ],
+          "outputs": [
+            48
+          ]
+        },
+        {
+          "inputs": [
+            2,
+            0
+          ],
+          "outputs": [
+            2
+          ]
+        },
+        {
+          "inputs": [
+            2,
+            2
+          ],
+          "outputs": [
+            4
+          ]
+        },
+        {
+          "inputs": [
+            2,
+            4
+          ],
+          "outputs": [
+            6
+          ]
+        },
+        {
+          "inputs": [
+            2,
+            7
+          ],
+          "outputs": [
+            9
+          ]
+        },
+        {
+          "inputs": [
+            2,
+            11
+          ],
+          "outputs": [
+            13
+          ]
+        },
+        {
+          "inputs": [
+            2,
+            16
+          ],
+          "outputs": [
+            18
+          ]
+        },
+        {
+          "inputs": [
+            2,
+            31
+          ],
+          "outputs": [
+            33
+          ]
+        },
+        {
+          "inputs": [
+            2,
+            47
+          ],
+          "outputs": [
+            49
+          ]
+        },
+        {
+          "inputs": [
+            3,
+            0
+          ],
+          "outputs": [
+            3
+          ]
+        },
+        {
+          "inputs": [
+            3,
+            2
+          ],
+          "outputs": [
+            5
+          ]
+        },
+        {
+          "inputs": [
+            3,
+            4
+          ],
+          "outputs": [
+            7
+          ]
+        },
+        {
+          "inputs": [
+            3,
+            7
+          ],
+          "outputs": [
+            10
+          ]
+        },
+        {
+          "inputs": [
+            3,
+            11
+          ],
+          "outputs": [
+            14
+          ]
+        },
+        {
+          "inputs": [
+            3,
+            16
+          ],
+          "outputs": [
+            19
+          ]
+        },
+        {
+          "inputs": [
+            3,
+            31
+          ],
+          "outputs": [
+            34
+          ]
+        },
+        {
+          "inputs": [
+            3,
+            47
+          ],
+          "outputs": [
+            50
+          ]
+        },
+        {
+          "inputs": [
+            4,
+            0
+          ],
+          "outputs": [
+            4
+          ]
+        },
+        {
+          "inputs": [
+            4,
+            2
+          ],
+          "outputs": [
+            6
+          ]
+        },
+        {
+          "inputs": [
+            4,
+            4
+          ],
+          "outputs": [
+            8
+          ]
+        },
+        {
+          "inputs": [
+            4,
+            7
+          ],
+          "outputs": [
+            11
+          ]
+        },
+        {
+          "inputs": [
+            4,
+            11
+          ],
+          "outputs": [
+            15
+          ]
+        },
+        {
+          "inputs": [
+            4,
+            16
+          ],
+          "outputs": [
+            20
+          ]
+        },
+        {
+          "inputs": [
+            4,
+            31
+          ],
+          "outputs": [
+            35
+          ]
+        },
+        {
+          "inputs": [
+            4,
+            47
+          ],
+          "outputs": [
+            51
+          ]
+        },
+        {
+          "inputs": [
+            5,
+            0
+          ],
+          "outputs": [
+            5
+          ]
+        },
+        {
+          "inputs": [
+            5,
+            2
+          ],
+          "outputs": [
+            7
+          ]
+        },
+        {
+          "inputs": [
+            5,
+            4
+          ],
+          "outputs": [
+            9
+          ]
+        },
+        {
+          "inputs": [
+            5,
+            7
+          ],
+          "outputs": [
+            12
+          ]
+        },
+        {
+          "inputs": [
+            5,
+            11
+          ],
+          "outputs": [
+            16
+          ]
+        },
+        {
+          "inputs": [
+            5,
+            16
+          ],
+          "outputs": [
+            21
+          ]
+        },
+        {
+          "inputs": [
+            5,
+            31
+          ],
+          "outputs": [
+            36
+          ]
+        },
+        {
+          "inputs": [
+            5,
+            47
+          ],
+          "outputs": [
+            52
+          ]
+        },
+        {
+          "inputs": [
+            7,
+            0
+          ],
+          "outputs": [
+            7
+          ]
+        },
+        {
+          "inputs": [
+            7,
+            2
+          ],
+          "outputs": [
+            9
+          ]
+        },
+        {
+          "inputs": [
+            7,
+            4
+          ],
+          "outputs": [
+            11
+          ]
+        },
+        {
+          "inputs": [
+            7,
+            7
+          ],
+          "outputs": [
+            14
+          ]
+        },
+        {
+          "inputs": [
+            7,
+            11
+          ],
+          "outputs": [
+            18
+          ]
+        },
+        {
+          "inputs": [
+            7,
+            16
+          ],
+          "outputs": [
+            23
+          ]
+        },
+        {
+          "inputs": [
+            7,
+            31
+          ],
+          "outputs": [
+            38
+          ]
+        },
+        {
+          "inputs": [
+            7,
+            47
+          ],
+          "outputs": [
+            54
+          ]
+        },
+        {
+          "inputs": [
+            8,
+            0
+          ],
+          "outputs": [
+            8
+          ]
+        },
+        {
+          "inputs": [
+            8,
+            2
+          ],
+          "outputs": [
+            10
+          ]
+        },
+        {
+          "inputs": [
+            8,
+            4
+          ],
+          "outputs": [
+            12
+          ]
+        },
+        {
+          "inputs": [
+            8,
+            7
+          ],
+          "outputs": [
+            15
+          ]
+        },
+        {
+          "inputs": [
+            8,
+            11
+          ],
+          "outputs": [
+            19
+          ]
+        },
+        {
+          "inputs": [
+            8,
+            16
+          ],
+          "outputs": [
+            24
+          ]
+        },
+        {
+          "inputs": [
+            8,
+            31
+          ],
+          "outputs": [
+            39
+          ]
+        },
+        {
+          "inputs": [
+            8,
+            47
+          ],
+          "outputs": [
+            55
+          ]
+        },
+        {
+          "inputs": [
+            11,
+            0
+          ],
+          "outputs": [
+            11
+          ]
+        },
+        {
+          "inputs": [
+            11,
+            2
+          ],
+          "outputs": [
+            13
+          ]
+        },
+        {
+          "inputs": [
+            11,
+            4
+          ],
+          "outputs": [
+            15
+          ]
+        },
+        {
+          "inputs": [
+            11,
+            7
+          ],
+          "outputs": [
+            18
+          ]
+        },
+        {
+          "inputs": [
+            11,
+            11
+          ],
+          "outputs": [
+            22
+          ]
+        },
+        {
+          "inputs": [
+            11,
+            16
+          ],
+          "outputs": [
+            27
+          ]
+        },
+        {
+          "inputs": [
+            11,
+            31
+          ],
+          "outputs": [
+            42
+          ]
+        },
+        {
+          "inputs": [
+            11,
+            47
+          ],
+          "outputs": [
+            58
+          ]
+        },
+        {
+          "inputs": [
+            15,
+            0
+          ],
+          "outputs": [
+            15
+          ]
+        },
+        {
+          "inputs": [
+            15,
+            2
+          ],
+          "outputs": [
+            17
+          ]
+        },
+        {
+          "inputs": [
+            15,
+            4
+          ],
+          "outputs": [
+            19
+          ]
+        },
+        {
+          "inputs": [
+            15,
+            7
+          ],
+          "outputs": [
+            22
+          ]
+        },
+        {
+          "inputs": [
+            15,
+            11
+          ],
+          "outputs": [
+            26
+          ]
+        },
+        {
+          "inputs": [
+            15,
+            16
+          ],
+          "outputs": [
+            31
+          ]
+        },
+        {
+          "inputs": [
+            15,
+            31
+          ],
+          "outputs": [
+            46
+          ]
+        },
+        {
+          "inputs": [
+            15,
+            47
+          ],
+          "outputs": [
+            62
+          ]
+        },
+        {
+          "inputs": [
+            16,
+            0
+          ],
+          "outputs": [
+            16
+          ]
+        },
+        {
+          "inputs": [
+            16,
+            2
+          ],
+          "outputs": [
+            18
+          ]
+        },
+        {
+          "inputs": [
+            16,
+            4
+          ],
+          "outputs": [
+            20
+          ]
+        },
+        {
+          "inputs": [
+            16,
+            7
+          ],
+          "outputs": [
+            23
+          ]
+        },
+        {
+          "inputs": [
+            16,
+            11
+          ],
+          "outputs": [
+            27
+          ]
+        },
+        {
+          "inputs": [
+            16,
+            16
+          ],
+          "outputs": [
+            32
+          ]
+        },
+        {
+          "inputs": [
+            16,
+            31
+          ],
+          "outputs": [
+            47
+          ]
+        },
+        {
+          "inputs": [
+            16,
+            47
+          ],
+          "outputs": [
+            63
+          ]
+        },
+        {
+          "inputs": [
+            23,
+            0
+          ],
+          "outputs": [
+            23
+          ]
+        },
+        {
+          "inputs": [
+            23,
+            2
+          ],
+          "outputs": [
+            25
+          ]
+        },
+        {
+          "inputs": [
+            23,
+            4
+          ],
+          "outputs": [
+            27
+          ]
+        },
+        {
+          "inputs": [
+            23,
+            7
+          ],
+          "outputs": [
+            30
+          ]
+        },
+        {
+          "inputs": [
+            23,
+            11
+          ],
+          "outputs": [
+            34
+          ]
+        },
+        {
+          "inputs": [
+            23,
+            16
+          ],
+          "outputs": [
+            39
+          ]
+        },
+        {
+          "inputs": [
+            23,
+            31
+          ],
+          "outputs": [
+            54
+          ]
+        },
+        {
+          "inputs": [
+            23,
+            47
+          ],
+          "outputs": [
+            70
+          ]
+        },
+        {
+          "inputs": [
+            31,
+            0
+          ],
+          "outputs": [
+            31
+          ]
+        },
+        {
+          "inputs": [
+            31,
+            2
+          ],
+          "outputs": [
+            33
+          ]
+        },
+        {
+          "inputs": [
+            31,
+            4
+          ],
+          "outputs": [
+            35
+          ]
+        },
+        {
+          "inputs": [
+            31,
+            7
+          ],
+          "outputs": [
+            38
+          ]
+        },
+        {
+          "inputs": [
+            31,
+            11
+          ],
+          "outputs": [
+            42
+          ]
+        },
+        {
+          "inputs": [
+            31,
+            16
+          ],
+          "outputs": [
+            47
+          ]
+        },
+        {
+          "inputs": [
+            31,
+            31
+          ],
+          "outputs": [
+            62
+          ]
+        },
+        {
+          "inputs": [
+            31,
+            47
+          ],
+          "outputs": [
+            78
+          ]
+        },
+        {
+          "inputs": [
+            32,
+            0
+          ],
+          "outputs": [
+            32
+          ]
+        },
+        {
+          "inputs": [
+            32,
+            2
+          ],
+          "outputs": [
+            34
+          ]
+        },
+        {
+          "inputs": [
+            32,
+            4
+          ],
+          "outputs": [
+            36
+          ]
+        },
+        {
+          "inputs": [
+            32,
+            7
+          ],
+          "outputs": [
+            39
+          ]
+        },
+        {
+          "inputs": [
+            32,
+            11
+          ],
+          "outputs": [
+            43
+          ]
+        },
+        {
+          "inputs": [
+            32,
+            16
+          ],
+          "outputs": [
+            48
+          ]
+        },
+        {
+          "inputs": [
+            32,
+            31
+          ],
+          "outputs": [
+            63
+          ]
+        },
+        {
+          "inputs": [
+            32,
+            47
+          ],
+          "outputs": [
+            79
+          ]
+        },
+        {
+          "inputs": [
+            47,
+            0
+          ],
+          "outputs": [
+            47
+          ]
+        },
+        {
+          "inputs": [
+            47,
+            2
+          ],
+          "outputs": [
+            49
+          ]
+        },
+        {
+          "inputs": [
+            47,
+            4
+          ],
+          "outputs": [
+            51
+          ]
+        },
+        {
+          "inputs": [
+            47,
+            7
+          ],
+          "outputs": [
+            54
+          ]
+        },
+        {
+          "inputs": [
+            47,
+            11
+          ],
+          "outputs": [
+            58
+          ]
+        },
+        {
+          "inputs": [
+            47,
+            16
+          ],
+          "outputs": [
+            63
+          ]
+        },
+        {
+          "inputs": [
+            47,
+            31
+          ],
+          "outputs": [
+            78
+          ]
+        },
+        {
+          "inputs": [
+            47,
+            47
+          ],
+          "outputs": [
+            94
+          ]
+        },
+        {
+          "inputs": [
+            63,
+            0
+          ],
+          "outputs": [
+            63
+          ]
+        },
+        {
+          "inputs": [
+            63,
+            2
+          ],
+          "outputs": [
+            65
+          ]
+        },
+        {
+          "inputs": [
+            63,
+            4
+          ],
+          "outputs": [
+            67
+          ]
+        },
+        {
+          "inputs": [
+            63,
+            7
+          ],
+          "outputs": [
+            70
+          ]
+        },
+        {
+          "inputs": [
+            63,
+            11
+          ],
+          "outputs": [
+            74
+          ]
+        },
+        {
+          "inputs": [
+            63,
+            16
+          ],
+          "outputs": [
+            79
+          ]
+        },
+        {
+          "inputs": [
+            63,
+            31
+          ],
+          "outputs": [
+            94
+          ]
+        },
+        {
+          "inputs": [
+            63,
+            47
+          ],
+          "outputs": [
+            110
+          ]
+        }
+      ]
+    },
+    {
+      "id": 10,
+      "label": "Problem 10",
+      "statement": "Multiplication: x • y. Using a combination of flow charts, prose, and \"snapshots\" of the tape, describe a step-by-step strategy for computing multiplication. This should not be a complete Turing Machine. (That is a difficult and laborious problem.) But it should be sufficiently detailed that you think someone could build a Turing Machine from your instructions, if they knew what they were doing. Your choice of Tally or Binary.",
+      "buildMode": "open",
+      "representation": "binary"
+    },
+    {
+      "id": 11,
+      "label": "Problem 11",
+      "statement": "Multi-function machine. Design a machine which can perform different functions depending on the user input (at least successor, addition, multiplication), similar to a calculator. There are many ways to do this, so be creative. Use a combination of flow charts, prose, and \"snapshots\" of the tape; don’t design a completed Turing Machine.",
+      "buildMode": "open",
+      "representation": "binary"
+    }
+  ]
+}

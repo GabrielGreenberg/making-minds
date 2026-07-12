@@ -1,0 +1,6118 @@
+[
+  {
+    "assignmentTitle": "HW5. Computing with TMs",
+    "student": "alice.chen@example.com",
+    "submittedAt": "2026-07-12T12:00:00.000Z",
+    "answers": [
+      {
+        "questionId": 1,
+        "circuit": {
+          "components": [
+            {
+              "id": "hw5-p1-s0",
+              "type": "STATE",
+              "x": 140,
+              "y": 220,
+              "label": "S₀",
+              "ports": [
+                {
+                  "id": "left",
+                  "label": "",
+                  "side": "left",
+                  "index": 0
+                },
+                {
+                  "id": "right",
+                  "label": "",
+                  "side": "right",
+                  "index": 0
+                }
+              ]
+            },
+            {
+              "id": "hw5-p1-s1",
+              "type": "STATE",
+              "x": 340,
+              "y": 220,
+              "label": "S₁",
+              "ports": [
+                {
+                  "id": "left",
+                  "label": "",
+                  "side": "left",
+                  "index": 0
+                },
+                {
+                  "id": "right",
+                  "label": "",
+                  "side": "right",
+                  "index": 0
+                }
+              ]
+            },
+            {
+              "id": "hw5-p1-s2",
+              "type": "STATE",
+              "x": 540,
+              "y": 220,
+              "label": "S₂",
+              "ports": [
+                {
+                  "id": "left",
+                  "label": "",
+                  "side": "left",
+                  "index": 0
+                },
+                {
+                  "id": "right",
+                  "label": "",
+                  "side": "right",
+                  "index": 0
+                }
+              ]
+            }
+          ],
+          "wires": [
+            {
+              "id": "hw5-p1-t1",
+              "sourceComponentId": "hw5-p1-s0",
+              "sourcePortId": "right",
+              "targetComponentId": "hw5-p1-s0",
+              "targetPortId": "left",
+              "value": 0,
+              "transitionLabel": "1:1,R"
+            },
+            {
+              "id": "hw5-p1-t2",
+              "sourceComponentId": "hw5-p1-s0",
+              "sourcePortId": "right",
+              "targetComponentId": "hw5-p1-s1",
+              "targetPortId": "left",
+              "value": 0,
+              "transitionLabel": "0:1,R"
+            },
+            {
+              "id": "hw5-p1-t3",
+              "sourceComponentId": "hw5-p1-s1",
+              "sourcePortId": "right",
+              "targetComponentId": "hw5-p1-s2",
+              "targetPortId": "left",
+              "value": 0,
+              "transitionLabel": "0:0,L"
+            }
+          ]
+        }
+      },
+      {
+        "questionId": 2,
+        "circuit": {
+          "components": [
+            {
+              "id": "hw5-p2-s0",
+              "type": "STATE",
+              "x": 140,
+              "y": 160,
+              "label": "S₀",
+              "ports": [
+                {
+                  "id": "left",
+                  "label": "",
+                  "side": "left",
+                  "index": 0
+                },
+                {
+                  "id": "right",
+                  "label": "",
+                  "side": "right",
+                  "index": 0
+                }
+              ]
+            },
+            {
+              "id": "hw5-p2-s1",
+              "type": "STATE",
+              "x": 340,
+              "y": 160,
+              "label": "S₁",
+              "ports": [
+                {
+                  "id": "left",
+                  "label": "",
+                  "side": "left",
+                  "index": 0
+                },
+                {
+                  "id": "right",
+                  "label": "",
+                  "side": "right",
+                  "index": 0
+                }
+              ]
+            },
+            {
+              "id": "hw5-p2-s2",
+              "type": "STATE",
+              "x": 540,
+              "y": 160,
+              "label": "S₂",
+              "ports": [
+                {
+                  "id": "left",
+                  "label": "",
+                  "side": "left",
+                  "index": 0
+                },
+                {
+                  "id": "right",
+                  "label": "",
+                  "side": "right",
+                  "index": 0
+                }
+              ]
+            },
+            {
+              "id": "hw5-p2-s3",
+              "type": "STATE",
+              "x": 540,
+              "y": 360,
+              "label": "S₃",
+              "ports": [
+                {
+                  "id": "left",
+                  "label": "",
+                  "side": "left",
+                  "index": 0
+                },
+                {
+                  "id": "right",
+                  "label": "",
+                  "side": "right",
+                  "index": 0
+                }
+              ]
+            },
+            {
+              "id": "hw5-p2-s4",
+              "type": "STATE",
+              "x": 340,
+              "y": 360,
+              "label": "S₄",
+              "ports": [
+                {
+                  "id": "left",
+                  "label": "",
+                  "side": "left",
+                  "index": 0
+                },
+                {
+                  "id": "right",
+                  "label": "",
+                  "side": "right",
+                  "index": 0
+                }
+              ]
+            }
+          ],
+          "wires": [
+            {
+              "id": "hw5-p2-t1",
+              "sourceComponentId": "hw5-p2-s0",
+              "sourcePortId": "right",
+              "targetComponentId": "hw5-p2-s0",
+              "targetPortId": "left",
+              "value": 0,
+              "transitionLabel": "1:1,R"
+            },
+            {
+              "id": "hw5-p2-t2",
+              "sourceComponentId": "hw5-p2-s0",
+              "sourcePortId": "right",
+              "targetComponentId": "hw5-p2-s1",
+              "targetPortId": "left",
+              "value": 0,
+              "transitionLabel": "0:1,R"
+            },
+            {
+              "id": "hw5-p2-t3",
+              "sourceComponentId": "hw5-p2-s1",
+              "sourcePortId": "right",
+              "targetComponentId": "hw5-p2-s2",
+              "targetPortId": "left",
+              "value": 0,
+              "transitionLabel": "0:1,R"
+            },
+            {
+              "id": "hw5-p2-t4",
+              "sourceComponentId": "hw5-p2-s2",
+              "sourcePortId": "right",
+              "targetComponentId": "hw5-p2-s3",
+              "targetPortId": "left",
+              "value": 0,
+              "transitionLabel": "0:1,R"
+            },
+            {
+              "id": "hw5-p2-t5",
+              "sourceComponentId": "hw5-p2-s3",
+              "sourcePortId": "right",
+              "targetComponentId": "hw5-p2-s4",
+              "targetPortId": "left",
+              "value": 0,
+              "transitionLabel": "0:0,L"
+            }
+          ]
+        }
+      },
+      {
+        "questionId": 3,
+        "circuit": {
+          "components": [
+            {
+              "id": "hw5-p3-s0",
+              "type": "STATE",
+              "x": 120,
+              "y": 140,
+              "label": "S₀",
+              "ports": [
+                {
+                  "id": "left",
+                  "label": "",
+                  "side": "left",
+                  "index": 0
+                },
+                {
+                  "id": "right",
+                  "label": "",
+                  "side": "right",
+                  "index": 0
+                }
+              ]
+            },
+            {
+              "id": "hw5-p3-s1",
+              "type": "STATE",
+              "x": 300,
+              "y": 140,
+              "label": "S₁",
+              "ports": [
+                {
+                  "id": "left",
+                  "label": "",
+                  "side": "left",
+                  "index": 0
+                },
+                {
+                  "id": "right",
+                  "label": "",
+                  "side": "right",
+                  "index": 0
+                }
+              ]
+            },
+            {
+              "id": "hw5-p3-s2",
+              "type": "STATE",
+              "x": 480,
+              "y": 140,
+              "label": "S₂",
+              "ports": [
+                {
+                  "id": "left",
+                  "label": "",
+                  "side": "left",
+                  "index": 0
+                },
+                {
+                  "id": "right",
+                  "label": "",
+                  "side": "right",
+                  "index": 0
+                }
+              ]
+            },
+            {
+              "id": "hw5-p3-s3",
+              "type": "STATE",
+              "x": 660,
+              "y": 140,
+              "label": "S₃",
+              "ports": [
+                {
+                  "id": "left",
+                  "label": "",
+                  "side": "left",
+                  "index": 0
+                },
+                {
+                  "id": "right",
+                  "label": "",
+                  "side": "right",
+                  "index": 0
+                }
+              ]
+            },
+            {
+              "id": "hw5-p3-s4",
+              "type": "STATE",
+              "x": 840,
+              "y": 140,
+              "label": "S₄",
+              "ports": [
+                {
+                  "id": "left",
+                  "label": "",
+                  "side": "left",
+                  "index": 0
+                },
+                {
+                  "id": "right",
+                  "label": "",
+                  "side": "right",
+                  "index": 0
+                }
+              ]
+            },
+            {
+              "id": "hw5-p3-s5",
+              "type": "STATE",
+              "x": 840,
+              "y": 360,
+              "label": "S₅",
+              "ports": [
+                {
+                  "id": "left",
+                  "label": "",
+                  "side": "left",
+                  "index": 0
+                },
+                {
+                  "id": "right",
+                  "label": "",
+                  "side": "right",
+                  "index": 0
+                }
+              ]
+            },
+            {
+              "id": "hw5-p3-s6",
+              "type": "STATE",
+              "x": 660,
+              "y": 360,
+              "label": "S₆",
+              "ports": [
+                {
+                  "id": "left",
+                  "label": "",
+                  "side": "left",
+                  "index": 0
+                },
+                {
+                  "id": "right",
+                  "label": "",
+                  "side": "right",
+                  "index": 0
+                }
+              ]
+            },
+            {
+              "id": "hw5-p3-s7",
+              "type": "STATE",
+              "x": 480,
+              "y": 360,
+              "label": "S₇",
+              "ports": [
+                {
+                  "id": "left",
+                  "label": "",
+                  "side": "left",
+                  "index": 0
+                },
+                {
+                  "id": "right",
+                  "label": "",
+                  "side": "right",
+                  "index": 0
+                }
+              ]
+            },
+            {
+              "id": "hw5-p3-s8",
+              "type": "STATE",
+              "x": 300,
+              "y": 360,
+              "label": "S₈",
+              "ports": [
+                {
+                  "id": "left",
+                  "label": "",
+                  "side": "left",
+                  "index": 0
+                },
+                {
+                  "id": "right",
+                  "label": "",
+                  "side": "right",
+                  "index": 0
+                }
+              ]
+            },
+            {
+              "id": "hw5-p3-s9",
+              "type": "STATE",
+              "x": 120,
+              "y": 360,
+              "label": "S₉",
+              "ports": [
+                {
+                  "id": "left",
+                  "label": "",
+                  "side": "left",
+                  "index": 0
+                },
+                {
+                  "id": "right",
+                  "label": "",
+                  "side": "right",
+                  "index": 0
+                }
+              ]
+            }
+          ],
+          "wires": [
+            {
+              "id": "hw5-p3-t01",
+              "sourceComponentId": "hw5-p3-s0",
+              "sourcePortId": "right",
+              "targetComponentId": "hw5-p3-s0",
+              "targetPortId": "left",
+              "value": 0,
+              "transitionLabel": "1:1,L"
+            },
+            {
+              "id": "hw5-p3-t02",
+              "sourceComponentId": "hw5-p3-s0",
+              "sourcePortId": "right",
+              "targetComponentId": "hw5-p3-s1",
+              "targetPortId": "left",
+              "value": 0,
+              "transitionLabel": "0:0,R"
+            },
+            {
+              "id": "hw5-p3-t03",
+              "sourceComponentId": "hw5-p3-s1",
+              "sourcePortId": "right",
+              "targetComponentId": "hw5-p3-s2",
+              "targetPortId": "left",
+              "value": 0,
+              "transitionLabel": "1:0,R"
+            },
+            {
+              "id": "hw5-p3-t04",
+              "sourceComponentId": "hw5-p3-s1",
+              "sourcePortId": "right",
+              "targetComponentId": "hw5-p3-s8",
+              "targetPortId": "left",
+              "value": 0,
+              "transitionLabel": "0:0,R"
+            },
+            {
+              "id": "hw5-p3-t05",
+              "sourceComponentId": "hw5-p3-s2",
+              "sourcePortId": "right",
+              "targetComponentId": "hw5-p3-s2",
+              "targetPortId": "left",
+              "value": 0,
+              "transitionLabel": "1:1,R"
+            },
+            {
+              "id": "hw5-p3-t06",
+              "sourceComponentId": "hw5-p3-s2",
+              "sourcePortId": "right",
+              "targetComponentId": "hw5-p3-s3",
+              "targetPortId": "left",
+              "value": 0,
+              "transitionLabel": "0:0,R"
+            },
+            {
+              "id": "hw5-p3-t07",
+              "sourceComponentId": "hw5-p3-s3",
+              "sourcePortId": "right",
+              "targetComponentId": "hw5-p3-s3",
+              "targetPortId": "left",
+              "value": 0,
+              "transitionLabel": "1:1,R"
+            },
+            {
+              "id": "hw5-p3-t08",
+              "sourceComponentId": "hw5-p3-s3",
+              "sourcePortId": "right",
+              "targetComponentId": "hw5-p3-s4",
+              "targetPortId": "left",
+              "value": 0,
+              "transitionLabel": "0:1,R"
+            },
+            {
+              "id": "hw5-p3-t09",
+              "sourceComponentId": "hw5-p3-s4",
+              "sourcePortId": "right",
+              "targetComponentId": "hw5-p3-s5",
+              "targetPortId": "left",
+              "value": 0,
+              "transitionLabel": "0:1,R"
+            },
+            {
+              "id": "hw5-p3-t10",
+              "sourceComponentId": "hw5-p3-s5",
+              "sourcePortId": "right",
+              "targetComponentId": "hw5-p3-s6",
+              "targetPortId": "left",
+              "value": 0,
+              "transitionLabel": "0:1,L"
+            },
+            {
+              "id": "hw5-p3-t11",
+              "sourceComponentId": "hw5-p3-s6",
+              "sourcePortId": "right",
+              "targetComponentId": "hw5-p3-s6",
+              "targetPortId": "left",
+              "value": 0,
+              "transitionLabel": "1:1,L"
+            },
+            {
+              "id": "hw5-p3-t12",
+              "sourceComponentId": "hw5-p3-s6",
+              "sourcePortId": "right",
+              "targetComponentId": "hw5-p3-s7",
+              "targetPortId": "left",
+              "value": 0,
+              "transitionLabel": "0:0,L"
+            },
+            {
+              "id": "hw5-p3-t13",
+              "sourceComponentId": "hw5-p3-s7",
+              "sourcePortId": "right",
+              "targetComponentId": "hw5-p3-s7",
+              "targetPortId": "left",
+              "value": 0,
+              "transitionLabel": "1:1,L"
+            },
+            {
+              "id": "hw5-p3-t14",
+              "sourceComponentId": "hw5-p3-s7",
+              "sourcePortId": "right",
+              "targetComponentId": "hw5-p3-s1",
+              "targetPortId": "left",
+              "value": 0,
+              "transitionLabel": "0:0,R"
+            },
+            {
+              "id": "hw5-p3-t15",
+              "sourceComponentId": "hw5-p3-s8",
+              "sourcePortId": "right",
+              "targetComponentId": "hw5-p3-s8",
+              "targetPortId": "left",
+              "value": 0,
+              "transitionLabel": "1:1,R"
+            },
+            {
+              "id": "hw5-p3-t16",
+              "sourceComponentId": "hw5-p3-s8",
+              "sourcePortId": "right",
+              "targetComponentId": "hw5-p3-s9",
+              "targetPortId": "left",
+              "value": 0,
+              "transitionLabel": "0:0,L"
+            }
+          ]
+        }
+      },
+      {
+        "questionId": 4,
+        "circuit": {
+          "components": [
+            {
+              "id": "hw5-p4-s0",
+              "type": "STATE",
+              "x": 140,
+              "y": 160,
+              "label": "S₀",
+              "ports": [
+                {
+                  "id": "left",
+                  "label": "",
+                  "side": "left",
+                  "index": 0
+                },
+                {
+                  "id": "right",
+                  "label": "",
+                  "side": "right",
+                  "index": 0
+                }
+              ]
+            },
+            {
+              "id": "hw5-p4-s1",
+              "type": "STATE",
+              "x": 340,
+              "y": 160,
+              "label": "S₁",
+              "ports": [
+                {
+                  "id": "left",
+                  "label": "",
+                  "side": "left",
+                  "index": 0
+                },
+                {
+                  "id": "right",
+                  "label": "",
+                  "side": "right",
+                  "index": 0
+                }
+              ]
+            },
+            {
+              "id": "hw5-p4-s2",
+              "type": "STATE",
+              "x": 540,
+              "y": 160,
+              "label": "S₂",
+              "ports": [
+                {
+                  "id": "left",
+                  "label": "",
+                  "side": "left",
+                  "index": 0
+                },
+                {
+                  "id": "right",
+                  "label": "",
+                  "side": "right",
+                  "index": 0
+                }
+              ]
+            },
+            {
+              "id": "hw5-p4-s3",
+              "type": "STATE",
+              "x": 540,
+              "y": 360,
+              "label": "S₃",
+              "ports": [
+                {
+                  "id": "left",
+                  "label": "",
+                  "side": "left",
+                  "index": 0
+                },
+                {
+                  "id": "right",
+                  "label": "",
+                  "side": "right",
+                  "index": 0
+                }
+              ]
+            },
+            {
+              "id": "hw5-p4-s4",
+              "type": "STATE",
+              "x": 340,
+              "y": 360,
+              "label": "S₄",
+              "ports": [
+                {
+                  "id": "left",
+                  "label": "",
+                  "side": "left",
+                  "index": 0
+                },
+                {
+                  "id": "right",
+                  "label": "",
+                  "side": "right",
+                  "index": 0
+                }
+              ]
+            },
+            {
+              "id": "hw5-p4-s5",
+              "type": "STATE",
+              "x": 140,
+              "y": 360,
+              "label": "S₅",
+              "ports": [
+                {
+                  "id": "left",
+                  "label": "",
+                  "side": "left",
+                  "index": 0
+                },
+                {
+                  "id": "right",
+                  "label": "",
+                  "side": "right",
+                  "index": 0
+                }
+              ]
+            }
+          ],
+          "wires": [
+            {
+              "id": "hw5-p4-t1",
+              "sourceComponentId": "hw5-p4-s0",
+              "sourcePortId": "right",
+              "targetComponentId": "hw5-p4-s1",
+              "targetPortId": "left",
+              "value": 0,
+              "transitionLabel": "1:0,L"
+            },
+            {
+              "id": "hw5-p4-t2",
+              "sourceComponentId": "hw5-p4-s1",
+              "sourcePortId": "right",
+              "targetComponentId": "hw5-p4-s1",
+              "targetPortId": "left",
+              "value": 0,
+              "transitionLabel": "1:1,L"
+            },
+            {
+              "id": "hw5-p4-t3",
+              "sourceComponentId": "hw5-p4-s1",
+              "sourcePortId": "right",
+              "targetComponentId": "hw5-p4-s2",
+              "targetPortId": "left",
+              "value": 0,
+              "transitionLabel": "0:1,L"
+            },
+            {
+              "id": "hw5-p4-t4",
+              "sourceComponentId": "hw5-p4-s2",
+              "sourcePortId": "right",
+              "targetComponentId": "hw5-p4-s3",
+              "targetPortId": "left",
+              "value": 0,
+              "transitionLabel": "0:0,R"
+            },
+            {
+              "id": "hw5-p4-t5",
+              "sourceComponentId": "hw5-p4-s2",
+              "sourcePortId": "right",
+              "targetComponentId": "hw5-p4-s4",
+              "targetPortId": "left",
+              "value": 0,
+              "transitionLabel": "1:1,R"
+            },
+            {
+              "id": "hw5-p4-t6",
+              "sourceComponentId": "hw5-p4-s3",
+              "sourcePortId": "right",
+              "targetComponentId": "hw5-p4-s3",
+              "targetPortId": "left",
+              "value": 0,
+              "transitionLabel": "1:1,R"
+            },
+            {
+              "id": "hw5-p4-t7",
+              "sourceComponentId": "hw5-p4-s3",
+              "sourcePortId": "right",
+              "targetComponentId": "hw5-p4-s0",
+              "targetPortId": "left",
+              "value": 0,
+              "transitionLabel": "0:0,L"
+            },
+            {
+              "id": "hw5-p4-t8",
+              "sourceComponentId": "hw5-p4-s4",
+              "sourcePortId": "right",
+              "targetComponentId": "hw5-p4-s4",
+              "targetPortId": "left",
+              "value": 0,
+              "transitionLabel": "1:1,R"
+            },
+            {
+              "id": "hw5-p4-t9",
+              "sourceComponentId": "hw5-p4-s4",
+              "sourcePortId": "right",
+              "targetComponentId": "hw5-p4-s5",
+              "targetPortId": "left",
+              "value": 0,
+              "transitionLabel": "0:0,L"
+            }
+          ]
+        }
+      },
+      {
+        "questionId": 5,
+        "circuit": {
+          "components": [
+            {
+              "id": "hw5-p5-s0",
+              "type": "STATE",
+              "x": 120,
+              "y": 140,
+              "label": "S₀",
+              "ports": [
+                {
+                  "id": "left",
+                  "label": "",
+                  "side": "left",
+                  "index": 0
+                },
+                {
+                  "id": "right",
+                  "label": "",
+                  "side": "right",
+                  "index": 0
+                }
+              ]
+            },
+            {
+              "id": "hw5-p5-s1",
+              "type": "STATE",
+              "x": 300,
+              "y": 140,
+              "label": "S₁",
+              "ports": [
+                {
+                  "id": "left",
+                  "label": "",
+                  "side": "left",
+                  "index": 0
+                },
+                {
+                  "id": "right",
+                  "label": "",
+                  "side": "right",
+                  "index": 0
+                }
+              ]
+            },
+            {
+              "id": "hw5-p5-s2",
+              "type": "STATE",
+              "x": 480,
+              "y": 140,
+              "label": "S₂",
+              "ports": [
+                {
+                  "id": "left",
+                  "label": "",
+                  "side": "left",
+                  "index": 0
+                },
+                {
+                  "id": "right",
+                  "label": "",
+                  "side": "right",
+                  "index": 0
+                }
+              ]
+            },
+            {
+              "id": "hw5-p5-s3",
+              "type": "STATE",
+              "x": 660,
+              "y": 140,
+              "label": "S₃",
+              "ports": [
+                {
+                  "id": "left",
+                  "label": "",
+                  "side": "left",
+                  "index": 0
+                },
+                {
+                  "id": "right",
+                  "label": "",
+                  "side": "right",
+                  "index": 0
+                }
+              ]
+            },
+            {
+              "id": "hw5-p5-s4",
+              "type": "STATE",
+              "x": 660,
+              "y": 320,
+              "label": "S₄",
+              "ports": [
+                {
+                  "id": "left",
+                  "label": "",
+                  "side": "left",
+                  "index": 0
+                },
+                {
+                  "id": "right",
+                  "label": "",
+                  "side": "right",
+                  "index": 0
+                }
+              ]
+            },
+            {
+              "id": "hw5-p5-s5",
+              "type": "STATE",
+              "x": 480,
+              "y": 320,
+              "label": "S₅",
+              "ports": [
+                {
+                  "id": "left",
+                  "label": "",
+                  "side": "left",
+                  "index": 0
+                },
+                {
+                  "id": "right",
+                  "label": "",
+                  "side": "right",
+                  "index": 0
+                }
+              ]
+            },
+            {
+              "id": "hw5-p5-s6",
+              "type": "STATE",
+              "x": 300,
+              "y": 320,
+              "label": "S₆",
+              "ports": [
+                {
+                  "id": "left",
+                  "label": "",
+                  "side": "left",
+                  "index": 0
+                },
+                {
+                  "id": "right",
+                  "label": "",
+                  "side": "right",
+                  "index": 0
+                }
+              ]
+            },
+            {
+              "id": "hw5-p5-s7",
+              "type": "STATE",
+              "x": 120,
+              "y": 320,
+              "label": "S₇",
+              "ports": [
+                {
+                  "id": "left",
+                  "label": "",
+                  "side": "left",
+                  "index": 0
+                },
+                {
+                  "id": "right",
+                  "label": "",
+                  "side": "right",
+                  "index": 0
+                }
+              ]
+            },
+            {
+              "id": "hw5-p5-s8",
+              "type": "STATE",
+              "x": 120,
+              "y": 500,
+              "label": "S₈",
+              "ports": [
+                {
+                  "id": "left",
+                  "label": "",
+                  "side": "left",
+                  "index": 0
+                },
+                {
+                  "id": "right",
+                  "label": "",
+                  "side": "right",
+                  "index": 0
+                }
+              ]
+            },
+            {
+              "id": "hw5-p5-s9",
+              "type": "STATE",
+              "x": 300,
+              "y": 500,
+              "label": "S₉",
+              "ports": [
+                {
+                  "id": "left",
+                  "label": "",
+                  "side": "left",
+                  "index": 0
+                },
+                {
+                  "id": "right",
+                  "label": "",
+                  "side": "right",
+                  "index": 0
+                }
+              ]
+            },
+            {
+              "id": "hw5-p5-s10",
+              "type": "STATE",
+              "x": 480,
+              "y": 500,
+              "label": "S₁₀",
+              "ports": [
+                {
+                  "id": "left",
+                  "label": "",
+                  "side": "left",
+                  "index": 0
+                },
+                {
+                  "id": "right",
+                  "label": "",
+                  "side": "right",
+                  "index": 0
+                }
+              ]
+            },
+            {
+              "id": "hw5-p5-s11",
+              "type": "STATE",
+              "x": 660,
+              "y": 500,
+              "label": "S₁₁",
+              "ports": [
+                {
+                  "id": "left",
+                  "label": "",
+                  "side": "left",
+                  "index": 0
+                },
+                {
+                  "id": "right",
+                  "label": "",
+                  "side": "right",
+                  "index": 0
+                }
+              ]
+            }
+          ],
+          "wires": [
+            {
+              "id": "hw5-p5-t1",
+              "sourceComponentId": "hw5-p5-s0",
+              "sourcePortId": "right",
+              "targetComponentId": "hw5-p5-s0",
+              "targetPortId": "left",
+              "value": 0,
+              "transitionLabel": "1:1,L"
+            },
+            {
+              "id": "hw5-p5-t2",
+              "sourceComponentId": "hw5-p5-s0",
+              "sourcePortId": "right",
+              "targetComponentId": "hw5-p5-s1",
+              "targetPortId": "left",
+              "value": 0,
+              "transitionLabel": "0:1,L"
+            },
+            {
+              "id": "hw5-p5-t3",
+              "sourceComponentId": "hw5-p5-s1",
+              "sourcePortId": "right",
+              "targetComponentId": "hw5-p5-s1",
+              "targetPortId": "left",
+              "value": 0,
+              "transitionLabel": "1:1,L"
+            },
+            {
+              "id": "hw5-p5-t4",
+              "sourceComponentId": "hw5-p5-s1",
+              "sourcePortId": "right",
+              "targetComponentId": "hw5-p5-s2",
+              "targetPortId": "left",
+              "value": 0,
+              "transitionLabel": "0:0,R"
+            },
+            {
+              "id": "hw5-p5-t5",
+              "sourceComponentId": "hw5-p5-s2",
+              "sourcePortId": "right",
+              "targetComponentId": "hw5-p5-s3",
+              "targetPortId": "left",
+              "value": 0,
+              "transitionLabel": "1:0,R"
+            },
+            {
+              "id": "hw5-p5-t6",
+              "sourceComponentId": "hw5-p5-s3",
+              "sourcePortId": "right",
+              "targetComponentId": "hw5-p5-s3",
+              "targetPortId": "left",
+              "value": 0,
+              "transitionLabel": "1:1,R"
+            },
+            {
+              "id": "hw5-p5-t7",
+              "sourceComponentId": "hw5-p5-s3",
+              "sourcePortId": "right",
+              "targetComponentId": "hw5-p5-s4",
+              "targetPortId": "left",
+              "value": 0,
+              "transitionLabel": "0:0,L"
+            },
+            {
+              "id": "hw5-p5-t8",
+              "sourceComponentId": "hw5-p5-s4",
+              "sourcePortId": "right",
+              "targetComponentId": "hw5-p5-s5",
+              "targetPortId": "left",
+              "value": 0,
+              "transitionLabel": "1:0,L"
+            },
+            {
+              "id": "hw5-p5-t9",
+              "sourceComponentId": "hw5-p5-s4",
+              "sourcePortId": "right",
+              "targetComponentId": "hw5-p5-s11",
+              "targetPortId": "left",
+              "value": 0,
+              "transitionLabel": "0:0,L"
+            },
+            {
+              "id": "hw5-p5-t10",
+              "sourceComponentId": "hw5-p5-s5",
+              "sourcePortId": "right",
+              "targetComponentId": "hw5-p5-s5",
+              "targetPortId": "left",
+              "value": 0,
+              "transitionLabel": "1:1,L"
+            },
+            {
+              "id": "hw5-p5-t11",
+              "sourceComponentId": "hw5-p5-s5",
+              "sourcePortId": "right",
+              "targetComponentId": "hw5-p5-s6",
+              "targetPortId": "left",
+              "value": 0,
+              "transitionLabel": "0:0,L"
+            },
+            {
+              "id": "hw5-p5-t12",
+              "sourceComponentId": "hw5-p5-s6",
+              "sourcePortId": "right",
+              "targetComponentId": "hw5-p5-s6",
+              "targetPortId": "left",
+              "value": 0,
+              "transitionLabel": "1:1,L"
+            },
+            {
+              "id": "hw5-p5-t13",
+              "sourceComponentId": "hw5-p5-s6",
+              "sourcePortId": "right",
+              "targetComponentId": "hw5-p5-s7",
+              "targetPortId": "left",
+              "value": 0,
+              "transitionLabel": "0:1,L"
+            },
+            {
+              "id": "hw5-p5-t14",
+              "sourceComponentId": "hw5-p5-s7",
+              "sourcePortId": "right",
+              "targetComponentId": "hw5-p5-s8",
+              "targetPortId": "left",
+              "value": 0,
+              "transitionLabel": "0:1,L"
+            },
+            {
+              "id": "hw5-p5-t15",
+              "sourceComponentId": "hw5-p5-s8",
+              "sourcePortId": "right",
+              "targetComponentId": "hw5-p5-s9",
+              "targetPortId": "left",
+              "value": 0,
+              "transitionLabel": "0:1,R"
+            },
+            {
+              "id": "hw5-p5-t16",
+              "sourceComponentId": "hw5-p5-s9",
+              "sourcePortId": "right",
+              "targetComponentId": "hw5-p5-s9",
+              "targetPortId": "left",
+              "value": 0,
+              "transitionLabel": "1:1,R"
+            },
+            {
+              "id": "hw5-p5-t17",
+              "sourceComponentId": "hw5-p5-s9",
+              "sourcePortId": "right",
+              "targetComponentId": "hw5-p5-s10",
+              "targetPortId": "left",
+              "value": 0,
+              "transitionLabel": "0:0,R"
+            },
+            {
+              "id": "hw5-p5-t18",
+              "sourceComponentId": "hw5-p5-s10",
+              "sourcePortId": "right",
+              "targetComponentId": "hw5-p5-s10",
+              "targetPortId": "left",
+              "value": 0,
+              "transitionLabel": "1:1,R"
+            },
+            {
+              "id": "hw5-p5-t19",
+              "sourceComponentId": "hw5-p5-s10",
+              "sourcePortId": "right",
+              "targetComponentId": "hw5-p5-s4",
+              "targetPortId": "left",
+              "value": 0,
+              "transitionLabel": "0:0,L"
+            }
+          ]
+        }
+      },
+      {
+        "questionId": 6,
+        "circuit": {
+          "components": [
+            {
+              "id": "hw5-p6-s0",
+              "type": "STATE",
+              "x": 120,
+              "y": 140,
+              "label": "S₀",
+              "ports": [
+                {
+                  "id": "left",
+                  "label": "",
+                  "side": "left",
+                  "index": 0
+                },
+                {
+                  "id": "right",
+                  "label": "",
+                  "side": "right",
+                  "index": 0
+                }
+              ]
+            },
+            {
+              "id": "hw5-p6-s1",
+              "type": "STATE",
+              "x": 300,
+              "y": 140,
+              "label": "S₁",
+              "ports": [
+                {
+                  "id": "left",
+                  "label": "",
+                  "side": "left",
+                  "index": 0
+                },
+                {
+                  "id": "right",
+                  "label": "",
+                  "side": "right",
+                  "index": 0
+                }
+              ]
+            },
+            {
+              "id": "hw5-p6-s2",
+              "type": "STATE",
+              "x": 480,
+              "y": 140,
+              "label": "S₂",
+              "ports": [
+                {
+                  "id": "left",
+                  "label": "",
+                  "side": "left",
+                  "index": 0
+                },
+                {
+                  "id": "right",
+                  "label": "",
+                  "side": "right",
+                  "index": 0
+                }
+              ]
+            },
+            {
+              "id": "hw5-p6-s3",
+              "type": "STATE",
+              "x": 660,
+              "y": 140,
+              "label": "S₃",
+              "ports": [
+                {
+                  "id": "left",
+                  "label": "",
+                  "side": "left",
+                  "index": 0
+                },
+                {
+                  "id": "right",
+                  "label": "",
+                  "side": "right",
+                  "index": 0
+                }
+              ]
+            },
+            {
+              "id": "hw5-p6-s4",
+              "type": "STATE",
+              "x": 840,
+              "y": 140,
+              "label": "S₄",
+              "ports": [
+                {
+                  "id": "left",
+                  "label": "",
+                  "side": "left",
+                  "index": 0
+                },
+                {
+                  "id": "right",
+                  "label": "",
+                  "side": "right",
+                  "index": 0
+                }
+              ]
+            },
+            {
+              "id": "hw5-p6-s5",
+              "type": "STATE",
+              "x": 1020,
+              "y": 140,
+              "label": "S₅",
+              "ports": [
+                {
+                  "id": "left",
+                  "label": "",
+                  "side": "left",
+                  "index": 0
+                },
+                {
+                  "id": "right",
+                  "label": "",
+                  "side": "right",
+                  "index": 0
+                }
+              ]
+            },
+            {
+              "id": "hw5-p6-s6",
+              "type": "STATE",
+              "x": 1020,
+              "y": 400,
+              "label": "S₆",
+              "ports": [
+                {
+                  "id": "left",
+                  "label": "",
+                  "side": "left",
+                  "index": 0
+                },
+                {
+                  "id": "right",
+                  "label": "",
+                  "side": "right",
+                  "index": 0
+                }
+              ]
+            },
+            {
+              "id": "hw5-p6-s7",
+              "type": "STATE",
+              "x": 840,
+              "y": 400,
+              "label": "S₇",
+              "ports": [
+                {
+                  "id": "left",
+                  "label": "",
+                  "side": "left",
+                  "index": 0
+                },
+                {
+                  "id": "right",
+                  "label": "",
+                  "side": "right",
+                  "index": 0
+                }
+              ]
+            },
+            {
+              "id": "hw5-p6-s8",
+              "type": "STATE",
+              "x": 660,
+              "y": 400,
+              "label": "S₈",
+              "ports": [
+                {
+                  "id": "left",
+                  "label": "",
+                  "side": "left",
+                  "index": 0
+                },
+                {
+                  "id": "right",
+                  "label": "",
+                  "side": "right",
+                  "index": 0
+                }
+              ]
+            },
+            {
+              "id": "hw5-p6-s9",
+              "type": "STATE",
+              "x": 480,
+              "y": 400,
+              "label": "S₉",
+              "ports": [
+                {
+                  "id": "left",
+                  "label": "",
+                  "side": "left",
+                  "index": 0
+                },
+                {
+                  "id": "right",
+                  "label": "",
+                  "side": "right",
+                  "index": 0
+                }
+              ]
+            },
+            {
+              "id": "hw5-p6-s10",
+              "type": "STATE",
+              "x": 300,
+              "y": 400,
+              "label": "S₁₀",
+              "ports": [
+                {
+                  "id": "left",
+                  "label": "",
+                  "side": "left",
+                  "index": 0
+                },
+                {
+                  "id": "right",
+                  "label": "",
+                  "side": "right",
+                  "index": 0
+                }
+              ]
+            }
+          ],
+          "wires": [
+            {
+              "id": "hw5-p6-t1",
+              "sourceComponentId": "hw5-p6-s0",
+              "sourcePortId": "right",
+              "targetComponentId": "hw5-p6-s0",
+              "targetPortId": "left",
+              "value": 0,
+              "transitionLabel": "1:1,L"
+            },
+            {
+              "id": "hw5-p6-t2",
+              "sourceComponentId": "hw5-p6-s0",
+              "sourcePortId": "right",
+              "targetComponentId": "hw5-p6-s1",
+              "targetPortId": "left",
+              "value": 0,
+              "transitionLabel": "0:0,L"
+            },
+            {
+              "id": "hw5-p6-t3",
+              "sourceComponentId": "hw5-p6-s1",
+              "sourcePortId": "right",
+              "targetComponentId": "hw5-p6-s2",
+              "targetPortId": "left",
+              "value": 0,
+              "transitionLabel": "1:1,L"
+            },
+            {
+              "id": "hw5-p6-t4",
+              "sourceComponentId": "hw5-p6-s1",
+              "sourcePortId": "right",
+              "targetComponentId": "hw5-p6-s8",
+              "targetPortId": "left",
+              "value": 0,
+              "transitionLabel": "0:0,R"
+            },
+            {
+              "id": "hw5-p6-t5",
+              "sourceComponentId": "hw5-p6-s2",
+              "sourcePortId": "right",
+              "targetComponentId": "hw5-p6-s2",
+              "targetPortId": "left",
+              "value": 0,
+              "transitionLabel": "1:1,L"
+            },
+            {
+              "id": "hw5-p6-t6",
+              "sourceComponentId": "hw5-p6-s2",
+              "sourcePortId": "right",
+              "targetComponentId": "hw5-p6-s3",
+              "targetPortId": "left",
+              "value": 0,
+              "transitionLabel": "0:0,R"
+            },
+            {
+              "id": "hw5-p6-t7",
+              "sourceComponentId": "hw5-p6-s3",
+              "sourcePortId": "right",
+              "targetComponentId": "hw5-p6-s4",
+              "targetPortId": "left",
+              "value": 0,
+              "transitionLabel": "1:0,R"
+            },
+            {
+              "id": "hw5-p6-t8",
+              "sourceComponentId": "hw5-p6-s4",
+              "sourcePortId": "right",
+              "targetComponentId": "hw5-p6-s4",
+              "targetPortId": "left",
+              "value": 0,
+              "transitionLabel": "1:1,R"
+            },
+            {
+              "id": "hw5-p6-t9",
+              "sourceComponentId": "hw5-p6-s4",
+              "sourcePortId": "right",
+              "targetComponentId": "hw5-p6-s5",
+              "targetPortId": "left",
+              "value": 0,
+              "transitionLabel": "0:0,R"
+            },
+            {
+              "id": "hw5-p6-t10",
+              "sourceComponentId": "hw5-p6-s5",
+              "sourcePortId": "right",
+              "targetComponentId": "hw5-p6-s5",
+              "targetPortId": "left",
+              "value": 0,
+              "transitionLabel": "1:1,R"
+            },
+            {
+              "id": "hw5-p6-t11",
+              "sourceComponentId": "hw5-p6-s5",
+              "sourcePortId": "right",
+              "targetComponentId": "hw5-p6-s6",
+              "targetPortId": "left",
+              "value": 0,
+              "transitionLabel": "0:1,R"
+            },
+            {
+              "id": "hw5-p6-t12",
+              "sourceComponentId": "hw5-p6-s6",
+              "sourcePortId": "right",
+              "targetComponentId": "hw5-p6-s7",
+              "targetPortId": "left",
+              "value": 0,
+              "transitionLabel": "0:1,R"
+            },
+            {
+              "id": "hw5-p6-t13",
+              "sourceComponentId": "hw5-p6-s7",
+              "sourcePortId": "right",
+              "targetComponentId": "hw5-p6-s0",
+              "targetPortId": "left",
+              "value": 0,
+              "transitionLabel": "0:1,L"
+            },
+            {
+              "id": "hw5-p6-t14",
+              "sourceComponentId": "hw5-p6-s8",
+              "sourcePortId": "right",
+              "targetComponentId": "hw5-p6-s9",
+              "targetPortId": "left",
+              "value": 0,
+              "transitionLabel": "0:0,R"
+            },
+            {
+              "id": "hw5-p6-t15",
+              "sourceComponentId": "hw5-p6-s9",
+              "sourcePortId": "right",
+              "targetComponentId": "hw5-p6-s9",
+              "targetPortId": "left",
+              "value": 0,
+              "transitionLabel": "1:1,R"
+            },
+            {
+              "id": "hw5-p6-t16",
+              "sourceComponentId": "hw5-p6-s9",
+              "sourcePortId": "right",
+              "targetComponentId": "hw5-p6-s10",
+              "targetPortId": "left",
+              "value": 0,
+              "transitionLabel": "0:0,L"
+            }
+          ]
+        }
+      },
+      {
+        "questionId": 7,
+        "circuit": {
+          "components": [
+            {
+              "id": "hw5-p7-s0",
+              "type": "STATE",
+              "x": 120,
+              "y": 160,
+              "label": "S₀",
+              "ports": [
+                {
+                  "id": "left",
+                  "label": "",
+                  "side": "left",
+                  "index": 0
+                },
+                {
+                  "id": "right",
+                  "label": "",
+                  "side": "right",
+                  "index": 0
+                }
+              ]
+            },
+            {
+              "id": "hw5-p7-s1",
+              "type": "STATE",
+              "x": 360,
+              "y": 160,
+              "label": "S₁",
+              "ports": [
+                {
+                  "id": "left",
+                  "label": "",
+                  "side": "left",
+                  "index": 0
+                },
+                {
+                  "id": "right",
+                  "label": "",
+                  "side": "right",
+                  "index": 0
+                }
+              ]
+            },
+            {
+              "id": "hw5-p7-s2",
+              "type": "STATE",
+              "x": 600,
+              "y": 160,
+              "label": "S₂",
+              "ports": [
+                {
+                  "id": "left",
+                  "label": "",
+                  "side": "left",
+                  "index": 0
+                },
+                {
+                  "id": "right",
+                  "label": "",
+                  "side": "right",
+                  "index": 0
+                }
+              ]
+            },
+            {
+              "id": "hw5-p7-s3",
+              "type": "STATE",
+              "x": 360,
+              "y": 380,
+              "label": "S₃",
+              "ports": [
+                {
+                  "id": "left",
+                  "label": "",
+                  "side": "left",
+                  "index": 0
+                },
+                {
+                  "id": "right",
+                  "label": "",
+                  "side": "right",
+                  "index": 0
+                }
+              ]
+            }
+          ],
+          "wires": [
+            {
+              "id": "hw5-p7-t1",
+              "sourceComponentId": "hw5-p7-s0",
+              "sourcePortId": "right",
+              "targetComponentId": "hw5-p7-s1",
+              "targetPortId": "left",
+              "value": 0,
+              "transitionLabel": "*:*,L"
+            },
+            {
+              "id": "hw5-p7-t2",
+              "sourceComponentId": "hw5-p7-s1",
+              "sourcePortId": "right",
+              "targetComponentId": "hw5-p7-s1",
+              "targetPortId": "left",
+              "value": 0,
+              "transitionLabel": "1:0,L"
+            },
+            {
+              "id": "hw5-p7-t3",
+              "sourceComponentId": "hw5-p7-s1",
+              "sourcePortId": "right",
+              "targetComponentId": "hw5-p7-s2",
+              "targetPortId": "left",
+              "value": 0,
+              "transitionLabel": "0:1,R"
+            },
+            {
+              "id": "hw5-p7-t4",
+              "sourceComponentId": "hw5-p7-s1",
+              "sourcePortId": "right",
+              "targetComponentId": "hw5-p7-s3",
+              "targetPortId": "left",
+              "value": 0,
+              "transitionLabel": "*:1,L"
+            },
+            {
+              "id": "hw5-p7-t5",
+              "sourceComponentId": "hw5-p7-s3",
+              "sourcePortId": "right",
+              "targetComponentId": "hw5-p7-s2",
+              "targetPortId": "left",
+              "value": 0,
+              "transitionLabel": "0:*,R"
+            },
+            {
+              "id": "hw5-p7-t6",
+              "sourceComponentId": "hw5-p7-s2",
+              "sourcePortId": "right",
+              "targetComponentId": "hw5-p7-s2",
+              "targetPortId": "left",
+              "value": 0,
+              "transitionLabel": "0:0,R"
+            },
+            {
+              "id": "hw5-p7-t7",
+              "sourceComponentId": "hw5-p7-s2",
+              "sourcePortId": "right",
+              "targetComponentId": "hw5-p7-s2",
+              "targetPortId": "left",
+              "value": 0,
+              "transitionLabel": "1:1,R"
+            }
+          ]
+        }
+      },
+      {
+        "questionId": 8,
+        "circuit": {
+          "components": [
+            {
+              "id": "hw5-p8-s0",
+              "type": "STATE",
+              "x": 140,
+              "y": 160,
+              "label": "S₀",
+              "ports": [
+                {
+                  "id": "left",
+                  "label": "",
+                  "side": "left",
+                  "index": 0
+                },
+                {
+                  "id": "right",
+                  "label": "",
+                  "side": "right",
+                  "index": 0
+                }
+              ]
+            },
+            {
+              "id": "hw5-p8-s1",
+              "type": "STATE",
+              "x": 380,
+              "y": 160,
+              "label": "S₁",
+              "ports": [
+                {
+                  "id": "left",
+                  "label": "",
+                  "side": "left",
+                  "index": 0
+                },
+                {
+                  "id": "right",
+                  "label": "",
+                  "side": "right",
+                  "index": 0
+                }
+              ]
+            },
+            {
+              "id": "hw5-p8-s2",
+              "type": "STATE",
+              "x": 620,
+              "y": 160,
+              "label": "S₂",
+              "ports": [
+                {
+                  "id": "left",
+                  "label": "",
+                  "side": "left",
+                  "index": 0
+                },
+                {
+                  "id": "right",
+                  "label": "",
+                  "side": "right",
+                  "index": 0
+                }
+              ]
+            },
+            {
+              "id": "hw5-p8-s3",
+              "type": "STATE",
+              "x": 380,
+              "y": 380,
+              "label": "S₃",
+              "ports": [
+                {
+                  "id": "left",
+                  "label": "",
+                  "side": "left",
+                  "index": 0
+                },
+                {
+                  "id": "right",
+                  "label": "",
+                  "side": "right",
+                  "index": 0
+                }
+              ]
+            }
+          ],
+          "wires": [
+            {
+              "id": "hw5-p8-t1",
+              "sourceComponentId": "hw5-p8-s0",
+              "sourcePortId": "right",
+              "targetComponentId": "hw5-p8-s1",
+              "targetPortId": "left",
+              "value": 0,
+              "transitionLabel": "*:*,L"
+            },
+            {
+              "id": "hw5-p8-t2",
+              "sourceComponentId": "hw5-p8-s1",
+              "sourcePortId": "right",
+              "targetComponentId": "hw5-p8-s2",
+              "targetPortId": "left",
+              "value": 0,
+              "transitionLabel": "1:0,R"
+            },
+            {
+              "id": "hw5-p8-t3",
+              "sourceComponentId": "hw5-p8-s1",
+              "sourcePortId": "right",
+              "targetComponentId": "hw5-p8-s1",
+              "targetPortId": "left",
+              "value": 0,
+              "transitionLabel": "0:1,L"
+            },
+            {
+              "id": "hw5-p8-t4",
+              "sourceComponentId": "hw5-p8-s1",
+              "sourcePortId": "right",
+              "targetComponentId": "hw5-p8-s3",
+              "targetPortId": "left",
+              "value": 0,
+              "transitionLabel": "*:*,R"
+            },
+            {
+              "id": "hw5-p8-t5",
+              "sourceComponentId": "hw5-p8-s2",
+              "sourcePortId": "right",
+              "targetComponentId": "hw5-p8-s2",
+              "targetPortId": "left",
+              "value": 0,
+              "transitionLabel": "0:0,R"
+            },
+            {
+              "id": "hw5-p8-t6",
+              "sourceComponentId": "hw5-p8-s2",
+              "sourcePortId": "right",
+              "targetComponentId": "hw5-p8-s2",
+              "targetPortId": "left",
+              "value": 0,
+              "transitionLabel": "1:1,R"
+            },
+            {
+              "id": "hw5-p8-t7",
+              "sourceComponentId": "hw5-p8-s3",
+              "sourcePortId": "right",
+              "targetComponentId": "hw5-p8-s3",
+              "targetPortId": "left",
+              "value": 0,
+              "transitionLabel": "1:0,R"
+            }
+          ]
+        }
+      },
+      {
+        "questionId": 9,
+        "circuit": {
+          "components": [
+            {
+              "id": "hw5-p9-s0",
+              "type": "STATE",
+              "x": 140,
+              "y": 160,
+              "label": "S₀",
+              "ports": [
+                {
+                  "id": "left",
+                  "label": "",
+                  "side": "left",
+                  "index": 0
+                },
+                {
+                  "id": "right",
+                  "label": "",
+                  "side": "right",
+                  "index": 0
+                }
+              ]
+            },
+            {
+              "id": "hw5-p9-s1",
+              "type": "STATE",
+              "x": 340,
+              "y": 160,
+              "label": "S₁",
+              "ports": [
+                {
+                  "id": "left",
+                  "label": "",
+                  "side": "left",
+                  "index": 0
+                },
+                {
+                  "id": "right",
+                  "label": "",
+                  "side": "right",
+                  "index": 0
+                }
+              ]
+            },
+            {
+              "id": "hw5-p9-s2",
+              "type": "STATE",
+              "x": 540,
+              "y": 160,
+              "label": "S₂",
+              "ports": [
+                {
+                  "id": "left",
+                  "label": "",
+                  "side": "left",
+                  "index": 0
+                },
+                {
+                  "id": "right",
+                  "label": "",
+                  "side": "right",
+                  "index": 0
+                }
+              ]
+            },
+            {
+              "id": "hw5-p9-s3",
+              "type": "STATE",
+              "x": 740,
+              "y": 160,
+              "label": "S₃",
+              "ports": [
+                {
+                  "id": "left",
+                  "label": "",
+                  "side": "left",
+                  "index": 0
+                },
+                {
+                  "id": "right",
+                  "label": "",
+                  "side": "right",
+                  "index": 0
+                }
+              ]
+            },
+            {
+              "id": "hw5-p9-s4",
+              "type": "STATE",
+              "x": 940,
+              "y": 160,
+              "label": "S₄",
+              "ports": [
+                {
+                  "id": "left",
+                  "label": "",
+                  "side": "left",
+                  "index": 0
+                },
+                {
+                  "id": "right",
+                  "label": "",
+                  "side": "right",
+                  "index": 0
+                }
+              ]
+            },
+            {
+              "id": "hw5-p9-s5",
+              "type": "STATE",
+              "x": 940,
+              "y": 420,
+              "label": "S₅",
+              "ports": [
+                {
+                  "id": "left",
+                  "label": "",
+                  "side": "left",
+                  "index": 0
+                },
+                {
+                  "id": "right",
+                  "label": "",
+                  "side": "right",
+                  "index": 0
+                }
+              ]
+            },
+            {
+              "id": "hw5-p9-s6",
+              "type": "STATE",
+              "x": 740,
+              "y": 420,
+              "label": "S₆",
+              "ports": [
+                {
+                  "id": "left",
+                  "label": "",
+                  "side": "left",
+                  "index": 0
+                },
+                {
+                  "id": "right",
+                  "label": "",
+                  "side": "right",
+                  "index": 0
+                }
+              ]
+            },
+            {
+              "id": "hw5-p9-s7",
+              "type": "STATE",
+              "x": 540,
+              "y": 420,
+              "label": "S₇",
+              "ports": [
+                {
+                  "id": "left",
+                  "label": "",
+                  "side": "left",
+                  "index": 0
+                },
+                {
+                  "id": "right",
+                  "label": "",
+                  "side": "right",
+                  "index": 0
+                }
+              ]
+            },
+            {
+              "id": "hw5-p9-s8",
+              "type": "STATE",
+              "x": 340,
+              "y": 420,
+              "label": "S₈",
+              "ports": [
+                {
+                  "id": "left",
+                  "label": "",
+                  "side": "left",
+                  "index": 0
+                },
+                {
+                  "id": "right",
+                  "label": "",
+                  "side": "right",
+                  "index": 0
+                }
+              ]
+            },
+            {
+              "id": "hw5-p9-s9",
+              "type": "STATE",
+              "x": 140,
+              "y": 420,
+              "label": "S₉",
+              "ports": [
+                {
+                  "id": "left",
+                  "label": "",
+                  "side": "left",
+                  "index": 0
+                },
+                {
+                  "id": "right",
+                  "label": "",
+                  "side": "right",
+                  "index": 0
+                }
+              ]
+            }
+          ],
+          "wires": [
+            {
+              "id": "hw5-p9-t01",
+              "sourceComponentId": "hw5-p9-s0",
+              "sourcePortId": "right",
+              "targetComponentId": "hw5-p9-s0",
+              "targetPortId": "left",
+              "value": 0,
+              "transitionLabel": "0:0,R"
+            },
+            {
+              "id": "hw5-p9-t02",
+              "sourceComponentId": "hw5-p9-s0",
+              "sourcePortId": "right",
+              "targetComponentId": "hw5-p9-s0",
+              "targetPortId": "left",
+              "value": 0,
+              "transitionLabel": "1:1,R"
+            },
+            {
+              "id": "hw5-p9-t03",
+              "sourceComponentId": "hw5-p9-s0",
+              "sourcePortId": "right",
+              "targetComponentId": "hw5-p9-s1",
+              "targetPortId": "left",
+              "value": 0,
+              "transitionLabel": "*:*,L"
+            },
+            {
+              "id": "hw5-p9-t04",
+              "sourceComponentId": "hw5-p9-s1",
+              "sourcePortId": "right",
+              "targetComponentId": "hw5-p9-s1",
+              "targetPortId": "left",
+              "value": 0,
+              "transitionLabel": "0:1,L"
+            },
+            {
+              "id": "hw5-p9-t05",
+              "sourceComponentId": "hw5-p9-s1",
+              "sourcePortId": "right",
+              "targetComponentId": "hw5-p9-s2",
+              "targetPortId": "left",
+              "value": 0,
+              "transitionLabel": "1:0,L"
+            },
+            {
+              "id": "hw5-p9-t06",
+              "sourceComponentId": "hw5-p9-s2",
+              "sourcePortId": "right",
+              "targetComponentId": "hw5-p9-s2",
+              "targetPortId": "left",
+              "value": 0,
+              "transitionLabel": "0:0,L"
+            },
+            {
+              "id": "hw5-p9-t07",
+              "sourceComponentId": "hw5-p9-s2",
+              "sourcePortId": "right",
+              "targetComponentId": "hw5-p9-s2",
+              "targetPortId": "left",
+              "value": 0,
+              "transitionLabel": "1:1,L"
+            },
+            {
+              "id": "hw5-p9-t08",
+              "sourceComponentId": "hw5-p9-s2",
+              "sourcePortId": "right",
+              "targetComponentId": "hw5-p9-s3",
+              "targetPortId": "left",
+              "value": 0,
+              "transitionLabel": "*:*,L"
+            },
+            {
+              "id": "hw5-p9-t09",
+              "sourceComponentId": "hw5-p9-s3",
+              "sourcePortId": "right",
+              "targetComponentId": "hw5-p9-s3",
+              "targetPortId": "left",
+              "value": 0,
+              "transitionLabel": "0:0,L"
+            },
+            {
+              "id": "hw5-p9-t10",
+              "sourceComponentId": "hw5-p9-s3",
+              "sourcePortId": "right",
+              "targetComponentId": "hw5-p9-s4",
+              "targetPortId": "left",
+              "value": 0,
+              "transitionLabel": "*:*,L"
+            },
+            {
+              "id": "hw5-p9-t11",
+              "sourceComponentId": "hw5-p9-s4",
+              "sourcePortId": "right",
+              "targetComponentId": "hw5-p9-s4",
+              "targetPortId": "left",
+              "value": 0,
+              "transitionLabel": "1:0,L"
+            },
+            {
+              "id": "hw5-p9-t12",
+              "sourceComponentId": "hw5-p9-s4",
+              "sourcePortId": "right",
+              "targetComponentId": "hw5-p9-s6",
+              "targetPortId": "left",
+              "value": 0,
+              "transitionLabel": "0:1,R"
+            },
+            {
+              "id": "hw5-p9-t13",
+              "sourceComponentId": "hw5-p9-s4",
+              "sourcePortId": "right",
+              "targetComponentId": "hw5-p9-s5",
+              "targetPortId": "left",
+              "value": 0,
+              "transitionLabel": "*:1,L"
+            },
+            {
+              "id": "hw5-p9-t14",
+              "sourceComponentId": "hw5-p9-s5",
+              "sourcePortId": "right",
+              "targetComponentId": "hw5-p9-s6",
+              "targetPortId": "left",
+              "value": 0,
+              "transitionLabel": "0:*,R"
+            },
+            {
+              "id": "hw5-p9-t15",
+              "sourceComponentId": "hw5-p9-s6",
+              "sourcePortId": "right",
+              "targetComponentId": "hw5-p9-s6",
+              "targetPortId": "left",
+              "value": 0,
+              "transitionLabel": "0:0,R"
+            },
+            {
+              "id": "hw5-p9-t16",
+              "sourceComponentId": "hw5-p9-s6",
+              "sourcePortId": "right",
+              "targetComponentId": "hw5-p9-s6",
+              "targetPortId": "left",
+              "value": 0,
+              "transitionLabel": "1:1,R"
+            },
+            {
+              "id": "hw5-p9-t17",
+              "sourceComponentId": "hw5-p9-s6",
+              "sourcePortId": "right",
+              "targetComponentId": "hw5-p9-s7",
+              "targetPortId": "left",
+              "value": 0,
+              "transitionLabel": "*:*,R"
+            },
+            {
+              "id": "hw5-p9-t18",
+              "sourceComponentId": "hw5-p9-s7",
+              "sourcePortId": "right",
+              "targetComponentId": "hw5-p9-s7",
+              "targetPortId": "left",
+              "value": 0,
+              "transitionLabel": "0:0,R"
+            },
+            {
+              "id": "hw5-p9-t19",
+              "sourceComponentId": "hw5-p9-s7",
+              "sourcePortId": "right",
+              "targetComponentId": "hw5-p9-s0",
+              "targetPortId": "left",
+              "value": 0,
+              "transitionLabel": "*:*,R"
+            },
+            {
+              "id": "hw5-p9-t20",
+              "sourceComponentId": "hw5-p9-s1",
+              "sourcePortId": "right",
+              "targetComponentId": "hw5-p9-s8",
+              "targetPortId": "left",
+              "value": 0,
+              "transitionLabel": "*:0,R"
+            },
+            {
+              "id": "hw5-p9-t21",
+              "sourceComponentId": "hw5-p9-s8",
+              "sourcePortId": "right",
+              "targetComponentId": "hw5-p9-s8",
+              "targetPortId": "left",
+              "value": 0,
+              "transitionLabel": "1:0,R"
+            },
+            {
+              "id": "hw5-p9-t22",
+              "sourceComponentId": "hw5-p9-s8",
+              "sourcePortId": "right",
+              "targetComponentId": "hw5-p9-s8",
+              "targetPortId": "left",
+              "value": 0,
+              "transitionLabel": "0:0,R"
+            },
+            {
+              "id": "hw5-p9-t23",
+              "sourceComponentId": "hw5-p9-s8",
+              "sourcePortId": "right",
+              "targetComponentId": "hw5-p9-s9",
+              "targetPortId": "left",
+              "value": 0,
+              "transitionLabel": "*:0,L"
+            },
+            {
+              "id": "hw5-p9-t24",
+              "sourceComponentId": "hw5-p9-s9",
+              "sourcePortId": "right",
+              "targetComponentId": "hw5-p9-s9",
+              "targetPortId": "left",
+              "value": 0,
+              "transitionLabel": "0:0,L"
+            }
+          ]
+        }
+      },
+      {
+        "questionId": 10,
+        "circuit": {
+          "components": [],
+          "wires": []
+        },
+        "responseText": "Tally strategy by repeated addition: use the y-block as a counter. On each pass, erase one 1 from y, then run the boxed x+y adder to append a copy of x to a separate accumulator block on the right. When y is empty, erase the leftover separators, leaving the accumulator as the single output block, and walk right to standard position."
+      },
+      {
+        "questionId": 11,
+        "circuit": {
+          "components": [],
+          "wires": []
+        },
+        "responseText": "Reserve the leftmost block of the tape as an opcode: 1 = successor, 11 = addition, 111 = multiplication. The machine first walks left, counts the opcode block, erases it, and branches into the corresponding boxed submachine (the earlier successor and addition solutions, and the multiplication strategy from Problem 10); each ends in standard position."
+      }
+    ]
+  },
+  {
+    "assignmentTitle": "HW5. Computing with TMs",
+    "student": "bob.okafor@example.com",
+    "submittedAt": "2026-07-12T12:00:00.000Z",
+    "answers": [
+      {
+        "questionId": 1,
+        "circuit": {
+          "components": [
+            {
+              "id": "hw5-p1-s0",
+              "type": "STATE",
+              "x": 140,
+              "y": 220,
+              "label": "S₀",
+              "ports": [
+                {
+                  "id": "left",
+                  "label": "",
+                  "side": "left",
+                  "index": 0
+                },
+                {
+                  "id": "right",
+                  "label": "",
+                  "side": "right",
+                  "index": 0
+                }
+              ]
+            },
+            {
+              "id": "hw5-p1-s1",
+              "type": "STATE",
+              "x": 340,
+              "y": 220,
+              "label": "S₁",
+              "ports": [
+                {
+                  "id": "left",
+                  "label": "",
+                  "side": "left",
+                  "index": 0
+                },
+                {
+                  "id": "right",
+                  "label": "",
+                  "side": "right",
+                  "index": 0
+                }
+              ]
+            }
+          ],
+          "wires": [
+            {
+              "id": "hw5-p1-t1",
+              "sourceComponentId": "hw5-p1-s0",
+              "sourcePortId": "right",
+              "targetComponentId": "hw5-p1-s0",
+              "targetPortId": "left",
+              "value": 0,
+              "transitionLabel": "1:1,R"
+            },
+            {
+              "id": "hw5-p1-t2",
+              "sourceComponentId": "hw5-p1-s0",
+              "sourcePortId": "right",
+              "targetComponentId": "hw5-p1-s1",
+              "targetPortId": "left",
+              "value": 0,
+              "transitionLabel": "0:0,R"
+            }
+          ]
+        }
+      },
+      {
+        "questionId": 2,
+        "circuit": {
+          "components": [
+            {
+              "id": "hw5-p2-s0",
+              "type": "STATE",
+              "x": 140,
+              "y": 160,
+              "label": "S₀",
+              "ports": [
+                {
+                  "id": "left",
+                  "label": "",
+                  "side": "left",
+                  "index": 0
+                },
+                {
+                  "id": "right",
+                  "label": "",
+                  "side": "right",
+                  "index": 0
+                }
+              ]
+            },
+            {
+              "id": "hw5-p2-s1",
+              "type": "STATE",
+              "x": 340,
+              "y": 160,
+              "label": "S₁",
+              "ports": [
+                {
+                  "id": "left",
+                  "label": "",
+                  "side": "left",
+                  "index": 0
+                },
+                {
+                  "id": "right",
+                  "label": "",
+                  "side": "right",
+                  "index": 0
+                }
+              ]
+            },
+            {
+              "id": "hw5-p2-s2",
+              "type": "STATE",
+              "x": 540,
+              "y": 160,
+              "label": "S₂",
+              "ports": [
+                {
+                  "id": "left",
+                  "label": "",
+                  "side": "left",
+                  "index": 0
+                },
+                {
+                  "id": "right",
+                  "label": "",
+                  "side": "right",
+                  "index": 0
+                }
+              ]
+            },
+            {
+              "id": "hw5-p2-s3",
+              "type": "STATE",
+              "x": 340,
+              "y": 360,
+              "label": "S₃",
+              "ports": [
+                {
+                  "id": "left",
+                  "label": "",
+                  "side": "left",
+                  "index": 0
+                },
+                {
+                  "id": "right",
+                  "label": "",
+                  "side": "right",
+                  "index": 0
+                }
+              ]
+            }
+          ],
+          "wires": [
+            {
+              "id": "hw5-p2-t1",
+              "sourceComponentId": "hw5-p2-s0",
+              "sourcePortId": "right",
+              "targetComponentId": "hw5-p2-s0",
+              "targetPortId": "left",
+              "value": 0,
+              "transitionLabel": "1:1,R"
+            },
+            {
+              "id": "hw5-p2-t2",
+              "sourceComponentId": "hw5-p2-s0",
+              "sourcePortId": "right",
+              "targetComponentId": "hw5-p2-s1",
+              "targetPortId": "left",
+              "value": 0,
+              "transitionLabel": "0:1,R"
+            },
+            {
+              "id": "hw5-p2-t3",
+              "sourceComponentId": "hw5-p2-s1",
+              "sourcePortId": "right",
+              "targetComponentId": "hw5-p2-s2",
+              "targetPortId": "left",
+              "value": 0,
+              "transitionLabel": "0:1,R"
+            },
+            {
+              "id": "hw5-p2-t4",
+              "sourceComponentId": "hw5-p2-s2",
+              "sourcePortId": "right",
+              "targetComponentId": "hw5-p2-s3",
+              "targetPortId": "left",
+              "value": 0,
+              "transitionLabel": "0:0,L"
+            }
+          ]
+        }
+      },
+      {
+        "questionId": 3,
+        "circuit": {
+          "components": [
+            {
+              "id": "hw5-p3-s0",
+              "type": "STATE",
+              "x": 120,
+              "y": 140,
+              "label": "S₀",
+              "ports": [
+                {
+                  "id": "left",
+                  "label": "",
+                  "side": "left",
+                  "index": 0
+                },
+                {
+                  "id": "right",
+                  "label": "",
+                  "side": "right",
+                  "index": 0
+                }
+              ]
+            },
+            {
+              "id": "hw5-p3-s1",
+              "type": "STATE",
+              "x": 300,
+              "y": 140,
+              "label": "S₁",
+              "ports": [
+                {
+                  "id": "left",
+                  "label": "",
+                  "side": "left",
+                  "index": 0
+                },
+                {
+                  "id": "right",
+                  "label": "",
+                  "side": "right",
+                  "index": 0
+                }
+              ]
+            },
+            {
+              "id": "hw5-p3-s2",
+              "type": "STATE",
+              "x": 480,
+              "y": 140,
+              "label": "S₂",
+              "ports": [
+                {
+                  "id": "left",
+                  "label": "",
+                  "side": "left",
+                  "index": 0
+                },
+                {
+                  "id": "right",
+                  "label": "",
+                  "side": "right",
+                  "index": 0
+                }
+              ]
+            },
+            {
+              "id": "hw5-p3-s3",
+              "type": "STATE",
+              "x": 660,
+              "y": 140,
+              "label": "S₃",
+              "ports": [
+                {
+                  "id": "left",
+                  "label": "",
+                  "side": "left",
+                  "index": 0
+                },
+                {
+                  "id": "right",
+                  "label": "",
+                  "side": "right",
+                  "index": 0
+                }
+              ]
+            },
+            {
+              "id": "hw5-p3-s4",
+              "type": "STATE",
+              "x": 840,
+              "y": 140,
+              "label": "S₄",
+              "ports": [
+                {
+                  "id": "left",
+                  "label": "",
+                  "side": "left",
+                  "index": 0
+                },
+                {
+                  "id": "right",
+                  "label": "",
+                  "side": "right",
+                  "index": 0
+                }
+              ]
+            },
+            {
+              "id": "hw5-p3-s6",
+              "type": "STATE",
+              "x": 840,
+              "y": 360,
+              "label": "S₆",
+              "ports": [
+                {
+                  "id": "left",
+                  "label": "",
+                  "side": "left",
+                  "index": 0
+                },
+                {
+                  "id": "right",
+                  "label": "",
+                  "side": "right",
+                  "index": 0
+                }
+              ]
+            },
+            {
+              "id": "hw5-p3-s7",
+              "type": "STATE",
+              "x": 660,
+              "y": 360,
+              "label": "S₇",
+              "ports": [
+                {
+                  "id": "left",
+                  "label": "",
+                  "side": "left",
+                  "index": 0
+                },
+                {
+                  "id": "right",
+                  "label": "",
+                  "side": "right",
+                  "index": 0
+                }
+              ]
+            },
+            {
+              "id": "hw5-p3-s8",
+              "type": "STATE",
+              "x": 480,
+              "y": 360,
+              "label": "S₈",
+              "ports": [
+                {
+                  "id": "left",
+                  "label": "",
+                  "side": "left",
+                  "index": 0
+                },
+                {
+                  "id": "right",
+                  "label": "",
+                  "side": "right",
+                  "index": 0
+                }
+              ]
+            },
+            {
+              "id": "hw5-p3-s9",
+              "type": "STATE",
+              "x": 300,
+              "y": 360,
+              "label": "S₉",
+              "ports": [
+                {
+                  "id": "left",
+                  "label": "",
+                  "side": "left",
+                  "index": 0
+                },
+                {
+                  "id": "right",
+                  "label": "",
+                  "side": "right",
+                  "index": 0
+                }
+              ]
+            }
+          ],
+          "wires": [
+            {
+              "id": "hw5-p3-b01",
+              "sourceComponentId": "hw5-p3-s0",
+              "sourcePortId": "right",
+              "targetComponentId": "hw5-p3-s0",
+              "targetPortId": "left",
+              "value": 0,
+              "transitionLabel": "1:1,L"
+            },
+            {
+              "id": "hw5-p3-b02",
+              "sourceComponentId": "hw5-p3-s0",
+              "sourcePortId": "right",
+              "targetComponentId": "hw5-p3-s1",
+              "targetPortId": "left",
+              "value": 0,
+              "transitionLabel": "0:0,R"
+            },
+            {
+              "id": "hw5-p3-b03",
+              "sourceComponentId": "hw5-p3-s1",
+              "sourcePortId": "right",
+              "targetComponentId": "hw5-p3-s2",
+              "targetPortId": "left",
+              "value": 0,
+              "transitionLabel": "1:0,R"
+            },
+            {
+              "id": "hw5-p3-b04",
+              "sourceComponentId": "hw5-p3-s1",
+              "sourcePortId": "right",
+              "targetComponentId": "hw5-p3-s8",
+              "targetPortId": "left",
+              "value": 0,
+              "transitionLabel": "0:0,R"
+            },
+            {
+              "id": "hw5-p3-b05",
+              "sourceComponentId": "hw5-p3-s2",
+              "sourcePortId": "right",
+              "targetComponentId": "hw5-p3-s2",
+              "targetPortId": "left",
+              "value": 0,
+              "transitionLabel": "1:1,R"
+            },
+            {
+              "id": "hw5-p3-b06",
+              "sourceComponentId": "hw5-p3-s2",
+              "sourcePortId": "right",
+              "targetComponentId": "hw5-p3-s3",
+              "targetPortId": "left",
+              "value": 0,
+              "transitionLabel": "0:0,R"
+            },
+            {
+              "id": "hw5-p3-b07",
+              "sourceComponentId": "hw5-p3-s3",
+              "sourcePortId": "right",
+              "targetComponentId": "hw5-p3-s3",
+              "targetPortId": "left",
+              "value": 0,
+              "transitionLabel": "1:1,R"
+            },
+            {
+              "id": "hw5-p3-b08",
+              "sourceComponentId": "hw5-p3-s3",
+              "sourcePortId": "right",
+              "targetComponentId": "hw5-p3-s4",
+              "targetPortId": "left",
+              "value": 0,
+              "transitionLabel": "0:1,R"
+            },
+            {
+              "id": "hw5-p3-b09",
+              "sourceComponentId": "hw5-p3-s4",
+              "sourcePortId": "right",
+              "targetComponentId": "hw5-p3-s6",
+              "targetPortId": "left",
+              "value": 0,
+              "transitionLabel": "0:1,L"
+            },
+            {
+              "id": "hw5-p3-b10",
+              "sourceComponentId": "hw5-p3-s6",
+              "sourcePortId": "right",
+              "targetComponentId": "hw5-p3-s6",
+              "targetPortId": "left",
+              "value": 0,
+              "transitionLabel": "1:1,L"
+            },
+            {
+              "id": "hw5-p3-b11",
+              "sourceComponentId": "hw5-p3-s6",
+              "sourcePortId": "right",
+              "targetComponentId": "hw5-p3-s7",
+              "targetPortId": "left",
+              "value": 0,
+              "transitionLabel": "0:0,L"
+            },
+            {
+              "id": "hw5-p3-b12",
+              "sourceComponentId": "hw5-p3-s7",
+              "sourcePortId": "right",
+              "targetComponentId": "hw5-p3-s7",
+              "targetPortId": "left",
+              "value": 0,
+              "transitionLabel": "1:1,L"
+            },
+            {
+              "id": "hw5-p3-b13",
+              "sourceComponentId": "hw5-p3-s7",
+              "sourcePortId": "right",
+              "targetComponentId": "hw5-p3-s1",
+              "targetPortId": "left",
+              "value": 0,
+              "transitionLabel": "0:0,R"
+            },
+            {
+              "id": "hw5-p3-b14",
+              "sourceComponentId": "hw5-p3-s8",
+              "sourcePortId": "right",
+              "targetComponentId": "hw5-p3-s8",
+              "targetPortId": "left",
+              "value": 0,
+              "transitionLabel": "1:1,R"
+            },
+            {
+              "id": "hw5-p3-b15",
+              "sourceComponentId": "hw5-p3-s8",
+              "sourcePortId": "right",
+              "targetComponentId": "hw5-p3-s9",
+              "targetPortId": "left",
+              "value": 0,
+              "transitionLabel": "0:0,L"
+            }
+          ]
+        }
+      },
+      {
+        "questionId": 4,
+        "circuit": {
+          "components": [
+            {
+              "id": "hw5-p4-s0",
+              "type": "STATE",
+              "x": 140,
+              "y": 160,
+              "label": "S₀",
+              "ports": [
+                {
+                  "id": "left",
+                  "label": "",
+                  "side": "left",
+                  "index": 0
+                },
+                {
+                  "id": "right",
+                  "label": "",
+                  "side": "right",
+                  "index": 0
+                }
+              ]
+            },
+            {
+              "id": "hw5-p4-s1",
+              "type": "STATE",
+              "x": 340,
+              "y": 160,
+              "label": "S₁",
+              "ports": [
+                {
+                  "id": "left",
+                  "label": "",
+                  "side": "left",
+                  "index": 0
+                },
+                {
+                  "id": "right",
+                  "label": "",
+                  "side": "right",
+                  "index": 0
+                }
+              ]
+            },
+            {
+              "id": "hw5-p4-s2",
+              "type": "STATE",
+              "x": 540,
+              "y": 160,
+              "label": "S₂",
+              "ports": [
+                {
+                  "id": "left",
+                  "label": "",
+                  "side": "left",
+                  "index": 0
+                },
+                {
+                  "id": "right",
+                  "label": "",
+                  "side": "right",
+                  "index": 0
+                }
+              ]
+            },
+            {
+              "id": "hw5-p4-s3",
+              "type": "STATE",
+              "x": 540,
+              "y": 360,
+              "label": "S₃",
+              "ports": [
+                {
+                  "id": "left",
+                  "label": "",
+                  "side": "left",
+                  "index": 0
+                },
+                {
+                  "id": "right",
+                  "label": "",
+                  "side": "right",
+                  "index": 0
+                }
+              ]
+            }
+          ],
+          "wires": [
+            {
+              "id": "hw5-p4-t1",
+              "sourceComponentId": "hw5-p4-s0",
+              "sourcePortId": "right",
+              "targetComponentId": "hw5-p4-s0",
+              "targetPortId": "left",
+              "value": 0,
+              "transitionLabel": "1:1,L"
+            },
+            {
+              "id": "hw5-p4-t2",
+              "sourceComponentId": "hw5-p4-s0",
+              "sourcePortId": "right",
+              "targetComponentId": "hw5-p4-s1",
+              "targetPortId": "left",
+              "value": 0,
+              "transitionLabel": "0:1,L"
+            },
+            {
+              "id": "hw5-p4-t3",
+              "sourceComponentId": "hw5-p4-s1",
+              "sourcePortId": "right",
+              "targetComponentId": "hw5-p4-s1",
+              "targetPortId": "left",
+              "value": 0,
+              "transitionLabel": "1:1,L"
+            },
+            {
+              "id": "hw5-p4-t4",
+              "sourceComponentId": "hw5-p4-s1",
+              "sourcePortId": "right",
+              "targetComponentId": "hw5-p4-s2",
+              "targetPortId": "left",
+              "value": 0,
+              "transitionLabel": "0:0,R"
+            },
+            {
+              "id": "hw5-p4-t5",
+              "sourceComponentId": "hw5-p4-s2",
+              "sourcePortId": "right",
+              "targetComponentId": "hw5-p4-s2",
+              "targetPortId": "left",
+              "value": 0,
+              "transitionLabel": "1:1,R"
+            },
+            {
+              "id": "hw5-p4-t6",
+              "sourceComponentId": "hw5-p4-s2",
+              "sourcePortId": "right",
+              "targetComponentId": "hw5-p4-s3",
+              "targetPortId": "left",
+              "value": 0,
+              "transitionLabel": "0:0,L"
+            }
+          ]
+        }
+      },
+      {
+        "questionId": 5,
+        "circuit": {
+          "components": [
+            {
+              "id": "hw5-p5-s0",
+              "type": "STATE",
+              "x": 120,
+              "y": 140,
+              "label": "S₀",
+              "ports": [
+                {
+                  "id": "left",
+                  "label": "",
+                  "side": "left",
+                  "index": 0
+                },
+                {
+                  "id": "right",
+                  "label": "",
+                  "side": "right",
+                  "index": 0
+                }
+              ]
+            },
+            {
+              "id": "hw5-p5-s1",
+              "type": "STATE",
+              "x": 300,
+              "y": 140,
+              "label": "S₁",
+              "ports": [
+                {
+                  "id": "left",
+                  "label": "",
+                  "side": "left",
+                  "index": 0
+                },
+                {
+                  "id": "right",
+                  "label": "",
+                  "side": "right",
+                  "index": 0
+                }
+              ]
+            },
+            {
+              "id": "hw5-p5-s2",
+              "type": "STATE",
+              "x": 480,
+              "y": 140,
+              "label": "S₂",
+              "ports": [
+                {
+                  "id": "left",
+                  "label": "",
+                  "side": "left",
+                  "index": 0
+                },
+                {
+                  "id": "right",
+                  "label": "",
+                  "side": "right",
+                  "index": 0
+                }
+              ]
+            },
+            {
+              "id": "hw5-p5-s3",
+              "type": "STATE",
+              "x": 660,
+              "y": 140,
+              "label": "S₃",
+              "ports": [
+                {
+                  "id": "left",
+                  "label": "",
+                  "side": "left",
+                  "index": 0
+                },
+                {
+                  "id": "right",
+                  "label": "",
+                  "side": "right",
+                  "index": 0
+                }
+              ]
+            },
+            {
+              "id": "hw5-p5-s4",
+              "type": "STATE",
+              "x": 660,
+              "y": 320,
+              "label": "S₄",
+              "ports": [
+                {
+                  "id": "left",
+                  "label": "",
+                  "side": "left",
+                  "index": 0
+                },
+                {
+                  "id": "right",
+                  "label": "",
+                  "side": "right",
+                  "index": 0
+                }
+              ]
+            },
+            {
+              "id": "hw5-p5-s5",
+              "type": "STATE",
+              "x": 480,
+              "y": 320,
+              "label": "S₅",
+              "ports": [
+                {
+                  "id": "left",
+                  "label": "",
+                  "side": "left",
+                  "index": 0
+                },
+                {
+                  "id": "right",
+                  "label": "",
+                  "side": "right",
+                  "index": 0
+                }
+              ]
+            },
+            {
+              "id": "hw5-p5-s6",
+              "type": "STATE",
+              "x": 300,
+              "y": 320,
+              "label": "S₆",
+              "ports": [
+                {
+                  "id": "left",
+                  "label": "",
+                  "side": "left",
+                  "index": 0
+                },
+                {
+                  "id": "right",
+                  "label": "",
+                  "side": "right",
+                  "index": 0
+                }
+              ]
+            },
+            {
+              "id": "hw5-p5-s7",
+              "type": "STATE",
+              "x": 120,
+              "y": 320,
+              "label": "S₇",
+              "ports": [
+                {
+                  "id": "left",
+                  "label": "",
+                  "side": "left",
+                  "index": 0
+                },
+                {
+                  "id": "right",
+                  "label": "",
+                  "side": "right",
+                  "index": 0
+                }
+              ]
+            },
+            {
+              "id": "hw5-p5-s8",
+              "type": "STATE",
+              "x": 120,
+              "y": 500,
+              "label": "S₈",
+              "ports": [
+                {
+                  "id": "left",
+                  "label": "",
+                  "side": "left",
+                  "index": 0
+                },
+                {
+                  "id": "right",
+                  "label": "",
+                  "side": "right",
+                  "index": 0
+                }
+              ]
+            },
+            {
+              "id": "hw5-p5-s9",
+              "type": "STATE",
+              "x": 300,
+              "y": 500,
+              "label": "S₉",
+              "ports": [
+                {
+                  "id": "left",
+                  "label": "",
+                  "side": "left",
+                  "index": 0
+                },
+                {
+                  "id": "right",
+                  "label": "",
+                  "side": "right",
+                  "index": 0
+                }
+              ]
+            }
+          ],
+          "wires": [
+            {
+              "id": "hw5-p5-t1",
+              "sourceComponentId": "hw5-p5-s0",
+              "sourcePortId": "right",
+              "targetComponentId": "hw5-p5-s0",
+              "targetPortId": "left",
+              "value": 0,
+              "transitionLabel": "1:1,L"
+            },
+            {
+              "id": "hw5-p5-t2",
+              "sourceComponentId": "hw5-p5-s0",
+              "sourcePortId": "right",
+              "targetComponentId": "hw5-p5-s1",
+              "targetPortId": "left",
+              "value": 0,
+              "transitionLabel": "0:1,L"
+            },
+            {
+              "id": "hw5-p5-t3",
+              "sourceComponentId": "hw5-p5-s1",
+              "sourcePortId": "right",
+              "targetComponentId": "hw5-p5-s1",
+              "targetPortId": "left",
+              "value": 0,
+              "transitionLabel": "1:1,L"
+            },
+            {
+              "id": "hw5-p5-t4",
+              "sourceComponentId": "hw5-p5-s1",
+              "sourcePortId": "right",
+              "targetComponentId": "hw5-p5-s2",
+              "targetPortId": "left",
+              "value": 0,
+              "transitionLabel": "0:0,R"
+            },
+            {
+              "id": "hw5-p5-t5",
+              "sourceComponentId": "hw5-p5-s2",
+              "sourcePortId": "right",
+              "targetComponentId": "hw5-p5-s3",
+              "targetPortId": "left",
+              "value": 0,
+              "transitionLabel": "1:0,R"
+            },
+            {
+              "id": "hw5-p5-t6",
+              "sourceComponentId": "hw5-p5-s3",
+              "sourcePortId": "right",
+              "targetComponentId": "hw5-p5-s3",
+              "targetPortId": "left",
+              "value": 0,
+              "transitionLabel": "1:1,R"
+            },
+            {
+              "id": "hw5-p5-t7",
+              "sourceComponentId": "hw5-p5-s3",
+              "sourcePortId": "right",
+              "targetComponentId": "hw5-p5-s4",
+              "targetPortId": "left",
+              "value": 0,
+              "transitionLabel": "0:0,L"
+            },
+            {
+              "id": "hw5-p5-t8",
+              "sourceComponentId": "hw5-p5-s4",
+              "sourcePortId": "right",
+              "targetComponentId": "hw5-p5-s5",
+              "targetPortId": "left",
+              "value": 0,
+              "transitionLabel": "1:1,R"
+            },
+            {
+              "id": "hw5-p5-t9",
+              "sourceComponentId": "hw5-p5-s5",
+              "sourcePortId": "right",
+              "targetComponentId": "hw5-p5-s6",
+              "targetPortId": "left",
+              "value": 0,
+              "transitionLabel": "0:1,R"
+            },
+            {
+              "id": "hw5-p5-t10",
+              "sourceComponentId": "hw5-p5-s6",
+              "sourcePortId": "right",
+              "targetComponentId": "hw5-p5-s7",
+              "targetPortId": "left",
+              "value": 0,
+              "transitionLabel": "0:1,R"
+            },
+            {
+              "id": "hw5-p5-t11",
+              "sourceComponentId": "hw5-p5-s7",
+              "sourcePortId": "right",
+              "targetComponentId": "hw5-p5-s8",
+              "targetPortId": "left",
+              "value": 0,
+              "transitionLabel": "0:1,R"
+            },
+            {
+              "id": "hw5-p5-t12",
+              "sourceComponentId": "hw5-p5-s8",
+              "sourcePortId": "right",
+              "targetComponentId": "hw5-p5-s9",
+              "targetPortId": "left",
+              "value": 0,
+              "transitionLabel": "0:0,L"
+            }
+          ]
+        }
+      },
+      {
+        "questionId": 6,
+        "circuit": {
+          "components": [
+            {
+              "id": "hw5-p6-bs0",
+              "type": "STATE",
+              "x": 120,
+              "y": 140,
+              "label": "S₀",
+              "ports": [
+                {
+                  "id": "left",
+                  "label": "",
+                  "side": "left",
+                  "index": 0
+                },
+                {
+                  "id": "right",
+                  "label": "",
+                  "side": "right",
+                  "index": 0
+                }
+              ]
+            },
+            {
+              "id": "hw5-p6-bs1",
+              "type": "STATE",
+              "x": 300,
+              "y": 140,
+              "label": "S₁",
+              "ports": [
+                {
+                  "id": "left",
+                  "label": "",
+                  "side": "left",
+                  "index": 0
+                },
+                {
+                  "id": "right",
+                  "label": "",
+                  "side": "right",
+                  "index": 0
+                }
+              ]
+            },
+            {
+              "id": "hw5-p6-bs2",
+              "type": "STATE",
+              "x": 480,
+              "y": 140,
+              "label": "S₂",
+              "ports": [
+                {
+                  "id": "left",
+                  "label": "",
+                  "side": "left",
+                  "index": 0
+                },
+                {
+                  "id": "right",
+                  "label": "",
+                  "side": "right",
+                  "index": 0
+                }
+              ]
+            },
+            {
+              "id": "hw5-p6-bs3",
+              "type": "STATE",
+              "x": 660,
+              "y": 140,
+              "label": "S₃",
+              "ports": [
+                {
+                  "id": "left",
+                  "label": "",
+                  "side": "left",
+                  "index": 0
+                },
+                {
+                  "id": "right",
+                  "label": "",
+                  "side": "right",
+                  "index": 0
+                }
+              ]
+            },
+            {
+              "id": "hw5-p6-bs4",
+              "type": "STATE",
+              "x": 840,
+              "y": 140,
+              "label": "S₄",
+              "ports": [
+                {
+                  "id": "left",
+                  "label": "",
+                  "side": "left",
+                  "index": 0
+                },
+                {
+                  "id": "right",
+                  "label": "",
+                  "side": "right",
+                  "index": 0
+                }
+              ]
+            },
+            {
+              "id": "hw5-p6-bs5",
+              "type": "STATE",
+              "x": 1020,
+              "y": 140,
+              "label": "S₅",
+              "ports": [
+                {
+                  "id": "left",
+                  "label": "",
+                  "side": "left",
+                  "index": 0
+                },
+                {
+                  "id": "right",
+                  "label": "",
+                  "side": "right",
+                  "index": 0
+                }
+              ]
+            },
+            {
+              "id": "hw5-p6-bs6",
+              "type": "STATE",
+              "x": 1020,
+              "y": 400,
+              "label": "S₆",
+              "ports": [
+                {
+                  "id": "left",
+                  "label": "",
+                  "side": "left",
+                  "index": 0
+                },
+                {
+                  "id": "right",
+                  "label": "",
+                  "side": "right",
+                  "index": 0
+                }
+              ]
+            },
+            {
+              "id": "hw5-p6-bs7",
+              "type": "STATE",
+              "x": 840,
+              "y": 400,
+              "label": "S₇",
+              "ports": [
+                {
+                  "id": "left",
+                  "label": "",
+                  "side": "left",
+                  "index": 0
+                },
+                {
+                  "id": "right",
+                  "label": "",
+                  "side": "right",
+                  "index": 0
+                }
+              ]
+            },
+            {
+              "id": "hw5-p6-bs8",
+              "type": "STATE",
+              "x": 660,
+              "y": 400,
+              "label": "S₈",
+              "ports": [
+                {
+                  "id": "left",
+                  "label": "",
+                  "side": "left",
+                  "index": 0
+                },
+                {
+                  "id": "right",
+                  "label": "",
+                  "side": "right",
+                  "index": 0
+                }
+              ]
+            },
+            {
+              "id": "hw5-p6-bs9",
+              "type": "STATE",
+              "x": 480,
+              "y": 400,
+              "label": "S₉",
+              "ports": [
+                {
+                  "id": "left",
+                  "label": "",
+                  "side": "left",
+                  "index": 0
+                },
+                {
+                  "id": "right",
+                  "label": "",
+                  "side": "right",
+                  "index": 0
+                }
+              ]
+            },
+            {
+              "id": "hw5-p6-bs10",
+              "type": "STATE",
+              "x": 300,
+              "y": 400,
+              "label": "S₁₀",
+              "ports": [
+                {
+                  "id": "left",
+                  "label": "",
+                  "side": "left",
+                  "index": 0
+                },
+                {
+                  "id": "right",
+                  "label": "",
+                  "side": "right",
+                  "index": 0
+                }
+              ]
+            }
+          ],
+          "wires": [
+            {
+              "id": "hw5-p6-bt1",
+              "sourceComponentId": "hw5-p6-bs0",
+              "sourcePortId": "right",
+              "targetComponentId": "hw5-p6-bs0",
+              "targetPortId": "left",
+              "value": 0,
+              "transitionLabel": "1:1,L"
+            },
+            {
+              "id": "hw5-p6-bt2",
+              "sourceComponentId": "hw5-p6-bs0",
+              "sourcePortId": "right",
+              "targetComponentId": "hw5-p6-bs1",
+              "targetPortId": "left",
+              "value": 0,
+              "transitionLabel": "0:0,L"
+            },
+            {
+              "id": "hw5-p6-bt3",
+              "sourceComponentId": "hw5-p6-bs1",
+              "sourcePortId": "right",
+              "targetComponentId": "hw5-p6-bs1",
+              "targetPortId": "left",
+              "value": 0,
+              "transitionLabel": "1:1,R"
+            },
+            {
+              "id": "hw5-p6-bt4",
+              "sourceComponentId": "hw5-p6-bs1",
+              "sourcePortId": "right",
+              "targetComponentId": "hw5-p6-bs2",
+              "targetPortId": "left",
+              "value": 0,
+              "transitionLabel": "0:0,R"
+            },
+            {
+              "id": "hw5-p6-bt5",
+              "sourceComponentId": "hw5-p6-bs2",
+              "sourcePortId": "right",
+              "targetComponentId": "hw5-p6-bs3",
+              "targetPortId": "left",
+              "value": 0,
+              "transitionLabel": "1:1,R"
+            },
+            {
+              "id": "hw5-p6-bt6",
+              "sourceComponentId": "hw5-p6-bs2",
+              "sourcePortId": "right",
+              "targetComponentId": "hw5-p6-bs9",
+              "targetPortId": "left",
+              "value": 0,
+              "transitionLabel": "0:0,L"
+            },
+            {
+              "id": "hw5-p6-bt7",
+              "sourceComponentId": "hw5-p6-bs3",
+              "sourcePortId": "right",
+              "targetComponentId": "hw5-p6-bs3",
+              "targetPortId": "left",
+              "value": 0,
+              "transitionLabel": "1:1,R"
+            },
+            {
+              "id": "hw5-p6-bt8",
+              "sourceComponentId": "hw5-p6-bs3",
+              "sourcePortId": "right",
+              "targetComponentId": "hw5-p6-bs4",
+              "targetPortId": "left",
+              "value": 0,
+              "transitionLabel": "0:0,L"
+            },
+            {
+              "id": "hw5-p6-bt9",
+              "sourceComponentId": "hw5-p6-bs4",
+              "sourcePortId": "right",
+              "targetComponentId": "hw5-p6-bs5",
+              "targetPortId": "left",
+              "value": 0,
+              "transitionLabel": "1:0,L"
+            },
+            {
+              "id": "hw5-p6-bt10",
+              "sourceComponentId": "hw5-p6-bs5",
+              "sourcePortId": "right",
+              "targetComponentId": "hw5-p6-bs5",
+              "targetPortId": "left",
+              "value": 0,
+              "transitionLabel": "1:1,L"
+            },
+            {
+              "id": "hw5-p6-bt11",
+              "sourceComponentId": "hw5-p6-bs5",
+              "sourcePortId": "right",
+              "targetComponentId": "hw5-p6-bs6",
+              "targetPortId": "left",
+              "value": 0,
+              "transitionLabel": "0:0,L"
+            },
+            {
+              "id": "hw5-p6-bt12",
+              "sourceComponentId": "hw5-p6-bs6",
+              "sourcePortId": "right",
+              "targetComponentId": "hw5-p6-bs6",
+              "targetPortId": "left",
+              "value": 0,
+              "transitionLabel": "1:1,L"
+            },
+            {
+              "id": "hw5-p6-bt13",
+              "sourceComponentId": "hw5-p6-bs6",
+              "sourcePortId": "right",
+              "targetComponentId": "hw5-p6-bs7",
+              "targetPortId": "left",
+              "value": 0,
+              "transitionLabel": "0:1,L"
+            },
+            {
+              "id": "hw5-p6-bt14",
+              "sourceComponentId": "hw5-p6-bs7",
+              "sourcePortId": "right",
+              "targetComponentId": "hw5-p6-bs8",
+              "targetPortId": "left",
+              "value": 0,
+              "transitionLabel": "0:1,L"
+            },
+            {
+              "id": "hw5-p6-bt15",
+              "sourceComponentId": "hw5-p6-bs8",
+              "sourcePortId": "right",
+              "targetComponentId": "hw5-p6-bs1",
+              "targetPortId": "left",
+              "value": 0,
+              "transitionLabel": "0:1,R"
+            },
+            {
+              "id": "hw5-p6-bt16",
+              "sourceComponentId": "hw5-p6-bs9",
+              "sourcePortId": "right",
+              "targetComponentId": "hw5-p6-bs10",
+              "targetPortId": "left",
+              "value": 0,
+              "transitionLabel": "0:0,L"
+            }
+          ]
+        }
+      },
+      {
+        "questionId": 7,
+        "circuit": {
+          "components": [
+            {
+              "id": "hw5-p7-s0",
+              "type": "STATE",
+              "x": 120,
+              "y": 160,
+              "label": "S₀",
+              "ports": [
+                {
+                  "id": "left",
+                  "label": "",
+                  "side": "left",
+                  "index": 0
+                },
+                {
+                  "id": "right",
+                  "label": "",
+                  "side": "right",
+                  "index": 0
+                }
+              ]
+            },
+            {
+              "id": "hw5-p7-s1",
+              "type": "STATE",
+              "x": 360,
+              "y": 160,
+              "label": "S₁",
+              "ports": [
+                {
+                  "id": "left",
+                  "label": "",
+                  "side": "left",
+                  "index": 0
+                },
+                {
+                  "id": "right",
+                  "label": "",
+                  "side": "right",
+                  "index": 0
+                }
+              ]
+            },
+            {
+              "id": "hw5-p7-s2",
+              "type": "STATE",
+              "x": 600,
+              "y": 160,
+              "label": "S₂",
+              "ports": [
+                {
+                  "id": "left",
+                  "label": "",
+                  "side": "left",
+                  "index": 0
+                },
+                {
+                  "id": "right",
+                  "label": "",
+                  "side": "right",
+                  "index": 0
+                }
+              ]
+            }
+          ],
+          "wires": [
+            {
+              "id": "hw5-p7-t1",
+              "sourceComponentId": "hw5-p7-s0",
+              "sourcePortId": "right",
+              "targetComponentId": "hw5-p7-s1",
+              "targetPortId": "left",
+              "value": 0,
+              "transitionLabel": "*:*,L"
+            },
+            {
+              "id": "hw5-p7-t2",
+              "sourceComponentId": "hw5-p7-s1",
+              "sourcePortId": "right",
+              "targetComponentId": "hw5-p7-s1",
+              "targetPortId": "left",
+              "value": 0,
+              "transitionLabel": "1:0,L"
+            },
+            {
+              "id": "hw5-p7-t3",
+              "sourceComponentId": "hw5-p7-s1",
+              "sourcePortId": "right",
+              "targetComponentId": "hw5-p7-s2",
+              "targetPortId": "left",
+              "value": 0,
+              "transitionLabel": "0:1,R"
+            },
+            {
+              "id": "hw5-p7-t6",
+              "sourceComponentId": "hw5-p7-s2",
+              "sourcePortId": "right",
+              "targetComponentId": "hw5-p7-s2",
+              "targetPortId": "left",
+              "value": 0,
+              "transitionLabel": "0:0,R"
+            },
+            {
+              "id": "hw5-p7-t7",
+              "sourceComponentId": "hw5-p7-s2",
+              "sourcePortId": "right",
+              "targetComponentId": "hw5-p7-s2",
+              "targetPortId": "left",
+              "value": 0,
+              "transitionLabel": "1:1,R"
+            }
+          ]
+        }
+      },
+      {
+        "questionId": 8,
+        "circuit": {
+          "components": [
+            {
+              "id": "hw5-p8-s0",
+              "type": "STATE",
+              "x": 140,
+              "y": 160,
+              "label": "S₀",
+              "ports": [
+                {
+                  "id": "left",
+                  "label": "",
+                  "side": "left",
+                  "index": 0
+                },
+                {
+                  "id": "right",
+                  "label": "",
+                  "side": "right",
+                  "index": 0
+                }
+              ]
+            },
+            {
+              "id": "hw5-p8-s1",
+              "type": "STATE",
+              "x": 380,
+              "y": 160,
+              "label": "S₁",
+              "ports": [
+                {
+                  "id": "left",
+                  "label": "",
+                  "side": "left",
+                  "index": 0
+                },
+                {
+                  "id": "right",
+                  "label": "",
+                  "side": "right",
+                  "index": 0
+                }
+              ]
+            },
+            {
+              "id": "hw5-p8-s2",
+              "type": "STATE",
+              "x": 620,
+              "y": 160,
+              "label": "S₂",
+              "ports": [
+                {
+                  "id": "left",
+                  "label": "",
+                  "side": "left",
+                  "index": 0
+                },
+                {
+                  "id": "right",
+                  "label": "",
+                  "side": "right",
+                  "index": 0
+                }
+              ]
+            },
+            {
+              "id": "hw5-p8-s3",
+              "type": "STATE",
+              "x": 380,
+              "y": 380,
+              "label": "S₃",
+              "ports": [
+                {
+                  "id": "left",
+                  "label": "",
+                  "side": "left",
+                  "index": 0
+                },
+                {
+                  "id": "right",
+                  "label": "",
+                  "side": "right",
+                  "index": 0
+                }
+              ]
+            }
+          ],
+          "wires": [
+            {
+              "id": "hw5-p8-t1",
+              "sourceComponentId": "hw5-p8-s0",
+              "sourcePortId": "right",
+              "targetComponentId": "hw5-p8-s1",
+              "targetPortId": "left",
+              "value": 0,
+              "transitionLabel": "*:*,L"
+            },
+            {
+              "id": "hw5-p8-t2",
+              "sourceComponentId": "hw5-p8-s1",
+              "sourcePortId": "right",
+              "targetComponentId": "hw5-p8-s1",
+              "targetPortId": "left",
+              "value": 0,
+              "transitionLabel": "1:0,L"
+            },
+            {
+              "id": "hw5-p8-t3",
+              "sourceComponentId": "hw5-p8-s1",
+              "sourcePortId": "right",
+              "targetComponentId": "hw5-p8-s2",
+              "targetPortId": "left",
+              "value": 0,
+              "transitionLabel": "0:1,R"
+            },
+            {
+              "id": "hw5-p8-t4",
+              "sourceComponentId": "hw5-p8-s1",
+              "sourcePortId": "right",
+              "targetComponentId": "hw5-p8-s3",
+              "targetPortId": "left",
+              "value": 0,
+              "transitionLabel": "*:*,R"
+            },
+            {
+              "id": "hw5-p8-t5",
+              "sourceComponentId": "hw5-p8-s2",
+              "sourcePortId": "right",
+              "targetComponentId": "hw5-p8-s2",
+              "targetPortId": "left",
+              "value": 0,
+              "transitionLabel": "0:0,R"
+            },
+            {
+              "id": "hw5-p8-t6",
+              "sourceComponentId": "hw5-p8-s2",
+              "sourcePortId": "right",
+              "targetComponentId": "hw5-p8-s2",
+              "targetPortId": "left",
+              "value": 0,
+              "transitionLabel": "1:1,R"
+            },
+            {
+              "id": "hw5-p8-t7",
+              "sourceComponentId": "hw5-p8-s3",
+              "sourcePortId": "right",
+              "targetComponentId": "hw5-p8-s3",
+              "targetPortId": "left",
+              "value": 0,
+              "transitionLabel": "1:0,R"
+            }
+          ]
+        }
+      },
+      {
+        "questionId": 9,
+        "circuit": {
+          "components": [
+            {
+              "id": "hw5-p9-s0",
+              "type": "STATE",
+              "x": 140,
+              "y": 160,
+              "label": "S₀",
+              "ports": [
+                {
+                  "id": "left",
+                  "label": "",
+                  "side": "left",
+                  "index": 0
+                },
+                {
+                  "id": "right",
+                  "label": "",
+                  "side": "right",
+                  "index": 0
+                }
+              ]
+            },
+            {
+              "id": "hw5-p9-s1",
+              "type": "STATE",
+              "x": 340,
+              "y": 160,
+              "label": "S₁",
+              "ports": [
+                {
+                  "id": "left",
+                  "label": "",
+                  "side": "left",
+                  "index": 0
+                },
+                {
+                  "id": "right",
+                  "label": "",
+                  "side": "right",
+                  "index": 0
+                }
+              ]
+            },
+            {
+              "id": "hw5-p9-s2",
+              "type": "STATE",
+              "x": 540,
+              "y": 160,
+              "label": "S₂",
+              "ports": [
+                {
+                  "id": "left",
+                  "label": "",
+                  "side": "left",
+                  "index": 0
+                },
+                {
+                  "id": "right",
+                  "label": "",
+                  "side": "right",
+                  "index": 0
+                }
+              ]
+            },
+            {
+              "id": "hw5-p9-s3",
+              "type": "STATE",
+              "x": 740,
+              "y": 160,
+              "label": "S₃",
+              "ports": [
+                {
+                  "id": "left",
+                  "label": "",
+                  "side": "left",
+                  "index": 0
+                },
+                {
+                  "id": "right",
+                  "label": "",
+                  "side": "right",
+                  "index": 0
+                }
+              ]
+            },
+            {
+              "id": "hw5-p9-s4",
+              "type": "STATE",
+              "x": 940,
+              "y": 160,
+              "label": "S₄",
+              "ports": [
+                {
+                  "id": "left",
+                  "label": "",
+                  "side": "left",
+                  "index": 0
+                },
+                {
+                  "id": "right",
+                  "label": "",
+                  "side": "right",
+                  "index": 0
+                }
+              ]
+            },
+            {
+              "id": "hw5-p9-s5",
+              "type": "STATE",
+              "x": 940,
+              "y": 420,
+              "label": "S₅",
+              "ports": [
+                {
+                  "id": "left",
+                  "label": "",
+                  "side": "left",
+                  "index": 0
+                },
+                {
+                  "id": "right",
+                  "label": "",
+                  "side": "right",
+                  "index": 0
+                }
+              ]
+            },
+            {
+              "id": "hw5-p9-s6",
+              "type": "STATE",
+              "x": 740,
+              "y": 420,
+              "label": "S₆",
+              "ports": [
+                {
+                  "id": "left",
+                  "label": "",
+                  "side": "left",
+                  "index": 0
+                },
+                {
+                  "id": "right",
+                  "label": "",
+                  "side": "right",
+                  "index": 0
+                }
+              ]
+            },
+            {
+              "id": "hw5-p9-s7",
+              "type": "STATE",
+              "x": 540,
+              "y": 420,
+              "label": "S₇",
+              "ports": [
+                {
+                  "id": "left",
+                  "label": "",
+                  "side": "left",
+                  "index": 0
+                },
+                {
+                  "id": "right",
+                  "label": "",
+                  "side": "right",
+                  "index": 0
+                }
+              ]
+            }
+          ],
+          "wires": [
+            {
+              "id": "hw5-p9-t01",
+              "sourceComponentId": "hw5-p9-s0",
+              "sourcePortId": "right",
+              "targetComponentId": "hw5-p9-s0",
+              "targetPortId": "left",
+              "value": 0,
+              "transitionLabel": "0:0,R"
+            },
+            {
+              "id": "hw5-p9-t02",
+              "sourceComponentId": "hw5-p9-s0",
+              "sourcePortId": "right",
+              "targetComponentId": "hw5-p9-s0",
+              "targetPortId": "left",
+              "value": 0,
+              "transitionLabel": "1:1,R"
+            },
+            {
+              "id": "hw5-p9-t03",
+              "sourceComponentId": "hw5-p9-s0",
+              "sourcePortId": "right",
+              "targetComponentId": "hw5-p9-s1",
+              "targetPortId": "left",
+              "value": 0,
+              "transitionLabel": "*:*,L"
+            },
+            {
+              "id": "hw5-p9-t04",
+              "sourceComponentId": "hw5-p9-s1",
+              "sourcePortId": "right",
+              "targetComponentId": "hw5-p9-s1",
+              "targetPortId": "left",
+              "value": 0,
+              "transitionLabel": "0:1,L"
+            },
+            {
+              "id": "hw5-p9-t05",
+              "sourceComponentId": "hw5-p9-s1",
+              "sourcePortId": "right",
+              "targetComponentId": "hw5-p9-s2",
+              "targetPortId": "left",
+              "value": 0,
+              "transitionLabel": "1:0,L"
+            },
+            {
+              "id": "hw5-p9-t06",
+              "sourceComponentId": "hw5-p9-s2",
+              "sourcePortId": "right",
+              "targetComponentId": "hw5-p9-s2",
+              "targetPortId": "left",
+              "value": 0,
+              "transitionLabel": "0:0,L"
+            },
+            {
+              "id": "hw5-p9-t07",
+              "sourceComponentId": "hw5-p9-s2",
+              "sourcePortId": "right",
+              "targetComponentId": "hw5-p9-s2",
+              "targetPortId": "left",
+              "value": 0,
+              "transitionLabel": "1:1,L"
+            },
+            {
+              "id": "hw5-p9-t08",
+              "sourceComponentId": "hw5-p9-s2",
+              "sourcePortId": "right",
+              "targetComponentId": "hw5-p9-s3",
+              "targetPortId": "left",
+              "value": 0,
+              "transitionLabel": "*:*,L"
+            },
+            {
+              "id": "hw5-p9-t09",
+              "sourceComponentId": "hw5-p9-s3",
+              "sourcePortId": "right",
+              "targetComponentId": "hw5-p9-s3",
+              "targetPortId": "left",
+              "value": 0,
+              "transitionLabel": "0:0,L"
+            },
+            {
+              "id": "hw5-p9-t10",
+              "sourceComponentId": "hw5-p9-s3",
+              "sourcePortId": "right",
+              "targetComponentId": "hw5-p9-s4",
+              "targetPortId": "left",
+              "value": 0,
+              "transitionLabel": "*:*,L"
+            },
+            {
+              "id": "hw5-p9-t11",
+              "sourceComponentId": "hw5-p9-s4",
+              "sourcePortId": "right",
+              "targetComponentId": "hw5-p9-s4",
+              "targetPortId": "left",
+              "value": 0,
+              "transitionLabel": "1:0,L"
+            },
+            {
+              "id": "hw5-p9-t12",
+              "sourceComponentId": "hw5-p9-s4",
+              "sourcePortId": "right",
+              "targetComponentId": "hw5-p9-s6",
+              "targetPortId": "left",
+              "value": 0,
+              "transitionLabel": "0:1,R"
+            },
+            {
+              "id": "hw5-p9-t13",
+              "sourceComponentId": "hw5-p9-s4",
+              "sourcePortId": "right",
+              "targetComponentId": "hw5-p9-s5",
+              "targetPortId": "left",
+              "value": 0,
+              "transitionLabel": "*:1,L"
+            },
+            {
+              "id": "hw5-p9-t14",
+              "sourceComponentId": "hw5-p9-s5",
+              "sourcePortId": "right",
+              "targetComponentId": "hw5-p9-s6",
+              "targetPortId": "left",
+              "value": 0,
+              "transitionLabel": "0:*,R"
+            },
+            {
+              "id": "hw5-p9-t15",
+              "sourceComponentId": "hw5-p9-s6",
+              "sourcePortId": "right",
+              "targetComponentId": "hw5-p9-s6",
+              "targetPortId": "left",
+              "value": 0,
+              "transitionLabel": "0:0,R"
+            },
+            {
+              "id": "hw5-p9-t16",
+              "sourceComponentId": "hw5-p9-s6",
+              "sourcePortId": "right",
+              "targetComponentId": "hw5-p9-s6",
+              "targetPortId": "left",
+              "value": 0,
+              "transitionLabel": "1:1,R"
+            },
+            {
+              "id": "hw5-p9-t17",
+              "sourceComponentId": "hw5-p9-s6",
+              "sourcePortId": "right",
+              "targetComponentId": "hw5-p9-s7",
+              "targetPortId": "left",
+              "value": 0,
+              "transitionLabel": "*:*,R"
+            },
+            {
+              "id": "hw5-p9-t18",
+              "sourceComponentId": "hw5-p9-s7",
+              "sourcePortId": "right",
+              "targetComponentId": "hw5-p9-s7",
+              "targetPortId": "left",
+              "value": 0,
+              "transitionLabel": "0:0,R"
+            },
+            {
+              "id": "hw5-p9-t19",
+              "sourceComponentId": "hw5-p9-s7",
+              "sourcePortId": "right",
+              "targetComponentId": "hw5-p9-s0",
+              "targetPortId": "left",
+              "value": 0,
+              "transitionLabel": "*:*,R"
+            }
+          ]
+        }
+      },
+      {
+        "questionId": 10,
+        "circuit": {
+          "components": [],
+          "wires": []
+        },
+        "responseText": "I ran out of time here, but my guess is yes — it seems like it should be possible."
+      },
+      {
+        "questionId": 11,
+        "circuit": {
+          "components": [],
+          "wires": []
+        },
+        "responseText": "I ran out of time here, but my guess is yes — it seems like it should be possible."
+      }
+    ]
+  },
+  {
+    "assignmentTitle": "HW5. Computing with TMs",
+    "student": "carol.reyes@example.com",
+    "submittedAt": "2026-07-12T12:00:00.000Z",
+    "answers": [
+      {
+        "questionId": 1,
+        "circuit": {
+          "components": [
+            {
+              "id": "hw5-p1-s0",
+              "type": "STATE",
+              "x": 140,
+              "y": 220,
+              "label": "S₀",
+              "ports": [
+                {
+                  "id": "left",
+                  "label": "",
+                  "side": "left",
+                  "index": 0
+                },
+                {
+                  "id": "right",
+                  "label": "",
+                  "side": "right",
+                  "index": 0
+                }
+              ]
+            },
+            {
+              "id": "hw5-p1-s1",
+              "type": "STATE",
+              "x": 340,
+              "y": 220,
+              "label": "S₁",
+              "ports": [
+                {
+                  "id": "left",
+                  "label": "",
+                  "side": "left",
+                  "index": 0
+                },
+                {
+                  "id": "right",
+                  "label": "",
+                  "side": "right",
+                  "index": 0
+                }
+              ]
+            },
+            {
+              "id": "hw5-p1-s2",
+              "type": "STATE",
+              "x": 540,
+              "y": 220,
+              "label": "S₂",
+              "ports": [
+                {
+                  "id": "left",
+                  "label": "",
+                  "side": "left",
+                  "index": 0
+                },
+                {
+                  "id": "right",
+                  "label": "",
+                  "side": "right",
+                  "index": 0
+                }
+              ]
+            }
+          ],
+          "wires": [
+            {
+              "id": "hw5-p1-t1",
+              "sourceComponentId": "hw5-p1-s0",
+              "sourcePortId": "right",
+              "targetComponentId": "hw5-p1-s0",
+              "targetPortId": "left",
+              "value": 0,
+              "transitionLabel": "1:1,R"
+            },
+            {
+              "id": "hw5-p1-t2",
+              "sourceComponentId": "hw5-p1-s0",
+              "sourcePortId": "right",
+              "targetComponentId": "hw5-p1-s1",
+              "targetPortId": "left",
+              "value": 0,
+              "transitionLabel": "0:1,R"
+            },
+            {
+              "id": "hw5-p1-t3",
+              "sourceComponentId": "hw5-p1-s1",
+              "sourcePortId": "right",
+              "targetComponentId": "hw5-p1-s2",
+              "targetPortId": "left",
+              "value": 0,
+              "transitionLabel": "0:0,L"
+            }
+          ]
+        }
+      },
+      {
+        "questionId": 2,
+        "circuit": {
+          "components": [
+            {
+              "id": "hw5-p2-s0",
+              "type": "STATE",
+              "x": 140,
+              "y": 160,
+              "label": "S₀",
+              "ports": [
+                {
+                  "id": "left",
+                  "label": "",
+                  "side": "left",
+                  "index": 0
+                },
+                {
+                  "id": "right",
+                  "label": "",
+                  "side": "right",
+                  "index": 0
+                }
+              ]
+            },
+            {
+              "id": "hw5-p2-s1",
+              "type": "STATE",
+              "x": 340,
+              "y": 160,
+              "label": "S₁",
+              "ports": [
+                {
+                  "id": "left",
+                  "label": "",
+                  "side": "left",
+                  "index": 0
+                },
+                {
+                  "id": "right",
+                  "label": "",
+                  "side": "right",
+                  "index": 0
+                }
+              ]
+            },
+            {
+              "id": "hw5-p2-s2",
+              "type": "STATE",
+              "x": 540,
+              "y": 160,
+              "label": "S₂",
+              "ports": [
+                {
+                  "id": "left",
+                  "label": "",
+                  "side": "left",
+                  "index": 0
+                },
+                {
+                  "id": "right",
+                  "label": "",
+                  "side": "right",
+                  "index": 0
+                }
+              ]
+            },
+            {
+              "id": "hw5-p2-s3",
+              "type": "STATE",
+              "x": 540,
+              "y": 360,
+              "label": "S₃",
+              "ports": [
+                {
+                  "id": "left",
+                  "label": "",
+                  "side": "left",
+                  "index": 0
+                },
+                {
+                  "id": "right",
+                  "label": "",
+                  "side": "right",
+                  "index": 0
+                }
+              ]
+            },
+            {
+              "id": "hw5-p2-s4",
+              "type": "STATE",
+              "x": 340,
+              "y": 360,
+              "label": "S₄",
+              "ports": [
+                {
+                  "id": "left",
+                  "label": "",
+                  "side": "left",
+                  "index": 0
+                },
+                {
+                  "id": "right",
+                  "label": "",
+                  "side": "right",
+                  "index": 0
+                }
+              ]
+            }
+          ],
+          "wires": [
+            {
+              "id": "hw5-p2-t1",
+              "sourceComponentId": "hw5-p2-s0",
+              "sourcePortId": "right",
+              "targetComponentId": "hw5-p2-s0",
+              "targetPortId": "left",
+              "value": 0,
+              "transitionLabel": "1:1,R"
+            },
+            {
+              "id": "hw5-p2-t2",
+              "sourceComponentId": "hw5-p2-s0",
+              "sourcePortId": "right",
+              "targetComponentId": "hw5-p2-s1",
+              "targetPortId": "left",
+              "value": 0,
+              "transitionLabel": "0:1,R"
+            },
+            {
+              "id": "hw5-p2-t3",
+              "sourceComponentId": "hw5-p2-s1",
+              "sourcePortId": "right",
+              "targetComponentId": "hw5-p2-s2",
+              "targetPortId": "left",
+              "value": 0,
+              "transitionLabel": "0:1,R"
+            },
+            {
+              "id": "hw5-p2-t4",
+              "sourceComponentId": "hw5-p2-s2",
+              "sourcePortId": "right",
+              "targetComponentId": "hw5-p2-s3",
+              "targetPortId": "left",
+              "value": 0,
+              "transitionLabel": "0:1,R"
+            },
+            {
+              "id": "hw5-p2-t5",
+              "sourceComponentId": "hw5-p2-s3",
+              "sourcePortId": "right",
+              "targetComponentId": "hw5-p2-s4",
+              "targetPortId": "left",
+              "value": 0,
+              "transitionLabel": "0:0,L"
+            }
+          ]
+        }
+      },
+      {
+        "questionId": 3,
+        "circuit": {
+          "components": [
+            {
+              "id": "hw5-p3-s0",
+              "type": "STATE",
+              "x": 120,
+              "y": 140,
+              "label": "S₀",
+              "ports": [
+                {
+                  "id": "left",
+                  "label": "",
+                  "side": "left",
+                  "index": 0
+                },
+                {
+                  "id": "right",
+                  "label": "",
+                  "side": "right",
+                  "index": 0
+                }
+              ]
+            },
+            {
+              "id": "hw5-p3-s1",
+              "type": "STATE",
+              "x": 300,
+              "y": 140,
+              "label": "S₁",
+              "ports": [
+                {
+                  "id": "left",
+                  "label": "",
+                  "side": "left",
+                  "index": 0
+                },
+                {
+                  "id": "right",
+                  "label": "",
+                  "side": "right",
+                  "index": 0
+                }
+              ]
+            },
+            {
+              "id": "hw5-p3-s2",
+              "type": "STATE",
+              "x": 480,
+              "y": 140,
+              "label": "S₂",
+              "ports": [
+                {
+                  "id": "left",
+                  "label": "",
+                  "side": "left",
+                  "index": 0
+                },
+                {
+                  "id": "right",
+                  "label": "",
+                  "side": "right",
+                  "index": 0
+                }
+              ]
+            },
+            {
+              "id": "hw5-p3-s3",
+              "type": "STATE",
+              "x": 660,
+              "y": 140,
+              "label": "S₃",
+              "ports": [
+                {
+                  "id": "left",
+                  "label": "",
+                  "side": "left",
+                  "index": 0
+                },
+                {
+                  "id": "right",
+                  "label": "",
+                  "side": "right",
+                  "index": 0
+                }
+              ]
+            },
+            {
+              "id": "hw5-p3-s4",
+              "type": "STATE",
+              "x": 840,
+              "y": 140,
+              "label": "S₄",
+              "ports": [
+                {
+                  "id": "left",
+                  "label": "",
+                  "side": "left",
+                  "index": 0
+                },
+                {
+                  "id": "right",
+                  "label": "",
+                  "side": "right",
+                  "index": 0
+                }
+              ]
+            },
+            {
+              "id": "hw5-p3-s5",
+              "type": "STATE",
+              "x": 840,
+              "y": 360,
+              "label": "S₅",
+              "ports": [
+                {
+                  "id": "left",
+                  "label": "",
+                  "side": "left",
+                  "index": 0
+                },
+                {
+                  "id": "right",
+                  "label": "",
+                  "side": "right",
+                  "index": 0
+                }
+              ]
+            },
+            {
+              "id": "hw5-p3-s6",
+              "type": "STATE",
+              "x": 660,
+              "y": 360,
+              "label": "S₆",
+              "ports": [
+                {
+                  "id": "left",
+                  "label": "",
+                  "side": "left",
+                  "index": 0
+                },
+                {
+                  "id": "right",
+                  "label": "",
+                  "side": "right",
+                  "index": 0
+                }
+              ]
+            },
+            {
+              "id": "hw5-p3-s7",
+              "type": "STATE",
+              "x": 480,
+              "y": 360,
+              "label": "S₇",
+              "ports": [
+                {
+                  "id": "left",
+                  "label": "",
+                  "side": "left",
+                  "index": 0
+                },
+                {
+                  "id": "right",
+                  "label": "",
+                  "side": "right",
+                  "index": 0
+                }
+              ]
+            },
+            {
+              "id": "hw5-p3-s8",
+              "type": "STATE",
+              "x": 300,
+              "y": 360,
+              "label": "S₈",
+              "ports": [
+                {
+                  "id": "left",
+                  "label": "",
+                  "side": "left",
+                  "index": 0
+                },
+                {
+                  "id": "right",
+                  "label": "",
+                  "side": "right",
+                  "index": 0
+                }
+              ]
+            },
+            {
+              "id": "hw5-p3-s9",
+              "type": "STATE",
+              "x": 120,
+              "y": 360,
+              "label": "S₉",
+              "ports": [
+                {
+                  "id": "left",
+                  "label": "",
+                  "side": "left",
+                  "index": 0
+                },
+                {
+                  "id": "right",
+                  "label": "",
+                  "side": "right",
+                  "index": 0
+                }
+              ]
+            }
+          ],
+          "wires": [
+            {
+              "id": "hw5-p3-t01",
+              "sourceComponentId": "hw5-p3-s0",
+              "sourcePortId": "right",
+              "targetComponentId": "hw5-p3-s0",
+              "targetPortId": "left",
+              "value": 0,
+              "transitionLabel": "1:1,L"
+            },
+            {
+              "id": "hw5-p3-t02",
+              "sourceComponentId": "hw5-p3-s0",
+              "sourcePortId": "right",
+              "targetComponentId": "hw5-p3-s1",
+              "targetPortId": "left",
+              "value": 0,
+              "transitionLabel": "0:0,R"
+            },
+            {
+              "id": "hw5-p3-t03",
+              "sourceComponentId": "hw5-p3-s1",
+              "sourcePortId": "right",
+              "targetComponentId": "hw5-p3-s2",
+              "targetPortId": "left",
+              "value": 0,
+              "transitionLabel": "1:0,R"
+            },
+            {
+              "id": "hw5-p3-t04",
+              "sourceComponentId": "hw5-p3-s1",
+              "sourcePortId": "right",
+              "targetComponentId": "hw5-p3-s8",
+              "targetPortId": "left",
+              "value": 0,
+              "transitionLabel": "0:0,R"
+            },
+            {
+              "id": "hw5-p3-t05",
+              "sourceComponentId": "hw5-p3-s2",
+              "sourcePortId": "right",
+              "targetComponentId": "hw5-p3-s2",
+              "targetPortId": "left",
+              "value": 0,
+              "transitionLabel": "1:1,R"
+            },
+            {
+              "id": "hw5-p3-t06",
+              "sourceComponentId": "hw5-p3-s2",
+              "sourcePortId": "right",
+              "targetComponentId": "hw5-p3-s3",
+              "targetPortId": "left",
+              "value": 0,
+              "transitionLabel": "0:0,R"
+            },
+            {
+              "id": "hw5-p3-t07",
+              "sourceComponentId": "hw5-p3-s3",
+              "sourcePortId": "right",
+              "targetComponentId": "hw5-p3-s3",
+              "targetPortId": "left",
+              "value": 0,
+              "transitionLabel": "1:1,R"
+            },
+            {
+              "id": "hw5-p3-t08",
+              "sourceComponentId": "hw5-p3-s3",
+              "sourcePortId": "right",
+              "targetComponentId": "hw5-p3-s4",
+              "targetPortId": "left",
+              "value": 0,
+              "transitionLabel": "0:1,R"
+            },
+            {
+              "id": "hw5-p3-t09",
+              "sourceComponentId": "hw5-p3-s4",
+              "sourcePortId": "right",
+              "targetComponentId": "hw5-p3-s5",
+              "targetPortId": "left",
+              "value": 0,
+              "transitionLabel": "0:1,R"
+            },
+            {
+              "id": "hw5-p3-t10",
+              "sourceComponentId": "hw5-p3-s5",
+              "sourcePortId": "right",
+              "targetComponentId": "hw5-p3-s6",
+              "targetPortId": "left",
+              "value": 0,
+              "transitionLabel": "0:1,L"
+            },
+            {
+              "id": "hw5-p3-t11",
+              "sourceComponentId": "hw5-p3-s6",
+              "sourcePortId": "right",
+              "targetComponentId": "hw5-p3-s6",
+              "targetPortId": "left",
+              "value": 0,
+              "transitionLabel": "1:1,L"
+            },
+            {
+              "id": "hw5-p3-t12",
+              "sourceComponentId": "hw5-p3-s6",
+              "sourcePortId": "right",
+              "targetComponentId": "hw5-p3-s7",
+              "targetPortId": "left",
+              "value": 0,
+              "transitionLabel": "0:0,L"
+            },
+            {
+              "id": "hw5-p3-t13",
+              "sourceComponentId": "hw5-p3-s7",
+              "sourcePortId": "right",
+              "targetComponentId": "hw5-p3-s7",
+              "targetPortId": "left",
+              "value": 0,
+              "transitionLabel": "1:1,L"
+            },
+            {
+              "id": "hw5-p3-t14",
+              "sourceComponentId": "hw5-p3-s7",
+              "sourcePortId": "right",
+              "targetComponentId": "hw5-p3-s1",
+              "targetPortId": "left",
+              "value": 0,
+              "transitionLabel": "0:0,R"
+            },
+            {
+              "id": "hw5-p3-t15",
+              "sourceComponentId": "hw5-p3-s8",
+              "sourcePortId": "right",
+              "targetComponentId": "hw5-p3-s8",
+              "targetPortId": "left",
+              "value": 0,
+              "transitionLabel": "1:1,R"
+            },
+            {
+              "id": "hw5-p3-t16",
+              "sourceComponentId": "hw5-p3-s8",
+              "sourcePortId": "right",
+              "targetComponentId": "hw5-p3-s9",
+              "targetPortId": "left",
+              "value": 0,
+              "transitionLabel": "0:0,L"
+            }
+          ]
+        }
+      },
+      {
+        "questionId": 4,
+        "circuit": {
+          "components": [
+            {
+              "id": "hw5-p4-s0",
+              "type": "STATE",
+              "x": 140,
+              "y": 160,
+              "label": "S₀",
+              "ports": [
+                {
+                  "id": "left",
+                  "label": "",
+                  "side": "left",
+                  "index": 0
+                },
+                {
+                  "id": "right",
+                  "label": "",
+                  "side": "right",
+                  "index": 0
+                }
+              ]
+            },
+            {
+              "id": "hw5-p4-s1",
+              "type": "STATE",
+              "x": 340,
+              "y": 160,
+              "label": "S₁",
+              "ports": [
+                {
+                  "id": "left",
+                  "label": "",
+                  "side": "left",
+                  "index": 0
+                },
+                {
+                  "id": "right",
+                  "label": "",
+                  "side": "right",
+                  "index": 0
+                }
+              ]
+            },
+            {
+              "id": "hw5-p4-s2",
+              "type": "STATE",
+              "x": 540,
+              "y": 160,
+              "label": "S₂",
+              "ports": [
+                {
+                  "id": "left",
+                  "label": "",
+                  "side": "left",
+                  "index": 0
+                },
+                {
+                  "id": "right",
+                  "label": "",
+                  "side": "right",
+                  "index": 0
+                }
+              ]
+            },
+            {
+              "id": "hw5-p4-s3",
+              "type": "STATE",
+              "x": 540,
+              "y": 360,
+              "label": "S₃",
+              "ports": [
+                {
+                  "id": "left",
+                  "label": "",
+                  "side": "left",
+                  "index": 0
+                },
+                {
+                  "id": "right",
+                  "label": "",
+                  "side": "right",
+                  "index": 0
+                }
+              ]
+            },
+            {
+              "id": "hw5-p4-s4",
+              "type": "STATE",
+              "x": 340,
+              "y": 360,
+              "label": "S₄",
+              "ports": [
+                {
+                  "id": "left",
+                  "label": "",
+                  "side": "left",
+                  "index": 0
+                },
+                {
+                  "id": "right",
+                  "label": "",
+                  "side": "right",
+                  "index": 0
+                }
+              ]
+            },
+            {
+              "id": "hw5-p4-s5",
+              "type": "STATE",
+              "x": 140,
+              "y": 360,
+              "label": "S₅",
+              "ports": [
+                {
+                  "id": "left",
+                  "label": "",
+                  "side": "left",
+                  "index": 0
+                },
+                {
+                  "id": "right",
+                  "label": "",
+                  "side": "right",
+                  "index": 0
+                }
+              ]
+            }
+          ],
+          "wires": [
+            {
+              "id": "hw5-p4-t1",
+              "sourceComponentId": "hw5-p4-s0",
+              "sourcePortId": "right",
+              "targetComponentId": "hw5-p4-s1",
+              "targetPortId": "left",
+              "value": 0,
+              "transitionLabel": "1:0,L"
+            },
+            {
+              "id": "hw5-p4-t2",
+              "sourceComponentId": "hw5-p4-s1",
+              "sourcePortId": "right",
+              "targetComponentId": "hw5-p4-s1",
+              "targetPortId": "left",
+              "value": 0,
+              "transitionLabel": "1:1,L"
+            },
+            {
+              "id": "hw5-p4-t3",
+              "sourceComponentId": "hw5-p4-s1",
+              "sourcePortId": "right",
+              "targetComponentId": "hw5-p4-s2",
+              "targetPortId": "left",
+              "value": 0,
+              "transitionLabel": "0:1,L"
+            },
+            {
+              "id": "hw5-p4-t4",
+              "sourceComponentId": "hw5-p4-s2",
+              "sourcePortId": "right",
+              "targetComponentId": "hw5-p4-s3",
+              "targetPortId": "left",
+              "value": 0,
+              "transitionLabel": "0:0,R"
+            },
+            {
+              "id": "hw5-p4-t5",
+              "sourceComponentId": "hw5-p4-s2",
+              "sourcePortId": "right",
+              "targetComponentId": "hw5-p4-s4",
+              "targetPortId": "left",
+              "value": 0,
+              "transitionLabel": "1:1,R"
+            },
+            {
+              "id": "hw5-p4-t6",
+              "sourceComponentId": "hw5-p4-s3",
+              "sourcePortId": "right",
+              "targetComponentId": "hw5-p4-s3",
+              "targetPortId": "left",
+              "value": 0,
+              "transitionLabel": "1:1,R"
+            },
+            {
+              "id": "hw5-p4-t7",
+              "sourceComponentId": "hw5-p4-s3",
+              "sourcePortId": "right",
+              "targetComponentId": "hw5-p4-s0",
+              "targetPortId": "left",
+              "value": 0,
+              "transitionLabel": "0:0,L"
+            },
+            {
+              "id": "hw5-p4-t8",
+              "sourceComponentId": "hw5-p4-s4",
+              "sourcePortId": "right",
+              "targetComponentId": "hw5-p4-s4",
+              "targetPortId": "left",
+              "value": 0,
+              "transitionLabel": "1:1,R"
+            },
+            {
+              "id": "hw5-p4-t9",
+              "sourceComponentId": "hw5-p4-s4",
+              "sourcePortId": "right",
+              "targetComponentId": "hw5-p4-s5",
+              "targetPortId": "left",
+              "value": 0,
+              "transitionLabel": "0:0,L"
+            }
+          ]
+        }
+      },
+      {
+        "questionId": 5,
+        "circuit": {
+          "components": [
+            {
+              "id": "hw5-p5-s0",
+              "type": "STATE",
+              "x": 120,
+              "y": 140,
+              "label": "S₀",
+              "ports": [
+                {
+                  "id": "left",
+                  "label": "",
+                  "side": "left",
+                  "index": 0
+                },
+                {
+                  "id": "right",
+                  "label": "",
+                  "side": "right",
+                  "index": 0
+                }
+              ]
+            },
+            {
+              "id": "hw5-p5-s1",
+              "type": "STATE",
+              "x": 300,
+              "y": 140,
+              "label": "S₁",
+              "ports": [
+                {
+                  "id": "left",
+                  "label": "",
+                  "side": "left",
+                  "index": 0
+                },
+                {
+                  "id": "right",
+                  "label": "",
+                  "side": "right",
+                  "index": 0
+                }
+              ]
+            },
+            {
+              "id": "hw5-p5-s2",
+              "type": "STATE",
+              "x": 480,
+              "y": 140,
+              "label": "S₂",
+              "ports": [
+                {
+                  "id": "left",
+                  "label": "",
+                  "side": "left",
+                  "index": 0
+                },
+                {
+                  "id": "right",
+                  "label": "",
+                  "side": "right",
+                  "index": 0
+                }
+              ]
+            },
+            {
+              "id": "hw5-p5-s3",
+              "type": "STATE",
+              "x": 660,
+              "y": 140,
+              "label": "S₃",
+              "ports": [
+                {
+                  "id": "left",
+                  "label": "",
+                  "side": "left",
+                  "index": 0
+                },
+                {
+                  "id": "right",
+                  "label": "",
+                  "side": "right",
+                  "index": 0
+                }
+              ]
+            },
+            {
+              "id": "hw5-p5-s4",
+              "type": "STATE",
+              "x": 660,
+              "y": 320,
+              "label": "S₄",
+              "ports": [
+                {
+                  "id": "left",
+                  "label": "",
+                  "side": "left",
+                  "index": 0
+                },
+                {
+                  "id": "right",
+                  "label": "",
+                  "side": "right",
+                  "index": 0
+                }
+              ]
+            },
+            {
+              "id": "hw5-p5-s5",
+              "type": "STATE",
+              "x": 480,
+              "y": 320,
+              "label": "S₅",
+              "ports": [
+                {
+                  "id": "left",
+                  "label": "",
+                  "side": "left",
+                  "index": 0
+                },
+                {
+                  "id": "right",
+                  "label": "",
+                  "side": "right",
+                  "index": 0
+                }
+              ]
+            },
+            {
+              "id": "hw5-p5-s6",
+              "type": "STATE",
+              "x": 300,
+              "y": 320,
+              "label": "S₆",
+              "ports": [
+                {
+                  "id": "left",
+                  "label": "",
+                  "side": "left",
+                  "index": 0
+                },
+                {
+                  "id": "right",
+                  "label": "",
+                  "side": "right",
+                  "index": 0
+                }
+              ]
+            },
+            {
+              "id": "hw5-p5-s7",
+              "type": "STATE",
+              "x": 120,
+              "y": 320,
+              "label": "S₇",
+              "ports": [
+                {
+                  "id": "left",
+                  "label": "",
+                  "side": "left",
+                  "index": 0
+                },
+                {
+                  "id": "right",
+                  "label": "",
+                  "side": "right",
+                  "index": 0
+                }
+              ]
+            },
+            {
+              "id": "hw5-p5-s8",
+              "type": "STATE",
+              "x": 120,
+              "y": 500,
+              "label": "S₈",
+              "ports": [
+                {
+                  "id": "left",
+                  "label": "",
+                  "side": "left",
+                  "index": 0
+                },
+                {
+                  "id": "right",
+                  "label": "",
+                  "side": "right",
+                  "index": 0
+                }
+              ]
+            },
+            {
+              "id": "hw5-p5-s9",
+              "type": "STATE",
+              "x": 300,
+              "y": 500,
+              "label": "S₉",
+              "ports": [
+                {
+                  "id": "left",
+                  "label": "",
+                  "side": "left",
+                  "index": 0
+                },
+                {
+                  "id": "right",
+                  "label": "",
+                  "side": "right",
+                  "index": 0
+                }
+              ]
+            },
+            {
+              "id": "hw5-p5-s10",
+              "type": "STATE",
+              "x": 480,
+              "y": 500,
+              "label": "S₁₀",
+              "ports": [
+                {
+                  "id": "left",
+                  "label": "",
+                  "side": "left",
+                  "index": 0
+                },
+                {
+                  "id": "right",
+                  "label": "",
+                  "side": "right",
+                  "index": 0
+                }
+              ]
+            },
+            {
+              "id": "hw5-p5-s11",
+              "type": "STATE",
+              "x": 660,
+              "y": 500,
+              "label": "S₁₁",
+              "ports": [
+                {
+                  "id": "left",
+                  "label": "",
+                  "side": "left",
+                  "index": 0
+                },
+                {
+                  "id": "right",
+                  "label": "",
+                  "side": "right",
+                  "index": 0
+                }
+              ]
+            }
+          ],
+          "wires": [
+            {
+              "id": "hw5-p5-t1",
+              "sourceComponentId": "hw5-p5-s0",
+              "sourcePortId": "right",
+              "targetComponentId": "hw5-p5-s0",
+              "targetPortId": "left",
+              "value": 0,
+              "transitionLabel": "1:1,L"
+            },
+            {
+              "id": "hw5-p5-t2",
+              "sourceComponentId": "hw5-p5-s0",
+              "sourcePortId": "right",
+              "targetComponentId": "hw5-p5-s1",
+              "targetPortId": "left",
+              "value": 0,
+              "transitionLabel": "0:1,L"
+            },
+            {
+              "id": "hw5-p5-t3",
+              "sourceComponentId": "hw5-p5-s1",
+              "sourcePortId": "right",
+              "targetComponentId": "hw5-p5-s1",
+              "targetPortId": "left",
+              "value": 0,
+              "transitionLabel": "1:1,L"
+            },
+            {
+              "id": "hw5-p5-t4",
+              "sourceComponentId": "hw5-p5-s1",
+              "sourcePortId": "right",
+              "targetComponentId": "hw5-p5-s2",
+              "targetPortId": "left",
+              "value": 0,
+              "transitionLabel": "0:0,R"
+            },
+            {
+              "id": "hw5-p5-t5",
+              "sourceComponentId": "hw5-p5-s2",
+              "sourcePortId": "right",
+              "targetComponentId": "hw5-p5-s3",
+              "targetPortId": "left",
+              "value": 0,
+              "transitionLabel": "1:0,R"
+            },
+            {
+              "id": "hw5-p5-t6",
+              "sourceComponentId": "hw5-p5-s3",
+              "sourcePortId": "right",
+              "targetComponentId": "hw5-p5-s3",
+              "targetPortId": "left",
+              "value": 0,
+              "transitionLabel": "1:1,R"
+            },
+            {
+              "id": "hw5-p5-t7",
+              "sourceComponentId": "hw5-p5-s3",
+              "sourcePortId": "right",
+              "targetComponentId": "hw5-p5-s4",
+              "targetPortId": "left",
+              "value": 0,
+              "transitionLabel": "0:0,L"
+            },
+            {
+              "id": "hw5-p5-t8",
+              "sourceComponentId": "hw5-p5-s4",
+              "sourcePortId": "right",
+              "targetComponentId": "hw5-p5-s5",
+              "targetPortId": "left",
+              "value": 0,
+              "transitionLabel": "1:0,L"
+            },
+            {
+              "id": "hw5-p5-t9",
+              "sourceComponentId": "hw5-p5-s4",
+              "sourcePortId": "right",
+              "targetComponentId": "hw5-p5-s11",
+              "targetPortId": "left",
+              "value": 0,
+              "transitionLabel": "0:0,L"
+            },
+            {
+              "id": "hw5-p5-t10",
+              "sourceComponentId": "hw5-p5-s5",
+              "sourcePortId": "right",
+              "targetComponentId": "hw5-p5-s5",
+              "targetPortId": "left",
+              "value": 0,
+              "transitionLabel": "1:1,L"
+            },
+            {
+              "id": "hw5-p5-t11",
+              "sourceComponentId": "hw5-p5-s5",
+              "sourcePortId": "right",
+              "targetComponentId": "hw5-p5-s6",
+              "targetPortId": "left",
+              "value": 0,
+              "transitionLabel": "0:0,L"
+            },
+            {
+              "id": "hw5-p5-t12",
+              "sourceComponentId": "hw5-p5-s6",
+              "sourcePortId": "right",
+              "targetComponentId": "hw5-p5-s6",
+              "targetPortId": "left",
+              "value": 0,
+              "transitionLabel": "1:1,L"
+            },
+            {
+              "id": "hw5-p5-t13",
+              "sourceComponentId": "hw5-p5-s6",
+              "sourcePortId": "right",
+              "targetComponentId": "hw5-p5-s7",
+              "targetPortId": "left",
+              "value": 0,
+              "transitionLabel": "0:1,L"
+            },
+            {
+              "id": "hw5-p5-t14",
+              "sourceComponentId": "hw5-p5-s7",
+              "sourcePortId": "right",
+              "targetComponentId": "hw5-p5-s8",
+              "targetPortId": "left",
+              "value": 0,
+              "transitionLabel": "0:1,L"
+            },
+            {
+              "id": "hw5-p5-t15",
+              "sourceComponentId": "hw5-p5-s8",
+              "sourcePortId": "right",
+              "targetComponentId": "hw5-p5-s9",
+              "targetPortId": "left",
+              "value": 0,
+              "transitionLabel": "0:1,R"
+            },
+            {
+              "id": "hw5-p5-t16",
+              "sourceComponentId": "hw5-p5-s9",
+              "sourcePortId": "right",
+              "targetComponentId": "hw5-p5-s9",
+              "targetPortId": "left",
+              "value": 0,
+              "transitionLabel": "1:1,R"
+            },
+            {
+              "id": "hw5-p5-t17",
+              "sourceComponentId": "hw5-p5-s9",
+              "sourcePortId": "right",
+              "targetComponentId": "hw5-p5-s10",
+              "targetPortId": "left",
+              "value": 0,
+              "transitionLabel": "0:0,R"
+            },
+            {
+              "id": "hw5-p5-t18",
+              "sourceComponentId": "hw5-p5-s10",
+              "sourcePortId": "right",
+              "targetComponentId": "hw5-p5-s10",
+              "targetPortId": "left",
+              "value": 0,
+              "transitionLabel": "1:1,R"
+            },
+            {
+              "id": "hw5-p5-t19",
+              "sourceComponentId": "hw5-p5-s10",
+              "sourcePortId": "right",
+              "targetComponentId": "hw5-p5-s4",
+              "targetPortId": "left",
+              "value": 0,
+              "transitionLabel": "0:0,L"
+            }
+          ]
+        }
+      },
+      {
+        "questionId": 6,
+        "circuit": {
+          "components": [
+            {
+              "id": "hw5-p6-s0",
+              "type": "STATE",
+              "x": 120,
+              "y": 140,
+              "label": "S₀",
+              "ports": [
+                {
+                  "id": "left",
+                  "label": "",
+                  "side": "left",
+                  "index": 0
+                },
+                {
+                  "id": "right",
+                  "label": "",
+                  "side": "right",
+                  "index": 0
+                }
+              ]
+            },
+            {
+              "id": "hw5-p6-s1",
+              "type": "STATE",
+              "x": 300,
+              "y": 140,
+              "label": "S₁",
+              "ports": [
+                {
+                  "id": "left",
+                  "label": "",
+                  "side": "left",
+                  "index": 0
+                },
+                {
+                  "id": "right",
+                  "label": "",
+                  "side": "right",
+                  "index": 0
+                }
+              ]
+            },
+            {
+              "id": "hw5-p6-s2",
+              "type": "STATE",
+              "x": 480,
+              "y": 140,
+              "label": "S₂",
+              "ports": [
+                {
+                  "id": "left",
+                  "label": "",
+                  "side": "left",
+                  "index": 0
+                },
+                {
+                  "id": "right",
+                  "label": "",
+                  "side": "right",
+                  "index": 0
+                }
+              ]
+            },
+            {
+              "id": "hw5-p6-s3",
+              "type": "STATE",
+              "x": 660,
+              "y": 140,
+              "label": "S₃",
+              "ports": [
+                {
+                  "id": "left",
+                  "label": "",
+                  "side": "left",
+                  "index": 0
+                },
+                {
+                  "id": "right",
+                  "label": "",
+                  "side": "right",
+                  "index": 0
+                }
+              ]
+            },
+            {
+              "id": "hw5-p6-s4",
+              "type": "STATE",
+              "x": 840,
+              "y": 140,
+              "label": "S₄",
+              "ports": [
+                {
+                  "id": "left",
+                  "label": "",
+                  "side": "left",
+                  "index": 0
+                },
+                {
+                  "id": "right",
+                  "label": "",
+                  "side": "right",
+                  "index": 0
+                }
+              ]
+            },
+            {
+              "id": "hw5-p6-s5",
+              "type": "STATE",
+              "x": 1020,
+              "y": 140,
+              "label": "S₅",
+              "ports": [
+                {
+                  "id": "left",
+                  "label": "",
+                  "side": "left",
+                  "index": 0
+                },
+                {
+                  "id": "right",
+                  "label": "",
+                  "side": "right",
+                  "index": 0
+                }
+              ]
+            },
+            {
+              "id": "hw5-p6-s6",
+              "type": "STATE",
+              "x": 1020,
+              "y": 400,
+              "label": "S₆",
+              "ports": [
+                {
+                  "id": "left",
+                  "label": "",
+                  "side": "left",
+                  "index": 0
+                },
+                {
+                  "id": "right",
+                  "label": "",
+                  "side": "right",
+                  "index": 0
+                }
+              ]
+            },
+            {
+              "id": "hw5-p6-s7",
+              "type": "STATE",
+              "x": 840,
+              "y": 400,
+              "label": "S₇",
+              "ports": [
+                {
+                  "id": "left",
+                  "label": "",
+                  "side": "left",
+                  "index": 0
+                },
+                {
+                  "id": "right",
+                  "label": "",
+                  "side": "right",
+                  "index": 0
+                }
+              ]
+            },
+            {
+              "id": "hw5-p6-s8",
+              "type": "STATE",
+              "x": 660,
+              "y": 400,
+              "label": "S₈",
+              "ports": [
+                {
+                  "id": "left",
+                  "label": "",
+                  "side": "left",
+                  "index": 0
+                },
+                {
+                  "id": "right",
+                  "label": "",
+                  "side": "right",
+                  "index": 0
+                }
+              ]
+            },
+            {
+              "id": "hw5-p6-s9",
+              "type": "STATE",
+              "x": 480,
+              "y": 400,
+              "label": "S₉",
+              "ports": [
+                {
+                  "id": "left",
+                  "label": "",
+                  "side": "left",
+                  "index": 0
+                },
+                {
+                  "id": "right",
+                  "label": "",
+                  "side": "right",
+                  "index": 0
+                }
+              ]
+            },
+            {
+              "id": "hw5-p6-s10",
+              "type": "STATE",
+              "x": 300,
+              "y": 400,
+              "label": "S₁₀",
+              "ports": [
+                {
+                  "id": "left",
+                  "label": "",
+                  "side": "left",
+                  "index": 0
+                },
+                {
+                  "id": "right",
+                  "label": "",
+                  "side": "right",
+                  "index": 0
+                }
+              ]
+            }
+          ],
+          "wires": [
+            {
+              "id": "hw5-p6-t1",
+              "sourceComponentId": "hw5-p6-s0",
+              "sourcePortId": "right",
+              "targetComponentId": "hw5-p6-s0",
+              "targetPortId": "left",
+              "value": 0,
+              "transitionLabel": "1:1,L"
+            },
+            {
+              "id": "hw5-p6-t2",
+              "sourceComponentId": "hw5-p6-s0",
+              "sourcePortId": "right",
+              "targetComponentId": "hw5-p6-s1",
+              "targetPortId": "left",
+              "value": 0,
+              "transitionLabel": "0:0,L"
+            },
+            {
+              "id": "hw5-p6-t3",
+              "sourceComponentId": "hw5-p6-s1",
+              "sourcePortId": "right",
+              "targetComponentId": "hw5-p6-s2",
+              "targetPortId": "left",
+              "value": 0,
+              "transitionLabel": "1:1,L"
+            },
+            {
+              "id": "hw5-p6-t4",
+              "sourceComponentId": "hw5-p6-s1",
+              "sourcePortId": "right",
+              "targetComponentId": "hw5-p6-s8",
+              "targetPortId": "left",
+              "value": 0,
+              "transitionLabel": "0:0,R"
+            },
+            {
+              "id": "hw5-p6-t5",
+              "sourceComponentId": "hw5-p6-s2",
+              "sourcePortId": "right",
+              "targetComponentId": "hw5-p6-s2",
+              "targetPortId": "left",
+              "value": 0,
+              "transitionLabel": "1:1,L"
+            },
+            {
+              "id": "hw5-p6-t6",
+              "sourceComponentId": "hw5-p6-s2",
+              "sourcePortId": "right",
+              "targetComponentId": "hw5-p6-s3",
+              "targetPortId": "left",
+              "value": 0,
+              "transitionLabel": "0:0,R"
+            },
+            {
+              "id": "hw5-p6-t7",
+              "sourceComponentId": "hw5-p6-s3",
+              "sourcePortId": "right",
+              "targetComponentId": "hw5-p6-s4",
+              "targetPortId": "left",
+              "value": 0,
+              "transitionLabel": "1:0,R"
+            },
+            {
+              "id": "hw5-p6-t8",
+              "sourceComponentId": "hw5-p6-s4",
+              "sourcePortId": "right",
+              "targetComponentId": "hw5-p6-s4",
+              "targetPortId": "left",
+              "value": 0,
+              "transitionLabel": "1:1,R"
+            },
+            {
+              "id": "hw5-p6-t9",
+              "sourceComponentId": "hw5-p6-s4",
+              "sourcePortId": "right",
+              "targetComponentId": "hw5-p6-s5",
+              "targetPortId": "left",
+              "value": 0,
+              "transitionLabel": "0:0,R"
+            },
+            {
+              "id": "hw5-p6-t10",
+              "sourceComponentId": "hw5-p6-s5",
+              "sourcePortId": "right",
+              "targetComponentId": "hw5-p6-s5",
+              "targetPortId": "left",
+              "value": 0,
+              "transitionLabel": "1:1,R"
+            },
+            {
+              "id": "hw5-p6-t11",
+              "sourceComponentId": "hw5-p6-s5",
+              "sourcePortId": "right",
+              "targetComponentId": "hw5-p6-s6",
+              "targetPortId": "left",
+              "value": 0,
+              "transitionLabel": "0:1,R"
+            },
+            {
+              "id": "hw5-p6-t12",
+              "sourceComponentId": "hw5-p6-s6",
+              "sourcePortId": "right",
+              "targetComponentId": "hw5-p6-s7",
+              "targetPortId": "left",
+              "value": 0,
+              "transitionLabel": "0:1,R"
+            },
+            {
+              "id": "hw5-p6-t13",
+              "sourceComponentId": "hw5-p6-s7",
+              "sourcePortId": "right",
+              "targetComponentId": "hw5-p6-s0",
+              "targetPortId": "left",
+              "value": 0,
+              "transitionLabel": "0:1,L"
+            },
+            {
+              "id": "hw5-p6-t14",
+              "sourceComponentId": "hw5-p6-s8",
+              "sourcePortId": "right",
+              "targetComponentId": "hw5-p6-s9",
+              "targetPortId": "left",
+              "value": 0,
+              "transitionLabel": "0:0,R"
+            },
+            {
+              "id": "hw5-p6-t15",
+              "sourceComponentId": "hw5-p6-s9",
+              "sourcePortId": "right",
+              "targetComponentId": "hw5-p6-s9",
+              "targetPortId": "left",
+              "value": 0,
+              "transitionLabel": "1:1,R"
+            },
+            {
+              "id": "hw5-p6-t16",
+              "sourceComponentId": "hw5-p6-s9",
+              "sourcePortId": "right",
+              "targetComponentId": "hw5-p6-s10",
+              "targetPortId": "left",
+              "value": 0,
+              "transitionLabel": "0:0,L"
+            }
+          ]
+        }
+      }
+    ]
+  }
+]

@@ -1,0 +1,2871 @@
+{
+  "id": "hw4",
+  "title": "HW4. Computing with FSMs",
+  "questions": [
+    {
+      "id": 1,
+      "label": "Problem 1",
+      "statement": "State abstraction. Construct a state table for the machine shown in the HW4 handout, then convert it to a FSM diagram. What function does it compute in binary? (The machine, drawn in the HW4 PDF: two half-adder stages in series — the input feeds the first HA; each HA’s carry output C loops back through NOT → MEM → NOT into that HA’s second input; the first HA’s sum S feeds the second HA; the second HA’s sum S is the output.)",
+      "buildMode": "open",
+      "representation": "binary"
+    },
+    {
+      "id": 2,
+      "label": "Problem 2",
+      "statement": "Multiple realizability. Consider the two SCs in the HW4 handout. What function does each compute in binary? Do they implement the same FSM? Why or why not? Show your work. (The machines, drawn in the HW4 PDF — A: the input splits into both inputs of a first half-adder; its sum S feeds a second half-adder whose other input comes from the two carries joined by an OR gate, then NOT → MEM → NOT, feeding back; the second HA’s sum is the output. B: the input passes through NOT → MEM → NOT in series to the output.)",
+      "buildMode": "open",
+      "representation": "binary"
+    },
+    {
+      "id": 3,
+      "label": "Problem 3",
+      "statement": "Design a finite-state machine that computes x + 1 on tally numerals.",
+      "buildMode": "FSM",
+      "representation": "tally",
+      "cc_spec": {
+        "inputs": [
+          {
+            "name": "x",
+            "width": 8
+          }
+        ],
+        "outputs": [
+          {
+            "name": "out",
+            "width": 9,
+            "formula": "x + 1"
+          }
+        ]
+      },
+      "test_cases": [
+        {
+          "inputs": [
+            0
+          ],
+          "outputs": [
+            1
+          ]
+        },
+        {
+          "inputs": [
+            1
+          ],
+          "outputs": [
+            2
+          ]
+        },
+        {
+          "inputs": [
+            2
+          ],
+          "outputs": [
+            3
+          ]
+        },
+        {
+          "inputs": [
+            3
+          ],
+          "outputs": [
+            4
+          ]
+        },
+        {
+          "inputs": [
+            4
+          ],
+          "outputs": [
+            5
+          ]
+        },
+        {
+          "inputs": [
+            5
+          ],
+          "outputs": [
+            6
+          ]
+        },
+        {
+          "inputs": [
+            6
+          ],
+          "outputs": [
+            7
+          ]
+        },
+        {
+          "inputs": [
+            7
+          ],
+          "outputs": [
+            8
+          ]
+        },
+        {
+          "inputs": [
+            8
+          ],
+          "outputs": [
+            9
+          ]
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "label": "Problem 4",
+      "statement": "Design a finite-state machine that computes x + 2 on tally numerals.",
+      "buildMode": "FSM",
+      "representation": "tally",
+      "cc_spec": {
+        "inputs": [
+          {
+            "name": "x",
+            "width": 8
+          }
+        ],
+        "outputs": [
+          {
+            "name": "out",
+            "width": 10,
+            "formula": "x + 2"
+          }
+        ]
+      },
+      "test_cases": [
+        {
+          "inputs": [
+            0
+          ],
+          "outputs": [
+            2
+          ]
+        },
+        {
+          "inputs": [
+            1
+          ],
+          "outputs": [
+            3
+          ]
+        },
+        {
+          "inputs": [
+            2
+          ],
+          "outputs": [
+            4
+          ]
+        },
+        {
+          "inputs": [
+            3
+          ],
+          "outputs": [
+            5
+          ]
+        },
+        {
+          "inputs": [
+            4
+          ],
+          "outputs": [
+            6
+          ]
+        },
+        {
+          "inputs": [
+            5
+          ],
+          "outputs": [
+            7
+          ]
+        },
+        {
+          "inputs": [
+            6
+          ],
+          "outputs": [
+            8
+          ]
+        },
+        {
+          "inputs": [
+            7
+          ],
+          "outputs": [
+            9
+          ]
+        },
+        {
+          "inputs": [
+            8
+          ],
+          "outputs": [
+            10
+          ]
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "label": "Problem 5",
+      "statement": "Design a finite-state machine that computes x + 1 on binary numerals.",
+      "buildMode": "FSM",
+      "representation": "binary",
+      "cc_spec": {
+        "inputs": [
+          {
+            "name": "x",
+            "width": 6
+          }
+        ],
+        "outputs": [
+          {
+            "name": "out",
+            "width": 7,
+            "formula": "x + 1"
+          }
+        ]
+      },
+      "test_cases": [
+        {
+          "inputs": [
+            0
+          ],
+          "outputs": [
+            1
+          ]
+        },
+        {
+          "inputs": [
+            1
+          ],
+          "outputs": [
+            2
+          ]
+        },
+        {
+          "inputs": [
+            2
+          ],
+          "outputs": [
+            3
+          ]
+        },
+        {
+          "inputs": [
+            3
+          ],
+          "outputs": [
+            4
+          ]
+        },
+        {
+          "inputs": [
+            4
+          ],
+          "outputs": [
+            5
+          ]
+        },
+        {
+          "inputs": [
+            5
+          ],
+          "outputs": [
+            6
+          ]
+        },
+        {
+          "inputs": [
+            7
+          ],
+          "outputs": [
+            8
+          ]
+        },
+        {
+          "inputs": [
+            8
+          ],
+          "outputs": [
+            9
+          ]
+        },
+        {
+          "inputs": [
+            11
+          ],
+          "outputs": [
+            12
+          ]
+        },
+        {
+          "inputs": [
+            15
+          ],
+          "outputs": [
+            16
+          ]
+        },
+        {
+          "inputs": [
+            16
+          ],
+          "outputs": [
+            17
+          ]
+        },
+        {
+          "inputs": [
+            23
+          ],
+          "outputs": [
+            24
+          ]
+        },
+        {
+          "inputs": [
+            31
+          ],
+          "outputs": [
+            32
+          ]
+        },
+        {
+          "inputs": [
+            32
+          ],
+          "outputs": [
+            33
+          ]
+        },
+        {
+          "inputs": [
+            47
+          ],
+          "outputs": [
+            48
+          ]
+        },
+        {
+          "inputs": [
+            63
+          ],
+          "outputs": [
+            64
+          ]
+        }
+      ]
+    },
+    {
+      "id": 6,
+      "label": "Problem 6",
+      "statement": "Design a finite-state machine that computes x + 2 on binary numerals.",
+      "buildMode": "FSM",
+      "representation": "binary",
+      "cc_spec": {
+        "inputs": [
+          {
+            "name": "x",
+            "width": 6
+          }
+        ],
+        "outputs": [
+          {
+            "name": "out",
+            "width": 7,
+            "formula": "x + 2"
+          }
+        ]
+      },
+      "test_cases": [
+        {
+          "inputs": [
+            0
+          ],
+          "outputs": [
+            2
+          ]
+        },
+        {
+          "inputs": [
+            1
+          ],
+          "outputs": [
+            3
+          ]
+        },
+        {
+          "inputs": [
+            2
+          ],
+          "outputs": [
+            4
+          ]
+        },
+        {
+          "inputs": [
+            3
+          ],
+          "outputs": [
+            5
+          ]
+        },
+        {
+          "inputs": [
+            4
+          ],
+          "outputs": [
+            6
+          ]
+        },
+        {
+          "inputs": [
+            5
+          ],
+          "outputs": [
+            7
+          ]
+        },
+        {
+          "inputs": [
+            7
+          ],
+          "outputs": [
+            9
+          ]
+        },
+        {
+          "inputs": [
+            8
+          ],
+          "outputs": [
+            10
+          ]
+        },
+        {
+          "inputs": [
+            11
+          ],
+          "outputs": [
+            13
+          ]
+        },
+        {
+          "inputs": [
+            15
+          ],
+          "outputs": [
+            17
+          ]
+        },
+        {
+          "inputs": [
+            16
+          ],
+          "outputs": [
+            18
+          ]
+        },
+        {
+          "inputs": [
+            23
+          ],
+          "outputs": [
+            25
+          ]
+        },
+        {
+          "inputs": [
+            31
+          ],
+          "outputs": [
+            33
+          ]
+        },
+        {
+          "inputs": [
+            32
+          ],
+          "outputs": [
+            34
+          ]
+        },
+        {
+          "inputs": [
+            47
+          ],
+          "outputs": [
+            49
+          ]
+        },
+        {
+          "inputs": [
+            63
+          ],
+          "outputs": [
+            65
+          ]
+        }
+      ]
+    },
+    {
+      "id": 7,
+      "label": "Problem 7",
+      "statement": "Design a finite-state machine that computes x + 4 on binary numerals.",
+      "buildMode": "FSM",
+      "representation": "binary",
+      "cc_spec": {
+        "inputs": [
+          {
+            "name": "x",
+            "width": 6
+          }
+        ],
+        "outputs": [
+          {
+            "name": "out",
+            "width": 7,
+            "formula": "x + 4"
+          }
+        ]
+      },
+      "test_cases": [
+        {
+          "inputs": [
+            0
+          ],
+          "outputs": [
+            4
+          ]
+        },
+        {
+          "inputs": [
+            1
+          ],
+          "outputs": [
+            5
+          ]
+        },
+        {
+          "inputs": [
+            2
+          ],
+          "outputs": [
+            6
+          ]
+        },
+        {
+          "inputs": [
+            3
+          ],
+          "outputs": [
+            7
+          ]
+        },
+        {
+          "inputs": [
+            4
+          ],
+          "outputs": [
+            8
+          ]
+        },
+        {
+          "inputs": [
+            5
+          ],
+          "outputs": [
+            9
+          ]
+        },
+        {
+          "inputs": [
+            7
+          ],
+          "outputs": [
+            11
+          ]
+        },
+        {
+          "inputs": [
+            8
+          ],
+          "outputs": [
+            12
+          ]
+        },
+        {
+          "inputs": [
+            11
+          ],
+          "outputs": [
+            15
+          ]
+        },
+        {
+          "inputs": [
+            15
+          ],
+          "outputs": [
+            19
+          ]
+        },
+        {
+          "inputs": [
+            16
+          ],
+          "outputs": [
+            20
+          ]
+        },
+        {
+          "inputs": [
+            23
+          ],
+          "outputs": [
+            27
+          ]
+        },
+        {
+          "inputs": [
+            31
+          ],
+          "outputs": [
+            35
+          ]
+        },
+        {
+          "inputs": [
+            32
+          ],
+          "outputs": [
+            36
+          ]
+        },
+        {
+          "inputs": [
+            47
+          ],
+          "outputs": [
+            51
+          ]
+        },
+        {
+          "inputs": [
+            63
+          ],
+          "outputs": [
+            67
+          ]
+        }
+      ]
+    },
+    {
+      "id": 8,
+      "label": "Problem 8",
+      "statement": "Design a finite-state machine that computes 2x on binary numerals.",
+      "buildMode": "FSM",
+      "representation": "binary",
+      "cc_spec": {
+        "inputs": [
+          {
+            "name": "x",
+            "width": 6
+          }
+        ],
+        "outputs": [
+          {
+            "name": "out",
+            "width": 7,
+            "formula": "2 * x"
+          }
+        ]
+      },
+      "test_cases": [
+        {
+          "inputs": [
+            0
+          ],
+          "outputs": [
+            0
+          ]
+        },
+        {
+          "inputs": [
+            1
+          ],
+          "outputs": [
+            2
+          ]
+        },
+        {
+          "inputs": [
+            2
+          ],
+          "outputs": [
+            4
+          ]
+        },
+        {
+          "inputs": [
+            3
+          ],
+          "outputs": [
+            6
+          ]
+        },
+        {
+          "inputs": [
+            4
+          ],
+          "outputs": [
+            8
+          ]
+        },
+        {
+          "inputs": [
+            5
+          ],
+          "outputs": [
+            10
+          ]
+        },
+        {
+          "inputs": [
+            7
+          ],
+          "outputs": [
+            14
+          ]
+        },
+        {
+          "inputs": [
+            8
+          ],
+          "outputs": [
+            16
+          ]
+        },
+        {
+          "inputs": [
+            11
+          ],
+          "outputs": [
+            22
+          ]
+        },
+        {
+          "inputs": [
+            15
+          ],
+          "outputs": [
+            30
+          ]
+        },
+        {
+          "inputs": [
+            16
+          ],
+          "outputs": [
+            32
+          ]
+        },
+        {
+          "inputs": [
+            23
+          ],
+          "outputs": [
+            46
+          ]
+        },
+        {
+          "inputs": [
+            31
+          ],
+          "outputs": [
+            62
+          ]
+        },
+        {
+          "inputs": [
+            32
+          ],
+          "outputs": [
+            64
+          ]
+        },
+        {
+          "inputs": [
+            47
+          ],
+          "outputs": [
+            94
+          ]
+        },
+        {
+          "inputs": [
+            63
+          ],
+          "outputs": [
+            126
+          ]
+        }
+      ]
+    },
+    {
+      "id": 9,
+      "label": "Problem 9",
+      "statement": "Design a finite-state machine that computes 2x + 1 on binary numerals.",
+      "buildMode": "FSM",
+      "representation": "binary",
+      "cc_spec": {
+        "inputs": [
+          {
+            "name": "x",
+            "width": 6
+          }
+        ],
+        "outputs": [
+          {
+            "name": "out",
+            "width": 7,
+            "formula": "2 * x + 1"
+          }
+        ]
+      },
+      "test_cases": [
+        {
+          "inputs": [
+            0
+          ],
+          "outputs": [
+            1
+          ]
+        },
+        {
+          "inputs": [
+            1
+          ],
+          "outputs": [
+            3
+          ]
+        },
+        {
+          "inputs": [
+            2
+          ],
+          "outputs": [
+            5
+          ]
+        },
+        {
+          "inputs": [
+            3
+          ],
+          "outputs": [
+            7
+          ]
+        },
+        {
+          "inputs": [
+            4
+          ],
+          "outputs": [
+            9
+          ]
+        },
+        {
+          "inputs": [
+            5
+          ],
+          "outputs": [
+            11
+          ]
+        },
+        {
+          "inputs": [
+            7
+          ],
+          "outputs": [
+            15
+          ]
+        },
+        {
+          "inputs": [
+            8
+          ],
+          "outputs": [
+            17
+          ]
+        },
+        {
+          "inputs": [
+            11
+          ],
+          "outputs": [
+            23
+          ]
+        },
+        {
+          "inputs": [
+            15
+          ],
+          "outputs": [
+            31
+          ]
+        },
+        {
+          "inputs": [
+            16
+          ],
+          "outputs": [
+            33
+          ]
+        },
+        {
+          "inputs": [
+            23
+          ],
+          "outputs": [
+            47
+          ]
+        },
+        {
+          "inputs": [
+            31
+          ],
+          "outputs": [
+            63
+          ]
+        },
+        {
+          "inputs": [
+            32
+          ],
+          "outputs": [
+            65
+          ]
+        },
+        {
+          "inputs": [
+            47
+          ],
+          "outputs": [
+            95
+          ]
+        },
+        {
+          "inputs": [
+            63
+          ],
+          "outputs": [
+            127
+          ]
+        }
+      ]
+    },
+    {
+      "id": 10,
+      "label": "Problem 10",
+      "statement": "Design a finite-state machine that computes 2(x + 1) on binary numerals.",
+      "buildMode": "FSM",
+      "representation": "binary",
+      "cc_spec": {
+        "inputs": [
+          {
+            "name": "x",
+            "width": 6
+          }
+        ],
+        "outputs": [
+          {
+            "name": "out",
+            "width": 8,
+            "formula": "2 * (x + 1)"
+          }
+        ]
+      },
+      "test_cases": [
+        {
+          "inputs": [
+            0
+          ],
+          "outputs": [
+            2
+          ]
+        },
+        {
+          "inputs": [
+            1
+          ],
+          "outputs": [
+            4
+          ]
+        },
+        {
+          "inputs": [
+            2
+          ],
+          "outputs": [
+            6
+          ]
+        },
+        {
+          "inputs": [
+            3
+          ],
+          "outputs": [
+            8
+          ]
+        },
+        {
+          "inputs": [
+            4
+          ],
+          "outputs": [
+            10
+          ]
+        },
+        {
+          "inputs": [
+            5
+          ],
+          "outputs": [
+            12
+          ]
+        },
+        {
+          "inputs": [
+            7
+          ],
+          "outputs": [
+            16
+          ]
+        },
+        {
+          "inputs": [
+            8
+          ],
+          "outputs": [
+            18
+          ]
+        },
+        {
+          "inputs": [
+            11
+          ],
+          "outputs": [
+            24
+          ]
+        },
+        {
+          "inputs": [
+            15
+          ],
+          "outputs": [
+            32
+          ]
+        },
+        {
+          "inputs": [
+            16
+          ],
+          "outputs": [
+            34
+          ]
+        },
+        {
+          "inputs": [
+            23
+          ],
+          "outputs": [
+            48
+          ]
+        },
+        {
+          "inputs": [
+            31
+          ],
+          "outputs": [
+            64
+          ]
+        },
+        {
+          "inputs": [
+            32
+          ],
+          "outputs": [
+            66
+          ]
+        },
+        {
+          "inputs": [
+            47
+          ],
+          "outputs": [
+            96
+          ]
+        },
+        {
+          "inputs": [
+            63
+          ],
+          "outputs": [
+            128
+          ]
+        }
+      ]
+    },
+    {
+      "id": 11,
+      "label": "Problem 11",
+      "statement": "Design a finite-state machine that adds two binary numerals x and y, reading one bit of x and one bit of y per time step (least significant bits first).",
+      "buildMode": "FSM",
+      "representation": "binary",
+      "cc_spec": {
+        "inputs": [
+          {
+            "name": "x",
+            "width": 6
+          },
+          {
+            "name": "y",
+            "width": 6
+          }
+        ],
+        "outputs": [
+          {
+            "name": "out",
+            "width": 7,
+            "formula": "x + y"
+          }
+        ]
+      },
+      "test_cases": [
+        {
+          "inputs": [
+            0,
+            0
+          ],
+          "outputs": [
+            0
+          ]
+        },
+        {
+          "inputs": [
+            0,
+            2
+          ],
+          "outputs": [
+            2
+          ]
+        },
+        {
+          "inputs": [
+            0,
+            4
+          ],
+          "outputs": [
+            4
+          ]
+        },
+        {
+          "inputs": [
+            0,
+            7
+          ],
+          "outputs": [
+            7
+          ]
+        },
+        {
+          "inputs": [
+            0,
+            11
+          ],
+          "outputs": [
+            11
+          ]
+        },
+        {
+          "inputs": [
+            0,
+            16
+          ],
+          "outputs": [
+            16
+          ]
+        },
+        {
+          "inputs": [
+            0,
+            31
+          ],
+          "outputs": [
+            31
+          ]
+        },
+        {
+          "inputs": [
+            0,
+            47
+          ],
+          "outputs": [
+            47
+          ]
+        },
+        {
+          "inputs": [
+            1,
+            0
+          ],
+          "outputs": [
+            1
+          ]
+        },
+        {
+          "inputs": [
+            1,
+            2
+          ],
+          "outputs": [
+            3
+          ]
+        },
+        {
+          "inputs": [
+            1,
+            4
+          ],
+          "outputs": [
+            5
+          ]
+        },
+        {
+          "inputs": [
+            1,
+            7
+          ],
+          "outputs": [
+            8
+          ]
+        },
+        {
+          "inputs": [
+            1,
+            11
+          ],
+          "outputs": [
+            12
+          ]
+        },
+        {
+          "inputs": [
+            1,
+            16
+          ],
+          "outputs": [
+            17
+          ]
+        },
+        {
+          "inputs": [
+            1,
+            31
+          ],
+          "outputs": [
+            32
+          ]
+        },
+        {
+          "inputs": [
+            1,
+            47
+          ],
+          "outputs": [
+            48
+          ]
+        },
+        {
+          "inputs": [
+            2,
+            0
+          ],
+          "outputs": [
+            2
+          ]
+        },
+        {
+          "inputs": [
+            2,
+            2
+          ],
+          "outputs": [
+            4
+          ]
+        },
+        {
+          "inputs": [
+            2,
+            4
+          ],
+          "outputs": [
+            6
+          ]
+        },
+        {
+          "inputs": [
+            2,
+            7
+          ],
+          "outputs": [
+            9
+          ]
+        },
+        {
+          "inputs": [
+            2,
+            11
+          ],
+          "outputs": [
+            13
+          ]
+        },
+        {
+          "inputs": [
+            2,
+            16
+          ],
+          "outputs": [
+            18
+          ]
+        },
+        {
+          "inputs": [
+            2,
+            31
+          ],
+          "outputs": [
+            33
+          ]
+        },
+        {
+          "inputs": [
+            2,
+            47
+          ],
+          "outputs": [
+            49
+          ]
+        },
+        {
+          "inputs": [
+            3,
+            0
+          ],
+          "outputs": [
+            3
+          ]
+        },
+        {
+          "inputs": [
+            3,
+            2
+          ],
+          "outputs": [
+            5
+          ]
+        },
+        {
+          "inputs": [
+            3,
+            4
+          ],
+          "outputs": [
+            7
+          ]
+        },
+        {
+          "inputs": [
+            3,
+            7
+          ],
+          "outputs": [
+            10
+          ]
+        },
+        {
+          "inputs": [
+            3,
+            11
+          ],
+          "outputs": [
+            14
+          ]
+        },
+        {
+          "inputs": [
+            3,
+            16
+          ],
+          "outputs": [
+            19
+          ]
+        },
+        {
+          "inputs": [
+            3,
+            31
+          ],
+          "outputs": [
+            34
+          ]
+        },
+        {
+          "inputs": [
+            3,
+            47
+          ],
+          "outputs": [
+            50
+          ]
+        },
+        {
+          "inputs": [
+            4,
+            0
+          ],
+          "outputs": [
+            4
+          ]
+        },
+        {
+          "inputs": [
+            4,
+            2
+          ],
+          "outputs": [
+            6
+          ]
+        },
+        {
+          "inputs": [
+            4,
+            4
+          ],
+          "outputs": [
+            8
+          ]
+        },
+        {
+          "inputs": [
+            4,
+            7
+          ],
+          "outputs": [
+            11
+          ]
+        },
+        {
+          "inputs": [
+            4,
+            11
+          ],
+          "outputs": [
+            15
+          ]
+        },
+        {
+          "inputs": [
+            4,
+            16
+          ],
+          "outputs": [
+            20
+          ]
+        },
+        {
+          "inputs": [
+            4,
+            31
+          ],
+          "outputs": [
+            35
+          ]
+        },
+        {
+          "inputs": [
+            4,
+            47
+          ],
+          "outputs": [
+            51
+          ]
+        },
+        {
+          "inputs": [
+            5,
+            0
+          ],
+          "outputs": [
+            5
+          ]
+        },
+        {
+          "inputs": [
+            5,
+            2
+          ],
+          "outputs": [
+            7
+          ]
+        },
+        {
+          "inputs": [
+            5,
+            4
+          ],
+          "outputs": [
+            9
+          ]
+        },
+        {
+          "inputs": [
+            5,
+            7
+          ],
+          "outputs": [
+            12
+          ]
+        },
+        {
+          "inputs": [
+            5,
+            11
+          ],
+          "outputs": [
+            16
+          ]
+        },
+        {
+          "inputs": [
+            5,
+            16
+          ],
+          "outputs": [
+            21
+          ]
+        },
+        {
+          "inputs": [
+            5,
+            31
+          ],
+          "outputs": [
+            36
+          ]
+        },
+        {
+          "inputs": [
+            5,
+            47
+          ],
+          "outputs": [
+            52
+          ]
+        },
+        {
+          "inputs": [
+            7,
+            0
+          ],
+          "outputs": [
+            7
+          ]
+        },
+        {
+          "inputs": [
+            7,
+            2
+          ],
+          "outputs": [
+            9
+          ]
+        },
+        {
+          "inputs": [
+            7,
+            4
+          ],
+          "outputs": [
+            11
+          ]
+        },
+        {
+          "inputs": [
+            7,
+            7
+          ],
+          "outputs": [
+            14
+          ]
+        },
+        {
+          "inputs": [
+            7,
+            11
+          ],
+          "outputs": [
+            18
+          ]
+        },
+        {
+          "inputs": [
+            7,
+            16
+          ],
+          "outputs": [
+            23
+          ]
+        },
+        {
+          "inputs": [
+            7,
+            31
+          ],
+          "outputs": [
+            38
+          ]
+        },
+        {
+          "inputs": [
+            7,
+            47
+          ],
+          "outputs": [
+            54
+          ]
+        },
+        {
+          "inputs": [
+            8,
+            0
+          ],
+          "outputs": [
+            8
+          ]
+        },
+        {
+          "inputs": [
+            8,
+            2
+          ],
+          "outputs": [
+            10
+          ]
+        },
+        {
+          "inputs": [
+            8,
+            4
+          ],
+          "outputs": [
+            12
+          ]
+        },
+        {
+          "inputs": [
+            8,
+            7
+          ],
+          "outputs": [
+            15
+          ]
+        },
+        {
+          "inputs": [
+            8,
+            11
+          ],
+          "outputs": [
+            19
+          ]
+        },
+        {
+          "inputs": [
+            8,
+            16
+          ],
+          "outputs": [
+            24
+          ]
+        },
+        {
+          "inputs": [
+            8,
+            31
+          ],
+          "outputs": [
+            39
+          ]
+        },
+        {
+          "inputs": [
+            8,
+            47
+          ],
+          "outputs": [
+            55
+          ]
+        },
+        {
+          "inputs": [
+            11,
+            0
+          ],
+          "outputs": [
+            11
+          ]
+        },
+        {
+          "inputs": [
+            11,
+            2
+          ],
+          "outputs": [
+            13
+          ]
+        },
+        {
+          "inputs": [
+            11,
+            4
+          ],
+          "outputs": [
+            15
+          ]
+        },
+        {
+          "inputs": [
+            11,
+            7
+          ],
+          "outputs": [
+            18
+          ]
+        },
+        {
+          "inputs": [
+            11,
+            11
+          ],
+          "outputs": [
+            22
+          ]
+        },
+        {
+          "inputs": [
+            11,
+            16
+          ],
+          "outputs": [
+            27
+          ]
+        },
+        {
+          "inputs": [
+            11,
+            31
+          ],
+          "outputs": [
+            42
+          ]
+        },
+        {
+          "inputs": [
+            11,
+            47
+          ],
+          "outputs": [
+            58
+          ]
+        },
+        {
+          "inputs": [
+            15,
+            0
+          ],
+          "outputs": [
+            15
+          ]
+        },
+        {
+          "inputs": [
+            15,
+            2
+          ],
+          "outputs": [
+            17
+          ]
+        },
+        {
+          "inputs": [
+            15,
+            4
+          ],
+          "outputs": [
+            19
+          ]
+        },
+        {
+          "inputs": [
+            15,
+            7
+          ],
+          "outputs": [
+            22
+          ]
+        },
+        {
+          "inputs": [
+            15,
+            11
+          ],
+          "outputs": [
+            26
+          ]
+        },
+        {
+          "inputs": [
+            15,
+            16
+          ],
+          "outputs": [
+            31
+          ]
+        },
+        {
+          "inputs": [
+            15,
+            31
+          ],
+          "outputs": [
+            46
+          ]
+        },
+        {
+          "inputs": [
+            15,
+            47
+          ],
+          "outputs": [
+            62
+          ]
+        },
+        {
+          "inputs": [
+            16,
+            0
+          ],
+          "outputs": [
+            16
+          ]
+        },
+        {
+          "inputs": [
+            16,
+            2
+          ],
+          "outputs": [
+            18
+          ]
+        },
+        {
+          "inputs": [
+            16,
+            4
+          ],
+          "outputs": [
+            20
+          ]
+        },
+        {
+          "inputs": [
+            16,
+            7
+          ],
+          "outputs": [
+            23
+          ]
+        },
+        {
+          "inputs": [
+            16,
+            11
+          ],
+          "outputs": [
+            27
+          ]
+        },
+        {
+          "inputs": [
+            16,
+            16
+          ],
+          "outputs": [
+            32
+          ]
+        },
+        {
+          "inputs": [
+            16,
+            31
+          ],
+          "outputs": [
+            47
+          ]
+        },
+        {
+          "inputs": [
+            16,
+            47
+          ],
+          "outputs": [
+            63
+          ]
+        },
+        {
+          "inputs": [
+            23,
+            0
+          ],
+          "outputs": [
+            23
+          ]
+        },
+        {
+          "inputs": [
+            23,
+            2
+          ],
+          "outputs": [
+            25
+          ]
+        },
+        {
+          "inputs": [
+            23,
+            4
+          ],
+          "outputs": [
+            27
+          ]
+        },
+        {
+          "inputs": [
+            23,
+            7
+          ],
+          "outputs": [
+            30
+          ]
+        },
+        {
+          "inputs": [
+            23,
+            11
+          ],
+          "outputs": [
+            34
+          ]
+        },
+        {
+          "inputs": [
+            23,
+            16
+          ],
+          "outputs": [
+            39
+          ]
+        },
+        {
+          "inputs": [
+            23,
+            31
+          ],
+          "outputs": [
+            54
+          ]
+        },
+        {
+          "inputs": [
+            23,
+            47
+          ],
+          "outputs": [
+            70
+          ]
+        },
+        {
+          "inputs": [
+            31,
+            0
+          ],
+          "outputs": [
+            31
+          ]
+        },
+        {
+          "inputs": [
+            31,
+            2
+          ],
+          "outputs": [
+            33
+          ]
+        },
+        {
+          "inputs": [
+            31,
+            4
+          ],
+          "outputs": [
+            35
+          ]
+        },
+        {
+          "inputs": [
+            31,
+            7
+          ],
+          "outputs": [
+            38
+          ]
+        },
+        {
+          "inputs": [
+            31,
+            11
+          ],
+          "outputs": [
+            42
+          ]
+        },
+        {
+          "inputs": [
+            31,
+            16
+          ],
+          "outputs": [
+            47
+          ]
+        },
+        {
+          "inputs": [
+            31,
+            31
+          ],
+          "outputs": [
+            62
+          ]
+        },
+        {
+          "inputs": [
+            31,
+            47
+          ],
+          "outputs": [
+            78
+          ]
+        },
+        {
+          "inputs": [
+            32,
+            0
+          ],
+          "outputs": [
+            32
+          ]
+        },
+        {
+          "inputs": [
+            32,
+            2
+          ],
+          "outputs": [
+            34
+          ]
+        },
+        {
+          "inputs": [
+            32,
+            4
+          ],
+          "outputs": [
+            36
+          ]
+        },
+        {
+          "inputs": [
+            32,
+            7
+          ],
+          "outputs": [
+            39
+          ]
+        },
+        {
+          "inputs": [
+            32,
+            11
+          ],
+          "outputs": [
+            43
+          ]
+        },
+        {
+          "inputs": [
+            32,
+            16
+          ],
+          "outputs": [
+            48
+          ]
+        },
+        {
+          "inputs": [
+            32,
+            31
+          ],
+          "outputs": [
+            63
+          ]
+        },
+        {
+          "inputs": [
+            32,
+            47
+          ],
+          "outputs": [
+            79
+          ]
+        },
+        {
+          "inputs": [
+            47,
+            0
+          ],
+          "outputs": [
+            47
+          ]
+        },
+        {
+          "inputs": [
+            47,
+            2
+          ],
+          "outputs": [
+            49
+          ]
+        },
+        {
+          "inputs": [
+            47,
+            4
+          ],
+          "outputs": [
+            51
+          ]
+        },
+        {
+          "inputs": [
+            47,
+            7
+          ],
+          "outputs": [
+            54
+          ]
+        },
+        {
+          "inputs": [
+            47,
+            11
+          ],
+          "outputs": [
+            58
+          ]
+        },
+        {
+          "inputs": [
+            47,
+            16
+          ],
+          "outputs": [
+            63
+          ]
+        },
+        {
+          "inputs": [
+            47,
+            31
+          ],
+          "outputs": [
+            78
+          ]
+        },
+        {
+          "inputs": [
+            47,
+            47
+          ],
+          "outputs": [
+            94
+          ]
+        },
+        {
+          "inputs": [
+            63,
+            0
+          ],
+          "outputs": [
+            63
+          ]
+        },
+        {
+          "inputs": [
+            63,
+            2
+          ],
+          "outputs": [
+            65
+          ]
+        },
+        {
+          "inputs": [
+            63,
+            4
+          ],
+          "outputs": [
+            67
+          ]
+        },
+        {
+          "inputs": [
+            63,
+            7
+          ],
+          "outputs": [
+            70
+          ]
+        },
+        {
+          "inputs": [
+            63,
+            11
+          ],
+          "outputs": [
+            74
+          ]
+        },
+        {
+          "inputs": [
+            63,
+            16
+          ],
+          "outputs": [
+            79
+          ]
+        },
+        {
+          "inputs": [
+            63,
+            31
+          ],
+          "outputs": [
+            94
+          ]
+        },
+        {
+          "inputs": [
+            63,
+            47
+          ],
+          "outputs": [
+            110
+          ]
+        }
+      ]
+    },
+    {
+      "id": 12,
+      "label": "Problem 12",
+      "statement": "Design a finite-state machine brain that drives the turbot up the zig-zag course: follow the stair-stepped corridor all the way to the goal and keep going until the course offers no way on. The sensor reads the cell ahead (0 = empty, 1 = blocked); each transition outputs the two-bit motor command (11 = forward, 10 = turn right, 01 = turn left, 00 = stop).",
+      "buildMode": "turbot",
+      "representation": "binary",
+      "innerMode": "FSM",
+      "turbot_cases": [
+        {
+          "arena": {
+            "width": 9,
+            "height": 9,
+            "cells": [
+              [
+                "block",
+                "goal",
+                "block",
+                "block",
+                "block",
+                "block",
+                "block",
+                "block",
+                "block"
+              ],
+              [
+                "block",
+                "empty",
+                "block",
+                "block",
+                "block",
+                "block",
+                "block",
+                "block",
+                "block"
+              ],
+              [
+                "block",
+                "empty",
+                "empty",
+                "empty",
+                "block",
+                "block",
+                "block",
+                "block",
+                "block"
+              ],
+              [
+                "block",
+                "block",
+                "block",
+                "empty",
+                "block",
+                "block",
+                "block",
+                "block",
+                "block"
+              ],
+              [
+                "block",
+                "block",
+                "block",
+                "empty",
+                "empty",
+                "empty",
+                "block",
+                "block",
+                "block"
+              ],
+              [
+                "block",
+                "block",
+                "block",
+                "block",
+                "block",
+                "empty",
+                "block",
+                "block",
+                "block"
+              ],
+              [
+                "block",
+                "block",
+                "block",
+                "block",
+                "block",
+                "empty",
+                "empty",
+                "empty",
+                "block"
+              ],
+              [
+                "block",
+                "block",
+                "block",
+                "block",
+                "block",
+                "block",
+                "block",
+                "empty",
+                "block"
+              ],
+              [
+                "block",
+                "block",
+                "block",
+                "block",
+                "block",
+                "block",
+                "block",
+                "empty",
+                "block"
+              ]
+            ],
+            "start": {
+              "x": 7,
+              "y": 8,
+              "facing": "N"
+            }
+          },
+          "maxSteps": 60,
+          "criterion": "pass-through"
+        },
+        {
+          "arena": {
+            "width": 6,
+            "height": 6,
+            "cells": [
+              [
+                "block",
+                "goal",
+                "block",
+                "block",
+                "block",
+                "block"
+              ],
+              [
+                "block",
+                "empty",
+                "empty",
+                "block",
+                "block",
+                "block"
+              ],
+              [
+                "block",
+                "block",
+                "empty",
+                "block",
+                "block",
+                "block"
+              ],
+              [
+                "block",
+                "block",
+                "empty",
+                "empty",
+                "empty",
+                "block"
+              ],
+              [
+                "block",
+                "block",
+                "block",
+                "block",
+                "empty",
+                "block"
+              ],
+              [
+                "block",
+                "block",
+                "block",
+                "block",
+                "empty",
+                "block"
+              ]
+            ],
+            "start": {
+              "x": 4,
+              "y": 5,
+              "facing": "N"
+            }
+          },
+          "maxSteps": 40,
+          "criterion": "pass-through"
+        }
+      ]
+    },
+    {
+      "id": 13,
+      "label": "Problem 13",
+      "statement": "Three ahead: the goal lies exactly three cells straight ahead of the turbot in an open field. Design a finite-state machine brain that drives the turbot forward onto the goal and stops there. The sensor reads the cell ahead (0 = empty, 1 = blocked); each transition outputs the two-bit motor command (11 = forward, 00 = stop, 10 = turn right, 01 = turn left).",
+      "buildMode": "turbot",
+      "representation": "binary",
+      "innerMode": "FSM",
+      "turbot_cases": [
+        {
+          "arena": {
+            "width": 7,
+            "height": 6,
+            "cells": [
+              [
+                "empty",
+                "empty",
+                "empty",
+                "empty",
+                "empty",
+                "empty",
+                "empty"
+              ],
+              [
+                "empty",
+                "empty",
+                "empty",
+                "goal",
+                "empty",
+                "empty",
+                "empty"
+              ],
+              [
+                "empty",
+                "empty",
+                "empty",
+                "empty",
+                "empty",
+                "empty",
+                "empty"
+              ],
+              [
+                "empty",
+                "empty",
+                "empty",
+                "empty",
+                "empty",
+                "empty",
+                "empty"
+              ],
+              [
+                "empty",
+                "empty",
+                "empty",
+                "empty",
+                "empty",
+                "empty",
+                "empty"
+              ],
+              [
+                "empty",
+                "empty",
+                "empty",
+                "empty",
+                "empty",
+                "empty",
+                "empty"
+              ]
+            ],
+            "start": {
+              "x": 3,
+              "y": 4,
+              "facing": "N"
+            }
+          },
+          "maxSteps": 20,
+          "criterion": "reach-and-stop"
+        },
+        {
+          "arena": {
+            "width": 6,
+            "height": 3,
+            "cells": [
+              [
+                "empty",
+                "empty",
+                "empty",
+                "empty",
+                "empty",
+                "empty"
+              ],
+              [
+                "empty",
+                "empty",
+                "empty",
+                "empty",
+                "goal",
+                "empty"
+              ],
+              [
+                "empty",
+                "empty",
+                "empty",
+                "empty",
+                "empty",
+                "empty"
+              ]
+            ],
+            "start": {
+              "x": 1,
+              "y": 1,
+              "facing": "E"
+            }
+          },
+          "maxSteps": 20,
+          "criterion": "reach-and-stop"
+        }
+      ]
+    },
+    {
+      "id": 14,
+      "label": "Problem 14",
+      "statement": "Way Finder: the turbot starts at one end of a non-branching maze — a path that never branches and is never wider than one cell across, except on corners where two one-cell-wide paths may intersect. Design a finite-state machine brain that makes its way all the way through any such maze: the layout is not known in advance, so the brain must feel its way with its sensor. Navigation is completed the moment the turbot crosses the goal cell near the far end — it does not need to stop on the goal, and may come to rest once the path finally runs out.",
+      "buildMode": "turbot",
+      "representation": "binary",
+      "innerMode": "FSM",
+      "turbot_cases": [
+        {
+          "arena": {
+            "width": 7,
+            "height": 7,
+            "cells": [
+              [
+                "block",
+                "block",
+                "block",
+                "block",
+                "block",
+                "block",
+                "block"
+              ],
+              [
+                "block",
+                "empty",
+                "empty",
+                "empty",
+                "block",
+                "block",
+                "block"
+              ],
+              [
+                "block",
+                "block",
+                "block",
+                "empty",
+                "block",
+                "block",
+                "block"
+              ],
+              [
+                "block",
+                "block",
+                "block",
+                "empty",
+                "empty",
+                "goal",
+                "block"
+              ],
+              [
+                "block",
+                "block",
+                "block",
+                "block",
+                "block",
+                "empty",
+                "block"
+              ],
+              [
+                "block",
+                "block",
+                "block",
+                "block",
+                "block",
+                "empty",
+                "block"
+              ],
+              [
+                "block",
+                "block",
+                "block",
+                "block",
+                "block",
+                "block",
+                "block"
+              ]
+            ],
+            "start": {
+              "x": 1,
+              "y": 1,
+              "facing": "E"
+            }
+          },
+          "maxSteps": 60,
+          "criterion": "pass-through"
+        },
+        {
+          "arena": {
+            "width": 9,
+            "height": 6,
+            "cells": [
+              [
+                "block",
+                "block",
+                "block",
+                "block",
+                "block",
+                "block",
+                "block",
+                "block",
+                "block"
+              ],
+              [
+                "block",
+                "empty",
+                "empty",
+                "empty",
+                "empty",
+                "block",
+                "block",
+                "block",
+                "block"
+              ],
+              [
+                "block",
+                "block",
+                "block",
+                "block",
+                "empty",
+                "block",
+                "block",
+                "block",
+                "block"
+              ],
+              [
+                "block",
+                "block",
+                "block",
+                "block",
+                "empty",
+                "block",
+                "block",
+                "block",
+                "block"
+              ],
+              [
+                "block",
+                "block",
+                "block",
+                "block",
+                "empty",
+                "goal",
+                "empty",
+                "empty",
+                "block"
+              ],
+              [
+                "block",
+                "block",
+                "block",
+                "block",
+                "block",
+                "block",
+                "block",
+                "block",
+                "block"
+              ]
+            ],
+            "start": {
+              "x": 1,
+              "y": 1,
+              "facing": "E"
+            }
+          },
+          "maxSteps": 60,
+          "criterion": "pass-through"
+        },
+        {
+          "arena": {
+            "width": 11,
+            "height": 6,
+            "cells": [
+              [
+                "block",
+                "block",
+                "block",
+                "block",
+                "block",
+                "block",
+                "block",
+                "block",
+                "block",
+                "block",
+                "block"
+              ],
+              [
+                "block",
+                "empty",
+                "block",
+                "block",
+                "block",
+                "block",
+                "block",
+                "block",
+                "block",
+                "block",
+                "block"
+              ],
+              [
+                "block",
+                "empty",
+                "block",
+                "empty",
+                "empty",
+                "empty",
+                "empty",
+                "block",
+                "empty",
+                "empty",
+                "block"
+              ],
+              [
+                "block",
+                "empty",
+                "block",
+                "empty",
+                "block",
+                "block",
+                "empty",
+                "block",
+                "goal",
+                "block",
+                "block"
+              ],
+              [
+                "block",
+                "empty",
+                "empty",
+                "empty",
+                "block",
+                "block",
+                "empty",
+                "empty",
+                "empty",
+                "block",
+                "block"
+              ],
+              [
+                "block",
+                "block",
+                "block",
+                "block",
+                "block",
+                "block",
+                "block",
+                "block",
+                "block",
+                "block",
+                "block"
+              ]
+            ],
+            "start": {
+              "x": 1,
+              "y": 1,
+              "facing": "S"
+            }
+          },
+          "maxSteps": 80,
+          "criterion": "pass-through"
+        }
+      ]
+    }
+  ]
+}

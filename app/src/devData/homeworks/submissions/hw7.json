@@ -1,0 +1,38 @@
+[
+  {
+    "assignmentTitle": "HW7. Final Project",
+    "student": "alice.chen@example.com",
+    "submittedAt": "2026-07-12T12:00:00.000Z",
+    "answers": [
+      {
+        "questionId": 1,
+        "circuit": {
+          "components": [],
+          "wires": []
+        },
+        "responseText": "Theme: Levels of power. This essay will explain computational power through the four machine classes built in this course — logic gates and CCs, SCs, FSMs, and Turing Machines — showing for each level a function it can compute that the level below cannot (XOR for gates, delay for SCs, unbounded tally successor for TMs), relating each jump to its physical difference in memory, and arguing that this hierarchy makes the Computational Theory of Mind concrete: representation as encoding, computation as mechanical evaluation, algorithm as machine table. (Demo submission — an outline standing in for the full essay.)"
+      }
+    ]
+  },
+  {
+    "assignmentTitle": "HW7. Final Project",
+    "student": "bob.okafor@example.com",
+    "submittedAt": "2026-07-12T12:00:00.000Z",
+    "answers": [
+      {
+        "questionId": 1,
+        "circuit": {
+          "components": [],
+          "wires": []
+        },
+        "responseText": "I ran out of time here, but my guess is yes — it seems like it should be possible."
+      }
+    ]
+  },
+  {
+    "assignmentTitle": "HW7. Final Project",
+    "student": "carol.reyes@example.com",
+    "submittedAt": "2026-07-12T12:00:00.000Z",
+    "answers": []
+  }
+]

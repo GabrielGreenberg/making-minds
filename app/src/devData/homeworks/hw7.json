@@ -1,0 +1,13 @@
+{
+  "id": "hw7",
+  "title": "HW7. Final Project",
+  "questions": [
+    {
+      "id": 1,
+      "label": "Problem 1",
+      "statement": "Final Project essay. Write an essay (6–10 pages, ~1.5 spaced) that connects the subject matter of this class to a particular philosophical or scientific theme of your choice. The assignment should be a roughly equal mix of prose and diagrams; be sure to explain your diagrams in the text (the Petzold readings are a good model). Your paper must address the relationship between your theme and the Computational Theory of Mind, and at some point should address: What are the key claims of the Computational Theory of Mind? How should we understand the concepts of representation, computation, and algorithm? Is the Computational Theory of Mind plausible — is the computational approach the right one to explain how physical cognition is possible? Whenever possible, illustrate your ideas with specific examples. Possible themes (see the HW7 handout for details): (1) a topic of your choosing from cognitive science or philosophy; (2) Letter to Leibniz; (3) The Long View — summarize the whole class, from logic gates and functions to UTM; (4) Lessons Learned — the 3 most important lessons about computation and the 3 most important about the philosophy of mind, and how they relate; (5) Levels of abstraction; (6) Levels of power; (7) Navigation — an interesting navigation problem beyond dead reckoning, solved in outline and as a state diagram; (8) Universal Turing Machine — a detailed design for a UTM.",
+      "buildMode": "open",
+      "representation": "binary"
+    }
+  ]
+}
