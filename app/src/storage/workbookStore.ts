@@ -27,7 +27,7 @@ export interface WorkbookStore {
 
 /** Fresh, empty canvas state for one question. */
 export function emptyQuestionCircuit(): QuestionCircuit {
-  return { components: [], wires: [], textElements: [], comments: [], boxes: [] };
+  return { components: [], wires: [], textElements: [], comments: [], boxes: [], confirmedBoxes: [] };
 }
 
 /**

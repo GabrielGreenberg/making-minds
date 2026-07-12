@@ -292,6 +292,8 @@ export interface QuestionCircuit {
   textElements: TextElement[];
   comments: CommentElement[];
   boxes: BoxDefinition[];
+  /** Confirmed boxes available in this question's palette (absent in pre-existing saves = none). */
+  confirmedBoxes?: ConfirmedBoxDef[];
   responseText?: string;
 }
 
@@ -312,6 +314,8 @@ export interface WorksheetData {
   textElements: TextElement[];
   comments: CommentElement[];
   boxes: BoxDefinition[];
+  /** Confirmed boxes available in this worksheet's palette (absent in pre-existing saves = none). */
+  confirmedBoxes?: ConfirmedBoxDef[];
   /** Turbot worksheets only: which machine kind the brain circuit is. */
   innerMode?: BuildMode;
   /** Turbot worksheets only: the sandbox arena the Map runs the brain in. */
@@ -365,6 +369,19 @@ export interface CommentElement {
 }
 
 // ─── Boxing (redesigned) ────────────────────────────────────────
+
+/** A confirmed box in a canvas's palette: the frozen internal circuit an
+ *  instance is stamped from. Scoped to ONE canvas (question or sandbox tab)
+ *  and persisted alongside its `boxes` — never shared across canvases. */
+export interface ConfirmedBoxDef {
+  id: string; // same id as the BoxDefinition it was confirmed from
+  name: string;
+  kind?: 'CC' | 'FSM'; // absent = CC (older entries)
+  inputPortIds: string[];
+  outputPortIds: string[];
+  internalComponents: CircuitComponent[];
+  internalWires: Wire[];
+}
 
 export interface BoxDefinition {
   id: string;
