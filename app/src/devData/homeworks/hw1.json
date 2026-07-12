@@ -1,0 +1,519 @@
+{
+  "id": "hw1",
+  "title": "HW1. Basics: Circuits, Functions, and Representations",
+  "questions": [
+    {
+      "id": 1,
+      "label": "Problem 1",
+      "statement": "Build a combinatorial circuit computing OUT1 = NAND(IN1, IN2): the output is 1 unless both inputs are 1.",
+      "buildMode": "CC",
+      "representation": "binary",
+      "cc_spec": {
+        "inputs": [
+          {
+            "name": "a",
+            "width": 1,
+            "max_value": 1
+          },
+          {
+            "name": "b",
+            "width": 1,
+            "max_value": 1
+          }
+        ],
+        "outputs": [
+          {
+            "name": "y",
+            "width": 1,
+            "formula": "1 - (a & b)"
+          }
+        ]
+      },
+      "test_cases": [
+        {
+          "inputs": [
+            0,
+            0
+          ],
+          "outputs": [
+            1
+          ]
+        },
+        {
+          "inputs": [
+            0,
+            1
+          ],
+          "outputs": [
+            1
+          ]
+        },
+        {
+          "inputs": [
+            1,
+            0
+          ],
+          "outputs": [
+            1
+          ]
+        },
+        {
+          "inputs": [
+            1,
+            1
+          ],
+          "outputs": [
+            0
+          ]
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "label": "Problem 2",
+      "statement": "Reconstructing OR. Design a combinatorial circuit with the following input-output profile: IN1=0,IN2=0 -> OUT=0; IN1=0,IN2=1 -> OUT=1; IN1=1,IN2=0 -> OUT=1; IN1=1,IN2=1 -> OUT=1. For this problem, do not use OR-gates. DeMorgan's Law is useful here!",
+      "buildMode": "CC",
+      "representation": "binary",
+      "allowed_components": [
+        "INPUT",
+        "OUTPUT",
+        "NOT",
+        "AND"
+      ],
+      "cc_spec": {
+        "inputs": [
+          {
+            "name": "x",
+            "width": 1,
+            "max_value": 1
+          },
+          {
+            "name": "y",
+            "width": 1,
+            "max_value": 1
+          }
+        ],
+        "outputs": [
+          {
+            "name": "out",
+            "width": 1,
+            "formula": "x | y"
+          }
+        ]
+      },
+      "test_cases": [
+        {
+          "inputs": [
+            0,
+            0
+          ],
+          "outputs": [
+            0
+          ]
+        },
+        {
+          "inputs": [
+            0,
+            1
+          ],
+          "outputs": [
+            1
+          ]
+        },
+        {
+          "inputs": [
+            1,
+            0
+          ],
+          "outputs": [
+            1
+          ]
+        },
+        {
+          "inputs": [
+            1,
+            1
+          ],
+          "outputs": [
+            1
+          ]
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "label": "Problem 3",
+      "statement": "Splitting outputs. Design a combinatorial circuit with two inputs and two outputs, with the following input-output profile: IN1=0,IN2=0 -> OUT1=0,OUT2=1; IN1=0,IN2=1 -> OUT1=0,OUT2=1; IN1=1,IN2=0 -> OUT1=0,OUT2=1; IN1=1,IN2=1 -> OUT1=1,OUT2=0.",
+      "buildMode": "CC",
+      "representation": "binary",
+      "cc_spec": {
+        "inputs": [
+          {
+            "name": "x",
+            "width": 1,
+            "max_value": 1
+          },
+          {
+            "name": "y",
+            "width": 1,
+            "max_value": 1
+          }
+        ],
+        "outputs": [
+          {
+            "name": "OUT1",
+            "width": 1,
+            "formula": "x & y"
+          },
+          {
+            "name": "OUT2",
+            "width": 1,
+            "formula": "(x & y) ^ 1"
+          }
+        ]
+      },
+      "test_cases": [
+        {
+          "inputs": [
+            0,
+            0
+          ],
+          "outputs": [
+            0,
+            1
+          ]
+        },
+        {
+          "inputs": [
+            0,
+            1
+          ],
+          "outputs": [
+            0,
+            1
+          ]
+        },
+        {
+          "inputs": [
+            1,
+            0
+          ],
+          "outputs": [
+            0,
+            1
+          ]
+        },
+        {
+          "inputs": [
+            1,
+            1
+          ],
+          "outputs": [
+            1,
+            0
+          ]
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "label": "Problem 4",
+      "statement": "XOR (exclusive OR). Design a combinatorial circuit with the following input-output profile: IN1=0,IN2=0 -> OUT=0; IN1=0,IN2=1 -> OUT=1; IN1=1,IN2=0 -> OUT=1; IN1=1,IN2=1 -> OUT=0.",
+      "buildMode": "CC",
+      "representation": "binary",
+      "allowed_components": [
+        "INPUT",
+        "OUTPUT",
+        "NOT",
+        "AND",
+        "OR"
+      ],
+      "cc_spec": {
+        "inputs": [
+          {
+            "name": "x",
+            "width": 1,
+            "max_value": 1
+          },
+          {
+            "name": "y",
+            "width": 1,
+            "max_value": 1
+          }
+        ],
+        "outputs": [
+          {
+            "name": "f",
+            "width": 1,
+            "formula": "x ^ y"
+          }
+        ]
+      },
+      "test_cases": [
+        {
+          "inputs": [
+            0,
+            0
+          ],
+          "outputs": [
+            0
+          ]
+        },
+        {
+          "inputs": [
+            0,
+            1
+          ],
+          "outputs": [
+            1
+          ]
+        },
+        {
+          "inputs": [
+            1,
+            0
+          ],
+          "outputs": [
+            1
+          ]
+        },
+        {
+          "inputs": [
+            1,
+            1
+          ],
+          "outputs": [
+            0
+          ]
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "label": "Problem 5",
+      "statement": "Combining circuits. Design a combinatorial circuit with two inputs and two outputs, with the following input-output profile: IN1=0,IN2=0 -> OUT1=0,OUT2=0; IN1=0,IN2=1 -> OUT1=1,OUT2=0; IN1=1,IN2=0 -> OUT1=1,OUT2=0; IN1=1,IN2=1 -> OUT1=0,OUT2=1.",
+      "buildMode": "CC",
+      "representation": "binary",
+      "cc_spec": {
+        "inputs": [
+          {
+            "name": "x",
+            "width": 1,
+            "max_value": 1
+          },
+          {
+            "name": "y",
+            "width": 1,
+            "max_value": 1
+          }
+        ],
+        "outputs": [
+          {
+            "name": "sum",
+            "width": 1,
+            "formula": "x ^ y"
+          },
+          {
+            "name": "carry",
+            "width": 1,
+            "formula": "x & y"
+          }
+        ]
+      },
+      "test_cases": [
+        {
+          "inputs": [
+            0,
+            0
+          ],
+          "outputs": [
+            0,
+            0
+          ]
+        },
+        {
+          "inputs": [
+            0,
+            1
+          ],
+          "outputs": [
+            1,
+            0
+          ]
+        },
+        {
+          "inputs": [
+            1,
+            0
+          ],
+          "outputs": [
+            1,
+            0
+          ]
+        },
+        {
+          "inputs": [
+            1,
+            1
+          ],
+          "outputs": [
+            0,
+            1
+          ]
+        }
+      ]
+    },
+    {
+      "id": 6,
+      "label": "Problem 6",
+      "statement": "Consider the function m(⋅) defined by the following equation: for any integers x, y, and z: m(x, y, z) = 3 + (x • y • z). (a) Describe the function with an English sentence using each of the terms \"argument\", \"value\", \"apply\", and \"return\" correctly. (b) Describe the function with another English sentence using the phrase \"maps ... to\". (c) How many places does this function have?",
+      "buildMode": "open",
+      "representation": "binary"
+    },
+    {
+      "id": 7,
+      "label": "Problem 7",
+      "statement": "Consider the function k(⋅) that takes two integers x and y as arguments, and returns the successor of their product as its value. Define this function with an equation.",
+      "buildMode": "open",
+      "representation": "binary"
+    },
+    {
+      "id": 8,
+      "label": "Problem 8",
+      "statement": "This is a problem about function composition. Let s(⋅) be the successor function. Let a(⋅) be the addition function. Suppose that p() is a 2-place function composed of successor functions and addition functions. Given that p(1, 2) = 5, provide two possible definitions of p().",
+      "buildMode": "open",
+      "representation": "binary"
+    },
+    {
+      "id": 9,
+      "label": "Problem 9",
+      "statement": "Consider the function j( ) that maps two integers x and y to their product, so long as both x and y are equal to or greater than 0, and equal to or less than two. For any other arguments, it is undefined. (a) Define j(⋅) with an equation. (b) Define j(⋅) with a table. This is a problem about partial functions.",
+      "buildMode": "open",
+      "representation": "binary"
+    },
+    {
+      "id": 10,
+      "label": "Problem 10",
+      "statement": "The Boolean numbers are 0 and 1, where 0 and 1 are considered to be the \"opposites\" of one another. A Boolean function is a function which has only Boolean numbers as arguments and values. (a) Using one equation, define a Boolean function which maps any Boolean number to its opposite. (b) Provide two different definitions of the Boolean function which maps any Boolean number to itself. This is called the identity function. (c) Provide two different definitions of the Boolean function which maps any Boolean number to the number one. This is called a constant function.",
+      "buildMode": "open",
+      "representation": "binary"
+    },
+    {
+      "id": 11,
+      "label": "Problem 11",
+      "statement": "Represent the numbers zero through ten in binary.",
+      "buildMode": "open",
+      "representation": "binary"
+    },
+    {
+      "id": 12,
+      "label": "Problem 12",
+      "statement": "Invent a new base-6 counting system, with all new symbols for the 6 digits (including zero!). List your basic symbols and their meanings. Then represent the number thirty-two in this system.",
+      "buildMode": "open",
+      "representation": "binary"
+    },
+    {
+      "id": 13,
+      "label": "Problem 13",
+      "statement": "(a) Add the binary number 1111 to the binary number 1. (b) Add the binary number 1011 to the binary number 11001. Use one of the methods of addition from the Petzold reading; show your work!",
+      "buildMode": "open",
+      "representation": "binary"
+    },
+    {
+      "id": 14,
+      "label": "Problem 14",
+      "statement": "Define a function f which maps the symbol \"○\" to the number zero and the symbol \"●\" to the number one. Use a table or an equation.",
+      "buildMode": "open",
+      "representation": "binary"
+    },
+    {
+      "id": 15,
+      "label": "Problem 15",
+      "statement": "Suppose we use the symbols in Problem 14 to form a base-2 counting system. Let’s call these symbols \"dots\". A dot can be black or white. Using an equation, define a 3-place function g which takes any three dots in a row and maps them onto the numerical value of that string of dots in that base-2 system. You will have to use the function in Problem 14 as part of the definition. So, for example, your function should predict that g(○, ○, ●) = one and g(○, ●, ○) = two, and so on. Your answer should take the form: \"for any series of three dots x, y, z: g(x, y, z) = …\".",
+      "buildMode": "open",
+      "representation": "binary"
+    },
+    {
+      "id": 16,
+      "label": "Problem 16",
+      "statement": "Let tal(.) be a function which maps strings of tally 1's and 0's to their numerical values (tal(0)=zero, tal(1)=one, tal(00)=zero, tal(01)=one, tal(11)=two, and so on). Consider a machine M which, on any one occasion, takes as input a single atomic symbol I, and produces two atomic symbols as output, O1 and O2, such that, in any context, successor(tal(I)) = tal(O1O2). Design a combinatorial circuit for machine M (schematic: I -> [M] -> O1, O2).",
+      "buildMode": "CC",
+      "representation": "tally",
+      "cc_spec": {
+        "inputs": [
+          {
+            "name": "x",
+            "width": 1,
+            "max_value": 1
+          }
+        ],
+        "outputs": [
+          {
+            "name": "y",
+            "width": 2,
+            "formula": "x + 1"
+          }
+        ]
+      },
+      "test_cases": [
+        {
+          "inputs": [
+            0
+          ],
+          "outputs": [
+            1
+          ]
+        },
+        {
+          "inputs": [
+            1
+          ],
+          "outputs": [
+            2
+          ]
+        }
+      ]
+    },
+    {
+      "id": 17,
+      "label": "Problem 17",
+      "statement": "Let bin(.) be a function which maps strings of binary 1's and 0's to their numerical values (bin(0)=zero, bin(1)=one, bin(00)=zero, bin(01)=one, bin(10)=two, bin(11)=three, and so on). Consider a machine N which, on any one occasion, takes as input a single atomic symbol I, and produces two atomic symbols as output, O1 and O2, such that, in any context, successor(bin(I)) = bin(O1O2). Design a combinatorial circuit for machine N (schematic: I -> [N] -> O1, O2).",
+      "buildMode": "CC",
+      "representation": "binary",
+      "cc_spec": {
+        "inputs": [
+          {
+            "name": "x",
+            "width": 1,
+            "max_value": 1
+          }
+        ],
+        "outputs": [
+          {
+            "name": "y",
+            "width": 2,
+            "formula": "x + 1"
+          }
+        ]
+      },
+      "test_cases": [
+        {
+          "inputs": [
+            0
+          ],
+          "outputs": [
+            1
+          ]
+        },
+        {
+          "inputs": [
+            1
+          ],
+          "outputs": [
+            2
+          ]
+        }
+      ]
+    }
+  ]
+}

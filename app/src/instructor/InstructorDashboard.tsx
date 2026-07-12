@@ -8,6 +8,7 @@ import { assignmentStore, submissionStore, backendMode } from '../storage/backen
 import { downloadJson } from '../download';
 import { navigate } from '../routing';
 import { seedSampleData } from '../devData/seed';
+import { seedHomeworks } from '../devData/homeworks';
 import { useAsyncValue } from '../useAsyncValue';
 
 /**
@@ -59,6 +60,20 @@ export function InstructorDashboard() {
     );
   };
 
+  const handleSeedHomeworks = async () => {
+    const { seeded, skipped, submissionCount } = await seedHomeworks();
+    reload();
+    window.alert(
+      (seeded.length
+        ? `Loaded ${seeded.length} homework assignment${seeded.length === 1 ? '' : 's'} (${seeded.join(', ')})`
+        : 'All homework assignments already exist — none reloaded') +
+        ` and reseeded ${submissionCount} autograded sample submissions.` +
+        (skipped.length
+          ? ` Skipped ${skipped.join(', ')} (already present; delete one first to restore its pristine copy).`
+          : ''),
+    );
+  };
+
   return (
     <div className="instructor-dashboard">
       <div className="instructor-page-head">
@@ -67,6 +82,11 @@ export function InstructorDashboard() {
           {backendMode === 'local' && (
             <button className="instructor-btn" onClick={() => void handleSeed()} title="Dev: seed a sample assignment and autograded submissions">
               Load sample data
+            </button>
+          )}
+          {backendMode === 'local' && (
+            <button className="instructor-btn" onClick={() => void handleSeedHomeworks()} title="Load the real PHIL 133 homeworks (HW1–HW7) as editable assignments; existing copies are never overwritten">
+              Load HW1–HW7
             </button>
           )}
           <button className="instructor-btn instructor-btn--primary" onClick={() => void handleNew()}>

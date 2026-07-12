@@ -14,7 +14,26 @@ Claude to load into context).
 >
 > A change isn't finished until the docs that describe it are too.
 
-_Last updated: 2026-07-08 (**P6.4 — the Remote-store cutover, S1–S4 COMPLETE** — the frontend
+_Last updated: 2026-07-12 (**HW1–HW7 shipped as seedable, editable assignments** — the seven
+real PHIL 133 homeworks now exist as `AssignmentData` JSON (`app/src/devData/homeworks/hw{1..7}.json`,
+84 questions total): the 56 machine-buildable problems reuse the reference fixtures' hand-verified
+question objects verbatim (same statements/specs/test banks the coverage harness pins), and the 28
+prose problems (HW1 functions/representations, the impossibility/reflection paragraphs, HW5
+algorithmic-design, HW6 flow-chart/life-cycle, the HW7 final-project essay) are transcribed from
+the PDFs as open questions. The PDFs' unnumbered challenge problems are deliberately omitted;
+HW4 P1–P2 reference circuit diagrams that exist only in the PDF, so their statements describe the
+drawn machines in words and point at the handout. Instructor dashboard gains a local-mode
+"Load HW1–HW7" button → `seedHomeworks()` (`devData/homeworks.ts`): FILL-EMPTY per assignment
+(existing ids skipped, instructor edits never clobbered — the seeded copies live in the ordinary
+instructor store, fully editable), plus 22 sample submissions (3 artificial students per HW —
+all-correct with written open answers, fixture-broken, and a half-answering partial; HW1 carries a
+two-attempt history) cleared + resubmitted through `localSubmissionStore.submit` on every seed so
+the gradebook always shows real autogrades. Verified headlessly: every machine question grades its
+fixture's correct circuit through the real `gradeQuestion` (partial scores only where the fixture
+bank is the known honest interface-tier attempt: hw2-p15 0/2, hw3-p15 1/3, hw6-p2 1/3), and the
+full seed→autograde→reseed flow runs through the real stores (~1.15 MB localStorage). Remaining to
+product: deploy, UCLA SSO, and server-side seeding of these homeworks for remote mode. Earlier
+2026-07-08: **P6.4 — the Remote-store cutover, S1–S4 COMPLETE** — the frontend
 now runs against the API server whenever it is built with `VITE_API_BASE` (remote mode) and
 stays byte-identical localStorage-only without it (local mode — still the default, the dev
 environment, and what the headless harness drives). The whole switch is ONE decision point:
@@ -622,9 +641,11 @@ noted:
   pins). Deployment recipes for Lightsail + Cloudflare Pages sit in `deploy/`.
   See `server/README.md`.
 
-What's missing is the **deployment** (waiting on the UCLA AWS account), **UCLA SSO** (a
-server-side `AuthProvider` swap; the client flow is done), and **real assignment content**
-(HW1–HW7).
+What's missing is the **deployment** (waiting on the UCLA AWS account) and **UCLA SSO** (a
+server-side `AuthProvider` swap; the client flow is done). **Real assignment content is in**:
+HW1–HW7 ship as seedable JSON (dashboard "Load HW1–HW7", local mode) — machine problems from
+the reference fixtures, prose problems as open questions; remote mode still needs them seeded
+server-side.
 
 ## What's next
 
@@ -687,7 +708,12 @@ server-side `AuthProvider` swap; the client flow is done), and **real assignment
 - **Real auth** — implement the `SsoAuthProvider` in `server/src/auth.ts` once UCLA SSO
   details exist; roles from the token. Roster ingestion in `server/src/seed.ts`. The client
   flow (AuthGate/HealthGate/login) is done and unchanged by that swap.
-- **Real assignment content** — author the actual PHIL 133 homeworks (HW1–HW7).
+- **Real assignment content — DONE for local mode (2026-07-12).** HW1–HW7 live in
+  `app/src/devData/homeworks/` (assignments + sample submissions), seeded via the dashboard's
+  "Load HW1–HW7" (fill-empty; editable in the assignment editor like any instructor-authored
+  assignment). Remaining: seed them into the SERVER for remote mode (e.g. extend
+  `server/src/seed.ts` to ingest the same JSON), and Gabriel's content review of the transcribed
+  open-question statements (esp. HW4 P1–P2, whose PDF diagrams are described in words).
 
 ---
 
