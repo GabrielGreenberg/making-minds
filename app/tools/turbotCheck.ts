@@ -14,6 +14,8 @@ import type {
   ArenaConfig,
   AssignmentData,
   SubmissionData,
+  TurbotHistoryEntry,
+  TurbotOrientation,
 } from '../src/types';
 import { getPortsForType } from '../src/types';
 import {
@@ -22,6 +24,7 @@ import {
   validateTurbotTM,
   validateTurbotFSM,
   TURBOT_FORWARD,
+  type TurbotRunResult,
 } from '../src/engine/turbot';
 import { gradeSubmission, summarizeResult } from '../src/engine/grader';
 import { gradeSubmissions } from '../src/instructor/Gradebook';
@@ -859,6 +862,111 @@ console.log('\n[failure reasons name the criterion]');
   const cleanPass = gradeOne(fsmForwardBrain(), corridor(4, 3), 'reach-and-stop');
   check('a cleanly passing case carries no reason',
     cleanPass.pass === true && cleanPass.reason === undefined);
+}
+
+// ── trajectory & orientation independence ────────────────────────────
+// Grading judges WHERE the turbot went (goal visited; where it came to
+// rest), never HOW: the path taken and the facing — final or at any point
+// of the trace — must not affect any criterion. Pinned two ways: the
+// criterion function judged on hand-built runs that differ ONLY in facing
+// or route, and an end-to-end grader run whose brain spins in place on the
+// goal before stopping (final facing ≠ arrival facing ≠ start facing).
+console.log('\n[trajectory & orientation independence]');
+{
+  const mkRun = (
+    final: { x: number; y: number; facing: TurbotOrientation },
+    trace: Array<[number, number]>,
+    opts: { stopped?: boolean; hitStepLimit?: boolean; facings?: TurbotOrientation[] } = {}
+  ): TurbotRunResult => ({
+    finalState: final,
+    history: trace.map(([x, y], i): TurbotHistoryEntry => ({
+      t: i + 1, kind: 'external', input: '0', action: 'forward',
+      x, y, facing: opts.facings?.[i] ?? 'E',
+    })),
+    haltedByMotor: opts.stopped ?? true,
+    haltedByBrain: false,
+    stopped: opts.stopped ?? true,
+    hitStepLimit: opts.hitStepLimit ?? false,
+  });
+
+  // reach-and-stop: identical rest position, every possible final facing.
+  const rasArena = corridor(3, 2);
+  const facings: TurbotOrientation[] = ['N', 'E', 'S', 'W'];
+  check('reach-and-stop passes with ANY final facing (N/E/S/W all equal)',
+    facings.every((f) =>
+      evaluateTurbotCriterion(rasArena, mkRun({ x: 2, y: 0, facing: f }, [[1, 0], [2, 0]]), 'reach-and-stop')));
+
+  // reach-and-stop: a roundabout route (overshoot-free here — corridor is
+  // 1-D, so wander = extra back-and-forth cells) grades the same as the
+  // direct one; only the rest position matters.
+  const direct = mkRun({ x: 2, y: 0, facing: 'E' }, [[1, 0], [2, 0]]);
+  const wander = mkRun({ x: 2, y: 0, facing: 'W' }, [[1, 0], [0, 0], [1, 0], [2, 0]],
+    { facings: ['E', 'W', 'E', 'E'] });
+  check('reach-and-stop: direct and roundabout routes to the same rest cell both pass',
+    evaluateTurbotCriterion(rasArena, direct, 'reach-and-stop') &&
+    evaluateTurbotCriterion(rasArena, wander, 'reach-and-stop'));
+
+  // pass-through: the goal appearing ANYWHERE in the trace suffices — the
+  // run may end far away, facing anywhere, truncated by the step limit.
+  const ptCross = mkRun({ x: 0, y: 0, facing: 'S' }, [[1, 0], [2, 0], [1, 0], [0, 0]],
+    { stopped: false, hitStepLimit: true });
+  const ptMiss = mkRun({ x: 1, y: 0, facing: 'E' }, [[1, 0], [0, 0], [1, 0]],
+    { stopped: false, hitStepLimit: true });
+  check('pass-through passes on a mid-trace goal crossing (ends elsewhere, any facing)',
+    evaluateTurbotCriterion(rasArena, ptCross, 'pass-through'));
+  check('pass-through fails the same-shaped run whose trace skipped the goal',
+    !evaluateTurbotCriterion(rasArena, ptMiss, 'pass-through'));
+
+  // return-to-start: home is a POSITION, not a pose — ending with a facing
+  // different from the start facing (corridor starts facing E) still passes,
+  // and the goal-visit clause reads the trace positions only.
+  const homeTurned = mkRun({ x: 0, y: 0, facing: 'W' }, [[1, 0], [2, 0], [1, 0], [0, 0]]);
+  check('return-to-start passes when home with a final facing ≠ start facing',
+    evaluateTurbotCriterion(rasArena, homeTurned, 'return-to-start'));
+
+  // End-to-end: an FSM brain that drives to the goal, then TURNS IN PLACE
+  // twice before stopping — trajectory gains two in-place turns and the
+  // final facing (W) differs from both the start and arrival facing (E).
+  const spinStopBrain = (): { components: CircuitComponent[]; wires: Wire[] } => {
+    const st = (id: string, label: string): CircuitComponent =>
+      ({ id, type: 'STATE', x: 0, y: 0, label, ports: getPortsForType('STATE') });
+    const tr = (id: string, from: string, to: string, label: string): Wire =>
+      ({ id, sourceComponentId: from, sourcePortId: 'right', targetComponentId: to, targetPortId: 'left', value: 0, transitionLabel: label });
+    return {
+      components: [st('s0', 'S₀'), st('s1', 'S₁'), st('s2', 'S₂')],
+      wires: [
+        tr('t1', 's0', 's0', '0:11'), // clear → forward
+        tr('t2', 's0', 's1', '1:01'), // blocked (past the goal) → turn left
+        tr('t3', 's1', 's2', '0:01'), // turn left again…
+        tr('t4', 's1', 's2', '1:01'),
+        tr('t5', 's2', 's2', '0:00'), // …then stop
+        tr('t6', 's2', 's2', '1:00'),
+      ],
+    };
+  };
+  const spinAssignment: AssignmentData = {
+    id: 'spin-smoke',
+    title: 'Spin smoke',
+    questions: [{
+      id: 1,
+      label: 'Q1 (spin-then-stop)',
+      statement: 'Final orientation must not matter.',
+      buildMode: 'turbot',
+      innerMode: 'FSM',
+      representation: 'binary',
+      turbot_cases: [{ arena: corridor(3, 2), maxSteps: 20, criterion: 'reach-and-stop' }],
+    }],
+  };
+  const spinResult = gradeSubmission(spinAssignment, {
+    assignmentTitle: spinAssignment.title,
+    student: 'spin@example.com',
+    submittedAt: '2026-07-19T00:00:00Z',
+    answers: [{ questionId: 1, circuit: spinStopBrain() }],
+  }).questions[0].turbotCases![0];
+  check('grader: spin-in-place-then-stop on the goal passes reach-and-stop end-to-end',
+    spinResult.pass === true && spinResult.reason === undefined);
+  check('grader: the spun run really ended facing away from its start facing',
+    spinResult.finalPosition.facing !== corridor(3, 2).start.facing);
 }
 
 console.log(`\n${failures === 0 ? 'TURBOT CHECK OK' : `TURBOT CHECK FAILED (${failures} checks)`}`);
