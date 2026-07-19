@@ -1366,6 +1366,32 @@ thead .sc-label-col {
   white-space: nowrap;
 }
 
+/* Due-date badge on an assignment card: green while comfortably out, amber
+   within 3 days, red once overdue (see dueDates.ts). */
+.home-due {
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.home-due--due-later {
+  color: #2e7d32;
+}
+
+.home-due--due-soon {
+  color: #b8860b;
+}
+
+.home-due--overdue {
+  color: #c62828;
+}
+
+/* "late by …" marker beside a submitted-after-the-deadline status. */
+.home-late {
+  color: #c62828;
+  font-weight: 600;
+}
+
 .home-tile-footer {
   display: flex;
   align-items: center;
@@ -1602,6 +1628,7 @@ thead .sc-label-col {
 /* Gradebook: per-student rows and expanded submission history */
 .instructor-expand-caret { color: var(--text-secondary); font-size: 10px; margin-right: 2px; }
 .instructor-latest-tag { color: var(--text-secondary); font-size: 11px; }
+.instructor-late { color: #c62828; font-size: 11px; font-weight: 600; }
 .instructor-attempt-table { margin: 6px 0; }
 .instructor-attempt-table th { font-size: 11px; }
 .instructor-input--formula { width: 260px; font-family: ui-monospace, Menlo, monospace; }

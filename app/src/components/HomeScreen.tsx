@@ -3,6 +3,7 @@ import { listAssignments } from '../assignments';
 import { navigate } from '../routing';
 import { getCurrentUserEmail, useAuth } from '../auth';
 import { summarizeResult } from '../engine/grader';
+import { dueStatus, formatDueDate, formatDuration, lateBy } from '../dueDates';
 import { useAsyncValue } from '../useAsyncValue';
 
 function formatSubmittedAt(iso: string): string {
@@ -82,6 +83,15 @@ export function HomeScreen() {
                     <span className="home-list-meta">
                       {a.questionCount} question{a.questionCount === 1 ? '' : 's'}
                     </span>
+                    {a.dueDate && (() => {
+                      const status = dueStatus(a.dueDate, Date.now());
+                      return (
+                        <span className={`home-due home-due--${status}`}>
+                          Due {formatDueDate(a.dueDate)}
+                          {status === 'overdue' && ' · Overdue'}
+                        </span>
+                      );
+                    })()}
                   </button>
                   {sub ? (
                     <span
@@ -89,6 +99,11 @@ export function HomeScreen() {
                       title={`Attempt ${sub.attempt}`}
                     >
                       ✓ Submitted {formatSubmittedAt(sub.submittedAt)}
+                      {a.dueDate && lateBy(a.dueDate, sub.submittedAt) > 0 && (
+                        <span className="home-late">
+                          {' '}· late by {formatDuration(lateBy(a.dueDate, sub.submittedAt))}
+                        </span>
+                      )}
                       {a.gradesReleased && sub.result && (() => {
                         const s = summarizeResult(sub.result);
                         return s.questionsTotal > 0

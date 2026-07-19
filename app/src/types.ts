@@ -186,6 +186,10 @@ export function questionModeLabel(
 export interface AssignmentData {
   id: string;                  // stable slug (e.g. "cc-basics"); keys the registry/persistence
   title: string;
+  /** Optional due date (ISO timestamp). Display/annotation policy only — a late
+   *  submission is still accepted and graded; lateness is computed against the
+   *  server-stamped `submittedAt` (see dueDates.ts). Absent = no due date. */
+  dueDate?: string;
   questions: AssignmentQuestion[];
 }
 

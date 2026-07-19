@@ -91,6 +91,7 @@ class LocalAssignmentStore implements AssignmentStore {
         title: a.title,
         questionCount: a.questions.length,
         gradesReleased: this.readReleased(a.id),
+        dueDate: a.dueDate,
       }));
   }
 

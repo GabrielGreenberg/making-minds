@@ -5,6 +5,7 @@ import { assignmentStore, submissionStore } from '../storage/backend';
 import { gradeSubmission } from '../engine/grader';
 import { navigate } from '../routing';
 import { gradeSubmissions, computeStats, type SubmissionGrade } from './Gradebook';
+import { formatDuration, lateBy } from '../dueDates';
 import { useAsyncValue } from '../useAsyncValue';
 
 function formatTime(iso: string): string {
@@ -18,6 +19,14 @@ function formatTime(iso: string): string {
 
 function pct(fraction: number): string {
   return `${Math.round(fraction * 100)}%`;
+}
+
+/** "· late by …" next to a submission time, or nothing when on time / no due date. */
+function LateTag({ assignment, submittedAt }: { assignment: AssignmentData; submittedAt: string }) {
+  if (!assignment.dueDate) return null;
+  const ms = lateBy(assignment.dueDate, submittedAt);
+  if (ms === 0) return null;
+  return <span className="instructor-late"> · late by {formatDuration(ms)}</span>;
 }
 
 /** One student's submissions, oldest first; `latest` is the graded one. */
@@ -242,7 +251,10 @@ function StudentRow({
         <td>
           <span className="instructor-expand-caret">{expanded ? '▾' : '▸'}</span> {student}
         </td>
-        <td>{formatTime(latest.record.submittedAt)}</td>
+        <td>
+          {formatTime(latest.record.submittedAt)}
+          <LateTag assignment={assignment} submittedAt={latest.record.submittedAt} />
+        </td>
         <td>{all.length}</td>
         <QuestionMarks grade={latest} assignment={assignment} />
         <td>{pct(latest.score)}</td>
@@ -307,7 +319,10 @@ function AttemptRow({
           {attempt}
           {isLatest && <span className="instructor-latest-tag"> (graded)</span>}
         </td>
-        <td>{formatTime(grade.record.submittedAt)}</td>
+        <td>
+          {formatTime(grade.record.submittedAt)}
+          <LateTag assignment={assignment} submittedAt={grade.record.submittedAt} />
+        </td>
         <QuestionMarks grade={grade} assignment={assignment} />
         <td>{pct(grade.score)}</td>
       </tr>

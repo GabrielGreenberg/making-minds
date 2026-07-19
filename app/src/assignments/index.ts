@@ -29,6 +29,8 @@ export interface AssignmentSummary {
   questionCount: number;
   /** Whether the instructor has released grades for this assignment. */
   gradesReleased: boolean;
+  /** Due date (ISO timestamp), if the instructor set one. */
+  dueDate?: string;
 }
 
 /** True if `id` is a bundled (read-only) assignment, not an instructor-authored one. */
@@ -51,6 +53,7 @@ export async function listAssignments(): Promise<AssignmentSummary[]> {
       title: a.title,
       questionCount: a.questions.length,
       gradesReleased: await assignmentStore.getGradesReleased(a.id),
+      dueDate: a.dueDate,
     })),
   );
   const custom = (await assignmentStore.list()).filter((a) => !BUNDLED_IDS.has(a.id));

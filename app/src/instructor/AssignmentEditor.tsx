@@ -9,6 +9,16 @@ import { QuestionCreator } from './QuestionCreator';
 import { summarizeQuestion } from './ccSummary';
 import { useAsyncValue } from '../useAsyncValue';
 
+/** ISO timestamp → the local wall-clock "YYYY-MM-DDTHH:MM" a datetime-local input wants. */
+function toLocalInputValue(iso: string): string {
+  const d = new Date(iso);
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return (
+    `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}` +
+    `T${pad(d.getHours())}:${pad(d.getMinutes())}`
+  );
+}
+
 /**
  * Assignment editor: edit the title and the ordered question list of an
  * instructor-authored assignment. Every mutation persists immediately via the
@@ -65,6 +75,20 @@ export function AssignmentEditor({ id }: { id: string }) {
     if (title !== assignment.title) commit({ ...assignment, title });
   };
 
+  // The datetime-local input speaks local wall-clock time; the stored dueDate
+  // is a canonical ISO timestamp. Empty input clears the due date.
+  const handleDueDateBlur = (value: string) => {
+    if (!value) {
+      if (assignment.dueDate !== undefined) {
+        const { dueDate: _cleared, ...rest } = assignment;
+        commit(rest);
+      }
+      return;
+    }
+    const iso = new Date(value).toISOString();
+    if (iso !== assignment.dueDate) commit({ ...assignment, dueDate: iso });
+  };
+
   const moveQuestion = (index: number, delta: number) => {
     const target = index + delta;
     if (target < 0 || target >= assignment.questions.length) return;
@@ -119,6 +143,17 @@ export function AssignmentEditor({ id }: { id: string }) {
           className="instructor-input instructor-title-input"
           defaultValue={assignment.title}
           onBlur={(e) => handleTitleBlur(e.target.value)}
+        />
+      </label>
+
+      <label className="instructor-field">
+        <span className="instructor-field-label">Due date</span>
+        <input
+          className="instructor-input"
+          type="datetime-local"
+          key={assignment.dueDate ?? 'no-due-date'}
+          defaultValue={assignment.dueDate ? toLocalInputValue(assignment.dueDate) : ''}
+          onBlur={(e) => handleDueDateBlur(e.target.value)}
         />
       </label>
 
