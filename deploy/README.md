@@ -59,15 +59,44 @@ plus Lightsail's instance snapshots is enough.
 
 Create a Pages project connected to the repo:
 
-| Setting                  | Value                                   |
-| ------------------------ | --------------------------------------- |
-| Root directory           | `app`                                   |
-| Build command            | `npm run build`                         |
-| Build output directory   | `dist`                                  |
-| Env var `VITE_API_BASE`  | `https://api.<domain>` (no trailing slash) |
+| Setting                    | Value                                      |
+| -------------------------- | ------------------------------------------ |
+| Root directory             | `app`                                      |
+| Build command              | `npm run build`                            |
+| Build output directory     | `dist`                                     |
+| Env var `VITE_BASE_PATH`   | `/`                                        |
+| Env var `VITE_API_BASE`    | `https://100-22-69-95.sslip.io` (no trailing slash) |
 
-`VITE_API_BASE` is read by `app/src/api/client.ts` at build time. The app uses
-hash routing, so no `_redirects` file is needed.
+`VITE_API_BASE` is read by `app/src/api/client.ts` at build time; setting it is
+what selects **remote** mode (`storage/backend.ts`). Leave it unset and the
+Pages build is the browser-only **local** prototype (localStorage, answers in
+the bundle) — fine for a demo, not for students.
+
+`VITE_BASE_PATH` overrides Vite's `base`, which defaults to `/making-minds/`
+for the GitHub Pages deploy (`.github/workflows/deploy.yml`). Cloudflare Pages
+serves at the domain root, so it **must** be set to `/` or every asset 404s.
+
+The app uses hash routing, so no `_redirects` file is needed.
+
+**Current API hostname is a placeholder.** There is no domain yet, so the box
+answers on `https://100-22-69-95.sslip.io` — wildcard DNS that resolves to the
+Lightsail static IP (100.22.69.95), with a real Let's Encrypt cert Caddy
+obtained over HTTP-01. Students never see it (the frontend calls it in the
+background). To swap in a real domain later, three edits and nothing else:
+
+1. DNS `A` record `api.<domain>` → 100.22.69.95.
+2. On the box: replace the hostname in `/etc/caddy/Caddyfile`,
+   `sudo systemctl reload caddy` (Caddy fetches the new cert automatically).
+3. Cloudflare Pages: set `VITE_API_BASE=https://api.<domain>` and redeploy
+   (it is baked in at build time).
+
+The Pages project must be named **`making-minds`** so its default origin is
+`https://making-minds.pages.dev` — the value already in the systemd unit's
+`MM_CORS_ORIGINS`. A different name means updating that env and restarting
+`makingminds-api`.
+
+Direct upload (no Git integration) works too:
+`VITE_BASE_PATH=/ VITE_API_BASE=... npm run build && npx wrangler pages deploy dist --project-name making-minds` from `app/`.
 
 Then set the Pages URL (and any custom domain) in the API's
 `MM_CORS_ORIGINS` env (systemd unit) and restart the service.
@@ -77,10 +106,8 @@ Then set the Pages URL (and any custom domain) in the API's
 - **UCLA SSO** — the server runs `MM_AUTH_MODE=dev` (passwordless roster-email
   login, same trust level as the current mockup login). The seam for SSO is
   `server/src/auth.ts` (`AuthProvider`); implementing it is config + one class.
-- **Frontend cutover** — the app still uses the Local* (localStorage) stores.
-  `app/src/api/client.ts` provides the typed calls for the Remote* store
-  implementations; wiring them in (and making the store seams async) is the
-  remaining frontend task, independent of AWS access.
+- **Frontend cutover** — DONE (P6.4, 2026-07-08). The `Remote*` stores back
+  every seam whenever `VITE_API_BASE` is set at build time.
 - **Roster** — `npm run seed` loads the toy accounts. For the real class,
   extend `server/src/seed.ts` to ingest the enrollment list (email, name,
   role), or rely on SSO to upsert users on first login.

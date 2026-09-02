@@ -14,7 +14,18 @@ Claude to load into context).
 >
 > A change isn't finished until the docs that describe it are too.
 
-_Last updated: 2026-07-19 (**turbot grading pinned trajectory- and orientation-independent** —
+_Last updated: 2026-09-02 (**pilot deployment live** — Cloudflare Pages
+(`https://making-minds.pages.dev`, direct upload, project `making-minds`) serving a remote-mode
+build against the Lightsail API on the placeholder hostname `https://100-22-69-95.sslip.io`.
+Three repo changes carried it: `app/vite.config.ts`'s `base` is now
+`process.env.VITE_BASE_PATH ?? '/making-minds/'` (GitHub Pages keeps its subpath; Pages builds
+pass `/`), `deploy/README.md` §2 records the real values plus the domain-swap procedure, and
+`.gitignore` now covers `secrets/` (the Cloudflare token) and `ssh/` (the Lightsail key, which
+had been sitting untracked-but-unignored). Verified over the public network: assets at the
+root, CORS preflight from the Pages origin, and a full student flow — login → `/api/auth/me`
+→ assignment list — with `test_cases` stripped from the student payload. NOT yet fit for
+students: `MM_AUTH_MODE=dev` (passwordless; the seeded instructor account has full gradebook
+access) and the server DB holds only the toy roster + `cc-basics`. Earlier 2026-07-19: **turbot grading pinned trajectory- and orientation-independent** —
 audit confirmed the success criteria (`evaluateTurbotCriterion`, engine/turbot.ts) already judge
 only positions, per Paul's rule that grading must ignore the path taken and the turbot's facing:
 no criterion reads `facing`; `pass-through` needs the goal anywhere in the position trace;
@@ -675,8 +686,13 @@ noted:
   pins). Deployment recipes for Lightsail + Cloudflare Pages sit in `deploy/`.
   See `server/README.md`.
 
-What's missing is the **deployment** (waiting on the UCLA AWS account) and **UCLA SSO** (a
-server-side `AuthProvider` swap; the client flow is done). **Real assignment content is in**:
+**The pilot deployment is LIVE** (2026-09-02): the frontend is on Cloudflare Pages at
+`https://making-minds.pages.dev` (direct upload via wrangler; project `making-minds`), talking
+to the Lightsail API at the placeholder hostname `https://100-22-69-95.sslip.io` (sslip.io
+wildcard DNS → the static IP 100.22.69.95, real Let's Encrypt cert via Caddy; swappable for a
+real domain in three edits — `deploy/README.md` §2). What's missing is **UCLA SSO** (a
+server-side `AuthProvider` swap; the client flow is done) — the box still runs
+`MM_AUTH_MODE=dev`, so the URL is not yet fit for students. **Real assignment content is in**:
 HW1–HW7 ship as seedable JSON (dashboard "Load HW1–HW7", local mode) — machine problems from
 the reference fixtures, prose problems as open questions; remote mode still needs them seeded
 server-side.
@@ -736,9 +752,15 @@ server-side.
   fill-empty migration and the crash-buffer journal cover durability, and
   `tools/remoteStoreCheck.ts` (56 pins, in `npm run check`) drives it all against the booted
   real server. Local mode is byte-identical and remains the default without `VITE_API_BASE`.
-- **Deploy** — once the UCLA AWS account lands: Lightsail box for `server/` (+ Caddy TLS),
-  Cloudflare Pages for `app/` (set `VITE_API_BASE` at build; set `MM_CORS_ORIGINS` on the box;
-  SQLite backup = copy the file) — step-by-step in `deploy/README.md`.
+- **Deploy — DONE for the pilot (2026-09-02).** Lightsail runs `server/` behind Caddy TLS;
+  Cloudflare Pages serves `app/` at `https://making-minds.pages.dev`, built with
+  `VITE_BASE_PATH=/` (Vite's `base` defaults to `/making-minds/` for the GitHub Pages job, and
+  Pages serves at the root) and `VITE_API_BASE=https://100-22-69-95.sslip.io`; the box's
+  `MM_CORS_ORIGINS` already names that Pages origin. Redeploy =
+  `npx wrangler pages deploy dist --project-name making-minds` from `app/` with the credentials
+  in the gitignored `secrets/cloudflare.env`. Remaining: a real domain (placeholder hostname
+  today), seeding HW1–HW7 into the server's DB (it holds only the toy roster + `cc-basics`),
+  and SQLite backup cron — all in `deploy/README.md`.
 - **Real auth** — implement the `SsoAuthProvider` in `server/src/auth.ts` once UCLA SSO
   details exist; roles from the token. Roster ingestion in `server/src/seed.ts`. The client
   flow (AuthGate/HealthGate/login) is done and unchanged by that swap.

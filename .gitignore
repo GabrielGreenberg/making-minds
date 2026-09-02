@@ -11,3 +11,7 @@ notes/
 *.sqlite
 *.sqlite-wal
 *.sqlite-shm
+
+# local credentials — never committed
+secrets/
+ssh/
