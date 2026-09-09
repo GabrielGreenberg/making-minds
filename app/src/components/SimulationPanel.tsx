@@ -109,7 +109,7 @@ export function SimulationToolbar() {
             }}
             title="Toggle selected states between internal (circle: read/write/move the tape) and external (square: sense ahead and move/turn)"
           >
-            <span className="toolbar-icon">{'▢'}</span> In/External
+            <span className="toolbar-icon">{'▢'}</span> Swap state type
           </button>
         )}
 
