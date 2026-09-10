@@ -640,12 +640,13 @@ html, body, #root {
 }
 
 .panel-resize-handle {
-  width: 0;
   cursor: col-resize;
-  flex-shrink: 0;
   position: absolute;
   top: 0;
-  left: -4px;
+  /* The panel is the containing block, so `left` is measured from its PADDING
+     box — 1px inside its border-left, which is the visible divider. Centering
+     the 9px strip on the divider's midline needs -4px - 1px. */
+  left: -5px;
   bottom: 0;
   width: 9px;
   z-index: 20;
