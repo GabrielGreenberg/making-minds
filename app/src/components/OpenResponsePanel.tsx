@@ -1,5 +1,6 @@
 import type { ClipboardEvent, DragEvent } from 'react';
 import { useStore } from '../store';
+import { StatementBody } from './StatementBody';
 
 /**
  * The workspace for an open (free-text) question — the text-panel analogue of
@@ -29,7 +30,7 @@ export function OpenResponsePanel() {
           <h2 className="open-response-label">{question.label}</h2>
           <span className="open-response-mode">open question</span>
         </div>
-        <p className="open-response-statement">{question.statement}</p>
+        <StatementBody text={question.statement} className="open-response-statement" />
         <textarea
           className="open-response-textarea"
           value={response}

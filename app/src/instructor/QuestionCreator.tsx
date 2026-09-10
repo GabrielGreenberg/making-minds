@@ -23,6 +23,7 @@ import {
   type AuthoredOutputGroup,
 } from '../engine/testVectorGen';
 import { FormulaError } from '../engine/formulaEval';
+import { StatementBody } from '../components/StatementBody';
 import {
   countCombos,
   maxInputLimit,
@@ -856,6 +857,17 @@ export function QuestionCreator({ assignment, existingQuestion, onSave, onCancel
             }
           />
         </label>
+        <p className="instructor-hint">
+          Math goes in LaTeX between dollar signs ($x + 1$, or $$…$$ on its own
+          line); machine literals go in `backticks`; **bold** and *italic* work
+          too. A blank line starts a new paragraph.
+        </p>
+        {statement.trim() && (
+          <div className="instructor-statement-preview">
+            <div className="instructor-field-label">Preview</div>
+            <StatementBody text={statement} />
+          </div>
+        )}
       </section>
 
       <div className="instructor-creator-foot">

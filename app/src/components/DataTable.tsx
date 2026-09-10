@@ -3,6 +3,7 @@ import { useStore, selectTmNotation, selectEffectiveMode, selectCodecWindow, sel
 import { tmNotation } from '../engine';
 import { outputDisplayString } from './outputDisplay';
 import { TurbotArenaPanel } from './TurbotArenaPanel';
+import { StatementBody } from './StatementBody';
 import type { TMSymbol } from '../types';
 import { loadUiPrefs, saveUiPref } from '../uiPrefs';
 
@@ -24,7 +25,7 @@ function QuestionStatement() {
         <span>Question</span>
         <span className="question-rep-badge">{question.representation} representation</span>
       </div>
-      <p className="question-statement">{question.statement}</p>
+      <StatementBody text={question.statement} className="question-statement" />
     </div>
   );
 }

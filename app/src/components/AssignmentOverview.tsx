@@ -2,6 +2,7 @@ import { useStore } from '../store';
 import { navigate } from '../routing';
 import { getCurrentUserEmail, useAuth } from '../auth';
 import { questionModeLabel } from '../types';
+import { statementProse } from '../statementFormat';
 
 /**
  * The question list an assignment opens to. Clicking a question opens its
@@ -57,7 +58,7 @@ export function AssignmentOverview() {
               >
                 <span className="assignment-overview-label">{q.label}</span>
                 <span className="assignment-overview-mode">{questionModeLabel(q)}</span>
-                <span className="assignment-overview-statement">{q.statement}</span>
+                <span className="assignment-overview-statement">{statementProse(q.statement)}</span>
               </button>
             ))}
             {assignment.questions.length === 0 && (
