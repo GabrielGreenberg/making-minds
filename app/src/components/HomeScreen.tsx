@@ -52,21 +52,21 @@ export function HomeScreen() {
   };
 
   return (
-    <div className="welcome-screen">
-      <div className="home-card">
-        <div className="home-session">
-          {user && <span className="session-chip">{user.name} · {user.role === 'instructor' ? 'Instructor' : 'Student'}</span>}
-          {user?.role === 'instructor' && (
-            <button className="menu-link-button" onClick={() => navigate({ kind: 'instructor' })}>
-              Instructor view
-            </button>
-          )}
-          <button className="menu-link-button" onClick={() => { logout(); navigate({ kind: 'home' }); }}>
-            Log out
+    <div className="page">
+      <header className="page-bar">
+        {user && <span className="session-chip">{user.name} · {user.role === 'instructor' ? 'Instructor' : 'Student'}</span>}
+        {user?.role === 'instructor' && (
+          <button className="menu-link-button" onClick={() => navigate({ kind: 'instructor' })}>
+            Instructor view
           </button>
-        </div>
-        <h1 className="welcome-title">Making Minds</h1>
-        <p className="welcome-subtitle">Design circuits, state machines, and more</p>
+        )}
+        <button className="menu-link-button" onClick={() => { logout(); navigate({ kind: 'home' }); }}>
+          Log out
+        </button>
+      </header>
+      <div className="page-body">
+        <h1 className="page-title">Making Minds</h1>
+        <p className="page-subtitle">Design circuits, state machines, and more</p>
 
         <section className="home-section">
           <h2 className="home-section-title">Assignments</h2>

@@ -34,17 +34,16 @@ export function AssignmentOverview() {
   };
 
   return (
-    <div className="welcome-screen">
-      <div className="home-card">
-        <div className="home-session">
-          <button className="menu-link-button" onClick={() => navigate({ kind: 'home' })}>
-            ← All assignments
-          </button>
-          {user && <span className="session-chip">{user.name} · {user.role === 'instructor' ? 'Instructor' : 'Student'}</span>}
-        </div>
-
-        <h1 className="welcome-title">{assignment.title}</h1>
-        <p className="welcome-subtitle">
+    <div className="page">
+      <header className="page-bar page-bar--split">
+        <button className="menu-link-button" onClick={() => navigate({ kind: 'home' })}>
+          ← All assignments
+        </button>
+        {user && <span className="session-chip">{user.name} · {user.role === 'instructor' ? 'Instructor' : 'Student'}</span>}
+      </header>
+      <div className="page-body">
+        <h1 className="page-title">{assignment.title}</h1>
+        <p className="page-subtitle">
           {assignment.questions.length} question{assignment.questions.length === 1 ? '' : 's'} — pick one to work on
         </p>
 
