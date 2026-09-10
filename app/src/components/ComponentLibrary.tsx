@@ -211,7 +211,16 @@ export function ComponentLibrary() {
   };
 
   return (
-    <div className="component-library">
+    <div
+      className="component-library"
+      onContextMenu={(e) => {
+        // Same disarm gesture as on the canvas.
+        if (selectedTool !== null) {
+          e.preventDefault();
+          setSelectedTool(null);
+        }
+      }}
+    >
       <div className="library-machine-label">
         {buildMode === 'turbot'
           ? `Turbot · ${TURBOT_BRAIN_LABELS[effectiveMode] || 'Logic Circuit'}`

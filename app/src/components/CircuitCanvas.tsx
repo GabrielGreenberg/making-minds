@@ -2704,6 +2704,20 @@ export function CircuitCanvas() {
         return;
       }
 
+      // ─── Click-to-place (placement mode) ───────────────────
+      // An armed component tool STAYS armed, so several copies can be dropped
+      // in a row, and it claims the click wherever it lands — a click that
+      // happens to fall on an existing gate places another copy rather than
+      // silently disarming the tool. Disarm with right-click, Escape, or by
+      // clicking the palette icon again. NEW_BOX is a one-shot drag tool and
+      // is handled further down, on the background branch.
+      if (e.button === 0 && !e.shiftKey && state.selectedTool && state.selectedTool !== 'NEW_BOX') {
+        e.preventDefault();
+        e.stopPropagation();
+        addComponent(state.selectedTool, canvasPos.x - 40, canvasPos.y - 30);
+        return;
+      }
+
       // ─── Wire segment drag ─────────────────────────────────
       if (hit.type === 'wiresegment') {
         e.preventDefault();
@@ -2908,7 +2922,10 @@ export function CircuitCanvas() {
         e.preventDefault();
         e.stopPropagation();
 
-        if (state.selectedTool) {
+        // Only the one-shot box tool is cancelled by clicking an object; a
+        // placement tool can only be reached here with shift held, and shift
+        // means "select", not "disarm".
+        if (state.selectedTool === 'NEW_BOX') {
           state.setSelectedTool(null);
         }
         if (e.shiftKey) {
@@ -2921,7 +2938,7 @@ export function CircuitCanvas() {
 
       // ─── Component click ───────────────────────────────────
       if (hit.type === 'component') {
-        if (state.selectedTool) {
+        if (state.selectedTool === 'NEW_BOX') {
           state.setSelectedTool(null);
         }
         e.preventDefault();
@@ -3032,12 +3049,6 @@ export function CircuitCanvas() {
         svgRef.current?.setPointerCapture(e.pointerId);
         window.addEventListener('pointermove', stableOnMove);
         window.addEventListener('pointerup', stableOnUp);
-        return;
-      }
-
-      // Click-to-place: component tool
-      if (state.selectedTool) {
-        addComponent(state.selectedTool as ComponentType, canvasPos.x - 40, canvasPos.y - 30);
         return;
       }
 
@@ -3601,6 +3612,17 @@ export function CircuitCanvas() {
       <svg
         ref={svgRef}
         onPointerDown={handlePointerDown}
+        onContextMenu={(e) => {
+          // Right-click disarms the palette tool (and cancels a pending wire)
+          // instead of opening the browser menu. With nothing armed the menu
+          // behaves normally.
+          const state = useStore.getState();
+          const armed = state.selectedTool !== null || pendingWireRef.current !== null;
+          if (!armed) return;
+          e.preventDefault();
+          state.setSelectedTool(null);
+          clearPendingWire();
+        }}
         onDoubleClick={(e) => {
           // Double-click on a box name → enter rename mode
           const target = e.target as SVGElement;

@@ -74,6 +74,10 @@ function checkAllSimFresh(label: string) {
   check(`${label}: turbot slice fresh`,
     s.turbotHistory.length === 0 && !s.turbotRunning && !s.turbotHalted &&
     s.turbotStopReason === null);
+  // Placement is sticky (the palette tool stays armed across placements), so
+  // a canvas swap must disarm it — otherwise a gate armed on one question
+  // drops a component on the first click in the next one.
+  check(`${label}: palette tool disarmed`, s.selectedTool === null);
 }
 
 // Junk that only navigation (not the actions used to build real runs above)
@@ -100,6 +104,7 @@ function plantSimJunk() {
     turbotHistory: [{ t: 1, kind: 'external', input: 'E', action: '↑', x: 0, y: 0, facing: 'N' }],
     turbotHalted: true,
     turbotStopReason: 'motor',
+    selectedTool: 'AND',
   });
 }
 
