@@ -31,6 +31,21 @@ export interface AssignmentSummary {
   gradesReleased: boolean;
   /** Due date (ISO timestamp), if the instructor set one. */
   dueDate?: string;
+  /** Instructor-chosen position; absent sorts last (see sortAssignments). */
+  order?: number;
+}
+
+/** The order the catalog and the dashboard both list assignments in: the
+ *  instructor's chosen positions first, in ascending order, then everything
+ *  that has never been moved, alphabetically. Pure, so both backends and the
+ *  headless checks agree. */
+export function sortAssignments<T extends { title: string; order?: number }>(rows: T[]): T[] {
+  return rows.slice().sort((a, b) => {
+    const ao = a.order ?? Number.POSITIVE_INFINITY;
+    const bo = b.order ?? Number.POSITIVE_INFINITY;
+    if (ao !== bo) return ao - bo;
+    return a.title.localeCompare(b.title);
+  });
 }
 
 /** True if `id` is a bundled (read-only) assignment, not an instructor-authored one. */
@@ -40,8 +55,9 @@ export function isBundledAssignment(id: string): boolean {
 
 /**
  * Lightweight list for a catalog/home/dashboard screen — no question details.
- * Bundled assignments come first, then instructor-authored ones. If an id
- * appears in both, the bundled (authoritative, read-only) one wins.
+ * Bundled assignments come first, then instructor-authored ones (if an id
+ * appears in both, the bundled read-only one wins); the combined list is then
+ * put in the instructor's chosen order (see sortAssignments).
  */
 export async function listAssignments(): Promise<AssignmentSummary[]> {
   // Bundled assignments live outside the AssignmentStore, but their release
@@ -54,10 +70,14 @@ export async function listAssignments(): Promise<AssignmentSummary[]> {
       questionCount: a.questions.length,
       gradesReleased: await assignmentStore.getGradesReleased(a.id),
       dueDate: a.dueDate,
+      // Bundled assignments cannot be renumbered (they live outside the
+      // store), so they are pinned ahead of everything the instructor has
+      // ordered rather than falling to the end with the unordered ones.
+      order: a.order ?? -1,
     })),
   );
   const custom = (await assignmentStore.list()).filter((a) => !BUNDLED_IDS.has(a.id));
-  return [...bundled, ...custom];
+  return sortAssignments([...bundled, ...custom]);
 }
 
 /** Full definition for one assignment, or undefined if the id is unknown. */

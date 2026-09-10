@@ -4,6 +4,7 @@ import {
   createAssignment,
   isBundledAssignment,
 } from '../assignments';
+import type { AssignmentSummary } from '../assignments';
 import { assignmentStore, submissionStore, backendMode } from '../storage/backend';
 import { downloadJson } from '../download';
 import { navigate } from '../routing';
@@ -32,6 +33,40 @@ export function InstructorDashboard() {
     return summaries.map((a, i) => ({ ...a, submissionCount: submissionLists[i].length }));
   }, []);
   const assignments = rows ?? [];
+
+  // Reordering writes an explicit position onto EVERY assignment, not just the
+  // pair that swapped: the list may still hold assignments that have never
+  // been moved (order absent, sorted last), and renumbering the whole list is
+  // what makes the new arrangement the one that comes back. Bundled
+  // assignments live outside the store and cannot be renumbered, so they are
+  // pinned in place and the buttons skip over them.
+  const handleMove = async (index: number, delta: number) => {
+    const rows = assignments;
+    const target = index + delta;
+    if (target < 0 || target >= rows.length) return;
+    if (isBundledAssignment(rows[index].id) || isBundledAssignment(rows[target].id)) return;
+    const reordered = rows.slice();
+    [reordered[index], reordered[target]] = [reordered[target], reordered[index]];
+    await Promise.all(
+      reordered.map(async (row, i) => {
+        if (isBundledAssignment(row.id)) return;
+        const data = await getAssignment(row.id);
+        if (!data || data.order === i) return;
+        await assignmentStore.save({ ...data, order: i });
+      }),
+    );
+    reload();
+  };
+
+  const canMove = (rows: AssignmentSummary[], index: number, delta: number) => {
+    const target = index + delta;
+    return (
+      target >= 0 &&
+      target < rows.length &&
+      !isBundledAssignment(rows[index].id) &&
+      !isBundledAssignment(rows[target].id)
+    );
+  };
 
   const handleNew = async () => {
     const title = window.prompt('Assignment title:');
@@ -110,6 +145,7 @@ export function InstructorDashboard() {
         <table className="instructor-table">
           <thead>
             <tr>
+              <th className="instructor-table-order-head">Order</th>
               <th>Title</th>
               <th>Questions</th>
               <th>Submissions</th>
@@ -117,10 +153,28 @@ export function InstructorDashboard() {
             </tr>
           </thead>
           <tbody>
-            {assignments.map((a) => {
+            {assignments.map((a, i) => {
               const bundled = isBundledAssignment(a.id);
               return (
                 <tr key={a.id}>
+                  <td className="instructor-table-order">
+                    <button
+                      className="instructor-btn instructor-btn--icon"
+                      disabled={!canMove(assignments, i, -1)}
+                      title="Move up"
+                      onClick={() => void handleMove(i, -1)}
+                    >
+                      ↑
+                    </button>
+                    <button
+                      className="instructor-btn instructor-btn--icon"
+                      disabled={!canMove(assignments, i, 1)}
+                      title="Move down"
+                      onClick={() => void handleMove(i, 1)}
+                    >
+                      ↓
+                    </button>
+                  </td>
                   <td>
                     <span className="instructor-asg-title">{a.title}</span>
                     {bundled ? (

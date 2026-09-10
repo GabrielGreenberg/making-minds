@@ -56,6 +56,7 @@ const { remoteWorkbookStore, remoteAssignmentStore, remoteSubmissionStore } = aw
   '../src/storage/remoteStores'
 );
 const { TOY_ACCOUNTS } = await import('../src/auth/accounts');
+const { sortAssignments } = await import('../src/assignments');
 const {
   buildSampleAssignment,
   buildCorrectSubmission,
@@ -141,6 +142,31 @@ check(
   'instructor get() keeps test_cases (the server trusts the role)',
   createdBack?.assignment.questions.some((q) => (q.test_cases ?? []).length > 0) === true,
 );
+// The instructor's chosen list position rides on the assignment itself, so it
+// must survive the server round-trip and reach the summary.
+const ordered = { ...created, order: 3 };
+await remoteAssignmentStore.save(ordered);
+check(
+  'order round-trips through the server onto the assignment',
+  (await remoteAssignmentStore.get('remote-check-asg'))?.assignment.order === 3,
+);
+check(
+  'order reaches the list summary',
+  (await remoteAssignmentStore.list()).find((a) => a.id === 'remote-check-asg')?.order === 3,
+);
+// sortAssignments is the one ordering rule both backends and both screens use.
+check(
+  'sortAssignments: explicit positions first, then untouched ones by title',
+  sortAssignments([
+    { title: 'Zeta', order: undefined },
+    { title: 'Beta', order: 2 },
+    { title: 'Alpha', order: undefined },
+    { title: 'Gamma', order: 0 },
+  ])
+    .map((r) => r.title)
+    .join(',') === 'Gamma,Beta,Alpha,Zeta',
+);
+
 await remoteAssignmentStore.remove('remote-check-asg');
 check('remove() → get() resolves null (404 → seam null)', (await remoteAssignmentStore.get('remote-check-asg')) === null);
 check('get() of an unknown id resolves null', (await remoteAssignmentStore.get('never-existed')) === null);

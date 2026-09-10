@@ -1442,6 +1442,9 @@ thead .sc-label-col {
 .instructor-btn--danger { color: var(--danger); }
 .instructor-btn--danger:hover:not(:disabled) { border-color: var(--danger); }
 .instructor-btn--icon { padding: 4px 8px; min-width: 28px; }
+
+.instructor-table-order-head { width: 1%; white-space: nowrap; }
+.instructor-table-order { display: flex; gap: 4px; }
 .instructor-link {
   border: none;
   background: none;

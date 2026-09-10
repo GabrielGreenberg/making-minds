@@ -234,6 +234,10 @@ export interface AssignmentData {
    *  submission is still accepted and graded; lateness is computed against the
    *  server-stamped `submittedAt` (see dueDates.ts). Absent = no due date. */
   dueDate?: string;
+  /** Instructor-chosen position in the assignment list (ascending). Absent
+   *  sorts last, then by title, so an assignment that has never been moved
+   *  keeps a stable place. Set by the dashboard's ↑/↓ buttons. */
+  order?: number;
   questions: AssignmentQuestion[];
 }
 

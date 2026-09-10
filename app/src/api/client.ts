@@ -38,6 +38,7 @@ export interface AssignmentSummary {
   questionCount: number;
   gradesReleased: boolean;
   dueDate?: string;
+  order?: number;
 }
 
 let apiBase: string = (import.meta.env?.VITE_API_BASE as string | undefined) ?? '';

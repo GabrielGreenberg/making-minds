@@ -113,6 +113,7 @@ export function createApp(config: ServerConfig, db: Db) {
       questionCount: a.questions.length,
       gradesReleased: released.get(a.id) ?? false,
       dueDate: a.dueDate,
+      order: a.order,
     }));
     res.json({ assignments: summaries });
   });
