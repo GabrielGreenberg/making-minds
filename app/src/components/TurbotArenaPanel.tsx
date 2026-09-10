@@ -211,9 +211,10 @@ export function TurbotArenaPanel() {
           </button>
         )}
       </div>
-      {/* Map column + glossary sit level when the panel is wide enough;
-          flex-wrap drops the glossary below the map when it isn't. */}
+      {/* The percept/motor glossary reads first — it is what the map's
+          symbols mean — and the map sits below it. */}
       <div className="turbot-map-row">
+        <TurbotGlossary innerMode={innerMode} notation={notation} />
         <div className="turbot-map-col">
           <div className="turbot-arena-scroll" ref={scrollRef}>
             <ArenaCanvas
@@ -285,7 +286,6 @@ export function TurbotArenaPanel() {
             </>
           )}
         </div>
-        <TurbotGlossary innerMode={innerMode} notation={notation} />
       </div>
     </div>
   );

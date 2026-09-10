@@ -2074,9 +2074,11 @@ thead .sc-label-col {
 
 /* The map column and the glossary share a wrapping row: level with each
    other when the panel is wide enough, glossary below the map otherwise. */
+/* Glossary on top, map below it (the map's cells are only legible once the
+   percept/motor vocabulary has been read). */
 .turbot-map-row {
   display: flex;
-  flex-wrap: wrap;
+  flex-direction: column;
   align-items: flex-start;
 }
 
