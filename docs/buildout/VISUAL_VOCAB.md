@@ -38,8 +38,9 @@ inner circuit's labels; double-click opens a read-only inner view.
 
 ## Tables (right panel)
 
-- **I/O vs A/V** — I/O shows raw per-wire bits; A/V shows the concatenated numeral
-  under tally or binary (IN1 = most significant bit).
+- **I/O** — the panel shows raw per-wire bits. The Argument/Value table (the
+  concatenated numeral under tally or binary, IN1 = most significant bit) and its
+  representation toggle were removed from the panel on 2026-09-10.
 - **Local vs Global** — local = per-wire; global = all inputs as one number, all
   outputs as one number.
 - **Time flows right → left** in SC and FSM tables: t1 on the right, later steps

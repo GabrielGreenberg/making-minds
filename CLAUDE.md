@@ -885,7 +885,7 @@ only — the grader never sees the formula; it runs against the generated numeri
 
 ## Build phases (from the spec)
 
-1. **CC** — gates (NOT/AND/OR), I/O, validated wiring, I/O & A/V tables, boxed circuits
+1. **CC** — gates (NOT/AND/OR), I/O, validated wiring, I/O tables, boxed circuits
    (XOR, Half-Adder), drag-and-drop snap-to-grid canvas. _(built)_
 2. **SC** — MEM block, clock/time model, right-to-left time-step table. _(built)_
 3. **FSM** — state nodes, `input:output` transition arrows, simulation with state
@@ -911,16 +911,19 @@ only — the grader never sees the formula; it runs against the generated numeri
   draw a bump/arc; splits draw a dot. Color: **black = 0, red = 1**.
 - **Validation** — _warn, don't block_ on loops, merged links, and free ends (red highlight +
   tooltip).
-- **I/O vs A/V tables** — I/O shows raw per-wire bits; A/V shows concatenated numerals under
-  **tally or binary**. Local scope = per-wire; global scope = all inputs as one number, all
-  outputs as one number.
+- **I/O tables** — the right panel shows raw per-wire bits. Local scope = per-wire; global
+  scope = all inputs/outputs together. (The spec's Argument/Value table — concatenated
+  numerals under tally or binary — was REMOVED from the panel on 2026-09-10, along with its
+  Tally/Binary/+ representation toggle; the codec's per-group value read survives as grading
+  plumbing, below. `repSystem` is still persisted and still picks a SANDBOX TM's tape
+  alphabet, but nothing sets it any more, so a sandbox TM is fixed at binary {0,1,*}.)
 - **Time flows right-to-left** in SC and FSM tables (t1 on the right; later steps extend left).
 - **SC/FSM question runs are the grader's runs** — inside an assignment question, Run/Step
   execute exactly the grader's run length (`stepCountFor` = max(input widths, output widths)
   time steps) AND feed exactly the grader's input stream: the typed global input is parsed as
-  a **value** per input group (as the A/V ARG column reads it — tally "11" = 2) and laid on
+  a **value** per input group (tally "11" = 2) and laid on
   the time axis by the codec's `encodeInput` (LSB at t1 — a tally value's ones arrive last,
-  zeros leading), and the SC A/V numeral decodes only the grader's window per output group.
+  zeros leading), and the SC run decodes only the grader's window per output group.
   What the student types is the value the grader tests; the UI verdict matches the grade in
   both representations (`selectCodecLayout`/`selectCodecWindow` in the store; pinned by
   `tools/scWindowCheck.ts`, incl. the real hw3-p7 tally fixture). Typed input that is not a

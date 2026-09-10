@@ -1,7 +1,7 @@
 import { useMemo, useState, useCallback, useRef, useEffect } from 'react';
 import { useStore, selectTmNotation, selectEffectiveMode, selectCodecWindow, selectFsmNotation } from '../store';
-import { bitsToTally, bitsToBinary, tmNotation, timeOutputBits } from '../engine';
-import { outputDisplayString, argGroupCountFor, argDisplayString } from './outputDisplay';
+import { tmNotation } from '../engine';
+import { outputDisplayString } from './outputDisplay';
 import { TurbotArenaPanel } from './TurbotArenaPanel';
 import type { TMSymbol } from '../types';
 import { loadUiPrefs, saveUiPref } from '../uiPrefs';
@@ -32,17 +32,14 @@ function QuestionStatement() {
 export function DataTable() {
   const components = useStore((s) => s.components);
   const tableRows = useStore((s) => s.tableRows);
-  const repSystem = useStore((s) => s.repSystem);
-  const setRepSystem = useStore((s) => s.setRepSystem);
   const clearTableRows = useStore((s) => s.clearTableRows);
   const buildMode = useStore((s) => s.buildMode);
   // TM alphabet is tied to the question's representation (sandbox: repSystem).
   const tmRep = useStore(selectTmNotation);
   // Codec run window for the open SC/FSM question (null in the sandbox):
-  // question runs execute — and the A/V decode presents — exactly the steps
-  // the grader reads, so UI verdicts match grades.
+  // question runs execute exactly the steps the grader reads, so UI verdicts
+  // match grades.
   const codecWindow = useStore(selectCodecWindow);
-  const openQuestion = useStore((s) => s.assignment?.questions[s.currentQuestionIndex]);
 
   // SC state
   const scHistory = useStore((s) => s.scHistory);
@@ -70,10 +67,8 @@ export function DataTable() {
   const _prefs = useRef(loadUiPrefs());
   const [localOpen, _setLocalOpen] = useState(() => _prefs.current.localOpen !== false);
   const [globalOpen, _setGlobalOpen] = useState(() => _prefs.current.globalOpen !== false);
-  const [avOpen, _setAvOpen] = useState(() => _prefs.current.avOpen !== false);
   const setLocalOpen = (v: boolean) => { _setLocalOpen(v); saveUiPref('localOpen', v); };
   const setGlobalOpen = (v: boolean) => { _setGlobalOpen(v); saveUiPref('globalOpen', v); };
-  const setAvOpen = (v: boolean) => { _setAvOpen(v); saveUiPref('avOpen', v); };
 
   // Run speed: multiplier (1 = 300ms per step, 2 = 150ms, 0.5 = 600ms, etc.)
   const [runSpeed, setRunSpeed] = useState(() => (typeof _prefs.current.runSpeed === 'number' ? _prefs.current.runSpeed as number : 1));
@@ -272,14 +267,6 @@ export function DataTable() {
     window.addEventListener('pointerup', onUp);
   }, [panelWidth]);
 
-  const interpret = (bits: number[]): string => {
-    if (repSystem === 'tally') {
-      const t = bitsToTally(bits);
-      return t != null ? String(t) : '/';
-    }
-    return String(bitsToBinary(bits));
-  };
-
   const inputs = components
     .filter((c) => c.type === 'INPUT')
     .sort((a, b) => {
@@ -287,14 +274,6 @@ export function DataTable() {
       const numB = parseInt(b.label.replace('IN', ''));
       return numA - numB;
     });
-
-  // A/V ARG for SC QUESTION runs: a multi-group question's typed string
-  // interleaves one char per input group per step, so it is read as one value
-  // PER GROUP ("2, 3") — the same per-group parse the store's codec feed
-  // applies — never as one whole-string numeral. null (sandbox, non-SC
-  // question, or machine/spec input-count mismatch — where the run itself
-  // falls back to raw typed bits) keeps the classic whole-string read.
-  const argGroupCount = argGroupCountFor(openQuestion, inputs.length);
 
   const outputs = components
     .filter((c) => c.type === 'OUTPUT')
@@ -397,64 +376,6 @@ export function DataTable() {
     }
     return rows;
   }, [inputs.length, outputs.length, mems.length, isSC]);
-
-  // ── For A/V table ──
-  // SC: each global sequence with output is one row (input sequence → output sequence as numerals)
-  // CC: evaluated rows from the truth table
-  const avRows = useMemo(() => {
-    if (isSC) {
-      // Question runs: the VAL numeral must decode exactly the codec window
-      // the grader reads — output wire j's steps 1..Wo_j (missing steps as 0)
-      // — not the entire run string. Sandbox: whole string as before.
-      const outputWidths = openQuestion?.buildMode === 'SC' && openQuestion.cc_spec
-        ? openQuestion.cc_spec.outputs.map((g) => g.width)
-        : null;
-      const nOut = outputs.length;
-      // Build from global sequences that have outputs
-      const rows: { inputBits: number[]; outputBits: number[] }[] = [];
-      for (let si = 0; si < scGlobalSequences.length; si++) {
-        const seq = scGlobalSequences[si];
-        const isActiveSeq = activeGlobalIndex === si;
-        const outStr = isActiveSeq && scHistory.length > 0
-          ? outputDisplayString(scHistory.map((h) => ({ t: h.t, bits: h.outputBits })))
-          : seq.outputStr;
-        if (seq.inputStr.length > 0 && outStr && outStr.length > 0) {
-          const inBits = seq.inputStr.split('').map(Number);
-          let outBits = outStr.split('').map(Number);
-          if (outputWidths && nOut === outputWidths.length && outBits.length % nOut === 0) {
-            // The history string is t-DESCENDING (latest step leftmost, nOut
-            // chars per step); rebuild [step][wire] t-ascending and take the
-            // grader's slice per output group via the codec's own reader.
-            const T = outBits.length / nOut;
-            const steps = Array.from({ length: T }, (_, t) =>
-              outBits.slice((T - 1 - t) * nOut, (T - t) * nOut));
-            outBits = outputWidths.flatMap((w, j) => timeOutputBits(steps, w, j));
-          }
-          rows.push({ inputBits: inBits, outputBits: outBits });
-        }
-      }
-      return rows;
-    }
-    if (isCC) {
-      // During local stepping, don't show the in-progress row in A/V until all outputs are filled
-      const steppingKey = localStepActive ? localStepSelectedKey : null;
-      const steppingComplete = localStepActive && localStepIndex >= localStepSorted.length;
-      return ccInputRows && ccInputRows !== 'too-many'
-        ? (ccInputRows as number[][])
-            .filter((inBits) => {
-              if (!evaluatedRows.has(inputKey(inBits))) return false;
-              // Hide in-progress row unless stepping is complete
-              if (steppingKey === inputKey(inBits) && !steppingComplete) return false;
-              return true;
-            })
-            .map((inBits) => ({
-              inputBits: inBits,
-              outputBits: evaluatedRows.get(inputKey(inBits))!,
-            }))
-        : [];
-    }
-    return tableRows;
-  }, [isSC, isCC, scGlobalSequences, scHistory, activeGlobalIndex, ccInputRows, evaluatedRows, tableRows, localStepActive, localStepSelectedKey, localStepIndex, localStepSorted.length, openQuestion, outputs.length]);
 
   // ── FSM Mode ──────────────────────────────────────────────────────
   // ── Turbot Mode ───────────────────────────────────────────────────
@@ -1472,58 +1393,6 @@ export function DataTable() {
           </>}
           </div>
         )}
-
-        {/* ── A/V Table (always visible) ── */}
-        <div className="table-section">
-          <div className="table-section-label" style={{ display: 'flex', alignItems: 'center' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 4, cursor: 'pointer' }} onClick={() => setAvOpen(!avOpen)}>
-              <span className="pod-toggle">{avOpen ? '▼' : '▶'}</span>
-              <span>Argument / Value</span>
-            </div>
-          </div>
-          {avOpen && <>
-            <table className="data-table">
-              <colgroup>
-                <col style={{ width: 18 }} />
-              </colgroup>
-              <thead>
-                <tr>
-                  <th style={{ border: 'none', background: 'transparent' }} />
-                  <th>ARG</th>
-                  <th>VAL</th>
-                </tr>
-              </thead>
-              <tbody>
-                {avRows.length > 0 ? avRows.map((row, i) => (
-                  <tr key={i}>
-                    <td style={{ border: 'none', background: 'transparent' }} />
-                    <td><span className="mono-value">{isSC && argGroupCount !== null
-                      ? argDisplayString(row.inputBits, argGroupCount, interpret)
-                      : interpret(row.inputBits)}</span></td>
-                    <td><span className="mono-value">{interpret(row.outputBits)}</span></td>
-                  </tr>
-                )) : (
-                  <tr>
-                    <td style={{ border: 'none', background: 'transparent' }} />
-                    <td><span className="mono-value" style={{ color: '#ccc' }}>&nbsp;</span></td>
-                    <td><span className="mono-value" style={{ color: '#ccc' }}>&nbsp;</span></td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-            <div style={{ display: 'flex', justifyContent: 'center', padding: '4px 0 2px' }}>
-              <div className="slide-selector">
-                <div
-                  className="slide-selector-thumb"
-                  style={{ left: repSystem === 'tally' ? '0%' : repSystem === 'binary' ? '33.33%' : '66.66%', width: '33.33%' }}
-                />
-                <button className={`slide-selector-opt ${repSystem === 'tally' ? 'active' : ''}`} onClick={() => setRepSystem('tally')}>Tally</button>
-                <button className={`slide-selector-opt ${repSystem === 'binary' ? 'active' : ''}`} onClick={() => setRepSystem('binary')}>Binary</button>
-                <button className={`slide-selector-opt ${repSystem === 'plus' ? 'active' : ''}`} onClick={() => setRepSystem('plus')}>+</button>
-              </div>
-            </div>
-          </>}
-        </div>
 
         {/* Sequential Timeline moved to bottom panel */}
       </div>

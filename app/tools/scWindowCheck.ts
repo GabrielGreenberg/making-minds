@@ -12,19 +12,19 @@
 //
 //   WINDOW CONTENT (P1.9b) the fed input stream must be the codec's, not the
 //     typed chars: the typed string is parsed as a VALUE per input group
-//     (exactly how the A/V ARG column reads it — tally "11" = 2) and laid on
+//     (tally "11" = 2) and laid on
 //     the time axis by encodeInput. For tally that means zeros LEAD and the
 //     ones arrive LAST — the reverse of feeding typed chars at t1..tL. Feeding
 //     raw chars made a grader-passing tally machine (hw3-p7's correct machine)
-//     show '/' in the A/V table, and a direct-wire tally identity decode '/'
+//     decode to no value, and a direct-wire tally identity decode '/'
 //     instead of its typed value. Binary is unaffected (typed numeral LSB-first
 //     coincides with the raw right-to-left feed).
 //
 //   Invalid input policy: a typed string that is not a valid numeral for the
 //     representation (tally with a 1 after a 0, e.g. "101") denotes no value,
 //     so there is no grader stream to match — the run falls back to feeding
-//     the raw typed bits (window-bounded), and the A/V ARG column flags the
-//     input '/' exactly as it always has.
+//     the raw typed bits (window-bounded), and the input reads as no value
+//     ('/') exactly as it always has.
 //
 //   DISPLAY DIRECTION (P1.9c) the FSM Input/Output row's OUT string is built
 //     t-DESCENDING (t1 rightmost — time flows right-to-left in SC and FSM
@@ -250,8 +250,8 @@ function scFedSteps(): number[][] {
   return useStore.getState().scHistory.slice().sort((a, b) => a.t - b.t).map((h) => h.inputBits);
 }
 
-/** The A/V VAL bits DataTable shows for a question run: the grader's exact
- *  window slice per output group (codec timeOutputBits over the history). */
+/** The output bits a question run yields: the grader's exact window slice
+ *  per output group (codec timeOutputBits over the history). */
 function avQuestionBits(outputWidths: number[]): number[] {
   const hist = useStore.getState().scHistory;
   const steps = hist.slice().sort((a, b) => a.t - b.t).map((h) => h.outputBits);
@@ -270,8 +270,8 @@ function eqArr(a: string[], b: string[]): boolean {
 console.log('\n[store: SC tally question runs feed the codec stream]');
 {
   // hw3-p7's CORRECT machine, typed "11" (= 2): the run must execute the
-  // grader's window, feed the grader's exact stream, and the A/V numeral must
-  // be the grader's expected output for x=2.
+  // grader's window, feed the grader's exact stream, and the decoded numeral
+  // must be the grader's expected output for x=2.
   const q = hw3p7.question;
   const win = windowOf(q);
   const layout = layoutOf(q);
@@ -291,7 +291,7 @@ console.log('\n[store: SC tally question runs feed the codec stream]');
   const expected = q.test_cases!.find((tc) => tc.inputs[0] === 2)!.outputs[0];
   const avBits = avQuestionBits(q.cc_spec!.outputs.map((g) => g.width));
   const avVal = bitsToTally(avBits);
-  check(`hw3-p7: A/V windowed decode is the CORRECT numeral (got ${avVal}, grader expects ${expected})`,
+  check(`hw3-p7: windowed decode is the CORRECT numeral (got ${avVal}, grader expects ${expected})`,
     avVal !== null && avVal === expected);
 }
 
@@ -326,7 +326,7 @@ console.log('\n[store: SC tally question runs feed the codec stream]');
     useStore.getState().scHistory.length === win);
 
   const avVal = bitsToTally(avQuestionBits(qTally.cc_spec!.outputs.map((g) => g.width)));
-  check(`exhibit B (store): A/V decode equals the grader's decoded got (${JSON.stringify(bX3?.got)}) — not the typed 3`,
+  check(`exhibit B (store): windowed decode equals the grader's decoded got (${JSON.stringify(bX3?.got)}) — not the typed 3`,
     bX3 !== undefined && avVal === bX3.got[0] && avVal !== 3);
 }
 
@@ -344,16 +344,16 @@ console.log('\n[store: SC binary question run]');
   check(`binary identity: ran the window (${useStore.getState().scHistory.length} steps, want ${win})`,
     useStore.getState().scHistory.length === win);
   const avBits = avQuestionBits(qBinSc.cc_spec!.outputs.map((g) => g.width));
-  check(`binary identity: A/V windowed decode = 6 (got ${bitsToValue(avBits, 'binary')})`,
+  check(`binary identity: windowed decode = 6 (got ${bitsToValue(avBits, 'binary')})`,
     bitsToValue(avBits, 'binary') === 6);
 }
 
-// ── Invalid input policy: not a numeral → raw bits, flagged '/' by ARG ─────
+// ── Invalid input policy: not a numeral → raw typed bits ──────────────────
 console.log('\n[store: invalid tally input falls back to raw typed bits]');
 {
   const win = windowOf(qTally);
   openQuestion(qTally, direct);
-  check("ARG reads tally '101' as invalid ('/')", bitsToTally([1, 0, 1]) === null);
+  check("tally '101' is not a valid numeral ('/')", bitsToTally([1, 0, 1]) === null);
   check('invalid input: run still terminates', await scTypeAndRun('101'));
   // No value → no grader stream; the raw typed bits are fed (t1 = rightmost
   // char), 0-padded to the window, window bound still enforced.
@@ -373,7 +373,7 @@ console.log('\n[store: FSM question runs]');
   useStore.getState().fsmGlobalReset();
   // NON-palindrome "110" (= 6): a t1-first raw feed would be the reversed
   // stream (reading 3), so this pins the DIRECTION — typed FSM question
-  // input is an MSB-left numeral, exactly like SC and the A/V ARG column.
+  // input is an MSB-left numeral, exactly like SC.
   useStore.getState().setFsmInputSequence([1, 1, 0]); // typed "110" = 6
   useStore.getState().fsmRun();
   const done = await waitUntil(() => {

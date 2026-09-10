@@ -750,53 +750,6 @@ html, body, #root {
   cursor: default;
 }
 
-/* ── Slide Selector ── */
-.slide-selector {
-  display: inline-flex;
-  position: relative;
-  background: #f0f0f0;
-  border-radius: 8px;
-  padding: 2px;
-  gap: 0;
-}
-
-.slide-selector-thumb {
-  position: absolute;
-  top: 2px;
-  bottom: 2px;
-  border-radius: 6px;
-  background: white;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
-  transition: left 0.2s ease;
-  pointer-events: none;
-}
-
-.slide-selector-opt {
-  position: relative;
-  z-index: 1;
-  padding: 3px 0;
-  width: 52px;
-  text-align: center;
-  font-size: 11px;
-  font-family: inherit;
-  font-weight: 500;
-  border: none;
-  background: transparent;
-  cursor: pointer;
-  color: #888;
-  transition: color 0.2s;
-  border-radius: 6px;
-}
-
-.slide-selector-opt.active {
-  color: #333;
-}
-
-.slide-selector-wide .slide-selector-opt {
-  width: 90px;
-  padding: 3px 0;
-}
-
 .data-table-content {
   flex: 1;
   overflow: auto;
