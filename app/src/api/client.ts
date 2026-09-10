@@ -37,6 +37,9 @@ export interface AssignmentSummary {
   title: string;
   questionCount: number;
   gradesReleased: boolean;
+  /** Whether students can see this assignment at all. Students only ever
+   *  receive visible ones, so it is always true in a student's list. */
+  visible: boolean;
   dueDate?: string;
   order?: number;
 }
@@ -180,8 +183,8 @@ export async function listAssignments(): Promise<AssignmentSummary[]> {
 /** Students receive the assignment with `test_cases` stripped server-side. */
 export async function getAssignment(
   id: string,
-): Promise<{ assignment: AssignmentData; gradesReleased: boolean }> {
-  return request<{ assignment: AssignmentData; gradesReleased: boolean }>(
+): Promise<{ assignment: AssignmentData; gradesReleased: boolean; visible: boolean }> {
+  return request<{ assignment: AssignmentData; gradesReleased: boolean; visible: boolean }>(
     'GET',
     `/assignments/${encodeURIComponent(id)}`,
   );
@@ -201,6 +204,15 @@ export async function deleteAssignment(id: string): Promise<void> {
  */
 export async function setGradesReleased(id: string, released: boolean): Promise<void> {
   await request('PUT', `/assignments/${encodeURIComponent(id)}/grades-release`, { released });
+}
+
+/**
+ * Instructor only: publish an assignment to students, or hide it again. A
+ * hidden assignment is absent from a student's list and 404s on fetch — they
+ * are not told it exists.
+ */
+export async function setVisible(id: string, visible: boolean): Promise<void> {
+  await request('PUT', `/assignments/${encodeURIComponent(id)}/visibility`, { visible });
 }
 
 // ── workbooks (autosave) ─────────────────────────────────────────

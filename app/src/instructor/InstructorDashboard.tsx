@@ -80,6 +80,17 @@ export function InstructorDashboard() {
     if (data) downloadJson(`assignment-${id}.json`, data);
   };
 
+  const handleVisibility = async (id: string, title: string, visible: boolean) => {
+    if (
+      !visible &&
+      !window.confirm(`Hide "${title}" from students? Their saved work is kept.`)
+    ) {
+      return;
+    }
+    await assignmentStore.setVisible(id, visible);
+    reload();
+  };
+
   const handleDelete = async (id: string, title: string) => {
     if (!window.confirm(`Delete "${title}"? This cannot be undone.`)) return;
     await assignmentStore.remove(id);
@@ -182,6 +193,9 @@ export function InstructorDashboard() {
                     ) : (
                       <span className="instructor-badge instructor-badge--custom">custom</span>
                     )}
+                    {!a.visible && (
+                      <span className="instructor-badge instructor-badge--hidden">hidden</span>
+                    )}
                   </td>
                   <td>{a.questionCount}</td>
                   <td>{a.submissionCount}</td>
@@ -194,6 +208,17 @@ export function InstructorDashboard() {
                         Edit
                       </button>
                     )}
+                    <button
+                      className="instructor-btn"
+                      onClick={() => void handleVisibility(a.id, a.title, !a.visible)}
+                      title={
+                        a.visible
+                          ? 'Hide this assignment from students'
+                          : 'Publish this assignment to students'
+                      }
+                    >
+                      {a.visible ? 'Hide' : 'Publish'}
+                    </button>
                     <button
                       className="instructor-btn"
                       onClick={() => navigate({ kind: 'instructor-submissions', id: a.id })}

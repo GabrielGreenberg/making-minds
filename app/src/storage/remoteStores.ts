@@ -37,6 +37,7 @@ import {
   putAssignment,
   deleteAssignment,
   setGradesReleased as apiSetGradesReleased,
+  setVisible as apiSetVisible,
   submitAssignment as apiSubmitAssignment,
   listSubmissions as apiListSubmissions,
   reviewSubmission,
@@ -71,7 +72,9 @@ class RemoteAssignmentStore implements AssignmentStore {
     return apiListAssignments();
   }
 
-  get(id: string): Promise<{ assignment: AssignmentData; gradesReleased: boolean } | null> {
+  get(id: string): Promise<
+    { assignment: AssignmentData; gradesReleased: boolean; visible?: boolean } | null
+  > {
     return or404(apiGetAssignment(id), null);
   }
 
@@ -91,6 +94,16 @@ class RemoteAssignmentStore implements AssignmentStore {
 
   setGradesReleased(id: string, released: boolean): Promise<void> {
     return apiSetGradesReleased(id, released);
+  }
+
+  async getVisible(id: string): Promise<boolean> {
+    // A hidden assignment 404s for a student, so or404's null already means
+    // "not visible to me"; for an instructor the fetch carries the flag.
+    return (await this.get(id))?.visible ?? false;
+  }
+
+  setVisible(id: string, visible: boolean): Promise<void> {
+    return apiSetVisible(id, visible);
   }
 }
 

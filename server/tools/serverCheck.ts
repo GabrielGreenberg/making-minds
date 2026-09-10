@@ -275,6 +275,70 @@ check(
   ownRehidden.json.records.every((r) => r.result === undefined),
 );
 
+// ── student visibility ───────────────────────────────────────────
+// A hidden assignment must be invisible, not merely flagged: absent from the
+// student's list and a 404 on fetch, so a deep link cannot confirm it exists.
+{
+  const listedBefore = await api<{ assignments: { id: string; visible: boolean }[] }>(
+    'GET', '/assignments', { token: sTok },
+  );
+  check(
+    'assignments are visible to students by default',
+    listedBefore.json.assignments.some((a) => a.id === SAMPLE_ASSIGNMENT_ID && a.visible),
+  );
+
+  const hideForbidden = await api('PUT', `/assignments/${SAMPLE_ASSIGNMENT_ID}/visibility`, {
+    token: sTok,
+    body: { visible: false },
+  });
+  check('student cannot change visibility', hideForbidden.status === 403);
+
+  const badBody = await api('PUT', `/assignments/${SAMPLE_ASSIGNMENT_ID}/visibility`, {
+    token: iTok,
+    body: { visible: 'no' },
+  });
+  check('visibility rejects a non-boolean body (400)', badBody.status === 400);
+
+  const hide = await api<{ visible: boolean }>(
+    'PUT', `/assignments/${SAMPLE_ASSIGNMENT_ID}/visibility`,
+    { token: iTok, body: { visible: false } },
+  );
+  check('instructor hides the assignment', hide.status === 200 && hide.json.visible === false);
+
+  const listedHidden = await api<{ assignments: { id: string }[] }>(
+    'GET', '/assignments', { token: sTok },
+  );
+  check(
+    'a hidden assignment is absent from the student list',
+    !listedHidden.json.assignments.some((a) => a.id === SAMPLE_ASSIGNMENT_ID),
+  );
+  const fetchHidden = await api('GET', `/assignments/${SAMPLE_ASSIGNMENT_ID}`, { token: sTok });
+  check('a hidden assignment 404s for a student (not 403)', fetchHidden.status === 404);
+
+  const iSees = await api<{ assignments: { id: string; visible: boolean }[] }>(
+    'GET', '/assignments', { token: iTok },
+  );
+  check(
+    'the instructor still sees it, marked hidden',
+    iSees.json.assignments.some((a) => a.id === SAMPLE_ASSIGNMENT_ID && a.visible === false),
+  );
+  const iFetch = await api('GET', `/assignments/${SAMPLE_ASSIGNMENT_ID}`, { token: iTok });
+  check('the instructor can still fetch it', iFetch.status === 200);
+
+  await api('PUT', `/assignments/${SAMPLE_ASSIGNMENT_ID}/visibility`, {
+    token: iTok,
+    body: { visible: true },
+  });
+  const fetchShown = await api('GET', `/assignments/${SAMPLE_ASSIGNMENT_ID}`, { token: sTok });
+  check('publishing again restores the student view', fetchShown.status === 200);
+
+  const unknown = await api('PUT', '/assignments/no-such-assignment/visibility', {
+    token: iTok,
+    body: { visible: false },
+  });
+  check('visibility on an unknown assignment is 404', unknown.status === 404);
+}
+
 // ── manual review (instructor-only; grades still unreleased here) ─
 const openQ = iAsg.json.assignment.questions.find((q) => q.buildMode === 'open')!;
 const reviewPath = `/assignments/${SAMPLE_ASSIGNMENT_ID}/submissions/1/review`;

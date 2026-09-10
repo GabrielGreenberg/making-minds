@@ -21,7 +21,13 @@ export function HomeScreen() {
     () => listAssignments(),
     [],
   );
-  const assignments = assignmentList ?? [];
+  // Hidden assignments are the instructor's drafts. Remotely the server never
+  // sends them to a student at all; this filter is what makes local mode
+  // agree, and it keeps an instructor's own catalog view honest by marking
+  // them rather than hiding them.
+  const assignments = (assignmentList ?? []).filter(
+    (a) => a.visible || user?.role === 'instructor',
+  );
 
   const handleSubmit = async (id: string, title: string) => {
     const ok = confirm(
@@ -80,6 +86,7 @@ export function HomeScreen() {
                     onClick={() => navigate({ kind: 'assignment', id: a.id })}
                   >
                     <span className="home-list-title">{a.title}</span>
+                    {!a.visible && <span className="home-hidden-tag">hidden from students</span>}
                     <span className="home-list-meta">
                       {a.questionCount} question{a.questionCount === 1 ? '' : 's'}
                     </span>

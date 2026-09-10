@@ -29,6 +29,8 @@ export interface AssignmentSummary {
   questionCount: number;
   /** Whether the instructor has released grades for this assignment. */
   gradesReleased: boolean;
+  /** Whether students can see this assignment at all (see AssignmentStore). */
+  visible: boolean;
   /** Due date (ISO timestamp), if the instructor set one. */
   dueDate?: string;
   /** Instructor-chosen position; absent sorts last (see sortAssignments). */
@@ -69,6 +71,7 @@ export async function listAssignments(): Promise<AssignmentSummary[]> {
       title: a.title,
       questionCount: a.questions.length,
       gradesReleased: await assignmentStore.getGradesReleased(a.id),
+      visible: await assignmentStore.getVisible(a.id),
       dueDate: a.dueDate,
       // Bundled assignments cannot be renumbered (they live outside the
       // store), so they are pinned ahead of everything the instructor has
@@ -115,5 +118,8 @@ export async function createAssignment(title: string): Promise<AssignmentData> {
     questions: [],
   };
   await assignmentStore.save(assignment);
+  // A brand-new assignment is empty; publish it deliberately once it has
+  // questions rather than flashing an empty shell into the student catalog.
+  await assignmentStore.setVisible(id, false);
   return assignment;
 }

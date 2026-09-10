@@ -8,6 +8,9 @@
 //   GET    /api/assignments/:id                student: answers stripped; instructor: full
 //   PUT    /api/assignments/:id                instructor: create/update
 //   DELETE /api/assignments/:id                instructor
+//   PUT    /api/assignments/:id/visibility     instructor: {visible: boolean} —
+//                                              hidden assignments are invisible
+//                                              to students (list + fetch)
 //   PUT    /api/assignments/:id/grades-release instructor: {released: boolean} —
 //                                              students see no grades at all until released
 //   GET    /api/workbooks/:assignmentId        the caller's saved canvas state
@@ -105,28 +108,40 @@ export function createApp(config: ServerConfig, db: Db) {
   });
 
   // ── assignments ────────────────────────────────────────────────
-  app.get('/api/assignments', auth, (_req, res) => {
+  app.get('/api/assignments', auth, (req, res) => {
     const released = db.listGradesReleased();
-    const summaries = db.listAssignments().map((a) => ({
-      id: a.id,
-      title: a.title,
-      questionCount: a.questions.length,
-      gradesReleased: released.get(a.id) ?? false,
-      dueDate: a.dueDate,
-      order: a.order,
-    }));
+    const visible = db.listVisible();
+    const isInstructor = req.user!.role === 'instructor';
+    const summaries = db
+      .listAssignments()
+      // A hidden assignment is invisible to students, not merely unlisted-
+      // with-a-flag: they must not learn it exists before it is published.
+      .filter((a) => isInstructor || (visible.get(a.id) ?? true))
+      .map((a) => ({
+        id: a.id,
+        title: a.title,
+        questionCount: a.questions.length,
+        gradesReleased: released.get(a.id) ?? false,
+        visible: visible.get(a.id) ?? true,
+        dueDate: a.dueDate,
+        order: a.order,
+      }));
     res.json({ assignments: summaries });
   });
 
   app.get('/api/assignments/:id', auth, (req, res) => {
     const assignment = db.getAssignment(String(req.params.id));
-    if (!assignment) {
+    const isInstructor = req.user!.role === 'instructor';
+    // A hidden assignment is a 404 for a student, not a 403: a deep link must
+    // not confirm that it exists.
+    if (!assignment || (!isInstructor && !db.getVisible(assignment.id))) {
       res.status(404).json({ error: 'not found' });
       return;
     }
     res.json({
-      assignment: req.user!.role === 'instructor' ? assignment : stripAnswers(assignment),
+      assignment: isInstructor ? assignment : stripAnswers(assignment),
       gradesReleased: db.getGradesReleased(assignment.id),
+      visible: db.getVisible(assignment.id),
     });
   });
 
@@ -154,6 +169,21 @@ export function createApp(config: ServerConfig, db: Db) {
   // Students never see grades — not even on submit — until the instructor
   // flips this per-assignment flag. Idempotent; unrelease (released: false)
   // hides grades again.
+  app.put('/api/assignments/:id/visibility', auth, requireInstructor, (req, res) => {
+    const id = String(req.params.id);
+    if (!db.getAssignment(id)) {
+      res.status(404).json({ error: 'unknown assignment' });
+      return;
+    }
+    const visible = (req.body ?? {}).visible;
+    if (typeof visible !== 'boolean') {
+      res.status(400).json({ error: 'body must be {visible: boolean}' });
+      return;
+    }
+    db.setVisible(id, visible);
+    res.json({ ok: true, visible });
+  });
+
   app.put('/api/assignments/:id/grades-release', auth, requireInstructor, (req, res) => {
     const id = String(req.params.id);
     if (!db.getAssignment(id)) {

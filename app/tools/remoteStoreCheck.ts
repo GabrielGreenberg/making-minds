@@ -167,6 +167,24 @@ check(
     .join(',') === 'Gamma,Beta,Alpha,Zeta',
 );
 
+// Visibility through the seam: hiding must make a student's fetch resolve
+// null (the server 404s), and getVisible must report it for the instructor.
+check('a saved assignment is visible by default', await remoteAssignmentStore.getVisible('remote-check-asg'));
+await remoteAssignmentStore.setVisible('remote-check-asg', false);
+check('setVisible(false) is reflected on the instructor summary',
+  (await remoteAssignmentStore.list()).find((a) => a.id === 'remote-check-asg')?.visible === false);
+check('…and by getVisible', (await remoteAssignmentStore.getVisible('remote-check-asg')) === false);
+await api.login(student.email);
+check('a hidden assignment is absent from the student list',
+  !(await remoteAssignmentStore.list()).some((a) => a.id === 'remote-check-asg'));
+check('…and get() resolves null for the student (404 → seam null)',
+  (await remoteAssignmentStore.get('remote-check-asg')) === null);
+check('…so getVisible answers false for them too',
+  (await remoteAssignmentStore.getVisible('remote-check-asg')) === false);
+await api.login(instructor.email);
+await remoteAssignmentStore.setVisible('remote-check-asg', true);
+check('publishing again restores it', (await remoteAssignmentStore.getVisible('remote-check-asg')) === true);
+
 await remoteAssignmentStore.remove('remote-check-asg');
 check('remove() → get() resolves null (404 → seam null)', (await remoteAssignmentStore.get('remote-check-asg')) === null);
 check('get() of an unknown id resolves null', (await remoteAssignmentStore.get('never-existed')) === null);

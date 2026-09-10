@@ -74,11 +74,19 @@ export class Db {
       CREATE INDEX IF NOT EXISTS idx_submissions_asg
         ON submissions (assignment_id, email, attempt);
     `);
-    // Column added after the initial schema; ALTER is a no-op error on re-run.
-    try {
-      this.db.exec('ALTER TABLE assignments ADD COLUMN grades_released INTEGER NOT NULL DEFAULT 0;');
-    } catch {
-      // already present
+    // Columns added after the initial schema; ALTER is a no-op error on re-run.
+    for (const sql of [
+      'ALTER TABLE assignments ADD COLUMN grades_released INTEGER NOT NULL DEFAULT 0;',
+      // Visibility defaults to 1 so every assignment that predates the column
+      // stays where students can see it; a NEW assignment is hidden by the
+      // client right after it is created (assignments/createAssignment).
+      'ALTER TABLE assignments ADD COLUMN student_visible INTEGER NOT NULL DEFAULT 1;',
+    ]) {
+      try {
+        this.db.exec(sql);
+      } catch {
+        // already present
+      }
     }
   }
 
@@ -180,6 +188,30 @@ export class Db {
       .prepare('SELECT id, grades_released FROM assignments')
       .all() as unknown as { id: string; grades_released: number }[];
     return new Map(rows.map((r) => [r.id, r.grades_released !== 0]));
+  }
+
+  // Student visibility — the same shape as grade release, and policy for the
+  // same reason: whether an assignment is published is not part of its
+  // content, and the server, not the client, decides who may see it.
+  getVisible(id: string): boolean {
+    const row = this.db
+      .prepare('SELECT student_visible FROM assignments WHERE id = ?')
+      .get(id) as unknown as { student_visible: number } | undefined;
+    return row ? row.student_visible !== 0 : false;
+  }
+
+  setVisible(id: string, visible: boolean): void {
+    this.db
+      .prepare('UPDATE assignments SET student_visible = ? WHERE id = ?')
+      .run(visible ? 1 : 0, id);
+  }
+
+  /** ids → visible flag, for decorating assignment list summaries. */
+  listVisible(): Map<string, boolean> {
+    const rows = this.db
+      .prepare('SELECT id, student_visible FROM assignments')
+      .all() as unknown as { id: string; student_visible: number }[];
+    return new Map(rows.map((r) => [r.id, r.student_visible !== 0]));
   }
 
   // ── workbooks ──────────────────────────────────────────────────
