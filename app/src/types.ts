@@ -154,6 +154,10 @@ export interface AssignmentQuestion {
   buildMode: BuildMode;        // canvas mode for this question (CC, SC, FSM, turbot, …)
   representation: RepSystem;   // authoritative for grading (binary | tally; TM notation: tally→unary)
   allowed_components?: ComponentType[];
+  /** Cap on how many of a component type the machine may contain, counted
+   *  through BOXED internals (engine/machineValidation.ts owns the
+   *  semantics). Absent, empty, or a type with no entry = unlimited. */
+  component_limits?: Partial<Record<ComponentType, number>>;
   /** TM-mode acceptance strictness: when true, a run is accepted only if the
    *  head halts on the output block's rightmost cell (standard position —
    *  tmCodec `AcceptOptions`). Absent/false = position-agnostic (default). */

@@ -773,6 +773,9 @@
       "statement": "Design a combinatorial circuit that computes 2(x+1): given a binary input x between 0 and 15 (IN1 = most significant bit), output the binary numeral for 2(x+1) (OUT1 = most significant bit). Only use ONE sub-part which computes +1 — box your +1 circuit once and reuse it, rather than incrementing twice.",
       "buildMode": "CC",
       "representation": "binary",
+      "component_limits": {
+        "BOXED": 1
+      },
       "cc_spec": {
         "inputs": [
           {

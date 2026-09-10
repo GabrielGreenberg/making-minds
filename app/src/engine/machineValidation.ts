@@ -116,6 +116,63 @@ export function validateAllowedComponents(
   };
 }
 
+// ─── component_limits — question-level component BUDGET ─────────────────────
+//
+// SEMANTICS (spec §1.5, beside allowed_components). Some problems cap how MANY
+// of something a machine may use, not just which types: HW2 P6 ("Only use ONE
+// sub-part which computes +1") is the motivating case.
+// `AssignmentQuestion.component_limits` maps a component type to the largest
+// number of that type the machine may contain.
+//
+//   - ABSENT, EMPTY, or a type with no entry ⇒ unlimited (back-compat).
+//   - An entry ⇒ at most that many, counted ANYWHERE in the machine: the walk
+//     recurses into BOXED internals, exactly as the type restriction does, so
+//     a budget cannot be dodged by hiding gates inside a box. A BOXED wrapper
+//     counts as one BOXED at the level it sits on (so "at most one boxed
+//     sub-part" is `{ BOXED: 1 }`), and its contents are then counted too.
+//
+// NOTE what this can and cannot say: a budget counts components, so
+// `{ BOXED: 1 }` enforces "at most one boxed sub-part", not "the +1 logic
+// appears only once" — a student who inlines two incrementers without boxing
+// them satisfies it. Checking THAT would need structural equivalence, which
+// the platform does not do.
+
+/** How many of each component type the machine contains, recursing into BOXED
+ *  internals (the wrapper counts as a BOXED itself). */
+export function componentCounts(
+  components: readonly CircuitComponent[],
+): Map<ComponentType, number> {
+  const counts = new Map<ComponentType, number>();
+  const walk = (comps: readonly CircuitComponent[]): void => {
+    for (const c of comps) {
+      counts.set(c.type, (counts.get(c.type) ?? 0) + 1);
+      if (c.type === 'BOXED') walk(c.internalCircuit?.components ?? []);
+    }
+  };
+  walk(components);
+  return counts;
+}
+
+/** Stage-1 check for the budget (see semantics above). Runs beside
+ *  validateAllowedComponents in every grading branch. */
+export function validateComponentLimits(
+  circuit: CircuitData,
+  limits: Partial<Record<ComponentType, number>> | undefined | null,
+): MachineValidation {
+  if (!limits) return OK;
+  const entries = Object.entries(limits) as [ComponentType, number][];
+  if (entries.length === 0) return OK;
+  const counts = componentCounts(circuit.components);
+  const over = entries
+    .filter(([type, max]) => Number.isFinite(max) && (counts.get(type) ?? 0) > max)
+    .map(([type, max]) => `${counts.get(type) ?? 0} × ${type} (at most ${max})`);
+  if (over.length === 0) return OK;
+  return {
+    ok: false,
+    reason: `machine exceeds this question's component budget: ${over.join(', ')} (boxed circuits are counted inside)`,
+  };
+}
+
 function sum(ns: number[]): number {
   return ns.reduce((a, b) => a + b, 0);
 }

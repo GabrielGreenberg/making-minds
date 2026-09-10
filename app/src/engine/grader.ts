@@ -46,7 +46,7 @@ import { fsmNotation } from './notation';
 import { evaluateTMSequence } from './tm';
 import { runTurbot, evaluateTurbotCriterion, explainTurbotCriterionFailure, criterionRequiresStop, validateTurbotTM, validateTurbotFSM } from './turbot';
 import { validatePerceptionMachine, runPerceptionCase } from './perception';
-import { validateMachine, validateAllowedComponents } from './machineValidation';
+import { validateMachine, validateAllowedComponents, validateComponentLimits } from './machineValidation';
 import {
   axisForMode,
   encodeInput,
@@ -107,6 +107,18 @@ function pendingOpen(questionId: number, responseText: string | undefined): Ques
   };
 }
 
+/** The two question-wide component rules, checked together at the head of
+ *  Stage 1 in every grading branch: which types are allowed, and how many of
+ *  each. Both are absent by default and both recurse into BOXED internals. */
+function questionComponentRules(
+  question: AssignmentQuestion,
+  circuit: CircuitData,
+): { ok: boolean; reason?: string } {
+  const allowed = validateAllowedComponents(circuit, question.allowed_components);
+  if (!allowed.ok) return allowed;
+  return validateComponentLimits(circuit, question.component_limits);
+}
+
 /**
  * Grade a single question's circuit against its numeric test cases.
  * `responseText` is the free-text answer for open questions (unused otherwise).
@@ -124,10 +136,11 @@ export function gradeQuestion(
   const cases = question.test_cases;
   if (!cases || cases.length === 0) return skip(question.id, 'question has no test cases');
 
-  // Stage 1 (question-wide): the component restriction, before any per-mode
-  // interface check — covers both the tape and space/time branches below.
-  // Semantics + helpers live in machineValidation.ts (allowed_components).
-  const restriction = validateAllowedComponents(circuit, question.allowed_components);
+  // Stage 1 (question-wide): the component restriction and budget, before any
+  // per-mode interface check — covers both the tape and space/time branches
+  // below. Semantics + helpers live in machineValidation.ts
+  // (allowed_components / component_limits).
+  const restriction = questionComponentRules(question, circuit);
   if (!restriction.ok) return failEvery(question.id, cases, restriction.reason!);
 
   const mode = question.buildMode;
@@ -244,10 +257,10 @@ function gradePerception(question: AssignmentQuestion, circuit: CircuitData): Qu
   const cases = question.perception_cases;
   if (!cases || cases.length === 0) return skip(question.id, 'question has no perception cases');
 
-  // Stage 1: the question-wide component restriction, then the retina
-  // interface (width input wires, one output wire). Invalid ⇒ fail every case
-  // with the reason, never `skipped`.
-  const restriction = validateAllowedComponents(circuit, question.allowed_components);
+  // Stage 1: the question-wide component rules, then the retina interface
+  // (width input wires, one output wire). Invalid ⇒ fail every case with the
+  // reason, never `skipped`.
+  const restriction = questionComponentRules(question, circuit);
   const valid = restriction.ok ? validatePerceptionMachine(circuit, spec.width) : restriction;
   if (!valid.ok) {
     const rejected: PerceptionCaseResult[] = cases.map((tc) => ({
@@ -309,9 +322,10 @@ function gradeTurbot(question: AssignmentQuestion, circuit: CircuitData): Questi
   // The question's encoding (representation) picks a turbot TM's internal
   // tape alphabet: binary {0,1,*}, unary (tally) {0,1}.
   const notation = notationForRepresentation(question.representation ?? 'binary');
-  // Stage 1 starts with the question-wide component restriction (vacuous for
-  // STATE-vocabulary FSM/TM brains — STATE is infrastructure — but uniform).
-  const restriction = validateAllowedComponents(circuit, question.allowed_components);
+  // Stage 1 starts with the question-wide component rules (the type
+  // restriction is vacuous for STATE-vocabulary FSM/TM brains — STATE is
+  // infrastructure — but uniform; a budget can still bite).
+  const restriction = questionComponentRules(question, circuit);
   let valid: { ok: boolean; reason?: string };
   if (!restriction.ok) {
     valid = restriction;

@@ -949,7 +949,13 @@ only — the grader never sees the formula; it runs against the generated numeri
   `allowed_components` to restrict the component vocabulary (semantics in
   `engine/machineValidation.ts`: listed types only + always-allowed INPUT/OUTPUT/STATE, boxed
   internals recursed; absent/empty = unrestricted) — enforced at Stage-1 grading, in the student
-  palette, and authored via the question creator's "Restrict available components" toggle.
+  palette, and authored via the question creator's "Restrict available components" toggle. It
+  may also set `component_limits` (`{TYPE: max}`, counted through boxed internals; absent or
+  a type with no entry = unlimited) to cap HOW MANY of something a machine may use — HW2 P6's
+  "only use ONE sub-part which computes +1" is `{BOXED: 1}`. Note what a budget can say: it
+  counts components, so it enforces "at most one boxed sub-part", not "the +1 logic appears
+  only once". Same Stage-1 seat as the type restriction; authored via "Limit how many
+  components may be used".
 
 ## Things to watch
 

@@ -89,6 +89,14 @@ const RESTRICTABLE_GATES: { type: ComponentType; label: string }[] = [
   { type: 'MEM', label: 'MEM' },
 ];
 
+// Types a question can put a BUDGET on (`component_limits`). The gates, plus
+// BOXED — "only use ONE sub-part" (HW2 P6) is the motivating case, and it is
+// a cap on boxed instances. Blank = no cap on that type.
+const BUDGETABLE_COMPONENTS: { type: ComponentType; label: string }[] = [
+  ...RESTRICTABLE_GATES,
+  { type: 'BOXED', label: 'Boxed sub-parts' },
+];
+
 type ArenaTool = 'block' | 'goal' | 'erase' | 'start';
 
 const ARENA_TOOLS: { tool: ArenaTool; label: string }[] = [
@@ -156,6 +164,21 @@ export function QuestionCreator({ assignment, existingQuestion, onSave, onCancel
     return existing && existing.length > 0
       ? vocabulary.filter((t) => existing.includes(t))
       : vocabulary; // default when first enabled: everything checked
+  });
+
+  // Component budget (`component_limits`). Held as text so a field can be
+  // cleared to "no cap"; only well-formed non-negative integers are saved.
+  const [limitComponents, setLimitComponents] = useState<boolean>(
+    () => Object.keys(existingQuestion?.component_limits ?? {}).length > 0,
+  );
+  const [componentLimits, setComponentLimits] = useState<Record<string, string>>(() => {
+    const existing = existingQuestion?.component_limits ?? {};
+    const out: Record<string, string> = {};
+    for (const b of BUDGETABLE_COMPONENTS) {
+      const v = existing[b.type];
+      out[b.type] = typeof v === 'number' ? String(v) : '';
+    }
+    return out;
   });
 
   const [inputs, setInputs] = useState<AuthoredInputGroup[]>(() =>
@@ -252,6 +275,20 @@ export function QuestionCreator({ assignment, existingQuestion, onSave, onCancel
     canRestrictComponents && restrictComponents
       ? { allowed_components: ['INPUT', 'OUTPUT', ...allowedGates] }
       : {};
+
+  // A budget is meaningful on any canvas that has components to count.
+  const canLimitComponents = mode !== 'open';
+  const componentLimitsField: Pick<AssignmentQuestion, 'component_limits'> = (() => {
+    if (!canLimitComponents || !limitComponents) return {};
+    const limits: Partial<Record<ComponentType, number>> = {};
+    for (const b of BUDGETABLE_COMPONENTS) {
+      const raw = (componentLimits[b.type] ?? '').trim();
+      if (raw === '') continue;
+      const n = Number(raw);
+      if (Number.isInteger(n) && n >= 0) limits[b.type] = n;
+    }
+    return Object.keys(limits).length > 0 ? { component_limits: limits } : {};
+  })();
 
   // The rule kind must match the mode's family; coerce when the mode flips.
   const kindChoices = mode === 'CC' || mode === 'SC' ? PERCEPTION_KINDS[mode] : [];
@@ -364,6 +401,7 @@ export function QuestionCreator({ assignment, existingQuestion, onSave, onCancel
         buildMode: 'turbot',
         representation: rep,
         ...allowedComponentsField,
+        ...componentLimitsField,
         innerMode,
         turbot_cases: [{ arena, maxSteps, criterion }],
       });
@@ -390,6 +428,7 @@ export function QuestionCreator({ assignment, existingQuestion, onSave, onCancel
         buildMode: mode,
         representation: 'binary',
         ...allowedComponentsField,
+        ...componentLimitsField,
         perception: { rule, width: effWidth },
         perception_cases,
       });
@@ -421,6 +460,7 @@ export function QuestionCreator({ assignment, existingQuestion, onSave, onCancel
       ...(mode === 'TM' && requireStandardHalt ? { requireStandardHaltPosition: true } : {}),
       // Component restriction; omitted (default = unrestricted) unless enabled.
       ...allowedComponentsField,
+      ...componentLimitsField,
       cc_spec: bank.spec,
       test_cases: bank.test_cases,
     });
@@ -594,6 +634,38 @@ export function QuestionCreator({ assignment, existingQuestion, onSave, onCancel
                       }
                     />
                     {g.label}
+                  </label>
+                ))}
+              </div>
+            )}
+          </>
+        )}
+        {canLimitComponents && (
+          <>
+            <label className="instructor-inline-field">
+              <input
+                type="checkbox"
+                checked={limitComponents}
+                onChange={(e) => setLimitComponents(e.target.checked)}
+              />
+              Limit how many components may be used (leave a box blank for no
+              cap; components inside boxed circuits are counted too)
+            </label>
+            {limitComponents && (
+              <div className="instructor-criterion-row">
+                {BUDGETABLE_COMPONENTS.map((b) => (
+                  <label key={b.type} className="instructor-inline-field">
+                    {b.label}
+                    <input
+                      className="instructor-input instructor-input--num"
+                      type="number"
+                      min={0}
+                      placeholder="—"
+                      value={componentLimits[b.type] ?? ''}
+                      onChange={(e) =>
+                        setComponentLimits({ ...componentLimits, [b.type]: e.target.value })
+                      }
+                    />
                   </label>
                 ))}
               </div>

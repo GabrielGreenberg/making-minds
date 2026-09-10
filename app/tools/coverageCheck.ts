@@ -57,6 +57,8 @@ import { axisForMode, encodeInput, type CodecLayout } from '../src/engine/codec'
 import {
   validateMachine,
   validateAllowedComponents,
+  validateComponentLimits,
+  componentCounts,
   isComponentTypeAllowed,
 } from '../src/engine/machineValidation';
 import { validateTurbotTM, validateTurbotFSM } from '../src/engine/turbot';
@@ -139,10 +141,13 @@ function validateStage1(
   // to 'pending' before any validation); fixtures are never open questions.
   if (question.buildMode === 'open') return { ok: true };
 
-  // Question-wide component restriction — every grading branch checks it first
-  // (allowed_components semantics live in machineValidation.ts).
+  // Question-wide component rules — every grading branch checks them first
+  // (allowed_components / component_limits semantics live in
+  // machineValidation.ts).
   const restriction = validateAllowedComponents(machine, question.allowed_components);
   if (!restriction.ok) return restriction;
+  const budget = validateComponentLimits(machine, question.component_limits);
+  if (!budget.ok) return budget;
 
   if (question.buildMode === 'turbot') {
     const innerMode = question.innerMode;
@@ -613,6 +618,62 @@ function runTripwires(): void {
   selfCheck(
     'allowed_components: interface-tier mirror rejects a violating machine → REGRESSED',
     ifaceRestricted.state === 'regressed' && ifaceRestricted.detail.includes('Stage-1'),
+  );
+
+  // (g) component_limits: the question-level BUDGET must bite too, and must
+  // count through boxed internals so a box cannot hide gates from it.
+  const twoOr = circuit(
+    [
+      comp('inx', 'INPUT', 'IN1', 100, 80),
+      comp('iny', 'INPUT', 'IN2', 100, 220),
+      comp('g1', 'OR', 'OR', 320, 130),
+      comp('g2', 'OR', 'OR', 320, 260),
+      comp('out1', 'OUTPUT', 'OUT1', 540, 150),
+    ],
+    [
+      wire('w1', 'inx', 'out', 'g1', 'in1'),
+      wire('w2', 'iny', 'out', 'g1', 'in2'),
+      wire('w3', 'g1', 'out', 'out1', 'in'),
+    ],
+  );
+  const budgeted = { ...unrestricted, component_limits: { OR: 1 } };
+  const overBudget = gradeQuestion(budgeted, twoOr);
+  selfCheck(
+    'component_limits: 2 ORs under a budget of 1 FAILS every case (reason names the count)',
+    overBudget.status === 'graded' && overBudget.passed === 0 &&
+      (overBudget.cases[0]?.reason ?? '').includes('2 × OR'),
+  );
+  selfCheck(
+    'component_limits: the same machine passes with the budget absent',
+    allPass(unrestricted, twoOr),
+  );
+  selfCheck(
+    'component_limits: one OR is within a budget of 1',
+    allPass(budgeted, orMachine),
+  );
+  const boxedOverBudget = gradeQuestion({ ...unrestricted, component_limits: { OR: 0 } }, smuggler);
+  selfCheck(
+    'component_limits: an OR hidden inside a box still counts',
+    boxedOverBudget.status === 'graded' && boxedOverBudget.passed === 0 &&
+      (boxedOverBudget.cases[0]?.reason ?? '').includes('OR'),
+  );
+  selfCheck(
+    'component_limits: componentCounts sees the wrapper AND its internals',
+    componentCounts(smuggler.components).get('BOXED') === 1 &&
+      componentCounts(smuggler.components).get('OR') === 1,
+  );
+
+  // The interface-tier Stage-1 mirror enforces the budget too.
+  const ifaceBudget = evaluateInterfaceFixture(
+    { ...tripwireRow('tripwire-iface-budget', 'SC'), tier: 'interface' },
+    {
+      question: { ...tripwireQuestion(cleanStatement), component_limits: { OR: 0 } },
+      correct, // the OR tripwire machine — busts the budget
+    },
+  );
+  selfCheck(
+    'component_limits: interface-tier mirror rejects an over-budget machine → REGRESSED',
+    ifaceBudget.state === 'regressed' && ifaceBudget.detail.includes('Stage-1'),
   );
 
   console.log('');
