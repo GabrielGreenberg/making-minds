@@ -1898,6 +1898,18 @@ thead .sc-label-col {
   color: #444;
 }
 
+/* A question's optional short name — bold, on a line of its own above the
+   statement (both the panel and the open-question workspace). */
+.question-title {
+  font-weight: 700;
+  color: var(--text);
+  margin-bottom: 0.35em;
+}
+
+.assignment-overview-title {
+  color: #1a1a1a;
+}
+
 /* ── Rendered question statements (components/StatementBody.tsx) ── */
 
 .statement-para {

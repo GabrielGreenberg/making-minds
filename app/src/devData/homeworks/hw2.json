@@ -3271,7 +3271,8 @@
     {
       "id": 10,
       "label": "Problem 10",
-      "statement": "Edge detector. Design a machine (8 inputs, 1 output) that outputs 1 iff there is a string of at least three consecutive 1s anywhere in the input.",
+      "title": "Edge detector",
+      "statement": "Design a machine (8 inputs, 1 output) that outputs 1 iff there is a string of at least three consecutive 1s anywhere in the input.",
       "buildMode": "CC",
       "representation": "binary",
       "perception": {
@@ -7639,7 +7640,8 @@
     {
       "id": 11,
       "label": "Problem 11",
-      "statement": "Object detector. Design a machine (8 inputs, 1 output) that outputs 1 iff there is a string of exactly three consecutive 1s anywhere in the input.",
+      "title": "Object detector",
+      "statement": "Design a machine (8 inputs, 1 output) that outputs 1 iff there is a string of exactly three consecutive 1s anywhere in the input.",
       "buildMode": "CC",
       "representation": "binary",
       "perception": {
@@ -12007,7 +12009,8 @@
     {
       "id": 12,
       "label": "Problem 12",
-      "statement": "Landmark recognition. Design a machine (9 inputs, 1 output) that outputs 1 iff the input = 110010111.",
+      "title": "Landmark recognition",
+      "statement": "Design a machine (9 inputs, 1 output) that outputs 1 iff the input = 110010111.",
       "buildMode": "CC",
       "representation": "binary",
       "perception": {
@@ -21239,7 +21242,8 @@
     {
       "id": 13,
       "label": "Problem 13",
-      "statement": "Spiral. The turbot starts at the outer end of a one-cell-wide spiral corridor, facing along it, and the goal lies at the corridor’s inner end. Build a combinatorial-circuit brain that drives the turbot around the spiral and over the goal. Navigation is complete when the turbot crosses the goal cell — it does not need to stop there.",
+      "title": "Spiral",
+      "statement": "The turbot starts at the outer end of a one-cell-wide spiral corridor, facing along it, and the goal lies at the corridor’s inner end. Build a combinatorial-circuit brain that drives the turbot around the spiral and over the goal. Navigation is complete when the turbot crosses the goal cell — it does not need to stop there.",
       "buildMode": "turbot",
       "representation": "binary",
       "innerMode": "CC",
@@ -21421,7 +21425,8 @@
     {
       "id": 14,
       "label": "Problem 14",
-      "statement": "Full circle. The turbot sits inside a walled rectangular room with no obstacles, on the bottom row of open cells, facing along the wall — and the goal lies in the cell directly behind it. Build a combinatorial-circuit brain that drives the turbot one full lap around the inside of the room and back over the goal. Navigation is completed when the turbot crosses over the goal — it does not need to stop on it. (Think of Pac-Man.)",
+      "title": "Full circle",
+      "statement": "The turbot sits inside a walled rectangular room with no obstacles, on the bottom row of open cells, facing along the wall — and the goal lies in the cell directly behind it. Build a combinatorial-circuit brain that drives the turbot one full lap around the inside of the room and back over the goal. Navigation is completed when the turbot crosses over the goal — it does not need to stop on it. (Think of Pac-Man.)",
       "buildMode": "turbot",
       "representation": "binary",
       "innerMode": "CC",
@@ -21592,7 +21597,8 @@
     {
       "id": 15,
       "label": "Problem 15",
-      "statement": "Zig-zag. The turbot starts at the bottom of a Z-shaped corridor, facing along its first leg; the goal lies at the far end, past two turns in opposite directions. Navigation is completed the moment the turbot crosses over the goal cell — it does not need to stop on it. Can this course be completed by a combinatorial circuit embedded in a turbot? If so, give the circuit. If not, explain why in a short paragraph.",
+      "title": "Zig-zag",
+      "statement": "The turbot starts at the bottom of a Z-shaped corridor, facing along its first leg; the goal lies at the far end, past two turns in opposite directions. Navigation is completed the moment the turbot crosses over the goal cell — it does not need to stop on it. Can this course be completed by a combinatorial circuit embedded in a turbot? If so, give the circuit. If not, explain why in a short paragraph.",
       "buildMode": "turbot",
       "representation": "binary",
       "innerMode": "CC",
@@ -21725,14 +21731,16 @@
     {
       "id": 16,
       "label": "Problem 16",
-      "statement": "Representational systems. Suppose you were designing a calculator for solving a high-stakes problem. (Perhaps \"you\" are Nature, the \"calculator\" is the Brain, and the \"problem\" is Survival.) Would you design it to calculate in binary or in tally? Why? Use specific examples to justify your answer. ~1 paragraph.",
+      "title": "Representational systems",
+      "statement": "Suppose you were designing a calculator for solving a high-stakes problem. (Perhaps \"you\" are Nature, the \"calculator\" is the Brain, and the \"problem\" is Survival.) Would you design it to calculate in binary or in tally? Why? Use specific examples to justify your answer. ~1 paragraph.",
       "buildMode": "open",
       "representation": "binary"
     },
     {
       "id": 17,
       "label": "Problem 17",
-      "statement": "Embodied computation. Consider a Turbot like the one in problem 12 (landmark recognition). What function, if any, does it compute? If it does compute a function, what are the arguments and what is the value of this function? How does this compare to the function computed by the \"directions\" mode in Google Maps? ~1 paragraph.",
+      "title": "Embodied computation",
+      "statement": "Consider a Turbot like the one in problem 12 (landmark recognition). What function, if any, does it compute? If it does compute a function, what are the arguments and what is the value of this function? How does this compare to the function computed by the \"directions\" mode in Google Maps? ~1 paragraph.",
       "buildMode": "open",
       "representation": "binary"
     }

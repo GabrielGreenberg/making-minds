@@ -2,7 +2,8 @@
   "question": {
     "id": 14,
     "label": "Problem 14",
-    "statement": "Three ahead. The goal lies exactly three cells directly ahead of the turbot, but it is invisible to the sensor — it reads as an empty cell. Build a sequential circuit brain that drives the turbot forward onto the goal and stops there. The brain has one sensor input and two outputs, one for each wheel.",
+    "title": "Three ahead",
+    "statement": "The goal lies exactly three cells directly ahead of the turbot, but it is invisible to the sensor — it reads as an empty cell. Build a sequential circuit brain that drives the turbot forward onto the goal and stops there. The brain has one sensor input and two outputs, one for each wheel.",
     "buildMode": "turbot",
     "representation": "binary",
     "innerMode": "SC",

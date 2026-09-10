@@ -2,7 +2,8 @@
   "question": {
     "id": 13,
     "label": "Problem 13",
-    "statement": "Spiral. The turbot starts at the outer end of a one-cell-wide spiral corridor, facing along it, and the goal lies at the corridor’s inner end. Build a combinatorial-circuit brain that drives the turbot around the spiral and over the goal. Navigation is complete when the turbot crosses the goal cell — it does not need to stop there.",
+    "title": "Spiral",
+    "statement": "The turbot starts at the outer end of a one-cell-wide spiral corridor, facing along it, and the goal lies at the corridor’s inner end. Build a combinatorial-circuit brain that drives the turbot around the spiral and over the goal. Navigation is complete when the turbot crosses the goal cell — it does not need to stop there.",
     "buildMode": "turbot",
     "representation": "binary",
     "innerMode": "CC",

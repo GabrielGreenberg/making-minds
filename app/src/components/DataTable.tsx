@@ -25,7 +25,10 @@ function QuestionStatement() {
         <span>Question</span>
         <span className="question-rep-badge">{question.representation} representation</span>
       </div>
-      <StatementBody text={question.statement} className="question-statement" />
+      <div className="question-statement">
+        {question.title && <div className="question-title">{question.title}</div>}
+        <StatementBody text={question.statement} />
+      </div>
     </div>
   );
 }

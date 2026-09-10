@@ -2,7 +2,8 @@
   "question": {
     "id": 14,
     "label": "Problem 14",
-    "statement": "Way Finder: the turbot starts at one end of a non-branching maze — a path that never branches and is never wider than one cell across, except on corners where two one-cell-wide paths may intersect. Design a finite-state machine brain that makes its way all the way through any such maze: the layout is not known in advance, so the brain must feel its way with its sensor. Navigation is completed the moment the turbot crosses the goal cell near the far end — it does not need to stop on the goal, and may come to rest once the path finally runs out.",
+    "title": "Way Finder",
+    "statement": "The turbot starts at one end of a non-branching maze — a path that never branches and is never wider than one cell across, except on corners where two one-cell-wide paths may intersect. Design a finite-state machine brain that makes its way all the way through any such maze: the layout is not known in advance, so the brain must feel its way with its sensor. Navigation is completed the moment the turbot crosses the goal cell near the far end — it does not need to stop on the goal, and may come to rest once the path finally runs out.",
     "buildMode": "turbot",
     "representation": "binary",
     "innerMode": "FSM",

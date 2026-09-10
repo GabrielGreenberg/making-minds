@@ -2,7 +2,8 @@
   "question": {
     "id": 10,
     "label": "Problem 10",
-    "statement": "Edge detector. Design a machine (8 inputs, 1 output) that outputs 1 iff there is a string of at least three consecutive 1s anywhere in the input.",
+    "title": "Edge detector",
+    "statement": "Design a machine (8 inputs, 1 output) that outputs 1 iff there is a string of at least three consecutive 1s anywhere in the input.",
     "buildMode": "CC",
     "representation": "binary",
     "perception": {

@@ -2,7 +2,8 @@
   "question": {
     "id": 14,
     "label": "Problem 14",
-    "statement": "Full circle. The turbot sits inside a walled rectangular room with no obstacles, on the bottom row of open cells, facing along the wall — and the goal lies in the cell directly behind it. Build a combinatorial-circuit brain that drives the turbot one full lap around the inside of the room and back over the goal. Navigation is completed when the turbot crosses over the goal — it does not need to stop on it. (Think of Pac-Man.)",
+    "title": "Full circle",
+    "statement": "The turbot sits inside a walled rectangular room with no obstacles, on the bottom row of open cells, facing along the wall — and the goal lies in the cell directly behind it. Build a combinatorial-circuit brain that drives the turbot one full lap around the inside of the room and back over the goal. Navigation is completed when the turbot crosses over the goal — it does not need to stop on it. (Think of Pac-Man.)",
     "buildMode": "turbot",
     "representation": "binary",
     "innerMode": "CC",

@@ -58,7 +58,10 @@ export function AssignmentOverview() {
               >
                 <span className="assignment-overview-label">{q.label}</span>
                 <span className="assignment-overview-mode">{questionModeLabel(q)}</span>
-                <span className="assignment-overview-statement">{statementProse(q.statement)}</span>
+                <span className="assignment-overview-statement">
+                  {q.title && <strong className="assignment-overview-title">{q.title}. </strong>}
+                  {statementProse(q.statement)}
+                </span>
               </button>
             ))}
             {assignment.questions.length === 0 && (

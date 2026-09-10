@@ -2,7 +2,8 @@
   "question": {
     "id": 12,
     "label": "Problem 12",
-    "statement": "Motion detector. Let an object image be a string of exactly three consecutive 1s. Design a sequential machine (8 inputs, 1 output) that outputs 1 iff there is an object image anywhere in the input moving upwards 1 unit per unit of time.",
+    "title": "Motion detector",
+    "statement": "Let an object image be a string of exactly three consecutive 1s. Design a sequential machine (8 inputs, 1 output) that outputs 1 iff there is an object image anywhere in the input moving upwards 1 unit per unit of time.",
     "buildMode": "SC",
     "representation": "binary",
     "perception": {

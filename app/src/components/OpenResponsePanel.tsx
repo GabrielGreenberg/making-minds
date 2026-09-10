@@ -30,7 +30,10 @@ export function OpenResponsePanel() {
           <h2 className="open-response-label">{question.label}</h2>
           <span className="open-response-mode">open question</span>
         </div>
-        <StatementBody text={question.statement} className="open-response-statement" />
+        <div className="open-response-statement">
+          {question.title && <div className="question-title">{question.title}</div>}
+          <StatementBody text={question.statement} />
+        </div>
         <textarea
           className="open-response-textarea"
           value={response}

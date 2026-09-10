@@ -71,7 +71,8 @@
     {
       "id": 2,
       "label": "Problem 2",
-      "statement": "Reconstructing OR. Design a combinatorial circuit with the following input-output profile: IN1=0,IN2=0 -> OUT=0; IN1=0,IN2=1 -> OUT=1; IN1=1,IN2=0 -> OUT=1; IN1=1,IN2=1 -> OUT=1. For this problem, do not use OR-gates. DeMorgan's Law is useful here!",
+      "title": "Reconstructing OR",
+      "statement": "Design a combinatorial circuit with the following input-output profile: IN1=0,IN2=0 -> OUT=0; IN1=0,IN2=1 -> OUT=1; IN1=1,IN2=0 -> OUT=1; IN1=1,IN2=1 -> OUT=1. For this problem, do not use OR-gates. DeMorgan's Law is useful here!",
       "buildMode": "CC",
       "representation": "binary",
       "allowed_components": [
@@ -143,7 +144,8 @@
     {
       "id": 3,
       "label": "Problem 3",
-      "statement": "Splitting outputs. Design a combinatorial circuit with two inputs and two outputs, with the following input-output profile: IN1=0,IN2=0 -> OUT1=0,OUT2=1; IN1=0,IN2=1 -> OUT1=0,OUT2=1; IN1=1,IN2=0 -> OUT1=0,OUT2=1; IN1=1,IN2=1 -> OUT1=1,OUT2=0.",
+      "title": "Splitting outputs",
+      "statement": "Design a combinatorial circuit with two inputs and two outputs, with the following input-output profile: IN1=0,IN2=0 -> OUT1=0,OUT2=1; IN1=0,IN2=1 -> OUT1=0,OUT2=1; IN1=1,IN2=0 -> OUT1=0,OUT2=1; IN1=1,IN2=1 -> OUT1=1,OUT2=0.",
       "buildMode": "CC",
       "representation": "binary",
       "cc_spec": {
@@ -218,7 +220,8 @@
     {
       "id": 4,
       "label": "Problem 4",
-      "statement": "XOR (exclusive OR). Design a combinatorial circuit with the following input-output profile: IN1=0,IN2=0 -> OUT=0; IN1=0,IN2=1 -> OUT=1; IN1=1,IN2=0 -> OUT=1; IN1=1,IN2=1 -> OUT=0.",
+      "title": "XOR (exclusive OR)",
+      "statement": "Design a combinatorial circuit with the following input-output profile: IN1=0,IN2=0 -> OUT=0; IN1=0,IN2=1 -> OUT=1; IN1=1,IN2=0 -> OUT=1; IN1=1,IN2=1 -> OUT=0.",
       "buildMode": "CC",
       "representation": "binary",
       "allowed_components": [
@@ -291,7 +294,8 @@
     {
       "id": 5,
       "label": "Problem 5",
-      "statement": "Combining circuits. Design a combinatorial circuit with two inputs and two outputs, with the following input-output profile: IN1=0,IN2=0 -> OUT1=0,OUT2=0; IN1=0,IN2=1 -> OUT1=1,OUT2=0; IN1=1,IN2=0 -> OUT1=1,OUT2=0; IN1=1,IN2=1 -> OUT1=0,OUT2=1.",
+      "title": "Combining circuits",
+      "statement": "Design a combinatorial circuit with two inputs and two outputs, with the following input-output profile: IN1=0,IN2=0 -> OUT1=0,OUT2=0; IN1=0,IN2=1 -> OUT1=1,OUT2=0; IN1=1,IN2=0 -> OUT1=1,OUT2=0; IN1=1,IN2=1 -> OUT1=0,OUT2=1.",
       "buildMode": "CC",
       "representation": "binary",
       "cc_spec": {

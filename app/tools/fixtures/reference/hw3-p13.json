@@ -2,7 +2,8 @@
   "question": {
     "id": 13,
     "label": "Problem 13",
-    "statement": "Zig-zag: reach the goal and keep going. A staircase corridor climbs from the turbot’s starting cell to the goal, walled in by blocks on every side; at the end of each leg the corridor turns, alternating left and right. Program the turbot’s sequential-circuit brain to follow the corridor all the way to the goal and keep going — it need not stop. The goal is invisible to the sensor: it reads as an empty cell. The brain has one sensor input and two outputs, one for each wheel.",
+    "title": "Zig-zag: reach the goal and keep going",
+    "statement": "A staircase corridor climbs from the turbot’s starting cell to the goal, walled in by blocks on every side; at the end of each leg the corridor turns, alternating left and right. Program the turbot’s sequential-circuit brain to follow the corridor all the way to the goal and keep going — it need not stop. The goal is invisible to the sensor: it reads as an empty cell. The brain has one sensor input and two outputs, one for each wheel.",
     "buildMode": "turbot",
     "representation": "binary",
     "innerMode": "SC",

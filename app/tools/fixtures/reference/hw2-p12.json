@@ -2,7 +2,8 @@
   "question": {
     "id": 12,
     "label": "Problem 12",
-    "statement": "Landmark recognition. Design a machine (9 inputs, 1 output) that outputs 1 iff the input = 110010111.",
+    "title": "Landmark recognition",
+    "statement": "Design a machine (9 inputs, 1 output) that outputs 1 iff the input = 110010111.",
     "buildMode": "CC",
     "representation": "binary",
     "perception": {

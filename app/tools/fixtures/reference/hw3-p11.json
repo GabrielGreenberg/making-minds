@@ -2,7 +2,8 @@
   "question": {
     "id": 11,
     "label": "Problem 11",
-    "statement": "Change detector. Design a sequential machine (8 inputs, 1 output) that outputs 1 iff the current input differs in any way from the previous input.",
+    "title": "Change detector",
+    "statement": "Design a sequential machine (8 inputs, 1 output) that outputs 1 iff the current input differs in any way from the previous input.",
     "buildMode": "SC",
     "representation": "binary",
     "perception": {

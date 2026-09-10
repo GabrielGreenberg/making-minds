@@ -2,7 +2,8 @@
   "question": {
     "id": 5,
     "label": "Problem 5",
-    "statement": "Combining circuits. Design a combinatorial circuit with two inputs and two outputs, with the following input-output profile: IN1=0,IN2=0 -> OUT1=0,OUT2=0; IN1=0,IN2=1 -> OUT1=1,OUT2=0; IN1=1,IN2=0 -> OUT1=1,OUT2=0; IN1=1,IN2=1 -> OUT1=0,OUT2=1.",
+    "title": "Combining circuits",
+    "statement": "Design a combinatorial circuit with two inputs and two outputs, with the following input-output profile: IN1=0,IN2=0 -> OUT1=0,OUT2=0; IN1=0,IN2=1 -> OUT1=1,OUT2=0; IN1=1,IN2=0 -> OUT1=1,OUT2=0; IN1=1,IN2=1 -> OUT1=0,OUT2=1.",
     "buildMode": "CC",
     "representation": "binary",
     "cc_spec": {

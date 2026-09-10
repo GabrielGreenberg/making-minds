@@ -2,7 +2,8 @@
   "question": {
     "id": 15,
     "label": "Problem 15",
-    "statement": "Mad Max. A block sits directly ahead of the turbot, an unknown distance away. Build a sequential circuit brain that drives the turbot out to the block, then turns around, returns to the starting point, and stops there. There are no blocks or markers at the starting point. The brain has one sensor input and two outputs, one for each wheel.",
+    "title": "Mad Max",
+    "statement": "A block sits directly ahead of the turbot, an unknown distance away. Build a sequential circuit brain that drives the turbot out to the block, then turns around, returns to the starting point, and stops there. There are no blocks or markers at the starting point. The brain has one sensor input and two outputs, one for each wheel.",
     "buildMode": "turbot",
     "representation": "binary",
     "innerMode": "SC",

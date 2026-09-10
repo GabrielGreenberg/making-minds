@@ -178,6 +178,8 @@ export function QuestionCreator({ assignment, existingQuestion, onSave, onCancel
     return `Problem ${assignment.questions.length + 1}`;
   });
   const [statement, setStatement] = useState(existingQuestion?.statement ?? '');
+  // Optional short name for the problem, shown bold above the statement.
+  const [title, setTitle] = useState(existingQuestion?.title ?? '');
 
   // ── Perception fields (CC/SC questions with task === 'perception') ──
   // Perception questions grade raw bit frames against a rule, not a formula
@@ -335,6 +337,7 @@ export function QuestionCreator({ assignment, existingQuestion, onSave, onCancel
       onSave({
         id: newId,
         label: label.trim(),
+        ...(title.trim() ? { title: title.trim() } : {}),
         statement: statement.trim(),
         buildMode: 'open',
         representation: 'binary',
@@ -350,6 +353,7 @@ export function QuestionCreator({ assignment, existingQuestion, onSave, onCancel
       onSave({
         id: newId,
         label: label.trim(),
+        ...(title.trim() ? { title: title.trim() } : {}),
         statement: statement.trim(),
         buildMode: 'turbot',
         representation: rep,
@@ -373,6 +377,7 @@ export function QuestionCreator({ assignment, existingQuestion, onSave, onCancel
       onSave({
         id: newId,
         label: label.trim(),
+        ...(title.trim() ? { title: title.trim() } : {}),
         statement: statement.trim(),
         buildMode: mode,
         representation: 'binary',
@@ -399,6 +404,7 @@ export function QuestionCreator({ assignment, existingQuestion, onSave, onCancel
     onSave({
       id: newId,
       label: label.trim(),
+      ...(title.trim() ? { title: title.trim() } : {}),
       statement: statement.trim(),
       buildMode: mode,
       representation: rep,
@@ -441,6 +447,15 @@ export function QuestionCreator({ assignment, existingQuestion, onSave, onCancel
             placeholder="e.g. Problem 1"
             value={label}
             onChange={(e) => setLabel(e.target.value)}
+          />
+        </label>
+        <label className="instructor-field">
+          <span className="instructor-field-label">Title (optional)</span>
+          <input
+            className="instructor-input"
+            placeholder="e.g. Reconstructing OR"
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
           />
         </label>
         <div className="instructor-section-head">

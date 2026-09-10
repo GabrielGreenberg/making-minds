@@ -2901,7 +2901,8 @@
     {
       "id": 11,
       "label": "Problem 11",
-      "statement": "Change detector. Design a sequential machine (8 inputs, 1 output) that outputs 1 iff the current input differs in any way from the previous input.",
+      "title": "Change detector",
+      "statement": "Design a sequential machine (8 inputs, 1 output) that outputs 1 iff the current input differs in any way from the previous input.",
       "buildMode": "SC",
       "representation": "binary",
       "perception": {
@@ -3580,7 +3581,8 @@
     {
       "id": 12,
       "label": "Problem 12",
-      "statement": "Motion detector. Let an object image be a string of exactly three consecutive 1s. Design a sequential machine (8 inputs, 1 output) that outputs 1 iff there is an object image anywhere in the input moving upwards 1 unit per unit of time.",
+      "title": "Motion detector",
+      "statement": "Let an object image be a string of exactly three consecutive 1s. Design a sequential machine (8 inputs, 1 output) that outputs 1 iff there is an object image anywhere in the input moving upwards 1 unit per unit of time.",
       "buildMode": "SC",
       "representation": "binary",
       "perception": {
@@ -4167,7 +4169,8 @@
     {
       "id": 13,
       "label": "Problem 13",
-      "statement": "Zig-zag: reach the goal and keep going. A staircase corridor climbs from the turbot’s starting cell to the goal, walled in by blocks on every side; at the end of each leg the corridor turns, alternating left and right. Program the turbot’s sequential-circuit brain to follow the corridor all the way to the goal and keep going — it need not stop. The goal is invisible to the sensor: it reads as an empty cell. The brain has one sensor input and two outputs, one for each wheel.",
+      "title": "Zig-zag: reach the goal and keep going",
+      "statement": "A staircase corridor climbs from the turbot’s starting cell to the goal, walled in by blocks on every side; at the end of each leg the corridor turns, alternating left and right. Program the turbot’s sequential-circuit brain to follow the corridor all the way to the goal and keep going — it need not stop. The goal is invisible to the sensor: it reads as an empty cell. The brain has one sensor input and two outputs, one for each wheel.",
       "buildMode": "turbot",
       "representation": "binary",
       "innerMode": "SC",
@@ -4354,7 +4357,8 @@
     {
       "id": 14,
       "label": "Problem 14",
-      "statement": "Three ahead. The goal lies exactly three cells directly ahead of the turbot, but it is invisible to the sensor — it reads as an empty cell. Build a sequential circuit brain that drives the turbot forward onto the goal and stops there. The brain has one sensor input and two outputs, one for each wheel.",
+      "title": "Three ahead",
+      "statement": "The goal lies exactly three cells directly ahead of the turbot, but it is invisible to the sensor — it reads as an empty cell. Build a sequential circuit brain that drives the turbot forward onto the goal and stops there. The brain has one sensor input and two outputs, one for each wheel.",
       "buildMode": "turbot",
       "representation": "binary",
       "innerMode": "SC",
@@ -4538,7 +4542,8 @@
     {
       "id": 15,
       "label": "Problem 15",
-      "statement": "Mad Max. A block sits directly ahead of the turbot, an unknown distance away. Build a sequential circuit brain that drives the turbot out to the block, then turns around, returns to the starting point, and stops there. There are no blocks or markers at the starting point. The brain has one sensor input and two outputs, one for each wheel.",
+      "title": "Mad Max",
+      "statement": "A block sits directly ahead of the turbot, an unknown distance away. Build a sequential circuit brain that drives the turbot out to the block, then turns around, returns to the starting point, and stops there. There are no blocks or markers at the starting point. The brain has one sensor input and two outputs, one for each wheel.",
       "buildMode": "turbot",
       "representation": "binary",
       "innerMode": "SC",

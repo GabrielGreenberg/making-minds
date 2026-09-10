@@ -3711,14 +3711,16 @@
     {
       "id": 10,
       "label": "Problem 10",
-      "statement": "Multiplication: x • y. Using a combination of flow charts, prose, and \"snapshots\" of the tape, describe a step-by-step strategy for computing multiplication. This should not be a complete Turing Machine. (That is a difficult and laborious problem.) But it should be sufficiently detailed that you think someone could build a Turing Machine from your instructions, if they knew what they were doing. Your choice of Tally or Binary.",
+      "title": "Multiplication: x • y",
+      "statement": "Using a combination of flow charts, prose, and \"snapshots\" of the tape, describe a step-by-step strategy for computing multiplication. This should not be a complete Turing Machine. (That is a difficult and laborious problem.) But it should be sufficiently detailed that you think someone could build a Turing Machine from your instructions, if they knew what they were doing. Your choice of Tally or Binary.",
       "buildMode": "open",
       "representation": "binary"
     },
     {
       "id": 11,
       "label": "Problem 11",
-      "statement": "Multi-function machine. Design a machine which can perform different functions depending on the user input (at least successor, addition, multiplication), similar to a calculator. There are many ways to do this, so be creative. Use a combination of flow charts, prose, and \"snapshots\" of the tape; don’t design a completed Turing Machine.",
+      "title": "Multi-function machine",
+      "statement": "Design a machine which can perform different functions depending on the user input (at least successor, addition, multiplication), similar to a calculator. There are many ways to do this, so be creative. Use a combination of flow charts, prose, and \"snapshots\" of the tape; don’t design a completed Turing Machine.",
       "buildMode": "open",
       "representation": "binary"
     }

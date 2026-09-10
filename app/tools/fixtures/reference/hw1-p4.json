@@ -2,7 +2,8 @@
   "question": {
     "id": 4,
     "label": "Problem 4",
-    "statement": "XOR (exclusive OR). Design a combinatorial circuit with the following input-output profile: IN1=0,IN2=0 -> OUT=0; IN1=0,IN2=1 -> OUT=1; IN1=1,IN2=0 -> OUT=1; IN1=1,IN2=1 -> OUT=0.",
+    "title": "XOR (exclusive OR)",
+    "statement": "Design a combinatorial circuit with the following input-output profile: IN1=0,IN2=0 -> OUT=0; IN1=0,IN2=1 -> OUT=1; IN1=1,IN2=0 -> OUT=1; IN1=1,IN2=1 -> OUT=0.",
     "buildMode": "CC",
     "representation": "binary",
     "allowed_components": [

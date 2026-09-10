@@ -143,6 +143,9 @@ export interface TestCase {
 export interface AssignmentQuestion {
   id: number;                  // stable id; referenced by the grader and submissions
   label: string;               // e.g. "Problem 1", "Q2a"
+  /** Optional short name for the problem ("Reconstructing OR"), shown bold on
+   *  its own line above the statement. Display only — never graded. */
+  title?: string;
   statement: string;           // problem text shown above the canvas
   buildMode: BuildMode;        // canvas mode for this question (CC, SC, FSM, turbot, …)
   representation: RepSystem;   // authoritative for grading (binary | tally; TM notation: tally→unary)

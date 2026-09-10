@@ -2,7 +2,8 @@
   "question": {
     "id": 11,
     "label": "Problem 11",
-    "statement": "Object detector. Design a machine (8 inputs, 1 output) that outputs 1 iff there is a string of exactly three consecutive 1s anywhere in the input.",
+    "title": "Object detector",
+    "statement": "Design a machine (8 inputs, 1 output) that outputs 1 iff there is a string of exactly three consecutive 1s anywhere in the input.",
     "buildMode": "CC",
     "representation": "binary",
     "perception": {
