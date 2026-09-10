@@ -33,6 +33,9 @@ export function OpenResponsePanel() {
         <div className="open-response-statement">
           {question.title && <div className="question-title">{question.title}</div>}
           <StatementBody text={question.statement} />
+          {question.hint && (
+            <div className="question-hint"><StatementBody text={question.hint} /></div>
+          )}
         </div>
         <textarea
           className="open-response-textarea"

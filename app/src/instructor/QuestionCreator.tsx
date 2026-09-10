@@ -180,6 +180,8 @@ export function QuestionCreator({ assignment, existingQuestion, onSave, onCancel
   const [statement, setStatement] = useState(existingQuestion?.statement ?? '');
   // Optional short name for the problem, shown bold above the statement.
   const [title, setTitle] = useState(existingQuestion?.title ?? '');
+  // Optional nudge, rendered italic on its own line under the statement.
+  const [hint, setHint] = useState(existingQuestion?.hint ?? '');
 
   // ── Perception fields (CC/SC questions with task === 'perception') ──
   // Perception questions grade raw bit frames against a rule, not a formula
@@ -338,6 +340,8 @@ export function QuestionCreator({ assignment, existingQuestion, onSave, onCancel
         id: newId,
         label: label.trim(),
         ...(title.trim() ? { title: title.trim() } : {}),
+      ...(hint.trim() ? { hint: hint.trim() } : {}),
+        ...(hint.trim() ? { hint: hint.trim() } : {}),
         statement: statement.trim(),
         buildMode: 'open',
         representation: 'binary',
@@ -354,6 +358,8 @@ export function QuestionCreator({ assignment, existingQuestion, onSave, onCancel
         id: newId,
         label: label.trim(),
         ...(title.trim() ? { title: title.trim() } : {}),
+      ...(hint.trim() ? { hint: hint.trim() } : {}),
+        ...(hint.trim() ? { hint: hint.trim() } : {}),
         statement: statement.trim(),
         buildMode: 'turbot',
         representation: rep,
@@ -378,6 +384,8 @@ export function QuestionCreator({ assignment, existingQuestion, onSave, onCancel
         id: newId,
         label: label.trim(),
         ...(title.trim() ? { title: title.trim() } : {}),
+      ...(hint.trim() ? { hint: hint.trim() } : {}),
+        ...(hint.trim() ? { hint: hint.trim() } : {}),
         statement: statement.trim(),
         buildMode: mode,
         representation: 'binary',
@@ -405,6 +413,7 @@ export function QuestionCreator({ assignment, existingQuestion, onSave, onCancel
       id: newId,
       label: label.trim(),
       ...(title.trim() ? { title: title.trim() } : {}),
+      ...(hint.trim() ? { hint: hint.trim() } : {}),
       statement: statement.trim(),
       buildMode: mode,
       representation: rep,
@@ -877,10 +886,22 @@ export function QuestionCreator({ assignment, existingQuestion, onSave, onCancel
           line); machine literals go in `backticks`; **bold** and *italic* work
           too. A blank line starts a new paragraph.
         </p>
+        <label className="instructor-field">
+          <span className="instructor-field-label">Hint (optional)</span>
+          <input
+            className="instructor-input"
+            placeholder="e.g. DeMorgan's Law is useful here!"
+            value={hint}
+            onChange={(e) => setHint(e.target.value)}
+          />
+        </label>
         {statement.trim() && (
           <div className="instructor-statement-preview">
             <div className="instructor-field-label">Preview</div>
             <StatementBody text={statement} />
+            {hint.trim() && (
+              <div className="question-hint"><StatementBody text={hint} /></div>
+            )}
           </div>
         )}
       </section>

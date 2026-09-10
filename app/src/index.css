@@ -1906,6 +1906,14 @@ thead .sc-label-col {
   margin-bottom: 0.35em;
 }
 
+/* A hint is help, not part of the problem: italic, in its own colour, on a
+   line of its own under the statement. */
+.question-hint {
+  margin-top: 0.6em;
+  font-style: italic;
+  color: #6a3fb5;
+}
+
 .assignment-overview-title {
   color: #1a1a1a;
 }

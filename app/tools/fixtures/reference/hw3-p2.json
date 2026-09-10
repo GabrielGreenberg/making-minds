@@ -2,7 +2,8 @@
   "question": {
     "id": 2,
     "label": "Problem 2",
-    "statement": "Design a sequential circuit that computes x + 2 in binary: the input numeral arrives one bit per clock tick (least-significant bit first), and the circuit must emit the binary numeral for x + 2 on its output wire, least-significant bit first. Hint: +2 is +1 twice \u2014 you can chain two incrementer blocks, or serially add the constant stream for 2 (a single 1 arriving at the second tick).",
+    "statement": "Design a sequential circuit that computes x + 2 in binary: the input numeral arrives one bit per clock tick (least-significant bit first), and the circuit must emit the binary numeral for x + 2 on its output wire, least-significant bit first.",
+    "hint": "+2 is +1 twice — you can chain two incrementer blocks, or serially add the constant stream for 2 (a single 1 arriving at the second tick).",
     "buildMode": "SC",
     "representation": "binary",
     "cc_spec": {

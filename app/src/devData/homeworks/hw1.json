@@ -72,7 +72,8 @@
       "id": 2,
       "label": "Problem 2",
       "title": "Reconstructing OR",
-      "statement": "Design a combinatorial circuit with the following input-output profile: IN1=0,IN2=0 -> OUT=0; IN1=0,IN2=1 -> OUT=1; IN1=1,IN2=0 -> OUT=1; IN1=1,IN2=1 -> OUT=1. For this problem, do not use OR-gates. DeMorgan's Law is useful here!",
+      "statement": "Design a combinatorial circuit with the following input-output profile: IN1=0,IN2=0 -> OUT=0; IN1=0,IN2=1 -> OUT=1; IN1=1,IN2=0 -> OUT=1; IN1=1,IN2=1 -> OUT=1. For this problem, do not use OR-gates.",
+      "hint": "DeMorgan's Law is useful here!",
       "buildMode": "CC",
       "representation": "binary",
       "allowed_components": [
@@ -384,14 +385,16 @@
     {
       "id": 8,
       "label": "Problem 8",
-      "statement": "This is a problem about function composition. Let s(⋅) be the successor function. Let a(⋅) be the addition function. Suppose that p() is a 2-place function composed of successor functions and addition functions. Given that p(1, 2) = 5, provide two possible definitions of p().",
+      "statement": "Let s(⋅) be the successor function. Let a(⋅) be the addition function. Suppose that p() is a 2-place function composed of successor functions and addition functions. Given that p(1, 2) = 5, provide two possible definitions of p().",
+      "hint": "This is a problem about function composition.",
       "buildMode": "open",
       "representation": "binary"
     },
     {
       "id": 9,
       "label": "Problem 9",
-      "statement": "Consider the function j( ) that maps two integers x and y to their product, so long as both x and y are equal to or greater than 0, and equal to or less than two. For any other arguments, it is undefined. (a) Define j(⋅) with an equation. (b) Define j(⋅) with a table. This is a problem about partial functions.",
+      "statement": "Consider the function j( ) that maps two integers x and y to their product, so long as both x and y are equal to or greater than 0, and equal to or less than two. For any other arguments, it is undefined. (a) Define j(⋅) with an equation. (b) Define j(⋅) with a table.",
+      "hint": "This is a problem about partial functions.",
       "buildMode": "open",
       "representation": "binary"
     },

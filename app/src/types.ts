@@ -147,6 +147,10 @@ export interface AssignmentQuestion {
    *  its own line above the statement. Display only — never graded. */
   title?: string;
   statement: string;           // problem text shown above the canvas
+  /** Optional nudge ("DeMorgan's Law is useful here!"), rendered italic in its
+   *  own colour on a line of its own below the statement, so it reads as help
+   *  rather than as part of the problem. Display only — never graded. */
+  hint?: string;
   buildMode: BuildMode;        // canvas mode for this question (CC, SC, FSM, turbot, …)
   representation: RepSystem;   // authoritative for grading (binary | tally; TM notation: tally→unary)
   allowed_components?: ComponentType[];

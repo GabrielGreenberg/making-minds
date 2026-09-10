@@ -2,7 +2,8 @@
   "question": {
     "id": 6,
     "label": "Problem 6",
-    "statement": "Design a sequential circuit that computes x + y in binary: two input streams x and y arrive one bit per clock tick (least-significant bit first, in parallel), and the circuit emits the binary numeral for their sum, one bit per tick. (Hint: add the two incoming bits plus a carry remembered in a MEM block from the previous tick.)",
+    "statement": "Design a sequential circuit that computes x + y in binary: two input streams x and y arrive one bit per clock tick (least-significant bit first, in parallel), and the circuit emits the binary numeral for their sum, one bit per tick.",
+    "hint": "Add the two incoming bits plus a carry remembered in a MEM block from the previous tick.",
     "buildMode": "SC",
     "representation": "binary",
     "cc_spec": {
