@@ -25,10 +25,17 @@ export function stripAnswers(assignment: AssignmentData): AssignmentData {
   return {
     ...assignment,
     questions: assignment.questions.map((q) => {
-      const { test_cases: _hidden, perception_cases: _alsoHidden, ...rest } = q;
+      const {
+        test_cases: _hidden,
+        perception_cases: _alsoHidden,
+        fill_in_answers: _key,
+        ...rest
+      } = q;
       // Perception questions keep their `perception` spec (retina width + rule
-      // — that's the statement) but lose the generated case bank (the key).
-      return { ...rest, test_cases: [], perception_cases: [] };
+      // — that's the statement) but lose the generated case bank (the key);
+      // fill-in questions keep their `fill_in` labels (they ARE the prompts)
+      // and lose the answers.
+      return { ...rest, test_cases: [], perception_cases: [], fill_in_answers: [] };
     }),
   };
 }
@@ -41,6 +48,8 @@ function stripQuestionResult(qr: QuestionResult): QuestionResult {
     // perceptionCases carry frames + expected + got — the perception answer
     // key. Leaked to students until 2026-07-08; pinned by tools/parityCheck.ts.
     perceptionCases: qr.perceptionCases ? [] : undefined,
+    // fillCases carry the expected answer per blank — the fill-in key.
+    fillCases: qr.fillCases ? [] : undefined,
   };
 }
 

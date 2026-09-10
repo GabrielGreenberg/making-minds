@@ -2269,6 +2269,44 @@ thead .sc-label-col {
   box-shadow: 0 0 0 2px rgba(42, 127, 255, 0.15);
 }
 
+/* Fill-in-the-blank answers: one labelled box per blank. */
+.fill-in-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 10px 16px;
+  margin: 18px 0 6px;
+}
+
+.fill-in-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.fill-in-label {
+  min-width: 2.2em;
+  text-align: right;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.fill-in-input {
+  flex: 1;
+  min-width: 0;
+  padding: 6px 8px;
+  font-family: 'SF Mono', 'Fira Code', ui-monospace, monospace;
+  font-size: 14px;
+  border: 1px solid var(--menu-border);
+  border-radius: 5px;
+  background: #fff;
+  color: var(--text);
+}
+
+.fill-in-input:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
 .open-response-foot {
   display: flex;
   justify-content: space-between;

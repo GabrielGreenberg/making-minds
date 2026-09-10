@@ -140,6 +140,29 @@ export interface TestCase {
   separations?: number[];
 }
 
+/**
+ * A fill-in-the-blank question: a short list of labelled text boxes the
+ * student types an answer into. Graded by string comparison, not by running a
+ * machine (engine/fillIn.ts) — the only normalisation is leading zeros.
+ *
+ * The spec ships to students (the labels ARE the prompts); the answers live
+ * in the separate `fill_in_answers` bank, which is stripped server-side
+ * exactly like `test_cases`.
+ */
+export interface FillInSpec {
+  labels: string[];
+  /** Restrict the boxes to digits (the HW1 P11 binary-numeral case). */
+  numericOnly?: boolean;
+}
+
+/** One blank's outcome — instructor-only, like CaseResult. */
+export interface FillInCaseResult {
+  label: string;
+  expected: string;
+  got: string;
+  pass: boolean;
+}
+
 export interface AssignmentQuestion {
   id: number;                  // stable id; referenced by the grader and submissions
   label: string;               // e.g. "Problem 1", "Q2a"
@@ -183,6 +206,12 @@ export interface AssignmentQuestion {
   // engine/perception.ts + gradePerception in grader.ts).
   perception?: PerceptionSpec;
   perception_cases?: PerceptionTestCase[];
+  // Fill-in-the-blank fields (buildMode 'open'). A `fill_in` spec turns the
+  // open question's writing panel into a list of labelled boxes and makes it
+  // autogradable; `fill_in_answers` is the key, and is stripped from student
+  // copies like `test_cases` (see engine/fillIn.ts + server/src/sanitize.ts).
+  fill_in?: FillInSpec;
+  fill_in_answers?: string[];
   notes?: string;
 }
 
@@ -219,7 +248,13 @@ export interface SubmissionData {
   submittedAt: string;     // ISO timestamp
   // Open questions carry their free-text answer in `responseText` (their
   // circuit is empty); machine questions carry only the circuit.
-  answers: { questionId: number; circuit: CircuitData; responseText?: string }[];
+  answers: {
+    questionId: number;
+    circuit: CircuitData;
+    responseText?: string;
+    /** Fill-in questions: one typed answer per blank, in the spec's order. */
+    fillAnswers?: string[];
+  }[];
 }
 
 // ─── Autograding results ─────────────────────────────────────────
@@ -278,6 +313,9 @@ export interface QuestionResult {
   // Populated instead of `cases` for perception questions — bit-level frame
   // grading, no value comparison (see engine/perception.ts).
   perceptionCases?: PerceptionCaseResult[];
+  // Populated instead of `cases` for fill-in questions — one entry per blank
+  // (engine/fillIn.ts). Carries the expected answers, so it is instructor-only.
+  fillCases?: FillInCaseResult[];
 }
 
 /** Grading outcome for a full submission. */
@@ -312,6 +350,8 @@ export interface QuestionCircuit {
   /** Confirmed boxes available in this question's palette (absent in pre-existing saves = none). */
   confirmedBoxes?: ConfirmedBoxDef[];
   responseText?: string;
+  /** Fill-in questions: one typed answer per blank, in the spec's order. */
+  fillAnswers?: string[];
 }
 
 /** A student's in-progress work for one assignment — the persisted payload. */

@@ -1,5 +1,5 @@
 // Headless end-to-end check of the autograding pipeline for CC, SC, FSM, TM,
-// turbot, perception, and open questions.
+// turbot, perception, open, and fill-in-the-blank questions.
 //
 //   npx tsx tools/pipelineCheck.ts
 //
@@ -10,14 +10,16 @@
 // question is asserted to come back `pending` (not autogradeable) with the
 // student's response attached for manual review.
 
-import type { SubmissionRecord } from '../src/types';
+import { readFileSync } from 'node:fs';
+import type { AssignmentData, SubmissionRecord } from '../src/types';
 import {
   buildSampleAssignment,
   buildCorrectSubmission,
   buildIncorrectSubmission,
 } from '../src/devData/sampleData';
-import { gradeSubmission, summarizeResult } from '../src/engine/grader';
-import { applyManualReview } from '../src/storage/submissionStore';
+import { gradeQuestion, gradeSubmission, summarizeResult } from '../src/engine/grader';
+import { applyManualReview, buildSubmission } from '../src/storage/submissionStore';
+import { emptyQuestionCircuit } from '../src/storage/workbookStore';
 import { gradeSubmissions } from '../src/instructor/Gradebook';
 
 const assignment = buildSampleAssignment();
@@ -107,6 +109,58 @@ if (reviewed) {
     before.score === 1 && after.score === 1 &&
     after.grades.filter((g) => !g.pending).length ===
       before.grades.filter((g) => !g.pending).length + 1);
+}
+
+// ── Fill-in-the-blank questions (HW1 P11) ──────────────────────────
+// An open question with a `fill_in` spec IS autogradable: string answers,
+// leading zeros normalised away, no machine to run (engine/fillIn.ts).
+console.log('\n[fill-in blanks]');
+{
+  const hw1 = JSON.parse(
+    readFileSync(new URL('../src/devData/homeworks/hw1.json', import.meta.url), 'utf8'),
+  ) as AssignmentData;
+  const q = hw1.questions.find((x) => x.id === 11)!;
+  check('HW1 P11 carries a fill-in spec and a same-length answer key',
+    !!q.fill_in && q.fill_in.labels.length === 11 &&
+    q.fill_in_answers?.length === 11);
+  check('the boxes are labelled 0 through 10',
+    q.fill_in!.labels.join(',') === '0,1,2,3,4,5,6,7,8,9,10');
+
+  const correct = Array.from({ length: 11 }, (_, n) => n.toString(2));
+  const graded = gradeQuestion(q, undefined, undefined, correct);
+  check('correct binary numerals score 11/11',
+    graded.status === 'graded' && graded.passed === 11 && graded.total === 11);
+  check('leading zeros are ignored ("0011" === "11")',
+    gradeQuestion(q, undefined, undefined, correct.map((a) => '00' + a)).passed === 11);
+  check('surrounding whitespace is ignored',
+    gradeQuestion(q, undefined, undefined, correct.map((a) => ` ${a} `)).passed === 11);
+  check('"000" still reads as zero, not as blank',
+    (gradeQuestion(q, undefined, undefined, ['000', ...correct.slice(1)]).fillCases ?? [])[0]?.pass === true);
+
+  const oneWrong = gradeQuestion(q, undefined, undefined, correct.map((a, i) => (i === 4 ? '1000' : a)));
+  check('one wrong numeral scores 10/11 and names the blank',
+    oneWrong.passed === 10 &&
+    (oneWrong.fillCases ?? []).filter((c) => !c.pass).map((c) => c.label).join('') === '4');
+
+  const blank = gradeQuestion(q, undefined, undefined, []);
+  check('no answers at all fails every blank (never "pending")',
+    blank.status === 'graded' && blank.passed === 0 && blank.total === 11);
+  check('a blank box is a failure, not a match against the empty string',
+    (blank.fillCases ?? []).every((c) => !c.pass && c.got === ''));
+
+  // Through the whole submit path, exactly as a student's Submit does.
+  const circuits = new Map<number, ReturnType<typeof emptyQuestionCircuit>>();
+  circuits.set(11, { ...emptyQuestionCircuit(), fillAnswers: correct });
+  const built = buildSubmission(hw1, circuits, {
+    student: 'fill@example.com',
+    submittedAt: '2026-09-10T00:00:00.000Z',
+  });
+  const answer = built.answers.find((a) => a.questionId === 11);
+  check('buildSubmission carries the blanks, not a responseText',
+    answer?.fillAnswers?.length === 11 && answer.responseText === undefined);
+  const wholeHw = gradeSubmission(hw1, built);
+  check('the fill-in question grades 11/11 through gradeSubmission',
+    wholeHw.questions.find((r) => r.questionId === 11)?.passed === 11);
 }
 
 console.log(`\n${failures === 0 ? 'PIPELINE OK' : `PIPELINE FAILED (${failures} checks)`}`);

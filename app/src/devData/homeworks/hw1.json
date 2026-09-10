@@ -408,9 +408,38 @@
     {
       "id": 11,
       "label": "Problem 11",
-      "statement": "Represent the numbers zero through ten in binary.",
+      "statement": "Represent the numbers zero through ten in binary. Type each binary numeral in the box labelled with the number it represents.",
       "buildMode": "open",
-      "representation": "binary"
+      "representation": "binary",
+      "fill_in": {
+        "labels": [
+          "0",
+          "1",
+          "2",
+          "3",
+          "4",
+          "5",
+          "6",
+          "7",
+          "8",
+          "9",
+          "10"
+        ],
+        "numericOnly": true
+      },
+      "fill_in_answers": [
+        "0",
+        "1",
+        "10",
+        "11",
+        "100",
+        "101",
+        "110",
+        "111",
+        "1000",
+        "1001",
+        "1010"
+      ]
     },
     {
       "id": 12,

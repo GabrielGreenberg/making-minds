@@ -474,6 +474,10 @@ interface AppState {
   // questionCircuits.responseText at the same points the canvas is.
   openResponse: string;
   setOpenResponse: (text: string) => void;
+  // The live typed blanks for the current FILL-IN question, in the spec's
+  // order. Synced into questionCircuits.fillAnswers alongside openResponse.
+  fillAnswers: string[];
+  setFillAnswer: (index: number, value: string) => void;
   loadAssignment: (assignment: AssignmentData) => void;
   // Open an assignment by id and show its workbook. Resolves false if the id is
   // unknown. A stale open (one superseded by a newer navigation while its seam
@@ -1404,6 +1408,14 @@ export const useStore = create<AppState>()((set, get) => ({
   questionCircuits: new Map(),
   openResponse: '',
   setOpenResponse: (text) => set({ openResponse: text }),
+  fillAnswers: [],
+  setFillAnswer: (index, value) =>
+    set((state) => {
+      const next = state.fillAnswers.slice();
+      while (next.length <= index) next.push('');
+      next[index] = value;
+      return { fillAnswers: next };
+    }),
   loadAssignment: (assignment) => {
     const questionCircuits = new Map<number, QuestionCircuit>();
     for (const q of assignment.questions) {
@@ -1418,6 +1430,7 @@ export const useStore = create<AppState>()((set, get) => ({
       boxes: [],
       confirmedBoxLibrary: [],
       openResponse: '',
+      fillAnswers: [],
       buildMode: assignment.questions[0]?.buildMode || 'CC',
     });
     get().resetAllSimState();
@@ -1467,6 +1480,7 @@ export const useStore = create<AppState>()((set, get) => ({
       boxes: activeCircuit.boxes,
       confirmedBoxLibrary: activeCircuit.confirmedBoxes ?? [],
       openResponse: activeCircuit.responseText ?? '',
+      fillAnswers: activeCircuit.fillAnswers ?? [],
       buildMode: activeQ?.buildMode || 'CC',
       workbookOpen: true,
     });
@@ -1486,6 +1500,7 @@ export const useStore = create<AppState>()((set, get) => ({
           boxes: state.boxes,
           confirmedBoxes: state.confirmedBoxLibrary,
           responseText: state.openResponse,
+          fillAnswers: state.fillAnswers,
         });
         set({ questionCircuits: qc });
       }
@@ -1550,6 +1565,7 @@ export const useStore = create<AppState>()((set, get) => ({
       boxes: state.boxes,
       confirmedBoxes: state.confirmedBoxLibrary,
       responseText: state.openResponse,
+      fillAnswers: state.fillAnswers,
     });
 
     const saved = updatedMap.get(nextQ.id) ?? emptyQuestionCircuit();
@@ -1561,6 +1577,7 @@ export const useStore = create<AppState>()((set, get) => ({
       boxes: saved.boxes,
       confirmedBoxLibrary: saved.confirmedBoxes ?? [],
       openResponse: saved.responseText ?? '',
+      fillAnswers: saved.fillAnswers ?? [],
       buildMode: nextQ.buildMode,
     });
     get().resetAllSimState();
@@ -1575,6 +1592,7 @@ export const useStore = create<AppState>()((set, get) => ({
       boxes: [],
       confirmedBoxLibrary: [],
       openResponse: '',
+      fillAnswers: [],
     });
   },
 
@@ -3664,6 +3682,7 @@ function syncedQuestionCircuits(s: AppState): Map<number, QuestionCircuit> {
       boxes: s.boxes,
       confirmedBoxes: s.confirmedBoxLibrary,
       responseText: s.openResponse,
+      fillAnswers: s.fillAnswers,
     });
   }
   return circuits;
@@ -3779,7 +3798,8 @@ useStore.subscribe((state, prev) => {
     state.boxes !== prev.boxes ||
     state.confirmedBoxLibrary !== prev.confirmedBoxLibrary ||
     // the open-question text panel is that mode's "canvas"
-    state.openResponse !== prev.openResponse;
+    state.openResponse !== prev.openResponse ||
+    state.fillAnswers !== prev.fillAnswers;
 
   let changed: boolean;
   if (state.assignment) {

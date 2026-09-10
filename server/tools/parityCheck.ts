@@ -115,6 +115,12 @@ const fixtures = FIXTURE_IDS.map((id) => loadFixture(id));
 // The open question comes from devData (buildSampleAssignment), as the
 // fixtures never author open questions.
 const openQuestion = buildSampleAssignment().questions.find((q) => q.buildMode === 'open')!;
+// HW1 P11: the fill-in-the-blank shape. Its `fill_in_answers` are the answer
+// key and must be stripped from the student's copy like any other bank.
+const fillInQuestion = JSON.parse(
+  readFileSync(new URL('../../app/src/devData/homeworks/hw1.json', import.meta.url), 'utf8'),
+).questions.find((q: { id: number }) => q.id === 11);
+const FILL_ANSWERS = Array.from({ length: 11 }, (_, n) => n.toString(2));
 
 const ASSIGNMENT_ID = 'parity-hw';
 const assignment: AssignmentData = {
@@ -123,6 +129,7 @@ const assignment: AssignmentData = {
   questions: [
     ...fixtures.map((fx, i) => ({ ...fx.question, id: i + 1, label: FIXTURE_IDS[i] })),
     { ...openQuestion, id: 7, label: 'open' },
+    { ...fillInQuestion, id: 8, label: 'fill-in' },
   ],
 };
 
@@ -148,6 +155,7 @@ type Answers = SubmissionData['answers'];
 const correctAnswers: Answers = [
   ...fixtures.map((fx, i) => ({ questionId: i + 1, circuit: fx.correct })),
   { questionId: 7, circuit: emptyCircuit, responseText: OPEN_RESPONSE },
+  { questionId: 8, circuit: emptyCircuit, fillAnswers: FILL_ANSWERS },
 ];
 
 const brokenAnswers: Answers = [
@@ -158,6 +166,8 @@ const brokenAnswers: Answers = [
     circuit: fx.broken ?? wandererBrain,
   })),
   { questionId: 7, circuit: emptyCircuit, responseText: '' },
+  // One padded (still correct — leading zeros normalise) and one wrong.
+  { questionId: 8, circuit: emptyCircuit, fillAnswers: FILL_ANSWERS.map((a, i) => (i === 4 ? '1' : '00' + a)) },
 ];
 
 // ── Direct in-process grades (side A) ────────────────────────────────────────
@@ -294,8 +304,15 @@ check('assignment created via API', put.status === 200);
 const sAsg = await api<{ assignment: AssignmentData }>('GET', `/assignments/${ASSIGNMENT_ID}`, {
   token: sTok,
 });
-const asgLeaks = findLeaks(sAsg.json.assignment, new Set(['test_cases', 'perception_cases', 'expected']));
-check('student assignment copy leaks no answer banks (incl. perception)', asgLeaks.length === 0, asgLeaks.join(', '));
+const asgLeaks = findLeaks(
+  sAsg.json.assignment,
+  new Set(['test_cases', 'perception_cases', 'fill_in_answers', 'expected']),
+);
+check('student assignment copy leaks no answer banks (incl. perception + fill-in)', asgLeaks.length === 0, asgLeaks.join(', '));
+check(
+  'student assignment copy keeps the fill-in labels (they are the prompts)',
+  (sAsg.json.assignment.questions.find((q) => q.id === 8)?.fill_in?.labels ?? []).length === 11,
+);
 check(
   'student assignment copy keeps the turbot arenas',
   (sAsg.json.assignment.questions.find((q) => q.buildMode === 'turbot')?.turbot_cases ?? []).length > 0,
@@ -428,7 +445,7 @@ check(
 // per-case detail of ANY shape — value cases, turbot cases, perception frames
 // with expected bits — may reach a student, released or not.
 const recordLeaks = postRelease.json.records.flatMap((r) =>
-  findLeaks(r.result, new Set(['cases', 'turbotCases', 'perceptionCases', 'expected', 'frames', 'got'])),
+  findLeaks(r.result, new Set(['cases', 'turbotCases', 'perceptionCases', 'fillCases', 'expected', 'frames', 'got'])),
 );
 check('post-release student records leak no per-case detail (incl. perception)', recordLeaks.length === 0, recordLeaks.join(', '));
 
@@ -483,7 +500,7 @@ check(
   sOpen?.manual?.pass === true && sOpen.manual.note === REVIEW_NOTE,
 );
 const reviewLeaks = sAfterReview.json.records.flatMap((r) =>
-  findLeaks(r.result, new Set(['cases', 'turbotCases', 'perceptionCases', 'expected', 'frames', 'got'])),
+  findLeaks(r.result, new Set(['cases', 'turbotCases', 'perceptionCases', 'fillCases', 'expected', 'frames', 'got'])),
 );
 check('reviewed student records still leak no per-case detail', reviewLeaks.length === 0, reviewLeaks.join(', '));
 

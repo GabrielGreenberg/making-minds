@@ -665,6 +665,12 @@ noted:
   (2–10 wires; a pattern's width is its length), and the bit-level case bank generates at save
   (`buildPerceptionCases`); representation is implicitly binary bits.
   **Open questions** are just a name + question text (no representation, formula, or bank).
+  **Fill-in-the-blank questions** are an open question carrying a `fill_in` spec (labelled
+  boxes, optionally digits-only) plus a separate `fill_in_answers` key: the student's panel
+  becomes a list of labelled boxes, and the question IS autograded — one string comparison per
+  blank, leading zeros and surrounding whitespace normalised away (`engine/fillIn.ts`). There
+  is deliberately no authoring UI yet (`notes/pset_updates.md` item 10): HW1 P11 is
+  hand-written in `devData/homeworks/hw1.json`.
 - **Reference-function DSL** — instructors don't hand-write test cases. They declare a question's
   input/output groups + one representation and specify the correct output with a small
   **affine/bitwise arithmetic mini-language** (the "reference function"); the system enumerates

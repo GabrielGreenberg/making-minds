@@ -2007,7 +2007,19 @@
           "components": [],
           "wires": []
         },
-        "responseText": "0, 1, 10, 11, 100, 101, 110, 111, 1000, 1001, 1010."
+        "fillAnswers": [
+          "0",
+          "1",
+          "10",
+          "11",
+          "100",
+          "101",
+          "110",
+          "111",
+          "1000",
+          "1001",
+          "1010"
+        ]
       },
       {
         "questionId": 12,
@@ -3050,7 +3062,19 @@
           "components": [],
           "wires": []
         },
-        "responseText": "I ran out of time here, but my guess is yes — it seems like it should be possible."
+        "fillAnswers": [
+          "0",
+          "1",
+          "10",
+          "11",
+          "1000",
+          "101",
+          "",
+          "",
+          "",
+          "",
+          ""
+        ]
       },
       {
         "questionId": 12,

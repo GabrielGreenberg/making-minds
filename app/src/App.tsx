@@ -8,6 +8,7 @@ import { SequentialTimeline } from './components/SequentialTimeline';
 import { TMTapePanel } from './components/TMTapePanel';
 import { TurbotTapePanel } from './components/TurbotTapePanel';
 import { OpenResponsePanel } from './components/OpenResponsePanel';
+import { FillInPanel } from './components/FillInPanel';
 import { HomeScreen } from './components/HomeScreen';
 import { AssignmentOverview } from './components/AssignmentOverview';
 import { InstructorApp } from './instructor/InstructorApp';
@@ -22,6 +23,7 @@ function App() {
   const effectiveMode = useStore(selectEffectiveMode);
   const assignment = useStore((s) => s.assignment);
   const assignmentView = useStore((s) => s.assignmentView);
+  const currentQuestionIndex = useStore((s) => s.currentQuestionIndex);
 
   // Hydrate the latest-submission map from the submission seam once the app is
   // up (App renders inside AuthGate, so mount = auth-ready). Replaces the old
@@ -46,14 +48,16 @@ function App() {
   // canvas (below) is entered by picking a question (#/a/:id/q/:i).
   if (assignment && assignmentView === 'overview') return <AssignmentOverview />;
 
-  // Open (free-text) questions: same chrome (menu + question nav), but the
-  // workspace is a writing panel — no palette, canvas, or data tables.
+  // Open questions: same chrome (menu + question nav), but the workspace is a
+  // writing panel — no palette, canvas, or data tables. A `fill_in` spec
+  // narrows that panel to a list of labelled boxes, which IS autograded.
   if (buildMode === 'open') {
+    const q = assignment?.questions[currentQuestionIndex];
     return (
       <div className="app">
         <MenuBar />
         <TabBar />
-        <OpenResponsePanel />
+        {q?.fill_in ? <FillInPanel /> : <OpenResponsePanel />}
       </div>
     );
   }

@@ -49,7 +49,10 @@ export function buildSubmission(
         questionId: q.id,
         circuit: { components: c.components, wires: c.wires },
       };
-      if (q.buildMode === 'open') answer.responseText = c.responseText ?? '';
+      // A fill-in question's answer is its typed blanks; every other open
+      // question's is its prose.
+      if (q.fill_in) answer.fillAnswers = c.fillAnswers ?? [];
+      else if (q.buildMode === 'open') answer.responseText = c.responseText ?? '';
       return answer;
     }),
   };

@@ -435,6 +435,37 @@ function SubmissionDetail({
             </div>
           );
         }
+        // Fill-in questions grade one typed string per blank.
+        if (qr.fillCases) {
+          const wrong = qr.fillCases.filter((c) => !c.pass);
+          return (
+            <div className="instructor-detail-q" key={qr.questionId}>
+              <strong>{q?.label ?? `Q${qr.questionId}`}</strong>: {qr.passed}/{qr.total} blanks correct
+              {wrong.length > 0 && (
+                <table className="instructor-detail-table">
+                  <thead>
+                    <tr>
+                      <th>blank</th>
+                      <th>expected</th>
+                      <th>got</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {wrong.map((c, ci) => (
+                      <tr key={ci}>
+                        <td>{c.label}</td>
+                        <td className="instructor-bits">{c.expected}</td>
+                        <td className="instructor-bits instructor-fail">
+                          {c.got === '' ? '(blank)' : c.got}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </div>
+          );
+        }
         // Perception questions grade raw frames bit-level — their failures
         // report the stimulus and the first mismatching time step.
         if (qr.perceptionCases) {

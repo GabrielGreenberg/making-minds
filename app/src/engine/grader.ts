@@ -46,6 +46,7 @@ import { fsmNotation } from './notation';
 import { evaluateTMSequence, tapeCellsUsed } from './tm';
 import { runTurbot, evaluateTurbotCriterion, explainTurbotCriterionFailure, criterionRequiresStop, validateTurbotTM, validateTurbotFSM } from './turbot';
 import { validatePerceptionMachine, runPerceptionCase } from './perception';
+import { gradeFillIn } from './fillIn';
 import { validateMachine, validateAllowedComponents, validateComponentLimits } from './machineValidation';
 import {
   axisForMode,
@@ -120,14 +121,45 @@ function questionComponentRules(
 }
 
 /**
+ * Fill-in-the-blank grading: one string comparison per blank, all-or-nothing
+ * at the question level like every other mode (passed === total ⇒ the
+ * question passes). The per-blank detail carries the expected answers, so it
+ * is instructor-only — server/src/sanitize.ts strips it.
+ */
+function gradeFillInQuestion(
+  question: AssignmentQuestion,
+  fillAnswers: string[] | undefined,
+): QuestionResult {
+  const spec = question.fill_in!;
+  const answers = question.fill_in_answers ?? [];
+  if (spec.labels.length === 0 || answers.length !== spec.labels.length) {
+    return skip(question.id, 'fill-in question has no answer key');
+  }
+  const fillCases = gradeFillIn(spec, answers, fillAnswers);
+  return {
+    questionId: question.id,
+    status: 'graded',
+    passed: fillCases.filter((c) => c.pass).length,
+    total: fillCases.length,
+    cases: [],
+    fillCases,
+  };
+}
+
+/**
  * Grade a single question's circuit against its numeric test cases.
- * `responseText` is the free-text answer for open questions (unused otherwise).
+ * `responseText` is the free-text answer for open questions, `fillAnswers`
+ * the typed blanks of a fill-in question (each unused otherwise).
  */
 export function gradeQuestion(
   question: AssignmentQuestion,
   circuit: CircuitData | undefined,
   responseText?: string,
+  fillAnswers?: string[],
 ): QuestionResult {
+  // A fill-in question is an open question that CAN be autograded: string
+  // answers, no machine to run (engine/fillIn.ts).
+  if (question.fill_in) return gradeFillInQuestion(question, fillAnswers);
   if (question.buildMode === 'open') return pendingOpen(question.id, responseText);
   if (!circuit) return skip(question.id, 'no circuit submitted');
   if (question.buildMode === 'turbot') return gradeTurbot(question, circuit);
@@ -421,7 +453,7 @@ export function gradeSubmission(assignment: AssignmentData, submission: Submissi
 
   const questions = assignment.questions.map((q) => {
     const answer = byId.get(q.id);
-    return gradeQuestion(q, answer?.circuit, answer?.responseText);
+    return gradeQuestion(q, answer?.circuit, answer?.responseText, answer?.fillAnswers);
   });
 
   const passed = questions.reduce((n, r) => n + r.passed, 0);
