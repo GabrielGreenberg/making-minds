@@ -35,13 +35,34 @@ export interface IoProfileRow {
 }
 
 export type Block =
-  | { kind: 'para'; content: Inline[] }
+  | { kind: 'para'; content: Inline[]; part?: string }
   | {
       kind: 'io-table';
       inputNames: string[];
       outputNames: string[];
       rows: IoProfileRow[];
     };
+
+// The parts of a multi-part short-answer question — "(a) … (b) … (c) …" run
+// together in one paragraph. Two or more markers are required: a lone "(a)"
+// mid-sentence is prose, not a list. The marker is kept (it is how the
+// student refers to the part) and each part becomes its own line.
+const PART_MARKER = /(?:^|\s)\(([a-h])\)\s/g;
+
+function splitParts(text: string): { part?: string; text: string }[] {
+  PART_MARKER.lastIndex = 0;
+  const marks = [...text.matchAll(PART_MARKER)];
+  if (marks.length < 2) return [{ text }];
+  const out: { part?: string; text: string }[] = [];
+  const lead = text.slice(0, marks[0].index).trim();
+  if (lead) out.push({ text: lead });
+  marks.forEach((m, i) => {
+    const start = m.index + m[0].length;
+    const end = i + 1 < marks.length ? marks[i + 1].index : text.length;
+    out.push({ part: m[1], text: text.slice(start, end).trim() });
+  });
+  return out;
+}
 
 // An input-output profile spelled inline. Deliberately strict: both sides of
 // every row must assign the SAME column names in the same order, and a single
@@ -99,7 +120,10 @@ function splitProfiles(chunk: string): Block[] {
   let last = 0;
   const prose = (text: string) => {
     const trimmed = text.trim();
-    if (trimmed) out.push({ kind: 'para', content: parseInline(trimmed) });
+    if (!trimmed) return;
+    for (const p of splitParts(trimmed)) {
+      if (p.text) out.push({ kind: 'para', content: parseInline(p.text), part: p.part });
+    }
   };
   PROFILE.lastIndex = 0;
   for (const m of chunk.matchAll(PROFILE)) {
@@ -170,7 +194,7 @@ export function statementProse(text: string): string {
   return parseStatement(text)
     .map((b) =>
       b.kind === 'para'
-        ? strip(b.content)
+        ? (b.part ? `(${b.part}) ` : '') + strip(b.content)
         : b.rows
             .map((r) =>
               `${b.inputNames.map((n, i) => `${n}=${r.inputs[i]}`).join(',')} -> ` +

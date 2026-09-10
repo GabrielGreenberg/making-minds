@@ -79,6 +79,25 @@ console.log('\n[io profiles]');
       === 'Profile: IN1=0 -> OUT=0; IN1=1 -> OUT=1');
 }
 
+console.log('\n[multi-part questions]');
+{
+  const b = parseStatement('Consider f. (a) Do this. (b) Do that. (c) And this.');
+  check('lead-in plus one block per part', b.length === 4);
+  check('the lead-in keeps no part marker', b[0].kind === 'para' && b[0].part === undefined);
+  check('parts are labelled in order',
+    b.slice(1).map((x) => (x.kind === 'para' ? x.part : '?')).join('') === 'abc');
+  check('a part carries only its own text',
+    b[1].kind === 'para' && b[1].content.map((n) => (n.kind === 'text' ? n.text : '')).join('') === 'Do this.');
+
+  check('ONE marker is prose, not a list',
+    parseStatement('Then (a) happens.').every((x) => x.kind === 'para' && x.part === undefined));
+  check('a function application is not a marker',
+    parseStatement('Given p(1, 2) = 5 and j( ) undefined, define p().')
+      .every((x) => x.kind === 'para' && x.part === undefined));
+  check('statementProse puts the markers back',
+    statementProse('Consider f. (a) One. (b) Two.') === 'Consider f. (a) One. (b) Two.');
+}
+
 console.log('\n[blocks]');
 {
   check('a blank line splits paragraphs', parseStatement('one\n\ntwo').length === 2);
@@ -100,6 +119,7 @@ console.log('\n[corpus: real homework statements are untouched prose]');
   let statements = 0;
   const reflowed: string[] = [];
   const tabulated: string[] = [];
+  const parted: string[] = [];
   for (const f of readdirSync(dir).filter((n) => n.endsWith('.json'))) {
     const hw = JSON.parse(readFileSync(join(dir, f), 'utf8')) as {
       questions: { label: string; statement: string }[];
@@ -115,6 +135,10 @@ console.log('\n[corpus: real homework statements are untouched prose]');
       // corpus may be interpreted, or adding markup support would silently
       // reflow homework nobody re-read.
       const plain = blocks.every((b) => b.kind === 'para' && b.content.every((n) => n.kind === 'text'));
+      if (blocks.some((b) => b.kind === 'para' && b.part)) {
+        parted.push(`${f.replace('.json', '')} ${q.label}`);
+        continue;
+      }
       if (!plain) reflowed.push(`${f} ${q.label}`);
     }
   }
@@ -125,6 +149,10 @@ console.log('\n[corpus: real homework statements are untouched prose]');
   // ones that should tabulate; anything else joining them is a false positive.
   check(`exactly the four HW1 profiles tabulate (${tabulated.join(', ')})`,
     tabulated.join('|') === 'hw1 Problem 2|hw1 Problem 3|hw1 Problem 4|hw1 Problem 5');
+  // Only the four genuinely multi-part HW1 questions split into parts —
+  // no "p(1, 2)" or "j( )" is mistaken for an (a)/(b) marker anywhere else.
+  check(`exactly the four multi-part HW1 questions split (${parted.join(', ')})`,
+    parted.join('|') === 'hw1 Problem 6|hw1 Problem 9|hw1 Problem 10|hw1 Problem 13');
 }
 
 console.log(`\nstatementFormatCheck: ${passed} passed, ${failed} failed`);

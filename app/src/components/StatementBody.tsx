@@ -76,6 +76,14 @@ function IoProfile({ table }: { table: Extract<Block, { kind: 'io-table' }> }) {
 
 function BlockNode({ block }: { block: Block }) {
   if (block.kind === 'io-table') return <IoProfile table={block} />;
+  if (block.part) {
+    return (
+      <p className="statement-para statement-part">
+        <span className="statement-part-marker">({block.part})</span>
+        <InlineNodes nodes={block.content} />
+      </p>
+    );
+  }
   return (
     <p className="statement-para">
       <InlineNodes nodes={block.content} />
