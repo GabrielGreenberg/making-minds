@@ -46,7 +46,36 @@ function InlineNodes({ nodes }: { nodes: Inline[] }) {
   );
 }
 
+function IoProfile({ table }: { table: Extract<Block, { kind: 'io-table' }> }) {
+  const { inputNames, outputNames, rows } = table;
+  return (
+    <div className="statement-io-wrap">
+      <table className="statement-io-table">
+        <thead>
+          <tr>
+            {inputNames.map((n) => <th key={`in-${n}`}>{n}</th>)}
+            {outputNames.map((n, i) => (
+              <th key={`out-${n}`} className={i === 0 ? 'statement-io-out' : undefined}>{n}</th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((r, ri) => (
+            <tr key={ri}>
+              {r.inputs.map((v, i) => <td key={`in-${i}`}>{v}</td>)}
+              {r.outputs.map((v, i) => (
+                <td key={`out-${i}`} className={i === 0 ? 'statement-io-out' : undefined}>{v}</td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
 function BlockNode({ block }: { block: Block }) {
+  if (block.kind === 'io-table') return <IoProfile table={block} />;
   return (
     <p className="statement-para">
       <InlineNodes nodes={block.content} />

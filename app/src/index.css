@@ -1917,6 +1917,36 @@ thead .sc-label-col {
   color: #333;
 }
 
+/* An input-output profile lifted out of the prose (statementFormat.ts). The
+   wrapper scrolls on its own so a wide profile never widens the panel. */
+.statement-io-wrap {
+  overflow-x: auto;
+  margin: 0.7em 0;
+}
+
+.statement-io-table {
+  border-collapse: collapse;
+  font-family: 'SF Mono', 'Fira Code', ui-monospace, monospace;
+  font-size: 0.95em;
+}
+
+.statement-io-table th,
+.statement-io-table td {
+  padding: 3px 10px;
+  text-align: center;
+  border: 1px solid #ddd;
+}
+
+.statement-io-table th {
+  background: #f4f4f4;
+  font-weight: 600;
+}
+
+/* The first output column carries the input/output divider. */
+.statement-io-table .statement-io-out {
+  border-left: 2px solid #bbb;
+}
+
 .statement-math--display {
   display: block;
   margin: 0.5em 0;
