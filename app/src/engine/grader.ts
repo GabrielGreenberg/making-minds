@@ -43,7 +43,7 @@ import { evaluateCCInputs } from './cc';
 import { evaluateSCSequence } from './sc';
 import { evaluateFSMSymbolSequence } from './fsm';
 import { fsmNotation } from './notation';
-import { evaluateTMSequence } from './tm';
+import { evaluateTMSequence, tapeCellsUsed } from './tm';
 import { runTurbot, evaluateTurbotCriterion, explainTurbotCriterionFailure, criterionRequiresStop, validateTurbotTM, validateTurbotFSM } from './turbot';
 import { validatePerceptionMachine, runPerceptionCase } from './perception';
 import { validateMachine, validateAllowedComponents, validateComponentLimits } from './machineValidation';
@@ -150,7 +150,10 @@ export function gradeQuestion(
   // Tape axis (TM): widths are content-relative — the tape codec lays values out
   // and locates the output block by content, so no cc_spec is required.
   if (axis === 'tape') {
-    return gradeTape(question.id, circuit, cases, rep, question.requireStandardHaltPosition);
+    return gradeTape(question.id, circuit, cases, rep, {
+      requireStandardHaltPosition: question.requireStandardHaltPosition,
+      maxTapeCells: question.maxTapeCells,
+    });
   }
 
   // Space/time axes need the per-group widths from the authoring spec.
@@ -210,13 +213,17 @@ function gradeSpaceTimeCase(
 /** TM grading — the codec's tape axis, delegated to tmCodec.
  *  `requireStandardHaltPosition` (question-level, optional) tightens the
  *  acceptor: the head must halt on the output block's rightmost cell.
- *  Absent/false keeps the default position-agnostic acceptance. */
+ *  Absent/false keeps the default position-agnostic acceptance.
+ *  `maxTapeCells` (optional) additionally caps how many cells the head may
+ *  occupy over the whole run — "use at most 20 cells of the tape". It is
+ *  checked AFTER acceptance, so a run that never halted is reported as such
+ *  rather than as a tape overrun. */
 function gradeTape(
   questionId: number,
   circuit: CircuitData,
   cases: TestCase[],
   rep: RepSystem,
-  requireStandardHaltPosition?: boolean,
+  opts: { requireStandardHaltPosition?: boolean; maxTapeCells?: number } = {},
 ): QuestionResult {
   const notation = notationForRepresentation(rep);
   const layout: CodecLayout = { axis: 'tape', rep, inputWidths: [], outputWidths: [] };
@@ -226,20 +233,27 @@ function gradeTape(
   if (!valid.ok) return failEvery(questionId, cases, valid.reason ?? 'invalid machine');
 
   const results = cases.map((tc) => {
-    const run = evaluateTMSequence(
-      circuit.components,
-      circuit.wires,
-      // The case's optional layout hint (block separations) rides through
-      // untouched — the codec owns what it means; the grader stays agnostic.
-      encodeTM(notation, tc.inputs, tc.separations),
-      notation,
-    );
-    const rej = acceptTM(notation, run, { requireStandardHaltPosition });
+    // The case's optional layout hint (block separations) rides through
+    // untouched — the codec owns what it means; the grader stays agnostic.
+    const initialTape = encodeTM(notation, tc.inputs, tc.separations);
+    const run = evaluateTMSequence(circuit.components, circuit.wires, initialTape, notation);
+    const rej = acceptTM(notation, run, {
+      requireStandardHaltPosition: opts.requireStandardHaltPosition,
+    });
     if (rej) return reject(tc, rej.reason);
+    const overrun = tapeOverrun(tapeCellsUsed(run, initialTape), opts.maxTapeCells);
+    if (overrun) return reject(tc, overrun);
     const got = decodeTM(notation, run.tape);
     return { input: tc.inputs, expected: tc.outputs, got: [got], pass: got === tc.outputs[0] };
   });
   return tally(questionId, results);
+}
+
+/** The rejection reason for a run that used more tape than the question
+ *  allows, or undefined when it is within budget (or unbudgeted). */
+function tapeOverrun(used: number, maxTapeCells: number | undefined): string | undefined {
+  if (maxTapeCells === undefined || used <= maxTapeCells) return undefined;
+  return `machine used ${used} tape cells — this question allows at most ${maxTapeCells}`;
 }
 
 /**
@@ -348,12 +362,20 @@ function gradeTurbot(question: AssignmentQuestion, circuit: CircuitData): Questi
     return { questionId: question.id, status: 'graded', passed: 0, total: rejected.length, cases: [], turbotCases: rejected };
   }
 
-  const turbotCases = cases.map((tc) => gradeTurbotCase(circuit, innerMode, tc, notation));
+  const turbotCases = cases.map((tc) =>
+    gradeTurbotCase(circuit, innerMode, tc, notation, question.maxTapeCells),
+  );
   const passed = turbotCases.filter((c) => c.pass).length;
   return { questionId: question.id, status: 'graded', passed, total: turbotCases.length, cases: [], turbotCases };
 }
 
-function gradeTurbotCase(circuit: CircuitData, innerMode: BuildMode, tc: TurbotTestCase, notation: TMNotation): TurbotCaseResult {
+function gradeTurbotCase(
+  circuit: CircuitData,
+  innerMode: BuildMode,
+  tc: TurbotTestCase,
+  notation: TMNotation,
+  maxTapeCells?: number,
+): TurbotCaseResult {
   const run = runTurbot(circuit.components, circuit.wires, innerMode, tc.arena, tc.maxSteps, notation);
   // The step limit bounds SIMULATION; whether a truncated run also fails is
   // the criterion's call (criterionRequiresStop, engine/turbot.ts). Stop-
@@ -363,6 +385,14 @@ function gradeTurbotCase(circuit: CircuitData, innerMode: BuildMode, tc: TurbotT
   // step-limited run is still judged on the trace it produced.
   if (run.hitStepLimit && criterionRequiresStop(tc.criterion)) {
     return { pass: false, stepsTaken: tc.maxSteps, finalPosition: run.finalState, hitStepLimit: true, reason: 'exceeded max steps' };
+  }
+  // A TM brain's private tape is budgeted the same way as a base TM's
+  // (HW6 P2: "Use at most 20 cells of the Turing machine tape"). Checked
+  // before the criterion: a navigation that only succeeds by overrunning the
+  // budget has not solved the problem as set.
+  const overrun = tapeOverrun(run.tapeCellsUsed, maxTapeCells);
+  if (overrun) {
+    return { pass: false, stepsTaken: run.history.length, finalPosition: run.finalState, hitStepLimit: run.hitStepLimit, reason: overrun };
   }
   const pass = evaluateTurbotCriterion(tc.arena, run, tc.criterion);
   // Failure reasons — EVERY failing case carries one: a step-limited trace

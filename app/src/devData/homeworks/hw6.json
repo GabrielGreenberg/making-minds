@@ -17,6 +17,7 @@
       "statement": "Your turbot lives in a desert: a 30 by 30 world surrounded by a wall, with a single piece of food somewhere in the quadrant to the north-east of the turbot’s starting position (never on the starting cell itself). Neither the starting position nor the exact location of the food is known in advance. Build a Turing-machine brain that searches until the turbot finds the food and passes over it, then returns to the starting cell as quickly as possible and stops there. Use at most 20 cells of the Turing machine tape. The tape starts blank; if your design needs an initial tape configuration, have the machine write it before setting off.",
       "buildMode": "turbot",
       "representation": "binary",
+      "maxTapeCells": 20,
       "innerMode": "TM",
       "turbot_cases": [
         {

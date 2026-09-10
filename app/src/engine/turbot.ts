@@ -433,6 +433,10 @@ export interface TurbotRunResult {
    */
   stopped: boolean;
   hitStepLimit: boolean;
+  /** TM brains only: how many cells of the brain's private tape the run
+   *  occupied — the span of head positions (engine/tm.ts tapeCellsUsed).
+   *  0 for CC/SC/FSM brains, which have no tape. */
+  tapeCellsUsed: number;
 }
 
 /**
@@ -452,18 +456,40 @@ export function runTurbot(
   let state: TurbotState = { ...arena.start };
   let brainState = initialBrainState(components, innerMode);
   const history: TurbotHistoryEntry[] = [];
+  // Tape-budget accounting for TM brains: the span of head positions on the
+  // private tape (which starts blank, head at 0). See tapeCellsUsed.
+  let headMin = brainState.tape?.head ?? 0;
+  let headMax = headMin;
+  const tapeCellsUsed = () => {
+    const tape = brainState.tape;
+    if (!tape) return 0;
+    let min = headMin;
+    let max = headMax;
+    // A turbot TM starts on a BLANK tape, so written cells are always cells
+    // the head stood on; unioned anyway so the two accountings agree.
+    for (const k of Object.keys(tape.cells)) {
+      const i = Number(k);
+      if (i < min) min = i;
+      if (i > max) max = i;
+    }
+    return max - min + 1;
+  };
 
   for (let step = 0; step < maxSteps; step++) {
     const sense = senseAheadSymbol(arena, state);
     const stepResult = runBrainStep(components, wires, innerMode, sense, brainState, notation);
     if (!stepResult) {
       const isTM = innerMode === 'TM';
-      return { finalState: state, history, haltedByMotor: false, haltedByBrain: true, stopped: isTM, hitStepLimit: false };
+      return { finalState: state, history, haltedByMotor: false, haltedByBrain: true, stopped: isTM, hitStepLimit: false, tapeCellsUsed: tapeCellsUsed() };
     }
     if (stepResult.motor !== null) {
       state = applyMotorCommand(arena, state, stepResult.motor);
     }
     brainState = stepResult.brainState;
+    if (brainState.tape) {
+      if (brainState.tape.head < headMin) headMin = brainState.tape.head;
+      if (brainState.tape.head > headMax) headMax = brainState.tape.head;
+    }
     history.push({
       t: step + 1,
       kind: stepResult.motor === null ? 'internal' : 'external',
@@ -474,11 +500,11 @@ export function runTurbot(
       facing: state.facing,
     });
     if (stepResult.motor === 'stop') {
-      return { finalState: state, history, haltedByMotor: true, haltedByBrain: false, stopped: true, hitStepLimit: false };
+      return { finalState: state, history, haltedByMotor: true, haltedByBrain: false, stopped: true, hitStepLimit: false, tapeCellsUsed: tapeCellsUsed() };
     }
   }
 
-  return { finalState: state, history, haltedByMotor: false, haltedByBrain: false, stopped: false, hitStepLimit: true };
+  return { finalState: state, history, haltedByMotor: false, haltedByBrain: false, stopped: false, hitStepLimit: true, tapeCellsUsed: tapeCellsUsed() };
 }
 
 // ─── Success criteria (spec §12.5) ───────────────────────────────────

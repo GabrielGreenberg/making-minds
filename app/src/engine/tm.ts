@@ -120,18 +120,32 @@ export interface TMEvalResult {
 export const DEFAULT_TM_MAX_STEPS = 10000;
 
 /**
- * Run a Turing machine from S₀ on an initial tape until it halts (no matching
- * transition) or `maxSteps` is reached. Unlike an FSM, halting is the *success
- * precondition* — it means the computation finished. Hitting the step limit
- * signals a probable infinite loop. The acceptor (tmCodec.ts) then decides
- * whether the halted tape is well-formed.
+ * How many tape cells a run occupied — the span from the leftmost to the
+ * rightmost cell it touched. This is what a question's `maxTapeCells` budget
+ * caps ("use at most 20 cells of the tape", HW6 P2).
  *
- * @param components - All circuit components (STATE nodes).
- * @param wires      - All wires; TM transition wires carry a `read:write,move` label.
- * @param initialTape - Starting tape (built by the codec's `encodeTM`).
- * @param notation   - Tape alphabet / action set ('unary' | 'binary').
- * @param maxSteps   - Safety bound against non-terminating machines.
+ * "Touched" is the union of three things, because none alone is the whole
+ * story: the cells the head sat on, the non-blank cells the run STARTED with
+ * (a pre-written input block the machine reads by standing to its right is
+ * tape it uses), and the non-blank cells it ENDED with. The span, not the
+ * count of distinct cells: a gap the machine steps over is still tape it
+ * occupies.
  */
+export function tapeCellsUsed(run: TMEvalResult, initialTape: TMTape): number {
+  let min = Infinity;
+  let max = -Infinity;
+  const touch = (i: number) => {
+    if (i < min) min = i;
+    if (i > max) max = i;
+  };
+  touch(initialTape.head);
+  touch(run.tape.head);
+  for (const h of run.history) touch(h.headBefore);
+  for (const k of Object.keys(initialTape.cells)) touch(Number(k));
+  for (const k of Object.keys(run.tape.cells)) touch(Number(k));
+  return max >= min ? max - min + 1 : 0;
+}
+
 export function evaluateTMSequence(
   components: CircuitComponent[],
   wires: Wire[],

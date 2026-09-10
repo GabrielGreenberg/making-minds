@@ -23,6 +23,7 @@ import type {
 import { getPortsForType } from '../src/types';
 import {
   evaluateTMSequence,
+  tapeCellsUsed,
   type TMEvalResult,
 } from '../src/engine/tm';
 import { tmNotation } from '../src/engine/notation';
@@ -53,6 +54,15 @@ function tmIncrement() {
   return {
     components: [comp('s0', 'S₀'), comp('s1', 'S₁')],
     wires: [wire('t1', 's0', 's0', '1:1,R'), wire('t2', 's0', 's1', '0:1,R')],
+  };
+}
+
+// A machine that never halts: S₀ rewrites whatever it reads and steps right
+// forever, so every run hits the step limit (and roams over the tape).
+function tmRunaway() {
+  return {
+    components: [comp('s0', 'S₀')],
+    wires: [wire('t1', 's0', 's0', '1:1,R'), wire('t2', 's0', 's0', '0:0,R')],
   };
 }
 
@@ -313,6 +323,49 @@ const strictStandard = gradeQuestion(strictQuestion, tmIncrementStandard());
 check('flag SET: standard-position increment passes all cases',
   strictStandard.status === 'graded' &&
   strictStandard.passed === strictStandard.total && strictStandard.total === 3);
+
+// ── maxTapeCells, end-to-end through the grader ────────────────────
+// The budget counts the SPAN of head positions, so a tally increment on x=3
+// (three strokes, head starting on the rightmost) occupies at least 4 cells.
+console.log('\n[grader: maxTapeCells]');
+const generousBudget: AssignmentQuestion = { ...laxQuestion, maxTapeCells: 99 };
+// One cell is below even the smallest case (x=0 spans 2: the blank input
+// cell and the stroke the machine writes), so every case must bust it.
+const tightBudget: AssignmentQuestion = { ...laxQuestion, maxTapeCells: 1 };
+
+const withinBudget = gradeQuestion(generousBudget, tmIncrement());
+check('budget ABSENT vs generous: the same machine passes either way',
+  withinBudget.status === 'graded' && withinBudget.passed === withinBudget.total &&
+  withinBudget.total === laxOffPosition.total);
+
+const overBudget = gradeQuestion(tightBudget, tmIncrement());
+check('budget SET tight: every case fails with the cell count named',
+  overBudget.status === 'graded' && overBudget.passed === 0 && overBudget.total === 3 &&
+  overBudget.cases.every((c) => !!c.reason && c.reason.includes('tape cells')));
+
+// A budget must not mask an acceptance failure: a machine that never halts is
+// reported as such, not as a tape overrun (the budget is checked after the
+// acceptor for exactly this reason).
+const loopingBudgeted = gradeQuestion(tightBudget, tmRunaway());
+check('budget does not mask a non-halting run (reason is the halt, not the tape)',
+  loopingBudgeted.status === 'graded' && loopingBudgeted.passed === 0 &&
+  loopingBudgeted.cases.every((c) => !!c.reason && !c.reason.includes('tape cells')));
+
+// The engine's own accounting: the span of everything the run touches — head
+// positions, the pre-written input, and whatever it wrote.
+{
+  const blank = { cells: {}, head: 0 };
+  const idle = evaluateTMSequence([], [], blank, 'unary');
+  check('tapeCellsUsed: an empty machine on a blank tape uses one cell',
+    tapeCellsUsed(idle, blank) === 1);
+  // x=3 lays three strokes at 0..2 with the head on 2; the machine writes the
+  // fourth at 3 and halts on 4 — cells 0..4, five in all. The input block
+  // counts even though the head never walks back over it.
+  const t0 = encodeTM('unary', [3]);
+  const run = evaluateTMSequence(tmIncrement().components, tmIncrement().wires, t0, 'unary');
+  check('tapeCellsUsed: increment on x=3 spans input block + written cell (5)',
+    tapeCellsUsed(run, t0) === 5);
+}
 
 console.log(`\n${failures === 0 ? 'TM CHECK OK' : `TM CHECK FAILED (${failures} checks)`}`);
 process.exit(failures === 0 ? 0 : 1);

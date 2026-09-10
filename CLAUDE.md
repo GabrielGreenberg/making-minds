@@ -945,7 +945,12 @@ only — the grader never sees the formula; it runs against the generated numeri
   codec encodes/decodes per axis and the grader compares decoded outputs to expected. TM
   questions may additionally set `requireStandardHaltPosition: true` (authored via a TM-only
   checkbox in the question creator) to reject runs whose head does not halt on the output
-  block's rightmost cell; absent/false, acceptance is position-agnostic. Any question may set
+  block's rightmost cell; absent/false, acceptance is position-agnostic. A TM question — or a
+  turbot question whose brain is a TM, e.g. HW6 P2's `maxTapeCells: 20` — may also set
+  `maxTapeCells` to cap how much tape a run may occupy: `engine/tm.ts`'s `tapeCellsUsed`
+  measures the SPAN from the leftmost to the rightmost cell touched (head positions ∪ the
+  pre-written input ∪ what the run wrote), checked after acceptance so a non-halting run is
+  still reported as such. Any question may set
   `allowed_components` to restrict the component vocabulary (semantics in
   `engine/machineValidation.ts`: listed types only + always-allowed INPUT/OUTPUT/STATE, boxed
   internals recursed; absent/empty = unrestricted) — enforced at Stage-1 grading, in the student

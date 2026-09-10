@@ -162,6 +162,10 @@ export interface AssignmentQuestion {
    *  head halts on the output block's rightmost cell (standard position —
    *  tmCodec `AcceptOptions`). Absent/false = position-agnostic (default). */
   requireStandardHaltPosition?: boolean;
+  /** Cap on how many tape cells a run may occupy — the span of head positions
+   *  (engine/tm.ts `tapeCellsUsed`). Applies to TM questions and to turbot
+   *  questions whose brain is a TM (its private tape). Absent = unbudgeted. */
+  maxTapeCells?: number;
   cc_spec?: CCSpec;            // authoring spec; source of group widths + generates test_cases at save
   test_cases?: TestCase[];     // value-based grading cases (one bank, all modes — see TestCase)
   // Turbot-only fields (buildMode === 'turbot'). A turbot question's "circuit"

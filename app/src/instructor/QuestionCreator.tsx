@@ -152,6 +152,13 @@ export function QuestionCreator({ assignment, existingQuestion, onSave, onCancel
     () => existingQuestion?.requireStandardHaltPosition ?? false,
   );
 
+  // Tape budget: the largest number of tape cells a run may occupy. Held as
+  // text so the field can be cleared back to "unbudgeted"; TM questions and
+  // TM-brained turbots only.
+  const [maxTapeCells, setMaxTapeCells] = useState<string>(
+    () => (existingQuestion?.maxTapeCells !== undefined ? String(existingQuestion.maxTapeCells) : ''),
+  );
+
   // Component restriction (`allowed_components`). Off = unrestricted (the
   // field is omitted). On = students may use only the checked gates (plus
   // INPUT/OUTPUT, which are always allowed — see engine/machineValidation.ts).
@@ -275,6 +282,16 @@ export function QuestionCreator({ assignment, existingQuestion, onSave, onCancel
     canRestrictComponents && restrictComponents
       ? { allowed_components: ['INPUT', 'OUTPUT', ...allowedGates] }
       : {};
+
+  // A tape budget only means something where there is a tape.
+  const hasTape = mode === 'TM' || (isTurbot && innerMode === 'TM');
+  const maxTapeCellsField: Pick<AssignmentQuestion, 'maxTapeCells'> = (() => {
+    if (!hasTape) return {};
+    const raw = maxTapeCells.trim();
+    if (raw === '') return {};
+    const n = Number(raw);
+    return Number.isInteger(n) && n > 0 ? { maxTapeCells: n } : {};
+  })();
 
   // A budget is meaningful on any canvas that has components to count.
   const canLimitComponents = mode !== 'open';
@@ -402,6 +419,7 @@ export function QuestionCreator({ assignment, existingQuestion, onSave, onCancel
         representation: rep,
         ...allowedComponentsField,
         ...componentLimitsField,
+        ...maxTapeCellsField,
         innerMode,
         turbot_cases: [{ arena, maxSteps, criterion }],
       });
@@ -429,6 +447,7 @@ export function QuestionCreator({ assignment, existingQuestion, onSave, onCancel
         representation: 'binary',
         ...allowedComponentsField,
         ...componentLimitsField,
+        ...maxTapeCellsField,
         perception: { rule, width: effWidth },
         perception_cases,
       });
@@ -458,6 +477,7 @@ export function QuestionCreator({ assignment, existingQuestion, onSave, onCancel
       representation: rep,
       // TM-only acceptance strictness; omitted (default) unless checked.
       ...(mode === 'TM' && requireStandardHalt ? { requireStandardHaltPosition: true } : {}),
+      ...maxTapeCellsField,
       // Component restriction; omitted (default = unrestricted) unless enabled.
       ...allowedComponentsField,
       ...componentLimitsField,
@@ -557,6 +577,22 @@ export function QuestionCreator({ assignment, existingQuestion, onSave, onCancel
             />
             Require standard halt position (the head must halt on the output block&#8217;s
             rightmost cell)
+          </label>
+        )}
+        {hasTape && (
+          <label className="instructor-inline-field">
+            Max tape cells
+            <input
+              className="instructor-input instructor-input--num"
+              type="number"
+              min={1}
+              placeholder="—"
+              value={maxTapeCells}
+              onChange={(e) => setMaxTapeCells(e.target.value)}
+            />
+            <span className="instructor-count">
+              blank = unbudgeted; counts the span of cells the head occupies
+            </span>
           </label>
         )}
         {isOpen && (

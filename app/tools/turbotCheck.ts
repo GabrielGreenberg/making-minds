@@ -427,6 +427,44 @@ check('grading respects the encoding: * table fails a unary (tally) question',
   tmStarGraded.questions[0].passed === 0 &&
   !!tmStarGraded.questions[0].turbotCases?.[0]?.reason);
 
+// ── maxTapeCells: a TM brain's private tape is budgeted too ────────
+// The walker writes a 1 per move and steps back left, so it stays inside a
+// handful of cells; a budget of 1 cell must still bite (the tape span counts
+// every cell the head occupies).
+console.log('\n[grader: maxTapeCells]');
+{
+  const runWalker = runTurbot(turbotTmWalker().components, turbotTmWalker().wires, 'TM', corridor(4, 3), 50);
+  check(`turbot TM run reports its tape span (${runWalker.tapeCellsUsed})`,
+    runWalker.tapeCellsUsed >= 1);
+  check('a CC brain has no tape, so it reports 0 cells',
+    runTurbot(ccForwardBrain().components, ccForwardBrain().wires, 'CC', corridor(3, 2), 10).tapeCellsUsed === 0);
+
+  const budgeted: AssignmentData = {
+    ...tmAssignment,
+    questions: [{ ...tmAssignment.questions[0], maxTapeCells: runWalker.tapeCellsUsed }],
+  };
+  check('a run exactly at the budget still passes',
+    gradeSubmission(budgeted, tmCorrectSub).questions[0].passed === 1);
+
+  const tight: AssignmentData = {
+    ...tmAssignment,
+    questions: [{ ...tmAssignment.questions[0], maxTapeCells: runWalker.tapeCellsUsed - 1 }],
+  };
+  const overGraded = gradeSubmission(tight, tmCorrectSub).questions[0];
+  check('one cell under budget: the same passing walker now fails',
+    overGraded.passed === 0 &&
+    (overGraded.turbotCases?.[0]?.reason ?? '').includes('tape cells'));
+
+  // A budget must not turn a CC brain's (tapeless) run into a failure.
+  const ccBudgeted: AssignmentData = {
+    ...tmAssignment,
+    questions: [{ ...tmAssignment.questions[0], innerMode: 'CC', representation: 'binary', maxTapeCells: 1 }],
+  };
+  const ccSub: SubmissionData = { ...tmCorrectSub, answers: [{ questionId: 1, circuit: ccForwardBrain() }] };
+  check('a budget is inert for a brain with no tape',
+    gradeSubmission(ccBudgeted, ccSub).questions[0].passed === 1);
+}
+
 // ── grader ─────────────────────────────────────────────────────
 console.log('\n[grader]');
 const assignment: AssignmentData = {
