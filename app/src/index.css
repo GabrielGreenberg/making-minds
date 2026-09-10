@@ -2124,6 +2124,37 @@ thead .sc-label-col {
   max-height: 340px;
 }
 
+/* Map zoom controls, in the "Map" section header beside the Edit map toggle. */
+.turbot-zoom {
+  display: inline-flex;
+  gap: 2px;
+  margin-left: 8px;
+}
+
+.turbot-zoom-btn {
+  min-width: 20px;
+  padding: 1px 6px;
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 1.4;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  background: #fff;
+  color: #555;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.turbot-zoom-btn:hover:not(:disabled) {
+  background: #f0f0f0;
+  border-color: #999;
+}
+
+.turbot-zoom-btn:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
 .turbot-arena-controls {
   display: flex;
   gap: 6px;

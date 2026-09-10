@@ -4,7 +4,7 @@
 // machine/history tables. The simulation itself lives in the store's turbot
 // slice; the canvas column stays the inner machine's normal editor.
 
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useStore, selectTurbotArena, selectTurbotInnerMode, selectTmNotation } from '../store';
 import {
   senseAhead,
@@ -17,6 +17,7 @@ import {
 import { setArenaCell, placeStart, resizeArena, MAX_ARENA_SIZE } from '../instructor/arenaEditing';
 import type { BuildMode, TMNotation } from '../types';
 import { ArenaCanvas } from './ArenaCanvas';
+import { loadUiPrefs, numericPref, saveUiPref } from '../uiPrefs';
 
 // Sandbox map editing reuses the instructor arena editor's tool set (pure
 // helpers in instructor/arenaEditing.ts; ArenaCanvas supplies the clickable
@@ -29,6 +30,17 @@ const MAP_TOOLS: { tool: MapTool; label: string; hint: string }[] = [
   { tool: 'erase', label: 'Erase', hint: 'Clear cells' },
   { tool: 'start', label: 'Start', hint: 'Move the turbot start; click its cell again to rotate' },
 ];
+
+// Map zoom. A 30x30 arena at the default 28px cell is ~840px of grid inside a
+// ~260px panel, so the Map is unreadable without it. Zoom with the -/+ buttons,
+// ctrl/cmd + wheel (the trackpad pinch gesture), or "Fit" to size the whole
+// arena to the scrollport. The level persists across navigation as a UI pref.
+const MIN_CELL = 8;
+const MAX_CELL = 64;
+const DEFAULT_CELL = 28;
+const ZOOM_STEP = 1.25;
+
+const clampCell = (n: number) => Math.max(MIN_CELL, Math.min(MAX_CELL, Math.round(n)));
 
 /**
  * The percept/motor glossary: what the brain can read and output, so
@@ -125,6 +137,34 @@ export function TurbotArenaPanel() {
   const [editingMap, setEditingMap] = useState(false);
   const [mapTool, setMapTool] = useState<MapTool>('block');
 
+  const [cellSize, setCellSizeState] = useState(() =>
+    clampCell(numericPref(loadUiPrefs(), 'arenaCellSize', DEFAULT_CELL)),
+  );
+  const setCellSize = (n: number) => setCellSizeState(clampCell(n));
+  // Functional update, so the once-bound wheel listener below never has to
+  // close over the current level.
+  const zoomBy = useCallback((factor: number) => {
+    setCellSizeState((prev) => clampCell(prev * factor));
+  }, []);
+  useEffect(() => { saveUiPref('arenaCellSize', cellSize); }, [cellSize]);
+
+  // Size the whole arena to the scrollport (both axes), so a 30x30 world is
+  // legible in one glance without scrolling.
+  const fitToPanel = () => {
+    const el = scrollRef.current;
+    if (!el) return;
+    const style = getComputedStyle(el);
+    const pad = parseFloat(style.paddingLeft) + parseFloat(style.paddingRight);
+    // The scrollport only grows to its max-height, and once the arena is
+    // smaller than that its clientHeight IS the content — so fitting must
+    // measure the space available, not the space currently used.
+    const maxH = parseFloat(style.maxHeight);
+    const availH = Number.isFinite(maxH) ? maxH : el.clientHeight;
+    const w = Math.floor((el.clientWidth - pad) / arena.width);
+    const h = Math.floor((availH - pad) / arena.height);
+    setCellSize(Math.min(w, h));
+  };
+
   const handleMapClick = (x: number, y: number) => {
     switch (mapTool) {
       case 'block': setTabArena(setArenaCell(arena, x, y, 'block')); break;
@@ -149,16 +189,26 @@ export function TurbotArenaPanel() {
     if (!el) return;
     const onPointerDown = () => { manualScroll.current.pointerDown = true; };
     const onPointerUp = () => { manualScroll.current.pointerDown = false; };
-    const onWheel = () => { manualScroll.current.lastWheelAt = Date.now(); };
+    // ctrl/cmd + wheel is the browser's pinch-zoom gesture; claim it for the
+    // Map instead of letting it zoom the whole page. Plain wheel scrolls, and
+    // arms the auto-follow guard below.
+    const onWheel = (e: WheelEvent) => {
+      if (e.ctrlKey || e.metaKey) {
+        e.preventDefault();
+        zoomBy(e.deltaY < 0 ? ZOOM_STEP : 1 / ZOOM_STEP);
+        return;
+      }
+      manualScroll.current.lastWheelAt = Date.now();
+    };
     el.addEventListener('pointerdown', onPointerDown);
     window.addEventListener('pointerup', onPointerUp);
-    el.addEventListener('wheel', onWheel, { passive: true });
+    el.addEventListener('wheel', onWheel, { passive: false });
     return () => {
       el.removeEventListener('pointerdown', onPointerDown);
       window.removeEventListener('pointerup', onPointerUp);
       el.removeEventListener('wheel', onWheel);
     };
-  }, []);
+  }, [zoomBy]);
 
   useEffect(() => {
     const container = scrollRef.current;
@@ -198,6 +248,27 @@ export function TurbotArenaPanel() {
     <div className="table-section">
       <div className="table-section-label">
         <span>Map</span>
+        <span className="turbot-zoom">
+          <button
+            className="turbot-zoom-btn"
+            onClick={() => setCellSize(cellSize / ZOOM_STEP)}
+            disabled={cellSize <= MIN_CELL}
+            title="Zoom out (or ctrl/⌘ + scroll over the map)"
+          >
+            −
+          </button>
+          <button className="turbot-zoom-btn" onClick={fitToPanel} title="Fit the whole arena in view">
+            Fit
+          </button>
+          <button
+            className="turbot-zoom-btn"
+            onClick={() => setCellSize(cellSize * ZOOM_STEP)}
+            disabled={cellSize >= MAX_CELL}
+            title="Zoom in (or ctrl/⌘ + scroll over the map)"
+          >
+            +
+          </button>
+        </span>
         {isSandbox && (
           <button
             className="map-edit-toggle"
@@ -220,7 +291,7 @@ export function TurbotArenaPanel() {
             <ArenaCanvas
               arena={arena}
               turbot={turbotState}
-              cellSize={28}
+              cellSize={cellSize}
               onCellClick={editingMap ? handleMapClick : undefined}
             />
           </div>

@@ -4,20 +4,7 @@ import { bitsToTally, bitsToBinary, tmNotation, timeOutputBits } from '../engine
 import { outputDisplayString, argGroupCountFor, argDisplayString } from './outputDisplay';
 import { TurbotArenaPanel } from './TurbotArenaPanel';
 import type { TMSymbol } from '../types';
-
-const UI_PREFS_KEY = 'making-minds-ui-prefs';
-
-function loadUiPrefs(): Record<string, unknown> {
-  try {
-    return JSON.parse(localStorage.getItem(UI_PREFS_KEY) || '{}');
-  } catch { return {}; }
-}
-
-function saveUiPref(key: string, value: unknown) {
-  const prefs = loadUiPrefs();
-  prefs[key] = value;
-  localStorage.setItem(UI_PREFS_KEY, JSON.stringify(prefs));
-}
+import { loadUiPrefs, saveUiPref } from '../uiPrefs';
 
 /** Key for an input combination, e.g. "0,1,0" */
 function inputKey(bits: number[]): string {
