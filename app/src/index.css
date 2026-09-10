@@ -1115,64 +1115,6 @@ thead .sc-label-col {
 }
 
 /* ── Problem Set Header ── */
-/* ── Text Formatting Toolbar ── */
-.text-format-toolbar {
-  position: absolute;
-  top: 4px;
-  right: 4px;
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  padding: 4px 8px;
-  background: white;
-  border: 1px solid var(--menu-border);
-  border-radius: 4px;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-  z-index: 60;
-}
-
-.text-format-select {
-  padding: 2px 4px;
-  font-size: 11px;
-  border: 1px solid var(--menu-border);
-  border-radius: 3px;
-  font-family: inherit;
-  cursor: pointer;
-}
-
-.text-format-color {
-  width: 22px;
-  height: 22px;
-  border: 1px solid var(--menu-border);
-  border-radius: 3px;
-  padding: 0;
-  cursor: pointer;
-  background: none;
-}
-
-.text-format-btn {
-  padding: 2px 6px;
-  font-size: 12px;
-  font-weight: 600;
-  border: 1px solid var(--menu-border);
-  border-radius: 3px;
-  background: white;
-  cursor: pointer;
-  font-family: inherit;
-  min-width: 24px;
-  text-align: center;
-}
-
-.text-format-btn:hover {
-  background: #f0f0f0;
-}
-
-.text-format-btn.active {
-  background: var(--accent);
-  color: white;
-  border-color: var(--accent);
-}
-
 /* ── Ready to Box button container ── */
 .ready-to-box-btn {
   display: flex;

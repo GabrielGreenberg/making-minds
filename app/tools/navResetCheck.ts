@@ -297,8 +297,6 @@ useStore.getState().importWorkbook(JSON.stringify({
     buildMode: 'SC',
     activeTask: 'arithmetic',
     circuit: { components: [], wires: [] },
-    textElements: [],
-    comments: [],
     boxes: [],
   }],
 }));

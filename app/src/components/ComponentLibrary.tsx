@@ -3,7 +3,7 @@ import { isComponentTypeAllowed, disallowedComponentTypes } from '../engine/mach
 import type { ComponentType } from '../types';
 
 interface LibraryEntry {
-  type: ComponentType | 'TEXT' | 'COMMENT';
+  type: ComponentType;
   label: string;
   section: string;
 }
@@ -15,14 +15,10 @@ const CC_LIBRARY_ITEMS: LibraryEntry[] = [
   { type: 'OR', label: 'OR', section: 'Gates' },
   { type: 'NOT', label: 'NOT', section: 'Gates' },
   { type: 'MEM', label: '', section: 'Memory' },
-  { type: 'TEXT', label: 'Text', section: 'Annotate' },
-  { type: 'COMMENT', label: 'Comment', section: 'Annotate' },
 ];
 
 const FSM_LIBRARY_ITEMS: LibraryEntry[] = [
   { type: 'STATE', label: 'State', section: 'States' },
-  { type: 'TEXT', label: 'Text', section: 'Annotate' },
-  { type: 'COMMENT', label: 'Comment', section: 'Annotate' },
 ];
 
 const SW = '1.5'; // uniform stroke width for all palette icons
@@ -83,20 +79,6 @@ function PaletteIcon({ type }: { type: string }) {
           <circle cx="6" cy="20" r="2.5" fill="#555" />
           <circle cx="50" cy="20" r="2.5" fill="#555" />
           <text x="28" y="24" textAnchor="middle" fontSize="12" fontWeight="600" fill="#333">M</text>
-        </svg>
-      );
-    case 'TEXT':
-      return (
-        <svg viewBox="-2 -2 60 44">
-          <text x="28" y="30" textAnchor="middle" fontSize="28" fontWeight="600" fontFamily="Georgia, serif" fill="#333">T</text>
-        </svg>
-      );
-    case 'COMMENT':
-      return (
-        <svg viewBox="4 0 48 44">
-          <path d="M16,6 L42,6 Q46,6 46,10 L46,24 Q46,28 42,28 L24,28 L18,35 L18,28 L16,28 Q12,28 12,24 L12,10 Q12,6 16,6 Z" fill="none" stroke="#333" strokeWidth={SW} />
-          <line x1="19" y1="14" x2="39" y2="14" stroke="#333" strokeWidth="1" />
-          <line x1="19" y1="20" x2="34" y2="20" stroke="#333" strokeWidth="1" />
         </svg>
       );
     case 'STATE':
@@ -204,19 +186,13 @@ export function ComponentLibrary() {
   const setSelectedTool = useStore((s) => s.setSelectedTool);
 
   // The open question's component restriction (null = unrestricted). Entries
-  // outside the allowed set are hidden — annotations (TEXT/COMMENT) are not
-  // circuit components and always stay. The grader's Stage-1 check enforces
+  // outside the allowed set are hidden. The grader's Stage-1 check enforces
   // the same rule (engine/machineValidation.ts owns the semantics).
   const allowedComponents = useStore(selectAllowedComponents);
 
   // TM shares the FSM editor palette (STATE nodes + transition wires).
   const allItems = effectiveMode === 'FSM' || effectiveMode === 'TM' ? FSM_LIBRARY_ITEMS : CC_LIBRARY_ITEMS;
-  const items = allItems.filter(
-    (item) =>
-      item.type === 'TEXT' ||
-      item.type === 'COMMENT' ||
-      isComponentTypeAllowed(item.type, allowedComponents),
-  );
+  const items = allItems.filter((item) => isComponentTypeAllowed(item.type, allowedComponents));
   const visibleLegacyBoxes = boxedLibrary.filter(
     (b) => disallowedComponentTypes(b.circuit, allowedComponents).length === 0,
   );
@@ -241,8 +217,8 @@ export function ComponentLibrary() {
           ? `Turbot · ${TURBOT_BRAIN_LABELS[effectiveMode] || 'Logic Circuit'}`
           : MACHINE_LABELS[buildMode] || 'Logic Circuit'}
       </div>
-      {/* Component sections (non-Annotate) */}
-      {Array.from(sections.entries()).filter(([section]) => section !== 'Annotate').map(([section, entries]) => (
+      {/* Component sections */}
+      {Array.from(sections.entries()).map(([section, entries]) => (
         <div key={section}>
           <div className="library-section-title">{section}</div>
           {entries.map((entry) => {
@@ -256,7 +232,7 @@ export function ComponentLibrary() {
                   if (selectedTool === entry.type) {
                     setSelectedTool(null);
                   } else {
-                    setSelectedTool(entry.type as ComponentType | 'TEXT' | 'COMMENT');
+                    setSelectedTool(entry.type);
                   }
                 }}
               >
@@ -336,29 +312,6 @@ export function ComponentLibrary() {
               }}
             >
               <PaletteIcon type="BOXED" />
-            </div>
-          ))}
-        </div>
-      )}
-
-      {/* Annotate section */}
-      {sections.has('Annotate') && (
-        <div>
-          <div className="library-section-title">Annotate</div>
-          {sections.get('Annotate')!.map((entry) => (
-            <div
-              key={entry.type}
-              className={`library-item${selectedTool === entry.type ? ' library-item-selected' : ''}`}
-              onClick={() => {
-                if (selectedTool === entry.type) {
-                  setSelectedTool(null);
-                } else {
-                  setSelectedTool(entry.type as ComponentType | 'TEXT' | 'COMMENT');
-                }
-              }}
-            >
-              <PaletteIcon type={entry.type} />
-              {entry.label && <span className="library-item-label">{entry.label}</span>}
             </div>
           ))}
         </div>

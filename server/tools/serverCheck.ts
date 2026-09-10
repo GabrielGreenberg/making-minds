@@ -142,7 +142,7 @@ check('instructor can save assignments', resave.status === 200);
 // ── workbook round-trip ──────────────────────────────────────────
 const wbState = {
   currentQuestionIndex: 2,
-  questionCircuits: { 1: { components: [], wires: [], textElements: [], comments: [], boxes: [] } },
+  questionCircuits: { 1: { components: [], wires: [], boxes: [] } },
 };
 const wbPut = await api('PUT', `/workbooks/${SAMPLE_ASSIGNMENT_ID}`, { token: sTok, body: wbState });
 const wbGet = await api<{ state: typeof wbState | null }>(

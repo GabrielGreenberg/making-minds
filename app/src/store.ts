@@ -11,8 +11,6 @@ import type {
   ComponentType,
   AssignmentData,
   AssignmentState,
-  TextElement,
-  CommentElement,
   BoxDefinition,
   ConfirmedBoxDef,
   WireManualSegment,
@@ -363,8 +361,6 @@ export function selectTransitionNotationForSource(
 interface HistoryEntry {
   components: CircuitComponent[];
   wires: Wire[];
-  textElements: TextElement[];
-  comments: CommentElement[];
   boxes: BoxDefinition[];
   confirmedBoxes: ConfirmedBoxDef[];
 }
@@ -551,7 +547,7 @@ interface AppState {
   renameTab: (id: string, title: string) => void;
   /** Sandbox turbot tabs only: replace the active tab's arena (Map editing). */
   setTabArena: (arena: ArenaConfig) => void;
-  tabCircuits: Map<string, { components: CircuitComponent[]; wires: Wire[]; textElements: TextElement[]; comments: CommentElement[]; boxes: BoxDefinition[]; confirmedBoxes: ConfirmedBoxDef[] }>;
+  tabCircuits: Map<string, { components: CircuitComponent[]; wires: Wire[]; boxes: BoxDefinition[]; confirmedBoxes: ConfirmedBoxDef[] }>;
 
   // Batch move (for efficient multi-component drag)
   moveComponentsBatch: (moves: Map<string, { x: number; y: number }>) => void;
@@ -593,22 +589,8 @@ interface AppState {
   recordScGlobalSequenceOutput: () => void;
 
   // Selected tool (click-to-place mode)
-  selectedTool: ComponentType | 'TEXT' | 'COMMENT' | 'NEW_BOX' | null;
-  setSelectedTool: (t: ComponentType | 'TEXT' | 'COMMENT' | 'NEW_BOX' | null) => void;
-
-  // Text elements
-  textElements: TextElement[];
-  addTextElement: (x: number, y: number) => string; // returns id
-  updateTextElement: (id: string, updates: Partial<TextElement>) => void;
-  removeTextElement: (id: string) => void;
-
-  // Comments
-  comments: CommentElement[];
-  showComments: boolean;
-  setShowComments: (v: boolean) => void;
-  addComment: (targetId: string, text: string) => string; // returns id
-  updateComment: (id: string, updates: Partial<CommentElement>) => void;
-  removeComment: (id: string) => void;
+  selectedTool: ComponentType | 'NEW_BOX' | null;
+  setSelectedTool: (t: ComponentType | 'NEW_BOX' | null) => void;
 
   // Box drawing mode state
   boxDrawing: {
@@ -825,8 +807,6 @@ export const useStore = create<AppState>()((set, get) => ({
       tabCircuits: new Map(),
       components: [],
       wires: [],
-      textElements: [],
-      comments: [],
       boxes: [],
       confirmedBoxLibrary: [],
       buildMode: 'CC',
@@ -850,8 +830,6 @@ export const useStore = create<AppState>()((set, get) => ({
       tabCircuits: new Map(),
       components: [],
       wires: [],
-      textElements: [],
-      comments: [],
       boxes: [],
       confirmedBoxLibrary: [],
       buildMode: 'CC',
@@ -873,22 +851,18 @@ export const useStore = create<AppState>()((set, get) => ({
     allTabCircuits.set(state.activeTabId, {
       components: state.components,
       wires: state.wires,
-      textElements: state.textElements,
-      comments: state.comments,
       boxes: state.boxes,
       confirmedBoxes: state.confirmedBoxLibrary,
     });
 
     const worksheets: WorksheetData[] = state.tabs.map((tab) => {
-      const circuit = allTabCircuits.get(tab.id) || { components: [], wires: [], textElements: [], comments: [], boxes: [], confirmedBoxes: [] };
+      const circuit = allTabCircuits.get(tab.id) || { components: [], wires: [], boxes: [], confirmedBoxes: [] };
       return {
         id: tab.id,
         title: tab.title,
         buildMode: tab.buildMode,
         activeTask: tab.activeTask,
         circuit: { components: circuit.components, wires: circuit.wires },
-        textElements: circuit.textElements,
-        comments: circuit.comments,
         boxes: circuit.boxes,
         confirmedBoxes: circuit.confirmedBoxes,
         // Turbot tabs: the brain kind + sandbox arena travel with the sheet.
@@ -933,8 +907,6 @@ export const useStore = create<AppState>()((set, get) => ({
           tabCircuits.set(ws.id, {
             components: resolvedComponents,
             wires: ws.circuit.wires || [],
-            textElements: ws.textElements || [],
-            comments: ws.comments || [],
             boxes: ws.boxes || [],
             confirmedBoxes: ws.confirmedBoxes || [],
           });
@@ -952,7 +924,7 @@ export const useStore = create<AppState>()((set, get) => ({
         });
 
         const activeId = wb.activeWorksheetId || tabs[0]?.id || defaultTabId;
-        const activeCircuit = tabCircuits.get(activeId) || { components: [], wires: [], textElements: [], comments: [], boxes: [], confirmedBoxes: [] };
+        const activeCircuit = tabCircuits.get(activeId) || { components: [], wires: [], boxes: [], confirmedBoxes: [] };
         const activeTab = tabs.find((t) => t.id === activeId);
 
         set({
@@ -965,8 +937,6 @@ export const useStore = create<AppState>()((set, get) => ({
           tabCircuits,
           components: activeCircuit.components,
           wires: activeCircuit.wires,
-          textElements: activeCircuit.textElements,
-          comments: activeCircuit.comments,
           boxes: activeCircuit.boxes,
           confirmedBoxLibrary: activeCircuit.confirmedBoxes,
           buildMode: activeTab?.buildMode || 'CC',
@@ -993,8 +963,6 @@ export const useStore = create<AppState>()((set, get) => ({
         tabCircuits.set(wsId, {
           components: resolvedComponents,
           wires: importedWires,
-          textElements: data.textElements || [],
-          comments: data.comments || [],
           boxes: data.boxes || [],
           confirmedBoxes: data.confirmedBoxes || [],
         });
@@ -1009,8 +977,6 @@ export const useStore = create<AppState>()((set, get) => ({
           tabCircuits,
           components: resolvedComponents,
           wires: importedWires,
-          textElements: data.textElements || [],
-          comments: data.comments || [],
           boxes: data.boxes || [],
           confirmedBoxLibrary: data.confirmedBoxes || [],
           buildMode: bm,
@@ -1166,7 +1132,6 @@ export const useStore = create<AppState>()((set, get) => ({
     set({
       components: resolvedComps,
       wires: newWires,
-      comments: state.comments.filter((c) => c.targetId !== id),
     });
     setTimeout(() => get().evaluateCircuit(), 0);
   },
@@ -1249,7 +1214,6 @@ export const useStore = create<AppState>()((set, get) => ({
     set({
       wires: newWires,
       components: resolvedComponents,
-      comments: state.comments.filter((c) => c.targetId !== id),
     });
     setTimeout(() => get().evaluateCircuit(), 0);
   },
@@ -1383,8 +1347,6 @@ export const useStore = create<AppState>()((set, get) => ({
         {
           components: JSON.parse(JSON.stringify(state.components)),
           wires: JSON.parse(JSON.stringify(state.wires)),
-          textElements: JSON.parse(JSON.stringify(state.textElements)),
-          comments: JSON.parse(JSON.stringify(state.comments)),
           boxes: JSON.parse(JSON.stringify(state.boxes)),
           confirmedBoxes: JSON.parse(JSON.stringify(state.confirmedBoxLibrary)),
         },
@@ -1403,16 +1365,12 @@ export const useStore = create<AppState>()((set, get) => ({
         {
           components: JSON.parse(JSON.stringify(state.components)),
           wires: JSON.parse(JSON.stringify(state.wires)),
-          textElements: JSON.parse(JSON.stringify(state.textElements)),
-          comments: JSON.parse(JSON.stringify(state.comments)),
           boxes: JSON.parse(JSON.stringify(state.boxes)),
           confirmedBoxes: JSON.parse(JSON.stringify(state.confirmedBoxLibrary)),
         },
       ],
       components: prev.components,
       wires: prev.wires,
-      textElements: prev.textElements,
-      comments: prev.comments,
       boxes: prev.boxes,
       confirmedBoxLibrary: prev.confirmedBoxes,
     });
@@ -1428,16 +1386,12 @@ export const useStore = create<AppState>()((set, get) => ({
         {
           components: JSON.parse(JSON.stringify(state.components)),
           wires: JSON.parse(JSON.stringify(state.wires)),
-          textElements: JSON.parse(JSON.stringify(state.textElements)),
-          comments: JSON.parse(JSON.stringify(state.comments)),
           boxes: JSON.parse(JSON.stringify(state.boxes)),
           confirmedBoxes: JSON.parse(JSON.stringify(state.confirmedBoxLibrary)),
         },
       ],
       components: next.components,
       wires: next.wires,
-      textElements: next.textElements,
-      comments: next.comments,
       boxes: next.boxes,
       confirmedBoxLibrary: next.confirmedBoxes,
     });
@@ -1461,8 +1415,6 @@ export const useStore = create<AppState>()((set, get) => ({
       questionCircuits,
       components: [],
       wires: [],
-      textElements: [],
-      comments: [],
       boxes: [],
       confirmedBoxLibrary: [],
       openResponse: '',
@@ -1512,8 +1464,6 @@ export const useStore = create<AppState>()((set, get) => ({
       currentQuestionIndex,
       components: activeCircuit.components,
       wires: activeCircuit.wires,
-      textElements: activeCircuit.textElements,
-      comments: activeCircuit.comments,
       boxes: activeCircuit.boxes,
       confirmedBoxLibrary: activeCircuit.confirmedBoxes ?? [],
       openResponse: activeCircuit.responseText ?? '',
@@ -1533,8 +1483,6 @@ export const useStore = create<AppState>()((set, get) => ({
         qc.set(q.id, {
           components: state.components,
           wires: state.wires,
-          textElements: state.textElements,
-          comments: state.comments,
           boxes: state.boxes,
           confirmedBoxes: state.confirmedBoxLibrary,
           responseText: state.openResponse,
@@ -1552,8 +1500,6 @@ export const useStore = create<AppState>()((set, get) => ({
       tc.set(state.activeTabId, {
         components: state.components,
         wires: state.wires,
-        textElements: state.textElements,
-        comments: state.comments,
         boxes: state.boxes,
         confirmedBoxes: state.confirmedBoxLibrary,
       });
@@ -1572,8 +1518,6 @@ export const useStore = create<AppState>()((set, get) => ({
     const saved = state.tabCircuits.get(state.activeTabId) ?? {
       components: [],
       wires: [],
-      textElements: [],
-      comments: [],
       boxes: [],
       confirmedBoxes: [],
     };
@@ -1583,8 +1527,6 @@ export const useStore = create<AppState>()((set, get) => ({
       workbookOpen: true,
       components: saved.components,
       wires: saved.wires,
-      textElements: saved.textElements,
-      comments: saved.comments,
       boxes: saved.boxes,
       confirmedBoxLibrary: saved.confirmedBoxes || [],
       buildMode: tab?.buildMode || 'CC',
@@ -1605,8 +1547,6 @@ export const useStore = create<AppState>()((set, get) => ({
     updatedMap.set(currentQ.id, {
       components: state.components,
       wires: state.wires,
-      textElements: state.textElements,
-      comments: state.comments,
       boxes: state.boxes,
       confirmedBoxes: state.confirmedBoxLibrary,
       responseText: state.openResponse,
@@ -1618,8 +1558,6 @@ export const useStore = create<AppState>()((set, get) => ({
       questionCircuits: updatedMap,
       components: saved.components,
       wires: saved.wires,
-      textElements: saved.textElements,
-      comments: saved.comments,
       boxes: saved.boxes,
       confirmedBoxLibrary: saved.confirmedBoxes ?? [],
       openResponse: saved.responseText ?? '',
@@ -1634,8 +1572,6 @@ export const useStore = create<AppState>()((set, get) => ({
       questionCircuits: new Map(),
       components: [],
       wires: [],
-      textElements: [],
-      comments: [],
       boxes: [],
       confirmedBoxLibrary: [],
       openResponse: '',
@@ -1657,8 +1593,6 @@ export const useStore = create<AppState>()((set, get) => ({
           components: state.components,
           wires: state.wires,
         },
-        textElements: state.textElements,
-        comments: state.comments,
         boxes: state.boxes,
         confirmedBoxes: state.confirmedBoxLibrary,
         repSystem: state.repSystem,
@@ -1706,8 +1640,6 @@ export const useStore = create<AppState>()((set, get) => ({
         set({
           components: resolvedComponents,
           wires: importedWires,
-          textElements: data.textElements || [],
-          comments: data.comments || [],
           boxes: data.boxes || [],
           confirmedBoxLibrary: data.confirmedBoxes || [],
           buildMode: data.metadata?.buildType || 'CC',
@@ -2244,8 +2176,6 @@ export const useStore = create<AppState>()((set, get) => ({
     set({
       components: [],
       wires: [],
-      textElements: [],
-      comments: [],
       boxes: [],
       selectedIds: [],
       boxDrawing: { phase: 'idle', draftBox: null },
@@ -2285,8 +2215,6 @@ export const useStore = create<AppState>()((set, get) => ({
     set({
       components: resolvedComps,
       wires: newWires,
-      textElements: state.textElements.filter((t) => !idsToRemove.has(t.id)),
-      comments: state.comments.filter((c) => !idsToRemove.has(c.id) && !idsToRemove.has(c.targetId)),
       boxes: state.boxes.filter((b) => !idsToRemove.has(b.id)),
       selectedIds: [],
     });
@@ -2372,8 +2300,6 @@ export const useStore = create<AppState>()((set, get) => ({
     updatedTabCircuits.set(state.activeTabId, {
       components: state.components,
       wires: state.wires,
-      textElements: state.textElements,
-      comments: state.comments,
       boxes: state.boxes,
       confirmedBoxes: state.confirmedBoxLibrary,
     });
@@ -2389,8 +2315,6 @@ export const useStore = create<AppState>()((set, get) => ({
       tabCircuits: updatedTabCircuits,
       components: [],
       wires: [],
-      textElements: [],
-      comments: [],
       boxes: [],
       confirmedBoxLibrary: [],
       buildMode,
@@ -2406,20 +2330,16 @@ export const useStore = create<AppState>()((set, get) => ({
     updatedTabCircuits.set(state.activeTabId, {
       components: state.components,
       wires: state.wires,
-      textElements: state.textElements,
-      comments: state.comments,
       boxes: state.boxes,
       confirmedBoxes: state.confirmedBoxLibrary,
     });
-    const saved = updatedTabCircuits.get(id) || { components: [], wires: [], textElements: [], comments: [], boxes: [], confirmedBoxes: [] };
+    const saved = updatedTabCircuits.get(id) || { components: [], wires: [], boxes: [], confirmedBoxes: [] };
     const tab = state.tabs.find((t) => t.id === id);
     set({
       activeTabId: id,
       tabCircuits: updatedTabCircuits,
       components: saved.components,
       wires: saved.wires,
-      textElements: saved.textElements,
-      comments: saved.comments,
       boxes: saved.boxes,
       confirmedBoxLibrary: saved.confirmedBoxes || [],
       buildMode: tab?.buildMode || 'CC',
@@ -2439,8 +2359,6 @@ export const useStore = create<AppState>()((set, get) => ({
       const saved = updatedTabCircuits.get(newActiveId) || {
         components: [],
         wires: [],
-        textElements: [],
-        comments: [],
         boxes: [],
         confirmedBoxes: [],
       };
@@ -2450,8 +2368,6 @@ export const useStore = create<AppState>()((set, get) => ({
         tabCircuits: updatedTabCircuits,
         components: saved.components,
         wires: saved.wires,
-        textElements: saved.textElements,
-        comments: saved.comments,
         boxes: saved.boxes,
         confirmedBoxLibrary: saved.confirmedBoxes || [],
         // The surviving tab's mode must come along with its canvas — leaving
@@ -3236,71 +3152,6 @@ export const useStore = create<AppState>()((set, get) => ({
   selectedTool: null,
   setSelectedTool: (t) => set({ selectedTool: t }),
 
-  // Text elements
-  textElements: [],
-  addTextElement: (x, y) => {
-    const state = get();
-    state.pushHistory();
-    const id = uuid();
-    const elem: TextElement = {
-      id,
-      x: snapToGrid(x),
-      y: snapToGrid(y),
-      width: 160,
-      height: 60,
-      text: '',
-      fontSize: 14,
-      fontColor: '#333',
-      bold: false,
-      italic: false,
-    };
-    set({ textElements: [...state.textElements, elem] });
-    return id;
-  },
-  updateTextElement: (id, updates) => {
-    set((state) => ({
-      textElements: state.textElements.map((t) =>
-        t.id === id ? { ...t, ...updates } : t
-      ),
-    }));
-  },
-  removeTextElement: (id) => {
-    const state = get();
-    state.pushHistory();
-    set({ textElements: state.textElements.filter((t) => t.id !== id) });
-  },
-
-  // Comments
-  comments: [],
-  showComments: true,
-  setShowComments: (v) => set({ showComments: v }),
-  addComment: (targetId, text) => {
-    const state = get();
-    state.pushHistory();
-    const id = uuid();
-    const comment: CommentElement = {
-      id,
-      targetId,
-      text,
-      x: 20,
-      y: -20,
-    };
-    set({ comments: [...state.comments, comment] });
-    return id;
-  },
-  updateComment: (id, updates) => {
-    set((state) => ({
-      comments: state.comments.map((c) =>
-        c.id === id ? { ...c, ...updates } : c
-      ),
-    }));
-  },
-  removeComment: (id) => {
-    const state = get();
-    state.pushHistory();
-    set({ comments: state.comments.filter((c) => c.id !== id) });
-  },
-
   // Box drawing mode state
   boxDrawing: {
     phase: 'idle',
@@ -3769,8 +3620,6 @@ function getAutoSaveData() {
   allTabCircuits.set(s.activeTabId, {
     components: s.components,
     wires: s.wires,
-    textElements: s.textElements,
-    comments: s.comments,
     boxes: s.boxes,
     confirmedBoxes: s.confirmedBoxLibrary,
   });
@@ -3808,8 +3657,6 @@ function syncedQuestionCircuits(s: AppState): Map<number, QuestionCircuit> {
     circuits.set(q.id, {
       components: s.components,
       wires: s.wires,
-      textElements: s.textElements,
-      comments: s.comments,
       boxes: s.boxes,
       confirmedBoxes: s.confirmedBoxLibrary,
       responseText: s.openResponse,
@@ -3925,8 +3772,6 @@ useStore.subscribe((state, prev) => {
   const canvasChanged =
     state.components !== prev.components ||
     state.wires !== prev.wires ||
-    state.textElements !== prev.textElements ||
-    state.comments !== prev.comments ||
     state.boxes !== prev.boxes ||
     state.confirmedBoxLibrary !== prev.confirmedBoxLibrary ||
     // the open-question text panel is that mode's "canvas"
@@ -4035,7 +3880,7 @@ useStore.subscribe((state) => {
 });
 
 // Load from localStorage on startup
-type TabCircuitData = { components: CircuitComponent[]; wires: Wire[]; textElements: TextElement[]; comments: CommentElement[]; boxes: BoxDefinition[]; confirmedBoxes: ConfirmedBoxDef[] };
+type TabCircuitData = { components: CircuitComponent[]; wires: Wire[]; boxes: BoxDefinition[]; confirmedBoxes: ConfirmedBoxDef[] };
 
 function loadAutoSave() {
   try {
@@ -4063,7 +3908,7 @@ function loadAutoSave() {
           : {}),
       }));
       const activeId = data.activeTabId || tabs[0]?.id || defaultTabId;
-      const activeCircuit = tabCircuits.get(activeId) || { components: [], wires: [], textElements: [], comments: [], boxes: [], confirmedBoxes: [] };
+      const activeCircuit = tabCircuits.get(activeId) || { components: [], wires: [], boxes: [], confirmedBoxes: [] };
       const activeTab = tabs.find((t: { id: string }) => t.id === activeId);
       const vp = data.viewPreferences || {};
 
@@ -4075,8 +3920,6 @@ function loadAutoSave() {
         tabCircuits,
         components: activeCircuit.components || [],
         wires: activeCircuit.wires || [],
-        textElements: activeCircuit.textElements || [],
-        comments: activeCircuit.comments || [],
         boxes: activeCircuit.boxes || [],
         confirmedBoxLibrary: activeCircuit.confirmedBoxes || [],
         buildMode: activeTab?.buildMode || 'CC',
@@ -4112,8 +3955,6 @@ function loadAutoSave() {
         repSystem: data.repSystem || 'binary',
         components: data.components || [],
         wires: data.wires || [],
-        textElements: data.textElements || [],
-        comments: data.comments || [],
         boxes: data.boxes || [],
         tabs,
         activeTabId: data.activeTabId || tabs[0]?.id || defaultTabId,

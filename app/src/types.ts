@@ -287,14 +287,12 @@ export interface SubmissionRecord {
   result?: SubmissionResult; // autograde computed at receipt (see SubmissionStore)
 }
 
-/** Saved canvas state for one assignment question (circuit + annotations).
+/** Saved canvas state for one assignment question.
  *  Open questions reuse the same container with `responseText` holding the
  *  student's free-text answer (their canvas fields stay empty). */
 export interface QuestionCircuit {
   components: CircuitComponent[];
   wires: Wire[];
-  textElements: TextElement[];
-  comments: CommentElement[];
   boxes: BoxDefinition[];
   /** Confirmed boxes available in this question's palette (absent in pre-existing saves = none). */
   confirmedBoxes?: ConfirmedBoxDef[];
@@ -315,8 +313,6 @@ export interface WorksheetData {
   buildMode: BuildMode;
   activeTask: ActiveTask;
   circuit: CircuitData;
-  textElements: TextElement[];
-  comments: CommentElement[];
   boxes: BoxDefinition[];
   /** Confirmed boxes available in this worksheet's palette (absent in pre-existing saves = none). */
   confirmedBoxes?: ConfirmedBoxDef[];
@@ -345,31 +341,6 @@ export interface WorkbookData {
     snapToAlign: boolean;
     repSystem: RepSystem;
   };
-}
-
-// ─── Text annotations ───────────────────────────────────────────
-
-export interface TextElement {
-  id: string;
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-  text: string;
-  fontSize: number;
-  fontColor: string;
-  bold: boolean;
-  italic: boolean;
-}
-
-// ─── Comments ───────────────────────────────────────────────────
-
-export interface CommentElement {
-  id: string;
-  targetId: string; // component or wire ID this comment is attached to
-  text: string;
-  x: number; // offset from target
-  y: number;
 }
 
 // ─── Boxing (redesigned) ────────────────────────────────────────

@@ -5,8 +5,6 @@ import type {
   CircuitComponent,
   Wire,
   ComponentType,
-  TextElement,
-  CommentElement,
   BoxDefinition,
 } from '../types';
 import {
@@ -315,7 +313,7 @@ function findAlignmentGuides(
 // ─── Drag state ──────────────────────────────────────────────────
 
 interface DragInfo {
-  type: 'move' | 'wire' | 'pan' | 'boxselect' | 'drawbox' | 'resizebox' | 'movebox' | 'movetext' | 'resizetext' | 'wiresegment';
+  type: 'move' | 'wire' | 'pan' | 'boxselect' | 'drawbox' | 'resizebox' | 'movebox' | 'wiresegment';
   anchorScreenX: number;
   anchorScreenY: number;
   anchorCanvasX: number;
@@ -352,17 +350,6 @@ interface DragInfo {
   moveBoxOffsetX?: number;
   moveBoxOffsetY?: number;
   moveBoxCompOffsets?: Map<string, { dx: number; dy: number }>;
-  // for 'movetext'
-  textId?: string;
-  textOffsetX?: number;
-  textOffsetY?: number;
-  // for 'resizetext'
-  resizeTextId?: string;
-  resizeCorner?: string;
-  origTextX?: number;
-  origTextY?: number;
-  origTextW?: number;
-  origTextH?: number;
   // for 'wiresegment'
   wireId?: string;
   segmentIndex?: number;
@@ -1599,234 +1586,6 @@ function FsmTransitionView({
   );
 }
 
-// ─── Text Element View ───────────────────────────────────────────
-
-function TextElementView({
-  elem,
-  isSelected,
-  isEditing,
-  onStartEdit,
-}: {
-  elem: TextElement;
-  isSelected: boolean;
-  isEditing: boolean;
-  onStartEdit: () => void;
-}) {
-  const updateTextElement = useStore((s) => s.updateTextElement);
-
-  return (
-    <g data-text-id={elem.id}>
-      {/* Bounding box */}
-      <rect
-        x={elem.x}
-        y={elem.y}
-        width={elem.width}
-        height={elem.height}
-        fill={isSelected ? 'rgba(42, 127, 255, 0.05)' : 'transparent'}
-        stroke={isSelected ? '#2a7fff' : '#ccc'}
-        strokeWidth={isSelected ? 1.5 : 0.5}
-        strokeDasharray={isSelected ? undefined : '4,2'}
-        data-text-id={elem.id}
-        style={{ cursor: 'move' }}
-      />
-      {/* Resize handles when selected */}
-      {isSelected && (
-        <>
-          {['nw', 'ne', 'sw', 'se'].map((corner) => {
-            const hx = corner.includes('e') ? elem.x + elem.width : elem.x;
-            const hy = corner.includes('s') ? elem.y + elem.height : elem.y;
-            return (
-              <rect
-                key={corner}
-                x={hx - 4}
-                y={hy - 4}
-                width={8}
-                height={8}
-                fill="white"
-                stroke="#2a7fff"
-                strokeWidth={1}
-                data-text-resize={elem.id}
-                data-resize-corner={corner}
-                style={{ cursor: `${corner}-resize` }}
-              />
-            );
-          })}
-        </>
-      )}
-      {/* Text content */}
-      {isEditing ? (
-        <foreignObject x={elem.x + 4} y={elem.y + 2} width={elem.width - 8} height={elem.height - 4}>
-          <textarea
-            autoFocus
-            defaultValue={elem.text}
-            onBlur={(e) => {
-              updateTextElement(elem.id, { text: e.target.value });
-            }}
-            onKeyDown={(e) => {
-              if (e.key === 'Escape') {
-                (e.target as HTMLTextAreaElement).blur();
-              }
-            }}
-            style={{
-              width: '100%',
-              height: '100%',
-              border: 'none',
-              outline: 'none',
-              background: 'transparent',
-              resize: 'none',
-              fontFamily: 'inherit',
-              fontSize: elem.fontSize,
-              color: elem.fontColor,
-              fontWeight: elem.bold ? 'bold' : 'normal',
-              fontStyle: elem.italic ? 'italic' : 'normal',
-              padding: 0,
-              margin: 0,
-            }}
-          />
-        </foreignObject>
-      ) : (
-        <foreignObject x={elem.x + 4} y={elem.y + 2} width={elem.width - 8} height={elem.height - 4}>
-          <div
-            onDoubleClick={(e) => {
-              e.stopPropagation();
-              onStartEdit();
-            }}
-            style={{
-              width: '100%',
-              height: '100%',
-              fontSize: elem.fontSize,
-              color: elem.fontColor,
-              fontWeight: elem.bold ? 'bold' : 'normal',
-              fontStyle: elem.italic ? 'italic' : 'normal',
-              fontFamily: 'inherit',
-              whiteSpace: 'pre-wrap',
-              wordBreak: 'break-word',
-              overflow: 'hidden',
-              cursor: 'text',
-              userSelect: 'none',
-            }}
-          >
-            {elem.text || (isSelected ? 'Double-click to edit' : '')}
-          </div>
-        </foreignObject>
-      )}
-    </g>
-  );
-}
-
-// ─── Comment Icon View ───────────────────────────────────────────
-
-function CommentIconView({
-  comment,
-  anchorX,
-  anchorY,
-  isExpanded,
-  onToggle,
-}: {
-  comment: CommentElement;
-  anchorX: number;
-  anchorY: number;
-  isExpanded: boolean;
-  onToggle: () => void;
-}) {
-  const updateComment = useStore((s) => s.updateComment);
-  const removeComment = useStore((s) => s.removeComment);
-  const [editing, setEditing] = useState(false);
-
-  const iconX = anchorX + comment.x;
-  const iconY = anchorY + comment.y;
-
-  return (
-    <g data-comment-id={comment.id}>
-      {/* Comment icon (speech bubble) */}
-      <g
-        onClick={(e) => {
-          e.stopPropagation();
-          onToggle();
-        }}
-        style={{ cursor: 'pointer' }}
-      >
-        <circle cx={iconX} cy={iconY} r={8} fill="#2196f3" />
-        <text
-          x={iconX}
-          y={iconY + 4}
-          textAnchor="middle"
-          fontSize="10"
-          fill="white"
-          fontWeight="bold"
-          pointerEvents="none"
-        >
-          {'\u2709'}
-        </text>
-      </g>
-
-      {/* Expanded comment bubble */}
-      {isExpanded && (
-        <foreignObject x={iconX + 12} y={iconY - 10} width={200} height={120}>
-          <div
-            onClick={(e) => e.stopPropagation()}
-            style={{
-              background: 'white',
-              border: '1px solid #2196f3',
-              borderRadius: 6,
-              padding: 8,
-              boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
-              fontSize: 12,
-            }}
-          >
-            {editing ? (
-              <textarea
-                autoFocus
-                defaultValue={comment.text}
-                onBlur={(e) => {
-                  updateComment(comment.id, { text: e.target.value });
-                  setEditing(false);
-                }}
-                onKeyDown={(e) => {
-                  if (e.key === 'Escape') (e.target as HTMLTextAreaElement).blur();
-                }}
-                style={{
-                  width: '100%',
-                  height: 60,
-                  border: '1px solid #ccc',
-                  borderRadius: 3,
-                  resize: 'none',
-                  fontSize: 12,
-                  fontFamily: 'inherit',
-                  padding: 4,
-                }}
-              />
-            ) : (
-              <div
-                onDoubleClick={() => setEditing(true)}
-                style={{ minHeight: 20, cursor: 'text', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}
-              >
-                {comment.text || 'Double-click to add comment...'}
-              </div>
-            )}
-            <div style={{ display: 'flex', gap: 4, marginTop: 4, justifyContent: 'flex-end' }}>
-              {!editing && (
-                <button
-                  onClick={() => setEditing(true)}
-                  style={{ fontSize: 10, padding: '2px 6px', cursor: 'pointer', border: '1px solid #ccc', borderRadius: 3, background: 'white' }}
-                >
-                  Edit
-                </button>
-              )}
-              <button
-                onClick={() => removeComment(comment.id)}
-                style={{ fontSize: 10, padding: '2px 6px', cursor: 'pointer', border: '1px solid #e53935', borderRadius: 3, background: 'white', color: '#e53935' }}
-              >
-                Delete
-              </button>
-            </div>
-          </div>
-        </foreignObject>
-      )}
-    </g>
-  );
-}
-
 // ─── Box View ────────────────────────────────────────────────────
 
 function BoxView({
@@ -2026,48 +1785,6 @@ function BoxView({
   );
 }
 
-// ─── Text Formatting Toolbar (HTML overlay) ──────────────────────
-
-function TextFormattingToolbar({ elem }: { elem: TextElement }) {
-  const updateTextElement = useStore((s) => s.updateTextElement);
-
-  return (
-    <div className="text-format-toolbar">
-      <select
-        value={elem.fontSize}
-        onChange={(e) => updateTextElement(elem.id, { fontSize: parseInt(e.target.value) })}
-        className="text-format-select"
-      >
-        {[10, 12, 14, 16, 18, 20, 24, 28, 32].map((s) => (
-          <option key={s} value={s}>{s}px</option>
-        ))}
-      </select>
-      <input
-        type="color"
-        value={elem.fontColor}
-        onChange={(e) => updateTextElement(elem.id, { fontColor: e.target.value })}
-        className="text-format-color"
-        title="Font color"
-      />
-      <button
-        className={`text-format-btn ${elem.bold ? 'active' : ''}`}
-        onClick={() => updateTextElement(elem.id, { bold: !elem.bold })}
-        title="Bold"
-      >
-        B
-      </button>
-      <button
-        className={`text-format-btn ${elem.italic ? 'active' : ''}`}
-        onClick={() => updateTextElement(elem.id, { italic: !elem.italic })}
-        title="Italic"
-        style={{ fontStyle: 'italic' }}
-      >
-        I
-      </button>
-    </div>
-  );
-}
-
 // ─── Navigation Arrow ────────────────────────────────────────────
 
 function NavigationArrow({
@@ -2131,9 +1848,7 @@ export function CircuitCanvas() {
   const [alignGuides, setAlignGuides] = useState<AlignGuide[]>([]);
   const [isPanning, setIsPanning] = useState(false);
   const [containerSize, setContainerSize] = useState({ width: 800, height: 600 });
-  const [editingTextId, setEditingTextId] = useState<string | null>(null);
   const [editingBoxId, setEditingBoxId] = useState<string | null>(null);
-  const [expandedCommentId, setExpandedCommentId] = useState<string | null>(null);
   const [drawBoxPreview, setDrawBoxPreview] = useState<{
     x: number; y: number; w: number; h: number;
   } | null>(null);
@@ -2164,9 +1879,6 @@ export function CircuitCanvas() {
   // editor-behavior branches key off the effective (inner) mode.
   const effectiveMode = useStore(selectEffectiveMode);
   const selectedTool = useStore((s) => s.selectedTool);
-  const textElements = useStore((s) => s.textElements);
-  const comments = useStore((s) => s.comments);
-  const showComments = useStore((s) => s.showComments);
   const boxes = useStore((s) => s.boxes);
   const boxDrawing = useStore((s) => s.boxDrawing);
 
@@ -2244,8 +1956,6 @@ export function CircuitCanvas() {
 
       if (e.key === 'Escape') {
         useStore.getState().setSelectedTool(null);
-        setEditingTextId(null);
-        setExpandedCommentId(null);
         // Cancel box drawing
         const state = useStore.getState();
         if (state.boxDrawing.phase !== 'idle') {
@@ -2277,10 +1987,7 @@ export function CircuitCanvas() {
         if (e.key === 'a') {
           e.preventDefault();
           const s = useStore.getState();
-          s.setSelectedIds([
-            ...s.components.map((c) => c.id),
-            ...s.textElements.map((t) => t.id),
-          ]);
+          s.setSelectedIds(s.components.map((c) => c.id));
         }
       }
     };
@@ -2420,28 +2127,6 @@ export function CircuitCanvas() {
       };
     }
 
-    // Check for text resize handle
-    const textResizeEl = target.getAttribute('data-text-resize')
-      ? target
-      : target.closest<SVGElement>('[data-text-resize]');
-    if (textResizeEl) {
-      return {
-        type: 'textresize' as const,
-        textId: textResizeEl.getAttribute('data-text-resize')!,
-        corner: textResizeEl.getAttribute('data-resize-corner')!,
-      };
-    }
-
-    // Check for text element
-    const textEl = target.getAttribute('data-text-id')
-      ? target
-      : target.closest<SVGElement>('[data-text-id]');
-    if (textEl) {
-      return {
-        type: 'text' as const,
-        textId: textEl.getAttribute('data-text-id')!,
-      };
-    }
 
     // Check for wire
     const wireEl =
@@ -2679,42 +2364,6 @@ export function CircuitCanvas() {
         return;
       }
 
-      if (drag.type === 'movetext' && drag.textId) {
-        state.updateTextElement(drag.textId, {
-          x: canvasPos.x - drag.textOffsetX!,
-          y: canvasPos.y - drag.textOffsetY!,
-        });
-        return;
-      }
-
-      if (drag.type === 'resizetext' && drag.resizeTextId) {
-        const corner = drag.resizeCorner!;
-        let newX = drag.origTextX!;
-        let newY = drag.origTextY!;
-        let newW = drag.origTextW!;
-        let newH = drag.origTextH!;
-
-        if (corner.includes('e')) {
-          newW = Math.max(40, canvasPos.x - newX);
-        }
-        if (corner.includes('w')) {
-          const right = newX + newW;
-          newX = Math.min(canvasPos.x, right - 40);
-          newW = right - newX;
-        }
-        if (corner.includes('s')) {
-          newH = Math.max(20, canvasPos.y - newY);
-        }
-        if (corner.includes('n')) {
-          const bottom = newY + newH;
-          newY = Math.min(canvasPos.y, bottom - 20);
-          newH = bottom - newY;
-        }
-
-        state.updateTextElement(drag.resizeTextId, { x: newX, y: newY, width: newW, height: newH });
-        return;
-      }
-
       if (drag.type === 'wiresegment' && drag.wireId) {
         // Calculate offset from base position
         const wire = state.wires.find((w) => w.id === drag.wireId);
@@ -2912,11 +2561,6 @@ export function CircuitCanvas() {
               return c.x + w > x1 && c.x < x2 && c.y + h > y1 && c.y < y2;
             })
             .map((c) => c.id);
-          const textIds = state.textElements
-            .filter((t) => {
-              return t.x + t.width > x1 && t.x < x2 && t.y + t.height > y1 && t.y < y2;
-            })
-            .map((t) => t.id);
           // FSM/TM transition arrows: selected when both endpoint states are
           // inside the rectangle (covers self-loops too, where from === to),
           // or when the rectangle captures the arrow's label.
@@ -2930,7 +2574,7 @@ export function CircuitCanvas() {
               return wd.labelPos != null && inRect(wd.labelPos);
             })
             .map((w) => w.id);
-          state.setSelectedIds([...compIds, ...textIds, ...transitionIds]);
+          state.setSelectedIds([...compIds, ...transitionIds]);
         }
         pendingOverlay.current.boxSelect = null;
         requestOverlayUpdate();
@@ -3174,73 +2818,6 @@ export function CircuitCanvas() {
         return;
       }
 
-      // ─── Text resize ──────────────────────────────────────
-      if (hit.type === 'textresize') {
-        e.preventDefault();
-        e.stopPropagation();
-        const elem = state.textElements.find((t) => t.id === hit.textId);
-        if (!elem) return;
-        state.pushHistory();
-        dragRef.current = {
-          type: 'resizetext',
-          anchorScreenX: e.clientX,
-          anchorScreenY: e.clientY,
-          anchorCanvasX: canvasPos.x,
-          anchorCanvasY: canvasPos.y,
-          currentCanvasX: canvasPos.x,
-          currentCanvasY: canvasPos.y,
-          resizeTextId: hit.textId,
-          resizeCorner: hit.corner,
-          origTextX: elem.x,
-          origTextY: elem.y,
-          origTextW: elem.width,
-          origTextH: elem.height,
-          pointerId: e.pointerId,
-        };
-        svgRef.current?.setPointerCapture(e.pointerId);
-        window.addEventListener('pointermove', stableOnMove);
-        window.addEventListener('pointerup', stableOnUp);
-        return;
-      }
-
-      // ─── Text element click ────────────────────────────────
-      if (hit.type === 'text') {
-        e.preventDefault();
-        e.stopPropagation();
-        const elem = state.textElements.find((t) => t.id === hit.textId);
-        if (!elem) return;
-
-        // If comment tool is active, attach comment to text element
-        if (state.selectedTool === 'COMMENT') {
-          const text = window.prompt('Enter comment:') || '';
-          state.addComment(hit.textId, text);
-          state.setSelectedTool(null);
-          return;
-        }
-
-        state.setSelectedIds([hit.textId]);
-
-        // Start drag for moving
-        dragRef.current = {
-          type: 'movetext',
-          anchorScreenX: e.clientX,
-          anchorScreenY: e.clientY,
-          anchorCanvasX: canvasPos.x,
-          anchorCanvasY: canvasPos.y,
-          currentCanvasX: canvasPos.x,
-          currentCanvasY: canvasPos.y,
-          textId: hit.textId,
-          textOffsetX: canvasPos.x - elem.x,
-          textOffsetY: canvasPos.y - elem.y,
-          hasMoved: false,
-          pointerId: e.pointerId,
-        };
-        svgRef.current?.setPointerCapture(e.pointerId);
-        window.addEventListener('pointermove', stableOnMove);
-        window.addEventListener('pointerup', stableOnUp);
-        return;
-      }
-
       // ─── Port interaction ─────────────────────────────────────
       if (hit.type === 'port') {
         e.preventDefault();
@@ -3331,14 +2908,6 @@ export function CircuitCanvas() {
         e.preventDefault();
         e.stopPropagation();
 
-        // Comment tool on wire
-        if (state.selectedTool === 'COMMENT') {
-          const text = window.prompt('Enter comment:') || '';
-          state.addComment(hit.wireId, text);
-          state.setSelectedTool(null);
-          return;
-        }
-
         if (state.selectedTool) {
           state.setSelectedTool(null);
         }
@@ -3352,14 +2921,6 @@ export function CircuitCanvas() {
 
       // ─── Component click ───────────────────────────────────
       if (hit.type === 'component') {
-        // Comment tool on component
-        if (state.selectedTool === 'COMMENT') {
-          const text = window.prompt('Enter comment:') || '';
-          state.addComment(hit.compId, text);
-          state.setSelectedTool(null);
-          return;
-        }
-
         if (state.selectedTool) {
           state.setSelectedTool(null);
         }
@@ -3395,10 +2956,7 @@ export function CircuitCanvas() {
 
         // Triple-click a component → select everything on the canvas
         if (e.detail >= 3) {
-          state.setSelectedIds([
-            ...state.components.map((c) => c.id),
-            ...state.textElements.map((t) => t.id),
-          ]);
+          state.setSelectedIds(state.components.map((c) => c.id));
           return;
         }
 
@@ -3457,15 +3015,6 @@ export function CircuitCanvas() {
       // ─── Canvas background ──────────────────────────────────────
       e.preventDefault();
 
-      // Click-to-place: TEXT tool
-      if (state.selectedTool === 'TEXT') {
-        const id = state.addTextElement(canvasPos.x, canvasPos.y);
-        state.setSelectedIds([id]);
-        setEditingTextId(id);
-        state.setSelectedTool(null);
-        return;
-      }
-
       // Click-to-place: NEW_BOX tool — start drawing
       if (state.selectedTool === 'NEW_BOX') {
         dragRef.current = {
@@ -3487,18 +3036,10 @@ export function CircuitCanvas() {
       }
 
       // Click-to-place: component tool
-      if (state.selectedTool && state.selectedTool !== 'COMMENT') {
+      if (state.selectedTool) {
         addComponent(state.selectedTool as ComponentType, canvasPos.x - 40, canvasPos.y - 30);
         return;
       }
-
-      // Deselect comment tool on canvas click
-      if (state.selectedTool === 'COMMENT') {
-        state.setSelectedTool(null);
-      }
-
-      // Close expanded comment
-      setExpandedCommentId(null);
 
       // Box select
       if (!e.shiftKey) {
@@ -3981,26 +3522,6 @@ export function CircuitCanvas() {
     ));
   }, [wires, wireData]);
 
-  // ─── Comment anchors ───────────────────────────────────────────
-  const commentAnchors = useMemo(() => {
-    const anchors = new Map<string, { x: number; y: number }>();
-    for (const comp of components) {
-      const { w } = getCompDimensions(comp);
-      anchors.set(comp.id, { x: comp.x + w, y: comp.y });
-    }
-    for (const wire of wires) {
-      const wd = wireData.get(wire.id);
-      if (wd && wd.points.length > 1) {
-        const mid = wd.points[Math.floor(wd.points.length / 2)];
-        anchors.set(wire.id, { x: mid.x, y: mid.y });
-      }
-    }
-    for (const te of textElements) {
-      anchors.set(te.id, { x: te.x + te.width, y: te.y });
-    }
-    return anchors;
-  }, [components, wires, wireData, textElements]);
-
   // ─── Box highlighting (inputs/outputs crossing boundary) ───────
   const draftBox = boxDrawing.draftBox;
   const highlightedPorts = useMemo(() => {
@@ -4030,13 +3551,8 @@ export function CircuitCanvas() {
   let cursor = 'default';
   if (isPanning) cursor = 'grabbing';
   else if (wirePreview) cursor = 'crosshair';
-  else if (selectedTool === 'TEXT') cursor = 'text';
-  else if (selectedTool === 'COMMENT') cursor = 'help';
   else if (selectedTool === 'NEW_BOX') cursor = 'crosshair';
   else if (selectedTool) cursor = 'crosshair';
-
-  // Selected text element for formatting toolbar
-  const selectedTextElem = textElements.find((t) => selectedIds.includes(t.id));
 
   return (
     <div
@@ -4045,11 +3561,6 @@ export function CircuitCanvas() {
       onDrop={handleDrop}
       onDragOver={handleDragOver}
     >
-      {/* Text formatting toolbar */}
-      {selectedTextElem && (
-        <TextFormattingToolbar elem={selectedTextElem} />
-      )}
-
       {/* Ready to Box button */}
       {draftBox && boxDrawing.phase === 'adjusting' && (
         <div
@@ -4289,35 +3800,6 @@ export function CircuitCanvas() {
               isSelected={selectedIds.includes(comp.id)}
             />
           ))}
-
-          {/* Text elements */}
-          {textElements.map((elem) => (
-            <TextElementView
-              key={elem.id}
-              elem={elem}
-              isSelected={selectedIds.includes(elem.id)}
-              isEditing={editingTextId === elem.id}
-              onStartEdit={() => setEditingTextId(elem.id)}
-            />
-          ))}
-
-          {/* Comments */}
-          {showComments && comments.map((comment) => {
-            const anchor = commentAnchors.get(comment.targetId);
-            if (!anchor) return null;
-            return (
-              <CommentIconView
-                key={comment.id}
-                comment={comment}
-                anchorX={anchor.x}
-                anchorY={anchor.y}
-                isExpanded={expandedCommentId === comment.id}
-                onToggle={() => setExpandedCommentId(
-                  expandedCommentId === comment.id ? null : comment.id
-                )}
-              />
-            );
-          })}
         </g>
       </svg>
 

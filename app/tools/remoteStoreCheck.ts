@@ -167,7 +167,7 @@ check(
 check('workbook load before any save resolves null', (await remoteWorkbookStore.loadAssignmentState(SAMPLE_ASSIGNMENT_ID)) === null);
 await remoteWorkbookStore.saveAssignmentState(SAMPLE_ASSIGNMENT_ID, {
   currentQuestionIndex: 2,
-  questionCircuits: { 1: { components: [], wires: [], textElements: [], comments: [], boxes: [] } },
+  questionCircuits: { 1: { components: [], wires: [], boxes: [] } },
 });
 const wbBack = await remoteWorkbookStore.loadAssignmentState(SAMPLE_ASSIGNMENT_ID);
 check(
@@ -292,11 +292,11 @@ const { localAssignmentStore } = await import('../src/storage/AssignmentStore');
 await api.login(instructor.email);
 const wbLocal = {
   currentQuestionIndex: 1,
-  questionCircuits: { 5: { components: [], wires: [], textElements: [], comments: [], boxes: [] } },
+  questionCircuits: { 5: { components: [], wires: [], boxes: [] } },
 };
 const wbServerPre = {
   currentQuestionIndex: 4,
-  questionCircuits: { 9: { components: [], wires: [], textElements: [], comments: [], boxes: [] } },
+  questionCircuits: { 9: { components: [], wires: [], boxes: [] } },
 };
 // Local prototype data in the shimmed browser localStorage:
 backing.set('mm:asg:' + SAMPLE_ASSIGNMENT_ID, JSON.stringify(wbLocal)); // instructor has NO server copy
@@ -357,7 +357,7 @@ const { writeJournal, readJournal, clearJournal, reconcileJournal } = await impo
 );
 const jState = {
   currentQuestionIndex: 7,
-  questionCircuits: { 3: { components: [], wires: [], textElements: [], comments: [], boxes: [] } },
+  questionCircuits: { 3: { components: [], wires: [], boxes: [] } },
 };
 writeJournal('alice@example.com', 'jr-asg', jState);
 check('journal keyed per email: another user reads null',
