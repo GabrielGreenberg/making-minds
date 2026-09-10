@@ -68,7 +68,7 @@ export function AssignmentOverview() {
         </section>
 
         <section className="home-section">
-          <div className="home-tile-footer" style={{ borderTop: 'none', paddingTop: 0 }}>
+          <div className="assignment-overview-submit">
             {sub ? (
               <span className="home-tile-status home-tile-status--done" title={`Attempt ${sub.attempt}`}>
                 ✓ Submitted {new Date(sub.submittedAt).toLocaleString()}

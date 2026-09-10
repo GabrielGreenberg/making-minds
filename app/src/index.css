@@ -1943,6 +1943,21 @@ thead .sc-label-col {
   -webkit-box-orient: vertical;
 }
 
+/* The assignment page's submit row. Not .home-tile-footer: that is card
+   chrome (grey band, 12px inset) meant for a tile inside the catalog list, so
+   here it pushed the button and the "Submitted …" line 12px inboard of the
+   question cards above and set them in two different type sizes. */
+.assignment-overview-submit {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.assignment-overview-submit .home-tile-status {
+  font-size: 12px;
+}
+
 /* ── Per-question navigation bar (assignment canvas) ── */
 .tab-bar.question-nav {
   align-items: center;
