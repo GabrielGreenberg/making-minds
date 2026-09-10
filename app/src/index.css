@@ -1987,6 +1987,18 @@ thead .sc-label-col {
   white-space: nowrap;
 }
 
+/* The open assignment's full name, right-aligned in the question nav bar so
+   the editor always says which homework you are in. */
+.question-nav-assignment {
+  margin-left: auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
 .question-nav-count {
   font-weight: 400;
   color: #999;

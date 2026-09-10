@@ -266,6 +266,9 @@ export function TabBar() {
           {q?.label ?? '?'}
           <span className="question-nav-count"> · {currentQuestionIndex + 1} of {count}</span>
         </span>
+        <span className="question-nav-assignment" title={assignment.title}>
+          {assignment.title}
+        </span>
       </div>
     );
   }
