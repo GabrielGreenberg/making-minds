@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { useStore, selectEffectiveMode, selectAllowedComponents } from '../store';
 import { isComponentTypeAllowed, disallowedComponentTypes } from '../engine/machineValidation';
 import type { ComponentType } from '../types';
@@ -125,9 +126,43 @@ function ConfirmedBoxItem({ box, numIn, numOut, isSelected, kind }: {
   kind?: 'CC' | 'FSM';
 }) {
   const isFsm = kind === 'FSM';
+  const [editing, setEditing] = useState(false);
+
+  // Rename: students label their boxes ("XOR box"), so the palette item is the
+  // place to do it — a box built on another question has no drawn rectangle on
+  // this canvas to double-click.
+  const commitRename = (value: string) => {
+    const name = value.trim();
+    setEditing(false);
+    if (!name || name === box.name) return;
+    const err = useStore.getState().renameBox(box.id, name);
+    if (err) alert(err);
+  };
+
+  if (editing) {
+    return (
+      <div className="library-item library-box-rename">
+        <input
+          autoFocus
+          defaultValue={box.name}
+          onBlur={(e) => commitRename(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
+            // Restore before blurring: the blur handler is what commits.
+            if (e.key === 'Escape') {
+              (e.target as HTMLInputElement).value = box.name;
+              (e.target as HTMLInputElement).blur();
+            }
+          }}
+        />
+      </div>
+    );
+  }
+
   return (
     <div
       className={`library-item${isSelected ? ' library-item-selected' : ''}`}
+      title={box.name}
       draggable
       onDragStart={(e) => {
         e.dataTransfer.setData('componentType', 'BOXED_INSTANCE');
@@ -172,6 +207,17 @@ function ConfirmedBoxItem({ box, numIn, numOut, isSelected, kind }: {
           <text x="28" y="24" textAnchor="middle" fontSize="8" fontWeight="600" fill="#333">{box.name}</text>
         </svg>
       )}
+      <button
+        type="button"
+        className="library-box-rename-btn"
+        title="Rename box"
+        onClick={(e) => {
+          e.stopPropagation();
+          setEditing(true);
+        }}
+      >
+        ✎
+      </button>
     </div>
   );
 }

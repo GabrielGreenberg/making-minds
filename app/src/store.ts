@@ -522,6 +522,10 @@ interface AppState {
   removeBox: (id: string) => void;
   confirmBox: (id: string) => string | null; // returns error or null
   removeConfirmedBox: (id: string) => void;
+  // Rename a box everywhere it appears — the library entry, the drawn box on
+  // the canvas, and the label of every placed instance (in this assignment,
+  // across every question). Returns an error string, or null on success.
+  renameBox: (id: string, name: string) => string | null;
   placeBoxInstance: (boxId: string, x: number, y: number) => void; // place a copy of a box as a BOXED component
   fsmPlaceBoxInstance: (boxId: string, x: number, y: number) => void; // expand FSM box states onto canvas
 
@@ -677,6 +681,28 @@ interface AppState {
 
 function snapToGrid(val: number): number {
   return Math.round(val / GRID_SIZE) * GRID_SIZE;
+}
+
+// ─── Box naming ─────────────────────────────────────────────────────
+// Default names must be unique across everything the student can see at once.
+// The confirmed-box library is ASSIGNMENT-wide (notes item 8), so counting the
+// boxes drawn on the live canvas alone hands out "Box 1" again for every
+// question; the library names go into the pool too.
+function takenBoxNames(
+  library: ConfirmedBoxDef[],
+  boxes: BoxDefinition[],
+  exceptId?: string
+): Set<string> {
+  const taken = new Set<string>();
+  for (const b of library) if (b.id !== exceptId) taken.add(b.name);
+  for (const b of boxes) if (b.id !== exceptId && b.name) taken.add(b.name);
+  return taken;
+}
+
+function nextBoxName(prefix: string, taken: Set<string>): string {
+  let n = 1;
+  while (taken.has(`${prefix} ${n}`)) n++;
+  return `${prefix} ${n}`;
 }
 
 // ─── MEM direction auto-resolution ──────────────────────────────────
@@ -1860,6 +1886,47 @@ export const useStore = create<AppState>()((set, get) => ({
       selectedIds: state.selectedIds.filter((sid) => !removedIds.has(sid)),
     });
   },
+  renameBox: (id, name) => {
+    const state = get();
+    const trimmed = name.trim();
+    if (!trimmed) return 'A box needs a name.';
+    if (takenBoxNames(state.confirmedBoxLibrary, state.boxes, id).has(trimmed))
+      return `A box named "${trimmed}" already exists.`;
+
+    state.pushHistory();
+
+    // Placed instances carry the name as their label, so every canvas that can
+    // hold one has to be swept: the live one, plus the other questions' saved
+    // circuits (the library is assignment-wide).
+    const relabel = (comps: CircuitComponent[]) =>
+      comps.some((c) => c.boxedCircuitId === id)
+        ? comps.map((c) => (c.boxedCircuitId === id ? { ...c, label: trimmed } : c))
+        : comps;
+    const renameDrawn = (boxes: BoxDefinition[]) =>
+      boxes.some((b) => b.id === id)
+        ? boxes.map((b) => (b.id === id ? { ...b, name: trimmed } : b))
+        : boxes;
+
+    const savedCircuits = new Map(state.questionCircuits);
+    for (const [qid, qc] of savedCircuits) {
+      savedCircuits.set(qid, {
+        ...qc,
+        components: relabel(qc.components),
+        boxes: renameDrawn(qc.boxes),
+      });
+    }
+
+    set({
+      confirmedBoxLibrary: state.confirmedBoxLibrary.map((b) =>
+        b.id === id ? { ...b, name: trimmed } : b
+      ),
+      boxes: renameDrawn(state.boxes),
+      components: relabel(state.components),
+      questionCircuits: savedCircuits,
+    });
+
+    return null;
+  },
   confirmBox: (id) => {
     const state = get();
     const box = state.boxes.find((b) => b.id === id);
@@ -1922,10 +1989,10 @@ export const useStore = create<AppState>()((set, get) => ({
       // (already satisfied since fsmComps.length > 0)
 
       // Auto-name
-      const existingNames = state.confirmedBoxLibrary.map((b) => b.name);
-      let name = `FSM Box ${state.confirmedBoxLibrary.filter((b) => b.kind === 'FSM').length + 1}`;
-      let n = 1;
-      while (existingNames.includes(name)) { n++; name = `FSM Box ${n}`; }
+      const name = nextBoxName(
+        'FSM Box',
+        takenBoxNames(state.confirmedBoxLibrary, state.boxes, id)
+      );
 
       const componentIds = fsmComps.map((c) => c.id);
       set((s) => ({
@@ -2104,13 +2171,10 @@ export const useStore = create<AppState>()((set, get) => ({
     }
 
     // Auto-suggest name
-    const existingNames = state.boxes.filter((b) => b.id !== id).map((b) => b.name);
-    let suggestedName = `Box ${state.boxes.indexOf(box) + 1}`;
-    let counter = 1;
-    while (existingNames.includes(suggestedName)) {
-      counter++;
-      suggestedName = `Box ${counter}`;
-    }
+    const suggestedName = nextBoxName(
+      'Box',
+      takenBoxNames(state.confirmedBoxLibrary, state.boxes, id)
+    );
 
     // Update the box as confirmed and add to global library
     const componentIds = insideComps.map((c) => c.id);

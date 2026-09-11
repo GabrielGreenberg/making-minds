@@ -503,6 +503,37 @@ html, body, #root {
   line-height: 1;
 }
 
+.library-box-rename-btn {
+  font-size: 8px;
+  line-height: 1;
+  padding: 1px 3px;
+  border: 1px solid transparent;
+  border-radius: 3px;
+  background: none;
+  color: var(--text-secondary);
+  cursor: pointer;
+  opacity: 0.45;
+}
+
+.library-item:hover .library-box-rename-btn {
+  opacity: 1;
+}
+
+.library-box-rename-btn:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.library-box-rename input {
+  width: 100%;
+  font-size: 10px;
+  font-family: inherit;
+  padding: 2px 4px;
+  border: 1px solid var(--accent);
+  border-radius: 3px;
+  outline: none;
+}
+
 /* ── Canvas ── */
 .canvas-container {
   flex: 1;

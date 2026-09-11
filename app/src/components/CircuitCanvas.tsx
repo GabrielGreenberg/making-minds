@@ -1601,7 +1601,6 @@ function BoxView({
   isEditingName?: boolean;
   onFinishEditName?: () => void;
 }) {
-  const updateBox = useStore((s) => s.updateBox);
   const removeConfirmedBox = useStore((s) => s.removeConfirmedBox);
   const [hovered, setHovered] = useState(false);
 
@@ -1693,12 +1692,19 @@ function BoxView({
             defaultValue={box.name}
             onBlur={(e) => {
               const name = e.target.value.trim();
-              if (name) updateBox(box.id, { name });
+              if (name && name !== box.name) {
+                const err = useStore.getState().renameBox(box.id, name);
+                if (err) alert(err);
+              }
               onFinishEditName?.();
             }}
             onKeyDown={(e) => {
               if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
-              if (e.key === 'Escape') onFinishEditName?.();
+              // Restore before blurring: the blur handler is what commits.
+              if (e.key === 'Escape') {
+                (e.target as HTMLInputElement).value = box.name;
+                (e.target as HTMLInputElement).blur();
+              }
             }}
             onClick={(e) => e.stopPropagation()}
             onPointerDown={(e) => e.stopPropagation()}

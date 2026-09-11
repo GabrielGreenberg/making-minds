@@ -11,7 +11,10 @@
 // Pins: confirm on Q1 → absent on Q2 → restored (with internals, placeable)
 // back on Q1; survives goHome/closeAssignment/openAssignment via the
 // workbook seam; sandbox tabs isolated from assignments and each other;
-// removeConfirmedBox strips the entry + placed instances and undo restores it.
+// removeConfirmedBox strips the entry + placed instances and undo restores it;
+// and [naming] — default `Box n` names are unique across the whole homework
+// (not per canvas), and renameBox validates + sweeps library, drawn box and
+// every placed instance's label on every question.
 const noop = () => {};
 const backing = new Map<string, string>();
 (globalThis as unknown as Record<string, unknown>).localStorage = {
@@ -296,6 +299,83 @@ console.log('[SC boxing]');
     memErr.includes('Memory cannot go inside a box'));
   check('...and nothing was added to the library',
     !useStore.getState().confirmedBoxLibrary.some((b) => b.id === memBoxId));
+}
+
+// ── default names are unique across the whole homework ──────────
+// The library is assignment-wide, so counting only the boxes drawn on the live
+// canvas handed out "Box 1" once per question (fixed 2026-09-10).
+console.log('\n[naming]');
+{
+  check('re-opened the assignment for naming checks',
+    (await useStore.getState().openAssignment(SAMPLE_ASSIGNMENT_ID)) === true);
+  useStore.setState({ confirmedBoxLibrary: [], questionCircuits: new Map() });
+  useStore.getState().switchQuestion(0);
+  await flush();
+  useStore.setState({ components: [], wires: [], boxes: [] });
+  const nameOf = (id: string) =>
+    useStore.getState().confirmedBoxLibrary.find((b) => b.id === id)?.name;
+
+  const first = buildAndBoxAnd();
+  check('the first box on Q1 is "Box 1"', nameOf(first) === 'Box 1');
+
+  useStore.getState().switchQuestion(1);
+  await flush();
+  useStore.setState({ components: [], wires: [], boxes: [] });
+  const second = buildAndBoxAnd();
+  check('a box confirmed on Q2 does NOT reuse "Box 1"', nameOf(second) === 'Box 2');
+
+  useStore.getState().switchQuestion(0);
+  await flush();
+  const third = buildAndBoxAnd();
+  check('a second box back on Q1 is "Box 3"', nameOf(third) === 'Box 3');
+  check('every library name is distinct',
+    new Set(useStore.getState().confirmedBoxLibrary.map((b) => b.name)).size ===
+      useStore.getState().confirmedBoxLibrary.length);
+
+  // ── renaming ──────────────────────────────────────────────────
+  useStore.getState().placeBoxInstance(first, 520, 420);
+  await flush();
+  check('renameBox accepts a fresh name',
+    useStore.getState().renameBox(first, '  XOR box  ') === null);
+  check('...trimmed, on the library entry', nameOf(first) === 'XOR box');
+  check('...on the drawn box on this canvas',
+    useStore.getState().boxes.find((b) => b.id === first)?.name === 'XOR box');
+  check('...and on every placed instance label',
+    useStore.getState().components
+      .filter((c) => c.boxedCircuitId === first)
+      .every((c) => c.label === 'XOR box'));
+
+  useStore.getState().undo();
+  await flush();
+  check('undo restores the previous name', nameOf(first) === 'Box 1');
+  useStore.getState().redo();
+  await flush();
+  check('redo puts the new one back', nameOf(first) === 'XOR box');
+
+  check('a duplicate name is refused, naming the clash',
+    (useStore.getState().renameBox(third, 'XOR box') ?? '').includes('XOR box'));
+  check('...leaving the box as it was', nameOf(third) === 'Box 3');
+  check('an empty name is refused', useStore.getState().renameBox(third, '   ') !== null);
+  check('renaming a box to its own name is a no-op, not a clash',
+    useStore.getState().renameBox(third, 'Box 3') === null);
+
+  // A renamed box frees its old number, but the taken ones are stepped over.
+  const fourth = buildAndBoxAnd();
+  check('the next default name skips taken numbers', nameOf(fourth) === 'Box 1');
+
+  // An instance stamped on ANOTHER question is relabelled too: the library is
+  // shared, so one box must not answer to two names.
+  useStore.getState().switchQuestion(1);
+  await flush();
+  useStore.getState().placeBoxInstance(first, 300, 300);
+  await flush();
+  check('renamed from the other question', useStore.getState().renameBox(first, 'Half adder') === null);
+  useStore.getState().switchQuestion(0);
+  await flush();
+  check('an instance on the question that was away is relabelled',
+    useStore.getState().components
+      .filter((c) => c.boxedCircuitId === first)
+      .every((c) => c.label === 'Half adder'));
 }
 
 console.log(`\nboxScopeCheck: ${passed} passed, ${failed} failed`);
