@@ -30,6 +30,54 @@ export interface ApiUser {
   email: string;
   name: string;
   role: 'student' | 'instructor';
+  /** Campus ID from the roster; absent when the import had no ID column. */
+  studentId?: string;
+  registered?: boolean;
+}
+
+/**
+ * What this server's sign-in system offers (GET /api/auth/config,
+ * unauthenticated). The login screen renders from THIS, not from a build-time
+ * constant, so switching the server to UCLA SSO — or to passwordless dev mode
+ * — changes the UI without rebuilding the frontend.
+ */
+export interface AuthCapabilities {
+  mode: 'password' | 'dev' | 'sso';
+  usesPassword: boolean;
+  allowsRegistration: boolean;
+  allowsAccessRequests: boolean;
+  passwordMinLength: number;
+  ssoLoginUrl?: string;
+}
+
+/** One roster row with its account state — the instructor's roster screen. */
+export interface RosterEntryView {
+  email: string;
+  name: string;
+  role: 'student' | 'instructor';
+  studentId: string;
+  registered: boolean;
+  registeredAt: string | null;
+}
+
+export interface AccessRequestView {
+  id: number;
+  email: string;
+  name: string;
+  studentId: string;
+  message: string;
+  status: 'pending' | 'approved' | 'rejected';
+  createdAt: string;
+  resolvedAt: string | null;
+  resolvedBy: string | null;
+}
+
+export interface RosterImportReport {
+  added: number;
+  updated: number;
+  total: number;
+  issues: { line: number; reason: string }[];
+  columns: { email: string | null; name: string | null; studentId: string | null; role: string | null };
 }
 
 export interface AssignmentSummary {
@@ -148,13 +196,73 @@ export async function health(timeoutMs = 4000): Promise<boolean> {
 
 // ── auth ─────────────────────────────────────────────────────────
 
-/** Dev-mode login by roster email; stores the returned token for later calls. */
-export async function login(email: string): Promise<ApiUser> {
+/**
+ * What the login screen should offer. Unauthenticated, and safe to call before
+ * anything else — a server that is up always answers.
+ */
+export async function authConfig(): Promise<AuthCapabilities> {
+  return request<AuthCapabilities>('GET', '/auth/config');
+}
+
+/**
+ * Sign in and store the returned session token. `password` is omitted only
+ * against a dev-mode server (passwordless roster login).
+ */
+export async function login(email: string, password?: string): Promise<ApiUser> {
   const { token, user } = await request<{ token: string; user: ApiUser }>('POST', '/auth/login', {
     email,
+    ...(password != null ? { password } : {}),
   });
   setToken(token);
   return user;
+}
+
+/**
+ * Create an account for a roster member. The server checks the email against
+ * the roster (and the student ID against the one on file, when it has one) and
+ * signs the caller straight in on success.
+ */
+export async function register(input: {
+  email: string;
+  password: string;
+  studentId?: string;
+}): Promise<ApiUser> {
+  const { token, user } = await request<{ token: string; user: ApiUser }>(
+    'POST',
+    '/auth/register',
+    input,
+  );
+  setToken(token);
+  return user;
+}
+
+/**
+ * Change your own password. The server ends every other session and re-issues
+ * this one, so the caller stays signed in here and nowhere else.
+ */
+export async function changePassword(
+  currentPassword: string,
+  newPassword: string,
+): Promise<void> {
+  const { token } = await request<{ ok: true; token: string | null }>('POST', '/auth/password', {
+    currentPassword,
+    newPassword,
+  });
+  if (token) setToken(token);
+}
+
+/**
+ * "My email isn't the one on file" — files a request for an instructor to
+ * review. Unauthenticated, and deliberately always succeeds: the response says
+ * nothing about whether the email is already known.
+ */
+export async function requestAccess(input: {
+  email: string;
+  name: string;
+  studentId?: string;
+  message?: string;
+}): Promise<void> {
+  await request('POST', '/auth/access-requests', input);
 }
 
 export async function logout(): Promise<void> {
@@ -168,6 +276,62 @@ export async function logout(): Promise<void> {
 export async function me(): Promise<ApiUser> {
   const { user } = await request<{ user: ApiUser }>('GET', '/auth/me');
   return user;
+}
+
+// ── roster + access requests (instructor) ────────────────────────
+
+export async function getRoster(): Promise<RosterEntryView[]> {
+  const { roster } = await request<{ roster: RosterEntryView[] }>('GET', '/roster');
+  return roster;
+}
+
+/** Upsert roster rows from CSV text. Never removes anyone, never touches a
+ *  password — a mid-quarter refresh must not sign the class out. */
+export async function importRoster(
+  csv: string,
+  defaultRole: 'student' | 'instructor' = 'student',
+): Promise<RosterImportReport> {
+  return request<RosterImportReport>('POST', '/roster/import', { csv, defaultRole });
+}
+
+export async function addRosterEntry(input: {
+  email: string;
+  name?: string;
+  role?: 'student' | 'instructor';
+  studentId?: string;
+}): Promise<void> {
+  await request('POST', '/roster', input);
+}
+
+export async function removeRosterEntry(email: string): Promise<void> {
+  await request('DELETE', `/roster/${encodeURIComponent(email)}`);
+}
+
+/** Forgotten password: clears the credential so they can register again. */
+export async function resetRosterPassword(email: string): Promise<void> {
+  await request('POST', `/roster/${encodeURIComponent(email)}/reset-password`);
+}
+
+export async function listAccessRequests(
+  status?: 'pending' | 'approved' | 'rejected',
+): Promise<AccessRequestView[]> {
+  const { requests } = await request<{ requests: AccessRequestView[] }>(
+    'GET',
+    `/access-requests${status ? `?status=${status}` : ''}`,
+  );
+  return requests;
+}
+
+/** Approving adds them to the roster; they then create an account normally. */
+export async function approveAccessRequest(
+  id: number,
+  role: 'student' | 'instructor' = 'student',
+): Promise<void> {
+  await request('POST', `/access-requests/${id}/approve`, { role });
+}
+
+export async function rejectAccessRequest(id: number): Promise<void> {
+  await request('POST', `/access-requests/${id}/reject`);
 }
 
 // ── assignments ──────────────────────────────────────────────────

@@ -37,8 +37,16 @@ sudo mkdir -p /srv/making-minds/data
 sudo -u makingminds git clone <repo-url> /srv/making-minds/repo
 cd /srv/making-minds/repo/server && sudo -u makingminds npm install
 
-# Seed the database (roster + bundled assignment)
+# Seed the database (bundled assignment; the toy roster comes with it)
 sudo -u makingminds MM_DB_PATH=/srv/making-minds/data/making-minds.sqlite npm run seed
+
+# Load the real class roster and give yourself an account (see section 3)
+sudo -u makingminds MM_DB_PATH=/srv/making-minds/data/making-minds.sqlite \
+  npm run roster -- import /path/to/roster.csv
+sudo -u makingminds MM_DB_PATH=/srv/making-minds/data/making-minds.sqlite \
+  npm run roster -- add you@ucla.edu --name "Your Name" --role instructor
+sudo -u makingminds MM_DB_PATH=/srv/making-minds/data/making-minds.sqlite \
+  npm run roster -- set-password you@ucla.edu
 
 # Services — EDIT the env values (domain, CORS origin) first
 sudo cp ../deploy/makingminds-api.service /etc/systemd/system/   # fix WorkingDirectory to the repo path
@@ -101,13 +109,69 @@ Direct upload (no Git integration) works too:
 Then set the Pages URL (and any custom domain) in the API's
 `MM_CORS_ORIGINS` env (systemd unit) and restart the service.
 
-## 3. What's intentionally NOT done yet
+## 3. Accounts and the roster
 
-- **UCLA SSO** — the server runs `MM_AUTH_MODE=dev` (passwordless roster-email
-  login, same trust level as the current mockup login). The seam for SSO is
-  `server/src/auth.ts` (`AuthProvider`); implementing it is config + one class.
-- **Frontend cutover** — DONE (P6.4, 2026-07-08). The `Remote*` stores back
-  every seam whenever `VITE_API_BASE` is set at build time.
-- **Roster** — `npm run seed` loads the toy accounts. For the real class,
-  extend `server/src/seed.ts` to ingest the enrollment list (email, name,
-  role), or rely on SSO to upsert users on first login.
+`MM_AUTH_MODE` picks the whole sign-in system (`server/src/auth.ts` is the one
+swap point; the frontend asks the server what it offers via
+`GET /api/auth/config` and renders accordingly, so switching modes needs no
+rebuild):
+
+| `MM_AUTH_MODE`        | What students see                                              |
+| --------------------- | -------------------------------------------------------------- |
+| `password` *(default)* | Email + password against the roster; account creation; access requests |
+| `dev`                  | Email only, **no password** — development and closed demos only |
+| `sso`                  | "Sign in with UCLA" — not implemented yet (see below)           |
+
+**The roster is the gate.** Nobody can create an account for an email the
+roster does not carry. Import it with the admin CLI on the box (or from the
+instructor's **Roster & accounts** screen in the web UI, which does the same
+thing through `POST /api/roster/import`):
+
+```sh
+cd /srv/making-minds/repo/server
+export MM_DB_PATH=/srv/making-minds/data/making-minds.sqlite
+
+npm run roster -- import roster.csv        # any export with an email column;
+                                           # name / student ID / role picked up
+npm run roster -- list --unregistered      # who hasn't created an account yet
+npm run roster -- reset student@ucla.edu   # forgotten password → they re-register
+npm run roster -- requests                 # pending "I'm not on the roster" requests
+```
+
+Importing only **adds and updates**. It never removes anyone and never touches
+a password, so re-importing an updated enrollment list mid-quarter is safe.
+
+**Bootstrapping the first instructor** is the one thing that must happen on the
+box, because the web UI needs an instructor to sign in before it can be used:
+
+```sh
+npm run roster -- add you@ucla.edu --name "Your Name" --role instructor
+npm run roster -- set-password you@ucla.edu        # prompts, or --password ...
+```
+
+After that, everything else — importing the class, resetting passwords,
+approving access requests — is available in the instructor UI.
+
+**Forgotten passwords** have no email loop (there is no mail server): the
+instructor resets the credential and the student creates their account again
+with the same email. Their saved work and submissions are untouched.
+
+**Student registration** requires the student ID when the roster carries one,
+which is the only evidence we have that the person claiming the seat owns it.
+A roster imported without an ID column skips that check.
+
+### What's intentionally NOT done yet
+
+- **UCLA SSO** — `SsoAuthProvider` in `server/src/auth.ts` reports its
+  capabilities (the frontend already renders a single "Sign in with UCLA"
+  button for it) but refuses to authenticate. Implementing it is one method:
+  validate the assertion, map its attributes to `{email, name}`, take the role
+  from the roster, `upsertUser`, return the row. Set `MM_AUTH_MODE=sso` and
+  `MM_SSO_LOGIN_URL`. Nothing else in the codebase changes.
+- **Rate limiting is in-process** — the failed-login throttle
+  (`LoginThrottle`) lives in memory on the single server process and resets on
+  restart. Fine for one box and ~80 students; revisit if the deployment grows.
+- **Session tokens live in `localStorage`** — the standard bearer-token
+  trade-off, in line with this app's threat model (see `app/src/api/client.ts`).
+- **Real assignment content** — HW1–HW7 exist as seedable JSON in local mode;
+  the server's DB still needs them ingested (extend `server/src/seed.ts`).

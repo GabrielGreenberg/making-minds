@@ -7,6 +7,7 @@ import { InstructorLayout } from './InstructorLayout';
 import { InstructorDashboard } from './InstructorDashboard';
 import { AssignmentEditor } from './AssignmentEditor';
 import { GradebookView } from './GradebookView';
+import { RosterView } from './RosterView';
 import type { InstructorRoute } from './useInstructorRoute';
 
 export function InstructorApp({ route }: { route: InstructorRoute }) {
@@ -31,5 +32,7 @@ function InstructorView({ route }: { route: InstructorRoute }) {
       return <AssignmentEditor id={route.id} />;
     case 'instructor-submissions':
       return <GradebookView id={route.id} />;
+    case 'instructor-roster':
+      return <RosterView />;
   }
 }

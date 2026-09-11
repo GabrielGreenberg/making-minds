@@ -2,6 +2,7 @@ import { useStore } from '../store';
 import { listAssignments } from '../assignments';
 import { navigate } from '../routing';
 import { getCurrentUserEmail, useAuth } from '../auth';
+import { AccountPanel } from '../auth/AccountPanel';
 import { summarizeResult } from '../engine/grader';
 import { dueStatus, formatDueDate, formatDuration, lateBy } from '../dueDates';
 import { useAsyncValue } from '../useAsyncValue';
@@ -70,6 +71,7 @@ export function HomeScreen() {
             Instructor view
           </button>
         )}
+        <AccountPanel />
         <button className="menu-link-button" onClick={() => { logout(); navigate({ kind: 'home' }); }}>
           Log out
         </button>

@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 import { useAuth } from '../auth';
+import { AccountPanel } from '../auth/AccountPanel';
 import { navigate } from '../routing';
 
 /**
@@ -29,6 +30,7 @@ export function InstructorLayout({ children }: { children: ReactNode }) {
           <button className="instructor-header-exit" onClick={() => navigate({ kind: 'home' })}>
             Student view
           </button>
+          <AccountPanel />
           <button className="instructor-header-exit" onClick={handleLogout}>
             Log out
           </button>

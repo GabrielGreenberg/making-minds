@@ -1,5 +1,6 @@
 import { useStore } from '../store';
 import { getCurrentUserEmail, useAuth } from '../auth';
+import { AccountPanel } from '../auth/AccountPanel';
 import { navigate } from '../routing';
 
 export function MenuBar() {
@@ -59,6 +60,7 @@ export function MenuBar() {
           </button>
         )}
         {user && <span className="session-chip">{user.name} · {user.role === 'instructor' ? 'Instructor' : 'Student'}</span>}
+        <AccountPanel />
         <button className="menu-link-button" onClick={() => { logout(); navigate({ kind: 'home' }); }}>
           Log out
         </button>

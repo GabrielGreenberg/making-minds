@@ -1813,6 +1813,95 @@ thead .sc-label-col {
 }
 .login-submit:disabled { opacity: 0.55; cursor: default; }
 .login-error { margin-top: 12px; font-size: 13px; color: #c62828; }
+.login-note { margin-top: 14px; font-size: 12px; color: var(--text-secondary); line-height: 1.5; }
+
+/* Sign in / Create account / Not on the roster? — the remote login panes */
+.login-tabs {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 18px;
+  border-bottom: 1px solid var(--menu-border);
+}
+.login-tab {
+  flex: 1;
+  padding: 8px 6px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  cursor: pointer;
+}
+.login-tab:hover { color: var(--text); }
+.login-tab--active { color: var(--accent); border-bottom-color: var(--accent); }
+.login-form--stacked { flex-direction: column; }
+.login-message {
+  padding: 9px 12px;
+  font-size: 14px;
+  font-family: inherit;
+  border: 1px solid var(--menu-border);
+  border-radius: 6px;
+  resize: vertical;
+}
+.login-message:focus { outline: none; border-color: var(--accent); }
+.login-submit--link { display: block; text-align: center; text-decoration: none; }
+
+/* ── Instructor: roster & accounts ── */
+.roster-section {
+  margin-top: 24px;
+  padding-top: 20px;
+  border-top: 1px solid #ececec;
+}
+.roster-section:first-of-type { border-top: none; padding-top: 0; }
+.roster-filter {
+  padding: 6px 10px;
+  font-size: 13px;
+  width: 220px;
+  border: 1px solid var(--menu-border);
+  border-radius: 6px;
+}
+.roster-notice {
+  margin: 12px 0 0;
+  padding: 10px 14px;
+  font-size: 13px;
+  background: #f1f7ff;
+  border: 1px solid #cfe0f5;
+  border-radius: 6px;
+}
+.roster-import-controls {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+  font-size: 13px;
+}
+.roster-role { display: flex; align-items: center; gap: 6px; color: var(--text-secondary); }
+.roster-csv {
+  display: block;
+  width: 100%;
+  margin-bottom: 10px;
+  padding: 10px 12px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12px;
+  border: 1px solid var(--menu-border);
+  border-radius: 6px;
+  resize: vertical;
+}
+.roster-report { margin-top: 12px; font-size: 12px; color: var(--text-secondary); }
+.roster-issues { margin: 6px 0 0 18px; color: #b25000; }
+.roster-table td, .roster-table th { font-size: 13px; }
+.roster-email { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; }
+.roster-message { max-width: 320px; color: var(--text-secondary); }
+.roster-actions { white-space: nowrap; text-align: right; }
+.roster-actions .instructor-btn + .instructor-btn { margin-left: 6px; }
+.roster-state { font-size: 12px; font-weight: 600; padding: 2px 8px; border-radius: 999px; }
+.roster-state--yes { background: #e8f5e9; color: #2e7d32; }
+.roster-state--no { background: #f4f4f4; color: var(--text-secondary); }
+.roster-add { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.roster-add .login-email { flex: 1 1 180px; min-width: 140px; }
+
 
 /* Session controls — shown in the menu bar, home screen, and instructor header */
 .session-chip {

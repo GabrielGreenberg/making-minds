@@ -21,7 +21,9 @@ Environment=PORT=8133
 Environment=MM_DB_PATH=/srv/making-minds/data/making-minds.sqlite
 # The Cloudflare Pages origin(s), comma-separated:
 Environment=MM_CORS_ORIGINS=https://making-minds.pages.dev
-Environment=MM_AUTH_MODE=dev
+# Sign-in system: password (roster + student-chosen passwords) | dev | sso.
+# 'dev' is PASSWORDLESS — never point students at a box running it.
+Environment=MM_AUTH_MODE=password
 
 # Hardening
 NoNewPrivileges=true

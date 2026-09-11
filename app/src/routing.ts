@@ -20,7 +20,8 @@ export type Route =
   | { kind: 'instructor' }
   | { kind: 'instructor-new-assignment' }
   | { kind: 'instructor-edit'; id: string }
-  | { kind: 'instructor-submissions'; id: string };
+  | { kind: 'instructor-submissions'; id: string }
+  | { kind: 'instructor-roster' };
 
 /** Parse a location hash (e.g. "#/a/cc-basics/q/2") into a Route. Pure. */
 export function parseHash(hash: string): Route {
@@ -28,7 +29,9 @@ export function parseHash(hash: string): Route {
   if (parts.length === 0) return { kind: 'home' };
   if (parts[0] === 'sandbox') return { kind: 'sandbox' };
   if (parts[0] === 'instructor') {
+    // #/instructor/roster
     // #/instructor/assignments/new | .../:id/edit | .../:id/submissions
+    if (parts[1] === 'roster') return { kind: 'instructor-roster' };
     if (parts[1] === 'assignments') {
       if (parts[2] === 'new') return { kind: 'instructor-new-assignment' };
       if (parts[2]) {
@@ -63,6 +66,8 @@ export function routeToHash(route: Route): string {
         : `#/a/${encodeURIComponent(route.id)}`;
     case 'instructor':
       return '#/instructor';
+    case 'instructor-roster':
+      return '#/instructor/roster';
     case 'instructor-new-assignment':
       return '#/instructor/assignments/new';
     case 'instructor-edit':
@@ -87,6 +92,7 @@ function applyRoute(route: Route): void {
     case 'instructor-new-assignment':
     case 'instructor-edit':
     case 'instructor-submissions':
+    case 'instructor-roster':
       // Instructor routes bypass the student Zustand store entirely — the
       // instructor UI reads the hash directly (see useInstructorRoute). Role
       // gating is handled by <InstructorGate> (which shows an unlock screen when

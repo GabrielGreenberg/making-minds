@@ -124,6 +124,13 @@ export function InstructorDashboard() {
               Load HW1–HW7
             </button>
           )}
+          <button
+            className="instructor-btn"
+            onClick={() => navigate({ kind: 'instructor-roster' })}
+            title="Import the class roster, see who has created an account, review access requests"
+          >
+            Roster &amp; accounts
+          </button>
           <button className="instructor-btn instructor-btn--primary" onClick={() => void handleNew()}>
             New Assignment
           </button>

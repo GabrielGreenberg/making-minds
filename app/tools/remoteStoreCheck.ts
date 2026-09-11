@@ -436,6 +436,93 @@ const passthrough = await reconcileJournal(student.email, 'jr-asg', jServer, rem
 check('no buffer → the fetched state passes through untouched',
   passthrough === jServer);
 
+// ── the account system through api/client.ts ─────────────────────
+// A SECOND real server, this one in the launch auth mode (password + roster),
+// driven through the browser client the login screen actually calls. The
+// server's own rules are pinned in server/tools/authCheck.ts; what is pinned
+// HERE is the client half: that each function talks to the right endpoint,
+// stores the session token, and surfaces the server's message on refusal.
+const authDb = new Db(':memory:');
+authDb.upsertUser({ email: 'prof@ucla.edu', name: 'Prof', role: 'instructor' });
+const { hashPassword } = await import('../../server/src/password');
+authDb.setPasswordHash('prof@ucla.edu', hashPassword('instructorpass'));
+const authApp = createApp(
+  { port: 0, dbPath: ':memory:', corsOrigins: [], authMode: 'password', sessionTtlSeconds: 3600 },
+  authDb,
+);
+const authServer = authApp.listen(0);
+await new Promise<void>((resolve) => authServer.on('listening', resolve));
+const authAddress = authServer.address();
+api.setToken(null);
+api.setApiBase(
+  `http://127.0.0.1:${typeof authAddress === 'object' && authAddress ? authAddress.port : 0}`,
+);
+
+const caps = await api.authConfig();
+check('authConfig() reports the server’s sign-in system', caps.mode === 'password' && caps.usesPassword);
+check('…without a session (it is the login screen’s first call)', api.getToken() === null);
+check('…and advertises registration + access requests', caps.allowsRegistration && caps.allowsAccessRequests);
+
+await api.login('prof@ucla.edu', 'instructorpass');
+check('login(email, password) stores the session token', api.getToken() != null);
+
+const importReport = await api.importRoster(
+  'Email,Name,Student ID\nnew@ucla.edu,New Student,004777888\n',
+);
+check('importRoster() upserts and reports', importReport.added === 1 && importReport.total === 1);
+const rosterRows = await api.getRoster();
+check(
+  'getRoster() carries account state',
+  rosterRows.find((r) => r.email === 'new@ucla.edu')?.registered === false,
+);
+
+const badLogin = await api
+  .login('new@ucla.edu', 'nopasswordyet')
+  .then(() => null as api.ApiError | null, (e: unknown) => (e instanceof api.ApiError ? e : null));
+check('a roster member with no account cannot sign in', badLogin?.status === 401);
+check('…and the refusal carries a displayable message', (badLogin?.message.length ?? 0) > 0);
+
+const registered = await api.register({
+  email: 'new@ucla.edu',
+  password: 'chosenpassword',
+  studentId: '004777888',
+});
+check('register() returns the roster identity, not the form’s', registered.name === 'New Student');
+check('…and signs the caller in (token swapped to the new account)', (await api.me()).email === 'new@ucla.edu');
+
+await api.changePassword('chosenpassword', 'secondpassword');
+check('changePassword() keeps THIS session alive', (await api.me()).email === 'new@ucla.edu');
+await api.login('new@ucla.edu', 'secondpassword');
+check('…and the new password is what signs in', (await api.me()).email === 'new@ucla.edu');
+
+const studentBlocked = await api
+  .getRoster()
+  .then(() => null as api.ApiError | null, (e: unknown) => (e instanceof api.ApiError ? e : null));
+check('a student calling getRoster() is refused (403)', studentBlocked?.status === 403);
+
+await api.requestAccess({ email: 'offroster@ucla.edu', name: 'Off Roster', studentId: '9' });
+await api.login('prof@ucla.edu', 'instructorpass');
+const pendingRequests = await api.listAccessRequests('pending');
+check('requestAccess() files a request the instructor can read', pendingRequests.length === 1);
+await api.approveAccessRequest(pendingRequests[0].id);
+check(
+  'approveAccessRequest() puts them on the roster',
+  (await api.getRoster()).some((r) => r.email === 'offroster@ucla.edu'),
+);
+await api.resetRosterPassword('new@ucla.edu');
+check(
+  'resetRosterPassword() clears the credential',
+  (await api.getRoster()).find((r) => r.email === 'new@ucla.edu')?.registered === false,
+);
+await api.removeRosterEntry('offroster@ucla.edu');
+check(
+  'removeRosterEntry() drops the row',
+  !(await api.getRoster()).some((r) => r.email === 'offroster@ucla.edu'),
+);
+
+authServer.close();
+authDb.close();
+
 server.close();
 db.close();
 

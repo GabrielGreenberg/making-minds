@@ -5,8 +5,10 @@
 // storage on a single box with trivial backup (copy one file).
 //
 // JSON-heavy tables mirror the client seams one-to-one:
-//   users        — the roster (dev auth logs in by known email; SSO will upsert)
+//   users        — the roster + local credentials (see src/auth.ts; SSO will upsert)
 //   sessions     — bearer tokens
+//   access_requests — people who want an account under an email the roster
+//                  does not have; an instructor approves or rejects each one
 //   assignments  — full AssignmentData JSON (INCLUDING test_cases — server-only;
 //                  the API strips answers before sending to students)
 //   workbooks    — per-(user, assignment) saved canvas state (WorkbookStore seam)
@@ -26,6 +28,32 @@ export interface UserRow {
   email: string;
   name: string;
   role: Role;
+  /** Campus ID from the roster CSV; '' when the import had no ID column. */
+  studentId?: string;
+  /** True once the person has created an account (set a password). */
+  registered?: boolean;
+}
+
+/** A roster row plus its account state — the instructor's roster view. */
+export interface RosterRow extends UserRow {
+  studentId: string;
+  registered: boolean;
+  registeredAt: string | null;
+}
+
+export type AccessRequestStatus = 'pending' | 'approved' | 'rejected';
+
+/** A "my email is not on the roster" request, awaiting an instructor. */
+export interface AccessRequestRow {
+  id: number;
+  email: string;
+  name: string;
+  studentId: string;
+  message: string;
+  status: AccessRequestStatus;
+  createdAt: string;
+  resolvedAt: string | null;
+  resolvedBy: string | null;
 }
 
 export class Db {
@@ -73,6 +101,20 @@ export class Db {
       );
       CREATE INDEX IF NOT EXISTS idx_submissions_asg
         ON submissions (assignment_id, email, attempt);
+      CREATE TABLE IF NOT EXISTS access_requests (
+        id          INTEGER PRIMARY KEY AUTOINCREMENT,
+        email       TEXT NOT NULL,
+        name        TEXT NOT NULL,
+        student_id  TEXT NOT NULL DEFAULT '',
+        message     TEXT NOT NULL DEFAULT '',
+        status      TEXT NOT NULL DEFAULT 'pending'
+                    CHECK (status IN ('pending', 'approved', 'rejected')),
+        created_at  TEXT NOT NULL,
+        resolved_at TEXT,
+        resolved_by TEXT
+      );
+      CREATE INDEX IF NOT EXISTS idx_access_requests_email
+        ON access_requests (email);
     `);
     // Columns added after the initial schema; ALTER is a no-op error on re-run.
     for (const sql of [
@@ -80,6 +122,12 @@ export class Db {
       // Assignments are HIDDEN until the instructor publishes them, so the
       // column defaults to 0 — including for any row that predates it.
       'ALTER TABLE assignments ADD COLUMN student_visible INTEGER NOT NULL DEFAULT 0;',
+      // Local accounts: the roster carries the campus ID, and a person who has
+      // created an account carries a credential. NULL password_hash = on the
+      // roster but no account yet (and, for the dev provider, irrelevant).
+      "ALTER TABLE users ADD COLUMN student_id TEXT NOT NULL DEFAULT '';",
+      'ALTER TABLE users ADD COLUMN password_hash TEXT;',
+      'ALTER TABLE users ADD COLUMN registered_at TEXT;',
     ]) {
       try {
         this.db.exec(sql);
@@ -95,18 +143,83 @@ export class Db {
 
   // ── users ──────────────────────────────────────────────────────
 
+  /**
+   * Create or update a roster row. Deliberately does NOT touch the credential:
+   * re-importing the roster mid-quarter must not log everybody out or wipe the
+   * passwords they already chose. Name/role/studentId are the roster's word,
+   * except that a blank incoming studentId leaves an existing one alone.
+   */
   upsertUser(user: UserRow): void {
     this.db
       .prepare(
-        `INSERT INTO users (email, name, role) VALUES (?, ?, ?)
-         ON CONFLICT(email) DO UPDATE SET name = excluded.name, role = excluded.role`,
+        `INSERT INTO users (email, name, role, student_id) VALUES (?, ?, ?, ?)
+         ON CONFLICT(email) DO UPDATE SET
+           name = excluded.name,
+           role = excluded.role,
+           student_id = CASE WHEN excluded.student_id = '' THEN users.student_id
+                             ELSE excluded.student_id END`,
       )
-      .run(user.email, user.name, user.role);
+      .run(user.email, user.name, user.role, user.studentId ?? '');
   }
 
   getUser(email: string): UserRow | null {
-    const row = this.db.prepare('SELECT email, name, role FROM users WHERE email = ?').get(email);
-    return (row as unknown as UserRow) ?? null;
+    const row = this.db
+      .prepare('SELECT email, name, role, student_id, password_hash FROM users WHERE email = ?')
+      .get(email) as unknown as
+      | { email: string; name: string; role: Role; student_id: string; password_hash: string | null }
+      | undefined;
+    if (!row) return null;
+    return {
+      email: row.email,
+      name: row.name,
+      role: row.role,
+      studentId: row.student_id ?? '',
+      registered: row.password_hash != null,
+    };
+  }
+
+  /** The stored credential, or null when the account has no password yet. */
+  getPasswordHash(email: string): string | null {
+    const row = this.db.prepare('SELECT password_hash FROM users WHERE email = ?').get(email) as
+      | unknown as { password_hash: string | null } | undefined;
+    return row?.password_hash ?? null;
+  }
+
+  /** Set (or, with null, clear) a credential. Clearing re-opens registration. */
+  setPasswordHash(email: string, hash: string | null): void {
+    this.db
+      .prepare('UPDATE users SET password_hash = ?, registered_at = ? WHERE email = ?')
+      .run(hash, hash ? new Date().toISOString() : null, email);
+  }
+
+  /** The full roster with account state, for the instructor's roster view. */
+  listUsers(): RosterRow[] {
+    const rows = this.db
+      .prepare(
+        `SELECT email, name, role, student_id, password_hash, registered_at
+         FROM users ORDER BY role DESC, name`,
+      )
+      .all() as unknown as {
+      email: string;
+      name: string;
+      role: Role;
+      student_id: string;
+      password_hash: string | null;
+      registered_at: string | null;
+    }[];
+    return rows.map((r) => ({
+      email: r.email,
+      name: r.name,
+      role: r.role,
+      studentId: r.student_id ?? '',
+      registered: r.password_hash != null,
+      registeredAt: r.registered_at ?? null,
+    }));
+  }
+
+  /** Remove a roster row (cascades to its sessions). Work is left in place. */
+  removeUser(email: string): void {
+    this.db.prepare('DELETE FROM users WHERE email = ?').run(email);
   }
 
   // ── sessions ───────────────────────────────────────────────────
@@ -121,20 +234,121 @@ export class Db {
   getSessionUser(token: string): UserRow | null {
     const row = this.db
       .prepare(
-        `SELECT u.email, u.name, u.role, s.expires_at FROM sessions s
-         JOIN users u ON u.email = s.email WHERE s.token = ?`,
+        `SELECT u.email, u.name, u.role, u.student_id, u.password_hash, s.expires_at
+         FROM sessions s JOIN users u ON u.email = s.email WHERE s.token = ?`,
       )
-      .get(token) as unknown as (UserRow & { expires_at: string }) | undefined;
+      .get(token) as unknown as
+      | {
+          email: string;
+          name: string;
+          role: Role;
+          student_id: string;
+          password_hash: string | null;
+          expires_at: string;
+        }
+      | undefined;
     if (!row) return null;
     if (new Date(row.expires_at).getTime() < Date.now()) {
       this.deleteSession(token);
       return null;
     }
-    return { email: row.email, name: row.name, role: row.role };
+    return {
+      email: row.email,
+      name: row.name,
+      role: row.role,
+      studentId: row.student_id ?? '',
+      registered: row.password_hash != null,
+    };
   }
 
   deleteSession(token: string): void {
     this.db.prepare('DELETE FROM sessions WHERE token = ?').run(token);
+  }
+
+  /**
+   * End every session belonging to one account — used when an instructor
+   * resets a password, so a stolen or stale session can't outlive the reset.
+   */
+  deleteSessionsFor(email: string): void {
+    this.db.prepare('DELETE FROM sessions WHERE email = ?').run(email);
+  }
+
+  // ── access requests ────────────────────────────────────────────
+
+  /** File a request for an account under an off-roster email. */
+  addAccessRequest(input: {
+    email: string;
+    name: string;
+    studentId: string;
+    message: string;
+  }): AccessRequestRow {
+    const createdAt = new Date().toISOString();
+    this.db
+      .prepare(
+        `INSERT INTO access_requests (email, name, student_id, message, status, created_at)
+         VALUES (?, ?, ?, ?, 'pending', ?)`,
+      )
+      .run(input.email, input.name, input.studentId, input.message, createdAt);
+    const row = this.db
+      .prepare('SELECT id FROM access_requests WHERE email = ? ORDER BY id DESC LIMIT 1')
+      .get(input.email) as unknown as { id: number };
+    return {
+      id: row.id,
+      email: input.email,
+      name: input.name,
+      studentId: input.studentId,
+      message: input.message,
+      status: 'pending',
+      createdAt,
+      resolvedAt: null,
+      resolvedBy: null,
+    };
+  }
+
+  listAccessRequests(status?: AccessRequestStatus): AccessRequestRow[] {
+    const sql = `SELECT id, email, name, student_id, message, status, created_at, resolved_at, resolved_by
+                 FROM access_requests ${status ? 'WHERE status = ?' : ''} ORDER BY id DESC`;
+    const stmt = this.db.prepare(sql);
+    const rows = (status ? stmt.all(status) : stmt.all()) as unknown as {
+      id: number;
+      email: string;
+      name: string;
+      student_id: string;
+      message: string;
+      status: AccessRequestStatus;
+      created_at: string;
+      resolved_at: string | null;
+      resolved_by: string | null;
+    }[];
+    return rows.map((r) => ({
+      id: r.id,
+      email: r.email,
+      name: r.name,
+      studentId: r.student_id ?? '',
+      message: r.message ?? '',
+      status: r.status,
+      createdAt: r.created_at,
+      resolvedAt: r.resolved_at,
+      resolvedBy: r.resolved_by,
+    }));
+  }
+
+  getAccessRequest(id: number): AccessRequestRow | null {
+    return this.listAccessRequests().find((r) => r.id === id) ?? null;
+  }
+
+  /** True when this email already has an unresolved request on file. */
+  hasPendingAccessRequest(email: string): boolean {
+    const row = this.db
+      .prepare("SELECT 1 AS hit FROM access_requests WHERE email = ? AND status = 'pending'")
+      .get(email) as unknown as { hit: number } | undefined;
+    return row != null;
+  }
+
+  resolveAccessRequest(id: number, status: AccessRequestStatus, resolvedBy: string): void {
+    this.db
+      .prepare('UPDATE access_requests SET status = ?, resolved_at = ?, resolved_by = ? WHERE id = ?')
+      .run(status, new Date().toISOString(), resolvedBy, id);
   }
 
   // ── assignments ────────────────────────────────────────────────

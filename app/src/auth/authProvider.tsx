@@ -1,6 +1,6 @@
 import { createContext, useContext, useState, useCallback, useEffect } from 'react';
 import type { ReactNode } from 'react';
-import type { AuthUser, AuthContextValue } from './types';
+import type { AuthUser, AuthContextValue, AuthCapabilities, AuthAttemptResult } from './types';
 import { SESSION_KEY, findAccount, readPersistedAccount } from './accounts';
 import { setSessionUser, getSessionUser } from './session';
 import { backendMode } from '../storage/backend';
@@ -11,23 +11,47 @@ import * as api from '../api/client';
 // useAuth / getCurrentUserEmail), selected once by `backendMode`:
 //
 //   local  — the original mockup: pick a toy account (see ./accounts), no
-//            password, choice persisted in localStorage. Byte-identical to
-//            the pre-S3 stub; exists to demo the two perspectives and drive
-//            the headless harness.
-//   remote — the server session: login(email) → POST /auth/login → bearer
-//            token (stored by api/client.ts under mm:auth:token) + user; on
+//            password, choice persisted in localStorage. Exists to demo the
+//            two perspectives and drive the headless harness; account
+//            creation, passwords and access requests are all reported
+//            unsupported, so the login screen shows only the account buttons.
+//   remote — the server's account system: the login screen asks the server
+//            what it supports (GET /api/auth/config) and renders accordingly —
+//            email + password against the CSV roster today, a single SSO
+//            button once UCLA SSO lands, passwordless email in dev mode. Every
+//            path ends the same way: a bearer token (stored by api/client.ts
+//            under mm:auth:token) + the user the SERVER says you are. On
 //            mount, an existing token is resolved via me() (`loading` is true
-//            until it settles, and AuthGate holds rendering, so nothing
-//            behind the gate ever runs unauthenticated); any 401 from any
-//            call clears the token and drops to the login screen via the
-//            client's onUnauthorized hook. Identity and role are the
-//            SERVER's word — the roster today, the UCLA SSO claim later
-//            (that swap happens in server/src/auth.ts; this file is done).
+//            until it settles, and AuthGate holds rendering, so nothing behind
+//            the gate ever runs unauthenticated); any 401 from any call clears
+//            the token and drops to the login screen via the client's
+//            onUnauthorized hook.
+//
+// Identity and role are never the client's decision in remote mode — they are
+// whatever the server's AuthProvider returns (server/src/auth.ts), which is
+// the seam UCLA SSO swaps.
+
+const UNSUPPORTED: AuthAttemptResult = {
+  ok: false,
+  error: 'Not available with this sign-in method.',
+};
+
+const LOCAL_CAPABILITIES: AuthCapabilities = {
+  mode: 'mockup',
+  usesPassword: false,
+  allowsRegistration: false,
+  allowsAccessRequests: false,
+  passwordMinLength: 8,
+};
 
 const AuthContext = createContext<AuthContextValue>({
   user: null,
   loading: false,
-  login: async () => false,
+  capabilities: LOCAL_CAPABILITIES,
+  login: async () => UNSUPPORTED,
+  register: async () => UNSUPPORTED,
+  requestAccess: async () => UNSUPPORTED,
+  changePassword: async () => UNSUPPORTED,
   logout: () => {},
 });
 
@@ -40,16 +64,16 @@ function LocalAuthProvider({ children }: { children: ReactNode }) {
   // Seed from the persisted session so a reload stays logged in.
   const [user, setUser] = useState<AuthUser | null>(() => accountToUser(readPersistedAccount()));
 
-  const login = useCallback(async (accountId: string) => {
+  const login = useCallback(async (accountId: string): Promise<AuthAttemptResult> => {
     const account = findAccount(accountId);
-    if (!account) return false;
+    if (!account) return { ok: false, error: 'Unknown account.' };
     try {
       localStorage.setItem(SESSION_KEY, account.id);
     } catch {
       // localStorage unavailable — the session just won't persist across reloads.
     }
     setUser(accountToUser(account));
-    return true;
+    return { ok: true, error: null };
   }, []);
 
   const logout = useCallback(() => {
@@ -61,8 +85,21 @@ function LocalAuthProvider({ children }: { children: ReactNode }) {
     setUser(null);
   }, []);
 
+  const unsupported = useCallback(async () => UNSUPPORTED, []);
+
   return (
-    <AuthContext.Provider value={{ user, loading: false, login, logout }}>
+    <AuthContext.Provider
+      value={{
+        user,
+        loading: false,
+        capabilities: LOCAL_CAPABILITIES,
+        login,
+        register: unsupported,
+        requestAccess: unsupported,
+        changePassword: unsupported,
+        logout,
+      }}
+    >
       {children}
     </AuthContext.Provider>
   );
@@ -83,8 +120,21 @@ async function runMigration(u: { email: string; role: 'student' | 'instructor' }
   }
 }
 
+/**
+ * Turn a failed API call into a message for the person in front of the screen.
+ * The server writes these (it knows which rule was broken); anything without
+ * one is a network failure.
+ */
+function describeError(e: unknown, fallback: string): string {
+  if (e instanceof api.ApiError && e.message) {
+    return e.message.charAt(0).toUpperCase() + e.message.slice(1);
+  }
+  return fallback;
+}
+
 function RemoteAuthProvider({ children }: { children: ReactNode }) {
   const [user, setUserState] = useState<AuthUser | null>(null);
+  const [capabilities, setCapabilities] = useState<AuthCapabilities | null>(null);
   // Only an existing token needs resolving; with none we go straight to login.
   const [loading, setLoading] = useState<boolean>(() => api.getToken() != null);
 
@@ -92,6 +142,35 @@ function RemoteAuthProvider({ children }: { children: ReactNode }) {
   const setUser = useCallback((u: AuthUser | null) => {
     setSessionUser(u);
     setUserState(u);
+  }, []);
+
+  // Ask the server what its sign-in system offers. The login screen waits for
+  // this rather than guessing, so it can never show a password box to an SSO
+  // server (or hide one from a password server).
+  useEffect(() => {
+    let cancelled = false;
+    api.authConfig().then(
+      (caps) => {
+        if (!cancelled) setCapabilities(caps);
+      },
+      () => {
+        // Unreachable/old server: fall back to the plainest thing that works.
+        // HealthGate has already vouched for the server being up, so this is
+        // a genuinely unexpected response, not an outage.
+        if (!cancelled) {
+          setCapabilities({
+            mode: 'password',
+            usesPassword: true,
+            allowsRegistration: true,
+            allowsAccessRequests: true,
+            passwordMinLength: 8,
+          });
+        }
+      },
+    );
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   useEffect(() => {
@@ -131,19 +210,65 @@ function RemoteAuthProvider({ children }: { children: ReactNode }) {
   }, [setUser]);
 
   const login = useCallback(
-    async (email: string) => {
+    async (email: string, password?: string): Promise<AuthAttemptResult> => {
       try {
-        const u = await api.login(email);
+        const u = await api.login(email, password);
         await runMigration(u);
         setUser(u);
-        return true;
-      } catch {
-        // Unknown account (401) or network failure — the login screen reports it.
-        return false;
+        return { ok: true, error: null };
+      } catch (e) {
+        return {
+          ok: false,
+          error: describeError(e, 'Could not reach the server — check your connection.'),
+        };
       }
     },
     [setUser],
   );
+
+  const register = useCallback(
+    async (input: { email: string; password: string; studentId?: string }) => {
+      try {
+        const u = await api.register(input);
+        await runMigration(u);
+        setUser(u);
+        return { ok: true, error: null };
+      } catch (e) {
+        return {
+          ok: false,
+          error: describeError(e, 'Could not reach the server — check your connection.'),
+        };
+      }
+    },
+    [setUser],
+  );
+
+  const requestAccess = useCallback(
+    async (input: { email: string; name: string; studentId?: string; message?: string }) => {
+      try {
+        await api.requestAccess(input);
+        return { ok: true, error: null };
+      } catch (e) {
+        return {
+          ok: false,
+          error: describeError(e, 'Could not reach the server — check your connection.'),
+        };
+      }
+    },
+    [],
+  );
+
+  const changePassword = useCallback(async (currentPassword: string, newPassword: string) => {
+    try {
+      await api.changePassword(currentPassword, newPassword);
+      return { ok: true, error: null };
+    } catch (e) {
+      return {
+        ok: false,
+        error: describeError(e, 'Could not reach the server — check your connection.'),
+      };
+    }
+  }, []);
 
   const logout = useCallback(() => {
     // Drop the session locally first (the UI must log out even offline);
@@ -154,7 +279,9 @@ function RemoteAuthProvider({ children }: { children: ReactNode }) {
   }, [setUser]);
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, logout }}>
+    <AuthContext.Provider
+      value={{ user, loading, capabilities, login, register, requestAccess, changePassword, logout }}
+    >
       {children}
     </AuthContext.Provider>
   );

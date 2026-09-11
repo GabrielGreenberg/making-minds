@@ -8,6 +8,7 @@
 
 import { loadConfig } from './config';
 import { Db } from './db';
+import { hashPassword } from './password';
 import { gradeSubmission } from '../../app/src/engine/grader';
 import { TOY_ACCOUNTS } from '../../app/src/auth/accounts';
 import type { AssignmentData } from '../../app/src/types';
@@ -21,10 +22,21 @@ import {
 const config = loadConfig();
 const db = new Db(config.dbPath);
 
+// `--password X` also gives every toy account the password X, so a box running
+// the real (password) auth mode is immediately usable for a demo. Without it
+// the toy accounts exist on the roster with no credential — exactly like a
+// real student before they create their account.
+const passwordArg = process.argv.find((a) => a.startsWith('--password='));
+const toyPassword = passwordArg ? passwordArg.slice('--password='.length) : null;
+
 for (const account of TOY_ACCOUNTS) {
-  db.upsertUser({ email: account.email.toLowerCase(), name: account.name, role: account.role });
+  const email = account.email.toLowerCase();
+  db.upsertUser({ email, name: account.name, role: account.role });
+  if (toyPassword) db.setPasswordHash(email, hashPassword(toyPassword));
 }
-console.log(`roster: ${TOY_ACCOUNTS.length} accounts`);
+console.log(
+  `roster: ${TOY_ACCOUNTS.length} accounts${toyPassword ? ' (with the given demo password)' : ''}`,
+);
 
 const bundled = ccBasics as unknown as AssignmentData;
 db.saveAssignment(bundled);
