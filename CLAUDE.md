@@ -595,7 +595,10 @@ noted:
   the `WorkbookStore` seam (local: instant localStorage; remote: server PUT with an `'error'`
   indicator + backoff retry, a keepalive unload flush, and a per-email crash-buffer journal
   replayed on the next open — a hard tab kill loses nothing) →
-  leave and resume (reload/Back returns you into the assignment) → Submit a timestamped
+  leave and resume (reload/Back returns you into the assignment) → once the instructor has
+  released grades, open a **grade sheet** from either the catalog or the assignment page (a
+  "View grades" modal: one row per question, its mode, and the verdict — scores only, never
+  which cases failed; policy in the pure `gradeDisplay.ts`) → Submit a timestamped
   snapshot (remote submit is online-only: a failure alerts and records nothing — the server
   stamps time, so nothing is silently late).
   The editor chrome is minimal: no File/Edit menus (Home + Submit + session controls only).

@@ -1,5 +1,6 @@
 // Headless end-to-end check of the autograding pipeline for CC, SC, FSM, TM,
-// turbot, perception, open, and fill-in-the-blank questions.
+// turbot, perception, open, and fill-in-the-blank questions, plus the pure
+// display policies both sides read a result through.
 //
 //   npx tsx tools/pipelineCheck.ts
 //
@@ -11,7 +12,7 @@
 // student's response attached for manual review.
 
 import { readFileSync } from 'node:fs';
-import type { AssignmentData, SubmissionRecord } from '../src/types';
+import type { AssignmentData, QuestionResult, SubmissionRecord } from '../src/types';
 import {
   buildSampleAssignment,
   buildCorrectSubmission,
@@ -21,6 +22,9 @@ import { gradeQuestion, gradeSubmission, summarizeResult } from '../src/engine/g
 import { applyManualReview, buildSubmission } from '../src/storage/submissionStore';
 import { emptyQuestionCircuit } from '../src/storage/workbookStore';
 import { gradeSubmissions } from '../src/instructor/Gradebook';
+import { questionVerdict } from '../src/gradeDisplay';
+
+const NOW_ISO = '2026-09-10T00:00:00.000Z';
 
 const assignment = buildSampleAssignment();
 
@@ -153,7 +157,7 @@ console.log('\n[fill-in blanks]');
   circuits.set(11, { ...emptyQuestionCircuit(), fillAnswers: correct });
   const built = buildSubmission(hw1, circuits, {
     student: 'fill@example.com',
-    submittedAt: '2026-09-10T00:00:00.000Z',
+    submittedAt: NOW_ISO,
   });
   const answer = built.answers.find((a) => a.questionId === 11);
   check('buildSubmission carries the blanks, not a responseText',
@@ -161,6 +165,35 @@ console.log('\n[fill-in blanks]');
   const wholeHw = gradeSubmission(hw1, built);
   check('the fill-in question grades 11/11 through gradeSubmission',
     wholeHw.questions.find((r) => r.questionId === 11)?.passed === 11);
+}
+
+// ── The student's own grade sheet (gradeDisplay.questionVerdict) ────
+// What a student is told about each question. The load-bearing cases are the
+// ones that must NOT read as a failure: a question with no result at all, one
+// that was never attempted, and an open question still awaiting review.
+console.log('\n[student grade sheet]');
+{
+  const verdict = (r: Parameters<typeof questionVerdict>[0]) => questionVerdict(r);
+  const q = (over: Partial<QuestionResult>): QuestionResult =>
+    ({ questionId: 1, status: 'graded', passed: 0, total: 0, cases: [], ...over });
+
+  check('no result at all is not a failure', verdict(undefined).tone === 'none');
+  check('a skipped question is "Not attempted"',
+    verdict(q({ status: 'skipped' })).tone === 'none' &&
+    verdict(q({ status: 'skipped' })).text === 'Not attempted');
+  check('a 0/0 result is not a failure either',
+    verdict(q({ passed: 0, total: 0 })).tone === 'none');
+  check('all cases passed reads as correct, with the count',
+    verdict(q({ passed: 4, total: 4 })).tone === 'pass' &&
+    verdict(q({ passed: 4, total: 4 })).text === 'Correct — 4/4');
+  check('some cases failed shows the score, not "correct"',
+    verdict(q({ passed: 3, total: 4 })).tone === 'fail' &&
+    verdict(q({ passed: 3, total: 4 })).text === '3/4');
+  check('an unreviewed open question is pending, not failed',
+    verdict(q({ status: 'pending' })).tone === 'pending');
+  check('a reviewed open question carries the instructor verdict',
+    verdict(q({ status: 'pending', manual: { pass: true, reviewedAt: NOW_ISO } })).tone === 'pass' &&
+    verdict(q({ status: 'pending', manual: { pass: false, reviewedAt: NOW_ISO } })).tone === 'fail');
 }
 
 console.log(`\n${failures === 0 ? 'PIPELINE OK' : `PIPELINE FAILED (${failures} checks)`}`);

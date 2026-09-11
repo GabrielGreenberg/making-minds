@@ -3,6 +3,10 @@ import { navigate } from '../routing';
 import { getCurrentUserEmail, useAuth } from '../auth';
 import { questionModeLabel } from '../types';
 import { statementProse } from '../statementFormat';
+import { GradesPanel } from './GradesPanel';
+import { useState } from 'react';
+import { useAsyncValue } from '../useAsyncValue';
+import { assignmentStore } from '../storage/backend';
 
 /**
  * The question list an assignment opens to. Clicking a question opens its
@@ -14,6 +18,13 @@ export function AssignmentOverview() {
   const submissions = useStore((s) => s.submissions);
   const submitAssignment = useStore((s) => s.submitAssignment);
   const { user } = useAuth();
+  const [showGrades, setShowGrades] = useState(false);
+  // Release is policy on the seam, not part of the assignment, so the page has
+  // to ask for it (the home catalog gets it on the summary).
+  const { value: released } = useAsyncValue(
+    () => (assignment ? assignmentStore.getGradesReleased(assignment.id) : Promise.resolve(false)),
+    [assignment?.id],
+  );
 
   if (!assignment) return null;
   const sub = submissions[assignment.id];
@@ -79,12 +90,26 @@ export function AssignmentOverview() {
             ) : (
               <span className="home-tile-status">Not submitted</span>
             )}
-            <button className="home-tile-submit" onClick={handleSubmit}>
-              Submit assignment
-            </button>
+            <span className="assignment-overview-submit-actions">
+              {released && sub?.result && (
+                <button className="menu-link-button" onClick={() => setShowGrades(true)}>
+                  View grades
+                </button>
+              )}
+              <button className="home-tile-submit" onClick={handleSubmit}>
+                Submit assignment
+              </button>
+            </span>
           </div>
         </section>
       </div>
+      {showGrades && sub && (
+        <GradesPanel
+          assignmentId={assignment.id}
+          record={sub}
+          onClose={() => setShowGrades(false)}
+        />
+      )}
     </div>
   );
 }

@@ -1074,6 +1074,74 @@ thead .sc-label-col {
   align-items: center;
 }
 
+/* ── Modal (student grade sheet) ── */
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.35);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  z-index: 500;
+}
+
+.modal-card {
+  width: min(640px, 100%);
+  max-height: 85vh;
+  overflow-y: auto;
+  background: #fff;
+  border-radius: 10px;
+  padding: 20px 24px 24px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+  text-align: left;
+}
+
+.modal-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.modal-title { font-size: 19px; margin: 0; }
+.modal-sub { font-size: 12px; color: var(--text-secondary); margin: 4px 0 16px; }
+.modal-foot { font-size: 12px; color: var(--text-secondary); margin: 14px 0 0; }
+
+.grades-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.grades-table th,
+.grades-table td {
+  text-align: left;
+  padding: 7px 8px;
+  border-bottom: 1px solid #eee;
+  vertical-align: top;
+}
+
+.grades-table th {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #999;
+}
+
+.grades-q-title {
+  display: block;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.grades-mode { color: var(--text-secondary); white-space: nowrap; }
+.grades-verdict { white-space: nowrap; font-weight: 600; }
+.grades-verdict--pass { color: #2e7d32; }
+.grades-verdict--fail { color: #c62828; }
+.grades-verdict--pending { color: #8a6d1f; }
+.grades-verdict--none { color: #999; font-weight: 400; }
+
 /* ── Flat page shell (home / assignment overview) ─────────────────
    These pages are not a floating card on a grey field: the page itself is
    the surface, it owns the scrollbar, and the only chrome is one full-width
@@ -1827,6 +1895,12 @@ thead .sc-label-col {
   justify-content: space-between;
   gap: 12px;
   padding: 0 12px;
+}
+
+.assignment-overview-submit-actions {
+  display: flex;
+  align-items: center;
+  gap: 14px;
 }
 
 .assignment-overview-submit .home-tile-status {

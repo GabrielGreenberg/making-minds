@@ -5,6 +5,8 @@ import { getCurrentUserEmail, useAuth } from '../auth';
 import { summarizeResult } from '../engine/grader';
 import { dueStatus, formatDueDate, formatDuration, lateBy } from '../dueDates';
 import { useAsyncValue } from '../useAsyncValue';
+import { GradesPanel } from './GradesPanel';
+import { useState } from 'react';
 
 function formatSubmittedAt(iso: string): string {
   const d = new Date(iso);
@@ -16,6 +18,8 @@ export function HomeScreen() {
   const submissions = useStore((s) => s.submissions);
   const submitAssignment = useStore((s) => s.submitAssignment);
   const { user, logout } = useAuth();
+  // Which assignment's grade sheet is open, if any.
+  const [gradesFor, setGradesFor] = useState<string | null>(null);
 
   const { value: assignmentList, loading, error, reload } = useAsyncValue(
     () => listAssignments(),
@@ -121,6 +125,15 @@ export function HomeScreen() {
                   ) : (
                     <span className="home-tile-status">Not submitted</span>
                   )}
+                  {a.gradesReleased && sub?.result && (
+                    <button
+                      className="menu-link-button"
+                      onClick={() => setGradesFor(a.id)}
+                      title="See your result for each question"
+                    >
+                      View grades
+                    </button>
+                  )}
                   <button
                     className="home-tile-submit"
                     onClick={() => void handleSubmit(a.id, a.title)}
@@ -152,6 +165,13 @@ export function HomeScreen() {
           </div>
         </section>
       </div>
+      {gradesFor && submissions[gradesFor] && (
+        <GradesPanel
+          assignmentId={gradesFor}
+          record={submissions[gradesFor]}
+          onClose={() => setGradesFor(null)}
+        />
+      )}
     </div>
   );
 }
