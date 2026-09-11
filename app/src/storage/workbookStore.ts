@@ -9,7 +9,7 @@
 // synchronously before the first suspension, so an unload-time flush still
 // lands the localStorage write.
 
-import type { AssignmentData, AssignmentState, QuestionCircuit } from '../types';
+import type { AssignmentData, AssignmentState, ConfirmedBoxDef, QuestionCircuit } from '../types';
 
 export interface WorkbookStore {
   loadAssignmentState(id: string): Promise<AssignmentState | null>;
@@ -40,7 +40,11 @@ export function emptyQuestionCircuit(): QuestionCircuit {
 export function restoreQuestionCircuits(
   def: AssignmentData,
   saved: AssignmentState | null,
-): { questionCircuits: Map<number, QuestionCircuit>; currentQuestionIndex: number } {
+): {
+  questionCircuits: Map<number, QuestionCircuit>;
+  currentQuestionIndex: number;
+  boxLibrary: ConfirmedBoxDef[];
+} {
   const questionCircuits = new Map<number, QuestionCircuit>();
   for (const q of def.questions) {
     const sc = saved?.questionCircuits[q.id];
@@ -50,7 +54,35 @@ export function restoreQuestionCircuits(
   const currentQuestionIndex = saved
     ? Math.min(Math.max(saved.currentQuestionIndex, 0), lastIndex)
     : 0;
-  return { questionCircuits, currentQuestionIndex };
+  return {
+    questionCircuits,
+    currentQuestionIndex,
+    boxLibrary: restoreBoxLibrary(saved, questionCircuits),
+  };
+}
+
+/**
+ * The assignment-wide confirmed-box library. `boxLibrary` is authoritative
+ * when present; a save that predates it kept one library PER QUESTION, so
+ * those are merged (first occurrence of each id wins, in question order) —
+ * which is exactly the sharing the student now gets, applied retroactively to
+ * work they already have.
+ */
+export function restoreBoxLibrary(
+  saved: AssignmentState | null,
+  questionCircuits: Map<number, QuestionCircuit>,
+): ConfirmedBoxDef[] {
+  if (saved?.boxLibrary) return saved.boxLibrary;
+  const merged: ConfirmedBoxDef[] = [];
+  const seen = new Set<string>();
+  for (const qc of questionCircuits.values()) {
+    for (const box of qc.confirmedBoxes ?? []) {
+      if (seen.has(box.id)) continue;
+      seen.add(box.id);
+      merged.push(box);
+    }
+  }
+  return merged;
 }
 
 // Exported for the fill-empty migration (migrateLocal.ts), which scans
@@ -66,6 +98,7 @@ class LocalWorkbookStore implements WorkbookStore {
       const data = JSON.parse(raw) as {
         currentQuestionIndex?: number;
         questionCircuits?: Record<string, QuestionCircuit>;
+        boxLibrary?: ConfirmedBoxDef[];
       };
       // JSON object keys are strings; coerce back to numeric question ids.
       const questionCircuits: Record<number, QuestionCircuit> = {};
@@ -75,6 +108,7 @@ class LocalWorkbookStore implements WorkbookStore {
       return {
         currentQuestionIndex: data.currentQuestionIndex ?? 0,
         questionCircuits,
+        boxLibrary: data.boxLibrary,
       };
     } catch {
       return null;

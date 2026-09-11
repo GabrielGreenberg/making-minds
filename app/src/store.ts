@@ -525,11 +525,15 @@ interface AppState {
   placeBoxInstance: (boxId: string, x: number, y: number) => void; // place a copy of a box as a BOXED component
   fsmPlaceBoxInstance: (boxId: string, x: number, y: number) => void; // expand FSM box states onto canvas
 
-  // The LIVE canvas's confirmed-box library (palette "Boxes" section). Scoped
-  // per canvas: swapped on every question/tab navigation alongside `boxes`
-  // and persisted with the canvas as QuestionCircuit/WorksheetData
-  // `confirmedBoxes` — a box confirmed in one question never appears in
-  // another.
+  // The confirmed-box library behind the palette's "Boxes" section. Its SCOPE
+  // depends on where you are:
+  //   - in an assignment: the whole ASSIGNMENT (notes item 8). A box built for
+  //     one question is available in every question of that homework which can
+  //     place its kind (`placeableBoxKinds`), so it does not swap on question
+  //     navigation; it persists as `AssignmentState.boxLibrary`.
+  //   - in the sandbox: per TAB. It swaps with `boxes` on tab navigation and
+  //     persists as `WorksheetData.confirmedBoxes`, so scratch sheets stay
+  //     independent of each other and of any assignment.
   confirmedBoxLibrary: ConfirmedBoxDef[];
 
   // Clear workspace
@@ -1479,7 +1483,7 @@ export const useStore = create<AppState>()((set, get) => ({
     get().loadAssignment(def);
 
     // Restore any saved work for this assignment (merged by question id).
-    const { questionCircuits, currentQuestionIndex } = restoreQuestionCircuits(def, saved);
+    const { questionCircuits, currentQuestionIndex, boxLibrary } = restoreQuestionCircuits(def, saved);
     const activeQ = def.questions[currentQuestionIndex];
     const activeCircuit = activeQ
       ? questionCircuits.get(activeQ.id) ?? emptyQuestionCircuit()
@@ -1490,7 +1494,9 @@ export const useStore = create<AppState>()((set, get) => ({
       components: activeCircuit.components,
       wires: activeCircuit.wires,
       boxes: activeCircuit.boxes,
-      confirmedBoxLibrary: activeCircuit.confirmedBoxes ?? [],
+      // Assignment-wide: a box built for one question is available in every
+      // question of the homework that can place its kind.
+      confirmedBoxLibrary: boxLibrary,
       openResponse: activeCircuit.responseText ?? '',
       fillAnswers: activeCircuit.fillAnswers ?? [],
       buildMode: activeQ?.buildMode || 'CC',
@@ -1510,7 +1516,6 @@ export const useStore = create<AppState>()((set, get) => ({
           components: state.components,
           wires: state.wires,
           boxes: state.boxes,
-          confirmedBoxes: state.confirmedBoxLibrary,
           responseText: state.openResponse,
           fillAnswers: state.fillAnswers,
         });
@@ -1575,7 +1580,6 @@ export const useStore = create<AppState>()((set, get) => ({
       components: state.components,
       wires: state.wires,
       boxes: state.boxes,
-      confirmedBoxes: state.confirmedBoxLibrary,
       responseText: state.openResponse,
       fillAnswers: state.fillAnswers,
     });
@@ -1587,7 +1591,8 @@ export const useStore = create<AppState>()((set, get) => ({
       components: saved.components,
       wires: saved.wires,
       boxes: saved.boxes,
-      confirmedBoxLibrary: saved.confirmedBoxes ?? [],
+      // confirmedBoxLibrary deliberately NOT swapped: it belongs to the
+      // assignment, not the question (notes/pset_updates.md item 8).
       openResponse: saved.responseText ?? '',
       fillAnswers: saved.fillAnswers ?? [],
       buildMode: nextQ.buildMode,
@@ -3709,7 +3714,6 @@ function syncedQuestionCircuits(s: AppState): Map<number, QuestionCircuit> {
       components: s.components,
       wires: s.wires,
       boxes: s.boxes,
-      confirmedBoxes: s.confirmedBoxLibrary,
       responseText: s.openResponse,
       fillAnswers: s.fillAnswers,
     });
@@ -3725,6 +3729,9 @@ function snapshotAssignmentState(s: AppState): AssignmentState {
       number,
       QuestionCircuit
     >,
+    // One library for the whole assignment (notes/pset_updates.md item 8), not
+    // one per question.
+    boxLibrary: s.confirmedBoxLibrary,
   };
 }
 

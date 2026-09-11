@@ -371,7 +371,9 @@ export interface QuestionCircuit {
   components: CircuitComponent[];
   wires: Wire[];
   boxes: BoxDefinition[];
-  /** Confirmed boxes available in this question's palette (absent in pre-existing saves = none). */
+  /** LEGACY: the per-question confirmed-box library, before it became
+   *  assignment-wide (`AssignmentState.boxLibrary`). Still read, so old saves
+   *  keep their boxes; no longer written. */
   confirmedBoxes?: ConfirmedBoxDef[];
   responseText?: string;
   /** Fill-in questions: one typed answer per blank, in the spec's order. */
@@ -382,6 +384,17 @@ export interface QuestionCircuit {
 export interface AssignmentState {
   currentQuestionIndex: number;
   questionCircuits: Record<number, QuestionCircuit>; // keyed by AssignmentQuestion.id
+  /**
+   * Confirmed boxes available across the WHOLE assignment: a box built for one
+   * question can be reused in any other question of the same homework that is
+   * allowed to place its kind (`placeableBoxKinds`). One list, not one per
+   * question — the palette does the per-mode filtering, so a CC box follows
+   * the student to every CC and SC question.
+   *
+   * Absent in saves that predate this (the library was per-question then, in
+   * `QuestionCircuit.confirmedBoxes`); those are merged into this list on load.
+   */
+  boxLibrary?: ConfirmedBoxDef[];
 }
 
 // ─── Workbook / Worksheet ────────────────────────────────────────
@@ -424,9 +437,10 @@ export interface WorkbookData {
 
 // ─── Boxing (redesigned) ────────────────────────────────────────
 
-/** A confirmed box in a canvas's palette: the frozen internal circuit an
- *  instance is stamped from. Scoped to ONE canvas (question or sandbox tab)
- *  and persisted alongside its `boxes` — never shared across canvases. */
+/** A confirmed box in the palette: the frozen internal circuit an instance is
+ *  stamped from. Shared across a whole ASSIGNMENT (AssignmentState.boxLibrary)
+ *  but scoped to one sandbox TAB; which canvases may place it is decided by
+ *  `kind` + `placeableBoxKinds`. */
 export interface ConfirmedBoxDef {
   id: string; // same id as the BoxDefinition it was confirmed from
   name: string;

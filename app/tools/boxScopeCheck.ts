@@ -67,7 +67,7 @@ function buildAndBoxAnd(): string {
   return boxId;
 }
 
-// ── assignment: per-question isolation ──────────────────────────
+// ── assignment: the library is shared across the homework ───────
 const assignment = buildSampleAssignment();
 await localAssignmentStore.save(assignment);
 // Unpublished assignments aren't openable by a student (store.openAssignment).
@@ -78,24 +78,69 @@ check('sample assignment opened', ok);
 useStore.getState().switchQuestion(0); // Q1 is a CC question
 await flush();
 
-console.log('[per-question isolation]');
+console.log('[shared across the assignment]');
 const boxId = buildAndBoxAnd();
 check('confirm added a library entry on Q1', useStore.getState().confirmedBoxLibrary.some((b) => b.id === boxId));
 
+// Q2 is the SC question: a CC box follows the student there (it is placeable
+// on an SC canvas — placeableBoxKinds('SC') includes 'CC').
 useStore.getState().switchQuestion(1);
 await flush();
-check('Q2 library is empty (no leak)', useStore.getState().confirmedBoxLibrary.length === 0);
+check('the box is available on Q2 as well (same homework)',
+  useStore.getState().confirmedBoxLibrary.some((b) => b.id === boxId));
+check('it arrives with its internals, so it can be stamped',
+  (useStore.getState().confirmedBoxLibrary.find((b) => b.id === boxId)?.internalComponents.length ?? 0) > 0);
+const beforeQ2 = useStore.getState().components.length;
+useStore.getState().placeBoxInstance(boxId, 400, 400);
+await flush();
+check('an instance is placeable on Q2 from the shared library',
+  useStore.getState().components.length === beforeQ2 + 1);
+// The DRAWN box rectangles stay per question — only the library is shared.
+check('Q2 has no drawn box of its own', useStore.getState().boxes.length === 0);
 
 useStore.getState().switchQuestion(0);
 await flush();
-check('back on Q1 the library is restored', useStore.getState().confirmedBoxLibrary.some((b) => b.id === boxId));
-check('restored entry has internals', (useStore.getState().confirmedBoxLibrary.find((b) => b.id === boxId)?.internalComponents.length ?? 0) > 0);
+check('back on Q1 the library still has it', useStore.getState().confirmedBoxLibrary.some((b) => b.id === boxId));
+check('…and Q1 kept its own drawn box', useStore.getState().boxes.some((b) => b.id === boxId));
+check('…while Q2 instance did not follow the canvas back',
+  !useStore.getState().components.some((c) => c.boxedCircuitId === boxId && c.x === 400));
 
-// place an instance from the restored library
 const before = useStore.getState().components.length;
-useStore.getState().placeBoxInstance(boxId, 400, 400);
+useStore.getState().placeBoxInstance(boxId, 500, 400);
 await flush();
-check('instance placeable from restored library', useStore.getState().components.length === before + 1);
+check('instance placeable on Q1 too', useStore.getState().components.length === before + 1);
+
+// Removing a library entry sweeps the LIVE canvas only. Instances already
+// stamped into another question keep working: a placed BOXED component carries
+// its own internals, so it still simulates and grades — and silently deleting
+// work in a question the student isn't looking at would be worse.
+{
+  useStore.getState().switchQuestion(1);
+  await flush();
+  const doomed = buildAndBoxAnd();
+  useStore.getState().switchQuestion(0);
+  await flush();
+  const q1Before = useStore.getState().components.length;
+  useStore.getState().placeBoxInstance(doomed, 700, 500);
+  await flush();
+  check('the new box is placeable on Q1 too', useStore.getState().components.length === q1Before + 1);
+  useStore.getState().switchQuestion(1);
+  await flush();
+  useStore.getState().removeConfirmedBox(doomed);
+  await flush();
+  check('removeConfirmedBox drops the shared library entry',
+    !useStore.getState().confirmedBoxLibrary.some((b) => b.id === doomed));
+  useStore.getState().switchQuestion(0);
+  await flush();
+  check('an instance already stamped on another question survives, internals intact',
+    useStore.getState().components.some(
+      (c) => c.boxedCircuitId === doomed && (c.internalCircuit?.components ?? []).length > 0,
+    ));
+  // Clean up so the persistence round-trip below starts from a known canvas.
+  useStore.setState({
+    components: useStore.getState().components.filter((c) => c.boxedCircuitId !== doomed),
+  });
+}
 
 // ── persistence: autosave → close → reopen ──────────────────────
 console.log('[persistence round-trip]');
@@ -107,6 +152,44 @@ const reopened = await useStore.getState().openAssignment(SAMPLE_ASSIGNMENT_ID);
 check('assignment reopened', reopened);
 await flush();
 check('reopen lands on Q1 with the library restored from storage', useStore.getState().confirmedBoxLibrary.some((b) => b.id === boxId));
+// The shared library survives the round-trip as AssignmentState.boxLibrary,
+// and is still shared (not re-scoped to the question it was reloaded on).
+useStore.getState().switchQuestion(1);
+await flush();
+check('after a reload it is still shared with Q2',
+  useStore.getState().confirmedBoxLibrary.some((b) => b.id === boxId));
+useStore.getState().switchQuestion(0);
+await flush();
+
+// A DIFFERENT assignment must not inherit it.
+{
+  const other = { ...buildSampleAssignment(), id: `${SAMPLE_ASSIGNMENT_ID}-other`, title: 'Other HW' };
+  await localAssignmentStore.save(other);
+  await localAssignmentStore.setVisible(other.id, true);
+  check('other assignment opened', (await useStore.getState().openAssignment(other.id)) === true);
+  await flush();
+  check('a different homework does NOT inherit the library',
+    !useStore.getState().confirmedBoxLibrary.some((b) => b.id === boxId));
+  check('…and back in the first homework it is there again',
+    (await useStore.getState().openAssignment(SAMPLE_ASSIGNMENT_ID)) === true &&
+    useStore.getState().confirmedBoxLibrary.some((b) => b.id === boxId));
+  await flush();
+}
+
+// Legacy saves kept one library PER QUESTION; those merge into the shared one.
+{
+  const { restoreBoxLibrary } = await import('../src/storage/workbookStore');
+  const legacy = new Map([
+    [1, { components: [], wires: [], boxes: [], confirmedBoxes: [{ id: 'a' }, { id: 'b' }] }],
+    [2, { components: [], wires: [], boxes: [], confirmedBoxes: [{ id: 'b' }, { id: 'c' }] }],
+  ] as never);
+  const merged = restoreBoxLibrary(null, legacy as never);
+  check('legacy per-question libraries merge, de-duped, in question order',
+    merged.map((b) => b.id).join(',') === 'a,b,c');
+  check('an explicit boxLibrary wins over the legacy per-question copies',
+    restoreBoxLibrary({ currentQuestionIndex: 0, questionCircuits: {}, boxLibrary: [] } as never, legacy as never)
+      .length === 0);
+}
 
 // ── sandbox: per-tab isolation + assignment↔sandbox boundary ────
 console.log('[sandbox isolation]');
