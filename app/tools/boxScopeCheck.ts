@@ -70,6 +70,8 @@ function buildAndBoxAnd(): string {
 // ── assignment: per-question isolation ──────────────────────────
 const assignment = buildSampleAssignment();
 await localAssignmentStore.save(assignment);
+// Unpublished assignments aren't openable by a student (store.openAssignment).
+await localAssignmentStore.setVisible(SAMPLE_ASSIGNMENT_ID, true);
 const store = useStore.getState();
 const ok = await store.openAssignment(SAMPLE_ASSIGNMENT_ID);
 check('sample assignment opened', ok);

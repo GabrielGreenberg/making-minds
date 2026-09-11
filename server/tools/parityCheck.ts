@@ -292,9 +292,16 @@ const iTok = (
 ).json.token;
 check('logins issued tokens', !!sTok && !!iTok);
 
-// Create the assignment via the API (instructor), as real authoring would.
+// Create the assignment via the API (instructor), as real authoring would, and
+// publish it — assignments are hidden from students until released, and the
+// student-side pins below need to be able to fetch it.
 const put = await api('PUT', `/assignments/${ASSIGNMENT_ID}`, { token: iTok, body: assignment });
 check('assignment created via API', put.status === 200);
+const published = await api<{ visible: boolean }>(
+  'PUT', `/assignments/${ASSIGNMENT_ID}/visibility`,
+  { token: iTok, body: { visible: true } },
+);
+check('assignment published to students', published.status === 200 && published.json.visible);
 
 // ── Sanitization pin #1: the student's assignment copy ──────────────────────
 // serverCheck pins empty test_cases + retained turbot arenas on the sample

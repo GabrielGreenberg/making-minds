@@ -118,8 +118,7 @@ export async function createAssignment(title: string): Promise<AssignmentData> {
     questions: [],
   };
   await assignmentStore.save(assignment);
-  // A brand-new assignment is empty; publish it deliberately once it has
-  // questions rather than flashing an empty shell into the student catalog.
-  await assignmentStore.setVisible(id, false);
+  // No setVisible call: unpublished is the default, so a brand-new (empty)
+  // assignment is already invisible to students until it is released.
   return assignment;
 }

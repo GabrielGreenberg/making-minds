@@ -25,8 +25,10 @@
 // reason: whether an assignment is published is policy, not content. Server-
 // side it is the `student_visible` column (hidden assignments are absent from
 // a student's list and 404 on fetch); locally it is a private
-// `mm:hidden:<id>` key. Absent means VISIBLE, so nothing that predates the
-// flag disappears — new assignments are hidden explicitly at creation.
+// `mm:published:<id>` key. An assignment is HIDDEN until the instructor
+// publishes it — absent means hidden, on both backends, for every assignment
+// including the bundled and seeded ones. Students see an empty catalog until
+// something is released, which is the point.
 
 import type { AssignmentData } from '../types';
 import type { AssignmentSummary } from '../assignments';
@@ -47,8 +49,7 @@ export interface AssignmentStore {
   setGradesReleased(id: string, released: boolean): Promise<void>;
   /**
    * Whether students can see this assignment. Answered for ANY id, like
-   * release. Absent = visible (back-compat), so hiding is always an explicit
-   * act.
+   * release. Absent = HIDDEN, so publishing is always an explicit act.
    */
   getVisible(id: string): Promise<boolean>;
   /** Instructor only: publish an assignment to students, or hide it again. */
@@ -63,9 +64,9 @@ const KEY_PREFIX = INSTRUCTOR_ASG_KEY_PREFIX;
 // Same key the pre-seam storage/gradeRelease.ts module used, so existing
 // local release flags keep working byte-for-byte.
 const RELEASE_PREFIX = 'mm:release:';
-// Presence means HIDDEN — absent is visible, so an assignment authored before
-// this flag existed keeps showing up.
-const HIDDEN_PREFIX = 'mm:hidden:';
+// Presence means PUBLISHED — absent is hidden, so nothing reaches students
+// until the instructor releases it.
+const PUBLISHED_PREFIX = 'mm:published:';
 
 class LocalAssignmentStore implements AssignmentStore {
   private ids(): string[] {
@@ -102,9 +103,9 @@ class LocalAssignmentStore implements AssignmentStore {
 
   private readVisible(id: string): boolean {
     try {
-      return localStorage.getItem(HIDDEN_PREFIX + id) !== '1';
+      return localStorage.getItem(PUBLISHED_PREFIX + id) === '1';
     } catch {
-      return true;
+      return false;
     }
   }
 
@@ -142,7 +143,7 @@ class LocalAssignmentStore implements AssignmentStore {
       // Release is policy about THIS assignment; a future assignment reusing
       // the id must not inherit a stale released flag.
       localStorage.removeItem(RELEASE_PREFIX + id);
-      localStorage.removeItem(HIDDEN_PREFIX + id);
+      localStorage.removeItem(PUBLISHED_PREFIX + id);
     } catch {
       // ignore
     }
@@ -167,10 +168,10 @@ class LocalAssignmentStore implements AssignmentStore {
 
   async setVisible(id: string, visible: boolean): Promise<void> {
     try {
-      if (visible) localStorage.removeItem(HIDDEN_PREFIX + id);
-      else localStorage.setItem(HIDDEN_PREFIX + id, '1');
+      if (visible) localStorage.setItem(PUBLISHED_PREFIX + id, '1');
+      else localStorage.removeItem(PUBLISHED_PREFIX + id);
     } catch {
-      // localStorage unavailable — stays visible, matching the absent default.
+      // localStorage unavailable — stays hidden, the safe default.
     }
   }
 }

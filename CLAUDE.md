@@ -639,8 +639,10 @@ noted:
   browser never sees `test_cases` and never grades — grep-gated by remoteStoreCheck; byte
   parity pinned by `server/tools/parityCheck.ts`).
 - **Instructor side** — role-gated `#/instructor` mode: dashboard (with per-assignment ↑/↓
-  reordering and a Publish/Hide toggle — a hidden assignment is absent from a student's list and
-  404s on fetch, and a newly created one starts hidden), assignment editor, a **question
+  reordering and a Publish/Hide toggle — **every assignment is hidden until it is published**,
+  bundled and seeded ones included, so a student's catalog is empty until the instructor
+  releases something; a hidden assignment is absent from a student's list, 404s on fetch, and
+  cannot be opened by URL), assignment editor, a **question
   creator**, and a **gradebook** that reflects stored autogrades, **grouped by student**: one row
   per student showing the **latest** submission's scores (only the latest counts for grading) and a
   per-student attempt count; expanding a student reveals the full submission history with
@@ -808,7 +810,7 @@ sole exporter of store instances. **Route new features through these seams, not 
 | Grading     | `engine/grader.ts`               | grades on receipt in `LocalSubmissionStore`  | server grades on submit; client never sees `test_cases` (grep-gated); parity pinned |
 | Identity    | `src/auth/` (one provider per mode) | mockup login: pick a toy account; role gates views | email login → bearer session → `me()` restore; 401 hook; boot health gate; UCLA SSO later = server-side `AuthProvider` swap |
 | Persistence | `WorkbookStore`                  | `LocalWorkbookStore` (localStorage)          | `RemoteWorkbookStore` + crash-buffer journal & fill-empty migration |
-| Assignments | `AssignmentStore` + registry     | bundled + localStorage (instructor-authored); release + visibility flags on the seam | server CRUD, role-sanitized; hidden assignments absent from a student's list and 404 on fetch; bundled set is empty remotely |
+| Assignments | `AssignmentStore` + registry     | bundled + localStorage (instructor-authored); release + visibility flags on the seam (unpublished by default — `mm:published:<id>` present = released) | server CRUD, role-sanitized; `student_visible` defaults to 0, hidden assignments absent from a student's list and 404 on fetch; bundled set is empty remotely |
 | Submission  | `SubmissionStore`                | `LocalSubmissionStore` (localStorage)        | `RemoteSubmissionStore` (answers only; identity/time = server's word) |
 | Navigation  | `routing` (`Route` + `navigate`) | hash URLs via History API (starts inside AuthGate) | same routes                |
 

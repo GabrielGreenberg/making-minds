@@ -43,9 +43,10 @@ import { emptyQuestionCircuit, restoreQuestionCircuits } from './storage/workboo
 import { buildSubmission } from './storage/submissionStore';
 // Store INSTANCES come from the backend seam (local vs. remote is decided
 // there, nowhere else); the modules above supply only pure helpers + types.
-import { workbookStore, submissionStore, backendMode } from './storage/backend';
+import { workbookStore, submissionStore, assignmentStore, backendMode } from './storage/backend';
 import { writeJournal, clearJournal, reconcileJournal } from './storage/journal';
 import { getSessionUser } from './auth/session';
+import { instructorRole } from './auth/instructorRole';
 
 /**
  * TM tape notation (alphabet) for the current context. Inside an assignment
@@ -1452,6 +1453,17 @@ export const useStore = create<AppState>()((set, get) => ({
     // Superseded while in flight — drop this resolve (see the AppState note).
     if (seq !== openAssignmentSeq) return true;
     if (!def) return false;
+    // An unpublished assignment is not openable by a student, by URL or
+    // otherwise. Remotely the server already refuses (the fetch 404s, so
+    // `def` is undefined above); local mode has no server to refuse, so the
+    // same rule is applied here.
+    if (
+      backendMode === 'local' &&
+      !instructorRole.isInstructor() &&
+      !(await assignmentStore.getVisible(id))
+    ) {
+      return false;
+    }
 
     // Remote mode: replay the crash buffer, if one survived a hard tab kill
     // (storage/journal.ts) — it supersedes the fetched server state and is

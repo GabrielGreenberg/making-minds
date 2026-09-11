@@ -77,10 +77,9 @@ export class Db {
     // Columns added after the initial schema; ALTER is a no-op error on re-run.
     for (const sql of [
       'ALTER TABLE assignments ADD COLUMN grades_released INTEGER NOT NULL DEFAULT 0;',
-      // Visibility defaults to 1 so every assignment that predates the column
-      // stays where students can see it; a NEW assignment is hidden by the
-      // client right after it is created (assignments/createAssignment).
-      'ALTER TABLE assignments ADD COLUMN student_visible INTEGER NOT NULL DEFAULT 1;',
+      // Assignments are HIDDEN until the instructor publishes them, so the
+      // column defaults to 0 — including for any row that predates it.
+      'ALTER TABLE assignments ADD COLUMN student_visible INTEGER NOT NULL DEFAULT 0;',
     ]) {
       try {
         this.db.exec(sql);
@@ -206,7 +205,8 @@ export class Db {
       .run(visible ? 1 : 0, id);
   }
 
-  /** ids → visible flag, for decorating assignment list summaries. */
+  /** ids → visible flag, for decorating assignment list summaries. Absent
+   *  from the map means hidden, matching the column default. */
   listVisible(): Map<string, boolean> {
     const rows = this.db
       .prepare('SELECT id, student_visible FROM assignments')

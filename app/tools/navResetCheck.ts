@@ -189,6 +189,10 @@ checkAllSimFresh('after re-load');
 // ── openAssignment flushes planted junk ─────────────────────────
 console.log('[openAssignment flushes junk]');
 await localAssignmentStore.save(assignment);
+// Assignments are unpublished until released, and a student cannot open one
+// that isn't (store.openAssignment). The harness has no logged-in instructor,
+// so publish it before driving the student-side navigation below.
+await localAssignmentStore.setVisible(SAMPLE_ASSIGNMENT_ID, true);
 useStore.getState().closeAssignment();
 plantSimJunk();
 check('openAssignment succeeds', (await useStore.getState().openAssignment(SAMPLE_ASSIGNMENT_ID)) === true);
@@ -201,6 +205,7 @@ checkAllSimFresh('after open');
 console.log('[openAssignment interleaving: last open wins]');
 const assignmentB = { ...buildSampleAssignment(), id: `${SAMPLE_ASSIGNMENT_ID}-b`, title: 'Sample B' };
 await localAssignmentStore.save(assignmentB);
+await localAssignmentStore.setVisible(assignmentB.id, true);
 useStore.getState().closeAssignment();
 const openA = useStore.getState().openAssignment(SAMPLE_ASSIGNMENT_ID);
 const openB = useStore.getState().openAssignment(assignmentB.id);
@@ -208,6 +213,22 @@ const [okA, okB] = await Promise.all([openA, openB]);
 check('both interleaved opens resolve true (stale open is a silent no-op)', okA === true && okB === true);
 check('the newest open owns the final state (B wins)',
   useStore.getState().assignment?.id === assignmentB.id && useStore.getState().workbookOpen);
+
+// ── an unpublished assignment is not openable ───────────────────
+// Hidden means hidden: a student cannot reach an unreleased assignment by URL
+// either. (Remotely the server refuses; this is the local-mode rule.)
+console.log('[openAssignment refuses an unpublished assignment]');
+{
+  const draft = { ...buildSampleAssignment(), id: `${SAMPLE_ASSIGNMENT_ID}-draft`, title: 'Draft' };
+  await localAssignmentStore.save(draft);
+  check('openAssignment resolves false for an unpublished assignment',
+    (await useStore.getState().openAssignment(draft.id)) === false);
+  check('…and nothing was opened', useStore.getState().assignment?.id !== draft.id);
+  await localAssignmentStore.setVisible(draft.id, true);
+  check('publishing it makes it openable',
+    (await useStore.getState().openAssignment(draft.id)) === true);
+  await localAssignmentStore.remove(draft.id);
+}
 
 // ═════ Sandbox tabs share the same fresh-machine contract ═══════
 

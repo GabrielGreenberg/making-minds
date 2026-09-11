@@ -116,13 +116,14 @@ export function createApp(config: ServerConfig, db: Db) {
       .listAssignments()
       // A hidden assignment is invisible to students, not merely unlisted-
       // with-a-flag: they must not learn it exists before it is published.
-      .filter((a) => isInstructor || (visible.get(a.id) ?? true))
+      // Unpublished is the default, so an unknown id counts as hidden.
+      .filter((a) => isInstructor || (visible.get(a.id) ?? false))
       .map((a) => ({
         id: a.id,
         title: a.title,
         questionCount: a.questions.length,
         gradesReleased: released.get(a.id) ?? false,
-        visible: visible.get(a.id) ?? true,
+        visible: visible.get(a.id) ?? false,
         dueDate: a.dueDate,
         order: a.order,
       }));

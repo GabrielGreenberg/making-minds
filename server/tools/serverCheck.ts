@@ -96,6 +96,23 @@ const noTok = await api('GET', '/assignments');
 check('no token → 401', noTok.status === 401);
 
 // ── assignments ──────────────────────────────────────────────────
+// Seeded assignments are unpublished, like every other one — a student sees an
+// empty catalog until the instructor releases something. The student-facing
+// checks below need it published, and the visibility section further down
+// exercises hiding it again.
+const beforePublish = await api<{ assignments: { id: string }[] }>('GET', '/assignments', {
+  token: sTok,
+});
+check(
+  'a student sees no assignments until one is published',
+  beforePublish.status === 200 && beforePublish.json.assignments.length === 0,
+);
+const publish = await api<{ visible: boolean }>(
+  'PUT', `/assignments/${SAMPLE_ASSIGNMENT_ID}/visibility`,
+  { token: iTok, body: { visible: true } },
+);
+check('instructor publishes the seeded assignment', publish.status === 200 && publish.json.visible);
+
 const list = await api<{ assignments: { id: string }[] }>('GET', '/assignments', { token: sTok });
 check(
   'assignment list',
@@ -283,7 +300,7 @@ check(
     'GET', '/assignments', { token: sTok },
   );
   check(
-    'assignments are visible to students by default',
+    'the published assignment is listed as visible',
     listedBefore.json.assignments.some((a) => a.id === SAMPLE_ASSIGNMENT_ID && a.visible),
   );
 

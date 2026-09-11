@@ -126,9 +126,14 @@ check('instructor login stored a bearer token', typeof iTok === 'string' && iTok
 const seededList = await remoteAssignmentStore.list();
 const seededRow = seededList.find((a) => a.id === SAMPLE_ASSIGNMENT_ID);
 check(
-  'list() reports the seeded assignment (gradesReleased false)',
-  seededRow != null && seededRow.gradesReleased === false && seededRow.questionCount > 0,
+  'list() reports the seeded assignment (gradesReleased false, unpublished)',
+  seededRow != null && seededRow.gradesReleased === false && seededRow.visible === false &&
+    seededRow.questionCount > 0,
 );
+// Everything starts hidden, so the student-side seams below need it published.
+await remoteAssignmentStore.setVisible(SAMPLE_ASSIGNMENT_ID, true);
+check('publishing it flips the summary', 
+  (await remoteAssignmentStore.list()).find((a) => a.id === SAMPLE_ASSIGNMENT_ID)?.visible === true);
 
 const created = { ...buildSampleAssignment(), id: 'remote-check-asg', title: 'Remote Check' };
 await remoteAssignmentStore.save(created);
@@ -169,11 +174,15 @@ check(
 
 // Visibility through the seam: hiding must make a student's fetch resolve
 // null (the server 404s), and getVisible must report it for the instructor.
-check('a saved assignment is visible by default', await remoteAssignmentStore.getVisible('remote-check-asg'));
-await remoteAssignmentStore.setVisible('remote-check-asg', false);
-check('setVisible(false) is reflected on the instructor summary',
+check('a saved assignment is HIDDEN until published',
+  (await remoteAssignmentStore.getVisible('remote-check-asg')) === false);
+check('…and its instructor summary says so',
   (await remoteAssignmentStore.list()).find((a) => a.id === 'remote-check-asg')?.visible === false);
-check('…and by getVisible', (await remoteAssignmentStore.getVisible('remote-check-asg')) === false);
+await remoteAssignmentStore.setVisible('remote-check-asg', true);
+check('setVisible(true) publishes it', (await remoteAssignmentStore.getVisible('remote-check-asg')) === true);
+await remoteAssignmentStore.setVisible('remote-check-asg', false);
+check('…and setVisible(false) hides it again',
+  (await remoteAssignmentStore.getVisible('remote-check-asg')) === false);
 await api.login(student.email);
 check('a hidden assignment is absent from the student list',
   !(await remoteAssignmentStore.list()).some((a) => a.id === 'remote-check-asg'));
@@ -183,7 +192,7 @@ check('…so getVisible answers false for them too',
   (await remoteAssignmentStore.getVisible('remote-check-asg')) === false);
 await api.login(instructor.email);
 await remoteAssignmentStore.setVisible('remote-check-asg', true);
-check('publishing again restores it', (await remoteAssignmentStore.getVisible('remote-check-asg')) === true);
+check('publishing restores it for the student', (await remoteAssignmentStore.getVisible('remote-check-asg')) === true);
 
 await remoteAssignmentStore.remove('remote-check-asg');
 check('remove() → get() resolves null (404 → seam null)', (await remoteAssignmentStore.get('remote-check-asg')) === null);
