@@ -14,7 +14,36 @@ Claude to load into context).
 >
 > A change isn't finished until the docs that describe it are too.
 
-_Last updated: 2026-09-02 (**pilot deployment live** — Cloudflare Pages
+_Last updated: 2026-09-10 (**the `notes/pset_updates.md` pass — 23 items, one commit each**.
+Student workspace: question statements are now rendered markup rather than a `pre-wrap` blob
+(`statementFormat.ts` + `components/StatementBody.tsx` — LaTeX via KaTeX, `` `code` ``, bold,
+italic, paragraphs; inline `IN1=0,IN2=1 -> OUT=1` profiles lifted into tables; `(a)/(b)` parts
+split onto their own lines), with new optional `title` (bold, own line) and `hint` (italic,
+coloured, own line) fields on `AssignmentQuestion` that 27 + 5 HW1–HW7 problems were migrated
+into; the text-annotation and comment tools are GONE; the Argument/Value panel is GONE (with
+its Tally/Binary/+ toggle — a sandbox TM's alphabet is now fixed at binary); the turbot Map is
+zoomable and sits below the percept/motor glossary; the editor names the open assignment; the
+home and assignment-overview pages are flat rather than a card on grey; students get a
+per-question **grade sheet** once grades are released. Grading gained three question-level
+constraints — `component_limits` (how many of a type, counted through boxed internals),
+`maxTapeCells` (the span of tape a run may occupy, `engine/tm.ts tapeCellsUsed`), and
+fill-in-the-blank autograding (`engine/fillIn.ts`; HW1 P11 is now 11 numbered boxes graded by
+string, leading zeros normalised, with `fill_in_answers` stripped server-side like
+`test_cases`). Instructor side gained ↑/↓ **reordering** (`AssignmentData.order` +
+`sortAssignments`) and a **Publish/Hide** toggle: every assignment — bundled and seeded
+included — is now HIDDEN until published, absent from a student's list, 404 on fetch, and
+unopenable by URL. Boxing: the confirmed-box library is now shared across a whole HOMEWORK
+rather than per question (`AssignmentState.boxLibrary`, legacy per-question saves merged on
+load), and SC canvases can box their COMBINATIONAL sub-circuits — MEM is refused, because a
+boxed circuit is evaluated statelessly and a boxed MEM never advances (0101 unboxed vs 0000
+boxed; boxScopeCheck pins the evidence). Two items ended differently from the note: the sticky
+palette tool was reverted at Paul's request (right-click-to-disarm kept), and boxing a
+SEQUENTIAL sub-circuit is explicitly NOT done — it needs nested MEM state threaded through
+`evaluateSCSequence`, the codec and the store's SC slice. Gates: app tsc/build/check (now 16
+tools — `statementFormatCheck` added; boxScopeCheck 16 → 38, navResetCheck 136 → 139,
+pipelineCheck + 18, remoteStoreCheck + 8, serverCheck + 9) and server tsc/check all green,
+coverage ledger unchanged at 46 exact + 10 interface, 0 regressed. Earlier 2026-09-02:
+**pilot deployment live** — Cloudflare Pages
 (`https://making-minds.pages.dev`, direct upload, project `making-minds`) serving a remote-mode
 build against the Lightsail API on the placeholder hostname `https://100-22-69-95.sslip.io`.
 Three repo changes carried it: `app/vite.config.ts`'s `base` is now
@@ -711,6 +740,12 @@ the reference fixtures, prose problems as open questions; remote mode still need
 server-side.
 
 ## What's next
+
+**Done in the 2026-09-10 notes pass** (see the header): rich statements, titles/hints,
+component + tape budgets, fill-in autograding, assignment ordering and publish/hide,
+homework-wide box libraries, SC boxing, the student grade sheet, and the flat main-page UI.
+Two follow-ups it names rather than closes: boxing a SEQUENTIAL sub-circuit (nested MEM state
+in `evaluateSCSequence`), and an authoring UI for fill-in questions (HW1 P11 is hand-written).
 
 **Near-term (still no backend):**
 
