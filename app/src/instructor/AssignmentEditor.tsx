@@ -8,6 +8,7 @@ import { navigate } from '../routing';
 import { QuestionCreator } from './QuestionCreator';
 import { summarizeQuestion } from './ccSummary';
 import { useAsyncValue } from '../useAsyncValue';
+import { useDragReorder } from './dragReorder';
 
 /** ISO timestamp → the local wall-clock "YYYY-MM-DDTHH:MM" a datetime-local input wants. */
 function toLocalInputValue(iso: string): string {
@@ -34,6 +35,19 @@ export function AssignmentEditor({ id }: { id: string }) {
   const assignment = draft ?? loaded;
   // null = creator closed; { existing? } = creator open (editing or adding).
   const [creator, setCreator] = useState<{ existing?: AssignmentQuestion } | null>(null);
+  // Persist and reflect a new assignment value. Fire-and-forget: the draft
+  // updates immediately either way (local writes land synchronously; a
+  // remote PUT settles in the background).
+  const commit = (next: AssignmentData) => {
+    void assignmentStore.save(next);
+    setDraft(next);
+  };
+
+  // Questions are reordered by dragging; the hook previews the new order under
+  // the cursor and hands back the committed list on drop.
+  const drag = useDragReorder<AssignmentQuestion>(assignment?.questions ?? [], (questions) => {
+    if (assignment) commit({ ...assignment, questions });
+  });
 
   if (!assignment) {
     if (loading) {
@@ -62,14 +76,6 @@ export function AssignmentEditor({ id }: { id: string }) {
     );
   }
 
-  // Persist and reflect a new assignment value. Fire-and-forget: the draft
-  // updates immediately either way (local writes land synchronously; a
-  // remote PUT settles in the background).
-  const commit = (next: AssignmentData) => {
-    void assignmentStore.save(next);
-    setDraft(next);
-  };
-
   const handleTitleBlur = (value: string) => {
     const title = value.trim() || 'Untitled assignment';
     if (title !== assignment.title) commit({ ...assignment, title });
@@ -87,14 +93,6 @@ export function AssignmentEditor({ id }: { id: string }) {
     }
     const iso = new Date(value).toISOString();
     if (iso !== assignment.dueDate) commit({ ...assignment, dueDate: iso });
-  };
-
-  const moveQuestion = (index: number, delta: number) => {
-    const target = index + delta;
-    if (target < 0 || target >= assignment.questions.length) return;
-    const questions = [...assignment.questions];
-    [questions[index], questions[target]] = [questions[target], questions[index]];
-    commit({ ...assignment, questions });
   };
 
   const deleteQuestion = (q: AssignmentQuestion) => {
@@ -171,30 +169,29 @@ export function AssignmentEditor({ id }: { id: string }) {
         <p className="instructor-empty">No questions yet. Add one to build the assignment.</p>
       ) : (
         <ol className="instructor-question-list">
-          {assignment.questions.map((q, i) => (
-            <li key={q.id} className="instructor-question-row">
+          {drag.items.map((q, i) => {
+            const { draggable, onDragStart, ...rowDrop } = drag.rowProps(i);
+            return (
+            <li
+              key={q.id}
+              {...rowDrop}
+              className={`instructor-question-row${drag.draggingIndex === i ? ' is-dragging' : ''}`}
+            >
               <div className="instructor-question-main">
+                <span
+                  className="instructor-drag-handle"
+                  draggable={draggable}
+                  onDragStart={onDragStart}
+                  title="Drag to reorder"
+                  aria-hidden="true"
+                >
+                  ⠿
+                </span>
                 <span className="instructor-question-label">{q.label}</span>
                 <span className="instructor-badge instructor-badge--mode">{questionModeLabel(q)}</span>
                 <span className="instructor-question-summary">{summarizeQuestion(q)}</span>
               </div>
               <div className="instructor-question-actions">
-                <button
-                  className="instructor-btn instructor-btn--icon"
-                  disabled={i === 0}
-                  onClick={() => moveQuestion(i, -1)}
-                  title="Move up"
-                >
-                  ↑
-                </button>
-                <button
-                  className="instructor-btn instructor-btn--icon"
-                  disabled={i === assignment.questions.length - 1}
-                  onClick={() => moveQuestion(i, 1)}
-                  title="Move down"
-                >
-                  ↓
-                </button>
                 <button
                   className="instructor-btn"
                   onClick={() => setCreator({ existing: q })}
@@ -209,7 +206,8 @@ export function AssignmentEditor({ id }: { id: string }) {
                 </button>
               </div>
             </li>
-          ))}
+            );
+          })}
         </ol>
       )}
     </div>

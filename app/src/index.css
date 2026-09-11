@@ -1524,7 +1524,24 @@ thead .sc-label-col {
 }
 
 .instructor-table-order-head { width: 1%; white-space: nowrap; }
-.instructor-table-order { display: flex; gap: 4px; }
+.instructor-table-order { width: 1%; padding-right: 0; }
+
+/* Drag-to-reorder: a grip handle starts the drag, the whole row is the drop
+   target, and the row being carried dims in place. */
+.instructor-drag-handle {
+  display: inline-block;
+  padding: 0 4px;
+  color: #bbb;
+  cursor: grab;
+  user-select: none;
+  line-height: 1;
+  font-size: 15px;
+}
+.instructor-drag-handle:hover { color: var(--text-secondary); }
+.instructor-drag-handle:active { cursor: grabbing; }
+.instructor-drag-handle--pinned { opacity: 0.3; cursor: default; }
+.instructor-drag-handle--pinned:hover { color: #bbb; }
+.is-dragging { opacity: 0.45; }
 .instructor-link {
   border: none;
   background: none;

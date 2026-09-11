@@ -11,6 +11,7 @@ import { navigate } from '../routing';
 import { seedSampleData } from '../devData/seed';
 import { seedHomeworks } from '../devData/homeworks';
 import { useAsyncValue } from '../useAsyncValue';
+import { useDragReorder } from './dragReorder';
 
 /**
  * Instructor dashboard: lists every assignment (bundled + instructor-authored)
@@ -35,18 +36,12 @@ export function InstructorDashboard() {
   const assignments = rows ?? [];
 
   // Reordering writes an explicit position onto EVERY assignment, not just the
-  // pair that swapped: the list may still hold assignments that have never
-  // been moved (order absent, sorted last), and renumbering the whole list is
-  // what makes the new arrangement the one that comes back. Bundled
-  // assignments live outside the store and cannot be renumbered, so they are
-  // pinned in place and the buttons skip over them.
-  const handleMove = async (index: number, delta: number) => {
-    const rows = assignments;
-    const target = index + delta;
-    if (target < 0 || target >= rows.length) return;
-    if (isBundledAssignment(rows[index].id) || isBundledAssignment(rows[target].id)) return;
-    const reordered = rows.slice();
-    [reordered[index], reordered[target]] = [reordered[target], reordered[index]];
+  // row that moved: the list may still hold assignments that have never been
+  // moved (order absent, sorted last), and renumbering the whole list is what
+  // makes the new arrangement the one that comes back. Bundled assignments
+  // live outside the store and cannot be renumbered, so they are pinned: they
+  // can neither be dragged nor be displaced by a row dragged past them.
+  const persistOrder = async (reordered: AssignmentSummary[]) => {
     await Promise.all(
       reordered.map(async (row, i) => {
         if (isBundledAssignment(row.id)) return;
@@ -58,15 +53,9 @@ export function InstructorDashboard() {
     reload();
   };
 
-  const canMove = (rows: AssignmentSummary[], index: number, delta: number) => {
-    const target = index + delta;
-    return (
-      target >= 0 &&
-      target < rows.length &&
-      !isBundledAssignment(rows[index].id) &&
-      !isBundledAssignment(rows[target].id)
-    );
-  };
+  const drag = useDragReorder(assignments, (next) => void persistOrder(next), (row) =>
+    isBundledAssignment(row.id),
+  );
 
   const handleNew = async () => {
     const title = window.prompt('Assignment title:');
@@ -156,7 +145,7 @@ export function InstructorDashboard() {
         <table className="instructor-table">
           <thead>
             <tr>
-              <th className="instructor-table-order-head">Order</th>
+              <th className="instructor-table-order-head" aria-label="Reorder"></th>
               <th>Title</th>
               <th>Questions</th>
               <th>Submissions</th>
@@ -164,27 +153,25 @@ export function InstructorDashboard() {
             </tr>
           </thead>
           <tbody>
-            {assignments.map((a, i) => {
+            {drag.items.map((a, i) => {
               const bundled = isBundledAssignment(a.id);
+              const { draggable, onDragStart, ...rowDrop } = drag.rowProps(i);
               return (
-                <tr key={a.id}>
+                <tr
+                  key={a.id}
+                  {...rowDrop}
+                  className={drag.draggingIndex === i ? 'is-dragging' : undefined}
+                >
                   <td className="instructor-table-order">
-                    <button
-                      className="instructor-btn instructor-btn--icon"
-                      disabled={!canMove(assignments, i, -1)}
-                      title="Move up"
-                      onClick={() => void handleMove(i, -1)}
+                    <span
+                      className={`instructor-drag-handle${bundled ? ' instructor-drag-handle--pinned' : ''}`}
+                      draggable={draggable}
+                      onDragStart={onDragStart}
+                      title={bundled ? 'Bundled assignments stay at the top' : 'Drag to reorder'}
+                      aria-hidden="true"
                     >
-                      ↑
-                    </button>
-                    <button
-                      className="instructor-btn instructor-btn--icon"
-                      disabled={!canMove(assignments, i, 1)}
-                      title="Move down"
-                      onClick={() => void handleMove(i, 1)}
-                    >
-                      ↓
-                    </button>
+                      ⠿
+                    </span>
                   </td>
                   <td>
                     <span className="instructor-asg-title">{a.title}</span>
