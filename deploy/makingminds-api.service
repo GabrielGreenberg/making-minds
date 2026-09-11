@@ -10,7 +10,7 @@ After=network.target
 [Service]
 Type=simple
 User=makingminds
-WorkingDirectory=/srv/making-minds/server
+WorkingDirectory=/srv/making-minds/repo/server
 ExecStart=/usr/bin/npm start
 Restart=always
 RestartSec=3

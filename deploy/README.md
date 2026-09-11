@@ -49,7 +49,7 @@ sudo -u makingminds MM_DB_PATH=/srv/making-minds/data/making-minds.sqlite \
   npm run roster -- set-password you@ucla.edu
 
 # Services — EDIT the env values (domain, CORS origin) first
-sudo cp ../deploy/makingminds-api.service /etc/systemd/system/   # fix WorkingDirectory to the repo path
+sudo cp ../deploy/makingminds-api.service /etc/systemd/system/   # paths already match the clone above
 sudo systemctl daemon-reload && sudo systemctl enable --now makingminds-api
 sudo cp ../deploy/Caddyfile /etc/caddy/Caddyfile                 # fix the hostname
 sudo systemctl reload caddy
