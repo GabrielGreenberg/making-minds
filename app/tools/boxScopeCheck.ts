@@ -133,6 +133,88 @@ check('removeConfirmedBox strips placed instances', !useStore.getState().compone
 useStore.getState().undo();
 check('undo restores the confirmed box', useStore.getState().confirmedBoxLibrary.some((b) => b.id === sbBox));
 
+// ── SC boxing (notes/pset_updates.md item 23) ───────────────────
+// An SC canvas can box its COMBINATIONAL sub-circuits. MEM is refused, and the
+// reason is an engine fact rather than a policy choice: a boxed circuit is
+// evaluated statelessly and evaluateSCSequence only clocks top-level MEMs, so
+// a boxed MEM would never advance. The first checks below are that evidence.
+console.log('[SC boxing]');
+{
+  const { placeableBoxKinds, getPortsForType } = await import('../src/types');
+  check('CC and SC place CC boxes; FSM places FSM boxes; TM places none',
+    placeableBoxKinds('CC').join(',') === 'CC' &&
+    placeableBoxKinds('SC').join(',') === 'CC' &&
+    placeableBoxKinds('FSM').join(',') === 'FSM' &&
+    placeableBoxKinds('TM').length === 0);
+
+  // WHY MEM is refused: the same one-tick delay, boxed vs not.
+  const { evaluateSCSequence } = await import('../src/engine/sc');
+  const mk = (id: string, type: 'INPUT' | 'OUTPUT' | 'MEM', label: string) => ({
+    id, type, x: 0, y: 0, label, ports: getPortsForType(type), value: 0,
+    storedValue: type === 'MEM' ? 0 : undefined,
+    ...(type === 'MEM' ? { memDirection: 'right-to-left' as const } : {}),
+  });
+  const wr = (id: string, src: string, sp: string, tgt: string, tp: string) =>
+    ({ id, sourceComponentId: src, sourcePortId: sp, targetComponentId: tgt, targetPortId: tp, value: 0 });
+  const delayComps = [mk('i', 'INPUT', 'IN1'), mk('m', 'MEM', 'M1'), mk('o', 'OUTPUT', 'OUT1')];
+  const delayWires = [wr('w1', 'i', 'out', 'm', 'min'), wr('w2', 'm', 'mout', 'o', 'in')];
+  const feed = [[1], [0], [1], [0]];
+  const unboxed = evaluateSCSequence(delayComps, delayWires, feed).flat().join('');
+  const boxedDelay = {
+    id: 'b', type: 'BOXED' as const, x: 0, y: 0, label: 'Delay', value: 0,
+    ports: [
+      { id: 'in1', label: 'in1', side: 'left' as const, index: 0 },
+      { id: 'out1', label: 'out1', side: 'right' as const, index: 0 },
+    ],
+    internalCircuit: { components: delayComps, wires: delayWires },
+  };
+  const boxedOut = evaluateSCSequence(
+    [mk('i', 'INPUT', 'IN1'), boxedDelay, mk('o', 'OUTPUT', 'OUT1')],
+    [wr('w1', 'i', 'out', 'b', 'in1'), wr('w2', 'b', 'out1', 'o', 'in')],
+    feed,
+  ).flat().join('');
+  check(`an unboxed MEM delays the stream (${unboxed})`, unboxed === '0101');
+  check(`the SAME delay boxed never advances (${boxedOut}) - why MEM may not be boxed`,
+    boxedOut === '0000');
+
+  // The sandbox section above left the assignment closed and its canvas
+  // populated; come back to the assignment's SC question (Q2) on a clean sheet.
+  check('re-opened the assignment', (await useStore.getState().openAssignment(SAMPLE_ASSIGNMENT_ID)) === true);
+  useStore.getState().switchQuestion(1);
+  await flush();
+  useStore.setState({ components: [], wires: [], boxes: [] });
+
+  // A combinational sub-circuit on the SC canvas boxes fine.
+  const scBox = buildAndBoxAnd();
+  const entry = useStore.getState().confirmedBoxLibrary.find((b) => b.id === scBox);
+  check('an SC canvas can confirm a combinational box', entry != null);
+  check('...recorded as a CC box, so it is placeable on either canvas',
+    (entry?.kind ?? 'CC') === 'CC' && placeableBoxKinds('SC').includes(entry?.kind ?? 'CC'));
+  useStore.getState().placeBoxInstance(scBox, 620, 300);
+  await flush();
+  check('...and places on the SC canvas with its internals',
+    useStore.getState().components.some(
+      (c) => c.boxedCircuitId === scBox && (c.internalCircuit?.components ?? []).length > 0,
+    ));
+
+  // But a selection containing MEM is refused, by name, with the reason.
+  useStore.setState({ components: [], wires: [], boxes: [] });
+  useStore.getState().addComponent('INPUT', 200, 180);
+  useStore.getState().addComponent('MEM', 320, 180);
+  useStore.getState().addComponent('OUTPUT', 460, 190);
+  const [inp, mem, out] = useStore.getState().components;
+  useStore.getState().addWire(inp.id, 'out', mem.id, 'min');
+  useStore.getState().addWire(mem.id, 'mout', out.id, 'in');
+  const memBoxId = 'scbox-mem';
+  useStore.getState().addBox({ id: memBoxId, name: '', x: 150, y: 120, width: 400, height: 220, componentIds: [], inputPortIds: [], outputPortIds: [] });
+  const memErr = useStore.getState().confirmBox(memBoxId);
+  check('boxing a MEM is refused, naming the block',
+    typeof memErr === 'string' && memErr.includes('M1') &&
+    memErr.includes('Memory cannot go inside a box'));
+  check('...and nothing was added to the library',
+    !useStore.getState().confirmedBoxLibrary.some((b) => b.id === memBoxId));
+}
+
 console.log(`\nboxScopeCheck: ${passed} passed, ${failed} failed`);
 process.exit(failed === 0 ? 0 : 1);
 

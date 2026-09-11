@@ -227,6 +227,26 @@ export function questionModeLabel(
   return q.perception ? `${q.buildMode} - perception` : q.buildMode;
 }
 
+/** Which kinds of confirmed box a canvas may place (the palette's "Boxes"
+ *  section reads this; boxScopeCheck pins it).
+ *    CC, SC → CC boxes. Gate-level boxes are always combinational (boxing
+ *             refuses MEM), so the same box is usable on either canvas.
+ *    FSM    → FSM boxes (sub-machines), which place as STATE nodes.
+ *    TM     → none: it borrows the FSM editor but not its box semantics, and
+ *             there is no way to author a TM box.
+ *  Absent `kind` on an older entry counts as CC. */
+export function placeableBoxKinds(mode: BuildMode): ('CC' | 'FSM')[] {
+  switch (mode) {
+    case 'CC':
+    case 'SC':
+      return ['CC'];
+    case 'FSM':
+      return ['FSM'];
+    default:
+      return [];
+  }
+}
+
 export interface AssignmentData {
   id: string;                  // stable slug (e.g. "cc-basics"); keys the registry/persistence
   title: string;
@@ -410,7 +430,11 @@ export interface WorkbookData {
 export interface ConfirmedBoxDef {
   id: string; // same id as the BoxDefinition it was confirmed from
   name: string;
-  kind?: 'CC' | 'FSM'; // absent = CC (older entries)
+  /** Which canvas the box was confirmed on, which decides where it may be
+   *  placed (see placeableBoxKinds). Absent = CC (older entries). A box drawn
+   *  on an SC canvas is a CC box: boxing refuses a selection containing MEM,
+   *  so every gate-level box is purely combinational. */
+  kind?: 'CC' | 'FSM';
   inputPortIds: string[];
   outputPortIds: string[];
   internalComponents: CircuitComponent[];

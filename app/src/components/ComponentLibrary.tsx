@@ -1,6 +1,7 @@
 import { useStore, selectEffectiveMode, selectAllowedComponents } from '../store';
 import { isComponentTypeAllowed, disallowedComponentTypes } from '../engine/machineValidation';
 import type { ComponentType } from '../types';
+import { placeableBoxKinds } from '../types';
 
 interface LibraryEntry {
   type: ComponentType;
@@ -254,7 +255,7 @@ export function ComponentLibrary() {
       ))}
 
       {/* New Box tool */}
-      {(effectiveMode === 'CC' || effectiveMode === 'FSM') && <div>
+      {(effectiveMode === 'CC' || effectiveMode === 'SC' || effectiveMode === 'FSM') && <div>
         <div className="library-section-title">Boxing</div>
         <div
           className={`library-item${selectedTool === 'NEW_BOX' ? ' library-item-selected' : ''}`}
@@ -280,12 +281,14 @@ export function ComponentLibrary() {
         </div>
       </div>}
 
-      {/* Box Menu — show CC boxes in CC mode, FSM boxes in FSM mode. Under a
-          component restriction, a box whose internals contain a disallowed
-          type is hidden too (a boxed OR must not smuggle an OR in). */}
+      {/* Box Menu — which kinds this canvas may place is placeableBoxKinds
+          (types.ts). Under a component restriction, a box whose internals
+          contain a disallowed type is hidden too (a boxed OR must not smuggle
+          an OR in). */}
       {(() => {
+        const placeableKinds = placeableBoxKinds(effectiveMode);
         const visibleBoxes = confirmedBoxLibrary.filter((b) =>
-          (effectiveMode === 'FSM' ? b.kind === 'FSM' : (b.kind ?? 'CC') === 'CC') &&
+          placeableKinds.includes(b.kind ?? 'CC') &&
           disallowedComponentTypes(b.internalComponents, allowedComponents).length === 0
         );
         if (visibleBoxes.length === 0) return null;

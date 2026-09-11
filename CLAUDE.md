@@ -901,7 +901,12 @@ only — the grader never sees the formula; it runs against the generated numeri
 
 1. **CC** — gates (NOT/AND/OR), I/O, validated wiring, I/O tables, boxed circuits
    (XOR, Half-Adder), drag-and-drop snap-to-grid canvas. _(built)_
-2. **SC** — MEM block, clock/time model, right-to-left time-step table. _(built)_
+2. **SC** — MEM block, clock/time model, right-to-left time-step table. _(built; SC canvases
+   can box their COMBINATIONAL sub-circuits — `placeableBoxKinds` in types.ts — but `confirmBox`
+   refuses a selection containing MEM: a boxed circuit is evaluated statelessly and
+   `evaluateSCSequence` only clocks TOP-LEVEL MEMs, so a boxed MEM would never advance. The
+   one-tick delay reads 0101 unboxed and 0000 boxed; boxScopeCheck pins that evidence beside
+   the refusal. Boxing a sequential sub-circuit needs nested MEM state in the engine.)_
 3. **FSM** — state nodes, `input:output` transition arrows, simulation with state
    highlighting, state table. _(built)_
 4. **Turbots** — split arena/circuitry workspace, grid arena, hardcoded sensor/motor

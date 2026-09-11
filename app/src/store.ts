@@ -1949,6 +1949,23 @@ export const useStore = create<AppState>()((set, get) => ({
       insideIds.has(w.sourceComponentId) && insideIds.has(w.targetComponentId)
     );
 
+    // ── MEM may not be boxed (SC boxing, notes item 23) ──
+    // A boxed circuit is evaluated statelessly (engine/cc.ts
+    // evaluateBoxedCircuit), and evaluateSCSequence only gives clocked state to
+    // TOP-LEVEL MEM blocks — it does not look inside BOXED internals. A boxed
+    // MEM would therefore never advance: the one-tick delay IN1→MEM→OUT1
+    // yields 0,1,0,1 unboxed and 0,0,0,0 boxed. So an SC canvas can box its
+    // combinational sub-circuits (that is what item 23 asks for), but the MEM
+    // itself stays outside the box until the engine can carry nested state.
+    {
+      const mems = insideComps.filter((c) => c.type === 'MEM');
+      if (mems.length > 0) {
+        return `Memory cannot go inside a box: ${mems.map((m) => m.label).join(', ')}. ` +
+          'A boxed circuit has no clock of its own, so a boxed MEM would never ' +
+          'update. Box the gates around it and leave the MEM on the canvas.';
+      }
+    }
+
     // ── Textbook Rule 1: No loops ──
     // Check for cycles among inside components using internal wires.
     // MEM blocks break feedback loops (like in topological sort), so skip
