@@ -74,9 +74,9 @@ function checkAllSimFresh(label: string) {
   check(`${label}: turbot slice fresh`,
     s.turbotHistory.length === 0 && !s.turbotRunning && !s.turbotHalted &&
     s.turbotStopReason === null);
-  // Placement is sticky (the palette tool stays armed across placements), so
-  // a canvas swap must disarm it — otherwise a gate armed on one question
-  // drops a component on the first click in the next one.
+  // The armed palette tool survives repeated background clicks, so a canvas
+  // swap must disarm it — otherwise a gate armed on one question drops a
+  // component on the first click in the next one.
   check(`${label}: palette tool disarmed`, s.selectedTool === null);
 }
 

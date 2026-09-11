@@ -3592,9 +3592,9 @@ export const useStore = create<AppState>()((set, get) => ({
     get().fsmGlobalReset();
     get().tmGlobalReset();
     get().turbotReset();
-    // The armed palette tool is canvas-scoped too: now that placement is
-    // sticky, an AND armed on a CC question must not survive into the next
-    // question's canvas and drop a gate on the first click there.
+    // The armed palette tool is canvas-scoped too: an AND armed on a CC
+    // question must not survive into the next question's canvas and drop a
+    // gate on the first click there.
     set({ selectedTool: null });
   },
 

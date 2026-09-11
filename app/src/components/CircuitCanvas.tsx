@@ -2704,20 +2704,6 @@ export function CircuitCanvas() {
         return;
       }
 
-      // ─── Click-to-place (placement mode) ───────────────────
-      // An armed component tool STAYS armed, so several copies can be dropped
-      // in a row, and it claims the click wherever it lands — a click that
-      // happens to fall on an existing gate places another copy rather than
-      // silently disarming the tool. Disarm with right-click, Escape, or by
-      // clicking the palette icon again. NEW_BOX is a one-shot drag tool and
-      // is handled further down, on the background branch.
-      if (e.button === 0 && !e.shiftKey && state.selectedTool && state.selectedTool !== 'NEW_BOX') {
-        e.preventDefault();
-        e.stopPropagation();
-        addComponent(state.selectedTool, canvasPos.x - 40, canvasPos.y - 30);
-        return;
-      }
-
       // ─── Wire segment drag ─────────────────────────────────
       if (hit.type === 'wiresegment') {
         e.preventDefault();
@@ -2922,10 +2908,7 @@ export function CircuitCanvas() {
         e.preventDefault();
         e.stopPropagation();
 
-        // Only the one-shot box tool is cancelled by clicking an object; a
-        // placement tool can only be reached here with shift held, and shift
-        // means "select", not "disarm".
-        if (state.selectedTool === 'NEW_BOX') {
+        if (state.selectedTool) {
           state.setSelectedTool(null);
         }
         if (e.shiftKey) {
@@ -2938,7 +2921,7 @@ export function CircuitCanvas() {
 
       // ─── Component click ───────────────────────────────────
       if (hit.type === 'component') {
-        if (state.selectedTool === 'NEW_BOX') {
+        if (state.selectedTool) {
           state.setSelectedTool(null);
         }
         e.preventDefault();
@@ -3049,6 +3032,14 @@ export function CircuitCanvas() {
         svgRef.current?.setPointerCapture(e.pointerId);
         window.addEventListener('pointermove', stableOnMove);
         window.addEventListener('pointerup', stableOnUp);
+        return;
+      }
+
+      // Click-to-place: component tool. The tool stays armed, so repeated
+      // background clicks drop copies in a row; a click that lands on an
+      // existing object disarms it instead (the branches above).
+      if (state.selectedTool) {
+        addComponent(state.selectedTool as ComponentType, canvasPos.x - 40, canvasPos.y - 30);
         return;
       }
 
