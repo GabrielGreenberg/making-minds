@@ -118,14 +118,12 @@ const TURBOT_BRAIN_LABELS: Record<string, string> = {
   SC: 'Sequential Circuit',
 };
 
-function ConfirmedBoxItem({ box, numIn, numOut, isSelected, kind }: {
+function ConfirmedBoxItem({ box, numIn, numOut, isSelected }: {
   box: { id: string; name: string; inputPortIds: string[]; outputPortIds: string[] };
   numIn: number;
   numOut: number;
   isSelected: boolean;
-  kind?: 'CC' | 'FSM';
 }) {
-  const isFsm = kind === 'FSM';
   const [editing, setEditing] = useState(false);
 
   // Rename: students label their boxes ("XOR box"), so the palette item is the
@@ -170,43 +168,32 @@ function ConfirmedBoxItem({ box, numIn, numOut, isSelected, kind }: {
         e.dataTransfer.effectAllowed = 'copy';
       }}
       onClick={() => {
-        if (isFsm) {
-          useStore.getState().fsmPlaceBoxInstance(box.id, 200, 200);
-        } else {
-          useStore.getState().placeBoxInstance(box.id, 200, 200);
-        }
+        useStore.getState().placeBoxInstance(box.id, 200, 200);
       }}
       style={{ cursor: 'pointer' }}
     >
-      {isFsm ? (
-        <svg viewBox="0 0 56 40">
-          <rect x="8" y="4" width="40" height="32" rx="3" fill="none" stroke="#333" strokeWidth="2" />
-          <text x="28" y="24" textAnchor="middle" fontSize="7" fontWeight="600" fill="#333">{box.name}</text>
-        </svg>
-      ) : (
-        <svg viewBox="0 0 56 40">
-          <rect x="8" y="4" width="40" height="32" rx="3" fill="none" stroke="#333" strokeWidth="2" />
-          {Array.from({ length: numIn }).map((_, i) => {
-            const py = 4 + (32 / (numIn + 1)) * (i + 1);
-            return (
-              <g key={`in-${i}`}>
-                <line x1="2" y1={py} x2="8" y2={py} stroke="#333" strokeWidth="1.5" />
-                <circle cx="2" cy={py} r="2" fill="#555" />
-              </g>
-            );
-          })}
-          {Array.from({ length: numOut }).map((_, i) => {
-            const py = 4 + (32 / (numOut + 1)) * (i + 1);
-            return (
-              <g key={`out-${i}`}>
-                <line x1="48" y1={py} x2="54" y2={py} stroke="#333" strokeWidth="1.5" />
-                <circle cx="54" cy={py} r="2" fill="#555" />
-              </g>
-            );
-          })}
-          <text x="28" y="24" textAnchor="middle" fontSize="8" fontWeight="600" fill="#333">{box.name}</text>
-        </svg>
-      )}
+      <svg viewBox="0 0 56 40">
+        <rect x="8" y="4" width="40" height="32" rx="3" fill="none" stroke="#333" strokeWidth="2" />
+        {Array.from({ length: numIn }).map((_, i) => {
+          const py = 4 + (32 / (numIn + 1)) * (i + 1);
+          return (
+            <g key={`in-${i}`}>
+              <line x1="2" y1={py} x2="8" y2={py} stroke="#333" strokeWidth="1.5" />
+              <circle cx="2" cy={py} r="2" fill="#555" />
+            </g>
+          );
+        })}
+        {Array.from({ length: numOut }).map((_, i) => {
+          const py = 4 + (32 / (numOut + 1)) * (i + 1);
+          return (
+            <g key={`out-${i}`}>
+              <line x1="48" y1={py} x2="54" y2={py} stroke="#333" strokeWidth="1.5" />
+              <circle cx="54" cy={py} r="2" fill="#555" />
+            </g>
+          );
+        })}
+        <text x="28" y="24" textAnchor="middle" fontSize="8" fontWeight="600" fill="#333">{box.name}</text>
+      </svg>
       <button
         type="button"
         className="library-box-rename-btn"
@@ -301,7 +288,7 @@ export function ComponentLibrary() {
       ))}
 
       {/* New Box tool */}
-      {(effectiveMode === 'CC' || effectiveMode === 'SC' || effectiveMode === 'FSM') && <div>
+      {(effectiveMode === 'CC' || effectiveMode === 'SC') && <div>
         <div className="library-section-title">Boxing</div>
         <div
           className={`library-item${selectedTool === 'NEW_BOX' ? ' library-item-selected' : ''}`}
@@ -334,7 +321,7 @@ export function ComponentLibrary() {
       {(() => {
         const placeableKinds = placeableBoxKinds(effectiveMode);
         const visibleBoxes = confirmedBoxLibrary.filter((b) =>
-          placeableKinds.includes(b.kind ?? 'CC') &&
+          (b.kind ?? 'CC') === 'CC' && placeableKinds.includes('CC') &&
           disallowedComponentTypes(b.internalComponents, allowedComponents).length === 0
         );
         if (visibleBoxes.length === 0) return null;
@@ -348,7 +335,6 @@ export function ComponentLibrary() {
                 numIn={box.inputPortIds.length}
                 numOut={box.outputPortIds.length}
                 isSelected={selectedTool === (`BOX:${box.id}` as any)}
-                kind={box.kind}
               />
             ))}
           </div>

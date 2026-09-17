@@ -563,7 +563,6 @@ interface AppState {
   // across every question). Returns an error string, or null on success.
   renameBox: (id: string, name: string) => string | null;
   placeBoxInstance: (boxId: string, x: number, y: number) => void; // place a copy of a box as a BOXED component
-  fsmPlaceBoxInstance: (boxId: string, x: number, y: number) => void; // expand FSM box states onto canvas
 
   // The confirmed-box library behind the palette's "Boxes" section. Its SCOPE
   // depends on where you are:
@@ -2050,75 +2049,14 @@ export const useStore = create<AppState>()((set, get) => ({
 
     if (insideComps.length === 0) return 'No components inside the box.';
 
-    // ── FSM boxing ────────────────────────────────────────────────
+    // ── FSM boxing is refused by design (notes/todos.md item 2) ─────
+    // See placeableBoxKinds (types.ts) for the full reasoning: a boxed
+    // sub-FSM would need an invented call/return convention across multiple
+    // external steps, the same reason TM boxing is refused. An earlier
+    // attempt got as far as this confirm step and a placeholder placement
+    // (git a05e3d6) but evaluateFSMSymbolStep never executed it.
     if (selectEffectiveMode(state) === 'FSM') {
-      const fsmComps = insideComps.filter((c) => c.type === 'STATE');
-      if (fsmComps.length === 0) return 'No states inside the box.';
-
-      const fsmIds = new Set(fsmComps.map((c) => c.id));
-
-      // All FSM transition wires among the boxed states
-      const internalWires = state.wires.filter(
-        (w) => fsmIds.has(w.sourceComponentId) && fsmIds.has(w.targetComponentId) && w.transitionLabel !== undefined
-      );
-
-      // No transitions may leave the box — S_B is terminal (no outputs)
-      const crossingOutWires = state.wires.filter(
-        (w) => fsmIds.has(w.sourceComponentId) && !fsmIds.has(w.targetComponentId) && w.transitionLabel !== undefined
-      );
-      if (crossingOutWires.length > 0) {
-        const culprits = [...new Set(crossingOutWires.map((w) => fsmComps.find((c) => c.id === w.sourceComponentId)?.label ?? ''))].join(', ');
-        return `State(s) ${culprits} have transitions leaving the box. The terminal state (S_B) must have no outgoing transitions — remove them before boxing.`;
-      }
-
-      // Rule 3: Exactly one terminal state S_B — the state with no outgoing transitions
-      const statesWithNoOutgoing = fsmComps.filter(
-        (c) => internalWires.filter((w) => w.sourceComponentId === c.id).length === 0
-      );
-      if (statesWithNoOutgoing.length === 0)
-        return 'No terminal state (S_B) found. Exactly one state must have no outgoing transitions — it becomes the exit point of the boxed machine.';
-      if (statesWithNoOutgoing.length > 1)
-        return `Multiple terminal states found (${statesWithNoOutgoing.map((c) => c.label).join(', ')}). Only one state may have no outgoing transitions (S_B).`;
-
-      // Rule 1: Every state except S_B must have exactly 2 outgoing transitions
-      // (completeness). Boxed FSMs are the classic 1-bit machines (spec §8.4),
-      // so labels are read under the 1-bit notation.
-      const sB = statesWithNoOutgoing[0];
-      for (const comp of fsmComps) {
-        if (comp.id === sB.id) continue;
-        const outgoing = internalWires.filter((w) => w.sourceComponentId === comp.id);
-        const inputs = outgoing.map((w) => fsmNotation(1, 1).parse(w.transitionLabel)?.input);
-        if (!inputs.includes('0')) return `State ${comp.label} is missing a transition for input 0. Every non-terminal state must handle all inputs.`;
-        if (!inputs.includes('1')) return `State ${comp.label} is missing a transition for input 1. Every non-terminal state must handle all inputs.`;
-      }
-
-      // Rule 2: S_A is the lowest-numbered state — must have at least one state inside
-      // (already satisfied since fsmComps.length > 0)
-
-      // Auto-name
-      const name = nextBoxName(
-        'FSM Box',
-        takenBoxNames(state.confirmedBoxLibrary, state.boxes, id)
-      );
-
-      const componentIds = fsmComps.map((c) => c.id);
-      set((s) => ({
-        boxes: s.boxes.map((b) => b.id === id ? { ...b, name, componentIds, inputPortIds: [], outputPortIds: [] } : b),
-        boxDrawing: { phase: 'idle', draftBox: null },
-        confirmedBoxLibrary: [
-          ...s.confirmedBoxLibrary,
-          {
-            id,
-            name,
-            kind: 'FSM' as const,
-            inputPortIds: [],
-            outputPortIds: [],
-            internalComponents: JSON.parse(JSON.stringify(fsmComps)),
-            internalWires: JSON.parse(JSON.stringify(internalWires)),
-          },
-        ],
-      }));
-      return null;
+      return 'Boxing is not available for FSM circuits.';
     }
 
     const insideIds = new Set(insideComps.map((c) => c.id));
@@ -2371,27 +2309,6 @@ export const useStore = create<AppState>()((set, get) => ({
       components: [...state.components, comp],
     });
     setTimeout(() => get().evaluateCircuit(), 0);
-  },
-
-  fsmPlaceBoxInstance: (boxId, x, y) => {
-    const state = get();
-    if (isCurrentQuestionLocked(state)) return;
-    const entry = state.confirmedBoxLibrary.find((b) => b.id === boxId && b.kind === 'FSM');
-    if (!entry) return;
-    state.pushHistory();
-
-    // Place as a single box-shaped STATE component that represents the sub-machine
-    const comp: CircuitComponent = {
-      id: uuid(),
-      type: 'STATE',
-      x: snapToGrid(x),
-      y: snapToGrid(y),
-      label: entry.name,
-      ports: getPortsForType('STATE'),
-      boxedCircuitId: boxId,
-    };
-
-    set({ components: [...state.components, comp] });
   },
 
   // Delete

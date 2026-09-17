@@ -14,7 +14,28 @@ Claude to load into context).
 >
 > A change isn't finished until the docs that describe it are too.
 
-_Last updated: 2026-09-17 (**the `notes/todos.md` pass — 13 items**. Three new seams landed,
+_Last updated: 2026-09-17 (**FSM boxing retired — notes/todos.md item 2, follow-up to the pass
+below**. The one item that pass left unfixed: `fsmPlaceBoxInstance` placed a STATE node with
+`boxedCircuitId` set, but `evaluateFSMSymbolStep` never read it, so a placed FSM box rendered
+as a labeled rectangle but ran as an ordinary, transition-less state. Investigated and refused
+by design, for the same underlying reason as the TM boxing refusal (also this file, below):
+`confirmBox`'s FSM rules (one entry state S_A, one terminal state S_B with no outgoing
+transitions, every other state complete on 0/1) describe a sub-automaton meant to consume
+MULTIPLE subsequent input symbols — tracking its own internal position across steps — before
+handing control back to the placed instance's own outgoing transitions. That is not a stateless
+function call like a boxed CC/SC circuit; it needs an invented call/return convention (the
+running machine's "current state" becoming a stack) threaded through `evaluateFSMSymbolStep`,
+the store's live sim, turbot FSM brains, and the grader — and it was never wired for headless
+grading either, since a placed instance carried only `boxedCircuitId`, never a frozen internal
+circuit the way a CC/SC `BOXED` component carries `internalCircuit`. Rather than leave a
+half-working feature, it's removed: `fsmPlaceBoxInstance`, confirmBox's FSM branch, and the
+STATE-specific `boxedCircuitId` rendering/geometry/hit-testing in `CircuitCanvas.tsx` and
+`componentGeometry.ts` are gone; `placeableBoxKinds('FSM')` (`types.ts`) now returns `[]`
+(mirroring TM) and carries the full reasoning inline; the palette's "New Box" tool is no longer
+offered on FSM canvases. `boxScopeCheck`/`routerCheck` pins updated to match; no seeded/sample
+data used FSM boxing (checked), so no existing data decays. App tsc/build/check all green.
+
+Earlier 2026-09-17 (**the `notes/todos.md` pass — 13 items**. Three new seams landed,
 following the established Local/Remote pattern exactly (Promise-returning interface, a
 localStorage-backed Local impl, a server-backed Remote impl, wired in `storage/backend.ts`):
 **`FeedbackStore`** (`storage/feedbackStore.ts` + `remoteStores.ts`; server `feedback` table +
@@ -1204,9 +1225,16 @@ only — the grader never sees the formula; it runs against the generated numeri
   NEVER locked — a frozen or done question can still be simulated, just not changed.
 - **Boxing a TM is refused by design** — a TM has one tape and one control thread
   (`evaluateTMSingleStep`, engine/tm.ts, does a single wire lookup keyed by the current state id
-  across the WHOLE table), so there is no wire boundary to box the way CC/SC/FSM boxing works (a
+  across the WHOLE table), so there is no wire boundary to box the way CC/SC boxing works (a
   boxed circuit is one stateless function call). `placeableBoxKinds('TM')` returns `[]` on
   purpose; see the full reasoning in `types.ts` beside it.
+- **Boxing an FSM is refused by design too (notes/todos.md item 2)** — a half-built attempt
+  (`fsmPlaceBoxInstance`, confirmBox's FSM branch) got as far as confirm + place but was never
+  wired into `evaluateFSMSymbolStep`. A boxed sub-FSM isn't a stateless function call either: its
+  own confirmBox rules described a sub-automaton meant to consume multiple subsequent input
+  symbols before handing control back, which needs the same invented call/return convention (the
+  running machine's "current state" becoming a stack) TM boxing is refused for. Removed rather
+  than left half-working; `placeableBoxKinds('FSM')` returns `[]`, same as TM.
 
 ## Things to watch
 

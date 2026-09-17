@@ -62,7 +62,7 @@ function findWireTarget(
       if (!isTargetPort) continue;
       // For STATE targets, releasing anywhere in (or just outside) the
       // circle connects — measure from the state's center, not the port.
-      const portPos = comp.type === 'STATE' && !comp.boxedCircuitId
+      const portPos = comp.type === 'STATE'
         ? { x: comp.x + STATE_RADIUS, y: comp.y + STATE_RADIUS }
         : getPortPosition(comp, port.id);
       const dist = Math.hypot(canvasPos.x - portPos.x, canvasPos.y - portPos.y);
@@ -772,30 +772,6 @@ function CircuitComponentView({
         const isCurrentState = liveFsmStateId === comp.id;
         const strokeColor = isCurrentState ? '#4caf50' : isSelected ? '#2a7fff' : '#333';
 
-        // Boxed FSM instance: render as a labeled rectangle
-        if (comp.boxedCircuitId) {
-          const { w, h } = getCompDimensions(comp);
-          return (
-            <g>
-              <rect
-                x={comp.x} y={comp.y} width={w} height={h} rx={5}
-                fill={isSelected ? '#e3f2fd' : '#f5f7ff'}
-                stroke={strokeColor}
-                strokeWidth={isSelected ? 2.5 : 2}
-                pointerEvents="none"
-              />
-              <text
-                x={comp.x + w / 2} y={comp.y + h / 2}
-                textAnchor="middle" dominantBaseline="central"
-                fontSize="13" fontWeight="700" fill="#333"
-                pointerEvents="none"
-              >
-                {comp.label}
-              </text>
-            </g>
-          );
-        }
-
         const ringR = STATE_RADIUS + 7;
         // Turbot-TM convention (textbook): external states draw as squares,
         // internal states as circles. stateKind is only ever set on turbot-TM
@@ -868,33 +844,6 @@ function CircuitComponentView({
     const isState = comp.type === 'STATE';
 
     if (isState) {
-      // Boxed FSM instance: rectangular port hit areas
-      if (comp.boxedCircuitId) {
-        const { w, h } = getCompDimensions(comp);
-        const midY = comp.y + h / 2;
-        const HIT_R = 12;
-        const nodes = [
-          { id: 'left',  x: comp.x,     y: midY, side: 'left'  },
-          { id: 'right', x: comp.x + w, y: midY, side: 'right' },
-        ];
-        return (
-          <>
-            {nodes.map(({ id, x, y, side }) => (
-              <circle key={id} cx={x} cy={y} r={HIT_R} fill="transparent"
-                className="port-hit-area"
-                data-port-compid={comp.id} data-port-id={id} data-port-side={side}
-              />
-            ))}
-            {/* Inner blocking rect — clicks in the middle drag the component */}
-            <rect x={comp.x + HIT_R} y={comp.y} width={w - 2 * HIT_R} height={h} fill="transparent" />
-            {/* Visual port dots */}
-            {nodes.map(({ id, x, y }) => (
-              <circle key={`dot-${id}`} cx={x} cy={y} r={3} fill="#888" stroke="white" strokeWidth={1} pointerEvents="none" />
-            ))}
-          </>
-        );
-      }
-
       const nodes = [
         { id: 'left',  x: cx - STATE_RADIUS, y: cy, side: 'left'  },
         { id: 'right', x: cx + STATE_RADIUS, y: cy, side: 'right' },
@@ -2047,13 +1996,7 @@ export function CircuitCanvas() {
       if (type === 'BOXED_INSTANCE') {
         const boxId = e.dataTransfer.getData('boxDefinitionId');
         if (boxId) {
-          const s = useStore.getState();
-          const entry = s.confirmedBoxLibrary.find((b) => b.id === boxId);
-          if (entry?.kind === 'FSM') {
-            s.fsmPlaceBoxInstance(boxId, pos.x, pos.y);
-          } else {
-            s.placeBoxInstance(boxId, pos.x - 40, pos.y - 30);
-          }
+          useStore.getState().placeBoxInstance(boxId, pos.x - 40, pos.y - 30);
         }
         return;
       }

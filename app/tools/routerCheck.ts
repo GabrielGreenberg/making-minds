@@ -107,8 +107,11 @@ console.log('GEOMETRY SMOKE — componentGeometry pins (rendered dimensions + po
   check('HA renders 75×80', eqDims(dims('HA'), 75, 80));
   check('MEM renders 50×50 (NOT the old phantom 75×70 router default)',
     eqDims(dims('MEM'), 50, 50));
-  check('STATE renders 60×60', eqDims(dims('STATE'), 60, 60));
-  check('boxed STATE renders 90×50', eqDims(dims('STATE', { boxedCircuitId: 'b1' }), 90, 50));
+  // FSM boxing is refused by design (notes/todos.md item 2; types.ts
+  // placeableBoxKinds) — a stray boxedCircuitId on a STATE no longer changes
+  // its rendered size, unlike a CC/SC BOXED component's own dims.
+  check('STATE renders 60×60 regardless of a stray boxedCircuitId',
+    eqDims(dims('STATE'), 60, 60) && eqDims(dims('STATE', { boxedCircuitId: 'b1' }), 60, 60));
 
   // Port math: two left ports on a 70-tall gate sit at h/3 and 2h/3.
   const and = comp('a', 'AND', 'AND', 100, 100);

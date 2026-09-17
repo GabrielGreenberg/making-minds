@@ -231,7 +231,28 @@ export function questionModeLabel(
  *  section reads this; boxScopeCheck pins it).
  *    CC, SC → CC boxes. Gate-level boxes are always combinational (boxing
  *             refuses MEM), so the same box is usable on either canvas.
- *    FSM    → FSM boxes (sub-machines), which place as STATE nodes.
+ *    FSM    → none (notes/todos.md item 2). An earlier attempt (git a05e3d6)
+ *             got as far as confirm + place — `confirmBox`'s FSM rules
+ *             required exactly one entry state (S_A, lowest-numbered) and one
+ *             terminal state (S_B, no outgoing transitions), which describes
+ *             a sub-automaton meant to consume MULTIPLE subsequent input
+ *             symbols — tracking its own internal position across steps —
+ *             before handing control back to whatever the placed instance's
+ *             own outgoing transitions say next. That is not a stateless
+ *             function call like a boxed CC/SC circuit (evaluateBoxedCircuit,
+ *             engine/cc.ts, runs once and returns instantly); it needs the
+ *             SAME kind of invented call/return convention TM boxing is
+ *             refused for, below — the running machine's "current state"
+ *             would have to become a stack (plain state, or box instance +
+ *             internal position), threaded through evaluateFSMSymbolStep,
+ *             the store's live sim, turbot FSM brains, and the grader. It
+ *             was also never wired for headless grading: a placed instance
+ *             carried only `boxedCircuitId`, never a frozen internal circuit
+ *             the way a CC/SC `BOXED` component carries `internalCircuit` —
+ *             so even a working evaluator would have nothing to run from a
+ *             submitted JSON payload. `fsmPlaceBoxInstance` and confirmBox's
+ *             FSM branch are gone; `evaluateFSMSymbolStep` never read
+ *             `boxedCircuitId` and this is why it never will.
  *    TM     → none, BY DESIGN, not as a gap to fill in later. CC boxing works
  *             because a boxed circuit is a pure function call: evaluateBoxedCircuit
  *             (engine/cc.ts) is invoked once and returns instantly, so a
@@ -244,21 +265,15 @@ export function questionModeLabel(
  *             steps before halting. Boxing a TM would mean splicing two
  *             transition tables together (shared state-id namespace, shared
  *             tape, an invented call/return convention) — a different, much
- *             larger feature, not an extension of CC/SC/FSM boxing. The FSM
- *             box's own state-graph attempt is the nearest precedent and is
- *             itself incomplete for the same underlying reason: a boxed FSM
- *             component's `boxedCircuitId` is a rendering label only — it is
- *             never read by evaluateFSMSymbolStep, so it does not execute a
- *             sub-machine. TM boxing is refused for the same "don't build
- *             something semantically wrong" reason SC refuses to box MEM.
+ *             larger feature, not an extension of CC/SC boxing. TM boxing is
+ *             refused for the same "don't build something semantically
+ *             wrong" reason SC refuses to box MEM, and FSM boxing, above.
  *  Absent `kind` on an older entry counts as CC. */
-export function placeableBoxKinds(mode: BuildMode): ('CC' | 'FSM')[] {
+export function placeableBoxKinds(mode: BuildMode): 'CC'[] {
   switch (mode) {
     case 'CC':
     case 'SC':
       return ['CC'];
-    case 'FSM':
-      return ['FSM'];
     default:
       return [];
   }
@@ -506,7 +521,9 @@ export interface ConfirmedBoxDef {
   /** Which canvas the box was confirmed on, which decides where it may be
    *  placed (see placeableBoxKinds). Absent = CC (older entries). A box drawn
    *  on an SC canvas is a CC box: boxing refuses a selection containing MEM,
-   *  so every gate-level box is purely combinational. */
+   *  so every gate-level box is purely combinational. A saved `'FSM'` value
+   *  can still appear on data from before FSM boxing was retired (notes/
+   *  todos.md item 2); placeableBoxKinds never offers it for placement. */
   kind?: 'CC' | 'FSM';
   inputPortIds: string[];
   outputPortIds: string[];

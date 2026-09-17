@@ -227,10 +227,10 @@ check('undo restores the confirmed box', useStore.getState().confirmedBoxLibrary
 console.log('[SC boxing]');
 {
   const { placeableBoxKinds, getPortsForType } = await import('../src/types');
-  check('CC and SC place CC boxes; FSM places FSM boxes; TM places none',
+  check('CC and SC place CC boxes; FSM and TM place none (notes/todos.md item 2: FSM boxing refused by design, same reason as TM)',
     placeableBoxKinds('CC').join(',') === 'CC' &&
     placeableBoxKinds('SC').join(',') === 'CC' &&
-    placeableBoxKinds('FSM').join(',') === 'FSM' &&
+    placeableBoxKinds('FSM').length === 0 &&
     placeableBoxKinds('TM').length === 0);
 
   // WHY MEM is refused: the same one-tick delay, boxed vs not.
@@ -275,7 +275,7 @@ console.log('[SC boxing]');
   const entry = useStore.getState().confirmedBoxLibrary.find((b) => b.id === scBox);
   check('an SC canvas can confirm a combinational box', entry != null);
   check('...recorded as a CC box, so it is placeable on either canvas',
-    (entry?.kind ?? 'CC') === 'CC' && placeableBoxKinds('SC').includes(entry?.kind ?? 'CC'));
+    (entry?.kind ?? 'CC') === 'CC' && placeableBoxKinds('SC').includes('CC'));
   useStore.getState().placeBoxInstance(scBox, 620, 300);
   await flush();
   check('...and places on the SC canvas with its internals',

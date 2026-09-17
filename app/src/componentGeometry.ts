@@ -58,7 +58,6 @@ export function getComponentSize(comp: CircuitComponent): { w: number; h: number
     return { w: 50, h: 50 };
   }
   if (comp.type === 'STATE') {
-    if (comp.boxedCircuitId) return { w: 90, h: 50 };
     return { w: STATE_SIZE, h: STATE_SIZE };
   }
   return { w: COMP_WIDTH, h: COMP_HEIGHT };
@@ -74,16 +73,6 @@ export function getPortPositionLocal(
 
   // STATE: ports on left/right
   if (comp.type === 'STATE') {
-    if (comp.boxedCircuitId) {
-      // Boxed FSM instance: ports at left/right center of the rectangle
-      const { w, h } = getComponentSize(comp);
-      const midY = comp.y + h / 2;
-      switch (portId) {
-        case 'left':  return { x: comp.x,     y: midY };
-        case 'right': return { x: comp.x + w, y: midY };
-        default:      return { x: comp.x + w / 2, y: midY };
-      }
-    }
     const cx = comp.x + STATE_RADIUS;
     const cy = comp.y + STATE_RADIUS;
     switch (portId) {
