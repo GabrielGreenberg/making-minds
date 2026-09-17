@@ -232,8 +232,25 @@ export function questionModeLabel(
  *    CC, SC → CC boxes. Gate-level boxes are always combinational (boxing
  *             refuses MEM), so the same box is usable on either canvas.
  *    FSM    → FSM boxes (sub-machines), which place as STATE nodes.
- *    TM     → none: it borrows the FSM editor but not its box semantics, and
- *             there is no way to author a TM box.
+ *    TM     → none, BY DESIGN, not as a gap to fill in later. CC boxing works
+ *             because a boxed circuit is a pure function call: evaluateBoxedCircuit
+ *             (engine/cc.ts) is invoked once and returns instantly, so a
+ *             sub-circuit can hide behind crossing-wire ports. A TM has ONE
+ *             tape and ONE control thread (evaluateTMSingleStep, engine/tm.ts,
+ *             does a single wire lookup keyed by the current state id across
+ *             the WHOLE table) — there is nothing that "crosses a boundary"
+ *             the way a wire does, and a sub-machine doesn't return a value
+ *             after one call, it runs an unbounded, data-dependent number of
+ *             steps before halting. Boxing a TM would mean splicing two
+ *             transition tables together (shared state-id namespace, shared
+ *             tape, an invented call/return convention) — a different, much
+ *             larger feature, not an extension of CC/SC/FSM boxing. The FSM
+ *             box's own state-graph attempt is the nearest precedent and is
+ *             itself incomplete for the same underlying reason: a boxed FSM
+ *             component's `boxedCircuitId` is a rendering label only — it is
+ *             never read by evaluateFSMSymbolStep, so it does not execute a
+ *             sub-machine. TM boxing is refused for the same "don't build
+ *             something semantically wrong" reason SC refuses to box MEM.
  *  Absent `kind` on an older entry counts as CC. */
 export function placeableBoxKinds(mode: BuildMode): ('CC' | 'FSM')[] {
   switch (mode) {
