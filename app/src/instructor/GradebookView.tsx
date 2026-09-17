@@ -166,33 +166,35 @@ export function GradebookView({ id }: { id: string }) {
       {records.length === 0 ? (
         <p className="instructor-empty">No submissions yet.</p>
       ) : (
-        <table className="instructor-table">
-          <thead>
-            <tr>
-              <th>Student</th>
-              <th>Last submitted</th>
-              <th>Attempts</th>
-              {assignment.questions.map((q) => (
-                <th key={q.id}>{q.label}</th>
+        <div className="instructor-table-scroll">
+          <table className="instructor-table instructor-table--score-sticky">
+            <thead>
+              <tr>
+                <th>Student</th>
+                <th>Last submitted</th>
+                <th>Attempts</th>
+                {assignment.questions.map((q) => (
+                  <th key={q.id}>{q.label}</th>
+                ))}
+                <th>Score</th>
+              </tr>
+            </thead>
+            <tbody>
+              {students.map((s) => (
+                <StudentRow
+                  key={s.student}
+                  studentGrades={s}
+                  assignment={assignment}
+                  expanded={expandedStudent === s.student}
+                  onToggle={() =>
+                    setExpandedStudent(expandedStudent === s.student ? null : s.student)
+                  }
+                  onReviewed={onReviewed}
+                />
               ))}
-              <th>Score</th>
-            </tr>
-          </thead>
-          <tbody>
-            {students.map((s) => (
-              <StudentRow
-                key={s.student}
-                studentGrades={s}
-                assignment={assignment}
-                expanded={expandedStudent === s.student}
-                onToggle={() =>
-                  setExpandedStudent(expandedStudent === s.student ? null : s.student)
-                }
-                onReviewed={onReviewed}
-              />
-            ))}
-          </tbody>
-        </table>
+            </tbody>
+          </table>
+        </div>
       )}
     </div>
   );
@@ -262,33 +264,35 @@ function StudentRow({
       {expanded && (
         <tr className="instructor-submission-detail">
           <td colSpan={colSpan}>
-            <table className="instructor-table instructor-attempt-table">
-              <thead>
-                <tr>
-                  <th>Attempt</th>
-                  <th>Submitted</th>
-                  {assignment.questions.map((q) => (
-                    <th key={q.id}>{q.label}</th>
-                  ))}
-                  <th>Score</th>
-                </tr>
-              </thead>
-              <tbody>
-                {all
-                  .map((g, i) => ({ g, attempt: i + 1 }))
-                  .reverse()
-                  .map(({ g, attempt }) => (
-                    <AttemptRow
-                      key={attempt}
-                      grade={g}
-                      attempt={attempt}
-                      isLatest={attempt === all.length}
-                      assignment={assignment}
-                      onReviewed={onReviewed}
-                    />
-                  ))}
-              </tbody>
-            </table>
+            <div className="instructor-table-scroll">
+              <table className="instructor-table instructor-attempt-table instructor-table--score-sticky">
+                <thead>
+                  <tr>
+                    <th>Attempt</th>
+                    <th>Submitted</th>
+                    {assignment.questions.map((q) => (
+                      <th key={q.id}>{q.label}</th>
+                    ))}
+                    <th>Score</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {all
+                    .map((g, i) => ({ g, attempt: i + 1 }))
+                    .reverse()
+                    .map(({ g, attempt }) => (
+                      <AttemptRow
+                        key={attempt}
+                        grade={g}
+                        attempt={attempt}
+                        isLatest={attempt === all.length}
+                        assignment={assignment}
+                        onReviewed={onReviewed}
+                      />
+                    ))}
+                </tbody>
+              </table>
+            </div>
           </td>
         </tr>
       )}

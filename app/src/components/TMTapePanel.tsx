@@ -50,8 +50,16 @@ export function TMTapePanel() {
         </span>
       </div>
       {open && (
-        <div style={{ overflowX: 'auto', padding: '18px 10px 10px' }}>
-          <div style={{ display: 'flex', width: 'max-content', margin: '0 auto' }}>
+        <div style={{ overflowX: 'auto', maxWidth: '100%', padding: '18px 10px 10px' }}>
+          <div
+            style={{
+              display: 'flex',
+              width: 'max-content',
+              margin: '0 auto',
+              userSelect: 'none',
+              WebkitUserSelect: 'none',
+            }}
+          >
             {indices.map((i) => {
               const symbol = tmTape.cells[i] ?? '0';
               const isHead = i === tmTape.head;

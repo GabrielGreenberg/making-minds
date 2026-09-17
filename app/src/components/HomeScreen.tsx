@@ -65,7 +65,12 @@ export function HomeScreen() {
   return (
     <div className="page">
       <header className="page-bar">
-        {user && <span className="session-chip">{user.name} · {user.role === 'instructor' ? 'Instructor' : 'Student'}</span>}
+        {user && (
+          <span className="session-chip">
+            {user.name}
+            {user.role === 'instructor' ? ' · Instructor' : ''}
+          </span>
+        )}
         {user?.role === 'instructor' && (
           <button className="menu-link-button" onClick={() => navigate({ kind: 'instructor' })}>
             Instructor view

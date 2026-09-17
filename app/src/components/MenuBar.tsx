@@ -59,7 +59,12 @@ export function MenuBar() {
             Instructor view
           </button>
         )}
-        {user && <span className="session-chip">{user.name} · {user.role === 'instructor' ? 'Instructor' : 'Student'}</span>}
+        {user && (
+          <span className="session-chip">
+            {user.name}
+            {user.role === 'instructor' ? ' · Instructor' : ''}
+          </span>
+        )}
         <AccountPanel />
         <button className="menu-link-button" onClick={() => { logout(); navigate({ kind: 'home' }); }}>
           Log out

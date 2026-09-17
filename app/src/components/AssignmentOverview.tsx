@@ -51,7 +51,12 @@ export function AssignmentOverview() {
         <button className="menu-link-button" onClick={() => navigate({ kind: 'home' })}>
           ← All assignments
         </button>
-        {user && <span className="session-chip">{user.name} · {user.role === 'instructor' ? 'Instructor' : 'Student'}</span>}
+        {user && (
+          <span className="session-chip">
+            {user.name}
+            {user.role === 'instructor' ? ' · Instructor' : ''}
+          </span>
+        )}
       </header>
       <div className="page-body">
         <h1 className="page-title">{assignment.title}</h1>
