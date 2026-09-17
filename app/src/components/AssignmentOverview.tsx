@@ -1,4 +1,4 @@
-import { useStore } from '../store';
+import { useStore, selectAssignmentFrozen } from '../store';
 import { navigate } from '../routing';
 import { getCurrentUserEmail, useAuth } from '../auth';
 import { questionModeLabel } from '../types';
@@ -19,6 +19,7 @@ export function AssignmentOverview() {
   const submitAssignment = useStore((s) => s.submitAssignment);
   const hydrateSubmissions = useStore((s) => s.hydrateSubmissions);
   const questionCircuits = useStore((s) => s.questionCircuits);
+  const frozen = useStore(selectAssignmentFrozen);
   const { user } = useAuth();
   const [showGrades, setShowGrades] = useState(false);
   // Release is policy on the seam, not part of the assignment, so the page has
@@ -121,9 +122,15 @@ export function AssignmentOverview() {
                   View grades
                 </button>
               )}
-              <button className="home-tile-submit" onClick={handleSubmit}>
-                Submit assignment
-              </button>
+              {frozen ? (
+                <span className="menu-frozen" title="This assignment closed after its due date — each question shows your submission, read-only.">
+                  🔒 Past due — showing your submission
+                </span>
+              ) : (
+                <button className="home-tile-submit" onClick={handleSubmit}>
+                  Submit assignment
+                </button>
+              )}
             </span>
           </div>
         </section>

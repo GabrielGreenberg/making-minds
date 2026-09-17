@@ -37,7 +37,7 @@ const backing = new Map<string, string>();
   visibilityState: 'visible',
 };
 
-const { useStore, selectTurbotArena } = await import('../src/store');
+const { useStore, selectTurbotArena, selectAssignmentFrozen } = await import('../src/store');
 const { buildSampleAssignment, scCorrect, fsmCorrect, tmCorrect, turbotCorrect, SAMPLE_ASSIGNMENT_ID } =
   await import('../src/devData/sampleData');
 const { localAssignmentStore } = await import('../src/storage/AssignmentStore');
@@ -267,6 +267,76 @@ console.log('[mark as done]');
   const afterUnlock = useStore.getState().components.length;
   useStore.getState().addComponent('AND', 100, 100);
   check('editing works again once unlocked', useStore.getState().components.length === afterUnlock + 1);
+}
+
+// ── frozen assignments show the SUBMISSION read-only, not diverged live
+// work (notes/todos.md item 3) ──
+console.log('[frozen assignment]');
+{
+  const FROZEN_ID = `${SAMPLE_ASSIGNMENT_ID}-frozen`;
+  const futureDate = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+  const pastDate = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+  const frozenAsg = { ...buildSampleAssignment(), id: FROZEN_ID, title: 'Frozen Sample', dueDate: futureDate };
+  await localAssignmentStore.save(frozenAsg);
+  await localAssignmentStore.setVisible(FROZEN_ID, true);
+
+  useStore.getState().closeAssignment();
+  check('opens fine while due date is in the future', (await useStore.getState().openAssignment(FROZEN_ID)) === true);
+  useStore.getState().switchQuestion(0); // Q1 (CC)
+  check('not frozen: due date in the future, no submission yet', !selectAssignmentFrozen(useStore.getState()));
+
+  useStore.getState().addComponent('AND', 100, 100);
+  const submittedCount = useStore.getState().components.length;
+  check('built a 1-component circuit to submit', submittedCount === 1);
+  const rec = await useStore.getState().submitAssignment(FROZEN_ID, 'student@example.com');
+  check('submit captured exactly that circuit',
+    rec?.submission.answers.find((a) => a.questionId === frozenAsg.questions[0].id)?.circuit?.components.length === submittedCount);
+  check('still not frozen: due date is still in the future', !selectAssignmentFrozen(useStore.getState()));
+
+  // Keep working AFTER submitting (assignment isn't due yet) — this becomes
+  // the "latest saved work" that the frozen view below must NOT show.
+  useStore.getState().addComponent('OR', 200, 100);
+  const divergedCount = useStore.getState().components.length;
+  check('kept editing after submitting, before the deadline', divergedCount === submittedCount + 1);
+
+  // The deadline arrives.
+  useStore.setState({ assignment: { ...useStore.getState().assignment!, dueDate: pastDate } });
+  check('now frozen: past due AND a submission exists', selectAssignmentFrozen(useStore.getState()));
+
+  const beforeRefusedEdit = useStore.getState().components.length;
+  useStore.getState().addComponent('NOT', 300, 100);
+  check('edits are refused once frozen', useStore.getState().components.length === beforeRefusedEdit);
+  useStore.getState().setOpenResponse('sneaking in an edit');
+  check('setOpenResponse is refused once frozen', useStore.getState().openResponse === '');
+
+  useStore.getState().switchQuestion(1);
+  useStore.getState().switchQuestion(0);
+  check('switching back shows the SUBMITTED circuit, not the diverged live work',
+    useStore.getState().components.length === submittedCount);
+
+  // A close + reopen re-fetches the assignment DEFINITION from storage, so
+  // the persisted copy's dueDate must reflect the passed deadline too — the
+  // earlier setState only simulated time passing for the in-memory session.
+  await localAssignmentStore.save({ ...frozenAsg, dueDate: pastDate });
+  useStore.getState().closeAssignment();
+  await useStore.getState().openAssignment(FROZEN_ID);
+  check('a fresh close + reopen also shows the frozen submission',
+    useStore.getState().components.length === submittedCount);
+  check('the frozen tag reads through the selector on a fresh open too',
+    selectAssignmentFrozen(useStore.getState()));
+
+  // A never-submitted, past-due assignment is NOT frozen — nothing to freeze
+  // (late submissions stay accepted, per dueDates.ts's policy).
+  const NEVER_SUBMITTED_ID = `${SAMPLE_ASSIGNMENT_ID}-never-submitted`;
+  const overdueNoSubmission = { ...buildSampleAssignment(), id: NEVER_SUBMITTED_ID, dueDate: pastDate };
+  await localAssignmentStore.save(overdueNoSubmission);
+  await localAssignmentStore.setVisible(NEVER_SUBMITTED_ID, true);
+  useStore.getState().closeAssignment();
+  await useStore.getState().openAssignment(NEVER_SUBMITTED_ID);
+  check('past due with no submission is NOT frozen (late submission stays possible)',
+    !selectAssignmentFrozen(useStore.getState()));
+  useStore.getState().addComponent('AND', 100, 100);
+  check('…and editing still works', useStore.getState().components.length === 1);
 }
 
 // ═════ Sandbox tabs share the same fresh-machine contract ═══════

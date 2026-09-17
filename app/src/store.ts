@@ -45,6 +45,7 @@ import { buildSubmission } from './storage/submissionStore';
 // there, nowhere else); the modules above supply only pure helpers + types.
 import { workbookStore, submissionStore, assignmentStore, backendMode } from './storage/backend';
 import { writeJournal, clearJournal, reconcileJournal } from './storage/journal';
+import { isFrozen } from './dueDates';
 import { getSessionUser } from './auth/session';
 import { instructorRole } from './auth/instructorRole';
 
@@ -67,18 +68,34 @@ export function selectTmNotation(s: {
 }
 
 /**
- * Is the open question locked against edits — the student marked it done
- * (notes/todos.md item 8)? The single read-side answer UI components use;
- * store.ts's mutating actions use the module-private
- * `isCurrentQuestionLocked(state)` on the full AppState.
+ * Is the open assignment frozen (notes/todos.md item 3)? True once its due
+ * date has passed AND the student already has a submission on file — see
+ * dueDates.ts's `isFrozen` for the policy and why a never-submitted student
+ * is never frozen. `now` defaults to the real clock; tests pass a fixed one.
+ */
+export function selectAssignmentFrozen(
+  s: { assignment: AssignmentData | null; submissions: Record<string, SubmissionRecord> },
+  now: number = Date.now(),
+): boolean {
+  if (!s.assignment) return false;
+  return isFrozen(s.assignment.dueDate, now, s.submissions[s.assignment.id] != null);
+}
+
+/**
+ * Is the open question locked against edits — either the student marked it
+ * done, or the whole assignment is frozen past its due date (item 3)? The
+ * single read-side answer UI components use; store.ts's mutating actions use
+ * the module-private `isCurrentQuestionLocked(state)` on the full AppState.
  */
 export function selectQuestionLocked(s: {
   assignment: AssignmentData | null;
   currentQuestionIndex: number;
   questionCircuits: Map<number, QuestionCircuit>;
+  submissions: Record<string, SubmissionRecord>;
 }): boolean {
   const q = s.assignment?.questions[s.currentQuestionIndex];
   if (!q) return false;
+  if (selectAssignmentFrozen(s)) return true;
   return s.questionCircuits.get(q.id)?.done ?? false;
 }
 
@@ -1507,9 +1524,14 @@ export const useStore = create<AppState>()((set, get) => ({
       return true;
     }
     const seq = ++openAssignmentSeq;
-    const [def, fetched] = await Promise.all([
+    const [def, fetched, latestSubmission] = await Promise.all([
       getAssignment(id),
       workbookStore.loadAssignmentState(id),
+      // Fetched directly, not read off the separately-hydrated `submissions`
+      // map: that hydration (App.tsx's mount effect) races this open on a
+      // fresh deep link, and the freeze check below needs THIS assignment's
+      // latest submission to be accurate the instant the question loads.
+      submissionStore.getLatest(id),
     ]);
     // Superseded while in flight — drop this resolve (see the AppState note).
     if (seq !== openAssignmentSeq) return true;
@@ -1538,12 +1560,20 @@ export const useStore = create<AppState>()((set, get) => ({
       }
     }
     get().loadAssignment(def);
+    if (latestSubmission) {
+      set({ submissions: { ...get().submissions, [id]: latestSubmission } });
+    }
 
     // Restore any saved work for this assignment (merged by question id).
     const { questionCircuits, currentQuestionIndex, boxLibrary } = restoreQuestionCircuits(def, saved);
     const activeQ = def.questions[currentQuestionIndex];
+    // Frozen (item 3): show what was actually SUBMITTED, read-only, not the
+    // live in-progress work — even if the two have since diverged.
+    const frozen = latestSubmission != null && selectAssignmentFrozen(get());
     const activeCircuit = activeQ
-      ? questionCircuits.get(activeQ.id) ?? emptyQuestionCircuit()
+      ? frozen
+        ? frozenQuestionCircuit(latestSubmission!, activeQ.id)
+        : questionCircuits.get(activeQ.id) ?? emptyQuestionCircuit()
       : emptyQuestionCircuit();
     set({
       questionCircuits,
@@ -1631,6 +1661,24 @@ export const useStore = create<AppState>()((set, get) => ({
     const currentQ = a.questions[state.currentQuestionIndex];
     const nextQ = a.questions[index];
     if (!currentQ || !nextQ) return;
+
+    // Frozen (item 3): every question shows its own submitted answer,
+    // read-only — there is no live canvas to save on the way out.
+    if (selectAssignmentFrozen(state)) {
+      const record = state.submissions[a.id]!;
+      const saved = frozenQuestionCircuit(record, nextQ.id);
+      set({
+        currentQuestionIndex: index,
+        components: saved.components,
+        wires: saved.wires,
+        boxes: saved.boxes,
+        openResponse: saved.responseText ?? '',
+        fillAnswers: saved.fillAnswers ?? [],
+        buildMode: nextQ.buildMode,
+      });
+      get().resetAllSimState();
+      return;
+    }
 
     // Save the live question's canvas, load the target question's.
     const updatedMap = new Map(state.questionCircuits);
@@ -3835,6 +3883,24 @@ function isCurrentQuestionLocked(state: AppState): boolean {
   return selectQuestionLocked(state);
 }
 
+/** One question's canvas as it was actually SUBMITTED, for the frozen
+ *  read-only view (item 3) — never the live in-progress work. `boxes` (the
+ *  draw-a-rectangle-around-existing-gates overlay) isn't captured by
+ *  buildSubmission, so a frozen view of a boxed selection renders/simulates
+ *  correctly but loses the box's visual rectangle; cosmetic, not a
+ *  correctness gap (the underlying components/wires are all there). */
+function frozenQuestionCircuit(record: SubmissionRecord, questionId: number): QuestionCircuit {
+  const answer = record.submission.answers.find((a) => a.questionId === questionId);
+  if (!answer) return emptyQuestionCircuit();
+  return {
+    components: answer.circuit?.components ?? [],
+    wires: answer.circuit?.wires ?? [],
+    boxes: [],
+    responseText: answer.responseText,
+    fillAnswers: answer.fillAnswers,
+  };
+}
+
 // Persist the open assignment's work (syncing the live question first) via the
 // storage seam, keyed by assignment id — separate from the sandbox blob.
 /**
@@ -3966,6 +4032,12 @@ async function performAutoSave(keepalive = false): Promise<void> {
 // Subscribe to state changes that should trigger auto-save. Routes by context:
 // assignment mode → per-assignment storage; sandbox mode → the sandbox blob.
 useStore.subscribe((state, prev) => {
+  // Frozen (notes/todos.md item 3): the canvas is showing the submission,
+  // not live work-in-progress, so nothing here should ever overwrite the
+  // real saved workbook. (Mutations are already refused at the source —
+  // isCurrentQuestionLocked — so in practice nothing changes anyway; this is
+  // the belt on top of that suspender.)
+  if (selectAssignmentFrozen(state)) return;
   const canvasChanged =
     state.components !== prev.components ||
     state.wires !== prev.wires ||

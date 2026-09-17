@@ -288,10 +288,13 @@ await remoteAssignmentStore.setGradesReleased(SAMPLE_ASSIGNMENT_ID, true);
 api.setToken(sTok);
 const releasedLatest = await remoteSubmissionStore.getLatest(SAMPLE_ASSIGNMENT_ID);
 check('after release, student getLatest() carries scores', releasedLatest?.result != null);
+// notes/todos.md item 4: per-case detail is now safe-widened (which input,
+// pass/fail) — server/tools/parityCheck.ts pins the widening itself; here
+// just confirm the answer key stays hidden through the seam too.
 check(
-  'released student records still hide per-case detail',
-  (releasedLatest?.result?.questions ?? []).every(
-    (q) => q.cases.length === 0 && (q.turbotCases ?? []).length === 0,
+  'released student records show cases but hide the answer key (input/pass yes, expected/got no)',
+  (releasedLatest?.result?.questions ?? []).every((q) =>
+    q.cases.every((c) => c.expected.length === 0 && c.got.length === 0),
   ),
 );
 check(

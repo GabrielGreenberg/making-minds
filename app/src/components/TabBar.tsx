@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, type CSSProperties } from 'react';
 import { createPortal } from 'react-dom';
-import { useStore } from '../store';
+import { useStore, selectAssignmentFrozen } from '../store';
 import { navigate } from '../routing';
 import type { BuildMode } from '../types';
 
@@ -229,6 +229,7 @@ export function TabBar() {
     questionCircuits,
     toggleCurrentQuestionDone,
   } = useStore();
+  const frozen = useStore(selectAssignmentFrozen);
 
   if (assignment) {
     // Per-question navigation: back to the assignment's question list, or to
@@ -268,17 +269,23 @@ export function TabBar() {
         <span className="question-nav-label">
           {q?.label ?? '?'}
           <span className="question-nav-count"> · {currentQuestionIndex + 1} of {count}</span>
-          {done && (
+          {!frozen && done && (
             <span className="question-nav-done-tag" title="Locked — mark not done to edit">🔒 done</span>
           )}
         </span>
-        <button
-          className={`question-nav-done-toggle${done ? ' question-nav-done-toggle--done' : ''}`}
-          onClick={() => toggleCurrentQuestionDone()}
-          title={done ? 'Unlock this question for editing' : 'Mark this question done and lock it'}
-        >
-          {done ? '✓ Done — click to unlock' : 'Mark done'}
-        </button>
+        {frozen ? (
+          <span className="question-nav-frozen-tag" title="This assignment closed after its due date — showing your submitted answer, read-only.">
+            🔒 submission (past due)
+          </span>
+        ) : (
+          <button
+            className={`question-nav-done-toggle${done ? ' question-nav-done-toggle--done' : ''}`}
+            onClick={() => toggleCurrentQuestionDone()}
+            title={done ? 'Unlock this question for editing' : 'Mark this question done and lock it'}
+          >
+            {done ? '✓ Done — click to unlock' : 'Mark done'}
+          </button>
+        )}
         <span className="question-nav-assignment" title={assignment.title}>
           {assignment.title}
         </span>

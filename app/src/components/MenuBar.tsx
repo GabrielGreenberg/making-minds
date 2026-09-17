@@ -1,4 +1,4 @@
-import { useStore } from '../store';
+import { useStore, selectAssignmentFrozen } from '../store';
 import { getCurrentUserEmail, useAuth } from '../auth';
 import { AccountPanel } from '../auth/AccountPanel';
 import { navigate } from '../routing';
@@ -6,6 +6,7 @@ import { navigate } from '../routing';
 export function MenuBar() {
   const { user, logout } = useAuth();
   const { assignment, submitAssignment, submissions } = useStore();
+  const frozen = useStore(selectAssignmentFrozen);
 
   const handleSubmitAssignment = () => {
     if (!assignment) return;
@@ -32,8 +33,10 @@ export function MenuBar() {
         ⌂ Home
       </div>
 
-      {/* Submit — record an immutable snapshot of the current assignment. */}
-      {assignment && (
+      {/* Submit — record an immutable snapshot of the current assignment.
+          Hidden once frozen (item 3): the canvas is already showing exactly
+          what was submitted, so there is nothing new to record. */}
+      {assignment && !frozen && (
         <div
           className="menu-item menu-submit"
           onClick={handleSubmitAssignment}
@@ -44,6 +47,11 @@ export function MenuBar() {
           }
         >
           {submissions[assignment.id] ? 'Submit ✓' : 'Submit'}
+        </div>
+      )}
+      {assignment && frozen && (
+        <div className="menu-item menu-frozen" title="This assignment closed after its due date — you're viewing your submission, read-only.">
+          🔒 Past due — viewing your submission
         </div>
       )}
 

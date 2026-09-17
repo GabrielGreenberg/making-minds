@@ -9,12 +9,22 @@
 // and an arena + success criterion is part of the question statement, not the
 // answer key.
 //
-// Grading detail is instructor-only too: students never see per-case
-// input/expected/got (spec: "Failing cases are recorded for the INSTRUCTOR
-// only"), so student-facing results keep only the per-question roll-up.
+// Per-case grading detail: which INPUT a case used, whether it passed, and
+// the (always-static, non-value-bearing) failure `reason` are safe — none of
+// that is the answer key, and it's what notes/todos.md item 4 ("indicate
+// failed test cases") shows students. What stays instructor-only is the
+// ANSWER itself: `expected` (the key) and `got` (which the student can
+// recompute live by loading the input into their own frozen circuit and
+// running it, todos.md item 3 — no reason to ship it from the server too).
+// TurbotCaseResult has no `expected`/`got` at all (grading is positional
+// pass/fail against the arena's success criterion) so it passes through
+// whole, same as `turbot_cases` above.
 
 import type {
   AssignmentData,
+  CaseResult,
+  FillInCaseResult,
+  PerceptionCaseResult,
   QuestionResult,
   SubmissionRecord,
   SubmissionResult,
@@ -40,16 +50,26 @@ export function stripAnswers(assignment: AssignmentData): AssignmentData {
   };
 }
 
+/** Keep `input`/`pass`/`reason` (safe — see header); blank the answer key. */
+function stripCaseResult(c: CaseResult): CaseResult {
+  return { input: c.input, expected: [], got: [], pass: c.pass, reason: c.reason };
+}
+
+function stripPerceptionCaseResult(c: PerceptionCaseResult): PerceptionCaseResult {
+  return { pass: c.pass, frames: c.frames, expected: [], got: [], failStep: c.failStep, reason: c.reason };
+}
+
+function stripFillInCaseResult(c: FillInCaseResult): FillInCaseResult {
+  return { label: c.label, expected: '', got: '', pass: c.pass };
+}
+
 function stripQuestionResult(qr: QuestionResult): QuestionResult {
   return {
     ...qr,
-    cases: [],
-    turbotCases: qr.turbotCases ? [] : undefined,
-    // perceptionCases carry frames + expected + got — the perception answer
-    // key. Leaked to students until 2026-07-08; pinned by tools/parityCheck.ts.
-    perceptionCases: qr.perceptionCases ? [] : undefined,
-    // fillCases carry the expected answer per blank — the fill-in key.
-    fillCases: qr.fillCases ? [] : undefined,
+    cases: qr.cases.map(stripCaseResult),
+    turbotCases: qr.turbotCases, // no answer key in this shape — passes through whole
+    perceptionCases: qr.perceptionCases?.map(stripPerceptionCaseResult),
+    fillCases: qr.fillCases?.map(stripFillInCaseResult),
   };
 }
 

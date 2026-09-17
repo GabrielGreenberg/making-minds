@@ -271,10 +271,15 @@ check(
   'after release, student sees scores',
   !!sFirst && sFirst.passed === sFirst.total && sFirst.total > 0,
 );
+// notes/todos.md item 4: students DO now see safe per-case detail (which
+// input, pass/fail) once released — the answer key (expected/got) is what
+// must stay hidden. parityCheck.ts pins this widening in full detail; this
+// is the same-shaped assertion serverCheck already made for the OLD (fully
+// blanked) policy, updated to the new one.
 check(
-  'after release, still no per-case detail for students',
+  'after release, per-case detail shows which input failed but never the answer',
   ownReleased.json.records.every((r) =>
-    (r.result?.questions ?? []).every((q) => q.cases.length === 0 && (q.turbotCases ?? []).length === 0),
+    (r.result?.questions ?? []).every((q) => q.cases.every((c) => c.expected.length === 0 && c.got.length === 0)),
   ),
 );
 

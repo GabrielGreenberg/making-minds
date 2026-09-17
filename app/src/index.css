@@ -1175,6 +1175,45 @@ thead .sc-label-col {
 }
 .grades-feedback-label { font-style: normal; font-weight: 600; }
 
+.grades-q-link {
+  border: none;
+  background: none;
+  padding: 0;
+  font: inherit;
+  font-weight: 600;
+  color: #1565c0;
+  cursor: pointer;
+  text-align: left;
+}
+.grades-q-link:hover { text-decoration: underline; }
+
+.grades-failed-toggle {
+  display: block;
+  margin-top: 4px;
+  border: none;
+  background: none;
+  padding: 0;
+  font-size: 11px;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+.grades-failed-toggle:hover { color: var(--text); }
+
+.grades-failed-dropdown {
+  margin: 6px 0 2px;
+  padding: 8px 10px;
+  background: var(--panel-bg);
+  border: 1px solid var(--menu-border);
+  border-radius: 6px;
+  font-size: 12px;
+}
+
+.grades-failed-list {
+  margin: 0 0 6px;
+  padding-left: 18px;
+  color: var(--text-secondary);
+}
+
 .grades-mode { color: var(--text-secondary); white-space: nowrap; }
 .grades-verdict { white-space: nowrap; font-weight: 600; }
 .grades-verdict--pass { color: #2e7d32; }
@@ -1404,6 +1443,13 @@ thead .sc-label-col {
 
 .menu-submit:hover {
   background: #e8f5e9;
+}
+
+.menu-frozen {
+  margin-left: auto;
+  color: #c62828;
+  font-weight: 600;
+  cursor: default;
 }
 
 /* ─────────────────────────────────────────────────────────────────
@@ -2187,6 +2233,16 @@ thead .sc-label-col {
 .question-nav-done-toggle--done:hover {
   border-color: #c62828;
   color: #c62828;
+}
+
+.question-nav-frozen-tag {
+  font-size: 12px;
+  font-weight: 600;
+  padding: 4px 10px;
+  border-radius: 4px;
+  background: #fff0f0;
+  color: #c62828;
+  white-space: nowrap;
 }
 
 /* Question statement shown at the top of the right data panel */

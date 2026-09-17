@@ -226,7 +226,13 @@ function findLeaks(value: unknown, forbidden: Set<string>, path = '$', out: stri
     return out;
   }
   for (const [k, v] of Object.entries(value)) {
-    if (forbidden.has(k) && Array.isArray(v) && v.length > 0) out.push(`${path}.${k}`);
+    // Array-valued secrets (test_cases, CaseResult.expected/got) leak by being
+    // non-empty; string-valued ones (FillInCaseResult.expected/got) leak by
+    // being non-empty text — both must be caught, or a blanked '' reads clean
+    // even when a regression puts the answer back.
+    if (forbidden.has(k) && ((Array.isArray(v) && v.length > 0) || (typeof v === 'string' && v.length > 0))) {
+      out.push(`${path}.${k}`);
+    }
     findLeaks(v, forbidden, `${path}.${k}`, out);
   }
   return out;
@@ -240,9 +246,14 @@ check(
     diffPaths({ x: 1 }, { x: 1, y: 2 }).length === 1,
 );
 check(
-  'self-test: findLeaks detects a planted leak',
+  'self-test: findLeaks detects a planted leak (array-valued)',
   findLeaks({ q: [{ test_cases: [1] }] }, new Set(['test_cases'])).length === 1 &&
     findLeaks({ q: [{ test_cases: [] }] }, new Set(['test_cases'])).length === 0,
+);
+check(
+  'self-test: findLeaks detects a planted leak (string-valued, e.g. fill-in expected)',
+  findLeaks({ q: [{ expected: 'answer' }] }, new Set(['expected'])).length === 1 &&
+    findLeaks({ q: [{ expected: '' }] }, new Set(['expected'])).length === 0,
 );
 
 // ── Boot the real server (same harness pattern as serverCheck) ──────────────
@@ -448,13 +459,45 @@ check(
     return !!r.result && !!full && r.result.passed === full.passed && r.result.total === full.total;
   }),
 );
-// The perception-aware extension of serverCheck's cases/turbotCases pin: no
-// per-case detail of ANY shape — value cases, turbot cases, perception frames
-// with expected bits — may reach a student, released or not.
-const recordLeaks = postRelease.json.records.flatMap((r) =>
-  findLeaks(r.result, new Set(['cases', 'turbotCases', 'perceptionCases', 'fillCases', 'expected', 'frames', 'got'])),
+// notes/todos.md item 4 ("indicate failed test cases"): students now DO see
+// safe per-case detail (which input, pass/fail, why) once released — the
+// widening in server/src/sanitize.ts. What must never reach them, released
+// or not, is the answer key itself: CaseResult/PerceptionCaseResult's
+// `expected`/`got` and FillInCaseResult's `expected`/`got` (a string, not an
+// array — the extended findLeaks catches that shape too).
+const recordLeaks = postRelease.json.records.flatMap((r) => findLeaks(r.result, new Set(['expected', 'got'])));
+check('post-release student records leak no answer keys (incl. perception + fill-in)', recordLeaks.length === 0, recordLeaks.join(', '));
+
+// The flip side of the same widening: the SAFE fields must actually be
+// there, not just absent-of-leak — a pin that only checks silence would pass
+// on an empty response too.
+const brokenRecord = postRelease.json.records.find((r) => r.attempt === 2)!;
+const sCodec = brokenRecord.result!.questions.find((x) => x.questionId === 1)!;
+check(
+  'student sees which inputs a value question failed on (input + pass, no expected/got)',
+  sCodec.cases.length > 0 &&
+    sCodec.cases.some((c) => !c.pass) &&
+    sCodec.cases.every((c) => Array.isArray(c.input) && c.input.length > 0),
 );
-check('post-release student records leak no per-case detail (incl. perception)', recordLeaks.length === 0, recordLeaks.join(', '));
+const sPerception = brokenRecord.result!.questions.find((x) => x.questionId === 6)!;
+check(
+  'student sees which frames a perception question failed on',
+  (sPerception.perceptionCases ?? []).length > 0 &&
+    (sPerception.perceptionCases ?? []).some((c) => !c.pass && c.frames.length > 0),
+);
+const sTurbot = brokenRecord.result!.questions.find((x) => x.questionId === 5)!;
+check(
+  "student sees turbot arenas' full detail (no answer key exists for this shape)",
+  (sTurbot.turbotCases ?? []).length > 0 &&
+    (sTurbot.turbotCases ?? []).every((c) => typeof c.stepsTaken === 'number' && c.finalPosition != null),
+);
+const sFillIn = brokenRecord.result!.questions.find((x) => x.questionId === 8)!;
+check(
+  'student sees which blanks a fill-in question got wrong (label + pass, no expected/got)',
+  (sFillIn.fillCases ?? []).length > 0 &&
+    (sFillIn.fillCases ?? []).some((c) => !c.pass) &&
+    (sFillIn.fillCases ?? []).every((c) => c.label.length > 0 && c.expected === '' && c.got === ''),
+);
 
 // ── Manual-review parity: review endpoint ≡ pure applyManualReview ──────────
 // The endpoint (POST .../submissions/:attempt/review) claims to be the same
@@ -493,7 +536,7 @@ check('PARITY: server-applied review ≡ in-process applyManualReview', dReview.
 
 // The verdict is the open question's grade: post-release the student sees it
 // (pass + note survive studentRecord's roll-up) — but the reviewed record
-// still leaks no per-case detail of any shape.
+// still leaks no answer key (the safe-field widening applies here too).
 const sAfterReview = await api<{ records: SubmissionRecord[] }>(
   'GET',
   `/assignments/${ASSIGNMENT_ID}/submissions`,
@@ -506,10 +549,8 @@ check(
   'post-release student sees the open-question verdict',
   sOpen?.manual?.pass === true && sOpen.manual.note === REVIEW_NOTE,
 );
-const reviewLeaks = sAfterReview.json.records.flatMap((r) =>
-  findLeaks(r.result, new Set(['cases', 'turbotCases', 'perceptionCases', 'fillCases', 'expected', 'frames', 'got'])),
-);
-check('reviewed student records still leak no per-case detail', reviewLeaks.length === 0, reviewLeaks.join(', '));
+const reviewLeaks = sAfterReview.json.records.flatMap((r) => findLeaks(r.result, new Set(['expected', 'got'])));
+check('reviewed student records still leak no answer keys', reviewLeaks.length === 0, reviewLeaks.join(', '));
 
 server.close();
 db.close();

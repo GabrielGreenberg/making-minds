@@ -4,7 +4,7 @@ import { navigate } from '../routing';
 import { getCurrentUserEmail, useAuth } from '../auth';
 import { AccountPanel } from '../auth/AccountPanel';
 import { summarizeResult } from '../engine/grader';
-import { dueStatus, formatDueDate, formatDuration, lateBy } from '../dueDates';
+import { dueStatus, formatDueDate, formatDuration, isFrozen, lateBy } from '../dueDates';
 import { useAsyncValue } from '../useAsyncValue';
 import { GradesPanel } from './GradesPanel';
 import { useState, useEffect } from 'react';
@@ -98,6 +98,7 @@ export function HomeScreen() {
           <div className="home-list">
             {assignments.map((a) => {
               const sub = submissions[a.id];
+              const frozen = isFrozen(a.dueDate, Date.now(), sub != null);
               return (
                 <div key={a.id} className="home-list-item">
                   <button
@@ -149,12 +150,18 @@ export function HomeScreen() {
                       View grades
                     </button>
                   )}
-                  <button
-                    className="home-tile-submit"
-                    onClick={() => void handleSubmit(a.id, a.title)}
-                  >
-                    Submit
-                  </button>
+                  {frozen ? (
+                    <span className="menu-frozen" title="This assignment closed after its due date — open it to see your submission, read-only.">
+                      🔒 Past due
+                    </span>
+                  ) : (
+                    <button
+                      className="home-tile-submit"
+                      onClick={() => void handleSubmit(a.id, a.title)}
+                    >
+                      Submit
+                    </button>
+                  )}
                 </div>
               );
             })}

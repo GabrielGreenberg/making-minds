@@ -1,10 +1,20 @@
 // Due-date display policy (pure, framework-agnostic — imported by the student
 // home screen, the instructor gradebook, and tools/dueDateCheck.ts).
 //
-// A due date never gates anything: submissions are accepted and graded whenever
-// they arrive. These helpers only ANSWER how to present a due date ("due soon",
-// "overdue") and how late a given submission was. On-time submissions get no
-// signal at all — `lateBy` returns 0 and callers render nothing.
+// A due date never gates SUBMITTING: submissions are accepted and graded
+// whenever they arrive. `dueStatus`/`lateBy`/`formatDuration`/`formatDueDate`
+// only ANSWER how to present a due date ("due soon", "overdue") and how late a
+// given submission was. On-time submissions get no signal at all — `lateBy`
+// returns 0 and callers render nothing.
+//
+// `isFrozen` (notes/todos.md item 3) is the one exception, and it gates
+// EDITING, not submitting: once the due date has passed AND the student has
+// at least one submission on file, their workbook stops being "the thing
+// they're still working on" and becomes a read-only view of what they last
+// submitted (store.ts's `selectAssignmentFrozen`/`isCurrentQuestionLocked`).
+// A student who has never submitted is never frozen — nothing exists to
+// freeze — so they can keep editing and submit late exactly as before; the
+// moment they do, THAT submission is what freezes their view from then on.
 
 /** "Due soon" horizon: less than this long until the deadline turns the badge amber. */
 export const DUE_SOON_MS = 3 * 24 * 60 * 60 * 1000; // 3 days
@@ -47,6 +57,15 @@ export function formatDuration(ms: number): string {
   if (hours > 0)
     return minutes > 0 ? `${unit(hours, 'hour')}, ${unit(minutes, 'minute')}` : unit(hours, 'hour');
   return unit(minutes, 'minute');
+}
+
+/**
+ * Should a submitted assignment's workbook show read-only? True only once
+ * the due date has passed AND a submission already exists — see the header
+ * comment. `dueDate` absent, or no submission yet, is never frozen.
+ */
+export function isFrozen(dueDate: string | undefined, now: number, hasSubmission: boolean): boolean {
+  return hasSubmission && dueDate != null && dueStatus(dueDate, now) === 'overdue';
 }
 
 /** Short display form for a due date, e.g. "Jul 22, 5:00 PM". */
