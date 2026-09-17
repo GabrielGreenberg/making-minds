@@ -378,6 +378,10 @@ export interface QuestionCircuit {
   responseText?: string;
   /** Fill-in questions: one typed answer per blank, in the spec's order. */
   fillAnswers?: string[];
+  /** The student has marked this question done — a self-imposed lock against
+   *  accidental edits, toggled from the question workspace. Absent/false =
+   *  unlocked (back-compat with saves that predate this). */
+  done?: boolean;
 }
 
 /** A student's in-progress work for one assignment — the persisted payload. */

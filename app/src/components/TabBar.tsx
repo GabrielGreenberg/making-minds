@@ -226,6 +226,8 @@ export function TabBar() {
     removeTab,
     assignment,
     currentQuestionIndex,
+    questionCircuits,
+    toggleCurrentQuestionDone,
   } = useStore();
 
   if (assignment) {
@@ -233,6 +235,7 @@ export function TabBar() {
     // the previous/next question — one dedicated canvas per question.
     const q = assignment.questions[currentQuestionIndex];
     const count = assignment.questions.length;
+    const done = q ? (questionCircuits.get(q.id)?.done ?? false) : false;
     const go = (i: number) =>
       navigate({ kind: 'assignment', id: assignment.id, questionIndex: i }, { replace: true });
     return (
@@ -265,7 +268,17 @@ export function TabBar() {
         <span className="question-nav-label">
           {q?.label ?? '?'}
           <span className="question-nav-count"> · {currentQuestionIndex + 1} of {count}</span>
+          {done && (
+            <span className="question-nav-done-tag" title="Locked — mark not done to edit">🔒 done</span>
+          )}
         </span>
+        <button
+          className={`question-nav-done-toggle${done ? ' question-nav-done-toggle--done' : ''}`}
+          onClick={() => toggleCurrentQuestionDone()}
+          title={done ? 'Unlock this question for editing' : 'Mark this question done and lock it'}
+        >
+          {done ? '✓ Done — click to unlock' : 'Mark done'}
+        </button>
         <span className="question-nav-assignment" title={assignment.title}>
           {assignment.title}
         </span>

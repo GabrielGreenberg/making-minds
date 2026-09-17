@@ -67,6 +67,22 @@ export function selectTmNotation(s: {
 }
 
 /**
+ * Is the open question locked against edits — the student marked it done
+ * (notes/todos.md item 8)? The single read-side answer UI components use;
+ * store.ts's mutating actions use the module-private
+ * `isCurrentQuestionLocked(state)` on the full AppState.
+ */
+export function selectQuestionLocked(s: {
+  assignment: AssignmentData | null;
+  currentQuestionIndex: number;
+  questionCircuits: Map<number, QuestionCircuit>;
+}): boolean {
+  const q = s.assignment?.questions[s.currentQuestionIndex];
+  if (!q) return false;
+  return s.questionCircuits.get(q.id)?.done ?? false;
+}
+
+/**
  * The open question's component restriction (`allowed_components`), or null
  * when unrestricted — sandbox (no assignment), or the field absent/empty
  * (absent/empty = all allowed; semantics in engine/machineValidation.ts).
@@ -486,6 +502,9 @@ interface AppState {
   // owns the outcome.
   openAssignment: (id: string) => Promise<boolean>;
   switchQuestion: (index: number) => void;
+  // Toggle the current question's self-imposed "done" lock (notes/todos.md
+  // item 8). No-op outside an assignment.
+  toggleCurrentQuestionDone: () => void;
   closeAssignment: () => void;
   // Navigation between the catalog (Home) and the editor.
   goHome: () => void;          // hide the editor, return to the catalog (preserves in-memory work)
@@ -1064,6 +1083,7 @@ export const useStore = create<AppState>()((set, get) => ({
 
   addComponent: (type, x, y) => {
     const state = get();
+    if (isCurrentQuestionLocked(state)) return;
     state.pushHistory();
     const sx = snapToGrid(x);
     const sy = snapToGrid(y);
@@ -1122,6 +1142,7 @@ export const useStore = create<AppState>()((set, get) => ({
   },
 
   moveComponent: (id, x, y) => {
+    if (isCurrentQuestionLocked(get())) return;
     const snappedX = snapToGrid(x);
     const snappedY = snapToGrid(y);
     set((state) => {
@@ -1137,6 +1158,7 @@ export const useStore = create<AppState>()((set, get) => ({
   },
 
   moveComponentRaw: (id, x, y) => {
+    if (isCurrentQuestionLocked(get())) return;
     set((state) => ({
       components: state.components.map((c) =>
         c.id === id ? { ...c, x, y } : c
@@ -1154,6 +1176,7 @@ export const useStore = create<AppState>()((set, get) => ({
 
   removeComponent: (id) => {
     const state = get();
+    if (isCurrentQuestionLocked(state)) return;
     state.pushHistory();
     const newWires = state.wires.filter(
       (w) => w.sourceComponentId !== id && w.targetComponentId !== id
@@ -1196,6 +1219,7 @@ export const useStore = create<AppState>()((set, get) => ({
 
   addWire: (sourceCompId, sourcePortId, targetCompId, targetPortId) => {
     const state = get();
+    if (isCurrentQuestionLocked(state)) return;
     const sourceComp = state.components.find((c) => c.id === sourceCompId);
     const targetComp = state.components.find((c) => c.id === targetCompId);
     const isFsmTransition = sourceComp?.type === 'STATE' && targetComp?.type === 'STATE';
@@ -1239,6 +1263,7 @@ export const useStore = create<AppState>()((set, get) => ({
 
   removeWire: (id) => {
     const state = get();
+    if (isCurrentQuestionLocked(state)) return;
     state.pushHistory();
     const newWires = state.wires.filter((w) => w.id !== id);
     // Reset all MEM directions, then re-resolve from remaining wires
@@ -1254,6 +1279,7 @@ export const useStore = create<AppState>()((set, get) => ({
   },
 
   updateWireManualSegments: (wireId, segments) => {
+    if (isCurrentQuestionLocked(get())) return;
     set((state) => ({
       wires: state.wires.map((w) =>
         w.id === wireId ? { ...w, manualSegments: segments } : w
@@ -1391,7 +1417,7 @@ export const useStore = create<AppState>()((set, get) => ({
   },
   undo: () => {
     const state = get();
-    if (state.undoStack.length === 0) return;
+    if (state.undoStack.length === 0 || isCurrentQuestionLocked(state)) return;
     const prev = state.undoStack[state.undoStack.length - 1];
     set({
       undoStack: state.undoStack.slice(0, -1),
@@ -1412,7 +1438,7 @@ export const useStore = create<AppState>()((set, get) => ({
   },
   redo: () => {
     const state = get();
-    if (state.redoStack.length === 0) return;
+    if (state.redoStack.length === 0 || isCurrentQuestionLocked(state)) return;
     const next = state.redoStack[state.redoStack.length - 1];
     set({
       redoStack: state.redoStack.slice(0, -1),
@@ -1438,15 +1464,20 @@ export const useStore = create<AppState>()((set, get) => ({
   currentQuestionIndex: 0,
   questionCircuits: new Map(),
   openResponse: '',
-  setOpenResponse: (text) => set({ openResponse: text }),
+  setOpenResponse: (text) => {
+    if (isCurrentQuestionLocked(get())) return;
+    set({ openResponse: text });
+  },
   fillAnswers: [],
-  setFillAnswer: (index, value) =>
+  setFillAnswer: (index, value) => {
+    if (isCurrentQuestionLocked(get())) return;
     set((state) => {
       const next = state.fillAnswers.slice();
       while (next.length <= index) next.push('');
       next[index] = value;
       return { fillAnswers: next };
-    }),
+    });
+  },
   loadAssignment: (assignment) => {
     const questionCircuits = new Map<number, QuestionCircuit>();
     for (const q of assignment.questions) {
@@ -1544,6 +1575,7 @@ export const useStore = create<AppState>()((set, get) => ({
           boxes: state.boxes,
           responseText: state.openResponse,
           fillAnswers: state.fillAnswers,
+          done: state.questionCircuits.get(q.id)?.done,
         });
         set({ questionCircuits: qc });
       }
@@ -1608,6 +1640,7 @@ export const useStore = create<AppState>()((set, get) => ({
       boxes: state.boxes,
       responseText: state.openResponse,
       fillAnswers: state.fillAnswers,
+      done: state.questionCircuits.get(currentQ.id)?.done,
     });
 
     const saved = updatedMap.get(nextQ.id) ?? emptyQuestionCircuit();
@@ -1624,6 +1657,25 @@ export const useStore = create<AppState>()((set, get) => ({
       buildMode: nextQ.buildMode,
     });
     get().resetAllSimState();
+  },
+  toggleCurrentQuestionDone: () => {
+    const state = get();
+    const q = state.assignment?.questions[state.currentQuestionIndex];
+    if (!q) return;
+    // Fold in the live canvas (mirrors switchQuestion/goHome's sync) rather
+    // than the possibly-stale map entry, so toggling done never discards an
+    // edit made since the last navigation.
+    const qc = new Map(state.questionCircuits);
+    const wasDone = qc.get(q.id)?.done ?? false;
+    qc.set(q.id, {
+      components: state.components,
+      wires: state.wires,
+      boxes: state.boxes,
+      responseText: state.openResponse,
+      fillAnswers: state.fillAnswers,
+      done: !wasDone,
+    });
+    set({ questionCircuits: qc });
   },
   closeAssignment: () => {
     set({
@@ -1717,6 +1769,7 @@ export const useStore = create<AppState>()((set, get) => ({
   // Rotation
   rotateComponent: (id) => {
     const state = get();
+    if (isCurrentQuestionLocked(state)) return;
     state.pushHistory();
     set({
       components: state.components.map((c) => {
@@ -1818,10 +1871,12 @@ export const useStore = create<AppState>()((set, get) => ({
   confirmedBoxLibrary: [],
   addBox: (box) => {
     const state = get();
+    if (isCurrentQuestionLocked(state)) return;
     state.pushHistory();
     set({ boxes: [...state.boxes, box] });
   },
   updateBox: (id, updates) => {
+    if (isCurrentQuestionLocked(get())) return;
     set((state) => {
       const updatedBoxes = state.boxes.map((b) =>
         b.id === id ? { ...b, ...updates } : b
@@ -1852,11 +1907,13 @@ export const useStore = create<AppState>()((set, get) => ({
   },
   removeBox: (id) => {
     const state = get();
+    if (isCurrentQuestionLocked(state)) return;
     state.pushHistory();
     set({ boxes: state.boxes.filter((b) => b.id !== id) });
   },
   removeConfirmedBox: (id) => {
     const state = get();
+    if (isCurrentQuestionLocked(state)) return;
     state.pushHistory();
 
     // Helper: strip all instances of this box from a circuit snapshot
@@ -1888,6 +1945,7 @@ export const useStore = create<AppState>()((set, get) => ({
   },
   renameBox: (id, name) => {
     const state = get();
+    if (isCurrentQuestionLocked(state)) return 'This question is marked done — unlock it to rename a box.';
     const trimmed = name.trim();
     if (!trimmed) return 'A box needs a name.';
     if (takenBoxNames(state.confirmedBoxLibrary, state.boxes, id).has(trimmed))
@@ -1929,6 +1987,7 @@ export const useStore = create<AppState>()((set, get) => ({
   },
   confirmBox: (id) => {
     const state = get();
+    if (isCurrentQuestionLocked(state)) return 'This question is marked done — unlock it to confirm a box.';
     const box = state.boxes.find((b) => b.id === id);
     if (!box) return 'Box not found.';
 
@@ -2203,6 +2262,7 @@ export const useStore = create<AppState>()((set, get) => ({
 
   placeBoxInstance: (boxId, x, y) => {
     const state = get();
+    if (isCurrentQuestionLocked(state)) return;
 
     // Look up from global library first, then fall back to current tab's boxes
     const libEntry = state.confirmedBoxLibrary.find((b) => b.id === boxId);
@@ -2267,6 +2327,7 @@ export const useStore = create<AppState>()((set, get) => ({
 
   fsmPlaceBoxInstance: (boxId, x, y) => {
     const state = get();
+    if (isCurrentQuestionLocked(state)) return;
     const entry = state.confirmedBoxLibrary.find((b) => b.id === boxId && b.kind === 'FSM');
     if (!entry) return;
     state.pushHistory();
@@ -2288,6 +2349,7 @@ export const useStore = create<AppState>()((set, get) => ({
   // Delete
   clearWorkspace: () => {
     const state = get();
+    if (isCurrentQuestionLocked(state)) return;
     state.pushHistory();
     set({
       components: [],
@@ -2305,7 +2367,7 @@ export const useStore = create<AppState>()((set, get) => ({
 
   deleteSelected: () => {
     const state = get();
-    if (state.selectedIds.length === 0) return;
+    if (state.selectedIds.length === 0 || isCurrentQuestionLocked(state)) return;
     state.pushHistory();
     const idsToRemove = new Set(state.selectedIds);
 
@@ -2359,7 +2421,7 @@ export const useStore = create<AppState>()((set, get) => ({
   },
   paste: () => {
     const state = get();
-    if (!state.clipboard) return;
+    if (!state.clipboard || isCurrentQuestionLocked(state)) return;
     state.pushHistory();
 
     // Compute next available label numbers from existing components on canvas
@@ -2522,6 +2584,7 @@ export const useStore = create<AppState>()((set, get) => ({
 
   // Batch move — single state update for moving multiple components
   moveComponentsBatch: (moves) => {
+    if (isCurrentQuestionLocked(get())) return;
     set((state) => {
       const movedIds = new Set(moves.keys());
       return {
@@ -3302,6 +3365,7 @@ export const useStore = create<AppState>()((set, get) => ({
     // '0:1', a dual-action TM '1:0R' — decay to their canonical spelling
     // ('0:11' / '1:0,R') on every edit-save.
     const state = get();
+    if (isCurrentQuestionLocked(state)) return;
     const wire = state.wires.find((w) => w.id === wireId);
     const source = state.components.find((c) => c.id === wire?.sourceComponentId);
     const notation = selectTransitionNotationForSource(state, source);
@@ -3317,6 +3381,7 @@ export const useStore = create<AppState>()((set, get) => ({
   },
 
   setFsmControlPt: (wireId, pt) => {
+    if (isCurrentQuestionLocked(get())) return;
     set({
       wires: get().wires.map((w) =>
         w.id === wireId ? { ...w, fsmControlPt: pt } : w
@@ -3699,7 +3764,7 @@ export const useStore = create<AppState>()((set, get) => ({
   toggleStateKind: (id) => {
     const state = get();
     const comp = state.components.find((c) => c.id === id);
-    if (!comp || comp.type !== 'STATE') return;
+    if (!comp || comp.type !== 'STATE' || isCurrentQuestionLocked(state)) return;
     state.pushHistory();
     const newKind = stateKindOf(comp) === 'external' ? 'internal' : 'external';
     // The two kinds' label grammars are disjoint, so outgoing transitions
@@ -3762,6 +3827,14 @@ function getAutoSaveData() {
   };
 }
 
+/** Is the currently-open question marked done? Outside an assignment (the
+ *  sandbox has no "done" concept) this is always false. Read at the top of
+ *  every action that would edit a question's persisted answer state, so a
+ *  student can't accidentally change work they've locked. */
+function isCurrentQuestionLocked(state: AppState): boolean {
+  return selectQuestionLocked(state);
+}
+
 // Persist the open assignment's work (syncing the live question first) via the
 // storage seam, keyed by assignment id — separate from the sandbox blob.
 /**
@@ -3780,6 +3853,7 @@ function syncedQuestionCircuits(s: AppState): Map<number, QuestionCircuit> {
       boxes: s.boxes,
       responseText: s.openResponse,
       fillAnswers: s.fillAnswers,
+      done: s.questionCircuits.get(q.id)?.done,
     });
   }
   return circuits;

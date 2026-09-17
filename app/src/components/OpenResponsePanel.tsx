@@ -1,5 +1,5 @@
 import type { ClipboardEvent, DragEvent } from 'react';
-import { useStore } from '../store';
+import { useStore, selectQuestionLocked } from '../store';
 import { StatementBody } from './StatementBody';
 
 /**
@@ -17,6 +17,7 @@ export function OpenResponsePanel() {
   const question = useStore((s) => s.assignment?.questions[s.currentQuestionIndex]);
   const response = useStore((s) => s.openResponse);
   const setOpenResponse = useStore((s) => s.setOpenResponse);
+  const locked = useStore(selectQuestionLocked);
 
   if (!question) return null;
 
@@ -47,10 +48,15 @@ export function OpenResponsePanel() {
           onDrop={block}
           placeholder="Type your answer here…"
           spellCheck
+          readOnly={locked}
         />
         <div className="open-response-foot">
           <span>{words} word{words === 1 ? '' : 's'}</span>
-          <span>Saved automatically — submit the assignment when you're done.</span>
+          <span>
+            {locked
+              ? 'Marked done — unlock this question to keep editing.'
+              : "Saved automatically — submit the assignment when you're done."}
+          </span>
         </div>
       </div>
     </div>

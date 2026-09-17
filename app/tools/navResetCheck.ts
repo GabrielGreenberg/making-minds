@@ -230,6 +230,45 @@ console.log('[openAssignment refuses an unpublished assignment]');
   await localAssignmentStore.remove(draft.id);
 }
 
+// ── "mark as done" locks a question against edits (notes/todos.md #8) ──
+console.log('[mark as done]');
+{
+  useStore.getState().closeAssignment();
+  await useStore.getState().openAssignment(SAMPLE_ASSIGNMENT_ID);
+  useStore.getState().switchQuestion(0); // Q1 (CC)
+  const q0 = useStore.getState().assignment!.questions[0];
+  const isDone = () => useStore.getState().questionCircuits.get(q0.id)?.done === true;
+
+  check('a fresh question starts NOT done', !isDone());
+  useStore.getState().toggleCurrentQuestionDone();
+  check('toggleCurrentQuestionDone marks it done', isDone());
+
+  const before = useStore.getState().components.length;
+  useStore.getState().addComponent('AND', 100, 100);
+  check('addComponent is refused while locked', useStore.getState().components.length === before);
+  useStore.getState().paste();
+  useStore.getState().clearWorkspace();
+  check('clearWorkspace is refused while locked', useStore.getState().components.length === before);
+  const openBefore = useStore.getState().openResponse;
+  useStore.getState().setOpenResponse('sneaking in an edit');
+  check('setOpenResponse is refused while locked', useStore.getState().openResponse === openBefore);
+
+  useStore.getState().switchQuestion(1);
+  useStore.getState().switchQuestion(0);
+  check('done survives a round trip through switchQuestion', isDone());
+
+  useStore.getState().goHome(); // flushes the immediate (non-debounced) save
+  useStore.getState().closeAssignment();
+  await useStore.getState().openAssignment(SAMPLE_ASSIGNMENT_ID);
+  check('done survives closeAssignment + a fresh openAssignment (persisted)', isDone());
+
+  useStore.getState().toggleCurrentQuestionDone();
+  check('toggling again unlocks it', !isDone());
+  const afterUnlock = useStore.getState().components.length;
+  useStore.getState().addComponent('AND', 100, 100);
+  check('editing works again once unlocked', useStore.getState().components.length === afterUnlock + 1);
+}
+
 // ═════ Sandbox tabs share the same fresh-machine contract ═══════
 
 /** A real SC run on the live canvas: scCorrect circuit, '0110' in, 3 steps. */

@@ -18,6 +18,7 @@ export function AssignmentOverview() {
   const submissions = useStore((s) => s.submissions);
   const submitAssignment = useStore((s) => s.submitAssignment);
   const hydrateSubmissions = useStore((s) => s.hydrateSubmissions);
+  const questionCircuits = useStore((s) => s.questionCircuits);
   const { user } = useAuth();
   const [showGrades, setShowGrades] = useState(false);
   // Release is policy on the seam, not part of the assignment, so the page has
@@ -70,6 +71,12 @@ export function AssignmentOverview() {
         <h1 className="page-title">{assignment.title}</h1>
         <p className="page-subtitle">
           {assignment.questions.length} question{assignment.questions.length === 1 ? '' : 's'} — pick one to work on
+          {assignment.questions.length > 0 && (
+            <span className="assignment-overview-progress">
+              {' '}· {assignment.questions.filter((q) => questionCircuits.get(q.id)?.done).length} of{' '}
+              {assignment.questions.length} marked done
+            </span>
+          )}
         </p>
 
         <section className="home-section">
@@ -80,7 +87,12 @@ export function AssignmentOverview() {
                 className="assignment-overview-item"
                 onClick={() => navigate({ kind: 'assignment', id: assignment.id, questionIndex: i })}
               >
-                <span className="assignment-overview-label">{q.label}</span>
+                <span className="assignment-overview-label">
+                  {q.label}
+                  {questionCircuits.get(q.id)?.done && (
+                    <span className="assignment-overview-done-badge" title="Marked done">✓</span>
+                  )}
+                </span>
                 <span className="assignment-overview-mode">{questionModeLabel(q)}</span>
                 <span className="assignment-overview-statement">
                   {q.title && <strong className="assignment-overview-title">{q.title}. </strong>}

@@ -7,13 +7,14 @@
 // boxes are the whole answer: no prose, and under `numericOnly` no characters
 // but digits reach the store.
 
-import { useStore } from '../store';
+import { useStore, selectQuestionLocked } from '../store';
 import { StatementBody } from './StatementBody';
 
 export function FillInPanel() {
   const question = useStore((s) => s.assignment?.questions[s.currentQuestionIndex]);
   const answers = useStore((s) => s.fillAnswers);
   const setFillAnswer = useStore((s) => s.setFillAnswer);
+  const locked = useStore(selectQuestionLocked);
 
   const spec = question?.fill_in;
   if (!question || !spec) return null;
@@ -44,6 +45,7 @@ export function FillInPanel() {
                 inputMode={spec.numericOnly ? 'numeric' : 'text'}
                 autoComplete="off"
                 spellCheck={false}
+                readOnly={locked}
                 onChange={(e) =>
                   setFillAnswer(
                     i,
@@ -56,7 +58,11 @@ export function FillInPanel() {
         </div>
         <div className="open-response-foot">
           <span>{filled} of {spec.labels.length} filled in</span>
-          <span>Saved automatically — submit the assignment when you're done.</span>
+          <span>
+            {locked
+              ? 'Marked done — unlock this question to keep editing.'
+              : "Saved automatically — submit the assignment when you're done."}
+          </span>
         </div>
       </div>
     </div>
