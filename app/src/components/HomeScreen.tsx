@@ -7,6 +7,7 @@ import { summarizeResult } from '../engine/grader';
 import { dueStatus, formatDueDate, formatDuration, isFrozen, lateBy } from '../dueDates';
 import { useAsyncValue } from '../useAsyncValue';
 import { GradesPanel } from './GradesPanel';
+import { FeedbackPanel } from './FeedbackPanel';
 import { useState, useEffect } from 'react';
 
 function formatSubmittedAt(iso: string): string {
@@ -22,6 +23,7 @@ export function HomeScreen() {
   const { user, logout } = useAuth();
   // Which assignment's grade sheet is open, if any.
   const [gradesFor, setGradesFor] = useState<string | null>(null);
+  const [showFeedback, setShowFeedback] = useState(false);
 
   // Re-fetch on every visit to this screen (not just once at app boot) so a
   // grade or feedback note the instructor recorded after the student's last
@@ -84,6 +86,9 @@ export function HomeScreen() {
             Instructor view
           </button>
         )}
+        <button className="menu-link-button" onClick={() => setShowFeedback(true)}>
+          Feedback
+        </button>
         <AccountPanel />
         <button className="menu-link-button" onClick={() => { logout(); navigate({ kind: 'home' }); }}>
           Log out
@@ -194,6 +199,7 @@ export function HomeScreen() {
           onClose={() => setGradesFor(null)}
         />
       )}
+      {showFeedback && <FeedbackPanel onClose={() => setShowFeedback(false)} />}
     </div>
   );
 }

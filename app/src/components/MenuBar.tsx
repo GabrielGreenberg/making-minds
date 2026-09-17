@@ -1,12 +1,15 @@
+import { useState } from 'react';
 import { useStore, selectAssignmentFrozen } from '../store';
 import { getCurrentUserEmail, useAuth } from '../auth';
 import { AccountPanel } from '../auth/AccountPanel';
 import { navigate } from '../routing';
+import { FeedbackPanel } from './FeedbackPanel';
 
 export function MenuBar() {
   const { user, logout } = useAuth();
   const { assignment, submitAssignment, submissions } = useStore();
   const frozen = useStore(selectAssignmentFrozen);
+  const [showFeedback, setShowFeedback] = useState(false);
 
   const handleSubmitAssignment = () => {
     if (!assignment) return;
@@ -73,11 +76,15 @@ export function MenuBar() {
             {user.role === 'instructor' ? ' · Instructor' : ''}
           </span>
         )}
+        <button className="menu-link-button" onClick={() => setShowFeedback(true)}>
+          Feedback
+        </button>
         <AccountPanel />
         <button className="menu-link-button" onClick={() => { logout(); navigate({ kind: 'home' }); }}>
           Log out
         </button>
       </div>
+      {showFeedback && <FeedbackPanel onClose={() => setShowFeedback(false)} />}
     </div>
   );
 }

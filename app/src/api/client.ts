@@ -22,6 +22,11 @@
 import type {
   AssignmentData,
   AssignmentState,
+  FeedbackCategory,
+  FeedbackScreenshot,
+  FeedbackStatus,
+  InstructorNote,
+  PlatformFeedback,
   SubmissionData,
   SubmissionRecord,
 } from '../types';
@@ -445,4 +450,42 @@ export async function reviewSubmission(
     { student, questionId, pass: review.pass, note: review.note },
   );
   return record;
+}
+
+// ── feedback ─────────────────────────────────────────────────────
+
+/** File a report. The server stamps `student`/`createdAt`/`status`. */
+export async function submitFeedback(input: {
+  category: FeedbackCategory;
+  message: string;
+  screenshots: FeedbackScreenshot[];
+  context?: { assignmentId?: string; questionId?: number };
+}): Promise<PlatformFeedback> {
+  const { feedback } = await request<{ feedback: PlatformFeedback }>('POST', '/feedback', input);
+  return feedback;
+}
+
+/** Instructor only: the full queue, newest first. */
+export async function listFeedback(): Promise<PlatformFeedback[]> {
+  const { feedback } = await request<{ feedback: PlatformFeedback[] }>('GET', '/feedback');
+  return feedback;
+}
+
+/** Instructor only: mark a report resolved, or reopen it. */
+export async function setFeedbackStatus(id: string, status: FeedbackStatus): Promise<void> {
+  await request('PUT', `/feedback/${encodeURIComponent(id)}/status`, { status });
+}
+
+// ── instructor notes ─────────────────────────────────────────────
+
+export async function getInstructorNote(): Promise<InstructorNote | null> {
+  const { note } = await request<{ note: InstructorNote | null }>('GET', '/instructor-notes');
+  return note;
+}
+
+/** The server stamps `updatedBy` from the session and `updatedAt` from its
+ *  own clock — the same identity/time discipline as submissions. */
+export async function saveInstructorNote(content: string): Promise<InstructorNote> {
+  const { note } = await request<{ note: InstructorNote }>('PUT', '/instructor-notes', { content });
+  return note;
 }

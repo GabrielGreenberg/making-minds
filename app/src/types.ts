@@ -364,6 +364,44 @@ export interface SubmissionRecord {
   result?: SubmissionResult; // autograde computed at receipt (see SubmissionStore)
 }
 
+// ── Platform feedback (notes/todos.md item 9) ──────────────────────────────
+// A student's report on the platform or a homework, queued for an instructor.
+// Not grading, not a submission — its own small seam (FeedbackStore).
+
+export type FeedbackCategory = 'platform design' | 'homework content';
+export type FeedbackStatus = 'open' | 'resolved';
+
+/** One attached screenshot, downscaled and base64-encoded client-side before
+ *  it ever reaches the store (see components/FeedbackPanel.tsx). */
+export interface FeedbackScreenshot {
+  dataUrl: string; // "data:image/jpeg;base64,..."
+  filename?: string;
+}
+
+export interface PlatformFeedback {
+  id: string;
+  student: string; // email — feedback is tied to identity so an instructor can follow up
+  category: FeedbackCategory;
+  message: string;
+  screenshots: FeedbackScreenshot[];
+  createdAt: string; // ISO; the server's word remotely, the client's word locally
+  status: FeedbackStatus;
+  /** Where the student was when they filed it, if anywhere — helps triage
+   *  "homework content" reports. Auto-filled from the current route. */
+  context?: { assignmentId?: string; questionId?: number };
+}
+
+// ── Instructor notes (notes/todos.md item 12) ──────────────────────────────
+// One shared markdown document, instructor-only, updated on Save — a single
+// piece of state, not a per-id list, so its NotesStore seam is get/save
+// rather than the list/CRUD shape of the other seams.
+
+export interface InstructorNote {
+  content: string; // raw markdown
+  updatedAt: string; // ISO timestamp
+  updatedBy: string; // the instructor's name (or email) who last saved
+}
+
 /** Saved canvas state for one assignment question.
  *  Open questions reuse the same container with `responseText` holding the
  *  student's free-text answer (their canvas fields stay empty). */

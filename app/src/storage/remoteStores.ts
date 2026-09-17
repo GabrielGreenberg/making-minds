@@ -23,11 +23,23 @@
 // import the engine grader — remote students must never grade client-side.
 // tools/remoteStoreCheck.ts grep-gates this.
 
-import type { AssignmentData, AssignmentState, SubmissionData, SubmissionRecord } from '../types';
+import type {
+  AssignmentData,
+  AssignmentState,
+  FeedbackCategory,
+  FeedbackScreenshot,
+  FeedbackStatus,
+  InstructorNote,
+  PlatformFeedback,
+  SubmissionData,
+  SubmissionRecord,
+} from '../types';
 import type { AssignmentSummary } from '../assignments';
 import type { WorkbookStore } from './workbookStore';
 import type { AssignmentStore } from './AssignmentStore';
 import type { SubmissionStore } from './submissionStore';
+import type { FeedbackStore } from './feedbackStore';
+import type { NotesStore } from './NotesStore';
 import {
   ApiError,
   getWorkbook,
@@ -41,6 +53,11 @@ import {
   submitAssignment as apiSubmitAssignment,
   listSubmissions as apiListSubmissions,
   reviewSubmission,
+  submitFeedback,
+  listFeedback,
+  setFeedbackStatus,
+  getInstructorNote,
+  saveInstructorNote,
 } from '../api/client';
 
 /** Resolve a thrown ApiError 404 to `fallback` (the seams' "not found" shape). */
@@ -136,6 +153,47 @@ class RemoteSubmissionStore implements SubmissionStore {
   }
 }
 
+class RemoteFeedbackStore implements FeedbackStore {
+  submit(input: {
+    student: string;
+    category: FeedbackCategory;
+    message: string;
+    screenshots: FeedbackScreenshot[];
+    context?: { assignmentId?: string; questionId?: number };
+  }): Promise<PlatformFeedback> {
+    // `student` is the server's word (the session identifies who is posting),
+    // same discipline as submissions — the client's value is not sent.
+    return submitFeedback({
+      category: input.category,
+      message: input.message,
+      screenshots: input.screenshots,
+      context: input.context,
+    });
+  }
+
+  list(): Promise<PlatformFeedback[]> {
+    return listFeedback();
+  }
+
+  setStatus(id: string, status: FeedbackStatus): Promise<void> {
+    return setFeedbackStatus(id, status);
+  }
+}
+
+class RemoteNotesStore implements NotesStore {
+  get(): Promise<InstructorNote | null> {
+    return getInstructorNote();
+  }
+
+  save(content: string, _updatedBy: string): Promise<InstructorNote> {
+    // `_updatedBy` is unused remotely: the server stamps the caller's own
+    // session identity, same discipline as submissions/feedback.
+    return saveInstructorNote(content);
+  }
+}
+
 export const remoteWorkbookStore: WorkbookStore = new RemoteWorkbookStore();
 export const remoteAssignmentStore: AssignmentStore = new RemoteAssignmentStore();
 export const remoteSubmissionStore: SubmissionStore = new RemoteSubmissionStore();
+export const remoteFeedbackStore: FeedbackStore = new RemoteFeedbackStore();
+export const remoteNotesStore: NotesStore = new RemoteNotesStore();

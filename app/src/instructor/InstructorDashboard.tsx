@@ -131,6 +131,20 @@ export function InstructorDashboard() {
           >
             Roster &amp; accounts
           </button>
+          <button
+            className="instructor-btn"
+            onClick={() => navigate({ kind: 'instructor-feedback' })}
+            title="Student reports on the platform and homeworks"
+          >
+            Feedback
+          </button>
+          <button
+            className="instructor-btn"
+            onClick={() => navigate({ kind: 'instructor-notes' })}
+            title="A shared note for instructors to coordinate on"
+          >
+            Notes
+          </button>
           <button className="instructor-btn instructor-btn--primary" onClick={() => void handleNew()}>
             New Assignment
           </button>

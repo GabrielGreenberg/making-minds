@@ -52,9 +52,13 @@ const { readFileSync } = await import('node:fs');
 const { createApp } = await import('../../server/src/app');
 const { Db } = await import('../../server/src/db');
 const api = await import('../src/api/client');
-const { remoteWorkbookStore, remoteAssignmentStore, remoteSubmissionStore } = await import(
-  '../src/storage/remoteStores'
-);
+const {
+  remoteWorkbookStore,
+  remoteAssignmentStore,
+  remoteSubmissionStore,
+  remoteFeedbackStore,
+  remoteNotesStore,
+} = await import('../src/storage/remoteStores');
 const { TOY_ACCOUNTS } = await import('../src/auth/accounts');
 const { sortAssignments } = await import('../src/assignments');
 const {
@@ -438,6 +442,55 @@ check('replay cleared the journal key', readJournal(student.email, 'jr-asg') ===
 const passthrough = await reconcileJournal(student.email, 'jr-asg', jServer, remoteWorkbookStore);
 check('no buffer → the fetched state passes through untouched',
   passthrough === jServer);
+
+// ── feedback (storage/remoteStores.ts RemoteFeedbackStore) ────────
+api.setToken(sTok);
+const filedViaSeam = await remoteFeedbackStore.submit({
+  student: 'someone-else@ucla.edu', // deliberately wrong — the server's word wins
+  category: 'platform design',
+  message: 'the TM tape is hard to scroll on a trackpad',
+  screenshots: [],
+});
+check('the server stamps the caller\'s own identity, not the client-supplied one',
+  filedViaSeam.student === student.email.toLowerCase());
+check('a fresh report starts open', filedViaSeam.status === 'open');
+
+api.setToken(sTok);
+let feedbackForbidden = false;
+try {
+  await remoteFeedbackStore.list();
+} catch (e) {
+  feedbackForbidden = e instanceof api.ApiError && e.status === 403;
+}
+check('a student cannot list the feedback queue through the seam', feedbackForbidden);
+
+api.setToken(iTok);
+const feedbackQueue = await remoteFeedbackStore.list();
+check('the instructor sees the report through the seam',
+  feedbackQueue.some((f) => f.id === filedViaSeam.id));
+
+await remoteFeedbackStore.setStatus(filedViaSeam.id, 'resolved');
+const afterResolveViaSeam = await remoteFeedbackStore.list();
+check('setStatus persists through the seam',
+  afterResolveViaSeam.find((f) => f.id === filedViaSeam.id)?.status === 'resolved');
+
+// ── instructor notes (storage/remoteStores.ts RemoteNotesStore) ──
+api.setToken(iTok);
+check('nobody has saved a note yet', (await remoteNotesStore.get()) === null);
+const savedViaSeam = await remoteNotesStore.save('# scratch notes', 'ignored — the server stamps this');
+check('the server stamps its OWN idea of who saved it, not the argument',
+  savedViaSeam.updatedBy !== 'ignored — the server stamps this' && savedViaSeam.content === '# scratch notes');
+const rereadViaSeam = await remoteNotesStore.get();
+check('the saved note round-trips through the seam', rereadViaSeam?.content === '# scratch notes');
+
+api.setToken(sTok);
+let notesForbidden = false;
+try {
+  await remoteNotesStore.get();
+} catch (e) {
+  notesForbidden = e instanceof api.ApiError && e.status === 403;
+}
+check('a student cannot read the notes through the seam', notesForbidden);
 
 // ── the account system through api/client.ts ─────────────────────
 // A SECOND real server, this one in the launch auth mode (password + roster),

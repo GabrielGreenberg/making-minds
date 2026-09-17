@@ -429,6 +429,154 @@ check(
   reReview.status === 201 && reReviewedQ?.manual?.pass === false && reReviewedQ.manual.note === 'on reflection, no',
 );
 
+// ── feedback ─────────────────────────────────────────────────────
+const noFeedbackTok = await api('POST', '/feedback', {
+  body: { category: 'platform design', message: 'hi' },
+});
+check('filing feedback needs auth', noFeedbackTok.status === 401);
+
+const badCategory = await api('POST', '/feedback', {
+  token: sTok,
+  body: { category: 'not a real category', message: 'hi' },
+});
+check('unknown category rejected', badCategory.status === 400);
+
+const emptyMessage = await api('POST', '/feedback', {
+  token: sTok,
+  body: { category: 'platform design', message: '   ' },
+});
+check('empty message rejected', emptyMessage.status === 400);
+
+const tooManyScreenshots = await api('POST', '/feedback', {
+  token: sTok,
+  body: {
+    category: 'platform design',
+    message: 'three is too many',
+    screenshots: [
+      { dataUrl: 'data:image/png;base64,AAAA' },
+      { dataUrl: 'data:image/png;base64,AAAA' },
+      { dataUrl: 'data:image/png;base64,AAAA' },
+    ],
+  },
+});
+check('more than 2 screenshots rejected', tooManyScreenshots.status === 400);
+
+const badScreenshot = await api('POST', '/feedback', {
+  token: sTok,
+  body: {
+    category: 'platform design',
+    message: 'not really an image',
+    screenshots: [{ dataUrl: 'not-a-data-url' }],
+  },
+});
+check('a non-image data URL is rejected', badScreenshot.status === 400);
+
+const filed = await api<{ feedback: { id: string; student: string; status: string } }>(
+  'POST',
+  '/feedback',
+  {
+    token: sTok,
+    body: {
+      category: 'homework content',
+      message: 'HW3 P7 statement has a typo',
+      screenshots: [{ dataUrl: 'data:image/png;base64,AAAA', filename: 'shot.png' }],
+      context: { assignmentId: SAMPLE_ASSIGNMENT_ID, questionId: 3 },
+    },
+  },
+);
+check(
+  'a well-formed report is filed, stamped with the caller\'s email',
+  filed.status === 201 && filed.json.feedback.student === student.email.toLowerCase() && filed.json.feedback.status === 'open',
+);
+const feedbackId = filed.json.feedback.id;
+
+const studentListsFeedback = await api('GET', '/feedback', { token: sTok });
+check('a student cannot see the queue', studentListsFeedback.status === 403);
+
+const instructorListsFeedback = await api<{ feedback: { id: string; category: string }[] }>(
+  'GET',
+  '/feedback',
+  { token: iTok },
+);
+check(
+  'the instructor sees the filed report',
+  instructorListsFeedback.status === 200 &&
+    instructorListsFeedback.json.feedback.some((f) => f.id === feedbackId && f.category === 'homework content'),
+);
+
+const studentResolves = await api('PUT', `/feedback/${feedbackId}/status`, {
+  token: sTok,
+  body: { status: 'resolved' },
+});
+check('a student cannot resolve a report', studentResolves.status === 403);
+
+const badStatus = await api('PUT', `/feedback/${feedbackId}/status`, {
+  token: iTok,
+  body: { status: 'archived' },
+});
+check('an unknown status value is rejected', badStatus.status === 400);
+
+const resolve = await api('PUT', `/feedback/${feedbackId}/status`, {
+  token: iTok,
+  body: { status: 'resolved' },
+});
+check('the instructor marks it resolved', resolve.status === 200);
+
+const afterResolve = await api<{ feedback: { id: string; status: string }[] }>('GET', '/feedback', {
+  token: iTok,
+});
+check(
+  'the resolved status persists',
+  afterResolve.json.feedback.find((f) => f.id === feedbackId)?.status === 'resolved',
+);
+
+const unknownFeedback = await api('PUT', '/feedback/nope/status', {
+  token: iTok,
+  body: { status: 'open' },
+});
+check('resolving an unknown id 404s', unknownFeedback.status === 404);
+
+// ── instructor notes ─────────────────────────────────────────────
+const noNote = await api<{ note: unknown }>('GET', '/instructor-notes', { token: iTok });
+check('no note saved yet reads null', noNote.status === 200 && noNote.json.note === null);
+
+const studentReadsNotes = await api('GET', '/instructor-notes', { token: sTok });
+check('a student cannot read the notes', studentReadsNotes.status === 403);
+
+const studentWritesNotes = await api('PUT', '/instructor-notes', {
+  token: sTok,
+  body: { content: 'sneaking in' },
+});
+check('a student cannot save the notes', studentWritesNotes.status === 403);
+
+const badNoteBody = await api('PUT', '/instructor-notes', { token: iTok, body: {} });
+check('a missing content field is rejected', badNoteBody.status === 400);
+
+const savedNote = await api<{ note: { content: string; updatedBy: string; updatedAt: string } }>(
+  'PUT',
+  '/instructor-notes',
+  { token: iTok, body: { content: '# Coordination\n\n- watch HW4 P2 for confusion' } },
+);
+check(
+  'saving stamps the caller\'s name and a timestamp',
+  savedNote.status === 200 &&
+    savedNote.json.note.updatedBy === instructor.name &&
+    savedNote.json.note.content.startsWith('# Coordination'),
+);
+
+const reread = await api<{ note: { content: string } | null }>('GET', '/instructor-notes', {
+  token: iTok,
+});
+check('the saved content persists across a fresh GET',
+  reread.json.note?.content === savedNote.json.note.content);
+
+const overwritten = await api<{ note: { content: string } }>('PUT', '/instructor-notes', {
+  token: iTok,
+  body: { content: 'replaced' },
+});
+check('saving again overwrites the single row (not a second one)',
+  overwritten.status === 200 && overwritten.json.note.content === 'replaced');
+
 // ── logout ───────────────────────────────────────────────────────
 await api('POST', '/auth/logout', { token: sTok });
 const afterLogout = await api('GET', '/auth/me', { token: sTok });

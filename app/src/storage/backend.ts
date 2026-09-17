@@ -16,7 +16,15 @@
 import { localWorkbookStore, type WorkbookStore } from './workbookStore';
 import { localAssignmentStore, type AssignmentStore } from './AssignmentStore';
 import { localSubmissionStore, type SubmissionStore } from './submissionStore';
-import { remoteWorkbookStore, remoteAssignmentStore, remoteSubmissionStore } from './remoteStores';
+import { localFeedbackStore, type FeedbackStore } from './feedbackStore';
+import { localNotesStore, type NotesStore } from './NotesStore';
+import {
+  remoteWorkbookStore,
+  remoteAssignmentStore,
+  remoteSubmissionStore,
+  remoteFeedbackStore,
+  remoteNotesStore,
+} from './remoteStores';
 
 export const backendMode: 'local' | 'remote' = import.meta.env?.VITE_API_BASE
   ? 'remote'
@@ -31,3 +39,5 @@ export const assignmentStore: AssignmentStore = remote
 export const submissionStore: SubmissionStore = remote
   ? remoteSubmissionStore
   : localSubmissionStore;
+export const feedbackStore: FeedbackStore = remote ? remoteFeedbackStore : localFeedbackStore;
+export const notesStore: NotesStore = remote ? remoteNotesStore : localNotesStore;

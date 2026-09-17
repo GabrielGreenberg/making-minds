@@ -35,6 +35,12 @@
 //                                              instructor: manual verdict on a pending
 //                                              open question — {student, questionId,
 //                                              pass, note?} → updated record
+//   POST   /api/feedback                       any signed-in user: file a platform/homework
+//                                              report, screenshots as base64 data URLs
+//   GET    /api/feedback                       instructor: the full queue, newest first
+//   PUT    /api/feedback/:id/status            instructor: {status: 'open'|'resolved'}
+//   GET    /api/instructor-notes               instructor: the one shared markdown note
+//   PUT    /api/instructor-notes               instructor: {content: string} → saves it
 //   GET    /api/health                         unauthenticated liveness probe
 //
 // Grading happens HERE, with the same pure engine the browser uses
@@ -574,6 +580,110 @@ export function createApp(config: ServerConfig, db: Db) {
     const record = updated.find((r) => r.attempt === attempt)!;
     db.updateSubmissionResult(assignmentId, email, attempt, record.result!);
     res.status(201).json({ record });
+  });
+
+  // ── feedback (notes/todos.md item 9) ────────────────────────────
+  // Anyone signed in can file a report; only an instructor can see or work
+  // the queue. Screenshots ride as base64 data URLs inside the JSON body —
+  // no upload endpoint, no multer, no filesystem — capped here so the shared
+  // express.json({limit:'10mb'}) body-size cap isn't the only backstop.
+  const MAX_FEEDBACK_SCREENSHOTS = 2;
+  const MAX_SCREENSHOT_DATA_URL_LENGTH = 4_500_000; // ~3.3MB decoded
+  const MAX_FEEDBACK_MESSAGE_LENGTH = 5000;
+
+  app.post('/api/feedback', auth, (req, res) => {
+    const body = (req.body ?? {}) as {
+      category?: unknown;
+      message?: unknown;
+      screenshots?: unknown;
+      context?: unknown;
+    };
+    if (body.category !== 'platform design' && body.category !== 'homework content') {
+      res.status(400).json({ error: 'category must be "platform design" or "homework content"' });
+      return;
+    }
+    if (typeof body.message !== 'string' || body.message.trim() === '') {
+      res.status(400).json({ error: 'message is required' });
+      return;
+    }
+    if (body.message.length > MAX_FEEDBACK_MESSAGE_LENGTH) {
+      res.status(400).json({ error: `message must be under ${MAX_FEEDBACK_MESSAGE_LENGTH} characters` });
+      return;
+    }
+    const screenshots = body.screenshots;
+    if (screenshots !== undefined && !Array.isArray(screenshots)) {
+      res.status(400).json({ error: 'screenshots must be an array' });
+      return;
+    }
+    const shots = (screenshots ?? []) as unknown[];
+    if (shots.length > MAX_FEEDBACK_SCREENSHOTS) {
+      res.status(400).json({ error: `at most ${MAX_FEEDBACK_SCREENSHOTS} screenshots` });
+      return;
+    }
+    for (const shot of shots) {
+      if (
+        typeof shot !== 'object' ||
+        shot === null ||
+        typeof (shot as { dataUrl?: unknown }).dataUrl !== 'string' ||
+        !/^data:image\/(png|jpe?g|webp);base64,/.test((shot as { dataUrl: string }).dataUrl)
+      ) {
+        res.status(400).json({ error: 'each screenshot must be a PNG/JPEG/WEBP data URL' });
+        return;
+      }
+      if ((shot as { dataUrl: string }).dataUrl.length > MAX_SCREENSHOT_DATA_URL_LENGTH) {
+        res.status(413).json({ error: 'a screenshot is too large' });
+        return;
+      }
+    }
+    const context = body.context as { assignmentId?: unknown; questionId?: unknown } | undefined;
+    const cleanContext =
+      context && (typeof context.assignmentId === 'string' || typeof context.questionId === 'number')
+        ? {
+            assignmentId: typeof context.assignmentId === 'string' ? context.assignmentId : undefined,
+            questionId: typeof context.questionId === 'number' ? context.questionId : undefined,
+          }
+        : undefined;
+    const feedback = db.addFeedback({
+      email: req.user!.email,
+      category: body.category,
+      message: body.message.trim(),
+      screenshots: shots as { dataUrl: string; filename?: string }[],
+      context: cleanContext,
+    });
+    res.status(201).json({ feedback });
+  });
+
+  app.get('/api/feedback', auth, requireInstructor, (_req, res) => {
+    res.json({ feedback: db.listFeedback() });
+  });
+
+  app.put('/api/feedback/:id/status', auth, requireInstructor, (req, res) => {
+    const status = (req.body ?? {}).status;
+    if (status !== 'open' && status !== 'resolved') {
+      res.status(400).json({ error: 'status must be "open" or "resolved"' });
+      return;
+    }
+    if (!db.setFeedbackStatus(String(req.params.id), status)) {
+      res.status(404).json({ error: 'unknown feedback id' });
+      return;
+    }
+    res.json({ ok: true });
+  });
+
+  // ── instructor notes (notes/todos.md item 12) ───────────────────
+  // One shared markdown document; instructor-only, both to read and to save.
+  app.get('/api/instructor-notes', auth, requireInstructor, (_req, res) => {
+    res.json({ note: db.getInstructorNote() });
+  });
+
+  app.put('/api/instructor-notes', auth, requireInstructor, (req, res) => {
+    const content = (req.body ?? {}).content;
+    if (typeof content !== 'string') {
+      res.status(400).json({ error: 'body must be {content: string}' });
+      return;
+    }
+    const note = db.saveInstructorNote(content, req.user!.name);
+    res.json({ note });
   });
 
   // ── errors ─────────────────────────────────────────────────────

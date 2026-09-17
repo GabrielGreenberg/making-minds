@@ -13,11 +13,22 @@
 //                  the API strips answers before sending to students)
 //   workbooks    — per-(user, assignment) saved canvas state (WorkbookStore seam)
 //   submissions  — immutable graded attempts (SubmissionStore seam)
+//   feedback     — student reports on the platform/homeworks, an instructor's
+//                  queue (FeedbackStore seam); screenshots ride as base64 in
+//                  the JSON `screenshots` column, capped client- and
+//                  server-side — see app.ts's POST /api/feedback
+//   instructor_notes — ONE shared markdown note (NotesStore seam); a single
+//                  row, id pinned to 1 by a CHECK constraint
 
 import { DatabaseSync } from 'node:sqlite';
 import type {
   AssignmentData,
   AssignmentState,
+  FeedbackCategory,
+  FeedbackScreenshot,
+  FeedbackStatus,
+  InstructorNote,
+  PlatformFeedback,
   SubmissionData,
   SubmissionRecord,
   SubmissionResult,
@@ -115,6 +126,24 @@ export class Db {
       );
       CREATE INDEX IF NOT EXISTS idx_access_requests_email
         ON access_requests (email);
+      CREATE TABLE IF NOT EXISTS feedback (
+        id          TEXT PRIMARY KEY,
+        email       TEXT NOT NULL,
+        category    TEXT NOT NULL CHECK (category IN ('platform design', 'homework content')),
+        message     TEXT NOT NULL,
+        screenshots TEXT NOT NULL DEFAULT '[]',
+        context     TEXT,
+        status      TEXT NOT NULL DEFAULT 'open' CHECK (status IN ('open', 'resolved')),
+        created_at  TEXT NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS idx_feedback_status
+        ON feedback (status, created_at);
+      CREATE TABLE IF NOT EXISTS instructor_notes (
+        id         INTEGER PRIMARY KEY CHECK (id = 1),
+        content    TEXT NOT NULL DEFAULT '',
+        updated_at TEXT NOT NULL,
+        updated_by TEXT NOT NULL
+      );
     `);
     // Columns added after the initial schema; ALTER is a no-op error on re-run.
     for (const sql of [
@@ -349,6 +378,96 @@ export class Db {
     this.db
       .prepare('UPDATE access_requests SET status = ?, resolved_at = ?, resolved_by = ? WHERE id = ?')
       .run(status, new Date().toISOString(), resolvedBy, id);
+  }
+
+  // ── feedback ───────────────────────────────────────────────────
+
+  addFeedback(input: {
+    email: string;
+    category: FeedbackCategory;
+    message: string;
+    screenshots: FeedbackScreenshot[];
+    context?: { assignmentId?: string; questionId?: number };
+  }): PlatformFeedback {
+    const id = `fb-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+    const createdAt = new Date().toISOString();
+    this.db
+      .prepare(
+        `INSERT INTO feedback (id, email, category, message, screenshots, context, status, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, 'open', ?)`,
+      )
+      .run(
+        id,
+        input.email,
+        input.category,
+        input.message,
+        JSON.stringify(input.screenshots),
+        input.context ? JSON.stringify(input.context) : null,
+        createdAt,
+      );
+    return {
+      id,
+      student: input.email,
+      category: input.category,
+      message: input.message,
+      screenshots: input.screenshots,
+      createdAt,
+      status: 'open',
+      context: input.context,
+    };
+  }
+
+  listFeedback(): PlatformFeedback[] {
+    const rows = this.db
+      .prepare(
+        'SELECT id, email, category, message, screenshots, context, status, created_at FROM feedback ORDER BY created_at DESC',
+      )
+      .all() as unknown as {
+      id: string;
+      email: string;
+      category: FeedbackCategory;
+      message: string;
+      screenshots: string;
+      context: string | null;
+      status: FeedbackStatus;
+      created_at: string;
+    }[];
+    return rows.map((r) => ({
+      id: r.id,
+      student: r.email,
+      category: r.category,
+      message: r.message,
+      screenshots: JSON.parse(r.screenshots) as FeedbackScreenshot[],
+      createdAt: r.created_at,
+      status: r.status,
+      context: r.context ? (JSON.parse(r.context) as { assignmentId?: string; questionId?: number }) : undefined,
+    }));
+  }
+
+  setFeedbackStatus(id: string, status: FeedbackStatus): boolean {
+    const result = this.db.prepare('UPDATE feedback SET status = ? WHERE id = ?').run(status, id);
+    return result.changes > 0;
+  }
+
+  // ── instructor notes ───────────────────────────────────────────
+
+  getInstructorNote(): InstructorNote | null {
+    const row = this.db
+      .prepare('SELECT content, updated_at, updated_by FROM instructor_notes WHERE id = 1')
+      .get() as unknown as { content: string; updated_at: string; updated_by: string } | undefined;
+    return row ? { content: row.content, updatedAt: row.updated_at, updatedBy: row.updated_by } : null;
+  }
+
+  saveInstructorNote(content: string, updatedBy: string): InstructorNote {
+    const updatedAt = new Date().toISOString();
+    this.db
+      .prepare(
+        `INSERT INTO instructor_notes (id, content, updated_at, updated_by) VALUES (1, ?, ?, ?)
+         ON CONFLICT(id) DO UPDATE SET
+           content = excluded.content, updated_at = excluded.updated_at, updated_by = excluded.updated_by`,
+      )
+      .run(content, updatedAt, updatedBy);
+    return { content, updatedAt, updatedBy };
   }
 
   // ── assignments ────────────────────────────────────────────────

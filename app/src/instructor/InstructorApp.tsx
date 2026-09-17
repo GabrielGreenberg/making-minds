@@ -8,6 +8,8 @@ import { InstructorDashboard } from './InstructorDashboard';
 import { AssignmentEditor } from './AssignmentEditor';
 import { GradebookView } from './GradebookView';
 import { RosterView } from './RosterView';
+import { FeedbackQueueView } from './FeedbackQueueView';
+import { NotesView } from './NotesView';
 import type { InstructorRoute } from './useInstructorRoute';
 
 export function InstructorApp({ route }: { route: InstructorRoute }) {
@@ -34,5 +36,9 @@ function InstructorView({ route }: { route: InstructorRoute }) {
       return <GradebookView id={route.id} />;
     case 'instructor-roster':
       return <RosterView />;
+    case 'instructor-feedback':
+      return <FeedbackQueueView />;
+    case 'instructor-notes':
+      return <NotesView />;
   }
 }
