@@ -1166,6 +1166,15 @@ thead .sc-label-col {
   color: var(--text-secondary);
 }
 
+.grades-feedback-note {
+  margin: 4px 0 0;
+  font-size: 12px;
+  font-style: italic;
+  color: var(--text-secondary);
+  white-space: pre-wrap;
+}
+.grades-feedback-label { font-style: normal; font-weight: 600; }
+
 .grades-mode { color: var(--text-secondary); white-space: nowrap; }
 .grades-verdict { white-space: nowrap; font-weight: 600; }
 .grades-verdict--pass { color: #2e7d32; }

@@ -67,12 +67,19 @@ export function GradesPanel({
               </thead>
               <tbody>
                 {questions.map((q) => {
-                  const v = questionVerdict(byId.get(q.id));
+                  const qr = byId.get(q.id);
+                  const v = questionVerdict(qr);
+                  const note = qr?.manual?.note?.trim();
                   return (
                     <tr key={q.id}>
                       <td>
                         {q.label}
                         {q.title && <span className="grades-q-title">{q.title}</span>}
+                        {note && (
+                          <p className="grades-feedback-note">
+                            <span className="grades-feedback-label">Instructor feedback:</span> {note}
+                          </p>
+                        )}
                       </td>
                       <td className="grades-mode">{questionModeLabel(q)}</td>
                       <td className={`grades-verdict grades-verdict--${v.tone}`}>{v.text}</td>

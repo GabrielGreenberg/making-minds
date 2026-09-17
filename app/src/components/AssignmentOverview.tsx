@@ -4,7 +4,7 @@ import { getCurrentUserEmail, useAuth } from '../auth';
 import { questionModeLabel } from '../types';
 import { statementProse } from '../statementFormat';
 import { GradesPanel } from './GradesPanel';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useAsyncValue } from '../useAsyncValue';
 import { assignmentStore } from '../storage/backend';
 
@@ -17,6 +17,7 @@ export function AssignmentOverview() {
   const assignment = useStore((s) => s.assignment);
   const submissions = useStore((s) => s.submissions);
   const submitAssignment = useStore((s) => s.submitAssignment);
+  const hydrateSubmissions = useStore((s) => s.hydrateSubmissions);
   const { user } = useAuth();
   const [showGrades, setShowGrades] = useState(false);
   // Release is policy on the seam, not part of the assignment, so the page has
@@ -25,6 +26,13 @@ export function AssignmentOverview() {
     () => (assignment ? assignmentStore.getGradesReleased(assignment.id) : Promise.resolve(false)),
     [assignment?.id],
   );
+
+  // Re-fetch on every visit (not just once at app boot) so a grade or
+  // feedback note recorded after the student's last reload shows up here
+  // without requiring a hard refresh.
+  useEffect(() => {
+    void hydrateSubmissions();
+  }, [hydrateSubmissions, assignment?.id]);
 
   if (!assignment) return null;
   const sub = submissions[assignment.id];

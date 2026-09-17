@@ -7,7 +7,7 @@ import { summarizeResult } from '../engine/grader';
 import { dueStatus, formatDueDate, formatDuration, lateBy } from '../dueDates';
 import { useAsyncValue } from '../useAsyncValue';
 import { GradesPanel } from './GradesPanel';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 
 function formatSubmittedAt(iso: string): string {
   const d = new Date(iso);
@@ -18,9 +18,17 @@ function formatSubmittedAt(iso: string): string {
 export function HomeScreen() {
   const submissions = useStore((s) => s.submissions);
   const submitAssignment = useStore((s) => s.submitAssignment);
+  const hydrateSubmissions = useStore((s) => s.hydrateSubmissions);
   const { user, logout } = useAuth();
   // Which assignment's grade sheet is open, if any.
   const [gradesFor, setGradesFor] = useState<string | null>(null);
+
+  // Re-fetch on every visit to this screen (not just once at app boot) so a
+  // grade or feedback note the instructor recorded after the student's last
+  // reload shows up without the student having to hard-refresh the tab.
+  useEffect(() => {
+    void hydrateSubmissions();
+  }, [hydrateSubmissions]);
 
   const { value: assignmentList, loading, error, reload } = useAsyncValue(
     () => listAssignments(),
