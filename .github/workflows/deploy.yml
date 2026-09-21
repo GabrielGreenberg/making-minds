@@ -44,6 +44,9 @@ jobs:
         working-directory: app
         run: npm ci
 
+      - name: Context budget (CLAUDE.md size guard — tasks/PROFILE.md)
+        run: node tasks/tools/check-budgets.mjs
+
       - name: Build
         working-directory: app
         run: npm run build

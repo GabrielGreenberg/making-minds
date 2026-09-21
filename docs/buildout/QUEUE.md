@@ -1,5 +1,8 @@
 # Task Queue
 
+> **Retired 2026-09-21.** This was the build-out loop's queue; it is complete at-tier and frozen. The live
+> queue is `tasks/incoming/` (see `tasks/README.md`). P-TOOLS-1 was carried over as a task there.
+
 _Ordered, atomic tasks. The loop takes the top unblocked `todo`, works it end to
 end (build → adversarially verify → update docs → commit), then re-plans. Every
 task names an **acceptance** criterion and the **COVERAGE** rows it advances._
