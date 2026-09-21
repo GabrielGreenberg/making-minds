@@ -8,9 +8,9 @@ requires: browser
 area: app
 source: chat
 created: 2026-09-21T16:30:00-07:00
-status: ready
+status: in-progress
 after:
-branch:
+branch: task/019-restyle-admin-surfaces
 merged_into:
 ---
 
