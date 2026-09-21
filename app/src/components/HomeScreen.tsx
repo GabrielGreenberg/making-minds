@@ -2,12 +2,12 @@ import { useStore } from '../store';
 import { listAssignments } from '../assignments';
 import { navigate } from '../routing';
 import { getCurrentUserEmail, useAuth } from '../auth';
-import { AccountPanel } from '../auth/AccountPanel';
 import { summarizeResult } from '../engine/grader';
 import { dueStatus, formatDueDate, formatDuration, isFrozen, lateBy } from '../dueDates';
 import { useAsyncValue } from '../useAsyncValue';
 import { GradesPanel } from './GradesPanel';
-import { FeedbackPanel } from './FeedbackPanel';
+import { PageShell, appNav } from './PageShell';
+import { SessionControls } from './SessionControls';
 import { useState, useEffect } from 'react';
 
 function formatSubmittedAt(iso: string): string {
@@ -16,14 +16,19 @@ function formatSubmittedAt(iso: string): string {
     ', ' + d.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
 }
 
+/**
+ * The student home: the assignment catalog. One row per published homework —
+ * title and meta, the submission status (which is also the way into the grade
+ * sheet once grades are released), and ONE action: Submit, or the past-due
+ * lock. Opening a row leads to its question list (AssignmentOverview).
+ */
 export function HomeScreen() {
   const submissions = useStore((s) => s.submissions);
   const submitAssignment = useStore((s) => s.submitAssignment);
   const hydrateSubmissions = useStore((s) => s.hydrateSubmissions);
-  const { user, logout } = useAuth();
+  const { user } = useAuth();
   // Which assignment's grade sheet is open, if any.
   const [gradesFor, setGradesFor] = useState<string | null>(null);
-  const [showFeedback, setShowFeedback] = useState(false);
 
   // Re-fetch on every visit to this screen (not just once at app boot) so a
   // grade or feedback note the instructor recorded after the student's last
@@ -73,125 +78,102 @@ export function HomeScreen() {
   };
 
   return (
-    <div className="page">
-      <header className="page-bar">
-        {user && (
-          <span className="session-chip">
-            {user.name}
-            {user.role === 'instructor' ? ' · Instructor' : ''}
-          </span>
-        )}
-        {user?.role === 'instructor' && (
-          <button className="menu-link-button" onClick={() => navigate({ kind: 'instructor' })}>
-            Instructor view
-          </button>
-        )}
-        <button className="menu-link-button" onClick={() => setShowFeedback(true)}>
-          Feedback
-        </button>
-        <AccountPanel />
-        <button className="menu-link-button" onClick={() => { logout(); navigate({ kind: 'home' }); }}>
-          Log out
-        </button>
-      </header>
-      <div className="page-body">
-        <h1 className="page-title">Making Minds</h1>
-        <p className="page-subtitle">Design circuits, state machines, and more</p>
-
-        <section className="home-section">
-          <h2 className="home-section-title">Assignments</h2>
-          <div className="home-list">
-            {assignments.map((a) => {
-              const sub = submissions[a.id];
-              const frozen = isFrozen(a.dueDate, Date.now(), sub != null);
-              return (
-                <div key={a.id} className="home-list-item">
-                  <button
-                    className="home-list-main"
-                    onClick={() => navigate({ kind: 'assignment', id: a.id })}
-                  >
-                    <span className="home-list-title">{a.title}</span>
-                    {!a.visible && <span className="home-hidden-tag">hidden from students</span>}
-                    <span className="home-list-meta">
-                      {a.questionCount} question{a.questionCount === 1 ? '' : 's'}
-                    </span>
-                    {a.dueDate && (() => {
-                      const status = dueStatus(a.dueDate, Date.now());
-                      return (
-                        <span className={`home-due home-due--${status}`}>
-                          Due {formatDueDate(a.dueDate)}
-                          {status === 'overdue' && ' · Overdue'}
-                        </span>
-                      );
-                    })()}
-                  </button>
-                  {sub ? (
-                    <span
-                      className="home-tile-status home-tile-status--done"
-                      title={`Attempt ${sub.attempt}`}
-                    >
-                      ✓ Submitted {formatSubmittedAt(sub.submittedAt)}
-                      {a.dueDate && lateBy(a.dueDate, sub.submittedAt) > 0 && (
-                        <span className="home-late">
-                          {' '}· late by {formatDuration(lateBy(a.dueDate, sub.submittedAt))}
-                        </span>
-                      )}
-                      {a.gradesReleased && sub.result && (() => {
-                        const s = summarizeResult(sub.result);
-                        return s.questionsTotal > 0
-                          ? ` · Grade: ${s.questionsPassed}/${s.questionsTotal} questions`
-                          : '';
-                      })()}
-                    </span>
-                  ) : (
-                    <span className="home-tile-status">Not submitted</span>
-                  )}
-                  {a.gradesReleased && sub?.result && (
-                    <button
-                      className="menu-link-button"
-                      onClick={() => setGradesFor(a.id)}
-                      title="See your result for each question"
-                    >
-                      View grades
-                    </button>
-                  )}
-                  {frozen ? (
-                    <span className="menu-frozen" title="This assignment closed after its due date — open it to see your submission, read-only.">
-                      🔒 Past due
-                    </span>
-                  ) : (
-                    <button
-                      className="home-tile-submit"
-                      onClick={() => void handleSubmit(a.id, a.title)}
-                    >
-                      Submit
-                    </button>
-                  )}
-                </div>
-              );
-            })}
-            {assignments.length === 0 && !error && (
-              <p className="home-empty">{loading ? 'Loading…' : 'No assignments available.'}</p>
-            )}
-            {error && !loading && (
-              <p className="home-empty">
-                Couldn’t load assignments — the server may be unreachable.{' '}
-                <button className="menu-link-button" onClick={reload}>Retry</button>
-              </p>
-            )}
-          </div>
-        </section>
-
-        <section className="home-section">
-          <h2 className="home-section-title">Explore</h2>
-          <div className="home-grid">
-            <button className="home-tile" onClick={() => navigate({ kind: 'sandbox' })}>
-              <span className="home-tile-title">Sandbox</span>
-              <span className="home-tile-meta">A freeform workbook to experiment — saved automatically</span>
-            </button>
-          </div>
-        </section>
+    <PageShell nav={appNav('assignments', user?.role === 'instructor')} session={<SessionControls />}>
+      <div className="mm-head">
+        <h1>Assignments</h1>
+        <p className="mm-lede">
+          Open a homework to work on it — each question has its own canvas, and your work
+          saves as you go. Submit when you're done; grades appear here once they're released.
+        </p>
       </div>
+
+      <div className="mm-list">
+        {assignments.map((a) => {
+          const sub = submissions[a.id];
+          const frozen = isFrozen(a.dueDate, Date.now(), sub != null);
+          const late = a.dueDate && sub ? lateBy(a.dueDate, sub.submittedAt) : 0;
+          const status = a.dueDate ? dueStatus(a.dueDate, Date.now()) : null;
+          const summary = a.gradesReleased && sub?.result ? summarizeResult(sub.result) : null;
+          return (
+            <div key={a.id} className="home-row">
+              <button
+                className="home-row-main"
+                onClick={() => navigate({ kind: 'assignment', id: a.id })}
+              >
+                <span className="home-row-title">{a.title}</span>
+                <span className="home-row-meta">
+                  <span>{a.questionCount} question{a.questionCount === 1 ? '' : 's'}</span>
+                  {a.dueDate && status && (
+                    <span className={`home-due home-due--${status}`}>
+                      Due {formatDueDate(a.dueDate)}
+                      {status === 'overdue' && ' · overdue'}
+                    </span>
+                  )}
+                  {!a.visible && <span className="tag">hidden from students</span>}
+                </span>
+              </button>
+              <span className="home-status">
+                {sub ? (
+                  <>
+                    <span className="home-status--done" title={`Attempt ${sub.attempt}`}>
+                      ✓ Submitted {formatSubmittedAt(sub.submittedAt)}
+                      {late > 0 && (
+                        <span className="home-late"> · late by {formatDuration(late)}</span>
+                      )}
+                    </span>
+                    {summary && (
+                      <button
+                        className="mm-link"
+                        onClick={() => setGradesFor(a.id)}
+                        title="See your result for each question"
+                      >
+                        {summary.questionsTotal > 0
+                          ? `${summary.questionsPassed} of ${summary.questionsTotal} correct · `
+                          : ''}
+                        View grades
+                      </button>
+                    )}
+                  </>
+                ) : (
+                  <span>Not submitted</span>
+                )}
+              </span>
+              {frozen ? (
+                <span
+                  className="home-locked"
+                  title="This assignment closed after its due date — open it to see your submission, read-only."
+                >
+                  🔒 Past due
+                </span>
+              ) : (
+                <button className="mm-btn" onClick={() => void handleSubmit(a.id, a.title)}>
+                  Submit
+                </button>
+              )}
+            </div>
+          );
+        })}
+        {assignments.length === 0 && !error && (
+          <p className="mm-empty">{loading ? 'Loading…' : 'No assignments available yet.'}</p>
+        )}
+        {error && !loading && (
+          <p className="mm-empty">
+            Couldn't load assignments — the server may be unreachable.{' '}
+            <button className="mm-link" onClick={reload}>Retry</button>
+          </p>
+        )}
+      </div>
+
+      <section className="mm-section">
+        <h2>Explore</h2>
+        <div className="mm-list">
+          <button className="mm-row mm-row--link" onClick={() => navigate({ kind: 'sandbox' })}>
+            <span className="mm-row-title mm-row-title--strong">Sandbox</span>
+            <span className="mm-row-meta">A freeform workbook to experiment in — saved automatically</span>
+          </button>
+        </div>
+      </section>
+
       {gradesFor && submissions[gradesFor] && (
         <GradesPanel
           assignmentId={gradesFor}
@@ -199,7 +181,6 @@ export function HomeScreen() {
           onClose={() => setGradesFor(null)}
         />
       )}
-      {showFeedback && <FeedbackPanel onClose={() => setShowFeedback(false)} />}
-    </div>
+    </PageShell>
   );
 }

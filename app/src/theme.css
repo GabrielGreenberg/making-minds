@@ -1,0 +1,301 @@
+/* ═══════════════════════════════════════════════════════════════════════
+   theme.css — the page-surface design layer (the makingminds.org vocabulary)
+
+   Everything a student or instructor sees OUTSIDE the circuit editor — login
+   and server-health screens, the home catalog, an assignment's question list,
+   the grade sheet, the feedback and account modals, the instructor shell — is
+   styled through the tokens and primitives in this file, so those surfaces
+   read as one site with the course website. The circuit editor keeps its own
+   un-prefixed tokens in index.css (there `--accent` is the canvas selection
+   blue), which is why page tokens are namespaced `--mm-*`.
+
+   Design authority: the website's stylesheet — `assets/site.css` in the
+   making-minds-website repo (github.com/GabrielGreenberg/making-minds-website),
+   reconciled against commit dab549b on 2026-09-21. Every palette token names
+   its site.css original in its trailing comment; tokens marked "app-only" have
+   no site original and are chosen to sit inside the same palette. The class
+   names shared with the site (.page .topbar .brand .band .eyebrow .tag .chip
+   .dim .mono) keep the site's meaning so the two can one day share a sheet.
+
+   Rules (pinned by app/tools/themeCheck.ts):
+   · colour literals live ONLY inside the :root block below;
+   · pages.css and every page component use var(--mm-*) tokens, never a literal;
+   · every var(--mm-*) referenced anywhere resolves to a token defined here.
+   Page-surface appearance rules: docs/buildout/VISUAL_VOCAB.md §"Page surfaces".
+   ═══════════════════════════════════════════════════════════════════════ */
+
+:root {
+  /* ── Palette (site.css :root) ── */
+  --mm-bg: #FBFAFD;              /* --bg          page background */
+  --mm-surface: #FFFFFF;         /* --surface     cards, topbar, tables */
+  --mm-surface-2: #F1EEF5;       /* --surface-2   quiet fills, hover rows */
+  --mm-ink: #2A2A2A;             /* --ink         body text */
+  --mm-ink-2: #4A4A4A;           /* --ink-2       secondary text, nav */
+  --mm-ink-3: #7B7B7B;           /* --ink-3       dim text, eyebrows, footer */
+  --mm-line: #E5E5E5;            /* --line        hairlines */
+  --mm-line-2: #D5D5D5;          /* --line-2      stronger rules, input borders */
+  --mm-navy: #030D24;            /* --navy        splash background */
+  --mm-accent: #C255B9;          /* --accent      magenta: section titles, current nav, primary buttons */
+  --mm-accent-2: #DA73D2;        /* --accent-2    hover pink */
+  --mm-accent-soft: #F7E6F5;     /* --accent-soft tag background */
+  --mm-lav: #E2B4FF;             /* --lav         the band under the topbar */
+  --mm-lav-soft: #F2E6FF;        /* --lav-soft    "up next" box */
+  --mm-lav-line: #DCC6F2;        /* --lav-line */
+  --mm-link: #1382D6;            /* --link        hyperlinks (the only surviving blue) */
+  --mm-date: #24678D;            /* --date        dates */
+  --mm-date-soft: #E3EEF6;       /* --date-soft */
+  --mm-hw: #C93A3A;              /* --hw          homework red */
+  --mm-hw-soft: #FCEBEB;         /* --hw-soft */
+  --mm-exam: #6E3A96;            /* --exam        exam purple */
+  --mm-exam-soft: #EFE2FF;       /* --exam-soft */
+  --mm-hol: #9A9A9A;             /* --hol         holidays (muted) */
+  --mm-orange: #F5A623;          /* --orange      unit 3 (decorative only; fails contrast as text) */
+
+  /* ── App-only semantic colours (no site.css original) ── */
+  --mm-ok: #2F8A55;              /* app-only  pass · submitted · due later */
+  --mm-ok-soft: #E4F3EA;         /* app-only */
+  --mm-warn: #A8700F;            /* app-only  pending · due soon (a text-safe --orange) */
+  --mm-warn-soft: #FDF3DC;       /* app-only */
+  --mm-danger: var(--mm-hw);     /* = --hw    fail · overdue · destructive */
+  --mm-danger-soft: var(--mm-hw-soft);
+  --mm-scrim: rgba(3, 13, 36, 0.42);             /* app-only  modal backdrop (navy-tinted) */
+  --mm-shadow: 0 14px 44px rgba(3, 13, 36, 0.18); /* app-only  modal card */
+  --mm-shadow-edge: -6px 0 6px -6px rgba(3, 13, 36, 0.15); /* app-only  sticky column edge */
+  --mm-focus: var(--mm-accent);
+
+  /* ── Type (site.css body · h1–h3 · .eyebrow · .tag · .topbar nav · td.date · .sub) ── */
+  --mm-font-sans: "IBM Plex Sans", "Helvetica Neue", Arial, sans-serif;
+  --mm-font-serif: "IBM Plex Serif", Georgia, "Times New Roman", serif;
+  --mm-font-mono: "IBM Plex Mono", "SFMono-Regular", Menlo, Consolas, monospace;
+  --mm-fs-body: 15px;            /* body */
+  --mm-lh-body: 1.5;             /* body */
+  --mm-fs-h1: 34px;              /* h1 */
+  --mm-fs-h2: 19px;              /* h2 (serif, accent) */
+  --mm-fs-h3: 16px;              /* h3 */
+  --mm-fs-nav: 14px;             /* .topbar nav, .fact */
+  --mm-fs-small: 13.5px;         /* td.date, .legend, .nx */
+  --mm-fs-meta: 12.5px;          /* .sub, footer */
+  --mm-fs-eyebrow: 11.5px;       /* .eyebrow, th, .brand .course */
+  --mm-fs-tag: 11px;             /* .tag, .chip */
+  --mm-tracking-eyebrow: 0.09em; /* .eyebrow */
+  --mm-tracking-th: 0.08em;      /* th, .chip */
+
+  /* ── Layout (site.css .page · section · .band) ── */
+  --mm-page-max: 1080px;         /* .page max-width */
+  --mm-page-max-wide: 1400px;    /* app-only: instructor tables need the room */
+  --mm-page-pad: clamp(16px, 4vw, 40px);  /* .page padding-inline */
+  --mm-section-gap: 32px;        /* section margin-top */
+  --mm-band: 14px;               /* .band height */
+  --mm-radius: 0px;              /* the site is flat: square corners everywhere */
+}
+
+/* ══════════════════════════════ Surface root ══════════════════════════════
+   Put .mm-surface on the root of anything outside the editor (the page shell,
+   a modal card): it sets the site's type and scopes the element rules below,
+   so the editor's own tables, headings and inputs are never touched. */
+.mm-surface {
+  font-family: var(--mm-font-sans);
+  font-size: var(--mm-fs-body);
+  line-height: var(--mm-lh-body);
+  color: var(--mm-ink);
+  text-align: left;
+  color-scheme: light;
+}
+.mm-surface h1, .mm-surface h2, .mm-surface h3 { font-family: var(--mm-font-serif); margin: 0; text-wrap: balance; }
+.mm-surface h1 { font-size: var(--mm-fs-h1); font-weight: 600; line-height: 1.12; letter-spacing: -0.01em; }
+.mm-surface h2 { font-size: var(--mm-fs-h2); font-weight: 600; color: var(--mm-accent); margin-bottom: 10px; }
+.mm-surface h3 { font-size: var(--mm-fs-h3); font-weight: 600; margin: 20px 0 6px; }
+.mm-surface a { color: var(--mm-link); text-decoration-thickness: 1px; text-underline-offset: 2px; }
+.mm-surface a:hover { text-decoration-thickness: 2px; }
+.mm-surface b, .mm-surface strong { font-weight: 600; }
+.mm-surface em { color: var(--mm-ink-3); font-style: italic; }
+.mm-surface button, .mm-surface input, .mm-surface select, .mm-surface textarea { font-family: inherit; font-size: inherit; }
+.mm-surface :focus-visible { outline: 2px solid var(--mm-focus); outline-offset: 1px; }
+
+/* ═════════════════════════════════ Shell ═════════════════════════════════
+   .mm-shell is the full-height scroll container; inside it: header.topbar >
+   div.page, div.band, main.page, footer.page — the site's own skeleton. */
+.mm-shell {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  overflow-y: auto;
+  background: var(--mm-bg);
+}
+.mm-shell > main { flex: 1 0 auto; }
+.page { width: 100%; max-width: var(--mm-page-max); margin-inline: auto; padding-inline: var(--mm-page-pad); }
+.page--wide { max-width: var(--mm-page-max-wide); }
+main.page { padding-block: 30px 40px; }
+
+.topbar { background: var(--mm-surface); border-bottom: 1px solid var(--mm-line); flex-shrink: 0; }
+.topbar .page { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 22px; padding-block: 12px; }
+.topbar .brand {
+  font-family: var(--mm-font-serif); font-weight: 700; font-size: 19px; color: var(--mm-ink);
+  text-decoration: none; display: inline-flex; align-items: baseline; gap: 10px; white-space: nowrap;
+}
+.topbar .brand:hover { color: var(--mm-accent); text-decoration: none; }
+.topbar .brand .course {
+  font-family: var(--mm-font-sans); font-weight: 600; font-size: var(--mm-fs-eyebrow);
+  letter-spacing: var(--mm-tracking-eyebrow); text-transform: uppercase; color: var(--mm-accent);
+}
+.topbar nav { display: flex; flex-wrap: wrap; gap: 4px 20px; font-size: var(--mm-fs-nav); }
+.topbar nav a, .topbar nav button {
+  color: var(--mm-ink-2); text-decoration: none; padding: 4px 0; background: none;
+  border: 0; border-bottom: 2px solid transparent; font: inherit; cursor: pointer; white-space: nowrap;
+}
+.topbar nav a:hover, .topbar nav button:hover { color: var(--mm-accent); }
+.topbar nav [aria-current="page"] { color: var(--mm-ink); border-bottom-color: var(--mm-accent); font-weight: 600; }
+.topbar .ext::after { content: " \2197"; color: var(--mm-ink-3); font-size: 12px; }
+/* Session controls: name + quiet actions, pushed to the right edge. The
+   direct-child selectors matter: a modal opened from here (Feedback, Password)
+   is a DOM descendant of .session, and its buttons must keep their own look. */
+.topbar .session { margin-left: auto; display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 16px; font-size: var(--mm-fs-nav); }
+.topbar .session > .who { color: var(--mm-ink-3); white-space: nowrap; }
+.topbar .session > button, .topbar .session > a {
+  color: var(--mm-ink-2); background: none; border: 0; padding: 4px 0; font: inherit; cursor: pointer; text-decoration: none; white-space: nowrap;
+}
+.topbar .session > button:hover, .topbar .session > a:hover { color: var(--mm-accent); }
+.band { height: var(--mm-band); background: var(--mm-lav); flex-shrink: 0; }
+footer.page {
+  flex-shrink: 0; padding-block: 14px 40px; border-top: 1px solid var(--mm-line);
+  color: var(--mm-ink-3); font-size: var(--mm-fs-meta);
+  display: flex; flex-wrap: wrap; justify-content: space-between; gap: 4px 16px;
+}
+footer.page a { color: inherit; }
+
+/* Card variant (login, server health): the topbar with the brand alone, then
+   one centred card on the page field. */
+.mm-center { display: flex; justify-content: center; align-items: flex-start; padding-block: 56px 40px; }
+.mm-card { background: var(--mm-surface); border: 1px solid var(--mm-line); padding: 30px 34px 32px; }
+.mm-card--narrow { width: 460px; max-width: 100%; }
+.mm-card > h1 { font-size: 27px; margin-bottom: 6px; }
+.mm-card .mm-lede { margin: 0 0 18px; }
+
+/* ══════════════════════════ Content vocabulary ══════════════════════════ */
+.mm-head { margin-bottom: 22px; }
+.mm-head .eyebrow { display: block; margin-bottom: 8px; }
+.mm-lede { color: var(--mm-ink-2); font-size: 14.5px; margin: 8px 0 0; max-width: 72ch; }
+.mm-section { margin-top: var(--mm-section-gap); }
+.mm-section > h2 { margin-bottom: 8px; }
+.eyebrow { font-size: var(--mm-fs-eyebrow); letter-spacing: var(--mm-tracking-eyebrow); text-transform: uppercase; color: var(--mm-ink-3); font-weight: 600; }
+.dim { color: var(--mm-ink-3); }
+a.eyebrow { color: var(--mm-ink-3); text-decoration: none; }
+a.eyebrow:hover { color: var(--mm-accent); }
+.mono { font-family: var(--mm-font-mono); font-variant-numeric: tabular-nums; }
+.mm-empty { color: var(--mm-ink-3); font-size: 14px; padding: 12px 0; margin: 0; }
+.mm-ok { color: var(--mm-ok); }
+.mm-warn { color: var(--mm-warn); }
+.mm-danger { color: var(--mm-danger); }
+.mm-date { color: var(--mm-date); }
+
+/* Tags: mono, small, on a soft field — the site's .tag; .chip is its uppercase cousin. */
+.tag {
+  display: inline-block; font-family: var(--mm-font-mono); font-size: var(--mm-fs-tag); font-weight: 600;
+  letter-spacing: 0.02em; padding: 1px 6px; white-space: nowrap; vertical-align: 1px; line-height: 1.5;
+  background: var(--mm-surface-2); color: var(--mm-ink-2);
+}
+.tag.c, .tag--accent { background: var(--mm-accent-soft); color: var(--mm-accent); }
+.tag.t, .tag--date { background: var(--mm-date-soft); color: var(--mm-date); }
+.tag--ok { background: var(--mm-ok-soft); color: var(--mm-ok); }
+.tag--warn { background: var(--mm-warn-soft); color: var(--mm-warn); }
+.tag--danger { background: var(--mm-danger-soft); color: var(--mm-danger); }
+.tag--exam { background: var(--mm-exam-soft); color: var(--mm-exam); }
+.chip { font-size: var(--mm-fs-tag); letter-spacing: var(--mm-tracking-th); text-transform: uppercase; font-weight: 700; color: var(--mm-ink-2); white-space: nowrap; }
+
+/* Hairline lists: rows over a --line-2 rule, --line between rows (the site's
+   .reslist / .fact). A row may be a button; the reset below makes that safe. */
+.mm-list { display: grid; border-top: 1px solid var(--mm-line-2); }
+.mm-row {
+  display: flex; align-items: baseline; gap: 6px 18px; padding: 12px 0;
+  border: 0; border-bottom: 1px solid var(--mm-line); background: none; font: inherit; color: inherit;
+  text-align: left; width: 100%;
+}
+.mm-row--link { cursor: pointer; }
+.mm-row--link:hover .mm-row-title { color: var(--mm-accent); }
+.mm-row-title { font-weight: 500; color: var(--mm-ink); }
+.mm-row-title--strong { font-weight: 600; }
+.mm-row-meta { color: var(--mm-ink-3); font-size: var(--mm-fs-small); white-space: nowrap; }
+.mm-row-fill { flex: 1 1 auto; min-width: 0; }
+.mm-row-sub { display: block; font-size: var(--mm-fs-meta); color: var(--mm-ink-3); margin-top: 2px; }
+
+/* Tables: uppercase eyebrow headers over a --line-2 rule, hairline rows. */
+.mm-tablewrap { overflow-x: auto; background: var(--mm-surface); border: 1px solid var(--mm-line); }
+.mm-table { border-collapse: collapse; width: 100%; }
+.mm-table th {
+  text-align: left; font-size: var(--mm-fs-eyebrow); letter-spacing: var(--mm-tracking-th); text-transform: uppercase;
+  color: var(--mm-ink-3); font-weight: 600; padding: 10px 12px; border-bottom: 1px solid var(--mm-line-2);
+}
+.mm-table td { padding: 10px 12px; border-bottom: 1px solid var(--mm-line); vertical-align: top; }
+.mm-table tr:last-child td { border-bottom: 0; }
+.mm-table td.date { white-space: nowrap; font-size: var(--mm-fs-small); color: var(--mm-date); }
+.mm-table td.num { text-align: right; font-variant-numeric: tabular-nums; }
+
+/* Buttons: square, quiet by default; one magenta primary per view. */
+.mm-btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  padding: 6px 14px; font: inherit; font-size: var(--mm-fs-small); font-weight: 600; line-height: 1.3;
+  color: var(--mm-ink); background: var(--mm-surface); border: 1px solid var(--mm-line-2); border-radius: var(--mm-radius);
+  cursor: pointer; white-space: nowrap; text-decoration: none;
+}
+.mm-btn:hover:not(:disabled) { border-color: var(--mm-ink-3); color: var(--mm-ink); }
+.mm-btn:disabled { opacity: 0.45; cursor: default; }
+.mm-btn--primary { background: var(--mm-accent); border-color: var(--mm-accent); color: var(--mm-surface); }
+.mm-btn--primary:hover:not(:disabled) { background: var(--mm-accent-2); border-color: var(--mm-accent-2); color: var(--mm-surface); }
+.mm-btn--danger { color: var(--mm-danger); }
+.mm-btn--danger:hover:not(:disabled) { border-color: var(--mm-danger); color: var(--mm-danger); }
+.mm-btn--quiet { border-color: transparent; background: transparent; color: var(--mm-ink-2); font-weight: 500; padding-inline: 6px; }
+.mm-btn--quiet:hover:not(:disabled) { color: var(--mm-accent); border-color: transparent; }
+.mm-btn--small { padding: 3px 10px; font-size: var(--mm-fs-meta); }
+.mm-link { border: 0; background: none; padding: 0; font: inherit; color: var(--mm-link); cursor: pointer; text-decoration: none; text-align: left; }
+.mm-link:hover { text-decoration: underline; }
+.mm-surface a.mm-btn { color: var(--mm-ink); }
+.mm-surface a.mm-btn--primary { color: var(--mm-surface); }
+.mm-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; align-items: center; gap: 8px 12px; }
+
+/* Fields: uppercase micro-label over a square input (the site's .calc-f). */
+.mm-field { display: grid; gap: 4px; }
+.mm-field > span, .mm-label {
+  font-size: var(--mm-fs-tag); letter-spacing: 0.06em; text-transform: uppercase; color: var(--mm-ink-3); font-weight: 600;
+}
+.mm-input {
+  width: 100%; font: inherit; font-size: 14px; padding: 7px 9px;
+  border: 1px solid var(--mm-line-2); background: var(--mm-surface); color: var(--mm-ink); border-radius: var(--mm-radius);
+}
+.mm-input:focus { outline: 2px solid var(--mm-focus); outline-offset: 1px; }
+.mm-input:disabled { background: var(--mm-surface-2); color: var(--mm-ink-3); }
+textarea.mm-input { resize: vertical; line-height: 1.45; }
+select.mm-input { width: auto; }
+.mm-form { display: grid; gap: 10px; }
+.mm-note { font-size: var(--mm-fs-small); color: var(--mm-ink-2); line-height: 1.5; margin: 0; }
+.mm-error { font-size: var(--mm-fs-small); color: var(--mm-danger); margin: 0; }
+.mm-notice { padding: 10px 14px; font-size: var(--mm-fs-small); background: var(--mm-lav-soft); border: 1px solid var(--mm-lav-line); }
+
+/* Modals: a navy scrim and a square white card; the card is its own surface
+   root because it can open over the editor, outside any .mm-shell. */
+.mm-modal-backdrop {
+  position: fixed; inset: 0; background: var(--mm-scrim);
+  display: flex; align-items: center; justify-content: center; padding: 24px; z-index: 500;
+}
+.mm-modal {
+  width: min(640px, 100%); max-height: 85vh; overflow-y: auto;
+  background: var(--mm-surface); border: 1px solid var(--mm-line); box-shadow: var(--mm-shadow);
+  padding: 22px 26px 26px;
+}
+.mm-modal--narrow { width: min(460px, 100%); }
+.mm-modal-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+.mm-modal-head h2 { color: var(--mm-ink); font-size: 22px; margin: 0; }
+.mm-modal-sub { font-size: var(--mm-fs-meta); color: var(--mm-ink-3); margin: 4px 0 16px; }
+.mm-modal-foot { font-size: var(--mm-fs-meta); color: var(--mm-ink-3); margin: 14px 0 0; }
+.mm-modal .mm-form { margin-top: 14px; }
+
+/* ═════════════════════════════ Small screens ═════════════════════════════ */
+@media (max-width: 720px) {
+  .topbar .page { gap: 4px 14px; }
+  .topbar nav { gap: 4px 14px; }
+  .topbar .session { gap: 4px 12px; }
+  .mm-center { padding-block: 24px 32px; }
+  .mm-card { padding: 22px 18px 24px; }
+  .mm-row { flex-wrap: wrap; gap: 4px 12px; }
+  .mm-modal { padding: 18px 16px 20px; }
+  .mm-modal-backdrop { padding: 12px; }
+}

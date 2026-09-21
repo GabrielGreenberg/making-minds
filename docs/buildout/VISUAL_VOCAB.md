@@ -132,3 +132,53 @@ _(textbook ch. 22, pp. 99–103; mockup `Mock_Ups-9.jpg`)_
 - Turbot-TM states: **internal = circle** (operate on the private {0,1,*} tape,
   single action write-or-move), **external = square** (sense B/E/F, move ↑/↱/↰).
   TM-turbot's private tape shown read-only below the canvas.
+
+## Page surfaces (everything outside the editor)
+
+_The course website, https://www.makingminds.org, is the design authority for every
+surface that is not the circuit editor: the login and server-health screens, the home
+catalog, an assignment's question list, the grade sheet, the feedback and account
+modals, the instructor shell and views. Its stylesheet is `assets/site.css` in the
+`making-minds-website` repo (reconciled against commit `dab549b`, 2026-09-21). The app
+carries the same vocabulary as `--mm-*` tokens in `app/src/theme.css` (each token
+comments its site.css original) plus the per-surface rules in `app/src/pages.css`;
+`app/tools/themeCheck.ts` fails `npm run check` if a page surface reintroduces a colour
+literal or an undefined token. Task: `tasks/done/2026-09-21-019-*`._
+
+- **Shell** — every page renders inside `components/PageShell.tsx`: a white `.topbar`
+  (serif brand "Making Minds · PHIL 133" linking to the website; the app nav
+  Assignments · Sandbox · Instructor with the current page underlined in magenta; name ·
+  Feedback · Password · Log out at the right, from `SessionControls`), the 14px lavender
+  `.band`, one centred `.page` column (max 1080px; `page--wide` 1400px for the
+  instructor's tables), the site footer. Login and server-health use the shell's
+  **card** variant: brand-only topbar, one centred `.mm-card`.
+- **Type** — IBM Plex, loaded from Google Fonts with system fallbacks: **Sans**
+  15px/1.5 for text, **Serif** for h1 (34px/600) and h2 (19px/600, magenta), **Mono**
+  for tags and emails. Section labels are `.eyebrow` (11.5px uppercase, tracked, grey).
+- **Colour** — ink greys `--mm-ink/-2/-3` on `--mm-bg`; hairlines `--mm-line` between
+  rows and `--mm-line-2` under a list or table head; **magenta `--mm-accent`** for
+  section titles, the current nav item, hover, and the ONE primary button per view;
+  **blue survives only as the link colour** `--mm-link`. Status colours are app-only
+  tokens chosen to sit in the palette: `--mm-ok` green (pass · submitted · due later),
+  `--mm-warn` amber (pending · due soon), `--mm-danger` = the site's homework red
+  (fail · overdue · destructive).
+- **Flat** — square corners everywhere (`--mm-radius: 0`); no shadow except the modal
+  card; surfaces are separated by hairlines, never boxed in grey.
+- **Lists and tables** — hairline rows over a `--mm-line-2` rule (`.mm-list`/`.mm-row`,
+  `.mm-table`): uppercase eyebrow `th`, dates in `--mm-date`; a clickable row turns its
+  title magenta on hover.
+- **Tags** — `.tag`: mono 11px/600 on a soft field — `tag--accent` for a question's
+  mode, `tag--date`/`tag--exam` for roles, `--ok/--warn/--danger` for states. Never a pill.
+- **Buttons** — `.mm-btn` square, white with a `--mm-line-2` border, 13.5px/600;
+  `mm-btn--primary` magenta (Submit assignment, Sign in, Send feedback, New question);
+  `mm-btn--quiet` text-only; `.mm-link` for inline text actions.
+- **Fields** — `.mm-field`: uppercase micro-label over a square `.mm-input`; focus is a
+  2px magenta outline; errors `.mm-error` in danger red, notes `.mm-note` grey.
+- **Modals** — navy-tinted scrim, square white `.mm-modal` card (the one shadow), serif
+  title, dim sub-line, Close as a small quiet button at the right of the head.
+- **Home row** — title · meta (question count, due date) · submission status (which
+  carries the grade line and the "View grades" link once released) · ONE action (Submit,
+  or the past-due lock). Nothing else.
+- **The editor is untouched** — `index.css` keeps its own canvas tokens (there
+  `--accent` is the selection blue) and inherits only the font family from the page
+  tokens; `themeCheck` pins that.

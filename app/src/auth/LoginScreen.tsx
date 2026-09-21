@@ -1,9 +1,10 @@
 import { useState } from 'react';
-import type { FormEvent } from 'react';
+import type { FormEvent, ReactNode } from 'react';
 import { useAuth } from './authProvider';
 import { TOY_ACCOUNTS } from './accounts';
 import { backendMode } from '../storage/backend';
 import type { AuthCapabilities } from './types';
+import { PageShell } from '../components/PageShell';
 
 /**
  * The login screen, shown by <AuthGate> whenever no user is set.
@@ -30,31 +31,38 @@ export function LoginScreen() {
   return <LocalLoginScreen />;
 }
 
+/** The card variant of the page shell: the brand topbar and one centred card. */
+function LoginCard({ children }: { children: ReactNode }) {
+  return (
+    <PageShell variant="card">
+      <div className="mm-card mm-card--narrow">{children}</div>
+    </PageShell>
+  );
+}
+
 function LocalLoginScreen() {
   const { login } = useAuth();
 
   return (
-    <div className="login-screen">
-      <div className="login-card">
-        <h1 className="login-title">Making Minds</h1>
-        <p className="login-text">Sign in to continue. Choose an account:</p>
-        <div className="login-accounts">
-          {TOY_ACCOUNTS.map((account) => (
-            <button
-              key={account.id}
-              className="login-account"
-              onClick={() => void login(account.id)}
-            >
-              <span className="login-account-name">{account.name}</span>
-              <span className={`login-account-role login-account-role--${account.role}`}>
-                {account.role === 'instructor' ? 'Instructor' : 'Student'}
-              </span>
-              <span className="login-account-email">{account.email}</span>
-            </button>
-          ))}
-        </div>
+    <LoginCard>
+      <h1>Sign in</h1>
+      <p className="mm-lede">Choose an account to continue.</p>
+      <div className="login-accounts">
+        {TOY_ACCOUNTS.map((account) => (
+          <button
+            key={account.id}
+            className="login-account"
+            onClick={() => void login(account.id)}
+          >
+            <span className="login-account-name">{account.name}</span>
+            <span className={`login-account-role tag ${account.role === 'instructor' ? 'tag--exam' : 'tag--date'}`}>
+              {account.role === 'instructor' ? 'Instructor' : 'Student'}
+            </span>
+            <span className="login-account-email">{account.email}</span>
+          </button>
+        ))}
       </div>
-    </div>
+    </LoginCard>
   );
 }
 
@@ -68,12 +76,10 @@ function RemoteLoginScreen() {
   // already confirmed is up, so this is a blink, not a wait.
   if (!capabilities) {
     return (
-      <div className="login-screen">
-        <div className="login-card">
-          <h1 className="login-title">Making Minds</h1>
-          <p className="login-text">Loading…</p>
-        </div>
-      </div>
+      <LoginCard>
+        <h1>Sign in</h1>
+        <p className="mm-lede">Loading…</p>
+      </LoginCard>
     );
   }
 
@@ -86,43 +92,40 @@ function RemoteLoginScreen() {
   ];
 
   return (
-    <div className="login-screen">
-      <div className="login-card">
-        <h1 className="login-title">Making Minds</h1>
-        {tabs.length > 1 && (
-          <div className="login-tabs" role="tablist">
-            {tabs.map((tab) => (
-              <button
-                key={tab.key}
-                role="tab"
-                aria-selected={pane === tab.key}
-                className={`login-tab${pane === tab.key ? ' login-tab--active' : ''}`}
-                onClick={() => setPane(tab.key)}
-              >
-                {tab.label}
-              </button>
-            ))}
-          </div>
-        )}
-        {pane === 'signin' && <SignInPane capabilities={capabilities} />}
-        {pane === 'create' && <CreateAccountPane capabilities={capabilities} onDone={() => setPane('signin')} />}
-        {pane === 'request' && <RequestAccessPane onDone={() => setPane('signin')} />}
-      </div>
-    </div>
+    <LoginCard>
+      {tabs.length > 1 ? (
+        <div className="login-tabs" role="tablist">
+          {tabs.map((tab) => (
+            <button
+              key={tab.key}
+              role="tab"
+              aria-selected={pane === tab.key}
+              className={`login-tab${pane === tab.key ? ' login-tab--active' : ''}`}
+              onClick={() => setPane(tab.key)}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
+      ) : (
+        <h1>Sign in</h1>
+      )}
+      {pane === 'signin' && <SignInPane capabilities={capabilities} />}
+      {pane === 'create' && <CreateAccountPane capabilities={capabilities} onDone={() => setPane('signin')} />}
+      {pane === 'request' && <RequestAccessPane onDone={() => setPane('signin')} />}
+    </LoginCard>
   );
 }
 
 function SsoLoginScreen({ capabilities }: { capabilities: AuthCapabilities }) {
   return (
-    <div className="login-screen">
-      <div className="login-card">
-        <h1 className="login-title">Making Minds</h1>
-        <p className="login-text">Sign in with your UCLA account to continue.</p>
-        <a className="login-submit login-submit--link" href={capabilities.ssoLoginUrl ?? '#'}>
-          Sign in with UCLA
-        </a>
-      </div>
-    </div>
+    <LoginCard>
+      <h1>Sign in</h1>
+      <p className="mm-lede">Use your UCLA account to continue.</p>
+      <a className="mm-btn mm-btn--primary" href={capabilities.ssoLoginUrl ?? '#'}>
+        Sign in with UCLA
+      </a>
+    </LoginCard>
   );
 }
 
@@ -147,14 +150,14 @@ function SignInPane({ capabilities }: { capabilities: AuthCapabilities }) {
 
   return (
     <>
-      <p className="login-text">
+      <p className="mm-lede">
         {capabilities.usesPassword
           ? 'Sign in with your course email and password.'
           : 'Sign in with your course email.'}
       </p>
-      <form className="login-form login-form--stacked" onSubmit={(e) => void handleSubmit(e)}>
+      <form className="mm-form login-form" onSubmit={(e) => void handleSubmit(e)}>
         <input
-          className="login-email"
+          className="mm-input"
           type="email"
           autoFocus
           autoComplete="username"
@@ -165,7 +168,7 @@ function SignInPane({ capabilities }: { capabilities: AuthCapabilities }) {
         />
         {capabilities.usesPassword && (
           <input
-            className="login-email"
+            className="mm-input"
             type="password"
             autoComplete="current-password"
             placeholder="Password"
@@ -174,13 +177,13 @@ function SignInPane({ capabilities }: { capabilities: AuthCapabilities }) {
             disabled={busy}
           />
         )}
-        <button className="login-submit" type="submit" disabled={busy || !ready}>
+        <button className="mm-btn mm-btn--primary" type="submit" disabled={busy || !ready}>
           {busy ? 'Signing in…' : 'Sign in'}
         </button>
       </form>
-      {error && <p className="login-error">{error}</p>}
+      {error && <p className="mm-error">{error}</p>}
       {capabilities.usesPassword && (
-        <p className="login-note">
+        <p className="mm-note">
           Forgot your password? Ask your instructor to reset it — they can clear it so you can set
           a new one.
         </p>
@@ -227,13 +230,13 @@ function CreateAccountPane({
 
   return (
     <>
-      <p className="login-text">
+      <p className="mm-lede">
         Use the email your instructor has on file, and choose a password. Your student ID confirms
         the account is yours.
       </p>
-      <form className="login-form login-form--stacked" onSubmit={(e) => void handleSubmit(e)}>
+      <form className="mm-form login-form" onSubmit={(e) => void handleSubmit(e)}>
         <input
-          className="login-email"
+          className="mm-input"
           type="email"
           autoFocus
           autoComplete="username"
@@ -243,7 +246,7 @@ function CreateAccountPane({
           disabled={busy}
         />
         <input
-          className="login-email"
+          className="mm-input"
           type="text"
           autoComplete="off"
           placeholder="Student ID"
@@ -252,7 +255,7 @@ function CreateAccountPane({
           disabled={busy}
         />
         <input
-          className="login-email"
+          className="mm-input"
           type="password"
           autoComplete="new-password"
           placeholder={`Password (at least ${capabilities.passwordMinLength} characters)`}
@@ -261,7 +264,7 @@ function CreateAccountPane({
           disabled={busy}
         />
         <input
-          className="login-email"
+          className="mm-input"
           type="password"
           autoComplete="new-password"
           placeholder="Confirm password"
@@ -269,17 +272,17 @@ function CreateAccountPane({
           onChange={(e) => setConfirm(e.target.value)}
           disabled={busy}
         />
-        <button className="login-submit" type="submit" disabled={busy || !ready}>
+        <button className="mm-btn mm-btn--primary" type="submit" disabled={busy || !ready}>
           {busy ? 'Creating…' : 'Create account'}
         </button>
       </form>
       {tooShort && (
-        <p className="login-error">
+        <p className="mm-error">
           Password must be at least {capabilities.passwordMinLength} characters.
         </p>
       )}
-      {mismatch && <p className="login-error">The two passwords don't match.</p>}
-      {error && <p className="login-error">{error}</p>}
+      {mismatch && <p className="mm-error">The two passwords don't match.</p>}
+      {error && <p className="mm-error">{error}</p>}
     </>
   );
 }
@@ -315,11 +318,11 @@ function RequestAccessPane({ onDone }: { onDone: () => void }) {
   if (sent) {
     return (
       <>
-        <p className="login-text">
+        <p className="mm-lede">
           Request sent. Your instructor will review it — once they add you, come back and create
           your account with this email.
         </p>
-        <button className="login-submit" onClick={onDone}>
+        <button className="mm-btn mm-btn--primary" onClick={onDone}>
           Back to sign in
         </button>
       </>
@@ -328,13 +331,13 @@ function RequestAccessPane({ onDone }: { onDone: () => void }) {
 
   return (
     <>
-      <p className="login-text">
+      <p className="mm-lede">
         If the course roster has a different email for you (or doesn't have you yet), tell your
         instructor here.
       </p>
-      <form className="login-form login-form--stacked" onSubmit={(e) => void handleSubmit(e)}>
+      <form className="mm-form login-form" onSubmit={(e) => void handleSubmit(e)}>
         <input
-          className="login-email"
+          className="mm-input"
           type="text"
           autoFocus
           placeholder="Your name"
@@ -343,7 +346,7 @@ function RequestAccessPane({ onDone }: { onDone: () => void }) {
           disabled={busy}
         />
         <input
-          className="login-email"
+          className="mm-input"
           type="email"
           placeholder="The email you want to use"
           value={email}
@@ -351,7 +354,7 @@ function RequestAccessPane({ onDone }: { onDone: () => void }) {
           disabled={busy}
         />
         <input
-          className="login-email"
+          className="mm-input"
           type="text"
           placeholder="Student ID"
           value={studentId}
@@ -359,18 +362,18 @@ function RequestAccessPane({ onDone }: { onDone: () => void }) {
           disabled={busy}
         />
         <textarea
-          className="login-message"
+          className="mm-input"
           placeholder="Anything your instructor should know (optional)"
           rows={3}
           value={message}
           onChange={(e) => setMessage(e.target.value)}
           disabled={busy}
         />
-        <button className="login-submit" type="submit" disabled={busy || !ready}>
+        <button className="mm-btn mm-btn--primary" type="submit" disabled={busy || !ready}>
           {busy ? 'Sending…' : 'Send request'}
         </button>
       </form>
-      {error && <p className="login-error">{error}</p>}
+      {error && <p className="mm-error">{error}</p>}
     </>
   );
 }

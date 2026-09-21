@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import type { ReactNode } from 'react';
 import { backendMode } from '../storage/backend';
 import { health } from '../api/client';
+import { PageShell } from '../components/PageShell';
 
 /**
  * Remote mode's boot gate: nothing renders — not even the login screen —
@@ -13,7 +14,8 @@ import { health } from '../api/client';
  *
  * Sits OUTSIDE <AuthProvider> (see main.tsx): the provider's `me()` session
  * restore and the login form only ever run against a server known to be up,
- * so a boot-time outage can't be misread as a dead session.
+ * so a boot-time outage can't be misread as a dead session. That is also why
+ * the screen uses the bare PageShell (no session controls).
  *
  * Local mode renders children directly — no probe, no network, byte-identical.
  */
@@ -50,24 +52,26 @@ function RemoteHealthGate({ children }: { children: ReactNode }) {
   if (status === 'ok') return <>{children}</>;
 
   return (
-    <div className="login-screen">
-      <div className="login-card">
-        <h1 className="login-title">Making Minds</h1>
+    <PageShell variant="card">
+      <div className="mm-card mm-card--narrow">
         {status === 'checking' ? (
-          <p className="login-text">Connecting to the course server…</p>
+          <>
+            <h1>Connecting…</h1>
+            <p className="mm-lede">Reaching the course server.</p>
+          </>
         ) : (
           <>
-            <p className="login-text">
-              The course server can’t be reached right now. Your work is safe — nothing is lost —
-              but signing in and saving need the server.
+            <h1>The course server can't be reached</h1>
+            <p className="mm-lede">
+              Your work is safe — nothing is lost — but signing in and saving need the server.
+              Retrying automatically every few seconds.
             </p>
-            <p className="login-text">Retrying automatically every few seconds.</p>
-            <button className="login-submit" onClick={() => void probe()}>
+            <button className="mm-btn mm-btn--primary" onClick={() => void probe()}>
               Retry now
             </button>
           </>
         )}
       </div>
-    </div>
+    </PageShell>
   );
 }

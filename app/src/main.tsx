@@ -1,7 +1,11 @@
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import 'katex/dist/katex.min.css'
+// Stylesheet order: the page-surface tokens first (index.css reads the font
+// family from them), then the editor, then the page surfaces (theme.css).
+import './theme.css'
 import './index.css'
+import './pages.css'
 import App from './App.tsx'
 import { AuthProvider, AuthGate } from './auth'
 import { HealthGate } from './auth/HealthGate.tsx'

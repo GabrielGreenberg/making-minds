@@ -107,21 +107,21 @@ export function GradesPanel({
   };
 
   return (
-    <div className="modal-backdrop" onClick={onClose}>
-      <div className="modal-card" onClick={(e) => e.stopPropagation()}>
-        <div className="modal-head">
-          <h2 className="modal-title">Your grades</h2>
-          <button className="menu-link-button" onClick={onClose}>Close</button>
+    <div className="mm-modal-backdrop" onClick={onClose}>
+      <div className="mm-modal mm-surface" onClick={(e) => e.stopPropagation()}>
+        <div className="mm-modal-head">
+          <h2>Your grades</h2>
+          <button className="mm-btn mm-btn--small" onClick={onClose}>Close</button>
         </div>
-        <p className="modal-sub">
+        <p className="mm-modal-sub">
           {record.submission.assignmentTitle} · attempt {record.attempt} ·
           {' '}submitted {new Date(record.submittedAt).toLocaleString()}
         </p>
         {loading && questions.length === 0 ? (
-          <p className="home-empty">Loading…</p>
+          <p className="mm-empty">Loading…</p>
         ) : (
           <>
-            <table className="grades-table">
+            <table className="mm-table grades-table">
               <thead>
                 <tr>
                   <th>Question</th>
@@ -138,7 +138,7 @@ export function GradesPanel({
                   return (
                     <tr key={q.id}>
                       <td>
-                        <button className="grades-q-link" onClick={() => goToQuestion(i)} title="Go to this question">
+                        <button className="mm-link" onClick={() => goToQuestion(i)} title="Go to this question">
                           {q.label}
                         </button>
                         {q.title && <span className="grades-q-title">{q.title}</span>}
@@ -158,20 +158,20 @@ export function GradesPanel({
                         {failed && expanded === q.id && qr && (
                           <div className="grades-failed-dropdown">
                             <FailedInputs qr={qr} />
-                            <button className="grades-q-link" onClick={() => goToQuestion(i)}>
+                            <button className="mm-link" onClick={() => goToQuestion(i)}>
                               Open my submission →
                             </button>
                           </div>
                         )}
                       </td>
-                      <td className="grades-mode">{questionModeLabel(q)}</td>
+                      <td><span className="tag">{questionModeLabel(q)}</span></td>
                       <td className={`grades-verdict grades-verdict--${v.tone}`}>{v.text}</td>
                     </tr>
                   );
                 })}
               </tbody>
             </table>
-            <p className="modal-foot">
+            <p className="mm-modal-foot">
               {correct} of {counted.length} graded question{counted.length === 1 ? '' : 's'} correct.
               {counted.length < questions.length &&
                 ` ${questions.length - counted.length} not counted yet.`}
