@@ -85,20 +85,23 @@ export function FeedbackPanel({ onClose }: { onClose: () => void }) {
   };
 
   return (
-    <div className="modal-backdrop" onClick={onClose}>
-      <div className="modal-card" onClick={(e) => e.stopPropagation()}>
-        <div className="modal-head">
-          <h2 className="modal-title">Feedback</h2>
-          <button className="menu-link-button" onClick={onClose}>Close</button>
+    <div className="mm-modal-backdrop" onClick={onClose}>
+      <div className="mm-modal mm-surface" onClick={(e) => e.stopPropagation()}>
+        <div className="mm-modal-head">
+          <h2>Feedback</h2>
+          <button className="mm-btn mm-btn--small" onClick={onClose}>Close</button>
         </div>
+        <p className="mm-modal-sub">
+          Something broken, confusing, or wrong in a homework? Tell the instructors.
+        </p>
         {sent ? (
           <p className="feedback-sent">Thanks — an instructor will take a look.</p>
         ) : (
-          <div className="feedback-form">
-            <label className="feedback-field">
+          <div className="mm-form">
+            <label className="mm-field">
               <span>Category</span>
               <select
-                className="instructor-select"
+                className="mm-input"
                 value={category}
                 onChange={(e) => setCategory(e.target.value as FeedbackCategory)}
               >
@@ -106,19 +109,20 @@ export function FeedbackPanel({ onClose }: { onClose: () => void }) {
                 <option value="homework content">Homework content</option>
               </select>
             </label>
-            <label className="feedback-field">
+            <label className="mm-field">
               <span>What happened?</span>
               <textarea
-                className="feedback-textarea"
+                className="mm-input"
                 value={message}
                 onChange={(e) => setMessage(e.target.value)}
                 placeholder="Describe the issue or suggestion…"
                 rows={5}
               />
             </label>
-            <label className="feedback-field">
+            <label className="mm-field">
               <span>Screenshots (optional, up to {MAX_SCREENSHOTS})</span>
               <input
+                className="feedback-file"
                 type="file"
                 accept="image/*"
                 multiple
@@ -132,7 +136,7 @@ export function FeedbackPanel({ onClose }: { onClose: () => void }) {
                   <div key={i} className="feedback-screenshot-preview">
                     <img className="feedback-screenshot-thumb" src={s.dataUrl} alt={s.filename ?? 'screenshot'} />
                     <button
-                      className="menu-link-button"
+                      className="mm-btn mm-btn--small"
                       onClick={() => setScreenshots((all) => all.filter((_, j) => j !== i))}
                     >
                       Remove
@@ -141,9 +145,9 @@ export function FeedbackPanel({ onClose }: { onClose: () => void }) {
                 ))}
               </div>
             )}
-            {error && <p className="feedback-error">{error}</p>}
-            <div className="feedback-form-foot">
-              <button className="home-tile-submit" disabled={busy} onClick={() => void submit()}>
+            {error && <p className="mm-error">{error}</p>}
+            <div className="mm-actions">
+              <button className="mm-btn mm-btn--primary" disabled={busy} onClick={() => void submit()}>
                 {busy ? 'Sending…' : 'Send feedback'}
               </button>
             </div>

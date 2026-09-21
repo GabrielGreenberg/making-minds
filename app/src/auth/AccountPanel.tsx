@@ -3,9 +3,9 @@ import type { FormEvent } from 'react';
 import { useAuth } from './authProvider';
 
 /**
- * "Password" button + its modal, shown beside the session chip wherever the
- * chrome offers session controls (home screen, editor menu bar, instructor
- * header). Renders NOTHING unless the server's sign-in system actually manages
+ * "Password" button + its modal, shown beside the session controls wherever
+ * the chrome offers them (the page shell's topbar, the editor menu bar).
+ * Renders NOTHING unless the server's sign-in system actually manages
  * passwords — under SSO or dev login there is nothing here to change, and the
  * button would be a dead end.
  *
@@ -20,7 +20,7 @@ export function AccountPanel() {
 
   return (
     <>
-      <button className="menu-link-button" onClick={() => setOpen(true)}>
+      <button type="button" className="menu-link-button" onClick={() => setOpen(true)}>
         Password
       </button>
       {open && <ChangePasswordModal onClose={() => setOpen(false)} />}
@@ -54,23 +54,27 @@ function ChangePasswordModal({ onClose }: { onClose: () => void }) {
   };
 
   return (
-    <div className="modal-backdrop" onClick={onClose}>
-      <div className="modal-card" onClick={(e) => e.stopPropagation()}>
-        <h2 className="modal-title">Change password</h2>
+    <div className="mm-modal-backdrop" onClick={onClose}>
+      <div className="mm-modal mm-modal--narrow mm-surface" onClick={(e) => e.stopPropagation()}>
+        <div className="mm-modal-head">
+          <h2>Change password</h2>
+        </div>
         {done ? (
           <>
-            <p className="login-text">
+            <p className="mm-lede">
               Password changed. You are still signed in here; any other device has been signed out.
             </p>
-            <button className="login-submit" onClick={onClose}>
-              Done
-            </button>
+            <div className="mm-actions">
+              <button className="mm-btn mm-btn--primary" onClick={onClose}>
+                Done
+              </button>
+            </div>
           </>
         ) : (
           <>
-            <form className="login-form login-form--stacked" onSubmit={(e) => void handleSubmit(e)}>
+            <form className="mm-form" onSubmit={(e) => void handleSubmit(e)}>
               <input
-                className="login-email"
+                className="mm-input"
                 type="password"
                 autoFocus
                 autoComplete="current-password"
@@ -80,7 +84,7 @@ function ChangePasswordModal({ onClose }: { onClose: () => void }) {
                 disabled={busy}
               />
               <input
-                className="login-email"
+                className="mm-input"
                 type="password"
                 autoComplete="new-password"
                 placeholder={`New password (at least ${minLength} characters)`}
@@ -89,7 +93,7 @@ function ChangePasswordModal({ onClose }: { onClose: () => void }) {
                 disabled={busy}
               />
               <input
-                className="login-email"
+                className="mm-input"
                 type="password"
                 autoComplete="new-password"
                 placeholder="Confirm new password"
@@ -97,20 +101,20 @@ function ChangePasswordModal({ onClose }: { onClose: () => void }) {
                 onChange={(e) => setConfirm(e.target.value)}
                 disabled={busy}
               />
-              <div className="modal-actions">
-                <button type="button" className="menu-link-button" onClick={onClose}>
+              {tooShort && (
+                <p className="mm-error">Password must be at least {minLength} characters.</p>
+              )}
+              {mismatch && <p className="mm-error">The two passwords don't match.</p>}
+              {error && <p className="mm-error">{error}</p>}
+              <div className="mm-actions">
+                <button type="button" className="mm-btn" onClick={onClose}>
                   Cancel
                 </button>
-                <button className="login-submit" type="submit" disabled={busy || !ready}>
+                <button className="mm-btn mm-btn--primary" type="submit" disabled={busy || !ready}>
                   {busy ? 'Changing…' : 'Change password'}
                 </button>
               </div>
             </form>
-            {tooShort && (
-              <p className="login-error">Password must be at least {minLength} characters.</p>
-            )}
-            {mismatch && <p className="login-error">The two passwords don't match.</p>}
-            {error && <p className="login-error">{error}</p>}
           </>
         )}
       </div>

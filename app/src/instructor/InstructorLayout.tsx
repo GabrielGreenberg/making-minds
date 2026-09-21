@@ -1,42 +1,17 @@
 import type { ReactNode } from 'react';
-import { useAuth } from '../auth';
-import { AccountPanel } from '../auth/AccountPanel';
-import { navigate } from '../routing';
+import { PageShell, appNav } from '../components/PageShell';
+import { SessionControls } from '../components/SessionControls';
 
 /**
- * Thin shell shared by all instructor views: a header bar with the title, the
- * signed-in identity, a link back to the student view, and Log out — plus a
- * content area for the active view.
+ * The shell shared by all instructor views: the site's page shell with the
+ * app nav (Instructor current), the signed-in identity and Log out, and a
+ * wide content column for the gradebook and roster tables. Only instructor
+ * accounts get here (InstructorGate), so the Instructor nav item is a given.
  */
 export function InstructorLayout({ children }: { children: ReactNode }) {
-  const { user, logout } = useAuth();
-
-  const handleLogout = () => {
-    logout();
-    navigate({ kind: 'home' });
-  };
-
   return (
-    <div className="instructor-app">
-      <header className="instructor-header">
-        <button
-          className="instructor-header-title"
-          onClick={() => navigate({ kind: 'instructor' })}
-        >
-          Instructor — Making Minds
-        </button>
-        <div className="instructor-header-actions">
-          {user && <span className="session-chip">{user.name} · Instructor</span>}
-          <button className="instructor-header-exit" onClick={() => navigate({ kind: 'home' })}>
-            Student view
-          </button>
-          <AccountPanel />
-          <button className="instructor-header-exit" onClick={handleLogout}>
-            Log out
-          </button>
-        </div>
-      </header>
-      <main className="instructor-content">{children}</main>
-    </div>
+    <PageShell nav={appNav('instructor', true)} width="wide" session={<SessionControls feedback={false} />}>
+      {children}
+    </PageShell>
   );
 }

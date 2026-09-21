@@ -1,0 +1,795 @@
+/* ═══════════════════════════════════════════════════════════════════════
+   pages.css — per-surface rules for everything OUTSIDE the circuit editor:
+   the home catalog, an assignment's question list, the grade sheet, login,
+   the feedback form, and the instructor views. The tokens and the shared
+   vocabulary (shell, tags, rows, tables, buttons, fields, modals) live in
+   theme.css; this file never holds a colour literal (app/tools/themeCheck.ts).
+
+   The instructor sections further down were carried over from index.css and
+   re-pointed at the tokens; their layout is restyled by the follow-up task
+   (2026-09-21-019 Phase B). The editor's own chrome stays in index.css.
+   ═══════════════════════════════════════════════════════════════════════ */
+
+/* ── Home: the assignment catalog ──────────────────────────────────────
+   One row per assignment: title + meta on the left, submission status in
+   the middle, ONE action on the right (Submit, or the past-due lock). */
+.home-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 6px 24px;
+  padding: 13px 0;
+  border-bottom: 1px solid var(--mm-line);
+}
+.home-row-main {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+  border: 0;
+  background: none;
+  padding: 0;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.home-row-title { font-size: 16px; font-weight: 500; color: var(--mm-ink); }
+.home-row-main:hover .home-row-title { color: var(--mm-accent); }
+.home-row-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 2px 10px;
+  font-size: var(--mm-fs-small);
+  color: var(--mm-ink-3);
+}
+.home-due { white-space: nowrap; }
+.home-due--due-later { color: var(--mm-date); }
+.home-due--due-soon { color: var(--mm-warn); font-weight: 600; }
+.home-due--overdue { color: var(--mm-danger); font-weight: 600; }
+.home-status {
+  display: grid;
+  justify-items: end;
+  gap: 2px;
+  font-size: var(--mm-fs-small);
+  color: var(--mm-ink-3);
+  text-align: right;
+  white-space: nowrap;
+}
+.home-status--done { color: var(--mm-ok); }
+.home-late { color: var(--mm-danger); font-weight: 600; }
+.home-locked { font-size: var(--mm-fs-meta); color: var(--mm-ink-3); white-space: nowrap; }
+.home-row .mm-btn { justify-self: end; }
+@media (max-width: 720px) {
+  /* Title + meta over the status in the left column; the one action centred beside them. */
+  .home-row { grid-template-columns: minmax(0, 1fr) auto; align-items: start; }
+  .home-status { grid-column: 1; justify-items: start; text-align: left; white-space: normal; }
+  .home-row .mm-btn, .home-row .home-locked { grid-column: 2; grid-row: 1 / span 2; align-self: center; }
+}
+
+/* ── Assignment overview: the question list ────────────────────────── */
+.overview-row {
+  display: grid;
+  grid-template-columns: auto auto minmax(0, 1fr);
+  justify-items: start;
+  align-items: baseline;
+  gap: 6px 14px;
+  width: 100%;
+  padding: 12px 0;
+  border: 0;
+  border-bottom: 1px solid var(--mm-line);
+  background: none;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.overview-label { font-weight: 600; white-space: nowrap; color: var(--mm-ink); }
+.overview-row:hover .overview-label { color: var(--mm-accent); }
+.overview-done { color: var(--mm-ok); margin-left: 5px; }
+.overview-statement {
+  font-size: var(--mm-fs-small);
+  color: var(--mm-ink-3);
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+.overview-statement strong { color: var(--mm-ink-2); }
+.overview-submit {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px 16px;
+  margin-top: 18px;
+}
+@media (max-width: 720px) {
+  .overview-row { grid-template-columns: auto minmax(0, 1fr); }
+  .overview-statement { grid-column: 1 / -1; }
+}
+
+/* ── Grade sheet (modal) ───────────────────────────────────────────── */
+.grades-table td:first-child { width: 58%; }
+.grades-q-title { display: block; font-size: var(--mm-fs-meta); color: var(--mm-ink-3); }
+.grades-feedback-note {
+  margin: 4px 0 0;
+  font-size: var(--mm-fs-meta);
+  font-style: italic;
+  color: var(--mm-ink-2);
+  white-space: pre-wrap;
+}
+.grades-feedback-label { font-style: normal; font-weight: 600; }
+.grades-failed-toggle {
+  display: block;
+  margin-top: 4px;
+  border: 0;
+  background: none;
+  padding: 0;
+  font: inherit;
+  font-size: var(--mm-fs-meta);
+  color: var(--mm-ink-3);
+  cursor: pointer;
+}
+.grades-failed-toggle:hover { color: var(--mm-accent); }
+.grades-failed-dropdown {
+  margin: 6px 0 2px;
+  padding: 8px 10px;
+  background: var(--mm-surface-2);
+  font-size: var(--mm-fs-meta);
+}
+.grades-failed-list { margin: 0 0 6px; padding-left: 18px; color: var(--mm-ink-2); }
+.grades-verdict { white-space: nowrap; font-weight: 600; }
+.grades-verdict--pass { color: var(--mm-ok); }
+.grades-verdict--fail { color: var(--mm-danger); }
+.grades-verdict--pending { color: var(--mm-warn); }
+.grades-verdict--none { color: var(--mm-ink-3); font-weight: 400; }
+
+/* ── Login (card variant of the shell) ─────────────────────────────── */
+.login-accounts { display: grid; gap: 8px; margin-top: 2px; }
+.login-account {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  grid-template-areas: "name role" "email role";
+  align-items: center;
+  gap: 2px 10px;
+  padding: 11px 14px;
+  background: var(--mm-surface);
+  border: 1px solid var(--mm-line-2);
+  cursor: pointer;
+  text-align: left;
+  font: inherit;
+  color: inherit;
+}
+.login-account:hover { border-color: var(--mm-accent); }
+.login-account-name { grid-area: name; font-weight: 600; }
+.login-account-email { grid-area: email; font-family: var(--mm-font-mono); font-size: var(--mm-fs-meta); color: var(--mm-ink-3); }
+.login-account-role { grid-area: role; }
+/* Sign in / Create account / Not on the roster? — the remote login panes */
+.login-tabs { display: flex; flex-wrap: wrap; gap: 0 18px; margin-bottom: 16px; border-bottom: 1px solid var(--mm-line-2); }
+.login-tab {
+  padding: 6px 0 8px;
+  margin-bottom: -1px;
+  font: inherit;
+  font-size: var(--mm-fs-nav);
+  font-weight: 500;
+  color: var(--mm-ink-2);
+  background: none;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  cursor: pointer;
+}
+.login-tab:hover { color: var(--mm-accent); }
+.login-tab--active { color: var(--mm-ink); border-bottom-color: var(--mm-accent); font-weight: 600; }
+.login-form .mm-btn { justify-self: start; margin-top: 2px; }
+
+/* ── Feedback (the student form; the instructor queue is further down) ── */
+.feedback-sent { padding: 12px 0 4px; }
+.feedback-file { font-size: var(--mm-fs-small); color: var(--mm-ink-2); }
+
+/* MenuBar Submit (assignment active) */
+.menu-submit {
+  margin-left: auto;
+  color: var(--mm-ok);
+  font-weight: 600;
+}
+
+.menu-submit:hover {
+  background: var(--mm-ok-soft);
+}
+
+.menu-frozen {
+  margin-left: auto;
+  color: var(--mm-danger);
+  font-weight: 600;
+  cursor: default;
+}
+
+/* ─────────────────────────────────────────────────────────────────
+   Instructor frontend
+   ───────────────────────────────────────────────────────────────── */
+
+/* Unlock screen */
+.instructor-unlock {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100vh;
+  width: 100vw;
+  background: var(--mm-surface-2);
+}
+.instructor-unlock-card {
+  max-width: 440px;
+  padding: 32px;
+  background: var(--mm-surface);
+  border: 1px solid var(--mm-line-2);
+  border-radius: 10px;
+  text-align: center;
+}
+.instructor-unlock-title { font-size: 22px; margin-bottom: 12px; }
+.instructor-unlock-text { color: var(--mm-ink-2); line-height: 1.5; margin-bottom: 20px; }
+.instructor-unlock-button {
+  background: var(--mm-accent);
+  color: var(--mm-surface);
+  border: none;
+  border-radius: 6px;
+  padding: 10px 20px;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.instructor-unlock-button:hover { background: var(--mm-accent-2); }
+
+/* Page heads / sections */
+.instructor-page-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.instructor-page-head-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.instructor-release {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-left: auto;
+  font-size: 13px;
+  color: var(--mm-ink-3);
+}
+.instructor-page-title { font-size: 20px; }
+.instructor-section-title { font-size: 18px; }
+.instructor-subhead { font-size: 15px; color: var(--mm-ink); }
+.instructor-section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin: 20px 0 10px;
+}
+.instructor-empty { color: var(--mm-ink-2); padding: 16px 0; }
+.instructor-error { padding: 24px; }
+.instructor-error p { margin-bottom: 12px; }
+.instructor-count { color: var(--mm-ink-2); font-size: 13px; }
+.instructor-statement-preview {
+  margin-top: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--mm-line-2);
+  border-radius: 6px;
+  background: var(--mm-surface-2);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.instructor-hint { color: var(--mm-ink-2); font-size: 13px; margin: 0 0 10px; font-style: italic; }
+
+/* Buttons */
+.instructor-btn {
+  border: 1px solid var(--mm-line-2);
+  background: var(--mm-surface);
+  border-radius: 5px;
+  padding: 5px 11px;
+  font-size: 13px;
+  cursor: pointer;
+  color: var(--mm-ink);
+}
+.instructor-btn:hover:not(:disabled) { border-color: var(--mm-ink-3); }
+.instructor-btn:disabled { opacity: 0.4; cursor: default; }
+.instructor-btn--primary { background: var(--mm-accent); color: var(--mm-surface); border-color: var(--mm-accent); }
+.instructor-btn--primary:hover:not(:disabled) { background: var(--mm-accent-2); }
+.instructor-btn--danger { color: var(--mm-danger); }
+.instructor-btn--danger:hover:not(:disabled) { border-color: var(--mm-danger); }
+.instructor-btn--icon { padding: 4px 8px; min-width: 28px; }
+
+.instructor-badge--hidden {
+  background: var(--mm-danger-soft);
+  color: var(--mm-danger);
+}
+
+.home-hidden-tag {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--mm-danger);
+  white-space: nowrap;
+}
+
+.instructor-table-order-head { width: 1%; white-space: nowrap; }
+.instructor-table-order { width: 1%; padding-right: 0; }
+
+/* Drag-to-reorder: a grip handle starts the drag, the whole row is the drop
+   target, and the row being carried dims in place. */
+.instructor-drag-handle {
+  display: inline-block;
+  padding: 0 4px;
+  color: var(--mm-line-2);
+  cursor: grab;
+  user-select: none;
+  line-height: 1;
+  font-size: 15px;
+}
+.instructor-drag-handle:hover { color: var(--mm-ink-2); }
+.instructor-drag-handle:active { cursor: grabbing; }
+.instructor-drag-handle--pinned { opacity: 0.3; cursor: default; }
+.instructor-drag-handle--pinned:hover { color: var(--mm-line-2); }
+.is-dragging { opacity: 0.45; }
+.instructor-link {
+  border: none;
+  background: none;
+  color: var(--mm-accent);
+  cursor: pointer;
+  font-size: 14px;
+  padding: 0;
+}
+
+/* Tables */
+.instructor-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+.instructor-table th,
+.instructor-table td {
+  text-align: left;
+  padding: 9px 10px;
+  border-bottom: 1px solid var(--mm-line);
+}
+.instructor-table th { color: var(--mm-ink-2); font-weight: 600; font-size: 12px; text-transform: uppercase; }
+.instructor-table-actions { display: flex; gap: 6px; flex-wrap: wrap; }
+.instructor-table-actions-head { text-align: right; }
+/* Fixed width per action button so a row's later buttons (Submissions, Export
+   JSON, Delete) land in the same horizontal position regardless of whether
+   this row's toggle reads "Publish" or "Hide". */
+.instructor-table-actions .instructor-btn { min-width: 96px; text-align: center; }
+.instructor-asg-title { font-weight: 500; margin-right: 8px; }
+
+.instructor-badge {
+  display: inline-block;
+  font-size: 11px;
+  padding: 1px 7px;
+  border-radius: 10px;
+  vertical-align: middle;
+}
+.instructor-badge--custom { background: var(--mm-date-soft); color: var(--mm-accent); }
+.instructor-badge--bundled { background: var(--mm-line); color: var(--mm-ink-2); }
+.instructor-badge--mode { background: var(--mm-exam-soft); color: var(--mm-exam); margin: 0 8px; }
+
+/* Fields */
+.instructor-field { display: block; margin-bottom: 16px; }
+.instructor-field-label { display: block; font-size: 13px; color: var(--mm-ink-2); margin-bottom: 4px; }
+.instructor-input {
+  border: 1px solid var(--mm-line-2);
+  border-radius: 5px;
+  padding: 6px 9px;
+  font-size: 14px;
+  font-family: inherit;
+}
+.instructor-input:focus { outline: none; border-color: var(--mm-accent); }
+.instructor-title-input { width: 100%; max-width: 480px; font-size: 16px; }
+.instructor-input--name { width: 90px; }
+.instructor-input--num { width: 54px; }
+
+/* Gradebook: per-student rows and expanded submission history */
+.instructor-expand-caret { color: var(--mm-ink-2); font-size: 10px; margin-right: 2px; }
+.instructor-latest-tag { color: var(--mm-ink-2); font-size: 11px; }
+.instructor-late { color: var(--mm-danger); font-size: 11px; font-weight: 600; }
+.instructor-attempt-table { margin: 6px 0; }
+.instructor-attempt-table th { font-size: 11px; }
+.instructor-input--formula { width: 260px; font-family: var(--mm-font-mono); }
+.instructor-textarea {
+  width: 100%;
+  max-width: 640px;
+  border: 1px solid var(--mm-line-2);
+  border-radius: 5px;
+  padding: 8px 10px;
+  font-size: 14px;
+  font-family: inherit;
+  resize: vertical;
+}
+.instructor-inline-field { display: inline-flex; align-items: center; gap: 5px; font-size: 13px; color: var(--mm-ink-2); }
+
+/* Question list */
+.instructor-question-list { list-style: none; }
+.instructor-question-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--mm-line);
+  border-radius: 6px;
+  margin-bottom: 8px;
+}
+.instructor-question-main { display: flex; align-items: center; gap: 4px; min-width: 0; flex-wrap: wrap; }
+.instructor-question-label { font-weight: 600; }
+.instructor-question-summary { color: var(--mm-ink-2); font-size: 13px; font-family: var(--mm-font-mono); }
+.instructor-question-actions { display: flex; gap: 6px; flex-shrink: 0; }
+
+/* Question creator */
+.instructor-creator { max-width: 880px; }
+.instructor-creator-section {
+  padding: 16px 0;
+  border-top: 1px solid var(--mm-line);
+}
+.instructor-creator-foot {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  padding-top: 16px;
+  border-top: 1px solid var(--mm-line);
+}
+.instructor-mode-group { display: flex; gap: 10px; margin: 16px 0; }
+.instructor-mode-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  border: 1px solid var(--mm-line-2);
+  background: var(--mm-surface);
+  border-radius: 8px;
+  padding: 16px 24px;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.instructor-mode-btn:hover:not(:disabled) { border-color: var(--mm-accent); }
+.instructor-mode-btn:disabled { opacity: 0.45; cursor: default; }
+.instructor-mode-soon { font-size: 10px; font-weight: 400; color: var(--mm-ink-2); text-transform: uppercase; }
+
+.instructor-group-row { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+.instructor-group-block { padding: 10px; border: 1px solid var(--mm-line); border-radius: 6px; margin-bottom: 10px; }
+.instructor-formula-row { display: flex; align-items: center; gap: 12px; margin-top: 8px; }
+.instructor-formula-field { font-family: var(--mm-font-mono); color: var(--mm-ink); }
+.instructor-formula-error { color: var(--mm-danger); font-size: 13px; }
+
+.instructor-encoding-toggle { display: inline-flex; border: 1px solid var(--mm-line-2); border-radius: 5px; overflow: hidden; }
+.instructor-encoding-btn { border: none; background: var(--mm-surface); padding: 5px 10px; font-size: 12px; cursor: pointer; color: var(--mm-ink-2); }
+.instructor-encoding-btn--active { background: var(--mm-accent); color: var(--mm-surface); }
+
+/* Preview table */
+.instructor-preview-table { border-collapse: collapse; font-size: 13px; margin-top: 8px; }
+.instructor-preview-table th, .instructor-preview-table td { border: 1px solid var(--mm-line); padding: 4px 10px; text-align: center; }
+.instructor-preview-table th { background: var(--mm-surface-2); }
+.instructor-preview-bits { font-family: var(--mm-font-mono); }
+.instructor-bits { font-family: var(--mm-font-mono); }
+.instructor-int { color: var(--mm-ink-2); margin-left: 5px; }
+.instructor-preview-elision td { color: var(--mm-ink-2); font-style: italic; }
+.instructor-preview-errors { color: var(--mm-danger); padding-left: 18px; }
+.instructor-preview-warning { color: var(--mm-danger); }
+
+/* Live single-input probe */
+.instructor-probe { display: flex; align-items: center; flex-wrap: wrap; gap: 14px; margin-top: 8px; }
+.instructor-probe-inputs, .instructor-probe-outputs { display: flex; align-items: center; flex-wrap: wrap; gap: 14px; }
+.instructor-probe-field { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; }
+.instructor-probe-name { color: var(--mm-ink-2); font-family: var(--mm-font-mono); }
+.instructor-probe-arrow { color: var(--mm-ink-2); font-size: 16px; }
+.instructor-probe-out { font-size: 13px; }
+
+/* Gradebook */
+.instructor-stats { display: flex; gap: 24px; flex-wrap: wrap; margin-bottom: 20px; padding: 14px 16px; background: var(--mm-surface-2); border-radius: 8px; }
+.instructor-stat { display: flex; flex-direction: column; }
+.instructor-stat-value { font-size: 20px; font-weight: 700; }
+.instructor-stat-label { font-size: 12px; color: var(--mm-ink-2); }
+.instructor-submission-row { cursor: pointer; }
+.instructor-submission-row:hover { background: var(--mm-surface-2); }
+
+/* Submissions pane: the per-question columns can run wide, so the pane
+   scrolls horizontally while the Score column stays pinned on the right. */
+.instructor-table-scroll { overflow-x: auto; }
+.instructor-table--score-sticky { width: max-content; min-width: 100%; }
+.instructor-table--score-sticky thead th:last-child,
+.instructor-table--score-sticky tbody tr.instructor-submission-row td:last-child {
+  position: sticky;
+  right: 0;
+  z-index: 1;
+  background: var(--mm-surface);
+  box-shadow: var(--mm-shadow-edge);
+}
+.instructor-table--score-sticky tbody tr.instructor-submission-row:hover td:last-child {
+  background: var(--mm-surface-2);
+}
+.instructor-pass { color: var(--mm-ok); font-weight: 700; }
+.instructor-fail { color: var(--mm-danger); font-weight: 700; }
+.instructor-pending { color: var(--mm-warn); font-weight: 700; }
+
+/* An open question's free-text answer in the gradebook drill-down */
+.instructor-open-response {
+  margin: 6px 0 0;
+  padding: 8px 12px;
+  border-left: 3px solid var(--mm-warn);
+  background: var(--mm-warn-soft);
+  font-size: 13px;
+  line-height: 1.55;
+  white-space: pre-wrap;
+  max-width: 680px;
+}
+.instructor-open-response--empty {
+  border-left-color: var(--mm-line-2);
+  background: var(--mm-surface-2);
+  color: var(--mm-ink-2);
+  font-style: italic;
+}
+/* Manual grading controls for a pending open question */
+.instructor-review { margin-top: 8px; max-width: 680px; }
+.instructor-review-verdict { margin: 0 0 6px; font-size: 13px; }
+.instructor-review-when { color: var(--mm-ink-2); font-size: 12px; font-weight: 400; }
+.instructor-review-controls { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.instructor-review-note {
+  flex: 1;
+  min-width: 200px;
+  padding: 5px 8px;
+  font-size: 13px;
+  border: 1px solid var(--mm-line-2);
+  border-radius: 4px;
+}
+.instructor-review-btn { white-space: nowrap; }
+
+.instructor-detail { padding: 10px 4px; }
+.instructor-detail-q { margin-bottom: 12px; font-size: 13px; }
+.instructor-detail-table { border-collapse: collapse; margin-top: 6px; font-size: 12px; }
+.instructor-detail-table th, .instructor-detail-table td { border: 1px solid var(--mm-line); padding: 3px 10px; text-align: center; }
+
+.instructor-head-actions { display: flex; gap: 8px; align-items: center; }
+
+/* ── Instructor: roster & accounts ── */
+.roster-section {
+  margin-top: 24px;
+  padding-top: 20px;
+  border-top: 1px solid var(--mm-line);
+}
+.roster-section:first-of-type { border-top: none; padding-top: 0; }
+.roster-filter {
+  padding: 6px 10px;
+  font-size: 13px;
+  width: 220px;
+  border: 1px solid var(--mm-line-2);
+  border-radius: 6px;
+}
+.roster-notice {
+  margin: 12px 0 0;
+  padding: 10px 14px;
+  font-size: 13px;
+  background: var(--mm-lav-soft);
+  border: 1px solid var(--mm-lav-line);
+  border-radius: 6px;
+}
+
+/* ── Feedback (student form + instructor queue) ── */
+.instructor-select {
+  padding: 6px 10px;
+  font-size: 13px;
+  border: 1px solid var(--mm-line-2);
+  border-radius: 6px;
+  background: var(--mm-surface);
+  color: var(--mm-ink);
+}
+
+.feedback-queue {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.feedback-card {
+  border: 1px solid var(--mm-line-2);
+  border-radius: 8px;
+  padding: 14px 16px;
+  background: var(--mm-surface);
+}
+
+.feedback-card-head {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+.feedback-category {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  border-radius: 4px;
+  padding: 2px 8px;
+}
+.feedback-category--design { background: var(--mm-date-soft); color: var(--mm-link); }
+.feedback-category--content { background: var(--mm-ok-soft); color: var(--mm-ok); }
+
+.feedback-meta {
+  font-size: 12px;
+  color: var(--mm-ink-2);
+}
+
+.feedback-message {
+  font-size: 14px;
+  white-space: pre-wrap;
+  margin: 0 0 10px;
+}
+
+.feedback-screenshots {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 8px 0;
+}
+
+.feedback-screenshot-thumb {
+  width: 96px;
+  height: 72px;
+  object-fit: cover;
+  border-radius: 6px;
+  border: 1px solid var(--mm-line-2);
+  display: block;
+}
+
+.feedback-screenshot-preview {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+
+.feedback-card-foot {
+  display: flex;
+  justify-content: flex-end;
+}
+
+/* ── Instructor notes ── */
+.notes-status {
+  font-size: 13px;
+  color: var(--mm-ink-2);
+  margin: 4px 0 12px;
+}
+
+.notes-split {
+  display: flex;
+  gap: 16px;
+  height: calc(100vh - 220px);
+  min-height: 320px;
+}
+
+.notes-editor {
+  flex: 1;
+  min-width: 0;
+  font-family: var(--mm-font-mono);
+  font-size: 13px;
+  line-height: 1.5;
+  padding: 14px;
+  border: 1px solid var(--mm-line-2);
+  border-radius: 8px;
+  resize: none;
+}
+
+.notes-preview {
+  flex: 1;
+  min-width: 0;
+  overflow-y: auto;
+  padding: 14px 18px;
+  border: 1px solid var(--mm-line-2);
+  border-radius: 8px;
+  background: var(--mm-surface-2);
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.notes-preview h1, .notes-preview h2, .notes-preview h3 {
+  margin: 0.6em 0 0.3em;
+  line-height: 1.3;
+}
+.notes-preview h1:first-child, .notes-preview h2:first-child, .notes-preview h3:first-child {
+  margin-top: 0;
+}
+.notes-preview p { margin: 0.4em 0; }
+.notes-preview ul, .notes-preview ol { margin: 0.4em 0; padding-left: 1.5em; }
+.notes-preview code {
+  font-family: var(--mm-font-mono);
+  font-size: 0.9em;
+  background: var(--mm-line);
+  border-radius: 3px;
+  padding: 1px 4px;
+}
+.notes-preview pre {
+  background: var(--mm-line);
+  border-radius: 6px;
+  padding: 10px 12px;
+  overflow-x: auto;
+}
+.notes-preview pre code { background: none; padding: 0; }
+.notes-preview blockquote {
+  margin: 0.4em 0;
+  padding-left: 12px;
+  border-left: 3px solid var(--mm-line-2);
+  color: var(--mm-ink-2);
+}
+.notes-preview a { color: var(--mm-link); }
+.notes-preview table { border-collapse: collapse; margin: 0.4em 0; }
+.notes-preview th, .notes-preview td { border: 1px solid var(--mm-line-2); padding: 4px 8px; }
+.roster-import-controls {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+  font-size: 13px;
+}
+.roster-role { display: flex; align-items: center; gap: 6px; color: var(--mm-ink-2); }
+.roster-csv {
+  display: block;
+  width: 100%;
+  margin-bottom: 10px;
+  padding: 10px 12px;
+  font-family: var(--mm-font-mono);
+  font-size: 12px;
+  border: 1px solid var(--mm-line-2);
+  border-radius: 6px;
+  resize: vertical;
+}
+.roster-report { margin-top: 12px; font-size: 12px; color: var(--mm-ink-2); }
+.roster-issues { margin: 6px 0 0 18px; color: var(--mm-warn); }
+.roster-table td, .roster-table th { font-size: 13px; }
+.roster-email { font-family: var(--mm-font-mono); font-size: 12px; }
+.roster-message { max-width: 320px; color: var(--mm-ink-2); }
+.roster-actions { white-space: nowrap; text-align: right; }
+.roster-actions .instructor-btn + .instructor-btn { margin-left: 6px; }
+.roster-state { font-size: 12px; font-weight: 600; padding: 2px 8px; border-radius: 999px; }
+.roster-state--yes { background: var(--mm-ok-soft); color: var(--mm-ok); }
+.roster-state--no { background: var(--mm-surface-2); color: var(--mm-ink-2); }
+.roster-add { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.roster-add .mm-input { flex: 1 1 180px; min-width: 140px; }
+
+
+/* Session controls — shown in the menu bar, home screen, and instructor header */
+.session-chip {
+  font-size: 13px;
+  color: var(--mm-ink-2);
+  padding: 4px 10px;
+  background: var(--mm-surface);
+  border: 1px solid var(--mm-line-2);
+  border-radius: 999px;
+  white-space: nowrap;
+}
+.menu-link-button {
+  border: 1px solid var(--mm-line-2);
+  background: var(--mm-surface);
+  border-radius: 5px;
+  padding: 4px 12px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  color: var(--mm-ink-2);
+}
+.menu-link-button:hover { color: var(--mm-ink); border-color: var(--mm-ink-3); }
+
+.menu-right {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 8px;
+}
+/* When Submit is present it owns the auto-margin; keep a gap before the group. */
+.menu-submit + .menu-right { margin-left: 8px; }

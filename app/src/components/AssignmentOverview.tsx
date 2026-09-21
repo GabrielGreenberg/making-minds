@@ -4,6 +4,8 @@ import { getCurrentUserEmail, useAuth } from '../auth';
 import { questionModeLabel } from '../types';
 import { statementProse } from '../statementFormat';
 import { GradesPanel } from './GradesPanel';
+import { PageShell, appNav } from './PageShell';
+import { SessionControls } from './SessionControls';
 import { useState, useEffect } from 'react';
 import { useAsyncValue } from '../useAsyncValue';
 import { assignmentStore } from '../storage/backend';
@@ -38,6 +40,8 @@ export function AssignmentOverview() {
 
   if (!assignment) return null;
   const sub = submissions[assignment.id];
+  const total = assignment.questions.length;
+  const done = assignment.questions.filter((q) => questionCircuits.get(q.id)?.done).length;
 
   const handleSubmit = () => {
     const ok = confirm(
@@ -56,85 +60,74 @@ export function AssignmentOverview() {
   };
 
   return (
-    <div className="page">
-      <header className="page-bar page-bar--split">
-        <button className="menu-link-button" onClick={() => navigate({ kind: 'home' })}>
+    <PageShell nav={appNav('assignments', user?.role === 'instructor')} session={<SessionControls />}>
+      <div className="mm-head">
+        <a
+          className="eyebrow"
+          href="#/"
+          onClick={(e) => { e.preventDefault(); navigate({ kind: 'home' }); }}
+        >
           ← All assignments
-        </button>
-        {user && (
-          <span className="session-chip">
-            {user.name}
-            {user.role === 'instructor' ? ' · Instructor' : ''}
-          </span>
-        )}
-      </header>
-      <div className="page-body">
-        <h1 className="page-title">{assignment.title}</h1>
-        <p className="page-subtitle">
-          {assignment.questions.length} question{assignment.questions.length === 1 ? '' : 's'} — pick one to work on
-          {assignment.questions.length > 0 && (
-            <span className="assignment-overview-progress">
-              {' '}· {assignment.questions.filter((q) => questionCircuits.get(q.id)?.done).length} of{' '}
-              {assignment.questions.length} marked done
-            </span>
-          )}
+        </a>
+        <h1>{assignment.title}</h1>
+        <p className="mm-lede">
+          {total} question{total === 1 ? '' : 's'} — pick one to work on
+          {total > 0 && ` · ${done} of ${total} marked done`}
         </p>
+      </div>
 
-        <section className="home-section">
-          <div className="assignment-overview-list">
-            {assignment.questions.map((q, i) => (
-              <button
-                key={q.id}
-                className="assignment-overview-item"
-                onClick={() => navigate({ kind: 'assignment', id: assignment.id, questionIndex: i })}
-              >
-                <span className="assignment-overview-label">
-                  {q.label}
-                  {questionCircuits.get(q.id)?.done && (
-                    <span className="assignment-overview-done-badge" title="Marked done">✓</span>
-                  )}
-                </span>
-                <span className="assignment-overview-mode">{questionModeLabel(q)}</span>
-                <span className="assignment-overview-statement">
-                  {q.title && <strong className="assignment-overview-title">{q.title}. </strong>}
-                  {statementProse(q.statement)}
-                </span>
-              </button>
-            ))}
-            {assignment.questions.length === 0 && (
-              <p className="home-empty">This assignment has no questions yet.</p>
-            )}
-          </div>
-        </section>
-
-        <section className="home-section">
-          <div className="assignment-overview-submit">
-            {sub ? (
-              <span className="home-tile-status home-tile-status--done" title={`Attempt ${sub.attempt}`}>
-                ✓ Submitted {new Date(sub.submittedAt).toLocaleString()}
-              </span>
-            ) : (
-              <span className="home-tile-status">Not submitted</span>
-            )}
-            <span className="assignment-overview-submit-actions">
-              {released && sub?.result && (
-                <button className="menu-link-button" onClick={() => setShowGrades(true)}>
-                  View grades
-                </button>
-              )}
-              {frozen ? (
-                <span className="menu-frozen" title="This assignment closed after its due date — each question shows your submission, read-only.">
-                  🔒 Past due — showing your submission
-                </span>
-              ) : (
-                <button className="home-tile-submit" onClick={handleSubmit}>
-                  Submit assignment
-                </button>
+      <div className="mm-list">
+        {assignment.questions.map((q, i) => (
+          <button
+            key={q.id}
+            className="overview-row"
+            onClick={() => navigate({ kind: 'assignment', id: assignment.id, questionIndex: i })}
+          >
+            <span className="overview-label">
+              {q.label}
+              {questionCircuits.get(q.id)?.done && (
+                <span className="overview-done" title="Marked done">✓</span>
               )}
             </span>
-          </div>
-        </section>
+            <span className="tag tag--accent">{questionModeLabel(q)}</span>
+            <span className="overview-statement">
+              {q.title && <strong>{q.title}. </strong>}
+              {statementProse(q.statement)}
+            </span>
+          </button>
+        ))}
+        {total === 0 && <p className="mm-empty">This assignment has no questions yet.</p>}
       </div>
+
+      <div className="overview-submit">
+        {sub ? (
+          <span className="home-status--done" title={`Attempt ${sub.attempt}`}>
+            ✓ Submitted {new Date(sub.submittedAt).toLocaleString()}
+          </span>
+        ) : (
+          <span className="dim">Not submitted</span>
+        )}
+        <span className="mm-actions">
+          {released && sub?.result && (
+            <button className="mm-btn" onClick={() => setShowGrades(true)}>
+              View grades
+            </button>
+          )}
+          {frozen ? (
+            <span
+              className="home-locked"
+              title="This assignment closed after its due date — each question shows your submission, read-only."
+            >
+              🔒 Past due — showing your submission
+            </span>
+          ) : (
+            <button className="mm-btn mm-btn--primary" onClick={handleSubmit}>
+              Submit assignment
+            </button>
+          )}
+        </span>
+      </div>
+
       {showGrades && sub && (
         <GradesPanel
           assignmentId={assignment.id}
@@ -142,6 +135,6 @@ export function AssignmentOverview() {
           onClose={() => setShowGrades(false)}
         />
       )}
-    </div>
+    </PageShell>
   );
 }

@@ -369,7 +369,7 @@ function AddPersonPanel({
       <h2 className="instructor-section-title">Add one person</h2>
       <div className="roster-add">
         <input
-          className="login-email"
+          className="mm-input"
           type="email"
           placeholder="email@ucla.edu"
           value={email}
@@ -377,7 +377,7 @@ function AddPersonPanel({
           disabled={busy}
         />
         <input
-          className="login-email"
+          className="mm-input"
           type="text"
           placeholder="Name"
           value={name}
@@ -385,7 +385,7 @@ function AddPersonPanel({
           disabled={busy}
         />
         <input
-          className="login-email"
+          className="mm-input"
           type="text"
           placeholder="Student ID"
           value={studentId}
