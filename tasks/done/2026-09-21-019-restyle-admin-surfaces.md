@@ -8,9 +8,9 @@ requires: browser
 area: app
 source: chat
 created: 2026-09-21T16:30:00-07:00
-status: in-progress
+status: done
 after:
-branch: task/019-restyle-admin-surfaces
+branch:
 merged_into:
 ---
 
@@ -145,3 +145,39 @@ in the repo says what a page should look like — this task defines it.
   2026-09-21); a real-device look on Gabriel's laptop.
 
 ## Progress log
+- **2026-09-21 (/work, `task/019-restyle-admin-surfaces`) — Phase A landed; Phase B split
+  off as 2026-09-21-021.** Design authority = the website source Gabriel pointed at
+  (`~/Documents/Academic/Teaching/Phil 133 - 2026f/Phil 133 - web/claude redesign`, the
+  `making-minds-website` repo at commit dab549b); cited from `theme.css` and VISUAL_VOCAB,
+  not copied into this repo.
+  Built: `app/src/theme.css` (`--mm-*` tokens, each naming its `site.css` original; colour
+  literals only in its `:root`; + the shared vocabulary: shell, tags, hairline rows,
+  tables, buttons, fields, modals), `app/src/pages.css` (the former `index.css` 1108–2325
+  carried over and re-pointed at the tokens — colours and fonts — with the student
+  sections rewritten), `components/PageShell.tsx` (topbar · band · `.page` · footer; card
+  variant; `appNav`; hash links that route through `navigate`) + `SessionControls.tsx`.
+  `index.css` lost exactly that block and gained one line (`font-family:
+  var(--mm-font-sans)`) — the editor is otherwise untouched (pinned). `index.html`: title,
+  the site's MM favicon, the IBM Plex link; `main.tsx` imports theme → index → pages.
+  Restyled: login (all panes), health, home (row = title · meta · status carrying the grade
+  line + "View grades" · ONE action), overview, grade sheet, feedback + password modals;
+  `InstructorLayout` is the shell on a wide column (views: 021). Gate
+  `app/tools/themeCheck.ts` in `npm run check`. `docs/buildout/VISUAL_VOCAB.md` §"Page
+  surfaces"; CLAUDE.md updated in place.
+  Verified: tsc, build, themeCheck, app `npm run check`, server typecheck + check; browser
+  at 1280 and 700 wide — attachments `2026-09-21-019-{login,home,overview,grades,feedback,
+  home-narrow,overview-narrow,instructor}-{before,after}.jpg`; nav links, Sandbox → editor,
+  feedback modal open/close, the editor under the new font.
+  Screenshot recipe (no deps, ~120 lines, rebuild from this): build a `localStorage`
+  snapshot headlessly (the harness shim + `seedHomeworks()` + one John Doe hw1 submission
+  + `mm:published:hw1..3` + `mm:release:hw1` + `mm:auth:current`), inject it into Google
+  Chrome `--headless=new --remote-debugging-port` over the DevTools protocol with Node 22's
+  built-in WebSocket, then `Page.captureScreenshot` per route (optional clicks by button
+  text). Scripts lived in the session scratchpad.
+  Decisions: the row Submit is the outlined button — the one magenta primary per view is
+  Submit assignment / Sign in / Send feedback; "hidden from students" on an instructor's
+  home view is the quiet grey tag; the brand opens the website in a new tab.
+  Owed: a real-device look on Gabriel's laptop; the password modal and the remote login
+  panes were restyled by class but only exist in remote mode — eyeball under "Vite Remote
+  Mode" next time a local server is up.
+  Next: nothing for this id — Phase B is `tasks/incoming/2026-09-21-021-restyle-instructor-surfaces.md`.
