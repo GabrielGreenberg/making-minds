@@ -31,6 +31,11 @@ etc. would like to box sequential parts.
   state for BOXED components (keyed by instance id + internal MEM id), the codec/grader thread
   it through, the store's SC slice snapshots it for Step/undo, and `CircuitData` needs no
   change (state is runtime only). `placeableBoxKinds`/`confirmBox` lift the refusal.
+- Note (catch 2026-09-21): `confirmBox` writes NO `kind` on the new library entry
+  (`app/src/store.ts:2232-2242`), so every box today defaults to CC — correct while boxes are
+  combinational-only. A sequential box must be stored with `kind: 'SC'`, and
+  `placeableBoxKinds('SC')` / the palette filter (`ComponentLibrary.tsx:322-326`) must
+  keep an SC box off CC canvases.
 - **surgicalFix:** none honest — inlining the box at evaluation time is the same work.
 
 ## Verify
