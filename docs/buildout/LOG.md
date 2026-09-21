@@ -1743,3 +1743,23 @@ METAs, with no new material to audit. **The loop reports done and stops.**
 Product remainder (deploy / UCLA SSO / real HW content) and the correct-answers
 project (interface → exact) are separate, human-initiated efforts — re-open the
 loop only when one of those produces new buildable coverage.
+
+## 2026-09-21 — Out-of-band: `buildout-infra` retired; the repo has one branch again
+
+**Shipped (repo hygiene, no code change):** a cloud session verified `origin/main`
+(938330f, "Retire FSM boxing by design", 2026-09-17) builds and passes every check in
+`app/` and `server/`, and that the loop's long-lived working branch `buildout-infra`
+— plus three other leftovers, `merge-hw-homeworks`, `worktree-auth-accounts`,
+`worktree-per-question-box-library` — each had **zero commits unique to them** vs
+`origin/main`. A local session then re-confirmed every count
+(`git rev-list --count origin/main..origin/<name>` printed 0 for all four), deleted the
+four branches on GitHub and locally, removed the last stale worktree, put the primary
+checkout on `main`, and re-verified on a fresh `npm ci`: app build exit 0, server
+typecheck exit 0. The remote now lists only `origin/main`.
+
+**What this means for the loop:** `main` is the ONE long-lived branch. If an
+iteration ever runs again it cuts a fresh `buildout-*` branch from `main`
+(`.claude/commands/handoff.md` says so now). Every mention of `buildout-infra` in
+this log, in QUEUE, and in CLAUDE.md's history is exactly that — history.
+
+**Next:** unchanged — nothing loop-owned (see the iteration-40 entry).

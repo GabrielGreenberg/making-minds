@@ -14,7 +14,15 @@ Claude to load into context).
 >
 > A change isn't finished until the docs that describe it are too.
 
-_Last updated: 2026-09-17 (**FSM boxing retired — notes/todos.md item 2, follow-up to the pass
+_Last updated: 2026-09-21 (**repo hygiene — the two-branch model is retired.** The build-out
+loop's long-lived working branch `buildout-infra` — and three other fully-merged leftovers,
+`merge-hw-homeworks`, `worktree-auth-accounts`, `worktree-per-question-box-library` — were each
+verified at ZERO commits unique to them vs `origin/main` and deleted locally and on GitHub;
+`main` (938330f, 2026-09-17; app build + server typecheck green on a fresh `npm ci`) is now the
+ONE long-lived branch, and the remote lists only `origin/main`. Any future loop iteration cuts a
+fresh `buildout-*` branch from `main` (`.claude/commands/handoff.md`); every later mention of
+`buildout-infra` in this log is history. No code changed. Earlier 2026-09-17: **FSM boxing
+retired — notes/todos.md item 2, follow-up to the pass
 below**. The one item that pass left unfixed: `fsmPlaceBoxInstance` placed a STATE node with
 `boxedCircuitId` set, but `evaluateFSMSymbolStep` never read it, so a placed FSM box rendered
 as a labeled rectangle but ran as an ordinary, transition-less state. Investigated and refused
@@ -474,8 +482,9 @@ opposite-direction FSM transition arcs; and the build-out loop infrastructure
 (`docs/buildout/` memos — HANDOFF/QUEUE/LOG/COVERAGE + design memos — and the `/handoff`
 command). The branch's 2026-07-06 TM-reset-on-navigation store change (0ca35b3) is subsumed
 by the same-day `resetAllSimState()` below — navResetCheck still pins the behavior.
-`buildout-infra` stays alive as the loop's working branch (it merges main each iteration);
-its in-flight wireRouter S3 work was NOT part of this merge. Earlier same day,
+`buildout-infra` stayed alive as the loop's working branch (merging main each iteration) until
+its retirement on 2026-09-21 (top of this log); its in-flight wireRouter S3 work was NOT part of
+this merge. Earlier same day,
 **sim-state reset on question navigation** — every question
 navigation path (`switchQuestion`, `openAssignment`, `loadAssignment`) now calls the new
 aggregate store action `resetAllSimState()` — which delegates to the per-mode global resets
@@ -945,8 +954,9 @@ in `evaluateSCSequence`), and an authoring UI for fill-in questions (HW1 P11 is 
 
 **Near-term (still no backend):**
 
-- **Reference-fixture buildout — COMPLETE AT-TIER** (branch `buildout-infra`, memos in
-  `docs/buildout/`) — **46 exact + 10 interface = 56/56**: every machine-buildable problem in
+- **Reference-fixture buildout — COMPLETE AT-TIER** (memos in `docs/buildout/`; its working
+  branch `buildout-infra` was fully merged into `main` and retired 2026-09-21) — **46 exact +
+  10 interface = 56/56**: every machine-buildable problem in
   HW1–HW6 has a hand-verified reference fixture behind the two-tier coverage harness. All
   arithmetic + perception at the **exact** tier (correct passes every case, broken variant
   fails); all navigation + the Desert Ant capstone at the **interface** tier (plausible attempt

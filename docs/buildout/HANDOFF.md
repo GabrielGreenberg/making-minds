@@ -6,7 +6,9 @@ run `npm run coverage` and reconcile._
 
 ## Where we are — ledger complete · P6.4 remote-store cutover COMPLETE (S1–S4)
 
-Branch `buildout-infra`. **46 exact + 10 interface = 56/56 at-tier**, 0
+Branch: `main` — the loop's former working branch `buildout-infra` was fully merged and
+retired 2026-09-21; a future iteration cuts a fresh `buildout-*` branch from `main`.
+**46 exact + 10 interface = 56/56 at-tier**, 0
 pending, 0 regressed, 0 warnings. The Remote-store cutover
 (`designs/remote-stores.md`, async-first, judge 82–72–58) is DONE — all four
 slices landed all-green, one per iteration (35–38); the full evidence trail

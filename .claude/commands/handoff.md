@@ -11,7 +11,10 @@ the memos and the harness, not on remembered context. Work through the phases be
 in order. Do exactly **one** task this iteration (or one meta-task), then hand off.
 
 Run git/npm from the repo; `app/` is the working dir for npm. Work on a
-`buildout-*` branch (do not commit to `main`).
+`buildout-*` branch cut fresh from `main` (do not commit to `main`). The original
+`buildout-infra` was fully merged and deleted on 2026-09-21 — don't look for it or
+recreate it by that name. When an iteration's work is merged back into `main` (a
+merge-commit PR, never squash), delete its branch so no leftovers accumulate.
 
 ## Operating style (both are standing directives)
 

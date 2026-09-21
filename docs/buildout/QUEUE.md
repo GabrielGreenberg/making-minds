@@ -20,7 +20,7 @@ never at the cost of an answer-search.
 
 ---
 
-## Phase 0 — Stand up the system  _(this branch)_
+## Phase 0 — Stand up the system  _(originally on branch `buildout-infra`, retired 2026-09-21)_
 
 - [x] **P0.1** Scaffold `docs/buildout/*`, seed COVERAGE (56 rows) + this queue +
   VISUAL_VOCAB. — _done (bootstrap commit)_
