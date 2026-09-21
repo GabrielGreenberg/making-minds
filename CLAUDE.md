@@ -1,758 +1,36 @@
 # Making Minds — Project Guide
 
-This file is read automatically at the start of every session. It has two parts:
-**Part 1 — Project Status** (an overview of what's done and what's left, for humans and
-Claude) and **Part 2 — Technical Reference** (architecture, key files, and design rules for
-Claude to load into context).
+This file is auto-loaded into every session, so it is an **index, not a journal**: Part 1
+says where the project stands, Part 2 is the technical reference. It is kept **under 40 KB**
+by `tasks/tools/check-budgets.mjs` (runs in CI and in app `npm run check`).
 
-> **Maintenance — keep this file current.** Whenever you finish a task that changes what is
-> built, how it works, or what comes next, update this file **as part of that task** (before you
-> report it done) — do not leave it stale for a later pass. Specifically:
-> - Update **Part 1** ("Where we are now" / "What's next") to match what actually shipped, and
->   bump the _Last updated_ date below.
-> - Update **Part 2** when the architecture, file layout, key files, or a design rule changes.
->
-> A change isn't finished until the docs that describe it are too.
+> **Maintenance.** When a task changes what is built, how it works, or what comes next,
+> update the STATUS here — Part 1 "Where we are now" / "What's next" and the affected Part 2
+> entries — **in place: replace, never append**, and bump the date below. The dated story of
+> a change lives in its task file's `## Progress log` under `tasks/` and one line in
+> `tasks/log.md`, never here. The pre-pipeline changelog (2026-07 → 2026-09-21) is frozen
+> in `docs/HISTORY.md`.
 
-_Last updated: 2026-09-21 (**repo hygiene — the two-branch model is retired.** The build-out
-loop's long-lived working branch `buildout-infra` — and three other fully-merged leftovers,
-`merge-hw-homeworks`, `worktree-auth-accounts`, `worktree-per-question-box-library` — were each
-verified at ZERO commits unique to them vs `origin/main` and deleted locally and on GitHub;
-`main` (938330f, 2026-09-17; app build + server typecheck green on a fresh `npm ci`) is now the
-ONE long-lived branch, and the remote lists only `origin/main`. Any future loop iteration cuts a
-fresh `buildout-*` branch from `main` (`.claude/commands/handoff.md`); every later mention of
-`buildout-infra` in this log is history. No code changed. Earlier 2026-09-17: **FSM boxing
-retired — notes/todos.md item 2, follow-up to the pass
-below**. The one item that pass left unfixed: `fsmPlaceBoxInstance` placed a STATE node with
-`boxedCircuitId` set, but `evaluateFSMSymbolStep` never read it, so a placed FSM box rendered
-as a labeled rectangle but ran as an ordinary, transition-less state. Investigated and refused
-by design, for the same underlying reason as the TM boxing refusal (also this file, below):
-`confirmBox`'s FSM rules (one entry state S_A, one terminal state S_B with no outgoing
-transitions, every other state complete on 0/1) describe a sub-automaton meant to consume
-MULTIPLE subsequent input symbols — tracking its own internal position across steps — before
-handing control back to the placed instance's own outgoing transitions. That is not a stateless
-function call like a boxed CC/SC circuit; it needs an invented call/return convention (the
-running machine's "current state" becoming a stack) threaded through `evaluateFSMSymbolStep`,
-the store's live sim, turbot FSM brains, and the grader — and it was never wired for headless
-grading either, since a placed instance carried only `boxedCircuitId`, never a frozen internal
-circuit the way a CC/SC `BOXED` component carries `internalCircuit`. Rather than leave a
-half-working feature, it's removed: `fsmPlaceBoxInstance`, confirmBox's FSM branch, and the
-STATE-specific `boxedCircuitId` rendering/geometry/hit-testing in `CircuitCanvas.tsx` and
-`componentGeometry.ts` are gone; `placeableBoxKinds('FSM')` (`types.ts`) now returns `[]`
-(mirroring TM) and carries the full reasoning inline; the palette's "New Box" tool is no longer
-offered on FSM canvases. `boxScopeCheck`/`routerCheck` pins updated to match; no seeded/sample
-data used FSM boxing (checked), so no existing data decays. App tsc/build/check all green.
+_Last updated: 2026-09-21_
 
-Earlier 2026-09-17 (**the `notes/todos.md` pass — 13 items**. Three new seams landed,
-following the established Local/Remote pattern exactly (Promise-returning interface, a
-localStorage-backed Local impl, a server-backed Remote impl, wired in `storage/backend.ts`):
-**`FeedbackStore`** (`storage/feedbackStore.ts` + `remoteStores.ts`; server `feedback` table +
-`POST/GET /api/feedback` + `PUT /api/feedback/:id/status`) backs a student "Feedback" link
-(`components/FeedbackPanel.tsx`, in both `MenuBar` and `HomeScreen` headers) — category
-dropdown (platform design / homework content), message, up to 2 screenshots
-client-downscaled-and-JPEG-compressed before base64 encoding (server caps them too, 400/413 on
-abuse) — feeding an instructor queue at `#/instructor/feedback`
-(`instructor/FeedbackQueueView.tsx`: open/resolved/all filter, mark resolved/reopen). Works in
-BOTH backends, unlike the roster. **`NotesStore`** (`storage/NotesStore.ts` + `remoteStores.ts`;
-server single-row `instructor_notes` table + `GET/PUT /api/instructor-notes`, both
-instructor-gated) backs one shared markdown document instructors use to coordinate, at
-`#/instructor/notes` (`instructor/NotesView.tsx`: split raw-markdown textarea + live preview,
-saves only on "Save" per the ask, warns before overwriting if the server's `updatedAt` moved
-since load — last-write-wins otherwise, surfaced rather than silent since this is explicit
-multi-instructor coordination). Rendering uses **`marked` + `dompurify`**, added as new
-dependencies (a real decision, confirmed with Paul first): `statementFormat.ts`'s parser is a
-narrow, pinned grammar for question statements, not general markdown, so extending it would
-have meant rebuilding a chunk of what a markdown library already does correctly. Neither new
-dep introduced a new `npm audit` vulnerability (checked; the pre-existing ones are all
-build-tooling transitives). The third change is data/behavior, not a new seam: **freezing +
-failed-case detail** (todos 3 & 4). `dueDates.ts` gains `isFrozen(dueDate, now, hasSubmission)`
-— the header comment's "a due date never gates anything" rule now has its one deliberate
-exception, spelled out there: due-date gating applies to EDITING, never to submitting, and only
-once a submission already exists (a student who never submitted stays fully editable past the
-deadline and can still submit late; the moment they do, THAT submission freezes their view from
-then on — this is how "late submissions are always accepted" and "freeze it in place" both stay
-true at once, confirmed with Paul as the intended semantics). `store.ts`'s
-`selectAssignmentFrozen` + `selectQuestionLocked` extend the SAME lock `isCurrentQuestionLocked`
-already used for "mark as done" (todo 8, below) — frozen behaves exactly like every question
-being marked done at once: `switchQuestion`/`openAssignment` load each question's actually-
-SUBMITTED circuit (`frozenQuestionCircuit`, not the possibly-diverged live workbook) read-only,
-the same ~26 mutating store actions refuse edits, and the autosave subscriber's own guard means
-nothing frozen ever overwrites the real saved workbook. Run/Step stay live on purpose — the ask
-was "see and run their submission, but not edit it." `server/src/sanitize.ts` now widens
-`stripQuestionResult`: students always saw scores-only before; now their own results also carry
-`input`/`pass`/`reason` (value cases), `frames`/`pass`/`failStep`/`reason` (perception),
-`label`/`pass` (fill-in), and full `turbotCases` (no answer key exists in that shape) — `cases[].expected`/`got`
-and `fillCases[].expected`/`got` (a STRING secret, which needed `parityCheck.ts`'s `findLeaks`
-extended to catch non-empty strings, not just non-empty arrays) stay hidden exactly as before.
-`GradesPanel.tsx` surfaces this as a per-question "▸ failed inputs" dropdown (never in the main
-pane, per the ask) whose "Open my submission" link navigates into the frozen view. Scope
-decision, documented rather than silently dropped: clicking a failing input does NOT
-auto-populate it into a live Run — CC/SC/FSM/TM/turbot each have a different "set this input"
-mechanism, and building all of them without live browser testing (unavailable this session) was
-judged too large/risky for this pass; the student sees exactly which input failed and can set it
-themselves. Also this pass: **"mark as done"** (todo 8) — `QuestionCircuit.done`, a toggle in
-the question nav bar (`TabBar.tsx`), the `isCurrentQuestionLocked` guard (store.ts) that
-freezing above also reuses, read-only open-response/fill-in inputs, an "N of M done" summary +
-per-question badge on the assignment overview. Deliberately NOT locked: INPUT toggles, MEM
-overrides, TM tape edits while idle — those are exploratory/reset-on-navigation, not the graded
-answer. **Box TMs** (todo 13) investigated and refused by design, documented beside
-`placeableBoxKinds` in `types.ts`: a TM has one tape and one control thread, so there is no wire
-boundary to box the way CC/SC/FSM boxing works (a single stateless function call); "boxing" a
-TM sub-graph would mean splicing transition tables (shared state-id namespace, shared tape, an
-invented call/return convention) — a materially different, uninvented feature. (Also surfaced,
-not fixed: the FSM "box" path places a `boxedCircuitId` that `evaluateFSMSymbolStep` never
-reads — a pre-existing rendering-only placeholder, worth a look independent of this todo.) Five
-small UI fixes round out the pass: manual-review notes are now shown to students in
-`GradesPanel` (the data already reached the browser; nothing rendered it); `HomeScreen`/
-`AssignmentOverview` re-fetch `submissions` on every visit instead of only once at app boot (the
-actual cause of "requires re-releasing to see an update" — every server read was already fresh,
-the client just never asked again); instructor-dashboard action buttons get a fixed min-width so
-"Publish" vs "Hide" no longer shifts later buttons; the Submissions pane's per-question columns
-scroll horizontally with the Score column pinned via `position: sticky`; the top bar shows a
-student's name without also announcing their role; the TM tape strip gets `user-select: none`
-(shift-click was selecting cell text) and an explicit `max-width: 100%`. Gates: app tsc/build/
-check (`navResetCheck` grew a `[mark as done]` section — 9 checks — and a `[frozen assignment]`
-section — 17 checks — 136 → 162) and server tsc/check both
-green; `parityCheck.ts` grew 5 checks (incl. a `findLeaks` self-test for string-valued secrets,
-needed for fill-in's `expected`/`got`) proving the sanitize.ts widening exposes the safe fields
-AND still hides the answer key, plus its two existing leak checks re-scoped to the narrower
-`expected`/`got` forbidden set; `serverCheck.ts` grew 20 checks (13 feedback + 7 notes) plus one
-updated per-case-detail assertion; `remoteStoreCheck.ts` grew 9 checks (5 feedback + 4 notes)
-plus one updated leak assertion. Not done this pass, flagged for a human: auto-loading a failed
-input into a live Run (todo 4's harder half); a dedicated due-date-independent "view this
-submission" mode for the edge case where grades release before the due date; live browser
-verification of the CSS-only fixes (Chrome automation was unavailable this session — the changes
-are small, standard, and low-risk, but not visually re-confirmed).
+## How work flows — the task pipeline (`tasks/`)
 
-Earlier 2026-09-11: **accounts and sign-in — the launch auth system**. The
-server now owns a real account system behind the same one-swap seam, so UCLA SSO stays a
-drop-in: `MM_AUTH_MODE` picks the provider (`server/src/auth.ts`, `createAuthProvider`) and
-**the default is now `password`**, not `dev`. The shape: a **CSV roster** decides who may have
-an account (pure `server/src/roster.ts` — RFC-4180 reader plus tolerant header detection for
-email / name-or-first+last / student ID / role, reporting per-row issues rather than dropping
-rows); each person **creates their own account** with a password (scrypt via
-`server/src/password.ts`, self-describing `scrypt$N$r$p$salt$hash`, so the cost can be raised
-later without invalidating anyone), verified against the roster **and** the student ID on file;
-afterwards they sign in with email + password and the 30-day bearer session persists as before.
-Someone whose email isn't on the roster files an **access request** an instructor approves or
-rejects. New endpoints: `GET /api/auth/config` (unauthenticated capabilities — the login screen
-renders from THIS, so switching the server to SSO or dev mode needs no frontend rebuild),
-`POST /api/auth/register`, `POST /api/auth/password`, `POST /api/auth/access-requests`, and the
-instructor's `/api/roster*` + `/api/access-requests/*` set. Security posture: one message for
-every failed sign-in (no roster enumeration), an equal-cost dummy hash for unknown accounts,
-a per-(email, IP) `LoginThrottle` that never locks an account by proxy, roster import that
-**only adds and updates** (a mid-quarter re-import never removes anyone or touches a password),
-password change and instructor reset that end every other session, and roster removal that
-keeps the person's submitted work. No mail server, so forgotten passwords are an instructor
-reset → the student registers again with the same email. Frontend: the login screen is now
-Sign in / Create account / Not on the roster? (or a single "Sign in with UCLA" button under
-`mode: 'sso'`), driven by the fetched capabilities; a "Password" control (`auth/AccountPanel.tsx`)
-sits beside the session chip wherever chrome offers session controls; and the instructor gains
-a **Roster & accounts** screen (`instructor/RosterView.tsx`, route `#/instructor/roster`) —
-CSV import by paste or file with a column/issue report, who has created an account, reset
-password, add/remove one person, approve/reject access requests. Local mode is unchanged: the
-toy-account picker, which now reports `mode: 'mockup'` with registration and requests off.
-Deploy: `MM_AUTH_MODE=password` in the systemd unit, and a new admin CLI
-`npm run roster -- import|add|set-password|reset|remove|list|requests` that bootstraps the first
-instructor (the one thing the web UI can't do for itself). Gates: new `server/tools/authCheck.ts`
-(138 checks, in `server`'s `npm run check`) covering roster parsing, password hashing/policy,
-every provider's decision table, and the whole HTTP lifecycle incl. the refusals; app
-`remoteStoreCheck` grew a section driving `api/client.ts` against a second real server booted in
-password mode (85 pins total); app tsc/build/check and server tsc/check all green, coverage
-ledger unchanged at 46 exact + 10 interface, 0 regressed. Still NOT done: UCLA SSO itself
-(`SsoAuthProvider.authenticate` is one honest TODO), and seeding HW1–HW7 into the server DB.
-Earlier 2026-09-10: **box naming: unique defaults + student renaming** — default names
-are now unique across the whole homework: `confirmBox` draws the next free `Box n` / `FSM Box n`
-from the union of the assignment-wide `confirmedBoxLibrary` and the boxes drawn on the live
-canvas (`takenBoxNames`/`nextBoxName` in store.ts), where it used to count only the live
-canvas's boxes and so handed out "Box 1" again on every question. Renaming is a first-class
-action: `renameBox(id, name)` trims, refuses an empty or already-taken name (returning the
-message), and sweeps the name everywhere at once — the library entry, the drawn rectangle, and
-the label of every placed instance in every question's saved circuit (`questionCircuits`), all
-under one `pushHistory` so undo restores it. Two entry points: the palette's Boxes items each
-carry a ✎ button that swaps the tile for an inline input (Enter/blur commits, Escape restores),
-and the existing double-click-the-box-name-on-canvas path now routes through `renameBox` too
-(previously `updateBox`, which never touched other questions). boxScopeCheck grew an 18-pin `[naming]`
-section (38 → 56 checks). Earlier same day: **drag-to-reorder for assignments and questions** — the ↑/↓ buttons
-are gone from both instructor lists; a grip handle on each row starts an HTML5 drag, the whole
-row is the drop target, and the list rearranges live under the cursor (`instructor/dragReorder.ts`
-— the pure `moveItem` plus the `useDragReorder` hook, which previews the move on every dragenter
-and commits on drop; a cancelled drag reverts). Bundled assignments stay PINNED (they live
-outside the store and can't be renumbered): their handle is inert and they can't be displaced by
-a row dragged past them. Persistence is unchanged — the dashboard still renumbers every
-non-bundled `AssignmentData.order` on commit, and the editor commits the reordered
-`questions` array. Earlier same day: **the `notes/pset_updates.md` pass — 23 items, one commit each**.
-Student workspace: question statements are now rendered markup rather than a `pre-wrap` blob
-(`statementFormat.ts` + `components/StatementBody.tsx` — LaTeX via KaTeX, `` `code` ``, bold,
-italic, paragraphs; inline `IN1=0,IN2=1 -> OUT=1` profiles lifted into tables; `(a)/(b)` parts
-split onto their own lines), with new optional `title` (bold, own line) and `hint` (italic,
-coloured, own line) fields on `AssignmentQuestion` that 27 + 5 HW1–HW7 problems were migrated
-into; the text-annotation and comment tools are GONE; the Argument/Value panel is GONE (with
-its Tally/Binary/+ toggle — a sandbox TM's alphabet is now fixed at binary); the turbot Map is
-zoomable and sits below the percept/motor glossary; the editor names the open assignment; the
-home and assignment-overview pages are flat rather than a card on grey; students get a
-per-question **grade sheet** once grades are released. Grading gained three question-level
-constraints — `component_limits` (how many of a type, counted through boxed internals),
-`maxTapeCells` (the span of tape a run may occupy, `engine/tm.ts tapeCellsUsed`), and
-fill-in-the-blank autograding (`engine/fillIn.ts`; HW1 P11 is now 11 numbered boxes graded by
-string, leading zeros normalised, with `fill_in_answers` stripped server-side like
-`test_cases`). Instructor side gained ↑/↓ **reordering** (`AssignmentData.order` +
-`sortAssignments`) and a **Publish/Hide** toggle: every assignment — bundled and seeded
-included — is now HIDDEN until published, absent from a student's list, 404 on fetch, and
-unopenable by URL. Boxing: the confirmed-box library is now shared across a whole HOMEWORK
-rather than per question (`AssignmentState.boxLibrary`, legacy per-question saves merged on
-load), and SC canvases can box their COMBINATIONAL sub-circuits — MEM is refused, because a
-boxed circuit is evaluated statelessly and a boxed MEM never advances (0101 unboxed vs 0000
-boxed; boxScopeCheck pins the evidence). Two items ended differently from the note: the sticky
-palette tool was reverted at Paul's request (right-click-to-disarm kept), and boxing a
-SEQUENTIAL sub-circuit is explicitly NOT done — it needs nested MEM state threaded through
-`evaluateSCSequence`, the codec and the store's SC slice. Gates: app tsc/build/check (now 16
-tools — `statementFormatCheck` added; boxScopeCheck 16 → 38, navResetCheck 136 → 139,
-pipelineCheck + 18, remoteStoreCheck + 8, serverCheck + 9) and server tsc/check all green,
-coverage ledger unchanged at 46 exact + 10 interface, 0 regressed. Earlier 2026-09-02:
-**pilot deployment live** — Cloudflare Pages
-(`https://making-minds.pages.dev`, direct upload, project `making-minds`) serving a remote-mode
-build against the Lightsail API on the placeholder hostname `https://100-22-69-95.sslip.io`.
-Three repo changes carried it: `app/vite.config.ts`'s `base` is now
-`process.env.VITE_BASE_PATH ?? '/making-minds/'` (GitHub Pages keeps its subpath; Pages builds
-pass `/`), `deploy/README.md` §2 records the real values plus the domain-swap procedure, and
-`.gitignore` now covers `secrets/` (the Cloudflare token) and `ssh/` (the Lightsail key, which
-had been sitting untracked-but-unignored). Verified over the public network: assets at the
-root, CORS preflight from the Pages origin, and a full student flow — login → `/api/auth/me`
-→ assignment list — with `test_cases` stripped from the student payload. The box was running
-`MM_AUTH_MODE=dev` (passwordless) at the time; since 2026-09-11 the default is `password` and
-the deploy unit sets it, so what the pilot box still needs is the real roster imported and
-HW1–HW7 seeded (it holds only the toy roster + `cc-basics`). Earlier 2026-07-19: **turbot grading pinned trajectory- and orientation-independent** —
-audit confirmed the success criteria (`evaluateTurbotCriterion`, engine/turbot.ts) already judge
-only positions, per Paul's rule that grading must ignore the path taken and the turbot's facing:
-no criterion reads `facing`; `pass-through` needs the goal anywhere in the position trace;
-`reach-and-stop` needs a stop on the goal cell; `return-to-start` needs end-at-start (+ the
-goal-visit clause in goal-ful arenas). No engine change needed — the property is now pinned by
-turbotCheck's new `[trajectory & orientation independence]` section (7 checks): all four final
-facings grade equally under reach-and-stop, direct vs roundabout routes to the same rest cell
-grade alike, pass-through's mid-trace-crossing vs skipped-goal pair, home-with-a-turned-facing
-passes return-to-start, and an end-to-end grader run whose FSM brain spins in place on the goal
-before stopping still passes with its final facing ≠ start facing. Same day, **assignment due
-dates** — `AssignmentData` gains an optional
-`dueDate` (ISO timestamp; display/annotation policy only — late submissions are still accepted
-and graded), settable via a datetime-local field in the assignment editor and carried on
-`AssignmentSummary` through both backends (local store list, bundled mapping, `api/client.ts`,
-and the server's `/api/assignments` summaries; `stripAnswers` spreads it through untouched).
-Presentation policy lives in the pure `app/src/dueDates.ts` (`dueStatus` — green >3 days out,
-amber <3 days, red overdue; `lateBy` — 0 = on time = NO signal; `formatDuration`): the student
-home card shows a colored "Due …" badge (+" · Overdue" once past) and a red "· late by X" beside
-its Submitted timestamp when late; the instructor gradebook appends the same late tag to every
-submission/attempt timestamp. Pinned by `app/tools/dueDateCheck.ts` (18 checks, in
-`npm run check`: the 3-day band incl. the exact-boundary edges, on-time-is-silent, duration
-wording). Earlier 2026-07-12: HW1–HW7 shipped as seedable, editable assignments — the seven
-real PHIL 133 homeworks now exist as `AssignmentData` JSON (`app/src/devData/homeworks/hw{1..7}.json`,
-84 questions total): the 56 machine-buildable problems reuse the reference fixtures' hand-verified
-question objects verbatim (same statements/specs/test banks the coverage harness pins), and the 28
-prose problems (HW1 functions/representations, the impossibility/reflection paragraphs, HW5
-algorithmic-design, HW6 flow-chart/life-cycle, the HW7 final-project essay) are transcribed from
-the PDFs as open questions. The PDFs' unnumbered challenge problems are deliberately omitted;
-HW4 P1–P2 reference circuit diagrams that exist only in the PDF, so their statements describe the
-drawn machines in words and point at the handout. Instructor dashboard gains a local-mode
-"Load HW1–HW7" button → `seedHomeworks()` (`devData/homeworks.ts`): FILL-EMPTY per assignment
-(existing ids skipped, instructor edits never clobbered — the seeded copies live in the ordinary
-instructor store, fully editable), plus 22 sample submissions (3 artificial students per HW —
-all-correct with written open answers, fixture-broken, and a half-answering partial; HW1 carries a
-two-attempt history) cleared + resubmitted through `localSubmissionStore.submit` on every seed so
-the gradebook always shows real autogrades. Verified headlessly: every machine question grades its
-fixture's correct circuit through the real `gradeQuestion` (partial scores only where the fixture
-bank is the known honest interface-tier attempt: hw2-p15 0/2, hw3-p15 1/3, hw6-p2 1/3), and the
-full seed→autograde→reseed flow runs through the real stores (~1.15 MB localStorage). Remaining to
-product: deploy, UCLA SSO, and server-side seeding of these homeworks for remote mode. Earlier
-same day: **per-question confirmed-box library** — the palette's "Boxes"
-section (`confirmedBoxLibrary`) is now scoped PER CANVAS: it swaps alongside `boxes` on every
-question/tab navigation and persists as the new optional `confirmedBoxes` field on
-`QuestionCircuit`/`WorksheetData` (absent in older saves = none, back-compatible), so a box
-confirmed in one CC question no longer appears in other questions or machines — and it now
-survives reload/reopen, which the old global in-memory slice never did (it also leaked across
-the sandbox↔assignment boundary and between sandbox tabs; both fixed). `removeConfirmedBox`
-sweeps only its own canvas (a box's instances can't exist elsewhere anymore), undo/redo
-history snapshots include the library, and a confirmed-box change arms the autosave. Pinned
-by the new store-level harness `app/tools/boxScopeCheck.ts` (16 checks, in `npm run check`):
-confirm-on-Q1 → absent-on-Q2 → restored-with-internals-and-placeable back on Q1, the
-goHome/close/reopen persistence round-trip, sandbox-tab isolation, and
-removeConfirmedBox + undo semantics. Earlier 2026-07-08: **P6.4 — the Remote-store cutover, S1–S4 COMPLETE** — the frontend
-now runs against the API server whenever it is built with `VITE_API_BASE` (remote mode) and
-stays byte-identical localStorage-only without it (local mode — still the default, the dev
-environment, and what the headless harness drives). The whole switch is ONE decision point:
-`storage/backend.ts` exports `backendMode` plus the three store INSTANCES, and nothing else
-constructs a store. Per the accepted design memo (`docs/buildout/designs/remote-stores.md`,
-async-first won the judge panel 82–72–58), in four slices: **S1** flipped the three storage
-seams Promise-returning and migrated every consumer once, compiler-driven — Local impls
-async-wrapped with zero logic change, `openAssignment` sequence-guarded (a stale resolve can't
-clobber a newer navigation) with flush-on-entry, autosave single-flight with a trailing rerun,
-module-init submission hydration replaced by `hydrateSubmissions()` on auth-ready, and one
-shared `useAsyncValue` hook (fetch/loading/error/reload) replacing the five views'
-render-time reads. **S2** absorbed grade-release into the `AssignmentStore` seam
-(`gradeRelease.ts` deleted; key byte-compatible) and closed the server's manual-review GAP:
-`POST /api/assignments/:id/submissions/:attempt/review` applies the SAME pure
-`applyManualReview` (moved to the leaf `storage/manualReview.ts` so the server imports it like
-the grader); serverCheck 35, parityCheck 36 incl. a server≡in-process review pin. **S3**
-landed the `Remote{Workbook,Assignment,Submission}Store` as direct `api/client.ts` calls (no
-cache layer; 404→seam-null; a grep gate forbids grader imports in remote-store modules —
-grading stays where the test cases are) and the full remote auth flow: email login → bearer
-token (`mm:auth:token`) → `me()` session restore on mount → any 401 clears to the login screen
-via the client's `onUnauthorized` hook; `initRouting()` moved inside AuthGate so deep links
-can't fire unauthenticated; `stubAuth.tsx` deleted; bundled assignments are local-mode-only
-(the client bundle's answer bank never ships beside sanitized server copies). **S4** added the
-resilience layer: `storage/migrateLocal.ts` (first-remote-login **fill-empty** migration of
-`mm:asg:*` workbooks + instructor `mm:inst-asg:*` assignments, per-user guard
-`mm:migrated:<email>`, server data NEVER overwritten, submissions/release/reviews deliberately
-not migrated), `storage/journal.ts` (the per-email crash buffer `mm:journal:<email>:<asgId>` —
-written synchronously on unload-time flushes and failed remote saves, cleared by every
-confirmed save, REPLAYED by the next `openAssignment`: buffer supersedes the fetched server
-copy and re-uploads, so a hard tab kill loses nothing; unload PUTs also go `keepalive`),
-`auth/HealthGate.tsx` (remote boot probes `GET /api/health` and shows a friendly auto-retrying
-screen while the server is down — no white screen, no silent local fallback; session restore
-only runs against a live server, so an outage can't be misread as a dead session), the
-autosave indicator's new `'error'` state with exponential backoff retry ("⚠ Not saved —
-retrying"), and online-only submit UX (a failed submit alerts and records NOTHING — the server
-stamps time, so nothing is silently late; no offline queue by design). `tools/remoteStoreCheck.ts`
-grew 31 → **56 pins** (health-probe true/503/dead-port, the migration decision table —
-server-null uploads, server-present never touched, guard + guard-less idempotence, student
-role never publishes authored assignments — and journal keying/replay/clear semantics), all
-in the 12-tool `npm run check` chain. Browser-verified both ways: remote boot with the server
-down → retry screen → automatic recovery; an edit made during an outage survives a hard tab
-kill via journal replay and lands back on the server; local mode byte-identical with zero
-`/api` traffic. Remaining to product: deploy (`deploy/README.md`), UCLA SSO
-(server-side `AuthProvider` swap), real HW content. Earlier same day:
-**P4.4 — turbot sandbox tab** — the sandbox + menu gains a
-"Turbot ›" entry (second menu page picks the CC/SC/FSM/TM brain); the new tab is the full
-turbot workspace via the existing selector seams — `SandboxTab` records optionally carry
-`innerMode` + their own `arena` (seeded by `sandboxDefaultArena()`, a 10×8 bordered field with
-one goal), and `selectTurbotInnerMode`/`selectTurbotArena` fall back to the active sandbox tab
-when no assignment is open, so the palette/grammar/Map/tape-panel/glossary all follow with NO
-new UI branches. The Map gains a sandbox-only **"Edit map"** mode (reuses
-`instructor/arenaEditing.ts` block/goal/erase/start tools + resize through the new
-`setTabArena` action, which turbotResets). Tabs persist through the sandbox autosave and
-workbook export/import (`WorksheetData.innerMode`/`arena`). Also fixed in passing: active-tab
-`removeTab` now swaps in the survivor's `buildMode`/`activeTask` with its canvas (previously
-the removed tab's mode leaked, e.g. a CC sheet kept rendering the turbot workspace).
-navResetCheck grew a sandbox-turbot section (117 checks): tab seeding, selector fallback,
-run/switch/re-enter reset semantics, and the removeTab mode-swap pin. Earlier same day:
-**P1.8 S4 (re-scoped) — router fallback phase-0 + route-quality
-flags** — `routeAllWires` now routes structurally-doomed wires (a stub tip buried in a FOREIGN
-component's bounds: every incident edge blocked) via the fallback L-path in a **phase-0 pass
-before any A\* search**, so later wires see those lanes as occupied tracks (iteration-exhaustion
-fallbacks stay in the main loop with the H1 validation rounds as their interaction net; doomed
-wires are skipped by validation reroutes — they can only re-fail identically). Route corpus
-byte-identical across all 62 CC/SC fixture machines. `WireRouteResult` gains warn-don't-block
-quality flags — `usedFallback` (final route is the L-path) and `violation` (a final READ-ONLY
-oracle-predicate sweep: the router's own near-overlap + rendered-body predicates, mirroring
-layoutCheck's, since src/ can't import tools/) — surfaced unobtrusively in `CircuitCanvas`:
-hover tooltip for either flag, faint dashed amber halo only on `violation` (wire color stays
-semantic black/red). routerCheck adds flag pins (hw3-p9's residual w21 = usedFallback + NO
-violation — the recorded rationale for skipping the S4 lane-nudge; a doomed tripwire carries
-both flags and falls back exactly once) and a **pre-fix layout regression pin**: the P1.3-era
-hw3-p4 positions (git 0d0c5e5; 4 collinear pairs pre-P1.8, dodged then by repositioning) must
-route oracle-clean under today's router — fallbacks allowed, violations not. Earlier same day:
-**buildout close-out, iterations 27–29** — three wrap-up passes on
-branch `buildout-infra`. **Iteration 27, the smalls sweep** (six fixes, one batch, each replacing
-a duplication with a shared owner): `engine/cc.ts` now has ONE `sortByLabel` for both the
-top-level and boxed-internal I/O ordering paths (P1.6); the A/V **ARG column renders per-group
-values** in question mode ("2, 3", not one interleaved numeral — pure builders in
-`components/outputDisplay.ts` reusing the codec's own value parse; invalid numerals still '/';
-P1.11); `componentGeometry` gained **`getLabelAnchor`** (rotation-aware, snapped 90° — rotated-MEM
-labels no longer bisected by the M_IN wire; P1.16) and **`getComponentBounds`** (the full obstacle
-footprint — body + adjuncts like INPUT's 14×20 toggle-tab — replacing wireRouter's local
-body-only copy, so toggle-tabs are now router obstacles; the last P1.8-S3 leftover); the
-instructor **arena editor cap rose 20→30** (`MAX_ARENA_SIZE`, scroll-aware — the Desert Ant's
-30×30 arena is now authorable in the UI; P5.2); and **every failing turbot case now carries a
-criterion-named reason** (`explainTurbotCriterionFailure` beside `evaluateTurbotCriterion`, e.g.
-"'return-to-start' criterion not satisfied: goal cell never visited"; pinned per criterion in
-turbotCheck; P5.3). **Iteration 28, P6.1 full-matrix appearance sweep:** all modes validated
-against VISUAL_VOCAB (CC/SC/FSM/TM, all four turbot inner modes, both perception types, open
-question, sandbox tabs), plus three polish fixes: **`selectLiveFsmStateId`** (one selector owns
-the canvas live-state highlight — FSM sim and turbot arena stepping both feed it, leak-free
-across navigation), the turbot palette header names the inner machine, and the arena Map
-auto-scrolls to follow the turbot (wheel guard). One open sub-item: arena turbot red vs
-VISUAL_VOCAB yellow — Gabriel's call. **Iteration 29, final reconciliation (META-audit + P6.2):**
-all gates fresh by exit code (app tsc/check/build, server typecheck/check), coverage ledger
-**56/56 at-tier re-confirmed row-by-row by script** (46 exact + 10 interface, 0 regressed,
-0 warnings), docs reconciled; remaining buildout queue is EXACTLY P6.1b/P6.3/P6.4
-(Gabriel-gated) + optionals. Earlier 2026-07-07: **P1.5 — `allowed_components` enforced end-to-end** — the
-question-level component restriction (optional on `AssignmentQuestion`) now has ONE semantics,
-owned by `engine/machineValidation.ts` (`validateAllowedComponents` + palette predicate
-`isComponentTypeAllowed`): absent/empty = unrestricted (back-compat); present = only the listed
-types plus always-allowed infrastructure (INPUT/OUTPUT — the I/O interface; STATE — the whole
-FSM/TM vocabulary, since the restriction targets the CC/SC gate vocabulary); BOXED is packaging,
-recursed into, so a boxed OR can't smuggle an OR into hw1-p2 ("reconstruct OR without OR").
-Enforced at all three touchpoints: (1) grading — Stage 1 in every grader branch
-(`gradeQuestion`/`gradeTurbot`/`gradePerception`, mirrored by coverageCheck's `validateStage1`);
-a violating machine fails every case with the offending type(s) named; (2) student UI — the
-palette (`ComponentLibrary`, via the store's `selectAllowedComponents`) hides disallowed gates
-and any library box whose internals contain one; (3) authoring — `QuestionCreator` gains a
-"Restrict available components" toggle + AND/OR/NOT/MEM checkboxes for gate-vocabulary questions
-(CC/SC incl. perception, turbot CC/SC brains), round-tripping through save/load. Six new
-coverageCheck self-test pins (correct-function OR machine fails hw1-p2 0/4 · absent field
-permissive · DeMorgan still passes · boxed smuggling caught · palette predicate ·
-interface-tier mirror); harness unchanged at 46 exact · 10 interface · 0 regressed; spec §1.5
-records the semantics. This closes the LAST deferred authoring follow-up. Earlier same day:
-**coverage buildout COMPLETE at-tier: 56/56** — the Desert Ant
-capstone (hw6-p2) landed as the final reference fixture: 3× 30×30 walled arenas (food varied
-in the NE quadrant), return-to-start with goal = food, and a 20-state turbot-TM
-diagonal-staircase forager with exact dead-reckoned return (tape span ≤20; honest score 1/3,
-reported not asserted). The reference-fixture ledger now covers every machine-buildable
-problem in HW1–HW6: 46 rows exact-verified (correct passes every case, broken fails) + 10
-navigation/capstone rows interface-verified (plausible attempt validates + grades end-to-end).
-Close-out items remain queued in docs/buildout/QUEUE.md (allowed_components enforcement was the
-one open grading-integrity gap — closed later the same day by P1.5, above). Earlier same day, **turbot navigation: nine reference questions + the step-limit/criterion
-fix** — the buildout landed interface-tier reference fixtures for every HW2/HW3/HW4 navigation
-problem (arena families transcribed from the PDFs; plausible CC/SC/FSM brains with honest
-reported scores), which exposed and fixed a real grading defect: `gradeTurbotCase` failed any
-step-limited run BEFORE consulting the criterion, making pass-through questions (HW2 §III's
-Pac-Man rule — crossing the goal completes navigation, no stop needed) unpassable for
-memoryless CC brains. New engine seam `criterionRequiresStop(criterion)` (engine/turbot.ts,
-beside evaluateTurbotCriterion): pass-through is judged on the trace with the step limit
-bounding only the simulation; reach-and-stop / return-to-start keep exact prior behavior.
-Honest reasons name the unsatisfied criterion, spec §12.5 records the rule, turbotCheck gains
-a 7-pin [pass-through step-limit] section, and `TurbotCaseResult.pass === true` with
-`hitStepLimit === true` is now a legitimate shape (UI note: render as "simulated full budget",
-not an error). Coverage ledger: 46 exact + 9 interface = 55/56 at-tier; only the HW6 Desert
-Ant capstone remains. Earlier same day, **sim-state reset extended to every sandbox canvas swap** — the
-sandbox had the same leak class the question-navigation fix (below) closed: `switchTab`
-swapped the canvas but reset no transient sim state, so one tab's SC/FSM/TM run or turbot
-pose rendered against the next tab's circuit. Every sandbox/workbook canvas swap now calls
-`resetAllSimState()` too — `enterSandbox`, `addTab`, `switchTab`, `removeTab`'s
-active-tab-change branch (removing a background tab deliberately leaves the live run
-untouched — the visible canvas doesn't change), `newWorkbook` (also covers enterSandbox's
-empty-tabs fallback), and both `importWorkbook` format branches — so ANY canvas entry hands
-back a fresh machine at t=1. `navResetCheck.ts` grew a sandbox section: **86 checks** total
-(42 assignment-nav + 44 sandbox; the sandbox half fails 28 without its fix), including a pin
-on the background-tab-removal asymmetry. Also: `vite.config.ts` honors an assigned `PORT`
-env var (parallel sessions' dev servers collide on 5173; default unchanged). Earlier same
-day, **router world model unified with the layout oracle (P1.8 S3)** —
-`wireRouter.ts` now grants every wire an **own-endpoint exemption**: grid edges carry
-`blockedBy` component attribution, and edges incident to a wire's stub-tip nodes ignore the
-wire's OWN source/target bounds — exactly the oracle's own-stub exemption. This erases the
-structural XOR fallback floor (the curved-face left-port inset put XOR stub tips inside their
-own expanded bounds, so every XOR-in wire was born A*-unreachable and burned 3 fallbacks).
-The H2 revalidation gained the same exemption (previously EVERY wire's stub crossed its own
-margin sliver, so each validation round silently rerouted the entire circuit — routing is now
-~3× faster), H1 adopted the oracle's rules (near-parallel <3px counts as overlap;
-same-source fan-out trunk sharing exempt), the A* cost model repels near-parallel foreign
-tracks (per-search interval index) and weights bump-undrawable crossings 10× (crossings the
-canvas can't arc within CROSSING_BUMP_RADIUS of a horizontal segment's end), a new **H4**
-validation round catches bumpless crossings on the final simplified paths and feeds the exact
-conflict points back into the re-route as overlap-priced avoid points (rip-up-and-reroute
-memory — the edge-local cost model is blind to crossings at grid-line intersections), and the
-A* iteration cap now scales with grid size (a flat 5000 silently doomed honest long paths on
-the ~30k-node HW3 fixtures). Net: fallback budget **147 → 2** (hw3-p9's w21, a genuinely
-cramped goal approach, deliberately pinned; `getFallbackWireIds()` names offenders in check
-output), all CC/SC reference fixtures oracle-clean AND bump-clean — including the 8 fixtures
-whose bumpless crossings predate this work — `bumpCheck` grew a no-arg all-CC/SC sweep mode
-and joined `npm run check`, and routerCheck pins XOR-in reachability beside MEM.min.
-Remaining S3 leftover, enqueued: INPUT toggle-tab obstacles. Earlier same day,
-**P4.2 — multi-arena navigation grading with teeth** — a turbot
-question's `turbot_cases` arena FAMILY now genuinely discriminates: aggregation was already
-all-or-nothing (`gradeTurbot` grades every case; a question passes iff passed === total in
-`summarizeResult` and the gradebook's `toQuestionGrade`; GradebookView lists every failing
-arena by 1-based index), but the spec-letter `return-to-start` criterion checked ONLY the
-final position, so a Mad-Max-style family (hw3-p15: block at unknown distance, drive to it,
-come home) was vacuously passable — a stop-immediately brain, or any fixed out-and-back,
-passed every arena (proved headlessly before the fix). `evaluateTurbotCriterion` now adds a
-goal-visit clause: when the arena declares a goal cell (the "out there" checkpoint, e.g. the
-cell before Mad Max's block), return-to-start also requires the position trace to visit it;
-goal-less arenas keep plain end-at-start, goal-on-start degenerates gracefully (mirrors
-pass-through). Spec §12.5 records the rule; the question creator's criterion hint states it.
-Exhibit (pinned in turbotCheck's new `[multi-arena]` section, 12 checks): a hardcoded
-out-2-back-2 FSM passes the 1-arena family but fails the 3-arena family 1/3, out-4-back-4
-gets 2/3 ≠ pass, the 3-state sensor-reactive Mad Max FSM passes 3/3, the lazy stop-now brain
-0/3; two headless Gradebook-logic pins. Earlier same day,
-**buildout-infra merged into main** — the fixture build-out
-branch (21 loop iterations, previously never merged back) landed on main: the two-tier
-reference-fixture coverage harness (`coverageCheck.ts` + hand-verified fixtures under
-`app/tools/fixtures/reference/`; ledger **46/56 at the exact tier** — all HW1–HW5 arithmetic
-AND all five perception problems; the 10 open rows are navigation/capstone at tier
-`interface` per the 2026-07-06 scope shift); the transition-label **syntax seam**
-`engine/notation.ts` (k-bit FSM symbols, the TM **two-output** label `read:write,move` — a
-deliberate textbook departure, legacy `1:0R` stays a parse alias — and the turbot-FSM 1-bit
-alias grammar, all behind `TransitionNotation`; label dissection outside the seam is banned
-by notationCheck's grep gate); the canonical SC/FSM codec run window (grading-fairness fix,
-pinned by `scWindowCheck.ts`); `requireStandardHaltPosition` wired end-to-end plus per-case
-TM block-separation variation; shared component geometry (`componentGeometry.ts`) + the
-cost-based A* orthogonal wire router (`wireRouter.ts`, divergence dots; `routerCheck`/
-`layoutCheck`/`bumpCheck` — bumpCheck deliberately NOT a gate yet, and routerCheck's fallback
-budget deliberately repinned 99 → 147 for hw3-p11's structural XOR floor of 48); separate
-opposite-direction FSM transition arcs; and the build-out loop infrastructure
-(`docs/buildout/` memos — HANDOFF/QUEUE/LOG/COVERAGE + design memos — and the `/handoff`
-command). The branch's 2026-07-06 TM-reset-on-navigation store change (0ca35b3) is subsumed
-by the same-day `resetAllSimState()` below — navResetCheck still pins the behavior.
-`buildout-infra` stayed alive as the loop's working branch (merging main each iteration) until
-its retirement on 2026-09-21 (top of this log); its in-flight wireRouter S3 work was NOT part of
-this merge. Earlier same day,
-**sim-state reset on question navigation** — every question
-navigation path (`switchQuestion`, `openAssignment`, `loadAssignment`) now calls the new
-aggregate store action `resetAllSimState()` — which delegates to the per-mode global resets
-(`scGlobalReset`/`fsmGlobalReset`/`tmGlobalReset`/`turbotReset`) so each slice's field list
-lives in one place — replacing the bare `tmGlobalReset()` + `turbotReset()` pair. Previously
-a run from one question leaked into the next: SC typed input rows, OUT strings, ARG/VAL
-decodes and the full Sequential Timeline (`scGlobalSequences`/`scHistory`/`scTimeStep`/
-`scInputSequence`), the I/O `tableRows`, and FSM run state (on main, which never received
-this branch's 0ca35b3 TM-reset fix, the TM tape leaked too). Question entry now hands back
-a fresh machine at t=1: MEM re-zeroed, input values cleared, circuit structure untouched.
-Pinned by the new committed store-level harness `app/tools/navResetCheck.ts` (42 checks;
-15 fail without the fix). Earlier same day, **merge #3: server groundwork + grade release + manual grading**
-— merged main's PR #15 (API server + typed client + deploy recipes), PR #14 (instructor manual
-grading of open questions), and the grade-release gate. All three compose cleanly with the
-branch: the server/client sit BEHIND the existing seams (`api/client.ts` is deliberately
-unwired; the server grades with the SAME pure `engine/grader.ts`), grade release is display
-POLICY outside the grading pipeline (submissions still autograde on receipt — pipelineCheck/
-coverageCheck read autogrades directly and are unaffected), and manual review ANNOTATES the
-pending result (status stays `'pending'`, 0/0 — the open-question contract the coverage
-self-test pins holds unchanged). Since merge #2 the branch also promoted all five perception
-fixtures to the exact tier (hw2-p10..p12, hw3-p11/p12 — ledger 46/56), added
-`tools/bumpCheck.ts` (headless bump-renderability predicate; not in `npm run check`), and
-deliberately repinned routerCheck's fallback budget 99 → 147 (hw3-p11's structural XOR floor
-of 48; see the tool header). Main's entries follow. From origin/main: **grade release** — students see NO grades (not even on submit)
-until the instructor releases them per assignment. Server: `grades_released` column beside the
-assignment row (policy, not content — never inside the AssignmentData JSON), new instructor
-endpoint `PUT /api/assignments/:id/grades-release` `{released: boolean}` (idempotent;
-unrelease re-hides), `gradesReleased` on assignment list/detail responses, and
-`studentRecord(record, released)` in `server/src/sanitize.ts` now withholds the result
-entirely until release (after release: scores only, still no per-case detail). Instructors
-always see everything immediately. serverCheck grew to 28 checks covering the full lifecycle
-(hidden on submit → 403 for student release → release → student sees scores → unrelease
-re-hides). Local prototype mirrors the rule behind a seam (originally
-`app/src/storage/gradeRelease.ts`; since remote-stores S2 (2026-07-08) the flag lives ON the
-`AssignmentStore` seam — `getGradesReleased`/`setGradesReleased` + `gradesReleased` on
-list/get, with `mm:release:` as the local impl's private key — and gradeRelease.ts is
-deleted): the student submit alert no longer shows the autograde, the home screen
-shows "Grade: n/m questions" beside a submitted assignment only once released, and the
-instructor gradebook header gets a "Release grades"/"Hide grades" toggle (with confirm).
-API client: `setGradesReleased`, `gradesReleased` on summaries/detail. Earlier same day,
-**server groundwork** — a complete API server package (`server/`,
-Express 5 + Node's built-in `node:sqlite`, zero native deps) implementing the whole backend
-seam set ahead of AWS access: dev auth (roster-email → bearer token; `AuthProvider` interface
-in `server/src/auth.ts` is where UCLA SSO plugs in via `MM_AUTH_MODE=sso`), assignment CRUD
-(instructor-gated), per-student workbook GET/PUT, and the submission endpoint — the server
-stamps identity/timestamp, grades on receipt with the SAME pure `app/src/engine/grader.ts` the
-browser uses (imported directly across packages), and persists the record. Redaction lives
-server-side (`server/src/sanitize.ts`): students get assignments without `test_cases` and
-results without per-case detail; instructors get everything. Storage is one SQLite file
-(users/sessions/assignments/workbooks/submissions; WAL). `npm run seed [-- --sample]` loads
-the toy roster + cc-basics (+ the sample assignment with graded demo submissions);
-`npm run check` (`server/tools/serverCheck.ts`) boots the real app on an ephemeral port
-against an in-memory DB and drives the full student→instructor flow over HTTP — 22 checks,
-all passing (incl. post-merge with perception/open questions). Browser half:
-`app/src/api/client.ts`, a typed function per endpoint ready to back future `Remote*` stores
-(nothing imports it yet — the app still runs on the Local* stores; the cutover needs the
-store seams to go async). Deployment is copy/paste-ready in `deploy/` (Lightsail setup
-README, systemd unit, Caddyfile for TLS; Cloudflare Pages settings incl. `VITE_API_BASE`).
-Same day, **manual grading for open questions** — the instructor can now
-record a verdict on a pending open question from the gradebook drill-down: ✓ Correct / ✗
-Incorrect buttons + an optional feedback note next to the displayed response. The verdict is a
-`ManualReview` (`{pass, note?, reviewedAt}`, new in `types.ts`) stored as `manual` on the
-record's pending `QuestionResult` — the result **stays `'pending'`** (annotated, not replaced,
-so it's re-reviewable and distinguishable from an autograde; a future LLM pass could write the
-same shape). Persistence goes through the submission seam: new
-`SubmissionStore.recordManualReview(id, attempt, questionId, {pass, note})` backed by the pure
-`applyManualReview(records, …)` helper in `submissionStore.ts` (returns a new array; rejects
-non-pending questions and unknown attempts). Once reviewed, the gradebook counts the question
-like any other: `toQuestionGrade` maps the verdict to passed/pending, so it enters the score
-(the score is now over autogradeable + reviewed questions; unreviewed stay excluded), the ✎
-mark becomes ✓/✗ (tooltip "manually graded"), and the open question's stat tile shows "✎ n to
-review" until every latest attempt is reviewed, then its manual pass rate. Legacy records with
-no stored result stay display-only. `pipelineCheck` grew a [manual review] section (7 checks).
-Earlier same day, **merge #2: perception questions (CC + SC)** — merged main's PR #12: the perception homeworks are
-now authorable and autogradable: a CC/SC question can be a **Perception** task (question
-creator's new "Task" toggle) whose machine reads its inputs as an array of stimulations (a
-retina) and outputs one classification bit. Grading is **bit-level, outside the value codec**
-(new `engine/perception.ts` + `gradePerception` branch in `grader.ts`): cases carry raw
-`frames` (bit-vectors, IN1 first; an SC case is one frame per clock tick) and the `expected`
-output bit per step, generated at save from an authored `PerceptionRule` — CC rules `min-run`
-(≥k consecutive 1s, "edge detector"), `exact-run` (a maximal run of exactly k, "object
-detector"), `pattern` (input = an exact bit string, "landmark recognition"; width = pattern
-length); SC rules `change` (current frame ≠ previous frame) and `motion` (an exactly-k object
-image moving **up** — toward IN1 — 1 unit per tick). CC banks enumerate all 2^width frames
-(width capped at 10); SC banks are a fixed deterministic battery of frame sequences (climbs,
-drifts, statics, jumps, noise, random streams). SC timing convention: the "previous input"
-before the first frame is the all-zero frame — exactly what fresh MEM blocks hold. New types
-(`PerceptionRule`/`PerceptionSpec`/`PerceptionTestCase`/`PerceptionCaseResult`,
-`perception`/`perception_cases` on `AssignmentQuestion`, `perceptionCases` on
-`QuestionResult`); structural Stage 1 = width input wires + 1 output wire; a case passes iff
-every step matches. Students need **zero new UI** — a perception question opens the ordinary
-CC/SC canvas (mode chips read "CC - perception"); the gradebook drill-down shows failed
-stimuli (frames → expected/got bit strings + first wrong step). Sample assignment grew to 13
-questions (Q9–Q13 = the five textbook perception problems) with correct/incorrect sample
-circuits built by a small netlist builder in `sampleData.ts` (the motion detector is ~80
-gates); new `tools/perceptionCheck.ts` (44 checks) and `pipelineCheck` now 13/13 vs 0/13.
-Merged with the same-day open-questions work: sample ids are machine Q1–Q8, perception
-Q9–Q13, open Q14.
-Merge-2 notes: `perceptionCheck` is now wired into `npm run check`, and the coverage
-harness's Stage-1 mirror (`validateStage1` in tools/coverageCheck.ts) was brought back to
-parity with `gradeQuestion`'s full dispatch — open questions short-circuit (no Stage 1),
-perception validates the retina interface via `validatePerceptionMachine`, and turbot
-validation is notation-aware (`validateTurbotTM(…, notation)` / `validateTurbotFSM`).
-Earlier same day, **merge: buildout-infra × origin/main** — combined the build-out
-branch's P2/P1.8 work with main's two PRs (open questions; turbot encoding/glossary + FSM/SC
-turbot grading). Both sides had independently implemented turbot-FSM 2-bit motors; the
-notation-seam implementation won: `turbotFsmNotation` (engine/notation.ts) remains the single
-validity answer for turbot-FSM brain labels (legacy 1-bit outputs stay valid as aliases), main's
-`validateTurbotFSM` now DELEGATES to the generic `validateTransitionTable` walker over it (its
-local `parseTurbotFSMLabel` regex is gone), and main's encoding-awareness landed on the seam:
-`turbotInternalNotation(tapeNotation)` is a memoized function whose alphabet/tokens come from
-`turbotTMReadSymbols`, so editor, validator, engine, and grader share one per-encoding answer.
-Both sides' entries follow. From origin/main: **open questions** — a sixth question mode, `buildMode: 'open'`,
-for free-text answers that cannot be autograded: the student workspace swaps the canvas for a
-writing panel (`OpenResponsePanel`; copy/cut/paste/drop are blocked in the textarea to
-discourage pasting in prepared text — a soft deterrent, not a security boundary) with the same
-chrome/nav/autosave/Submit as machine questions; the answer lives as `responseText` on
-`QuestionCircuit` (mirrored by the store's `openResponse` at every canvas sync point) and on
-the submission's answer; the grader returns a new `QuestionResult` status `'pending'`
-("open question — needs manual review") carrying the `response`, contributing 0/0 to tallies —
-designed so a future LLM-grading pass can consume the same field and replace the pending
-result (not implemented). The question creator gains an 'Open' mode (name + statement only);
-the gradebook marks open questions ✎ (excluded from the auto score — `SubmissionGrade.score`
-is now over autogradeable questions only), shows a "manual review" stat tile instead of a pass
-rate, and the attempt drill-down displays the full response; the grading CLI prints a word
-count. A sample open question (the binary-vs-tally design question, now Q14) + sample
-responses; `pipelineCheck` asserts the pending path. Verified: tsc/build clean, all tool
-checks pass, and a store-level Node harness drove the open-question student flow (type →
-switch → reload → submit → pending result). Earlier same day: **sample turbot questions for
-all four inner modes** — the seeded
-sample assignment now has eight questions: CC/SC/FSM/TM plus one turbot question per inner
-mode (Q5 CC corridor, Q6 SC 3×3 L-course needing a MEM turner, Q7 FSM corridor, Q8 TM textbook
-walker on a tally/unary question), each with correct/incorrect sample brains wired into the
-sample submissions and `pipelineCheck` (now 8/8 vs 0/8); mode chips in the student question
-list and the instructor assignment editor now name a turbot question's inner machine
-("turbot - TM") via the new `questionModeLabel` helper in `types.ts`. Also: **turbotCheck FSM/SC coverage** — the turbot smoke test now
-grades questions in all four inner modes: new FSM- and SC-brained graded questions beside the
-existing TM and CC ones, plus first engine coverage for SC brains — a MEM-latching turner that
-threads a 3×3 L-course (forward → turn left at the first wall → stop at the second), proving
-brain state carries across arena cycles. Same day, **turbot-FSM 2-bit motors** — an FSM-brained turbot's Mealy
-transitions now output the full 2-bit motor code (`in:ij`, e.g. `0:11`, `1:01` — same
-wheel-motor encoding as CC/SC output wires), so FSM brains can issue every movement command,
-turns included, closing the old stop/forward-only limitation. Post-merge this rides the
-notation seam: `validateTurbotFSM` (`engine/turbot.ts`, used by `gradeTurbot`'s Stage 1;
-every state must handle both sensor inputs exactly once) delegates to the generic
-`validateTransitionTable` walker over `turbotFsmNotation`, `runBrainStep`'s FSM branch
-executes via `evaluateFSMSymbolStep` under the same notation (so legacy 1-bit labels stay
-valid as aliases), and the notation-driven transition editor picks up the two motor bits
-from `turbotFsmNotation.outputFields` (new turbot-FSM default label `0:11`); the glossary's
-CC/SC/FSM rows merged into one motor-code table. Same day, **turbot encoding + glossary polish** — turbot questions now carry an
-authored **encoding** (binary | unary; the question creator's "Encoding" toggle, stored as the
-question's `representation`, no longer hardcoded to 'tally'): it picks a turbot-TM brain's
-internal tape alphabet (binary {0,1,*}, unary {0,1}) everywhere — the transition editor's token
-sets (no `*` enterable under unary; post-merge via `turbotInternalNotation(tapeNotation)`, now a
-memoized function on the notation seam), the glossary, `validateTurbotTM`/`parseTurbotInternalLabel`/
-`runBrainStep`/`runTurbot` (new `TMNotation` param, default binary), the store's live stepping,
-and grading (`gradeTurbot` maps `representation` → notation; a `*`-using table fails Stage 1 on a
-unary question — `turbotCheck` covers this). The Map glossary sits **level with the Map** when
-the data panel is wide enough and wraps below it when not (`.turbot-map-row` flex-wrap), and its
-output lines now name **motor states**, not movements: circuit brains "00 = both motors off /
-01 = right motor on / 10 = left motor on / 11 = both motors on"), and
-the turbot-TM arrows are glossed as ↑ = both motors on, ↱ = left motor on, ↰ = right motor on.
-The engine's `TURBOT_TM_READ_SYMBOLS`/`TURBOT_TM_INTERNAL_ACTIONS` constants became the
-notation-aware `turbotTMReadSymbols`/`turbotTMInternalActions`. Earlier 2026-07-05: a From buildout-infra: **TM sim-state reset on question nav** — navigating between assignment
-questions (`switchQuestion`, `openAssignment`, `loadAssignment`) now calls `tmGlobalReset()`
-alongside the existing `turbotReset()`, so the TM tape, head, step counter `t`, run history, and
-current state no longer leak from one TM question into the next; verified by a two-TM-question
-store harness (fails 14 checks without the fix, all pass with it). Earlier same day: **P2.3 — standard-halt-position toggle wired end-to-end** —
-`requireStandardHaltPosition` is now an optional field on `AssignmentQuestion`; the grader's
-tape branch passes it into `acceptTM` (absent/false = position-agnostic, unchanged), and the
-question creator exposes it as a TM-only checkbox that round-trips through save/load. HW5
-fixtures p1–p8 — whose statements promise standard-position halting — are flagged (p9's does
-not); all stay verified, and hw5-p8's broken variant now fails 16/16 (was 15/16: one case
-slipped through only because position was unenforced). tmCheck pins the flag end-to-end
-through `gradeQuestion` (off-position machine passes without the flag, fails every case with
-it; a standard-position machine passes with it). Earlier same day: **P2.1 — TM two-output
-notation** — TM transition labels moved
-off the textbook's dual-action token (`1:0R`) to the industry-standard **two-output form**
-`read:write,move` (stored `1:0,R`; canvas renders read │ write,move with the comma shown;
-the label editor presents one input field + two output fields (write, move); the machine
-table gains separate WRITE/MOVE columns; history shows `1,R`) — the platform's ONE
-deliberate departure from the textbook, recorded in spec §10.3 and VISUAL_VOCAB §TM. The
-grammar now lives natively in `engine/notation.ts` (`tmNotation(rep)` — replacing the
-delegating `tmDualNotation` adapter; alphabet still representation-tied, `*` only on
-binary); the legacy dual-action spelling parses FOREVER as an alias and decays to canonical
-on any edit-save, so old localStorage machines keep working with no migration (devData's TM
-sample migrated to canonical anyway). `parseTMTransition`/`parseTMAction` are gone from
-`engine/tm.ts` — the engine parses through the seam — and `validateTMTable` folded onto the
-generic `validateTransitionTable` walker (which now carries a `kind`:
-unparseable/ambiguous/missing), preserving its error shape. Engine SEMANTICS are unchanged:
-every transition still writes and moves as one atomic step. notationCheck pins the new
-grammar (canonical corpus, alias≡canonical, decay, `*` binary-only, outputFields contract)
-and its grep gate no longer whitelists tm.ts; tmCheck gained legacy-alias engine-equivalence
-pins. Earlier same day: **FSM arc-rendering fix** — opposite-direction transition
-pairs (S₀→S₁ and S₁→S₀) now auto-offset into two separated arcs (each bows left of its
-own travel direction, distance-scaled); previously both curves computed to the same
-control point and rendered coincident with superimposed labels. Explicit `fsmControlPt`
-still wins; self-loop fanning and same-direction parallel stacking unchanged. Earlier
-same day: **Transition-notation seam + k-bit FSM (P1.12)** — new
-framework-agnostic `engine/notation.ts` owns transition-label SYNTAX for all four grammars
-(FSM, base-TM, turbot-TM internal/external) behind one `TransitionNotation`
-interface: parse / canonical format / input alphabet / editor token fields / default label.
-FSM is k-bit capable — `fsmNotation(inBits, outBits)`, symbol char i = cc_spec group i — so
-multi-input FSM questions (hw4-p11 `x+y`) now validate (totality over all 2^kIn symbols,
-kIn ≤ 3), grade (the grader feeds the FULL encoded row per step, not wire 0), and run in the
-UI (question runs join the row into one k-char symbol; the label editor enters symbols one
-character at a time for every grammar). TM/turbot parsers are unchanged behind delegating
-adapters; `turbotFsmNotation` is the single validity answer for turbot-FSM brain labels
-(legacy 1-bit outputs alias to the canonical 2-bit motor form and decay on edit-save;
-`runBrainStep` decodes both identically). Also folded in **P1.10**: the sandbox FSM feed now
-consumes typed input rightmost-char-first (t1), matching SC. `tools/notationCheck.ts` (in
-`npm run check`) pins adapter≡parser equivalence, legacy byte-compat, an asymmetric `x + 2*y`
-bit-order grade, and a grep gate keeping label dissection inside the seam. Earlier same day:
-**SC/FSM question runs mirror the grader exactly — window AND content** — inside an assignment question, Run/Step execute exactly the grader's `stepCountFor`
-window and feed exactly the grader's input stream: the typed global input is parsed as a
-**value** per input group (exactly how the A/V ARG column reads it — tally "11" = 2, binary
-"110" = 6) and laid on the time axis by the codec's `encodeInput` (LSB at t1, so a tally
-value's ones arrive LAST, zeros leading) in `scStep`/`fsmStep` via the store's
-`selectCodecLayout`; the SC A/V numeral decodes only the grader's window per output group
-(`timeOutputBits`). What the student types is the value the grader tests, and UI verdicts
-match grades in **both representations**. Note this changes FSM question-run typed input: it
-is now read as a **numeral** (MSB-left, "110" = 6) like SC and the ARG column — previously it
-was fed t1-first raw; sandbox FSM is unchanged. The FSM Input/Output row's OUT display now
-also renders t1-rightmost (time flows right-to-left, matching SC) via the pure builder
-`components/outputDisplay.ts`, so a passing identity's OUT reads as the same numeral as its
-typed IN. A typed string that is not a valid numeral for the
-representation (tally "101") denotes no value: the run falls back to the raw typed bits and
-the ARG column flags it '/'; values wider than a group clamp/mask via `valueToBits` as
-everywhere else. Sandbox behavior is unchanged (raw typed bits; SC: L + one 0-drain step per
-MEM; FSM: L). Pinned by `tools/scWindowCheck.ts` (grader + real-store headless runs, incl. the
-real hw3-p7 tally fixture's correct machine), part of `npm run check`. Earlier 2026-07-05: a
-percept/motor **glossary** under the Map — TM brains list the
-internal/external vocabularies (B/E/F → ↑/↱/↰; 0/1/* → write/move), circuit brains the 1-bit
-sensor and motor codes — and the question creator's Save/Cancel now also appear at the top of
-the form. Same day, **turbot TM + Map relocation** — the TM-brained turbot is now the
-textbook's real model ("Turbots: Operation"), replacing the earlier placeholder that reused the
-base dual-action TM engine: STATE nodes carry a `stateKind` (internal = circle, external =
-square; toolbar "In/External" toggle), internal transitions read the private {0,1,*} tape and
-perform ONE single action (write a symbol OR move L/R), external transitions sense the cell
-ahead as B (block/boundary) / E (empty) / F (food — passable, and F IS the goal cell) and move
-forward (↑) or turn (↱/↰); every transition is one time step, turbots start on a blank tape
-(shown read-only below the canvas via `TurbotTapePanel`), and halting is the turbot TM's stop —
-`reach-and-stop` accepts a TM that halts on the goal (`TurbotRunResult.stopped`). Turbot-TM
-tables get their own validator (`validateTurbotTM`, per-state-kind grammar) and the transition
-editor/label store enforce the per-kind grammars. The student Map moved from above the canvas
-into the right data panel (below the question statement, above the machine/history tables).
-`TurbotHistoryEntry` is now kind/input/action (internal rows dimmed in the history table).
-Earlier same day: **turbots, end to end** — the full Phase 4 feature block in five
-staged commits: (1) pure `engine/turbot.ts` (arena driver loop around the existing CC/SC/FSM/TM
-single-step evaluators — sense → one brain cycle → apply motor command → record history, halting
-on motor "00", a halted FSM/TM brain, or the step limit) + the grader's `gradeTurbot` branch
-(arena success criteria: reach-and-stop / pass-through / return-to-start) + new types
-(`ArenaConfig`, `TurbotState`, `TurbotHistoryEntry`, `TurbotTestCase`, `TurbotCaseResult`,
-`innerMode`/`turbot_cases` on `AssignmentQuestion`); (2) the store's turbot sim slice
-(`turbotStep/Run/Pause/Reset`, pose + brain state + history), with reset wired into question
-load/switch; (3) the student workspace — `TurbotArenaPanel` (Map grid + Step/Run/Pause/Reset +
-cycle/sensor/motor readout) mounted above the normal canvas, `selectEffectiveMode` so a turbot
-question's canvas edits its `innerMode` brain (palette, transition grammar, STATE interactions,
-toolbar reset all follow it), and a DataTable turbot branch (machine table for FSM/TM brains +
-movement history); (4) instructor authoring — 'Turbot' mode in `QuestionCreator` with an
-inner-machine picker, clickable arena editor (blocks/goals/start+facing, resizable ≤30×30),
-criterion + max-steps; gradebook drill-down shows per-arena steps/final-pose/reason; (5) sample
-Q5 turbot question + correct/incorrect sample brains; `pipelineCheck` now covers all five modes.
-Verified: tsc/build clean; `turbotCheck`/`tmCheck`/`codecCheck`/`pipelineCheck` all pass; a
-store-level Node harness drove the full student flow (open → switch to turbot question → build
-brain → step to goal → halt/reset/switch semantics). Earlier 2026-07-04: UI/UX batch —
-FSM/TM connection rework, TM alphabet tied to representation, gradebook by student, single
-target function; see git history)_
+All work bigger than a one-line fix goes through the committed queue in `tasks/` (schema and
+the id rule: `tasks/README.md`; shared operating rules every role reads first:
+`tasks/PROFILE.md`; how to launch: `tasks/START.md`):
+
+- **`/catch`** — the catcher session: Gabriel describes problems and ideas, it diagnoses
+  (root cause, class, deep vs surgical fix) and files task files, surfacing parked questions
+  from `tasks/blocked/` first.
+- **`/work`** — the work session: it surveys the queue, proposes merges, offers options;
+  Gabriel picks; the session works one task in depth on a `task/NNN-slug` branch and lands
+  it with a merge commit.
+- **`/worker`** — the unattended routine (written, **not yet scheduled**): claims one
+  `size: small` task, fixes it in a worktree, verifies by the gates, merges. `large`/`unknown`
+  tasks and anything with `requires:` are interactive-only by construction.
+
+The former build-out loop (`/handoff`, `docs/buildout/`) is retired; its memos are history,
+except `NORTH_STAR.md` (the design principle) and `VISUAL_VOCAB.md` (the appearance oracle).
 
 ---
 
@@ -761,274 +39,106 @@ target function; see git history)_
 ## The goal
 
 A platform where a student logs in (eventually UCLA SSO), picks an assignment, works on it
-(one canvas per question, in the right mode — CC / SC / FSM / TM), leaves, comes back, and
-resumes exactly where they left off — then submits the whole assignment with one button. On
-submit it goes to the **server** and is **autograded**. Instructors author assignments and
-view scores. **Students cannot grade their own work** — grading is a server/instructor
-capability.
+(one canvas per question, in the right mode — CC / SC / FSM / TM / turbot / open), leaves,
+comes back, and resumes exactly where they left off — then submits the whole assignment
+with one button. On submit it goes to the **server** and is **autograded**. Instructors
+author assignments and view scores. **Students cannot grade their own work** — grading is a
+server/instructor capability.
 
 ## Where we are now
 
-A single-page app supporting the full target flow end-to-end in **two backends behind one
-switch** (`storage/backend.ts`): **local** mode (browser-only, localStorage — the default, the
-dev environment, and what the headless harness drives) and **remote** mode (built with
-`VITE_API_BASE`; every seam backed by the `server/` API — server-side grading, sanitized
-student payloads, real sessions). The flows below are identical in both modes except where
-noted:
+A single-page React + TypeScript app supporting the full target flow end-to-end in **two
+backends behind one switch** (`app/src/storage/backend.ts`): **local** mode (browser-only
+localStorage — the default, the dev environment, what the headless harness drives) and
+**remote** mode (built with `VITE_API_BASE`; every seam backed by the `server/` API —
+server-side grading, sanitized student payloads, real sessions). Identical flows in both
+except where noted.
 
-- **Student side** — sign in (local: mockup account picker; remote: **email + the password you
-  chose**, with "Create account" for anyone on the CSV roster who hasn't yet — roster email +
-  student ID + a password — and "Not on the roster?" filing an instructor-reviewed access
-  request; the login screen renders from the server's own reported capabilities, so an SSO
-  server shows one "Sign in with UCLA" button instead — session restored across reloads, with a
-  boot health-probe retry screen when the server is unreachable; a "Password" control beside the
-  session chip changes it) → browse assignments →
-  open one to its **question list** (`AssignmentOverview`) → click a question to open its
-  dedicated canvas in the correct mode (**CC, SC, FSM, TM, and turbot** — TM has a clickable tape
-  strip below the canvas plus machine-table/run/history panels; its tape alphabet is tied to the
-  question's `representation`, so `*` can only be entered — in the transition editor or on the
-  tape — on binary questions; a turbot question's canvas is the normal editor for the question's
-  `innerMode` brain, with the arena "Map" (grid + Step/Run/Pause/Reset + cycle/sensor readout) in
-  the right data panel below the question statement, above the machine table and step history;
-  TM-brained turbots additionally show their internal tape read-only below the canvas; an
-  **open** question swaps the canvas for a free-text writing panel — same nav/autosave/Submit,
-  copy/paste blocked in the textarea) →
-  navigate back to the list or between questions via the nav bar → debounced autosave through
-  the `WorkbookStore` seam (local: instant localStorage; remote: server PUT with an `'error'`
-  indicator + backoff retry, a keepalive unload flush, and a per-email crash-buffer journal
-  replayed on the next open — a hard tab kill loses nothing) →
-  leave and resume (reload/Back returns you into the assignment) → once the instructor has
-  released grades, open a **grade sheet** from either the catalog or the assignment page (a
-  "View grades" modal: one row per question, its mode, the verdict, any instructor feedback note
-  left on a manually-reviewed question, and — tucked into a per-question "▸ failed inputs"
-  dropdown, never the main pane — which inputs a value/perception/fill-in question failed on or
-  which turbot arenas it missed, safe fields only, never the answer key; a question's label links
-  straight into that question's canvas) — the panel and the home/overview screens re-fetch on
-  every visit, not just once at app boot, so an instructor's newly-released grade or added note
-  shows up without a hard refresh — → Submit a timestamped
-  snapshot (remote submit is online-only: a failure alerts and records nothing — the server
-  stamps time, so nothing is silently late). **Once an assignment's due date has passed AND a
-  submission exists, it freezes**: every question shows the actually-submitted circuit read-only
-  (Run/Step still work) instead of the live workbook, edits are refused, and Submit disappears —
-  a student who never submitted stays fully editable and can still submit late, and that
-  submission is what freezes the view from then on (`dueDates.ts isFrozen`,
-  `store.ts selectAssignmentFrozen`). A student can also **mark a question done** (a toggle in
-  the question nav bar) to self-lock it against accidental edits before freezing ever applies,
-  with an "N of M done" summary on the assignment overview; both locks share the same
-  `isCurrentQuestionLocked` guard in the store. A **"Feedback" link** in the top bar opens a form
-  (category — platform design / homework content — message, up to 2 screenshots) for reporting
-  issues with the platform or a homework.
-  The editor chrome is minimal: no File/Edit menus (Home + Submit + session controls only).
-  The freeform **sandbox** offers every machine as a worksheet tab — the + menu lists Logic
-  Circuit / FSM / TM **and Turbot** (a second menu page picks the CC/SC/FSM/TM brain); a sandbox
-  turbot tab is the full turbot workspace (same selectors as questions) with its own **editable**
-  arena — the Map's sandbox-only "Edit map" mode reuses the instructor arena tools
-  (block/goal/erase/start + resize) — persisted per tab in the sandbox autosave.
-- **Autograding (the codec)** — pure headless `engine/` simulators for **CC, SC, FSM, and TM**,
-  graded through one **value-based codec pipeline**: every machine implements a function `f`, and
-  `grader.ts` checks it against a machine-agnostic bank of numeric `(x, f(x))` `test_cases` via
-  `validate → encode → run → accept → decode → compare`. The only per-mode knowledge is the
-  **axis** — how a number maps to/from bits over wires (CC `space`), time (SC/FSM `time`), or tape
-  (TM `tape`) — which lives in the **codec** (`engine/codec.ts` + `tmCodec.ts`). The old bit-based
-  `test_vectors` are gone. **Turbots grade outside the codec**: a turbot's brain is a CC/SC/FSM
-  circuit with a fixed 1-bit sensor / 2-bit motor interface, or a **turbot TM** (textbook model:
-  internal states do single-action tape ops on the question's encoding's alphabet — binary
-  {0,1,*}, unary {0,1}; external states sense B/E/F and move forward/turn; halting is its stop).
-  `gradeTurbot` maps the question's `representation` to that notation and runs the brain in each
-  `turbot_cases` arena (`engine/turbot.ts` driver loop; turbot-TM tables validated by the
-  notation-aware `validateTurbotTM`) and checks
-  the case's success criterion (reach-and-stop / pass-through / return-to-start) — positional
-  results (`TurbotCaseResult`), not value comparisons. `turbot_cases` is an arena FAMILY and
-  every arena must pass (navigation questions promise generality — block/goal at unknown
-  distance); return-to-start in a goal-ful arena additionally requires the trace to visit the
-  goal before ending at start, so hardcoded out-and-back brains fail the family
-  (turbotCheck `[multi-arena]`). **Perception questions also grade outside
-  the codec** (`engine/perception.ts`, `gradePerception`): a CC/SC question with a `perception`
-  spec is graded bit-level against `perception_cases` — raw input frames in (one frame per SC
-  clock tick; the pre-first-frame "previous input" is the all-zero frame, matching MEM init),
-  one output bit compared per step, a case passing iff every step matches
-  (`PerceptionCaseResult`). **Open questions aren't autograded at
-  all**: the answer travels as `responseText` on the submission and the grader returns a
-  `'pending'` result carrying it for manual review (an LLM-grading pass could later replace
-  that pending result — the seam is there, not implemented). Submissions **autograde on
-  receipt** and the result is persisted on the record — in local mode inside
-  `LocalSubmissionStore`, in remote mode on the SERVER (same pure engine; the student's
-  browser never sees `test_cases` and never grades — grep-gated by remoteStoreCheck; byte
-  parity pinned by `server/tools/parityCheck.ts`).
-- **Instructor side** — role-gated `#/instructor` mode: a **Roster & accounts** screen
-  (`#/instructor/roster`, remote mode — import the class CSV by paste or file with a
-  column/issue report, see who has created an account, reset a forgotten password, add or
-  remove one person, approve or reject access requests), a **Feedback** queue
-  (`#/instructor/feedback` — every student report, open/resolved/all filter, mark
-  resolved/reopen; works in both backends), a shared **Notes** page
-  (`#/instructor/notes` — one markdown document instructors use to coordinate; split
-  raw-source/live-preview editor rendered with `marked` + `dompurify`, saves only on "Save",
-  warns before overwriting a colleague's more-recent save), dashboard (with drag-to-reorder
-  assignment rows — grip handle, live preview, bundled rows pinned — and a Publish/Hide toggle — **every assignment is hidden until it is published**,
-  bundled and seeded ones included, so a student's catalog is empty until the instructor
-  releases something; a hidden assignment is absent from a student's list, 404s on fetch, and
-  cannot be opened by URL), assignment editor, a **question
-  creator**, and a **gradebook** that reflects stored autogrades, **grouped by student**: one row
-  per student showing the **latest** submission's scores (only the latest counts for grading) and a
-  per-student attempt count; expanding a student reveals the full submission history with
-  failed-case drill-down per attempt (value questions: input/expected/got; turbot questions:
-  arena #, steps taken, final pose, failure reason; perception questions: input frames,
-  expected/got bit strings, first wrong step; open questions: the full text response with
-  **manual grading controls** — ✓ Correct / ✗ Incorrect + an optional note, recorded through
-  `SubmissionStore.recordManualReview` onto the stored result; unreviewed open questions are
-  marked ✎ and excluded from the score, reviewed ones count like any other question and the
-  ✎ stat tile tracks how many latest attempts still need review). Sample data for all six
-  modes plus the five perception problems can be seeded to demo the pipeline.
-  The question creator is one shared form authoring **all six modes** (CC/SC/FSM/TM/turbot/open) —
-  mode is an ordinary field, not a gate; question names are editable; there is no bit-width field
-  and no example-preview table. CC/SC/FSM/TM questions compute exactly **one output**: the
-  **Target function** section shows `f(x, y, …) = <formula>` over the declared input-group names,
-  with a lightweight live single-input check inline next to it. CC input groups declare a **max
-  input value**; SC/FSM/TM have no size field — they're tested on a **sampled** set of values
-  across a range of input lengths (`buildQuestionBank` in `engine/testVectorGen.ts`, which also
-  derives all group widths). **Turbot questions** replace the formula pipeline with an
-  inner-machine picker (CC/SC/FSM/TM), an **encoding** toggle (binary | unary, stored as the
-  question's `representation`; it picks a TM brain's internal tape alphabet), a clickable
-  **arena editor** (paint blocks/goals, place + rotate the turbot start; resizable up to 30×30;
-  helpers in `instructor/arenaEditing.ts`), and a
-  success criterion + max-steps pair; goal-directed criteria require a goal cell before save.
-  **Perception questions** (CC/SC only) are a "Task" toggle on the same form: pick a rule
-  (CC: ≥k run / exactly-k run / exact pattern; SC: change / upward motion), a retina size
-  (2–10 wires; a pattern's width is its length), and the bit-level case bank generates at save
-  (`buildPerceptionCases`); representation is implicitly binary bits.
-  **Open questions** are just a name + question text (no representation, formula, or bank).
-  **Fill-in-the-blank questions** are an open question carrying a `fill_in` spec (labelled
-  boxes, optionally digits-only) plus a separate `fill_in_answers` key: the student's panel
-  becomes a list of labelled boxes, and the question IS autograded — one string comparison per
-  blank, leading zeros and surrounding whitespace normalised away (`engine/fillIn.ts`). There
-  is deliberately no authoring UI yet (`notes/pset_updates.md` item 10): HW1 P11 is
-  hand-written in `devData/homeworks/hw1.json`.
-- **Reference-function DSL** — instructors don't hand-write test cases. They declare a question's
-  input/output groups + one representation and specify the correct output with a small
-  **affine/bitwise arithmetic mini-language** (the "reference function"); the system enumerates
-  inputs, evaluates the formula, and auto-generates the numeric `test_cases` — the full
-  enumeration runs once, at save. While editing, a live check evaluates the formula on a single
-  input per keystroke and a button previews up to 16 worked examples on demand (enumerating the
-  whole space per keystroke was too slow). See the DSL section in Part 2.
+**Student side.** Sign in (local: toy-account picker; remote: email + password against the
+CSV roster, "Create account" for roster members verified by student ID, "Not on the roster?"
+files an instructor-reviewed access request; the login screen renders from the server's
+reported capabilities, so an SSO server shows one "Sign in with UCLA" button with no frontend
+rebuild; a 30-day bearer session restored across reloads; a boot health-probe retry screen
+while the server is down; a "Password" control beside the session chip) → browse
+**published** assignments (hidden until an instructor publishes) → question list
+(`AssignmentOverview`) → a per-question canvas in the right mode: **CC, SC, FSM, TM,
+turbot** (TM: clickable tape strip below the canvas, machine table / run / history panels,
+tape alphabet tied to the question's `representation`; turbot: the normal editor for the
+question's `innerMode` brain plus the arena "Map" — grid, Step/Run/Pause/Reset, cycle/sensor
+readout — in the right panel; TM brains also show their internal tape read-only),
+**open** (free-text panel, copy/paste blocked as a soft deterrent) and **fill-in** (labelled
+boxes, autograded). Debounced autosave through `WorkbookStore` (remote: PUT with an `'error'`
+indicator + backoff retry, keepalive unload flush, and a per-email crash-buffer journal
+replayed on the next open — a hard tab kill loses nothing). Leave and resume. **Submit** a
+timestamped snapshot (remote submit is online-only: a failure alerts and records nothing —
+the server stamps time). Once grades are released: a **grade sheet** modal (verdict per
+question, the instructor's feedback note if any, a per-question "▸ failed inputs" dropdown
+with safe fields only — which input/frame/blank/arena failed and why, never the answer key —
+and a link into that question); home/overview re-fetch on every visit. **Freezing**: once the
+due date has passed AND a submission exists, every question shows the actually-submitted
+circuit read-only (Run/Step still work), edits are refused, Submit disappears; a student who
+never submitted stays editable and can submit late, and that submission then freezes them.
+**Mark done**: a per-question self-lock toggle with an "N of M done" summary; both locks share
+`isCurrentQuestionLocked`. A **Feedback** link files platform/homework reports (category,
+message, ≤ 2 downscaled screenshots). Editor chrome is minimal (Home + Submit + session).
+The freeform **sandbox** offers every machine as a worksheet tab — CC / FSM / TM and a
+Turbot tab (second menu page picks the brain kind) with its own editable arena ("Edit map").
 
-- **Server (built and WIRED to the frontend; not yet deployed)** — `server/` is a runnable API
-  server implementing the backend half of every seam: dev auth + sessions (roster email →
-  bearer token), assignment CRUD, workbook sync, submit-with-server-side-autograding (same
-  `engine/grader.ts`, imported directly), manual review (same pure `applyManualReview` from
-  `storage/manualReview.ts`), grade release, and an unauthenticated `/api/health` probe. It
-  keeps `test_cases` server-only and strips per-case detail from student results
-  (`sanitize.ts`). SQLite storage, seed script, a 35-check HTTP smoke test plus the 36-check
-  server↔engine grading-parity pin (`cd server && npm run check`). Since P6.4 the app's
-  `Remote*` stores and remote auth consume it end-to-end (`app/src/api/client.ts`;
-  `tools/remoteStoreCheck.ts` drives the Remote seams against the booted real server — 56
-  pins). Deployment recipes for Lightsail + Cloudflare Pages sit in `deploy/`.
-  See `server/README.md`.
+**Autograding.** Pure headless `engine/` simulators for CC, SC, FSM and TM, graded through
+one **value-based codec pipeline**: every machine implements a function `f`, checked against
+a machine-agnostic bank of numeric `(x, f(x))` `test_cases` via `validate → encode → run →
+accept → decode → compare`. The only per-mode knowledge is the **axis** — CC `space`, SC/FSM
+`time`, TM `tape` — in `engine/codec.ts` + `tmCodec.ts`. Outside the codec: **turbots**
+(`gradeTurbot` runs the CC/SC/FSM/TM brain in every `turbot_cases` arena; criteria
+reach-and-stop / pass-through / return-to-start judged on positions only, never path or
+facing; every arena of the family must pass; return-to-start in a goal-ful arena also
+requires visiting the goal, so hardcoded out-and-back brains fail), **perception**
+(`gradePerception`, bit-level against `perception_cases`, a case passes iff every step
+matches), **fill-in** (`engine/fillIn.ts`, string compare, leading zeros/whitespace
+normalised), **open** (a `'pending'` result carrying the response for manual review).
+Question-level constraints checked at Stage 1: `allowed_components`, `component_limits`,
+`maxTapeCells`, `requireStandardHaltPosition`. Submissions autograde on receipt — locally in
+`LocalSubmissionStore`, remotely on the server with the same engine; in remote mode the
+browser never sees `test_cases` (grep-gated) and server ≡ engine parity is pinned.
 
-**The pilot deployment is LIVE** (2026-09-02): the frontend is on Cloudflare Pages at
-`https://making-minds.pages.dev` (direct upload via wrangler; project `making-minds`), talking
-to the Lightsail API at the placeholder hostname `https://100-22-69-95.sslip.io` (sslip.io
-wildcard DNS → the static IP 100.22.69.95, real Let's Encrypt cert via Caddy; swappable for a
-real domain in three edits — `deploy/README.md` §2). What's missing is **UCLA SSO** (a
-server-side `AuthProvider` swap; the client flow is done) — the box still runs
-`MM_AUTH_MODE=dev`, so the URL is not yet fit for students. **Real assignment content is in**:
-HW1–HW7 ship as seedable JSON (dashboard "Load HW1–HW7", local mode) — machine problems from
-the reference fixtures, prose problems as open questions; remote mode still needs them seeded
-server-side.
+**Instructor side** (`#/instructor`): **Roster & accounts** (remote — CSV import with a
+column/issue report, who has an account, password reset, add/remove, access requests),
+**Feedback** queue (open/resolved/all), shared **Notes** page (one markdown document,
+`marked` + `dompurify`, save-only-on-Save, warns before overwriting a newer save),
+dashboard (drag-to-reorder, **Publish/Hide** — every assignment hidden until published;
+local-mode "Load HW1–HW7"), assignment editor (drag-to-reorder questions), **question
+creator** (all six modes on one form; formula DSL → test banks; turbot: inner machine,
+encoding, arena editor ≤ 30×30, criterion + max-steps; perception: rule + retina size;
+component restrictions and limits; TM halt-position toggle; **no fill-in authoring UI yet**),
+**gradebook** grouped by student (latest attempt counts; expandable history with failed-case
+drill-down per mode; ✓/✗ + note manual review of open questions; Release/Hide grades).
+
+**Server** (`server/`, Express 5 + `node:sqlite`, zero native deps): auth providers behind
+`MM_AUTH_MODE` (`password` default — roster-gated registration, scrypt, login throttle;
+`dev` passwordless; `sso` — capabilities reported, `authenticate` is a TODO), roster CSV
+import + admin CLI (`npm run roster`), assignment CRUD, workbooks, submit-with-grading,
+manual review, grade release, feedback, notes, `/api/health`. Redaction server-side
+(`sanitize.ts`). SQLite, WAL. Gates: `serverCheck`, `authCheck`, `parityCheck`.
+
+**Deployment — pilot live.** Cloudflare Pages `https://making-minds.pages.dev` → Lightsail
+API at the placeholder `https://100-22-69-95.sslip.io` (Caddy TLS). Not yet fit for students:
+UCLA SSO is a stub and the box holds only the toy roster + `cc-basics`. **Content:** HW1–HW7
+exist as seedable JSON (`app/src/devData/homeworks/`, 84 questions — machine problems from the
+reference fixtures, prose problems as open questions) for local mode only so far.
+
+**Reference-fixture coverage:** 56/56 at-tier — 46 exact (correct passes every case, broken
+fails) + 10 interface (navigation/capstone: a plausible attempt validates and grades
+end-to-end; score reported, never asserted) — behind `app/tools/coverageCheck.ts`.
 
 ## What's next
 
-**Done in the 2026-09-17 todos pass** (see the header): manual-review feedback notes shown to
-students, live re-fetch of grades/feedback, due-date freezing with a read-only submission view,
-a safe-widened failed-cases dropdown, "mark as done" question locking, the feedback form +
-instructor queue, the shared instructor notes page, and five small UI fixes. Follow-ups it names
-rather than closes: auto-loading a failed input into a live Run, a due-date-independent "view
-this submission" mode (today the frozen view only applies once past due), and the dead
-`boxedCircuitId` FSM-box rendering-only placeholder (discovered while investigating why TMs
-can't box, unrelated to it).
-
-**Done in the 2026-09-10 notes pass** (see the header): rich statements, titles/hints,
-component + tape budgets, fill-in autograding, assignment ordering and publish/hide,
-homework-wide box libraries, SC boxing, the student grade sheet, and the flat main-page UI.
-Two follow-ups it names rather than closes: boxing a SEQUENTIAL sub-circuit (nested MEM state
-in `evaluateSCSequence`), and an authoring UI for fill-in questions (HW1 P11 is hand-written).
-
-**Near-term (still no backend):**
-
-- **Reference-fixture buildout — COMPLETE AT-TIER** (memos in `docs/buildout/`; its working
-  branch `buildout-infra` was fully merged into `main` and retired 2026-09-21) — **46 exact +
-  10 interface = 56/56**: every machine-buildable problem in
-  HW1–HW6 has a hand-verified reference fixture behind the two-tier coverage harness. All
-  arithmetic + perception at the **exact** tier (correct passes every case, broken variant
-  fails); all navigation + the Desert Ant capstone at the **interface** tier (plausible attempt
-  validates + grades end-to-end; scores reported, never asserted — 2026-07-06 scope shift;
-  exactly-correct answers are a separate future project). Close-out queue (see
-  `docs/buildout/QUEUE.md`): everything through P6.4 (the Remote-store cutover) is DONE,
-  including P6.1b (resolved iteration 34 — Gabriel chose the implemented red `#c73535`
-  over the mockups' yellow; VISUAL_VOCAB updated to record it). No loop-owned buildout
-  work remains — the ledger is complete at-tier and the queue holds only the two
-  recurring META tasks plus one optional non-blocking hardening item (P-TOOLS-1, a
-  harness-tool portability grep-gate); product remainder (deploy / UCLA SSO / real HW
-  content) is human/backend-gated, below.
-- **Turbot polish** — the full turbot flow (engine, grader, store, student workspace, instructor
-  authoring, gradebook, sample data) shipped 2026-07-05, including the textbook turbot TM
-  (internal/external states, single tape actions, B/E/F senses, ↑/↱/↰ motors); FSM brains got
-  full 2-bit motor outputs 2026-07-06, and the sample assignment gained a turbot question per
-  inner mode the same day; the **sandbox turbot tab** (P4.4, 2026-07-08) added scratch-building
-  turbot brains outside assignments, with a per-tab editable arena. Known follow-ups:
-  multi-arena authoring UI (the `turbot_cases` data model already holds a list; the creator
-  authors one), and live-linking arena stepping to circuit-edit invalidation (currently the
-  student Resets manually after editing mid-run, same as TM).
-- **Perception polish** — the CC/SC perception flow (rules, bit-level grading, authoring,
-  gradebook drill-down, samples) shipped 2026-07-06. Known follow-ups: a student-facing frame
-  player for SC perception (today students hand-enter per-wire input sequences in the normal SC
-  timeline to test their circuit), instructor-editable/custom frame sequences for SC banks (the
-  battery is fixed), and richer rules (downward/any-direction motion, multi-object scenes).
-- **Deferred authoring follow-ups — both done.** `requireStandardHaltPosition` (2026-07-06):
-  wired end-to-end through `gradeQuestion` and exposed as a TM-only checkbox in the question
-  creator. `allowed_components` (2026-07-07, P1.5): one semantics in
-  `engine/machineValidation.ts` (absent/empty = unrestricted; present = listed types only, plus
-  always-allowed INPUT/OUTPUT/STATE; BOXED internals recursed so a boxed gate can't smuggle a
-  banned one), enforced as Stage-1 grading in every grader branch, filtered out of the student
-  palette (`ComponentLibrary` via `selectAllowedComponents`), and authored via a
-  "Restrict available components" toggle + gate checkboxes in the question creator.
-- **Open-question grading follow-ups** — manual grading shipped 2026-07-07 (gradebook
-  drill-down: correct/incorrect + note, stored as `ManualReview` on the pending result via
-  `SubmissionStore.recordManualReview`); the note is now shown to the student too
-  (2026-09-17, `GradesPanel.tsx`). Remaining: optional LLM-assisted grading — the
-  `pending` `QuestionResult` carries the `response` and `ManualReview` is the shape a
-  server-side LLM pass would write.
-
-**The backend phase (server shipped 2026-07-07; frontend cutover DONE 2026-07-08 = P6.4):**
-
-- **Frontend cutover — DONE (P6.4 S1–S4, 2026-07-08).** The seams are async, the `Remote*`
-  stores back them via `app/src/api/client.ts` behind the `storage/backend.ts` switch, remote
-  auth (email login / bearer session / 401 handling / boot health gate) is live, first-login
-  fill-empty migration and the crash-buffer journal cover durability, and
-  `tools/remoteStoreCheck.ts` (85 pins, in `npm run check`) drives it all against the booted
-  real server. Local mode is byte-identical and remains the default without `VITE_API_BASE`.
-- **Deploy — DONE for the pilot (2026-09-02).** Lightsail runs `server/` behind Caddy TLS;
-  Cloudflare Pages serves `app/` at `https://making-minds.pages.dev`, built with
-  `VITE_BASE_PATH=/` (Vite's `base` defaults to `/making-minds/` for the GitHub Pages job, and
-  Pages serves at the root) and `VITE_API_BASE=https://100-22-69-95.sslip.io`; the box's
-  `MM_CORS_ORIGINS` already names that Pages origin. Redeploy =
-  `npx wrangler pages deploy dist --project-name making-minds` from `app/` with the credentials
-  in the gitignored `secrets/cloudflare.env`. Remaining: a real domain (placeholder hostname
-  today), seeding HW1–HW7 into the server's DB (it holds only the toy roster + `cc-basics`),
-  and SQLite backup cron — all in `deploy/README.md`.
-- **Accounts — DONE (2026-09-11).** Roster-gated registration, email + password sign-in,
-  access requests, instructor roster administration, and the `npm run roster` CLI; the default
-  `MM_AUTH_MODE` is now `password`. What remains is **UCLA SSO itself**: fill in
-  `SsoAuthProvider.authenticate` in `server/src/auth.ts` (validate the assertion, map attributes
-  to `{email, name}`, take the role from the roster, upsert, return the row) and set
-  `MM_AUTH_MODE=sso` + `MM_SSO_LOGIN_URL`. Nothing else changes — sessions, every route, the
-  role gate, and the login screen are already provider-agnostic (the screen reads
-  `GET /api/auth/config`).
-- **Real assignment content — DONE for local mode (2026-07-12).** HW1–HW7 live in
-  `app/src/devData/homeworks/` (assignments + sample submissions), seeded via the dashboard's
-  "Load HW1–HW7" (fill-empty; editable in the assignment editor like any instructor-authored
-  assignment). Remaining: seed them into the SERVER for remote mode (e.g. extend
-  `server/src/seed.ts` to ingest the same JSON), and Gabriel's content review of the transcribed
-  open-question statements (esp. HW4 P1–P2, whose PDF diagrams are described in words).
+The open work is the queue: `tasks/incoming/` (ready) and `tasks/blocked/` (waiting on
+Gabriel) — run `/work` to see it offered. Headline items on 2026-09-21: **UCLA SSO** (blocked
+on UCLA IdP details), **seeding HW1–HW7 into the server DB**, a real domain + SQLite backup
+for the pilot box, sequential-sub-circuit boxing, a fill-in authoring UI, failed-input →
+live Run, a due-date-independent "view my submission" mode, turbot multi-arena authoring,
+an SC perception frame player, LLM-assisted open-question grading, and — last — activating
+the worker routine.
 
 ---
 
@@ -1037,238 +147,188 @@ in `evaluateSCSequence`), and an authoring UI for fill-in questions (HW1 P11 is 
 ## What this is
 
 An interactive web platform for **PHIL 133 ("Making Minds")**, a philosophy/computation
-course (~80 students). Students build circuits, finite state machines, and grid-based agents
-("turbots"), completing and submitting homeworks that are automatically graded. Built as a
-**single-page React + TypeScript app** with two backends behind one switch: local (browser-only
-localStorage; the default and the dev/harness environment) and remote (the `server/` API,
-selected at build time by `VITE_API_BASE`).
+course (~80 students). Students build circuits, finite state machines, Turing machines and
+grid-based agents ("turbots"), completing and submitting homeworks that are automatically
+graded. A **single-page React + TypeScript app** (`app/`, Vite) with two backends behind one
+switch: local (localStorage; the default and the dev/harness environment) and remote (the
+`server/` API, selected at build time by `VITE_API_BASE`).
 
 ## Architecture principle: seams
 
 Every external dependency sits **behind an interface**. This is how the no-backend prototype
-BECAME a server-backed product (P6.4, 2026-07-08) by swapping implementations — not rewriting
-the UI. The seams are Promise-returning; `storage/backend.ts` is the ONE mode decision and the
-sole exporter of store instances. **Route new features through these seams, not around them.**
+became a server-backed product by swapping implementations, not rewriting the UI. The seams
+are Promise-returning; `storage/backend.ts` is the ONE mode decision and the sole exporter of
+store instances. **Route new features through these seams, not around them.**
 
-| Seam        | Interface                        | Local mode (default; dev + harness)          | Remote mode (`VITE_API_BASE` set) — LIVE since P6.4 |
-| ----------- | -------------------------------- | -------------------------------------------- | -------------------------- |
-| Evaluation  | `engine/` (pure, headless)       | runs in browser                              | same code grades on server (imported directly) |
-| Grading     | `engine/grader.ts`               | grades on receipt in `LocalSubmissionStore`  | server grades on submit; client never sees `test_cases` (grep-gated); parity pinned |
-| Identity    | `src/auth/` (one provider per mode) | mockup login: pick a toy account; role gates views | the server's account system, rendered from its reported capabilities: email + password against the CSV roster, roster-gated account creation, access requests → bearer session → `me()` restore; 401 hook; boot health gate; UCLA SSO = one server-side `AuthProvider` swap, no frontend rebuild |
-| Persistence | `WorkbookStore`                  | `LocalWorkbookStore` (localStorage)          | `RemoteWorkbookStore` + crash-buffer journal & fill-empty migration |
-| Assignments | `AssignmentStore` + registry     | bundled + localStorage (instructor-authored); release + visibility flags on the seam (unpublished by default — `mm:published:<id>` present = released) | server CRUD, role-sanitized; `student_visible` defaults to 0, hidden assignments absent from a student's list and 404 on fetch; bundled set is empty remotely |
-| Submission  | `SubmissionStore`                | `LocalSubmissionStore` (localStorage)        | `RemoteSubmissionStore` (answers only; identity/time = server's word) |
-| Navigation  | `routing` (`Route` + `navigate`) | hash URLs via History API (starts inside AuthGate) | same routes                |
+| Seam | Interface | Local mode (default) | Remote mode (`VITE_API_BASE`) |
+| --- | --- | --- | --- |
+| Evaluation | `engine/` (pure, headless) | runs in browser | same code grades on the server (imported directly) |
+| Grading | `engine/grader.ts` | grades on receipt in `LocalSubmissionStore` | server grades on submit; client never sees `test_cases` (grep-gated); parity pinned |
+| Identity | `src/auth/` (one provider per mode) | mockup login: pick a toy account | the server's account system rendered from its reported capabilities → bearer session → `me()` restore; 401 hook; boot health gate; UCLA SSO = one server-side `AuthProvider` swap |
+| Persistence | `WorkbookStore` | `LocalWorkbookStore` | `RemoteWorkbookStore` + crash-buffer journal + fill-empty migration |
+| Assignments | `AssignmentStore` + registry | bundled + localStorage; release + visibility flags on the seam (`mm:published:<id>`) | server CRUD, role-sanitized; `student_visible` defaults 0; bundled set empty remotely |
+| Submission | `SubmissionStore` | `LocalSubmissionStore` | `RemoteSubmissionStore` (answers only; identity/time = server's word) |
+| Feedback / Notes | `FeedbackStore` / `NotesStore` | localStorage (`mm:feedback`, `mm:instructor-notes`) | `/api/feedback*`, `/api/instructor-notes` |
+| Navigation | `routing` (`Route` + `navigate`) | hash URLs (starts inside AuthGate) | same |
 
-**Keep evaluation logic framework-agnostic.** All circuit/FSM evaluation lives in
-`app/src/engine/` (pure TypeScript — no React, Zustand, or DOM) so the same code runs in the
-browser and headlessly for server-side autograding. The store and UI are thin wrappers over
-the engine.
+**Keep evaluation logic framework-agnostic.** All simulation and grading lives in
+`app/src/engine/` — pure TypeScript, no React, Zustand, or DOM — so the same code runs in the
+browser and on the server. The store and UI are thin wrappers over the engine.
 
 ## Key files
 
-| Area          | Path                                                                           | What's there                                                                                                                               |
-| ------------- | ------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------ |
-| Types         | `app/src/types.ts`                                                             | All domain types: `AssignmentData`, `AssignmentQuestion`, `SubmissionData`/`SubmissionRecord`, `CircuitData`, `CCSpec`, `SubmissionResult` |
-| Engine        | `app/src/engine/cc.ts`, `sc.ts`, `fsm.ts`                                      | Pure simulators per mode (topological eval for CC; clocked step for SC; transition-matching for FSM)                                       |
-| Engine        | `app/src/engine/tm.ts`, `tmValidate.ts`, `tmCodec.ts`                          | TM: notation-aware tape engine — **two-output** labels `read:write,move` (e.g. `1:0,R`; legacy `1:0R` parses as an alias), executed as one **atomic step** (every transition writes a symbol AND moves; grammar lives in `engine/notation.ts`); pre-engine table validation (ambiguous/unparseable, via the generic walker); encode/accept/decode (the codec `tape` axis; accept honors the question's optional `requireStandardHaltPosition` — head must halt on the output block's rightmost cell)          |
-| Engine        | `app/src/engine/grader.ts`                                                     | `gradeSubmission` / `gradeQuestion` — one value-based codec pipeline for CC/SC/FSM/TM against numeric `test_cases`, plus a separate `gradeTurbot` branch (arena success criteria, not the codec); open questions short-circuit to a `'pending'` result carrying the free-text `response` for manual (later maybe LLM) review          |
-| Engine        | `app/src/engine/codec.ts`, `machineValidation.ts`                              | The codec (`space`/`time` value↔bits; `tape` → `tmCodec`) and Stage-1 machine validation for all modes, incl. the `allowed_components` restriction semantics (`validateAllowedComponents`/`isComponentTypeAllowed` — absent/empty = unrestricted; INPUT/OUTPUT/STATE always allowed; BOXED internals recursed)                                     |
-| Engine        | `app/src/engine/testVectorGen.ts`, `formulaEval.ts`                            | Authoring-time: affine-formula language → `buildQuestionBank(inputs, outputs, rep, mode)` → `{spec, test_cases}` (widths derived; SC/FSM/TM sampled). Legacy `generateTestCases(spec, rep, mode)` remains for the sample data |
-| Engine        | `app/src/engine/notation.ts`                                                   | Transition-label SYNTAX seam: `TransitionNotation` (parse/format/alphabet/editor token fields/default) for all four grammars — native k-bit `fsmNotation(inBits,outBits)` + `turbotFsmNotation` (1-bit alias → canonical 2-bit motor, decays on edit-save); TM/turbot grammars delegate to their engine parsers; generic `validateTransitionTable` walker. Label dissection is allowed ONLY here + the delegated parsers (notationCheck grep gate)  |
-| Engine        | `app/src/engine/representation.ts`, `index.ts`                                 | value↔bits core (`valueToBits`/`isValidCodeword`/`bitsToValue`) + display helpers; barrel exports                                          |
-| Engine        | `app/src/engine/turbot.ts`                                                     | Turbot arena driver loop: `senseAhead`(bit)/`senseAheadSymbol`(B/E/F)/`applyMotorCommand`, `runBrainStep`/`initialBrainState` (one transition per call: CC/SC circuit brains, the **turbot FSM** — Mealy transitions with full 2-bit motor outputs `in:ij`, executed and validated through `turbotFsmNotation` (engine/notation.ts; `validateTurbotFSM` delegates to the generic walker, legacy 1-bit labels stay valid as aliases) — or the **turbot TM** — per-state internal/external kinds, single tape actions, ↑/↱/↰ motor labels, own validator `validateTurbotTM`; internal alphabet per the question's encoding, a `TMNotation` param — binary {0,1,*}, unary {0,1}), and `runTurbot` (`stopped` = motor 00 or a TM halt). `evaluateTurbotCriterion` judges `reach-and-stop` / `pass-through` / `return-to-start` (spec §12.5; return-to-start in a goal-ful arena also requires the trace to VISIT the goal — the clause that gives out-and-back arena families (Mad Max) their teeth; goal-less arenas are plain end-at-start), with two seam companions beside it: `criterionRequiresStop` (pass-through is trace-satisfiable — the step limit bounds SIMULATION, not success, so `pass: true` + `hitStepLimit: true` is a legitimate shape) and `explainTurbotCriterionFailure` (read-only clause mirror; every failing `TurbotCaseResult` carries a criterion-named reason) |
-| Engine        | `app/src/engine/perception.ts`                                                 | Perception (bit-level, outside the codec): `PerceptionRule` evaluators (`hasRunAtLeast`/`hasRunExactly`/`singleObjectAt`/`expectedPerceptionOutputs` — the pre-first-frame "previous input" is the blank frame, "up" = toward IN1), save-time bank generation `buildPerceptionCases` (CC: exhaustive 2^width, width ≤ 10; SC: deterministic frame-sequence battery), `validatePerceptionMachine` (width inputs + 1 output), and `runPerceptionCase` (CC frame eval / SC clocked sequence) |
-| Store         | `app/src/store.ts`                                                             | Zustand UI state; delegates simulation to `engine/`. Per-mode sim state incl. TM (`tmTape`/`tmStep`/`setTmCell`) and turbot (`turbotState`/`turbotStep`/`turbotRun`); ALL transient sim slices (SC/FSM/TM/turbot + I/O `tableRows`) are app-wide, not per-canvas, so every canvas swap — question navigation (`loadAssignment`/`openAssignment`/`switchQuestion`) and sandbox tab/workbook entry (`enterSandbox`/`addTab`/`switchTab`/active-tab `removeTab`/`newWorkbook`/`importWorkbook`; background-tab removal leaves the live run alone) — flushes them via `resetAllSimState()` (delegates to `scGlobalReset`/`fsmGlobalReset`/`tmGlobalReset`/`turbotReset`; pinned by `tools/navResetCheck.ts`); selectors `selectTmNotation` (TM alphabet: open question's `representation`, sandbox falls back to `repSystem`), `selectTurbotArena`/`selectTurbotInnerMode` (open turbot question's arena/`innerMode`; in the sandbox both fall back to the active turbot tab — a `SandboxTab` carries optional `innerMode` + its own `arena`, seeded by `addTab(…, 'turbot', …, innerMode)` with `sandboxDefaultArena()` (10×8 bordered field) and edited via `setTabArena`, persisted through the sandbox autosave and workbook export/import), `selectEffectiveMode` (turbot → the question's/tab's `innerMode`; drives every editor-behavior branch), `selectAllowedComponents` (the open question's `allowed_components`, filters the palette), and `selectLiveFsmStateId` (the ONE source for the canvas live-state highlight — FSM sim and turbot arena stepping both feed it), `selectAssignmentFrozen` (notes/todos.md item 3 — past due AND a submission exists; `now` defaults to `Date.now()`, tests pass a fixed one) and `selectQuestionLocked` (the open question is marked done OR the assignment is frozen — the one read-side answer UI reaches for; the module-private `isCurrentQuestionLocked(state)` is the same check inlined at the top of ~26 mutating store actions, addComponent through toggleStateKind, so a locked/frozen question refuses edits at the source regardless of which UI surface tried), `toggleCurrentQuestionDone` (flips `QuestionCircuit.done`, folding in the live canvas first so toggling never discards an unsaved edit), and `frozenQuestionCircuit`/`openAssignment`/`switchQuestion` (when frozen, load the question's actually-SUBMITTED circuit — never the possibly-diverged live workbook — and the autosave subscriber's own guard means nothing frozen ever overwrites the real saved workbook), plus `assignmentView` ('overview' \| 'question'), `openResponse`/`setOpenResponse` (the open question's free-text answer, synced into `QuestionCircuit.responseText` at every canvas sync point), and `confirmedBoxLibrary` (the confirmed-box palette entries; scope depends on where you are — in an assignment it is the whole HOMEWORK, persisted as `AssignmentState.boxLibrary`, so a box built for one question is placeable in every question that can take its kind and does NOT swap on question navigation; in the sandbox it is per TAB, swapped with `boxes` and persisted as `WorksheetData.confirmedBoxes`. Legacy per-question `QuestionCircuit.confirmedBoxes` saves merge into the shared list on load. Default names come from `nextBoxName`/`takenBoxNames` and are unique across everything visible at once; `renameBox(id, name)` is the ONE rename path — it validates and sweeps the library entry, the drawn box and every placed instance's label, in the live canvas and in every saved `questionCircuits` entry. Pinned by `tools/boxScopeCheck.ts`)  |
-| Statements    | `app/src/statementFormat.ts`, `app/src/components/StatementBody.tsx`          | Question-statement markup: a pure parser for the small authored subset (LaTeX `$…$`/`$$…$$`, `` `code` ``, `**bold**`, `*italic*`, blank-line paragraphs), the inline **input-output profile** reader (a run of ≥2 `IN1=0,IN2=1 -> OUT=1` rows with matching columns is lifted out of the prose and rendered as a table — read at display time, so the stored statement text, which coverageCheck lints and the reference fixtures duplicate, is never rewritten), plus `statementProse` (markers stripped, for one-line previews), and the ONE renderer that turns it into JSX — KaTeX for the math — shared by the student panel, the open-question panel and the instructor's live preview. Pinned by `tools/statementFormatCheck.ts`, whose corpus sweep asserts every existing HW1–HW7 statement still parses as plain prose |
-| Due dates     | `app/src/dueDates.ts`                                                          | Pure due-date display policy: `dueStatus` (green >3 days out / amber <3 days / red overdue — the home card's badge bands), `lateBy` (ms late; 0 = on time = no signal), `formatDuration`/`formatDueDate`, and `isFrozen(dueDate, now, hasSubmission)` (notes/todos.md item 3 — the one deliberate exception to "a due date never gates anything": true only once the deadline has passed AND a submission already exists, which is what `store.ts`'s `selectAssignmentFrozen` reads to show the submitted circuit read-only). Consumed by HomeScreen + GradebookView + store.ts; pinned by `tools/dueDateCheck.ts` (display policy) and `tools/navResetCheck.ts`'s `[frozen assignment]` section (the freeze mechanism) |
-| Routing       | `app/src/routing.ts`                                                           | `Route` union, `parseHash`/`routeToHash`, `navigate()`                                                                                     |
-| Wire layout   | `app/src/componentGeometry.ts`, `app/src/wireRouter.ts`                        | `componentGeometry` is the SINGLE source of truth for rendered component dimensions (`getComponentSize`; MEM 50×50) + port math (`getPortPosition(Local)`, incl. OR/XOR left-port inset and rotation), the full obstacle footprint `getComponentBounds` (body + adjuncts — INPUT's 14×20 toggle-tab — so tabs are router obstacles; wireRouter's old body-only copy is deleted), and the rotation-aware label anchor `getLabelAnchor` (snapped 90°, keeps rotated-MEM labels clear of the port axis), imported by `CircuitCanvas`, `wireRouter`, and `tools/layoutCheck` so renderer/router/oracle geometry can never desync; `wireRouter` is the cost-based A* orthogonal wire router (obstacle bounds from the shared geometry; structurally-doomed wires take the L-path fallback in a **phase-0 pass** so every A* search sees their lanes; fallback instrumented via `get/resetFallbackCount` for `tools/routerCheck.ts`; per-wire warn-don't-block flags `usedFallback`/`violation` from a final read-only oracle-predicate sweep, surfaced by `CircuitCanvas` as a hover tooltip + a faint amber dashed halo on violations) plus the pure `findDivergencePoints` (VISUAL_VOCAB junction dots: fan-out split dots at the elbow where displayed paths part, skipping dots on canvas-side crossing bumps)          |
-| Storage       | `app/src/storage/workbookStore.ts`, `AssignmentStore.ts`, `submissionStore.ts` | The three Promise-returning seam interfaces + their Local (localStorage) impls; grade release lives ON the `AssignmentStore` seam (`getGradesReleased`/`setGradesReleased`, `mm:release:` = the local impl's private key); `submissionStore` owns manual review of open questions (`recordManualReview`)                                                                                                        |
-| Storage       | `app/src/storage/feedbackStore.ts`, `NotesStore.ts`                            | Two more Promise-returning seams, same Local/Remote pattern. `feedbackStore.ts` — `submit`/`list`/`setStatus`; Local impl keys one JSON array under `mm:feedback`. `NotesStore.ts` — `get`/`save`, a single shared document (not a list); Local impl keys one object under `mm:instructor-notes`. Both work in EITHER backend, unlike the roster (a remote-only concept) |
-| Storage       | `app/src/storage/backend.ts`, `remoteStores.ts`, `manualReview.ts`             | `backend.ts` — the ONE mode decision (`backendMode` from `VITE_API_BASE`) and sole exporter of store instances (now five: workbook/assignment/submission/feedback/notes). `remoteStores.ts` — the Remote impls as direct `api/client.ts` calls (404→seam-null; answers-only submit; GRADER-FREE, grep-gated by remoteStoreCheck). `manualReview.ts` — the leaf pure `applyManualReview`, the ONE review implementation, imported by both the local store and the server's review route |
-| Storage       | `app/src/storage/journal.ts`, `migrateLocal.ts`                                | Remote-mode durability grafts. `journal.ts` — per-email crash buffer (`mm:journal:<email>:<asgId>`): written synchronously on unload flushes + failed remote saves, cleared by every confirmed save, replayed (supersede + re-upload) by the next `openAssignment`. `migrateLocal.ts` — first-remote-login fill-empty migration of local workbooks + (instructor) authored assignments; guard `mm:migrated:<email>`; server data never overwritten; submissions/release/reviews deliberately not migrated |
-| Auth          | `app/src/auth/`                                                                | `AuthGate.tsx` (holds rendering until a user exists; `initRouting()` fires here so deep links never run unauthenticated), `HealthGate.tsx` (remote boot: `/api/health` probe + auto-retrying outage screen; local mode renders through untouched), `LoginScreen.tsx` (toy-account picker local / remote: Sign in · Create account · Not on the roster? panes, or one SSO button — which panes exist is read from the SERVER's `AuthCapabilities`, never hardcoded), `AccountPanel.tsx` (the "Password" control + change-password modal beside the session chip; renders nothing unless the server actually manages passwords), `authProvider.tsx` (one provider per mode; remote: capabilities fetch + login/register/requestAccess/changePassword → bearer token → `me()` restore, 401 hook logs out, first-login migration awaited before user set; every failure returns the SERVER's message for display), `types.ts` (`AuthCapabilities`/`AuthAttemptResult` — the stable surface), `session.ts` (non-hook user cache for `getCurrentUserEmail`), `accounts.ts`, `instructorRole.ts` |
-| Async UI      | `app/src/useAsyncValue.ts`                                                     | The shared fetch-on-mount hook (`value`/`loading`/`error`/`reload`) behind every view that reads the async seams (HomeScreen, InstructorDashboard, AssignmentEditor, GradebookView); stale resolves dropped, previous value kept during reloads       |
-| Assignments   | `app/src/assignments/index.ts`, `cc-basics.json`                               | Registry over the `AssignmentStore` seam (`listAssignments`/`getAssignment`), plus `sortAssignments` — the ONE list order (instructor-chosen `AssignmentData.order` ascending, then never-moved ones by title; bundled assignments pin ahead of both, since they live outside the store and can't be renumbered), used by the catalog and the dashboard alike; the bundled CC assignment is LOCAL-mode-only (an empty bundled set remotely — the client bundle's answer bank must never ship beside sanitized server copies)                                                       |
-| Instructor UI | `app/src/instructor/`                                                          | `InstructorApp`, `InstructorGate`, `InstructorDashboard`, `RosterView` (roster & accounts — CSV import with a column/issue report, account state per row, password reset, add/remove, access-request approval; remote mode only), `FeedbackQueueView` (every student report, open/resolved/all filter, works in both backends), `NotesView` (the shared markdown note — split textarea/live-preview via `marked`+`dompurify`, saves only on Save, warns before overwriting a colleague's more-recent save), `AssignmentEditor` (both reorder by dragging via `dragReorder.ts` — pure `moveItem` + the `useDragReorder` hook: grip handle drags, whole row drops, live preview, pinned rows can't move or be displaced), `QuestionCreator` (incl. turbot arena editor — up to 30×30 (`MAX_ARENA_SIZE`), scroll-aware; pure paint/resize/place helpers in `arenaEditing.ts`), `Gradebook(.ts/View.tsx)`                 |
-| Student UI    | `app/src/components/`                                                          | `CircuitCanvas`, `ComponentLibrary`, `DataTable`, `HomeScreen`, `AssignmentOverview` (question list; "N of M marked done" + a per-row ✓ badge, a 🔒 banner in place of Submit once frozen), `MenuBar` (a "Feedback" link opens `FeedbackPanel`; the Submit item is replaced by a 🔒 banner once frozen), `GradesPanel` ("Your grades" modal — verdicts, an instructor's feedback note when present, and a per-question "▸ failed inputs" dropdown into `FailedInputs`/`hasFailedCases` with a link that navigates into that question), `FeedbackPanel` (category/message/up-to-2-screenshots form; screenshots are downscaled to ≤1600px and JPEG-re-encoded client-side before base64), `SequentialTimeline`, `TMTapePanel` (clickable tape; `user-select: none` + `max-width: 100%`), `ArenaCanvas` (shared arena grid renderer), `TurbotArenaPanel` ("Map" + run controls, in the right data panel; in the sandbox also the "Edit map" mode — instructor arena tools + resize via `setTabArena`), `TurbotTapePanel` (turbot TM's read-only internal tape), `OpenResponsePanel`/`FillInPanel` (readOnly once `selectQuestionLocked` — marked done OR the assignment is frozen; copy/cut/paste/drop blocked on OpenResponsePanel regardless), `SimulationPanel`, `TabBar` (question nav bar in assignments — a "Mark done"/"✓ Done" toggle, or a 🔒 "submission (past due)" tag once frozen; the sandbox + menu — CC/FSM/TM plus a Turbot entry whose second menu page picks the brain kind), `outputDisplay.ts` (pure OUT/ARG display builders — t1-rightmost OUT rows, per-group ARG values in question mode) |
-| API client    | `app/src/api/client.ts`                                                        | Typed browser client for the API server (one function per endpoint; bearer token under `mm:auth:token`; `onUnauthorized` hook fired on any 401; `health()` boot probe; `authConfig()`/`register`/`changePassword`/`requestAccess` + the instructor roster and access-request calls; `submitFeedback`/`listFeedback`/`setFeedbackStatus`; `getInstructorNote`/`saveInstructorNote`; `putWorkbook` takes `keepalive` for unload flushes). LIVE since P6.4: consumed by the `Remote*` stores and the remote AuthProvider; `setApiBase` is the harness override |
-| Server        | `server/src/app.ts`, `db.ts`, `auth.ts`, `password.ts`, `roster.ts`, `sanitize.ts`, `config.ts`, `seed.ts`, `roster-cli.ts` | The API server (Express 5 + `node:sqlite`): routes (incl. the instructor manual-review route reusing the app's pure `applyManualReview`, the feedback queue `POST/GET /api/feedback` + `PUT /api/feedback/:id/status` — screenshots as base64 data URLs, capped both sides, no multer/filesystem — the shared `GET/PUT /api/instructor-notes` single-row document, and the unauthenticated `/api/health` liveness probe), storage, the `AuthProvider` seam — `createAuthProvider` is the ONE mode decision (`MM_AUTH_MODE`, default `password`): `PasswordAuthProvider` (the CSV roster gates registration; scrypt credentials in `password.ts`; student ID checked when the roster has one), `DevAuthProvider` (passwordless, dev only), `SsoAuthProvider` (capabilities reported so the frontend renders the SSO button; `authenticate` is one honest TODO) — plus `LoginThrottle`, the pure CSV reader `roster.ts`, the admin CLI `roster-cli.ts` (`npm run roster -- import|add|set-password|reset|remove|list|requests`, which is how the first instructor account is bootstrapped), student-facing redaction + grade-release withholding (`sanitize.ts` — since 2026-09-17 a student's own per-case detail is safe-widened: which input/frame/blank failed and why, never the answer key `expected`/`got`), env config, DB seeding. Smoke tests: `server/tools/serverCheck.ts` (67 checks) and `server/tools/authCheck.ts` (138 checks — roster parsing, password hashing/policy, every provider's decision table, and the whole sign-in lifecycle over HTTP incl. the refusals: off-roster registration, double registration, wrong password/ID, throttling, student access to instructor routes), plus the server↔engine grading-parity pin `server/tools/parityCheck.ts` (representative fixtures — all four codec axes, turbot, perception, open — graded through the real HTTP submit path AND directly via `gradeSubmission`, payloads deep-compared with only JSON-canonicalization; also pins the perception-aware student redaction — `perception_cases`/`perceptionCases` leaked to students until 2026-07-08); both run in `npm run check` in `server/`. Deploy recipes in `deploy/` |
-| Dev/sample    | `app/src/devData/sampleData.ts`, `seed.ts`                                     | Builders + seeding for demo CC/SC/FSM/TM/turbot/perception/open assignments and submissions (one turbot question per inner mode; netlist-built perception circuits; `questionModeLabel` in `types.ts` names a turbot question's inner machine / a perception task in mode chips)                                                                |
-| Tools         | `app/tools/grade.ts`, `pipelineCheck.ts`, `codecCheck.ts`, `notationCheck.ts`, `tmCheck.ts`, `turbotCheck.ts`, `perceptionCheck.ts`, `scWindowCheck.ts`, `routerCheck.ts`, `coverageCheck.ts`, `layoutCheck.ts`, `bumpCheck.ts`, `navResetCheck.ts`, `boxScopeCheck.ts`, `remoteStoreCheck.ts` | Headless CLI grader (prints a word count for pending open questions), submit→grade pipeline check (all modes, incl. perception and the open question's pending path; 13/13 vs 0/13), codec + rep-core unit checks, the transition-notation seam check (adapter≡parser equivalence incl. per-encoding turbot-internal, legacy byte-compat, k=2 asymmetric bit-order grade pin, arity/totality errors, label-dissection grep gate), TM engine/codec/grader smoke test, turbot engine/grader smoke test (all four inner modes graded — CC/SC/FSM/TM — incl. the turbot-FSM one-notation validity pins, the encoding-aware `*`-rejection pins, and the `[multi-arena]` family pins: hardcoded out-and-back brains pass a 1-arena Mad Max family but fail the 3-arena one, 2/3 arenas ≠ pass, per-arena results identify the failures, and Gradebook logic counts them; plus the `[pass-through step-limit]` pins — a goal-crossing brain passes without stopping, step limit ≠ failure per `criterionRequiresStop` — and per-criterion failure-reason pins), the perception rules/generation/grading smoke test, the SC/FSM question-run contract check (grader window length + codec input-stream content parity, via real-store headless runs incl. the hw3-p7 fixture and a k=2 FSM store-run≡grader pin), the wire-router world-model pins (shared-geometry smoke, MEM.min + XOR-in A* reachability — the own-endpoint exemption keeps inset-port stub tips reachable — fallback budget 2 total (hw3-p9's one genuinely-cramped wire, deliberately pinned; the structural XOR floor is gone), the divergence-dot corpus, the route-quality flag pins (hw3-p9's w21 usedFallback + violation-free; the doomed tripwire carries both flags, falling back exactly once in phase 0), and the pre-fix hw3-p4 layout regression pin (P1.3-era positions route oracle-clean today — fallbacks allowed, violations not)), the reference-fixture coverage harness (two-tier ledger — `exact`: correct passes + broken fails, vs `interface`: a plausible attempt validates + grades end-to-end, score reported not asserted (scope shift 2026-07-06) — plus breadth/drain warnings + statement lint, six permanent `allowed_components` self-test pins — OR machine fails hw1-p2 with the reason naming OR, absent field permissive, boxed-OR smuggling caught, palette predicate, interface-tier mirror — and its Stage-1 mirror tracks the grader's full dispatch: open/perception/turbot/codec), and the canvas layout oracle (real `routeAllWires` route prediction: collinear/near-parallel overlaps, body crossings, box collisions; CLI + used by the harness for CC/SC fixtures), and the bump-renderability predicate `bumpCheck.ts` (replicates the canvas crossing-bump draw/skip rules headlessly; no-arg = sweep of every CC/SC reference fixture, wired into `npm run check`; all fixtures pinned bump-clean since the router learned the drawability rule), and the store-level canvas-swap sim-reset regression check `navResetCheck.ts` (drives `loadAssignment`/`openAssignment`/`switchQuestion` AND the sandbox swaps — `enterSandbox`/`addTab`/`switchTab`/`removeTab` both branches/`newWorkbook`/`importWorkbook` — through real SC/FSM/TM runs and asserts `resetAllSimState` leaves every sim slice fresh; 162 checks (grew a `[mark as done]` section and a `[frozen assignment]` section 2026-09-17), incl. the `backendMode === 'local'` harness pin and the open-A-then-open-B interleaving pin), and the confirmed-box-library check `boxScopeCheck.ts` (56 checks: the library is shared across a homework but isolated per sandbox tab, restored with placeable internals on return, survives the goHome/close/reopen persistence round-trip, `removeConfirmedBox`+undo behave, SC canvases box combinational sub-circuits but refuse MEM, and the `[naming]` section — default `Box n` names unique across the whole homework, `renameBox` sweeping library/drawn box/instances on every question, duplicate + empty names refused, undo/redo), and the remote-seam check `remoteStoreCheck.ts` (94 pins (grew a feedback + a notes section 2026-09-17): boots the REAL server on an ephemeral port against in-memory SQLite and drives the `Remote*` stores through `api/client.ts` — the grader-import grep gate over the remote-store module graph, 401/`onUnauthorized` paths, answer-stripped student payloads, answers-only submit with spoofed identity/timestamp ignored, release/review round-trips, the `health()` probe (live/503/dead-port), the fill-empty migration decision table + guard/guard-less idempotence, crash-buffer journal keying/replay/clear, and — against a SECOND real server booted in password auth mode — the account-system client half: `authConfig`/`login`/`register`/`changePassword`/`requestAccess` and the instructor roster + access-request calls) (`npx tsx`)          |
+| Area | Path | What's there |
+| --- | --- | --- |
+| Types | `app/src/types.ts` | All domain types: `AssignmentData`/`AssignmentQuestion` (incl. `title`, `hint`, `allowed_components`, `component_limits`, `maxTapeCells`, `requireStandardHaltPosition`, `perception`/`perception_cases`, `turbot_cases`, `fill_in`/`fill_in_answers`), `SubmissionData`/`SubmissionRecord`, `QuestionResult` (+ `ManualReview`), `CircuitData`, `CCSpec`, `ArenaConfig`/`TurbotCaseResult`, `PerceptionCaseResult`, `QuestionCircuit` (`responseText`, `done`). `questionModeLabel` names a turbot's inner machine / a perception task in mode chips. `placeableBoxKinds`: CC/SC box kinds; TM and FSM return `[]` **by design**, reasoning inline. |
+| Engine | `app/src/engine/cc.ts`, `sc.ts`, `fsm.ts` | Pure simulators: topological eval (CC), clocked step (SC; `evaluateSCSequence` clocks top-level MEMs only), transition matching (FSM; `evaluateFSMSymbolStep`). One `sortByLabel` in cc.ts orders I/O for top-level and boxed internals. |
+| Engine | `app/src/engine/tm.ts`, `tmValidate.ts`, `tmCodec.ts` | TM: notation-aware tape engine — **two-output** labels `read:write,move` (`1:0,R`; legacy `1:0R` parses forever as an alias) executed as one atomic step; table validation (ambiguous/unparseable via the generic walker); the codec `tape` axis (accept honors `requireStandardHaltPosition` — head halts on the output block's rightmost cell); `tapeCellsUsed` = span of tape touched, for `maxTapeCells`. |
+| Engine | `app/src/engine/grader.ts` | `gradeSubmission`/`gradeQuestion`: Stage-1 validation then the codec pipeline for CC/SC/FSM/TM; `gradeTurbot` (arena criteria); `gradePerception` (bit-level); fill-in; open → `'pending'` carrying `response`. |
+| Engine | `app/src/engine/codec.ts`, `machineValidation.ts` | The codec (`space`/`time` value↔bits; `tape` → tmCodec; `stepCountFor`, `encodeInput`, `timeOutputBits`) and Stage-1 validation incl. `validateAllowedComponents`/`isComponentTypeAllowed` (absent/empty = unrestricted; INPUT/OUTPUT/STATE always allowed; BOXED internals recursed) and component limits. |
+| Engine | `app/src/engine/testVectorGen.ts`, `formulaEval.ts` | Authoring-time: formula DSL → `buildQuestionBank(inputs, outputs, rep, mode)` → `{spec, test_cases}` (widths derived; SC/FSM/TM sampled). |
+| Engine | `app/src/engine/notation.ts` | Transition-label SYNTAX seam: `TransitionNotation` (parse / canonical format / alphabet / editor token fields / default) for all grammars — k-bit `fsmNotation(inBits, outBits)`, `tmNotation(rep)` (`*` binary-only), `turbotFsmNotation` (1-bit alias → canonical 2-bit motor), `turbotInternalNotation(tapeNotation)`; generic `validateTransitionTable` walker. Label dissection is allowed ONLY here (notationCheck grep gate). |
+| Engine | `app/src/engine/representation.ts`, `index.ts` | value↔bits core (`valueToBits`/`isValidCodeword`/`bitsToValue`), display helpers; barrel exports. |
+| Engine | `app/src/engine/turbot.ts` | Arena driver loop: `senseAhead`/`senseAheadSymbol` (B/E/F), `applyMotorCommand`, `runBrainStep`/`initialBrainState` (CC/SC circuit brains; the turbot FSM with 2-bit motor outputs `in:ij` via `turbotFsmNotation`; the textbook **turbot TM** — internal (circle) states do single tape ops on the encoding's alphabet, external (square) states sense B/E/F and move ↑/↱/↰; `validateTurbotTM`/`validateTurbotFSM`), `runTurbot` (`stopped` = motor 00 or TM halt). `evaluateTurbotCriterion` + `criterionRequiresStop` (pass-through is trace-satisfiable: `pass: true` with `hitStepLimit: true` is legitimate) + `explainTurbotCriterionFailure`. |
+| Engine | `app/src/engine/perception.ts`, `fillIn.ts` | Perception rules (`min-run`/`exact-run`/`pattern` for CC; `change`/`motion` for SC — "up" = toward IN1; the pre-first-frame "previous input" is the all-zero frame), `buildPerceptionCases` (CC exhaustive ≤ 10 wires; SC fixed battery), `validatePerceptionMachine`, `runPerceptionCase`. Fill-in grading. |
+| Store | `app/src/store.ts` | Zustand UI state delegating simulation to `engine/`. ALL transient sim slices (SC/FSM/TM/turbot + I/O `tableRows`) are app-wide, so every canvas swap — `loadAssignment`/`openAssignment`/`switchQuestion` and the sandbox's `enterSandbox`/`addTab`/`switchTab`/active-tab `removeTab`/`newWorkbook`/`importWorkbook` — calls `resetAllSimState()`. Selectors: `selectEffectiveMode` (turbot → inner mode; drives every editor branch), `selectTmNotation`, `selectTurbotArena`/`selectTurbotInnerMode` (sandbox falls back to the active tab's own `arena`/`innerMode`), `selectAllowedComponents`, `selectLiveFsmStateId`, `selectCodecLayout`/`selectCodecWindow` (question runs mirror the grader), `selectAssignmentFrozen`, `selectQuestionLocked`. `isCurrentQuestionLocked(state)` (done OR frozen) is inlined at the top of every mutating action. `frozenQuestionCircuit` loads the SUBMITTED circuit when frozen. Boxes: `confirmedBoxLibrary` is per HOMEWORK in an assignment (`AssignmentState.boxLibrary`), per TAB in the sandbox; `nextBoxName`/`takenBoxNames` keep default names unique; `renameBox` is the ONE rename path (library + drawn box + every placed instance in every question). `openResponse` mirrors `QuestionCircuit.responseText`. |
+| Statements | `app/src/statementFormat.ts`, `components/StatementBody.tsx` | Question-statement markup: parser for the authored subset (`$…$` KaTeX, `` `code` ``, bold, italic, paragraphs; inline `IN1=0,IN2=1 -> OUT=1` profiles lifted into tables; `(a)/(b)` parts on their own lines), `statementProse` for previews, one JSX renderer shared by student panel, open panel and instructor preview. |
+| Due dates | `app/src/dueDates.ts` | Pure policy: `dueStatus` (green > 3 days / amber < 3 days / red overdue), `lateBy` (0 = on time = no signal), `formatDuration`/`formatDueDate`, and `isFrozen(dueDate, now, hasSubmission)` — the ONE exception to "a due date never gates anything": editing is gated only once past due AND submitted; submitting never is. |
+| Routing | `app/src/routing.ts` | `Route` union, `parseHash`/`routeToHash`, `navigate()`. |
+| Wire layout | `app/src/componentGeometry.ts`, `wireRouter.ts` | `componentGeometry` is the single source of truth for component dimensions, port math (`getPortPosition`, OR/XOR left-port inset, rotation), the full obstacle footprint `getComponentBounds` (body + INPUT toggle-tab) and the rotation-aware `getLabelAnchor` — imported by the canvas, the router and the layout oracle. `wireRouter` is the cost-based A* orthogonal router (own-endpoint exemption; doomed wires take the L-path in a phase-0 pass; per-wire `usedFallback`/`violation` flags shown as tooltip + amber halo; `findDivergencePoints` for junction dots). |
+| Storage | `app/src/storage/workbookStore.ts`, `AssignmentStore.ts`, `submissionStore.ts`, `feedbackStore.ts`, `NotesStore.ts` | The five Promise-returning seam interfaces + Local impls. Grade release lives on `AssignmentStore` (`getGradesReleased`/`setGradesReleased`). `submissionStore` owns `recordManualReview`. |
+| Storage | `app/src/storage/backend.ts`, `remoteStores.ts`, `manualReview.ts`, `journal.ts`, `migrateLocal.ts` | `backend.ts`: the ONE mode decision + sole exporter of store instances. `remoteStores.ts`: Remote impls as direct `api/client.ts` calls (404 → seam-null; GRADER-FREE, grep-gated). `manualReview.ts`: the leaf pure `applyManualReview` used by the local store AND the server. `journal.ts`: per-email crash buffer `mm:journal:<email>:<asgId>` replayed by the next `openAssignment`. `migrateLocal.ts`: first-remote-login fill-empty upload of local data (guard `mm:migrated:<email>`; server never overwritten; submissions/release/reviews not migrated). |
+| Auth | `app/src/auth/` | `AuthGate.tsx` (no rendering until a user exists; `initRouting()` fires here), `HealthGate.tsx` (remote boot probe + auto-retry screen), `LoginScreen.tsx` (toy picker locally; remotely Sign in · Create account · Not on the roster? or one SSO button — panes from the server's `AuthCapabilities`), `AccountPanel.tsx` (change password), `authProvider.tsx` (one provider per mode), `types.ts`, `session.ts`, `accounts.ts`, `instructorRole.ts`. |
+| Async UI | `app/src/useAsyncValue.ts` | The shared fetch-on-mount hook (`value`/`loading`/`error`/`reload`) behind every view reading the async seams. |
+| Assignments | `app/src/assignments/index.ts`, `cc-basics.json` | Registry over the `AssignmentStore` seam + `sortAssignments` (instructor `order` asc, then title; bundled pinned first). The bundled CC assignment is LOCAL-mode-only (its JSON carries answers). |
+| Instructor UI | `app/src/instructor/` | `InstructorApp`, `InstructorGate`, `InstructorDashboard`, `RosterView`, `FeedbackQueueView`, `NotesView`, `AssignmentEditor`, `dragReorder.ts` (pure `moveItem` + `useDragReorder`; pinned rows immovable), `QuestionCreator` (+ `ccPreview.ts`, `arenaEditing.ts` — `MAX_ARENA_SIZE` 30), `Gradebook.ts`/`GradebookView.tsx`. |
+| Student UI | `app/src/components/` | `CircuitCanvas`, `ComponentLibrary`, `DataTable`, `HomeScreen`, `AssignmentOverview`, `MenuBar`, `GradesPanel` (+ `FailedInputs`), `FeedbackPanel`, `SequentialTimeline`, `TMTapePanel`, `ArenaCanvas`, `TurbotArenaPanel` (Map + run controls; sandbox "Edit map"), `TurbotTapePanel`, `OpenResponsePanel`/`FillInPanel` (read-only when locked), `SimulationPanel`, `TabBar` (question nav + Mark done / 🔒 tag; sandbox + menu), `outputDisplay.ts` (t1-rightmost OUT rows, per-group ARG values). |
+| API client | `app/src/api/client.ts` | One typed function per endpoint; bearer token under `mm:auth:token`; `onUnauthorized` hook; `health()`; auth/roster/feedback/notes calls; `putWorkbook` takes `keepalive`. `setApiBase` is the harness override. |
+| Server | `server/src/app.ts`, `db.ts`, `auth.ts`, `password.ts`, `roster.ts`, `sanitize.ts`, `config.ts`, `seed.ts`, `roster-cli.ts` | Routes, SQLite storage, the `AuthProvider` seam (`createAuthProvider` — `MM_AUTH_MODE`: `password` default / `dev` / `sso`; `LoginThrottle`), scrypt credentials (`scrypt$N$r$p$salt$hash`, self-describing), the pure RFC-4180 roster reader, redaction + grade-release withholding (`sanitize.ts`: students get no `test_cases`/`perception_cases`/`fill_in_answers`; their own results keep safe per-case fields but never `expected`/`got`), env config, seeding, the admin CLI (`npm run roster -- import\|add\|set-password\|reset\|remove\|list\|requests`). Tools: `serverCheck.ts`, `authCheck.ts`, `parityCheck.ts` (server ≡ in-process grading, deep-compared). |
+| Dev/sample | `app/src/devData/sampleData.ts`, `seed.ts`, `homeworks.ts`, `homeworks/hw{1..7}.json` | Sample assignment for all modes (netlist-built perception circuits, one turbot question per inner mode, open Q14) + sample submissions; `seedHomeworks()` (fill-empty) loads the real HW1–HW7 + 22 sample submissions. |
+| Tools | `app/tools/*.ts` | The headless harness — the project's test suite, all in `npm run check` (plus `grade.ts`, the CLI grader; `builder.ts`, the netlist builder; `layoutCheck.ts`, the canvas layout oracle): `codecCheck`, `dueDateCheck`, `statementFormatCheck`, `notationCheck` (grammar pins + label-dissection grep gate), `tmCheck`, `turbotCheck` (all four brains; `[multi-arena]`, `[pass-through step-limit]`, trajectory/orientation independence), `perceptionCheck`, `scWindowCheck` (question runs ≡ grader), `routerCheck` (fallback budget 2; route-quality flags; hw3-p4 regression pin), `bumpCheck`, `pipelineCheck` (submit → grade, every mode), `navResetCheck` (sim reset on every canvas swap; `[mark as done]`, `[frozen assignment]`), `boxScopeCheck` (box library scope, SC boxing refuses MEM, `[naming]`), `remoteStoreCheck` (boots the REAL server; grader-import grep gate; auth client against a password-mode server), `coverageCheck` (the two-tier reference-fixture ledger + `allowed_components` self-test pins). |
+| Queue | `tasks/` | The task pipeline (top of this file). `tasks/tools/check-budgets.mjs` is the size guard on this file. |
 
 ## Reference-function DSL (instructor authoring)
 
-Instructors specify _what a student circuit must compute_ with a small arithmetic
-mini-language instead of writing test cases by hand. This is an authoring-time convenience
-only — the grader never sees the formula; it runs against the generated numeric `test_cases`.
+Instructors specify _what a student machine must compute_ with a small arithmetic
+mini-language instead of writing test cases by hand — authoring-time only; the grader never
+sees the formula, it runs against the generated numeric `test_cases`.
 
-- **Where it lives** — `engine/formulaEval.ts` (`evalFormula(expr, vars)` → non-negative
-  integer; throws `FormulaError`) and `engine/testVectorGen.ts`
-  (`buildQuestionBank(inputs, outputs, rep, mode)` → `{spec, test_cases}`, all at save). The
-  instructor UI (`instructor/QuestionCreator.tsx`, with `instructor/ccPreview.ts`) validates
-  formulas **live on a single input** (`probeFormulas`, cheap per keystroke); there is no
-  example-preview table. Blocks save on any formula error.
-- **The language** — variables (declared input-group names like `x`, `y`), non-negative
-  integer literals, and the operators `+ - *` and bitwise `& | ^ ~`, with parentheses. No
-  division, modulo, conditionals, or function calls. Each formula is one expression returning a
-  single non-negative integer.
-- **No width fields; widths are derived.** Instructors never enter bit widths. A CC input group
-  declares a **max input value** (stored as `max_value`; width = bits/strokes to hold it) and is
-  enumerated exhaustively 0..max. SC/FSM/TM input spaces are unbounded/streaming, so they get no
-  size field: `buildQuestionBank` tests a **sample** of values across a range of input lengths
-  (binary: min/mid/max of each bit-length up to `SAMPLE_MAX_LEN`; tally: 0..`TALLY_SAMPLE_MAX`
-  exhaustively; cartesian capped at `MAX_SAMPLED_CASES`). Output group widths are derived from
-  the largest generated output, so **outputs are never truncated** — there is no
-  width-as-modulus trick; write `x ^ y` for XOR, and `x + y` always keeps its carry.
-- **Representation** — one per question (`binary` | `tally`), not per group. It governs the input
-  value ranges, how the codec lays values onto the machine's axis, and how outputs decode. The
-  codec — not the DSL — owns the value↔bits mapping at grade time.
-- **All four modes in the UI.** `QuestionCreator` authors CC/SC/FSM/TM through one shared form
-  (mode is a field, not a separate step; the question **name** is editable); the same DSL
-  expresses every mode's function (the sample SC delay is `2 * x`, the FSM identity is `x`, the
-  TM increment is `x + 1`). `buildQuestionBank` takes the mode to pick exhaustive-vs-sampled
-  enumeration per axis. The grader handles all modes via the codec.
-- **Safety** — `evalFormula` validates against a strict token whitelist (digits, declared
-  variable names, the allowed operators) before evaluating via `new Function()`. Acceptable
-  because formulas are instructor-authored, never student-supplied.
+- **Where** — `engine/formulaEval.ts` (`evalFormula(expr, vars)` → non-negative integer;
+  throws `FormulaError`) and `engine/testVectorGen.ts` (`buildQuestionBank(inputs, outputs,
+  rep, mode)` → `{spec, test_cases}`, all at save). `QuestionCreator` validates formulas live
+  on a single input per keystroke (`probeFormulas`); no example-preview table. Save blocks on
+  any formula error.
+- **Language** — variables (declared input-group names), non-negative integer literals,
+  `+ - *` and bitwise `& | ^ ~`, parentheses. No division, modulo, conditionals, calls. One
+  expression per output, returning one non-negative integer.
+- **No width fields; widths are derived.** A CC input group declares a **max input value**
+  (`max_value`) and is enumerated exhaustively. SC/FSM/TM inputs are streaming, so they get a
+  **sample** across input lengths (binary: min/mid/max of each bit-length up to
+  `SAMPLE_MAX_LEN`; tally: 0..`TALLY_SAMPLE_MAX`; cartesian capped at `MAX_SAMPLED_CASES`).
+  Output widths come from the largest generated output — **outputs are never truncated**;
+  `x + y` keeps its carry, write `x ^ y` for XOR.
+- **Representation** — one per question (`binary` | `tally`), governing input ranges, how the
+  codec lays values on the axis, and decoding. The codec, not the DSL, owns value↔bits.
+- **All modes on one form**; `buildQuestionBank` takes the mode to choose exhaustive vs
+  sampled enumeration per axis.
+- **Safety** — strict token whitelist before `new Function()`; acceptable because formulas are
+  instructor-authored, never student-supplied.
 
 ## Source-of-truth docs (in repo, not auto-loaded)
 
-- `spec/PHIL_133_Platform_Spec_v2.md` — full platform spec; the authority for behavior,
-  layout, and feature decisions. Read before implementing a phase.
-- `CLAUDE_CODE_PROMPT.md` — the original implementation brief (phase plan + design details).
-- `spec/mm_textbook.pdf` — course textbook for pedagogy and notation.
-- `problem sets/hw1.pdf`…`hw7.pdf` — the real homeworks the grader must handle.
-- `spec/Private & Shared/.../Mock_Ups-*.jpg` — UI mockups (CC/SC workspaces, FSM editor,
-  turbot split view, TM).
+- `spec/PHIL_133_Platform_Spec_v2.md` — the platform spec; authority for behaviour, layout
+  and feature decisions.
+- `docs/buildout/NORTH_STAR.md` (design principle, verification tiers) and
+  `docs/buildout/VISUAL_VOCAB.md` (the appearance oracle); `docs/buildout/designs/` (one
+  memo per major architectural decision — write one before a significant move).
+- `docs/HISTORY.md` — the frozen changelog through 2026-09-21.
+- `CLAUDE_CODE_PROMPT.md` — the original implementation brief.
+- `spec/mm_textbook.pdf`, `problem sets/hw1.pdf`…`hw7.pdf`, the UI mockups under `spec/`.
+- `deploy/README.md`, `server/README.md`, `app/tools/fixtures/reference/README.md`.
 
-## Build phases (from the spec)
+## Build phases (from the spec) — all built
 
-1. **CC** — gates (NOT/AND/OR), I/O, validated wiring, I/O tables, boxed circuits
-   (XOR, Half-Adder), drag-and-drop snap-to-grid canvas. _(built)_
-2. **SC** — MEM block, clock/time model, right-to-left time-step table. _(built; SC canvases
-   can box their COMBINATIONAL sub-circuits — `placeableBoxKinds` in types.ts — but `confirmBox`
-   refuses a selection containing MEM: a boxed circuit is evaluated statelessly and
-   `evaluateSCSequence` only clocks TOP-LEVEL MEMs, so a boxed MEM would never advance. The
-   one-tick delay reads 0101 unboxed and 0000 boxed; boxScopeCheck pins that evidence beside
-   the refusal. Boxing a sequential sub-circuit needs nested MEM state in the engine.)_
-3. **FSM** — state nodes, `input:output` transition arrows, simulation with state
-   highlighting, state table. _(built)_
-4. **Turbots** — split arena/circuitry workspace, grid arena, hardcoded sensor/motor
-   encoding, live-linked internal circuit. _(built: engine + grading + store + UI +
-   instructor arena authoring; brain = CC/SC/FSM/TM circuit behind a fixed 1-bit sensor /
-   2-bit motor interface)_
-5. **Turing Machines** — infinite tape, read/write head, TM transition labels, op cycle.
-   _(built: engine + grading + store + UI — FSM-style state editor, two-output
-   `read:write,move` labels (the platform's one deliberate textbook departure, spec §10.3),
-   clickable tape strip, machine table / run controls / history)_
-6. **TM Turbots** — turbot with TM-based internal circuitry. _(built, per the textbook
-   "Turbots: Operation" model: internal (circle) states do single-action {0,1,*} tape ops,
-   external (square) states sense B/E/F and move ↑/↱/↰, one transition per time step, blank
-   starting tape shown read-only below the canvas, halting = stopping)_
+1. **CC** — gates, I/O, validated wiring, I/O tables, boxed circuits, snap-to-grid canvas.
+2. **SC** — MEM block, clock/time model, right-to-left time-step table. SC canvases box
+   COMBINATIONAL sub-circuits only; `confirmBox` refuses MEM (a boxed circuit is evaluated
+   statelessly; `boxScopeCheck` pins the 0101-vs-0000 evidence). Sequential boxing needs
+   nested MEM state in `evaluateSCSequence` — queued as a task.
+3. **FSM** — state nodes, `input:output` transitions (k-bit), simulation with highlighting,
+   state table; opposite-direction transition pairs render as two separated arcs.
+4. **Turbots** — arena Map + circuitry workspace, fixed sensor/motor encoding, CC/SC/FSM/TM
+   brains, instructor arena authoring.
+5. **Turing machines** — tape, head, two-output `read:write,move` labels (the platform's one
+   deliberate textbook departure, spec §10.3), clickable tape strip, run/history.
+6. **TM turbots** — the textbook "Turbots: Operation" model (internal/external states,
+   single tape actions, B/E/F senses, ↑/↱/↰ motors, blank starting tape shown read-only).
 
 ## Critical design rules (don't miss these)
 
-- **Directionality** — every component has inputs on the **left**, outputs on the **right**;
-  signal flows left→right (gates, MEM, boxed circuits alike).
-- **Wires** — splitting allowed (one output → many inputs); merging forbidden. Crossings
-  draw a bump/arc; splits draw a dot. Color: **black = 0, red = 1**.
-- **Validation** — _warn, don't block_ on loops, merged links, and free ends (red highlight +
-  tooltip).
-- **I/O tables** — the right panel shows raw per-wire bits. Local scope = per-wire; global
-  scope = all inputs/outputs together. (The spec's Argument/Value table — concatenated
-  numerals under tally or binary — was REMOVED from the panel on 2026-09-10, along with its
-  Tally/Binary/+ representation toggle; the codec's per-group value read survives as grading
-  plumbing, below. `repSystem` is still persisted and still picks a SANDBOX TM's tape
-  alphabet, but nothing sets it any more, so a sandbox TM is fixed at binary {0,1,*}.)
-- **Time flows right-to-left** in SC and FSM tables (t1 on the right; later steps extend left).
-- **SC/FSM question runs are the grader's runs** — inside an assignment question, Run/Step
-  execute exactly the grader's run length (`stepCountFor` = max(input widths, output widths)
-  time steps) AND feed exactly the grader's input stream: the typed global input is parsed as
-  a **value** per input group (tally "11" = 2) and laid on
-  the time axis by the codec's `encodeInput` (LSB at t1 — a tally value's ones arrive last,
-  zeros leading), and the SC run decodes only the grader's window per output group.
-  What the student types is the value the grader tests; the UI verdict matches the grade in
-  both representations (`selectCodecLayout`/`selectCodecWindow` in the store; pinned by
-  `tools/scWindowCheck.ts`, incl. the real hw3-p7 tally fixture). Typed input that is not a
-  valid numeral for the representation (tally "101") runs on the raw typed bits and is flagged
-  '/' in ARG. The per-MEM flush rule — after the typed input is consumed, Run continues for
-  one 0-input drain step per MEM so delayed bits (a serial adder's final carry) reach the
-  output — applies only to **sandbox** SC runs (which feed raw typed bits); sandbox FSM runs
-  stop at the typed length L.
+- **Directionality** — inputs on the **left**, outputs on the **right**; signal flows
+  left→right (gates, MEM, boxed circuits alike).
+- **Wires** — splitting allowed (one output → many inputs); merging forbidden. Crossings draw
+  a bump; splits draw a dot. Color: **black = 0, red = 1**.
+- **Validation** — _warn, don't block_ on loops, merged links, free ends (red + tooltip).
+- **I/O tables** — the right panel shows raw per-wire bits. The Argument/Value table and its
+  Tally/Binary toggle were REMOVED (2026-09-10); the codec's per-group value read survives as
+  grading plumbing. `repSystem` is still persisted and picks a SANDBOX TM's tape alphabet, but
+  nothing sets it, so a sandbox TM is fixed at binary {0,1,*}.
+- **Time flows right-to-left** in SC and FSM tables (t1 on the right).
+- **SC/FSM question runs ARE the grader's runs** — inside an assignment question, Run/Step
+  execute exactly `stepCountFor` time steps and feed exactly the grader's stream: the typed
+  global input is parsed as a **value** per input group (tally "11" = 2, binary "110" = 6) and
+  laid on the time axis by `encodeInput` (LSB at t1); the SC run decodes only the grader's
+  window per output group (`selectCodecLayout`/`selectCodecWindow`; pinned by `scWindowCheck`).
+  Invalid numerals (tally "101") run on raw bits and show '/'. The per-MEM 0-drain flush rule
+  applies only to **sandbox** SC runs; sandbox FSM runs stop at the typed length.
 - **MEM block** — M_OUT (left) feeds the stored value in; M_IN (right) receives the new value.
-  All memory initializes to 0; display the stored value during simulation.
+  All memory initializes to 0; the stored value is displayed during simulation.
 - **Input labels** — assigned at creation and permanent; new inputs get the next sequential
   number regardless of vertical position.
-- **Turbot encoding is hardcoded** — sensor in: 0 empty, 1 block. Motor out `ij` = the two
-  wheel motors (i = left wheel, j = right wheel): 00 stay, 01 right motor on → turn left,
-  10 left motor on → turn right, 11 both on → forward.
-- **CC evaluation** — topological sort for gate order; propagation is instantaneous.
-- **Homework JSON** (spec §1.5) carries numeric `test_cases` (`{inputs, outputs}` of values); the
-  codec encodes/decodes per axis and the grader compares decoded outputs to expected. TM
-  questions may additionally set `requireStandardHaltPosition: true` (authored via a TM-only
-  checkbox in the question creator) to reject runs whose head does not halt on the output
-  block's rightmost cell; absent/false, acceptance is position-agnostic. A TM question — or a
-  turbot question whose brain is a TM, e.g. HW6 P2's `maxTapeCells: 20` — may also set
-  `maxTapeCells` to cap how much tape a run may occupy: `engine/tm.ts`'s `tapeCellsUsed`
-  measures the SPAN from the leftmost to the rightmost cell touched (head positions ∪ the
-  pre-written input ∪ what the run wrote), checked after acceptance so a non-halting run is
-  still reported as such. Any question may set
-  `allowed_components` to restrict the component vocabulary (semantics in
-  `engine/machineValidation.ts`: listed types only + always-allowed INPUT/OUTPUT/STATE, boxed
-  internals recursed; absent/empty = unrestricted) — enforced at Stage-1 grading, in the student
-  palette, and authored via the question creator's "Restrict available components" toggle. It
-  may also set `component_limits` (`{TYPE: max}`, counted through boxed internals; absent or
-  a type with no entry = unlimited) to cap HOW MANY of something a machine may use — HW2 P6's
-  "only use ONE sub-part which computes +1" is `{BOXED: 1}`. Note what a budget can say: it
-  counts components, so it enforces "at most one boxed sub-part", not "the +1 logic appears
-  only once". Same Stage-1 seat as the type restriction; authored via "Limit how many
-  components may be used".
-- **Editing locks (notes/todos.md items 3 & 8)** — a question refuses edits when EITHER it's
-  marked done by the student, OR the whole assignment is frozen (past due AND a submission
-  exists — `dueDates.ts isFrozen`). Both routes through the same single choke point,
+- **Turbot encoding is hardcoded** — sensor in: 0 empty, 1 block. Motor out `ij` = left/right
+  wheel motors: 00 stay, 01 turn left, 10 turn right, 11 forward. FSM brains output the full
+  2-bit code (`in:ij`); TM brains use ↑/↱/↰ on external states.
+- **CC evaluation** — topological sort; propagation is instantaneous.
+- **Homework JSON** (spec §1.5) carries numeric `test_cases` (`{inputs, outputs}` of values).
+  TM questions may set `requireStandardHaltPosition` (head must halt on the output block's
+  rightmost cell) and any TM or TM-brained turbot question `maxTapeCells` (span of tape
+  touched, checked after acceptance). Any question may set `allowed_components` (listed types
+  + always-allowed INPUT/OUTPUT/STATE; boxed internals recursed; absent/empty = unrestricted —
+  enforced at Stage 1, in the palette, and authored in the creator) and `component_limits`
+  (`{TYPE: max}`, counted through boxed internals — HW2 P6's "one +1 sub-part" is `{BOXED: 1}`;
+  it counts components, so it says "at most one boxed sub-part", not "the +1 logic appears once").
+- **Editing locks** — a question refuses edits when it's marked done OR the assignment is
+  frozen (past due AND submitted, `dueDates.ts isFrozen`). Both route through
   `store.ts`'s `isCurrentQuestionLocked`/`selectQuestionLocked`, inlined at the top of every
-  mutating store action — never gate in a component instead, or a new edit path (a keyboard
-  shortcut, a palette drag) will slip past it. Simulation (Run/Step/evaluate) is deliberately
-  NEVER locked — a frozen or done question can still be simulated, just not changed.
-- **Boxing a TM is refused by design** — a TM has one tape and one control thread
-  (`evaluateTMSingleStep`, engine/tm.ts, does a single wire lookup keyed by the current state id
-  across the WHOLE table), so there is no wire boundary to box the way CC/SC boxing works (a
-  boxed circuit is one stateless function call). `placeableBoxKinds('TM')` returns `[]` on
-  purpose; see the full reasoning in `types.ts` beside it.
-- **Boxing an FSM is refused by design too (notes/todos.md item 2)** — a half-built attempt
-  (`fsmPlaceBoxInstance`, confirmBox's FSM branch) got as far as confirm + place but was never
-  wired into `evaluateFSMSymbolStep`. A boxed sub-FSM isn't a stateless function call either: its
-  own confirmBox rules described a sub-automaton meant to consume multiple subsequent input
-  symbols before handing control back, which needs the same invented call/return convention (the
-  running machine's "current state" becoming a stack) TM boxing is refused for. Removed rather
-  than left half-working; `placeableBoxKinds('FSM')` returns `[]`, same as TM.
+  mutating action — never gate in a component, or a new edit path will slip past it.
+  Simulation (Run/Step/evaluate) is deliberately NEVER locked. Not locked either: INPUT
+  toggles, MEM overrides, idle TM tape edits (exploratory, reset on navigation).
+- **Boxing a TM or an FSM is refused by design** — a TM has one tape and one control thread,
+  so there is no wire boundary to box as a stateless function call; a boxed sub-FSM would be a
+  sub-automaton consuming multiple input symbols, needing an invented call/return convention.
+  `placeableBoxKinds('TM'|'FSM')` return `[]`; full reasoning beside it in `types.ts`.
+- **Every canvas swap resets sim state** via `resetAllSimState()` (`navResetCheck`); a
+  background-tab removal deliberately leaves the live run alone.
 
 ## Things to watch
 
-- **Test cases must not ship to the client in production — SOLVED in remote mode (P6.4).**
-  The server strips `test_cases`/`perception_cases` from student assignment copies entirely, and
-  from student RESULTS strips only the answer key (`CaseResult`/`PerceptionCaseResult`'s
-  `expected`/`got`, `FillInCaseResult`'s `expected`/`got`) — since 2026-09-17 the SAFE per-case
-  fields (which input/frame/blank, pass/fail, why) survive on purpose (notes/todos.md item 4;
-  `server/src/sanitize.ts`; parity-pinned both ways, that the safe fields ARE there and that the
-  answer key is NOT). Students submit answers only, grading happens server-side, and the bundled
-  assignment (whose JSON carries answers) is excluded from remote builds (`assignments/index.ts`).
-  LOCAL mode still bundles answers and grades in the browser — by design, it is the dev/demo
-  prototype, never the deployment students use. Keep it that way: never re-wire the bundled set
-  or the engine grader into the remote-store module graph (remoteStoreCheck's grep gate enforces
-  this).
-- **localStorage is a stopgap — LOCAL mode only.** Per-browser, per-device, ~5 MB; fine for
-  dev. In remote mode the seams are server-backed and localStorage holds only the session
-  token (`mm:auth:token`), the crash-buffer journal (`mm:journal:<email>:<asgId>`, transient
-  by design), and the migration guard (`mm:migrated:<email>`). Old local prototype data is
-  never deleted — first remote login uploads it fill-empty (`storage/migrateLocal.ts`).
+- **Test cases never ship to the client in production — SOLVED in remote mode.** The server
+  strips `test_cases`/`perception_cases`/`fill_in_answers` from student assignment copies and
+  the answer key (`expected`/`got`) from student results, keeping the safe per-case fields
+  (`sanitize.ts`; parity-pinned both ways). Students submit answers only; the bundled
+  assignment is excluded from remote builds. LOCAL mode bundles answers and grades in the
+  browser **by design** — it is the dev/demo prototype, never what students use. Never
+  re-wire the bundled set or the engine grader into the remote-store module graph
+  (`remoteStoreCheck`'s grep gate enforces this).
+- **localStorage is LOCAL mode only.** In remote mode it holds only the session token
+  (`mm:auth:token`), the crash-buffer journal (transient by design) and the migration guard.
+  Old local prototype data is never deleted — first remote login uploads it fill-empty.
 - **Remote workbooks are last-write-wins across devices** (accepted pilot trade-off,
-  `docs/buildout/designs/remote-stores.md` §5): simultaneous multi-device editing silently
-  drops the loser; the crash-buffer journal covers crashes, not conflicts. An
-  `updatedAt`/If-Match precondition is the noted follow-up if it ever bites.
-- **Deploy knobs live in `deploy/README.md`**: Cloudflare Pages sets `VITE_API_BASE` at build
-  time; the Lightsail box sets `MM_CORS_ORIGINS` (and friends) via systemd; SQLite backup =
-  copy the file.
+  `docs/buildout/designs/remote-stores.md` §5); an `updatedAt`/If-Match precondition is the
+  noted follow-up if it ever bites.
+- **Deploy knobs live in `deploy/README.md`**: Pages sets `VITE_API_BASE` and
+  `VITE_BASE_PATH=/` at build; the Lightsail unit sets `MM_AUTH_MODE=password`,
+  `MM_CORS_ORIGINS` and friends; SQLite backup = copy the file (WAL-safe).
+- **CI is strict TypeScript** (`noUnusedLocals`, `noUnusedParameters`): run
+  `npx tsc -p tsconfig.app.json --noEmit` before committing; after any push check
+  `gh run list --limit 1`.

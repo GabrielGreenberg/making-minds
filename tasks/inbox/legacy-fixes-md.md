@@ -1,3 +1,10 @@
+# Legacy list (moved from todos/fixes.md on 2026-09-21)
+
+Most of these shipped in the 2026-09-10 pass (see docs/HISTORY.md). The catcher should
+verify each remaining item against the code before filing it or discarding it. Items
+known NOT to be confirmed in the changelog: the off-center question-pane resize grabber,
+the "Swap state type" button rename, the misaligned Submit button vs "submitted <date>".
+
 - In question descriptions in editor: if a particular input-output behavior is described, format as a table rather than inline for readability.
 - If a question has a title, it should be in bold and on its own line.
 - The grabbable component for resizing the question pane is not centered on the pane boundary. It's a couple pixels to the right.

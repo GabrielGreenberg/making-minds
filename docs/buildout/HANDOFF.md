@@ -1,5 +1,7 @@
 # Handoff — the hot state
 
+> **Retired 2026-09-21** with the `/handoff` loop. Nothing reads this any more; the live queue is `tasks/`.
+
 _Read this first. It says exactly where we are and what to do next. Rewrite it at
 the end of every iteration. If it conflicts with the harness, the harness wins —
 run `npm run coverage` and reconcile._

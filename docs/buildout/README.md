@@ -1,5 +1,9 @@
 # `docs/buildout/` — the build-out loop's memory
 
+> **Retired 2026-09-21.** The build-out loop (`/handoff`) finished at-tier and was retired. These memos
+> are history. New work flows through the committed task queue in `tasks/` (`/catch`, `/work`,
+> `/worker`); see `tasks/README.md`.
+
 This folder is the durable brain of the Making-Minds build-out: a self-driving,
 memo-disciplined effort to make the UI able to construct a machine that solves
 **every machine-buildable problem in HW1–HW6**, verified adversarially (function +
