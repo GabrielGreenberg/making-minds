@@ -25,6 +25,9 @@ said "reviewed".
 
 ## Design
 Not a code task. If corrections come in, they're one edit to the JSON + `statementFormatCheck`.
+Note (catch 2026-09-21): task 2026-09-21-020 re-transcribes HW1–HW7 to the PDFs' structure
+and restores the HW4 P1–P2 diagrams as figures, so the worded descriptions become captions;
+this review then matters for the transcription, not the layout.
 
 ## Verify
 `statementFormatCheck` still parses every statement.

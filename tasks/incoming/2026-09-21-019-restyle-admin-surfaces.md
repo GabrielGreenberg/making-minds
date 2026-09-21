@@ -23,9 +23,11 @@ or be visibly continuous with, the course website **https://www.makingminds.org*
 The circuit editor and canvas are explicitly OUT of scope for now. Student surfaces first;
 the instructor side is more coherent already and just needs to match.
 
-Gabriel intends to drop the website's source into the repo (folder to be named); until then
-the live site's stylesheet `https://www.makingminds.org/assets/site.css` (18 KB) is the
-reference and was read during intake. Provenance: chat, catch session 2026-09-21.
+The website's SOURCE is the git repo at
+`~/Documents/Academic/Teaching/Phil 133 - 2026f/Phil 133 - web/claude redesign/` (CNAME
+`www.makingminds.org`; `assets/site.css` is the stylesheet, `data/course.json` drives the pages,
+its README explains). The live `https://www.makingminds.org/assets/site.css` (18 KB) was read
+during intake and is what the vocabulary below records. Provenance: chat, catch session 2026-09-21.
 
 ### The reference vocabulary (from site.css, 2026-09-21)
 - **Type:** body `"IBM Plex Sans"` 15px / 1.5, ink `#2A2A2A`; headings `"IBM Plex Serif"`
@@ -139,7 +141,7 @@ in the repo says what a page should look like — this task defines it.
   Edit, New question, Submissions, Feedback, Notes. Roster is remote-only: run "Vite Remote
   Mode" against a local server for that one view. Check at 1280 wide and at ~700 wide.
 - Screenshots: `tasks/attachments/2026-09-21-019-<surface>.png`, before and after.
-- Owed: reconcile against the website SOURCE once Gabriel drops it into the repo (the live
-  `site.css` may lag it); a real-device look on Gabriel's laptop.
+- Owed: re-read `assets/site.css` in the source repo at start (it may have moved on since
+  2026-09-21); a real-device look on Gabriel's laptop.
 
 ## Progress log
