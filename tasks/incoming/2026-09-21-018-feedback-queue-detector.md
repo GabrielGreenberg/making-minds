@@ -1,8 +1,8 @@
 ---
 id: 2026-09-21-018
 type: feature
-title: Let /catch pull the app's student feedback reports into tasks/inbox/
-priority: low
+title: Pull the app's feedback reports into tasks/inbox/ with the author's role (stage 1 of the feedback pipeline)
+priority: normal
 size: small
 requires: human
 area: pipeline
@@ -20,9 +20,17 @@ The app has a student "Feedback" form feeding an instructor queue (`FeedbackStor
 pipeline: the catcher should be able to drain open reports into `tasks/inbox/` (one file per
 report, screenshots into `attachments/`) and diagnose them like any other intake.
 
+Updated 2026-09-22 (catch): this is STAGE 1 of the feedback pipeline Gabriel asked for — task
+2026-09-22-029 is the triage routine that consumes these files, and it needs to know whether
+the author is an instructor or a student. The `feedback` table stores email, category,
+message, screenshots, `context` and status but NOT the role (`server/src/db.ts:129–140, 396`);
+`GET /api/feedback` (`server/src/app.ts:656`) should return each report with `role` joined
+from the users table, and every inbox file carries `author-role: instructor | student`.
+
 ## Done when
 `node tasks/tools/pull-feedback.mjs` (instructor token from gitignored `secrets/`) writes each
-open report not yet pulled as `inbox/feedback-<id>.md` with provenance; `CATCHER.md` §3 lists
+open report not yet pulled as `inbox/feedback-<id>.md` with provenance; `author-role`, category, report id and
+the route/assignment `context`, screenshots as `attachments/feedback-<id>-<n>.<ext>`; `CATCHER.md` §3 lists
 it as a source. Marking resolved stays a human/instructor action.
 
 ## Design
