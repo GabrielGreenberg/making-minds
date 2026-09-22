@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import type { AssignmentData, AssignmentQuestion } from '../types';
 import { questionModeLabel } from '../types';
-import { getAssignment, isBundledAssignment } from '../assignments';
+import { getAssignment } from '../assignments';
 import { assignmentStore } from '../storage/backend';
 import { downloadJson } from '../download';
 import { navigate } from '../routing';
@@ -22,8 +22,7 @@ function toLocalInputValue(iso: string): string {
 
 /**
  * Assignment editor: edit the title and the ordered question list of an
- * instructor-authored assignment. Every mutation persists immediately via the
- * AssignmentStore. Bundled assignments are read-only and cannot be opened here.
+ * assignment. Every mutation persists immediately via the AssignmentStore.
  */
 export function AssignmentEditor({ id }: { id: string }) {
   const { value: loaded, loading } = useAsyncValue(() => getAssignment(id), [id]);
@@ -56,19 +55,6 @@ export function AssignmentEditor({ id }: { id: string }) {
     return (
       <div className="instructor-error">
         <p>Assignment not found.</p>
-        <button className="mm-btn" onClick={() => navigate({ kind: 'instructor' })}>
-          Back to dashboard
-        </button>
-      </div>
-    );
-  }
-
-  if (isBundledAssignment(id)) {
-    return (
-      <div className="instructor-error">
-        <p>
-          <strong>{assignment.title}</strong> is a bundled assignment and cannot be edited.
-        </p>
         <button className="mm-btn" onClick={() => navigate({ kind: 'instructor' })}>
           Back to dashboard
         </button>

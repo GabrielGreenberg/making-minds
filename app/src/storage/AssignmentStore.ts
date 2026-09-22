@@ -1,10 +1,10 @@
-// Instructor-authored assignment seam.
+// Assignment seam.
 //
-// Bundled assignments (assignments/index.ts) are read-only and fixed at build
-// time. Instructor-created assignments need to be editable at runtime, so they
-// live behind this mutable store. The UI talks to the `AssignmentStore`
-// interface, never to localStorage directly, so a server CRUD API drops in later
-// at the same seam. Mirrors the WorkbookStore / SubmissionStore pattern.
+// Every assignment is instructor-authored and editable at runtime, so all of
+// them live behind this mutable store — the registry (assignments/index.ts) is
+// a thin layer over it. The UI talks to the `AssignmentStore` interface, never
+// to localStorage directly, so a server CRUD API drops in at the same seam.
+// Mirrors the WorkbookStore / SubmissionStore pattern.
 // Promise-returning (a remote backend is intrinsically async); the local
 // implementation resolves immediately.
 //
@@ -27,7 +27,7 @@
 // a student's list and 404 on fetch); locally it is a private
 // `mm:published:<id>` key. An assignment is HIDDEN until the instructor
 // publishes it — absent means hidden, on both backends, for every assignment
-// including the bundled and seeded ones. Students see an empty catalog until
+// including the seeded ones. Students see an empty catalog until
 // something is released, which is the point.
 
 import type { AssignmentData } from '../types';
@@ -39,10 +39,10 @@ export interface AssignmentStore {
   save(assignment: AssignmentData): Promise<void>; // create or update
   remove(id: string): Promise<void>;
   /**
-   * The release flag for one assignment id. Answered for ANY id — including
-   * bundled assignments that live outside this store — because release is
-   * policy keyed on the id, not a property of a stored row. (Remote mode reads
-   * it off the fetched assignment; there, every assignment is a server row.)
+   * The release flag for one assignment id. Answered for ANY id, known or not,
+   * because release is policy keyed on the id, not a property of a stored row
+   * (an unknown id is simply unreleased). Remote mode reads it off the fetched
+   * assignment.
    */
   getGradesReleased(id: string): Promise<boolean>;
   /** Instructor only: release (or hide again) grades for an assignment. */

@@ -104,8 +104,8 @@ class RemoteAssignmentStore implements AssignmentStore {
   }
 
   async getGradesReleased(id: string): Promise<boolean> {
-    // Release rides the assignment row server-side; there is no bundled-
-    // outside-the-store case remotely, so an unknown id is simply unreleased.
+    // Release rides the assignment row server-side, so an unknown id is
+    // simply unreleased.
     return (await this.get(id))?.gradesReleased ?? false;
   }
 

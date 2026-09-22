@@ -7,7 +7,7 @@ size: small
 requires:
 area: app
 source: chat
-created: 2026-09-21T21:39:44:z
+created: 2026-09-21T21:39:44-07:00
 status: in-progress
 after:
 branch: task/022-retire-bundled-assignment

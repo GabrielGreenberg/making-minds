@@ -126,7 +126,8 @@ manual review, grade release, feedback, notes, `/api/health`. Redaction server-s
 
 **Deployment — pilot live.** Cloudflare Pages `https://making-minds.pages.dev` → Lightsail
 API at the placeholder `https://100-22-69-95.sslip.io` (Caddy TLS). Not yet fit for students:
-UCLA SSO is a stub and the box holds only the toy roster + `cc-basics`. **Content:** HW1–HW7
+UCLA SSO is a stub and the box holds only the toy roster (plus a leftover `cc-basics` demo
+row, deletable from the dashboard). **Content:** HW1–HW7
 exist as seedable JSON (`app/src/devData/homeworks/`, 84 questions — machine problems from the
 reference fixtures, prose problems as open questions) for local mode only so far.
 
@@ -170,7 +171,7 @@ store instances. **Route new features through these seams, not around them.**
 | Grading | `engine/grader.ts` | grades on receipt in `LocalSubmissionStore` | server grades on submit; client never sees `test_cases` (grep-gated); parity pinned |
 | Identity | `src/auth/` (one provider per mode) | mockup login: pick a toy account | the server's account system rendered from its reported capabilities → bearer session → `me()` restore; 401 hook; boot health gate; UCLA SSO = one server-side `AuthProvider` swap |
 | Persistence | `WorkbookStore` | `LocalWorkbookStore` | `RemoteWorkbookStore` + crash-buffer journal + fill-empty migration |
-| Assignments | `AssignmentStore` + registry | bundled + localStorage; release + visibility flags on the seam (`mm:published:<id>`) | server CRUD, role-sanitized; `student_visible` defaults 0; bundled set empty remotely |
+| Assignments | `AssignmentStore` + registry | localStorage; release + visibility flags on the seam (`mm:published:<id>`) | server CRUD, role-sanitized; `student_visible` defaults 0 |
 | Submission | `SubmissionStore` | `LocalSubmissionStore` | `RemoteSubmissionStore` (answers only; identity/time = server's word) |
 | Feedback / Notes | `FeedbackStore` / `NotesStore` | localStorage (`mm:feedback`, `mm:instructor-notes`) | `/api/feedback*`, `/api/instructor-notes` |
 | Navigation | `routing` (`Route` + `navigate`) | hash URLs (starts inside AuthGate) | same |
@@ -203,7 +204,7 @@ browser and on the server. The store and UI are thin wrappers over the engine.
 | Auth | `app/src/auth/` | `AuthGate.tsx` (no rendering until a user exists; `initRouting()` fires here), `HealthGate.tsx` (remote boot probe + auto-retry screen), `LoginScreen.tsx` (toy picker locally; remotely Sign in · Create account · Not on the roster? or one SSO button — panes from the server's `AuthCapabilities`), `AccountPanel.tsx` (change password), `authProvider.tsx` (one provider per mode), `types.ts`, `session.ts`, `accounts.ts`, `instructorRole.ts`. |
 | Page surfaces | `app/src/theme.css`, `pages.css`, `components/PageShell.tsx`, `SessionControls.tsx` | The design layer for everything outside the editor. `theme.css`: the makingminds.org palette / type / spacing as `--mm-*` tokens (each names its `site.css` original; colour literals live ONLY in its `:root`) + the shared vocabulary (shell, tags, hairline rows, tables, buttons, fields, segmented controls, modals). `pages.css`: per-surface rules (home, overview, grade sheet, login, feedback, the instructor views). `PageShell`: topbar (serif brand → the website, `appNav`, session controls) · optional `subnav` bar (the instructor's sections) · band · `.page` column (`width="wide"` for instructor tables) · footer, plus a `card` variant for login/health. `index.css` is the editor alone and inherits only the font family. Rules: `docs/buildout/VISUAL_VOCAB.md` §Page surfaces; gate: `themeCheck`. |
 | Async UI | `app/src/useAsyncValue.ts` | The shared fetch-on-mount hook (`value`/`loading`/`error`/`reload`) behind every view reading the async seams. |
-| Assignments | `app/src/assignments/index.ts`, `cc-basics.json` | Registry over the `AssignmentStore` seam + `sortAssignments` (instructor `order` asc, then title; bundled pinned first). The bundled CC assignment is LOCAL-mode-only (its JSON carries answers). |
+| Assignments | `app/src/assignments/index.ts` | Thin registry over the `AssignmentStore` seam (`listAssignments`/`getAssignment`/`createAssignment`) + `sortAssignments` (instructor `order` asc, then title). Nothing is bundled into the app: local mode starts empty until the dashboard's dev seeds load content. |
 | Instructor UI | `app/src/instructor/` | `InstructorApp`, `InstructorGate`, `InstructorDashboard`, `RosterView`, `FeedbackQueueView`, `NotesView`, `AssignmentEditor`, `dragReorder.ts` (pure `moveItem` + `useDragReorder`; pinned rows immovable), `QuestionCreator` (+ `ccPreview.ts`, `arenaEditing.ts` — `MAX_ARENA_SIZE` 30), `Gradebook.ts`/`GradebookView.tsx`. |
 | Student UI | `app/src/components/` | `CircuitCanvas`, `ComponentLibrary`, `DataTable`, `HomeScreen`, `AssignmentOverview`, `MenuBar`, `GradesPanel` (+ `FailedInputs`), `FeedbackPanel`, `SequentialTimeline`, `TMTapePanel`, `ArenaCanvas`, `TurbotArenaPanel` (Map + run controls; sandbox "Edit map"), `TurbotTapePanel`, `OpenResponsePanel`/`FillInPanel` (read-only when locked), `SimulationPanel`, `TabBar` (question nav + Mark done / 🔒 tag; sandbox + menu), `outputDisplay.ts` (t1-rightmost OUT rows, per-group ARG values). |
 | API client | `app/src/api/client.ts` | One typed function per endpoint; bearer token under `mm:auth:token`; `onUnauthorized` hook; `health()`; auth/roster/feedback/notes calls; `putWorkbook` takes `keepalive`. `setApiBase` is the harness override. |
@@ -320,11 +321,10 @@ sees the formula, it runs against the generated numeric `test_cases`.
 - **Test cases never ship to the client in production — SOLVED in remote mode.** The server
   strips `test_cases`/`perception_cases`/`fill_in_answers` from student assignment copies and
   the answer key (`expected`/`got`) from student results, keeping the safe per-case fields
-  (`sanitize.ts`; parity-pinned both ways). Students submit answers only; the bundled
-  assignment is excluded from remote builds. LOCAL mode bundles answers and grades in the
-  browser **by design** — it is the dev/demo prototype, never what students use. Never
-  re-wire the bundled set or the engine grader into the remote-store module graph
-  (`remoteStoreCheck`'s grep gate enforces this).
+  (`sanitize.ts`; parity-pinned both ways). Students submit answers only. LOCAL mode holds
+  answers and grades in the browser **by design** — it is the dev/demo prototype, never what
+  students use. Never wire the engine grader (or any answer-carrying JSON) into the
+  remote-store module graph (`remoteStoreCheck`'s grep gate enforces this).
 - **localStorage is LOCAL mode only.** In remote mode it holds only the session token
   (`mm:auth:token`), the crash-buffer journal (transient by design) and the migration guard.
   Old local prototype data is never deleted — first remote login uploads it fill-empty.
