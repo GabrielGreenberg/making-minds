@@ -347,6 +347,9 @@ sees the formula, it runs against the generated numeric `test_cases`.
 - **Remote workbooks are last-write-wins across devices** (accepted pilot trade-off,
   `docs/buildout/designs/remote-stores.md` §5); an `updatedAt`/If-Match precondition is the
   noted follow-up if it ever bites.
+- **Releasing = `deploy/release.sh`** after a push to `main` (box pull + restart over ssh,
+  then the Pages upload; refuses unless local main == origin/main; needs the gitignored
+  `secrets/cloudflare.env` and an `ssh/` key — `deploy/README.md` §0).
 - **Deploy knobs live in `deploy/README.md`**: Pages sets `VITE_API_BASE` and
   `VITE_BASE_PATH=/` at build; the Lightsail unit sets `MM_AUTH_MODE=password`,
   `MM_CORS_ORIGINS` and friends; SQLite backup = copy the file (WAL-safe).

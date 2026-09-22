@@ -14,6 +14,25 @@ The frontend is a static SPA (hash routing — no redirect rules needed). The AP
 holds the test cases and does all grading; CORS restricts it to the Pages
 origin.
 
+## 0. Routine release — what to run after every push to `main`
+
+```sh
+deploy/release.sh            # box (git pull + restart) → site (build + upload) → proof
+deploy/release.sh --dry-run  # preflight + build only, nothing deployed
+```
+
+It refuses to run unless local `main` is clean and identical to GitHub's, because
+the box pulls from GitHub — so the site can never be built from a commit the box
+cannot reach. It needs two gitignored things: `secrets/cloudflare.env`
+(`CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`) for the site, and a private key
+in `ssh/` for the box. **One-time setup for the key:** Bruin Cloud
+(https://bruincloud.awsapps.com/start) → Lightsail → the instance → Connect tab →
+"Download default key" (`LightsailDefaultKey-us-west-2.pem`) into `ssh/`. Until then the script prints the update
+commands to paste into Lightsail's browser terminal ("Connect using SSH") and
+stops before the site, so the site is never newer than the API; re-run with
+`--frontend-only` once the box is done. `--frontend-only` is also fine on its
+own when neither `server/` nor `app/src/engine/` changed.
+
 ## 1. Lightsail instance (API)
 
 1. Create an instance: **Ubuntu 24.04 LTS**, smallest plan is fine to start
@@ -57,7 +76,8 @@ sudo systemctl reload caddy
 curl -s https://api.<domain>/api/health    # → {"ok":true}
 ```
 
-Updates: `git pull && npm install && sudo systemctl restart makingminds-api`.
+Updates: `deploy/release.sh` (section 0). By hand, as the `makingminds` user:
+`git pull && npm install && sudo systemctl restart makingminds-api`.
 
 **Backups**: the entire state is one SQLite file. A nightly cron
 (`sqlite3 .../making-minds.sqlite ".backup /srv/making-minds/data/backup-$(date +%a).sqlite"`)
@@ -103,8 +123,9 @@ The Pages project must be named **`making-minds`** so its default origin is
 `MM_CORS_ORIGINS`. A different name means updating that env and restarting
 `makingminds-api`.
 
-Direct upload (no Git integration) works too:
-`VITE_BASE_PATH=/ VITE_API_BASE=... npm run build && npx wrangler pages deploy dist --project-name making-minds` from `app/`.
+The pilot project **is** a direct upload (no Git integration) — `deploy/release.sh`
+does it. By hand, from `app/`:
+`VITE_BASE_PATH=/ VITE_API_BASE=... npm run build && npx wrangler pages deploy dist --project-name making-minds`.
 
 Then set the Pages URL (and any custom domain) in the API's
 `MM_CORS_ORIGINS` env (systemd unit) and restart the service.
