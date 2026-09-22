@@ -8,9 +8,9 @@ requires: browser
 area: app
 source: chat
 created: 2026-09-21T17:05:00-07:00
-status: in-progress
+status: done
 after:
-branch: task/021-restyle-instructor-surfaces
+branch:
 merged_into:
 ---
 
@@ -73,3 +73,28 @@ Feedback · Notes), the unlock screen (`InstructorGate`) with its own card. Spli
 - Owed: a real-device look on Gabriel's laptop.
 
 ## Progress log
+- **2026-09-21 (/work, `task/021-restyle-instructor-surfaces`) — landed.** Every instructor
+  view speaks the page vocabulary: `mm-btn` (one magenta primary per view), `tag` for the
+  badges and the feedback category chips, `mm-table`, `mm-field`/`mm-input` (+ sized
+  modifiers `--num/--name/--formula/--title/--area`, `.mm-inline-field`), serif `h1`/`h2`/`h3`
+  under `.mm-head--row`/`.mm-section-head`, `.mm-segmented` for the mode / representation /
+  arena toggles, hairline question rows in the editor, eyebrow back-links + serif titles on
+  the editor and gradebook. The shell grew `subnav` (`PageShell` → `.subbar`): Dashboard ·
+  Roster & accounts · Feedback · Notes, current by route kind (`InstructorLayout` takes the
+  route; the dashboard's three section buttons are gone, the dev seeds stay as quiet buttons
+  in its head). The instructors-only refusal is the shell's card. 51 dead rule blocks left
+  `pages.css`, corners flattened in the carried-over instructor CSS, and `themeCheck`'s
+  retired-idiom pin now covers the old families.
+  Verified: tsc, build, themeCheck, app `npm run check`, server typecheck + check; browser at
+  1280 and 700 — attachments `2026-09-21-021-{dashboard,editor,creator,gradebook,feedback,notes,
+  unlock}-{before,after}.jpg`, `-{dashboard,creator}-narrow-after.jpg`, and against a scratch
+  API server in dev auth mode through "Vite Remote Mode" (`PORT=8199 MM_AUTH_MODE=dev
+  MM_DB_PATH=<scratch> MM_CORS_ORIGINS=http://localhost:5177 npm run seed && npm run start`):
+  `-roster-after`, `-remote-home-after`, `-remote-login-after` — which also closes 019's owed
+  look at the remote login panes.
+  Gotcha: Vite served stale copies of files written by the editor tools until the dev server
+  was restarted; if a change "doesn't show", curl the served module under the `/making-minds/`
+  base before debugging the code.
+  Owed: a roster "before" (remote-only; not captured), the password modal (needs a
+  password-mode server), a real-device look.
+  Next: nothing — done.
