@@ -1,15 +1,16 @@
 import type { ReactNode } from 'react';
-import { PageShell, appNav } from '../components/PageShell';
+import { PageShell, appNav, hashLink } from '../components/PageShell';
 import type { ShellNavItem } from '../components/PageShell';
 import { SessionControls } from '../components/SessionControls';
 import type { InstructorRoute } from './useInstructorRoute';
 
-/** The instructor's sections, shown as the shell's sub-nav; each names the
- *  route kinds it is "current" for (the dashboard owns the editor and the
- *  gradebook, which are reached from it). */
+/** The Dashboard's sections, shown as tabs at the top of the column on every
+ *  instructor page; each names the route kinds it is current for (the
+ *  Assignments tab owns the editor, the question creator and the gradebook,
+ *  which are reached from it). */
 const SECTIONS: { label: string; route: ShellNavItem['route']; kinds: InstructorRoute['kind'][] }[] = [
   {
-    label: 'Dashboard',
+    label: 'Assignments',
     route: { kind: 'instructor' },
     kinds: ['instructor', 'instructor-new-assignment', 'instructor-edit', 'instructor-submissions'],
   },
@@ -20,20 +21,31 @@ const SECTIONS: { label: string; route: ShellNavItem['route']; kinds: Instructor
 
 /**
  * The shell shared by all instructor views: the site's page shell with the
- * app nav (Instructor current), the instructor sections as a sub-nav, the
- * signed-in identity and Log out, and a wide content column for the
- * gradebook and roster tables. Only instructor accounts get here
- * (InstructorGate), so the Instructor nav item is a given.
+ * instructor's nav (Student view · Dashboard, the latter current), the
+ * signed-in identity and Log out — and, inside the column, the Dashboard's
+ * tab row. The chrome is the same one the student pages use, so nothing
+ * moves on the crossing. Only instructor accounts get here (InstructorGate).
  */
 export function InstructorLayout({ route, children }: { route: InstructorRoute; children: ReactNode }) {
-  const subnav = SECTIONS.map((s) => ({ label: s.label, route: s.route, current: s.kinds.includes(route.kind) }));
   return (
-    <PageShell
-      nav={appNav('instructor', true)}
-      subnav={subnav}
-      width="wide"
-      session={<SessionControls feedback={false} />}
-    >
+    <PageShell nav={appNav('dashboard', 'instructor')} session={<SessionControls feedback={false} />}>
+      <nav className="mm-tabs" aria-label="Dashboard sections">
+        <span className="eyebrow">Dashboard</span>
+        {SECTIONS.map((s) => {
+          const active = s.kinds.includes(route.kind);
+          return (
+            <a
+              key={s.label}
+              className={`mm-tab${active ? ' mm-tab--active' : ''}`}
+              aria-current={active ? 'page' : undefined}
+              data-text={s.label}
+              {...hashLink(s.route)}
+            >
+              {s.label}
+            </a>
+          );
+        })}
+      </nav>
       {children}
     </PageShell>
   );

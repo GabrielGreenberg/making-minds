@@ -1,7 +1,6 @@
 import { listAssignments, getAssignment, createAssignment } from '../assignments';
 import type { AssignmentSummary } from '../assignments';
 import { assignmentStore, submissionStore, backendMode } from '../storage/backend';
-import { downloadJson } from '../download';
 import { navigate } from '../routing';
 import { seedSampleData } from '../devData/seed';
 import { seedHomeworks } from '../devData/homeworks';
@@ -52,11 +51,6 @@ export function InstructorDashboard() {
     if (title == null) return; // cancelled
     const created = await createAssignment(title);
     navigate({ kind: 'instructor-edit', id: created.id });
-  };
-
-  const handleExport = async (id: string) => {
-    const data = await getAssignment(id);
-    if (data) downloadJson(`assignment-${id}.json`, data);
   };
 
   const handleVisibility = async (id: string, title: string, visible: boolean) => {
@@ -194,9 +188,6 @@ export function InstructorDashboard() {
                       onClick={() => navigate({ kind: 'instructor-submissions', id: a.id })}
                     >
                       Submissions
-                    </button>
-                    <button className="mm-btn" onClick={() => void handleExport(a.id)}>
-                      Export JSON
                     </button>
                     <button
                       className="mm-btn mm-btn--danger"

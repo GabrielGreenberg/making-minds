@@ -78,7 +78,7 @@ export function HomeScreen() {
   };
 
   return (
-    <PageShell nav={appNav('assignments', user?.role === 'instructor')} session={<SessionControls />}>
+    <PageShell nav={appNav('student', user?.role === 'instructor' ? 'instructor' : 'student')} session={<SessionControls />}>
       <div className="mm-head">
         <h1>Assignments</h1>
         <p className="mm-lede">
@@ -164,15 +164,6 @@ export function HomeScreen() {
         )}
       </div>
 
-      <section className="mm-section">
-        <h2>Explore</h2>
-        <div className="mm-list">
-          <button className="mm-row mm-row--link" onClick={() => navigate({ kind: 'sandbox' })}>
-            <span className="mm-row-title mm-row-title--strong">Sandbox</span>
-            <span className="mm-row-meta">A freeform workbook to experiment in — saved automatically</span>
-          </button>
-        </div>
-      </section>
 
       {gradesFor && submissions[gradesFor] && (
         <GradesPanel

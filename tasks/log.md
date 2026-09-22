@@ -5,3 +5,4 @@
 2026-09-21-019 · feature · Restyle the administrative surfaces to be continuous with makingminds.org (student first, then instructor) — Phase A · 2026-09-21T16:31:22-0700 · task/019-restyle-admin-surfaces · c35a427
 2026-09-21-021 · feature · Restyle the instructor views onto the page-surface design layer (019 Phase B) · 2026-09-21T20:56:28-0700 · task/021-restyle-instructor-surfaces · 060a3c8
 2026-09-21-022 · chore · Retire the bundled assignment mechanism (drop cc-basics) · 2026-09-21T21:46:28-0700 · task/022-retire-bundled-assignment · 6b33798
+2026-09-21-023 · feature · One page frame and a clear instructor navigation (Dashboard, tabs, role switch, Sandbox set apart) · 2026-09-21T21:59:30-0700 · task/023-instructor-navigation · 86f2761

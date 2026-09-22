@@ -60,7 +60,7 @@ export function AssignmentOverview() {
   };
 
   return (
-    <PageShell nav={appNav('assignments', user?.role === 'instructor')} session={<SessionControls />}>
+    <PageShell nav={appNav('student', user?.role === 'instructor' ? 'instructor' : 'student')} session={<SessionControls />}>
       <div className="mm-head">
         <a
           className="eyebrow"

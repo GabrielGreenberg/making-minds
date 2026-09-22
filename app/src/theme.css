@@ -81,8 +81,7 @@
   --mm-tracking-th: 0.08em;      /* th, .chip */
 
   /* ── Layout (site.css .page · section · .band) ── */
-  --mm-page-max: 1080px;         /* .page max-width */
-  --mm-page-max-wide: 1400px;    /* app-only: instructor tables need the room */
+  --mm-page-max: 1080px;         /* .page max-width — the ONE column, every route, every role */
   --mm-page-pad: clamp(16px, 4vw, 40px);  /* .page padding-inline */
   --mm-section-gap: 32px;        /* section margin-top */
   --mm-band: 14px;               /* .band height */
@@ -124,7 +123,6 @@
 }
 .mm-shell > main { flex: 1 0 auto; }
 .page { width: 100%; max-width: var(--mm-page-max); margin-inline: auto; padding-inline: var(--mm-page-pad); }
-.page--wide { max-width: var(--mm-page-max-wide); }
 main.page { padding-block: 30px 40px; }
 
 .topbar { background: var(--mm-surface); border-bottom: 1px solid var(--mm-line); flex-shrink: 0; }
@@ -139,13 +137,19 @@ main.page { padding-block: 30px 40px; }
   letter-spacing: var(--mm-tracking-eyebrow); text-transform: uppercase; color: var(--mm-accent);
 }
 .topbar nav { display: flex; flex-wrap: wrap; gap: 4px 20px; font-size: var(--mm-fs-nav); }
-.topbar nav a, .topbar nav button, .subbar nav a {
+.topbar nav a, .topbar nav button {
   color: var(--mm-ink-2); text-decoration: none; padding: 4px 0; background: none;
   border: 0; border-bottom: 2px solid transparent; font: inherit; cursor: pointer; white-space: nowrap;
 }
-.topbar nav a:hover, .topbar nav button:hover, .subbar nav a:hover { color: var(--mm-accent); }
-.topbar nav [aria-current="page"], .subbar nav [aria-current="page"] { color: var(--mm-ink); border-bottom-color: var(--mm-accent); font-weight: 600; }
+.topbar nav a:hover, .topbar nav button:hover { color: var(--mm-accent); }
+.topbar nav [aria-current="page"] { color: var(--mm-ink); border-bottom-color: var(--mm-accent); font-weight: 600; }
 .topbar .ext::after { content: " \2197"; color: var(--mm-ink-3); font-size: 12px; }
+/* The current item is bold; a hidden bold ghost (data-text) reserves each link's
+   width so the row never shifts when the current item changes. */
+.topbar nav a[data-text], .mm-tabs > .mm-tab[data-text] { display: inline-flex; flex-direction: column; align-items: flex-start; }
+.topbar nav a[data-text]::after, .mm-tabs > .mm-tab[data-text]::after {
+  content: attr(data-text); font-weight: 600; height: 0; overflow: hidden; visibility: hidden; pointer-events: none;
+}
 /* Session controls: name + quiet actions, pushed to the right edge. The
    direct-child selectors matter: a modal opened from here (Feedback, Password)
    is a DOM descendant of .session, and its buttons must keep their own look. */
@@ -155,9 +159,14 @@ main.page { padding-block: 30px 40px; }
   color: var(--mm-ink-2); background: none; border: 0; padding: 4px 0; font: inherit; cursor: pointer; text-decoration: none; white-space: nowrap;
 }
 .topbar .session > button:hover, .topbar .session > a:hover { color: var(--mm-accent); }
-/* Sub-navigation (the instructor's sections): a second white bar between the topbar and the band. */
-.subbar { background: var(--mm-surface); border-bottom: 1px solid var(--mm-line); flex-shrink: 0; }
-.subbar nav { display: flex; flex-wrap: wrap; gap: 4px 22px; font-size: var(--mm-fs-nav); padding-block: 6px; }
+/* Sandbox is not a page — it opens the editor — so it sits beside the nav as a
+   lavender box, visibly a different kind of thing. */
+.topbar .navbox {
+  margin-left: 6px; padding: 3px 10px; align-self: center;
+  background: var(--mm-lav-soft); border: 1px solid var(--mm-lav-line); color: var(--mm-ink);
+  font-size: var(--mm-fs-meta); font-weight: 600; letter-spacing: 0.02em; text-decoration: none; white-space: nowrap;
+}
+.topbar .navbox:hover { background: var(--mm-lav); border-color: var(--mm-lav); color: var(--mm-ink); }
 .band { height: var(--mm-band); background: var(--mm-lav); flex-shrink: 0; }
 footer.page {
   flex-shrink: 0; padding-block: 14px 40px; border-top: 1px solid var(--mm-line);
@@ -296,6 +305,7 @@ select.mm-input { width: auto; }
   .topbar .page { gap: 4px 14px; }
   .topbar nav { gap: 4px 14px; }
   .topbar .session { gap: 4px 12px; }
+  .mm-tabs { gap: 0 16px; }
   .mm-center { padding-block: 24px 32px; }
   .mm-card { padding: 22px 18px 24px; }
   .mm-row { flex-wrap: wrap; gap: 4px 12px; }
@@ -330,3 +340,18 @@ select.mm-input { width: auto; }
 .mm-segmented-btn:hover:not(:disabled) { color: var(--mm-accent); }
 .mm-segmented-btn:disabled { opacity: 0.45; cursor: default; }
 .mm-segmented-btn--active, .mm-segmented-btn--active:hover:not(:disabled) { background: var(--mm-accent); color: var(--mm-surface); }
+
+/* ═══════════════════════════════════ Tabs ═══════════════════════════════════
+   A section's own navigation INSIDE the page column — the Dashboard's tabs on
+   every instructor page, the remote login's panes. The shell never changes
+   for a section; the column does. An optional .eyebrow leads the row. */
+.mm-tabs { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0 20px; border-bottom: 1px solid var(--mm-line-2); margin-bottom: 24px; }
+.mm-tabs > .eyebrow { margin-right: 6px; }
+.mm-tabs > .mm-tab {
+  padding: 8px 0 9px; margin-bottom: -1px; font: inherit; font-size: var(--mm-fs-nav); font-weight: 500;
+  color: var(--mm-ink-2); background: none; border: 0; border-bottom: 2px solid transparent;
+  cursor: pointer; text-decoration: none; white-space: nowrap;
+}
+.mm-tabs > .mm-tab:hover { color: var(--mm-accent); }
+.mm-tabs > .mm-tab--active { color: var(--mm-ink); border-bottom-color: var(--mm-accent); font-weight: 600; }
+.mm-card .mm-tabs { margin-bottom: 16px; }

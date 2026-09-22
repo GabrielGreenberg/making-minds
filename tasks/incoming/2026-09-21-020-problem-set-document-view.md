@@ -9,7 +9,7 @@ area: app
 source: chat
 created: 2026-09-21T17:10:00-07:00
 status: ready
-after:
+after: 2026-09-21-023
 branch:
 merged_into:
 ---
@@ -43,7 +43,8 @@ session 2026-09-21; the PDFs were read during intake.
 
 ### What the app does
 `AssignmentOverview.tsx` maps `assignment.questions` to `<button>` rows (label, mode chip,
-`statementProse` clamped to 2 lines — `index.css:2240–2325`). Inside the editor the statement is
+`statementProse` clamped to 2 lines — since 019 the rows are `.overview-row` / `.overview-statement` in
+`app/src/pages.css:70–110`). Inside the editor the statement is
 `QuestionStatement` (`DataTable.tsx:17–36`) at 12px `#444` in the right panel. The HW JSON was
 transcribed to fit this: every statement was rewritten as self-contained prose ("Design a
 sequential circuit that computes +1 in binary: the input stream carries …" for what the PDF
@@ -128,12 +129,15 @@ that is missing.
   as context;
   (c) status marks live in the margin, never inside the problem text;
   (d) seeded homeworks carry an "Original PDF" link.
-- **Relationship to 019:** both edit `AssignmentOverview.tsx` and the overview CSS. Preferred
-  order: 019 Phase A (tokens + shell) → this. `/work` may also propose doing them as one
-  design push. **Relationship to 009:** figures restore HW4 P1–P2's diagrams; the worded
+- **Relationship to 019 / 021 / 023 (updated 2026-09-21 evening):** 019 Phase A and 021 (Phase B)
+  have LANDED — build on `app/src/theme.css` (`--mm-*` tokens: `--mm-font-serif`, `--mm-fs-h1..h3`,
+  `--mm-accent`, `--mm-lav-soft`, `--mm-line` …), `pages.css` (page surfaces; the overview at
+  :70–110), `components/PageShell.tsx`, and the `themeCheck` grep gate (no colour literals outside
+  `theme.css` — the document CSS must use tokens). 023 (one page frame + instructor nav) is in
+  progress and edits `AssignmentOverview.tsx`, hence `after: 023`. **Relationship to 009:** figures restore HW4 P1–P2's diagrams; the worded
   descriptions become captions/alt text, so 009's review shrinks to the transcription.
 - Pointers: `app/src/types.ts:166–216, 282–294` · `components/AssignmentOverview.tsx` (whole) ·
-  `index.css:2240–2325` (overview), `:2440–2462` (statement/title/hint) ·
+  `pages.css:70–110` (overview rows), `index.css:1225–1250` (`.question-statement`, title, hint) ·
   `components/DataTable.tsx:17–36` · `statementFormat.ts` (`Block`/`Inline`, `parseStatement`,
   `statementProse`) + `components/StatementBody.tsx` · `instructor/AssignmentEditor.tsx` (215
   lines) · `server/src/sanitize.ts:38–48` · `app/src/devData/homeworks/hw{1..7}.json` ·
