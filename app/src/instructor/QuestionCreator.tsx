@@ -1,4 +1,6 @@
 import { useState } from 'react';
+import type { Callout, Figure } from '../types';
+import { CalloutsEditor, FiguresEditor } from './DocumentEditors';
 import type {
   AssignmentData,
   AssignmentQuestion,
@@ -212,6 +214,9 @@ export function QuestionCreator({ assignment, existingQuestion, onSave, onCancel
   const [title, setTitle] = useState(existingQuestion?.title ?? '');
   // Optional nudge, rendered italic on its own line under the statement.
   const [hint, setHint] = useState(existingQuestion?.hint ?? '');
+  // The problem's own callout boxes and figures (the document level).
+  const [callouts, setCallouts] = useState<Callout[]>(existingQuestion?.callouts ?? []);
+  const [figures, setFigures] = useState<Figure[]>(existingQuestion?.figures ?? []);
 
   // ── Perception fields (CC/SC questions with task === 'perception') ──
   // Perception questions grade raw bit frames against a rule, not a formula
@@ -396,8 +401,9 @@ export function QuestionCreator({ assignment, existingQuestion, onSave, onCancel
         id: newId,
         label: label.trim(),
         ...(title.trim() ? { title: title.trim() } : {}),
-      ...(hint.trim() ? { hint: hint.trim() } : {}),
         ...(hint.trim() ? { hint: hint.trim() } : {}),
+        ...(callouts.length ? { callouts } : {}),
+        ...(figures.length ? { figures } : {}),
         statement: statement.trim(),
         buildMode: 'open',
         representation: 'binary',
@@ -414,8 +420,9 @@ export function QuestionCreator({ assignment, existingQuestion, onSave, onCancel
         id: newId,
         label: label.trim(),
         ...(title.trim() ? { title: title.trim() } : {}),
-      ...(hint.trim() ? { hint: hint.trim() } : {}),
         ...(hint.trim() ? { hint: hint.trim() } : {}),
+        ...(callouts.length ? { callouts } : {}),
+        ...(figures.length ? { figures } : {}),
         statement: statement.trim(),
         buildMode: 'turbot',
         representation: rep,
@@ -442,8 +449,9 @@ export function QuestionCreator({ assignment, existingQuestion, onSave, onCancel
         id: newId,
         label: label.trim(),
         ...(title.trim() ? { title: title.trim() } : {}),
-      ...(hint.trim() ? { hint: hint.trim() } : {}),
         ...(hint.trim() ? { hint: hint.trim() } : {}),
+        ...(callouts.length ? { callouts } : {}),
+        ...(figures.length ? { figures } : {}),
         statement: statement.trim(),
         buildMode: mode,
         representation: 'binary',
@@ -474,6 +482,8 @@ export function QuestionCreator({ assignment, existingQuestion, onSave, onCancel
       label: label.trim(),
       ...(title.trim() ? { title: title.trim() } : {}),
       ...(hint.trim() ? { hint: hint.trim() } : {}),
+      ...(callouts.length ? { callouts } : {}),
+      ...(figures.length ? { figures } : {}),
       statement: statement.trim(),
       buildMode: mode,
       representation: rep,
@@ -1005,6 +1015,8 @@ export function QuestionCreator({ assignment, existingQuestion, onSave, onCancel
             onChange={(e) => setHint(e.target.value)}
           />
         </label>
+        <CalloutsEditor label="Callout boxes for this problem" callouts={callouts} onChange={setCallouts} />
+        <FiguresEditor label="Figures for this problem" figures={figures} onChange={setFigures} />
         {statement.trim() && (
           <div className="instructor-statement-preview">
             <div className="mm-label">Preview</div>

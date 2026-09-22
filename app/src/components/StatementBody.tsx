@@ -6,7 +6,7 @@
 
 import { useMemo, type ReactNode } from 'react';
 import katex from 'katex';
-import { parseStatement, type Block, type Inline, type ListItem } from '../statementFormat';
+import { parseInline, parseStatement, type Block, type Inline, type ListItem } from '../statementFormat';
 
 /** KaTeX renders to an HTML string. It is called in throwOnError:false mode,
  *  so malformed TeX shows in red rather than blanking the statement — an
@@ -17,6 +17,12 @@ function mathHtml(tex: string, display: boolean): string {
     throwOnError: false,
     output: 'html',
   });
+}
+
+/** One line of inline markup (a problem title, a caption) — no blocks. */
+export function InlineMarkup({ text }: { text: string }) {
+  const nodes = useMemo(() => parseInline(text), [text]);
+  return <InlineNodes nodes={nodes} />;
 }
 
 function InlineNodes({ nodes }: { nodes: Inline[] }) {
@@ -112,6 +118,7 @@ function BlockNode({ block, lead }: { block: Block; lead?: ReactNode }) {
   return (
     <p className="statement-para">
       {lead}
+      {lead !== undefined && ' '}
       <InlineNodes nodes={block.content} />
     </p>
   );

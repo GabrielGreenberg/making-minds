@@ -156,6 +156,44 @@ const resave = await api('PUT', `/assignments/${SAMPLE_ASSIGNMENT_ID}`, {
 });
 check('instructor can save assignments', resave.status === 200);
 
+// The problem-set document (task 020): preamble, sections, sourcePdf and a
+// question's callouts/figures are display data that must round-trip through
+// the server and reach the student copy intact — only the three answer-key
+// fields are stripped.
+const firstQ = iAsg.json.assignment.questions[0];
+const documented: AssignmentData = {
+  ...iAsg.json.assignment,
+  preamble: '**Note:** key words are in bold.',
+  sourcePdf: 'problem-sets/sample.pdf',
+  sections: [
+    {
+      heading: 'I. Everything',
+      intro: 'Design the following:',
+      questionIds: iAsg.json.assignment.questions.map((q) => q.id),
+      callouts: [{ kind: 'hint', body: 'think in tables', placement: 'after' }],
+      figures: [{ src: 'data:image/svg+xml;base64,PHN2Zy8+', alt: 'a figure', placement: 'aside' }],
+    },
+  ],
+  questions: iAsg.json.assignment.questions.map((q) =>
+    q.id === firstQ.id ? { ...q, callouts: [{ kind: 'caution', body: 'no OR gates', placement: 'aside' }] } : q,
+  ),
+};
+const saveDoc = await api('PUT', `/assignments/${SAMPLE_ASSIGNMENT_ID}`, { token: iTok, body: documented });
+const sDoc = await api<{ assignment: AssignmentData }>('GET', `/assignments/${SAMPLE_ASSIGNMENT_ID}`, { token: sTok });
+check(
+  'the document fields (preamble, sections, sourcePdf, callouts, figures) reach the student copy intact',
+  saveDoc.status === 200 &&
+    sDoc.status === 200 &&
+    sDoc.json.assignment.preamble === documented.preamble &&
+    sDoc.json.assignment.sourcePdf === documented.sourcePdf &&
+    JSON.stringify(sDoc.json.assignment.sections) === JSON.stringify(documented.sections) &&
+    JSON.stringify(sDoc.json.assignment.questions.find((q) => q.id === firstQ.id)?.callouts) ===
+      JSON.stringify([{ kind: 'caution', body: 'no OR gates', placement: 'aside' }]) &&
+    sDoc.json.assignment.questions.every((q) => (q.test_cases ?? []).length === 0),
+);
+// Put the sample back as it was for the pins that follow.
+await api('PUT', `/assignments/${SAMPLE_ASSIGNMENT_ID}`, { token: iTok, body: iAsg.json.assignment });
+
 // ── workbook round-trip ──────────────────────────────────────────
 const wbState = {
   currentQuestionIndex: 2,

@@ -114,10 +114,12 @@
 .ps-run--columns .ps-problem { break-inside: avoid; }
 .ps-run--grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-  gap: 8px 28px;
+  grid-template-columns: repeat(auto-fill, minmax(205px, 1fr));
+  gap: 8px 20px;
   align-items: start;
 }
+/* A grid cell has no room for the mode tag; the section says what these are. */
+.ps-run--grid .ps-mode { display: none; }
 
 /* One problem: a hanging number in the gutter, the body beside it. The block
    opens the canvas; hover says so without a button. */
@@ -182,7 +184,7 @@
 @media (max-width: 720px) {
   .ps-section-body--aside { grid-template-columns: minmax(0, 1fr); }
   .ps-run--columns { columns: 1; }
-  .ps-run--grid { grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); }
+  .ps-run--grid { grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); }
 }
 
 /* ── Rendered statement markup (components/StatementBody.tsx) ─────────
@@ -488,6 +490,28 @@
 .instructor-detail-table { border-collapse: collapse; margin-top: 6px; font-size: 12px; }
 .instructor-detail-table th, .instructor-detail-table td { border: 1px solid var(--mm-line); padding: 3px 10px; text-align: center; }
 
+
+/* ── Instructor: document editing (DocumentEditors.tsx; sections and the
+   preview in AssignmentEditor.tsx) ── */
+.doc-editor { margin: 12px 0 0; padding-top: 8px; border-top: 1px dashed var(--mm-line); }
+.doc-editor-head { display: flex; align-items: center; gap: 10px; }
+.doc-editor-row { margin-top: 8px; padding: 10px 12px; background: var(--mm-surface-2); }
+.doc-editor-row--figure { display: flex; gap: 12px; align-items: flex-start; }
+.doc-editor-thumb { width: 96px; max-height: 96px; object-fit: contain; flex-shrink: 0; background: var(--mm-surface); border: 1px solid var(--mm-line); }
+.doc-editor-fields { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 6px; }
+.doc-editor-inline { display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: center; }
+.doc-editor-grow { flex: 1 1 220px; }
+.doc-editor-grow .mm-input { flex: 1; width: auto; }
+.doc-editor-body { width: 100%; max-width: none; margin-top: 6px; }
+.instructor-section-card { margin-top: 10px; padding: 12px 14px; border: 1px solid var(--mm-line-2); background: var(--mm-surface); }
+.instructor-section-top { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: flex-end; }
+.instructor-section-top .mm-field--grow { flex: 1 1 260px; }
+.instructor-section-card .mm-input--area { max-width: none; width: 100%; }
+.instructor-section-actions { display: flex; gap: 6px; }
+.instructor-question-section { margin-left: auto; }
+.instructor-doc-preview { margin-top: 28px; padding-top: 12px; border-top: 1px solid var(--mm-line-2); }
+.instructor-doc-preview > summary { cursor: pointer; font-weight: 600; color: var(--mm-ink-2); }
+.instructor-doc-preview .ps { margin-top: 12px; }
 
 /* ── Instructor: roster & accounts ── */
 .roster-section {

@@ -145,6 +145,8 @@ export function problemRuns(section: ResolvedSection): ProblemRun[] {
     if (last && last.flow === flow) last.problems.push(p);
     else runs.push({ flow, problems: [p] });
   }
+  // A lone one-liner between longer problems is not a column: stack it.
+  for (const run of runs) if (run.flow === 'columns' && run.problems.length === 1) run.flow = 'stack';
   return runs;
 }
 

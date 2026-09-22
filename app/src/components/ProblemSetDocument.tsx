@@ -28,7 +28,8 @@ import {
 } from '../problemSet';
 import { navigate, type Route } from '../routing';
 import { hashLink } from './PageShell';
-import { StatementBody } from './StatementBody';
+import { InlineMarkup, StatementBody } from './StatementBody';
+import { parseStatement } from '../statementFormat';
 import { ArenaCanvas } from './ArenaCanvas';
 
 /** What the margin shows beside a problem: the student's own "done" tick and,
@@ -54,15 +55,17 @@ function FigureView({ figure }: { figure: Figure }) {
   );
 }
 
-function CalloutView({ callout }: { callout: Callout }) {
-  const title = callout.title ?? DEFAULT_CALLOUT_TITLE[callout.kind];
+/** `note` = a problem's margin note: no default heading, the kind shows only
+ *  as its colour, as the PDFs' "<<" notes beside a table. */
+function CalloutView({ callout, note = false }: { callout: Callout; note?: boolean }) {
+  const title = callout.title ?? (note ? '' : DEFAULT_CALLOUT_TITLE[callout.kind]);
   const block = calloutTitleIsBlock(callout);
   return (
     <div className={`ps-callout ps-callout--${callout.kind}`}>
       {block && title && <div className="ps-callout-title">{title}</div>}
       <StatementBody
         text={callout.body}
-        lead={!block && title ? <strong className="ps-callout-lead">{title} </strong> : undefined}
+        lead={!block && title ? <strong className="ps-callout-lead">{title}</strong> : undefined}
       />
       {(callout.figures ?? []).map((f, i) => <FigureView key={i} figure={f} />)}
     </div>
@@ -70,13 +73,13 @@ function CalloutView({ callout }: { callout: Callout }) {
 }
 
 /** The callouts and figures of one owner at one placement, callouts first. */
-function Attachments({ callouts, figures, where }: { callouts: Callout[]; figures: Figure[]; where: Placement }) {
+function Attachments({ callouts, figures, where, note = false }: { callouts: Callout[]; figures: Figure[]; where: Placement; note?: boolean }) {
   const cs = callouts.filter((c) => placementOf(c) === where);
   const fs = figures.filter((f) => placementOf(f) === where);
   if (cs.length === 0 && fs.length === 0) return null;
   return (
     <div className={`ps-attachments ps-attachments--${where}`}>
-      {cs.map((c, i) => <CalloutView key={`c${i}`} callout={c} />)}
+      {cs.map((c, i) => <CalloutView key={`c${i}`} callout={c} note={note} />)}
       {fs.map((f, i) => <FigureView key={`f${i}`} figure={f} />)}
     </div>
   );
@@ -96,15 +99,20 @@ export function ProblemBody({ question, showArena = true }: { question: Assignme
   const callouts = question.callouts ?? [];
   const figures = question.figures ?? [];
   const arena = showArena && question.buildMode === 'turbot' ? question.turbot_cases?.[0]?.arena : undefined;
-  const hasText = question.statement.trim().length > 0;
   const title = question.title?.trim();
+  // The PDFs' run-in idiom: "**Edge detector.** Design a machine …" — the
+  // period only when text follows on the same line.
+  const first = parseStatement(question.statement)[0];
+  const runsIn = first !== undefined && first.kind === 'para' && !first.part;
   const lead: ReactNode = title ? (
-    <strong className="ps-title">{title}{hasText && !/[.!?:]$/.test(title) ? '.' : ''}</strong>
+    <strong className="ps-title"><InlineMarkup text={title} />{runsIn && !/[.!?:]$/.test(title) ? '.' : ''}</strong>
   ) : undefined;
   return (
     <div className="ps-body">
       <Attachments callouts={callouts} figures={figures} where="before" />
       <StatementBody text={question.statement} lead={lead} />
+      {/* A problem has no margin of its own: its asides follow it as notes. */}
+      <Attachments callouts={callouts} figures={figures} where="aside" note />
       {question.hint && <div className="ps-hint"><StatementBody text={question.hint} /></div>}
       {arena && (
         <div className="ps-arena">
@@ -117,8 +125,6 @@ export function ProblemBody({ question, showArena = true }: { question: Assignme
         </div>
       )}
       <Attachments callouts={callouts} figures={figures} where="after" />
-      {/* A problem has no margin of its own: its asides follow it as notes. */}
-      <Attachments callouts={callouts} figures={figures} where="aside" />
     </div>
   );
 }
@@ -164,29 +170,40 @@ function StatusMarks({ status }: { status: ProblemStatus | undefined }) {
   );
 }
 
+/** Where a problem opens: a route (the student's canvas) or a callback (the
+ *  instructor's editor, which opens the creator instead of navigating). */
+export type ProblemTarget =
+  | { route: (index: number) => Route; onOpen?: undefined }
+  | { onOpen: (index: number) => void; route?: undefined };
+
 function ProblemView({
   problem,
-  route,
+  target,
   status,
 }: {
   problem: ResolvedProblem;
-  route: (index: number) => Route;
+  target: ProblemTarget;
   status?: (q: AssignmentQuestion) => ProblemStatus;
 }) {
-  const target = route(problem.index);
-  const link = hashLink(target);
-  // The whole block opens the canvas (the PDF idiom has no button); a click
+  const route = target.route?.(problem.index);
+  const link = route ? hashLink(route) : undefined;
+  const open = () => (route ? navigate(route) : target.onOpen?.(problem.index));
+  // The whole block opens the problem (the PDF idiom has no button); a click
   // that lands on a real link, or carries a modifier, is left to the browser.
   const onClick = (e: MouseEvent<HTMLDivElement>) => {
-    if ((e.target as HTMLElement).closest('a')) return;
+    if ((e.target as HTMLElement).closest('a, button')) return;
     if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button !== 0) return;
     if (window.getSelection()?.toString()) return;
-    navigate(target);
+    open();
   };
   return (
     <div className={`ps-problem ps-problem--${problem.shape}`} onClick={onClick}>
       <div className="ps-gutter">
-        <a className="ps-num" {...link} aria-label={problem.question.label}>{problem.number}.</a>
+        {link ? (
+          <a className="ps-num" {...link} aria-label={problem.question.label}>{problem.number}.</a>
+        ) : (
+          <button type="button" className="ps-num" aria-label={problem.question.label} onClick={open}>{problem.number}.</button>
+        )}
         <StatusMarks status={status?.(problem.question)} />
       </div>
       <div className="ps-problem-main">
@@ -199,11 +216,11 @@ function ProblemView({
 
 function SectionView({
   section,
-  route,
+  target,
   status,
 }: {
   section: ResolvedSection;
-  route: (index: number) => Route;
+  target: ProblemTarget;
   status?: (q: AssignmentQuestion) => ProblemStatus;
 }) {
   const asideCallouts = section.callouts.filter((c) => placementOf(c) === 'aside');
@@ -219,7 +236,7 @@ function SectionView({
           {problemRuns(section).map((run, i) => (
             <div key={i} className={`ps-run ps-run--${run.flow}`}>
               {run.problems.map((p) => (
-                <ProblemView key={p.question.id} problem={p} route={route} status={status} />
+                <ProblemView key={p.question.id} problem={p} target={target} status={status} />
               ))}
             </div>
           ))}
@@ -238,23 +255,22 @@ function SectionView({
 
 /**
  * The whole document below the page head: preamble, then every section.
- * `route(index)` says where a problem opens (its canvas); `status(q)` what
- * its margin shows.
+ * `route(index)` says where a problem opens (its canvas) — or `onOpen(index)`
+ * for a host that opens it itself; `status(q)` is what its margin shows.
  */
 export function ProblemSetDocument({
   assignment,
-  route,
   status,
+  ...target
 }: {
   assignment: AssignmentData;
-  route: (index: number) => Route;
   status?: (q: AssignmentQuestion) => ProblemStatus;
-}) {
+} & ProblemTarget) {
   const sections = documentSections(assignment);
   return (
     <article className="ps">
       {assignment.preamble && <div className="ps-preamble"><StatementBody text={assignment.preamble} /></div>}
-      {sections.map((s, i) => <SectionView key={i} section={s} route={route} status={status} />)}
+      {sections.map((s, i) => <SectionView key={i} section={s} target={target} status={status} />)}
       {assignment.questions.length === 0 && <p className="mm-empty">This assignment has no questions yet.</p>}
     </article>
   );
