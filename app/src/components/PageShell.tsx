@@ -51,14 +51,35 @@ function onNavClick(route: Route) {
  * `variant="card"` centres one `.mm-card` on the page field (login, health);
  * `width="wide"` widens the column for the instructor's tables.
  */
+function NavLinks({ items }: { items: ShellNavItem[] }) {
+  return (
+    <>
+      {items.map((item) => (
+        <a
+          key={item.label}
+          href={routeToHash(item.route)}
+          onClick={onNavClick(item.route)}
+          aria-current={item.current ? 'page' : undefined}
+        >
+          {item.label}
+        </a>
+      ))}
+    </>
+  );
+}
+
 export function PageShell({
   nav = [],
+  subnav = [],
   session,
   variant = 'page',
   width = 'default',
   children,
 }: {
   nav?: ShellNavItem[];
+  /** A section's own navigation (the instructor's Dashboard · Roster · Feedback · Notes):
+   *  a second bar under the topbar, same link idiom. */
+  subnav?: ShellNavItem[];
   session?: ReactNode;
   variant?: 'page' | 'card';
   width?: 'default' | 'wide';
@@ -74,21 +95,19 @@ export function PageShell({
           </a>
           {nav.length > 0 && (
             <nav aria-label="App">
-              {nav.map((item) => (
-                <a
-                  key={item.label}
-                  href={routeToHash(item.route)}
-                  onClick={onNavClick(item.route)}
-                  aria-current={item.current ? 'page' : undefined}
-                >
-                  {item.label}
-                </a>
-              ))}
+              <NavLinks items={nav} />
             </nav>
           )}
           {session}
         </div>
       </header>
+      {subnav.length > 0 && (
+        <div className="subbar">
+          <nav className={pageClass} aria-label="Section">
+            <NavLinks items={subnav} />
+          </nav>
+        </div>
+      )}
       <div className="band" />
       <main className={variant === 'card' ? `${pageClass} mm-center` : pageClass}>{children}</main>
       <footer className="page">

@@ -51,12 +51,12 @@ export function AssignmentEditor({ id }: { id: string }) {
 
   if (!assignment) {
     if (loading) {
-      return <p className="instructor-empty">Loading…</p>;
+      return <p className="mm-empty">Loading…</p>;
     }
     return (
       <div className="instructor-error">
         <p>Assignment not found.</p>
-        <button className="instructor-btn" onClick={() => navigate({ kind: 'instructor' })}>
+        <button className="mm-btn" onClick={() => navigate({ kind: 'instructor' })}>
           Back to dashboard
         </button>
       </div>
@@ -69,7 +69,7 @@ export function AssignmentEditor({ id }: { id: string }) {
         <p>
           <strong>{assignment.title}</strong> is a bundled assignment and cannot be edited.
         </p>
-        <button className="instructor-btn" onClick={() => navigate({ kind: 'instructor' })}>
+        <button className="mm-btn" onClick={() => navigate({ kind: 'instructor' })}>
           Back to dashboard
         </button>
       </div>
@@ -123,42 +123,48 @@ export function AssignmentEditor({ id }: { id: string }) {
 
   return (
     <div className="instructor-editor">
-      <div className="instructor-page-head">
-        <button className="instructor-link" onClick={() => navigate({ kind: 'instructor' })}>
-          ← Dashboard
-        </button>
-        <button
-          className="instructor-btn"
-          onClick={() => downloadJson(`assignment-${id}.json`, assignment)}
-        >
+      <div className="mm-head mm-head--row">
+        <div>
+          <a
+            className="eyebrow"
+            href="#/instructor"
+            onClick={(e) => { e.preventDefault(); navigate({ kind: 'instructor' }); }}
+          >
+            ← Dashboard
+          </a>
+          <h1>{assignment.title}</h1>
+        </div>
+        <button className="mm-btn" onClick={() => downloadJson(`assignment-${id}.json`, assignment)}>
           Export Assignment JSON
         </button>
       </div>
 
-      <label className="instructor-field">
-        <span className="instructor-field-label">Title</span>
+      <div className="mm-form mm-form--inline">
+      <label className="mm-field">
+        <span className="mm-label">Title</span>
         <input
-          className="instructor-input instructor-title-input"
+          className="mm-input mm-input--title"
           defaultValue={assignment.title}
           onBlur={(e) => handleTitleBlur(e.target.value)}
         />
       </label>
 
-      <label className="instructor-field">
-        <span className="instructor-field-label">Due date</span>
+      <label className="mm-field">
+        <span className="mm-label">Due date</span>
         <input
-          className="instructor-input"
+          className="mm-input"
           type="datetime-local"
           key={assignment.dueDate ?? 'no-due-date'}
           defaultValue={assignment.dueDate ? toLocalInputValue(assignment.dueDate) : ''}
           onBlur={(e) => handleDueDateBlur(e.target.value)}
         />
       </label>
+      </div>
 
-      <div className="instructor-section-head">
-        <h3 className="instructor-section-title">Questions</h3>
+      <div className="mm-section-head">
+        <h2>Questions</h2>
         <button
-          className="instructor-btn instructor-btn--primary"
+          className="mm-btn mm-btn--primary"
           onClick={() => setCreator({})}
         >
           Add Question
@@ -166,7 +172,7 @@ export function AssignmentEditor({ id }: { id: string }) {
       </div>
 
       {assignment.questions.length === 0 ? (
-        <p className="instructor-empty">No questions yet. Add one to build the assignment.</p>
+        <p className="mm-empty">No questions yet. Add one to build the assignment.</p>
       ) : (
         <ol className="instructor-question-list">
           {drag.items.map((q, i) => {
@@ -188,18 +194,18 @@ export function AssignmentEditor({ id }: { id: string }) {
                   ⠿
                 </span>
                 <span className="instructor-question-label">{q.label}</span>
-                <span className="instructor-badge instructor-badge--mode">{questionModeLabel(q)}</span>
+                <span className="tag tag--accent">{questionModeLabel(q)}</span>
                 <span className="instructor-question-summary">{summarizeQuestion(q)}</span>
               </div>
               <div className="instructor-question-actions">
                 <button
-                  className="instructor-btn"
+                  className="mm-btn"
                   onClick={() => setCreator({ existing: q })}
                 >
                   Edit
                 </button>
                 <button
-                  className="instructor-btn instructor-btn--danger"
+                  className="mm-btn mm-btn--danger"
                   onClick={() => deleteQuestion(q)}
                 >
                   Delete

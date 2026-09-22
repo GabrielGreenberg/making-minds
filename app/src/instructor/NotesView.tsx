@@ -71,10 +71,10 @@ export function NotesView() {
 
   return (
     <div className="instructor-dashboard">
-      <div className="instructor-page-head">
-        <h2 className="instructor-page-title">Notes</h2>
-        <div className="instructor-head-actions">
-          <button className="instructor-btn instructor-btn--primary" disabled={saving} onClick={() => void save()}>
+      <div className="mm-head mm-head--row">
+        <h1>Notes</h1>
+        <div className="mm-actions">
+          <button className="mm-btn mm-btn--primary" disabled={saving} onClick={() => void save()}>
             {saving ? 'Saving…' : 'Save'}
           </button>
         </div>

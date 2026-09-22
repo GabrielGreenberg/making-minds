@@ -71,14 +71,14 @@ export function GradebookView({ id }: { id: string }) {
   };
 
   if (!data) {
-    return <p className="instructor-empty">{loading ? 'Loading…' : 'Failed to load submissions.'}</p>;
+    return <p className="mm-empty">{loading ? 'Loading…' : 'Failed to load submissions.'}</p>;
   }
   const { assignment, records } = data;
   if (!assignment) {
     return (
       <div className="instructor-error">
         <p>Assignment not found.</p>
-        <button className="instructor-btn" onClick={() => navigate({ kind: 'instructor' })}>
+        <button className="mm-btn" onClick={() => navigate({ kind: 'instructor' })}>
           Back to dashboard
         </button>
       </div>
@@ -105,17 +105,24 @@ export function GradebookView({ id }: { id: string }) {
 
   return (
     <div className="instructor-gradebook">
-      <div className="instructor-page-head">
-        <button className="instructor-link" onClick={() => navigate({ kind: 'instructor' })}>
-          ← Dashboard
-        </button>
-        <h3 className="instructor-section-title">{assignment.title} — Submissions</h3>
+      <div className="mm-head mm-head--row">
+        <div>
+          <a
+            className="eyebrow"
+            href="#/instructor"
+            onClick={(e) => { e.preventDefault(); navigate({ kind: 'instructor' }); }}
+          >
+            ← Dashboard
+          </a>
+          <h1>{assignment.title}</h1>
+          <p className="mm-lede">Submissions — each student's latest attempt is the one that counts.</p>
+        </div>
         <span
           className="instructor-release"
           title="Students see no grades for this assignment until you release them."
         >
           {released ? 'Grades released to students' : 'Grades hidden from students'}
-          <button className="instructor-btn" onClick={() => void toggleRelease()}>
+          <button className="mm-btn" onClick={() => void toggleRelease()}>
             {released ? 'Hide grades' : 'Release grades'}
           </button>
         </span>
@@ -164,10 +171,10 @@ export function GradebookView({ id }: { id: string }) {
       </div>
 
       {records.length === 0 ? (
-        <p className="instructor-empty">No submissions yet.</p>
+        <p className="mm-empty">No submissions yet.</p>
       ) : (
         <div className="instructor-table-scroll">
-          <table className="instructor-table instructor-table--score-sticky">
+          <table className="mm-table instructor-table--score-sticky">
             <thead>
               <tr>
                 <th>Student</th>
@@ -265,7 +272,7 @@ function StudentRow({
         <tr className="instructor-submission-detail">
           <td colSpan={colSpan}>
             <div className="instructor-table-scroll">
-              <table className="instructor-table instructor-attempt-table instructor-table--score-sticky">
+              <table className="mm-table instructor-attempt-table instructor-table--score-sticky">
                 <thead>
                   <tr>
                     <th>Attempt</th>
@@ -589,10 +596,10 @@ function ManualReviewControls({
           value={note}
           onChange={(e) => setNote(e.target.value)}
         />
-        <button className="instructor-btn instructor-review-btn" onClick={() => void save(true)}>
+        <button className="mm-btn instructor-review-btn" onClick={() => void save(true)}>
           ✓ Correct
         </button>
-        <button className="instructor-btn instructor-review-btn" onClick={() => void save(false)}>
+        <button className="mm-btn instructor-review-btn" onClick={() => void save(false)}>
           ✗ Incorrect
         </button>
       </div>

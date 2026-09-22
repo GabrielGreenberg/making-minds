@@ -139,12 +139,12 @@ main.page { padding-block: 30px 40px; }
   letter-spacing: var(--mm-tracking-eyebrow); text-transform: uppercase; color: var(--mm-accent);
 }
 .topbar nav { display: flex; flex-wrap: wrap; gap: 4px 20px; font-size: var(--mm-fs-nav); }
-.topbar nav a, .topbar nav button {
+.topbar nav a, .topbar nav button, .subbar nav a {
   color: var(--mm-ink-2); text-decoration: none; padding: 4px 0; background: none;
   border: 0; border-bottom: 2px solid transparent; font: inherit; cursor: pointer; white-space: nowrap;
 }
-.topbar nav a:hover, .topbar nav button:hover { color: var(--mm-accent); }
-.topbar nav [aria-current="page"] { color: var(--mm-ink); border-bottom-color: var(--mm-accent); font-weight: 600; }
+.topbar nav a:hover, .topbar nav button:hover, .subbar nav a:hover { color: var(--mm-accent); }
+.topbar nav [aria-current="page"], .subbar nav [aria-current="page"] { color: var(--mm-ink); border-bottom-color: var(--mm-accent); font-weight: 600; }
 .topbar .ext::after { content: " \2197"; color: var(--mm-ink-3); font-size: 12px; }
 /* Session controls: name + quiet actions, pushed to the right edge. The
    direct-child selectors matter: a modal opened from here (Feedback, Password)
@@ -155,6 +155,9 @@ main.page { padding-block: 30px 40px; }
   color: var(--mm-ink-2); background: none; border: 0; padding: 4px 0; font: inherit; cursor: pointer; text-decoration: none; white-space: nowrap;
 }
 .topbar .session > button:hover, .topbar .session > a:hover { color: var(--mm-accent); }
+/* Sub-navigation (the instructor's sections): a second white bar between the topbar and the band. */
+.subbar { background: var(--mm-surface); border-bottom: 1px solid var(--mm-line); flex-shrink: 0; }
+.subbar nav { display: flex; flex-wrap: wrap; gap: 4px 22px; font-size: var(--mm-fs-nav); padding-block: 6px; }
 .band { height: var(--mm-band); background: var(--mm-lav); flex-shrink: 0; }
 footer.page {
   flex-shrink: 0; padding-block: 14px 40px; border-top: 1px solid var(--mm-line);
@@ -299,3 +302,31 @@ select.mm-input { width: auto; }
   .mm-modal { padding: 18px 16px 20px; }
   .mm-modal-backdrop { padding: 12px; }
 }
+
+/* ═══════════════════ Page heads, sections, forms (instructor views) ═══════════════════ */
+.mm-head--row { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 10px 20px; }
+.mm-head--row > h1, .mm-head--row > div { flex: 1 1 auto; min-width: 0; }
+.mm-head--row > .mm-actions { flex: 0 1 auto; }
+.mm-section-head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 8px 16px; margin: 26px 0 10px; }
+.mm-section-head > h2, .mm-section-head > h3 { margin: 0; }
+.mm-form--inline { display: flex; flex-wrap: wrap; gap: 12px 24px; margin: 18px 0; }
+.mm-form--inline > .mm-field { flex: 1 1 240px; }
+.mm-inline-field { display: inline-flex; align-items: center; gap: 6px; font-size: var(--mm-fs-small); color: var(--mm-ink-2); }
+.mm-inline-field .mm-input { width: auto; }
+.mm-input--num { width: 64px; }
+.mm-input--name { width: 100px; }
+.mm-input--formula { width: 260px; font-family: var(--mm-font-mono); }
+.mm-input--title { max-width: 480px; font-size: 16px; }
+.mm-input--area { max-width: 640px; resize: vertical; line-height: 1.5; }
+.mm-hint { font-style: italic; margin: 0 0 10px; }
+.mm-btn--icon { padding: 4px 8px; min-width: 28px; }
+/* Segmented control: one choice among a few (mode, representation, arena tool). */
+.mm-segmented { display: inline-flex; border: 1px solid var(--mm-line-2); background: var(--mm-surface); }
+.mm-segmented-btn {
+  border: 0; background: var(--mm-surface); padding: 5px 11px; font: inherit; font-size: var(--mm-fs-meta); font-weight: 500;
+  color: var(--mm-ink-2); cursor: pointer; white-space: nowrap;
+}
+.mm-segmented-btn + .mm-segmented-btn { border-left: 1px solid var(--mm-line-2); }
+.mm-segmented-btn:hover:not(:disabled) { color: var(--mm-accent); }
+.mm-segmented-btn:disabled { opacity: 0.45; cursor: default; }
+.mm-segmented-btn--active, .mm-segmented-btn--active:hover:not(:disabled) { background: var(--mm-accent); color: var(--mm-surface); }

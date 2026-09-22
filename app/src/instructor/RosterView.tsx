@@ -22,8 +22,8 @@ export function RosterView() {
   if (backendMode !== 'remote') {
     return (
       <div className="instructor-dashboard">
-        <h2 className="instructor-page-title">Roster</h2>
-        <p className="instructor-empty">
+        <h1>Roster</h1>
+        <p className="mm-empty">
           The roster lives on the server. This build runs in local mode, where the two demo
           accounts are built in — there is nothing to manage here.
         </p>
@@ -73,11 +73,11 @@ function RemoteRosterView() {
 
   return (
     <div className="instructor-dashboard">
-      <div className="instructor-page-head">
-        <h2 className="instructor-page-title">Roster &amp; accounts</h2>
-        <div className="instructor-head-actions">
+      <div className="mm-head mm-head--row">
+        <h1>Roster &amp; accounts</h1>
+        <div className="mm-actions">
           <input
-            className="roster-filter"
+            className="mm-input roster-filter"
             placeholder="Filter by name, email, ID"
             value={filter}
             onChange={(e) => setFilter(e.target.value)}
@@ -94,18 +94,18 @@ function RemoteRosterView() {
       )}
 
       <section className="roster-section">
-        <h2 className="instructor-section-title">
+        <h2>
           {roster ? `${roster.length} on the roster · ${registered} have created an account` : 'Roster'}
         </h2>
-        {loading && !roster && <p className="instructor-empty">Loading…</p>}
-        {error && <p className="instructor-empty">Could not load the roster.</p>}
+        {loading && !roster && <p className="mm-empty">Loading…</p>}
+        {error && <p className="mm-empty">Could not load the roster.</p>}
         {roster && rows.length === 0 && (
-          <p className="instructor-empty">
+          <p className="mm-empty">
             {roster.length === 0 ? 'Nobody on the roster yet — import the class CSV above.' : 'No matches.'}
           </p>
         )}
         {rows.length > 0 && (
-          <table className="instructor-table roster-table">
+          <table className="mm-table roster-table">
             <thead>
               <tr>
                 <th>Name</th>
@@ -153,7 +153,7 @@ function RosterRow({
       <td className="roster-actions">
         {row.registered && (
           <button
-            className="instructor-btn"
+            className="mm-btn"
             disabled={busy}
             onClick={() =>
               confirm(
@@ -171,7 +171,7 @@ function RosterRow({
           </button>
         )}
         <button
-          className="instructor-btn"
+          className="mm-btn"
           disabled={busy}
           onClick={() =>
             confirm(
@@ -219,8 +219,8 @@ function ImportPanel({
 
   return (
     <section className="roster-section">
-      <h2 className="instructor-section-title">Import a roster CSV</h2>
-      <p className="instructor-hint">
+      <h2>Import a roster CSV</h2>
+      <p className="mm-note mm-hint">
         Any export with an email column works — name, student ID and role are picked up when
         present. Importing only adds and updates: nobody is removed, and nobody's password is
         touched, so a mid-quarter re-import is safe.
@@ -243,7 +243,7 @@ function ImportPanel({
         onChange={(e) => setCsv(e.target.value)}
         disabled={busy}
       />
-      <button className="instructor-btn instructor-btn--primary" disabled={busy || csv.trim() === ''} onClick={submit}>
+      <button className="mm-btn mm-btn--primary" disabled={busy || csv.trim() === ''} onClick={submit}>
         Import
       </button>
       {report && (
@@ -279,14 +279,14 @@ function AccessRequestsPanel({
 }) {
   return (
     <section className="roster-section">
-      <h2 className="instructor-section-title">
+      <h2>
         Access requests ({requests.length} waiting)
       </h2>
-      <p className="instructor-hint">
+      <p className="mm-note mm-hint">
         People who asked to be added under an email the roster doesn't have. Approving adds them —
         they then create their account the same way everyone else does.
       </p>
-      <table className="instructor-table roster-table">
+      <table className="mm-table roster-table">
         <thead>
           <tr>
             <th>Name</th>
@@ -305,7 +305,7 @@ function AccessRequestsPanel({
               <td className="roster-message">{req.message || '—'}</td>
               <td className="roster-actions">
                 <button
-                  className="instructor-btn"
+                  className="mm-btn"
                   disabled={busy}
                   onClick={() =>
                     onAction(async () => {
@@ -317,7 +317,7 @@ function AccessRequestsPanel({
                   Approve
                 </button>
                 <button
-                  className="instructor-btn"
+                  className="mm-btn"
                   disabled={busy}
                   onClick={() =>
                     onAction(async () => {
@@ -366,7 +366,7 @@ function AddPersonPanel({
 
   return (
     <section className="roster-section">
-      <h2 className="instructor-section-title">Add one person</h2>
+      <h2>Add one person</h2>
       <div className="roster-add">
         <input
           className="mm-input"
@@ -396,7 +396,7 @@ function AddPersonPanel({
           <option value="student">Student</option>
           <option value="instructor">Instructor</option>
         </select>
-        <button className="instructor-btn instructor-btn--primary" disabled={busy || email.trim() === ''} onClick={submit}>
+        <button className="mm-btn mm-btn--primary" disabled={busy || email.trim() === ''} onClick={submit}>
           Add
         </button>
       </div>
