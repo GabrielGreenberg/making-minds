@@ -56,7 +56,7 @@ except where noted.
 
 **Student side.** Every surface outside the editor renders inside ONE site-styled shell
 (`PageShell`: the makingminds.org topbar, nav and lavender band, IBM Plex, the `--mm-*`
-tokens of `theme.css`; task 019 Phase A — the instructor views follow in task 021). Sign in
+tokens of `theme.css`; tasks 019 + 021). Sign in
 (local: toy-account picker; remote: email + password against the
 CSV roster, "Create account" for roster members verified by student ID, "Not on the roster?"
 files an instructor-reviewed access request; the login screen renders from the server's
@@ -104,8 +104,8 @@ Question-level constraints checked at Stage 1: `allowed_components`, `component_
 `LocalSubmissionStore`, remotely on the server with the same engine; in remote mode the
 browser never sees `test_cases` (grep-gated) and server ≡ engine parity is pinned.
 
-**Instructor side** (`#/instructor`, inside the same shell on a wide column; its views are
-restyled in task 021): **Roster & accounts** (remote — CSV import with a
+**Instructor side** (`#/instructor`: the same shell on a wide column with a section sub-nav
+Dashboard · Roster & accounts · Feedback · Notes; every view in the page vocabulary): **Roster & accounts** (remote — CSV import with a
 column/issue report, who has an account, password reset, add/remove, access requests),
 **Feedback** queue (open/resolved/all), shared **Notes** page (one markdown document,
 `marked` + `dompurify`, save-only-on-Save, warns before overwriting a newer save),
@@ -139,7 +139,7 @@ end-to-end; score reported, never asserted) — behind `app/tools/coverageCheck.
 The open work is the queue: `tasks/incoming/` (ready) and `tasks/blocked/` (waiting on
 Gabriel) — run `/work` to see it offered. Headline items on 2026-09-21: **UCLA SSO** (blocked
 on UCLA IdP details), **seeding HW1–HW7 into the server DB**, a real domain + SQLite backup
-for the pilot box, sequential-sub-circuit boxing, a fill-in authoring UI, the instructor-surface restyle (021), failed-input →
+for the pilot box, sequential-sub-circuit boxing, a fill-in authoring UI, failed-input →
 live Run, a due-date-independent "view my submission" mode, turbot multi-arena authoring,
 an SC perception frame player, LLM-assisted open-question grading, and — last — activating
 the worker routine.
@@ -201,7 +201,7 @@ browser and on the server. The store and UI are thin wrappers over the engine.
 | Storage | `app/src/storage/workbookStore.ts`, `AssignmentStore.ts`, `submissionStore.ts`, `feedbackStore.ts`, `NotesStore.ts` | The five Promise-returning seam interfaces + Local impls. Grade release lives on `AssignmentStore` (`getGradesReleased`/`setGradesReleased`). `submissionStore` owns `recordManualReview`. |
 | Storage | `app/src/storage/backend.ts`, `remoteStores.ts`, `manualReview.ts`, `journal.ts`, `migrateLocal.ts` | `backend.ts`: the ONE mode decision + sole exporter of store instances. `remoteStores.ts`: Remote impls as direct `api/client.ts` calls (404 → seam-null; GRADER-FREE, grep-gated). `manualReview.ts`: the leaf pure `applyManualReview` used by the local store AND the server. `journal.ts`: per-email crash buffer `mm:journal:<email>:<asgId>` replayed by the next `openAssignment`. `migrateLocal.ts`: first-remote-login fill-empty upload of local data (guard `mm:migrated:<email>`; server never overwritten; submissions/release/reviews not migrated). |
 | Auth | `app/src/auth/` | `AuthGate.tsx` (no rendering until a user exists; `initRouting()` fires here), `HealthGate.tsx` (remote boot probe + auto-retry screen), `LoginScreen.tsx` (toy picker locally; remotely Sign in · Create account · Not on the roster? or one SSO button — panes from the server's `AuthCapabilities`), `AccountPanel.tsx` (change password), `authProvider.tsx` (one provider per mode), `types.ts`, `session.ts`, `accounts.ts`, `instructorRole.ts`. |
-| Page surfaces | `app/src/theme.css`, `pages.css`, `components/PageShell.tsx`, `SessionControls.tsx` | The design layer for everything outside the editor. `theme.css`: the makingminds.org palette / type / spacing as `--mm-*` tokens (each names its `site.css` original; colour literals live ONLY in its `:root`) + the shared vocabulary (shell, tags, hairline rows, tables, buttons, fields, modals). `pages.css`: per-surface rules (home, overview, grade sheet, login, feedback, the instructor views). `PageShell`: topbar (serif brand → the website, `appNav`, session controls) · band · `.page` column (`width="wide"` for instructor tables) · footer, plus a `card` variant for login/health. `index.css` is the editor alone and inherits only the font family. Rules: `docs/buildout/VISUAL_VOCAB.md` §Page surfaces; gate: `themeCheck`. |
+| Page surfaces | `app/src/theme.css`, `pages.css`, `components/PageShell.tsx`, `SessionControls.tsx` | The design layer for everything outside the editor. `theme.css`: the makingminds.org palette / type / spacing as `--mm-*` tokens (each names its `site.css` original; colour literals live ONLY in its `:root`) + the shared vocabulary (shell, tags, hairline rows, tables, buttons, fields, segmented controls, modals). `pages.css`: per-surface rules (home, overview, grade sheet, login, feedback, the instructor views). `PageShell`: topbar (serif brand → the website, `appNav`, session controls) · optional `subnav` bar (the instructor's sections) · band · `.page` column (`width="wide"` for instructor tables) · footer, plus a `card` variant for login/health. `index.css` is the editor alone and inherits only the font family. Rules: `docs/buildout/VISUAL_VOCAB.md` §Page surfaces; gate: `themeCheck`. |
 | Async UI | `app/src/useAsyncValue.ts` | The shared fetch-on-mount hook (`value`/`loading`/`error`/`reload`) behind every view reading the async seams. |
 | Assignments | `app/src/assignments/index.ts`, `cc-basics.json` | Registry over the `AssignmentStore` seam + `sortAssignments` (instructor `order` asc, then title; bundled pinned first). The bundled CC assignment is LOCAL-mode-only (its JSON carries answers). |
 | Instructor UI | `app/src/instructor/` | `InstructorApp`, `InstructorGate`, `InstructorDashboard`, `RosterView`, `FeedbackQueueView`, `NotesView`, `AssignmentEditor`, `dragReorder.ts` (pure `moveItem` + `useDragReorder`; pinned rows immovable), `QuestionCreator` (+ `ccPreview.ts`, `arenaEditing.ts` — `MAX_ARENA_SIZE` 30), `Gradebook.ts`/`GradebookView.tsx`. |

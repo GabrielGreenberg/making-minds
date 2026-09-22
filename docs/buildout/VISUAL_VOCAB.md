@@ -150,8 +150,11 @@ literal or an undefined token. Task: `tasks/done/2026-09-21-019-*`._
   Assignments · Sandbox · Instructor with the current page underlined in magenta; name ·
   Feedback · Password · Log out at the right, from `SessionControls`), the 14px lavender
   `.band`, one centred `.page` column (max 1080px; `page--wide` 1400px for the
-  instructor's tables), the site footer. Login and server-health use the shell's
-  **card** variant: brand-only topbar, one centred `.mm-card`.
+  instructor's tables), the site footer. Login, server-health and the instructors-only
+  refusal use the shell's **card** variant: one centred `.mm-card`. A section's own
+  navigation (the instructor's Dashboard · Roster & accounts · Feedback · Notes) is the
+  shell's `subnav`: a second white bar under the topbar, same link idiom, current item
+  underlined.
 - **Type** — IBM Plex, loaded from Google Fonts with system fallbacks: **Sans**
   15px/1.5 for text, **Serif** for h1 (34px/600) and h2 (19px/600, magenta), **Mono**
   for tags and emails. Section labels are `.eyebrow` (11.5px uppercase, tracked, grey).
@@ -170,10 +173,14 @@ literal or an undefined token. Task: `tasks/done/2026-09-21-019-*`._
 - **Tags** — `.tag`: mono 11px/600 on a soft field — `tag--accent` for a question's
   mode, `tag--date`/`tag--exam` for roles, `--ok/--warn/--danger` for states. Never a pill.
 - **Buttons** — `.mm-btn` square, white with a `--mm-line-2` border, 13.5px/600;
-  `mm-btn--primary` magenta (Submit assignment, Sign in, Send feedback, New question);
-  `mm-btn--quiet` text-only; `.mm-link` for inline text actions.
-- **Fields** — `.mm-field`: uppercase micro-label over a square `.mm-input`; focus is a
-  2px magenta outline; errors `.mm-error` in danger red, notes `.mm-note` grey.
+  `mm-btn--primary` magenta (Submit assignment, Sign in, Send feedback, New Assignment,
+  Add Question, Save); `mm-btn--quiet` text-only (the dev seeds); `.mm-link` for inline
+  text actions. `.mm-segmented` is the one-of-a-few control (mode, representation, arena
+  tool): square, hairline-divided, the active segment filled magenta.
+- **Fields** — `.mm-field`: uppercase micro-label over a square `.mm-input` (sized
+  modifiers `--num/--name/--formula/--title/--area`; `.mm-inline-field` for a label beside
+  a small input); focus is a 2px magenta outline; errors `.mm-error` in danger red, notes
+  `.mm-note` grey, `.mm-hint` italic.
 - **Modals** — navy-tinted scrim, square white `.mm-modal` card (the one shadow), serif
   title, dim sub-line, Close as a small quiet button at the right of the head.
 - **Home row** — title · meta (question count, due date) · submission status (which

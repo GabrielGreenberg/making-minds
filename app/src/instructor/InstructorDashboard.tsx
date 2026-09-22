@@ -111,59 +111,39 @@ export function InstructorDashboard() {
 
   return (
     <div className="instructor-dashboard">
-      <div className="instructor-page-head">
-        <h2 className="instructor-page-title">Assignments</h2>
-        <div className="instructor-head-actions">
+      <div className="mm-head mm-head--row">
+        <h1>Assignments</h1>
+        <div className="mm-actions">
           {backendMode === 'local' && (
-            <button className="instructor-btn" onClick={() => void handleSeed()} title="Dev: seed a sample assignment and autograded submissions">
+            <button className="mm-btn mm-btn--quiet" onClick={() => void handleSeed()} title="Dev: seed a sample assignment and autograded submissions">
               Load sample data
             </button>
           )}
           {backendMode === 'local' && (
-            <button className="instructor-btn" onClick={() => void handleSeedHomeworks()} title="Load the real PHIL 133 homeworks (HW1–HW7) as editable assignments; existing copies are never overwritten">
+            <button className="mm-btn mm-btn--quiet" onClick={() => void handleSeedHomeworks()} title="Load the real PHIL 133 homeworks (HW1–HW7) as editable assignments; existing copies are never overwritten">
               Load HW1–HW7
             </button>
           )}
-          <button
-            className="instructor-btn"
-            onClick={() => navigate({ kind: 'instructor-roster' })}
-            title="Import the class roster, see who has created an account, review access requests"
-          >
-            Roster &amp; accounts
-          </button>
-          <button
-            className="instructor-btn"
-            onClick={() => navigate({ kind: 'instructor-feedback' })}
-            title="Student reports on the platform and homeworks"
-          >
-            Feedback
-          </button>
-          <button
-            className="instructor-btn"
-            onClick={() => navigate({ kind: 'instructor-notes' })}
-            title="A shared note for instructors to coordinate on"
-          >
-            Notes
-          </button>
-          <button className="instructor-btn instructor-btn--primary" onClick={() => void handleNew()}>
+          <button className="mm-btn mm-btn--primary" onClick={() => void handleNew()}>
             New Assignment
           </button>
         </div>
       </div>
 
       {assignments.length === 0 ? (
-        <p className="instructor-empty">
+        <p className="mm-empty">
           {loading ? 'Loading…'
             : error ? (
                 <>
                   Couldn’t load assignments — the server may be unreachable.{' '}
-                  <button className="menu-link-button" onClick={reload}>Retry</button>
+                  <button className="mm-link" onClick={reload}>Retry</button>
                 </>
               )
             : 'No assignments yet. Create one to get started.'}
         </p>
       ) : (
-        <table className="instructor-table">
+        <div className="instructor-table-scroll">
+        <table className="mm-table">
           <thead>
             <tr>
               <th className="instructor-table-order-head" aria-label="Reorder"></th>
@@ -197,12 +177,12 @@ export function InstructorDashboard() {
                   <td>
                     <span className="instructor-asg-title">{a.title}</span>
                     {bundled ? (
-                      <span className="instructor-badge instructor-badge--bundled">bundled</span>
+                      <span className="tag">bundled</span>
                     ) : (
-                      <span className="instructor-badge instructor-badge--custom">custom</span>
+                      <span className="tag tag--accent">custom</span>
                     )}
                     {!a.visible && (
-                      <span className="instructor-badge instructor-badge--hidden">hidden</span>
+                      <span className="tag tag--danger">hidden</span>
                     )}
                   </td>
                   <td>{a.questionCount}</td>
@@ -210,14 +190,14 @@ export function InstructorDashboard() {
                   <td className="instructor-table-actions">
                     {!bundled && (
                       <button
-                        className="instructor-btn"
+                        className="mm-btn"
                         onClick={() => navigate({ kind: 'instructor-edit', id: a.id })}
                       >
                         Edit
                       </button>
                     )}
                     <button
-                      className="instructor-btn"
+                      className="mm-btn"
                       onClick={() => void handleVisibility(a.id, a.title, !a.visible)}
                       title={
                         a.visible
@@ -228,17 +208,17 @@ export function InstructorDashboard() {
                       {a.visible ? 'Hide' : 'Publish'}
                     </button>
                     <button
-                      className="instructor-btn"
+                      className="mm-btn"
                       onClick={() => navigate({ kind: 'instructor-submissions', id: a.id })}
                     >
                       Submissions
                     </button>
-                    <button className="instructor-btn" onClick={() => void handleExport(a.id)}>
+                    <button className="mm-btn" onClick={() => void handleExport(a.id)}>
                       Export JSON
                     </button>
                     {!bundled && (
                       <button
-                        className="instructor-btn instructor-btn--danger"
+                        className="mm-btn mm-btn--danger"
                         onClick={() => void handleDelete(a.id, a.title)}
                       >
                         Delete
@@ -250,6 +230,7 @@ export function InstructorDashboard() {
             })}
           </tbody>
         </table>
+        </div>
       )}
     </div>
   );

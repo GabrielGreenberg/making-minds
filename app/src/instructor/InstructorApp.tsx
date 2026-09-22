@@ -15,7 +15,7 @@ import type { InstructorRoute } from './useInstructorRoute';
 export function InstructorApp({ route }: { route: InstructorRoute }) {
   return (
     <InstructorGate>
-      <InstructorLayout>
+      <InstructorLayout route={route}>
         <InstructorView route={route} />
       </InstructorLayout>
     </InstructorGate>

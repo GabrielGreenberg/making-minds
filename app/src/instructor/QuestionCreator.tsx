@@ -488,17 +488,17 @@ export function QuestionCreator({ assignment, existingQuestion, onSave, onCancel
 
   return (
     <div className="instructor-creator">
-      <div className="instructor-page-head">
-        <h3 className="instructor-section-title">
+      <div className="mm-head mm-head--row">
+        <h1>
           {existingQuestion ? `Edit ${existingQuestion.label}` : `New ${mode} question`}
-        </h3>
-        <div className="instructor-page-head-actions">
+        </h1>
+        <div className="mm-actions">
           {saveError && <span className="instructor-formula-error">{saveError}</span>}
-          <button className="instructor-btn" onClick={onCancel}>
+          <button className="mm-btn" onClick={onCancel}>
             Cancel
           </button>
           <button
-            className="instructor-btn instructor-btn--primary"
+            className="mm-btn mm-btn--primary"
             disabled={!saveable}
             onClick={handleSave}
           >
@@ -509,33 +509,33 @@ export function QuestionCreator({ assignment, existingQuestion, onSave, onCancel
 
       {/* Name + mode + representation (all per-question) */}
       <section className="instructor-creator-section">
-        <label className="instructor-field">
-          <span className="instructor-field-label">Question name</span>
+        <label className="mm-field">
+          <span className="mm-label">Question name</span>
           <input
-            className="instructor-input instructor-input--name"
+            className="mm-input mm-input--name"
             placeholder="e.g. Problem 1"
             value={label}
             onChange={(e) => setLabel(e.target.value)}
           />
         </label>
-        <label className="instructor-field">
-          <span className="instructor-field-label">Title (optional)</span>
+        <label className="mm-field">
+          <span className="mm-label">Title (optional)</span>
           <input
-            className="instructor-input"
+            className="mm-input"
             placeholder="e.g. Reconstructing OR"
             value={title}
             onChange={(e) => setTitle(e.target.value)}
           />
         </label>
-        <div className="instructor-section-head">
-          <h4 className="instructor-subhead">Mode</h4>
-          <div className="instructor-encoding-toggle">
+        <div className="mm-section-head">
+          <h3>Mode</h3>
+          <div className="mm-segmented">
             {MODES.map((m) => (
               <button
                 key={m.mode}
                 className={
-                  'instructor-encoding-btn' +
-                  (mode === m.mode ? ' instructor-encoding-btn--active' : '')
+                  'mm-segmented-btn' +
+                  (mode === m.mode ? ' mm-segmented-btn--active' : '')
                 }
                 onClick={() => setMode(m.mode)}
               >
@@ -545,14 +545,14 @@ export function QuestionCreator({ assignment, existingQuestion, onSave, onCancel
           </div>
         </div>
         {canPerceive && (
-          <div className="instructor-section-head">
-            <h4 className="instructor-subhead">Task</h4>
-            <div className="instructor-encoding-toggle">
+          <div className="mm-section-head">
+            <h3>Task</h3>
+            <div className="mm-segmented">
               {(['function', 'perception'] as const).map((t) => (
                 <button
                   key={t}
                   className={
-                    'instructor-encoding-btn' + (task === t ? ' instructor-encoding-btn--active' : '')
+                    'mm-segmented-btn' + (task === t ? ' mm-segmented-btn--active' : '')
                   }
                   onClick={() => setTask(t)}
                 >
@@ -563,13 +563,13 @@ export function QuestionCreator({ assignment, existingQuestion, onSave, onCancel
           </div>
         )}
         {!isTurbot && !isOpen && !isPerception && (
-          <div className="instructor-section-head">
-            <h4 className="instructor-subhead">Representation</h4>
+          <div className="mm-section-head">
+            <h3>Representation</h3>
             <RepToggle value={rep} onChange={setRep} />
           </div>
         )}
         {mode === 'TM' && (
-          <label className="instructor-inline-field">
+          <label className="mm-inline-field">
             <input
               type="checkbox"
               checked={requireStandardHalt}
@@ -580,10 +580,10 @@ export function QuestionCreator({ assignment, existingQuestion, onSave, onCancel
           </label>
         )}
         {hasTape && (
-          <label className="instructor-inline-field">
+          <label className="mm-inline-field">
             Max tape cells
             <input
-              className="instructor-input instructor-input--num"
+              className="mm-input mm-input--num"
               type="number"
               min={1}
               placeholder="—"
@@ -596,22 +596,22 @@ export function QuestionCreator({ assignment, existingQuestion, onSave, onCancel
           </label>
         )}
         {isOpen && (
-          <p className="instructor-hint">
+          <p className="mm-note mm-hint">
             An open question is answered in free text and is not autograded — review the
             responses in the gradebook. (LLM-assisted grading may plug in here later.)
           </p>
         )}
         {isTurbot && (
           <>
-            <div className="instructor-section-head">
-              <h4 className="instructor-subhead">Internal machine</h4>
-              <div className="instructor-encoding-toggle">
+            <div className="mm-section-head">
+              <h3>Internal machine</h3>
+              <div className="mm-segmented">
                 {INNER_MODES.map((m) => (
                   <button
                     key={m.mode}
                     className={
-                      'instructor-encoding-btn' +
-                      (innerMode === m.mode ? ' instructor-encoding-btn--active' : '')
+                      'mm-segmented-btn' +
+                      (innerMode === m.mode ? ' mm-segmented-btn--active' : '')
                     }
                     onClick={() => setInnerMode(m.mode)}
                   >
@@ -623,15 +623,15 @@ export function QuestionCreator({ assignment, existingQuestion, onSave, onCancel
             {/* The machine's encoding (stored as the question's representation;
                 'tally' is the unary system). For a TM brain it picks the
                 internal tape alphabet: binary {0,1,*}, unary {0,1}. */}
-            <div className="instructor-section-head">
-              <h4 className="instructor-subhead">Encoding</h4>
-              <div className="instructor-encoding-toggle">
+            <div className="mm-section-head">
+              <h3>Encoding</h3>
+              <div className="mm-segmented">
                 {REPS.map((r) => (
                   <button
                     key={r}
                     className={
-                      'instructor-encoding-btn' +
-                      (rep === r ? ' instructor-encoding-btn--active' : '')
+                      'mm-segmented-btn' +
+                      (rep === r ? ' mm-segmented-btn--active' : '')
                     }
                     onClick={() => setRep(r)}
                   >
@@ -644,7 +644,7 @@ export function QuestionCreator({ assignment, existingQuestion, onSave, onCancel
         )}
         {canRestrictComponents && (
           <>
-            <label className="instructor-inline-field">
+            <label className="mm-inline-field">
               <input
                 type="checkbox"
                 checked={restrictComponents}
@@ -657,7 +657,7 @@ export function QuestionCreator({ assignment, existingQuestion, onSave, onCancel
             {restrictComponents && (
               <div className="instructor-criterion-row">
                 {RESTRICTABLE_GATES.map((g) => (
-                  <label key={g.type} className="instructor-inline-field">
+                  <label key={g.type} className="mm-inline-field">
                     <input
                       type="checkbox"
                       checked={allowedGates.includes(g.type)}
@@ -678,7 +678,7 @@ export function QuestionCreator({ assignment, existingQuestion, onSave, onCancel
         )}
         {canLimitComponents && (
           <>
-            <label className="instructor-inline-field">
+            <label className="mm-inline-field">
               <input
                 type="checkbox"
                 checked={limitComponents}
@@ -690,10 +690,10 @@ export function QuestionCreator({ assignment, existingQuestion, onSave, onCancel
             {limitComponents && (
               <div className="instructor-criterion-row">
                 {BUDGETABLE_COMPONENTS.map((b) => (
-                  <label key={b.type} className="instructor-inline-field">
+                  <label key={b.type} className="mm-inline-field">
                     {b.label}
                     <input
-                      className="instructor-input instructor-input--num"
+                      className="mm-input mm-input--num"
                       type="number"
                       min={0}
                       placeholder="—"
@@ -715,15 +715,15 @@ export function QuestionCreator({ assignment, existingQuestion, onSave, onCancel
       {isTurbot && (
         <>
           <section className="instructor-creator-section">
-            <div className="instructor-section-head">
-              <h4 className="instructor-subhead">Arena</h4>
-              <div className="instructor-encoding-toggle">
+            <div className="mm-section-head">
+              <h3>Arena</h3>
+              <div className="mm-segmented">
                 {ARENA_TOOLS.map((t) => (
                   <button
                     key={t.tool}
                     className={
-                      'instructor-encoding-btn' +
-                      (arenaTool === t.tool ? ' instructor-encoding-btn--active' : '')
+                      'mm-segmented-btn' +
+                      (arenaTool === t.tool ? ' mm-segmented-btn--active' : '')
                     }
                     onClick={() => setArenaTool(t.tool)}
                   >
@@ -732,15 +732,15 @@ export function QuestionCreator({ assignment, existingQuestion, onSave, onCancel
                 ))}
               </div>
             </div>
-            <p className="instructor-hint">
+            <p className="mm-note mm-hint">
               Click cells to paint with the selected tool. With the Turbot tool, click a cell to
               move the start there; click the turbot again to rotate it.
             </p>
             <div className="instructor-arena-size">
-              <label className="instructor-inline-field">
+              <label className="mm-inline-field">
                 width
                 <input
-                  className="instructor-input instructor-input--num"
+                  className="mm-input mm-input--num"
                   type="number"
                   min={1}
                   max={MAX_ARENA_SIZE}
@@ -748,10 +748,10 @@ export function QuestionCreator({ assignment, existingQuestion, onSave, onCancel
                   onChange={(e) => setArena((a) => resizeArena(a, Number(e.target.value), a.height))}
                 />
               </label>
-              <label className="instructor-inline-field">
+              <label className="mm-inline-field">
                 height
                 <input
-                  className="instructor-input instructor-input--num"
+                  className="mm-input mm-input--num"
                   type="number"
                   min={1}
                   max={MAX_ARENA_SIZE}
@@ -770,12 +770,12 @@ export function QuestionCreator({ assignment, existingQuestion, onSave, onCancel
           </section>
 
           <section className="instructor-creator-section">
-            <div className="instructor-section-head">
-              <h4 className="instructor-subhead">Success criterion</h4>
+            <div className="mm-section-head">
+              <h3>Success criterion</h3>
             </div>
             <div className="instructor-criterion-row">
               <select
-                className="instructor-input"
+                className="mm-input"
                 value={criterion}
                 onChange={(e) => setCriterion(e.target.value as TurbotSuccessCriterion)}
               >
@@ -783,10 +783,10 @@ export function QuestionCreator({ assignment, existingQuestion, onSave, onCancel
                   <option key={c.value} value={c.value}>{c.label}</option>
                 ))}
               </select>
-              <label className="instructor-inline-field">
+              <label className="mm-inline-field">
                 max steps
                 <input
-                  className="instructor-input instructor-input--num"
+                  className="mm-input mm-input--num"
                   type="number"
                   min={1}
                   max={10000}
@@ -795,7 +795,7 @@ export function QuestionCreator({ assignment, existingQuestion, onSave, onCancel
                 />
               </label>
             </div>
-            <p className="instructor-hint">
+            <p className="mm-note mm-hint">
               {CRITERIA.find((c) => c.value === criterion)?.hint} The turbot fails if it exceeds
               the step budget.
             </p>
@@ -807,10 +807,10 @@ export function QuestionCreator({ assignment, existingQuestion, onSave, onCancel
           inputs/target-function pipeline below; grading is raw bits) */}
       {isPerception && (
         <section className="instructor-creator-section">
-          <div className="instructor-section-head">
-            <h4 className="instructor-subhead">Perception rule</h4>
+          <div className="mm-section-head">
+            <h3>Perception rule</h3>
           </div>
-          <p className="instructor-hint">
+          <p className="mm-note mm-hint">
             The machine's inputs are an array of stimulations (like light hitting a retina) and
             its single output classifies them. Grading feeds raw bit patterns
             {mode === 'SC' ? ' — one frame per clock tick — ' : ' '}to the circuit and checks the
@@ -818,7 +818,7 @@ export function QuestionCreator({ assignment, existingQuestion, onSave, onCancel
           </p>
           <div className="instructor-criterion-row">
             <select
-              className="instructor-input"
+              className="mm-input"
               value={kind}
               onChange={(e) => setPKind(e.target.value as PerceptionKind)}
             >
@@ -827,10 +827,10 @@ export function QuestionCreator({ assignment, existingQuestion, onSave, onCancel
               ))}
             </select>
             {(kind === 'min-run' || kind === 'exact-run' || kind === 'motion') && (
-              <label className="instructor-inline-field">
+              <label className="mm-inline-field">
                 {kind === 'motion' ? 'object length' : 'run length k'}
                 <input
-                  className="instructor-input instructor-input--num"
+                  className="mm-input mm-input--num"
                   type="number"
                   min={1}
                   max={effWidth}
@@ -840,20 +840,20 @@ export function QuestionCreator({ assignment, existingQuestion, onSave, onCancel
               </label>
             )}
             {kind === 'pattern' ? (
-              <label className="instructor-inline-field">
+              <label className="mm-inline-field">
                 pattern
                 <input
-                  className="instructor-input"
+                  className="mm-input"
                   placeholder="e.g. 110010111"
                   value={pPattern}
                   onChange={(e) => setPPattern(e.target.value.replace(/[^01]/g, ''))}
                 />
               </label>
             ) : (
-              <label className="instructor-inline-field">
+              <label className="mm-inline-field">
                 inputs
                 <input
-                  className="instructor-input instructor-input--num"
+                  className="mm-input mm-input--num"
                   type="number"
                   min={MIN_PERCEPTION_WIDTH}
                   max={MAX_PERCEPTION_WIDTH}
@@ -864,14 +864,14 @@ export function QuestionCreator({ assignment, existingQuestion, onSave, onCancel
             )}
           </div>
           {kind === 'pattern' && (
-            <p className="instructor-hint">
+            <p className="mm-note mm-hint">
               The number of inputs equals the pattern length ({effWidth || '—'}).
             </p>
           )}
           {perceptionError ? (
             <p className="instructor-preview-warning">{perceptionError}</p>
           ) : (
-            <p className="instructor-hint">
+            <p className="mm-note mm-hint">
               Rule: {describePerceptionRule(rule)}. The circuit needs {effWidth} inputs and 1 output.
             </p>
           )}
@@ -882,23 +882,23 @@ export function QuestionCreator({ assignment, existingQuestion, onSave, onCancel
       {!isTurbot && !isOpen && !isPerception && (
       <>
       <section className="instructor-creator-section">
-        <div className="instructor-section-head">
-          <h4 className="instructor-subhead">Input groups</h4>
+        <div className="mm-section-head">
+          <h3>Input groups</h3>
         </div>
-        {SAMPLING_NOTE[mode] && <p className="instructor-hint">{SAMPLING_NOTE[mode]}</p>}
+        {SAMPLING_NOTE[mode] && <p className="mm-note mm-hint">{SAMPLING_NOTE[mode]}</p>}
         {inputs.map((g, i) => (
           <div key={i} className="instructor-group-row">
             <input
-              className="instructor-input instructor-input--name"
+              className="mm-input mm-input--name"
               placeholder="name"
               value={g.name}
               onChange={(e) => updateInput(i, { name: e.target.value })}
             />
             {isCC && (
-              <label className="instructor-inline-field">
+              <label className="mm-inline-field">
                 max input value
                 <input
-                  className="instructor-input instructor-input--num"
+                  className="mm-input mm-input--num"
                   type="number"
                   min={1}
                   max={maxInputLimit(rep)}
@@ -908,7 +908,7 @@ export function QuestionCreator({ assignment, existingQuestion, onSave, onCancel
               </label>
             )}
             <button
-              className="instructor-btn instructor-btn--icon instructor-btn--danger"
+              className="mm-btn mm-btn--icon mm-btn--danger"
               onClick={() => setInputs((gs) => gs.filter((_, idx) => idx !== i))}
               title="Remove input group"
             >
@@ -917,7 +917,7 @@ export function QuestionCreator({ assignment, existingQuestion, onSave, onCancel
           </div>
         ))}
         <button
-          className="instructor-btn"
+          className="mm-btn"
           onClick={() => setInputs((gs) => [...gs, blankInput()])}
         >
           Add input group
@@ -927,14 +927,14 @@ export function QuestionCreator({ assignment, existingQuestion, onSave, onCancel
       {/* Target function — one formula, one output. The live single-input
           check sits right next to the formula (no separate section). */}
       <section className="instructor-creator-section">
-        <div className="instructor-section-head">
-          <h4 className="instructor-subhead">Target function</h4>
+        <div className="mm-section-head">
+          <h3>Target function</h3>
         </div>
         <div className="instructor-formula-row">
-          <label className="instructor-inline-field instructor-formula-field">
+          <label className="mm-inline-field instructor-formula-field">
             f({inputs.map((g) => g.name.trim() || '?').join(', ')}) =
             <input
-              className="instructor-input instructor-input--formula"
+              className="mm-input mm-input--formula"
               placeholder="e.g. 2 * x"
               value={formula}
               onChange={(e) => setFormula(e.target.value)}
@@ -973,12 +973,12 @@ export function QuestionCreator({ assignment, existingQuestion, onSave, onCancel
 
       {/* Statement — for an open question this IS the question. */}
       <section className="instructor-creator-section">
-        <label className="instructor-field">
-          <span className="instructor-field-label">
+        <label className="mm-field">
+          <span className="mm-label">
             {isOpen ? 'Question shown to students' : 'Instructions shown to students'}
           </span>
           <textarea
-            className="instructor-textarea"
+            className="mm-input mm-input--area"
             rows={isOpen ? 8 : 4}
             value={statement}
             onChange={(e) => setStatement(e.target.value)}
@@ -989,15 +989,15 @@ export function QuestionCreator({ assignment, existingQuestion, onSave, onCancel
             }
           />
         </label>
-        <p className="instructor-hint">
+        <p className="mm-note mm-hint">
           Math goes in LaTeX between dollar signs ($x + 1$, or $$…$$ on its own
           line); machine literals go in `backticks`; **bold** and *italic* work
           too. A blank line starts a new paragraph.
         </p>
-        <label className="instructor-field">
-          <span className="instructor-field-label">Hint (optional)</span>
+        <label className="mm-field">
+          <span className="mm-label">Hint (optional)</span>
           <input
-            className="instructor-input"
+            className="mm-input"
             placeholder="e.g. DeMorgan's Law is useful here!"
             value={hint}
             onChange={(e) => setHint(e.target.value)}
@@ -1005,7 +1005,7 @@ export function QuestionCreator({ assignment, existingQuestion, onSave, onCancel
         </label>
         {statement.trim() && (
           <div className="instructor-statement-preview">
-            <div className="instructor-field-label">Preview</div>
+            <div className="mm-label">Preview</div>
             <StatementBody text={statement} />
             {hint.trim() && (
               <div className="question-hint"><StatementBody text={hint} /></div>
@@ -1016,11 +1016,11 @@ export function QuestionCreator({ assignment, existingQuestion, onSave, onCancel
 
       <div className="instructor-creator-foot">
         {saveError && <span className="instructor-formula-error">{saveError}</span>}
-        <button className="instructor-btn" onClick={onCancel}>
+        <button className="mm-btn" onClick={onCancel}>
           Cancel
         </button>
         <button
-          className="instructor-btn instructor-btn--primary"
+          className="mm-btn mm-btn--primary"
           disabled={!saveable}
           onClick={handleSave}
         >
@@ -1039,12 +1039,12 @@ function RepToggle({
   onChange: (r: RepSystem) => void;
 }) {
   return (
-    <div className="instructor-encoding-toggle">
+    <div className="mm-segmented">
       {REPS.map((r) => (
         <button
           key={r}
           className={
-            'instructor-encoding-btn' + (value === r ? ' instructor-encoding-btn--active' : '')
+            'mm-segmented-btn' + (value === r ? ' mm-segmented-btn--active' : '')
           }
           onClick={() => onChange(r)}
         >
@@ -1079,7 +1079,7 @@ function ProbePanel({
           <label key={i} className="instructor-probe-field">
             <span className="instructor-probe-name">{g.name}</span>
             <input
-              className="instructor-input instructor-input--num"
+              className="mm-input mm-input--num"
               type="text"
               inputMode="numeric"
               title={`0 to ${probeMax(g, rep, mode)}`}

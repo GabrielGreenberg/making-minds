@@ -40,11 +40,11 @@ export function FeedbackQueueView() {
 
   return (
     <div className="instructor-dashboard">
-      <div className="instructor-page-head">
-        <h2 className="instructor-page-title">Feedback</h2>
-        <div className="instructor-head-actions">
+      <div className="mm-head mm-head--row">
+        <h1>Feedback</h1>
+        <div className="mm-actions">
           <select
-            className="instructor-select"
+            className="mm-input"
             value={filter}
             onChange={(e) => setFilter(e.target.value as 'open' | 'resolved' | 'all')}
           >
@@ -55,10 +55,10 @@ export function FeedbackQueueView() {
         </div>
       </div>
 
-      {loading && !feedback && <p className="instructor-empty">Loading…</p>}
-      {error && <p className="instructor-empty">Couldn’t load feedback.</p>}
+      {loading && !feedback && <p className="mm-empty">Loading…</p>}
+      {error && <p className="mm-empty">Couldn’t load feedback.</p>}
       {feedback && rows.length === 0 && (
-        <p className="instructor-empty">
+        <p className="mm-empty">
           {filter === 'open' ? 'No open feedback — nice.' : 'Nothing here.'}
         </p>
       )}
@@ -67,7 +67,7 @@ export function FeedbackQueueView() {
         {rows.map((f) => (
           <article key={f.id} className="feedback-card">
             <div className="feedback-card-head">
-              <span className={`feedback-category feedback-category--${f.category === 'platform design' ? 'design' : 'content'}`}>
+              <span className={`tag ${f.category === 'platform design' ? 'tag--date' : 'tag--ok'}`}>
                 {f.category}
               </span>
               <span className="feedback-meta">{f.student} · {formatTime(f.createdAt)}</span>
@@ -90,7 +90,7 @@ export function FeedbackQueueView() {
             )}
             <div className="feedback-card-foot">
               <button
-                className="instructor-btn"
+                className="mm-btn"
                 disabled={busyId === f.id}
                 onClick={() => void toggleStatus(f)}
               >
