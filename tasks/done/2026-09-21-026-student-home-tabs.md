@@ -8,9 +8,9 @@ requires: browser
 area: app
 source: chat
 created: 2026-09-21T23:05:00-07:00
-status: in-progress
+status: done
 after:
-branch: task/026-student-home-tabs
+branch:
 merged_into:
 ---
 
@@ -71,3 +71,25 @@ favour of the Grades page.
 - Screenshots `tasks/attachments/2026-09-21-026-<surface>-{before,after}.jpg`.
 
 ## Progress log
+- **2026-09-21 (/work, `task/026-student-home-tabs`) — landed.** The student area is Home:
+  `appNav` labels a student's one page "Home" (an instructor's "Student view" is the same
+  page); `StudentLayout` (the twin of `InstructorLayout`) renders the eyebrow + the tabs
+  Assignments · Grades inside the column on the catalog, the Grades page and the assignment
+  overview. `Route` gained `grades` (`#/grades`, `#/grades/:id`); applying it closes any
+  workbook as Home does, and `HomeScreen` picks the tab from the hash through the new shared
+  `useRoute` hook (which `useInstructorRoute` now uses too). `GradesView` is the Grades tab
+  (assignment · submitted · result; a released row opens in place into `GradeSheet`, the
+  modal's sheet extracted; the open row is the route id, so it is linkable and Back closes
+  it); `GradesPanel` is deleted and both "View grades" links navigate to `#/grades/:id`.
+  The up-next box (`.mm-next`/`.mm-nx`, the site's idiom) shows the soonest future due date
+  with time left and submission state; `dueDates.ts` gained `formatDateTime`/`formatDueDay`.
+  Verified: tsc, build, themeCheck (page-component list + StudentLayout pins + "GradesPanel
+  is gone"), app check, server check; in the pane as John Doe with HW1 released and HW2 due
+  in 3 days: View grades → `#/grades/hw1` with the sheet open and the chrome unmoved (brand
+  [140,12], band [0,58], tabs [140,102]); collapse → `#/grades`; failed inputs → "Open my
+  submission →" → `#/a/hw1/q/0` in the editor; Grades tab rows read "5 of 6 correct" /
+  "Not released yet". Screenshots `2026-09-21-026-{home,grades,overview}-before.jpg`,
+  `-{home,grades,grades-open,overview,student-view}-after.jpg`,
+  `-{home,grades-open}-narrow-after.jpg` (HW2/HW3 due dates injected into the snapshot).
+  Owed: a real-device look; Account and Help tabs are candidates when there is content.
+  Next: nothing — done.
