@@ -8,9 +8,9 @@ requires: browser
 area: app
 source: chat
 created: 2026-09-21T17:10:00-07:00
-status: ready
+status: in-progress
 after: 2026-09-21-023
-branch:
+branch: task/020-problem-set-document-view
 merged_into:
 ---
 
