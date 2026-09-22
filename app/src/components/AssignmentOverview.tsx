@@ -1,12 +1,10 @@
 import { useStore, selectAssignmentFrozen } from '../store';
 import { navigate } from '../routing';
-import { getCurrentUserEmail, useAuth } from '../auth';
+import { getCurrentUserEmail } from '../auth';
 import { questionModeLabel } from '../types';
 import { statementProse } from '../statementFormat';
-import { GradesPanel } from './GradesPanel';
-import { PageShell, appNav } from './PageShell';
-import { SessionControls } from './SessionControls';
-import { useState, useEffect } from 'react';
+import { StudentLayout } from './StudentLayout';
+import { useEffect } from 'react';
 import { useAsyncValue } from '../useAsyncValue';
 import { assignmentStore } from '../storage/backend';
 
@@ -22,8 +20,6 @@ export function AssignmentOverview() {
   const hydrateSubmissions = useStore((s) => s.hydrateSubmissions);
   const questionCircuits = useStore((s) => s.questionCircuits);
   const frozen = useStore(selectAssignmentFrozen);
-  const { user } = useAuth();
-  const [showGrades, setShowGrades] = useState(false);
   // Release is policy on the seam, not part of the assignment, so the page has
   // to ask for it (the home catalog gets it on the summary).
   const { value: released } = useAsyncValue(
@@ -60,7 +56,7 @@ export function AssignmentOverview() {
   };
 
   return (
-    <PageShell nav={appNav('student', user?.role === 'instructor' ? 'instructor' : 'student')} session={<SessionControls />}>
+    <StudentLayout current="assignments">
       <div className="mm-head">
         <a
           className="eyebrow"
@@ -109,7 +105,7 @@ export function AssignmentOverview() {
         )}
         <span className="mm-actions">
           {released && sub?.result && (
-            <button className="mm-btn" onClick={() => setShowGrades(true)}>
+            <button className="mm-btn" onClick={() => navigate({ kind: 'grades', id: assignment.id })}>
               View grades
             </button>
           )}
@@ -128,13 +124,6 @@ export function AssignmentOverview() {
         </span>
       </div>
 
-      {showGrades && sub && (
-        <GradesPanel
-          assignmentId={assignment.id}
-          record={sub}
-          onClose={() => setShowGrades(false)}
-        />
-      )}
-    </PageShell>
+    </StudentLayout>
   );
 }

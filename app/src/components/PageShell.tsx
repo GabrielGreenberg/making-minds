@@ -15,7 +15,7 @@ export interface ShellNavItem {
 export type NavRole = 'student' | 'instructor';
 
 /**
- * The app's nav, derived from the role. A student has one page, Assignments.
+ * The app's nav, derived from the role. A student has one page, Home.
  * An instructor moves between two views and the nav says so: Student view (the
  * catalog exactly as students see it) and Dashboard (the instructor area).
  * Sandbox is not a page — it opens the editor — so the shell sets it apart
@@ -28,7 +28,7 @@ export function appNav(current: 'student' | 'dashboard', role: NavRole): ShellNa
       { label: 'Dashboard', route: { kind: 'instructor' }, current: current === 'dashboard' },
     ];
   }
-  return [{ label: 'Assignments', route: { kind: 'home' }, current: current === 'student' }];
+  return [{ label: 'Home', route: { kind: 'home' }, current: current === 'student' }];
 }
 
 /** A real hash link (middle-click, copy) that still routes through `navigate`. */

@@ -77,3 +77,18 @@ export function formatDueDate(iso: string): string {
     d.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })
   );
 }
+
+/** A submitted-at stamp in the catalog's short form, e.g. "Sep 20, 4:12 PM". */
+export function formatDateTime(iso: string): string {
+  return formatDueDate(iso);
+}
+
+/** The up-next box's fuller form, with the weekday: "Tue, Sep 30, 11:59 PM". */
+export function formatDueDay(iso: string): string {
+  const d = new Date(iso);
+  return (
+    d.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' }) +
+    ', ' +
+    d.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })
+  );
+}

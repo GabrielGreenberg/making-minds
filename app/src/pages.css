@@ -109,7 +109,17 @@
   .overview-statement { grid-column: 1 / -1; }
 }
 
-/* ── Grade sheet (modal) ───────────────────────────────────────────── */
+/* ── Grades page (the Home's Grades tab) and the inline grade sheet ──── */
+.grades-list td:first-child { width: 50%; }
+.grades-toggle { border: 0; background: none; padding: 0; font: inherit; font-weight: 500; color: var(--mm-ink); cursor: pointer; text-align: left; }
+.grades-toggle:hover { color: var(--mm-accent); }
+.grades-caret { display: inline-block; width: 14px; color: var(--mm-ink-3); font-size: 11px; }
+.grades-title { font-weight: 500; }
+.grades-score { font-weight: 600; }
+.grades-row--open td { border-bottom: 0; }
+.grades-detail > td { padding: 0 0 18px 26px; }
+.grade-sheet { background: var(--mm-surface); border: 1px solid var(--mm-line); }
+.grades-foot { font-size: var(--mm-fs-meta); color: var(--mm-ink-3); margin: 0; padding: 10px 12px; border-top: 1px solid var(--mm-line); }
 .grades-table td:first-child { width: 58%; }
 .grades-q-title { display: block; font-size: var(--mm-fs-meta); color: var(--mm-ink-3); }
 .grades-feedback-note {
