@@ -1,5 +1,5 @@
 ---
-id: 2026-09-21-021
+id: 2026-09-21-024
 type: feature
 title: Shift-click a gate to rotate it, with a light "(shift+click to ↻)" hint beside the Rotate button
 priority: normal
@@ -69,6 +69,6 @@ all (`:2907`). No modifier-click currently rotates.
   0°; wires from IN1/IN2 re-route each time); cmd-click two gates → both selected; shift+drag
   adds to a selection. FSM tab — select S1, shift-click S2 → a transition is created, no
   rotation. An assignment question marked done → shift-click does nothing. Undo after a
-  rotation restores it. Screenshot the toolbar hint: `tasks/attachments/2026-09-21-021-hint.png`.
+  rotation restores it. Screenshot the toolbar hint: `tasks/attachments/2026-09-21-024-hint.png`.
 
 ## Progress log

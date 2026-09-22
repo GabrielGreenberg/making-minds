@@ -1,5 +1,5 @@
 ---
-id: 2026-09-21-022
+id: 2026-09-21-025
 type: feature
 title: Flash and briefly hold when the turbot reaches the goal, then continue the run
 priority: normal
@@ -76,6 +76,6 @@ precedent in the app is the table `row-flash-anim` keyframe (`index.css:866–87
   the turbot crosses it and the turbot pauses ~0.6 s, then keeps going; Reset → Step ×3: pulse,
   no hold. HW6 P2 (after Load HW1–HW7): same with a TM brain. Owed: `prefers-reduced-motion`
   cannot be emulated by the browser tools — check once in a real browser with the OS setting.
-- Screenshot mid-pulse: `tasks/attachments/2026-09-21-022-goal.png`.
+- Screenshot mid-pulse: `tasks/attachments/2026-09-21-025-goal.png`.
 
 ## Progress log
