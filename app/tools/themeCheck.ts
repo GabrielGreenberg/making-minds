@@ -15,7 +15,7 @@
 //
 // Run from app/: npx tsx tools/themeCheck.ts   (part of `npm run check`).
 
-import { readFileSync, readdirSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 
@@ -34,7 +34,9 @@ const PAGE_COMPONENTS = [
   'components/SessionControls.tsx',
   'components/HomeScreen.tsx',
   'components/AssignmentOverview.tsx',
-  'components/GradesPanel.tsx',
+  'components/GradesView.tsx',
+  'components/GradeSheet.tsx',
+  'components/StudentLayout.tsx',
   'components/FeedbackPanel.tsx',
   'auth/LoginScreen.tsx',
   'auth/HealthGate.tsx',
@@ -97,9 +99,13 @@ check(
   `found: ${[...new Set(editorTokenUses)].join(', ') || 'none'}`,
 );
 
-for (const rel of ['components/HomeScreen.tsx', 'components/AssignmentOverview.tsx', 'instructor/InstructorLayout.tsx', 'auth/LoginScreen.tsx', 'auth/HealthGate.tsx']) {
+for (const rel of ['components/StudentLayout.tsx', 'instructor/InstructorLayout.tsx', 'instructor/InstructorGate.tsx', 'auth/LoginScreen.tsx', 'auth/HealthGate.tsx']) {
   check(`${rel} renders <PageShell>`, /<PageShell\b/.test(read(rel)));
 }
+for (const rel of ['components/HomeScreen.tsx', 'components/GradesView.tsx', 'components/AssignmentOverview.tsx']) {
+  check(`${rel} renders <StudentLayout> (the Home tabs)`, /<StudentLayout\b/.test(read(rel)));
+}
+check('the grade-sheet modal (GradesPanel) is gone', !existsSync(path.join(SRC, 'components/GradesPanel.tsx')));
 
 const RETIRED =
   /(?<![\w-])(?:page-bar|page-body|instructor-header|instructor-app|login-screen|login-card|modal-card|modal-backdrop|instructor-btn|instructor-input|instructor-badge|instructor-page-head|instructor-page-title|instructor-section-title|instructor-subhead|instructor-section-head|instructor-field|instructor-unlock|instructor-empty|instructor-hint|instructor-link|instructor-select|instructor-encoding|instructor-mode-btn|instructor-textarea|instructor-title-input|instructor-inline-field|instructor-head-actions|subbar|page--wide|login-tabs|login-tab)(?:--?[\w-]*)?(?![\w-])|(?<![\w-])instructor-table(?![\w-])/;

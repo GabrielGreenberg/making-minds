@@ -1,34 +1,56 @@
 import { useStore } from '../store';
 import { listAssignments } from '../assignments';
+import type { AssignmentSummary } from '../assignments';
 import { navigate } from '../routing';
 import { getCurrentUserEmail, useAuth } from '../auth';
 import { summarizeResult } from '../engine/grader';
-import { dueStatus, formatDueDate, formatDuration, isFrozen, lateBy } from '../dueDates';
+import {
+  dueStatus,
+  formatDateTime,
+  formatDueDate,
+  formatDueDay,
+  formatDuration,
+  isFrozen,
+  lateBy,
+} from '../dueDates';
 import { useAsyncValue } from '../useAsyncValue';
-import { GradesPanel } from './GradesPanel';
-import { PageShell, appNav } from './PageShell';
-import { SessionControls } from './SessionControls';
-import { useState, useEffect } from 'react';
+import { useRoute } from '../useRoute';
+import { GradesView } from './GradesView';
+import { StudentLayout } from './StudentLayout';
+import { useEffect } from 'react';
 
-function formatSubmittedAt(iso: string): string {
-  const d = new Date(iso);
-  return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) +
-    ', ' + d.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
+/**
+ * The student Home — what App renders whenever no workbook is open. Two tabs,
+ * chosen by the route: Assignments (the catalog, below) and Grades
+ * (GradesView, #/grades). The tab row itself is StudentLayout's.
+ */
+export function HomeScreen() {
+  const route = useRoute();
+  if (route.kind === 'grades') return <GradesView openId={route.id} />;
+  return <AssignmentsTab />;
+}
+
+/** Among the visible assignments, the one due soonest that isn't past due. */
+function nextDue(assignments: AssignmentSummary[], now: number): { a: AssignmentSummary; due: number } | null {
+  const upcoming = assignments.flatMap((a) =>
+    a.dueDate && dueStatus(a.dueDate, now) !== 'overdue' ? [{ a, due: Date.parse(a.dueDate) }] : [],
+  );
+  upcoming.sort((x, y) => x.due - y.due);
+  return upcoming[0] ?? null;
 }
 
 /**
- * The student home: the assignment catalog. One row per published homework —
- * title and meta, the submission status (which is also the way into the grade
- * sheet once grades are released), and ONE action: Submit, or the past-due
- * lock. Opening a row leads to its question list (AssignmentOverview).
+ * The catalog: the website's "up next" box (the soonest due homework) over one
+ * row per published assignment — title and meta, the submission status (which
+ * carries the score and the way into the Grades tab once grades are released),
+ * and ONE action: Submit, or the past-due lock. Opening a row leads to its
+ * question list (AssignmentOverview).
  */
-export function HomeScreen() {
+function AssignmentsTab() {
   const submissions = useStore((s) => s.submissions);
   const submitAssignment = useStore((s) => s.submitAssignment);
   const hydrateSubmissions = useStore((s) => s.hydrateSubmissions);
   const { user } = useAuth();
-  // Which assignment's grade sheet is open, if any.
-  const [gradesFor, setGradesFor] = useState<string | null>(null);
 
   // Re-fetch on every visit to this screen (not just once at app boot) so a
   // grade or feedback note the instructor recorded after the student's last
@@ -48,6 +70,9 @@ export function HomeScreen() {
   const assignments = (assignmentList ?? []).filter(
     (a) => a.visible || user?.role === 'instructor',
   );
+  const now = Date.now();
+  const next = nextDue(assignments.filter((a) => a.visible), now);
+  const nextSub = next ? submissions[next.a.id] : undefined;
 
   const handleSubmit = async (id: string, title: string) => {
     const ok = confirm(
@@ -73,26 +98,46 @@ export function HomeScreen() {
     // them for the assignment (the release flag on the AssignmentStore seam).
     alert(
       `Submitted "${title}" (attempt ${rec.attempt}).\n` +
-        'Your work has been recorded. Grades will appear here once your instructor releases them.',
+        'Your work has been recorded. Grades will appear under Grades once your instructor releases them.',
     );
   };
 
   return (
-    <PageShell nav={appNav('student', user?.role === 'instructor' ? 'instructor' : 'student')} session={<SessionControls />}>
+    <StudentLayout current="assignments">
       <div className="mm-head">
         <h1>Assignments</h1>
         <p className="mm-lede">
           Open a homework to work on it — each question has its own canvas, and your work
-          saves as you go. Submit when you're done; grades appear here once they're released.
+          saves as you go. Submit when you're done; grades appear under Grades once they're released.
         </p>
       </div>
+
+      {next && (
+        <div className="mm-next" aria-label="Up next">
+          <div className="mm-nx">
+            <span className="chip">Next due</span>
+            <div className="mm-nx-body">
+              <button className="mm-nx-main" onClick={() => navigate({ kind: 'assignment', id: next.a.id })}>
+                <span className="mm-nx-date">{next.a.dueDate ? formatDueDay(next.a.dueDate) : ''}</span>
+                {next.a.title}
+              </button>
+              <div className="mm-nx-detail">
+                in {formatDuration(next.due - now)}
+                {nextSub
+                  ? ` · submitted ${formatDateTime(nextSub.submittedAt)} — you can submit again until then`
+                  : ' · not submitted yet'}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="mm-list">
         {assignments.map((a) => {
           const sub = submissions[a.id];
-          const frozen = isFrozen(a.dueDate, Date.now(), sub != null);
+          const frozen = isFrozen(a.dueDate, now, sub != null);
           const late = a.dueDate && sub ? lateBy(a.dueDate, sub.submittedAt) : 0;
-          const status = a.dueDate ? dueStatus(a.dueDate, Date.now()) : null;
+          const status = a.dueDate ? dueStatus(a.dueDate, now) : null;
           const summary = a.gradesReleased && sub?.result ? summarizeResult(sub.result) : null;
           return (
             <div key={a.id} className="home-row">
@@ -116,7 +161,7 @@ export function HomeScreen() {
                 {sub ? (
                   <>
                     <span className="home-status--done" title={`Attempt ${sub.attempt}`}>
-                      ✓ Submitted {formatSubmittedAt(sub.submittedAt)}
+                      ✓ Submitted {formatDateTime(sub.submittedAt)}
                       {late > 0 && (
                         <span className="home-late"> · late by {formatDuration(late)}</span>
                       )}
@@ -124,7 +169,7 @@ export function HomeScreen() {
                     {summary && (
                       <button
                         className="mm-link"
-                        onClick={() => setGradesFor(a.id)}
+                        onClick={() => navigate({ kind: 'grades', id: a.id })}
                         title="See your result for each question"
                       >
                         {summary.questionsTotal > 0
@@ -163,15 +208,6 @@ export function HomeScreen() {
           </p>
         )}
       </div>
-
-
-      {gradesFor && submissions[gradesFor] && (
-        <GradesPanel
-          assignmentId={gradesFor}
-          record={submissions[gradesFor]}
-          onClose={() => setGradesFor(null)}
-        />
-      )}
-    </PageShell>
+    </StudentLayout>
   );
 }

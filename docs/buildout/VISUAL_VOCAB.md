@@ -158,8 +158,14 @@ literal or an undefined token. Task: `tasks/done/2026-09-21-019-*`._
   site footer. Login, server-health and the instructors-only refusal use the shell's
   **card** variant: one centred `.mm-card`. A section's own navigation lives INSIDE the
   column as `.mm-tabs` (an optional eyebrow, then tabs; current tab underlined): the
-  Dashboard's Assignments · Roster & accounts · Feedback · Notes on every instructor
-  page, the remote login's panes.
+  student Home's Assignments · Grades on the catalog, the Grades page and an
+  assignment's overview; the Dashboard's Assignments · Roster & accounts · Feedback ·
+  Notes on every instructor page; the remote login's panes.
+- **Up next** — the site's `.next`/`.nx` box (`.mm-next`/`.mm-nx`): a lavender field with
+  a chip on the left (NEXT DUE) and date-in-`--mm-date` + title + a detail line on the
+  right, above the student's catalog; shown only when a homework has a future due date.
+- **Grades** — a hairline table (assignment · submitted · result); a released row opens
+  in place into its question-by-question sheet (a bordered white block), never a modal.
 - **Type** — IBM Plex, loaded from Google Fonts with system fallbacks: **Sans**
   15px/1.5 for text, **Serif** for h1 (34px/600) and h2 (19px/600, magenta), **Mono**
   for tags and emails. Section labels are `.eyebrow` (11.5px uppercase, tracked, grey).

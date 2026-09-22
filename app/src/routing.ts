@@ -16,6 +16,7 @@ import { useStore } from './store';
 export type Route =
   | { kind: 'home' }
   | { kind: 'sandbox' }
+  | { kind: 'grades'; id?: string }
   | { kind: 'assignment'; id: string; questionIndex?: number }
   | { kind: 'instructor' }
   | { kind: 'instructor-new-assignment' }
@@ -30,6 +31,10 @@ export function parseHash(hash: string): Route {
   const parts = hash.replace(/^#/, '').replace(/^\/+/, '').split('/').filter(Boolean);
   if (parts.length === 0) return { kind: 'home' };
   if (parts[0] === 'sandbox') return { kind: 'sandbox' };
+  // #/grades | #/grades/:id — Home's Grades tab, optionally with one sheet open
+  if (parts[0] === 'grades') {
+    return parts[1] ? { kind: 'grades', id: decodeURIComponent(parts[1]) } : { kind: 'grades' };
+  }
   if (parts[0] === 'instructor') {
     // #/instructor/roster
     // #/instructor/assignments/new | .../:id/edit | .../:id/submissions
@@ -64,6 +69,8 @@ export function routeToHash(route: Route): string {
       return '#/';
     case 'sandbox':
       return '#/sandbox';
+    case 'grades':
+      return route.id ? `#/grades/${encodeURIComponent(route.id)}` : '#/grades';
     case 'assignment':
       return route.questionIndex != null
         ? `#/a/${encodeURIComponent(route.id)}/q/${route.questionIndex}`
@@ -109,6 +116,12 @@ function applyRoute(route: Route): void {
       // the user is not in instructor mode), so there is nothing to do here.
       return;
     case 'home':
+      store.goHome();
+      return;
+    case 'grades':
+      // Home's Grades tab: close any open workbook exactly as Home does. Which
+      // tab shows, and which sheet is open, HomeScreen reads from the hash
+      // (useRoute) — the store has no notion of a tab.
       store.goHome();
       return;
     case 'sandbox':

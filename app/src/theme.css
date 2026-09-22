@@ -355,3 +355,16 @@ select.mm-input { width: auto; }
 .mm-tabs > .mm-tab:hover { color: var(--mm-accent); }
 .mm-tabs > .mm-tab--active { color: var(--mm-ink); border-bottom-color: var(--mm-accent); font-weight: 600; }
 .mm-card .mm-tabs { margin-bottom: 16px; }
+
+/* ══════════════════ Up next (the site's .next / .nx box) ══════════════════
+   The soonest due homework, above the student's catalog: a lavender box with
+   a chip on the left and the date + title + detail on the right. */
+.mm-next { background: var(--mm-lav-soft); border: 1px solid var(--mm-lav-line); padding: 4px 16px; margin-bottom: 22px; }
+.mm-nx { display: grid; grid-template-columns: 104px 1fr; gap: 12px; align-items: start; padding: 9px 0; font-size: var(--mm-fs-small); line-height: 1.45; }
+.mm-nx > .chip { margin-top: 2px; }
+.mm-nx-body { min-width: 0; }
+.mm-nx-main { border: 0; background: none; padding: 0; font: inherit; color: var(--mm-ink); font-weight: 600; cursor: pointer; text-align: left; }
+.mm-nx-main:hover { color: var(--mm-accent); }
+.mm-nx-date { font-weight: 400; color: var(--mm-date); margin-right: 6px; }
+.mm-nx-detail { color: var(--mm-ink-2); font-size: 13px; margin-top: 2px; }
+@media (max-width: 720px) { .mm-nx { grid-template-columns: 1fr; gap: 4px; } }
