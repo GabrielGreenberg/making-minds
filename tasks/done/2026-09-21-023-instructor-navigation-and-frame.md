@@ -8,9 +8,9 @@ requires: browser
 area: app
 source: chat
 created: 2026-09-21T22:10:00-07:00
-status: in-progress
+status: done
 after:
-branch: task/023-instructor-navigation
+branch:
 merged_into:
 ---
 
@@ -70,3 +70,26 @@ Sandbox · Instructor) and the sub-nav's first item is "Dashboard", whose page i
 - Screenshots `tasks/attachments/2026-09-21-023-<surface>-{before,after}.jpg`.
 
 ## Progress log
+- **2026-09-21 (/work, `task/023-instructor-navigation`) — landed.** The shell is invariant:
+  `page--wide` and `.subbar` are gone, every route renders in the one 1080px column; the
+  instructor sections are `.mm-tabs` inside the column (eyebrow DASHBOARD · Assignments ·
+  Roster & accounts · Feedback · Notes, rendered by `InstructorLayout` on every instructor
+  page, current by route kind); `appNav(current, role)` derives the labels — Assignments for
+  students, Student view · Dashboard for instructors; Sandbox is the shell's boxed lavender
+  `.navbox` beside the nav; the home Explore section is gone; the dashboard row lost Export
+  JSON (the editor page has it) so four actions fit the column; the editor/gradebook
+  back-links read "← Assignments"; the login panes use the shared `.mm-tabs`. Link widths
+  are reserved at bold (`data-text` ghost) so the current item can change without a shift.
+  Measured at 1280 (Student view → Dashboard → Roster): brand [140,12], nav [362,14,176],
+  Sandbox box [566,15], band [0,58], column [100,72,1080] — identical on every route; tabs
+  row [140,102] on both instructor routes. At 700: brand [28,12], box [432,15], band [0,91],
+  column [0,105,700] — identical. Before the change: brand 140→40, band 58→102, column
+  1080→1280. Dashboard table at 1280: scrollWidth = clientWidth (no overflow).
+  Verified: tsc, build, themeCheck (retired pin grew `subbar|page--wide|login-tabs|login-tab`),
+  app check, server check; screenshots `2026-09-21-023-{home,dashboard,gradebook}-before.jpg`,
+  `-{home,dashboard,gradebook,editor,notes,roster-local,student-home}-after.jpg`,
+  `-{dashboard,home}-narrow-after.jpg`. Gotcha again: Vite served stale modules for BOTH
+  editor-tool and script edits this time; a stop/start of "Vite Dev Server" fixed it —
+  probe with curl under `/making-minds/` first.
+  Owed: a real-device look.
+  Next: nothing — done.
