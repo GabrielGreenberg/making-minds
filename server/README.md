@@ -19,7 +19,7 @@ from `../app/src` — one grading implementation, zero duplication.
 ```sh
 cd server
 npm install
-npm run seed -- --sample   # roster + cc-basics + the five-mode sample assignment/submissions
+npm run seed -- --sample   # toy roster + the five-mode sample assignment/submissions
 npm run dev                # http://localhost:8133
 ```
 
@@ -96,7 +96,7 @@ endpoint, ready to back `Remote*` implementations of the `WorkbookStore` /
 | `src/sanitize.ts`       | student-facing redaction: `stripAnswers` (no `test_cases`), `stripResultDetail` (scores only), `studentRecord` (no grade at all until grades are released) |
 | `src/app.ts`            | the Express app (factory, no `listen`) — all routes                     |
 | `src/index.ts`          | entry point: config → db → listen, graceful shutdown                    |
-| `src/seed.ts`           | seed roster + bundled/sample assignments (`npm run seed [-- --sample] [-- --password=X]`) |
+| `src/seed.ts`           | seed the toy roster (+ the sample assignment) (`npm run seed [-- --sample] [-- --password=X]`) |
 | `src/roster-cli.ts`     | roster + account admin from the shell (`npm run roster -- <command>`)   |
 | `tools/serverCheck.ts`  | end-to-end HTTP smoke test (`npm run check`)                            |
 | `tools/authCheck.ts`    | the account system: roster parsing, passwords, providers, and the whole sign-in lifecycle over HTTP |

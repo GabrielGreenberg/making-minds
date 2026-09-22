@@ -252,8 +252,6 @@
 }
 .instructor-drag-handle:hover { color: var(--mm-ink-2); }
 .instructor-drag-handle:active { cursor: grabbing; }
-.instructor-drag-handle--pinned { opacity: 0.3; cursor: default; }
-.instructor-drag-handle--pinned:hover { color: var(--mm-line-2); }
 .is-dragging { opacity: 0.45; }
 
 /* Tables */

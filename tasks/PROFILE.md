@@ -94,8 +94,8 @@ State each such gap in the task's `## Verify` as owed, with the recipe.
 1. **Students never receive answer keys.** `test_cases` / `perception_cases` /
    `fill_in_answers` are stripped server-side (`server/src/sanitize.ts`); the remote-store
    module graph contains no grader (grep gate in `app/tools/remoteStoreCheck.ts`); parity is
-   pinned by `server/tools/parityCheck.ts`. Never wire the bundled assignment or the grader
-   into remote code.
+   pinned by `server/tools/parityCheck.ts`. Never wire the grader (or any answer-carrying
+   JSON) into remote code.
 2. **`app/src/engine/` is pure TypeScript** — no React, Zustand, or DOM. The server imports
    it directly.
 3. **All edit locking goes through `isCurrentQuestionLocked` in `app/src/store.ts`**, at the

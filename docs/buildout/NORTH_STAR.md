@@ -56,7 +56,7 @@ The finish line is the **Problem Coverage Matrix** ([COVERAGE.md](COVERAGE.md)),
 one row per machine-buildable problem in HW1–HW6. A row is **green** when all of:
 
 - **authorable** — the question exists (instructor UI can express it, or it's a
-  bundled assignment with correct value-based `test_cases`);
+  seeded assignment JSON with correct value-based `test_cases`);
 - **buildable** — a reference machine can be constructed in the student UI;
 - **grades ✓** — at the row's **tier** (below);
 - **appearance ✓** — the rendering matches [VISUAL_VOCAB.md](VISUAL_VOCAB.md).

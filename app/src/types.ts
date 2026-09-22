@@ -280,7 +280,7 @@ export function placeableBoxKinds(mode: BuildMode): 'CC'[] {
 }
 
 export interface AssignmentData {
-  id: string;                  // stable slug (e.g. "cc-basics"); keys the registry/persistence
+  id: string;                  // stable slug (e.g. "hw1"); keys the registry/persistence
   title: string;
   /** Optional due date (ISO timestamp). Display/annotation policy only — a late
    *  submission is still accepted and graded; lateness is computed against the

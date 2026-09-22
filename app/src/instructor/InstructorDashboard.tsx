@@ -1,9 +1,4 @@
-import {
-  listAssignments,
-  getAssignment,
-  createAssignment,
-  isBundledAssignment,
-} from '../assignments';
+import { listAssignments, getAssignment, createAssignment } from '../assignments';
 import type { AssignmentSummary } from '../assignments';
 import { assignmentStore, submissionStore, backendMode } from '../storage/backend';
 import { downloadJson } from '../download';
@@ -14,9 +9,9 @@ import { useAsyncValue } from '../useAsyncValue';
 import { useDragReorder } from './dragReorder';
 
 /**
- * Instructor dashboard: lists every assignment (bundled + instructor-authored)
- * with question and submission counts, and the per-assignment actions. Bundled
- * assignments are read-only (no Edit/Delete); custom ones are fully editable.
+ * Instructor dashboard: lists every assignment with question and submission
+ * counts, and the per-assignment actions. Every assignment is a row in the
+ * AssignmentStore, so every row is editable, publishable and deletable.
  */
 export function InstructorDashboard() {
   // The list and per-row submission counts come from the async seams; after a
@@ -38,13 +33,10 @@ export function InstructorDashboard() {
   // Reordering writes an explicit position onto EVERY assignment, not just the
   // row that moved: the list may still hold assignments that have never been
   // moved (order absent, sorted last), and renumbering the whole list is what
-  // makes the new arrangement the one that comes back. Bundled assignments
-  // live outside the store and cannot be renumbered, so they are pinned: they
-  // can neither be dragged nor be displaced by a row dragged past them.
+  // makes the new arrangement the one that comes back.
   const persistOrder = async (reordered: AssignmentSummary[]) => {
     await Promise.all(
       reordered.map(async (row, i) => {
-        if (isBundledAssignment(row.id)) return;
         const data = await getAssignment(row.id);
         if (!data || data.order === i) return;
         await assignmentStore.save({ ...data, order: i });
@@ -53,9 +45,7 @@ export function InstructorDashboard() {
     reload();
   };
 
-  const drag = useDragReorder(assignments, (next) => void persistOrder(next), (row) =>
-    isBundledAssignment(row.id),
-  );
+  const drag = useDragReorder(assignments, (next) => void persistOrder(next));
 
   const handleNew = async () => {
     const title = window.prompt('Assignment title:');
@@ -155,7 +145,6 @@ export function InstructorDashboard() {
           </thead>
           <tbody>
             {drag.items.map((a, i) => {
-              const bundled = isBundledAssignment(a.id);
               const { draggable, onDragStart, ...rowDrop } = drag.rowProps(i);
               return (
                 <tr
@@ -165,10 +154,10 @@ export function InstructorDashboard() {
                 >
                   <td className="instructor-table-order">
                     <span
-                      className={`instructor-drag-handle${bundled ? ' instructor-drag-handle--pinned' : ''}`}
+                      className="instructor-drag-handle"
                       draggable={draggable}
                       onDragStart={onDragStart}
-                      title={bundled ? 'Bundled assignments stay at the top' : 'Drag to reorder'}
+                      title="Drag to reorder"
                       aria-hidden="true"
                     >
                       ⠿
@@ -176,11 +165,6 @@ export function InstructorDashboard() {
                   </td>
                   <td>
                     <span className="instructor-asg-title">{a.title}</span>
-                    {bundled ? (
-                      <span className="tag">bundled</span>
-                    ) : (
-                      <span className="tag tag--accent">custom</span>
-                    )}
                     {!a.visible && (
                       <span className="tag tag--danger">hidden</span>
                     )}
@@ -188,14 +172,12 @@ export function InstructorDashboard() {
                   <td>{a.questionCount}</td>
                   <td>{a.submissionCount}</td>
                   <td className="instructor-table-actions">
-                    {!bundled && (
-                      <button
-                        className="mm-btn"
-                        onClick={() => navigate({ kind: 'instructor-edit', id: a.id })}
-                      >
-                        Edit
-                      </button>
-                    )}
+                    <button
+                      className="mm-btn"
+                      onClick={() => navigate({ kind: 'instructor-edit', id: a.id })}
+                    >
+                      Edit
+                    </button>
                     <button
                       className="mm-btn"
                       onClick={() => void handleVisibility(a.id, a.title, !a.visible)}
@@ -216,14 +198,12 @@ export function InstructorDashboard() {
                     <button className="mm-btn" onClick={() => void handleExport(a.id)}>
                       Export JSON
                     </button>
-                    {!bundled && (
-                      <button
-                        className="mm-btn mm-btn--danger"
-                        onClick={() => void handleDelete(a.id, a.title)}
-                      >
-                        Delete
-                      </button>
-                    )}
+                    <button
+                      className="mm-btn mm-btn--danger"
+                      onClick={() => void handleDelete(a.id, a.title)}
+                    >
+                      Delete
+                    </button>
                   </td>
                 </tr>
               );

@@ -25,7 +25,7 @@ export type Route =
   | { kind: 'instructor-feedback' }
   | { kind: 'instructor-notes' };
 
-/** Parse a location hash (e.g. "#/a/cc-basics/q/2") into a Route. Pure. */
+/** Parse a location hash (e.g. "#/a/hw1/q/2") into a Route. Pure. */
 export function parseHash(hash: string): Route {
   const parts = hash.replace(/^#/, '').replace(/^\/+/, '').split('/').filter(Boolean);
   if (parts.length === 0) return { kind: 'home' };

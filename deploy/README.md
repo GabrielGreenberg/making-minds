@@ -37,7 +37,7 @@ sudo mkdir -p /srv/making-minds/data
 sudo -u makingminds git clone <repo-url> /srv/making-minds/repo
 cd /srv/making-minds/repo/server && sudo -u makingminds npm install
 
-# Seed the database (bundled assignment; the toy roster comes with it)
+# Seed the database (the toy roster; assignments are authored in the instructor UI)
 sudo -u makingminds MM_DB_PATH=/srv/making-minds/data/making-minds.sqlite npm run seed
 
 # Load the real class roster and give yourself an account (see section 3)

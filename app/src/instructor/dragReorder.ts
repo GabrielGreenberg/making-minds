@@ -7,9 +7,7 @@ import { useEffect, useRef, useState } from 'react';
  * `moveItem` is the pure rearrangement — splice out, splice back in — and the
  * hook drives it live: every dragenter over a new row re-runs it on the
  * PREVIEW copy, so the list rearranges under the cursor and the drop merely
- * commits what is already on screen. Rows can be pinned (bundled assignments
- * live outside the store and cannot be renumbered): a pinned row can neither
- * be picked up nor be displaced by a row dragged past it.
+ * commits what is already on screen.
  */
 export function moveItem<T>(list: T[], from: number, to: number): T[] {
   if (from === to) return list;
@@ -38,11 +36,7 @@ export interface DragReorder<T> {
   rowProps: (index: number) => RowDragProps;
 }
 
-export function useDragReorder<T>(
-  source: T[],
-  commit: (next: T[]) => void,
-  isPinned: (item: T) => boolean = () => false,
-): DragReorder<T> {
+export function useDragReorder<T>(source: T[], commit: (next: T[]) => void): DragReorder<T> {
   const [preview, setPreview] = useState<T[] | null>(null);
   const [draggingIndex, setDraggingIndex] = useState<number | null>(null);
   // dragend fires after drop; this tells a committed drag from a cancelled one.
@@ -58,9 +52,8 @@ export function useDragReorder<T>(
   }, [source]);
 
   const rowProps = (index: number): RowDragProps => ({
-    draggable: !isPinned(items[index]),
+    draggable: true,
     onDragStart: (e) => {
-      if (isPinned(items[index])) return;
       e.dataTransfer.effectAllowed = 'move';
       // Firefox refuses to start a drag without payload.
       e.dataTransfer.setData('text/plain', String(index));
@@ -70,7 +63,6 @@ export function useDragReorder<T>(
     },
     onDragEnter: (e) => {
       if (draggingIndex === null || index === draggingIndex) return;
-      if (isPinned(items[index])) return;
       e.preventDefault();
       setPreview(moveItem(items, draggingIndex, index));
       setDraggingIndex(index);
