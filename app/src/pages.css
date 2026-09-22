@@ -165,22 +165,6 @@
 .login-account-name { grid-area: name; font-weight: 600; }
 .login-account-email { grid-area: email; font-family: var(--mm-font-mono); font-size: var(--mm-fs-meta); color: var(--mm-ink-3); }
 .login-account-role { grid-area: role; }
-/* Sign in / Create account / Not on the roster? — the remote login panes */
-.login-tabs { display: flex; flex-wrap: wrap; gap: 0 18px; margin-bottom: 16px; border-bottom: 1px solid var(--mm-line-2); }
-.login-tab {
-  padding: 6px 0 8px;
-  margin-bottom: -1px;
-  font: inherit;
-  font-size: var(--mm-fs-nav);
-  font-weight: 500;
-  color: var(--mm-ink-2);
-  background: none;
-  border: 0;
-  border-bottom: 2px solid transparent;
-  cursor: pointer;
-}
-.login-tab:hover { color: var(--mm-accent); }
-.login-tab--active { color: var(--mm-ink); border-bottom-color: var(--mm-accent); font-weight: 600; }
 .login-form .mm-btn { justify-self: start; margin-top: 2px; }
 
 /* ── Feedback (the student form; the instructor queue is further down) ── */

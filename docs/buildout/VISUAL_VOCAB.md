@@ -145,16 +145,21 @@ comments its site.css original) plus the per-surface rules in `app/src/pages.css
 `app/tools/themeCheck.ts` fails `npm run check` if a page surface reintroduces a colour
 literal or an undefined token. Task: `tasks/done/2026-09-21-019-*`._
 
-- **Shell** — every page renders inside `components/PageShell.tsx`: a white `.topbar`
-  (serif brand "Making Minds · PHIL 133" linking to the website; the app nav
-  Assignments · Sandbox · Instructor with the current page underlined in magenta; name ·
-  Feedback · Password · Log out at the right, from `SessionControls`), the 14px lavender
-  `.band`, one centred `.page` column (max 1080px; `page--wide` 1400px for the
-  instructor's tables), the site footer. Login, server-health and the instructors-only
-  refusal use the shell's **card** variant: one centred `.mm-card`. A section's own
-  navigation (the instructor's Dashboard · Roster & accounts · Feedback · Notes) is the
-  shell's `subnav`: a second white bar under the topbar, same link idiom, current item
-  underlined.
+- **Shell** — every page renders inside `components/PageShell.tsx`, and the shell is
+  **invariant**: the same chrome and the same column on every route and for every role,
+  so crossing between the student catalog and the instructor area moves nothing (pinned
+  by measurement in task 023). A white `.topbar` (serif brand "Making Minds · PHIL 133"
+  linking to the website; the nav by role — a student sees Assignments, an instructor
+  sees Student view · Dashboard — current page underlined in magenta, link widths
+  reserved at bold so the row never shifts; the boxed lavender **Sandbox** link beside
+  the nav, set apart because it opens the editor rather than a page; name · Feedback ·
+  Password · Log out at the right, from `SessionControls`), the 14px lavender `.band`,
+  ONE centred `.page` column (max 1080px; wide tables scroll inside their wrappers), the
+  site footer. Login, server-health and the instructors-only refusal use the shell's
+  **card** variant: one centred `.mm-card`. A section's own navigation lives INSIDE the
+  column as `.mm-tabs` (an optional eyebrow, then tabs; current tab underlined): the
+  Dashboard's Assignments · Roster & accounts · Feedback · Notes on every instructor
+  page, the remote login's panes.
 - **Type** — IBM Plex, loaded from Google Fonts with system fallbacks: **Sans**
   15px/1.5 for text, **Serif** for h1 (34px/600) and h2 (19px/600, magenta), **Mono**
   for tags and emails. Section labels are `.eyebrow` (11.5px uppercase, tracked, grey).

@@ -102,7 +102,7 @@ for (const rel of ['components/HomeScreen.tsx', 'components/AssignmentOverview.t
 }
 
 const RETIRED =
-  /(?<![\w-])(?:page-bar|page-body|instructor-header|instructor-app|login-screen|login-card|modal-card|modal-backdrop|instructor-btn|instructor-input|instructor-badge|instructor-page-head|instructor-page-title|instructor-section-title|instructor-subhead|instructor-section-head|instructor-field|instructor-unlock|instructor-empty|instructor-hint|instructor-link|instructor-select|instructor-encoding|instructor-mode-btn|instructor-textarea|instructor-title-input|instructor-inline-field|instructor-head-actions)(?:--?[\w-]*)?(?![\w-])|(?<![\w-])instructor-table(?![\w-])/;
+  /(?<![\w-])(?:page-bar|page-body|instructor-header|instructor-app|login-screen|login-card|modal-card|modal-backdrop|instructor-btn|instructor-input|instructor-badge|instructor-page-head|instructor-page-title|instructor-section-title|instructor-subhead|instructor-section-head|instructor-field|instructor-unlock|instructor-empty|instructor-hint|instructor-link|instructor-select|instructor-encoding|instructor-mode-btn|instructor-textarea|instructor-title-input|instructor-inline-field|instructor-head-actions|subbar|page--wide|login-tabs|login-tab)(?:--?[\w-]*)?(?![\w-])|(?<![\w-])instructor-table(?![\w-])/;
 const allSrc = (dir: string): string[] =>
   readdirSync(path.join(SRC, dir), { withFileTypes: true }).flatMap((d) =>
     d.isDirectory() ? allSrc(path.join(dir, d.name)) : /\.(tsx?|css)$/.test(d.name) ? [path.join(dir, d.name)] : []);

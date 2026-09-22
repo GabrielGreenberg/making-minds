@@ -22,7 +22,7 @@ export function InstructorGate({ children }: { children: ReactNode }) {
 
   if (!instructorRole.isInstructor()) {
     return (
-      <PageShell variant="card" nav={appNav('assignments', false)} session={<SessionControls />}>
+      <PageShell variant="card" nav={appNav('dashboard', 'student')} session={<SessionControls />}>
         <div className="mm-card mm-card--narrow">
           <h1>Instructors only</h1>
           <p className="mm-lede">

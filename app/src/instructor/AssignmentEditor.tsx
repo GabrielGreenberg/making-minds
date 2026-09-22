@@ -116,7 +116,7 @@ export function AssignmentEditor({ id }: { id: string }) {
             href="#/instructor"
             onClick={(e) => { e.preventDefault(); navigate({ kind: 'instructor' }); }}
           >
-            ← Dashboard
+            ← Assignments
           </a>
           <h1>{assignment.title}</h1>
         </div>

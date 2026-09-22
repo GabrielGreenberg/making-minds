@@ -94,13 +94,14 @@ function RemoteLoginScreen() {
   return (
     <LoginCard>
       {tabs.length > 1 ? (
-        <div className="login-tabs" role="tablist">
+        <div className="mm-tabs" role="tablist">
           {tabs.map((tab) => (
             <button
               key={tab.key}
               role="tab"
               aria-selected={pane === tab.key}
-              className={`login-tab${pane === tab.key ? ' login-tab--active' : ''}`}
+              className={`mm-tab${pane === tab.key ? ' mm-tab--active' : ''}`}
+              data-text={tab.label}
               onClick={() => setPane(tab.key)}
             >
               {tab.label}
