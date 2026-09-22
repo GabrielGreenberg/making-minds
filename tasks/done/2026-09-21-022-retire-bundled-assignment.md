@@ -8,9 +8,9 @@ requires:
 area: app
 source: chat
 created: 2026-09-21T21:39:44-07:00
-status: in-progress
+status: done
 after:
-branch: task/022-retire-bundled-assignment
+branch:
 merged_into:
 ---
 
@@ -63,3 +63,20 @@ no CC basics row; Delete on every row. Nothing owed: no remote or deploy behavio
   need it anymore"). Next: delete the JSON, collapse the registry, strip the dashboard /
   editor / drag-hook branches and the pinned CSS, fix the server seed and the docs, run the
   gates, eyeball the dashboard.
+- 2026-09-21 — Landed. `cc-basics.json` deleted; the registry is a thin layer over the seam
+  (`listAssignments` sorts the store's list, `getAssignment`/`createAssignment` hit the store
+  only, `isBundledAssignment` gone); the dashboard shows Edit + Delete on every row with no
+  bundled/custom tag or pinned handle, the editor's bundled refusal is gone, `useDragReorder`
+  lost its pinned concept and `pages.css` its `--pinned` rules; `server/src/seed.ts` seeds the
+  toy roster only (+ `--sample`); docs and comments (CLAUDE.md, PROFILE §8, server/deploy
+  READMEs, NORTH_STAR, store/registry headers) updated in place.
+  Verified: app tsc + build + `npm run check` (budgets + all harness tools), server typecheck +
+  check — green by exit code; browser (fresh origin, local mode): the dashboard is empty on a
+  fresh store and, after "Load HW1–HW7", lists HW1–HW7 only, Delete on every row, no console
+  errors.
+  Gotcha: another session's Vite on 5173 kept serving the pre-edit modules even after the
+  files were touched; verified on a second dev server via `"autoPort": true` in the
+  gitignored `.claude/launch.json`.
+  Owed (human, no ssh needed): the Lightsail DB still holds the `cc-basics` row seeded
+  earlier — now an ordinary row, deletable from the remote dashboard. Not pushed.
+  Next: nothing — done.
