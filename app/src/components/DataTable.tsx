@@ -3,7 +3,7 @@ import { useStore, selectTmNotation, selectEffectiveMode, selectCodecWindow, sel
 import { tmNotation } from '../engine';
 import { outputDisplayString } from './outputDisplay';
 import { TurbotArenaPanel } from './TurbotArenaPanel';
-import { StatementBody } from './StatementBody';
+import { ProblemBody, ProblemContext } from './ProblemSetDocument';
 import type { TMSymbol } from '../types';
 import { loadUiPrefs, saveUiPref } from '../uiPrefs';
 
@@ -12,25 +12,24 @@ function inputKey(bits: number[]): string {
   return bits.join(',');
 }
 
-/** The open assignment question's statement, shown above the tables in every
- *  mode's panel. Renders nothing in the sandbox. */
+/** The open assignment question, shown above the tables in every mode's
+ *  panel: its section's instruction as context, then the problem itself
+ *  (the document's own parts — components/ProblemSetDocument.tsx). Renders
+ *  nothing in the sandbox. */
 function QuestionStatement() {
   const assignment = useStore((s) => s.assignment);
   const currentQuestionIndex = useStore((s) => s.currentQuestionIndex);
   const question = assignment?.questions[currentQuestionIndex];
-  if (!question?.statement) return null;
+  if (!assignment || !question) return null;
   return (
     <div className="table-section">
       <div className="table-section-label">
-        <span>Question</span>
+        <span>{question.label}</span>
         <span className="question-rep-badge">{question.representation} representation</span>
       </div>
       <div className="question-statement">
-        {question.title && <div className="question-title">{question.title}</div>}
-        <StatementBody text={question.statement} />
-        {question.hint && (
-          <div className="question-hint"><StatementBody text={question.hint} /></div>
-        )}
+        <ProblemContext assignment={assignment} questionId={question.id} />
+        <ProblemBody question={question} showArena={false} />
       </div>
     </div>
   );

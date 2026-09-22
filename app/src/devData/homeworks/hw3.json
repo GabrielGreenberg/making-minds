@@ -1,11 +1,83 @@
 {
   "id": "hw3",
   "title": "HW3. Computing with SCs",
+  "sourcePdf": "problem-sets/hw3.pdf",
+  "sections": [
+    {
+      "heading": "I. SC Arithmetic",
+      "intro": "At any stage you may define a new boxed circuit from a previously established circuit. You may assume boxed circuits for **XOR** and **half-adder.** You will also want to introduce boxed circuits for specific mathematical functions as the need arises.\n\nDesign SCs that compute the following functions.",
+      "questionIds": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6
+      ],
+      "layout": "list"
+    },
+    {
+      "heading": "",
+      "intro": "For each of the following functions, is it possible to compute this function with an SC? If so, construct the circuit. If not, explain why in a short paragraph: be as clear and precise as you can.",
+      "questionIds": [
+        7,
+        8,
+        9,
+        10
+      ],
+      "layout": "list"
+    },
+    {
+      "heading": "II. SC Perception",
+      "intro": "For each of the following problems assume a SC that has 8 inputs and 1 output, like the schematic circuit shown. Think of these as computing **perception**: they take as their input an array of stimulations (like hitting the retina) and they output a symbol which represents a specific shape or category.",
+      "questionIds": [
+        11,
+        12
+      ],
+      "figures": [
+        {
+          "src": "problem-sets/hw3-retina.svg",
+          "alt": "A schematic circuit box with 8 inputs entering from the left and 1 output leaving to the right",
+          "placement": "aside",
+          "width": 130
+        }
+      ]
+    },
+    {
+      "heading": "III. SC Navigation",
+      "intro": "For each of the following navigation tasks: can it be completed by a combinatorial circuit embedded in a turbot? If so, give the circuit. If not, explain why in a short paragraph.",
+      "questionIds": [
+        13,
+        14,
+        15
+      ],
+      "callouts": [
+        {
+          "kind": "note",
+          "placement": "aside",
+          "body": "**Note 1:** SC Turbots have two outputs, one for each wheel."
+        },
+        {
+          "kind": "note",
+          "placement": "aside",
+          "body": "**Note 2:** The goal (the green circle) is invisible to the turbot; it reads as an empty block."
+        }
+      ]
+    },
+    {
+      "heading": "IV. Reflection",
+      "intro": "Short paragraph answers.",
+      "questionIds": [
+        16,
+        17
+      ]
+    }
+  ],
   "questions": [
     {
       "id": 1,
       "label": "Problem 1",
-      "statement": "Design a sequential circuit that computes +1 in binary: the input stream carries the binary numeral of x one bit per clock tick (least-significant bit first), and the output stream must be the binary numeral of x + 1.",
+      "statement": "+1 B",
       "buildMode": "SC",
       "representation": "binary",
       "cc_spec": {
@@ -157,8 +229,7 @@
     {
       "id": 2,
       "label": "Problem 2",
-      "statement": "Design a sequential circuit that computes x + 2 in binary: the input numeral arrives one bit per clock tick (least-significant bit first), and the circuit must emit the binary numeral for x + 2 on its output wire, least-significant bit first.",
-      "hint": "+2 is +1 twice — you can chain two incrementer blocks, or serially add the constant stream for 2 (a single 1 arriving at the second tick).",
+      "statement": "+2 B",
       "buildMode": "SC",
       "representation": "binary",
       "cc_spec": {
@@ -310,7 +381,7 @@
     {
       "id": 3,
       "label": "Problem 3",
-      "statement": "Design a sequential circuit that computes 2x in binary: the input arrives one bit per clock tick (least-significant bit first), and the output series must read as the binary numeral for twice the input value.",
+      "statement": "2*x* B",
       "buildMode": "SC",
       "representation": "binary",
       "cc_spec": {
@@ -462,7 +533,7 @@
     {
       "id": 4,
       "label": "Problem 4",
-      "statement": "Design a sequential circuit that computes 2x + 1 in binary: given the binary numeral for x streamed in over time, output the binary numeral for 2x + 1. [Use one 2x circuit and one +1 circuit.]",
+      "statement": "2*x*+1 B [Use one 2*x* circuit and one +1 circuit]",
       "buildMode": "SC",
       "representation": "binary",
       "cc_spec": {
@@ -614,7 +685,7 @@
     {
       "id": 5,
       "label": "Problem 5",
-      "statement": "Design a sequential circuit that computes 2(x+1) in binary. [Use one 2x circuit and one +1 circuit.]",
+      "statement": "2(*x*+1) B [Use one 2*x* circuit and one +1 circuit]",
       "buildMode": "SC",
       "representation": "binary",
       "cc_spec": {
@@ -766,8 +837,7 @@
     {
       "id": 6,
       "label": "Problem 6",
-      "statement": "Design a sequential circuit that computes x + y in binary: two input streams x and y arrive one bit per clock tick (least-significant bit first, in parallel), and the circuit emits the binary numeral for their sum, one bit per tick.",
-      "hint": "Add the two incoming bits plus a carry remembered in a MEM block from the previous tick.",
+      "statement": "*x*+*y* B",
       "buildMode": "SC",
       "representation": "binary",
       "cc_spec": {
@@ -1947,7 +2017,7 @@
     {
       "id": 7,
       "label": "Problem 7",
-      "statement": "Is it possible to compute +3 on tally numerals with an SC? If so, construct the circuit; if not, explain why.",
+      "statement": "+3 T",
       "buildMode": "SC",
       "representation": "tally",
       "cc_spec": {
@@ -2043,7 +2113,7 @@
     {
       "id": 8,
       "label": "Problem 8",
-      "statement": "Is it possible to compute 2x on tally numerals with a sequential circuit? If so, construct the circuit; if not, explain why.",
+      "statement": "2*x* T",
       "buildMode": "SC",
       "representation": "tally",
       "cc_spec": {
@@ -2139,7 +2209,7 @@
     {
       "id": 9,
       "label": "Problem 9",
-      "statement": "Is it possible to compute x + y on tally numerals with a sequential circuit, where the two tally inputs arrive as separate streams on IN1 (x) and IN2 (y)? If it is possible, construct the circuit; if not, explain why not.",
+      "statement": "*x* + *y* T",
       "buildMode": "SC",
       "representation": "tally",
       "cc_spec": {
@@ -2896,7 +2966,7 @@
     {
       "id": 10,
       "label": "Problem 10",
-      "statement": "Is it possible to compute the following function with an SC? If so, describe how you would construct the circuit. If not, explain why in a short paragraph — be as clear and precise as you can: x • y B (multiplication).",
+      "statement": "*x* • *y* B (multiplication)",
       "buildMode": "open",
       "representation": "binary"
     },
@@ -2904,7 +2974,7 @@
       "id": 11,
       "label": "Problem 11",
       "title": "Change detector",
-      "statement": "Design a sequential machine (8 inputs, 1 output) that outputs 1 iff the current input differs in any way from the previous input.",
+      "statement": "Design a machine that obeys the following rule: output 1 iff the current input differs in any way from the previous input.",
       "buildMode": "SC",
       "representation": "binary",
       "perception": {
@@ -3584,7 +3654,7 @@
       "id": 12,
       "label": "Problem 12",
       "title": "Motion detector",
-      "statement": "Let an object image be a string of exactly three consecutive 1s. Design a sequential machine (8 inputs, 1 output) that outputs 1 iff there is an object image anywhere in the input moving upwards 1 unit per unit of time.",
+      "statement": "Let an *object image* be a string of exactly three consecutive 1's. Design a machine that obeys the following rule: output 1 iff there is an object image anywhere in the input moving upwards 1 unit per unit of time.",
       "buildMode": "SC",
       "representation": "binary",
       "perception": {
@@ -4171,8 +4241,8 @@
     {
       "id": 13,
       "label": "Problem 13",
-      "title": "Zig-zag: reach the goal and keep going",
-      "statement": "A staircase corridor climbs from the turbot’s starting cell to the goal, walled in by blocks on every side; at the end of each leg the corridor turns, alternating left and right. Program the turbot’s sequential-circuit brain to follow the corridor all the way to the goal and keep going — it need not stop. The goal is invisible to the sensor: it reads as an empty cell. The brain has one sensor input and two outputs, one for each wheel.",
+      "title": "Zig-Zag",
+      "statement": "Reach the goal and **keep going**.",
       "buildMode": "turbot",
       "representation": "binary",
       "innerMode": "SC",
@@ -4360,7 +4430,7 @@
       "id": 14,
       "label": "Problem 14",
       "title": "Three ahead",
-      "statement": "The goal lies exactly three cells directly ahead of the turbot, but it is invisible to the sensor — it reads as an empty cell. Build a sequential circuit brain that drives the turbot forward onto the goal and stops there. The brain has one sensor input and two outputs, one for each wheel.",
+      "statement": "Reach the goal and **stop**.",
       "buildMode": "turbot",
       "representation": "binary",
       "innerMode": "SC",
@@ -4545,7 +4615,14 @@
       "id": 15,
       "label": "Problem 15",
       "title": "Mad Max",
-      "statement": "A block sits directly ahead of the turbot, an unknown distance away. Build a sequential circuit brain that drives the turbot out to the block, then turns around, returns to the starting point, and stops there. There are no blocks or markers at the starting point. The brain has one sensor input and two outputs, one for each wheel.",
+      "statement": "Go to a block directly ahead, but an unknown distance away, then return to the starting point and **stop**.",
+      "figures": [
+        {
+          "src": "problem-sets/hw3-mad-max.svg",
+          "alt": "A block some unknown distance straight ahead of the turbot, a dotted there-and-back trajectory between them; there are no blocks or markers at the starting point",
+          "width": 240
+        }
+      ],
       "buildMode": "turbot",
       "representation": "binary",
       "innerMode": "SC",
@@ -4715,14 +4792,14 @@
     {
       "id": 16,
       "label": "Problem 16",
-      "statement": "SCs are more computationally powerful than CCs: SCs can solve problems that CCs cannot. What physical abilities would you add to an SC if you wanted to make it even more powerful? Short paragraph.",
+      "statement": "SCs are more computationally powerful than CCs: SCs can solve problems that CCs cannot. What physical abilities would you add to an SC if you wanted to make it even more powerful?",
       "buildMode": "open",
       "representation": "binary"
     },
     {
       "id": 17,
       "label": "Problem 17",
-      "statement": "Could there be an intelligent being with no memory? Short paragraph.",
+      "statement": "Could there be an intelligent being with no memory?",
       "buildMode": "open",
       "representation": "binary"
     }

@@ -37,3 +37,8 @@ this review then matters for the transcription, not the layout.
    descriptions of the diagrams match the PDF? Give corrections, or say "reviewed".
 
 ## Progress log
+
+_2026-09-22 (task 020):_ HW4 P1–P2 now show the PDF's own diagrams (SVG crops,
+`app/public/problem-sets/hw4-state-abstraction.svg`, `hw4-multiple-realizability.svg`) and
+the statements follow the PDF text; the worded descriptions survive only as the figures'
+alt text. The review is now just: does each alt text describe its diagram correctly?

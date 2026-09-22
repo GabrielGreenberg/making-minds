@@ -1,6 +1,6 @@
 import type { ClipboardEvent, DragEvent } from 'react';
 import { useStore, selectQuestionLocked } from '../store';
-import { StatementBody } from './StatementBody';
+import { ProblemBody, ProblemContext } from './ProblemSetDocument';
 
 /**
  * The workspace for an open (free-text) question — the text-panel analogue of
@@ -14,12 +14,14 @@ import { StatementBody } from './StatementBody';
  * boundary.
  */
 export function OpenResponsePanel() {
-  const question = useStore((s) => s.assignment?.questions[s.currentQuestionIndex]);
+  const assignment = useStore((s) => s.assignment);
+  const currentQuestionIndex = useStore((s) => s.currentQuestionIndex);
+  const question = assignment?.questions[currentQuestionIndex];
   const response = useStore((s) => s.openResponse);
   const setOpenResponse = useStore((s) => s.setOpenResponse);
   const locked = useStore(selectQuestionLocked);
 
-  if (!question) return null;
+  if (!assignment || !question) return null;
 
   const block = (e: ClipboardEvent | DragEvent) => e.preventDefault();
   const words = response.trim() === '' ? 0 : response.trim().split(/\s+/).length;
@@ -32,11 +34,8 @@ export function OpenResponsePanel() {
           <span className="open-response-mode">open question</span>
         </div>
         <div className="open-response-statement">
-          {question.title && <div className="question-title">{question.title}</div>}
-          <StatementBody text={question.statement} />
-          {question.hint && (
-            <div className="question-hint"><StatementBody text={question.hint} /></div>
-          )}
+          <ProblemContext assignment={assignment} questionId={question.id} />
+          <ProblemBody question={question} />
         </div>
         <textarea
           className="open-response-textarea"

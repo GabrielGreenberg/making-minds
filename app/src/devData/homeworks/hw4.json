@@ -1,12 +1,85 @@
 {
   "id": "hw4",
   "title": "HW4. Computing with FSMs",
+  "sourcePdf": "problem-sets/hw4.pdf",
+  "sections": [
+    {
+      "heading": "I. State Abstraction",
+      "questionIds": [
+        1,
+        2
+      ]
+    },
+    {
+      "heading": "II. FSM Arithmetic",
+      "intro": "Design FSMs that compute the following functions.",
+      "questionIds": [
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11
+      ],
+      "layout": "columns",
+      "callouts": [
+        {
+          "kind": "advice",
+          "placement": "aside",
+          "body": "**Don't** design an SC first to get your solution; **do** think through the FSM directly."
+        },
+        {
+          "kind": "caution",
+          "placement": "aside",
+          "body": "Function composition **does not work** for FSMs. You can't combine two +1 machines to get a +2 machine.\n\nThis has to do with the fact that FSM diagrams show states of the *overall* machine, not the flow of information *through* it."
+        }
+      ]
+    },
+    {
+      "heading": "III. FSM Navigation",
+      "intro": "For each of the following navigation tasks, design an FSM which solves it.",
+      "questionIds": [
+        12,
+        13,
+        14
+      ],
+      "callouts": [
+        {
+          "kind": "note",
+          "placement": "before",
+          "body": "Use the following abbreviations:\n\nInputs:\n0 = **E** (Empty)\n1 = **B** (Block)\n\nOutputs:\n11 = **F** (Forward)\n00 = **S** (Stop)\n10 = **R** (Right)\n01 = **L** (Left)\n\nFor example, this machine goes forward until it hits a block, then stops:",
+          "figures": [
+            {
+              "src": "problem-sets/hw4-fsm-example.svg",
+              "alt": "A two-state FSM: S0 loops to itself on E:F and moves to S1 on B:S",
+              "width": 150
+            }
+          ]
+        },
+        {
+          "kind": "note",
+          "placement": "after",
+          "body": "* Problem 14 was designed by Isaijah Johnson and Jack Schaeffer, Phil 133 W19."
+        }
+      ]
+    }
+  ],
   "questions": [
     {
       "id": 1,
       "label": "Problem 1",
       "title": "State abstraction",
-      "statement": "Construct a state table for the machine shown in the HW4 handout, then convert it to a FSM diagram. What function does it compute in binary? (The machine, drawn in the HW4 PDF: two half-adder stages in series — the input feeds the first HA; each HA’s carry output C loops back through NOT → MEM → NOT into that HA’s second input; the first HA’s sum S feeds the second HA; the second HA’s sum S is the output.)",
+      "statement": "Construct a state table for the following machine, then convert it to a FSM diagram. What function does it compute in binary?",
+      "figures": [
+        {
+          "src": "problem-sets/hw4-state-abstraction.svg",
+          "alt": "Two half-adder (HA) stages in series: the input feeds the first HA; each HA’s carry C loops back through a NOT gate, an M block and a NOT gate into that HA’s upper input; the first HA’s sum S feeds the second HA; the second HA’s sum S is the output",
+          "width": 460
+        }
+      ],
       "buildMode": "open",
       "representation": "binary"
     },
@@ -14,14 +87,21 @@
       "id": 2,
       "label": "Problem 2",
       "title": "Multiple realizability",
-      "statement": "Consider the two SCs in the HW4 handout. What function does each compute in binary? Do they implement the same FSM? Why or why not? Show your work. (The machines, drawn in the HW4 PDF — A: the input splits into both inputs of a first half-adder; its sum S feeds a second half-adder whose other input comes from the two carries joined by an OR gate, then NOT → MEM → NOT, feeding back; the second HA’s sum is the output. B: the input passes through NOT → MEM → NOT in series to the output.)",
+      "statement": "Consider the following two SCs. What function does each compute in binary? Do they implement the same FSM? Why or why not? Show your work.",
+      "figures": [
+        {
+          "src": "problem-sets/hw4-multiple-realizability.svg",
+          "alt": "A: the input splits into both inputs of a first half-adder; its sum S feeds a second half-adder; the two carries C join at an OR gate, then pass through a NOT gate, an M block and a NOT gate into the second half-adder’s upper input; the second half-adder’s sum S is the output. B: the input passes through a NOT gate, an M block and a NOT gate to the output",
+          "width": 460
+        }
+      ],
       "buildMode": "open",
       "representation": "binary"
     },
     {
       "id": 3,
       "label": "Problem 3",
-      "statement": "Design a finite-state machine that computes x + 1 on tally numerals.",
+      "statement": "+1 T",
       "buildMode": "FSM",
       "representation": "tally",
       "cc_spec": {
@@ -117,7 +197,7 @@
     {
       "id": 4,
       "label": "Problem 4",
-      "statement": "Design a finite-state machine that computes x + 2 on tally numerals.",
+      "statement": "+2 T",
       "buildMode": "FSM",
       "representation": "tally",
       "cc_spec": {
@@ -213,7 +293,7 @@
     {
       "id": 5,
       "label": "Problem 5",
-      "statement": "Design a finite-state machine that computes x + 1 on binary numerals.",
+      "statement": "+1 B",
       "buildMode": "FSM",
       "representation": "binary",
       "cc_spec": {
@@ -365,7 +445,7 @@
     {
       "id": 6,
       "label": "Problem 6",
-      "statement": "Design a finite-state machine that computes x + 2 on binary numerals.",
+      "statement": "+2 B",
       "buildMode": "FSM",
       "representation": "binary",
       "cc_spec": {
@@ -517,7 +597,7 @@
     {
       "id": 7,
       "label": "Problem 7",
-      "statement": "Design a finite-state machine that computes x + 4 on binary numerals.",
+      "statement": "+4 B",
       "buildMode": "FSM",
       "representation": "binary",
       "cc_spec": {
@@ -669,7 +749,7 @@
     {
       "id": 8,
       "label": "Problem 8",
-      "statement": "Design a finite-state machine that computes 2x on binary numerals.",
+      "statement": "2*x* B",
       "buildMode": "FSM",
       "representation": "binary",
       "cc_spec": {
@@ -821,7 +901,7 @@
     {
       "id": 9,
       "label": "Problem 9",
-      "statement": "Design a finite-state machine that computes 2x + 1 on binary numerals.",
+      "statement": "2*x*+1 B",
       "buildMode": "FSM",
       "representation": "binary",
       "cc_spec": {
@@ -973,7 +1053,7 @@
     {
       "id": 10,
       "label": "Problem 10",
-      "statement": "Design a finite-state machine that computes 2(x + 1) on binary numerals.",
+      "statement": "2(*x*+1) B",
       "buildMode": "FSM",
       "representation": "binary",
       "cc_spec": {
@@ -1125,7 +1205,7 @@
     {
       "id": 11,
       "label": "Problem 11",
-      "statement": "Design a finite-state machine that adds two binary numerals x and y, reading one bit of x and one bit of y per time step (least significant bits first).",
+      "statement": "*x* + *y* B",
       "buildMode": "FSM",
       "representation": "binary",
       "cc_spec": {
@@ -2305,7 +2385,8 @@
     {
       "id": 12,
       "label": "Problem 12",
-      "statement": "Design a finite-state machine brain that drives the turbot up the zig-zag course: follow the stair-stepped corridor all the way to the goal and keep going until the course offers no way on. The sensor reads the cell ahead (0 = empty, 1 = blocked); each transition outputs the two-bit motor command (11 = forward, 10 = turn right, 01 = turn left, 00 = stop).",
+      "title": "Zig-Zag",
+      "statement": "Reach the goal and **keep going**.",
       "buildMode": "turbot",
       "representation": "binary",
       "innerMode": "FSM",
@@ -2492,8 +2573,8 @@
     {
       "id": 13,
       "label": "Problem 13",
-      "title": "Three ahead",
-      "statement": "The goal lies exactly three cells straight ahead of the turbot in an open field. Design a finite-state machine brain that drives the turbot forward onto the goal and stops there. The sensor reads the cell ahead (0 = empty, 1 = blocked); each transition outputs the two-bit motor command (11 = forward, 00 = stop, 10 = turn right, 01 = turn left).",
+      "title": "Three Ahead",
+      "statement": "Reach the goal and **stop**.",
       "buildMode": "turbot",
       "representation": "binary",
       "innerMode": "FSM",
@@ -2612,7 +2693,7 @@
       "id": 14,
       "label": "Problem 14",
       "title": "Way Finder",
-      "statement": "The turbot starts at one end of a non-branching maze — a path that never branches and is never wider than one cell across, except on corners where two one-cell-wide paths may intersect. Design a finite-state machine brain that makes its way all the way through any such maze: the layout is not known in advance, so the brain must feel its way with its sensor. Navigation is completed the moment the turbot crosses the goal cell near the far end — it does not need to stop on the goal, and may come to rest once the path finally runs out.",
+      "statement": "Given *any* non-branching maze, make your way all the way through, and keep going.\n\nA **non-branching maze** is a path that never branches and is never wider than 1-cell across, except on corners where two 1-cell width paths may intersect. Here is an example.*",
       "buildMode": "turbot",
       "representation": "binary",
       "innerMode": "FSM",

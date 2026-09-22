@@ -1,11 +1,49 @@
 {
   "id": "hw5",
   "title": "HW5. Computing with TMs",
+  "sourcePdf": "problem-sets/hw5.pdf",
+  "sections": [
+    {
+      "heading": "Rules",
+      "intro": "- **Annotation:** all machines must be annotated.\n- **Arguments:** Tally problems are defined on arguments *x* ≥ 1; for binary problems, *x* ≥ 0.\n- **Blocks:** blocks are defined differently for tally and binary.\n  - Tally block = a single block of 1's.\n  - Binary block = a block of 0's or 1's, flanked by *s.\n- **X- and Y-Blocks:**\n  - For 1-place functions, the tape starts with a single block. For 2-place functions, the tape starts with two blocks.\n  - When a problem involves two arguments *x* and *y*: the *x*-block is on the **right**, and the *y*-block is on the **left.**\n- **Standard Position.**\n  - All problems begin in standard position, and must return to standard position.\n    - Tally SP = the right most cell of the right most block.\n    - Binary SP = the right most * of the right most block.\n- **Final configuration:**\n  - All problems must end in standard position.\n  - All problems must end with a well-formed output: a single block.\n- **Boxes**\n  - You can use a boxed version of any problem you have solved in an earlier problem, provided it satisfies the criteria for boxing.",
+      "questionIds": []
+    },
+    {
+      "heading": "I. TM Arithmetic: Tally",
+      "intro": "Assume *x*,*y* ≥ 1.",
+      "questionIds": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6
+      ],
+      "layout": "list"
+    },
+    {
+      "heading": "II. TM Arithmetic: Binary",
+      "intro": "Assume *x*,*y* ≥ 0. The following problems have some arbitrary constraints built-in to make them simpler.",
+      "questionIds": [
+        7,
+        8,
+        9
+      ],
+      "layout": "list"
+    },
+    {
+      "heading": "III. Algorithmic Design",
+      "questionIds": [
+        10,
+        11
+      ]
+    }
+  ],
   "questions": [
     {
       "id": 1,
       "label": "Problem 1",
-      "statement": "Design a Turing machine that adds one in tally notation. The tape starts with a single block of strokes representing x, with the head on the rightmost stroke. The machine must halt leaving a single block of x + 1 strokes, with the head back on the rightmost stroke of the block.",
+      "statement": "*x*+1 T",
       "buildMode": "TM",
       "representation": "tally",
       "requireStandardHaltPosition": true,
@@ -94,7 +132,7 @@
     {
       "id": 2,
       "label": "Problem 2",
-      "statement": "Design a Turing machine that computes x + 3 in tally notation, reusing your solution to the add-one problem. The tape starts with a single block of strokes representing x, with the head on the rightmost stroke, and the machine must halt leaving a single block of x + 3 strokes in standard position.",
+      "statement": "*x*+3 T. Use your solution from (1).",
       "buildMode": "TM",
       "representation": "tally",
       "requireStandardHaltPosition": true,
@@ -191,7 +229,7 @@
     {
       "id": 3,
       "label": "Problem 3",
-      "statement": "Design a Turing machine that multiplies its input by three in tally notation, building on your solution to the x + 3 problem. The tape starts with a single block of strokes representing x, with the head on the rightmost stroke, and the machine must halt leaving a single block of 3x strokes in standard position.",
+      "statement": "3*x* T. Use your solution from (2).",
       "buildMode": "TM",
       "representation": "tally",
       "requireStandardHaltPosition": true,
@@ -280,7 +318,7 @@
     {
       "id": 4,
       "label": "Problem 4",
-      "statement": "Design a Turing machine that adds two numbers in tally notation. The tape starts with two blocks of strokes: the block for y on the left and the block for x on the right, with the head on the rightmost stroke of the x block. The machine must halt leaving a single block of x + y strokes in standard position. Do not assume the two blocks are separated by exactly one empty cell; a robust machine should work when they are separated by any number of empty cells.",
+      "statement": "*x*+*y* T. Use your solution from (1).\n\nFor this problem, do not assume that the input blocks will be only separated by 1 cell. They may be separated by any number of cells.",
       "buildMode": "TM",
       "representation": "tally",
       "requireStandardHaltPosition": true,
@@ -1029,7 +1067,7 @@
     {
       "id": 5,
       "label": "Problem 5",
-      "statement": "Design a Turing machine that computes three times the sum of its two inputs in tally notation, reusing your addition and tripling constructions. The tape starts with the y block on the left and the x block on the right, with the head on the rightmost stroke of the x block, and the machine must halt leaving a single block of 3(x + y) strokes in standard position.",
+      "statement": "3(*x* + *y*) T. Use your solutions from (3) and (4).",
       "buildMode": "TM",
       "representation": "tally",
       "requireStandardHaltPosition": true,
@@ -1634,7 +1672,7 @@
     {
       "id": 6,
       "label": "Problem 6",
-      "statement": "Design a Turing machine that computes x + 3y in tally notation, reusing your earlier constructions. The tape starts with the y block on the left and the x block on the right, with the head on the rightmost stroke of the x block, and the machine must halt leaving a single block of x + 3y strokes in standard position.",
+      "statement": "*x* + 3*y* T. Use your solutions from (3) and (4).",
       "buildMode": "TM",
       "representation": "tally",
       "requireStandardHaltPosition": true,
@@ -2239,7 +2277,7 @@
     {
       "id": 7,
       "label": "Problem 7",
-      "statement": "Design a Turing machine that adds one to a binary numeral. The tape starts with the numeral of x written between two asterisk markers, with the head on the right marker, and the machine must halt leaving one well-formed block containing the binary numeral of x + 1, with the head back on the block's right marker.",
+      "statement": "*x*+1 B\n- Assume the input block will always have an extra 0 in the left-most cell.",
       "buildMode": "TM",
       "representation": "binary",
       "requireStandardHaltPosition": true,
@@ -2392,7 +2430,7 @@
     {
       "id": 8,
       "label": "Problem 8",
-      "statement": "Design a Turing machine that subtracts one from a binary numeral, outputting zero when the input is zero. The tape starts with the numeral of x written between two asterisk markers, with the head on the right marker. The machine must halt leaving one well-formed block containing the binary numeral of x - 1 when x is at least one, and the numeral 0 when x is zero, ending with the head on the block's right marker.",
+      "statement": "*x* −1 B\n*f*(*x*) = *x* − 1 if *x* ≥ 1\n*f*(*x*) = 0 if *x* = 0",
       "buildMode": "TM",
       "representation": "binary",
       "requireStandardHaltPosition": true,
@@ -2531,7 +2569,7 @@
     {
       "id": 9,
       "label": "Problem 9",
-      "statement": "Design a Turing machine that adds two binary numerals, reusing your add-one and subtract-one machines. The tape starts with the numeral of y between asterisk markers on the left and the numeral of x between asterisk markers on the right, with the head on the rightmost marker. The machine must transfer the value of x into the y block one unit at a time, then erase everything except a single well-formed block containing the binary numeral of x + y — clean up so that exactly one pair of markers remains on the tape.",
+      "statement": "*x* + *y* B. Use your solutions from (7) and (8).\n- Assume that the *y*-block contains enough 0's padding the left side initially so that the entire block may contain the binary representation of *x*+*y*.\n- Don't forget to “clean up” your tape at the end of computation.",
       "buildMode": "TM",
       "representation": "binary",
       "cc_spec": {
@@ -3711,8 +3749,8 @@
     {
       "id": 10,
       "label": "Problem 10",
-      "title": "Multiplication: x • y",
-      "statement": "Using a combination of flow charts, prose, and \"snapshots\" of the tape, describe a step-by-step strategy for computing multiplication. This should not be a complete Turing Machine. (That is a difficult and laborious problem.) But it should be sufficiently detailed that you think someone could build a Turing Machine from your instructions, if they knew what they were doing. Your choice of Tally or Binary.",
+      "title": "Multiplication: *x* • *y*",
+      "statement": "Using a combination of flow charts, prose, and “snapshots” of the tape, describe a step-by-step *strategy* for computing multiplication. This should not be a complete Turing Machine. (That is a difficult and laborious problem.) But it should be sufficiently detailed that you think someone *could* build a Turing Machine from your instructions, if they knew what they were doing. Your choice of Tally or Binary.",
       "buildMode": "open",
       "representation": "binary"
     },
@@ -3720,7 +3758,7 @@
       "id": 11,
       "label": "Problem 11",
       "title": "Multi-function machine",
-      "statement": "Design a machine which can perform different functions depending on the user input (at least successor, addition, multiplication), similar to a calculator. There are many ways to do this, so be creative. Use a combination of flow charts, prose, and \"snapshots\" of the tape; don’t design a completed Turing Machine.",
+      "statement": "Design a machine which can perform different functions depending on the user input (at least successor, addition, multiplication), similar to a calculator. There are many ways to do this, so be creative. Use a combination of flow charts, prose, and “snapshots” of the tape; don’t design a completed Turing Machine.",
       "buildMode": "open",
       "representation": "binary"
     }

@@ -8,16 +8,18 @@
 // but digits reach the store.
 
 import { useStore, selectQuestionLocked } from '../store';
-import { StatementBody } from './StatementBody';
+import { ProblemBody, ProblemContext } from './ProblemSetDocument';
 
 export function FillInPanel() {
-  const question = useStore((s) => s.assignment?.questions[s.currentQuestionIndex]);
+  const assignment = useStore((s) => s.assignment);
+  const currentQuestionIndex = useStore((s) => s.currentQuestionIndex);
+  const question = assignment?.questions[currentQuestionIndex];
   const answers = useStore((s) => s.fillAnswers);
   const setFillAnswer = useStore((s) => s.setFillAnswer);
   const locked = useStore(selectQuestionLocked);
 
   const spec = question?.fill_in;
-  if (!question || !spec) return null;
+  if (!assignment || !question || !spec) return null;
 
   const filled = spec.labels.filter((_, i) => (answers[i] ?? '').trim() !== '').length;
 
@@ -29,11 +31,8 @@ export function FillInPanel() {
           <span className="open-response-mode">fill in the blanks</span>
         </div>
         <div className="open-response-statement">
-          {question.title && <div className="question-title">{question.title}</div>}
-          <StatementBody text={question.statement} />
-          {question.hint && (
-            <div className="question-hint"><StatementBody text={question.hint} /></div>
-          )}
+          <ProblemContext assignment={assignment} questionId={question.id} />
+          <ProblemBody question={question} />
         </div>
         <div className="fill-in-grid">
           {spec.labels.map((label, i) => (
