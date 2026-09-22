@@ -1,11 +1,12 @@
-// The one renderer for a question statement, shared by the student workspace
-// panel, the open-question panel and the instructor's live preview, so the
-// markup a statement is written in means the same thing everywhere.
-// The grammar and the parse live in src/statementFormat.ts.
+// The one renderer for statement markup — question statements, section
+// intros, preambles and callout bodies — shared by the problem-set document,
+// the student workspace panels and the instructor's live preview, so the
+// markup means the same thing everywhere. The grammar and the parse live in
+// src/statementFormat.ts.
 
-import { useMemo } from 'react';
+import { useMemo, type ReactNode } from 'react';
 import katex from 'katex';
-import { parseStatement, type Block, type Inline } from '../statementFormat';
+import { parseStatement, type Block, type Inline, type ListItem } from '../statementFormat';
 
 /** KaTeX renders to an HTML string. It is called in throwOnError:false mode,
  *  so malformed TeX shows in red rather than blanking the statement — an
@@ -74,28 +75,60 @@ function IoProfile({ table }: { table: Extract<Block, { kind: 'io-table' }> }) {
   );
 }
 
-function BlockNode({ block }: { block: Block }) {
+/** Items carry a depth; nest them as real sub-lists so indentation, markers
+ *  and screen readers all agree. */
+function nestList(items: ListItem[], depth: number, ordered: boolean): ReactNode {
+  const out: ReactNode[] = [];
+  let i = 0;
+  while (i < items.length) {
+    const item = items[i];
+    if (item.depth < depth) break;
+    const children: ListItem[] = [];
+    let j = i + 1;
+    while (j < items.length && items[j].depth > depth) children.push(items[j++]);
+    out.push(
+      <li key={i}>
+        <InlineNodes nodes={item.content} />
+        {children.length > 0 && nestList(children, depth + 1, ordered)}
+      </li>,
+    );
+    i = j;
+  }
+  const Tag = ordered ? 'ol' : 'ul';
+  return <Tag className="statement-list">{out}</Tag>;
+}
+
+function BlockNode({ block, lead }: { block: Block; lead?: ReactNode }) {
   if (block.kind === 'io-table') return <IoProfile table={block} />;
+  if (block.kind === 'list') return <>{nestList(block.items, 0, block.ordered)}</>;
   if (block.part) {
     return (
       <p className="statement-para statement-part">
-        <span className="statement-part-marker">({block.part})</span>
+        <span className="statement-part-marker">{block.part}.</span>
         <InlineNodes nodes={block.content} />
       </p>
     );
   }
   return (
     <p className="statement-para">
+      {lead}
       <InlineNodes nodes={block.content} />
     </p>
   );
 }
 
-export function StatementBody({ text, className }: { text: string; className?: string }) {
+/**
+ * `lead` is run into the first paragraph (a problem's bold title, a callout's
+ * "Hint:" heading — the PDFs' run-in idiom); when the text opens with a table,
+ * a list or a part, it stands on its own line instead.
+ */
+export function StatementBody({ text, className, lead }: { text: string; className?: string; lead?: ReactNode }) {
   const blocks = useMemo(() => parseStatement(text), [text]);
+  const runIn = lead !== undefined && blocks.length > 0 && blocks[0].kind === 'para' && !blocks[0].part;
   return (
     <div className={className ? `statement ${className}` : 'statement'}>
-      {blocks.map((b, i) => <BlockNode key={i} block={b} />)}
+      {lead !== undefined && !runIn && <p className="statement-para">{lead}</p>}
+      {blocks.map((b, i) => <BlockNode key={i} block={b} lead={i === 0 && runIn ? lead : undefined} />)}
     </div>
   );
 }

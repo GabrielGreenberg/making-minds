@@ -1,11 +1,86 @@
 {
   "id": "hw2",
   "title": "HW2. Computing with CCs",
+  "sourcePdf": "problem-sets/hw2.pdf",
+  "sections": [
+    {
+      "heading": "I. CC Arithmetic",
+      "intro": "Starting with **the three basic logic gates only**, design CCs that compute the following functions. At any stage you may define a new boxed circuit from a previously established circuit or logic gate. Useful circuits to define in this way include **All-1**, **XOR**, **half-adder**, and (if you wish) **full-adder**. You will also want to introduce boxed circuits for specific mathematical functions as the need arises.",
+      "questionIds": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9
+      ],
+      "layout": "list",
+      "callouts": [
+        {
+          "kind": "challenge",
+          "body": "prove the following: for any numerical function *f* and any integer *n*, there is a CC which computes *f* [0 - *n*] B."
+        },
+        {
+          "kind": "hint",
+          "title": "On binary addition",
+          "body": "**Hint 1:** Use the grade school algorithm for long addition. Start by thinking of the problem in terms of long addition (the first figure below), then set up your machine in the same format (the second).\n\nWhen filling in the circuit, think of your machine first in terms of columns (e.g. how does the Output Digit 1 relate to the Input Digit 1’s?). Then think about how the columns relate to each other. A key idea here is the “carry digit” – remember how this works in standard long addition, and see if you can apply the same idea to the construction of your machine.\n\n**Hint 2:** Add twice. When you are doing long addition, note that you really have to do basic addition *twice* for each column. First you have to add the digit from the top row to the digit from the bottom row, and then you have to add the carry to the result. (You can also do these in the opposite order.) The same thing is true in binary, a fact you should convince yourself of before trying to solve the problem. You’ll find this idea has a direct correlate in the circuit which computes binary addition.",
+          "figures": [
+            {
+              "src": "problem-sets/hw2-long-addition.svg",
+              "alt": "Long addition of 11 and 10 in binary: Input 1 over Input 2, a rule, and the Output 101",
+              "width": 260
+            },
+            {
+              "src": "problem-sets/hw2-machine-format.svg",
+              "alt": "The same format as a machine: Input 1 and Input 2 as four digit boxes each, the Output as five",
+              "width": 300
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "heading": "II. CC Perception",
+      "intro": "For each of the following problems assume a CC that has 8 inputs and 1 output, like the schematic circuit shown. Think of these as computing **perception**: they take as their input an array of stimulations (like hitting the retina) and they output a symbol which represents a specific shape or category.",
+      "questionIds": [
+        10,
+        11,
+        12
+      ],
+      "figures": [
+        {
+          "src": "problem-sets/hw2-retina.svg",
+          "alt": "A schematic circuit box with 8 inputs entering from the left and 1 output leaving to the right",
+          "placement": "aside",
+          "width": 130
+        }
+      ]
+    },
+    {
+      "heading": "III. CC Navigation",
+      "intro": "In these navigation tasks, the yellow triangle indicates the turbot's starting position and orientation. Navigation is “completed,” and the problem solved, when the turbot *crosses over* the goal. It does not need to stop on the goal. (Think of Pac-Man.)\n\nFor each of the following problems, answer the question: can it be completed by a combinatorial circuit embedded in a turbot? If so, give the circuit. If not, explain why in a short paragraph.",
+      "questionIds": [
+        13,
+        14,
+        15
+      ]
+    },
+    {
+      "heading": "IV. Reflection",
+      "questionIds": [
+        16,
+        17
+      ]
+    }
+  ],
   "questions": [
     {
       "id": 1,
       "label": "Problem 1",
-      "statement": "Design a combinatorial circuit that computes the successor function: given a binary input x between 0 and 15, output the binary numeral for x + 1. Start from the three basic logic gates; you may define and reuse boxed circuits (e.g. XOR, half-adder) along the way.",
+      "statement": "+1 [0-15] B",
       "buildMode": "CC",
       "representation": "binary",
       "cc_spec": {
@@ -158,7 +233,7 @@
     {
       "id": 2,
       "label": "Problem 2",
-      "statement": "Design a combinatorial circuit that computes x + 2: given a binary input x between 0 and 15, output the binary numeral for x + 2. Build it from the basic gates and/or boxed circuits you have already defined (e.g. the half-adder from the +1 problem).",
+      "statement": "+2 [0-15] B",
       "buildMode": "CC",
       "representation": "binary",
       "cc_spec": {
@@ -311,7 +386,7 @@
     {
       "id": 3,
       "label": "Problem 3",
-      "statement": "Design a CC that computes x + 3: given a binary input x between 0 and 15, output the binary numeral for x + 3. A good strategy is to compose circuits you have already built — e.g. feed the output of your +1 circuit into a +2 circuit (boxed sub-circuits may be chained).",
+      "statement": "+3 [0-15] B",
       "buildMode": "CC",
       "representation": "binary",
       "cc_spec": {
@@ -464,7 +539,7 @@
     {
       "id": 4,
       "label": "Problem 4",
-      "statement": "Design a combinatorial circuit that computes doubling: given a binary input x between 0 and 15, output the binary numeral for 2x. Think about what doubling does to a binary numeral’s digits.",
+      "statement": "2*x* [0-15] B",
       "buildMode": "CC",
       "representation": "binary",
       "cc_spec": {
@@ -617,7 +692,7 @@
     {
       "id": 5,
       "label": "Problem 5",
-      "statement": "Design a combinatorial circuit that computes 2x + 1: given a binary input x between 0 and 15, output the binary numeral for 2x + 1. Consider how this circuit relates to your 2x circuit.",
+      "statement": "2*x*+1 [0-15] B",
       "buildMode": "CC",
       "representation": "binary",
       "cc_spec": {
@@ -770,7 +845,7 @@
     {
       "id": 6,
       "label": "Problem 6",
-      "statement": "Design a combinatorial circuit that computes 2(x+1): given a binary input x between 0 and 15 (IN1 = most significant bit), output the binary numeral for 2(x+1) (OUT1 = most significant bit). Only use ONE sub-part which computes +1 — box your +1 circuit once and reuse it, rather than incrementing twice.",
+      "statement": "2(*x*+1) [0-15] B (only use *one* sub-part which computes +1)",
       "buildMode": "CC",
       "representation": "binary",
       "component_limits": {
@@ -926,7 +1001,7 @@
     {
       "id": 7,
       "label": "Problem 7",
-      "statement": "Design a combinatorial circuit that computes binary addition: given two binary inputs x and y, each between 0 and 15, output the binary numeral for x + y. Use the grade-school long-addition algorithm: work column by column, and remember the carry digit — each column really adds twice (top digit + bottom digit, then + the carry in). Reference: Petzold (2000), \"A binary adding machine.\"",
+      "statement": "*x*+*y* [0-15] B (i.e. addition, bounded to 0-15 for each argument)\n**Reference:** Petzold (2000) “A binary adding machine.”",
       "buildMode": "CC",
       "representation": "binary",
       "cc_spec": {
@@ -3260,7 +3335,7 @@
     {
       "id": 8,
       "label": "Problem 8",
-      "statement": "For any integer n, in principle, could you design a CC that computes +1 [0-n] B? Why or why not? Short paragraph.",
+      "statement": "For any integer *n*, in principle, could you design a CC that computes +1 [0- *n*] B? Why or why not? Short paragraph.",
       "buildMode": "open",
       "representation": "binary"
     },
@@ -3275,7 +3350,7 @@
       "id": 10,
       "label": "Problem 10",
       "title": "Edge detector",
-      "statement": "Design a machine (8 inputs, 1 output) that outputs 1 iff there is a string of at least three consecutive 1s anywhere in the input.",
+      "statement": "Design a machine that obeys the following rule: output 1 iff there is a string of *at least* three consecutive 1’s anywhere in the input.",
       "buildMode": "CC",
       "representation": "binary",
       "perception": {
@@ -7644,7 +7719,7 @@
       "id": 11,
       "label": "Problem 11",
       "title": "Object detector",
-      "statement": "Design a machine (8 inputs, 1 output) that outputs 1 iff there is a string of exactly three consecutive 1s anywhere in the input.",
+      "statement": "Design a machine that obeys the following rule: output 1 iff there is a string of *exactly* three consecutive 1’s anywhere in the input.",
       "buildMode": "CC",
       "representation": "binary",
       "perception": {
@@ -12013,7 +12088,7 @@
       "id": 12,
       "label": "Problem 12",
       "title": "Landmark recognition",
-      "statement": "Design a machine (9 inputs, 1 output) that outputs 1 iff the input = 110010111.",
+      "statement": "Design a machine that obeys the following rule: output 1 iff the input = 110010111",
       "buildMode": "CC",
       "representation": "binary",
       "perception": {
@@ -21246,7 +21321,7 @@
       "id": 13,
       "label": "Problem 13",
       "title": "Spiral",
-      "statement": "The turbot starts at the outer end of a one-cell-wide spiral corridor, facing along it, and the goal lies at the corridor’s inner end. Build a combinatorial-circuit brain that drives the turbot around the spiral and over the goal. Navigation is complete when the turbot crosses the goal cell — it does not need to stop there.",
+      "statement": "",
       "buildMode": "turbot",
       "representation": "binary",
       "innerMode": "CC",
@@ -21429,7 +21504,7 @@
       "id": 14,
       "label": "Problem 14",
       "title": "Full circle",
-      "statement": "The turbot sits inside a walled rectangular room with no obstacles, on the bottom row of open cells, facing along the wall — and the goal lies in the cell directly behind it. Build a combinatorial-circuit brain that drives the turbot one full lap around the inside of the room and back over the goal. Navigation is completed when the turbot crosses over the goal — it does not need to stop on it. (Think of Pac-Man.)",
+      "statement": "",
       "buildMode": "turbot",
       "representation": "binary",
       "innerMode": "CC",
@@ -21601,7 +21676,7 @@
       "id": 15,
       "label": "Problem 15",
       "title": "Zig-zag",
-      "statement": "The turbot starts at the bottom of a Z-shaped corridor, facing along its first leg; the goal lies at the far end, past two turns in opposite directions. Navigation is completed the moment the turbot crosses over the goal cell — it does not need to stop on it. Can this course be completed by a combinatorial circuit embedded in a turbot? If so, give the circuit. If not, explain why in a short paragraph.",
+      "statement": "",
       "buildMode": "turbot",
       "representation": "binary",
       "innerMode": "CC",
@@ -21735,7 +21810,7 @@
       "id": 16,
       "label": "Problem 16",
       "title": "Representational systems",
-      "statement": "Suppose you were designing a calculator for solving a high-stakes problem. (Perhaps \"you\" are Nature, the \"calculator\" is the Brain, and the \"problem\" is Survival.) Would you design it to calculate in binary or in tally? Why? Use specific examples to justify your answer. ~1 paragraph.",
+      "statement": "Suppose you were designing a calculator for solving a high-stakes problem. (Perhaps “you” are Nature, the “calculator” is the Brain, and the “problem” is Survival.) Would you design it to calculate in binary or in tally? Why? Use specific examples to justify your answer. ~1 paragraph",
       "buildMode": "open",
       "representation": "binary"
     },
@@ -21743,7 +21818,7 @@
       "id": 17,
       "label": "Problem 17",
       "title": "Embodied computation",
-      "statement": "Consider a Turbot like the one in problem 12 (landmark recognition). What function, if any, does it compute? If it does compute a function, what are the arguments and what is the value of this function? How does this compare to the function computed by the \"directions\" mode in Google Maps? ~1 paragraph.",
+      "statement": "Consider a Turbot like the one in problem 12. What function, if any, does it compute? If it does compute a function, what are the arguments and what is the value of this function? How does this compare to the function computed by the “directions” mode in Google Maps? ~1 paragraph",
       "buildMode": "open",
       "representation": "binary"
     }

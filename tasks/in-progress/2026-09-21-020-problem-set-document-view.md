@@ -155,3 +155,18 @@ that is missing.
 - Owed: nothing beyond the browser pass.
 
 ## Progress log
+- 2026-09-22 09:45 — Checkpoint 1 (branch `task/020-problem-set-document-view`). Done: design memo
+  `docs/buildout/designs/problem-set-document.md`; the model (`types.ts`: `Callout`, `Figure`,
+  `AssignmentSection`, `preamble`/`sections`/`sourcePdf`, per-question `callouts`/`figures`);
+  the pure semantics `src/problemSet.ts`; `statementFormat.ts` gains bulleted/numbered lists,
+  line breaks and the PDFs' `a.` parts; `components/ProblemSetDocument.tsx` (document +
+  `ProblemBody`/`ProblemContext` reused by DataTable's QuestionStatement, FillInPanel,
+  OpenResponsePanel); `AssignmentOverview` renders the document; `.statement-*` CSS moved from
+  `index.css` to `pages.css` (tokenised) with the `.ps-*` document styles; HW1–HW7 JSON
+  re-transcribed to the PDFs (grading fields byte-identical to HEAD, verified by stripping
+  display fields and diffing); ten figures cropped from the PDFs as SVG + the PDFs under
+  `app/public/problem-sets/`; `statementFormatCheck` extended (65 pins). Gates green: tsc,
+  statementFormatCheck, themeCheck. Remaining: (5) authoring in AssignmentEditor/QuestionCreator;
+  serverCheck pin (student copy keeps sections); full gates; browser pass at 1280/700 with
+  screenshots; CLAUDE.md. Next step: reseed local HW (clear `mm:inst-asg:hw*`, Load HW1–HW7,
+  Publish), eyeball each HW beside its PDF.

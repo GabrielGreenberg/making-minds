@@ -163,6 +163,70 @@ export interface FillInCaseResult {
   pass: boolean;
 }
 
+// ── The problem-set document (task 2026-09-21-020) ─────────────────────────
+// A homework is a DOCUMENT — the PDFs under problem sets/ have a preamble,
+// sections whose intro sentence carries the instruction for a run of problems
+// ("Design SCs that compute the following functions."), boxed callouts that
+// belong to a section or a problem, and figures. These types give that level a
+// home in the data so one renderer (components/ProblemSetDocument.tsx) can show
+// any assignment the way its author laid it out. `questions[]` stays flat and
+// stays the grading unit; everything here is display-only — the grader,
+// submissions, workbooks and the server's sanitizer never read it. Semantics
+// (section normalisation, numbering, layout) live in src/problemSet.ts.
+
+export type CalloutKind = 'hint' | 'challenge' | 'advice' | 'caution' | 'note';
+export const CALLOUT_KINDS: readonly CalloutKind[] = ['hint', 'challenge', 'advice', 'caution', 'note'];
+
+/** Where an attachment sits relative to the thing it belongs to: before its
+ *  problems (a section's instruction box), beside them on wide screens (the
+ *  PDFs' sidebar boxes and margin notes), or after them (the default). */
+export type Placement = 'before' | 'aside' | 'after';
+
+export interface Figure {
+  /** A data URL (instructor upload, size-capped by the editor) or a path
+   *  under the app's public root such as `problem-sets/hw1-mn.svg`, resolved
+   *  against the app's base URL at render time (src/problemSet.ts figureUrl). */
+  src: string;
+  alt: string;
+  caption?: string;
+  /** CSS pixel cap on the rendered width. Absent = the natural size, capped
+   *  by the column. */
+  width?: number;
+  placement?: Placement;
+}
+
+/** A boxed aside — the PDFs' "Hint:", "Challenge problem:", "Advice!",
+ *  "Caution!" and plain note boxes. `body` is statement markup. */
+export interface Callout {
+  kind: CalloutKind;
+  /** Heading; absent = the kind's default ("Hint", "Challenge problem", …). */
+  title?: string;
+  body: string;
+  placement?: Placement;
+  figures?: Figure[];
+}
+
+/** How a section's run of compact problems flows. Absent = `auto`: consecutive
+ *  truth-table problems form a grid, consecutive one-liners form columns,
+ *  anything longer takes the full width (src/problemSet.ts problemShape). */
+export type SectionLayout = 'auto' | 'list' | 'columns' | 'grid';
+
+export interface AssignmentSection {
+  /** "I. Combinatorial Circuits". Empty = a continuation: no heading or rule
+   *  is drawn, only the intro — for a fresh instruction mid-section (HW3 §I
+   *  switches from "design" to "is it possible?" after problem 6). */
+  heading: string;
+  /** Statement markup: the instruction carried by the whole run of problems. */
+  intro?: string;
+  /** The problems, in order, by AssignmentQuestion.id. Together the sections
+   *  partition the assignment's question ids; a question listed nowhere is
+   *  rendered in a trailing unnamed section so it is never lost. */
+  questionIds: number[];
+  callouts?: Callout[];
+  figures?: Figure[];
+  layout?: SectionLayout;
+}
+
 export interface AssignmentQuestion {
   id: number;                  // stable id; referenced by the grader and submissions
   label: string;               // e.g. "Problem 1", "Q2a"
@@ -212,6 +276,10 @@ export interface AssignmentQuestion {
   // copies like `test_cases` (see engine/fillIn.ts + server/src/sanitize.ts).
   fill_in?: FillInSpec;
   fill_in_answers?: string[];
+  /** Boxed asides and figures that belong to this problem alone (the
+   *  document level, above; a `hint` is the lighter margin-note idiom). */
+  callouts?: Callout[];
+  figures?: Figure[];
   notes?: string;
 }
 
@@ -291,6 +359,17 @@ export interface AssignmentData {
    *  keeps a stable place. Set by the dashboard's ↑/↓ buttons. */
   order?: number;
   questions: AssignmentQuestion[];
+  /** Statement markup shown under the title, before the first section
+   *  (HW1's "Note: I have put key words in bold …"). */
+  preamble?: string;
+  /** The document structure over `questions` — see AssignmentSection. Absent
+   *  = one unnamed section holding every question, so every existing
+   *  assignment renders unchanged. */
+  sections?: AssignmentSection[];
+  /** The original handout, as a path under the app's public root
+   *  (`problem-sets/hw1.pdf`) or an absolute URL; rendered as an "Original
+   *  PDF" link. */
+  sourcePdf?: string;
 }
 
 /**

@@ -1,20 +1,41 @@
 {
   "id": "hw6",
   "title": "HW6. Navigation with Turbots",
+  "sourcePdf": "problem-sets/hw6.pdf",
+  "sections": [
+    {
+      "heading": "The Desert Ant",
+      "intro": "**Goal:** Search until you find food (and pass over it), then return to where you started as quickly as possible. You may choose any initial configuration for the tape.\n- **Assumption 1:** the food will always appear in the NE quadrant relative to the Turbot’s starting position (and not at the same position as the Turbot itself.)\n- **Assumption 2:** the world is 30 X 30 cells, surrounded by a wall.\n- **Constraint:** use a maximum of 20 cells on the Turing Machine tape.\n- **Unknowns:** the starting position of the Turbot in the world is unknown, the position of the food within the NE quadrant of the Turbot is also unknown.",
+      "figures": [
+        {
+          "src": "problem-sets/hw6-desert-ant.svg",
+          "alt": "The desert: a 30 by 30 world with a one-cell wall around it; the turbot starts at an unknown position facing north; the food lies at an unknown position in the quadrant to its north-east",
+          "placement": "before",
+          "width": 400
+        }
+      ],
+      "questionIds": [
+        1,
+        2,
+        3
+      ]
+    }
+  ],
   "questions": [
     {
       "id": 1,
       "label": "Problem 1",
-      "title": "The Desert Ant — Flow-chart",
-      "statement": "Goal: search until you find food (and pass over it), then return to where you started as quickly as possible. You may choose any initial configuration for the tape. Assumption 1: the food will always appear in the NE quadrant relative to the Turbot’s starting position (and not at the same position as the Turbot itself). Assumption 2: the world is 30 × 30 cells, surrounded by a wall. Constraint: use a maximum of 20 cells on the Turing Machine tape. Unknowns: the starting position of the Turbot in the world is unknown; the position of the food within the NE quadrant of the Turbot is also unknown. Design a high-level flow-chart that describes your solution to the Desert Ant Problem. Be sure to describe both the design of the machine and the configuration of the tape.",
+      "title": "Flow-chart",
+      "statement": "Design a high-level flow-chart that describes your solution to the Desert Ant Problem. Be sure to describe both the design of the machine and the configuration of the tape.",
       "buildMode": "open",
       "representation": "binary"
     },
     {
       "id": 2,
       "label": "Problem 2",
-      "title": "The Desert Ant",
-      "statement": "Your turbot lives in a desert: a 30 by 30 world surrounded by a wall, with a single piece of food somewhere in the quadrant to the north-east of the turbot’s starting position (never on the starting cell itself). Neither the starting position nor the exact location of the food is known in advance. Build a Turing-machine brain that searches until the turbot finds the food and passes over it, then returns to the starting cell as quickly as possible and stops there. Use at most 20 cells of the Turing machine tape. The tape starts blank; if your design needs an initial tape configuration, have the machine write it before setting off.",
+      "title": "Turbot",
+      "statement": "Construct a TM that follows the flow-chart in (1) and solves the Desert Ant Problem. Use modular boxed functions when you can. Label all the major parts of your design according to their function.\n\nFor very similar functions, it is sufficient to provide one solution, and indicate the obvious change to the other. (For example, if you have one sub-part that handles left turns, and a symmetrical one that handles right turns, you can just design one of these, and describe the other one in words.)",
+      "hint": "In the app the tape starts blank; if your design needs an initial tape configuration, have the machine write it before setting off.",
       "buildMode": "turbot",
       "representation": "binary",
       "maxTapeCells": 20,
@@ -2951,7 +2972,7 @@
       "id": 3,
       "label": "Problem 3",
       "title": "The Life Cycle",
-      "statement": "Suppose that, after solving the Desert Ant Problem, your Turbot must stay at home for a fixed amount of time (say: 20 clock cycles), then return to the food, and the whole cycle must repeat again. Assuming the food never moves, how would you change your initial design to accommodate this challenge? How would you change the tape? Describe your approach in prose, or with the help of a flow chart, but don’t design the actual Turbot.",
+      "statement": "Suppose that, after solving the Desert Ant Problem, your Turbot must stay at home for a fixed amount of time (say: 20 clock cycles), then return to the food, and the whole cycle must repeat again.\n\nAssuming the food never moves, how would you change your initial design to accommodate this challenge? How would you change the tape? Describe your approach in prose, or with the help of a flow chart, but don’t design the actual Turbot.",
       "buildMode": "open",
       "representation": "binary"
     }

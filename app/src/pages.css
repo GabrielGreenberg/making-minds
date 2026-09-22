@@ -67,47 +67,150 @@
   .home-row .mm-btn, .home-row .home-locked { grid-column: 2; grid-row: 1 / span 2; align-self: center; }
 }
 
-/* ── Assignment overview: the question list ────────────────────────── */
-.overview-row {
-  display: grid;
-  grid-template-columns: auto auto minmax(0, 1fr);
-  justify-items: start;
-  align-items: baseline;
-  gap: 6px 14px;
-  width: 100%;
-  padding: 12px 0;
-  border: 0;
-  border-bottom: 1px solid var(--mm-line);
-  background: none;
-  font: inherit;
-  color: inherit;
-  text-align: left;
-  cursor: pointer;
-}
-.overview-label { font-weight: 600; white-space: nowrap; color: var(--mm-ink); }
-.overview-row:hover .overview-label { color: var(--mm-accent); }
-.overview-done { color: var(--mm-ok); margin-left: 5px; }
-.overview-statement {
-  font-size: var(--mm-fs-small);
-  color: var(--mm-ink-3);
-  overflow: hidden;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-}
-.overview-statement strong { color: var(--mm-ink-2); }
+/* ── Assignment overview: the problem-set document ─────────────────────
+   components/ProblemSetDocument.tsx renders an assignment the way its handout
+   reads (docs/buildout/designs/problem-set-document.md). The same .ps-body /
+   .ps-context parts render inside the editor's right panel, where the panel's
+   own font size applies — every size here is relative for that reason. */
+.overview-meta { display: flex; flex-wrap: wrap; gap: 6px 18px; align-items: baseline; }
+.overview-meta .mm-link { font-size: inherit; }
 .overview-submit {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
   gap: 10px 16px;
-  margin-top: 18px;
+  margin-top: 28px;
+  padding-top: 16px;
+  border-top: 1px solid var(--mm-line-2);
 }
+
+.ps { max-width: 78ch; }
+.ps-preamble { margin: 0 0 18px; color: var(--mm-ink-2); }
+.ps-section { margin-top: var(--mm-section-gap); }
+.ps-section--continued { margin-top: 18px; }
+.ps-section-heading {
+  font-family: var(--mm-font-serif);
+  font-size: var(--mm-fs-h2);
+  font-weight: 600;
+  color: var(--mm-accent);
+  margin: 0 0 10px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--mm-line-2);
+}
+.ps-intro { margin: 0 0 12px; }
+.ps-section-body--aside {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(200px, 30%);
+  gap: 8px 28px;
+  align-items: start;
+}
+.ps-section-aside { display: flex; flex-direction: column; gap: 12px; padding-top: 4px; }
+
+/* Runs of problems: stacked, two columns (the PDFs' numbered lists), or a
+   grid of truth tables / arenas several per row. */
+.ps-run + .ps-run, .ps-attachments + .ps-run, .ps-run + .ps-attachments { margin-top: 10px; }
+.ps-run--columns { columns: 2; column-gap: 36px; }
+.ps-run--columns .ps-problem { break-inside: avoid; }
+.ps-run--grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 8px 28px;
+  align-items: start;
+}
+
+/* One problem: a hanging number in the gutter, the body beside it. The block
+   opens the canvas; hover says so without a button. */
+.ps-problem {
+  display: grid;
+  grid-template-columns: 2.2em minmax(0, 1fr);
+  gap: 0 4px;
+  padding: 7px 8px 7px 0;
+  margin: 0 0 0 -8px;
+  cursor: pointer;
+}
+.ps-problem:hover { background: var(--mm-surface-2); }
+.ps-problem-main { min-width: 0; position: relative; }
+.ps-gutter { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; padding: 0 6px 0 8px; }
+.ps-num { font-weight: 700; color: var(--mm-ink); text-decoration: none; white-space: nowrap; }
+.ps-problem:hover .ps-num { color: var(--mm-accent); }
+.ps-mark { font-size: 0.8em; font-weight: 700; line-height: 1; }
+.ps-mark--done, .ps-mark--pass { color: var(--mm-ok); }
+.ps-mark--fail { color: var(--mm-danger); }
+.ps-mark--pending { color: var(--mm-warn); }
+.ps-mode { float: right; margin: 2px 0 4px 10px; opacity: 0.85; }
+.ps-title { color: var(--mm-ink); }
+.ps-hint { margin-top: 0.4em; font-style: italic; color: var(--mm-exam); }
+.ps-arena { margin: 8px 0 4px; }
+.ps-arena-more { margin-top: 4px; font-size: 0.85em; color: var(--mm-ink-3); }
+.ps-body .arena-grid { border-width: 1px; }
+
+/* Callouts: the PDFs' boxes. Hint = lavender field, challenge = the date
+   blue field, advice / caution = an outlined box with a heading line, note =
+   the quiet field. An aside attached to a problem reads as a margin note. */
+.ps-callout { padding: 10px 14px; margin: 10px 0; }
+.ps-callout--hint { background: var(--mm-lav-soft); }
+.ps-callout--challenge { background: var(--mm-date-soft); }
+.ps-callout--note { background: var(--mm-surface-2); }
+.ps-callout--advice, .ps-callout--caution { background: var(--mm-surface); border: 1px solid var(--mm-line-2); }
+.ps-callout--caution { border-color: var(--mm-warn); }
+.ps-callout-title { font-weight: 700; margin-bottom: 0.4em; }
+.ps-callout-lead { color: var(--mm-ink); }
+.ps-attachments--aside .ps-callout {
+  padding: 2px 0 2px 12px;
+  margin: 8px 0 0;
+  background: none;
+  border: 0;
+  border-left: 2px solid var(--mm-line-2);
+  font-size: 0.93em;
+  color: var(--mm-ink-2);
+}
+.ps-section-aside .ps-callout { margin: 0; }
+
+.ps-figure { margin: 10px 0; text-align: center; }
+.ps-figure img { max-width: 100%; height: auto; }
+.ps-figure figcaption { margin-top: 4px; font-size: 0.9em; color: var(--mm-ink-3); }
+.ps-figure figcaption .statement-para { margin: 0; }
+
+/* The problem's section as context on its canvas (the editor panels). */
+.ps-context { margin-bottom: 10px; padding-bottom: 8px; border-bottom: 1px solid var(--mm-line); }
+.ps-context-heading { font-weight: 700; color: var(--mm-accent); margin-bottom: 0.3em; }
+.ps-context-more { margin-top: 6px; }
+.ps-context-more > summary { cursor: pointer; color: var(--mm-ink-3); font-style: italic; }
+.ps-context-more .ps-callout { margin: 8px 0 0; }
+
 @media (max-width: 720px) {
-  .overview-row { grid-template-columns: auto minmax(0, 1fr); }
-  .overview-statement { grid-column: 1 / -1; }
+  .ps-section-body--aside { grid-template-columns: minmax(0, 1fr); }
+  .ps-run--columns { columns: 1; }
+  .ps-run--grid { grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); }
 }
+
+/* ── Rendered statement markup (components/StatementBody.tsx) ─────────
+   Shared by the document and the editor panels; sizes are relative. */
+.statement-para { margin: 0; white-space: pre-line; }
+.statement-para + .statement-para, .statement-list + .statement-para, .statement-para + .statement-list { margin-top: 0.6em; }
+/* One part per line, its "a." marker hanging in the left margin. */
+.statement-part { padding-left: 1.6em; text-indent: -1.6em; }
+.statement-part-marker { display: inline-block; width: 1.6em; text-indent: 0; font-weight: 600; }
+.statement-list { margin: 0.3em 0 0; padding-left: 1.4em; }
+.statement-list .statement-list { margin-top: 0.15em; }
+.statement-list li + li { margin-top: 0.15em; }
+.statement-code {
+  font-family: var(--mm-font-mono);
+  font-size: 0.92em;
+  padding: 0 3px;
+  background: var(--mm-surface-2);
+  color: var(--mm-ink);
+}
+/* An input-output profile lifted out of the prose (statementFormat.ts). The
+   wrapper scrolls on its own so a wide profile never widens the panel. */
+.statement-io-wrap { overflow-x: auto; margin: 0.5em 0; }
+.statement-io-table { border-collapse: collapse; font-family: var(--mm-font-mono); font-size: 0.92em; }
+.statement-io-table th, .statement-io-table td { padding: 2px 10px; text-align: center; border: 1px solid var(--mm-line-2); }
+.statement-io-table th { background: var(--mm-surface-2); font-weight: 600; }
+/* The first output column carries the input/output divider. */
+.statement-io-table .statement-io-out { border-left: 2px solid var(--mm-ink-3); }
+.statement-math--display { display: block; margin: 0.5em 0; overflow-x: auto; }
 
 /* ── Grades page (the Home's Grades tab) and the inline grade sheet ──── */
 .grades-list td:first-child { width: 50%; }

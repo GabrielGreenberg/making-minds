@@ -363,9 +363,11 @@ export function QuestionCreator({ assignment, existingQuestion, onSave, onCancel
     : null;
 
   // Open questions are just a name + statement; nothing else gates saving.
+  // A problem may be its title alone ("Spiral" over an arena, "+1 T"), so
+  // either the title or the statement must say something.
   const saveable =
     label.trim().length > 0 &&
-    statement.trim().length > 0 &&
+    (statement.trim().length > 0 || title.trim().length > 0) &&
     (isOpen
       ? true
       : isTurbot
