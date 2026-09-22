@@ -8,9 +8,9 @@ requires: browser
 area: app
 source: chat
 created: 2026-09-21T17:10:00-07:00
-status: in-progress
+status: done
 after: 2026-09-21-023
-branch: task/020-problem-set-document-view
+branch:
 merged_into:
 ---
 
@@ -170,3 +170,31 @@ that is missing.
   serverCheck pin (student copy keeps sections); full gates; browser pass at 1280/700 with
   screenshots; CLAUDE.md. Next step: reseed local HW (clear `mm:inst-asg:hw*`, Load HW1–HW7,
   Publish), eyeball each HW beside its PDF.
+- 2026-09-22 10:05 — Checkpoint 2 → land. Done since checkpoint 1: (5) authoring —
+  `instructor/DocumentEditors.tsx` (callout list + figure list, `readFigureFile` → data URL
+  ≤ 300 KB, rasters downscaled), `AssignmentEditor` (preamble, source PDF, section cards with
+  heading / intro / layout / ↑↓ / delete / callouts / figures, a Section select per question
+  row, `normalizeSections` keeps ids unique and in flat order, a live `ProblemSetDocument`
+  preview whose problems open the creator via `onOpen`), `QuestionCreator` (per-problem
+  callouts + figures; a title-only problem is saveable). `serverCheck` pins that preamble /
+  sections / sourcePdf / callouts / figures reach the student copy intact. Rendering fixes from
+  the screenshots: three-up grids (205px cells; no mode tag inside a cell), run-in title
+  spacing and its period only when text follows, a problem's margin note without a default
+  heading, titles parsed as inline markup, a lone one-liner stacks instead of columning.
+  **Verify:** tsc, `npm run build`, `npm run check`, server typecheck + check — all exit 0 (log
+  in the land commit). **Browser:** the desktop pane was hidden for most of the session
+  (pointer input and screenshots refused), so structure was verified by script and the visual
+  pass came from headless Chrome through `app/tools/shootProblemSets.mjs`: every HW at 1280,
+  HW1/HW4 at 700, two canvas panels, the editor — `tasks/attachments/2026-09-21-020-*.png`
+  (hw1..hw7, hw1-700, hw4-700, hw1-q1-canvas, hw3-q1-canvas, editor). Nothing owed.
+  **Content decisions for Gabriel (none blocking):** statements follow the PDFs; two hints that
+  were not in the PDFs were dropped (HW3 P2, P6); two app-specific hints stay (HW1 P11 "type each
+  numeral in its box", HW6 P2 "the tape starts blank"); HW3's duplicate "II." headings are
+  renumbered III / IV; HW3 §III keeps the PDF's "combinatorial circuit" wording (likely a PDF
+  slip — say if it should read "sequential"); HW2 §II says 8 inputs while P12's retina is 9 wide
+  (the fixture's choice); HW7's outline and the eight themes are section intros and the one open
+  question sits under "Your essay"; HW1 P2's "<<" note is a caution aside beside the table.
+  **Dev gotcha:** this machine's Vite dev server does not notice whole-file writes (Write tool,
+  node scripts) — HMR fired for in-place edits only; restart the dev server after bulk edits or
+  the seed loads a stale module (that is why HW1 first reseeded as its old copy).
+- 2026-09-22 — Landed: code 5f8bb98 on task/020-problem-set-document-view, merged to main with --no-ff.
