@@ -8,9 +8,9 @@ requires:
 area: server
 source: chat
 created: 2026-09-23T14:00:00-07:00
-status: in-progress
+status: done
 after:
-branch: task/035-registrar-roster-import
+branch:
 merged_into:
 ---
 
@@ -167,3 +167,33 @@ every task file.
   role none; after release, the same import on the pilot.
 - **Next step:** loop session: run visual checks (a) and (b), then land per PROFILE §5. Owed
   check (c) goes to Gabriel.
+
+### 2026-09-23 — landed (work loop)
+- **Review follow-ups (loop session, `cde8684`).** The three nits are fixed. `STATUS_TABLE` is
+  read through own keys only, so a status cell named "constructor" is now an unknown code
+  (imported, with an issue); this is pinned in rosterCheck [status]. The `listUsers` comment
+  is corrected, and `server/README.md` now describes the class-list reader, `rosterImport.ts`
+  and `rosterCheck`. Both roster tables are wrapped in `.instructor-table-scroll`, the idiom
+  the other instructor tables use. The page shell used to scroll sideways at 375px, because
+  the table was already 783px wide before the Section column and 854px after. Now only the
+  table scrolls.
+- **Visual checks done.** Setup: remote mode against a scratch local server (`dev` auth, so no
+  password is typed) with an invented registrar-shaped list.
+  - **(a) Report and table:** the report says "Skipped 8 lines before the header" and lists
+    the columns used with role "(none)". It also shows "2 dropped — not imported" and
+    "1 waitlisted — imported". The Section column is there, with surname order and display
+    names (De Anda, McDonald, MacDonald, Nunez de la O, Roe III).
+  - **(a) Re-import:** after a W→D change and a deleted row, both are listed under "No longer
+    on the class list — review (2)" and both are still on the roster. W→E is only updated.
+  - **(a) Phone width:** at 375px nothing outside the table overflows, and the shell's
+    scrollWidth equals its width.
+  - **(b) Sign-in wording:** the Sign-in placeholder reads "Email". The Create-account pane
+    has the class-list-email wording and the placeholder "Email on your class-list record".
+    In local mode the toy picker is unchanged and there are no `/api` endpoint calls.
+  - **CLI:** `npm run roster -- import` on the same list prints the same report.
+- **Gates on the final tree (exit codes):** app-tsc 0, app-build 0, app-check 0, server-tsc 0,
+  server-check 0.
+- **Still owed to Gabriel (c):** import the real class list, kept outside the repo. Expect the
+  header on line 9, 87 imported (80 E + 7 W), "7 waitlisted — imported", no "not imported"
+  line, sections 42/45, and display names including the 2 suffix rows. After release, do the
+  same import through the pilot dashboard.
