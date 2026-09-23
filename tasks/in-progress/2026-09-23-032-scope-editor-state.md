@@ -8,9 +8,9 @@ requires:
 area: app
 source: chat
 created: 2026-09-23T11:30:00-07:00
-status: ready
+status: in-progress
 after:
-branch:
+branch: task/032-scope-editor-state
 merged_into:
 ---
 
