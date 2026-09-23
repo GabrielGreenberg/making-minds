@@ -122,6 +122,11 @@ identity and keeps no history, and a roster row with role `ta` becomes a full `i
 9. **Release** — per assignment today; granularity to decide.
 10. **Export** — per-assignment grades out of 100 and/or the course grade (40 + 60·P, late
     deductions, 55 % / 15 % / 25 % / 5 % weights) for the official gradebook.
+12. **Integrity flags** (added 2026-09-23, from task 033): identical or near-identical circuits
+    across students (a canonical circuit hash), identical open-response text, and later a
+    workbook-save history showing a circuit that appeared fully formed. These are the only
+    defence against console, localStorage or API tampering and redrawing by hand. Present them
+    as prompts to look, never verdicts.
 11. **Several graders** — a TA/grader role; who graded what; not two people on one response.
 
 ### E. Straw-man surface map (for the review, not decided)

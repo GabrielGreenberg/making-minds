@@ -40,6 +40,9 @@ per-browser autosave blob `making-minds-autosave` (`store.ts:3760`).
   keep the file format = `exportWorkbook`'s JSON (already round-trips through
   `importWorkbook`; pin it in `boxScopeCheck` or a new `workbookFileCheck`: export → import ≡).
 - **surgicalFix:** none needed — the store side is done.
+- Constraint (catch 2026-09-23, task 2026-09-23-033): a file import must NEVER write into an
+  assignment; it opens only as sandbox tabs (as `importWorkbook` does today). Content loaded this
+  way is sandbox-scoped and cannot be pasted into an assignment.
 - Assumption: file only (no cloud/per-account sandbox storage) for now.
 - Pointers: `store.ts:888–970`, `fileHandle.ts`, `components/TabBar.tsx:98–150` (the one
   existing sandbox menu, the "+ New worksheet" machine picker), `components/MenuBar.tsx:35–85`.
