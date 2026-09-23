@@ -44,9 +44,11 @@ your context, don't re-read them.
 
 ## 3. The task workflow (`.claude/workflows/mm-task.js`)
 
-Use the saved workflow `mm-task` (args `{ task: "<task file path>", branch: "task/NNN-slug" }`).
-If it doesn't exist yet, author it once (load the `workflow-authoring` skill first), run it
-on the first task, and commit it on `main` (`tasks: add the mm-task workflow`). Its shape,
+Run the committed workflow by path — `Workflow({scriptPath: "<repo>/.claude/workflows/mm-task.js",
+args})`; a lookup by name doesn't find it. Args: `{ task, branch, repo, today, coauthor }`,
+plus `decisions: [...]` when a Plan stop's question is answered (Gabriel, or a point the task
+file settles): resume the same run (`resumeFromRunId`) with them and the cached Plan replays.
+`.claude/` is gitignored, so edits to it are committed with `git add -f`. Its shape,
 ≤ 8 agents:
 
 - **Plan** (read-only): PROFILE §6–§8, the task file, the code it points at. Returns the
