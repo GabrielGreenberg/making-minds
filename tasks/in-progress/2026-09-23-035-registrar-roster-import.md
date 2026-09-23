@@ -8,9 +8,9 @@ requires:
 area: server
 source: chat
 created: 2026-09-23T14:00:00-07:00
-status: ready
+status: in-progress
 after:
-branch:
+branch: task/035-registrar-roster-import
 merged_into:
 ---
 
