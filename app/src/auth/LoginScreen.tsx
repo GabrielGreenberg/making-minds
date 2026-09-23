@@ -34,22 +34,22 @@ export function LoginScreen() {
 
 /**
  * The card variant of the page shell: the brand topbar and one centred card.
- * Every sign-in pane (the local picker; remote password / SSO / dev) ends with
- * the same way past it: continue as a visitor, into the sandbox — as
- * prominent as signing in, because most people arriving from the website
- * just want to try the machines.
+ * Every sign-in pane (the local picker; remote password / SSO / dev) OPENS
+ * with the way past it: continue as a visitor, into the sandbox — first and
+ * in the site's colours, because most people arriving from the website just
+ * want to try the machines.
  */
 function LoginCard({ children }: { children: ReactNode }) {
   return (
     <PageShell variant="card">
       <div className="mm-card mm-card--narrow">
-        {children}
         <div className="login-visitor">
           <p>Just exploring? Build circuits, state machines and Turing machines — no account needed.</p>
-          <a className="mm-btn" {...hashLink({ kind: 'sandbox' })}>
+          <a className="mm-btn mm-btn--primary" {...hashLink({ kind: 'sandbox' })}>
             Continue as a visitor → Sandbox
           </a>
         </div>
+        {children}
       </div>
     </PageShell>
   );

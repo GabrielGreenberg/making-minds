@@ -166,8 +166,9 @@ literal or an undefined token. Task: `tasks/done/2026-09-21-019-*`._
   Feedback / Log out sit (no ⌂ Home), and under it one dismissible lavender
   `.visitor-banner` line ("…as a visitor — PHIL 133 student? Sign in"; dismissed for the
   browser session). On page surfaces `SessionControls` shows Visitor · Sign in. Every
-  sign-in card (local picker; remote password / dev / SSO) ends, below a hairline, with a
-  full-width **Continue as a visitor → Sandbox** button — as prominent as signing in; the
+  sign-in card (local picker; remote password / dev / SSO) OPENS with a lavender block
+  (magenta left rule) holding a full-width primary **Continue as a visitor → Sandbox**
+  button — the one sanctioned second primary button, above Sign in; the
   server-health card offers "Open the sandbox" beside Retry.
 - **Up next** — the site's `.next`/`.nx` box (`.mm-next`/`.mm-nx`): a lavender field with
   a chip on the left (NEXT DUE) and date-in-`--mm-date` + title + a detail line on the

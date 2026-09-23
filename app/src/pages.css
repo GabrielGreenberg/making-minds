@@ -747,8 +747,15 @@
 }
 .visitor-banner-close:hover { color: var(--mm-ink); }
 .session-chip--visitor { color: var(--mm-accent); border-color: var(--mm-accent); }
-.login-visitor { margin-top: 22px; padding-top: 18px; border-top: 1px solid var(--mm-line); display: grid; gap: 10px; }
-.login-visitor p { margin: 0; color: var(--mm-ink-2); }
+.login-visitor {
+  display: grid;
+  gap: 10px;
+  margin: 0 0 24px;
+  padding: 16px 18px;
+  background: var(--mm-accent-soft);
+  border-left: 3px solid var(--mm-accent);
+}
+.login-visitor p { margin: 0; color: var(--mm-ink); }
 .login-visitor .mm-btn { justify-self: stretch; text-align: center; }
 .login-actions { display: flex; flex-wrap: wrap; gap: 10px; }
 
