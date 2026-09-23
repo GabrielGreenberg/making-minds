@@ -13,6 +13,7 @@ prompt file here:
 | --- | --- | --- |
 | `/catch` | `CATCHER.md` | Interactive. You describe problems and ideas; it diagnoses, files task files, and surfaces parked questions. Writes only under `tasks/`. |
 | `/work` | `WORK.md` | Interactive. Surveys the queue, proposes merges, offers options; you pick one; the session works it in depth on a `task/NNN-slug` branch and lands it. |
+| `/work-loop` | `LOOP.md` | Attended loop, started as `/loop /work-loop`. `/work` without the picking: works the ready queue one task at a time (one Workflow per task), lands each, parks what needs you as questions, stops when nothing more can move. Never pushes unless given `push`/`release`. |
 | `/worker` | `WORKER.md` | Unattended routine (written, **not yet scheduled** — `START.md`). Claims ONE `size: small` task, fixes it in a worktree, verifies, merges to `main`, logs. |
 
 Every role reads `PROFILE.md` first — the shared operating context (git rules, gates, laws,

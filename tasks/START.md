@@ -8,6 +8,7 @@ Read this after a break. Keep it current.
 | --- | --- |
 | Report a problem, dump ideas, answer parked questions | Open a session at the repo root, type `/catch`. Talk. It files task files under `tasks/` and commits each one. Drop longer notes in `tasks/inbox/` first if you like (from any machine — commit + push). |
 | Work on something | `/work` (or `/work 007` to go straight to a task). It offers options; you pick; it claims, branches, works, checkpoints, lands. Sessions can end mid-task: the progress log's last line is the resume point, and the next `/work` offers "resume" first. |
+| Work the queue while you're away | `/loop /work-loop` (keep the app open). It takes the ready tasks one by one in priority order, lands each on `main`, parks decisions as questions in `blocked/`, and stops with a report. Add `push`, `release`, `max=N` or task ids to widen or narrow it. It costs real money: several agents per large task. |
 | Let the routine drain small tasks | Not yet activated — see below. Foreground alternative any time: `/loop /worker` (advances only while that window is open). |
 
 Both interactive roles may run in **ultracode** if you start them that way (you see the
