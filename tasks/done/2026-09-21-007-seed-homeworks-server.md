@@ -8,9 +8,9 @@ requires:
 area: server
 source: claude-md
 created: 2026-09-21T15:30:00-07:00
-status: in-progress
+status: done
 after:
-branch: task/007-homework-sync
+branch:
 merged_into:
 ---
 
@@ -77,3 +77,12 @@ the pilot DB rows carry sections and the site renders them.
 ## Progress log
 - 2026-09-22 — Widened from a fill-empty seed to a repo→deployment sync (see Description);
   claimed by the /work session on `task/007-homework-sync`.
+- 2026-09-22 — Built and landed (code d1e3230). Planner `app/src/devData/homeworkSync.ts`;
+  server adapter `server/src/homeworks.ts` + CLI `npm run homeworks -- sync|status` + the
+  `content_sync` table; `seed.ts --homeworks`; local "Load HW1–HW7" on the same planner
+  (browser-verified: added / refreshed keeping `order` / edited left alone); release.sh runs the
+  sync before the restart; README §0 and CLAUDE.md updated. Rehearsal on a read-only copy of the
+  pilot's rows: 7 refresh (matched `ec5c1ac 2026-07-12`), `order` 1–7 kept, re-run all current.
+  A remote build still carries no homework data (grep of the bundle). Gates: app tsc / build /
+  check, server typecheck / check (with `homeworkSyncCheck`) — all exit 0. Remaining: push +
+  release (Done-when 6), done in the same session after the merge.
