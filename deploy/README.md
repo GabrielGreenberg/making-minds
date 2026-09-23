@@ -17,9 +17,21 @@ origin.
 ## 0. Routine release — what to run after every push to `main`
 
 ```sh
-deploy/release.sh            # box (git pull + restart) → site (build + upload) → proof
+deploy/release.sh            # box (backup + git pull + homework sync + restart) → site (build + upload) → proof
 deploy/release.sh --dry-run  # preflight + build only, nothing deployed
 ```
+
+**Homework content ships with every release.** The box step runs
+`npm run homeworks -- sync` (server/src/homeworks.ts): HW1–HW7 in
+`app/src/devData/homeworks/` are copied into the database — a missing one is added
+(unpublished), a copy nobody has edited on the pilot is refreshed to the repo's
+version (keeping its order, due date, publish/release flags and submissions), and a
+copy an instructor edited in the dashboard is left alone and listed in the release
+output. "Nobody has edited it" means its content equals a committed version of its
+file or a version an earlier sync wrote. To overwrite an edited copy on purpose, on
+the box: `cd /srv/making-minds/repo/server && sudo -u makingminds -H
+MM_DB_PATH=/srv/making-minds/data/making-minds.sqlite npm run homeworks -- sync
+--force=hw3` (`-- status` previews without writing).
 
 It refuses to run unless local `main` is clean and identical to GitHub's, because
 the box pulls from GitHub — so the site can never be built from a commit the box

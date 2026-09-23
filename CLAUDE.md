@@ -133,18 +133,22 @@ drill-down per mode; ✓/✗ + note manual review of open questions; Release/Hid
 **Server** (`server/`, Express 5 + `node:sqlite`, zero native deps): auth providers behind
 `MM_AUTH_MODE` (`password` default — roster-gated registration, scrypt, login throttle;
 `dev` passwordless; `sso` — capabilities reported, `authenticate` is a TODO), roster CSV
-import + admin CLI (`npm run roster`), assignment CRUD, workbooks, submit-with-grading,
+import + admin CLI (`npm run roster`), the **homework sync** (`npm run homeworks -- sync |
+status`, task 007 — HW1–HW7 from the repo into the DB: missing ones added unpublished, copies
+nobody edited refreshed, instructor-edited ones left alone and listed), assignment CRUD, workbooks, submit-with-grading,
 manual review, grade release, feedback, notes, `/api/health`. Redaction server-side
-(`sanitize.ts`). SQLite, WAL. Gates: `serverCheck`, `authCheck`, `parityCheck`.
+(`sanitize.ts`). SQLite, WAL. Gates: `serverCheck`, `authCheck`, `parityCheck`, `homeworkSyncCheck`.
 
 **Deployment — pilot live.** Cloudflare Pages `https://making-minds.pages.dev` → Lightsail
 API at the placeholder `https://100-22-69-95.sslip.io` (Caddy TLS). Not yet fit for students:
-UCLA SSO is a stub and the box holds only the toy roster (plus a leftover `cc-basics` demo
-row, deletable from the dashboard). **Content:** HW1–HW7
-exist as seedable JSON (`app/src/devData/homeworks/`, 80 questions — machine problems from the
-reference fixtures, prose problems as open questions), transcribed to their PDFs' document
-structure (sections, intros, callouts, SVG figures cropped from the PDFs under
-`app/public/problem-sets/` beside the PDFs themselves) for local mode only so far.
+UCLA SSO is a stub and the roster is the toy one (plus a leftover `cc-basics` demo row,
+deletable from the dashboard). **Content:** HW1–HW7 live in the repo as JSON
+(`app/src/devData/homeworks/`, 80 questions — machine problems from the reference fixtures,
+prose problems as open questions), transcribed to their PDFs' document structure (sections,
+intros, callouts, SVG figures cropped from the PDFs under `app/public/problem-sets/` beside the
+PDFs themselves). **The repo is the source; every release syncs it into the pilot DB**
+(`deploy/release.sh` → `npm run homeworks -- sync`; unpublished until an instructor publishes),
+and local mode's "Load HW1–HW7" runs the same planner.
 
 **Reference-fixture coverage:** 56/56 at-tier — 46 exact (correct passes every case, broken
 fails) + 10 interface (navigation/capstone: a plausible attempt validates and grades
@@ -153,9 +157,8 @@ end-to-end; score reported, never asserted) — behind `app/tools/coverageCheck.
 ## What's next
 
 The open work is the queue: `tasks/incoming/` (ready) and `tasks/blocked/` (waiting on
-Gabriel) — run `/work` to see it offered. Headline items on 2026-09-21: **UCLA SSO** (blocked
-on UCLA IdP details), **seeding HW1–HW7 into the server DB**, a real domain + SQLite backup
-for the pilot box, sequential-sub-circuit boxing, a fill-in authoring UI, failed-input →
+Gabriel) — run `/work` to see it offered. Headline items on 2026-09-22: **UCLA SSO** (blocked
+on UCLA IdP details), a real domain + scheduled SQLite backup for the pilot box, sequential-sub-circuit boxing, a fill-in authoring UI, failed-input →
 live Run, a due-date-independent "view my submission" mode, turbot multi-arena authoring,
 an SC perception frame player, LLM-assisted open-question grading, and — last — activating
 the worker routine.
@@ -224,8 +227,8 @@ browser and on the server. The store and UI are thin wrappers over the engine.
 | Student UI | `app/src/components/` | `CircuitCanvas`, `ComponentLibrary`, `DataTable`, `StudentLayout` (the Home tabs), `HomeScreen` (Assignments tab + up-next box), `GradesView` + `GradeSheet` (the Grades tab and its inline sheet), `AssignmentOverview` (the document page), `ProblemSetDocument`, `MenuBar`, `FeedbackPanel`, `SequentialTimeline`, `TMTapePanel`, `ArenaCanvas`, `TurbotArenaPanel` (Map + run controls; sandbox "Edit map"), `TurbotTapePanel`, `OpenResponsePanel`/`FillInPanel` (read-only when locked), `SimulationPanel`, `TabBar` (question nav + Mark done / 🔒 tag; sandbox + menu), `outputDisplay.ts` (t1-rightmost OUT rows, per-group ARG values). |
 | API client | `app/src/api/client.ts` | One typed function per endpoint; bearer token under `mm:auth:token`; `onUnauthorized` hook; `health()`; auth/roster/feedback/notes calls; `putWorkbook` takes `keepalive`. `setApiBase` is the harness override. |
 | Dev tool | `app/tools/shootProblemSets.mjs` | Headless-Chrome (CDP) full-page screenshots of every HW document, the canvas panel and the editor against the dev server, seeding local mode itself — the visual proof recipe when the browser pane is unavailable. |
-| Server | `server/src/app.ts`, `db.ts`, `auth.ts`, `password.ts`, `roster.ts`, `sanitize.ts`, `config.ts`, `seed.ts`, `roster-cli.ts` | Routes, SQLite storage, the `AuthProvider` seam (`createAuthProvider` — `MM_AUTH_MODE`: `password` default / `dev` / `sso`; `LoginThrottle`), scrypt credentials (`scrypt$N$r$p$salt$hash`, self-describing), the pure RFC-4180 roster reader, redaction + grade-release withholding (`sanitize.ts`: students get no `test_cases`/`perception_cases`/`fill_in_answers`; their own results keep safe per-case fields but never `expected`/`got`), env config, seeding, the admin CLI (`npm run roster -- import\|add\|set-password\|reset\|remove\|list\|requests`). Tools: `serverCheck.ts`, `authCheck.ts`, `parityCheck.ts` (server ≡ in-process grading, deep-compared). |
-| Dev/sample | `app/src/devData/sampleData.ts`, `seed.ts`, `homeworks.ts`, `homeworks/hw{1..7}.json` | Sample assignment for all modes (netlist-built perception circuits, one turbot question per inner mode, open Q14) + sample submissions; `seedHomeworks()` (fill-empty) loads the real HW1–HW7 + 22 sample submissions. |
+| Server | `server/src/app.ts`, `db.ts`, `auth.ts`, `password.ts`, `roster.ts`, `sanitize.ts`, `config.ts`, `seed.ts`, `roster-cli.ts`, `homeworks.ts`, `homeworks-cli.ts` | Routes, SQLite storage, the `AuthProvider` seam (`createAuthProvider` — `MM_AUTH_MODE`: `password` default / `dev` / `sso`; `LoginThrottle`), scrypt credentials (`scrypt$N$r$p$salt$hash`, self-describing), the pure RFC-4180 roster reader, redaction + grade-release withholding (`sanitize.ts`: students get no `test_cases`/`perception_cases`/`fill_in_answers`; their own results keep safe per-case fields but never `expected`/`got`), env config, seeding, the admin CLI (`npm run roster -- import\|add\|set-password\|reset\|remove\|list\|requests`). The homework sync (`homeworks.ts`: a copy is pristine iff its content hash is a committed version of its file — `gitLineage` over the box's clone — or one the sync wrote, the `content_sync` table; `seed.ts --homeworks` runs it too). Tools: `serverCheck.ts`, `authCheck.ts`, `parityCheck.ts` (server ≡ in-process grading, deep-compared), `homeworkSyncCheck.ts`. |
+| Dev/sample | `app/src/devData/sampleData.ts`, `seed.ts`, `homeworks.ts`, `homeworks/hw{1..7}.json` | Sample assignment for all modes (netlist-built perception circuits, one turbot question per inner mode, open Q14) + sample submissions; `seedHomeworks()` syncs the real HW1–HW7 (added / refreshed if untouched since loaded — record `mm:seeded-homework:<id>` / left alone if edited) + reseeds 22 sample submissions; `homeworkSync.ts` is the pure planner it shares with the server (content hash = canonical JSON minus the instructor-owned `order`/`dueDate`; insert / unchanged / refresh / edited). |
 | Tools | `app/tools/*.ts` | The headless harness — the project's test suite, all in `npm run check` (plus `grade.ts`, the CLI grader; `builder.ts`, the netlist builder; `layoutCheck.ts`, the canvas layout oracle): `codecCheck`, `dueDateCheck`, `statementFormatCheck` (markup grammar + the document model + every seeded HW valid, its figures on disk), `notationCheck` (grammar pins + label-dissection grep gate), `themeCheck` (page-surface design layer: colour literals only in `theme.css :root`, every `--mm-*` token defined, shell wiring, retired header idioms gone), `tmCheck`, `turbotCheck` (all four brains; `[multi-arena]`, `[pass-through step-limit]`, trajectory/orientation independence), `perceptionCheck`, `scWindowCheck` (question runs ≡ grader), `routerCheck` (fallback budget 2; route-quality flags; hw3-p4 regression pin), `bumpCheck`, `pipelineCheck` (submit → grade, every mode), `navResetCheck` (sim reset on every canvas swap; `[mark as done]`, `[frozen assignment]`), `boxScopeCheck` (box library scope, SC boxing refuses MEM, `[naming]`), `remoteStoreCheck` (boots the REAL server; grader-import grep gate; auth client against a password-mode server), `coverageCheck` (the two-tier reference-fixture ledger + `allowed_components` self-test pins). |
 | Queue | `tasks/` | The task pipeline (top of this file). `tasks/tools/check-budgets.mjs` is the size guard on this file. |
 
@@ -347,7 +350,7 @@ sees the formula, it runs against the generated numeric `test_cases`.
 - **Remote workbooks are last-write-wins across devices** (accepted pilot trade-off,
   `docs/buildout/designs/remote-stores.md` §5); an `updatedAt`/If-Match precondition is the
   noted follow-up if it ever bites.
-- **Releasing = `deploy/release.sh`** after a push to `main` (box pull + restart over ssh,
+- **Releasing = `deploy/release.sh`** after a push to `main` (box backup + pull + homework sync + restart over ssh,
   then the Pages upload; refuses unless local main == origin/main; needs the gitignored
   `secrets/cloudflare.env` and an `ssh/` key — `deploy/README.md` §0).
 - **Deploy knobs live in `deploy/README.md`**: Pages sets `VITE_API_BASE` and

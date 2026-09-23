@@ -3,7 +3,10 @@
 #
 #   1. preflight  — you are on main, nothing uncommitted, and HEAD == origin/main
 #                   (the box pulls from GitHub, so what you deploy must be pushed)
-#   2. the box    — the Lightsail API server pulls that commit and restarts
+#   2. the box    — the Lightsail API server pulls that commit, syncs HW1–HW7
+#                   from the repo into its database (npm run homeworks -- sync:
+#                   untouched copies refresh, instructor-edited ones are left
+#                   alone and listed) and restarts
 #                   (needs a key in ssh/; without one the commands to paste into the
 #                   Lightsail browser terminal are printed instead)
 #   3. the site   — the frontend is built in remote mode and uploaded to Cloudflare
@@ -78,6 +81,10 @@ if [ -n "${EXPECT:-}" ] && [ "$after" != "$EXPECT" ]; then
   echo "warning: box pulled ${after:0:7}, the release is ${EXPECT:0:7} (GitHub main moved?)" >&2
 fi
 sudo -u makingminds -H bash -c "cd '$REPO/server' && npm install --no-audit --no-fund --silent"
+# Homework content follows the repo like code does (server/src/homeworks.ts).
+# A failure stops the release before the restart; the old server keeps running.
+echo "homeworks:"
+sudo -u makingminds -H bash -c "cd '$REPO/server' && NODE_NO_WARNINGS=1 MM_DB_PATH='$DB' npm run --silent homeworks -- sync"
 sudo systemctl restart makingminds-api
 for i in $(seq 1 30); do
   curl -fsS http://127.0.0.1:8133/api/health >/dev/null 2>&1 && break
