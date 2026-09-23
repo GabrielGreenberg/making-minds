@@ -8,7 +8,7 @@ requires: human
 area: server
 source: chat
 created: 2026-09-23T14:00:00-07:00
-status: blocked
+status: ready
 after: 2026-09-23-035
 branch:
 merged_into:
@@ -35,7 +35,6 @@ personal addresses** (gmail, icloud, outlook, yahoo, me.com), not `@ucla.edu` or
   canonicalises it.
 
 ## Done when
-(Shape depends on the Questions; this is the recommended version.)
 1. The UID is the roster's identity: a unique normalised `uid` on `users` (nullable only for
    instructors and manual adds).
 2. A person may have several emails: the roster email plus any UCLA address they sign up with,
@@ -63,16 +62,16 @@ personal addresses** (gmail, icloud, outlook, yahoo, me.com), not `@ucla.edu` or
   provider, `normalizeId`), `:248–272` (sessions, `requireAuth`); `server/src/app.ts:121–260`
   (auth routes); `app/src/auth/LoginScreen.tsx:280–340`; `server/src/roster.ts`.
 
+### Resolved decisions (Gabriel, 2026-09-23)
+1. **Yes:** a student signs up with their UID plus EITHER their class-list email or their UCLA
+   email; both become sign-in addresses for the one account (the deepFix above, not the
+   surgical wording-only fix).
+2. **Yes, interim:** until this lands, the sign-up pane tells students to use the email on
+   their class-list record, which may be a personal address. That one-line change ships inside
+   task 035 (its Done-when item 9).
+
 ## Verify
 `authCheck` decision table (above); a browser pass of the three sign-in panes in remote mode.
 Owed: a real SSO round trip (006).
-
-## Questions
-1. **Sign up by UID with any email?** May a student create their account with their UID plus
-   either their class-list email or their UCLA email (recommended), or only the class-list
-   email with clearer wording (the surgical fix)?
-2. **Timing:** this is bigger than the import fix (035). Until it lands, should the sign-up
-   pane at least say "use the email on your class-list record — it may be a personal address"?
-   Recommended: yes, as a one-line interim change inside 035.
 
 ## Progress log

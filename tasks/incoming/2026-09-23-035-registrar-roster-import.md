@@ -78,6 +78,11 @@ starts 2026-09-24, so students will soon be creating accounts against this roste
    `E-mail`, `Grade Type`, E/W status, sections. It asserts the count, the skipped withdrawn
    rows, display names, section, and that role is not taken from Grade Type.
 
+9. **Interim sign-up wording** (Gabriel, 2026-09-23, from task 036): the Create-account pane
+   (`app/src/auth/LoginScreen.tsx:294–303`) says to use the email on your class-list record,
+   noting it may be a personal address rather than @ucla.edu, and its placeholder stops
+   suggesting `you@ucla.edu`. Task 036 later replaces this with sign-up by UID + either email.
+
 ## Design
 - **deepFix (recommended):** make the reader recognise the registrar's export as a first-class
   format: header discovery, strict column matching, name normalisation, enrollment status. The
