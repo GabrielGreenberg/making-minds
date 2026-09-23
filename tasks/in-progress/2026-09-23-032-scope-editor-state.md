@@ -89,3 +89,66 @@ Both `tsc`s, `npm run build`, and `npx tsx tools/navResetCheck.ts` with the two 
 then `npm run check`. A browser pass is optional here; task 033's browser pass covers it.
 
 ## Progress log
+- 2026-09-23 — Implemented the deepFix (not yet committed). Two reset laws in `store.ts`:
+  `resetAllSimState()` now also empties undo/redo (every existing call site is a canvas
+  swap), and `goHome`/`closeAssignment` clear history too; the new `resetForPrincipal(email |
+  null)` flushes the leaving person's pending save/journal under their keys, stops runs,
+  bumps `openAssignmentSeq` + a `principalEpoch` (stale `openAssignment` /
+  `hydrateSubmissions` / `submitAssignment` / in-flight autosave resolves apply nothing, and
+  an in-flight save never clears the next person's journal), then sets
+  `{...getInitialState(), ...readSandbox(email)}` and cancels the autosave that set armed.
+  The auth provider reports every principal change synchronously before React state
+  (`reportPrincipal`: local initializer + login/logout; remote initializer = visitor + first
+  line of `setUser`, before the session cache). Sandbox keys `making-minds-autosave:<email |
+  visitor>` (`sandboxKey`, lowercased): no load at import; a signed-in person with no
+  sandbox WORK receives the visitor's (moved); the legacy bare key is adopted as the visitor
+  sandbox when none exists; `closeWorkbook` removes only the current principal's key.
+  `routing.ts`: `setRoutingSignedIn` → `setRoutingPrincipal(email | null)`, which re-applies
+  the URL on every real change (replaces `heldRoute`; fixes Home-at-#/sandbox on restore and
+  a blank page on a #/sandbox sign-out). Pins: navResetCheck `[no load at import]`, `[undo
+  scope]`, `[principal change]`, `[sandbox per person]`, plus a history assertion in every
+  canvas-swap pin (the harness's localStorage shim gained `length`/`key` so
+  `hydrateSubmissions` can list); routingCheck `[principal change]`. CLAUDE.md + PROFILE
+  law 6 updated in place.
+- 2026-09-23 — Review fixes (not yet committed). The leaving principal's save no longer
+  rides the debounced save: `saveForLeavingPrincipal` writes the sandbox directly and, for
+  an assignment, the local seam directly or (remote) journal + one single-flight PUT; a PUT
+  confirmed after the change clears the journal only while it holds exactly what was saved
+  (`journal.ts clearJournalIfHolds`), so a sign-out no longer leaves a stale buffer that a
+  later open replays over another device's work (remote repro via Vite SSR + mocked fetch:
+  confirmed sign-out → no journal; in-flight + newer edit → journal kept and replayed;
+  offline → kept). "No sandbox yet" = absent or PRISTINE (no component/box, one default
+  tab, no arena, default title), so tab-, rename- or map-only sandboxes are never replaced
+  by the visitor's. A remote token boot reports the token's owner (`mm:auth:principal`
+  hint, removed with the token), not the visitor. `resetForPrincipal` keeps an open sandbox
+  open (the arriving person's) and routing never re-enters one already open. Pins:
+  navResetCheck `[undo scope]` made non-vacuous (pre-edit content, unlocked target, leak
+  visibility asserted), `[sandbox per person]` +component-free sandboxes + keep-open,
+  `[principal change mid-save]`, `[auth provider wiring]` (source gate); routingCheck
+  `[token boot]`; remoteStoreCheck `clearJournalIfHolds`. Each new pin fails with its fix
+  reverted.
+
+### 2026-09-23 — implemented (work loop)
+- **Built.** Signing in or out now wipes the editor: the next person never sees the last
+  person's canvas, box library, clipboard, undo history or submissions. Undo no longer
+  reaches across questions or sandbox tabs. Each person on a browser has their own sandbox;
+  a visitor's sandbox moves to the first person to sign in, and the old one-per-browser key
+  becomes the visitor sandbox. Mechanics: `store.ts resetForPrincipal` (reset law 2, called
+  by `authProvider.tsx reportPrincipal` in both modes, remote boot = the token's owner via
+  `mm:auth:principal`); `resetAllSimState` + `goHome`/`closeAssignment` clear history;
+  `saveForLeavingPrincipal` + `journal.ts clearJournalIfHolds`; `routing.ts
+  setRoutingPrincipal`.
+- **Pins.** navResetCheck `[no load at import]`, `[undo scope]`, `[principal change]`,
+  `[sandbox per person]`, `[principal change mid-save]`, `[auth provider wiring]` + a history
+  assertion in every canvas-swap pin (250 passed); routingCheck `[principal change]`,
+  `[token boot]`; remoteStoreCheck `clearJournalIfHolds` keep/clear.
+- **Gates.** app-tsc=0 app-build=0 app-check=0 server-tsc=0 server-check=0.
+- **Review.** 8 findings, all fixed (vacuous undo pin; pristine-sandbox predicate; leaving
+  save off the debounce; stale journal after a confirmed sign-out; remote token boot as
+  visitor; provider wiring ungated). None skipped.
+- **Owed (loop session, browser).** Local: undo scope (HW1 Q1 → Q2, Cmd+Z), clipboard across
+  a sign-out, sandbox per person incl. visitor move and legacy adoption. Remote (Vite Remote
+  Mode + server :8199, two roster accounts): sandbox survives reload on #/sandbox; A's HW1
+  never reaches B; 401 on #/sandbox → visitor sandbox, on #/a/hw1/q/0 → sign-in then B's
+  work. Nothing owed over ssh; no real student data.
+- **Next step.** Loop session: the owed browser checks above, then land per PROFILE §5.

@@ -142,22 +142,37 @@ export function landingRoute(route: Route, hasSignInTrace: boolean): Route | nul
   return null;
 }
 
-// Whether a user is signed in, as far as applying routes is concerned (set by
-// AuthGate from the auth provider). A route that needs sign-in is NOT applied
-// to the store while nobody is (a deep link must not fire an unauthenticated
-// openAssignment — in remote mode it would just 401); it is remembered and
-// applied the moment someone signs in, so `#/a/hw1` opened logged-out lands
-// on hw1 right after the sign-in screen.
+// Who is signed in, as far as applying routes is concerned (set by AuthGate
+// from the auth provider; null = nobody, the visitor). A route that needs
+// sign-in is NOT applied to the store while nobody is (a deep link must not
+// fire an unauthenticated openAssignment — in remote mode it would just 401);
+// it is HELD: the URL stays, and the gate shows the sign-in screen.
+//
+// Every principal change re-applies the current URL. The auth provider has
+// just reset the whole editor store for the new person (store.ts
+// resetForPrincipal), so the store no longer matches the URL: re-applying
+// releases a held route on sign-in (`#/a/hw1` opened logged-out lands on hw1
+// right after the sign-in screen), holds a signed-in route on sign-out or a
+// 401, and enters the sandbox on `#/sandbox` — the new person's own — unless
+// one is already open (the store keeps an open sandbox open across its reset).
+let principal: string | null = null;
 let signedIn = false;
-let heldRoute = false;
 
-/** Tell routing whether a user is signed in; releases a held route on sign-in. */
-export function setRoutingSignedIn(value: boolean): void {
-  signedIn = value;
-  if (value && heldRoute && routingStarted) {
-    heldRoute = false;
-    applyRoute(parseHash(location.hash));
-  }
+/** Tell routing who is signed in (null = nobody); a change re-applies the URL. */
+export function setRoutingPrincipal(email: string | null): void {
+  if (email === principal) return;
+  principal = email;
+  signedIn = email != null;
+  if (!routingStarted) return;
+  const route = parseHash(location.hash);
+  // A sandbox already on screen is already the right person's: the store
+  // keeps it open across its own reset (resetForPrincipal), and a restored
+  // session that confirms the person the store was booted for (the auth
+  // provider's token hint) resets nothing. Re-entering would reload the
+  // active tab's last save over the live canvas.
+  const { workbookOpen, assignment } = useStore.getState();
+  if (route.kind === 'sandbox' && workbookOpen && assignment === null) return;
+  applyRoute(route);
 }
 
 /** Drive the store to match a route. The only place navigation state is applied. */
@@ -166,10 +181,8 @@ function applyRoute(route: Route): void {
   if (routeAccess(route) !== 'public' && !signedIn) {
     // The gate renders the sign-in screen (or the server-health screen) for
     // this route; the store is left alone until someone signs in.
-    heldRoute = true;
     return;
   }
-  heldRoute = false;
   const store = useStore.getState();
   switch (route.kind) {
     case 'instructor':

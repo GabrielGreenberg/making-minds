@@ -3,7 +3,7 @@ import type { ReactNode } from 'react';
 import { useAuth } from './authProvider';
 import { LoginScreen } from './LoginScreen';
 import { HealthGate } from './HealthGate';
-import { initRouting, routeAccess, setRoutingSignedIn } from '../routing';
+import { initRouting, routeAccess, setRoutingPrincipal } from '../routing';
 import { useRoute } from '../useRoute';
 
 /**
@@ -21,9 +21,11 @@ import { useRoute } from '../useRoute';
  * Routing starts HERE, at boot, for everyone: `initRouting` applies the
  * landing rule (a browser with no trace of a previous sign-in, opening `#/`,
  * lands in the sandbox as a visitor) and the initial URL. A route that needs
- * sign-in is held — never applied to the store unauthenticated — and applied
- * the moment someone signs in (`setRoutingSignedIn`), so a deep link like
- * #/a/hw1 opened logged-out lands on hw1 right after the sign-in screen.
+ * sign-in is held — never applied to the store unauthenticated. Every
+ * principal change (`setRoutingPrincipal`) re-applies the URL onto the store
+ * the auth provider has just reset for the new person: a deep link like
+ * #/a/hw1 opened logged-out lands on hw1 right after the sign-in screen, and
+ * #/sandbox shows the arriving person's own sandbox.
  */
 export function AuthGate({ children }: { children: ReactNode }) {
   const { user, loading, hasSignInTrace } = useAuth();
@@ -32,7 +34,7 @@ export function AuthGate({ children }: { children: ReactNode }) {
   // Declared first so it runs first: routing must know who is signed in
   // before it applies the initial URL.
   useEffect(() => {
-    setRoutingSignedIn(user != null);
+    setRoutingPrincipal(user?.email ?? null);
   }, [user]);
 
   useEffect(() => {

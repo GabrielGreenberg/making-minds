@@ -1,10 +1,15 @@
-// Headless regression check: every canvas swap must flush EVERY mode's
-// transient sim state. The sim slices (SC history/sequences, FSM run state,
-// TM tape/history, turbot pose, the I/O table) are shared app-wide — they are
-// NOT part of questionCircuits or tabCircuits — so anything left in them
-// after navigating shows up against the next canvas's circuit (e.g. question
-// 1's typed SC input row, OUT string, and full timeline rendered on question
-// 2, or a sandbox tab's run rendered on the next tab).
+// Headless regression check for the store's two reset laws.
+//
+// Law 1 — every canvas swap must flush EVERY mode's transient sim state AND
+// the undo/redo history. The sim slices (SC history/sequences, FSM run state,
+// TM tape/history, turbot pose, the I/O table) and the history stacks are
+// shared app-wide — they are NOT part of questionCircuits or tabCircuits — so
+// anything left in them after navigating shows up against the next canvas
+// (e.g. question 1's typed SC input row rendered on question 2, or an undo
+// writing question 1's snapshot over question 2).
+//
+// Law 2 — every principal change (sign-in, sign-out, a 401) resets the WHOLE
+// editor store and loads that person's own sandbox (resetForPrincipal).
 //
 //   cd app && npx tsx tools/navResetCheck.ts
 //
@@ -12,11 +17,19 @@
 // points (loadAssignment, openAssignment, switchQuestion) and the sandbox
 // canvas swaps (enterSandbox, addTab, switchTab, removeTab, newWorkbook,
 // importWorkbook) with real runs on the sample SC / FSM / TM circuits,
-// asserting `resetAllSimState` leaves every slice fresh each time — and that
-// removing a background tab (no canvas swap) leaves the live run alone.
+// asserting `resetAllSimState` leaves every slice fresh and both history
+// stacks empty each time — and that removing a background tab (no canvas
+// swap) leaves the live run alone. Then [undo scope] (undo never crosses a
+// canvas), [principal change] (A's work, clipboard and submissions never
+// reach B; stale async resolves apply nothing), [sandbox per person] (one
+// sandbox per person per browser; the visitor's moves only to someone with no
+// sandbox of their own; the legacy key is adopted as the visitor's), [principal
+// change mid-save] (a save in flight swallows none of the leaving person's
+// edits) and [auth provider wiring] (both providers report every change).
 
-// The store registers window/document listeners and reads localStorage at
-// import time, so install minimal shims BEFORE dynamically importing it.
+// The store registers window/document listeners at import time (and must NOT
+// read the sandbox then — [no load at import]), so install minimal shims
+// BEFORE dynamically importing it.
 const noop = () => {};
 const backing = new Map<string, string>();
 (globalThis as unknown as Record<string, unknown>).localStorage = {
@@ -24,6 +37,9 @@ const backing = new Map<string, string>();
   setItem: (k: string, v: string) => void backing.set(k, String(v)),
   removeItem: (k: string) => void backing.delete(k),
   clear: () => backing.clear(),
+  // Enumeration, so the local AssignmentStore can list (hydrateSubmissions).
+  get length() { return backing.size; },
+  key: (i: number) => [...backing.keys()][i] ?? null,
 };
 (globalThis as unknown as Record<string, unknown>).window = {
   setInterval: setInterval.bind(globalThis),
@@ -37,11 +53,21 @@ const backing = new Map<string, string>();
   visibilityState: 'visible',
 };
 
-const { useStore, selectTurbotArena, selectAssignmentFrozen } = await import('../src/store');
+// A visitor sandbox already on disk must stay there until the auth provider
+// reports who is here — the store may not load it at import.
+const VISITOR_KEY = 'making-minds-autosave:visitor';
+backing.set(VISITOR_KEY, JSON.stringify({
+  formatVersion: 2,
+  tabs: [{ id: 'import-tab', title: 'Circuit 1', buildMode: 'CC', activeTask: 'arithmetic' }],
+  activeTabId: 'import-tab',
+  tabCircuits: { 'import-tab': { components: [{ id: 'import-sentinel', type: 'AND', x: 0, y: 0 }], wires: [], boxes: [] } },
+}));
+
+const { useStore, selectTurbotArena, selectAssignmentFrozen, selectQuestionLocked } = await import('../src/store');
 const { buildSampleAssignment, scCorrect, fsmCorrect, tmCorrect, turbotCorrect, SAMPLE_ASSIGNMENT_ID } =
   await import('../src/devData/sampleData');
 const { localAssignmentStore } = await import('../src/storage/AssignmentStore');
-const { backendMode } = await import('../src/storage/backend');
+const { backendMode, workbookStore } = await import('../src/storage/backend');
 
 let passed = 0;
 let failed = 0;
@@ -78,6 +104,9 @@ function checkAllSimFresh(label: string) {
   // swap must disarm it — otherwise a gate armed on one question drops a
   // component on the first click in the next one.
   check(`${label}: palette tool disarmed`, s.selectedTool === null);
+  // Undo writes its snapshot into the CURRENT canvas, so history must not
+  // survive a swap either.
+  check(`${label}: undo/redo history empty`, s.undoStack.length === 0 && s.redoStack.length === 0);
 }
 
 // Junk that only navigation (not the actions used to build real runs above)
@@ -105,6 +134,8 @@ function plantSimJunk() {
     turbotHalted: true,
     turbotStopReason: 'motor',
     selectedTool: 'AND',
+    undoStack: [{ components: [], wires: [], boxes: [], confirmedBoxes: [] }],
+    redoStack: [{ components: [], wires: [], boxes: [], confirmedBoxes: [] }],
   });
 }
 
@@ -114,6 +145,12 @@ const store = useStore.getState();
 // ── backend mode: the Node harness must run against the Local stores ──
 console.log('[backend mode]');
 check('backendMode resolves to local under the Node harness', backendMode === 'local');
+
+// ── the sandbox is NOT loaded at module import ──────────────────
+console.log('[no load at import]');
+check('a stored visitor sandbox is not in the store before anyone is reported',
+  useStore.getState().tabCircuits.size === 0 && useStore.getState().components.length === 0);
+backing.delete(VISITOR_KEY);
 
 // ── loadAssignment lands fresh ──────────────────────────────────
 console.log('[loadAssignment]');
@@ -496,6 +533,412 @@ useStore.getState().removeTab(useStore.getState().activeTabId);
   check('removal landed on the first surviving tab', survivor?.id === s.tabs[0].id);
   check('survivor buildMode swapped in with its canvas', s.buildMode === survivor?.buildMode);
   checkAllSimFresh('after removing the active turbot tab');
+}
+
+// ═════ Undo/redo is canvas-scoped (reset law 1) ═════════════════
+
+console.log('[undo scope]');
+{
+  // Q1 edit → Q2 → undo: Q2 is untouched and Q1 keeps its edit.
+  await useStore.getState().openAssignment(SAMPLE_ASSIGNMENT_ID);
+  useStore.getState().switchQuestion(0); // Q1 (CC)
+  const [q1, q2] = useStore.getState().assignment!.questions;
+  // [mark as done]'s last unlock never reached the seam (closeAssignment
+  // drops the pending debounced save), so Q1 may come back locked.
+  if (useStore.getState().questionCircuits.get(q1.id)?.done) useStore.getState().toggleCurrentQuestionDone();
+  const q2Saved = JSON.stringify(useStore.getState().questionCircuits.get(q2.id)?.components ?? []);
+  // Something on Q1 BEFORE the edit, so the snapshot a leaked undo would
+  // write (Q1 before its last edit) visibly differs from Q2 — an empty Q1
+  // over an empty Q2 would prove nothing.
+  useStore.getState().addComponent('NOT', 10, 10);
+  const before = new Set(useStore.getState().components.map((c) => c.id));
+  useStore.getState().addComponent('AND', 40, 40);
+  const added = useStore.getState().components.find((c) => !before.has(c.id));
+  check('an edit on Q1 pushes history', added != null && useStore.getState().undoStack.length > 0);
+  const q1Leak = JSON.stringify(useStore.getState().undoStack.at(-1)?.components);
+  check('(a leaked undo would be visible: Q1 before its edit ≠ Q2)', q1Leak !== q2Saved);
+  useStore.getState().switchQuestion(1);
+  check('switchQuestion empties both history stacks',
+    useStore.getState().undoStack.length === 0 && useStore.getState().redoStack.length === 0);
+  useStore.getState().undo();
+  check('undo on Q2 leaves Q2 unchanged', JSON.stringify(useStore.getState().components) === q2Saved);
+  check('…and Q1 still holds its edit',
+    useStore.getState().questionCircuits.get(q1.id)?.components.some((c) => c.id === added?.id) === true);
+  const q2Count = useStore.getState().components.length;
+  useStore.getState().addComponent('OR', 80, 80);
+  useStore.getState().undo();
+  check('undo still works within one canvas', useStore.getState().components.length === q2Count);
+
+  // Sandbox edit → a question: the sandbox's history does not follow. As
+  // above, the sheet holds something before the edit, so the leaked snapshot
+  // could not coincide with the question's canvas.
+  useStore.getState().enterSandbox();
+  useStore.getState().addComponent('NOT', 10, 10);
+  useStore.getState().addComponent('OR', 40, 40);
+  check('a sandbox edit pushes history', useStore.getState().undoStack.length > 0);
+  const sandboxLeak = JSON.stringify(useStore.getState().undoStack.at(-1)?.components);
+  await useStore.getState().openAssignment(SAMPLE_ASSIGNMENT_ID);
+  // The seam's copy may have this question marked done (the unlock above
+  // never reached it), and a locked question refuses undo outright — which
+  // would pass this pin whatever the history held.
+  {
+    const s = useStore.getState();
+    const landed = s.assignment!.questions[s.currentQuestionIndex];
+    if (s.questionCircuits.get(landed.id)?.done) s.toggleCurrentQuestionDone();
+  }
+  check('(the question is unlocked, so undo is not refused outright)', !selectQuestionLocked(useStore.getState()));
+  const qBefore = JSON.stringify(useStore.getState().components);
+  check('(a leaked undo would be visible: the sandbox before its edit ≠ the question)', sandboxLeak !== qBefore);
+  useStore.getState().undo();
+  check('sandbox → question: undo is a no-op there', JSON.stringify(useStore.getState().components) === qBefore);
+
+  // Leaving the editor clears history too (goHome resumes the same canvas,
+  // but whichever canvas is entered next must start clean).
+  useStore.getState().addComponent('AND', 120, 40);
+  useStore.getState().goHome();
+  check('goHome empties both history stacks',
+    useStore.getState().undoStack.length === 0 && useStore.getState().redoStack.length === 0);
+  await useStore.getState().openAssignment(SAMPLE_ASSIGNMENT_ID); // resume
+  useStore.getState().addComponent('AND', 160, 40);
+  useStore.getState().closeAssignment();
+  check('closeAssignment empties both history stacks',
+    useStore.getState().undoStack.length === 0 && useStore.getState().redoStack.length === 0);
+}
+
+// ═════ Principal change resets the whole editor store (reset law 2) ═══
+
+const SANDBOX_PREFIX = 'making-minds-autosave';
+const keyOf = (p: string | null) => `${SANDBOX_PREFIX}:${p ?? 'visitor'}`;
+/** Component ids across every sheet of the sandbox blob stored under `key`. */
+function storedSandboxIds(key: string): string[] {
+  const raw = backing.get(key);
+  if (!raw) return [];
+  const data = JSON.parse(raw);
+  return Object.values(data.tabCircuits ?? {}).flatMap(
+    (c) => ((c as { components?: { id: string }[] }).components ?? []).map((x) => x.id));
+}
+/** Component ids across every sheet of the LIVE sandbox (live canvas folded in). */
+function liveSandboxIds(): string[] {
+  const s = useStore.getState();
+  const sheets = new Map(s.tabCircuits);
+  if (!s.assignment) sheets.set(s.activeTabId, { components: s.components, wires: s.wires, boxes: s.boxes, confirmedBoxes: s.confirmedBoxLibrary });
+  return [...sheets.values()].flatMap((c) => c.components.map((x) => x.id));
+}
+
+console.log('[principal change]');
+{
+  const A = 'a@x.test';
+  const B = 'b@x.test';
+  useStore.getState().resetForPrincipal(A);
+  check('A signs in: nothing open', useStore.getState().assignment === null && !useStore.getState().workbookOpen);
+  await useStore.getState().openAssignment(SAMPLE_ASSIGNMENT_ID);
+  useStore.getState().switchQuestion(0);
+  if (useStore.getState().questionCircuits.get(useStore.getState().assignment!.questions[0].id)?.done) {
+    useStore.getState().toggleCurrentQuestionDone();
+  }
+  const before = new Set(useStore.getState().components.map((c) => c.id));
+  useStore.getState().addComponent('AND', 200, 200);
+  const aGate = useStore.getState().components.find((c) => !before.has(c.id))!;
+  useStore.setState({ selectedIds: [aGate.id] });
+  useStore.getState().copySelected();
+  await useStore.getState().hydrateSubmissions();
+  {
+    const s = useStore.getState();
+    check('A has a gate, a clipboard, history and a submissions map',
+      aGate != null && s.clipboard != null && s.undoStack.length > 0 && Object.keys(s.submissions).length > 0);
+  }
+
+  // Sign out exactly as SessionControls.signOut does: Home first, then the
+  // provider reports the visitor.
+  useStore.getState().goHome();
+  useStore.getState().resetForPrincipal(null);
+  {
+    const s = useStore.getState();
+    check('sign-out: no assignment in memory', s.assignment === null && s.questionCircuits.size === 0);
+    check('sign-out: live canvas empty', s.components.length === 0 && s.wires.length === 0 && s.boxes.length === 0);
+    check('sign-out: box library empty', s.confirmedBoxLibrary.length === 0);
+    check('sign-out: clipboard empty', s.clipboard === null);
+    check('sign-out: selection empty', s.selectedIds.length === 0);
+    check('sign-out: submissions map empty', Object.keys(s.submissions).length === 0);
+    check('sign-out: back to the welcome state', !s.workbookOpen && s.autoSaveStatus === 'saved');
+  }
+  checkAllSimFresh('after sign-out');
+  useStore.getState().resetForPrincipal(null);
+  check('a repeat report of the same principal is a no-op', useStore.getState().assignment === null);
+
+  // B's own stored workbook (the local seam is per-browser; it stands in for
+  // the per-user remote store here): a sentinel gate on Q1.
+  const asg = buildSampleAssignment();
+  const sentinel = { ...aGate, id: 'b-sentinel' };
+  await workbookStore.saveAssignmentState(SAMPLE_ASSIGNMENT_ID, {
+    currentQuestionIndex: 0,
+    questionCircuits: { [asg.questions[0].id]: { components: [sentinel], wires: [], boxes: [] } },
+    boxLibrary: [],
+  });
+  useStore.getState().resetForPrincipal(B);
+  check('B opens HW', (await useStore.getState().openAssignment(SAMPLE_ASSIGNMENT_ID)) === true);
+  {
+    const s = useStore.getState();
+    check("B sees B's stored workbook", s.components.some((c) => c.id === 'b-sentinel'));
+    check("…and none of A's work", !s.components.some((c) => c.id === aGate.id));
+    check('B starts with an empty clipboard', s.clipboard === null);
+    useStore.getState().paste();
+    check("pasting as B brings nothing of A's", useStore.getState().components.length === s.components.length);
+  }
+
+  // Async resolves that started under the previous principal apply nothing.
+  useStore.getState().resetForPrincipal(A);
+  const staleOpen = useStore.getState().openAssignment(SAMPLE_ASSIGNMENT_ID);
+  useStore.getState().resetForPrincipal(B);
+  check('an open started before the change resolves as a no-op', (await staleOpen) === true);
+  check('…and opens nothing for the next person', useStore.getState().assignment === null && !useStore.getState().workbookOpen);
+  const staleHydrate = useStore.getState().hydrateSubmissions();
+  useStore.getState().resetForPrincipal(A);
+  await staleHydrate;
+  check("a hydration started before the change writes nothing after it", Object.keys(useStore.getState().submissions).length === 0);
+  const EPOCH_ID = `${SAMPLE_ASSIGNMENT_ID}-epoch`;
+  await localAssignmentStore.save({ ...buildSampleAssignment(), id: EPOCH_ID, dueDate: new Date(Date.now() + 86_400_000).toISOString() });
+  await localAssignmentStore.setVisible(EPOCH_ID, true);
+  const staleSubmit = useStore.getState().submitAssignment(EPOCH_ID, A);
+  useStore.getState().resetForPrincipal(B);
+  check('a submit started before the change still records', (await staleSubmit) != null);
+  check("…but does not badge the next person's submissions map", Object.keys(useStore.getState().submissions).length === 0);
+}
+
+// ═════ One sandbox per person per browser ═══════════════════════
+
+console.log('[sandbox per person]');
+{
+  const A = 'a@x.test';
+  const B = 'b@x.test';
+  // A clean slate: the visitor in charge, no sandbox stored for anyone.
+  useStore.getState().resetForPrincipal(null);
+  for (const k of [...backing.keys()]) if (k.startsWith(SANDBOX_PREFIX)) backing.delete(k);
+  const build = (type: 'AND' | 'OR' | 'NOT') => {
+    useStore.getState().enterSandbox();
+    const before = new Set(liveSandboxIds());
+    useStore.getState().addComponent(type, 40, 40);
+    const id = liveSandboxIds().find((x) => !before.has(x))!;
+    useStore.getState().goHome();
+    return id;
+  };
+
+  useStore.getState().resetForPrincipal(A);
+  const aId = build('AND');
+  useStore.getState().resetForPrincipal(null); // A signs out
+  check("A's sandbox is saved under A's key", storedSandboxIds(keyOf(A)).includes(aId));
+  check('the visitor sandbox is empty after A signs out', liveSandboxIds().length === 0);
+  useStore.getState().resetForPrincipal(B);
+  useStore.getState().enterSandbox();
+  check('B signs in and sees an empty sandbox', liveSandboxIds().length === 0);
+  useStore.getState().goHome();
+  useStore.getState().resetForPrincipal(null);
+  useStore.getState().resetForPrincipal(A);
+  check("A signs back in and sees A's sandbox", liveSandboxIds().includes(aId));
+
+  // A visitor's sandbox moves to a first-time signer-in.
+  const C = 'c@x.test';
+  useStore.getState().resetForPrincipal(null);
+  const vId = build('OR');
+  useStore.getState().resetForPrincipal(C);
+  check("a first-time signer-in receives the visitor's sandbox", liveSandboxIds().includes(vId));
+  check('…MOVED: the visitor key is gone', !backing.has(keyOf(null)));
+  useStore.getState().resetForPrincipal(null);
+  check('the next visitor sees an empty sandbox', liveSandboxIds().length === 0);
+
+  // A person whose stored sandbox is EMPTY still counts as having none.
+  const D = 'd@x.test';
+  useStore.getState().resetForPrincipal(D);
+  useStore.getState().enterSandbox();
+  useStore.getState().goHome();
+  useStore.getState().resetForPrincipal(null);
+  check("D's empty sandbox was stored", backing.has(keyOf(D)) && storedSandboxIds(keyOf(D)).length === 0);
+  const v2Id = build('NOT');
+  useStore.getState().resetForPrincipal(D);
+  check("an empty stored sandbox still receives the visitor's work", liveSandboxIds().includes(v2Id));
+
+  // …but a sandbox with no components can still be someone's: a named
+  // turbot tab with a hand-edited map (its only tab), or a renamed tab, is
+  // never overwritten by a visitor's.
+  const F = 'f@x.test';
+  useStore.getState().resetForPrincipal(F);
+  useStore.getState().enterSandbox();
+  const fBaseTab = useStore.getState().activeTabId;
+  useStore.getState().addTab('My custom map', 'turbot', 'turbot', 'CC');
+  const fArena = structuredClone(selectTurbotArena(useStore.getState()));
+  fArena.cells[1][1] = fArena.cells[1][1] === 'block' ? 'empty' : 'block';
+  useStore.getState().setTabArena(fArena);
+  useStore.getState().removeTab(fBaseTab);
+  useStore.getState().goHome();
+  useStore.getState().resetForPrincipal(null);
+  const v3Id = build('AND');
+  useStore.getState().resetForPrincipal(F);
+  {
+    const s = useStore.getState();
+    const tab = s.tabs.find((t) => t.title === 'My custom map');
+    check("a component-free sandbox (one named turbot tab, an edited map) is kept on sign-in",
+      s.tabs.length === 1 && tab?.arena?.cells[1][1] === fArena.cells[1][1]);
+    check("…and the visitor's sandbox is not moved over it",
+      !liveSandboxIds().includes(v3Id) && storedSandboxIds(keyOf(null)).includes(v3Id));
+  }
+  const G = 'g@x.test';
+  backing.delete(keyOf(null)); // G is a first-time signer-in: nothing to receive
+  useStore.getState().resetForPrincipal(G);
+  useStore.getState().enterSandbox();
+  useStore.getState().renameTab(useStore.getState().activeTabId, 'Scratch');
+  useStore.getState().goHome();
+  useStore.getState().resetForPrincipal(null);
+  build('OR');
+  useStore.getState().resetForPrincipal(G);
+  check('a sandbox that is only a renamed tab is kept on sign-in',
+    useStore.getState().tabs.map((t) => t.title).join() === 'Scratch' && liveSandboxIds().length === 0);
+
+
+  // The legacy one-per-browser key is adopted as the visitor sandbox.
+  useStore.getState().resetForPrincipal(null);
+  backing.delete(keyOf(null));
+  backing.set(SANDBOX_PREFIX, JSON.stringify({
+    formatVersion: 2,
+    tabs: [{ id: 'legacy-tab', title: 'Circuit 1', buildMode: 'CC', activeTask: 'arithmetic' }],
+    activeTabId: 'legacy-tab',
+    tabCircuits: { 'legacy-tab': { components: [{ id: 'legacy-sentinel', type: 'AND', x: 0, y: 0, inputs: [], outputs: [] }], wires: [], boxes: [], confirmedBoxes: [] } },
+  }));
+  useStore.getState().resetForPrincipal(A); // A has work, so no visitor move fires
+  check('the legacy key becomes the visitor sandbox',
+    storedSandboxIds(keyOf(null)).includes('legacy-sentinel') && !backing.has(SANDBOX_PREFIX));
+  check("…and A still sees A's own", liveSandboxIds().includes(aId) && !liveSandboxIds().includes('legacy-sentinel'));
+  useStore.getState().resetForPrincipal(null);
+  check('a visitor sees the adopted legacy sandbox', liveSandboxIds().includes('legacy-sentinel'));
+
+  // closeWorkbook removes the current principal's key only.
+  useStore.getState().closeWorkbook();
+  check("closeWorkbook removes the current principal's sandbox", !backing.has(keyOf(null)));
+  check("…and nobody else's", backing.has(keyOf(A)) && backing.has(keyOf(C)) && backing.has(keyOf(D)));
+
+  // A principal change with the sandbox ON SCREEN (a 401, a session restore
+  // resolving) keeps a sandbox on screen — the arriving person's own.
+  useStore.getState().resetForPrincipal(A);
+  useStore.getState().enterSandbox();
+  check("A's sandbox is open", useStore.getState().workbookOpen && liveSandboxIds().includes(aId));
+  useStore.getState().resetForPrincipal(null);
+  {
+    const s = useStore.getState();
+    check('a principal change keeps an open sandbox open',
+      s.workbookOpen && s.assignment === null);
+    check("…showing the arriving person's sandbox, not the leaving one's", !liveSandboxIds().includes(aId));
+  }
+  useStore.getState().goHome();
+}
+
+// ═════ A save in flight at the change swallows nothing ══════════
+
+console.log('[principal change mid-save]');
+{
+  // The reset cancels the debounced save's trailing rerun, so a seam save
+  // still in flight when the principal changes must not be what carries the
+  // leaving person's newer edits. The stub keeps the local seam's synchronous
+  // write but confirms late — the shape of a slow remote PUT.
+  const E = 'e@x.test';
+  const seam = workbookStore as { saveAssignmentState: typeof workbookStore.saveAssignmentState };
+  const realSave = seam.saveAssignmentState.bind(workbookStore);
+  const inFlight: Promise<void>[] = [];
+  seam.saveAssignmentState = (id, st, o) => {
+    const p = realSave(id, st, o).then(() => new Promise<void>((r) => setTimeout(r, 40)));
+    inFlight.push(p);
+    return p;
+  };
+  const openQ1 = async () => {
+    await useStore.getState().openAssignment(SAMPLE_ASSIGNMENT_ID);
+    useStore.getState().switchQuestion(0);
+    const q1 = useStore.getState().assignment!.questions[0];
+    if (useStore.getState().questionCircuits.get(q1.id)?.done) useStore.getState().toggleCurrentQuestionDone();
+    return q1;
+  };
+  /** Edit, then re-open (resume): its flush starts a seam save that is still in flight after. */
+  const startSlowSave = async () => {
+    useStore.getState().addComponent('AND', 240, 240);
+    const before = inFlight.length;
+    await useStore.getState().openAssignment(SAMPLE_ASSIGNMENT_ID);
+    return inFlight.length > before;
+  };
+  try {
+    useStore.getState().resetForPrincipal(E);
+    const q1 = await openQ1();
+    check('a seam save is in flight', await startSlowSave());
+    const before = new Set(useStore.getState().components.map((c) => c.id));
+    useStore.getState().addComponent('OR', 280, 280);
+    const newer = useStore.getState().components.find((c) => !before.has(c.id))!;
+    useStore.getState().resetForPrincipal(null); // a 401 mid-save: no goHome
+    const stored = await workbookStore.loadAssignmentState(SAMPLE_ASSIGNMENT_ID);
+    check('an assignment edit made while a save was in flight reaches the seam',
+      stored?.questionCircuits[q1.id]?.components.some((c) => c.id === newer.id) === true);
+    await Promise.all(inFlight); // settled, so the next round starts its own
+
+    useStore.getState().resetForPrincipal(E);
+    await openQ1();
+    check('a seam save is in flight again', await startSlowSave());
+    useStore.getState().goHome();
+    const sbBefore = new Set(liveSandboxIds());
+    useStore.getState().enterSandbox();
+    useStore.getState().addComponent('OR', 40, 40);
+    const sbId = liveSandboxIds().find((x) => !sbBefore.has(x))!;
+    useStore.getState().goHome();
+    useStore.getState().resetForPrincipal(null); // sign-out
+    check("a sandbox edit made while a save was in flight is stored under the leaving person's key",
+      storedSandboxIds(keyOf(E)).includes(sbId));
+  } finally {
+    seam.saveAssignmentState = realSave;
+    await Promise.all(inFlight);
+  }
+}
+
+// ═════ The auth provider reports every principal change ═════════
+
+console.log('[auth provider wiring]');
+{
+  // resetForPrincipal only guards anything if the auth provider calls it on
+  // every change, in both modes. The provider is React (no DOM here), so its
+  // wiring is pinned in the source: each provider reports from its boot
+  // initializer, and from the ONE wrapper every later user change goes
+  // through, before React state moves.
+  const { readFileSync } = await import('node:fs');
+  const src = readFileSync(new URL('../src/auth/authProvider.tsx', import.meta.url), 'utf8');
+  /** The balanced {…} block opening at the first '{' after `marker` in `text`. */
+  const block = (text: string, marker: string): string => {
+    const at = text.indexOf(marker);
+    if (at < 0) return '';
+    const open = text.indexOf('{', at + marker.length);
+    let depth = 0;
+    for (let i = open; i < text.length; i++) {
+      if (text[i] === '{') depth++;
+      else if (text[i] === '}' && --depth === 0) return text.slice(open, i + 1);
+    }
+    return '';
+  };
+  /** A top-level function's source, up to the next top-level declaration. */
+  const topLevel = (name: string): string => {
+    const at = src.indexOf(`\nfunction ${name}(`);
+    if (at < 0) return '';
+    const next = src.slice(at + 1).search(/\n(export )?(function|const|let) /);
+    return next < 0 ? src.slice(at) : src.slice(at, at + 1 + next);
+  };
+  check('reportPrincipal hands the store to resetForPrincipal',
+    /useStore\.getState\(\)\.resetForPrincipal\(/.test(block(src, 'function reportPrincipal(')));
+  for (const [name, wrapper] of [
+    ['LocalAuthProvider', 'const changeUser = useCallback('],
+    ['RemoteAuthProvider', 'const setUser = useCallback('],
+  ] as const) {
+    const provider = topLevel(name);
+    const init = block(provider, 'useState<AuthUser | null>(() =>');
+    const wrap = block(provider, wrapper);
+    check(`${name}: the boot initializer reports the principal`, /reportPrincipal\(/.test(init));
+    check(`${name}: the user-change wrapper reports before React state moves`,
+      wrap.includes('reportPrincipal(') && wrap.indexOf('reportPrincipal(') < wrap.indexOf('setUserState('));
+    check(`${name}: every user change goes through that wrapper`,
+      provider.split('setUserState(').length - 1 === 1 && wrap.includes('setUserState('));
+  }
+  check('RemoteAuthProvider boots as the stored token\'s owner, never a bare visitor',
+    /reportPrincipal\(readPrincipalHint\(\)\)/.test(block(topLevel('RemoteAuthProvider'), 'useState<AuthUser | null>(() =>')));
 }
 
 await flushTimers();

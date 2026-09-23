@@ -103,7 +103,9 @@ State each such gap in the task's `## Verify` as owed, with the recipe.
 4. **Transition-label syntax lives only in `app/src/engine/notation.ts`** (grep gate in
    `notationCheck`).
 5. **Local mode stays byte-identical** with zero `/api` traffic when `VITE_API_BASE` is unset.
-6. **Every canvas swap resets sim state** via `resetAllSimState()` (`navResetCheck`).
+6. **Every canvas swap resets sim state AND undo/redo** via `resetAllSimState()`; **every
+   principal change resets the whole editor store** (and loads that person's sandbox) via
+   `resetForPrincipal()`, called by the auth provider in both modes (`navResetCheck`).
 7. **`CLAUDE.md` stays ≤ 40 KB** and is never appended to (§9).
 Full rules: `CLAUDE.md` Part 2 "Critical design rules" and "Things to watch".
 

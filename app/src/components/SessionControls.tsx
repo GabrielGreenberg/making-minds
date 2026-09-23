@@ -7,7 +7,9 @@ import { FeedbackPanel } from './FeedbackPanel';
 /**
  * Log out and land on the sign-in screen. Navigates Home FIRST, while the
  * session still exists, so the open workbook closes (and flushes its save)
- * as the signed-in user; then the session ends and Home — a signed-in route —
+ * as the signed-in user; then the session ends — the auth provider resets the
+ * editor store for the visitor (store.ts resetForPrincipal), so nothing of
+ * this user's stays in memory for the next — and Home, a signed-in route,
  * shows the sign-in screen. The one sign-out path for every surface.
  */
 export function signOut(logout: () => void): void {
