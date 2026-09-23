@@ -138,6 +138,14 @@ export class Db {
       );
       CREATE INDEX IF NOT EXISTS idx_feedback_status
         ON feedback (status, created_at);
+      -- Every homework content version the repo sync wrote (server/src/homeworks.ts):
+      -- a copy still equal to one of them is untouched since, so it may refresh.
+      CREATE TABLE IF NOT EXISTS content_sync (
+        assignment_id TEXT NOT NULL,
+        hash          TEXT NOT NULL,
+        synced_at     TEXT NOT NULL,
+        PRIMARY KEY (assignment_id, hash)
+      );
       CREATE TABLE IF NOT EXISTS instructor_notes (
         id         INTEGER PRIMARY KEY CHECK (id = 1),
         content    TEXT NOT NULL DEFAULT '',
@@ -492,6 +500,23 @@ export class Db {
          ON CONFLICT(id) DO UPDATE SET data = excluded.data, updated_at = excluded.updated_at`,
       )
       .run(assignment.id, JSON.stringify(assignment), new Date().toISOString());
+  }
+
+  /** Content hashes the homework sync has written for this assignment. */
+  syncedHashes(id: string): Set<string> {
+    const rows = this.db
+      .prepare('SELECT hash FROM content_sync WHERE assignment_id = ?')
+      .all(id) as { hash: string }[];
+    return new Set(rows.map((r) => r.hash));
+  }
+
+  recordSync(id: string, hash: string): void {
+    this.db
+      .prepare(
+        `INSERT INTO content_sync (assignment_id, hash, synced_at) VALUES (?, ?, ?)
+         ON CONFLICT(assignment_id, hash) DO UPDATE SET synced_at = excluded.synced_at`,
+      )
+      .run(id, hash, new Date().toISOString());
   }
 
   removeAssignment(id: string): void {

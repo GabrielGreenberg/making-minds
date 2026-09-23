@@ -1,15 +1,18 @@
 // Seed the server database with the toy roster and, with --sample, the
 // five-mode sample assignment plus its graded demo submissions — the server
-// twin of app/src/devData/seed.ts. Idempotent: reruns upsert/replace. No
-// assignment is seeded by default: course content is authored in the
-// instructor UI (or ingested by a content seed).
+// twin of app/src/devData/seed.ts. Idempotent: reruns upsert/replace. With
+// --homeworks it also runs the homework sync (src/homeworks.ts — the same
+// step every release runs), so a fresh box starts with HW1–HW7, unpublished.
 //
 //   MM_DB_PATH=making-minds.sqlite npm run seed          # toy roster only
 //   MM_DB_PATH=making-minds.sqlite npm run seed -- --sample
+//   MM_DB_PATH=making-minds.sqlite npm run seed -- --homeworks
 
 import { loadConfig } from './config';
 import { Db } from './db';
 import { hashPassword } from './password';
+import { syncHomeworks } from './homeworks';
+import { describeSyncStep } from '../../app/src/devData/homeworkSync';
 import { gradeSubmission } from '../../app/src/engine/grader';
 import { TOY_ACCOUNTS } from '../../app/src/auth/accounts';
 import {
@@ -52,6 +55,10 @@ if (process.argv.includes('--sample')) {
     );
   }
   console.log(`assignment: ${sample.id} (${sample.questions.length} questions) + demo submissions`);
+}
+
+if (process.argv.includes('--homeworks')) {
+  for (const step of syncHomeworks(db)) console.log(`homework ${describeSyncStep(step)}`);
 }
 
 db.close();
