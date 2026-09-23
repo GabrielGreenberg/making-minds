@@ -2,39 +2,56 @@ import { useEffect } from 'react';
 import type { ReactNode } from 'react';
 import { useAuth } from './authProvider';
 import { LoginScreen } from './LoginScreen';
-import { initRouting } from '../routing';
+import { HealthGate } from './HealthGate';
+import { initRouting, routeAccess, setRoutingSignedIn } from '../routing';
+import { useRoute } from '../useRoute';
 
 /**
- * Gates the app behind authentication. Renders the login screen until a user
- * is logged in, then the app. Consumers wrapping with <AuthGate> stay the same
- * when real auth replaces the dev login — only what `useAuth` resolves to
- * changes.
+ * The per-route access gate. Access is a property of the route
+ * (routing.ts `routeAccess`), so the gate asks what the CURRENT route needs:
  *
- * Routing starts HERE, not at module init: `initRouting()` applies the initial
- * URL (a deep link like #/a/hw1 fires `openAssignment`, which reads the
- * storage seams), so it must not run until a user exists — in remote mode an
- * unauthenticated open would just 401. Gating it on `user` also means a deep
- * link saved before login is applied right after it, for free. `initRouting`
- * is idempotent, so login → logout → login doesn't re-arm anything.
+ *   public     — rendered for anyone: a signed-in user or a visitor. No
+ *                server needed (a visitor's sandbox works while the course
+ *                server is down).
+ *   signed-in  — (and `instructor`, whose role check is <InstructorGate>'s)
+ *                held behind the server-health screen in remote mode, then
+ *                "Loading…" while a session restores, then the sign-in screen
+ *                if nobody is signed in, then the app.
+ *
+ * Routing starts HERE, at boot, for everyone: `initRouting` applies the
+ * landing rule (a browser with no trace of a previous sign-in, opening `#/`,
+ * lands in the sandbox as a visitor) and the initial URL. A route that needs
+ * sign-in is held — never applied to the store unauthenticated — and applied
+ * the moment someone signs in (`setRoutingSignedIn`), so a deep link like
+ * #/a/hw1 opened logged-out lands on hw1 right after the sign-in screen.
  */
 export function AuthGate({ children }: { children: ReactNode }) {
-  const { user, loading } = useAuth();
+  const { user, loading, hasSignInTrace } = useAuth();
+  const route = useRoute();
 
+  // Declared first so it runs first: routing must know who is signed in
+  // before it applies the initial URL.
   useEffect(() => {
-    if (user) initRouting();
+    setRoutingSignedIn(user != null);
   }, [user]);
 
-  if (loading) {
-    return (
-      <div className="auth-gate-loading" style={{ padding: 24 }}>
-        Loading…
-      </div>
-    );
-  }
+  useEffect(() => {
+    initRouting({ hasSignInTrace: hasSignInTrace() });
+  }, [hasSignInTrace]);
 
-  if (!user) {
-    return <LoginScreen />;
-  }
+  if (routeAccess(route) === 'public') return <>{children}</>;
 
-  return <>{children}</>;
+  return (
+    <HealthGate>
+      {loading ? (
+        <div className="auth-gate-loading" style={{ padding: 24 }}>
+          Loading…
+        </div>
+      ) : user ? (
+        children
+      ) : (
+        <LoginScreen />
+      )}
+    </HealthGate>
+  );
 }

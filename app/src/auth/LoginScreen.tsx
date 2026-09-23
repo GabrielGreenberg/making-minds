@@ -4,10 +4,11 @@ import { useAuth } from './authProvider';
 import { TOY_ACCOUNTS } from './accounts';
 import { backendMode } from '../storage/backend';
 import type { AuthCapabilities } from './types';
-import { PageShell } from '../components/PageShell';
+import { PageShell, hashLink } from '../components/PageShell';
 
 /**
- * The login screen, shown by <AuthGate> whenever no user is set.
+ * The sign-in screen, shown by <AuthGate> when a route that needs sign-in is
+ * requested and nobody is signed in.
  *
  * Local mode: one button per toy account — no passwords; picking an account
  * logs in as that identity and its `role` drives which views are reachable.
@@ -31,11 +32,25 @@ export function LoginScreen() {
   return <LocalLoginScreen />;
 }
 
-/** The card variant of the page shell: the brand topbar and one centred card. */
+/**
+ * The card variant of the page shell: the brand topbar and one centred card.
+ * Every sign-in pane (the local picker; remote password / SSO / dev) ends with
+ * the same way past it: continue as a visitor, into the sandbox — as
+ * prominent as signing in, because most people arriving from the website
+ * just want to try the machines.
+ */
 function LoginCard({ children }: { children: ReactNode }) {
   return (
     <PageShell variant="card">
-      <div className="mm-card mm-card--narrow">{children}</div>
+      <div className="mm-card mm-card--narrow">
+        {children}
+        <div className="login-visitor">
+          <p>Just exploring? Build circuits, state machines and Turing machines — no account needed.</p>
+          <a className="mm-btn" {...hashLink({ kind: 'sandbox' })}>
+            Continue as a visitor → Sandbox
+          </a>
+        </div>
+      </div>
     </PageShell>
   );
 }

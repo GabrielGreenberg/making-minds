@@ -9,3 +9,4 @@
 2026-09-21-026 · feature · Give students a Home with Assignments · Grades tabs, an up-next box and a Grades page (retire the grade-sheet modal) · 2026-09-21T23:02:30-0700 · task/026-student-home-tabs · bd53ff4
 2026-09-21-020 · feature · Render an assignment as a readable problem-set document modelled on the HW PDFs · 2026-09-22T09:55:39-0700 · task/020-problem-set-document-view · 5f8bb98
 2026-09-21-007 · feature · Sync HW1–HW7 from the repo into the server database on every release · 2026-09-22T19:11:14-0700 · task/007-homework-sync · d1e3230
+2026-09-22-027 · feature · Visitor mode — use the sandbox without signing in; unknown browsers land there, known ones sign back in · 2026-09-23T11:45:40-0700 · task/027-visitor-mode · b92c737

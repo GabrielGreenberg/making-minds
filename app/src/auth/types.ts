@@ -41,6 +41,19 @@ export interface AuthContextValue {
   /** True while the initial session is being resolved. */
   loading: boolean;
   /**
+   * Nobody is signed in and nothing is being resolved: the visitor — a
+   * first-class principal, not "loading" and not an error. A visitor may use
+   * the public routes (routing.ts `routeAccess`: the sandbox); every other
+   * route shows the sign-in screen.
+   */
+  isVisitor: boolean;
+  /**
+   * Whether this browser shows any trace of a previous sign-in (a session
+   * record, a token, or the durable marker). Read once at boot for the
+   * landing rule (routing.ts `landingRoute`).
+   */
+  hasSignInTrace(): boolean;
+  /**
    * What this server's sign-in system supports. Null while it is still being
    * fetched (remote mode, first paint).
    */
@@ -70,6 +83,6 @@ export interface AuthContextValue {
   }): Promise<AuthAttemptResult>;
   /** Change the signed-in user's own password. */
   changePassword(currentPassword: string, newPassword: string): Promise<AuthAttemptResult>;
-  /** Clear the session, returning to the login screen. */
+  /** Clear the session (the sign-in screen follows — see SessionControls). */
   logout(): void;
 }
