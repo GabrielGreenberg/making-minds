@@ -150,7 +150,11 @@ existing gradebook route is retired into it.
 for this design. 003 (student views the submitted snapshot) shares the read-only viewer with
 item D3. 002 (failed input → live Run) applies equally to the instructor's view. 008 (backups)
 should precede any re-grade that commits.
-
+**030 (Activity tab, filed 2026-09-22)** overlaps: its per-assignment started / submitted / late
+counts and per-question pass rates are the same roster ↔ submissions join and summary query
+this design needs. The memo must say what lives where — suggested: Activity = usage (accounts,
+active students, saves, traffic), Grading = progress, grades and flags — and name ONE shared
+summary endpoint both consume.
 ## Done when
 1. A design memo `docs/buildout/designs/grading-interface.md`: surfaces and routes; the grade
    model (points, ½ credit, override, counting attempt, late penalty, extensions); re-grade

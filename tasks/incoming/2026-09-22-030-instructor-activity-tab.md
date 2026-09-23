@@ -26,6 +26,11 @@ into Cloudflare. Two layers, in this order of importance:
    over time, top referrers, countries, devices. Fetched **server-side** from Cloudflare's
    GraphQL Analytics API. The Cloudflare token never reaches the browser.
 
+Note (catch 2026-09-23): task 2026-09-23-031 (grading interface design) needs the same
+roster ↔ submissions join and per-assignment summary (submitted / late / pass rate). If this
+lands first, build that query as ONE reusable summary endpoint the grading surfaces can
+consume; if 031's design lands first, reuse its endpoint here.
+
 ## Done when
 - The Dashboard has an **Activity** tab (`#/instructor/activity`) beside Assignments ·
   Roster & accounts · Feedback · Notes, built from the page vocabulary (`theme.css`,
