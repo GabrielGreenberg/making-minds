@@ -10,3 +10,4 @@
 2026-09-21-020 · feature · Render an assignment as a readable problem-set document modelled on the HW PDFs · 2026-09-22T09:55:39-0700 · task/020-problem-set-document-view · 5f8bb98
 2026-09-21-007 · feature · Sync HW1–HW7 from the repo into the server database on every release · 2026-09-22T19:11:14-0700 · task/007-homework-sync · d1e3230
 2026-09-22-027 · feature · Visitor mode — use the sandbox without signing in; unknown browsers land there, known ones sign back in · 2026-09-23T11:45:40-0700 · task/027-visitor-mode · b92c737
+2026-09-23-035 · bug · Import the registrar's class list as exported — skip its preamble, read its columns and name format, leave out withdrawn students · 2026-09-23T14:34:45-0700 · task/035-registrar-roster-import · cde8684

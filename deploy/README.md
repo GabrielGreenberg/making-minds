@@ -71,9 +71,10 @@ cd /srv/making-minds/repo/server && sudo -u makingminds npm install
 # Seed the database (the toy roster; assignments are authored in the instructor UI)
 sudo -u makingminds MM_DB_PATH=/srv/making-minds/data/making-minds.sqlite npm run seed
 
-# Load the real class roster and give yourself an account (see section 3)
+# Load the real class roster and give yourself an account (see section 3).
+# The class list is a student record: copy it to the box OUTSIDE the repo.
 sudo -u makingminds MM_DB_PATH=/srv/making-minds/data/making-minds.sqlite \
-  npm run roster -- import /path/to/roster.csv
+  npm run roster -- import /srv/making-minds/rosters/class-list.csv
 sudo -u makingminds MM_DB_PATH=/srv/making-minds/data/making-minds.sqlite \
   npm run roster -- add you@ucla.edu --name "Your Name" --role instructor
 sudo -u makingminds MM_DB_PATH=/srv/making-minds/data/making-minds.sqlite \
@@ -164,15 +165,35 @@ thing through `POST /api/roster/import`):
 cd /srv/making-minds/repo/server
 export MM_DB_PATH=/srv/making-minds/data/making-minds.sqlite
 
-npm run roster -- import roster.csv        # any export with an email column;
-                                           # name / student ID / role picked up
+npm run roster -- import /srv/making-minds/rosters/class-list.csv
+                                           # the registrar's export as-is, or any
+                                           # export with an email column
 npm run roster -- list --unregistered      # who hasn't created an account yet
 npm run roster -- reset student@ucla.edu   # forgotten password → they re-register
 npm run roster -- requests                 # pending "I'm not on the roster" requests
 ```
 
+**The registrar's class-list export is imported unedited.** Its preamble
+(`Term:`, `Class:`, … and blank lines) is skipped — the header is the first row
+with an email column; `"LAST, FIRST MIDDLE"` names become `First Middle Last`
+(sorted by surname); `UID` is the student ID and `Section` is stored. Major,
+Classification and Grade Type are deliberately not read. The `Status` column
+decides who is imported: `E` enrolled, `W` wait list and `H` held are; `D`
+dropped (and cancelled / withdrawn) are not, and the report counts each
+(`1 dropped — not imported`). An unfamiliar status code is imported with a
+warning.
+
 Importing only **adds and updates**. It never removes anyone and never touches
 a password, so re-importing an updated enrollment list mid-quarter is safe.
+Instead, a re-import of a class list (a file with a `Status` column) lists the
+students already on the platform whose row is now dropped or who are missing
+from the file under **"no longer on the class list — review"**; remove them by
+hand once you have checked.
+
+**Class lists never go in git.** They are student records (FERPA). Keep them
+outside the repo — on the box, `/srv/making-minds/rosters/`; locally, anywhere
+outside the checkout or in the repo's ignored `rosters/` folder. `.gitignore`
+also ignores the registrar's download name, `*-csv.csv`.
 
 **Bootstrapping the first instructor** is the one thing that must happen on the
 box, because the web UI needs an instructor to sign in before it can be used:

@@ -15,3 +15,8 @@ notes/
 # local credentials — never committed
 secrets/
 ssh/
+
+# class lists (student records, FERPA) — never committed. Keep them outside
+# the repo or in rosters/; *-csv.csv is the registrar's export naming.
+rosters/
+*-csv.csv

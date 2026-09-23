@@ -30,6 +30,8 @@ Checks:
 ```sh
 npm run typecheck   # tsc --noEmit over server + the shared app sources
 npm run check       # serverCheck (full student → instructor flow over HTTP)
+                    # + rosterCheck (the class-list reader: registrar export,
+                    #   header discovery, names, statuses, the import report)
                     # + authCheck (the account system: roster parsing, password
                     #   hashing, the providers, registration/sign-in/reset/access
                     #   requests end to end)
@@ -63,7 +65,7 @@ All routes are under `/api`, JSON in/out, auth via `Authorization: Bearer <token
 | `GET /api/auth/me`                      | logged in  | `{user}`                                                             |
 | `POST /api/auth/access-requests`        | anyone     | `{email, name, studentId?, message?}` — "my email isn't on the roster"; always answers ok |
 | `GET /api/roster`                       | instructor | the roster with per-row account state                                |
-| `POST /api/roster/import`               | instructor | `{csv, defaultRole?}` → upsert; never removes anyone, never touches a password |
+| `POST /api/roster/import`               | instructor | `{csv, defaultRole?}` → upsert + the import report (`headerLine`, columns, `statusCounts`, `noLongerListed`, issues); never removes anyone, never touches a password |
 | `POST /api/roster`                      | instructor | add or update one person                                             |
 | `DELETE /api/roster/:email`             | instructor | remove from the roster (their submitted work is kept)                |
 | `POST /api/roster/:email/reset-password`| instructor | clear the credential + all their sessions; they register again       |
@@ -92,13 +94,15 @@ endpoint, ready to back `Remote*` implementations of the `WorkbookStore` /
 | `src/db.ts`             | `node:sqlite` schema + typed accessors (users, sessions, assignments, workbooks, submissions) |
 | `src/auth.ts`           | the auth seam: `AuthProvider` (authenticate / register / capabilities) with `PasswordAuthProvider`, `DevAuthProvider`, `SsoAuthProvider`; `createAuthProvider` is the one mode decision. Plus session issue/lookup, `requireAuth`/`requireInstructor`, and the failed-login `LoginThrottle` |
 | `src/password.ts`       | scrypt hashing (self-describing `scrypt$N$r$p$salt$hash`), constant-time verify, the length policy |
-| `src/roster.ts`         | pure CSV roster parsing: RFC-4180 reader + tolerant header detection (email / name or first+last / student ID / role), per-row issues |
+| `src/roster.ts`         | pure CSV roster parsing: RFC-4180 reader; header discovery past a preamble (the registrar's export as-is); strict column matching (exact, then whole word — no substring fallback) for email / name or first+last / student ID / role / section / status; `LAST, FIRST` → display name + surname sort key; `STATUS_TABLE` (E/W/H imported, D/C/withdrawn not); `rosterReview` (who is no longer on the class list); per-row issues |
+| `src/rosterImport.ts`   | `importRosterCsv` — parse, upsert, and the import report (added / updated / statuses / columns / no longer listed), shared by `POST /api/roster/import` and the CLI |
 | `src/sanitize.ts`       | student-facing redaction: `stripAnswers` (no `test_cases`), `stripResultDetail` (scores only), `studentRecord` (no grade at all until grades are released) |
 | `src/app.ts`            | the Express app (factory, no `listen`) — all routes                     |
 | `src/index.ts`          | entry point: config → db → listen, graceful shutdown                    |
 | `src/seed.ts`           | seed the toy roster (+ the sample assignment) (`npm run seed [-- --sample] [-- --password=X]`) |
 | `src/roster-cli.ts`     | roster + account admin from the shell (`npm run roster -- <command>`)   |
 | `tools/serverCheck.ts`  | end-to-end HTTP smoke test (`npm run check`)                            |
+| `tools/rosterCheck.ts`  | the class-list reader against a synthetic registrar-shaped fixture (never a real class list) |
 | `tools/authCheck.ts`    | the account system: roster parsing, passwords, providers, and the whole sign-in lifecycle over HTTP |
 
 ## Accounts
@@ -108,7 +112,7 @@ choosing a password. Nobody can register for an email the roster doesn't carry �
 they file an access request instead, and an instructor approves it.
 
 ```sh
-npm run roster -- import roster.csv      # any CSV with an email column
+npm run roster -- import ~/rosters/class-list.csv   # the registrar export as-is, or any CSV with an email column; class lists never go in git
 npm run roster -- add x@ucla.edu --role instructor
 npm run roster -- set-password x@ucla.edu    # bootstrap the first instructor
 npm run roster -- list --unregistered

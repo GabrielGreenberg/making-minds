@@ -13,7 +13,7 @@
     "typecheck": "tsc --noEmit",
     "parity": "tsx tools/parityCheck.ts",
     "auth": "tsx tools/authCheck.ts",
-    "check": "tsx tools/serverCheck.ts && npm run auth && npm run parity && tsx tools/homeworkSyncCheck.ts"
+    "check": "tsx tools/serverCheck.ts && tsx tools/rosterCheck.ts && npm run auth && npm run parity && tsx tools/homeworkSyncCheck.ts"
   },
   "dependencies": {
     "express": "^5.1.0",
