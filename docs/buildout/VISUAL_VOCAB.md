@@ -169,7 +169,7 @@ literal or an undefined token. Task: `tasks/done/2026-09-21-019-*`._
   `.visitor-banner` line ("…as a visitor — PHIL 133 student? Sign in"; dismissed for the
   browser session). On page surfaces `SessionControls` shows Visitor · Sign in. Every
   sign-in card (local picker; remote password / dev / SSO) OPENS with "Just exploring?…"
-  on white and a full-width **Continue as a visitor → Sandbox** button in soft magenta
+  on white and a full-width **Continue as visitor** button in soft magenta
   (`--mm-accent-soft` field, `--mm-accent` text), then a hairline, then Sign in; the
   server-health card offers "Open the sandbox" beside Retry.
 - **Up next** — the site's `.next`/`.nx` box (`.mm-next`/`.mm-nx`): a lavender field with

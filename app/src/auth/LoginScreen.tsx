@@ -44,9 +44,9 @@ function LoginCard({ children }: { children: ReactNode }) {
     <PageShell variant="card">
       <div className="mm-card mm-card--narrow">
         <div className="login-visitor">
-          <p>Just exploring? Build circuits, state machines and Turing machines — no account needed.</p>
+          <p>Just exploring? Build circuits, state machines and Turing machines. No account needed.</p>
           <a className="mm-btn login-visitor-btn" {...hashLink({ kind: 'sandbox' })}>
-            Continue as a visitor → Sandbox
+            Continue as visitor
           </a>
         </div>
         {children}
