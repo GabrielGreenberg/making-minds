@@ -247,7 +247,7 @@ export class Db {
   }
 
   /** The full roster with account state, for the instructor's roster view:
-   *  instructors first, then by surname where the class list gave one. */
+   *  students first (role DESC), then by surname where the class list gave one. */
   listUsers(): RosterRow[] {
     const rows = this.db
       .prepare(

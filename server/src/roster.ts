@@ -297,6 +297,13 @@ const STATUS_TABLE: Readonly<Record<string, StatusMeaning>> = {
 
 const statusKey = (cell: string): string => cell.trim().toLowerCase().replace(/[\s_-]+/g, ' ');
 
+/** The table's meaning of a status cell — own keys only, so a cell like "constructor"
+ *  is an unknown code (imported with an issue), never an inherited property. */
+const statusMeaning = (cell: string): StatusMeaning | undefined => {
+  const key = statusKey(cell);
+  return Object.hasOwn(STATUS_TABLE, key) ? STATUS_TABLE[key] : undefined;
+};
+
 // ── names ───────────────────────────────────────────────────────
 
 /** Lowercased between surname words ("Nunez de la O"), never first or last. */
@@ -497,7 +504,7 @@ export function parseRoster(csv: string, defaultRole: Role = 'student'): RosterP
     const email = normalizeEmail(at(emailIdx));
     const named = at(nameIdx) ? normalizeRosterName(at(nameIdx)) : composeName(at(firstIdx), at(lastIdx));
     const statusCell = at(statusIdx);
-    const status: StatusMeaning | undefined = statusCell ? STATUS_TABLE[statusKey(statusCell)] : ENROLLED;
+    const status: StatusMeaning | undefined = statusCell ? statusMeaning(statusCell) : ENROLLED;
     if (status && !status.imported) {
       gathered.push({ line, email, name: named.display, label: status.label, imported: false });
       continue;

@@ -235,6 +235,12 @@ check(
   JSON.stringify(twoDrops.statusCounts) === JSON.stringify([{ label: 'dropped', count: 2, imported: false }]),
   JSON.stringify(twoDrops.statusCounts),
 );
+const inherited = parseRoster('Email,Status\nproto@example.com,constructor\n');
+check(
+  'a status named like an Object property ("constructor") is an unknown code: imported with an issue',
+  inherited.entries.length === 1 && inherited.issues.some((i) => i.reason === 'unrecognised status "constructor" — imported'),
+  JSON.stringify(inherited.issues),
+);
 
 // ═══ [names] ═════════════════════════════════════════════════════
 section('[names]');

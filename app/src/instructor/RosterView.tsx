@@ -111,24 +111,26 @@ function RemoteRosterView() {
           </p>
         )}
         {rows.length > 0 && (
-          <table className="mm-table roster-table">
-            <thead>
-              <tr>
-                <th>Name</th>
-                <th>Email</th>
-                <th>Student ID</th>
-                <th>Section</th>
-                <th>Role</th>
-                <th>Account</th>
-                <th />
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((row) => (
-                <RosterRow key={row.email} row={row} busy={busy} onAction={run} />
-              ))}
-            </tbody>
-          </table>
+          <div className="instructor-table-scroll">
+            <table className="mm-table roster-table">
+              <thead>
+                <tr>
+                  <th>Name</th>
+                  <th>Email</th>
+                  <th>Student ID</th>
+                  <th>Section</th>
+                  <th>Role</th>
+                  <th>Account</th>
+                  <th />
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map((row) => (
+                  <RosterRow key={row.email} row={row} busy={busy} onAction={run} />
+                ))}
+              </tbody>
+            </table>
+          </div>
         )}
       </section>
 
@@ -329,53 +331,55 @@ function AccessRequestsPanel({
         People who asked to be added under an email the roster doesn't have. Approving adds them —
         they then create their account the same way everyone else does.
       </p>
-      <table className="mm-table roster-table">
-        <thead>
-          <tr>
-            <th>Name</th>
-            <th>Email</th>
-            <th>Student ID</th>
-            <th>Message</th>
-            <th />
-          </tr>
-        </thead>
-        <tbody>
-          {requests.map((req) => (
-            <tr key={req.id}>
-              <td>{req.name}</td>
-              <td className="roster-email">{req.email}</td>
-              <td>{req.studentId || '—'}</td>
-              <td className="roster-message">{req.message || '—'}</td>
-              <td className="roster-actions">
-                <button
-                  className="mm-btn"
-                  disabled={busy}
-                  onClick={() =>
-                    onAction(async () => {
-                      await api.approveAccessRequest(req.id, 'student');
-                      return `${req.email} added to the roster.`;
-                    })
-                  }
-                >
-                  Approve
-                </button>
-                <button
-                  className="mm-btn"
-                  disabled={busy}
-                  onClick={() =>
-                    onAction(async () => {
-                      await api.rejectAccessRequest(req.id);
-                      return `Rejected the request from ${req.email}.`;
-                    })
-                  }
-                >
-                  Reject
-                </button>
-              </td>
+      <div className="instructor-table-scroll">
+        <table className="mm-table roster-table">
+          <thead>
+            <tr>
+              <th>Name</th>
+              <th>Email</th>
+              <th>Student ID</th>
+              <th>Message</th>
+              <th />
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {requests.map((req) => (
+              <tr key={req.id}>
+                <td>{req.name}</td>
+                <td className="roster-email">{req.email}</td>
+                <td>{req.studentId || '—'}</td>
+                <td className="roster-message">{req.message || '—'}</td>
+                <td className="roster-actions">
+                  <button
+                    className="mm-btn"
+                    disabled={busy}
+                    onClick={() =>
+                      onAction(async () => {
+                        await api.approveAccessRequest(req.id, 'student');
+                        return `${req.email} added to the roster.`;
+                      })
+                    }
+                  >
+                    Approve
+                  </button>
+                  <button
+                    className="mm-btn"
+                    disabled={busy}
+                    onClick={() =>
+                      onAction(async () => {
+                        await api.rejectAccessRequest(req.id);
+                        return `Rejected the request from ${req.email}.`;
+                      })
+                    }
+                  >
+                    Reject
+                  </button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </section>
   );
 }
