@@ -8,9 +8,9 @@ requires:
 area: app
 source: chat
 created: 2026-09-23T11:30:00-07:00
-status: in-progress
+status: done
 after:
-branch: task/032-scope-editor-state
+branch:
 merged_into:
 ---
 
@@ -152,3 +152,13 @@ then `npm run check`. A browser pass is optional here; task 033's browser pass c
   never reaches B; 401 on #/sandbox → visitor sandbox, on #/a/hw1/q/0 → sign-in then B's
   work. Nothing owed over ssh; no real student data.
 - **Next step.** Loop session: the owed browser checks above, then land per PROFILE §5.
+
+### 2026-09-23 — landed (work loop)
+- **Browser, local mode (dev server :5173), done.** A visitor built an AND gate in the sandbox,
+  then signed in as John: the gate moved to `making-minds-autosave:john.doe@example.com` and the
+  `:visitor` key was removed. After logout the visitor sandbox was empty. Ada signed in to an
+  empty sandbox of her own. John signed back in and saw his gate. No console errors.
+- **Still owed.** The remote-mode pass (sandbox reload on `#/sandbox`, A's HW1 never reaching
+  B, the 401 paths) goes with task 033's browser pass, as `## Verify` allows. Headless pins
+  cover each of these.
+- Landed at 306691d via a merge into `main`.
