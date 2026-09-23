@@ -160,15 +160,17 @@ literal or an undefined token. Task: `tasks/done/2026-09-21-019-*`._
   column as `.mm-tabs` (an optional eyebrow, then tabs; current tab underlined): the
   student Home's Assignments · Grades on the catalog, the Grades page and an
   assignment's overview; the Dashboard's Assignments · Roster & accounts · Feedback ·
-  Notes on every instructor page; the remote login's panes.
+  Notes on every instructor page. (The remote sign-in has no tabs: one form, with a quiet
+  "First time here?" link to setup and an access request only when setup finds the
+  email off-roster.)
 - **Visitor** (task 027) — someone not signed in reaches only the sandbox (the editor):
   its menu bar shows a magenta-outlined "Visitor" chip and **Sign in** where the name /
   Feedback / Log out sit (no ⌂ Home), and under it one dismissible lavender
   `.visitor-banner` line ("…as a visitor — PHIL 133 student? Sign in"; dismissed for the
   browser session). On page surfaces `SessionControls` shows Visitor · Sign in. Every
-  sign-in card (local picker; remote password / dev / SSO) OPENS with a lavender block
-  (magenta left rule) holding a full-width primary **Continue as a visitor → Sandbox**
-  button — the one sanctioned second primary button, above Sign in; the
+  sign-in card (local picker; remote password / dev / SSO) OPENS with "Just exploring?…"
+  on white and a full-width **Continue as a visitor → Sandbox** button in soft magenta
+  (`--mm-accent-soft` field, `--mm-accent` text), then a hairline, then Sign in; the
   server-health card offers "Open the sandbox" beside Retry.
 - **Up next** — the site's `.next`/`.nx` box (`.mm-next`/`.mm-nx`): a lavender field with
   a chip on the left (NEXT DUE) and date-in-`--mm-date` + title + a detail line on the

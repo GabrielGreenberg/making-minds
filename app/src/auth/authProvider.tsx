@@ -264,6 +264,8 @@ function RemoteAuthProvider({ children }: { children: ReactNode }) {
         return {
           ok: false,
           error: describeError(e, 'Could not reach the server — check your connection.'),
+          // The server refuses an off-roster email with 403 (and only that).
+          notOnRoster: e instanceof api.ApiError && e.status === 403,
         };
       }
     },

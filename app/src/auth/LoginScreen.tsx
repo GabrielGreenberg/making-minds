@@ -35,8 +35,8 @@ export function LoginScreen() {
 /**
  * The card variant of the page shell: the brand topbar and one centred card.
  * Every sign-in pane (the local picker; remote password / SSO / dev) OPENS
- * with the way past it: continue as a visitor, into the sandbox — first and
- * in the site's colours, because most people arriving from the website just
+ * with the way past it: continue as a visitor, into the sandbox — first, its
+ * button in the site's soft magenta, because most people arriving from the website just
  * want to try the machines.
  */
 function LoginCard({ children }: { children: ReactNode }) {
@@ -45,7 +45,7 @@ function LoginCard({ children }: { children: ReactNode }) {
       <div className="mm-card mm-card--narrow">
         <div className="login-visitor">
           <p>Just exploring? Build circuits, state machines and Turing machines — no account needed.</p>
-          <a className="mm-btn mm-btn--primary" {...hashLink({ kind: 'sandbox' })}>
+          <a className="mm-btn login-visitor-btn" {...hashLink({ kind: 'sandbox' })}>
             Continue as a visitor → Sandbox
           </a>
         </div>
@@ -81,14 +81,32 @@ function LocalLoginScreen() {
   );
 }
 
-type Pane = 'signin' | 'create' | 'request';
+type View = 'signin' | 'setup' | 'request';
 
+/** What the setup form hands the access request when the roster lacks the email. */
+interface Prefill {
+  email: string;
+  studentId: string;
+}
+
+/**
+ * One screen, not three tabs: Sign in is what nearly everyone needs every
+ * time, so it is the whole default view. First-time setup (a roster member
+ * choosing a password) is one quiet link below it, and an access request is
+ * not offered up front at all — it appears only when setup finds the email
+ * is not on the roster, pre-filled with what was just typed. (If a server
+ * allows requests but not registration, the request link takes setup's
+ * place.) The first-time step stays an explicit choice rather than being
+ * inferred from a failed sign-in: the server gives one message for every
+ * failed sign-in so the roster can't be enumerated.
+ */
 function RemoteLoginScreen() {
   const { capabilities } = useAuth();
-  const [pane, setPane] = useState<Pane>('signin');
+  const [view, setView] = useState<View>('signin');
+  const [prefill, setPrefill] = useState<Prefill>({ email: '', studentId: '' });
 
-  // The capabilities fetch is one request against a server HealthGate has
-  // already confirmed is up, so this is a blink, not a wait.
+  // The capabilities fetch is one request against a server the health probe
+  // has already confirmed is up, so this is a blink, not a wait.
   if (!capabilities) {
     return (
       <LoginCard>
@@ -100,35 +118,57 @@ function RemoteLoginScreen() {
 
   if (capabilities.mode === 'sso') return <SsoLoginScreen capabilities={capabilities} />;
 
-  const tabs: { key: Pane; label: string }[] = [
-    { key: 'signin', label: 'Sign in' },
-    ...(capabilities.allowsRegistration ? [{ key: 'create' as const, label: 'Create account' }] : []),
-    ...(capabilities.allowsAccessRequests ? [{ key: 'request' as const, label: 'Not on the roster?' }] : []),
-  ];
+  const back = (
+    <button type="button" className="login-switch" onClick={() => setView('signin')}>
+      ← Back to sign in
+    </button>
+  );
+
+  if (view === 'setup') {
+    return (
+      <LoginCard>
+        <h1>Set up your account</h1>
+        <CreateAccountPane
+          capabilities={capabilities}
+          onNotOnRoster={
+            capabilities.allowsAccessRequests
+              ? (p) => {
+                  setPrefill(p);
+                  setView('request');
+                }
+              : undefined
+          }
+        />
+        {back}
+      </LoginCard>
+    );
+  }
+
+  if (view === 'request') {
+    return (
+      <LoginCard>
+        <h1>Ask to be added</h1>
+        <RequestAccessPane prefill={prefill} onDone={() => setView('signin')} />
+        {back}
+      </LoginCard>
+    );
+  }
 
   return (
     <LoginCard>
-      {tabs.length > 1 ? (
-        <div className="mm-tabs" role="tablist">
-          {tabs.map((tab) => (
-            <button
-              key={tab.key}
-              role="tab"
-              aria-selected={pane === tab.key}
-              className={`mm-tab${pane === tab.key ? ' mm-tab--active' : ''}`}
-              data-text={tab.label}
-              onClick={() => setPane(tab.key)}
-            >
-              {tab.label}
-            </button>
-          ))}
-        </div>
+      <h1>Sign in</h1>
+      <SignInPane capabilities={capabilities} />
+      {capabilities.allowsRegistration ? (
+        <button type="button" className="login-switch" onClick={() => setView('setup')}>
+          First time here? Set up your account
+        </button>
       ) : (
-        <h1>Sign in</h1>
+        capabilities.allowsAccessRequests && (
+          <button type="button" className="login-switch" onClick={() => setView('request')}>
+            Not on the class roster? Ask to be added
+          </button>
+        )
       )}
-      {pane === 'signin' && <SignInPane capabilities={capabilities} />}
-      {pane === 'create' && <CreateAccountPane capabilities={capabilities} onDone={() => setPane('signin')} />}
-      {pane === 'request' && <RequestAccessPane onDone={() => setPane('signin')} />}
     </LoginCard>
   );
 }
@@ -210,10 +250,11 @@ function SignInPane({ capabilities }: { capabilities: AuthCapabilities }) {
 
 function CreateAccountPane({
   capabilities,
-  onDone,
+  onNotOnRoster,
 }: {
   capabilities: AuthCapabilities;
-  onDone: () => void;
+  /** Offered when the server says the email isn't on the roster (if requests are allowed). */
+  onNotOnRoster?: (prefill: Prefill) => void;
 }) {
   const { register } = useAuth();
   const [email, setEmail] = useState('');
@@ -222,6 +263,7 @@ function CreateAccountPane({
   const [confirm, setConfirm] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [notOnRoster, setNotOnRoster] = useState(false);
 
   const tooShort = password !== '' && password.length < capabilities.passwordMinLength;
   const mismatch = confirm !== '' && confirm !== password;
@@ -232,23 +274,25 @@ function CreateAccountPane({
     if (!ready || busy) return;
     setBusy(true);
     setError(null);
+    setNotOnRoster(false);
     const result = await register({
       email: email.trim(),
       password,
       studentId: studentId.trim() || undefined,
     });
     setBusy(false);
-    // On success the provider sets the user and this screen unmounts; the
-    // onDone fallback only matters if that ever stops being true.
-    if (!result.ok) setError(result.error);
-    else onDone();
+    // On success the provider sets the user and this screen unmounts.
+    if (!result.ok) {
+      if (result.notOnRoster) setNotOnRoster(true);
+      else setError(result.error);
+    }
   };
 
   return (
     <>
       <p className="mm-lede">
-        Use the email your instructor has on file, and choose a password. Your student ID confirms
-        the account is yours.
+        Use the email the course has on file for you, and choose a password. Your student ID
+        confirms the account is yours.
       </p>
       <form className="mm-form login-form" onSubmit={(e) => void handleSubmit(e)}>
         <input
@@ -289,7 +333,7 @@ function CreateAccountPane({
           disabled={busy}
         />
         <button className="mm-btn mm-btn--primary" type="submit" disabled={busy || !ready}>
-          {busy ? 'Creating…' : 'Create account'}
+          {busy ? 'Setting up…' : 'Set up account'}
         </button>
       </form>
       {tooShort && (
@@ -299,15 +343,32 @@ function CreateAccountPane({
       )}
       {mismatch && <p className="mm-error">The two passwords don't match.</p>}
       {error && <p className="mm-error">{error}</p>}
+      {notOnRoster && (
+        <p className="mm-error">
+          That email isn't on the class roster.
+          {onNotOnRoster && (
+            <>
+              {' '}
+              <button
+                type="button"
+                className="login-switch login-switch--inline"
+                onClick={() => onNotOnRoster({ email: email.trim(), studentId: studentId.trim() })}
+              >
+                Ask to be added
+              </button>
+            </>
+          )}
+        </p>
+      )}
     </>
   );
 }
 
-function RequestAccessPane({ onDone }: { onDone: () => void }) {
+function RequestAccessPane({ prefill, onDone }: { prefill: Prefill; onDone: () => void }) {
   const { requestAccess } = useAuth();
-  const [email, setEmail] = useState('');
+  const [email, setEmail] = useState(prefill.email);
   const [name, setName] = useState('');
-  const [studentId, setStudentId] = useState('');
+  const [studentId, setStudentId] = useState(prefill.studentId);
   const [message, setMessage] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -335,7 +396,7 @@ function RequestAccessPane({ onDone }: { onDone: () => void }) {
     return (
       <>
         <p className="mm-lede">
-          Request sent. Your instructor will review it — once they add you, come back and create
+          Request sent. Your instructor will review it — once they add you, come back and set up
           your account with this email.
         </p>
         <button className="mm-btn mm-btn--primary" onClick={onDone}>
@@ -348,8 +409,8 @@ function RequestAccessPane({ onDone }: { onDone: () => void }) {
   return (
     <>
       <p className="mm-lede">
-        If the course roster has a different email for you (or doesn't have you yet), tell your
-        instructor here.
+        The class roster doesn't have this email (it may list a different one for you). Tell your
+        instructor and they'll add you.
       </p>
       <form className="mm-form login-form" onSubmit={(e) => void handleSubmit(e)}>
         <input

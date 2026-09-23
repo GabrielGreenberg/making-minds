@@ -749,14 +749,33 @@
 .session-chip--visitor { color: var(--mm-accent); border-color: var(--mm-accent); }
 .login-visitor {
   display: grid;
-  gap: 10px;
-  margin: 0 0 24px;
-  padding: 16px 18px;
-  background: var(--mm-accent-soft);
-  border-left: 3px solid var(--mm-accent);
+  gap: 12px;
+  margin: 0 0 22px;
+  padding-bottom: 22px;
+  border-bottom: 1px solid var(--mm-line);
 }
-.login-visitor p { margin: 0; color: var(--mm-ink); }
-.login-visitor .mm-btn { justify-self: stretch; text-align: center; }
+.login-visitor p { margin: 0; color: var(--mm-ink-2); }
+.mm-surface .login-visitor a.login-visitor-btn {
+  justify-self: stretch;
+  text-align: center;
+  background: var(--mm-accent-soft);
+  border-color: var(--mm-accent-soft);
+  color: var(--mm-accent);
+}
+.mm-surface .login-visitor a.login-visitor-btn:hover { border-color: var(--mm-accent); color: var(--mm-accent); }
+.login-switch {
+  display: block;
+  margin-top: 16px;
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  font-size: var(--mm-fs-meta);
+  color: var(--mm-link);
+  cursor: pointer;
+}
+.login-switch:hover { text-decoration: underline; }
+.login-switch--inline { display: inline; margin: 0; font-size: inherit; }
 .login-actions { display: flex; flex-wrap: wrap; gap: 10px; }
 
 /* Session controls — shown in the menu bar, home screen, and instructor header */

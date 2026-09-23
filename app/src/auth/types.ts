@@ -33,6 +33,8 @@ export interface AuthAttemptResult {
   ok: boolean;
   /** Ready-to-display message; null on success. */
   error: string | null;
+  /** Registration only: refused because the email isn't on the roster. */
+  notOnRoster?: boolean;
 }
 
 export interface AuthContextValue {
