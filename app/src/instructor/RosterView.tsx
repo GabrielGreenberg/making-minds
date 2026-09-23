@@ -4,12 +4,15 @@ import * as api from '../api/client';
 import type { RosterEntryView, AccessRequestView, RosterImportReport } from '../api/client';
 import { backendMode } from '../storage/backend';
 import { useAsyncValue } from '../useAsyncValue';
+import { NO_LONGER_LISTED_TEXT, sentenceCase, skippedLinesText, statusCountText } from './rosterReportText';
 
 /**
  * Roster + accounts, the instructor's half of the sign-in system:
  *
- *   · import the class CSV (paste it or pick the file) — upsert only, so a
- *     mid-quarter re-import never removes anyone or resets a password
+ *   · import the class CSV (paste it or pick the file; the registrar's export
+ *     as-is) — upsert only, so a mid-quarter re-import never removes anyone or
+ *     resets a password; who the class list no longer carries is listed for
+ *     review instead
  *   · see who has created an account and who hasn't
  *   · reset a forgotten password (clears it; the student registers again)
  *   · add or remove one person
@@ -66,7 +69,10 @@ function RemoteRosterView() {
     const q = filter.trim().toLowerCase();
     if (!q) return true;
     return (
-      r.email.includes(q) || r.name.toLowerCase().includes(q) || r.studentId.includes(q)
+      r.email.includes(q) ||
+      r.name.toLowerCase().includes(q) ||
+      r.studentId.includes(q) ||
+      (r.section ?? '').toLowerCase().includes(q)
     );
   });
   const registered = (roster ?? []).filter((r) => r.registered).length;
@@ -78,7 +84,7 @@ function RemoteRosterView() {
         <div className="mm-actions">
           <input
             className="mm-input roster-filter"
-            placeholder="Filter by name, email, ID"
+            placeholder="Filter by name, email, ID, section"
             value={filter}
             onChange={(e) => setFilter(e.target.value)}
           />
@@ -111,6 +117,7 @@ function RemoteRosterView() {
                 <th>Name</th>
                 <th>Email</th>
                 <th>Student ID</th>
+                <th>Section</th>
                 <th>Role</th>
                 <th>Account</th>
                 <th />
@@ -144,6 +151,7 @@ function RosterRow({
       <td>{row.name}</td>
       <td className="roster-email">{row.email}</td>
       <td>{row.studentId || '—'}</td>
+      <td>{row.section ?? '—'}</td>
       <td>{row.role === 'instructor' ? 'Instructor' : 'Student'}</td>
       <td>
         <span className={`roster-state roster-state--${row.registered ? 'yes' : 'no'}`}>
@@ -214,16 +222,22 @@ function ImportPanel({
       const result = await api.importRoster(csv, role);
       setReport(result);
       setCsv('');
-      return `Imported ${result.total} row(s): ${result.added} added, ${result.updated} updated.`;
+      const skipped = result.statusCounts
+        .filter((s) => !s.imported)
+        .map((s) => `; ${statusCountText(s)}`)
+        .join('');
+      return `Imported ${result.total}: ${result.added} added, ${result.updated} updated${skipped}.`;
     });
 
   return (
     <section className="roster-section">
       <h2>Import a roster CSV</h2>
       <p className="mm-note mm-hint">
-        Any export with an email column works — name, student ID and role are picked up when
-        present. Importing only adds and updates: nobody is removed, and nobody's password is
-        touched, so a mid-quarter re-import is safe.
+        The registrar's class-list export works as-is: its heading lines are skipped, names are
+        put in display form, and the section is kept; dropped students are left out, waitlisted
+        ones are imported. Any other export with an email column works too — name, student ID
+        and role are picked up when present. Importing only adds and updates: nobody is
+        removed, and nobody's password is touched, so a mid-quarter re-import is safe.
       </p>
       <div className="roster-import-controls">
         <input type="file" accept=".csv,text/csv" onChange={handleFile} disabled={busy} />
@@ -246,25 +260,54 @@ function ImportPanel({
       <button className="mm-btn mm-btn--primary" disabled={busy || csv.trim() === ''} onClick={submit}>
         Import
       </button>
-      {report && (
-        <div className="roster-report">
-          <p>
-            Columns used — email: {report.columns.email ?? '(none)'} · name:{' '}
-            {report.columns.name ?? '(none)'} · ID: {report.columns.studentId ?? '(none)'} · role:{' '}
-            {report.columns.role ?? '(none)'}
-          </p>
-          {report.issues.length > 0 && (
-            <ul className="roster-issues">
-              {report.issues.map((issue, i) => (
-                <li key={i}>
-                  Line {issue.line}: {issue.reason}
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
-      )}
+      {report && <ImportReport report={report} />}
     </section>
+  );
+}
+
+function ImportReport({ report }: { report: RosterImportReport }) {
+  const c = report.columns;
+  const skippedLines = skippedLinesText(report.headerLine);
+  return (
+    <div className="roster-report">
+      {skippedLines && <p>{sentenceCase(skippedLines)}.</p>}
+      <p>
+        Columns used — email: {c.email ?? '(none)'} · name: {c.name ?? '(none)'} · ID:{' '}
+        {c.studentId ?? '(none)'} · role: {c.role ?? '(none)'} · section: {c.section ?? '(none)'} ·
+        status: {c.status ?? '(none)'}
+      </p>
+      {report.statusCounts.length > 0 && (
+        <ul className="roster-statuses">
+          {report.statusCounts.map((s) => (
+            <li key={`${s.label}:${s.imported}`}>{statusCountText(s)}</li>
+          ))}
+        </ul>
+      )}
+      {report.issues.length > 0 && (
+        <ul className="roster-issues">
+          {report.issues.map((issue, i) => (
+            <li key={i}>
+              Line {issue.line}: {issue.reason}
+            </li>
+          ))}
+        </ul>
+      )}
+      {report.noLongerListed.length > 0 && (
+        <>
+          <p className="roster-review-head">
+            {sentenceCase(NO_LONGER_LISTED_TEXT)} ({report.noLongerListed.length}). Nobody was
+            removed: remove someone below once you have checked they left the course.
+          </p>
+          <ul className="roster-issues">
+            {report.noLongerListed.map((r) => (
+              <li key={r.email}>
+                {r.name} <span className="roster-email">{r.email}</span> — {r.reason}
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
+    </div>
   );
 }
 

@@ -65,7 +65,8 @@ import {
   type AuthProvider,
 } from './auth';
 import { hashPassword, passwordProblem, verifyPassword } from './password';
-import { isEmail, normalizeEmail, parseRoster } from './roster';
+import { isEmail, normalizeEmail } from './roster';
+import { importRosterCsv } from './rosterImport';
 import { stripAnswers, studentRecord } from './sanitize';
 
 export function createApp(config: ServerConfig, db: Db) {
@@ -263,20 +264,6 @@ export function createApp(config: ServerConfig, db: Db) {
     res.json({ roster: db.listUsers() });
   });
 
-  /** Upsert roster entries; returns what changed so the UI can report it. */
-  function applyRoster(
-    entries: { email: string; name: string; studentId: string; role: 'student' | 'instructor' }[],
-  ) {
-    let added = 0;
-    let updated = 0;
-    for (const entry of entries) {
-      if (db.getUser(entry.email)) updated++;
-      else added++;
-      db.upsertUser(entry);
-    }
-    return { added, updated };
-  }
-
   app.post('/api/roster/import', auth, requireInstructor, (req, res) => {
     const body = (req.body ?? {}) as Record<string, unknown>;
     if (typeof body.csv !== 'string' || body.csv.trim() === '') {
@@ -284,18 +271,12 @@ export function createApp(config: ServerConfig, db: Db) {
       return;
     }
     const defaultRole = body.defaultRole === 'instructor' ? 'instructor' : 'student';
-    const parsed = parseRoster(body.csv, defaultRole);
     // Re-importing never removes anyone and never touches a password: a
     // mid-quarter roster refresh must not delete a student's work or sign them
-    // out. Removal is the explicit DELETE below.
-    const { added, updated } = applyRoster(parsed.entries);
-    res.json({
-      added,
-      updated,
-      total: parsed.entries.length,
-      issues: parsed.issues,
-      columns: parsed.columns,
-    });
+    // out. Who the class list no longer carries comes back in the report
+    // (noLongerListed) for the instructor to review; removal is the explicit
+    // DELETE below.
+    res.json(importRosterCsv(db, body.csv, defaultRole));
   });
 
   app.post('/api/roster', auth, requireInstructor, (req, res) => {

@@ -416,6 +416,88 @@ check('their submitted work survives the removal', db.listSubmissions('some-assi
 check('a removed person cannot register', (await api('POST', '/auth/register', { token: undefined, body: { email: 'kurt@ucla.edu', password: 'longenough1' } })).status === 403);
 check('the instructor cannot remove themselves', (await api('DELETE', '/roster/prof%40ucla.edu', { token: profToken })).status === 400);
 
+// The registrar's class list as exported — SYNTHETIC (invented names,
+// @example.com). The pure reader is pinned in rosterCheck; this is the route.
+type ImportReport = {
+  added: number;
+  headerLine: number | null;
+  statusCounts: { label: string; count: number; imported: boolean }[];
+  noLongerListed: { email: string; name: string; reason: string }[];
+  columns: { section: string | null; status: string | null; role: string | null };
+};
+type RosterRowView = { email: string; name: string; section: string | null };
+const classList = (rows: string[]) =>
+  ['Term: 26F', 'Students: 4', '', 'UID,Name,E-mail,Major,Classification,Grade Type,Status,Section', ...rows].join('\r\n') + '\r\n';
+const ANA = '999-000-101,"ZUBER, ANA",ana.zuber@example.com,Philosophy,Junior,LG,E,1B';
+const ZED = '999-000-102,"ABLE, ZED",zed.able@example.com,Philosophy,Junior,LG,W,1A';
+const MAX = '999-000-103,"MIDDLETON, MAX",max.middleton@example.com,Philosophy,Junior,LG,E,1A';
+const DANA = '999-000-104,"DROPP, DANA",dana.dropp@example.com,Philosophy,Junior,LG,D,1A';
+const exampleRows = async () =>
+  (await api<{ roster: RosterRowView[] }>('GET', '/roster', { token: profToken })).json.roster.filter((r) =>
+    r.email.endsWith('@example.com'),
+  );
+
+const classImport = await api<ImportReport>('POST', '/roster/import', {
+  token: profToken,
+  body: { csv: classList([ANA, ZED, MAX, DANA]) },
+});
+check('a registrar export imports as exported', classImport.status === 200 && classImport.json.added === 3);
+check('…reporting the header line past the preamble', classImport.json.headerLine === 4);
+check(
+  '…the status counts (waitlisted imported, dropped not)',
+  classImport.json.statusCounts.some((s) => s.label === 'waitlisted' && s.count === 1 && s.imported) &&
+    classImport.json.statusCounts.some((s) => s.label === 'dropped' && s.count === 1 && !s.imported),
+  JSON.stringify(classImport.json.statusCounts),
+);
+check(
+  '…and the section + status columns (role NOT from Grade Type)',
+  classImport.json.columns.section === 'Section' &&
+    classImport.json.columns.status === 'Status' &&
+    classImport.json.columns.role === null,
+);
+const listed = await exampleRows();
+check(
+  'GET /roster carries the display name and section',
+  listed.some((r) => r.email === 'zed.able@example.com' && r.name === 'Zed Able' && r.section === '1A'),
+  JSON.stringify(listed),
+);
+check(
+  'GET /roster sorts by surname, not by the display name',
+  listed.map((r) => r.email).join() === 'zed.able@example.com,max.middleton@example.com,ana.zuber@example.com',
+  listed.map((r) => r.email).join(),
+);
+
+// The next export: Zed dropped, Max is gone.
+const nextImport = await api<ImportReport>('POST', '/roster/import', {
+  token: profToken,
+  body: { csv: classList([ANA, ZED.replace(',W,', ',D,'), DANA]) },
+});
+const review = nextImport.json.noLongerListed;
+check(
+  'a re-import lists a student now dropped for review',
+  review.some((r) => r.email === 'zed.able@example.com' && r.reason === 'status dropped'),
+  JSON.stringify(review),
+);
+check(
+  '…and one missing from the file',
+  review.some((r) => r.email === 'max.middleton@example.com' && r.reason === 'not in this file'),
+);
+check('…never an instructor', !review.some((r) => r.email === 'prof@ucla.edu' || r.email === 'ta@ucla.edu'));
+check(
+  '…and removes nobody',
+  (await exampleRows()).filter((r) => r.email === 'zed.able@example.com' || r.email === 'max.middleton@example.com')
+    .length === 2,
+);
+const plainImport = await api<ImportReport>('POST', '/roster/import', {
+  token: profToken,
+  body: { csv: 'Email,Name\nana.zuber@example.com,Ana Zuber\n' },
+});
+check('a plain Email,Name import reviews nobody', plainImport.status === 200 && plainImport.json.noLongerListed.length === 0);
+check(
+  '…and a re-import without a Section column keeps the stored section',
+  (await exampleRows()).find((r) => r.email === 'ana.zuber@example.com')?.section === '1B',
+);
+
 section('[http: throttling]');
 
 const target = 'ta@ucla.edu';

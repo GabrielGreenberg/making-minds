@@ -61,6 +61,8 @@ export interface RosterEntryView {
   name: string;
   role: 'student' | 'instructor';
   studentId: string;
+  /** Discussion section from the class list; null when none was imported. */
+  section: string | null;
   registered: boolean;
   registeredAt: string | null;
 }
@@ -77,12 +79,27 @@ export interface AccessRequestView {
   resolvedBy: string | null;
 }
 
+/** What a roster import did (server/src/rosterImport.ts). It never removes
+ *  anyone: `noLongerListed` is a list for the instructor to review. */
 export interface RosterImportReport {
   added: number;
   updated: number;
   total: number;
+  /** Physical line of the header row (a registrar preamble is skipped); null when none was found. */
+  headerLine: number | null;
+  /** Non-enrolled statuses seen: waitlisted/held imported, dropped/cancelled/withdrawn not. */
+  statusCounts: { label: string; count: number; imported: boolean }[];
+  /** Students a class list no longer carries: reason "status dropped" or "not in this file". */
+  noLongerListed: { email: string; name: string; reason: string }[];
   issues: { line: number; reason: string }[];
-  columns: { email: string | null; name: string | null; studentId: string | null; role: string | null };
+  columns: {
+    email: string | null;
+    name: string | null;
+    studentId: string | null;
+    role: string | null;
+    section: string | null;
+    status: string | null;
+  };
 }
 
 export interface AssignmentSummary {

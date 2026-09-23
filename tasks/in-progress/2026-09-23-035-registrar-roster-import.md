@@ -27,7 +27,8 @@ starts 2026-09-24, so students will soon be creating accounts against this roste
 - 87 rows. `Name` is quoted `"LAST, FIRST MIDDLE"`, all capitals; 2 rows add a suffix after a
   second comma (`"LAST, FIRST, III"`). `UID` is `999-999-999`. Emails: 26 contain capitals, and
   37 of the 87 are NOT UCLA addresses (see task 036). `Status`: 80 `E` (enrolled), 7 `W`
-  (withdrawn). `Section`: 42 in `1A`, 45 in `1B`. `Grade Type`: 86 `LG`, 1 `PN`.
+  (withdrawn — **wrong: `W` is Wait List**, see the 2026-09-23 Checkpoint). `Section`: 42 in
+  `1A`, 45 in `1B`. `Grade Type`: 86 `LG`, 1 `PN`.
 
 ### Reproduced (`parseRoster` run on the file, `server/src/roster.ts`)
 - **As exported: 0 students imported**, with the one issue "no email column found". The reader
@@ -65,6 +66,9 @@ starts 2026-09-24, so students will soon be creating accounts against this roste
    imported". A re-import lists people already on the platform whose row is now withdrawn or
    missing, as "no longer on the class list — review". Nobody is removed automatically (the
    import's never-removes rule stands, `app.ts:288–290`).
+   _Superseded in part by Gabriel's decision of 2026-09-23 (Progress log, Checkpoint): `W` is
+   Wait List and IS imported, reported as "7 waitlisted — imported"; dropped / cancelled /
+   withdrawn rows are the ones not imported._
 5. **Section** is stored on the user (a new nullable `section` column) and returned by
    `GET /api/roster`. Major, Classification and Grade Type are deliberately NOT stored: the
    data-classification rule is UID, name, email, work and scores, nothing else.
@@ -100,7 +104,66 @@ starts 2026-09-24, so students will soon be creating accounts against this roste
 Gates: server `npm run typecheck` and `npm run check` (with the new pins); app `tsc` and
 `remoteStoreCheck` (roster client). Owed, and done by Gabriel or with him: import the real file
 through the dashboard on the pilot (or a local remote-mode server) and confirm 80 imported, 7
-withdrawn skipped, and names in display form. The real file stays out of the repo and out of
+withdrawn skipped, and names in display form. _(Per the 2026-09-23 decision: expect all 87
+imported, the report reading "7 waitlisted — imported".)_ The real file stays out of the repo and out of
 every task file.
 
 ## Progress log
+- 2026-09-23 — Checkpoint (uncommitted, fix stage). **Gabriel's decision (in chat): import
+  wait-listed students.** On UCLA's registrar roster `W` = Wait List, not withdrawn (UCLA KB:
+  E Enrolled, D Dropped, W Wait List, H Held; Extension P Pending, A Approved, C Cancelled),
+  so the Description's "7 `W` (withdrawn)" and Done-when 4's "7 withdrawn — not imported"
+  were a wrong premise. Done-when 4 now reads: `W` rows are imported (they can create
+  accounts and start HW1, as UCLA's own course-site sync keeps them), and the report counts
+  them as "<n> waitlisted — imported"; D / C / the word "withdrawn" are not imported and
+  reported as "<n> dropped — not imported" etc. One table, `STATUS_TABLE` in
+  `server/src/roster.ts` (E/enrolled, W/waitlisted/wait list, H/held imported; D, C,
+  withdrawn not; any other code imported with the issue `unrecognised status "X" — imported`).
+  The re-import review is as specified: a platform student whose row is now dropped /
+  cancelled / withdrawn or missing is listed "no longer on the class list — review"; nobody is
+  removed; W → E is simply an update. For the owed live check against the real file: expect
+  87 imported (80 E + 7 W), "7 waitlisted — imported", no "not imported" line.
+  Review fixes this round: a display-form name with a comma suffix ("Martin Luther King, Jr.",
+  "Jane Doe, PhD") passes through unchanged (all-caps "RAHMAN, MD" is still registrar form);
+  the header scan blanks only preamble rows (first cell "Key: value"), so "Email:" or a
+  question-style email header is still found; a not-imported row is counted only when no row
+  for that email was imported, once per email; the report's words live once in
+  `app/src/instructor/rosterReportText.ts`, used by both the CLI report and `RosterView`, and
+  `server/tools/rosterCheck.ts` pins them (plus a grep gate that `RosterView` keeps no copy).
+
+### 2026-09-23 — implemented (work loop)
+- **Built.** The roster import now takes the registrar's class list unedited. It skips the
+  preamble (the header is the first of 20 non-blank rows with an email column; `Key: value`
+  rows can't be the header), matches columns exactly then by whole word (no substring
+  fallback, no `type` role alias), turns `"LAST, FIRST MIDDLE[, SUFFIX]"` into `First Middle
+  Last Suffix` with a `sort_name` for surname order, and applies Gabriel's decision through
+  `STATUS_TABLE`. It stores `section` (a new nullable column, returned by `GET /api/roster`
+  and shown in `RosterView`). It lists who a re-import no longer carries and never removes
+  them. One import path, `server/src/rosterImport.ts`, serves both the route and the CLI; the
+  report's words live once in `app/src/instructor/rosterReportText.ts`. The sign-up pane
+  wording and placeholders changed (Done-when 9). `.gitignore` gains `rosters/` and
+  `*-csv.csv`, and `deploy/README.md` says class lists stay outside the repo.
+- **Pins.** New `server/tools/rosterCheck.ts` (in server `npm run check`): [registrar
+  export] [header discovery] [columns] [status] [names] [review] [report], all on a synthetic
+  example.com fixture. `authCheck` covers the route: import, status counts, section plus
+  surname order in `GET /roster`, re-import review, nobody removed, section kept. The app's
+  `remoteStoreCheck` covers the client types against the real server.
+- **Gates (exit codes):** app-tsc 0, app-build 0, app-check 0, server-tsc 0, server-check 0.
+  Checkpoint re-run: server typecheck 0, server check 0, app tsc 0, budgets 0 (CLAUDE.md
+  39943/40000 bytes).
+- **Review.** 5 findings fixed: suffix pass-through, report words shared, status counted
+  once per left-out email, header scan blanks only preamble rows, and the decision recorded.
+  None skipped. Nits left alone: the `listUsers` comment says "instructors first" but the
+  order puts students first; `STATUS_TABLE` is a plain object, so a status cell such as
+  "constructor" is skipped with no label; `server/README.md` still describes the old roster
+  reader.
+- **Owed.** (a) Browser, remote mode on a scratch local server: paste the rosterCheck
+  fixture, check the report (skipped 8 lines, columns used with role none, status lines),
+  the Section column and surname order, then re-import with one row flipped to D and one
+  deleted (both listed, both kept), then 375px width. (b) The Create-account pane wording and
+  placeholders; local mode's toy picker unchanged with zero `/api` calls. (c) Gabriel, with
+  the real file outside the repo: expect the header on line 9, 87 imported (80 E + 7 W),
+  "7 waitlisted — imported", sections 42/45, display names including the 2 suffix rows,
+  role none; after release, the same import on the pilot.
+- **Next step:** loop session: run visual checks (a) and (b), then land per PROFILE §5. Owed
+  check (c) goes to Gabriel.

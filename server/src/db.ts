@@ -41,13 +41,19 @@ export interface UserRow {
   role: Role;
   /** Campus ID from the roster CSV; '' when the import had no ID column. */
   studentId?: string;
+  /** Discussion section from the class list; absent/null leaves a stored one. */
+  section?: string | null;
+  /** "Last, First" sort key from the class list; null sorts by name. */
+  sortName?: string | null;
   /** True once the person has created an account (set a password). */
   registered?: boolean;
 }
 
-/** A roster row plus its account state — the instructor's roster view. */
+/** A roster row plus its account state — the instructor's roster view.
+ *  Instructor-only: `section` never reaches a student (getUser omits it). */
 export interface RosterRow extends UserRow {
   studentId: string;
+  section: string | null;
   registered: boolean;
   registeredAt: string | null;
 }
@@ -165,6 +171,10 @@ export class Db {
       "ALTER TABLE users ADD COLUMN student_id TEXT NOT NULL DEFAULT '';",
       'ALTER TABLE users ADD COLUMN password_hash TEXT;',
       'ALTER TABLE users ADD COLUMN registered_at TEXT;',
+      // From the registrar's class list (task 035): the discussion section and
+      // a "Last, First" sort key. Nothing else from that file is stored.
+      'ALTER TABLE users ADD COLUMN section TEXT;',
+      'ALTER TABLE users ADD COLUMN sort_name TEXT;',
     ]) {
       try {
         this.db.exec(sql);
@@ -184,19 +194,26 @@ export class Db {
    * Create or update a roster row. Deliberately does NOT touch the credential:
    * re-importing the roster mid-quarter must not log everybody out or wipe the
    * passwords they already chose. Name/role/studentId are the roster's word,
-   * except that a blank incoming studentId leaves an existing one alone.
+   * except that a blank incoming studentId leaves an existing one alone, and so
+   * does a missing section (a re-import without a Section column keeps it).
+   * The sort key follows the name: a caller that keeps the name and sends no
+   * key (the CLI's `add`) keeps the stored one; a new name drops a stale one.
    */
   upsertUser(user: UserRow): void {
     this.db
       .prepare(
-        `INSERT INTO users (email, name, role, student_id) VALUES (?, ?, ?, ?)
+        `INSERT INTO users (email, name, role, student_id, section, sort_name) VALUES (?, ?, ?, ?, ?, ?)
          ON CONFLICT(email) DO UPDATE SET
            name = excluded.name,
            role = excluded.role,
            student_id = CASE WHEN excluded.student_id = '' THEN users.student_id
-                             ELSE excluded.student_id END`,
+                             ELSE excluded.student_id END,
+           section = COALESCE(excluded.section, users.section),
+           sort_name = CASE WHEN excluded.name = users.name
+                            THEN COALESCE(excluded.sort_name, users.sort_name)
+                            ELSE excluded.sort_name END`,
       )
-      .run(user.email, user.name, user.role, user.studentId ?? '');
+      .run(user.email, user.name, user.role, user.studentId ?? '', user.section ?? null, user.sortName ?? null);
   }
 
   getUser(email: string): UserRow | null {
@@ -229,18 +246,20 @@ export class Db {
       .run(hash, hash ? new Date().toISOString() : null, email);
   }
 
-  /** The full roster with account state, for the instructor's roster view. */
+  /** The full roster with account state, for the instructor's roster view:
+   *  instructors first, then by surname where the class list gave one. */
   listUsers(): RosterRow[] {
     const rows = this.db
       .prepare(
-        `SELECT email, name, role, student_id, password_hash, registered_at
-         FROM users ORDER BY role DESC, name`,
+        `SELECT email, name, role, student_id, section, password_hash, registered_at
+         FROM users ORDER BY role DESC, COALESCE(sort_name, name) COLLATE NOCASE`,
       )
       .all() as unknown as {
       email: string;
       name: string;
       role: Role;
       student_id: string;
+      section: string | null;
       password_hash: string | null;
       registered_at: string | null;
     }[];
@@ -249,6 +268,7 @@ export class Db {
       name: r.name,
       role: r.role,
       studentId: r.student_id ?? '',
+      section: r.section ?? null,
       registered: r.password_hash != null,
       registeredAt: r.registered_at ?? null,
     }));

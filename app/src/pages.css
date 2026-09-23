@@ -701,6 +701,8 @@
 }
 .roster-report { margin-top: 12px; font-size: 12px; color: var(--mm-ink-2); }
 .roster-issues { margin: 6px 0 0 18px; color: var(--mm-warn); }
+.roster-statuses { margin: 6px 0 0 18px; }
+.roster-review-head { margin: 12px 0 0; font-weight: 600; color: var(--mm-ink); }
 .roster-table td, .roster-table th { font-size: 13px; }
 .roster-email { font-family: var(--mm-font-mono); font-size: 12px; }
 .roster-message { max-width: 320px; color: var(--mm-ink-2); }

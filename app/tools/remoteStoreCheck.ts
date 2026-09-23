@@ -531,6 +531,30 @@ check(
   'getRoster() carries account state',
   rosterRows.find((r) => r.email === 'new@ucla.edu')?.registered === false,
 );
+// The registrar's class list as exported (synthetic): the client's report and
+// row types against the real server's shapes.
+const classReport = await api.importRoster(
+  [
+    'Term: 26F',
+    'Students: 2',
+    '',
+    'UID,Name,E-mail,Major,Classification,Grade Type,Status,Section',
+    '999-000-201,"DOE, JANE",jane.doe@example.com,Philosophy,Junior,LG,E,1A',
+    '999-000-202,"ROE, RAY",ray.roe@example.com,Philosophy,Junior,LG,D,1B',
+  ].join('\r\n'),
+);
+check(
+  'importRoster() returns the registrar report (header line, status counts, review list)',
+  classReport.headerLine === 4 &&
+    classReport.statusCounts.some((s) => s.label === 'dropped' && s.count === 1 && !s.imported) &&
+    Array.isArray(classReport.noLongerListed) &&
+    classReport.columns.section === 'Section' &&
+    classReport.columns.status === 'Status',
+);
+check(
+  'getRoster() rows carry the section and the display name',
+  (await api.getRoster()).some((r) => r.email === 'jane.doe@example.com' && r.section === '1A' && r.name === 'Jane Doe'),
+);
 
 const badLogin = await api
   .login('new@ucla.edu', 'nopasswordyet')

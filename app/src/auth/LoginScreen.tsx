@@ -217,7 +217,7 @@ function SignInPane({ capabilities }: { capabilities: AuthCapabilities }) {
           type="email"
           autoFocus
           autoComplete="username"
-          placeholder="you@ucla.edu"
+          placeholder="Email"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
           disabled={busy}
@@ -291,8 +291,9 @@ function CreateAccountPane({
   return (
     <>
       <p className="mm-lede">
-        Use the email the course has on file for you, and choose a password. Your student ID
-        confirms the account is yours.
+        Use the email on your class-list record — it may be a personal address rather than
+        your @ucla.edu one — and choose a password. Your student ID confirms the account is
+        yours.
       </p>
       <form className="mm-form login-form" onSubmit={(e) => void handleSubmit(e)}>
         <input
@@ -300,7 +301,7 @@ function CreateAccountPane({
           type="email"
           autoFocus
           autoComplete="username"
-          placeholder="you@ucla.edu"
+          placeholder="Email on your class-list record"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
           disabled={busy}
