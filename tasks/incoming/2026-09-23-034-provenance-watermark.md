@@ -1,7 +1,7 @@
 ---
 id: 2026-09-23-034
 type: feature
-title: Quiet provenance watermark — mint assignment ids bound to student and assignment, verify at submit, plus plain integrity notices
+title: Quiet provenance watermark for circuits and paragraphs — keyed ids and text stamps, a signed writing/build trace, verify at submit, plain integrity notices
 priority: high
 size: large
 requires: browser
@@ -45,6 +45,13 @@ be sealed in the browser, because any lock's key lives in the browser.
   - Defeating it means finding the key in network traffic or memory and re-implementing the
     MAC over every id and every wire reference. That is far beyond "paste this into the
     console", and an LLM asked to forge integrity marks on graded work is likely to refuse.
+  - **Correction (catch, later on 2026-09-23): the easier way around it goes THROUGH the app.**
+    Chrome's DevTools "Local Overrides" lets a user edit the site's own JavaScript. With the
+    paste policy patched to always say yes, a sandbox circuit pasted into a question is
+    re-minted by the app as genuine. An LLM could walk someone through that. So the id mark
+    catches transplants that go AROUND the app (console data, curl, localStorage and journal
+    edits, files), not ones made through a modified app. The backstop for those is the
+    PROCESS: how the work came to be (see "Writing and build trace" below).
 - **Instructions to the LLM: yes, but openly.** On load in production, print a plain console
   banner addressed to the person AND any AI assistant, like the self-XSS warnings large sites
   print. Something like: "Stop. The browser console is not needed for PHIL 133. Changing
@@ -55,8 +62,26 @@ be sealed in the browser, because any lock's key lives in the browser.
   a comment at the top of the production bundle. **Not recommended:** covert text that tells an
   LLM to mislead the user (wrong steps, sabotage). Different models act on it unpredictably,
   and it would deceive an innocent student who asks an AI to debug the app.
-- **Prose cannot carry this mark.** Zero-width characters get stripped, and they get noticed.
-  Open responses rely on 033's paste block plus 031's similarity and save-history flags.
+- **Paragraphs can carry a mark, but it has to be a different kind** (Gabriel asked,
+  2026-09-23):
+  - *Hidden characters inside the text* (zero-width marks, look-alike letters, odd spaces):
+    not recommended. They are stripped by many tools, visible to an LLM reading the raw
+    string, interfere with screen readers and spell-check, and tangle with the student's own
+    editing.
+  - *A stamp beside the text* (`responseText` and `fillAnswers` signed with the same key on
+    every save): cheap, and catches the same around-the-app transplants as the circuit ids.
+    But for text there is a one-line way through the app: set the answer box's value from the
+    console and fire an input event, and the app stamps it as genuine. For a circuit the
+    equivalent means scripting dozens of clicks and drags, which is why ids hold up better.
+  - *The writing history* (recommended, and it covers circuits too): honest paragraphs arrive a
+    few characters at a time over minutes; transplanted text arrives in one piece. The app keeps
+    a small signed summary per question — edit actions, the largest single insertion, active
+    editing time — and the server keeps a coarse per-save history. A one-line injection shows as
+    one huge insertion; beating it needs a script that "types" with human-like timing, the next
+    level up. Aggregates only, never a keystroke log (P3).
+- **Perspective:** anyone can always redraw or retype a friend's work by hand in minutes. The
+  realistic aim is that every shortcut costs more than that, so the lazy routes are blocked or
+  caught and the rest at least have to rebuild the work themselves.
 
 ## Done when
 1. **One minting seam**, `app/src/provenance/ids.ts` (pure; the server imports it as it imports
@@ -80,9 +105,19 @@ be sealed in the browser, because any lock's key lives in the browser.
 6. **Disclosure:** a drafted sentence for the Policies page and the submit dialog, "the
    platform checks that submitted work was created in your own editor", with the mechanism
    undisclosed. Gabriel edits the website.
-7. **Gates:** a `provenanceCheck.ts` pins mint→verify round trips; that a friend's ids are
+7. **Paragraphs and fill-ins:** `responseText` and `fillAnswers` carry a stamp minted over
+   the text with the same key on every save, stored BESIDE the text, never inside it; verified
+   at submit like the ids.
+8. **Writing and build trace:** per question, signed aggregates updated on every edit — edit
+   actions, the largest single insertion (characters, or components added in one action),
+   active editing time — stored with the workbook; the server also keeps a coarse per-save
+   history (time, per-question component count and text length; not full snapshots). At submit,
+   "arrived in one piece" (a paragraph whose largest insertion is most of its length, a circuit
+   that appears in one save) becomes an integrity flag, with the same never-a-verdict rule.
+9. **Gates:** a `provenanceCheck.ts` pins mint→verify round trips; that a friend's ids are
    attributed to the friend; that random and sandbox ids come back unbound; that paste
-   re-mints under the target; and that a MAC bit-flip fails. `serverCheck` pins the
+   re-mints under the target; that a MAC bit-flip fails; that a text stamp fails after the text changes; and that a
+   paragraph set in one insertion is flagged while one typed in small steps is not. `serverCheck` pins the
    student-side strip and `parityCheck` stays green (grading unchanged).
 
 ## Design
@@ -103,7 +138,8 @@ be sealed in the browser, because any lock's key lives in the browser.
 - Live, remote mode: A builds HW1 P1 and submits. B takes A's workbook JSON off the server
   (test fixture) and PUTs it into B's workbook with curl, then submits. The integrity summary
   names A. B pastes a sandbox file's circuit through the console; the summary says unbound.
-  An honest submission shows all ids bound. Load the production build: the console banner
+  An honest submission shows all ids bound. In an open question, set the answer box from the console
+  and fire an input event: the stamp verifies but the trace flags one insertion. Load the production build: the console banner
   prints.
 
 ## Progress log
