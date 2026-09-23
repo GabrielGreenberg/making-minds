@@ -98,9 +98,78 @@ export function routeToHash(route: Route): string {
 // applied.
 let applySeq = 0;
 
+// ── Access: who may enter a route ────────────────────────────────────────
+//
+// Access is a property of the ROUTE, not a wall in front of the app: a
+// visitor (nobody signed in) may use the public surfaces — today the sandbox,
+// which needs no identity and no server — while everything that reads the
+// storage seams needs a signed-in user, and the instructor area the
+// instructor role. A new public surface is one line here.
+
+export type RouteAccess = 'public' | 'signed-in' | 'instructor';
+
+/** Who may enter a route. Pure. */
+export function routeAccess(route: Route): RouteAccess {
+  switch (route.kind) {
+    case 'sandbox':
+      return 'public';
+    case 'home':
+    case 'grades':
+    case 'assignment':
+      return 'signed-in';
+    case 'instructor':
+    case 'instructor-new-assignment':
+    case 'instructor-edit':
+    case 'instructor-submissions':
+    case 'instructor-roster':
+    case 'instructor-feedback':
+    case 'instructor-notes':
+      return 'instructor';
+  }
+}
+
+/**
+ * The boot landing rule. Pure. A browser with no trace of any previous
+ * sign-in that opens the bare site (`#/`) is a newcomer — most of them want
+ * to try the machines, not sign in — so it lands in the sandbox as a visitor.
+ * A browser that HAS signed in before stays where it asked to go (Home
+ * restores the session, or shows the sign-in screen if it no longer
+ * restores); any explicit deep link is honoured for everyone. Returns the
+ * route to replace the initial URL with, or null to leave it alone.
+ */
+export function landingRoute(route: Route, hasSignInTrace: boolean): Route | null {
+  if (route.kind === 'home' && !hasSignInTrace) return { kind: 'sandbox' };
+  return null;
+}
+
+// Whether a user is signed in, as far as applying routes is concerned (set by
+// AuthGate from the auth provider). A route that needs sign-in is NOT applied
+// to the store while nobody is (a deep link must not fire an unauthenticated
+// openAssignment — in remote mode it would just 401); it is remembered and
+// applied the moment someone signs in, so `#/a/hw1` opened logged-out lands
+// on hw1 right after the sign-in screen.
+let signedIn = false;
+let heldRoute = false;
+
+/** Tell routing whether a user is signed in; releases a held route on sign-in. */
+export function setRoutingSignedIn(value: boolean): void {
+  signedIn = value;
+  if (value && heldRoute && routingStarted) {
+    heldRoute = false;
+    applyRoute(parseHash(location.hash));
+  }
+}
+
 /** Drive the store to match a route. The only place navigation state is applied. */
 function applyRoute(route: Route): void {
   applySeq++;
+  if (routeAccess(route) !== 'public' && !signedIn) {
+    // The gate renders the sign-in screen (or the server-health screen) for
+    // this route; the store is left alone until someone signs in.
+    heldRoute = true;
+    return;
+  }
+  heldRoute = false;
   const store = useStore.getState();
   switch (route.kind) {
     case 'instructor':
@@ -179,17 +248,23 @@ export function navigate(route: Route, opts?: { replace?: boolean }): void {
 /** Custom event fired by `navigate` so hash-reading hooks can re-render. */
 export const ROUTE_EVENT = 'mm:route';
 
-// initRouting runs once per page load. It is called from an AuthGate effect
-// (only after a user exists — a deep link must not fire an unauthenticated
-// openAssignment), so guard against re-entry: StrictMode double-fires
-// effects, and logout → login would otherwise re-arm the popstate listener
-// and re-apply the route.
+// initRouting runs once per page load, from an AuthGate effect at boot — for
+// everyone, visitor or user (routes that need sign-in are held, above).
+// Guarded against re-entry: StrictMode double-fires effects.
 let routingStarted = false;
 
-/** Wire up Back/Forward and apply the initial URL. Idempotent; called by AuthGate once a user exists. */
-export function initRouting(): void {
+/**
+ * Wire up Back/Forward, apply the boot landing rule, and apply the initial
+ * URL. Idempotent; called by AuthGate once, at boot.
+ */
+export function initRouting(opts: { hasSignInTrace: boolean }): void {
   if (routingStarted) return;
   routingStarted = true;
   window.addEventListener('popstate', () => applyRoute(parseHash(location.hash)));
+  const landed = landingRoute(parseHash(location.hash), opts.hasSignInTrace);
+  if (landed) {
+    navigate(landed, { replace: true });
+    return;
+  }
   applyRoute(parseHash(location.hash));
 }

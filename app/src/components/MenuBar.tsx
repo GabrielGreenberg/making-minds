@@ -3,10 +3,11 @@ import { useStore, selectAssignmentFrozen } from '../store';
 import { getCurrentUserEmail, useAuth } from '../auth';
 import { AccountPanel } from '../auth/AccountPanel';
 import { navigate } from '../routing';
+import { signOut } from './SessionControls';
 import { FeedbackPanel } from './FeedbackPanel';
 
 export function MenuBar() {
-  const { user, logout } = useAuth();
+  const { user, isVisitor, logout } = useAuth();
   const { assignment, submitAssignment, submissions } = useStore();
   const frozen = useStore(selectAssignmentFrozen);
   const [showFeedback, setShowFeedback] = useState(false);
@@ -31,10 +32,12 @@ export function MenuBar() {
 
   return (
     <div className="menu-bar">
-      {/* Home — back to the assignment catalog */}
-      <div className="menu-item" onClick={() => navigate({ kind: 'home' })}>
-        ⌂ Home
-      </div>
+      {/* Home — back to the assignment catalog (a visitor has none) */}
+      {!isVisitor && (
+        <div className="menu-item" onClick={() => navigate({ kind: 'home' })}>
+          ⌂ Home
+        </div>
+      )}
 
       {/* Submit — record an immutable snapshot of the current assignment.
           Hidden once frozen (item 3): the canvas is already showing exactly
@@ -71,18 +74,30 @@ export function MenuBar() {
           </button>
         )}
         {user && (
-          <span className="session-chip">
-            {user.name}
-            {user.role === 'instructor' ? ' · Instructor' : ''}
-          </span>
+          <>
+            <span className="session-chip">
+              {user.name}
+              {user.role === 'instructor' ? ' · Instructor' : ''}
+            </span>
+            <button className="menu-link-button" onClick={() => setShowFeedback(true)}>
+              Feedback
+            </button>
+            <AccountPanel />
+            <button className="menu-link-button" onClick={() => signOut(logout)}>
+              Log out
+            </button>
+          </>
         )}
-        <button className="menu-link-button" onClick={() => setShowFeedback(true)}>
-          Feedback
-        </button>
-        <AccountPanel />
-        <button className="menu-link-button" onClick={() => { logout(); navigate({ kind: 'home' }); }}>
-          Log out
-        </button>
+        {/* A visitor: who they are, and the way in. No Feedback — reports
+            are filed by a signed-in account (the server requires one). */}
+        {isVisitor && (
+          <>
+            <span className="session-chip session-chip--visitor">Visitor</span>
+            <button className="menu-link-button" onClick={() => navigate({ kind: 'home' })}>
+              Sign in
+            </button>
+          </>
+        )}
       </div>
       {showFeedback && <FeedbackPanel onClose={() => setShowFeedback(false)} />}
     </div>

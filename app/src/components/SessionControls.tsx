@@ -5,15 +5,37 @@ import { navigate } from '../routing';
 import { FeedbackPanel } from './FeedbackPanel';
 
 /**
- * The signed-in identity and its actions for the page shell's topbar: the
+ * Log out and land on the sign-in screen. Navigates Home FIRST, while the
+ * session still exists, so the open workbook closes (and flushes its save)
+ * as the signed-in user; then the session ends and Home — a signed-in route —
+ * shows the sign-in screen. The one sign-out path for every surface.
+ */
+export function signOut(logout: () => void): void {
+  navigate({ kind: 'home' });
+  logout();
+}
+
+/**
+ * The identity and its actions for the page shell's topbar. Signed in: the
  * name, Feedback (opens the report modal), Password (only when the server
- * manages passwords — AccountPanel decides), Log out. One component so every
- * page surface offers the same controls in the same order.
+ * manages passwords — AccountPanel decides), Log out. A visitor: a "Visitor"
+ * tag and Sign in. One component so every page surface offers the same
+ * controls in the same order.
  */
 export function SessionControls({ feedback = true }: { feedback?: boolean }) {
-  const { user, logout } = useAuth();
+  const { user, isVisitor, logout } = useAuth();
   const [showFeedback, setShowFeedback] = useState(false);
 
+  if (isVisitor) {
+    return (
+      <div className="session">
+        <span className="who">Visitor</span>
+        <button type="button" onClick={() => navigate({ kind: 'home' })}>
+          Sign in
+        </button>
+      </div>
+    );
+  }
   if (!user) return null;
 
   return (
@@ -28,7 +50,7 @@ export function SessionControls({ feedback = true }: { feedback?: boolean }) {
         </button>
       )}
       <AccountPanel />
-      <button type="button" onClick={() => { logout(); navigate({ kind: 'home' }); }}>
+      <button type="button" onClick={() => signOut(logout)}>
         Log out
       </button>
       {showFeedback && <FeedbackPanel onClose={() => setShowFeedback(false)} />}

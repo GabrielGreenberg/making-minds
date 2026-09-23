@@ -712,6 +712,46 @@
 .roster-add { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
 .roster-add .mm-input { flex: 1 1 180px; min-width: 140px; }
 
+/* Visitor mode — the editor's one-line banner and the menu bar's Visitor tag
+   (the sandbox is the one surface a visitor reaches), and the sign-in card's
+   "continue as a visitor" block. */
+.visitor-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-shrink: 0;
+  padding: 5px 12px;
+  font-size: 13px;
+  color: var(--mm-ink-2);
+  background: var(--mm-accent-soft);
+  border-bottom: 1px solid var(--mm-line);
+}
+.visitor-banner-link {
+  border: 0;
+  padding: 0;
+  background: none;
+  font: inherit;
+  font-weight: 600;
+  color: var(--mm-accent);
+  cursor: pointer;
+  text-decoration: underline;
+}
+.visitor-banner-close {
+  border: 0;
+  background: none;
+  font-size: 17px;
+  line-height: 1;
+  color: var(--mm-ink-3);
+  cursor: pointer;
+}
+.visitor-banner-close:hover { color: var(--mm-ink); }
+.session-chip--visitor { color: var(--mm-accent); border-color: var(--mm-accent); }
+.login-visitor { margin-top: 22px; padding-top: 18px; border-top: 1px solid var(--mm-line); display: grid; gap: 10px; }
+.login-visitor p { margin: 0; color: var(--mm-ink-2); }
+.login-visitor .mm-btn { justify-self: stretch; text-align: center; }
+.login-actions { display: flex; flex-wrap: wrap; gap: 10px; }
+
 /* Session controls — shown in the menu bar, home screen, and instructor header */
 .session-chip {
   font-size: 13px;
