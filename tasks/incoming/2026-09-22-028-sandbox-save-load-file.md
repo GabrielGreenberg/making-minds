@@ -2,7 +2,7 @@
 id: 2026-09-22-028
 type: feature
 title: Save and load a sandbox worksheet as a file (visitor-mode bells and whistles)
-priority: low
+priority: normal
 size: large
 requires: browser
 area: app
@@ -18,6 +18,8 @@ merged_into:
 Gabriel, filing visitor mode (027): "we may want to add some bells and whistles to visitor
 mode eventually, like being able to save and load a worksheet locally." Provenance: chat,
 catch session 2026-09-22.
+Raised to normal (catch 2026-09-23): Gabriel asked for it again: "add a save/load worksheet option
+to visitor mode". Visitor mode (027) has landed, so nothing blocks it.
 
 Most of this exists headless already: the store has `newWorkbook`, `exportWorkbook`,
 `importWorkbook` and `openWorkbook` (`app/src/store.ts:891, 913, 917, 967`) with NO UI callers,

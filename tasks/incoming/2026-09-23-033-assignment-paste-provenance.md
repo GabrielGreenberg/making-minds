@@ -8,7 +8,7 @@ requires: browser
 area: app
 source: chat
 created: 2026-09-23T11:30:00-07:00
-status: blocked
+status: ready
 after: 2026-09-23-032
 branch:
 merged_into:
@@ -59,6 +59,9 @@ per window. The rule "same window" holds for free as long as the clipboard never
 1. **One provenance seam**, `app/src/provenance.ts`: an in-memory clipboard for canvas content
    and assignment text, each item stamped with `{scope: sandbox | assignment <id>, user}`, and
    a pure `canPaste(item, target)` policy that answers every paste question in the app.
+   Resolved policy: a paste into an assignment is accepted iff the item was copied inside an
+   assignment (any) by the current user in this window; sandbox-scoped items are always refused;
+   a paste into the sandbox is always accepted. No record of refused pastes is kept.
 2. **Canvas:** copy stamps the item; paste into an assignment is refused unless the policy
    allows it; paste also refuses component types the question does not allow, and a mode
    mismatch. Paste into the sandbox is always allowed.
@@ -96,35 +99,23 @@ per window. The rule "same window" holds for free as long as the clipboard never
   `components/ComponentLibrary.tsx:143`; `storage/journal.ts:46–56`;
   `storage/migrateLocal.ts:73–80`; `server/src/app.ts:484–523`.
 
+### Resolved decisions (Gabriel, 2026-09-23)
+1. **Scope:** yes — the same user in the same window may paste between ANY of their assignments
+   (every assignment is guarded, so it can only hold their own work).
+2. **Own sandbox work → assignment:** refused, always. Students prototype in the question canvas.
+3. **Nothing leaves an assignment:** yes — copying out to another app yields nothing.
+4. **Record and detection:** the student sees a message; no log of refused pastes is kept;
+   similarity flags go into task 031's design (added there as item 12).
+5. **Group work:** each member rebuilds the shared solution in their own session.
+
 ## Verify
 - Gates: both `tsc`s, build, `npm run check` with `pasteCheck` and the grep gate.
 - Browser, local mode: build a circuit in the sandbox, copy it, open HW1 P1, paste: refused
-  with a message. Copy in P1, paste in P2: allowed (or refused, per Question 1). Paste text
+  with a message. Copy in P1, paste in P2: allowed; copy in HW1, paste in HW2: allowed. Paste text
   from another app into the open response and into a fill-in blank: refused. Copy a sentence
   inside the open response and paste it back: allowed. Copy in an assignment and paste into
   another app: nothing arrives. Sign out, sign in as another user, paste: refused (task 032).
   `window.__store` is undefined in `npm run build && npm run preview`.
 - Owed: mobile Safari and Chrome paste behaviour on a real phone.
-
-## Questions
-1. **Scope of "same place".** May a student paste between different assignments of their own
-   in the same window, for example reusing their HW2 +1 circuit in HW3? Recommendation: yes,
-   the same user in the same window across any assignment, because every assignment is itself
-   guarded, so it can only hold their own work. The strict alternative is the same assignment
-   only.
-2. **The student's OWN sandbox work.** Is sandbox → assignment always refused, even for
-   something the same student just built there? Recommendation: always refused. The sandbox
-   cannot tell hand-built content from a friend's file. Students prototype in the question
-   canvas instead, which works just as well. The alternative, tracking a "clean" or
-   "imported" mark on every component, is complex and still beaten by redrawing.
-3. **Nothing leaves an assignment.** Copying out of an assignment into another app gives
-   nothing (the reverse of the friend attack). Recommendation: yes. The cost is that a
-   student cannot paste their own paragraph into an email to the TA.
-4. **Blocked-paste record and detection.** Should refused pastes be counted per question and
-   shown to instructors in grading (task 031)? Should 031 add similarity flags for tiers 2–3?
-   Recommendation: show the message to the student, keep no log for now (logs are FERPA/P3
-   records too), and add similarity flags to 031's design.
-Group work (policy: a group may share solutions it built together) is assumed to mean each
-member builds their own copy in their own session. Say if not.
 
 ## Progress log
