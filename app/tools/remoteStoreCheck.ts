@@ -412,7 +412,7 @@ check('the student-carried authored assignment never reached the server',
   (await remoteAssignmentStore.get('student-carried-asg')) === null);
 
 // ── crash-buffer journal (storage/journal.ts) ────────────────────
-const { writeJournal, readJournal, clearJournal, reconcileJournal } = await import(
+const { writeJournal, readJournal, clearJournal, clearJournalIfHolds, reconcileJournal } = await import(
   '../src/storage/journal'
 );
 const jState = {
@@ -426,6 +426,18 @@ check('journal round-trips for its own (email, assignment)',
   readJournal('alice@example.com', 'jr-asg')?.currentQuestionIndex === 7);
 clearJournal('alice@example.com', 'jr-asg');
 check('clearJournal removes the buffer', readJournal('alice@example.com', 'jr-asg') === null);
+
+// A save confirmed after its user left (a sign-out mid-save, store.ts
+// performAutoSave) clears the buffer only if it holds exactly what was saved:
+// an equal buffer is obsolete (replaying it would overwrite later work from
+// another device), a newer one is work still owed to the next open.
+writeJournal('alice@example.com', 'jr-asg', jState);
+clearJournalIfHolds('alice@example.com', 'jr-asg', { ...jState, currentQuestionIndex: 6 });
+check('clearJournalIfHolds keeps a buffer NEWER than the confirmed save',
+  readJournal('alice@example.com', 'jr-asg')?.currentQuestionIndex === 7);
+clearJournalIfHolds('alice@example.com', 'jr-asg', { ...jState });
+check('clearJournalIfHolds removes a buffer equal to the confirmed save',
+  readJournal('alice@example.com', 'jr-asg') === null);
 
 // Replay: a surviving buffer supersedes the fetched server state, is
 // re-uploaded through the seam, and is cleared on the confirmed upload.

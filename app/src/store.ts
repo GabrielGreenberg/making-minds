@@ -44,7 +44,7 @@ import { buildSubmission } from './storage/submissionStore';
 // Store INSTANCES come from the backend seam (local vs. remote is decided
 // there, nowhere else); the modules above supply only pure helpers + types.
 import { workbookStore, submissionStore, assignmentStore, backendMode } from './storage/backend';
-import { writeJournal, clearJournal, reconcileJournal } from './storage/journal';
+import { writeJournal, clearJournal, clearJournalIfHolds, reconcileJournal } from './storage/journal';
 import { isFrozen } from './dueDates';
 import { getSessionUser } from './auth/session';
 import { instructorRole } from './auth/instructorRole';
@@ -706,12 +706,24 @@ interface AppState {
   // kind's default since the grammars are disjoint.
   toggleStateKind: (id: string) => void;
 
-  // Flush EVERY mode's transient sim state (SC/FSM/TM/turbot + the I/O table).
-  // Every canvas swap must call this — question navigation and sandbox
-  // tab/workbook entry alike — because the sim slices are shared app-wide,
-  // not per-canvas, so anything left in them shows up against the next
-  // canvas's circuit.
+  // Reset law 1 — the CANVAS swap. Flush EVERY mode's transient sim state
+  // (SC/FSM/TM/turbot + the I/O table) AND the undo/redo history. Every canvas
+  // swap must call this — question navigation and sandbox tab/workbook entry
+  // alike — because the sim slices and the history stacks are shared
+  // app-wide, not per-canvas: a run left in them shows up against the next
+  // canvas's circuit, and an undo would write the previous canvas's snapshot
+  // over this one.
   resetAllSimState: () => void;
+  // Reset law 2 — the PRINCIPAL change (sign-in, sign-out, a 401, a restored
+  // session; null = the visitor). Called by the auth provider in both modes,
+  // synchronously, before React sees the new user. Saves what the leaving
+  // principal had pending under ITS keys, then resets the WHOLE editor store
+  // to its initial state (assignment, question circuits, box library,
+  // clipboard, history, submissions, every sim slice) and loads the arriving
+  // principal's own sandbox — so the next openAssignment reads the seam, never
+  // the previous person's memory. A repeat call for the same principal is a
+  // no-op.
+  resetForPrincipal: (email: string | null) => void;
 }
 
 function snapToGrid(val: number): number {
@@ -845,6 +857,17 @@ let suppressAutoAddRow = false;
 // resolve must never clobber a newer navigation.
 let openAssignmentSeq = 0;
 
+// Who the editor store currently belongs to (reset law 2, resetForPrincipal):
+// the signed-in email, or null for the visitor. It keys the sandbox autosave.
+// `principalReported` is false until the auth provider first reports, so the
+// boot report (visitor included) always loads that principal's sandbox.
+// `principalEpoch` bumps on every change: an async resolve that started under
+// an earlier principal (hydrateSubmissions, submitAssignment, an autosave in
+// flight) applies nothing to the next person's store.
+let currentPrincipal: string | null = null;
+let principalReported = false;
+let principalEpoch = 0;
+
 export const useStore = create<AppState>()((set, get) => ({
   autoSaveStatus: 'saved' as const,
 
@@ -855,10 +878,14 @@ export const useStore = create<AppState>()((set, get) => ({
   submissions: {},
 
   hydrateSubmissions: async () => {
+    const epoch = principalEpoch;
     const assignments = await listAssignments();
     const latests = await Promise.all(
       assignments.map((a) => submissionStore.getLatest(a.id)),
     );
+    // The principal changed while this was in flight: these are the previous
+    // person's submissions.
+    if (epoch !== principalEpoch) return;
     const out: Record<string, SubmissionRecord> = {};
     assignments.forEach((a, i) => {
       const latest = latests[i];
@@ -884,8 +911,8 @@ export const useStore = create<AppState>()((set, get) => ({
       undoStack: [],
       redoStack: [],
     });
-    // Clear auto-save so next load shows welcome screen
-    try { localStorage.removeItem('making-minds-autosave'); } catch { /* ignore */ }
+    // Clear THIS principal's sandbox autosave (never another person's).
+    try { localStorage.removeItem(sandboxKey(currentPrincipal)); } catch { /* ignore */ }
   },
 
   newWorkbook: () => {
@@ -1624,7 +1651,9 @@ export const useStore = create<AppState>()((set, get) => ({
       });
       set({ tabCircuits: tc });
     }
-    set({ workbookOpen: false });
+    // History is canvas-scoped: an undo after coming back must not restore
+    // the canvas left here over whichever one is entered next.
+    set({ workbookOpen: false, undoStack: [], redoStack: [] });
   },
   enterSandbox: () => {
     const state = get();
@@ -1735,6 +1764,8 @@ export const useStore = create<AppState>()((set, get) => ({
       confirmedBoxLibrary: [],
       openResponse: '',
       fillAnswers: [],
+      undoStack: [],
+      redoStack: [],
     });
   },
 
@@ -1772,6 +1803,7 @@ export const useStore = create<AppState>()((set, get) => ({
     return JSON.stringify(submission, null, 2);
   },
   submitAssignment: async (id, student) => {
+    const epoch = principalEpoch;
     const def = await getAssignment(id);
     if (!def) return null;
     const state = get();
@@ -1787,7 +1819,8 @@ export const useStore = create<AppState>()((set, get) => ({
       submittedAt: new Date().toISOString(),
     });
     const record = await submissionStore.submit(id, submission);
-    set({ submissions: { ...get().submissions, [id]: record } });
+    // Recorded either way; only the SAME principal's badge map shows it.
+    if (epoch === principalEpoch) set({ submissions: { ...get().submissions, [id]: record } });
     return record;
   },
   importProject: (json) => {
@@ -3722,8 +3755,38 @@ export const useStore = create<AppState>()((set, get) => ({
     get().turbotReset();
     // The armed palette tool is canvas-scoped too: an AND armed on a CC
     // question must not survive into the next question's canvas and drop a
-    // gate on the first click there.
-    set({ selectedTool: null });
+    // gate on the first click there. So is the history: undo writes its
+    // snapshot into the CURRENT canvas, so a stack carried across a swap
+    // would restore the previous question (or sandbox tab) over this one.
+    set({ selectedTool: null, undoStack: [], redoStack: [] });
+  },
+
+  resetForPrincipal: (email) => {
+    if (principalReported && email === currentPrincipal) return;
+    // The leaving principal's pending edits land under ITS keys (the sandbox
+    // key and, remotely, the crash journal read currentPrincipal and the
+    // session cache — both still the leaving person's here).
+    saveForLeavingPrincipal();
+    // A sandbox on screen stays on screen — the arriving person's own. (A
+    // sign-out from the menu goes Home first, so this is a 401, a session
+    // restore resolving, or a sign-in from a sandbox left open behind the
+    // sign-in screen; routing may re-apply the URL after, which is harmless.)
+    const s = get();
+    const keepSandboxOpen = principalReported && s.workbookOpen && s.assignment === null;
+    // Stops any run interval before the fields holding their ids are wiped.
+    get().resetAllSimState();
+    // In-flight opens and submission hydrations belong to the leaving
+    // principal: their resolves must apply nothing.
+    openAssignmentSeq++;
+    principalEpoch++;
+    currentPrincipal = email;
+    principalReported = true;
+    set({ ...useStore.getInitialState(), ...readSandbox(email) });
+    if (keepSandboxOpen) get().enterSandbox();
+    // The reset's own set() armed the autosave, and so did entering the
+    // sandbox; nothing here is an edit.
+    cancelPendingAutoSave();
+    setTimeout(() => get().evaluateCircuit(), 0);
   },
 
   toggleStateKind: (id) => {
@@ -3757,8 +3820,18 @@ if (typeof window !== 'undefined') {
 }
 
 // ─── Auto-save to localStorage ─────────────────────────────────────
-const AUTO_SAVE_KEY = 'making-minds-autosave';
+// The sandbox autosaves per PERSON on this browser (reset law 2 loads it):
+// `making-minds-autosave:<email>` for a signed-in user, one shared
+// `making-minds-autosave:visitor` for visitors. The bare prefix is the legacy
+// one-per-browser key, adopted as the visitor sandbox (adoptLegacySandbox).
+// sandboxKey is the ONE place the key is spelled.
+const SANDBOX_KEY_PREFIX = 'making-minds-autosave';
 const AUTO_SAVE_DELAY = 1500; // ms debounce
+
+function sandboxKey(principal: string | null): string {
+  // Lowercased like the crash journal's keys (storage/journal.ts).
+  return `${SANDBOX_KEY_PREFIX}:${principal ? principal.toLowerCase() : 'visitor'}`;
+}
 
 let autoSaveTimer: ReturnType<typeof setTimeout> | null = null;
 
@@ -3861,12 +3934,15 @@ function snapshotAssignmentState(s: AppState): AssignmentState {
 // suspension), so unload-time flushes still land with the local store; remote
 // unload flushes additionally pass `keepalive` so the PUT can outlive the
 // page. Returns the saved assignment's id (null when no assignment is open).
-async function saveAssignmentState(keepalive = false): Promise<string | null> {
+async function saveAssignmentState(
+  keepalive = false,
+): Promise<{ id: string; state: AssignmentState } | null> {
   const s = useStore.getState();
   const a = s.assignment;
   if (!a) return null;
-  await workbookStore.saveAssignmentState(a.id, snapshotAssignmentState(s), { keepalive });
-  return a.id;
+  const state = snapshotAssignmentState(s);
+  await workbookStore.saveAssignmentState(a.id, state, { keepalive });
+  return { id: a.id, state };
 }
 
 // ── Remote-mode crash buffer (storage/journal.ts) ──────────────────
@@ -3903,23 +3979,40 @@ async function performAutoSave(keepalive = false): Promise<void> {
     return;
   }
   autoSaveInFlight = true;
+  // Whose save this is, read BEFORE the seam await: a principal change while
+  // it is in flight must not touch the next person's journal or save chip.
+  const epoch = principalEpoch;
+  const email = getSessionUser()?.email;
   try {
     useStore.setState({ autoSaveStatus: 'saving' });
-    let savedAssignmentId: string | null = null;
+    let saved: { id: string; state: AssignmentState } | null = null;
     if (useStore.getState().assignment) {
-      savedAssignmentId = await saveAssignmentState(keepalive);
+      saved = await saveAssignmentState(keepalive);
     } else {
-      localStorage.setItem(AUTO_SAVE_KEY, JSON.stringify(getAutoSaveData()));
+      localStorage.setItem(sandboxKey(currentPrincipal), JSON.stringify(getAutoSaveData()));
+    }
+    if (epoch !== principalEpoch) {
+      // The principal changed mid-save, and the change journaled the leaving
+      // person's work (saveForLeavingPrincipal). This confirmed save makes
+      // that journal obsolete only if it holds exactly what was just
+      // confirmed — no edit came after this save started. A NEWER journal is
+      // kept for their next open to replay. Nothing else here is theirs any
+      // more (the save chip and the retry belong to the next person).
+      if (backendMode === 'remote' && saved && email) {
+        clearJournalIfHolds(email, saved.id, saved.state);
+      }
+      return;
     }
     useStore.setState({ autoSaveStatus: 'saved' });
     autoSaveBackoff = AUTO_SAVE_BACKOFF_INITIAL;
-    if (backendMode === 'remote' && savedAssignmentId) {
+    if (backendMode === 'remote' && saved) {
       // Confirmed on the server — the crash buffer for this assignment is
       // now obsolete (a newer edit's own flush would rewrite it anyway).
-      const email = getSessionUser()?.email;
-      if (email) clearJournal(email, savedAssignmentId);
+      if (email) clearJournal(email, saved.id);
     }
   } catch {
+    // As above: the previous principal's failed save is already journaled.
+    if (epoch !== principalEpoch) return;
     if (backendMode === 'remote') {
       // Server unreachable (or the write failed): buffer the state locally,
       // show the error chip, and retry with backoff. The student's work is
@@ -4009,6 +4102,61 @@ function flushAutoSave(opts?: { journal?: boolean; keepalive?: boolean }) {
   // (before the first suspension), so it lands even mid-unload.
   void performAutoSave(opts?.keepalive === true);
 }
+
+// Reset law 2's save step: land the LEAVING principal's unsaved work under
+// their keys before the reset wipes it from memory. Never left to the
+// debounced save or its trailing rerun — the reset cancels both
+// (cancelPendingAutoSave), and a save already in flight would otherwise
+// swallow the request. "Unsaved" = a debounced save armed, a trailing rerun
+// queued, or the chip not 'saved'.
+// - The sandbox (no assignment in memory): one synchronous localStorage write,
+//   made here directly. What is in memory is this person's by construction
+//   (the last reset loaded it for them).
+// - An open assignment (never a frozen one — its canvas is the submission):
+//   locally, the seam's synchronous write, directly. Remotely, the crash
+//   journal first (synchronous, so it holds even if the PUT fails or the tab
+//   dies), then one PUT through the single-flight path: with a save already in
+//   flight a second PUT could land before it, so the journal alone carries the
+//   newer work to their next open. A confirmed PUT clears the journal only
+//   while it holds exactly what was confirmed (performAutoSave), so a sign-out
+//   never leaves a stale buffer to replay over work done later on another
+//   device.
+function saveForLeavingPrincipal(): void {
+  if (!principalReported) return; // boot: nothing in memory is anyone's yet
+  const s = useStore.getState();
+  const unsaved = autoSaveTimer != null || autoSaveTrailing || s.autoSaveStatus !== 'saved';
+  if (!unsaved) return;
+  const a = s.assignment;
+  if (!a) {
+    try {
+      localStorage.setItem(sandboxKey(currentPrincipal), JSON.stringify(getAutoSaveData()));
+    } catch {
+      // storage full/unavailable — the same silent fail as the autosave
+    }
+    return;
+  }
+  if (selectAssignmentFrozen(s)) return;
+  if (backendMode === 'local') {
+    void saveAssignmentState().catch(() => {});
+    return;
+  }
+  const email = getSessionUser()?.email;
+  if (email) writeJournal(email, a.id, snapshotAssignmentState(s));
+  if (autoSaveTimer) clearTimeout(autoSaveTimer);
+  autoSaveTimer = null;
+  void performAutoSave();
+}
+
+// Drop the debounced save armed by resetForPrincipal's own set() (loading a
+// person's sandbox is not an edit), and any queued trailing rerun or retry
+// backoff left over from the previous principal.
+function cancelPendingAutoSave() {
+  if (autoSaveTimer) clearTimeout(autoSaveTimer);
+  autoSaveTimer = null;
+  autoSaveTrailing = false;
+  autoSaveBackoff = AUTO_SAVE_BACKOFF_INITIAL;
+  useStore.setState({ autoSaveStatus: 'saved' });
+}
 window.addEventListener('beforeunload', () => flushAutoSave({ journal: true, keepalive: true }));
 window.addEventListener('pagehide', () => flushAutoSave({ journal: true, keepalive: true }));
 document.addEventListener('visibilitychange', () => {
@@ -4066,13 +4214,108 @@ useStore.subscribe((state) => {
   if (state.localStepActive) useStore.getState().localStepClear();
 });
 
-// Load from localStorage on startup
+// ─── The sandbox's per-person load (reset law 2) ───────────────────
+// Nothing loads at module import: which sandbox appears depends on who is
+// here, so resetForPrincipal reads it (readSandbox) whenever that changes.
 type TabCircuitData = { components: CircuitComponent[]; wires: Wire[]; boxes: BoxDefinition[]; confirmedBoxes: ConfirmedBoxDef[] };
 
-function loadAutoSave() {
+function readStored(key: string): string | null {
   try {
-    const raw = localStorage.getItem(AUTO_SAVE_KEY);
-    if (!raw) return; // No saved data — stay on welcome screen (workbookOpen: false)
+    return localStorage.getItem(key);
+  } catch {
+    return null;
+  }
+}
+
+/** The legacy one-per-browser sandbox becomes the visitor sandbox, once. If a
+ *  visitor sandbox already exists the legacy blob is left untouched — never
+ *  overwrite, never delete what can't be placed. */
+function adoptLegacySandbox(): void {
+  try {
+    const legacy = localStorage.getItem(SANDBOX_KEY_PREFIX);
+    if (legacy == null || localStorage.getItem(sandboxKey(null)) != null) return;
+    localStorage.setItem(sandboxKey(null), legacy);
+    localStorage.removeItem(SANDBOX_KEY_PREFIX);
+  } catch {
+    // storage unavailable — nothing to adopt
+  }
+}
+
+/** Does a stored sandbox blob hold anything the person made — anything a
+ *  fresh sandbox (the store's initial state) doesn't? A component, box or
+ *  saved box on any sheet, a second tab, a renamed or re-moded tab, a turbot
+ *  tab's arena, a retitled workbook. Only an absent, unreadable or PRISTINE
+ *  blob counts as "no sandbox yet": a principal change and every Home visit
+ *  autosave one even when nothing was made, so a bare key-exists test would
+ *  never let a returning user receive a visitor's work — and anything short of
+ *  pristine is someone's sandbox, never overwritten. */
+function sandboxHasWork(raw: string | null): boolean {
+  if (!raw) return false;
+  let data: {
+    workbookTitle?: string;
+    tabs?: Array<Partial<SandboxTab> & { name?: string }>;
+    tabCircuits?: Record<string, Partial<TabCircuitData>>;
+    components?: unknown[];
+    boxes?: unknown[];
+  };
+  try {
+    data = JSON.parse(raw);
+  } catch {
+    return false;
+  }
+  if (!data || typeof data !== 'object') return false;
+  const sheetHasWork = (c: Partial<TabCircuitData> | undefined) =>
+    (c?.components?.length ?? 0) > 0 ||
+    (c?.boxes?.length ?? 0) > 0 ||
+    (c?.confirmedBoxes?.length ?? 0) > 0;
+  const fresh = useStore.getInitialState();
+  const freshTab = fresh.tabs[0];
+  const tabs = Array.isArray(data.tabs) ? data.tabs : [];
+  return (
+    Object.values(data.tabCircuits ?? {}).some(sheetHasWork) ||
+    // the legacy flat format's single canvas
+    (data.components?.length ?? 0) > 0 ||
+    (data.boxes?.length ?? 0) > 0 ||
+    (data.workbookTitle != null && data.workbookTitle !== fresh.workbookTitle) ||
+    tabs.length > 1 ||
+    tabs.some(
+      (t) =>
+        (t.title ?? t.name ?? freshTab.title) !== freshTab.title ||
+        (t.buildMode ?? freshTab.buildMode) !== freshTab.buildMode ||
+        (t.activeTask ?? freshTab.activeTask) !== freshTab.activeTask ||
+        t.arena != null ||
+        t.innerMode != null,
+    )
+  );
+}
+
+/** The arriving principal's sandbox as a store patch ({} when there is none).
+ *  A signed-in person with no sandbox here yet (none, or a pristine one —
+ *  sandboxHasWork) receives the visitor sandbox — MOVED, so a visitor who
+ *  signs in keeps their work and the next visitor doesn't see it. Nothing
+ *  is ever deleted otherwise: a signed-out person's sandbox just waits under
+ *  their key. */
+function readSandbox(principal: string | null): Partial<AppState> {
+  adoptLegacySandbox();
+  if (principal != null) {
+    const visitors = readStored(sandboxKey(null));
+    if (!sandboxHasWork(readStored(sandboxKey(principal))) && sandboxHasWork(visitors)) {
+      try {
+        localStorage.setItem(sandboxKey(principal), visitors!);
+        localStorage.removeItem(sandboxKey(null));
+      } catch {
+        // storage unavailable — they start from their own (empty) sandbox
+      }
+    }
+  }
+  return sandboxPatchFrom(readStored(sandboxKey(principal)));
+}
+
+/** Parse one stored sandbox blob into a store patch; {} when absent or
+ *  corrupt (stay on the welcome state, workbookOpen false). */
+function sandboxPatchFrom(raw: string | null): Partial<AppState> {
+  if (!raw) return {};
+  try {
     const data = JSON.parse(raw);
 
     if (data.formatVersion === 2) {
@@ -4099,7 +4342,7 @@ function loadAutoSave() {
       const activeTab = tabs.find((t: { id: string }) => t.id === activeId);
       const vp = data.viewPreferences || {};
 
-      useStore.setState({
+      return {
         workbookOpen: false, // home-first: restore the sandbox into memory but land on Home
         workbookTitle: data.workbookTitle || 'Untitled Workbook',
         tabs,
@@ -4118,8 +4361,7 @@ function loadAutoSave() {
         showGrid: vp.showGrid ?? true,
         showWireValues: vp.showWireValues ?? true,
         snapToAlign: vp.snapToAlign ?? true,
-      });
-      setTimeout(() => useStore.getState().evaluateCircuit(), 0);
+      };
     } else if (data.tabs) {
       // Legacy auto-save format (has tabs but no formatVersion)
       const tabCircuits = new Map<string, TabCircuitData>();
@@ -4135,7 +4377,7 @@ function loadAutoSave() {
         buildMode: t.buildMode || 'CC',
         activeTask: 'arithmetic' as ActiveTask,
       }));
-      useStore.setState({
+      return {
         workbookOpen: false, // home-first: restore the sandbox but land on Home
         workbookTitle: 'Untitled Workbook',
         buildMode: data.buildMode || 'CC',
@@ -4146,12 +4388,10 @@ function loadAutoSave() {
         tabs,
         activeTabId: data.activeTabId || tabs[0]?.id || defaultTabId,
         ...(tabCircuits.size > 0 ? { tabCircuits } : {}),
-      });
-      setTimeout(() => useStore.getState().evaluateCircuit(), 0);
+      };
     }
   } catch {
     // Corrupted data — ignore, stay on welcome screen
   }
+  return {};
 }
-
-loadAutoSave();

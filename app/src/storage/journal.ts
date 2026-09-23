@@ -64,6 +64,26 @@ export function clearJournal(email: string, assignmentId: string): void {
 }
 
 /**
+ * Clear the buffer only if it holds exactly `state` — the snapshot a save just
+ * confirmed. For a save whose confirmation arrives after the user left (a
+ * sign-out mid-save): a buffer written after that save started is NEWER work
+ * and stays for the replay; one equal to it is obsolete and must go, or its
+ * replay would later overwrite whatever the student saved from another device.
+ */
+export function clearJournalIfHolds(
+  email: string,
+  assignmentId: string,
+  state: AssignmentState,
+): void {
+  try {
+    const key = journalKey(email, assignmentId);
+    if (localStorage.getItem(key) === JSON.stringify(state)) localStorage.removeItem(key);
+  } catch {
+    // ignore
+  }
+}
+
+/**
  * The replay step of `openAssignment` (remote mode only): if a crash buffer
  * exists for this (user, assignment), it supersedes the fetched server state —
  * upload it, clear the buffer on confirmed upload, and return it as the state
