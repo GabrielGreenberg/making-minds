@@ -216,3 +216,20 @@ Checkpoint (details in the two entries above).
   undo/redo + page reload → still 0101. Optional: remote-mode submit of a boxed SC answer.
 - **NEXT STEP:** loop session: visual check (owed above), file the drawn-across-wires task
   from the repro, then land per PROFILE §5.
+
+### 2026-09-23 — loop browser check and land
+- **Browser, local mode (dev server restarted on the branch), John's sandbox Logic Circuit
+  tab.** Built IN → MEM → OUT and confirmed a box around all three: the library holds "Box 1"
+  with `kind: 'SC'`, and the palette lists it under BOXES. The originals were cleared, then the
+  box was placed with a fresh IN and OUT. The SC controls appeared with no top-level MEM
+  ("Reset to t=1", timeline Run/Step/Reset). Global input 1010 ran to output **10100**, the
+  one-step delay, with the history's boxed memory at 0, 0, 1, 0, 1 and no "Loop detected"
+  warning. The Local Input / Output table's columns read **IN1 · Box 1·M1 · OUT1**, with rows
+  (0,0)→0, (0,1)→1, (1,0)→0. After a page reload the box was still placed and still ran 10100.
+- **Fixed here:** the review nit at `boxScopeCheck.ts:518`. The pin now checks that the
+  refusal names `M1` ("…inside a box here: M1"). boxScopeCheck: 123 passed.
+- **Still owed:** the turbot SC-brain and toggle-through-a-box eyeballs (pinned headless in
+  `boxScopeCheck [sequential boxes]`), and a CC question's palette hiding an SC box (pinned).
+- **For Gabriel to confirm:** the "Box 1·M1" state column (loop-settled).
+- **Filed:** the box-drawn-across-wires bug as its own task (see `tasks/log.md` / incoming).
+- Landed via a merge into `main`.

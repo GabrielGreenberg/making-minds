@@ -516,8 +516,8 @@ console.log('\n[sequential boxes: store]');
   buildDelay();
   const ccRefusal = drawAndConfirm();
   check(`a CC question refuses to box a MEM, naming it (${ccRefusal.err})`,
-    typeof ccRefusal.err === 'string' && ccRefusal.err.includes('M') &&
-    ccRefusal.err.includes('Memory cannot go inside a box here'));
+    typeof ccRefusal.err === 'string' &&
+    ccRefusal.err.includes('Memory cannot go inside a box here: M1'));
   check('...and nothing was added to the library',
     !S().confirmedBoxLibrary.some((b) => b.id === ccRefusal.id));
 
