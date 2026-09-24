@@ -22,6 +22,19 @@
 //                        `fill_in`), submit → graded, the questionTask
 //                        classifier, and a grep pin: one reader and one
 //                        writer of `numericOnly`.
+//
+//   [turbot arena authoring]  (task 010) the question creator's arena family:
+//                        drafts → `turbot_cases` round-trips every sample and
+//                        HW1–HW7 turbot question exactly (the homework sync
+//                        keeps them pristine), add / duplicate (a deep copy)
+//                        / remove (never the last) / reorder move an arena
+//                        with its criterion and budget, the saved arenas an
+//                        edit would shift (graded runs are positional: warned
+//                        and confirmed at save), the per-arena defects
+//                        that block a save, an authored 2-arena question kept
+//                        whole in the student copy and graded per arena in
+//                        order (`turbotCases[k]` is `turbot_cases[k]`), and a
+//                        grep pin: no single-arena path left in the creator.
 
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';
@@ -33,6 +46,8 @@ import {
   buildCorrectSubmission,
   buildIncorrectSubmission,
   scCorrect,
+  turbotCorrect,
+  turbotIncorrect,
 } from '../src/devData/sampleData';
 import { boxWhole } from './builder';
 import { gradeQuestion, gradeSubmission, summarizeResult } from '../src/engine/grader';
@@ -51,6 +66,22 @@ import {
   type FillInBlankDraft,
 } from '../src/instructor/fillInAuthoring';
 import { moveItem } from '../src/instructor/dragReorder';
+import {
+  describeTurbotCase,
+  duplicateTurbotCase,
+  misplacedArenas,
+  misplacedArenasWarning,
+  newTurbotCaseDraft,
+  removeTurbotCase,
+  turbotCaseDraftsOf,
+  turbotCaseIndexOf,
+  turbotCaseProblems,
+  turbotCasesField,
+  DEFAULT_CRITERION,
+  DEFAULT_MAX_STEPS,
+  type TurbotCaseDraft,
+} from '../src/instructor/turbotCaseAuthoring';
+import { resizeArena, setArenaCell } from '../src/instructor/arenaEditing';
 import { canonicalJson } from '../src/devData/homeworkSync';
 import { stripAnswers } from '../../server/src/sanitize';
 
@@ -389,6 +420,211 @@ console.log('\n[fill-in authoring]');
   check('`numericOnly` is named only in types.ts, engine/fillIn.ts and instructor/fillInAuthoring.ts',
     strays.length === 0 && allowed.every((f) => mentions.includes(f)));
   for (const f of strays) console.log(`        → ${f}`);
+}
+
+// ── Authoring a turbot arena family (task 010) ─────────────────────
+// The creator's arenas are drafts (instructor/turbotCaseAuthoring.ts), one per
+// `turbot_cases` entry, each with its own criterion and step budget. Arenas are
+// the problem statement (the server keeps them whole for students); grading
+// requires every one to pass, and results are positional.
+console.log('\n[turbot arena authoring]');
+{
+  const readHw = (n: number) => JSON.parse(
+    readFileSync(new URL(`../src/devData/homeworks/hw${n}.json`, import.meta.url), 'utf8'),
+  ) as AssignmentData;
+  const hws = [1, 2, 3, 4, 5, 6, 7].map(readHw);
+
+  // (1) A no-op creator edit reproduces every arena family exactly —
+  // canonicalJson is the homework sync's own comparison. (The old creator
+  // kept only turbot_cases[0], so saving any HW family dropped arenas 2+.)
+  const hwTurbots = hws.flatMap((a) => a.questions.filter((q) => q.buildMode === 'turbot'));
+  const allTurbots = [...assignment.questions.filter((q) => q.buildMode === 'turbot'), ...hwTurbots];
+  const drifted = allTurbots.filter((q) => {
+    const drafts = turbotCaseDraftsOf(q);
+    return drafts.length !== q.turbot_cases!.length ||
+      new Set(drafts.map((d) => d.key)).size !== drafts.length ||
+      canonicalJson(turbotCasesField(drafts)) !== canonicalJson(q.turbot_cases);
+  });
+  check(`drafts → turbot_cases round-trips every sample + HW turbot question (${allTurbots.length}; ${hwTurbots.length} HW families)`,
+    hwTurbots.length === 10 && drifted.length === 0);
+  for (const q of drifted) console.log(`        → ${q.label}`);
+  check('every HW family has at least two arenas (none may silently shrink)',
+    hwTurbots.every((q) => turbotCaseDraftsOf(q).length >= 2));
+  const hw3p14 = hws[2].questions.find((q) => q.id === 14)!;
+  check('HW3 P14 loads as three drafts, each with its own arena',
+    turbotCaseDraftsOf(hw3p14).length === 3 &&
+      turbotCaseDraftsOf(hw3p14).every((d, i) => d.arena === hw3p14.turbot_cases![i].arena));
+  check('each saved case is exactly {arena, maxSteps, criterion} (no row key leaks)',
+    turbotCasesField(turbotCaseDraftsOf(hw3p14)).every((c) =>
+      Object.keys(c).join() === 'arena,maxSteps,criterion'));
+
+  // (2) A new question (or one of another mode) starts with one default arena.
+  const isDefault = (ds: TurbotCaseDraft[]) =>
+    ds.length === 1 && ds[0].arena.width === 5 && ds[0].arena.height === 5 &&
+    ds[0].arena.cells.flat().every((c) => c === 'empty') &&
+    ds[0].criterion === 'reach-and-stop' && DEFAULT_CRITERION === 'reach-and-stop' &&
+    ds[0].maxSteps === 100 && DEFAULT_MAX_STEPS === 100;
+  check('a new question gets one blank 5×5 arena, reach-and-stop, 100 steps',
+    isDefault(turbotCaseDraftsOf(undefined)));
+  check('...and so does a non-turbot question (or one with an empty family)',
+    isDefault(turbotCaseDraftsOf(assignment.questions[0])) &&
+      isDefault(turbotCaseDraftsOf({ turbot_cases: [] })));
+
+  // (3) The list operations.
+  const family = turbotCaseDraftsOf(hw3p14);
+  const tail = { ...family[2], criterion: 'pass-through' as const, maxSteps: 37 };
+  const withTail = [family[0], family[1], tail];
+  const added = newTurbotCaseDraft(withTail);
+  check('a new arena is a blank 5×5 graded like the last arena (criterion + budget)',
+    added.arena.width === 5 && added.arena.height === 5 &&
+      added.arena.cells.flat().every((c) => c === 'empty') &&
+      added.criterion === 'pass-through' && added.maxSteps === 37 &&
+      withTail.every((d) => d.key !== added.key));
+  const dup = duplicateTurbotCase(family, 0);
+  check('duplicate inserts a copy right after the original, with a fresh key',
+    dup.drafts.length === 4 && dup.drafts[1].key === dup.key &&
+      dup.key !== family[0].key && dup.drafts[0] === family[0] && dup.drafts[2] === family[1] &&
+      canonicalJson(turbotCasesField([dup.drafts[1]])) === canonicalJson(turbotCasesField([family[0]])));
+  const before = canonicalJson(family[0].arena);
+  const copy = dup.drafts[1];
+  const free = copy.arena.cells.flatMap((row, y) =>
+    row.map((c, x) => ({ c, x, y }))).find((p) =>
+    p.c === 'empty' && !(p.x === copy.arena.start.x && p.y === copy.arena.start.y))!;
+  const painted = setArenaCell(copy.arena, free.x, free.y, 'block');
+  copy.arena.cells[free.y][free.x] = 'goal'; // even a stray in-place write
+  copy.arena.start.facing = copy.arena.start.facing === 'N' ? 'S' : 'N';
+  check('the copy owns its cells and start: painting or mutating it leaves the original untouched',
+    painted.cells[free.y][free.x] === 'block' && canonicalJson(family[0].arena) === before);
+  check('removing an arena drops exactly that one',
+    removeTurbotCase(family, 1).map((d) => d.key).join() === [family[0].key, family[2].key].join());
+  const one = turbotCaseDraftsOf(undefined);
+  check('the last arena cannot be removed',
+    removeTurbotCase(one, 0).length === 1 && removeTurbotCase(one, 0)[0] === one[0]);
+  const moved = moveItem(withTail, 2, 0);
+  check('reordering moves an arena with its criterion and budget',
+    moved[0] === tail && moved[0].criterion === 'pass-through' && moved[0].maxSteps === 37 &&
+      canonicalJson(turbotCasesField(moved)) ===
+        canonicalJson(turbotCasesField([tail, family[0], family[1]])));
+  check('the active arena is found by key after a reorder, and a stale key falls back to #1',
+    turbotCaseIndexOf(moved, tail.key) === 0 && turbotCaseIndexOf(moved, family[0].key) === 1 &&
+      turbotCaseIndexOf(moved, -1) === 0);
+  check('a row summary reads "W×H · criterion · N steps"',
+    describeTurbotCase(tail) === `${tail.arena.width}×${tail.arena.height} · Pass through goal · 37 steps`);
+
+  // (3b) Graded runs are positional (the gradebook's "#k", a student's replay
+  // of run k in the CURRENT turbot_cases[k]), so the creator warns — and
+  // confirms at save — exactly when a saved arena loses its slot.
+  const painted0 = { ...family[0], arena: setArenaCell(family[0].arena, 0, 0, 'block'), maxSteps: 7 };
+  check('painting, re-budgeting or re-judging a saved arena where it stands misplaces nothing',
+    misplacedArenas(family, [painted0, { ...family[1], criterion: 'pass-through' }, family[2]]).length === 0);
+  check('appending an arena (Add, or duplicating the last) misplaces nothing',
+    misplacedArenas(family, [...family, newTurbotCaseDraft(family)]).length === 0 &&
+      misplacedArenas(family, duplicateTurbotCase(family, 2).drafts).length === 0);
+  check('moving arena #3 to the top (↑↑) misplaces all three saved arenas',
+    misplacedArenas(family, moveItem(family, 2, 0)).join() === '0,1,2');
+  check('swapping arenas #2 and #3 misplaces exactly those two',
+    misplacedArenas(family, moveItem(family, 1, 2)).join() === '1,2');
+  check('removing arena #2 misplaces it and every arena after it',
+    misplacedArenas(family, removeTurbotCase(family, 1)).join() === '1,2');
+  check('duplicating arena #1 (an insert before #2) misplaces #2 and #3',
+    misplacedArenas(family, duplicateTurbotCase(family, 0).drafts).join() === '1,2');
+  check('saving no arenas (the question stops being a turbot) misplaces every saved one',
+    misplacedArenas(family, []).join() === '0,1,2');
+  check('a new question has no saved arenas to misplace',
+    misplacedArenas([], turbotCaseDraftsOf(undefined)).length === 0);
+  const arenaWarning = misplacedArenasWarning([1, 2]);
+  check('the warning names the saved arenas by number, and counts past five',
+    arenaWarning.includes('graded in arenas #2, #3 will') &&
+      arenaWarning.includes('"Run this input"') &&
+      misplacedArenasWarning([0]).includes('graded in arena #1 will') &&
+      misplacedArenasWarning([0, 1, 2, 3, 4, 5, 6]).includes('#1, #2, #3, #4, #5 and 2 more'));
+
+  // (4) What blocks a save, each named by its arena.
+  const goalless = { ...one[0] };
+  const withGoal = { ...one[0], arena: setArenaCell(one[0].arena, 4, 4, 'goal') };
+  check('a sound family has no problems', turbotCaseProblems(family).length === 0);
+  check('a goal-less reach-and-stop arena is named by its number',
+    turbotCaseProblems([withGoal, { ...goalless, criterion: 'reach-and-stop' }])
+      .includes('Arena #2: this success criterion needs at least one goal cell.'));
+  check('...and so is a goal-less pass-through arena',
+    turbotCaseProblems([withGoal, { ...goalless, criterion: 'pass-through' }])
+      .some((p) => p.startsWith('Arena #2:')));
+  check('a goal-less return-to-start arena is sound',
+    turbotCaseProblems([withGoal, { ...goalless, criterion: 'return-to-start' }]).length === 0);
+  check('zero arenas cannot be saved',
+    turbotCaseProblems([]).join() === 'A turbot question needs at least one arena.');
+  check('a step budget below 1 (or fractional) is named',
+    turbotCaseProblems([withGoal, { ...withGoal, maxSteps: 0 }])
+      .includes('Arena #2: max steps must be a whole number of at least 1.') &&
+      turbotCaseProblems([{ ...withGoal, maxSteps: 2.5 }]).length === 1);
+
+  // (5) An authored 2-arena CC question, built the way the creator builds it
+  // (arenaEditing on the drafts): a 1×5 and a 1×3 corridor, goal against the
+  // east wall, reach-and-stop.
+  const corridor = (d: TurbotCaseDraft, w: number, goalX: number): TurbotCaseDraft =>
+    ({ ...d, maxSteps: 20, arena: setArenaCell(resizeArena(d.arena, w, 1), goalX, 0, 'goal') });
+  const first = corridor(turbotCaseDraftsOf(undefined)[0], 5, 4);
+  const authoredDrafts = [first, corridor(newTurbotCaseDraft([first]), 3, 2)];
+  const turbotQ = (cases: TurbotCaseDraft[]): AssignmentQuestion => ({
+    id: 1,
+    label: 'Problem 1',
+    statement: 'Walk forward until blocked, then stop.',
+    buildMode: 'turbot',
+    representation: 'binary',
+    innerMode: 'CC',
+    turbot_cases: turbotCasesField(cases),
+  });
+  const authoredOf = (cases: TurbotCaseDraft[]): AssignmentData =>
+    ({ id: 'authored-turbot', title: 'Authored', questions: [turbotQ(cases)] });
+  const authored = authoredOf(authoredDrafts);
+  check('the authored family is two corridors graded reach-and-stop in 20 steps',
+    canonicalJson(authored.questions[0].turbot_cases!.map((c) => [c.arena.width, c.arena.height, c.criterion, c.maxSteps])) ===
+      canonicalJson([[5, 1, 'reach-and-stop', 20], [3, 1, 'reach-and-stop', 20]]));
+  const studentCopy = stripAnswers(authored);
+  check('the student copy keeps both arenas unchanged (they are the statement, not a key)',
+    canonicalJson(studentCopy.questions[0].turbot_cases) ===
+      canonicalJson(authored.questions[0].turbot_cases));
+
+  const gradeAgainst = (def: AssignmentData, brain: ReturnType<typeof turbotCorrect>) => {
+    const circuits = new Map([[1, { ...emptyQuestionCircuit(), ...brain }]]);
+    const built = buildSubmission(stripAnswers(def), circuits, { student: 'turbot@example.com', submittedAt: NOW_ISO });
+    return gradeSubmission(def, built);
+  };
+  const right = gradeAgainst(authored, turbotCorrect()).questions[0];
+  check('the reference brain passes both arenas (2/2, one result per arena)',
+    right.status === 'graded' && right.passed === 2 && right.total === 2 &&
+      right.turbotCases?.length === 2 && right.turbotCases.every((c) => c.pass));
+
+  // Arena 2's goal moved mid-corridor: the brain walks past it to the wall.
+  const midGoal = [authoredDrafts[0], corridor(authoredDrafts[1], 3, 1)];
+  midGoal[1] = { ...midGoal[1], arena: setArenaCell(midGoal[1].arena, 2, 0, 'empty') };
+  const halfDef = authoredOf(midGoal);
+  const half = gradeAgainst(halfDef, turbotCorrect());
+  const halfQ = half.questions[0];
+  check('with arena 2\'s goal mid-corridor the brain grades 1/2, failing arena 2',
+    halfQ.passed === 1 && halfQ.total === 2 &&
+      halfQ.turbotCases?.[0].pass === true && halfQ.turbotCases?.[1].pass === false);
+  check('...and the question fails as a whole (every arena must pass)',
+    summarizeResult(half).questionsPassed === 0 && summarizeResult(half).questionsTotal === 1);
+  const wrong = gradeAgainst(authored, turbotIncorrect()).questions[0];
+  check('a brain that never leaves the start fails both arenas (0/2)',
+    wrong.passed === 0 && wrong.total === 2 && wrong.turbotCases?.length === 2);
+  const reversed = gradeAgainst(authoredOf([...midGoal].reverse()), turbotCorrect()).questions[0];
+  check('reversing the arenas reverses the results (turbotCases[k] is turbot_cases[k])',
+    canonicalJson(reversed.turbotCases) === canonicalJson([...(halfQ.turbotCases ?? [])].reverse()) &&
+      reversed.turbotCases?.[0].pass === false && reversed.turbotCases?.[1].pass === true);
+
+  // (6) No single-arena path may come back into the creator: every case goes
+  // through the drafts, in and out.
+  const creator = readFileSync(new URL('../src/instructor/QuestionCreator.tsx', import.meta.url), 'utf8');
+  check('QuestionCreator reads and writes turbot_cases only through the drafts',
+    !creator.includes('turbot_cases?.[') && !creator.includes('turbot_cases: [') &&
+      creator.includes('turbotCaseDraftsOf(existingQuestion)') &&
+      creator.includes('turbot_cases: turbotCasesField(caseDrafts)'));
+  check('...and guards the saved arenas\' slots: warned in the list, confirmed at save',
+    creator.includes('misplacedArenas(savedArenas, isTurbot ? caseDrafts : [])') &&
+      creator.includes('misplacedArenasWarning(misplacedRuns)') &&
+      creator.includes('saved={savedArenas}'));
 }
 
 // ── The student's own grade sheet (gradeDisplay.questionVerdict) ────

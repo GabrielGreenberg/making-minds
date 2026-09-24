@@ -529,8 +529,7 @@ export function evaluateTurbotCriterion(
       return run.history.some((h) => isGoal(arena, h.x, h.y));
     case 'return-to-start': {
       if (run.finalState.x !== arena.start.x || run.finalState.y !== arena.start.y) return false;
-      const hasGoal = arena.cells.some((row) => row.some((c) => c === 'goal'));
-      if (!hasGoal) return true;
+      if (!arenaHasGoal(arena)) return true;
       // A goal on the start cell is visited by construction (arenaEditing
       // allows that authoring pattern), mirroring pass-through's rule.
       if (isGoal(arena, arena.start.x, arena.start.y)) return true;
@@ -585,4 +584,21 @@ export function explainTurbotCriterionFailure(
  */
 export function criterionRequiresStop(criterion: TurbotSuccessCriterion): boolean {
   return criterion !== 'pass-through';
+}
+
+/** Whether the arena declares at least one goal cell. */
+export function arenaHasGoal(arena: ArenaConfig): boolean {
+  return arena.cells.some((row) => row.some((c) => c === 'goal'));
+}
+
+/**
+ * Whether a criterion can only ever be met in an arena with a goal cell —
+ * the authoring-side reading of evaluateTurbotCriterion. `reach-and-stop`
+ * must stop ON a goal and `pass-through` must cross one, so in a goal-less
+ * arena no brain can pass them: such an arena would fail every submission.
+ * `return-to-start` stands alone (its goal-visit clause applies only when the
+ * arena has a goal), so a goal-less arena is a sound return-to-start case.
+ */
+export function criterionNeedsGoal(criterion: TurbotSuccessCriterion): boolean {
+  return criterion !== 'return-to-start';
 }

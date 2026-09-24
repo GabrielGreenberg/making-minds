@@ -7,8 +7,6 @@ import type {
   BuildMode,
   ComponentType,
   RepSystem,
-  ArenaConfig,
-  TurbotSuccessCriterion,
   PerceptionRule,
   QuestionTask,
 } from '../types';
@@ -28,8 +26,14 @@ import {
   MAX_PERCEPTION_WIDTH,
   MIN_PERCEPTION_WIDTH,
 } from '../engine/perception';
-import { ArenaCanvas } from '../components/ArenaCanvas';
-import { blankArena, resizeArena, setArenaCell, placeStart, MAX_ARENA_SIZE } from './arenaEditing';
+import { TurbotArenasEditor } from './TurbotArenasEditor';
+import {
+  misplacedArenas,
+  misplacedArenasWarning,
+  turbotCaseDraftsOf,
+  turbotCaseProblems,
+  turbotCasesField,
+} from './turbotCaseAuthoring';
 import {
   buildQuestionBank,
   type AuthoredInputGroup,
@@ -75,19 +79,13 @@ const MODES: { mode: BuildMode; label: string }[] = [
   { mode: 'open', label: 'Open' },
 ];
 
-// A turbot's brain is one of the four machine kinds (spec §9.3); the arena
-// and criterion are shared regardless of which brain drives the turbot.
+// A turbot's brain is one of the four machine kinds (spec §9.3); the arenas
+// and their criteria are the same whichever brain drives the turbot.
 const INNER_MODES: { mode: BuildMode; label: string }[] = [
   { mode: 'CC', label: 'CC' },
   { mode: 'SC', label: 'SC' },
   { mode: 'FSM', label: 'FSM' },
   { mode: 'TM', label: 'TM' },
-];
-
-const CRITERIA: { value: TurbotSuccessCriterion; label: string; hint: string }[] = [
-  { value: 'reach-and-stop', label: 'Reach goal and stop', hint: 'The turbot must halt itself (motor 00) on the goal cell.' },
-  { value: 'pass-through', label: 'Pass through goal', hint: 'The turbot must visit the goal cell at some step.' },
-  { value: 'return-to-start', label: 'Return to start', hint: 'The turbot must end on its starting cell — first visiting the goal cell, if the arena has one.' },
 ];
 
 // The restrictable gate vocabulary (`allowed_components`, semantics in
@@ -109,15 +107,6 @@ const RESTRICTABLE_GATES: { type: ComponentType; label: string }[] = [
 const BUDGETABLE_COMPONENTS: { type: ComponentType; label: string }[] = [
   ...RESTRICTABLE_GATES,
   { type: 'BOXED', label: 'Boxed sub-parts' },
-];
-
-type ArenaTool = 'block' | 'goal' | 'erase' | 'start';
-
-const ARENA_TOOLS: { tool: ArenaTool; label: string }[] = [
-  { tool: 'block', label: 'Block' },
-  { tool: 'goal', label: 'Goal' },
-  { tool: 'erase', label: 'Erase' },
-  { tool: 'start', label: 'Turbot' },
 ];
 
 const SAMPLING_NOTE: Partial<Record<BuildMode, string>> = {
@@ -276,30 +265,18 @@ export function QuestionCreator({ assignment, existingQuestion, onSave, onCancel
   });
 
   // ── Turbot-only fields (mode === 'turbot') ─────────────────────
-  // One primary arena per question for now; the data model (`turbot_cases`)
-  // is a list so held-out grading arenas can be added without a migration.
+  // The arena family (`turbot_cases`): one draft per arena, each with its own
+  // criterion and step budget (./turbotCaseAuthoring.ts), never fewer than
+  // one. The arena being edited is held by its draft key, so reordering or
+  // removing arenas never points the editor at another one. `savedArenas` are
+  // the rows the question opened with (none for a new question or one of
+  // another mode): graded runs are stored by position, so the saved arenas
+  // that no longer keep their slot are warned about and confirmed at save.
   const [innerMode, setInnerMode] = useState<BuildMode>(existingQuestion?.innerMode ?? 'CC');
-  const [arena, setArena] = useState<ArenaConfig>(
-    () => existingQuestion?.turbot_cases?.[0]?.arena ?? blankArena(),
-  );
-  const [maxSteps, setMaxSteps] = useState<number>(
-    existingQuestion?.turbot_cases?.[0]?.maxSteps ?? 100,
-  );
-  const [criterion, setCriterion] = useState<TurbotSuccessCriterion>(
-    existingQuestion?.turbot_cases?.[0]?.criterion ?? 'reach-and-stop',
-  );
-  const [arenaTool, setArenaTool] = useState<ArenaTool>('block');
-
-  const handleArenaClick = (x: number, y: number) => {
-    setArena((a) => {
-      switch (arenaTool) {
-        case 'block': return setArenaCell(a, x, y, 'block');
-        case 'goal': return setArenaCell(a, x, y, 'goal');
-        case 'erase': return setArenaCell(a, x, y, 'empty');
-        case 'start': return placeStart(a, x, y);
-      }
-    });
-  };
+  const [caseDrafts, setCaseDrafts] = useState(() => turbotCaseDraftsOf(existingQuestion));
+  const [savedArenas] = useState(() =>
+    (existingQuestion?.turbot_cases?.length ?? 0) > 0 ? caseDrafts : []);
+  const [activeArenaKey, setActiveArenaKey] = useState(() => caseDrafts[0].key);
 
   // The single input the live probe evaluates the formulas on. Keyed by group
   // name (robust to add/remove/reorder); unset groups default to their max value.
@@ -400,13 +377,12 @@ export function QuestionCreator({ assignment, existingQuestion, onSave, onCancel
     : null;
   const formulasOk = probe ? probe.outputErrors.every((e) => e == null) : false;
 
-  // Turbot questions are gated on the arena instead of the formula pipeline:
-  // goal-directed criteria need at least one goal cell to be satisfiable.
-  const arenaHasGoal = arena.cells.some((row) => row.some((c) => c === 'goal'));
-  const needsGoal = criterion === 'reach-and-stop' || criterion === 'pass-through';
-  const arenaError = isTurbot && needsGoal && !arenaHasGoal
-    ? 'This success criterion needs at least one goal cell in the arena.'
-    : null;
+  // Turbot questions are gated on their arenas instead of the formula
+  // pipeline: every arena must be passable (goal-directed criteria need a
+  // goal cell) with a step budget of at least 1.
+  const turbotProblems = isTurbot ? turbotCaseProblems(caseDrafts) : [];
+  // Saving another mode drops every arena, so every graded run loses its own.
+  const misplacedRuns = misplacedArenas(savedArenas, isTurbot ? caseDrafts : []);
 
   // A free-response question is just a name + statement; a fill-in one also
   // needs a sound list of blanks. A problem may be its title alone ("Spiral"
@@ -418,7 +394,7 @@ export function QuestionCreator({ assignment, existingQuestion, onSave, onCancel
     (isOpen
       ? fillInErrors.length === 0
       : isTurbot
-        ? maxSteps >= 1 && !arenaError
+        ? turbotProblems.length === 0
         : isPerception
           ? !perceptionError
           : structurallyValid && !tooLarge && formulasOk);
@@ -429,10 +405,12 @@ export function QuestionCreator({ assignment, existingQuestion, onSave, onCancel
 
   const handleSave = () => {
     if (!saveable) return;
-    if (
-      misplacedAnswers.length > 0 &&
-      !window.confirm(`${misplacedAnswersWarning(misplacedAnswers)}\n\nSave anyway?`)
-    ) {
+    // What this save would misplace in work already stored by position.
+    const misplacing = [
+      ...(misplacedAnswers.length > 0 ? [misplacedAnswersWarning(misplacedAnswers)] : []),
+      ...(misplacedRuns.length > 0 ? [misplacedArenasWarning(misplacedRuns)] : []),
+    ];
+    if (misplacing.length > 0 && !window.confirm(`${misplacing.join('\n\n')}\n\nSave anyway?`)) {
       return;
     }
 
@@ -461,7 +439,7 @@ export function QuestionCreator({ assignment, existingQuestion, onSave, onCancel
       return;
     }
 
-    // Turbot questions carry an arena + criterion, not a generated test bank.
+    // Turbot questions carry their arenas + criteria, not a generated test bank.
     // The authored encoding still matters: it picks a turbot-TM brain's
     // internal tape alphabet (binary {0,1,*}, unary {0,1}) for the editor,
     // the arena driver loop, and grading.
@@ -480,7 +458,7 @@ export function QuestionCreator({ assignment, existingQuestion, onSave, onCancel
         ...componentLimitsField,
         ...maxTapeCellsField,
         innerMode,
-        turbot_cases: [{ arena, maxSteps, criterion }],
+        turbot_cases: turbotCasesField(caseDrafts),
       });
       return;
     }
@@ -788,97 +766,17 @@ export function QuestionCreator({ assignment, existingQuestion, onSave, onCancel
         )}
       </section>
 
-      {/* Turbot: arena editor + success criterion (replaces the value-based
-          inputs/target-function pipeline below) */}
+      {/* Turbot: the arena family, each arena with its own success criterion
+          and step budget (replaces the value-based inputs/target-function
+          pipeline below) */}
       {isTurbot && (
-        <>
-          <section className="instructor-creator-section">
-            <div className="mm-section-head">
-              <h3>Arena</h3>
-              <div className="mm-segmented">
-                {ARENA_TOOLS.map((t) => (
-                  <button
-                    key={t.tool}
-                    className={
-                      'mm-segmented-btn' +
-                      (arenaTool === t.tool ? ' mm-segmented-btn--active' : '')
-                    }
-                    onClick={() => setArenaTool(t.tool)}
-                  >
-                    {t.label}
-                  </button>
-                ))}
-              </div>
-            </div>
-            <p className="mm-note mm-hint">
-              Click cells to paint with the selected tool. With the Turbot tool, click a cell to
-              move the start there; click the turbot again to rotate it.
-            </p>
-            <div className="instructor-arena-size">
-              <label className="mm-inline-field">
-                width
-                <input
-                  className="mm-input mm-input--num"
-                  type="number"
-                  min={1}
-                  max={MAX_ARENA_SIZE}
-                  value={arena.width}
-                  onChange={(e) => setArena((a) => resizeArena(a, Number(e.target.value), a.height))}
-                />
-              </label>
-              <label className="mm-inline-field">
-                height
-                <input
-                  className="mm-input mm-input--num"
-                  type="number"
-                  min={1}
-                  max={MAX_ARENA_SIZE}
-                  value={arena.height}
-                  onChange={(e) => setArena((a) => resizeArena(a, a.width, Number(e.target.value)))}
-                />
-              </label>
-            </div>
-            {/* Scroll container: a max-size (30×30) arena is ~1200px square at the
-                default cell size, well past the editor panel — let it scroll in
-                both axes instead of blowing out the form layout. */}
-            <div style={{ overflow: 'auto', maxWidth: '100%', maxHeight: '60vh' }}>
-              <ArenaCanvas arena={arena} onCellClick={handleArenaClick} />
-            </div>
-            {arenaError && <p className="instructor-preview-warning">{arenaError}</p>}
-          </section>
-
-          <section className="instructor-creator-section">
-            <div className="mm-section-head">
-              <h3>Success criterion</h3>
-            </div>
-            <div className="instructor-criterion-row">
-              <select
-                className="mm-input"
-                value={criterion}
-                onChange={(e) => setCriterion(e.target.value as TurbotSuccessCriterion)}
-              >
-                {CRITERIA.map((c) => (
-                  <option key={c.value} value={c.value}>{c.label}</option>
-                ))}
-              </select>
-              <label className="mm-inline-field">
-                max steps
-                <input
-                  className="mm-input mm-input--num"
-                  type="number"
-                  min={1}
-                  max={10000}
-                  value={maxSteps}
-                  onChange={(e) => setMaxSteps(Math.max(1, Math.trunc(Number(e.target.value)) || 1))}
-                />
-              </label>
-            </div>
-            <p className="mm-note mm-hint">
-              {CRITERIA.find((c) => c.value === criterion)?.hint} The turbot fails if it exceeds
-              the step budget.
-            </p>
-          </section>
-        </>
+        <TurbotArenasEditor
+          drafts={caseDrafts}
+          saved={savedArenas}
+          activeKey={activeArenaKey}
+          onChange={setCaseDrafts}
+          onSelect={setActiveArenaKey}
+        />
       )}
 
       {/* Perception: rule + retina size (replaces the value-based

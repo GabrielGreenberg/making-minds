@@ -21,6 +21,8 @@ import { getPortsForType } from '../src/types';
 import {
   runTurbot,
   evaluateTurbotCriterion,
+  arenaHasGoal,
+  criterionNeedsGoal,
   validateTurbotTM,
   validateTurbotFSM,
   TURBOT_FORWARD,
@@ -1005,6 +1007,40 @@ console.log('\n[trajectory & orientation independence]');
     spinResult.pass === true && spinResult.reason === undefined);
   check('grader: the spun run really ended facing away from its start facing',
     spinResult.finalPosition.facing !== corridor(3, 2).start.facing);
+}
+
+// ── goal-less arenas (task 010) ──────────────────────────────────────
+// The question creator refuses a goal-less arena under a criterion that
+// needs a goal (criterionNeedsGoal) because no brain could ever pass it.
+// Pinned against the criterion itself: in a goal-less corridor, resting on
+// ANY cell, and a trace that crosses EVERY cell, pass neither reach-and-stop
+// nor pass-through; return-to-start still passes by coming home.
+console.log('\n[goal-less arenas]');
+{
+  const bare = corridor(3, -1);
+  const run = (x: number, trace: number[]): TurbotRunResult => ({
+    finalState: { x, y: 0, facing: 'E' },
+    history: trace.map((tx, i): TurbotHistoryEntry => ({
+      t: i + 1, kind: 'external', input: '0', action: 'forward', x: tx, y: 0, facing: 'E',
+    })),
+    haltedByMotor: true,
+    haltedByBrain: false,
+    stopped: true,
+    hitStepLimit: false,
+  });
+  // Rest on each cell after a trace that has crossed all three.
+  const everyRun = [run(0, [1, 2, 1, 0]), run(1, [1, 2, 1]), run(2, [1, 2, 1, 0, 1, 2])];
+  check('a corridor with no goal cell has no goal (arenaHasGoal)',
+    !arenaHasGoal(bare) && arenaHasGoal(corridor(3, 2)));
+  check('in a goal-less arena no run passes reach-and-stop or pass-through',
+    everyRun.every((r) =>
+      !evaluateTurbotCriterion(bare, r, 'reach-and-stop') &&
+      !evaluateTurbotCriterion(bare, r, 'pass-through')));
+  check('...while a run that comes home passes return-to-start there',
+    evaluateTurbotCriterion(bare, run(0, [1, 2, 1, 0]), 'return-to-start'));
+  check('criterionNeedsGoal names exactly the two goal-directed criteria',
+    criterionNeedsGoal('reach-and-stop') && criterionNeedsGoal('pass-through') &&
+      !criterionNeedsGoal('return-to-start'));
 }
 
 console.log(`\n${failures === 0 ? 'TURBOT CHECK OK' : `TURBOT CHECK FAILED (${failures} checks)`}`);
