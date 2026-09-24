@@ -17,6 +17,7 @@ import type {
   SubmissionData,
   SubmissionRecord,
 } from '../types';
+import { questionTask } from '../types';
 import { emptyQuestionCircuit } from './workbookStore';
 import { gradeSubmission } from '../engine/grader';
 import { applyManualReview } from './manualReview';
@@ -52,10 +53,11 @@ export function buildSubmission(
         questionId: q.id,
         circuit: { components: c.components, wires: c.wires },
       };
-      // A fill-in question's answer is its typed blanks; every other open
-      // question's is its prose.
-      if (q.fill_in) answer.fillAnswers = c.fillAnswers ?? [];
-      else if (q.buildMode === 'open') answer.responseText = c.responseText ?? '';
+      // A fill-in question's answer is its typed blanks; an open question's
+      // is its prose (types.ts questionTask — the grader reads the same).
+      const task = questionTask(q);
+      if (task === 'fill-in') answer.fillAnswers = c.fillAnswers ?? [];
+      else if (task === 'open') answer.responseText = c.responseText ?? '';
       // The signed editing record rides beside the answer (task 034): the
       // integrity check reads it, the grader never does.
       if (c.provenance) answer.provenance = c.provenance;

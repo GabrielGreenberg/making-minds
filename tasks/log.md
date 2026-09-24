@@ -17,3 +17,4 @@
 2026-09-21-002 · feature · Load a failed test input from the grade sheet into a live Run on the question canvas · 2026-09-23T20:21:14-0700 · task/002-failed-input-to-live-run · f511af7
 2026-09-21-003 · feature · Let a student view a submitted snapshot read-only at any time, not only once past due · 2026-09-23T21:24:57-0700 · task/003-view-submission-mode · 6269f85
 2026-09-21-004 · feature · Allow boxing a sequential (MEM-containing) sub-circuit on SC canvases · 2026-09-23T22:49:05-0700 · task/004-box-sequential-subcircuit · 2978b7b
+2026-09-21-005 · feature · Author fill-in-the-blank questions in the question creator · 2026-09-23T23:24:21-0700 · task/005-fill-in-authoring-ui · 0a2e76e

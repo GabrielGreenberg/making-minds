@@ -35,6 +35,7 @@ import {
   getMemInputPortId,
   isMemSinkPort,
   placeableBoxKinds,
+  questionTask,
   CC_AND_SC_BOXES,
   GRID_SIZE,
   toSubscript,
@@ -4144,11 +4145,12 @@ export const useStore = create<AppState>()((set, get) => ({
     const state = get();
     const a = state.assignment;
     const q = a?.questions[state.currentQuestionIndex];
-    // Only the open question's own cases, and only machine questions with a
-    // case bank shape the replay understands (value cases, turbot arenas —
-    // not perception frames, fill-in blanks or open prose).
+    // Only the open question's own cases, and only tasks with a case bank
+    // shape the replay understands (value cases, turbot arenas — not
+    // perception frames, fill-in blanks or open prose; types.ts questionTask).
     if (!a || !q || q.id !== questionId) return Promise.resolve();
-    if (q.perception || q.fill_in || q.buildMode === 'open') return Promise.resolve();
+    const task = questionTask(q);
+    if (task !== 'function' && task !== 'turbot') return Promise.resolve();
     // The result of the attempt on show (viewingSubmission — its own
     // machine is on the canvas), else the latest recorded submission's —
     // remotely the student's own sanitized copy (present once grades are

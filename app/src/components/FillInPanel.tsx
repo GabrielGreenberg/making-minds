@@ -4,13 +4,15 @@
 // fillAnswers and persist/travel exactly like a circuit.
 //
 // Unlike an open question this one IS autograded (engine/fillIn.ts), so the
-// boxes are the whole answer: no prose, and under `numericOnly` no characters
-// but digits reach the store. Every box wears the one provenance guard
+// boxes are the whole answer: no prose, and into a digits-only blank no
+// characters but digits reach the store (engine/fillIn.ts fillInBlanks reads
+// the flag, per blank). Every box wears the one provenance guard
 // (usePasteGuard; law 8): only text copied in the student's own assignments
 // pastes in, and nothing copied here reaches the system clipboard.
 
 import { useStore, selectLockNotice } from '../store';
 import { usePasteGuard } from '../usePasteGuard';
+import { fillInBlanks } from '../engine/fillIn';
 import { ProblemBody, ProblemContext } from './ProblemSetDocument';
 
 export function FillInPanel() {
@@ -27,7 +29,8 @@ export function FillInPanel() {
   const spec = question?.fill_in;
   if (!assignment || !question || !spec) return null;
 
-  const filled = spec.labels.filter((_, i) => (answers[i] ?? '').trim() !== '').length;
+  const blanks = fillInBlanks(spec);
+  const filled = blanks.filter((_, i) => (answers[i] ?? '').trim() !== '').length;
 
   return (
     <div className="open-response">
@@ -41,13 +44,15 @@ export function FillInPanel() {
           <ProblemBody question={question} />
         </div>
         <div className="fill-in-grid">
-          {spec.labels.map((label, i) => (
-            <label key={label} className="fill-in-row">
-              <span className="fill-in-label">{label}</span>
+          {/* Keyed by position: answers are positional (fillAnswers[i] is
+              blank i), and labels are unique only by authoring. */}
+          {blanks.map((blank, i) => (
+            <label key={i} className="fill-in-row">
+              <span className="fill-in-label">{blank.label}</span>
               <input
                 className="fill-in-input"
                 value={answers[i] ?? ''}
-                inputMode={spec.numericOnly ? 'numeric' : 'text'}
+                inputMode={blank.digitsOnly ? 'numeric' : 'text'}
                 autoComplete="off"
                 spellCheck={false}
                 readOnly={locked}
@@ -55,7 +60,7 @@ export function FillInPanel() {
                 onChange={(e) =>
                   setFillAnswer(
                     i,
-                    spec.numericOnly ? e.target.value.replace(/\D/g, '') : e.target.value,
+                    blank.digitsOnly ? e.target.value.replace(/\D/g, '') : e.target.value,
                   )
                 }
               />
@@ -63,7 +68,7 @@ export function FillInPanel() {
           ))}
         </div>
         <div className="open-response-foot">
-          <span>{filled} of {spec.labels.length} filled in</span>
+          <span>{filled} of {blanks.length} filled in</span>
           {pasteNotice ? (
             <span className="paste-notice" role="status">{pasteNotice}</span>
           ) : (

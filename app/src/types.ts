@@ -151,8 +151,11 @@ export interface TestCase {
  */
 export interface FillInSpec {
   labels: string[];
-  /** Restrict the boxes to digits (the HW1 P11 binary-numeral case). */
-  numericOnly?: boolean;
+  /** Restrict boxes to digits: `true` = every blank (the HW1 P11
+   *  binary-numeral case), an array = per blank, parallel to `labels`.
+   *  Read it ONLY through engine/fillIn.ts `fillInBlanks` — an array is
+   *  truthy, so a bare `if (spec.numericOnly)` would lock every blank. */
+  numericOnly?: boolean | boolean[];
 }
 
 /** One blank's outcome — instructor-only, like CaseResult. */
@@ -286,13 +289,50 @@ export interface AssignmentQuestion {
 /**
  * Display label for a question's mode chip. A turbot question names its inner
  * machine too ("turbot - TM"), since the brain's mode is what the student
- * actually edits; a perception question flags its bit-level task.
+ * actually edits; a perception or fill-in question flags its task.
  */
 export function questionModeLabel(
-  q: Pick<AssignmentQuestion, 'buildMode' | 'innerMode' | 'perception'>,
+  q: Pick<AssignmentQuestion, 'buildMode' | 'innerMode' | 'perception' | 'fill_in'>,
 ): string {
-  if (q.buildMode === 'turbot') return `turbot - ${q.innerMode ?? 'CC'}`;
-  return q.perception ? `${q.buildMode} - perception` : q.buildMode;
+  const task = questionTask(q);
+  if (task === 'turbot') return `turbot - ${q.innerMode ?? 'CC'}`;
+  if (task === 'fill-in') return 'open - fill-in';
+  return task === 'perception' ? `${q.buildMode} - perception` : q.buildMode;
+}
+
+/**
+ * What a question asks for — the ONE place that decides which student panel
+ * it gets, which grader branch scores it, what its answer carries and whether
+ * a graded case replays (task 005). `buildMode` picks the canvas; the task
+ * says what is done on it:
+ *   function   — a machine computing f, graded on `test_cases` (value codec)
+ *   perception — a CC/SC classifier graded bit-level on `perception_cases`
+ *   turbot     — a brain driven through `turbot_cases` arenas
+ *   open       — free prose, `pending` manual review
+ *   fill-in    — labelled blanks, autograded against `fill_in_answers`
+ * The order below is the grader's historical precedence, so classification
+ * never moved a grade. Pure (no engine import), so every side can call it.
+ */
+export type QuestionTask = 'function' | 'perception' | 'turbot' | 'open' | 'fill-in';
+
+/** The tasks each canvas mode can author, the default first (the creator's
+ *  Task toggle, coerced when the mode flips). Perception is a spatial (CC) or
+ *  temporal (SC) classification of raw bits, so only those canvases offer it. */
+export const QUESTION_TASKS: Record<BuildMode, readonly QuestionTask[]> = {
+  CC: ['function', 'perception'],
+  SC: ['function', 'perception'],
+  FSM: ['function'],
+  TM: ['function'],
+  turbot: ['turbot'],
+  open: ['open', 'fill-in'],
+};
+
+export function questionTask(
+  q: Pick<AssignmentQuestion, 'buildMode' | 'perception' | 'fill_in'>,
+): QuestionTask {
+  if (q.buildMode === 'open') return q.fill_in ? 'fill-in' : 'open';
+  if (q.buildMode === 'turbot') return 'turbot';
+  return q.perception ? 'perception' : 'function';
 }
 
 export const CC_BOXES: ReadonlyArray<'CC' | 'SC'> = ['CC'];
