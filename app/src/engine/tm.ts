@@ -115,6 +115,9 @@ export interface TMEvalResult {
   steps: number;         // number of steps actually taken
   hitStepLimit: boolean; // true if we bailed at maxSteps (likely a non-terminating machine)
   history: TmHistoryEntry[];
+  /** The control state the run ended in (null: a machine with no states) —
+   *  what a replay needs to resume a UI run exactly where this one stopped. */
+  finalStateId: string | null;
 }
 
 export const DEFAULT_TM_MAX_STEPS = 10000;
@@ -155,7 +158,7 @@ export function evaluateTMSequence(
 ): TMEvalResult {
   const states = sortStateComponents(components);
   if (states.length === 0) {
-    return { tape: initialTape, halted: true, steps: 0, hitStepLimit: false, history: [] };
+    return { tape: initialTape, halted: true, steps: 0, hitStepLimit: false, history: [], finalStateId: null };
   }
 
   let currentStateId = states[0].id;
@@ -165,7 +168,7 @@ export function evaluateTMSequence(
   for (let step = 0; step < maxSteps; step++) {
     const result = evaluateTMSingleStep(wires, currentStateId, tape, notation);
     if (!result) {
-      return { tape, halted: true, steps: step, hitStepLimit: false, history };
+      return { tape, halted: true, steps: step, hitStepLimit: false, history, finalStateId: currentStateId };
     }
     const fromState = components.find((c) => c.id === currentStateId);
     const toState = components.find((c) => c.id === result.nextStateId);
@@ -181,5 +184,5 @@ export function evaluateTMSequence(
     tape = result.tape;
   }
 
-  return { tape, halted: false, steps: maxSteps, hitStepLimit: true, history };
+  return { tape, halted: false, steps: maxSteps, hitStepLimit: true, history, finalStateId: currentStateId };
 }

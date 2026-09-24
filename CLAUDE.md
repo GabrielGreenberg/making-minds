@@ -59,23 +59,21 @@ instructor's "Student view" is the same page) with the tabs **Assignments** (the
 the website's up-next box — the soonest due homework) and **Grades** (`#/grades[/:id]`: a row per
 homework with the result once released, opening into the question-by-question sheet; task
 026). Sign in
-(local: toy-account picker; remote: email + password against the
-CSV roster, one form; "First time here?" sets up a roster member's account (student ID), and
-an instructor-reviewed access request is offered only for an off-roster email; the login screen renders from the server's
-reported capabilities, so an SSO server shows one "Sign in with UCLA" button with no frontend
-rebuild; a 30-day bearer session restored across reloads; a health retry screen before
-signed-in routes while the server is down; a "Password" control beside the session chip) → browse
+(local: toy-account picker; remote: email + password against the CSV roster; "First time
+here?" sets up a roster member's account (student ID), an access request only for an
+off-roster email; the screen renders from the server's reported capabilities, so SSO needs
+no frontend rebuild; a 30-day bearer session; a health retry screen while the server is
+down; a "Password" control) → browse
 **published** assignments (hidden until an instructor publishes) → the assignment as a
 **problem-set document** (`AssignmentOverview` → `ProblemSetDocument`, task 020: preamble,
 sections with the instruction for their run of problems, continuously numbered problems with
-run-in titles, truth tables three per row, one-liners in columns, Hint / Challenge / Advice /
-Caution boxes, figures, a turbot's arena drawn live, a status mark per problem, an "Original
-PDF" link) → a per-question canvas, whose panel shows the problem under its section's
+run-in titles, tables/one-liners in grids/columns, callout boxes, figures, a turbot's arena
+drawn live, a status mark per problem, an "Original PDF" link) → a per-question canvas, whose panel shows the problem under its section's
 instruction, in the right mode: **CC, SC, FSM, TM,
 turbot** (TM: clickable tape strip below the canvas, machine table / run / history panels,
 tape alphabet tied to the question's `representation`; turbot: the normal editor for the
-question's `innerMode` brain plus the arena "Map" — grid, Step/Run/Pause/Reset, cycle/sensor
-readout — in the right panel; TM brains also show their internal tape read-only),
+question's `innerMode` brain plus the arena "Map" (Step/Run/Pause/Reset) in the right panel;
+TM brains also show their internal tape read-only),
 **open** (free-text panel) and **fill-in** (labelled
 boxes, autograded). Debounced autosave through `WorkbookStore` (remote: PUT with an `'error'`
 indicator + backoff retry, keepalive unload flush, and a per-email crash-buffer journal
@@ -84,7 +82,8 @@ timestamped snapshot (remote submit is online-only: a failure alerts and records
 the server stamps time). Once grades are released: the **Grades** tab's sheet (verdict per
 question, the instructor's feedback note if any, a per-question "▸ failed inputs" dropdown
 with safe fields only — which input/frame/blank/arena failed and why, never the answer key —
-and a link into that question); Home and the overview re-fetch on every visit. **Freezing**: once the
+a link into that question, and per failed input/arena **Run this input** — the grader's run of
+that case, loaded, recorded vs live verdict); Home and the overview re-fetch on every visit. **Freezing**: once the
 due date has passed AND a submission exists, every question shows the actually-submitted
 circuit read-only (Run/Step still work), edits are refused, Submit disappears; a student who
 never submitted stays editable and can submit late, and that submission then freezes them.
@@ -92,7 +91,7 @@ never submitted stays editable and can submit late, and that submission then fre
 `isCurrentQuestionLocked`. A **Feedback** link files platform/homework reports (category,
 message, ≤ 2 downscaled screenshots). Editor chrome is minimal (Home + Submit + session).
 **Paste provenance** (task 033): in an assignment a paste (canvas or answer field) takes only
-what this user copied in an assignment in this window, else a notice says why; nothing copied
+what this user copied in an assignment in this window; nothing copied
 there reaches the system clipboard. The sandbox is free. **Watermark** (task 034): ids carry a
 MAC under a per-student, per-assignment key, each question a signed editing record; at submit
 the server names whose ids they are and flags one-piece work (`integrity`, instructor-only,
@@ -116,7 +115,7 @@ matches), **fill-in** (`engine/fillIn.ts`, string compare, leading zeros/whitesp
 normalised), **open** (a `'pending'` result carrying the response for manual review).
 Question-level constraints checked at Stage 1: `allowed_components`, `component_limits`,
 `maxTapeCells`, `requireStandardHaltPosition`. Submissions autograde on receipt (the Grading
-seam: locally in the browser, remotely on the server with the same engine).
+seam).
 
 **Instructor side** (`#/instructor`, the **Dashboard**: the student pages' shell and column, its sections
 as tabs — Assignments · Roster & accounts · Feedback · Notes): **Roster & accounts** (remote — the registrar's class list as exported,
@@ -127,8 +126,8 @@ dashboard (drag-to-reorder, **Publish/Hide** — every assignment hidden until p
 local-mode "Load HW1–HW7"), assignment editor (drag-to-reorder questions; the document around them — preamble, source
 PDF, sections with intro / layout / callouts / figures, every question filed into a section,
 a live preview of the problem set), **question
-creator** (all six modes on one form; per-problem callout boxes and figures, an image upload
-becoming a size-capped data URL; formula DSL → test banks; turbot: inner machine,
+creator** (all six modes on one form; per-problem callout boxes and figures; formula DSL →
+test banks; turbot: inner machine,
 encoding, arena editor ≤ 30×30, criterion + max-steps; perception: rule + retina size;
 component restrictions and limits; TM halt-position toggle; **no fill-in authoring UI yet**),
 **gradebook** grouped by student (latest attempt counts; expandable history with failed-case
@@ -160,8 +159,8 @@ end-to-end; score reported, never asserted) — behind `app/tools/coverageCheck.
 
 The open work is the queue: `tasks/incoming/` (ready) and `tasks/blocked/` (waiting on
 Gabriel) — run `/work` to see it offered. Headline items on 2026-09-22: **UCLA SSO** (blocked
-on UCLA IdP details), a real domain + scheduled SQLite backup for the pilot box, sequential-sub-circuit boxing, a fill-in authoring UI, failed-input →
-live Run, a due-date-independent "view my submission" mode, turbot multi-arena authoring,
+on UCLA IdP details), a real domain + scheduled SQLite backup for the pilot box, sequential-sub-circuit boxing, a fill-in authoring UI,
+a due-date-independent "view my submission" mode, turbot multi-arena authoring,
 an SC perception frame player, LLM-assisted open-question grading, and — last — activating
 the worker routine.
 
@@ -205,17 +204,17 @@ wrappers over it.
 | Types | `app/src/types.ts` | All domain types: `AssignmentData` (incl. the document level: `preamble`, `sections: AssignmentSection[]`, `sourcePdf`) / `AssignmentQuestion` (incl. `title`, `hint`, `callouts`, `figures`, `allowed_components`, `component_limits`, `maxTapeCells`, `requireStandardHaltPosition`, `perception`/`perception_cases`, `turbot_cases`, `fill_in`/`fill_in_answers`), `SubmissionData`/`SubmissionRecord`, `QuestionResult` (+ `ManualReview`), `CircuitData`, `CCSpec`, `ArenaConfig`/`TurbotCaseResult`, `PerceptionCaseResult`, `QuestionCircuit` (`responseText`, `done`). `questionModeLabel` names a turbot's inner machine / a perception task in mode chips. |
 | Engine | `app/src/engine/cc.ts`, `sc.ts`, `fsm.ts` | Pure simulators: topological eval (CC), clocked step (SC; `evaluateSCSequence` clocks top-level MEMs only), transition matching (FSM; `evaluateFSMSymbolStep`). One `sortByLabel` in cc.ts orders I/O for top-level and boxed internals. |
 | Engine | `app/src/engine/tm.ts`, `tmValidate.ts`, `tmCodec.ts` | TM: notation-aware tape engine — **two-output** labels `read:write,move` (`1:0,R`; legacy `1:0R` parses forever as an alias) executed as one atomic step; table validation (ambiguous/unparseable via the generic walker); the codec `tape` axis (accept honors `requireStandardHaltPosition` — head halts on the output block's rightmost cell); `tapeCellsUsed` = span of tape touched, for `maxTapeCells`. |
-| Engine | `app/src/engine/grader.ts` | `gradeSubmission`/`gradeQuestion`: Stage-1 validation then the codec pipeline for CC/SC/FSM/TM; `gradeTurbot` (arena criteria); `gradePerception` (bit-level); fill-in; open → `'pending'` carrying `response`. |
+| Engine | `app/src/engine/caseRun.ts`, `grader.ts` | `caseRun.ts`: one case run as graded, key-free (`questionLayout`, `gradingCircuit` — MEMs from 0, `validateQuestionMachine`, `caseStimulus`, `runValueCase`/`runTurbotCase`); `grader.ts` = that + the comparison (`gradeQuestion` results parallel the banks; turbot, perception bit-level, fill-in, open → `'pending'`). |
 | Engine | `app/src/engine/codec.ts`, `machineValidation.ts` | The codec (`space`/`time` value↔bits; `tape` → tmCodec; `stepCountFor`, `encodeInput`, `timeOutputBits`) and Stage-1 validation incl. `validateAllowedComponents`/`isComponentTypeAllowed` (semantics: Critical design rules, Homework JSON) and component limits. |
 | Engine | `app/src/engine/testVectorGen.ts`, `formulaEval.ts` | Authoring-time: formula DSL → test banks (Reference-function DSL below). |
 | Engine | `app/src/engine/notation.ts` | Transition-label SYNTAX seam: `TransitionNotation` (parse / canonical format / alphabet / editor token fields / default) for all grammars — k-bit `fsmNotation(inBits, outBits)`, `tmNotation(rep)` (`*` binary-only), `turbotFsmNotation` (1-bit alias → canonical 2-bit motor), `turbotInternalNotation(tapeNotation)`; generic `validateTransitionTable` walker. Label dissection is allowed ONLY here (notationCheck grep gate). |
 | Engine | `app/src/engine/representation.ts`, `index.ts` | value↔bits core (`valueToBits`/`isValidCodeword`/`bitsToValue`), display helpers; barrel exports. |
 | Engine | `app/src/engine/turbot.ts` | Arena driver loop: `senseAhead`/`senseAheadSymbol` (B/E/F), `applyMotorCommand`, `runBrainStep`/`initialBrainState` (CC/SC circuit brains; the turbot FSM with 2-bit motor outputs `in:ij` via `turbotFsmNotation`; the textbook **turbot TM** — internal (circle) states do single tape ops on the encoding's alphabet, external (square) states sense B/E/F and move ↑/↱/↰; `validateTurbotTM`/`validateTurbotFSM`), `runTurbot` (`stopped` = motor 00 or TM halt). `evaluateTurbotCriterion` + `criterionRequiresStop` (pass-through is trace-satisfiable: `pass: true` with `hitStepLimit: true` is legitimate) + `explainTurbotCriterionFailure`. |
 | Engine | `app/src/engine/perception.ts`, `fillIn.ts` | Perception rules (`min-run`/`exact-run`/`pattern` for CC; `change`/`motion` for SC — "up" = toward IN1; the pre-first-frame "previous input" is the all-zero frame), `buildPerceptionCases` (CC exhaustive ≤ 10 wires; SC fixed battery), `validatePerceptionMachine`, `runPerceptionCase`. Fill-in grading. |
-| Store | `app/src/store.ts` | Zustand UI state delegating simulation to `engine/`. Sim slices (SC/FSM/TM/turbot + I/O `tableRows`) and undo/redo are app-wide — hence the two reset laws (Critical design rules). Selectors: `selectEffectiveMode` (turbot → inner mode; drives every editor branch), `selectTmNotation`, `selectTurbotArena`/`selectTurbotInnerMode` (sandbox falls back to the active tab's own `arena`/`innerMode`), `selectAllowedComponents`, `selectLiveFsmStateId`, `selectCodecLayout`/`selectCodecWindow` (question runs mirror the grader), `selectAssignmentFrozen`, `selectQuestionLocked`. `isCurrentQuestionLocked(state)` (done OR frozen) is inlined at the top of every mutating action. `frozenQuestionCircuit` loads the SUBMITTED circuit when frozen. Boxes: `confirmedBoxLibrary` is per HOMEWORK in an assignment (`AssignmentState.boxLibrary`), per TAB in the sandbox; `nextBoxName`/`takenBoxNames` keep default names unique; `renameBox` is the ONE rename path (library + drawn box + every placed instance in every question). `openResponse` mirrors `QuestionCircuit.responseText`. |
+| Store | `app/src/store.ts` | Zustand UI state delegating simulation to `engine/`. Sim slices (SC/FSM/TM/turbot + I/O `tableRows`) and undo/redo are app-wide — hence the two reset laws (Critical design rules). Selectors: `selectEffectiveMode` (turbot → inner mode; drives every editor branch), `selectTmNotation`, `selectTurbotArena`/`selectTurbotInnerMode` (sandbox falls back to the active tab's own `arena`/`innerMode`), `selectAllowedComponents`, `selectLiveFsmStateId`, `selectCodecLayout`/`selectCodecWindow`/`selectQuestionStepBudget` (question runs mirror the grader), `selectAssignmentFrozen`, `selectQuestionLocked`. `isCurrentQuestionLocked(state)` (done OR frozen) is inlined at the top of every mutating action. `frozenQuestionCircuit` loads the SUBMITTED circuit when frozen. `loadCaseInput` replays a graded case (`loadedCase`, `turbotCaseIndex`). Boxes: `confirmedBoxLibrary` is per HOMEWORK in an assignment (`AssignmentState.boxLibrary`), per TAB in the sandbox; `nextBoxName`/`takenBoxNames` keep default names unique; `renameBox` is the ONE rename path (library + drawn box + every placed instance in every question). `openResponse` mirrors `QuestionCircuit.responseText`. |
 | Problem-set document | `app/src/problemSet.ts`, `components/ProblemSetDocument.tsx`, `statementFormat.ts`, `components/StatementBody.tsx` | The document level over `questions[]` (design memo `docs/buildout/designs/problem-set-document.md`). `problemSet.ts` (pure): `documentSections` (no `sections` → one unnamed section; unlisted questions trail; ids used once), continuous `problemNumber`, `problemShape` table / compact / full → `problemRuns` grid / columns / stack (a section's `layout` overrides), `figureUrl` (data URL or public path under the base URL), `validateDocument`. `ProblemSetDocument` renders the overview and lends `ProblemBody` / `ProblemContext` to the three editor panels. `statementFormat.ts`: the markup parser (`$…$` KaTeX, `` `code` ``, bold, italic, paragraphs, line breaks, `- ` / `1. ` lists with two-space nesting, `(a)` or line-start `a.` parts; inline `IN1=0,IN2=1 -> OUT=1` profiles lifted into tables), `statementProse` for previews; `StatementBody` the one JSX renderer (`lead` runs a title into the first paragraph). Styling: `.ps-*` and `.statement-*` in `pages.css`. |
 | Due dates | `app/src/dueDates.ts` | Pure policy: `dueStatus` (green > 3 days / amber < 3 days / red overdue), `lateBy` (0 = on time = no signal), `formatDuration`/`formatDueDate`, and `isFrozen(dueDate, now, hasSubmission)` — the ONE exception to "a due date never gates anything": editing is gated only once past due AND submitted; submitting never is. |
-| Routing | `app/src/routing.ts`, `useRoute.ts` | `Route` union (incl. `grades`, Home's Grades tab), `parseHash`/`routeToHash`, `navigate()`; `useRoute()` is the hash as React state (the student Home's tabs and `useInstructorRoute` read it). |
+| Routing | `app/src/routing.ts`, `useRoute.ts` | `Route` union (incl. `grades`, Home's Grades tab; `caseIndex` = `#/a/:id/q/:i/case/:k`), `parseHash`/`routeToHash`, `navigate()`; `useRoute()` is the hash as React state (the student Home's tabs and `useInstructorRoute` read it). |
 | Wire layout | `app/src/componentGeometry.ts`, `wireRouter.ts` | `componentGeometry` is the single source of truth for component dimensions, port math (`getPortPosition`, OR/XOR left-port inset, rotation), the full obstacle footprint `getComponentBounds` (body + INPUT toggle-tab) and the rotation-aware `getLabelAnchor` — imported by the canvas, the router and the layout oracle. `wireRouter` is the cost-based A* orthogonal router (own-endpoint exemption; doomed wires take the L-path in a phase-0 pass; per-wire `usedFallback`/`violation` flags shown as tooltip + amber halo; `findDivergencePoints` for junction dots). |
 | Storage | `app/src/storage/workbookStore.ts`, `AssignmentStore.ts`, `submissionStore.ts`, `feedbackStore.ts`, `NotesStore.ts` | The five Promise-returning seam interfaces + Local impls. Grade release lives on `AssignmentStore` (`getGradesReleased`/`setGradesReleased`). `submissionStore` owns `recordManualReview`. |
 | Storage | `app/src/storage/backend.ts`, `remoteStores.ts`, `manualReview.ts`, `journal.ts`, `migrateLocal.ts` | `backend.ts`: the ONE mode decision + sole exporter of store instances. `remoteStores.ts`: Remote impls as direct `api/client.ts` calls (404 → seam-null; GRADER-FREE, grep-gated). `manualReview.ts`: the leaf pure `applyManualReview` used by the local store AND the server. `journal.ts`: per-email crash buffer `mm:journal:<email>:<asgId>` replayed by the next `openAssignment`. `migrateLocal.ts`: first-remote-login fill-empty upload of local data (guard `mm:migrated:<email>`; server never overwritten; submissions/release/reviews not migrated). |
@@ -225,12 +224,12 @@ wrappers over it.
 | Provenance | `app/src/provenance.ts`, `usePasteGuard.ts` | The paste seam (pure; its header states the rule and its limits): `canPaste`, `canvasPasteVerdict` (in an assignment + canvas kind, `allowed_components`), `textPasteVerdict`, `refusalMessage`; a module-memory clipboard (canvas + text slots). `usePasteGuard`: the answer fields' DOM adapter (copy/cut/paste/drop/`beforeinput`). `provenance/` (task 034; pure, server-imported): `ids` (`mintId`, the ONE id source; `verifyId`; the memory-only key registry), `sha256`, `trace` (the signed record), `integrity` (`assessIntegrity`, thresholds), `notice`. |
 | Assignments | `app/src/assignments/index.ts` | Thin registry over the `AssignmentStore` seam (`listAssignments`/`getAssignment`/`createAssignment`) + `sortAssignments` (instructor `order` asc, then title). Nothing is bundled into the app: local mode starts empty until the dashboard's dev seeds load content. |
 | Instructor UI | `app/src/instructor/` | `InstructorApp`, `InstructorGate`, `InstructorDashboard`, `RosterView`, `FeedbackQueueView`, `NotesView`, `AssignmentEditor`, `dragReorder.ts` (pure `moveItem` + `useDragReorder`; pinned rows immovable), `QuestionCreator` (+ `ccPreview.ts`, `arenaEditing.ts` — `MAX_ARENA_SIZE` 30), `Gradebook.ts`/`GradebookView.tsx`, `DocumentEditors.tsx` (the callout-list and figure-list widgets shared by the assignment editor and the creator; `readFigureFile` caps an upload at 300 KB, downscaling rasters). |
-| Student UI | `app/src/components/` | `CircuitCanvas`, `ComponentLibrary`, `DataTable`, `StudentLayout` (the Home tabs), `HomeScreen` (Assignments tab + up-next box), `GradesView` + `GradeSheet` (the Grades tab and its inline sheet), `AssignmentOverview` (the document page), `ProblemSetDocument`, `MenuBar`, `FeedbackPanel`, `SequentialTimeline`, `TMTapePanel`, `ArenaCanvas`, `TurbotArenaPanel` (Map + run controls; sandbox "Edit map"), `TurbotTapePanel`, `OpenResponsePanel`/`FillInPanel` (read-only when locked; paste-guarded), `SimulationPanel`, `TabBar` (question nav + Mark done / 🔒 tag; sandbox + menu), `outputDisplay.ts` (t1-rightmost OUT rows, per-group ARG values). |
+| Student UI | `app/src/components/` | `CircuitCanvas`, `ComponentLibrary`, `DataTable`, `StudentLayout` (the Home tabs), `HomeScreen` (Assignments tab + up-next box), `GradesView` + `GradeSheet` (the Grades tab and its inline sheet), `GradedCaseBanner`, `AssignmentOverview` (the document page), `ProblemSetDocument`, `MenuBar`, `FeedbackPanel`, `SequentialTimeline`, `TMTapePanel`, `ArenaCanvas`, `TurbotArenaPanel` (Map + run controls; sandbox "Edit map"), `TurbotTapePanel`, `OpenResponsePanel`/`FillInPanel` (read-only when locked; paste-guarded), `SimulationPanel`, `TabBar` (question nav + Mark done / 🔒 tag; sandbox + menu), `outputDisplay.ts` (t1-rightmost OUT rows, per-group ARG values). |
 | API client | `app/src/api/client.ts` | One typed function per endpoint; bearer token under `mm:auth:token`; `onUnauthorized` hook; `health()`; auth/roster/feedback/notes calls; `putWorkbook` takes `keepalive`. `setApiBase` is the harness override. |
 | Dev tool | `app/tools/shootProblemSets.mjs` | Headless-Chrome screenshots of every HW document, the canvas panel and the editor (it seeds local mode itself) — the visual proof when the browser pane is unavailable. |
 | Server | `server/src/app.ts`, `db.ts`, `auth.ts`, `password.ts`, `roster.ts`, `rosterImport.ts`, `sanitize.ts`, `config.ts`, `seed.ts`, `roster-cli.ts`, `homeworks.ts`, `homeworks-cli.ts` | Routes, SQLite storage, the `AuthProvider` seam (`createAuthProvider` — `MM_AUTH_MODE`: `password` default / `dev` / `sso`; `LoginThrottle`), scrypt credentials (`scrypt$N$r$p$salt$hash`, self-describing), the pure roster reader (`roster.ts`, the registrar's export as-is) + `rosterImport.ts` (never removes; lists who left), redaction + grade-release withholding (`sanitize.ts`: students get no `test_cases`/`perception_cases`/`fill_in_answers`; their own results keep safe per-case fields but never `expected`/`got` or `integrity`), env config, seeding, the admin CLI (`npm run roster`). The homework sync (`homeworks.ts`: a copy is pristine iff its content hash is a committed version of its file — `gitLineage` over the box's clone — or one the sync wrote, the `content_sync` table; `seed.ts --homeworks` runs it too). Tools: `serverCheck.ts`, `rosterCheck.ts`, `authCheck.ts`, `parityCheck.ts` (server ≡ in-process grading, deep-compared), `homeworkSyncCheck.ts`. |
 | Dev/sample | `app/src/devData/sampleData.ts`, `seed.ts`, `homeworks.ts`, `homeworks/hw{1..7}.json` | Sample assignment for all modes (netlist-built perception circuits, one turbot question per inner mode, open Q14) + sample submissions; `seedHomeworks()` syncs the real HW1–HW7 (record `mm:seeded-homework:<id>`) + reseeds 22 sample submissions; `homeworkSync.ts` is the pure planner it shares with the server (content hash = canonical JSON minus the instructor-owned `order`/`dueDate`; insert / unchanged / refresh / edited). |
-| Tools | `app/tools/*.ts` | The headless harness — the project's test suite, all in `npm run check` (plus `grade.ts`, the CLI grader; `builder.ts`, the netlist builder; `layoutCheck.ts`, the canvas layout oracle): `codecCheck`, `dueDateCheck`, `statementFormatCheck` (markup grammar, document model, every HW valid with its figures), `notationCheck` (grammar pins + label-dissection grep gate), `themeCheck` (colour literals only in `theme.css :root`, every `--mm-*` token defined, shell wiring), `tmCheck`, `turbotCheck` (all four brains; `[multi-arena]`, `[pass-through step-limit]`, trajectory/orientation independence), `perceptionCheck`, `scWindowCheck` (question runs ≡ grader), `routerCheck` (fallback budget 2; route-quality flags; hw3-p4 regression pin), `bumpCheck`, `pipelineCheck` (submit → grade, every mode), `navResetCheck` (both reset laws; `[mark as done]`, `[frozen assignment]`), `routingCheck` (route access, landing, held routes, principal change), `boxScopeCheck` (box library scope, SC boxing refuses MEM, `[naming]`), `pasteCheck` (paste policy, store paste, clipboard-API + answer-field grep gates, dev-only `__store`), `provenanceCheck` (mint/verify, attribution, paste re-mint, stamp + trace flags, uuid grep gate), `remoteStoreCheck` (boots the REAL server; grader-import grep gate; auth client against a password-mode server), `coverageCheck` (the two-tier reference-fixture ledger + `allowed_components` self-test pins). |
+| Tools | `app/tools/*.ts` | The headless harness — the project's test suite, all in `npm run check` (plus `grade.ts`, the CLI grader; `builder.ts`, the netlist builder; `layoutCheck.ts`, the canvas layout oracle): `codecCheck`, `dueDateCheck`, `statementFormatCheck` (markup grammar, document model, every HW valid with its figures), `notationCheck` (grammar pins + label-dissection grep gate), `themeCheck` (the Page surfaces gate), `tmCheck`, `turbotCheck` (all four brains; `[multi-arena]`, `[pass-through step-limit]`, trajectory/orientation independence), `perceptionCheck`, `scWindowCheck` (question runs ≡ grader), `caseRunCheck` (caseRun ≡ grader; replay per mode, remote shape, budgets), `routerCheck` (fallback budget 2; hw3-p4 pin), `bumpCheck`, `pipelineCheck` (submit → grade, every mode), `navResetCheck` (both reset laws; `[mark as done]`, `[frozen assignment]`), `routingCheck` (route access, landing, held routes, principal change), `boxScopeCheck` (box library scope, SC boxing refuses MEM, `[naming]`), `pasteCheck` (paste policy + the provenance grep gates), `provenanceCheck` (mint/verify, attribution, paste re-mint, stamp + trace flags, uuid grep gate), `remoteStoreCheck` (boots the REAL server; grader-import grep gate; auth client against a password-mode server), `coverageCheck` (the two-tier reference-fixture ledger + `allowed_components` self-test pins). |
 | Queue | `tasks/` | The task pipeline (top of this file). `tasks/tools/check-budgets.mjs` is the size guard on this file. |
 
 ## Reference-function DSL (instructor authoring)
@@ -273,7 +272,7 @@ sees the formula, it runs against the generated numeric `test_cases`.
 
 1. **CC** — gates, I/O, validated wiring, I/O tables, boxed circuits, snap-to-grid canvas.
 2. **SC** — MEM block, clock/time model, right-to-left time-step table. SC boxes are
-   combinational only (`confirmBox` refuses MEM; sequential boxing is queued).
+   combinational only (`confirmBox` refuses MEM).
 3. **FSM** — state nodes, `input:output` transitions (k-bit), simulation with highlighting,
    state table; opposite-direction transition pairs render as two separated arcs.
 4. **Turbots** — arena Map + circuitry workspace, fixed sensor/motor encoding, CC/SC/FSM/TM
@@ -295,15 +294,18 @@ sees the formula, it runs against the generated numeric `test_cases`.
   is still persisted and picks a SANDBOX TM's tape alphabet, but nothing sets it, so a sandbox
   TM is fixed at binary {0,1,*}.
 - **Time flows right-to-left** in SC and FSM tables (t1 on the right).
-- **SC/FSM question runs ARE the grader's runs** — inside an assignment question, Run/Step
+- **Question runs ARE the grader's runs** — inside an assignment question, SC/FSM Run/Step
   execute exactly `stepCountFor` time steps and feed exactly the grader's stream: the typed
   global input is parsed as a **value** per input group (tally "11" = 2, binary "110" = 6) and
   laid on the time axis by `encodeInput` (LSB at t1); the SC run decodes only the grader's
   window per output group (`selectCodecLayout`/`selectCodecWindow`; pinned by `scWindowCheck`).
   Invalid numerals (tally "101") run on raw bits and show '/'. The per-MEM 0-drain flush rule
-  applies only to **sandbox** SC runs; sandbox FSM runs stop at the typed length.
+  applies only to **sandbox** SC runs; sandbox FSM runs stop at the typed length. TM/turbot
+  question runs stop at the grader's budgets (`DEFAULT_TM_MAX_STEPS`; the arena's `maxSteps`),
+  sandbox Run at 1000 (`selectQuestionStepBudget`; `caseRunCheck`).
 - **MEM block** — M_OUT (left) feeds the stored value in; M_IN (right) receives the new value.
-  All memory initializes to 0; the stored value is displayed during simulation.
+  All memory initializes to 0 (the grader ignores saved values); the stored value is
+  displayed during simulation.
 - **Input labels** — assigned at creation and permanent; new inputs get the next sequential
   number regardless of vertical position.
 - **Turbot encoding is hardcoded** — sensor in: 0 empty, 1 block. Motor out `ij` = left/right
@@ -316,8 +318,7 @@ sees the formula, it runs against the generated numeric `test_cases`.
   touched, checked after acceptance). Any question may set `allowed_components` (listed types
   + always-allowed INPUT/OUTPUT/STATE; boxed internals recursed; absent/empty = unrestricted —
   enforced at Stage 1, in the palette, and authored in the creator) and `component_limits`
-  (`{TYPE: max}`, counted through boxed internals — HW2 P6's "one +1 sub-part" is `{BOXED: 1}`;
-  it counts components, so it says "at most one boxed sub-part", not "the +1 logic appears once").
+  (`{TYPE: max}`, counted through boxed internals — HW2 P6's "one +1 sub-part" is `{BOXED: 1}`).
 - **Editing locks** — a question refuses edits when it's marked done OR the assignment is
   frozen (past due AND submitted, `dueDates.ts isFrozen`). Both route through
   `store.ts`'s `isCurrentQuestionLocked`/`selectQuestionLocked`, inlined at the top of every

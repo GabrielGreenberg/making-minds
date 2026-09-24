@@ -97,9 +97,10 @@ export function evaluateGate(type: ComponentType, inputs: number[], comp?: Circu
  * label ("IN2" → 2; unparseable → 0). Both the top-level grading path
  * (`evaluateCCInputs`) and boxed-circuit internal binding
  * (`evaluateBoxedCircuit`) MUST bind bit vectors through this helper so the
- * two can never desync.
+ * two can never desync — and so does the store's graded-case loader
+ * (`loadCaseInput`), which sets a CC case's INPUT toggles through it.
  */
-function sortByLabel(components: CircuitComponent[], prefix: 'IN' | 'OUT'): CircuitComponent[] {
+export function sortByLabel(components: CircuitComponent[], prefix: 'IN' | 'OUT'): CircuitComponent[] {
   return components
     .filter((c) => (prefix === 'IN' ? c.type === 'INPUT' : c.type === 'OUTPUT'))
     .sort((a, b) => {

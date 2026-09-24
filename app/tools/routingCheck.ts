@@ -5,7 +5,10 @@
 //
 // Pins: [routeAccess] — the sandbox is the one public route; the student
 // routes need sign-in; every instructor route needs the instructor role (and
-// every Route kind is classified). [landing] — a browser with no trace of a
+// every Route kind is classified). [case route] — `#/a/:id/q/:i/case/:k`
+// ("Run this input") parses and round-trips, a malformed case segment is
+// dropped (the question kept), and applying it loads case k of question i
+// into the run after the question opens. [landing] — a browser with no trace of a
 // previous sign-in opening `#/` lands in the sandbox; one with a trace, or
 // any deep link, is left alone. [held routes] — with nobody signed in, a
 // route that needs sign-in is never applied to the store (no unauthenticated
@@ -43,7 +46,7 @@ const setUrl = (_s: unknown, _t: string, url: string) => {
 };
 g.history = { pushState: setUrl, replaceState: setUrl };
 
-const { routeAccess, landingRoute, initRouting, setRoutingPrincipal, parseHash, navigate } = await import('../src/routing');
+const { routeAccess, landingRoute, initRouting, setRoutingPrincipal, parseHash, routeToHash, navigate } = await import('../src/routing');
 const { useStore } = await import('../src/store');
 type Route = import('../src/routing').Route;
 
@@ -61,6 +64,7 @@ const ALL: Route[] = [
   { kind: 'grades', id: 'hw1' },
   { kind: 'assignment', id: 'hw1' },
   { kind: 'assignment', id: 'hw1', questionIndex: 2 },
+  { kind: 'assignment', id: 'hw1', questionIndex: 2, caseIndex: 5 },
   { kind: 'instructor' },
   { kind: 'instructor-new-assignment' },
   { kind: 'instructor-edit', id: 'hw1' },
@@ -78,6 +82,25 @@ check(
   'every instructor-* route needs the instructor role',
   ALL.filter((r) => r.kind.startsWith('instructor')).every((r) => routeAccess(r) === 'instructor'),
 );
+
+console.log('[case route]');
+{
+  const r = parseHash('#/a/hw1/q/2/case/5');
+  check("'#/a/hw1/q/2/case/5' → question 2, case 5",
+    r.kind === 'assignment' && r.id === 'hw1' && r.questionIndex === 2 && r.caseIndex === 5);
+  check('…and round-trips through routeToHash', routeToHash(r) === '#/a/hw1/q/2/case/5');
+  for (const bad of ['-1', 'x', '1.5']) {
+    const b = parseHash(`#/a/hw1/q/2/case/${bad}`);
+    check(`'/case/${bad}' drops the case but keeps the question`,
+      b.kind === 'assignment' && b.questionIndex === 2 && b.caseIndex === undefined);
+  }
+  const plain = parseHash('#/a/hw1/q/2');
+  check('a question route has no case', plain.kind === 'assignment' && plain.caseIndex === undefined &&
+    routeToHash(plain) === '#/a/hw1/q/2');
+  check('a case without a question is not a route to one',
+    routeToHash({ kind: 'assignment', id: 'hw1', caseIndex: 5 }) === '#/a/hw1');
+  check('the case route needs sign-in', routeAccess(r) === 'signed-in');
+}
 
 console.log('[landing]');
 check('no trace + #/ → the sandbox', landingRoute(parseHash('#/'), false)?.kind === 'sandbox');
@@ -134,6 +157,38 @@ navigate({ kind: 'grades' });
 check('signed out again → #/grades held (goHome not called)', homes === 1);
 setRoutingPrincipal('a@x.test');
 check('…and applied on the next sign-in', homes === 2);
+
+// Applying a case route, signed in: the question opens (switchQuestion),
+// THEN its case loads — by the opened question's id.
+console.log('[case route: applied]');
+{
+  const loads: [number, number][] = [];
+  const switched: number[] = [];
+  const questions = [0, 1, 2].map((i) => ({ id: 100 + i, label: `Q${i}`, statement: '', buildMode: 'CC', representation: 'binary' }));
+  useStore.setState({
+    assignment: { id: 'hwc', title: 'case route', questions } as unknown as import('../src/types').AssignmentData,
+    currentQuestionIndex: 0,
+    switchQuestion: (i: number) => {
+      switched.push(i);
+      useStore.setState({ currentQuestionIndex: i });
+    },
+    loadCaseInput: async (qid: number, k: number) => {
+      loads.push([qid, k]);
+    },
+  });
+  navigate({ kind: 'assignment', id: 'hwc', questionIndex: 2, caseIndex: 5 });
+  await new Promise((r) => setTimeout(r, 0));
+  check('a case route opens the question, then loads its case (question id, case index)',
+    switched.join() === '2' && loads.length === 1 && loads[0][0] === 102 && loads[0][1] === 5);
+  navigate({ kind: 'assignment', id: 'hwc', questionIndex: 2, caseIndex: 1 });
+  await new Promise((r) => setTimeout(r, 0));
+  check('a case route to the question already open loads without a switch',
+    switched.join() === '2' && loads.length === 2 && loads[1][1] === 1);
+  navigate({ kind: 'assignment', id: 'hwc', questionIndex: 1 });
+  await new Promise((r) => setTimeout(r, 0));
+  check('a plain question route loads no case', loads.length === 2);
+  useStore.setState({ assignment: null, currentQuestionIndex: 0 });
+}
 
 // Last: these reset the whole store (as the auth provider does), which also
 // replaces the spies installed above — so they are re-installed each time.

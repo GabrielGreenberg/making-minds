@@ -486,11 +486,13 @@ export interface SubmissionIntegrity {
 // grader.ts re-exports these.
 
 /**
- * One case's outcome for a question (instructor-only — students never see failed
- * cases). All modes are value-based: `input` is the input value list `x`,
- * `expected` is `f(x)`, and `got` is the decoded output value list — empty `[]`
- * when the output was rejected before decoding. `reason` carries a rejection /
- * syntax-error explanation (malformed output, no halt, invalid machine table).
+ * One case's outcome for a question (the answer key — `expected`/`got` — is
+ * instructor-only; a student's copy keeps `input`/`pass`/`reason`/
+ * `separations`, server/src/sanitize.ts). All modes are value-based: `input`
+ * is the input value list `x`, `expected` is `f(x)`, and `got` is the decoded
+ * output value list — empty `[]` when the output was rejected before decoding.
+ * `reason` carries a rejection / syntax-error explanation (malformed output,
+ * no halt, invalid machine table).
  */
 export interface CaseResult {
   input: number[];
@@ -498,6 +500,10 @@ export interface CaseResult {
   got: number[];
   pass: boolean;
   reason?: string;
+  /** The case's TM block separations (TestCase.separations), present only
+   *  when the case has them — part of the INPUT, not the key, so a student
+   *  replaying the case gets the grader's exact tape. */
+  separations?: number[];
 }
 
 /**
@@ -528,6 +534,8 @@ export interface QuestionResult {
   manual?: ManualReview;   // open questions: the instructor's recorded verdict
   passed: number;          // test cases passed
   total: number;           // test cases total
+  // Parallel to the question's bank: cases[k] is test_cases[k] (and
+  // turbotCases[k] is turbot_cases[k]) — a replay of case k relies on it.
   cases: CaseResult[];
   // Populated instead of `cases` for turbot questions — arena grading
   // doesn't produce an f(x) value comparison, so it gets its own result shape.

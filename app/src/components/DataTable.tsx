@@ -4,6 +4,7 @@ import { tmNotation } from '../engine';
 import { outputDisplayString } from './outputDisplay';
 import { TurbotArenaPanel } from './TurbotArenaPanel';
 import { ProblemBody, ProblemContext } from './ProblemSetDocument';
+import { GradedCaseBanner } from './GradedCaseBanner';
 import type { TMSymbol } from '../types';
 import { loadUiPrefs, saveUiPref } from '../uiPrefs';
 
@@ -14,8 +15,9 @@ function inputKey(bits: number[]): string {
 
 /** The open assignment question, shown above the tables in every mode's
  *  panel: its section's instruction as context, then the problem itself
- *  (the document's own parts — components/ProblemSetDocument.tsx). Renders
- *  nothing in the sandbox. */
+ *  (the document's own parts — components/ProblemSetDocument.tsx), then any
+ *  graded case loaded into the run (GradedCaseBanner). Renders nothing in
+ *  the sandbox. */
 function QuestionStatement() {
   const assignment = useStore((s) => s.assignment);
   const currentQuestionIndex = useStore((s) => s.currentQuestionIndex);
@@ -31,6 +33,7 @@ function QuestionStatement() {
         <ProblemContext assignment={assignment} questionId={question.id} />
         <ProblemBody question={question} showArena={false} />
       </div>
+      <GradedCaseBanner />
     </div>
   );
 }

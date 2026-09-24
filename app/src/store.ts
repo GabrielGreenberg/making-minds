@@ -27,6 +27,7 @@ import type {
   ArenaConfig,
   TurbotState,
   TurbotHistoryEntry,
+  TurbotCaseResult,
 } from './types';
 import {
   getPortsForType,
@@ -36,7 +37,7 @@ import {
   GRID_SIZE,
   toSubscript,
 } from './types';
-import { topologicalSort, evaluateGate, evaluateCC, evaluateSCSingleStep, sortStateComponents, evaluateFSMSymbolStep, evaluateTMSingleStep, notationForRepresentation, stepCountFor, encodeInput, bitsToTally, bitsToBinary, fsmNotation, turbotFsmNotation, tmNotation, turbotInternalNotation, turbotExternalNotation, type CodecLayout, type TransitionNotation } from './engine';
+import { topologicalSort, evaluateGate, evaluateCC, evaluateSCSingleStep, sortStateComponents, evaluateFSMSymbolStep, evaluateTMSingleStep, evaluateTMSequence, DEFAULT_TM_MAX_STEPS, notationForRepresentation, encodeTM, stepCountFor, encodeInput, valueToBits, bitsToValue, bitsToTally, bitsToBinary, sortByLabel, fsmNotation, turbotFsmNotation, tmNotation, turbotInternalNotation, turbotExternalNotation, questionLayout, caseStimulus, recordedCaseSeparations, gradedMachineKey, gradingCircuit, type CodecLayout, type TransitionNotation } from './engine';
 import { senseAheadSymbol, applyMotorCommand, initialBrainState, runBrainStep, stateKindOf, type BrainState } from './engine/turbot';
 import { getAssignment, listAssignments } from './assignments';
 import { emptyQuestionCircuit, restoreQuestionCircuits } from './storage/workbookStore';
@@ -139,7 +140,8 @@ export function selectPasteScope(s: { assignment: AssignmentData | null }): Past
 }
 
 /**
- * The codec layout of the open SC/FSM question (the grader's view of it), or
+ * The codec layout of the open SC/FSM question (the grader's view of it —
+ * engine/caseRun.ts questionLayout, the very function the grader reads), or
  * null in the sandbox (no open question, or a question without a time-axis
  * cc_spec). Everything question-run-specific — the run window, the exact input
  * stream to feed — derives from this one selector.
@@ -149,14 +151,8 @@ export function selectCodecLayout(s: {
   currentQuestionIndex: number;
 }): CodecLayout | null {
   const q = s.assignment?.questions[s.currentQuestionIndex];
-  if (!q?.cc_spec) return null;
-  if (q.buildMode !== 'SC' && q.buildMode !== 'FSM') return null;
-  return {
-    axis: 'time',
-    rep: q.representation,
-    inputWidths: q.cc_spec.inputs.map((g) => g.width),
-    outputWidths: q.cc_spec.outputs.map((g) => g.width),
-  };
+  if (!q || (q.buildMode !== 'SC' && q.buildMode !== 'FSM')) return null;
+  return questionLayout(q);
 }
 
 /**
@@ -230,6 +226,28 @@ function fsmGroupSequences(digits: number[], numGroups: number): number[][] {
   return seqs;
 }
 
+/**
+ * The typed-input digits (SC's global input string, FSM's IN field) that make
+ * a question run feed EXACTLY the codec's stream for `values` — the inverse
+ * of how scStep/fsmStep read typed input (codecInputSteps): each group's
+ * value as one numeral of the widest group's width, chunked right-to-left
+ * (rightmost chunk = t1) with group i at position i of every chunk. The value
+ * is first clamped/masked to its OWN width exactly as encodeInput does, so
+ * reading the numeral back re-encodes to the grader's bits. Numerals are
+ * padded by width, never by prepending zeros: a left-padded tally numeral
+ * ("011") is not a codeword, and codecInputSteps would silently fall back to
+ * the raw typed bits.
+ */
+function codecTypedDigits(values: number[], layout: CodecLayout): number[] {
+  const width = Math.max(1, ...layout.inputWidths);
+  const numerals = layout.inputWidths.map((w, i) =>
+    valueToBits(bitsToValue(valueToBits(values[i] ?? 0, w, layout.rep), layout.rep), width, layout.rep),
+  );
+  const digits: number[] = [];
+  for (let c = 0; c < width; c++) for (const n of numerals) digits.push(n[c]);
+  return digits;
+}
+
 /** A blank arena for the sandbox / question-authoring preview (no assignment context). */
 export function defaultArenaConfig(): ArenaConfig {
   return {
@@ -283,20 +301,55 @@ function activeSandboxTab(s: {
 }
 
 /**
- * The active turbot context's arena. Inside an assignment: the open turbot
- * question's primary arena (its first `turbot_cases` entry — the one the
- * student sees and simulates against; see engine/turbot.ts). In the sandbox:
- * the active turbot tab's own arena (seeded by addTab, edited via
+ * The active turbot context's arena. Inside an assignment: one of the open
+ * turbot question's `turbot_cases` arenas — `turbotCaseIndex`, which is 0
+ * (the primary arena, the one the student sees and simulates against; see
+ * engine/turbot.ts) unless a graded case was loaded into the run
+ * (loadCaseInput); an index past the bank falls back to the primary. In the
+ * sandbox: the active turbot tab's own arena (seeded by addTab, edited via
  * setTabArena). Falls back to a blank arena outside any turbot context.
  */
 export function selectTurbotArena(s: {
   assignment: AssignmentData | null;
   currentQuestionIndex: number;
+  turbotCaseIndex?: number;
   tabs?: SandboxTab[];
   activeTabId?: string;
 }): ArenaConfig {
   const q = s.assignment?.questions[s.currentQuestionIndex];
-  return q?.turbot_cases?.[0]?.arena ?? activeSandboxTab(s)?.arena ?? FALLBACK_ARENA;
+  return (
+    q?.turbot_cases?.[s.turbotCaseIndex ?? 0]?.arena ??
+    q?.turbot_cases?.[0]?.arena ??
+    activeSandboxTab(s)?.arena ??
+    FALLBACK_ARENA
+  );
+}
+
+/** The step cap on a sandbox TM or turbot Run (a runaway machine in the UI). */
+export const UI_RUN_STEP_CAP = 1000;
+
+/**
+ * The GRADER's step budget for the open question's TM or turbot run, or null
+ * outside one (the sandbox, other modes). Question runs ARE the grader's
+ * runs (the SC/FSM codec-window rule, extended): a TM question's Step/Run
+ * stop where the grader's TM run stops (DEFAULT_TM_MAX_STEPS), a turbot's at
+ * the shown arena's `maxSteps` — so a run the grader cut off is cut off on
+ * screen too, and one it let finish is never cut short. Sandbox runs keep
+ * UI_RUN_STEP_CAP (Run only; sandbox Step is unbounded).
+ */
+export function selectQuestionStepBudget(s: {
+  buildMode: BuildMode;
+  assignment: AssignmentData | null;
+  currentQuestionIndex: number;
+  turbotCaseIndex?: number;
+}): number | null {
+  const q = s.assignment?.questions[s.currentQuestionIndex];
+  if (!q) return null;
+  if (s.buildMode === 'turbot') {
+    const cases = q.turbot_cases;
+    return cases?.[s.turbotCaseIndex ?? 0]?.maxSteps ?? cases?.[0]?.maxSteps ?? null;
+  }
+  return q.buildMode === 'TM' ? DEFAULT_TM_MAX_STEPS : null;
 }
 
 /**
@@ -414,6 +467,38 @@ export function selectTransitionNotationForSource(
   }
   return selectFsmNotation(s);
 }
+
+/**
+ * A graded case loaded into the open question's run ("Run this input" on the
+ * grade sheet, loadCaseInput): which case of which attempt, its INPUT, the
+ * verdict recorded for it, and `gradedKey` — engine gradedMachineKey of the
+ * machine THAT attempt submitted for the question (null when it submitted
+ * none), so the banner can tell whether the canvas still holds the graded
+ * machine even after a later attempt replaces the latest record. Never the
+ * answer key — no expected/got, even in local mode where the full result is
+ * at hand; the live output comes from running the canvas machine
+ * (engine/caseRun.ts).
+ */
+export type LoadedCase =
+  | {
+      kind: 'value';
+      questionId: number;
+      caseIndex: number;
+      attempt: number;
+      gradedKey: string | null;
+      input: number[];
+      separations?: number[];
+      recorded: { pass: boolean; reason?: string };
+    }
+  | {
+      kind: 'turbot';
+      questionId: number;
+      caseIndex: number;
+      attempt: number;
+      gradedKey: string | null;
+      // A turbot case's result has no answer key (positional pass/fail).
+      recorded: TurbotCaseResult;
+    };
 
 interface HistoryEntry {
   components: CircuitComponent[];
@@ -738,6 +823,28 @@ interface AppState {
   // (square, sense/move ops). Outgoing transition labels are reset to the new
   // kind's default since the grammars are disjoint.
   toggleStateKind: (id: string) => void;
+  // Which of the open turbot question's arenas (a `turbot_cases` index) the
+  // Map shows and the turbot slice runs — 0 unless a graded case put another
+  // there (loadCaseInput). Canvas-scoped: resetAllSimState zeroes it.
+  turbotCaseIndex: number;
+
+  // Graded-case replay ("Run this input" on the grade sheet): the recorded
+  // case the run slices hold, or null. Canvas-scoped: resetAllSimState
+  // clears it.
+  loadedCase: LoadedCase | null;
+  // Load case `caseIndex` of the open question's latest recorded result into
+  // the run and run it to the grader's end: CC sets the INPUT toggles, SC/FSM
+  // the typed input, TM the tape, a turbot the arena — each exactly the
+  // grader's stimulus (engine/caseRun.ts). Every run slice restarts (Reset
+  // then replays from t=1); the undo history stays — this is the same canvas,
+  // and loading an input is not an edit. NOT gated by the question locks:
+  // simulation is never locked. Resolves once the run has reached its end (or
+  // was superseded); a no-op unless `questionId` is the open question and a
+  // recorded result has that case.
+  loadCaseInput: (questionId: number, caseIndex: number) => Promise<void>;
+  // Drop the loaded case (the banner's ✕); the Map returns to the primary
+  // arena if the case had put another there.
+  clearLoadedCase: () => void;
 
   // Reset law 1 — the CANVAS swap. Flush EVERY mode's transient sim state
   // (SC/FSM/TM/turbot + the I/O table) AND the undo/redo history. Every canvas
@@ -3614,6 +3721,10 @@ export const useStore = create<AppState>()((set, get) => ({
     const state = get();
     const { components, wires, tmTape, tmTimeStep, tmHistory, tmHalted } = state;
     if (tmHalted) return;
+    // A question run stops where the grader's does (its step budget); the
+    // sandbox steps without bound.
+    const budget = selectQuestionStepBudget(state);
+    if (budget !== null && tmHistory.length >= budget) return;
 
     const states = sortStateComponents(components);
     if (states.length === 0) return;
@@ -3651,10 +3762,12 @@ export const useStore = create<AppState>()((set, get) => ({
   tmRun: () => {
     const state = get();
     if (state.tmRunning) return;
-    const MAX_UI_TM_STEPS = 1000; // stop a runaway machine in the UI
     const intervalId = window.setInterval(() => {
       const s = get();
-      if (s.tmHalted || s.tmTimeStep > MAX_UI_TM_STEPS) {
+      // Question runs stop at the grader's budget; the sandbox stops a
+      // runaway machine at the UI cap.
+      const cap = selectQuestionStepBudget(s) ?? UI_RUN_STEP_CAP;
+      if (s.tmHalted || s.tmHistory.length >= cap) {
         s.tmPause();
         return;
       }
@@ -3717,15 +3830,22 @@ export const useStore = create<AppState>()((set, get) => ({
     const state = get();
     const { components, wires, turbotHistory, turbotHalted, turbotState } = state;
     if (turbotHalted) return;
+    // A question run stops where the grader's does: the arena's maxSteps
+    // (grader: hitStepLimit). The sandbox steps without bound.
+    const budget = selectQuestionStepBudget(state);
+    if (budget !== null && turbotHistory.length >= budget) {
+      set({ turbotHalted: true, turbotStopReason: 'limit' });
+      return;
+    }
 
     const arena = selectTurbotArena(state);
-    const innerMode = selectTurbotInnerMode(state);
     // On the first cycle, derive the brain state from the circuit as it is
     // NOW — the student normally builds the brain after the last reset, so a
     // reset-time snapshot would still point at a state that didn't exist yet.
     const turbotBrainState = turbotHistory.length === 0
-      ? initialBrainState(components, innerMode)
+      ? turbotBrainStart(state)
       : state.turbotBrainState;
+    const innerMode = selectTurbotInnerMode(state);
     const sense = senseAheadSymbol(arena, turbotState);
     const result = runBrainStep(components, wires, innerMode, sense, turbotBrainState, selectTmNotation(state));
     if (!result) {
@@ -3760,10 +3880,12 @@ export const useStore = create<AppState>()((set, get) => ({
   turbotRun: () => {
     const state = get();
     if (state.turbotRunning) return;
-    const MAX_UI_TURBOT_STEPS = 1000; // stop a runaway turbot in the UI
     const intervalId = window.setInterval(() => {
       const s = get();
-      if (s.turbotHalted || s.turbotHistory.length >= MAX_UI_TURBOT_STEPS) {
+      // Question runs stop at the arena's maxSteps (the grader's budget);
+      // the sandbox stops a runaway turbot at the UI cap.
+      const cap = selectQuestionStepBudget(s) ?? UI_RUN_STEP_CAP;
+      if (s.turbotHalted || s.turbotHistory.length >= cap) {
         s.turbotPause();
         if (!s.turbotHalted) set({ turbotHalted: true, turbotStopReason: 'limit' });
         return;
@@ -3787,16 +3909,169 @@ export const useStore = create<AppState>()((set, get) => ({
       window.clearInterval(state.turbotRunIntervalId);
     }
     const arena = selectTurbotArena(state);
-    const innerMode = selectTurbotInnerMode(state);
     set({
       turbotState: { ...arena.start },
-      turbotBrainState: initialBrainState(state.components, innerMode),
+      turbotBrainState: turbotBrainStart(state),
       turbotHistory: [],
       turbotRunning: false,
       turbotRunIntervalId: null,
       turbotHalted: false,
       turbotStopReason: null,
     });
+  },
+  turbotCaseIndex: 0,
+
+  // ─── Graded-case replay ────────────────────────────────────────
+  loadedCase: null,
+
+  loadCaseInput: (questionId, caseIndex) => {
+    const state = get();
+    const a = state.assignment;
+    const q = a?.questions[state.currentQuestionIndex];
+    // Only the open question's own cases, and only machine questions with a
+    // case bank shape the replay understands (value cases, turbot arenas —
+    // not perception frames, fill-in blanks or open prose).
+    if (!a || !q || q.id !== questionId) return Promise.resolve();
+    if (q.perception || q.fill_in || q.buildMode === 'open') return Promise.resolve();
+    // The latest recorded submission's result — remotely the student's own
+    // sanitized copy (present once grades are released): input, pass,
+    // reason, separations; never the key.
+    const record = state.submissions[a.id];
+    const qr = record?.result?.questions.find((r) => r.questionId === q.id);
+    if (!record || !qr) return Promise.resolve();
+    // The machine this attempt was graded on, as the banner compares it.
+    const graded = record.submission.answers.find((ans) => ans.questionId === q.id)?.circuit;
+    const gradedKey = graded ? gradedMachineKey(graded) : null;
+
+    let loaded: LoadedCase;
+    if (q.buildMode === 'turbot') {
+      // Dispatch on the literal buildMode FIRST: selectEffectiveMode would
+      // answer a turbot's INNER mode (an FSM brain is not an FSM question).
+      const recorded = qr.turbotCases?.[caseIndex];
+      if (!recorded || !q.turbot_cases?.[caseIndex]) return Promise.resolve();
+      loaded = { kind: 'turbot', questionId, caseIndex, attempt: record.attempt, gradedKey, recorded: { ...recorded } };
+    } else {
+      const c = qr.cases[caseIndex];
+      if (!c || !questionLayout(q)) return Promise.resolve();
+      // Results graded before a case carried its separations: the server
+      // fills a student's own copy from its bank (sanitize.ts); locally the
+      // bank is at hand — the same rule either way.
+      const separations = recordedCaseSeparations(q, caseIndex, c);
+      loaded = {
+        kind: 'value',
+        questionId,
+        caseIndex,
+        attempt: record.attempt,
+        gradedKey,
+        input: [...c.input],
+        ...(separations ? { separations: [...separations] } : {}),
+        recorded: { pass: c.pass, ...(c.reason !== undefined ? { reason: c.reason } : {}) },
+      };
+    }
+
+    // A fresh run for the case: every run slice back to t=1 with its
+    // interval stopped and the canvas's MEMs at 0 (the grader's start) —
+    // whether this question was just opened or has been running all along
+    // (a route to the open question skips the canvas swap, so nothing else
+    // resets them). NOT the undo history: same canvas, and a stimulus is
+    // not an edit (no pushHistory, no recordEdit).
+    get().localStepClear();
+    get().scGlobalReset();
+    get().fsmGlobalReset();
+    get().tmGlobalReset();
+    set({ loadedCase: loaded, turbotCaseIndex: loaded.kind === 'turbot' ? caseIndex : 0 });
+    get().turbotReset();
+
+    // The grader's stimulus, then (deferred) the run to the grader's end.
+    let runToEnd: () => void;
+    if (loaded.kind === 'turbot') {
+      runToEnd = () => {
+        const budget = selectQuestionStepBudget(get()) ?? 0;
+        // turbotStep stops itself at the budget ('limit'), one call past it.
+        for (let i = 0; i <= budget && !get().turbotHalted; i++) get().turbotStep();
+      };
+    } else if (q.buildMode === 'CC') {
+      const stim = caseStimulus(q, loaded.input);
+      const bits = stim?.axis === 'space' ? stim.bits : [];
+      // The engine's IN-label order (cc.ts sortByLabel) — the order
+      // evaluateCCInputs binds the grader's wire vector in.
+      const inputs = sortByLabel(get().components, 'IN');
+      set({
+        components: get().components.map((c) => {
+          const i = inputs.indexOf(c);
+          if (i < 0) return c;
+          const v = bits[i] ?? 0;
+          return { ...c, value: v, inputValues: [v] };
+        }),
+      });
+      suppressAutoAddRow = false; // an explicit input: the I/O table records it
+      runToEnd = () => get().evaluateCircuit();
+    } else if (q.buildMode === 'SC' || q.buildMode === 'FSM') {
+      const layout = questionLayout(q)!;
+      const digits = codecTypedDigits(loaded.input, layout);
+      if (q.buildMode === 'SC') {
+        set({ scGlobalSequences: [{ inputStr: digits.join(''), outputStr: '' }] });
+        get().loadScGlobalSequence(0);
+      } else {
+        get().setFsmInputSequence(digits);
+      }
+      const isSC = q.buildMode === 'SC';
+      runToEnd = () => {
+        // Exactly the codec window (scStep/fsmStep refuse past it anyway);
+        // an FSM that halts mid-input stops there, as the grader's does.
+        const win = selectCodecWindow(get()) ?? 0;
+        for (let t = 0; t < win; t++) {
+          if (isSC) get().scStep();
+          else if (get().fsmHalted) break;
+          else get().fsmStep();
+        }
+      };
+    } else {
+      // TM: the grader's initial tape (block separations included), then ONE
+      // engine run to where the grader's stopped — a stepped fast-forward
+      // would copy the history per step, and a TM run can take thousands.
+      const tape = encodeTM(selectTmNotation(get()), loaded.input, loaded.separations);
+      set({ tmTape: tape, tmInitialTape: tape });
+      runToEnd = () => {
+        const s = get();
+        const run = evaluateTMSequence(
+          s.components,
+          s.wires,
+          s.tmInitialTape,
+          selectTmNotation(s),
+          selectQuestionStepBudget(s) ?? DEFAULT_TM_MAX_STEPS,
+        );
+        set({
+          tmTape: run.tape,
+          tmHistory: run.history,
+          tmTimeStep: run.steps + 1,
+          tmHalted: run.halted,
+          tmCurrentStateId: run.finalStateId,
+        });
+      };
+    }
+
+    // Deferred one task: the resets and the SC load above each queued a
+    // canvas re-evaluation (evaluateCircuit), which would otherwise land on
+    // top of the finished run and overwrite its display.
+    return new Promise<void>((resolve) => {
+      setTimeout(() => {
+        // Superseded (a newer load, a canvas swap, a principal change): the
+        // run slices are someone else's now.
+        if (get().loadedCase === loaded) runToEnd();
+        resolve();
+      }, 0);
+    });
+  },
+
+  // Dismissing the case also puts the Map back on the primary arena — the one
+  // the question's own URL shows, and whose budget its runs stop at — with
+  // the turbot re-seated at its start (the pose on the case's arena means
+  // nothing on another).
+  clearLoadedCase: () => {
+    const onCaseArena = get().turbotCaseIndex !== 0;
+    set({ loadedCase: null, turbotCaseIndex: 0 });
+    if (onCaseArena) get().turbotReset();
   },
 
   // One aggregate reset for canvas-swapping navigation (question navigation
@@ -3808,6 +4083,10 @@ export const useStore = create<AppState>()((set, get) => ({
     get().scGlobalReset();
     get().fsmGlobalReset();
     get().tmGlobalReset();
+    // A loaded graded case belongs to the canvas it was loaded on, and so
+    // does the arena it picked — cleared BEFORE turbotReset, which re-seats
+    // the turbot on the (now primary) arena's start.
+    set({ loadedCase: null, turbotCaseIndex: 0 });
     get().turbotReset();
     // The armed palette tool is canvas-scoped too: an AND armed on a CC
     // question must not survive into the next question's canvas and drop a
@@ -3951,6 +4230,17 @@ function getAutoSaveData() {
  *  student can't accidentally change work they've locked. */
 function isCurrentQuestionLocked(state: AppState): boolean {
   return selectQuestionLocked(state);
+}
+
+/** A turbot brain's state before its first cycle, from the canvas as it is
+ *  now. Inside a question the brain starts from rest like the grader's
+ *  (engine/caseRun.ts gradingCircuit: every MEM at 0), whatever a MEM
+ *  override left on the canvas; the sandbox seeds from the canvas as-is. */
+function turbotBrainStart(state: AppState): BrainState {
+  const components = state.assignment
+    ? gradingCircuit({ components: state.components, wires: state.wires }).components
+    : state.components;
+  return initialBrainState(components, selectTurbotInnerMode(state));
 }
 
 /** One question's canvas as it was actually SUBMITTED, for the frozen

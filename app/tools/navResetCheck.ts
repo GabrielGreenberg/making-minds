@@ -110,6 +110,9 @@ function checkAllSimFresh(label: string) {
   check(`${label}: turbot slice fresh`,
     s.turbotHistory.length === 0 && !s.turbotRunning && !s.turbotHalted &&
     s.turbotStopReason === null);
+  // A graded case loaded into the run ("Run this input") and the arena it
+  // put on the Map belong to the canvas they were loaded on.
+  check(`${label}: no graded case loaded, primary arena`, s.loadedCase === null && s.turbotCaseIndex === 0);
   // The armed palette tool survives repeated background clicks, so a canvas
   // swap must disarm it — otherwise a gate armed on one question drops a
   // component on the first click in the next one.
@@ -143,6 +146,8 @@ function plantSimJunk() {
     turbotHistory: [{ t: 1, kind: 'external', input: 'E', action: '↑', x: 0, y: 0, facing: 'N' }],
     turbotHalted: true,
     turbotStopReason: 'motor',
+    turbotCaseIndex: 2,
+    loadedCase: { kind: 'value', questionId: 1, caseIndex: 3, attempt: 1, gradedKey: null, input: [1, 2], recorded: { pass: false } },
     selectedTool: 'AND',
     undoStack: [{ components: [], wires: [], boxes: [], confirmedBoxes: [] }],
     redoStack: [{ components: [], wires: [], boxes: [], confirmedBoxes: [] }],
@@ -665,8 +670,10 @@ console.log('[principal change]');
   }
 
   // Sign out exactly as SessionControls.signOut does: Home first, then the
-  // provider reports the visitor.
+  // provider reports the visitor. (A's run slices hold junk — a graded case
+  // loaded, a second arena on the Map — which must not reach the visitor.)
   useStore.getState().goHome();
+  plantSimJunk();
   useStore.getState().resetForPrincipal(null);
   {
     const s = useStore.getState();
