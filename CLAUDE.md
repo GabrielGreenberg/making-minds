@@ -129,7 +129,7 @@ PDF, sections with intro / layout / callouts / figures, every question filed int
 a live preview of the problem set), **question
 creator** (all six modes on one form; per-problem callout boxes and figures; formula DSL →
 test banks; turbot: inner machine,
-encoding, arena editor ≤ 30×30, criterion + max-steps; perception: rule + retina size;
+encoding, arenas (add/copy/move/remove) ≤ 30×30, each with criterion + max-steps; perception: rule + retina size;
 component restrictions and limits; TM halt-position toggle; fill-in blanks, per-blank digits-only),
 **gradebook** grouped by student (latest attempt counts; expandable history with failed-case
 drill-down per mode; ✓/✗ + note manual review of open questions; ⚑ integrity flags; Release/Hide grades).
@@ -161,7 +161,7 @@ end-to-end; score reported, never asserted) — behind `app/tools/coverageCheck.
 The open work is the queue: `tasks/incoming/` (ready) and `tasks/blocked/` (waiting on
 Gabriel) — run `/work` to see it offered. Headline items on 2026-09-22: **UCLA SSO** (blocked
 on UCLA IdP details), a real domain + scheduled SQLite backup for the pilot box,
-turbot multi-arena authoring, an SC perception frame player, LLM-assisted open-question grading, and — last — activating
+an SC perception frame player, LLM-assisted open-question grading, and — last — activating
 the worker routine.
 
 ---
@@ -223,7 +223,7 @@ wrappers over it.
 | Async UI | `app/src/useAsyncValue.ts` | The shared fetch-on-mount hook (`value`/`loading`/`error`/`reload`) behind every view reading the async seams. |
 | Provenance | `app/src/provenance.ts`, `usePasteGuard.ts` | The paste seam (pure; its header states the rule and its limits): `canPaste`, `canvasPasteVerdict` (in an assignment + canvas kind, `allowed_components`), `textPasteVerdict`, `refusalMessage`; a module-memory clipboard (canvas + text slots). `usePasteGuard`: the answer fields' DOM adapter (copy/cut/paste/drop/`beforeinput`). `provenance/` (task 034; pure, server-imported): `ids` (`mintId`, the ONE id source; `verifyId`; the memory-only key registry), `sha256`, `trace` (the signed record), `integrity` (`assessIntegrity`, thresholds), `notice`. |
 | Assignments | `app/src/assignments/index.ts` | Thin registry over the `AssignmentStore` seam (`listAssignments`/`getAssignment`/`createAssignment`) + `sortAssignments` (instructor `order` asc, then title). Nothing is bundled into the app: local mode starts empty until the dashboard's dev seeds load content. |
-| Instructor UI | `app/src/instructor/` | `InstructorApp`, `InstructorGate`, `InstructorDashboard`, `RosterView`, `FeedbackQueueView`, `NotesView`, `AssignmentEditor`, `dragReorder.ts` (pure `moveItem` + `useDragReorder`; pinned rows immovable), `QuestionCreator` (+ `ccPreview.ts`, `arenaEditing.ts` — `MAX_ARENA_SIZE` 30, `fillInAuthoring.ts`), `Gradebook.ts`/`GradebookView.tsx`, `DocumentEditors.tsx` (the callout-list and figure-list widgets shared by the assignment editor and the creator; `readFigureFile` caps an upload at 300 KB, downscaling rasters). |
+| Instructor UI | `app/src/instructor/` | `InstructorApp`, `InstructorGate`, `InstructorDashboard`, `RosterView`, `FeedbackQueueView`, `NotesView`, `AssignmentEditor`, `dragReorder.ts` (pure `moveItem` + `useDragReorder`; pinned rows immovable), `QuestionCreator` (+ `ccPreview.ts`, `arenaEditing.ts`, `turbotCaseAuthoring.ts` / `TurbotArenasEditor`, `fillInAuthoring.ts`), `Gradebook.ts`/`GradebookView.tsx`, `DocumentEditors.tsx` (callout/figure list widgets shared by the assignment editor and creator; `readFigureFile` caps an upload at 300 KB, downscaling rasters). |
 | Student UI | `app/src/components/` | `CircuitCanvas`, `ComponentLibrary`, `DataTable`, `StudentLayout` (the Home tabs), `HomeScreen` (Assignments tab + up-next box), `GradesView` + `GradeSheet` (the Grades tab and its inline sheet), `GradedCaseBanner`, `AssignmentOverview` (the document page), `ProblemSetDocument`, `MenuBar`, `FeedbackPanel`, `SequentialTimeline`, `TMTapePanel`, `ArenaCanvas`, `TurbotArenaPanel` (Map + run controls; sandbox "Edit map"), `TurbotTapePanel`, `OpenResponsePanel`/`FillInPanel` (read-only when locked; paste-guarded), `SimulationPanel`, `TabBar` (question nav + Mark done / 🔒 tag; sandbox + menu), `outputDisplay.ts` (t1-rightmost OUT rows, per-group ARG values). |
 | API client | `app/src/api/client.ts` | One typed function per endpoint; bearer token under `mm:auth:token`; `onUnauthorized` hook; `health()`; auth/roster/feedback/notes calls; `putWorkbook` takes `keepalive`. `setApiBase` is the harness override. |
 | Dev tool | `app/tools/shootProblemSets.mjs` | Headless-Chrome screenshots of every HW document, the canvas panel and the editor (it seeds local mode itself) — the visual proof when the browser pane is unavailable. |
