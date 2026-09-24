@@ -1059,6 +1059,51 @@ thead .sc-label-col {
   white-space: nowrap;
 }
 
+/* ── Paste notices (provenance.ts refusalMessage) ── */
+/* On the canvas: top centre, clear of the validation warnings below. */
+.canvas-notice,
+.library-paste-notice {
+  background: #e8f1ff;
+  border: 1px solid var(--accent);
+  color: var(--text);
+  border-radius: 4px;
+  line-height: 1.4;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
+.canvas-notice {
+  position: absolute;
+  top: 10px;
+  left: 50%;
+  transform: translateX(-50%);
+  max-width: min(560px, calc(100% - 32px));
+  padding: 6px 14px;
+  font-size: 12px;
+  text-align: center;
+  z-index: 50;
+}
+
+/* Beside the palette's box rename. The 64px palette scrolls, so it would clip
+   anything wider: the notice is a fixed box at its static position, nudged
+   out over the canvas. */
+.library-paste-notice {
+  position: fixed;
+  align-self: flex-start;
+  margin-left: 58px;
+  width: 240px;
+  padding: 6px 10px;
+  font-size: 11px;
+  cursor: default;
+  z-index: 60;
+}
+
+/* In an answer field's footer (open response, fill-in). */
+.paste-notice {
+  color: var(--accent-hover);
+  font-weight: 500;
+  text-align: right;
+}
+
 /* ── Machine Type Selector ── */
 .machine-type-selector {
   display: flex;
@@ -1573,6 +1618,12 @@ thead .sc-label-col {
 .open-response-foot {
   display: flex;
   justify-content: space-between;
+  gap: 16px;
   font-size: 12px;
   color: var(--text-secondary);
+}
+
+/* The count keeps its line when a paste notice takes the right side. */
+.open-response-foot > :first-child {
+  white-space: nowrap;
 }

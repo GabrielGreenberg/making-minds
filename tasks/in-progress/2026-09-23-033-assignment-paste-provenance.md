@@ -119,3 +119,57 @@ per window. The rule "same window" holds for free as long as the clipboard never
 - Owed: mobile Safari and Chrome paste behaviour on a real phone.
 
 ## Progress log
+
+### 2026-09-23 — implemented (work loop)
+**Built.** In an assignment, a paste (canvas or answer field) now takes only what this user
+copied inside one of their assignments in this window; anything else is refused with a short
+notice naming the rule. The sandbox is free, as before. One seam, `app/src/provenance.ts`: a
+module-memory clipboard with a canvas slot and a text slot, each item stamped `{scope, user}`
+(+ canvas kind), the pure `canPaste` policy, `canvasPasteVerdict` (policy, then canvas kind,
+then `allowed_components` recursing into BOXED; a sandbox target skips all three),
+`textPasteVerdict`, `refusalMessage`. `app/src/usePasteGuard.ts` is the one DOM adapter
+(copy / cut / paste / drop / dragstart / `beforeinput`) worn by the open response, the fill-in
+blanks and both box-rename fields; a guarded copy writes only `''` plus an opaque copy id
+(`application/x-makingminds-copy`, no content) to the system clipboard, and a paste inserts
+the slot's text, never the system clipboard's. The store's `clipboard` state is gone
+(`copySelected`/`paste` go through the seam; a refused paste leaves no undo entry);
+`resetForPrincipal` empties the seam, a canvas swap never does. `window.__store` is dev-only;
+`importProject` (and the dead `boxedLibrary`/`importBoxedCircuit`/`boxCurrentCircuit`) removed.
+Law 8 added to PROFILE §8 and CLAUDE.md "Critical design rules"; CLAUDE.md trimmed to 39973 B.
+
+**Settled default (reversible — Gabriel may flip):** problem-statement text is NOT pasteable
+into an answer. Only the answer fields are guarded (Done-when 3); statement copying stays
+native (the PDFs are public), so pasting it into an answer is refused like any outside text.
+No page-wide copy listener. The flip would stamp statement copies into the seam's text slot.
+
+**Pins.** New `app/tools/pasteCheck.ts` (85 checks, in `npm run check`): [policy table],
+[canvas verdict] (mode mismatch, OR into a restricted question, boxed-OR recursion, sandbox
+free), [text verdict] (copy id / other-window / outside / image-since), [input types],
+[store paste] (sandbox → HW refused with no undo entry; Q1 → Q2 and HW-A → HW-B accepted;
+FSM → CC refused; FSM → sandbox tab accepted; locked no-op; principal change), [grep gate]
+(no clipboard API outside the hook; every `components/*.tsx` text field guarded, bare
+`readOnly`, or a counted exemption — mutation-tested), [console hole]. `navResetCheck`'s
+principal-change pins now read the seam's two slots.
+
+**Gates (exit codes):** app tsc 0 · app build 0 · app `npm run check` 0 · server typecheck 0 ·
+server check 0. Fresh `dist/` has no `__store` string (proxy for the production check).
+
+**Review findings — fixed:** (1+4) sandbox verdict now returns ok before policy/kind/allowed
+checks, as Done-when 1–2 say; (2) a stale text slot no longer pastes silently after a copy in
+another window — the copy id; (3+5) the answer-field gate checks each field, not each file;
+CLAUDE.md Provenance row wording. **Skipped:** none. **Known limit:** a browser that drops
+custom clipboard types loses the id, so after a copy in another window the stale slot can
+still paste (never outside content) — documented at `textPasteVerdict`.
+
+**Owed (not claimed):** the Verify browser pass with screenshots (Done-when 7) — canvas
+sandbox → HW1 P1 refused; P1 → P2 and HW1 → HW2 accepted; OR into P2 refused naming OR;
+FSM → CC refused; open response + fill-in: own copy → paste works, outside text / statement
+text / drag refused; box rename refused; nothing reaches the system clipboard; sign out → other
+toy account → paste brings nothing; `npm run build && npm run preview` → `window.__store`
+undefined (still defined in dev); notices sit in the editor vocabulary without overlapping
+validation warnings; a real two-window copy to confirm the copy id survives. Owed to Gabriel:
+iOS Safari / Android Chrome long-press paste (keyboard clipboard-suggestion chips arrive as
+IME typing and cannot be told apart — a stated limit).
+
+**Next step:** loop session: visual check (owed browser pass above, screenshots into this
+log), then land per PROFILE §5.

@@ -1,5 +1,5 @@
-import type { ClipboardEvent, DragEvent } from 'react';
 import { useStore, selectQuestionLocked } from '../store';
+import { usePasteGuard } from '../usePasteGuard';
 import { ProblemBody, ProblemContext } from './ProblemSetDocument';
 
 /**
@@ -8,10 +8,10 @@ import { ProblemBody, ProblemContext } from './ProblemSetDocument';
  * Submit), but the "canvas" is one writing area bound to the store's
  * openResponse, which persists/travels exactly like a circuit.
  *
- * Copy, cut, paste, and drag-and-drop are blocked in the writing area to
- * discourage pasting in prepared (or generated) text and copying answers out —
- * students type their answer here. This is a soft deterrent, not a security
- * boundary.
+ * The writing area wears the provenance guard (usePasteGuard; law 8): the
+ * student may copy, cut and paste their OWN assignment text, but text from
+ * outside the assignments (another app, a chat, the sandbox) is refused with a
+ * notice, and nothing copied here reaches the system clipboard.
  */
 export function OpenResponsePanel() {
   const assignment = useStore((s) => s.assignment);
@@ -20,10 +20,10 @@ export function OpenResponsePanel() {
   const response = useStore((s) => s.openResponse);
   const setOpenResponse = useStore((s) => s.setOpenResponse);
   const locked = useStore(selectQuestionLocked);
+  const { ref: pasteGuardRef, notice: pasteNotice } = usePasteGuard();
 
   if (!assignment || !question) return null;
 
-  const block = (e: ClipboardEvent | DragEvent) => e.preventDefault();
   const words = response.trim() === '' ? 0 : response.trim().split(/\s+/).length;
 
   return (
@@ -41,21 +41,22 @@ export function OpenResponsePanel() {
           className="open-response-textarea"
           value={response}
           onChange={(e) => setOpenResponse(e.target.value)}
-          onCopy={block}
-          onCut={block}
-          onPaste={block}
-          onDrop={block}
+          ref={pasteGuardRef}
           placeholder="Type your answer here…"
           spellCheck
           readOnly={locked}
         />
         <div className="open-response-foot">
           <span>{words} word{words === 1 ? '' : 's'}</span>
-          <span>
-            {locked
-              ? 'Marked done — unlock this question to keep editing.'
-              : "Saved automatically — submit the assignment when you're done."}
-          </span>
+          {pasteNotice ? (
+            <span className="paste-notice" role="status">{pasteNotice}</span>
+          ) : (
+            <span>
+              {locked
+                ? 'Marked done — unlock this question to keep editing.'
+                : "Saved automatically — submit the assignment when you're done."}
+            </span>
+          )}
         </div>
       </div>
     </div>

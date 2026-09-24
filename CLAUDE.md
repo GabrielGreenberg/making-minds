@@ -5,11 +5,10 @@ says where the project stands, Part 2 is the technical reference. It is kept **u
 by `tasks/tools/check-budgets.mjs` (runs in CI and in app `npm run check`).
 
 > **Maintenance.** When a task changes what is built, how it works, or what comes next,
-> update the STATUS here — Part 1 "Where we are now" / "What's next" and the affected Part 2
-> entries — **in place: replace, never append**, and bump the date below. The dated story of
-> a change lives in its task file's `## Progress log` under `tasks/` and one line in
-> `tasks/log.md`, never here. The pre-pipeline changelog (2026-07 → 2026-09-21) is frozen
-> in `docs/HISTORY.md`.
+> update the STATUS here (Part 1 "Where we are now" / "What's next", the affected Part 2
+> entries) **in place: replace, never append**, and bump the date below. A change's dated
+> story lives in its task file's `## Progress log` and one line in `tasks/log.md`, never
+> here; the pre-pipeline changelog (2026-07 → 2026-09-21) is frozen in `docs/HISTORY.md`.
 
 _Last updated: 2026-09-23_
 
@@ -29,8 +28,8 @@ the id rule: `tasks/README.md`; shared operating rules every role reads first:
   `size: small` task, fixes it in a worktree, verifies by the gates, merges. `large`/`unknown`
   tasks and anything with `requires:` are interactive-only by construction.
 
-The former build-out loop (`/handoff`, `docs/buildout/`) is retired; its memos are history,
-except `NORTH_STAR.md` (the design principle) and `VISUAL_VOCAB.md` (the appearance oracle).
+The former build-out loop (`/handoff`) is retired; of `docs/buildout/` only `NORTH_STAR.md`
+and `VISUAL_VOCAB.md` stay live (Source-of-truth docs).
 
 ---
 
@@ -55,8 +54,7 @@ server-side grading, sanitized student payloads, real sessions). Identical flows
 except where noted.
 
 **Student side.** Every surface outside the editor renders inside ONE site-styled shell
-(`PageShell`: the makingminds.org topbar, nav and lavender band, IBM Plex, the `--mm-*`
-tokens of `theme.css`; tasks 019 + 021 + 023). The student area is **Home** (nav label; an
+(`PageShell`, the makingminds.org look — Key files: Page surfaces). The student area is **Home** (nav label; an
 instructor's "Student view" is the same page) with the tabs **Assignments** (the catalog under
 the website's up-next box — the soonest due homework) and **Grades** (`#/grades[/:id]`: a row per
 homework with the result once released, opening into the question-by-question sheet; task
@@ -78,7 +76,7 @@ turbot** (TM: clickable tape strip below the canvas, machine table / run / histo
 tape alphabet tied to the question's `representation`; turbot: the normal editor for the
 question's `innerMode` brain plus the arena "Map" — grid, Step/Run/Pause/Reset, cycle/sensor
 readout — in the right panel; TM brains also show their internal tape read-only),
-**open** (free-text panel, copy/paste blocked as a soft deterrent) and **fill-in** (labelled
+**open** (free-text panel) and **fill-in** (labelled
 boxes, autograded). Debounced autosave through `WorkbookStore` (remote: PUT with an `'error'`
 indicator + backoff retry, keepalive unload flush, and a per-email crash-buffer journal
 replayed on the next open — a hard tab kill loses nothing). Leave and resume. **Submit** a
@@ -93,6 +91,9 @@ never submitted stays editable and can submit late, and that submission then fre
 **Mark done**: a per-question self-lock toggle with an "N of M done" summary; both locks share
 `isCurrentQuestionLocked`. A **Feedback** link files platform/homework reports (category,
 message, ≤ 2 downscaled screenshots). Editor chrome is minimal (Home + Submit + session).
+**Paste provenance** (task 033): in an assignment a paste (canvas or answer field) takes only
+what this user copied in an assignment in this window, else a notice says why; nothing copied
+there reaches the system clipboard. The sandbox is free.
 **Visitors** (task 027): access is per route (`routing.ts routeAccess`) — the sandbox is public, needs
 no server; a browser never signed in (`mm:auth:known`) opening `#/` lands there (banner, Sign in).
 The freeform **sandbox** offers every machine as a worksheet tab — CC / FSM / TM and a
@@ -111,13 +112,11 @@ requires visiting the goal, so hardcoded out-and-back brains fail), **perception
 matches), **fill-in** (`engine/fillIn.ts`, string compare, leading zeros/whitespace
 normalised), **open** (a `'pending'` result carrying the response for manual review).
 Question-level constraints checked at Stage 1: `allowed_components`, `component_limits`,
-`maxTapeCells`, `requireStandardHaltPosition`. Submissions autograde on receipt — locally in
-`LocalSubmissionStore`, remotely on the server with the same engine; in remote mode the
-browser never sees `test_cases` (grep-gated) and server ≡ engine parity is pinned.
+`maxTapeCells`, `requireStandardHaltPosition`. Submissions autograde on receipt (the Grading
+seam: locally in the browser, remotely on the server with the same engine).
 
-**Instructor side** (`#/instructor`, the **Dashboard**: the same shell and column as the student
-pages, its sections as tabs in the column — Assignments · Roster & accounts · Feedback · Notes;
-the nav reads Student view · Dashboard for instructors; every view in the page vocabulary): **Roster & accounts** (remote — the registrar's class list as exported,
+**Instructor side** (`#/instructor`, the **Dashboard**: the student pages' shell and column, its sections
+as tabs — Assignments · Roster & accounts · Feedback · Notes): **Roster & accounts** (remote — the registrar's class list as exported,
 a status report + who-left review; who has an account, password reset, add/remove, access requests),
 **Feedback** queue (open/resolved/all), shared **Notes** page (one markdown document,
 `marked` + `dompurify`, save-only-on-Save, warns before overwriting a newer save),
@@ -138,8 +137,7 @@ drill-down per mode; ✓/✗ + note manual review of open questions; Release/Hid
 import (UI + CLI), the **homework sync** (`npm run homeworks -- sync |
 status`, task 007 — HW1–HW7 from the repo into the DB: missing ones added unpublished, copies
 nobody edited refreshed, instructor-edited ones left alone and listed), assignment CRUD, workbooks, submit-with-grading,
-manual review, grade release, feedback, notes, `/api/health`. Redaction server-side
-(`sanitize.ts`). SQLite, WAL. Gates: `serverCheck`, `rosterCheck`, `authCheck`, `parityCheck`, `homeworkSyncCheck`.
+manual review, grade release, feedback, notes, `/api/health`. SQLite, WAL. Gates: `serverCheck`, `rosterCheck`, `authCheck`, `parityCheck`, `homeworkSyncCheck`.
 
 **Deployment — pilot live.** Cloudflare Pages `https://making-minds.pages.dev` → Lightsail
 API at the placeholder `https://100-22-69-95.sslip.io` (Caddy TLS). Not yet fit for students:
@@ -149,8 +147,7 @@ deletable from the dashboard). **Content:** HW1–HW7 live in the repo as JSON
 prose problems as open questions), transcribed to their PDFs' document structure (sections,
 intros, callouts, SVG figures cropped from the PDFs under `app/public/problem-sets/` beside the
 PDFs themselves). **The repo is the source; every release syncs it into the pilot DB**
-(`deploy/release.sh` → `npm run homeworks -- sync`; unpublished until an instructor publishes),
-and local mode's "Load HW1–HW7" runs the same planner.
+(`deploy/release.sh` → `npm run homeworks -- sync`), and local mode's "Load HW1–HW7" runs the same planner.
 
 **Reference-fixture coverage:** 56/56 at-tier — 46 exact (correct passes every case, broken
 fails) + 10 interface (navigation/capstone: a plausible attempt validates and grades
@@ -172,16 +169,14 @@ the worker routine.
 ## What this is
 
 An interactive web platform for **PHIL 133 ("Making Minds")**, a philosophy/computation
-course (~80 students). Students build circuits, finite state machines, Turing machines and
-grid-based agents ("turbots"), completing and submitting homeworks that are automatically
-graded. A **single-page React + TypeScript app** (`app/`, Vite) with two backends behind one
-switch: local (localStorage; the default and the dev/harness environment) and remote (the
-`server/` API, selected at build time by `VITE_API_BASE`).
+course (~80 students): students build circuits, finite state machines, Turing machines and
+grid-based agents ("turbots") in autograded homeworks. A **single-page React + TypeScript
+app** (`app/`, Vite) over the two backends of Part 1 (`VITE_API_BASE` picks remote at build).
 
 ## Architecture principle: seams
 
-Every external dependency sits **behind an interface**. This is how the no-backend prototype
-became a server-backed product by swapping implementations, not rewriting the UI. The seams
+Every external dependency sits **behind an interface** — how the no-backend prototype became
+a server-backed product by swapping implementations, not rewriting the UI. The seams
 are Promise-returning; `storage/backend.ts` is the ONE mode decision and the sole exporter of
 store instances. **Route new features through these seams, not around them.**
 
@@ -196,20 +191,20 @@ store instances. **Route new features through these seams, not around them.**
 | Feedback / Notes | `FeedbackStore` / `NotesStore` | localStorage (`mm:feedback`, `mm:instructor-notes`) | `/api/feedback*`, `/api/instructor-notes` |
 | Navigation | `routing` (`Route` + `navigate`) | hash URLs (starts inside AuthGate) | same |
 
-**Keep evaluation logic framework-agnostic.** All simulation and grading lives in
-`app/src/engine/` — pure TypeScript, no React, Zustand, or DOM — so the same code runs in the
-browser and on the server. The store and UI are thin wrappers over the engine.
+**Keep evaluation logic framework-agnostic**: all simulation and grading lives in
+`app/src/engine/` (pure TypeScript, no React, Zustand or DOM); the store and UI are thin
+wrappers over it.
 
 ## Key files
 
 | Area | Path | What's there |
 | --- | --- | --- |
-| Types | `app/src/types.ts` | All domain types: `AssignmentData` (incl. the document level: `preamble`, `sections: AssignmentSection[]`, `sourcePdf`) / `AssignmentQuestion` (incl. `title`, `hint`, `callouts`, `figures`, `allowed_components`, `component_limits`, `maxTapeCells`, `requireStandardHaltPosition`, `perception`/`perception_cases`, `turbot_cases`, `fill_in`/`fill_in_answers`), `SubmissionData`/`SubmissionRecord`, `QuestionResult` (+ `ManualReview`), `CircuitData`, `CCSpec`, `ArenaConfig`/`TurbotCaseResult`, `PerceptionCaseResult`, `QuestionCircuit` (`responseText`, `done`). `questionModeLabel` names a turbot's inner machine / a perception task in mode chips. `placeableBoxKinds`: CC/SC box kinds; TM and FSM return `[]` **by design**, reasoning inline. |
+| Types | `app/src/types.ts` | All domain types: `AssignmentData` (incl. the document level: `preamble`, `sections: AssignmentSection[]`, `sourcePdf`) / `AssignmentQuestion` (incl. `title`, `hint`, `callouts`, `figures`, `allowed_components`, `component_limits`, `maxTapeCells`, `requireStandardHaltPosition`, `perception`/`perception_cases`, `turbot_cases`, `fill_in`/`fill_in_answers`), `SubmissionData`/`SubmissionRecord`, `QuestionResult` (+ `ManualReview`), `CircuitData`, `CCSpec`, `ArenaConfig`/`TurbotCaseResult`, `PerceptionCaseResult`, `QuestionCircuit` (`responseText`, `done`). `questionModeLabel` names a turbot's inner machine / a perception task in mode chips. |
 | Engine | `app/src/engine/cc.ts`, `sc.ts`, `fsm.ts` | Pure simulators: topological eval (CC), clocked step (SC; `evaluateSCSequence` clocks top-level MEMs only), transition matching (FSM; `evaluateFSMSymbolStep`). One `sortByLabel` in cc.ts orders I/O for top-level and boxed internals. |
 | Engine | `app/src/engine/tm.ts`, `tmValidate.ts`, `tmCodec.ts` | TM: notation-aware tape engine — **two-output** labels `read:write,move` (`1:0,R`; legacy `1:0R` parses forever as an alias) executed as one atomic step; table validation (ambiguous/unparseable via the generic walker); the codec `tape` axis (accept honors `requireStandardHaltPosition` — head halts on the output block's rightmost cell); `tapeCellsUsed` = span of tape touched, for `maxTapeCells`. |
 | Engine | `app/src/engine/grader.ts` | `gradeSubmission`/`gradeQuestion`: Stage-1 validation then the codec pipeline for CC/SC/FSM/TM; `gradeTurbot` (arena criteria); `gradePerception` (bit-level); fill-in; open → `'pending'` carrying `response`. |
-| Engine | `app/src/engine/codec.ts`, `machineValidation.ts` | The codec (`space`/`time` value↔bits; `tape` → tmCodec; `stepCountFor`, `encodeInput`, `timeOutputBits`) and Stage-1 validation incl. `validateAllowedComponents`/`isComponentTypeAllowed` (absent/empty = unrestricted; INPUT/OUTPUT/STATE always allowed; BOXED internals recursed) and component limits. |
-| Engine | `app/src/engine/testVectorGen.ts`, `formulaEval.ts` | Authoring-time: formula DSL → `buildQuestionBank(inputs, outputs, rep, mode)` → `{spec, test_cases}` (widths derived; SC/FSM/TM sampled). |
+| Engine | `app/src/engine/codec.ts`, `machineValidation.ts` | The codec (`space`/`time` value↔bits; `tape` → tmCodec; `stepCountFor`, `encodeInput`, `timeOutputBits`) and Stage-1 validation incl. `validateAllowedComponents`/`isComponentTypeAllowed` (semantics: Critical design rules, Homework JSON) and component limits. |
+| Engine | `app/src/engine/testVectorGen.ts`, `formulaEval.ts` | Authoring-time: formula DSL → test banks (Reference-function DSL below). |
 | Engine | `app/src/engine/notation.ts` | Transition-label SYNTAX seam: `TransitionNotation` (parse / canonical format / alphabet / editor token fields / default) for all grammars — k-bit `fsmNotation(inBits, outBits)`, `tmNotation(rep)` (`*` binary-only), `turbotFsmNotation` (1-bit alias → canonical 2-bit motor), `turbotInternalNotation(tapeNotation)`; generic `validateTransitionTable` walker. Label dissection is allowed ONLY here (notationCheck grep gate). |
 | Engine | `app/src/engine/representation.ts`, `index.ts` | value↔bits core (`valueToBits`/`isValidCodeword`/`bitsToValue`), display helpers; barrel exports. |
 | Engine | `app/src/engine/turbot.ts` | Arena driver loop: `senseAhead`/`senseAheadSymbol` (B/E/F), `applyMotorCommand`, `runBrainStep`/`initialBrainState` (CC/SC circuit brains; the turbot FSM with 2-bit motor outputs `in:ij` via `turbotFsmNotation`; the textbook **turbot TM** — internal (circle) states do single tape ops on the encoding's alphabet, external (square) states sense B/E/F and move ↑/↱/↰; `validateTurbotTM`/`validateTurbotFSM`), `runTurbot` (`stopped` = motor 00 or TM halt). `evaluateTurbotCriterion` + `criterionRequiresStop` (pass-through is trace-satisfiable: `pass: true` with `hitStepLimit: true` is legitimate) + `explainTurbotCriterionFailure`. |
@@ -224,14 +219,15 @@ browser and on the server. The store and UI are thin wrappers over the engine.
 | Auth | `app/src/auth/` | `AuthGate.tsx` (per-route gate; `initRouting()` + landing rule fire here), `HealthGate.tsx` (health provider + retry screen), `LoginScreen.tsx` (toy picker locally; remotely the panes Part 1 describes, from the server's `AuthCapabilities`), `AccountPanel.tsx` (change password), `authProvider.tsx` (one provider per mode), `types.ts`, `session.ts`, `accounts.ts`, `instructorRole.ts`. |
 | Page surfaces | `app/src/theme.css`, `pages.css`, `components/PageShell.tsx`, `SessionControls.tsx` | The design layer for everything outside the editor. `theme.css`: the makingminds.org palette / type / spacing as `--mm-*` tokens (each names its `site.css` original; colour literals live ONLY in its `:root`) + the shared vocabulary (shell, tags, hairline rows, tables, buttons, fields, segmented controls, modals). `pages.css`: per-surface rules (home, overview, grade sheet, login, feedback, the instructor views). `PageShell`: topbar (serif brand → the website; `appNav` by role — Assignments for students, Student view · Dashboard for instructors; the boxed Sandbox link; session controls) · band · ONE `.page` column (1080px, every route — the shell is invariant, pinned by measurement) · footer, plus a `card` variant for login/health; `.mm-tabs` is a section's own navigation inside the column (the Dashboard's tabs). `index.css` is the editor alone and inherits only the font family. Rules: `docs/buildout/VISUAL_VOCAB.md` §Page surfaces; gate: `themeCheck`. |
 | Async UI | `app/src/useAsyncValue.ts` | The shared fetch-on-mount hook (`value`/`loading`/`error`/`reload`) behind every view reading the async seams. |
+| Provenance | `app/src/provenance.ts`, `usePasteGuard.ts` | The paste seam (pure; its header states the rule and its limits): `canPaste`, `canvasPasteVerdict` (in an assignment + canvas kind, `allowed_components`), `textPasteVerdict`, `refusalMessage`; a module-memory clipboard (canvas + text slots). `usePasteGuard`: the answer fields' DOM adapter (copy/cut/paste/drop/`beforeinput`). |
 | Assignments | `app/src/assignments/index.ts` | Thin registry over the `AssignmentStore` seam (`listAssignments`/`getAssignment`/`createAssignment`) + `sortAssignments` (instructor `order` asc, then title). Nothing is bundled into the app: local mode starts empty until the dashboard's dev seeds load content. |
 | Instructor UI | `app/src/instructor/` | `InstructorApp`, `InstructorGate`, `InstructorDashboard`, `RosterView`, `FeedbackQueueView`, `NotesView`, `AssignmentEditor`, `dragReorder.ts` (pure `moveItem` + `useDragReorder`; pinned rows immovable), `QuestionCreator` (+ `ccPreview.ts`, `arenaEditing.ts` — `MAX_ARENA_SIZE` 30), `Gradebook.ts`/`GradebookView.tsx`, `DocumentEditors.tsx` (the callout-list and figure-list widgets shared by the assignment editor and the creator; `readFigureFile` caps an upload at 300 KB, downscaling rasters). |
-| Student UI | `app/src/components/` | `CircuitCanvas`, `ComponentLibrary`, `DataTable`, `StudentLayout` (the Home tabs), `HomeScreen` (Assignments tab + up-next box), `GradesView` + `GradeSheet` (the Grades tab and its inline sheet), `AssignmentOverview` (the document page), `ProblemSetDocument`, `MenuBar`, `FeedbackPanel`, `SequentialTimeline`, `TMTapePanel`, `ArenaCanvas`, `TurbotArenaPanel` (Map + run controls; sandbox "Edit map"), `TurbotTapePanel`, `OpenResponsePanel`/`FillInPanel` (read-only when locked), `SimulationPanel`, `TabBar` (question nav + Mark done / 🔒 tag; sandbox + menu), `outputDisplay.ts` (t1-rightmost OUT rows, per-group ARG values). |
+| Student UI | `app/src/components/` | `CircuitCanvas`, `ComponentLibrary`, `DataTable`, `StudentLayout` (the Home tabs), `HomeScreen` (Assignments tab + up-next box), `GradesView` + `GradeSheet` (the Grades tab and its inline sheet), `AssignmentOverview` (the document page), `ProblemSetDocument`, `MenuBar`, `FeedbackPanel`, `SequentialTimeline`, `TMTapePanel`, `ArenaCanvas`, `TurbotArenaPanel` (Map + run controls; sandbox "Edit map"), `TurbotTapePanel`, `OpenResponsePanel`/`FillInPanel` (read-only when locked; paste-guarded), `SimulationPanel`, `TabBar` (question nav + Mark done / 🔒 tag; sandbox + menu), `outputDisplay.ts` (t1-rightmost OUT rows, per-group ARG values). |
 | API client | `app/src/api/client.ts` | One typed function per endpoint; bearer token under `mm:auth:token`; `onUnauthorized` hook; `health()`; auth/roster/feedback/notes calls; `putWorkbook` takes `keepalive`. `setApiBase` is the harness override. |
 | Dev tool | `app/tools/shootProblemSets.mjs` | Headless-Chrome (CDP) full-page screenshots of every HW document, the canvas panel and the editor against the dev server, seeding local mode itself — the visual proof recipe when the browser pane is unavailable. |
 | Server | `server/src/app.ts`, `db.ts`, `auth.ts`, `password.ts`, `roster.ts`, `rosterImport.ts`, `sanitize.ts`, `config.ts`, `seed.ts`, `roster-cli.ts`, `homeworks.ts`, `homeworks-cli.ts` | Routes, SQLite storage, the `AuthProvider` seam (`createAuthProvider` — `MM_AUTH_MODE`: `password` default / `dev` / `sso`; `LoginThrottle`), scrypt credentials (`scrypt$N$r$p$salt$hash`, self-describing), the pure roster reader (`roster.ts`, the registrar's export as-is) + `rosterImport.ts` (never removes; lists who left), redaction + grade-release withholding (`sanitize.ts`: students get no `test_cases`/`perception_cases`/`fill_in_answers`; their own results keep safe per-case fields but never `expected`/`got`), env config, seeding, the admin CLI (`npm run roster`). The homework sync (`homeworks.ts`: a copy is pristine iff its content hash is a committed version of its file — `gitLineage` over the box's clone — or one the sync wrote, the `content_sync` table; `seed.ts --homeworks` runs it too). Tools: `serverCheck.ts`, `rosterCheck.ts`, `authCheck.ts`, `parityCheck.ts` (server ≡ in-process grading, deep-compared), `homeworkSyncCheck.ts`. |
-| Dev/sample | `app/src/devData/sampleData.ts`, `seed.ts`, `homeworks.ts`, `homeworks/hw{1..7}.json` | Sample assignment for all modes (netlist-built perception circuits, one turbot question per inner mode, open Q14) + sample submissions; `seedHomeworks()` syncs the real HW1–HW7 (added / refreshed if untouched since loaded — record `mm:seeded-homework:<id>` / left alone if edited) + reseeds 22 sample submissions; `homeworkSync.ts` is the pure planner it shares with the server (content hash = canonical JSON minus the instructor-owned `order`/`dueDate`; insert / unchanged / refresh / edited). |
-| Tools | `app/tools/*.ts` | The headless harness — the project's test suite, all in `npm run check` (plus `grade.ts`, the CLI grader; `builder.ts`, the netlist builder; `layoutCheck.ts`, the canvas layout oracle): `codecCheck`, `dueDateCheck`, `statementFormatCheck` (markup grammar + the document model + every seeded HW valid, its figures on disk), `notationCheck` (grammar pins + label-dissection grep gate), `themeCheck` (page-surface design layer: colour literals only in `theme.css :root`, every `--mm-*` token defined, shell wiring, retired header idioms gone), `tmCheck`, `turbotCheck` (all four brains; `[multi-arena]`, `[pass-through step-limit]`, trajectory/orientation independence), `perceptionCheck`, `scWindowCheck` (question runs ≡ grader), `routerCheck` (fallback budget 2; route-quality flags; hw3-p4 regression pin), `bumpCheck`, `pipelineCheck` (submit → grade, every mode), `navResetCheck` (both reset laws; `[mark as done]`, `[frozen assignment]`), `routingCheck` (route access, landing, held routes, principal change), `boxScopeCheck` (box library scope, SC boxing refuses MEM, `[naming]`), `remoteStoreCheck` (boots the REAL server; grader-import grep gate; auth client against a password-mode server), `coverageCheck` (the two-tier reference-fixture ledger + `allowed_components` self-test pins). |
+| Dev/sample | `app/src/devData/sampleData.ts`, `seed.ts`, `homeworks.ts`, `homeworks/hw{1..7}.json` | Sample assignment for all modes (netlist-built perception circuits, one turbot question per inner mode, open Q14) + sample submissions; `seedHomeworks()` syncs the real HW1–HW7 (record `mm:seeded-homework:<id>`) + reseeds 22 sample submissions; `homeworkSync.ts` is the pure planner it shares with the server (content hash = canonical JSON minus the instructor-owned `order`/`dueDate`; insert / unchanged / refresh / edited). |
+| Tools | `app/tools/*.ts` | The headless harness — the project's test suite, all in `npm run check` (plus `grade.ts`, the CLI grader; `builder.ts`, the netlist builder; `layoutCheck.ts`, the canvas layout oracle): `codecCheck`, `dueDateCheck`, `statementFormatCheck` (markup grammar + the document model + every seeded HW valid, its figures on disk), `notationCheck` (grammar pins + label-dissection grep gate), `themeCheck` (page-surface design layer: colour literals only in `theme.css :root`, every `--mm-*` token defined, shell wiring, retired header idioms gone), `tmCheck`, `turbotCheck` (all four brains; `[multi-arena]`, `[pass-through step-limit]`, trajectory/orientation independence), `perceptionCheck`, `scWindowCheck` (question runs ≡ grader), `routerCheck` (fallback budget 2; route-quality flags; hw3-p4 regression pin), `bumpCheck`, `pipelineCheck` (submit → grade, every mode), `navResetCheck` (both reset laws; `[mark as done]`, `[frozen assignment]`), `routingCheck` (route access, landing, held routes, principal change), `boxScopeCheck` (box library scope, SC boxing refuses MEM, `[naming]`), `pasteCheck` (paste policy, store paste, clipboard-API + answer-field grep gates, dev-only `__store`), `remoteStoreCheck` (boots the REAL server; grader-import grep gate; auth client against a password-mode server), `coverageCheck` (the two-tier reference-fixture ledger + `allowed_components` self-test pins). |
 | Queue | `tasks/` | The task pipeline (top of this file). `tasks/tools/check-budgets.mjs` is the size guard on this file. |
 
 ## Reference-function DSL (instructor authoring)
@@ -256,8 +252,6 @@ sees the formula, it runs against the generated numeric `test_cases`.
   `x + y` keeps its carry, write `x ^ y` for XOR.
 - **Representation** — one per question (`binary` | `tally`), governing input ranges, how the
   codec lays values on the axis, and decoding. The codec, not the DSL, owns value↔bits.
-- **All modes on one form**; `buildQuestionBank` takes the mode to choose exhaustive vs
-  sampled enumeration per axis.
 - **Safety** — strict token whitelist before `new Function()`; acceptable because formulas are
   instructor-authored, never student-supplied.
 
@@ -338,20 +332,24 @@ sees the formula, it runs against the generated numeric `test_cases`.
   principal change** (sign-in/out, 401) resets the whole editor store and loads that person's
   sandbox via `resetForPrincipal()`, called by the auth provider (`navResetCheck`); a
   background-tab removal deliberately leaves the live run alone.
+- **Assignment content enters only through the provenance seam** — canvas paste and every
+  answer field (open response, fill-in, box rename) ask `provenance.ts`; no clipboard API
+  outside `usePasteGuard.ts`, which every new answer field must wear (`pasteCheck` grep gate).
+  The clipboard is memory only: a principal change empties it, a canvas swap never does.
+  `window.__store` is dev-only.
 
 ## Things to watch
 
 - **Test cases never ship to the client in production — SOLVED in remote mode.** The server
-  strips `test_cases`/`perception_cases`/`fill_in_answers` from student assignment copies and
-  the answer key (`expected`/`got`) from student results, keeping the safe per-case fields
-  (`sanitize.ts`; parity-pinned both ways). Students submit answers only. LOCAL mode holds
-  answers and grades in the browser **by design** — it is the dev/demo prototype, never what
-  students use. Never wire the engine grader (or any answer-carrying JSON) into the
-  remote-store module graph (`remoteStoreCheck`'s grep gate enforces this).
+  strips `test_cases`/`perception_cases`/`fill_in_answers` from student copies and the answer
+  key (`expected`/`got`) from student results, keeping safe per-case fields (`sanitize.ts`;
+  parity-pinned both ways). LOCAL mode holds answers and grades in the browser **by design**
+  (the dev/demo prototype, never what students use). Never wire the engine grader (or any
+  answer-carrying JSON) into the remote-store module graph (`remoteStoreCheck` grep gate).
 - **localStorage is LOCAL mode only.** Remotely: the token (`mm:auth:token`) + its owner
   (`mm:auth:principal`), the crash journal, per-person sandboxes (`making-minds-autosave:*`),
   the migration guard.
-  Old local prototype data is never deleted — first remote login uploads it fill-empty.
+  Old local data is never deleted (first remote login uploads it fill-empty).
 - **Remote workbooks are last-write-wins across devices** (accepted pilot trade-off,
   `docs/buildout/designs/remote-stores.md` §5); an `updatedAt`/If-Match precondition is the
   noted follow-up if it ever bites.

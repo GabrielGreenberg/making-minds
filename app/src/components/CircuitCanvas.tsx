@@ -1,6 +1,7 @@
 import { useRef, useState, useCallback, useEffect, useMemo } from 'react';
 import { useStore, selectEffectiveMode, selectLiveFsmStateId, selectTransitionNotationForSource } from '../store';
 import { inputCharTokens } from '../engine';
+import { usePasteGuard, useNotice } from '../usePasteGuard';
 import type {
   CircuitComponent,
   Wire,
@@ -1543,15 +1544,22 @@ function BoxView({
   isHighlighted,
   isEditingName,
   onFinishEditName,
+  onNotice,
 }: {
   box: BoxDefinition;
   isDraft: boolean;
   isHighlighted: boolean;
   isEditingName?: boolean;
   onFinishEditName?: () => void;
+  /** Where a refused paste into the rename field explains itself (the
+   *  canvas's notice line — the field is too small to hold one). */
+  onNotice?: (message: string) => void;
 }) {
   const removeConfirmedBox = useStore((s) => s.removeConfirmedBox);
   const [hovered, setHovered] = useState(false);
+  // Box names are part of the graded circuit: the rename wears the provenance
+  // guard like every assignment answer field (law 8).
+  const { ref: pasteGuardRef } = usePasteGuard(onNotice);
 
   // Compute port positions along box boundary
   const inputPortPositions = useMemo(() => {
@@ -1638,6 +1646,7 @@ function BoxView({
         <foreignObject x={box.x + 2} y={box.y - 20} width={120} height={18}>
           <input
             autoFocus
+            ref={pasteGuardRef}
             defaultValue={box.name}
             onBlur={(e) => {
               const name = e.target.value.trim();
@@ -1804,6 +1813,9 @@ export function CircuitCanvas() {
   const [isPanning, setIsPanning] = useState(false);
   const [containerSize, setContainerSize] = useState({ width: 800, height: 600 });
   const [editingBoxId, setEditingBoxId] = useState<string | null>(null);
+  // A refused paste's explanation (provenance.ts refusalMessage), from the
+  // canvas's own Cmd+V or a box-rename field's guard.
+  const [pasteNotice, showPasteNotice] = useNotice();
   const [drawBoxPreview, setDrawBoxPreview] = useState<{
     x: number; y: number; w: number; h: number;
   } | null>(null);
@@ -1937,7 +1949,8 @@ export function CircuitCanvas() {
         }
         if (e.key === 'v') {
           e.preventDefault();
-          useStore.getState().paste();
+          const refused = useStore.getState().paste();
+          if (refused) showPasteNotice(refused);
         }
         if (e.key === 'a') {
           e.preventDefault();
@@ -1948,7 +1961,7 @@ export function CircuitCanvas() {
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, []);
+  }, [showPasteNotice]);
 
   // ─── Wheel: zoom / pan ─────────────────────────────────────────
   useEffect(() => {
@@ -3593,6 +3606,7 @@ export function CircuitCanvas() {
               isHighlighted={selectedIds.some((id) => box.componentIds.includes(id))}
               isEditingName={editingBoxId === box.id}
               onFinishEditName={() => setEditingBoxId(null)}
+              onNotice={showPasteNotice}
             />
           ))}
 
@@ -3768,6 +3782,13 @@ export function CircuitCanvas() {
       {/* Navigation arrow */}
       {navArrow && (
         <NavigationArrow direction={navArrow} onClick={handleNavigate} />
+      )}
+
+      {/* A refused paste explains itself */}
+      {pasteNotice && (
+        <div className="canvas-notice" role="status">
+          {pasteNotice}
+        </div>
       )}
 
       {/* Validation warnings */}
