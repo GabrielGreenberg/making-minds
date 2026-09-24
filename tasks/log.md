@@ -15,3 +15,4 @@
 2026-09-23-033 · feature · Anti-cheating paste constraints — in an assignment, accept only content copied there in this window by this user; the sandbox stays free · 2026-09-23T17:36:42-0700 · task/033-assignment-paste-provenance · ee74c79
 2026-09-23-034 · feature · Quiet provenance watermark for circuits and paragraphs — keyed ids and text stamps, a signed writing/build trace, verify at submit, plain integrity notices · 2026-09-23T19:03:27-0700 · task/034-provenance-watermark · e78764f
 2026-09-21-002 · feature · Load a failed test input from the grade sheet into a live Run on the question canvas · 2026-09-23T20:21:14-0700 · task/002-failed-input-to-live-run · f511af7
+2026-09-21-003 · feature · Let a student view a submitted snapshot read-only at any time, not only once past due · 2026-09-23T21:24:57-0700 · task/003-view-submission-mode · 6269f85

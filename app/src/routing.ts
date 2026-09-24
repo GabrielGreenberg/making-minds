@@ -17,9 +17,12 @@ export type Route =
   | { kind: 'home' }
   | { kind: 'sandbox' }
   | { kind: 'grades'; id?: string }
-  // caseIndex: a graded case to load into the question's run ("Run this
-  // input" on the grade sheet) — only meaningful with a questionIndex.
-  | { kind: 'assignment'; id: string; questionIndex?: number; caseIndex?: number }
+  // attempt: a submitted attempt shown read-only instead of the live
+  // workbook (task 003, store viewSubmission) — absent = the live workbook
+  // (or, frozen, the latest submission). caseIndex: a graded case to load
+  // into the question's run ("Run this input" on the grade sheet) — only
+  // meaningful with a questionIndex.
+  | { kind: 'assignment'; id: string; attempt?: number; questionIndex?: number; caseIndex?: number }
   | { kind: 'instructor' }
   | { kind: 'instructor-new-assignment' }
   | { kind: 'instructor-edit'; id: string }
@@ -33,6 +36,12 @@ function indexSegment(part: string | undefined): number | undefined {
   if (part == null) return undefined;
   const n = Number(part);
   return Number.isInteger(n) && n >= 0 ? n : undefined;
+}
+
+/** An attempt number URL segment (an integer ≥ 1), or undefined. */
+function attemptSegment(part: string | undefined): number | undefined {
+  const n = indexSegment(part);
+  return n !== undefined && n >= 1 ? n : undefined;
 }
 
 /** Parse a location hash (e.g. "#/a/hw1/q/2") into a Route. Pure. */
@@ -62,16 +71,23 @@ export function parseHash(hash: string): Route {
   }
   if (parts[0] === 'a' && parts[1]) {
     const id = decodeURIComponent(parts[1]);
-    // #/a/:id/q/:i[/case/:k] — a malformed case segment is dropped, the
-    // question kept.
-    const qi = parts[2] === 'q' ? indexSegment(parts[3]) : undefined;
-    if (qi !== undefined) {
-      const k = parts[4] === 'case' ? indexSegment(parts[5]) : undefined;
-      return k !== undefined
-        ? { kind: 'assignment', id, questionIndex: qi, caseIndex: k }
-        : { kind: 'assignment', id, questionIndex: qi };
+    // #/a/:id[/submission/:n][/q/:i[/case/:k]] — a malformed attempt or case
+    // segment is dropped, the rest kept.
+    let rest = parts.slice(2);
+    let attempt: number | undefined;
+    if (rest[0] === 'submission') {
+      attempt = attemptSegment(rest[1]);
+      rest = rest.slice(2);
     }
-    return { kind: 'assignment', id };
+    const route: Route = attempt !== undefined ? { kind: 'assignment', id, attempt } : { kind: 'assignment', id };
+    const qi = rest[0] === 'q' ? indexSegment(rest[1]) : undefined;
+    if (qi !== undefined) {
+      const k = rest[2] === 'case' ? indexSegment(rest[3]) : undefined;
+      return k !== undefined
+        ? { ...route, questionIndex: qi, caseIndex: k }
+        : { ...route, questionIndex: qi };
+    }
+    return route;
   }
   return { kind: 'home' };
 }
@@ -85,11 +101,15 @@ export function routeToHash(route: Route): string {
       return '#/sandbox';
     case 'grades':
       return route.id ? `#/grades/${encodeURIComponent(route.id)}` : '#/grades';
-    case 'assignment':
-      if (route.questionIndex == null) return `#/a/${encodeURIComponent(route.id)}`;
+    case 'assignment': {
+      const base =
+        `#/a/${encodeURIComponent(route.id)}` +
+        (route.attempt != null ? `/submission/${route.attempt}` : '');
+      if (route.questionIndex == null) return base;
       return route.caseIndex != null
-        ? `#/a/${encodeURIComponent(route.id)}/q/${route.questionIndex}/case/${route.caseIndex}`
-        : `#/a/${encodeURIComponent(route.id)}/q/${route.questionIndex}`;
+        ? `${base}/q/${route.questionIndex}/case/${route.caseIndex}`
+        : `${base}/q/${route.questionIndex}`;
+    }
     case 'instructor':
       return '#/instructor';
     case 'instructor-roster':
@@ -226,7 +246,7 @@ function applyRoute(route: Route): void {
       return;
     case 'assignment': {
       const seq = applySeq;
-      void store.openAssignment(route.id).then((ok) => {
+      void store.openAssignment(route.id).then(async (ok) => {
         // A newer navigation was applied while the open was in flight — it
         // owns the UI now; applying this route's view state would clobber it.
         if (seq !== applySeq) return;
@@ -234,6 +254,15 @@ function applyRoute(route: Route): void {
           // Unknown assignment id (e.g. a stale deep link) — repair the URL to
           // Home without leaving a broken entry in history.
           navigate({ kind: 'home' }, { replace: true });
+          return;
+        }
+        // Which workbook the canvas shows — a submitted attempt, or the live
+        // one — BEFORE the question opens and any case loads, so both land on
+        // it. An unknown attempt repairs the URL to the live route.
+        const shown = await useStore.getState().viewSubmission(route.attempt ?? null);
+        if (seq !== applySeq) return;
+        if (route.attempt != null && !shown) {
+          navigate({ ...route, attempt: undefined }, { replace: true });
           return;
         }
         if (route.questionIndex != null) {

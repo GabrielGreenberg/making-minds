@@ -11,7 +11,10 @@
 // EDITING, not submitting: once the due date has passed AND the student has
 // at least one submission on file, their workbook stops being "the thing
 // they're still working on" and becomes a read-only view of what they last
-// submitted (store.ts's `selectAssignmentFrozen`/`isCurrentQuestionLocked`).
+// submitted (store.ts's `selectAssignmentFrozen`/`isCurrentQuestionLocked`):
+// the freeze is the one trigger that FORCES the submission view on — a
+// student can open that view themselves at any time (task 003,
+// `viewingSubmission`), but a frozen one has no way back to the live work.
 // A student who has never submitted is never frozen — nothing exists to
 // freeze — so they can keep editing and submit late exactly as before; the
 // moment they do, THAT submission is what freezes their view from then on.
