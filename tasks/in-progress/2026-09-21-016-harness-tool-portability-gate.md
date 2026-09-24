@@ -104,3 +104,26 @@ c6e8a8a (task 038), not this task; the follow-up below owns it. Recipe once it l
   visual check is owed. File follow-ups 1 and 2 above.
 - **Next step.** Loop session: run and log the neuter test (no visual check owed), file
   follow-ups 1 and 2, then land per PROFILE §5.
+
+### 2026-09-24 — neuter test, follow-ups, land (work loop)
+- **Neuter test (run and reverted by the loop session; the tree is clean after).**
+  - (1) `import '/Users/nobody/making-minds/app/src/types';` as line 1 of
+    `tools/dueDateCheck.ts` → the gate printed "→ app/tools/dueDateCheck.ts:1 imports
+    '/Users/nobody/…' — is an absolute path (resolves on one machine only)", then "PORTABILITY
+    CHECK FAILED".
+  - (2) `'./builder'` → `'./Builder'` in `tools/coverageCheck.ts` → gate exit 1, "→
+    app/tools/coverageCheck.ts:68 imports './Builder' — letter case differs from the file on
+    disk (resolves on macOS only)".
+  - Both files were restored from copies; the gate then printed "PORTABILITY CHECK OK", exit 0.
+- **Follow-up 1 (the red on main) is resolved.** It was the loop session's own 038 fix-up
+  (c6e8a8a). Rather than narrowing the law-3 pin, the decision moved into the store:
+  `selectShowUnboundBoxWarning` (store.ts), and the canvas reads only that. It is committed on
+  `main` as `d020e5e` (full app check green there) and merged into this branch.
+- **Follow-up 2** (harness tools are not type-checked) is filed as task 039.
+- **Gates on the branch (exit codes):** app tsc 0, build 0, `npm run check` **0** (portability
+  gate first; COVERAGE OK last); server typecheck 0, check 0.
+- **Nit left as is:** the gate is wider than P-TOOLS-1's letter (R3–R5, tasks/tools). Every
+  rule is a portability failure of the same family, and all files pass today.
+- **Owed at the next CI run:** the "Harness-tool portability gate" step ends `PORTABILITY CHECK
+  OK` on Linux/Node 20. That is checked when this merge is pushed.
+- Landed via a merge into `main`.
