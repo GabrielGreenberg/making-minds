@@ -9,6 +9,11 @@ import './pages.css'
 import App from './App.tsx'
 import { AuthProvider, AuthGate } from './auth'
 import { ServerHealthProvider } from './auth/HealthGate.tsx'
+import { printIntegrityBanner } from './provenance/notice.ts'
+
+// The plain integrity notice (task 034), addressed to the person at the
+// console and to any AI assistant helping them — production builds only.
+if (import.meta.env.PROD) printIntegrityBanner()
 
 // Access is decided per route inside <AuthGate> (see auth/AuthGate.tsx): the
 // sandbox is public — a visitor uses it without signing in, and without the

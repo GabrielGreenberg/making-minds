@@ -5,6 +5,7 @@ import { AccountPanel } from '../auth/AccountPanel';
 import { navigate } from '../routing';
 import { signOut } from './SessionControls';
 import { FeedbackPanel } from './FeedbackPanel';
+import { submitConfirmMessage } from '../provenance/notice';
 
 export function MenuBar() {
   const { user, isVisitor, logout } = useAuth();
@@ -14,10 +15,7 @@ export function MenuBar() {
 
   const handleSubmitAssignment = () => {
     if (!assignment) return;
-    const ok = confirm(
-      `Submit "${assignment.title}"? This records a snapshot of your current work.\n\n` +
-      'Note: only your most recent submission is graded — submitting again replaces any earlier submission for grading purposes.'
-    );
+    const ok = confirm(submitConfirmMessage(assignment.title));
     if (!ok) return;
     // Submit is online-only, never queued: a failure records NOTHING and asks
     // for a visible retry (the server stamps the submission time, so nothing

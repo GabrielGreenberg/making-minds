@@ -5,7 +5,7 @@
 // (storage/remoteStores.ts) and the remote AuthProvider (src/auth) are its
 // consumers, selected by `backendMode` (storage/backend.ts):
 //
-//   RemoteWorkbookStore   → getWorkbook / putWorkbook
+//   RemoteWorkbookStore   → getWorkbook / getWorkbookFull / putWorkbook
 //   RemoteAssignmentStore → listAssignments / getAssignment / putAssignment / deleteAssignment
 //   RemoteSubmissionStore → submitAssignment / listSubmissions / reviewSubmission
 //   remote auth           → login / logout / me
@@ -404,11 +404,18 @@ export async function setVisible(id: string, visible: boolean): Promise<void> {
 // ── workbooks (autosave) ─────────────────────────────────────────
 
 export async function getWorkbook(assignmentId: string): Promise<AssignmentState | null> {
-  const { state } = await request<{ state: AssignmentState | null }>(
+  return (await getWorkbookFull(assignmentId)).state;
+}
+
+/** The workbook fetch in full: the saved state plus the caller's mint key for
+ *  the assignment (task 034; absent from a server that predates it). */
+export async function getWorkbookFull(
+  assignmentId: string,
+): Promise<{ state: AssignmentState | null; mintKey?: string }> {
+  return request<{ state: AssignmentState | null; mintKey?: string }>(
     'GET',
     `/workbooks/${encodeURIComponent(assignmentId)}`,
   );
-  return state;
 }
 
 export async function putWorkbook(

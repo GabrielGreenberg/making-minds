@@ -1,5 +1,5 @@
 import { useRef, useState, useCallback, useEffect, useMemo } from 'react';
-import { useStore, selectEffectiveMode, selectLiveFsmStateId, selectTransitionNotationForSource } from '../store';
+import { useStore, selectEffectiveMode, selectLiveFsmStateId, selectTransitionNotationForSource, selectPasteScope } from '../store';
 import { inputCharTokens } from '../engine';
 import { usePasteGuard, useNotice } from '../usePasteGuard';
 import type {
@@ -15,7 +15,7 @@ import {
   isMemSourcePort,
   isMemSinkPort,
 } from '../types';
-import { v4 as uuid } from 'uuid';
+import { mintId } from '../provenance/ids';
 import {
   routeAllWires,
   validateSegmentPosition,
@@ -2551,7 +2551,8 @@ export function CircuitCanvas() {
 
         if (preview && preview.w > 20 && preview.h > 20) {
           const newBox: BoxDefinition = {
-            id: uuid(),
+            // Minted like every id (task 034): bound to this assignment.
+            id: mintId(selectPasteScope(useStore.getState())),
             name: '',
             x: preview.x,
             y: preview.y,

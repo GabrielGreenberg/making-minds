@@ -15,5 +15,5 @@
     "noEmit": true,
     "allowImportingTsExtensions": false
   },
-  "include": ["src", "tools", "../app/src/types.ts", "../app/src/engine", "../app/src/auth/accounts.ts", "../app/src/devData/sampleData.ts", "../app/src/devData/homeworkSync.ts"]
+  "include": ["src", "tools", "../app/src/types.ts", "../app/src/engine", "../app/src/auth/accounts.ts", "../app/src/devData/sampleData.ts", "../app/src/devData/homeworkSync.ts", "../app/src/provenance"]
 }

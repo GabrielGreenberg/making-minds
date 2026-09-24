@@ -19,8 +19,21 @@
 //                  server-side — see app.ts's POST /api/feedback
 //   instructor_notes — ONE shared markdown note (NotesStore seam); a single
 //                  row, id pinned to 1 by a CHECK constraint
+//   server_meta  — server-owned settings; today the generated provenance
+//                  mint secret when MM_MINT_SECRET is unset (task 034)
+//   workbook_saves — a coarse per-save history of each workbook: time and,
+//                  per question, component/wire counts and text length —
+//                  never the work itself; one row per CHANGED summary
+//   legacy_content — what every workbook held when the watermark arrived
+//                  (its ids, box library internals included, + per-question
+//                  sizes), snapshotted ONCE, on the
+//                  boot that creates the table; the integrity check reads it
+//                  as "legacy", not unbound
+//   (submissions.integrity — the provenance check computed on receipt,
+//                  instructor-only; see app.ts and sanitize.ts)
 
 import { DatabaseSync } from 'node:sqlite';
+import { randomBytes } from 'node:crypto';
 import type {
   AssignmentData,
   AssignmentState,
@@ -30,10 +43,13 @@ import type {
   InstructorNote,
   PlatformFeedback,
   SubmissionData,
+  SubmissionIntegrity,
   SubmissionRecord,
   SubmissionResult,
 } from '../../app/src/types';
 import type { Role } from '../../app/src/auth/accounts';
+import { idsOfWorkbook } from '../../app/src/provenance/ids';
+import { saveSummary, type LegacyContent, type SaveSummary } from '../../app/src/provenance/integrity';
 
 export interface UserRow {
   email: string;
@@ -84,6 +100,11 @@ export class Db {
   }
 
   private migrate(): void {
+    // Is this the boot that brings the provenance watermark (task 034)? Asked
+    // BEFORE the CREATE below: only then is what the workbooks hold legacy.
+    const firstWatermarkBoot = !this.db
+      .prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'legacy_content'")
+      .get();
     this.db.exec(`
       CREATE TABLE IF NOT EXISTS users (
         email TEXT PRIMARY KEY,
@@ -158,6 +179,27 @@ export class Db {
         updated_at TEXT NOT NULL,
         updated_by TEXT NOT NULL
       );
+      CREATE TABLE IF NOT EXISTS server_meta (
+        key   TEXT PRIMARY KEY,
+        value TEXT NOT NULL
+      );
+      CREATE TABLE IF NOT EXISTS workbook_saves (
+        id            INTEGER PRIMARY KEY AUTOINCREMENT,
+        email         TEXT NOT NULL,
+        assignment_id TEXT NOT NULL,
+        saved_at      TEXT NOT NULL,
+        summary       TEXT NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS idx_workbook_saves
+        ON workbook_saves (email, assignment_id, id);
+      CREATE TABLE IF NOT EXISTS legacy_content (
+        email         TEXT NOT NULL,
+        assignment_id TEXT NOT NULL,
+        ids           TEXT NOT NULL,
+        summary       TEXT NOT NULL,
+        recorded_at   TEXT NOT NULL,
+        PRIMARY KEY (email, assignment_id)
+      );
     `);
     // Columns added after the initial schema; ALTER is a no-op error on re-run.
     for (const sql of [
@@ -175,6 +217,9 @@ export class Db {
       // a "Last, First" sort key. Nothing else from that file is stored.
       'ALTER TABLE users ADD COLUMN section TEXT;',
       'ALTER TABLE users ADD COLUMN sort_name TEXT;',
+      // The provenance check computed on receipt (task 034) — JSON, beside
+      // `result`, never part of it.
+      'ALTER TABLE submissions ADD COLUMN integrity TEXT;',
     ]) {
       try {
         this.db.exec(sql);
@@ -182,10 +227,52 @@ export class Db {
         // already present
       }
     }
+    if (firstWatermarkBoot) this.snapshotLegacyContent();
+  }
+
+  /** Record every existing workbook's ids and per-question sizes as legacy:
+   *  work made before ids carried a mark. Runs once (see migrate). */
+  private snapshotLegacyContent(): void {
+    const rows = this.db
+      .prepare('SELECT email, assignment_id, state FROM workbooks')
+      .all() as unknown as { email: string; assignment_id: string; state: string }[];
+    const insert = this.db.prepare(
+      `INSERT OR IGNORE INTO legacy_content (email, assignment_id, ids, summary, recorded_at)
+       VALUES (?, ?, ?, ?, ?)`,
+    );
+    const now = new Date().toISOString();
+    for (const r of rows) {
+      let state: AssignmentState | null = null;
+      try {
+        state = JSON.parse(r.state) as AssignmentState;
+      } catch {
+        continue;
+      }
+      // The box library's internals too: an instance placed from it later
+      // keeps them (store.placeBoxInstance).
+      const ids = idsOfWorkbook(state);
+      insert.run(r.email, r.assignment_id, JSON.stringify(ids), JSON.stringify(saveSummary(state)), now);
+    }
   }
 
   close(): void {
     this.db.close();
+  }
+
+  // ── server meta ────────────────────────────────────────────────
+
+  /** The provenance mint secret when MM_MINT_SECRET is unset: generated once,
+   *  then kept, so a restart (or a forgotten env var) never changes keys. */
+  mintSecret(): string {
+    const row = this.db
+      .prepare("SELECT value FROM server_meta WHERE key = 'mint_secret'")
+      .get() as unknown as { value: string } | undefined;
+    if (row) return row.value;
+    const secret = randomBytes(32).toString('hex');
+    this.db
+      .prepare("INSERT OR IGNORE INTO server_meta (key, value) VALUES ('mint_secret', ?)")
+      .run(secret);
+    return this.mintSecret();
   }
 
   // ── users ──────────────────────────────────────────────────────
@@ -611,6 +698,52 @@ export class Db {
       .run(email, assignmentId, JSON.stringify(state), new Date().toISOString());
   }
 
+  /** Every email that has a roster row or a saved workbook — whose mint keys
+   *  the integrity check tries (someone removed from the roster included). */
+  knownEmails(): string[] {
+    const rows = this.db
+      .prepare('SELECT email FROM users UNION SELECT email FROM workbooks')
+      .all() as unknown as { email: string }[];
+    return rows.map((r) => r.email);
+  }
+
+  /** Append a save to the workbook's coarse history — only when its summary
+   *  differs from the last one recorded (an unchanged autosave adds nothing). */
+  addWorkbookSave(email: string, assignmentId: string, summary: SaveSummary): void {
+    const json = JSON.stringify(summary);
+    const last = this.db
+      .prepare(
+        `SELECT summary FROM workbook_saves WHERE email = ? AND assignment_id = ?
+         ORDER BY id DESC LIMIT 1`,
+      )
+      .get(email, assignmentId) as unknown as { summary: string } | undefined;
+    if (last?.summary === json) return;
+    this.db
+      .prepare('INSERT INTO workbook_saves (email, assignment_id, saved_at, summary) VALUES (?, ?, ?, ?)')
+      .run(email, assignmentId, new Date().toISOString(), json);
+  }
+
+  /** The workbook's save history, oldest first. */
+  listWorkbookSaves(email: string, assignmentId: string): { savedAt: string; summary: SaveSummary }[] {
+    const rows = this.db
+      .prepare(
+        `SELECT saved_at, summary FROM workbook_saves WHERE email = ? AND assignment_id = ?
+         ORDER BY id`,
+      )
+      .all(email, assignmentId) as unknown as { saved_at: string; summary: string }[];
+    return rows.map((r) => ({ savedAt: r.saved_at, summary: JSON.parse(r.summary) as SaveSummary }));
+  }
+
+  /** What this workbook held when the watermark arrived, if it existed then. */
+  legacyFor(email: string, assignmentId: string): LegacyContent | null {
+    const row = this.db
+      .prepare('SELECT ids, summary FROM legacy_content WHERE email = ? AND assignment_id = ?')
+      .get(email, assignmentId) as unknown as { ids: string; summary: string } | undefined;
+    return row
+      ? { ids: JSON.parse(row.ids) as string[], summary: JSON.parse(row.summary) as SaveSummary }
+      : null;
+  }
+
   // ── submissions ────────────────────────────────────────────────
 
   /** Append a graded attempt; the attempt number is per (assignment, student). */
@@ -619,6 +752,7 @@ export class Db {
     email: string,
     submission: SubmissionData,
     result: SubmissionResult | undefined,
+    integrity?: SubmissionIntegrity,
   ): SubmissionRecord {
     const prev = this.db
       .prepare(
@@ -628,8 +762,8 @@ export class Db {
     const attempt = prev.n + 1;
     this.db
       .prepare(
-        `INSERT INTO submissions (assignment_id, email, attempt, submitted_at, submission, result)
-         VALUES (?, ?, ?, ?, ?, ?)`,
+        `INSERT INTO submissions (assignment_id, email, attempt, submitted_at, submission, result, integrity)
+         VALUES (?, ?, ?, ?, ?, ?, ?)`,
       )
       .run(
         assignmentId,
@@ -638,8 +772,16 @@ export class Db {
         submission.submittedAt,
         JSON.stringify(submission),
         result ? JSON.stringify(result) : null,
+        integrity ? JSON.stringify(integrity) : null,
       );
-    return { assignmentId, attempt, submittedAt: submission.submittedAt, submission, result };
+    return {
+      assignmentId,
+      attempt,
+      submittedAt: submission.submittedAt,
+      submission,
+      result,
+      ...(integrity ? { integrity } : {}),
+    };
   }
 
   /** All attempts for one assignment; optionally scoped to one student. */
@@ -648,23 +790,30 @@ export class Db {
       email
         ? this.db
             .prepare(
-              `SELECT attempt, submitted_at, submission, result FROM submissions
+              `SELECT attempt, submitted_at, submission, result, integrity FROM submissions
                WHERE assignment_id = ? AND email = ? ORDER BY email, attempt`,
             )
             .all(assignmentId, email)
         : this.db
             .prepare(
-              `SELECT attempt, submitted_at, submission, result FROM submissions
+              `SELECT attempt, submitted_at, submission, result, integrity FROM submissions
                WHERE assignment_id = ? ORDER BY email, attempt`,
             )
             .all(assignmentId)
-    ) as unknown as { attempt: number; submitted_at: string; submission: string; result: string | null }[];
+    ) as unknown as {
+      attempt: number;
+      submitted_at: string;
+      submission: string;
+      result: string | null;
+      integrity: string | null;
+    }[];
     return rows.map((r) => ({
       assignmentId,
       attempt: r.attempt,
       submittedAt: r.submitted_at,
       submission: JSON.parse(r.submission) as SubmissionData,
       result: r.result ? (JSON.parse(r.result) as SubmissionResult) : undefined,
+      ...(r.integrity ? { integrity: JSON.parse(r.integrity) as SubmissionIntegrity } : {}),
     }));
   }
 
@@ -672,7 +821,8 @@ export class Db {
    * Overwrite the stored grade of one attempt — the manual-review write path.
    * The submission snapshot is immutable; `result` is the grade side of the
    * record, which the server owns and may amend (a review annotates the
-   * stored SubmissionResult via the pure applyManualReview).
+   * stored SubmissionResult via the pure applyManualReview). `integrity`
+   * is a column of its own and untouched here.
    */
   updateSubmissionResult(
     assignmentId: string,

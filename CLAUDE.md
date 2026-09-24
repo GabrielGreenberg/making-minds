@@ -93,7 +93,10 @@ never submitted stays editable and can submit late, and that submission then fre
 message, ≤ 2 downscaled screenshots). Editor chrome is minimal (Home + Submit + session).
 **Paste provenance** (task 033): in an assignment a paste (canvas or answer field) takes only
 what this user copied in an assignment in this window, else a notice says why; nothing copied
-there reaches the system clipboard. The sandbox is free.
+there reaches the system clipboard. The sandbox is free. **Watermark** (task 034): ids carry a
+MAC under a per-student, per-assignment key, each question a signed editing record; at submit
+the server names whose ids they are and flags one-piece work (`integrity`, instructor-only,
+never a verdict).
 **Visitors** (task 027): access is per route (`routing.ts routeAccess`) — the sandbox is public, needs
 no server; a browser never signed in (`mm:auth:known`) opening `#/` lands there (banner, Sign in).
 The freeform **sandbox** offers every machine as a worksheet tab — CC / FSM / TM and a
@@ -129,14 +132,14 @@ becoming a size-capped data URL; formula DSL → test banks; turbot: inner machi
 encoding, arena editor ≤ 30×30, criterion + max-steps; perception: rule + retina size;
 component restrictions and limits; TM halt-position toggle; **no fill-in authoring UI yet**),
 **gradebook** grouped by student (latest attempt counts; expandable history with failed-case
-drill-down per mode; ✓/✗ + note manual review of open questions; Release/Hide grades).
+drill-down per mode; ✓/✗ + note manual review of open questions; ⚑ integrity flags; Release/Hide grades).
 
 **Server** (`server/`, Express 5 + `node:sqlite`, zero native deps): auth providers behind
 `MM_AUTH_MODE` (`password` default — roster-gated registration, scrypt, login throttle;
 `dev` passwordless; `sso` — capabilities reported, `authenticate` is a TODO), roster
 import (UI + CLI), the **homework sync** (`npm run homeworks -- sync |
 status`, task 007 — HW1–HW7 from the repo into the DB: missing ones added unpublished, copies
-nobody edited refreshed, instructor-edited ones left alone and listed), assignment CRUD, workbooks, submit-with-grading,
+nobody edited refreshed, instructor-edited ones left alone and listed), assignment CRUD, workbooks (+ mint key, per-save size history), submit-with-grading + integrity,
 manual review, grade release, feedback, notes, `/api/health`. SQLite, WAL. Gates: `serverCheck`, `rosterCheck`, `authCheck`, `parityCheck`, `homeworkSyncCheck`.
 
 **Deployment — pilot live.** Cloudflare Pages `https://making-minds.pages.dev` → Lightsail
@@ -217,17 +220,17 @@ wrappers over it.
 | Storage | `app/src/storage/workbookStore.ts`, `AssignmentStore.ts`, `submissionStore.ts`, `feedbackStore.ts`, `NotesStore.ts` | The five Promise-returning seam interfaces + Local impls. Grade release lives on `AssignmentStore` (`getGradesReleased`/`setGradesReleased`). `submissionStore` owns `recordManualReview`. |
 | Storage | `app/src/storage/backend.ts`, `remoteStores.ts`, `manualReview.ts`, `journal.ts`, `migrateLocal.ts` | `backend.ts`: the ONE mode decision + sole exporter of store instances. `remoteStores.ts`: Remote impls as direct `api/client.ts` calls (404 → seam-null; GRADER-FREE, grep-gated). `manualReview.ts`: the leaf pure `applyManualReview` used by the local store AND the server. `journal.ts`: per-email crash buffer `mm:journal:<email>:<asgId>` replayed by the next `openAssignment`. `migrateLocal.ts`: first-remote-login fill-empty upload of local data (guard `mm:migrated:<email>`; server never overwritten; submissions/release/reviews not migrated). |
 | Auth | `app/src/auth/` | `AuthGate.tsx` (per-route gate; `initRouting()` + landing rule fire here), `HealthGate.tsx` (health provider + retry screen), `LoginScreen.tsx` (toy picker locally; remotely the panes Part 1 describes, from the server's `AuthCapabilities`), `AccountPanel.tsx` (change password), `authProvider.tsx` (one provider per mode), `types.ts`, `session.ts`, `accounts.ts`, `instructorRole.ts`. |
-| Page surfaces | `app/src/theme.css`, `pages.css`, `components/PageShell.tsx`, `SessionControls.tsx` | The design layer for everything outside the editor. `theme.css`: the makingminds.org palette / type / spacing as `--mm-*` tokens (each names its `site.css` original; colour literals live ONLY in its `:root`) + the shared vocabulary (shell, tags, hairline rows, tables, buttons, fields, segmented controls, modals). `pages.css`: per-surface rules (home, overview, grade sheet, login, feedback, the instructor views). `PageShell`: topbar (serif brand → the website; `appNav` by role — Assignments for students, Student view · Dashboard for instructors; the boxed Sandbox link; session controls) · band · ONE `.page` column (1080px, every route — the shell is invariant, pinned by measurement) · footer, plus a `card` variant for login/health; `.mm-tabs` is a section's own navigation inside the column (the Dashboard's tabs). `index.css` is the editor alone and inherits only the font family. Rules: `docs/buildout/VISUAL_VOCAB.md` §Page surfaces; gate: `themeCheck`. |
+| Page surfaces | `app/src/theme.css`, `pages.css`, `components/PageShell.tsx`, `SessionControls.tsx` | The design layer for everything outside the editor. `theme.css`: the makingminds.org palette / type / spacing as `--mm-*` tokens (each names its `site.css` original; colour literals live ONLY in its `:root`) + the shared vocabulary (shell, tags, rows, tables, buttons, fields, segmented controls, modals). `pages.css`: per-surface rules. `PageShell`: topbar (brand → the website; `appNav` by role; the Sandbox link; session controls) · band · ONE `.page` column (1080px, every route) · footer, plus a `card` variant for login/health; `.mm-tabs` is a section's own navigation inside the column (the Dashboard's tabs). `index.css` is the editor alone and inherits only the font family. Rules: `docs/buildout/VISUAL_VOCAB.md` §Page surfaces; gate: `themeCheck`. |
 | Async UI | `app/src/useAsyncValue.ts` | The shared fetch-on-mount hook (`value`/`loading`/`error`/`reload`) behind every view reading the async seams. |
-| Provenance | `app/src/provenance.ts`, `usePasteGuard.ts` | The paste seam (pure; its header states the rule and its limits): `canPaste`, `canvasPasteVerdict` (in an assignment + canvas kind, `allowed_components`), `textPasteVerdict`, `refusalMessage`; a module-memory clipboard (canvas + text slots). `usePasteGuard`: the answer fields' DOM adapter (copy/cut/paste/drop/`beforeinput`). |
+| Provenance | `app/src/provenance.ts`, `usePasteGuard.ts` | The paste seam (pure; its header states the rule and its limits): `canPaste`, `canvasPasteVerdict` (in an assignment + canvas kind, `allowed_components`), `textPasteVerdict`, `refusalMessage`; a module-memory clipboard (canvas + text slots). `usePasteGuard`: the answer fields' DOM adapter (copy/cut/paste/drop/`beforeinput`). `provenance/` (task 034; pure, server-imported): `ids` (`mintId`, the ONE id source; `verifyId`; the memory-only key registry), `sha256`, `trace` (the signed record), `integrity` (`assessIntegrity`, thresholds), `notice`. |
 | Assignments | `app/src/assignments/index.ts` | Thin registry over the `AssignmentStore` seam (`listAssignments`/`getAssignment`/`createAssignment`) + `sortAssignments` (instructor `order` asc, then title). Nothing is bundled into the app: local mode starts empty until the dashboard's dev seeds load content. |
 | Instructor UI | `app/src/instructor/` | `InstructorApp`, `InstructorGate`, `InstructorDashboard`, `RosterView`, `FeedbackQueueView`, `NotesView`, `AssignmentEditor`, `dragReorder.ts` (pure `moveItem` + `useDragReorder`; pinned rows immovable), `QuestionCreator` (+ `ccPreview.ts`, `arenaEditing.ts` — `MAX_ARENA_SIZE` 30), `Gradebook.ts`/`GradebookView.tsx`, `DocumentEditors.tsx` (the callout-list and figure-list widgets shared by the assignment editor and the creator; `readFigureFile` caps an upload at 300 KB, downscaling rasters). |
 | Student UI | `app/src/components/` | `CircuitCanvas`, `ComponentLibrary`, `DataTable`, `StudentLayout` (the Home tabs), `HomeScreen` (Assignments tab + up-next box), `GradesView` + `GradeSheet` (the Grades tab and its inline sheet), `AssignmentOverview` (the document page), `ProblemSetDocument`, `MenuBar`, `FeedbackPanel`, `SequentialTimeline`, `TMTapePanel`, `ArenaCanvas`, `TurbotArenaPanel` (Map + run controls; sandbox "Edit map"), `TurbotTapePanel`, `OpenResponsePanel`/`FillInPanel` (read-only when locked; paste-guarded), `SimulationPanel`, `TabBar` (question nav + Mark done / 🔒 tag; sandbox + menu), `outputDisplay.ts` (t1-rightmost OUT rows, per-group ARG values). |
 | API client | `app/src/api/client.ts` | One typed function per endpoint; bearer token under `mm:auth:token`; `onUnauthorized` hook; `health()`; auth/roster/feedback/notes calls; `putWorkbook` takes `keepalive`. `setApiBase` is the harness override. |
-| Dev tool | `app/tools/shootProblemSets.mjs` | Headless-Chrome (CDP) full-page screenshots of every HW document, the canvas panel and the editor against the dev server, seeding local mode itself — the visual proof recipe when the browser pane is unavailable. |
-| Server | `server/src/app.ts`, `db.ts`, `auth.ts`, `password.ts`, `roster.ts`, `rosterImport.ts`, `sanitize.ts`, `config.ts`, `seed.ts`, `roster-cli.ts`, `homeworks.ts`, `homeworks-cli.ts` | Routes, SQLite storage, the `AuthProvider` seam (`createAuthProvider` — `MM_AUTH_MODE`: `password` default / `dev` / `sso`; `LoginThrottle`), scrypt credentials (`scrypt$N$r$p$salt$hash`, self-describing), the pure roster reader (`roster.ts`, the registrar's export as-is) + `rosterImport.ts` (never removes; lists who left), redaction + grade-release withholding (`sanitize.ts`: students get no `test_cases`/`perception_cases`/`fill_in_answers`; their own results keep safe per-case fields but never `expected`/`got`), env config, seeding, the admin CLI (`npm run roster`). The homework sync (`homeworks.ts`: a copy is pristine iff its content hash is a committed version of its file — `gitLineage` over the box's clone — or one the sync wrote, the `content_sync` table; `seed.ts --homeworks` runs it too). Tools: `serverCheck.ts`, `rosterCheck.ts`, `authCheck.ts`, `parityCheck.ts` (server ≡ in-process grading, deep-compared), `homeworkSyncCheck.ts`. |
+| Dev tool | `app/tools/shootProblemSets.mjs` | Headless-Chrome screenshots of every HW document, the canvas panel and the editor (it seeds local mode itself) — the visual proof when the browser pane is unavailable. |
+| Server | `server/src/app.ts`, `db.ts`, `auth.ts`, `password.ts`, `roster.ts`, `rosterImport.ts`, `sanitize.ts`, `config.ts`, `seed.ts`, `roster-cli.ts`, `homeworks.ts`, `homeworks-cli.ts` | Routes, SQLite storage, the `AuthProvider` seam (`createAuthProvider` — `MM_AUTH_MODE`: `password` default / `dev` / `sso`; `LoginThrottle`), scrypt credentials (`scrypt$N$r$p$salt$hash`, self-describing), the pure roster reader (`roster.ts`, the registrar's export as-is) + `rosterImport.ts` (never removes; lists who left), redaction + grade-release withholding (`sanitize.ts`: students get no `test_cases`/`perception_cases`/`fill_in_answers`; their own results keep safe per-case fields but never `expected`/`got` or `integrity`), env config, seeding, the admin CLI (`npm run roster`). The homework sync (`homeworks.ts`: a copy is pristine iff its content hash is a committed version of its file — `gitLineage` over the box's clone — or one the sync wrote, the `content_sync` table; `seed.ts --homeworks` runs it too). Tools: `serverCheck.ts`, `rosterCheck.ts`, `authCheck.ts`, `parityCheck.ts` (server ≡ in-process grading, deep-compared), `homeworkSyncCheck.ts`. |
 | Dev/sample | `app/src/devData/sampleData.ts`, `seed.ts`, `homeworks.ts`, `homeworks/hw{1..7}.json` | Sample assignment for all modes (netlist-built perception circuits, one turbot question per inner mode, open Q14) + sample submissions; `seedHomeworks()` syncs the real HW1–HW7 (record `mm:seeded-homework:<id>`) + reseeds 22 sample submissions; `homeworkSync.ts` is the pure planner it shares with the server (content hash = canonical JSON minus the instructor-owned `order`/`dueDate`; insert / unchanged / refresh / edited). |
-| Tools | `app/tools/*.ts` | The headless harness — the project's test suite, all in `npm run check` (plus `grade.ts`, the CLI grader; `builder.ts`, the netlist builder; `layoutCheck.ts`, the canvas layout oracle): `codecCheck`, `dueDateCheck`, `statementFormatCheck` (markup grammar + the document model + every seeded HW valid, its figures on disk), `notationCheck` (grammar pins + label-dissection grep gate), `themeCheck` (page-surface design layer: colour literals only in `theme.css :root`, every `--mm-*` token defined, shell wiring, retired header idioms gone), `tmCheck`, `turbotCheck` (all four brains; `[multi-arena]`, `[pass-through step-limit]`, trajectory/orientation independence), `perceptionCheck`, `scWindowCheck` (question runs ≡ grader), `routerCheck` (fallback budget 2; route-quality flags; hw3-p4 regression pin), `bumpCheck`, `pipelineCheck` (submit → grade, every mode), `navResetCheck` (both reset laws; `[mark as done]`, `[frozen assignment]`), `routingCheck` (route access, landing, held routes, principal change), `boxScopeCheck` (box library scope, SC boxing refuses MEM, `[naming]`), `pasteCheck` (paste policy, store paste, clipboard-API + answer-field grep gates, dev-only `__store`), `remoteStoreCheck` (boots the REAL server; grader-import grep gate; auth client against a password-mode server), `coverageCheck` (the two-tier reference-fixture ledger + `allowed_components` self-test pins). |
+| Tools | `app/tools/*.ts` | The headless harness — the project's test suite, all in `npm run check` (plus `grade.ts`, the CLI grader; `builder.ts`, the netlist builder; `layoutCheck.ts`, the canvas layout oracle): `codecCheck`, `dueDateCheck`, `statementFormatCheck` (markup grammar, document model, every HW valid with its figures), `notationCheck` (grammar pins + label-dissection grep gate), `themeCheck` (colour literals only in `theme.css :root`, every `--mm-*` token defined, shell wiring), `tmCheck`, `turbotCheck` (all four brains; `[multi-arena]`, `[pass-through step-limit]`, trajectory/orientation independence), `perceptionCheck`, `scWindowCheck` (question runs ≡ grader), `routerCheck` (fallback budget 2; route-quality flags; hw3-p4 regression pin), `bumpCheck`, `pipelineCheck` (submit → grade, every mode), `navResetCheck` (both reset laws; `[mark as done]`, `[frozen assignment]`), `routingCheck` (route access, landing, held routes, principal change), `boxScopeCheck` (box library scope, SC boxing refuses MEM, `[naming]`), `pasteCheck` (paste policy, store paste, clipboard-API + answer-field grep gates, dev-only `__store`), `provenanceCheck` (mint/verify, attribution, paste re-mint, stamp + trace flags, uuid grep gate), `remoteStoreCheck` (boots the REAL server; grader-import grep gate; auth client against a password-mode server), `coverageCheck` (the two-tier reference-fixture ledger + `allowed_components` self-test pins). |
 | Queue | `tasks/` | The task pipeline (top of this file). `tasks/tools/check-budgets.mjs` is the size guard on this file. |
 
 ## Reference-function DSL (instructor authoring)
@@ -238,9 +241,8 @@ sees the formula, it runs against the generated numeric `test_cases`.
 
 - **Where** — `engine/formulaEval.ts` (`evalFormula(expr, vars)` → non-negative integer;
   throws `FormulaError`) and `engine/testVectorGen.ts` (`buildQuestionBank(inputs, outputs,
-  rep, mode)` → `{spec, test_cases}`, all at save). `QuestionCreator` validates formulas live
-  on a single input per keystroke (`probeFormulas`); no example-preview table. Save blocks on
-  any formula error.
+  rep, mode)` → `{spec, test_cases}`, all at save). `QuestionCreator` probes formulas live
+  (`probeFormulas`); save blocks on any formula error.
 - **Language** — variables (declared input-group names), non-negative integer literals,
   `+ - *` and bitwise `& | ^ ~`, parentheses. No division, modulo, conditionals, calls. One
   expression per output, returning one non-negative integer.
@@ -270,10 +272,8 @@ sees the formula, it runs against the generated numeric `test_cases`.
 ## Build phases (from the spec) — all built
 
 1. **CC** — gates, I/O, validated wiring, I/O tables, boxed circuits, snap-to-grid canvas.
-2. **SC** — MEM block, clock/time model, right-to-left time-step table. SC canvases box
-   COMBINATIONAL sub-circuits only; `confirmBox` refuses MEM (a boxed circuit is evaluated
-   statelessly; `boxScopeCheck` pins the 0101-vs-0000 evidence). Sequential boxing needs
-   nested MEM state in `evaluateSCSequence` — queued as a task.
+2. **SC** — MEM block, clock/time model, right-to-left time-step table. SC boxes are
+   combinational only (`confirmBox` refuses MEM; sequential boxing is queued).
 3. **FSM** — state nodes, `input:output` transitions (k-bit), simulation with highlighting,
    state table; opposite-direction transition pairs render as two separated arcs.
 4. **Turbots** — arena Map + circuitry workspace, fixed sensor/motor encoding, CC/SC/FSM/TM
@@ -291,9 +291,9 @@ sees the formula, it runs against the generated numeric `test_cases`.
   a bump; splits draw a dot. Color: **black = 0, red = 1**.
 - **Validation** — _warn, don't block_ on loops, merged links, free ends (red + tooltip).
 - **I/O tables** — the right panel shows raw per-wire bits. The Argument/Value table and its
-  Tally/Binary toggle were REMOVED (2026-09-10); the codec's per-group value read survives as
-  grading plumbing. `repSystem` is still persisted and picks a SANDBOX TM's tape alphabet, but
-  nothing sets it, so a sandbox TM is fixed at binary {0,1,*}.
+  toggle are gone; the codec's per-group value read survives as grading plumbing. `repSystem`
+  is still persisted and picks a SANDBOX TM's tape alphabet, but nothing sets it, so a sandbox
+  TM is fixed at binary {0,1,*}.
 - **Time flows right-to-left** in SC and FSM tables (t1 on the right).
 - **SC/FSM question runs ARE the grader's runs** — inside an assignment question, Run/Step
   execute exactly `stepCountFor` time steps and feed exactly the grader's stream: the typed
@@ -324,10 +324,8 @@ sees the formula, it runs against the generated numeric `test_cases`.
   mutating action — never gate in a component, or a new edit path will slip past it.
   Simulation (Run/Step/evaluate) is deliberately NEVER locked. Not locked either: INPUT
   toggles, MEM overrides, idle TM tape edits (exploratory, reset on navigation).
-- **Boxing a TM or an FSM is refused by design** — a TM has one tape and one control thread,
-  so there is no wire boundary to box as a stateless function call; a boxed sub-FSM would be a
-  sub-automaton consuming multiple input symbols, needing an invented call/return convention.
-  `placeableBoxKinds('TM'|'FSM')` return `[]`; full reasoning beside it in `types.ts`.
+- **Boxing a TM or an FSM is refused by design** (no wire boundary to box as a stateless
+  call): `placeableBoxKinds('TM'|'FSM')` return `[]`; the reasoning is beside it in `types.ts`.
 - **Every canvas swap resets sim state AND undo/redo** via `resetAllSimState()`; **every
   principal change** (sign-in/out, 401) resets the whole editor store and loads that person's
   sandbox via `resetForPrincipal()`, called by the auth provider (`navResetCheck`); a
@@ -335,15 +333,16 @@ sees the formula, it runs against the generated numeric `test_cases`.
 - **Assignment content enters only through the provenance seam** — canvas paste and every
   answer field (open response, fill-in, box rename) ask `provenance.ts`; no clipboard API
   outside `usePasteGuard.ts`, which every new answer field must wear (`pasteCheck` grep gate).
-  The clipboard is memory only: a principal change empties it, a canvas swap never does.
-  `window.__store` is dev-only.
+  The clipboard is memory only: a principal change empties it (and the mint keys), a canvas
+  swap never does. `window.__store` is dev-only. Ids come only from `mintId` (grep-gated); the
+  editing record advances in `store.ts recordEdit`, at edit time, never at save.
 
 ## Things to watch
 
 - **Test cases never ship to the client in production — SOLVED in remote mode.** The server
   strips `test_cases`/`perception_cases`/`fill_in_answers` from student copies and the answer
-  key (`expected`/`got`) from student results, keeping safe per-case fields (`sanitize.ts`;
-  parity-pinned both ways). LOCAL mode holds answers and grades in the browser **by design**
+  key (`expected`/`got`) and `integrity` from student results, keeping safe per-case fields
+  (`sanitize.ts`; parity-pinned both ways). LOCAL mode holds answers and grades in the browser **by design**
   (the dev/demo prototype, never what students use). Never wire the engine grader (or any
   answer-carrying JSON) into the remote-store module graph (`remoteStoreCheck` grep gate).
 - **localStorage is LOCAL mode only.** Remotely: the token (`mm:auth:token`) + its owner
@@ -351,8 +350,7 @@ sees the formula, it runs against the generated numeric `test_cases`.
   the migration guard.
   Old local data is never deleted (first remote login uploads it fill-empty).
 - **Remote workbooks are last-write-wins across devices** (accepted pilot trade-off,
-  `docs/buildout/designs/remote-stores.md` §5); an `updatedAt`/If-Match precondition is the
-  noted follow-up if it ever bites.
+  `docs/buildout/designs/remote-stores.md` §5; an If-Match precondition is the follow-up if it bites).
 - **Releasing = `deploy/release.sh`** after a push to `main` (box backup + pull + homework sync + restart over ssh,
   then the Pages upload; refuses unless local main == origin/main; needs the gitignored
   `secrets/cloudflare.env` and an `ssh/` key — `deploy/README.md` §0).

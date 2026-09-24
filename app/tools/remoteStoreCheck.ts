@@ -31,6 +31,11 @@
 //     lab browsers), replay supersedes the fetched server state, re-uploads
 //     through the seam, and clears itself on the confirmed upload
 //
+// Task 034: RemoteWorkbookStore.loadForOpen returns, in ONE GET, the saved
+// state and the key the server derives from ITS secret for the session's
+// person (never the dev key), and the grader grep gate covers
+// provenance/integrity.ts too.
+//
 // Exits non-zero on the first tally of failures.
 
 // The api client reads the bearer token from localStorage (lazily, per call);
@@ -84,6 +89,10 @@ for (const rel of [
   '../src/api/client.ts',
   '../src/storage/journal.ts',
   '../src/storage/migrateLocal.ts',
+  // The integrity check runs beside the grade, never through it.
+  '../src/provenance/integrity.ts',
+  '../src/provenance/ids.ts',
+  '../src/provenance/trace.ts',
 ]) {
   const source = readFileSync(new URL(rel, import.meta.url), 'utf8');
   check(
@@ -231,6 +240,33 @@ check(
   'workbook save/load round-trips',
   wbBack?.currentQuestionIndex === 2 && wbBack.questionCircuits[1] != null,
 );
+
+// The mint key (task 034): the server's derivation for the session's person.
+{
+  const { deriveMintKey, DEV_MINT_SECRET } = await import('../src/provenance/ids');
+  const serverKey = deriveMintKey(db.mintSecret(), student.email, SAMPLE_ASSIGNMENT_ID);
+  // Count the requests the open makes: the key rides the workbook fetch.
+  const realFetch = globalThis.fetch;
+  const seen: string[] = [];
+  globalThis.fetch = ((input: Parameters<typeof fetch>[0], init?: Parameters<typeof fetch>[1]) => {
+    seen.push(`${init?.method ?? 'GET'} ${String(input)}`);
+    return realFetch(input, init);
+  }) as typeof fetch;
+  let opened: { state: unknown; mintKey: string | null };
+  try {
+    opened = await remoteWorkbookStore.loadForOpen(SAMPLE_ASSIGNMENT_ID, 'ignored@example.com');
+  } finally {
+    globalThis.fetch = realFetch;
+  }
+  const got = opened.mintKey;
+  check('loadForOpen returns the server-derived key for the session\'s person (the email argument is ignored)',
+    got === serverKey);
+  check('…beside the saved state, in ONE request',
+    JSON.stringify(opened.state) === JSON.stringify(wbBack) && seen.length === 1 && /GET .*\/api\/workbooks\//.test(seen[0]),
+    seen.join(' | '));
+  check('…never the client\'s dev key', got !== deriveMintKey(DEV_MINT_SECRET, student.email, SAMPLE_ASSIGNMENT_ID));
+  check('…per assignment', (await remoteWorkbookStore.loadForOpen('another-asg', null)).mintKey !== got);
+}
 
 // ── student: submit — answers only, server's word, no grade ──────
 const spoofed = {

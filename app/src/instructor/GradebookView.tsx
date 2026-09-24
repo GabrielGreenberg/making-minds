@@ -207,6 +207,13 @@ export function GradebookView({ id }: { id: string }) {
   );
 }
 
+/** The provenance flags on one question of a record (task 034) — things to
+ *  look at, never a verdict, and never part of the score. */
+function integrityFlags(record: SubmissionRecord, questionId: number): string[] {
+  const qi = record.integrity?.questions.find((x) => x.questionId === questionId);
+  return qi ? qi.flags.map((f) => f.detail) : [];
+}
+
 function QuestionMarks({
   grade,
   assignment,
@@ -218,6 +225,7 @@ function QuestionMarks({
     <>
       {assignment.questions.map((q) => {
         const qg = grade.grades.find((x) => x.questionId === q.id);
+        const flags = integrityFlags(grade.record, q.id);
         return (
           <td key={q.id}>
             {qg?.pending ? (
@@ -228,6 +236,14 @@ function QuestionMarks({
               <span className="instructor-pass" title={qg.manual ? 'manually graded correct' : undefined}>✓</span>
             ) : (
               <span className="instructor-fail" title={qg?.manual ? 'manually graded incorrect' : undefined}>✗</span>
+            )}
+            {flags.length > 0 && (
+              <span
+                className="instructor-latest-tag"
+                title={`Integrity — to look at, not a verdict:\n${flags.join('\n')}`}
+              >
+                {' '}⚑
+              </span>
             )}
           </td>
         );
@@ -542,6 +558,40 @@ function SubmissionDetail({
           </div>
         );
       })}
+      <IntegrityNotes record={record} assignment={assignment} />
+    </div>
+  );
+}
+
+/** The provenance check's flags for one attempt (task 034): what to look at
+ *  — ids made in someone else's editor or outside this assignment, text or a
+ *  circuit that arrived in one piece. Never a verdict; the score ignores it.
+ *  Records from before the check carry none, and show nothing. */
+function IntegrityNotes({ record, assignment }: { record: SubmissionRecord; assignment: AssignmentData }) {
+  const integrity = record.integrity;
+  if (!integrity) return null;
+  const flagged = integrity.questions.filter((q) => q.flags.length > 0);
+  // instructor-review: the detail column's readable width (the attempt table
+  // around it is max-content), so long flag details wrap.
+  return (
+    <div className="instructor-detail-q instructor-review">
+      <strong>Integrity — to look at, not a verdict</strong>
+      {flagged.length === 0 ? (
+        <p className="mm-note">Nothing to look at.</p>
+      ) : (
+        flagged.map((qi) => (
+          <div key={qi.questionId}>
+            <p className="mm-note">
+              {assignment.questions.find((q) => q.id === qi.questionId)?.label ?? `Q${qi.questionId}`}:
+            </p>
+            <ul className="mm-note">
+              {qi.flags.map((f, i) => (
+                <li key={i}>{f.detail}</li>
+              ))}
+            </ul>
+          </div>
+        ))
+      )}
     </div>
   );
 }

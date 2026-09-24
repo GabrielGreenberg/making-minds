@@ -25,12 +25,16 @@
 //                                              to students (list + fetch)
 //   PUT    /api/assignments/:id/grades-release instructor: {released: boolean} —
 //                                              students see no grades at all until released
-//   GET    /api/workbooks/:assignmentId        the caller's saved canvas state
-//   PUT    /api/workbooks/:assignmentId        autosave target
+//   GET    /api/workbooks/:assignmentId        the caller's saved canvas state + their
+//                                              mint key for it (task 034)
+//   PUT    /api/workbooks/:assignmentId        autosave target (also appends to the
+//                                              coarse per-save history)
 //   POST   /api/assignments/:id/submissions    submit → server autogrades → record
+//                                              (+ the integrity check, instructor-only)
 //   GET    /api/assignments/:id/submissions    student: own attempts (no grades until
-//                                              released, then scores only);
-//                                              instructor: all attempts, full detail
+//                                              released, then scores only; never
+//                                              integrity); instructor: all attempts,
+//                                              full detail
 //   POST   /api/assignments/:id/submissions/:attempt/review
 //                                              instructor: manual verdict on a pending
 //                                              open question — {student, questionId,
@@ -45,7 +49,9 @@
 //
 // Grading happens HERE, with the same pure engine the browser uses
 // (app/src/engine/grader.ts) — the server holds the test cases, the client
-// never sees them. Exported as a factory (no listen()) so the smoke test can
+// never sees them. So does the provenance check (app/src/provenance/, task
+// 034): the server holds the mint secret, hands each student their own key,
+// and on submit tests every id and editing record against every known key. Exported as a factory (no listen()) so the smoke test can
 // boot it on an ephemeral port against a temp database.
 
 import express from 'express';
@@ -53,6 +59,8 @@ import type { Request, Response, NextFunction } from 'express';
 import type { AssignmentData, AssignmentState, SubmissionData } from '../../app/src/types';
 import { gradeSubmission } from '../../app/src/engine/grader';
 import { applyManualReview } from '../../app/src/storage/manualReview';
+import { deriveMintKey } from '../../app/src/provenance/ids';
+import { assessIntegrity, saveSummary } from '../../app/src/provenance/integrity';
 import type { ServerConfig } from './config';
 import { Db } from './db';
 import {
@@ -104,6 +112,10 @@ export function createApp(config: ServerConfig, db: Db) {
   const requestThrottle = new LoginThrottle(20, 60 * 60 * 1000);
 
   const auth = requireAuth(db);
+  // The watermark's secret: the configured one, else the one this database
+  // generated and keeps (db.mintSecret) — never the client's dev secret.
+  const mintSecret = config.mintSecret || db.mintSecret();
+  const mintKey = (email: string, assignmentId: string) => deriveMintKey(mintSecret, email, assignmentId);
   const clientIp = (req: Request): string => req.ip ?? req.socket.remoteAddress ?? 'unknown';
 
   // ── health ─────────────────────────────────────────────────────
@@ -458,8 +470,11 @@ export function createApp(config: ServerConfig, db: Db) {
 
   // ── workbooks (per-student autosave) ───────────────────────────
   app.get('/api/workbooks/:assignmentId', auth, (req, res) => {
-    const state = db.getWorkbook(req.user!.email, String(req.params.assignmentId));
-    res.json({ state });
+    const assignmentId = String(req.params.assignmentId);
+    const state = db.getWorkbook(req.user!.email, assignmentId);
+    // The caller's own mint key for this assignment: the ids they mint and
+    // the editing records they sign from now on bind to them.
+    res.json({ state, mintKey: mintKey(req.user!.email, assignmentId) });
   });
 
   app.put('/api/workbooks/:assignmentId', auth, (req, res) => {
@@ -468,7 +483,10 @@ export function createApp(config: ServerConfig, db: Db) {
       res.status(400).json({ error: 'malformed workbook state' });
       return;
     }
-    db.saveWorkbook(req.user!.email, String(req.params.assignmentId), state);
+    const assignmentId = String(req.params.assignmentId);
+    db.saveWorkbook(req.user!.email, assignmentId, state);
+    // The coarse history the "arrived in one save" check reads: sizes only.
+    db.addWorkbookSave(req.user!.email, assignmentId, saveSummary(state));
     res.json({ ok: true });
   });
 
@@ -492,7 +510,19 @@ export function createApp(config: ServerConfig, db: Db) {
       answers: body.answers,
     };
     const result = gradeSubmission(assignment, submission);
-    const record = db.addSubmission(assignment.id, req.user!.email, submission, result);
+    // Provenance (task 034): whose ids and editing records these are, tested
+    // against the student's own key and everyone else's. Beside the grade,
+    // never in it; instructor-only (sanitize.ts).
+    const email = req.user!.email;
+    const integrity = assessIntegrity({
+      questionIds: assignment.questions.map((q) => q.id),
+      answers: submission.answers,
+      self: { email, key: mintKey(email, assignment.id) },
+      others: db.knownEmails().map((e) => ({ email: e, key: mintKey(e, assignment.id) })),
+      legacy: db.legacyFor(email, assignment.id),
+      history: db.listWorkbookSaves(email, assignment.id).map((h) => h.summary),
+    });
+    const record = db.addSubmission(assignment.id, email, submission, result, integrity);
     // The grade is computed and stored NOW, but students don't see it until
     // the instructor releases grades — and even then, scores only.
     res.status(201).json({
