@@ -8,9 +8,9 @@ requires: browser
 area: app
 source: chat
 created: 2026-09-21T17:40:00-07:00
-status: ready
+status: in-progress
 after:
-branch:
+branch: task/025-turbot-goal-flash
 merged_into:
 ---
 
