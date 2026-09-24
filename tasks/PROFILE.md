@@ -68,7 +68,7 @@ the wrong tree).
 | --- | --- | --- |
 | `app/` | `npx tsc -p tsconfig.app.json --noEmit` | strict types (`noUnusedLocals/Parameters` — CI is strict) |
 | `app/` | `npm run build` | the production bundle builds |
-| `app/` | `npm run check` | the budget guard + 16 headless harness tools (`app/tools/*Check.ts`; several boot a real server — minutes, not seconds) |
+| `app/` | `npm run check` | the budget guard + 18 headless harness tools (`app/tools/*Check.ts`; several boot a real server — minutes, not seconds) |
 | `server/` | `npm run typecheck` | server types |
 | `server/` | `npm run check` | serverCheck + authCheck + parityCheck (server ≡ engine grading) |
 
@@ -104,9 +104,15 @@ State each such gap in the task's `## Verify` as owed, with the recipe.
    `notationCheck`).
 5. **Local mode stays byte-identical** with zero `/api` traffic when `VITE_API_BASE` is unset.
 6. **Every canvas swap resets sim state AND undo/redo** via `resetAllSimState()`; **every
-   principal change resets the whole editor store** (and loads that person's sandbox) via
-   `resetForPrincipal()`, called by the auth provider in both modes (`navResetCheck`).
+   principal change resets the whole editor store** and the provenance clipboard (and loads
+   that person's sandbox) via `resetForPrincipal()`, called by the auth provider in both modes
+   (`navResetCheck`). A canvas swap never clears that clipboard (copy in P1, paste in P2).
 7. **`CLAUDE.md` stays ≤ 40 KB** and is never appended to (§9).
+8. **Assignment content enters only through the provenance seam** (`app/src/provenance.ts`
+   `canPaste` + `app/src/usePasteGuard.ts`): a paste into an assignment takes only what this
+   user copied inside an assignment in this window; no clipboard API outside the hook, every
+   answer field guarded (grep gate in `app/tools/pasteCheck.ts`). A new input or import path
+   asks the seam — never its own rule.
 Full rules: `CLAUDE.md` Part 2 "Critical design rules" and "Things to watch".
 
 ## 9. Context budget (a lesson from the Virgil pipeline — read twice)

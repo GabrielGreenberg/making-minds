@@ -8,9 +8,9 @@ requires: browser
 area: app
 source: chat
 created: 2026-09-23T11:30:00-07:00
-status: in-progress
+status: done
 after: 2026-09-23-032
-branch: task/033-assignment-paste-provenance
+branch:
 merged_into:
 ---
 
@@ -119,3 +119,88 @@ per window. The rule "same window" holds for free as long as the clipboard never
 - Owed: mobile Safari and Chrome paste behaviour on a real phone.
 
 ## Progress log
+
+### 2026-09-23 — implemented (work loop)
+**Built.** In an assignment, a paste (canvas or answer field) now takes only what this user
+copied inside one of their assignments in this window; anything else is refused with a short
+notice naming the rule. The sandbox is free, as before. One seam, `app/src/provenance.ts`: a
+module-memory clipboard with a canvas slot and a text slot, each item stamped `{scope, user}`
+(+ canvas kind), the pure `canPaste` policy, `canvasPasteVerdict` (policy, then canvas kind,
+then `allowed_components` recursing into BOXED; a sandbox target skips all three),
+`textPasteVerdict`, `refusalMessage`. `app/src/usePasteGuard.ts` is the one DOM adapter
+(copy / cut / paste / drop / dragstart / `beforeinput`) worn by the open response, the fill-in
+blanks and both box-rename fields; a guarded copy writes only `''` plus an opaque copy id
+(`application/x-makingminds-copy`, no content) to the system clipboard, and a paste inserts
+the slot's text, never the system clipboard's. The store's `clipboard` state is gone
+(`copySelected`/`paste` go through the seam; a refused paste leaves no undo entry);
+`resetForPrincipal` empties the seam, a canvas swap never does. `window.__store` is dev-only;
+`importProject` (and the dead `boxedLibrary`/`importBoxedCircuit`/`boxCurrentCircuit`) removed.
+Law 8 added to PROFILE §8 and CLAUDE.md "Critical design rules"; CLAUDE.md trimmed to 39973 B.
+
+**Decision (Gabriel, 2026-09-23):** problem-statement text is NOT pasteable
+into an answer. Only the answer fields are guarded (Done-when 3); statement copying stays
+native (the PDFs are public), so pasting it into an answer is refused like any outside text.
+No page-wide copy listener. (The loop session proposed this from Done-when 3; Gabriel confirmed it.)
+
+**Pins.** New `app/tools/pasteCheck.ts` (85 checks, in `npm run check`): [policy table],
+[canvas verdict] (mode mismatch, OR into a restricted question, boxed-OR recursion, sandbox
+free), [text verdict] (copy id / other-window / outside / image-since), [input types],
+[store paste] (sandbox → HW refused with no undo entry; Q1 → Q2 and HW-A → HW-B accepted;
+FSM → CC refused; FSM → sandbox tab accepted; locked no-op; principal change), [grep gate]
+(no clipboard API outside the hook; every `components/*.tsx` text field guarded, bare
+`readOnly`, or a counted exemption — mutation-tested), [console hole]. `navResetCheck`'s
+principal-change pins now read the seam's two slots.
+
+**Gates (exit codes):** app tsc 0 · app build 0 · app `npm run check` 0 · server typecheck 0 ·
+server check 0. Fresh `dist/` has no `__store` string (proxy for the production check).
+
+**Review findings — fixed:** (1+4) sandbox verdict now returns ok before policy/kind/allowed
+checks, as Done-when 1–2 say; (2) a stale text slot no longer pastes silently after a copy in
+another window — the copy id; (3+5) the answer-field gate checks each field, not each file;
+CLAUDE.md Provenance row wording. **Skipped:** none. **Known limit:** a browser that drops
+custom clipboard types loses the id, so after a copy in another window the stale slot can
+still paste (never outside content) — documented at `textPasteVerdict`.
+
+**Owed (not claimed):** the Verify browser pass with screenshots (Done-when 7) — canvas
+sandbox → HW1 P1 refused; P1 → P2 and HW1 → HW2 accepted; OR into P2 refused naming OR;
+FSM → CC refused; open response + fill-in: own copy → paste works, outside text / statement
+text / drag refused; box rename refused; nothing reaches the system clipboard; sign out → other
+toy account → paste brings nothing; `npm run build && npm run preview` → `window.__store`
+undefined (still defined in dev); notices sit in the editor vocabulary without overlapping
+validation warnings; a real two-window copy to confirm the copy id survives. Owed to Gabriel:
+iOS Safari / Android Chrome long-press paste (keyboard clipboard-suggestion chips arrive as
+IME typing and cannot be told apart — a stated limit).
+
+**Next step:** loop session: visual check (owed browser pass above, screenshots into this
+log), then land per PROFILE §5.
+
+### 2026-09-23 — browser pass and land (work loop)
+- **Browser, local mode (dev server :5173, John Doe, HW1/HW2/HW4 published), all passed.**
+  Canvas, driven by real Cmd+C / Cmd+V keys, with in-app hash navigation and no page reload:
+  - (a) An AND copied in the sandbox and pasted into HW1 P1 was refused with "Not pasted: that was copied in the
+    sandbox…". Nothing was added and no undo entry was recorded.
+  - (b) An AND copied in HW1 P1 pasted into P2, and the same clip pasted into HW2 P1. Both were accepted.
+  - (c) An OR copied in HW1 P1 and pasted into P2 was refused with "this question doesn't allow OR".
+  - (d) An FSM state from HW4 P3 pasted into HW1 P3 was refused with "state-machine parts can't go on a
+    logic-circuit canvas".
+
+  Text fields (the pane's synthetic keys don't fire native clipboard events, so real
+  `ClipboardEvent`s were dispatched):
+  - Open response (HW1 P6): a copy writes only `''` plus the opaque copy id, so nothing leaves. Pasting
+    the field's own copy inserted the text. Outside text, statement text, a drop and a `beforeinput`
+    insertFromPaste were all refused, and the footer notice appeared in blue beside the word count.
+  - Fill-in (HW1 P11): a copy from blank 0 pasted into blank 1. Outside text was refused with the notice.
+
+  Principal change: after John logged out and Ada signed in on the same page, a paste into HW1 got
+  "Nothing to paste", so the seam was cleared.
+
+  Production: the built bundle has no `__store` string and does carry the paste guard.
+  In dev, `window.__store` still exists. A full page load also empties the clipboard, as designed
+  ("in this window" means this page load).
+- **Seen in passing, dev only.** John's sandbox from task 032's check came back empty after this
+  tab had lived through about 50 minutes of Vite hot updates to `store.ts`. That is a module
+  re-evaluation inside a live page, which can't happen in production. With full loads, the same
+  flow (Home, log out, Ada in and out, John back) kept his sandbox intact. Not pursued.
+- **Still owed to Gabriel:** real-phone paste on iOS Safari and Android Chrome (Verify), plus a
+  copy between two real browser windows to confirm the custom clipboard type survives.
+- Landed via a merge into `main`.

@@ -48,6 +48,16 @@ import { writeJournal, clearJournal, clearJournalIfHolds, reconcileJournal } fro
 import { isFrozen } from './dueDates';
 import { getSessionUser } from './auth/session';
 import { instructorRole } from './auth/instructorRole';
+import {
+  canvasKind,
+  canvasPasteVerdict,
+  peekClipboard,
+  resetClipboard,
+  stampCanvas,
+  type CanvasClip,
+  type PasteScope,
+  type Provenance,
+} from './provenance';
 
 /**
  * TM tape notation (alphabet) for the current context. Inside an assignment
@@ -113,6 +123,15 @@ export function selectAllowedComponents(s: {
 }): ComponentType[] | null {
   const allowed = s.assignment?.questions[s.currentQuestionIndex]?.allowed_components;
   return allowed && allowed.length > 0 ? allowed : null;
+}
+
+/**
+ * Where a copy is made or a paste lands, for the provenance seam
+ * (provenance.ts): the open assignment, else the sandbox. The canvas and the
+ * guarded answer fields (usePasteGuard) both read it, so they agree on scope.
+ */
+export function selectPasteScope(s: { assignment: AssignmentData | null }): PasteScope {
+  return s.assignment ? { kind: 'assignment', assignmentId: s.assignment.id } : { kind: 'sandbox' };
 }
 
 /**
@@ -527,9 +546,11 @@ interface AppState {
   goHome: () => void;          // hide the editor, return to the catalog (preserves in-memory work)
   enterSandbox: () => void;    // open the freeform sandbox workbook (clears any active assignment)
 
-  // Save/Load (legacy single-circuit export for "Export Worksheet")
+  // Legacy single-circuit export for "Export Worksheet". (Its importProject
+  // twin wrote a whole canvas with no lock or provenance check and had no
+  // caller — removed with task 033; imports go through importWorkbook, which
+  // only ever writes sandbox tabs.)
   exportProject: () => string;
-  importProject: (json: string) => void;
   // Submission export (null when no assignment is loaded)
   exportSubmission: (student?: string) => string | null;
   // Latest recorded submission per assignment id (reactive; for status badges).
@@ -546,12 +567,7 @@ interface AppState {
   // Rotation
   rotateComponent: (id: string) => void;
 
-  // Boxed circuits (legacy library-based)
-  importBoxedCircuit: (name: string, json: string) => void;
-  boxCurrentCircuit: (name: string) => string | null;
-  boxedLibrary: { name: string; type: ComponentType; circuit: CircuitComponent[]; wires: Wire[]; ports: import('./types').Port[] }[];
-
-  // Box definitions (new draw-on-canvas boxing)
+  // Box definitions (draw-on-canvas boxing)
   boxes: BoxDefinition[];
   addBox: (box: BoxDefinition) => void;
   updateBox: (id: string, updates: Partial<BoxDefinition>) => void;
@@ -581,10 +597,15 @@ interface AppState {
   // Delete selected
   deleteSelected: () => void;
 
-  // Copy/paste
-  clipboard: { components: CircuitComponent[]; wires: Wire[] } | null;
+  // Copy/paste. The clipboard is NOT store state: it lives in the provenance
+  // seam (provenance.ts), stamped with where and by whom it was copied, so a
+  // question or canvas swap keeps it and only a principal change clears it.
+  // copySelected stamps the selection (an empty selection is a no-op). paste
+  // returns the refusal message when the seam's policy, the canvas kind or
+  // the question's allowed_components says no — or null (pasted, or the
+  // question is locked).
   copySelected: () => void;
-  paste: () => void;
+  paste: () => string | null;
 
   // Tabs (worksheets)
   tabs: SandboxTab[];
@@ -719,7 +740,8 @@ interface AppState {
   // synchronously, before React sees the new user. Saves what the leaving
   // principal had pending under ITS keys, then resets the WHOLE editor store
   // to its initial state (assignment, question circuits, box library,
-  // clipboard, history, submissions, every sim slice) and loads the arriving
+  // history, submissions, every sim slice), empties the provenance seam's
+  // clipboard (resetClipboard) and loads the arriving
   // principal's own sandbox — so the next openAssignment reads the seam, never
   // the previous person's memory. A repeat call for the same principal is a
   // no-op.
@@ -867,6 +889,11 @@ let openAssignmentSeq = 0;
 let currentPrincipal: string | null = null;
 let principalReported = false;
 let principalEpoch = 0;
+
+/** The provenance of a canvas copy made / paste landing in `state` now. */
+function pasteProvenance(state: { assignment: AssignmentData | null }): Provenance {
+  return { scope: selectPasteScope(state), user: currentPrincipal };
+}
 
 export const useStore = create<AppState>()((set, get) => ({
   autoSaveStatus: 'saved' as const,
@@ -1823,28 +1850,6 @@ export const useStore = create<AppState>()((set, get) => ({
     if (epoch === principalEpoch) set({ submissions: { ...get().submissions, [id]: record } });
     return record;
   },
-  importProject: (json) => {
-    try {
-      const data = JSON.parse(json);
-      if (data.circuit) {
-        const importedComponents = data.circuit.components || [];
-        const importedWires = data.circuit.wires || [];
-        const resolvedComponents = resolveMemDirections(importedComponents, importedWires);
-        set({
-          components: resolvedComponents,
-          wires: importedWires,
-          boxes: data.boxes || [],
-          confirmedBoxLibrary: data.confirmedBoxes || [],
-          buildMode: data.metadata?.buildType || 'CC',
-          repSystem: data.repSystem || 'binary',
-        });
-        setTimeout(() => get().evaluateCircuit(), 0);
-      }
-    } catch (e) {
-      console.error('Invalid project JSON:', e);
-      alert('Invalid project file. Please check the JSON format.');
-    }
-  },
 
   // Rotation
   rotateComponent: (id) => {
@@ -1862,91 +1867,7 @@ export const useStore = create<AppState>()((set, get) => ({
     setTimeout(() => get().evaluateCircuit(), 0);
   },
 
-  // Boxed circuits (legacy library)
-  boxedLibrary: [],
-  importBoxedCircuit: (name, json) => {
-    try {
-      const data = JSON.parse(json);
-      const circuit = data.circuit || data;
-      set((state) => ({
-        boxedLibrary: [
-          ...state.boxedLibrary,
-          { name, type: 'BOXED' as ComponentType, circuit: circuit.components || circuit, wires: circuit.wires || [], ports: [] },
-        ],
-      }));
-    } catch (e) {
-      console.error('Invalid boxed circuit JSON:', e);
-    }
-  },
-
-  boxCurrentCircuit: (name) => {
-    const state = get();
-    const { components, wires } = state;
-
-    const inputs = components.filter((c) => c.type === 'INPUT');
-    const outputs = components.filter((c) => c.type === 'OUTPUT');
-
-    if (inputs.length === 0) return 'Circuit must have at least 1 INPUT.';
-    if (outputs.length === 0) return 'Circuit must have at least 1 OUTPUT.';
-
-    // Check for free ends: every input port on non-INPUT components should be connected
-    for (const comp of components) {
-      if (comp.type === 'INPUT') continue;
-      const inputPorts = comp.ports.filter((p) => p.side === 'left');
-      for (const port of inputPorts) {
-        const connected = wires.some(
-          (w) => w.targetComponentId === comp.id && w.targetPortId === port.id
-        );
-        if (!connected) {
-          return `Free end: port "${port.id}" on component "${comp.label}" is not connected.`;
-        }
-      }
-    }
-
-    // Build boxed circuit ports: inputs become left ports, outputs become right ports
-    const sortedInputs = [...inputs].sort((a, b) => {
-      const numA = parseInt(a.label.replace('IN', ''));
-      const numB = parseInt(b.label.replace('IN', ''));
-      return numA - numB;
-    });
-    const sortedOutputs = [...outputs].sort((a, b) => {
-      const numA = parseInt(a.label.replace('OUT', ''));
-      const numB = parseInt(b.label.replace('OUT', ''));
-      return numA - numB;
-    });
-
-    const boxedPorts: import('./types').Port[] = [
-      ...sortedInputs.map((inp, i) => ({
-        id: `in${i + 1}`,
-        label: inp.label,
-        side: 'left' as const,
-        index: i,
-      })),
-      ...sortedOutputs.map((out, i) => ({
-        id: `out${i + 1}`,
-        label: out.label,
-        side: 'right' as const,
-        index: i,
-      })),
-    ];
-
-    set((s) => ({
-      boxedLibrary: [
-        ...s.boxedLibrary,
-        {
-          name,
-          type: 'BOXED' as ComponentType,
-          circuit: JSON.parse(JSON.stringify(components)),
-          wires: JSON.parse(JSON.stringify(wires)),
-          ports: boxedPorts,
-        },
-      ],
-    }));
-
-    return null;
-  },
-
-  // Box definitions (new draw-on-canvas boxing)
+  // Box definitions (draw-on-canvas boxing)
   boxes: [],
   confirmedBoxLibrary: [],
   addBox: (box) => {
@@ -2397,29 +2318,37 @@ export const useStore = create<AppState>()((set, get) => ({
     setTimeout(() => get().evaluateCircuit(), 0);
   },
 
-  // Copy/Paste
-  clipboard: null,
+  // Copy/Paste — through the provenance seam (provenance.ts, law 8). Copying
+  // reads and is never locked; the stamp records where (this assignment, or
+  // the sandbox), by whom and from which kind of canvas.
   copySelected: () => {
     const state = get();
     const selectedComps = state.components.filter((c) =>
       state.selectedIds.includes(c.id)
     );
+    // Nothing selected: keep what was copied before rather than overwrite it.
+    const kind = canvasKind(state.buildMode, selectEffectiveMode(state));
+    if (selectedComps.length === 0 || !kind) return;
     const selectedCompIds = new Set(selectedComps.map((c) => c.id));
     const selectedWires = state.wires.filter(
       (w) =>
         selectedCompIds.has(w.sourceComponentId) &&
         selectedCompIds.has(w.targetComponentId)
     );
-    set({
-      clipboard: {
-        components: JSON.parse(JSON.stringify(selectedComps)),
-        wires: JSON.parse(JSON.stringify(selectedWires)),
-      },
-    });
+    stampCanvas({ components: selectedComps, wires: selectedWires }, pasteProvenance(state), kind);
   },
   paste: () => {
     const state = get();
-    if (!state.clipboard || isCurrentQuestionLocked(state)) return;
+    if (isCurrentQuestionLocked(state)) return null;
+    // Refused before pushHistory, so a refused paste leaves no undo entry.
+    const verdict = canvasPasteVerdict(peekClipboard().canvas, {
+      prov: pasteProvenance(state),
+      kind: canvasKind(state.buildMode, selectEffectiveMode(state)),
+      allowed: selectAllowedComponents(state),
+    });
+    if (!verdict.ok) return verdict.message;
+    // A fresh copy per paste: two pastes of one item never share objects.
+    const clip = JSON.parse(JSON.stringify(verdict.clip)) as CanvasClip;
     state.pushHistory();
 
     // Compute next available label numbers from existing components on canvas
@@ -2431,7 +2360,7 @@ export const useStore = create<AppState>()((set, get) => ({
     let nextMem = memNums.length === 0 ? 1 : Math.max(...memNums) + 1;
 
     const idMap = new Map<string, string>();
-    const newComps = state.clipboard.components.map((c) => {
+    const newComps = clip.components.map((c) => {
       const newId = uuid();
       idMap.set(c.id, newId);
       let label = c.label;
@@ -2447,7 +2376,7 @@ export const useStore = create<AppState>()((set, get) => ({
       }
       return { ...c, id: newId, x: c.x + 40, y: c.y + 40, label };
     });
-    const newWires = state.clipboard.wires.map((w) => ({
+    const newWires = clip.wires.map((w) => ({
       ...w,
       id: uuid(),
       sourceComponentId: idMap.get(w.sourceComponentId) || w.sourceComponentId,
@@ -2460,6 +2389,7 @@ export const useStore = create<AppState>()((set, get) => ({
       selectedIds: newComps.map((c) => c.id),
     });
     setTimeout(() => get().evaluateCircuit(), 0);
+    return null;
   },
 
   // Tabs (worksheets)
@@ -3781,6 +3711,9 @@ export const useStore = create<AppState>()((set, get) => ({
     principalEpoch++;
     currentPrincipal = email;
     principalReported = true;
+    // The clipboard lives in the provenance seam, not in store state: empty
+    // it here too, and hand the seam the arriving principal.
+    resetClipboard(email);
     set({ ...useStore.getInitialState(), ...readSandbox(email) });
     if (keepSandboxOpen) get().enterSandbox();
     // The reset's own set() armed the autosave, and so did entering the
@@ -3813,8 +3746,10 @@ export const useStore = create<AppState>()((set, get) => ({
   },
 }));
 
-// Expose for debugging
-if (typeof window !== 'undefined') {
+// Expose for debugging — DEV BUILDS ONLY. In production one console line on
+// window.__store could set any circuit, past every lock and the provenance
+// seam (task 033). `?.`: import.meta.env is undefined under tsx (the harness).
+if (import.meta.env?.DEV === true && typeof window !== 'undefined') {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   (window as any).__store = useStore;
 }

@@ -5,9 +5,12 @@
 //
 // Unlike an open question this one IS autograded (engine/fillIn.ts), so the
 // boxes are the whole answer: no prose, and under `numericOnly` no characters
-// but digits reach the store.
+// but digits reach the store. Every box wears the one provenance guard
+// (usePasteGuard; law 8): only text copied in the student's own assignments
+// pastes in, and nothing copied here reaches the system clipboard.
 
 import { useStore, selectQuestionLocked } from '../store';
+import { usePasteGuard } from '../usePasteGuard';
 import { ProblemBody, ProblemContext } from './ProblemSetDocument';
 
 export function FillInPanel() {
@@ -17,6 +20,7 @@ export function FillInPanel() {
   const answers = useStore((s) => s.fillAnswers);
   const setFillAnswer = useStore((s) => s.setFillAnswer);
   const locked = useStore(selectQuestionLocked);
+  const { ref: pasteGuardRef, notice: pasteNotice } = usePasteGuard();
 
   const spec = question?.fill_in;
   if (!assignment || !question || !spec) return null;
@@ -45,6 +49,7 @@ export function FillInPanel() {
                 autoComplete="off"
                 spellCheck={false}
                 readOnly={locked}
+                ref={pasteGuardRef}
                 onChange={(e) =>
                   setFillAnswer(
                     i,
@@ -57,11 +62,15 @@ export function FillInPanel() {
         </div>
         <div className="open-response-foot">
           <span>{filled} of {spec.labels.length} filled in</span>
-          <span>
-            {locked
-              ? 'Marked done — unlock this question to keep editing.'
-              : "Saved automatically — submit the assignment when you're done."}
-          </span>
+          {pasteNotice ? (
+            <span className="paste-notice" role="status">{pasteNotice}</span>
+          ) : (
+            <span>
+              {locked
+                ? 'Marked done — unlock this question to keep editing.'
+                : "Saved automatically — submit the assignment when you're done."}
+            </span>
+          )}
         </div>
       </div>
     </div>

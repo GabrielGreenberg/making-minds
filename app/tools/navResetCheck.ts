@@ -68,6 +68,10 @@ const { buildSampleAssignment, scCorrect, fsmCorrect, tmCorrect, turbotCorrect, 
   await import('../src/devData/sampleData');
 const { localAssignmentStore } = await import('../src/storage/AssignmentStore');
 const { backendMode, workbookStore } = await import('../src/storage/backend');
+// The clipboard lives in the provenance seam, not in store state (task 033).
+const { peekClipboard, stampText, currentProvenance } = await import('../src/provenance');
+/** Both of the seam's slots empty. */
+const clipboardEmpty = () => peekClipboard().canvas === null && peekClipboard().text === null;
 
 let passed = 0;
 let failed = 0;
@@ -641,11 +645,13 @@ console.log('[principal change]');
   const aGate = useStore.getState().components.find((c) => !before.has(c.id))!;
   useStore.setState({ selectedIds: [aGate.id] });
   useStore.getState().copySelected();
+  // …and a sentence copied in an answer field (usePasteGuard's text slot).
+  stampText("A's sentence", currentProvenance({ kind: 'assignment', assignmentId: SAMPLE_ASSIGNMENT_ID }));
   await useStore.getState().hydrateSubmissions();
   {
     const s = useStore.getState();
-    check('A has a gate, a clipboard, history and a submissions map',
-      aGate != null && s.clipboard != null && s.undoStack.length > 0 && Object.keys(s.submissions).length > 0);
+    check('A has a gate, a clipboard (both seam slots), history and a submissions map',
+      aGate != null && peekClipboard().canvas != null && peekClipboard().text != null && s.undoStack.length > 0 && Object.keys(s.submissions).length > 0);
   }
 
   // Sign out exactly as SessionControls.signOut does: Home first, then the
@@ -657,7 +663,7 @@ console.log('[principal change]');
     check('sign-out: no assignment in memory', s.assignment === null && s.questionCircuits.size === 0);
     check('sign-out: live canvas empty', s.components.length === 0 && s.wires.length === 0 && s.boxes.length === 0);
     check('sign-out: box library empty', s.confirmedBoxLibrary.length === 0);
-    check('sign-out: clipboard empty', s.clipboard === null);
+    check('sign-out: clipboard empty (both seam slots)', clipboardEmpty());
     check('sign-out: selection empty', s.selectedIds.length === 0);
     check('sign-out: submissions map empty', Object.keys(s.submissions).length === 0);
     check('sign-out: back to the welcome state', !s.workbookOpen && s.autoSaveStatus === 'saved');
@@ -681,7 +687,7 @@ console.log('[principal change]');
     const s = useStore.getState();
     check("B sees B's stored workbook", s.components.some((c) => c.id === 'b-sentinel'));
     check("…and none of A's work", !s.components.some((c) => c.id === aGate.id));
-    check('B starts with an empty clipboard', s.clipboard === null);
+    check('B starts with an empty clipboard (both seam slots)', clipboardEmpty());
     useStore.getState().paste();
     check("pasting as B brings nothing of A's", useStore.getState().components.length === s.components.length);
   }
