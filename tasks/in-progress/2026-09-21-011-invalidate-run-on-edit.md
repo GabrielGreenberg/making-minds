@@ -89,3 +89,17 @@ none skipped. **Owed (browser, loop session):** the sandbox FSM / TM / turbot (C
 brains) edit-mid-run recipes, a question's SC run, and Grades → "Run this input" then edit
 (recipe in `## Verify`; the banner stays and "Run again" works).
 **Next step:** loop session: visual check if owed, then land per PROFILE §5.
+
+### 2026-09-24 — loop browser check and land
+- **Browser, local mode (dev server restarted on the branch), Ada's sandbox Logic Circuit
+  tab.** Built IN → MEM → OUT and typed 1011001 into the Global I/O row.
+  - The panel's **Run** (now the store's `scRun`) ran 8 steps to output **10110010** (the
+    delay) and stopped.
+  - Reset, then Run. Mid-run (t=3, running), adding a NOT stopped the run and reset it to
+    **t=1**: history empty, the global output blank, the typed input kept
+    (`[[1,0,0,1,1,0,1]]`). It stayed stopped 1.5 s later, with no leftover interval.
+  - Run again, then moving the MEM mid-run changed nothing: still running at t=3, and it
+    finished at t=9 with 10110010.
+- **Still owed:** TM, FSM and turbot eyeballs of the same reset (pinned headless in
+  `navResetCheck [edit during run]`, 45 checks, and `caseRunCheck [same question]`).
+- Landed via a merge into `main`.
