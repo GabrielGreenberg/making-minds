@@ -148,3 +148,27 @@ work; "Back to my work" shows the live work; a past-due + submitted assignment s
   `getLatest`), so the two options coincide. (3) 002's "Run this input" is unchanged.
 - **Next step.** Loop session: the owed browser checks (a)–(d) above, then land per PROFILE §5,
   and file the out-of-scope instructor "Student view" / shared-local-list submission leak.
+
+### 2026-09-23 — loop browser check and land
+- **Browser, local mode (dev server restarted on the branch; local data re-seeded).** John
+  submitted attempt 5 of HW1 P1 (IN1, IN2 → AND → OUT) and then added an OR to the live P1.
+  Grades were released and there was no due date.
+  - Grades → Problem 1 → ▾ failed inputs → "Open my submission →" opened
+    `#/a/hw1/submission/5/q/0`. The canvas showed the submitted machine without the live OR.
+    The header read "Viewing submission 5 — read-only", and the question bar showed
+    "Submission 5 · read-only" and "Back to my work". Submit was gone, and adding or removing a
+    component was refused.
+  - Simulation works in the view: INPUTs set to 1, 1 evaluate to OUT1 = 1. The save chip stayed
+    "Saved".
+  - "Back to my work" returned to `#/a/hw1/q/0` with the live OR, editable, and Submit back.
+    Browser Back returned to the view.
+  - Frozen: with the HW1 due date set in the past, `#/a/hw1/q/0` opened submission 5 with
+    "🔒 Past due — viewing your submission". There was no "Back to my work" and no Submit, and
+    edits were refused. After Home the stored live workbook still held the OR (the old goHome
+    overwrite is gone).
+  - At 375 px neither the submission view nor the Grades page scrolls sideways.
+- **Still owed:** the remote-mode round trip (recipe above). The seam lookups and the "no PUT
+  while viewing" rule are pinned headless in `navResetCheck [viewing a submission]`.
+- **Filed:** the out-of-scope submission leak (instructor Student view / local shared list) as
+  task 037.
+- Landed via a merge into `main`.
