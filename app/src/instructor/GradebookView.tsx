@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import type { AssignmentData, ManualReview, SubmissionRecord } from '../types';
+import { questionTask } from '../types';
 import { getAssignment } from '../assignments';
 import { assignmentStore, submissionStore } from '../storage/backend';
 import { gradeSubmission } from '../engine/grader';
@@ -143,9 +144,10 @@ export function GradebookView({ id }: { id: string }) {
           <span className="instructor-stat-label">mean score</span>
         </div>
         {assignment.questions.map((q) => {
-          if (q.buildMode === 'open') {
+          if (questionTask(q) === 'open') {
             // Open questions are graded by hand: show how many latest attempts
-            // still await review, or the manual pass rate once all are in.
+            // still await review, or the manual pass rate once all are in. A
+            // fill-in question is autograded, so it gets the plain pass rate.
             const awaiting = students.filter(
               (s) => s.latest.grades.find((g) => g.questionId === q.id)?.pending,
             ).length;

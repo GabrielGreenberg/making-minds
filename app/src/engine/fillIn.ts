@@ -11,6 +11,24 @@
 
 import type { FillInCaseResult, FillInSpec } from '../types';
 
+/** One blank of a fill-in spec, as the student panel and the creator see it. */
+export interface FillInBlank {
+  label: string;
+  /** Only digits may be typed into this blank. */
+  digitsOnly: boolean;
+}
+
+/** The spec's blanks, in order. The ONE reader of `numericOnly` (a pipelineCheck
+ *  grep pin): `true` locks every blank to digits, an array locks blank i iff
+ *  its entry i is `true` — an array is truthy, so nothing may test it bare. */
+export function fillInBlanks(spec: FillInSpec): FillInBlank[] {
+  const n = spec.numericOnly;
+  return spec.labels.map((label, i) => ({
+    label,
+    digitsOnly: Array.isArray(n) ? n[i] === true : n === true,
+  }));
+}
+
 /** Trim, then drop leading zeros while keeping at least one digit ("000" →
  *  "0", "0011" → "11", "" → ""). */
 export function normalizeFillAnswer(raw: string): string {

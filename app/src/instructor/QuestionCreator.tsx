@@ -10,7 +10,18 @@ import type {
   ArenaConfig,
   TurbotSuccessCriterion,
   PerceptionRule,
+  QuestionTask,
 } from '../types';
+import { QUESTION_TASKS, questionTask } from '../types';
+import { FillInBlanksEditor } from './FillInBlanksEditor';
+import {
+  blankDraftsOf,
+  fillInFields,
+  fillInProblems,
+  misplacedAnswersWarning,
+  misplacedBlanks,
+  newBlankDraft,
+} from './fillInAuthoring';
 import {
   buildPerceptionCases,
   describePerceptionRule,
@@ -53,7 +64,8 @@ interface Props {
 // tested on a fixed sample of values across a range of input lengths and have
 // no size field at all. 'Open' is the odd one out: a free-text question is
 // just a name + statement — no representation, formula, or test bank — and is
-// reviewed manually instead of autograded.
+// reviewed manually instead of autograded; its fill-in task adds labelled
+// blanks with an answer each, and is autograded by string comparison.
 const MODES: { mode: BuildMode; label: string }[] = [
   { mode: 'CC', label: 'CC' },
   { mode: 'SC', label: 'SC' },
@@ -117,6 +129,16 @@ const SAMPLING_NOTE: Partial<Record<BuildMode, string>> = {
 function blankInput(): AuthoredInputGroup {
   return { name: '', maxVal: 1 };
 }
+
+// The Task toggle's words for each task a mode offers (types.ts QUESTION_TASKS;
+// a mode with one task shows no toggle).
+const TASK_LABELS: Record<QuestionTask, string> = {
+  function: 'Function',
+  perception: 'Perception',
+  turbot: 'Turbot',
+  open: 'Free response',
+  'fill-in': 'Fill-in blanks',
+};
 
 // Representation systems the codec grades against (the display-only 'plus' is not
 // a grading representation, so it isn't offered here).
@@ -218,12 +240,26 @@ export function QuestionCreator({ assignment, existingQuestion, onSave, onCancel
   const [callouts, setCallouts] = useState<Callout[]>(existingQuestion?.callouts ?? []);
   const [figures, setFigures] = useState<Figure[]>(existingQuestion?.figures ?? []);
 
+  // What the question asks for (types.ts questionTask) — a choice among the
+  // tasks its mode offers: Function/Perception on CC and SC, Free response/
+  // Fill-in blanks on Open. Held as picked and coerced to the mode below, so
+  // flipping the mode away and back keeps the choice.
+  const [task, setTask] = useState<QuestionTask>(
+    existingQuestion ? questionTask(existingQuestion) : 'function',
+  );
+
+  // ── Fill-in fields (open questions with task === 'fill-in') ────
+  // One row per blank — label, digits-only flag and answer together
+  // (./fillInAuthoring.ts); saved as `fill_in` + the stripped `fill_in_answers`.
+  // `savedBlanks` are the rows the question opened with: students' answers
+  // are stored by position, so the ones that no longer keep their slot are
+  // warned about in the editor and confirmed at save.
+  const [savedBlanks] = useState(() => blankDraftsOf(existingQuestion));
+  const [blankDrafts, setBlankDrafts] = useState(savedBlanks);
+
   // ── Perception fields (CC/SC questions with task === 'perception') ──
   // Perception questions grade raw bit frames against a rule, not a formula
   // (engine/perception.ts); representation is implicitly binary bits.
-  const [task, setTask] = useState<'function' | 'perception'>(
-    existingQuestion?.perception ? 'perception' : 'function',
-  );
   const [pKind, setPKind] = useState<PerceptionKind>(
     existingQuestion?.perception?.rule.kind ?? 'min-run',
   );
@@ -276,8 +312,13 @@ export function QuestionCreator({ assignment, existingQuestion, onSave, onCancel
   // ── Live, per-keystroke validation (all O(#groups), no space enumeration) ──
   const isTurbot = mode === 'turbot';
   const isOpen = mode === 'open';
-  const canPerceive = mode === 'CC' || mode === 'SC';
-  const isPerception = canPerceive && task === 'perception';
+  const taskChoices = QUESTION_TASKS[mode];
+  const effTask: QuestionTask = taskChoices.includes(task) ? task : taskChoices[0];
+  const isPerception = effTask === 'perception';
+  const isFillIn = effTask === 'fill-in';
+  const fillInErrors = isFillIn ? fillInProblems(blankDrafts) : [];
+  // Saving anything but these blanks (another task, another mode) drops them.
+  const misplacedAnswers = misplacedBlanks(savedBlanks, isFillIn ? blankDrafts : []);
 
   // The restriction applies to gate-vocabulary canvases: CC/SC questions
   // (function or perception) and turbot questions whose brain is CC/SC.
@@ -367,14 +408,15 @@ export function QuestionCreator({ assignment, existingQuestion, onSave, onCancel
     ? 'This success criterion needs at least one goal cell in the arena.'
     : null;
 
-  // Open questions are just a name + statement; nothing else gates saving.
-  // A problem may be its title alone ("Spiral" over an arena, "+1 T"), so
-  // either the title or the statement must say something.
+  // A free-response question is just a name + statement; a fill-in one also
+  // needs a sound list of blanks. A problem may be its title alone ("Spiral"
+  // over an arena, "+1 T"), so either the title or the statement must say
+  // something.
   const saveable =
     label.trim().length > 0 &&
     (statement.trim().length > 0 || title.trim().length > 0) &&
     (isOpen
-      ? true
+      ? fillInErrors.length === 0
       : isTurbot
         ? maxSteps >= 1 && !arenaError
         : isPerception
@@ -387,15 +429,22 @@ export function QuestionCreator({ assignment, existingQuestion, onSave, onCancel
 
   const handleSave = () => {
     if (!saveable) return;
+    if (
+      misplacedAnswers.length > 0 &&
+      !window.confirm(`${misplacedAnswersWarning(misplacedAnswers)}\n\nSave anyway?`)
+    ) {
+      return;
+    }
 
     const existingQsForId = assignment.questions;
     const newId =
       existingQuestion?.id ??
       existingQsForId.reduce((max, q) => Math.max(max, q.id), 0) + 1;
 
-    // Open questions carry only their prompt — no test bank, no grading
-    // machinery. The representation field is meaningless for them; store the
-    // default so the type stays uniform.
+    // Open questions carry their prompt and, for fill-in, the blanks + their
+    // key — no test bank, no machine. A free-response save drops any blanks.
+    // The representation field is meaningless for them; store the default so
+    // the type stays uniform.
     if (mode === 'open') {
       onSave({
         id: newId,
@@ -407,6 +456,7 @@ export function QuestionCreator({ assignment, existingQuestion, onSave, onCancel
         statement: statement.trim(),
         buildMode: 'open',
         representation: 'binary',
+        ...(isFillIn ? fillInFields(blankDrafts) : {}),
       });
       return;
     }
@@ -556,19 +606,23 @@ export function QuestionCreator({ assignment, existingQuestion, onSave, onCancel
             ))}
           </div>
         </div>
-        {canPerceive && (
+        {taskChoices.length > 1 && (
           <div className="mm-section-head">
             <h3>Task</h3>
             <div className="mm-segmented">
-              {(['function', 'perception'] as const).map((t) => (
+              {taskChoices.map((t) => (
                 <button
                   key={t}
                   className={
-                    'mm-segmented-btn' + (task === t ? ' mm-segmented-btn--active' : '')
+                    'mm-segmented-btn' + (effTask === t ? ' mm-segmented-btn--active' : '')
                   }
-                  onClick={() => setTask(t)}
+                  onClick={() => {
+                    setTask(t);
+                    // A first switch to fill-in starts with one blank to fill.
+                    if (t === 'fill-in' && blankDrafts.length === 0) setBlankDrafts([newBlankDraft([])]);
+                  }}
                 >
-                  {t === 'function' ? 'Function' : 'Perception'}
+                  {TASK_LABELS[t]}
                 </button>
               ))}
             </div>
@@ -607,11 +661,23 @@ export function QuestionCreator({ assignment, existingQuestion, onSave, onCancel
             </span>
           </label>
         )}
-        {isOpen && (
+        {isOpen && !isFillIn && (
           <p className="mm-note mm-hint">
             An open question is answered in free text and is not autograded — review the
             responses in the gradebook. (LLM-assisted grading may plug in here later.)
           </p>
+        )}
+        {isFillIn && (
+          <>
+            <p className="mm-note mm-hint">
+              The student types an answer into each labelled blank, and it is autograded by
+              string comparison — surrounding spaces and leading zeros are ignored
+              (&#8220;0011&#8221; matches &#8220;11&#8221;). A digits-only blank refuses every
+              other character. Answers match blanks by position: once students have started,
+              relabel blanks in place and add new ones at the end.
+            </p>
+            <FillInBlanksEditor drafts={blankDrafts} saved={savedBlanks} onChange={setBlankDrafts} />
+          </>
         )}
         {isTurbot && (
           <>
@@ -995,9 +1061,11 @@ export function QuestionCreator({ assignment, existingQuestion, onSave, onCancel
             value={statement}
             onChange={(e) => setStatement(e.target.value)}
             placeholder={
-              isOpen
-                ? 'Write the question the student answers in prose (mention the expected length, e.g. ~1 paragraph)…'
-                : "Describe the function the student's circuit must compute…"
+              isFillIn
+                ? 'Write the question the blanks answer (e.g. Represent the numbers zero through ten in binary.)…'
+                : isOpen
+                  ? 'Write the question the student answers in prose (mention the expected length, e.g. ~1 paragraph)…'
+                  : "Describe the function the student's circuit must compute…"
             }
           />
         </label>

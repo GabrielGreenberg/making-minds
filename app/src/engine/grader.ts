@@ -41,6 +41,7 @@ import type {
   QuestionResult,
   SubmissionResult,
 } from '../types';
+import { questionTask } from '../types';
 import { validatePerceptionMachine, runPerceptionCase } from './perception';
 import { gradeFillIn } from './fillIn';
 import { notationForRepresentation } from './tmCodec';
@@ -161,16 +162,19 @@ export function gradeQuestion(
   responseText?: string,
   fillAnswers?: string[],
 ): QuestionResult {
+  // The question's task (types.ts questionTask) picks the branch — the same
+  // classifier that picks the student's panel and what the answer carries.
+  const task = questionTask(question);
   // A fill-in question is an open question that CAN be autograded: string
   // answers, no machine to run (engine/fillIn.ts).
-  if (question.fill_in) return gradeFillInQuestion(question, fillAnswers);
-  if (question.buildMode === 'open') return pendingOpen(question.id, responseText);
+  if (task === 'fill-in') return gradeFillInQuestion(question, fillAnswers);
+  if (task === 'open') return pendingOpen(question.id, responseText);
   if (!circuit) return skip(question.id, 'no circuit submitted');
   // Every machine is graded from rest: MEMs at 0, whatever the saved circuit
   // carried from the student's last UI run (engine/caseRun.ts).
   const machine = gradingCircuit(circuit);
-  if (question.buildMode === 'turbot') return gradeTurbot(question, machine);
-  if (question.perception) return gradePerception(question, machine);
+  if (task === 'turbot') return gradeTurbot(question, machine);
+  if (task === 'perception') return gradePerception(question, machine);
 
   const cases = question.test_cases;
   if (!cases || cases.length === 0) return skip(question.id, 'question has no test cases');

@@ -10,9 +10,24 @@
 // adapters against real circuits, independent of the browser/UI. The open
 // question is asserted to come back `pending` (not autogradeable) with the
 // student's response attached for manual review.
+//
+//   [fill-in authoring]  (task 005) the question creator's fill-in blanks:
+//                        drafts → saved fields round-trip HW1 P11 exactly,
+//                        the canonical per-blank digits-only flag, reorder
+//                        moves label + answer + flag together, which saved
+//                        blanks an edit strips of students' answers (they
+//                        are stored by position), the defects
+//                        that block a save, the student copy stripped
+//                        (server/src/sanitize.ts — no answer rides inside
+//                        `fill_in`), submit → graded, the questionTask
+//                        classifier, and a grep pin: one reader and one
+//                        writer of `numericOnly`.
 
-import { readFileSync } from 'node:fs';
-import type { AssignmentData, QuestionResult, SubmissionRecord } from '../src/types';
+import { readFileSync, readdirSync, statSync } from 'node:fs';
+import { join, relative } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import type { AssignmentData, AssignmentQuestion, QuestionResult, SubmissionRecord } from '../src/types';
+import { QUESTION_TASKS, questionModeLabel, questionTask } from '../src/types';
 import {
   buildSampleAssignment,
   buildCorrectSubmission,
@@ -25,6 +40,19 @@ import { applyManualReview, buildSubmission } from '../src/storage/submissionSto
 import { emptyQuestionCircuit } from '../src/storage/workbookStore';
 import { gradeSubmissions } from '../src/instructor/Gradebook';
 import { questionVerdict } from '../src/gradeDisplay';
+import { fillInBlanks } from '../src/engine/fillIn';
+import {
+  blankDraftsOf,
+  fillInFields,
+  fillInProblems,
+  misplacedAnswersWarning,
+  misplacedBlanks,
+  newBlankDraft,
+  type FillInBlankDraft,
+} from '../src/instructor/fillInAuthoring';
+import { moveItem } from '../src/instructor/dragReorder';
+import { canonicalJson } from '../src/devData/homeworkSync';
+import { stripAnswers } from '../../server/src/sanitize';
 
 const NOW_ISO = '2026-09-10T00:00:00.000Z';
 
@@ -184,6 +212,181 @@ console.log('\n[fill-in blanks]');
   const wholeHw = gradeSubmission(hw1, built);
   check('the fill-in question grades 11/11 through gradeSubmission',
     wholeHw.questions.find((r) => r.questionId === 11)?.passed === 11);
+}
+
+// ── Authoring a fill-in question (task 005) ────────────────────────
+// The creator's blanks are drafts (instructor/fillInAuthoring.ts) saved as
+// `fill_in` + `fill_in_answers`; the server strips the answers for students
+// and keeps the spec whole, so nothing that is a key may live in the spec.
+console.log('\n[fill-in authoring]');
+{
+  const readHw = (n: number) => JSON.parse(
+    readFileSync(new URL(`../src/devData/homeworks/hw${n}.json`, import.meta.url), 'utf8'),
+  ) as AssignmentData;
+  const hw1 = readHw(1);
+  const p11 = hw1.questions.find((x) => x.id === 11)!;
+
+  // (1) A no-op creator edit reproduces the hand-written question exactly —
+  // canonicalJson is the homework sync's own comparison, so P11 stays pristine.
+  const p11Drafts = blankDraftsOf(p11);
+  check('HW1 P11 loads as 11 drafts, each with its answer and the digits-only flag',
+    p11Drafts.length === 11 && p11Drafts.every((d, i) =>
+      d.label === String(i) && d.answer === p11.fill_in_answers![i] && d.digitsOnly));
+  check('drafts → fields round-trips HW1 P11 byte-for-byte (canonicalJson)',
+    canonicalJson(fillInFields(p11Drafts)) ===
+      canonicalJson({ fill_in: p11.fill_in, fill_in_answers: p11.fill_in_answers }));
+  check('...and keeps P11 in its `numericOnly: true` form',
+    fillInFields(p11Drafts).fill_in.numericOnly === true);
+  const added = newBlankDraft(p11Drafts);
+  check('a new blank after 0–10 is labelled "11" and inherits digits-only',
+    added.label === '11' && added.digitsOnly && added.answer === '' &&
+      !p11Drafts.some((d) => d.key === added.key));
+  check('a question without a spec (new, or free response) has no drafts',
+    blankDraftsOf(undefined).length === 0 &&
+      blankDraftsOf(hw1.questions.find((x) => x.id === 10)).length === 0);
+
+  // An authored question with a MIX of digits-only and free-text blanks.
+  const draft = (label: string, digitsOnly: boolean, answer: string): FillInBlankDraft =>
+    ({ ...newBlankDraft([]), label, digitsOnly, answer });
+  const drafts = [
+    draft(' seven in binary ', true, ' 111 '),
+    draft('the capital of France', false, 'Paris'),
+    draft('four in binary', true, '100'),
+  ];
+  const fields = fillInFields(drafts);
+
+  // (2) numericOnly: all → true, none → absent, mixed → one flag per blank.
+  check('mixed blanks save one flag per blank [true, false, true]',
+    JSON.stringify(fields.fill_in.numericOnly) === '[true,false,true]');
+  check('...read back per blank by fillInBlanks',
+    fillInBlanks(fields.fill_in).map((b) => b.digitsOnly).join() === 'true,false,true');
+  check('all digits-only saves `numericOnly: true`',
+    fillInFields(drafts.map((d) => ({ ...d, digitsOnly: true }))).fill_in.numericOnly === true);
+  check('no digits-only blank omits the key',
+    !('numericOnly' in fillInFields(drafts.map((d) => ({ ...d, digitsOnly: false }))).fill_in));
+  check('labels and answers are saved trimmed, parallel, in row order',
+    fields.fill_in.labels.join('|') === 'seven in binary|the capital of France|four in binary' &&
+      fields.fill_in_answers.join('|') === '111|Paris|100');
+  check('a lone array entry that is not true reads as a free-text blank',
+    fillInBlanks({ labels: ['a', 'b'], numericOnly: [true] }).map((b) => b.digitsOnly).join() === 'true,false');
+
+  // (3) Reordering moves a whole row: label, answer and flag stay together.
+  const moved = fillInFields(moveItem(drafts, 0, 2));
+  check('moving blank #1 to the end moves its label, answer and flag together',
+    moved.fill_in.labels.join('|') === 'the capital of France|four in binary|seven in binary' &&
+      moved.fill_in_answers.join('|') === 'Paris|100|111' &&
+      JSON.stringify(moved.fill_in.numericOnly) === '[false,true,true]');
+
+  // (3b) Students' answers are stored by position, so the creator warns (and
+  // confirms at save) exactly when a saved blank loses its slot.
+  const labelsOf = (ls: string[]) => ls.join('|');
+  const edited = p11Drafts.map((d, i) =>
+    i === 4 ? { ...d, label: 'four', answer: '0100', digitsOnly: false } : d);
+  check('relabelling a saved blank, or changing its answer or flag, misplaces nothing',
+    misplacedBlanks(p11Drafts, edited).length === 0);
+  check('appending blanks misplaces nothing',
+    misplacedBlanks(p11Drafts, [...p11Drafts, newBlankDraft(p11Drafts)]).length === 0);
+  check('removing blank "3" misplaces the answers to "3" and every blank after it',
+    labelsOf(misplacedBlanks(p11Drafts, p11Drafts.filter((_, i) => i !== 3))) ===
+      '3|4|5|6|7|8|9|10');
+  check('swapping two blanks misplaces exactly those two',
+    labelsOf(misplacedBlanks(p11Drafts, moveItem(p11Drafts, 0, 1))) === '0|1');
+  check('inserting a new blank first misplaces every saved one',
+    misplacedBlanks(p11Drafts, [newBlankDraft(p11Drafts), ...p11Drafts]).length === 11);
+  check('saving no blanks (the question stops being fill-in) misplaces every saved one',
+    misplacedBlanks(p11Drafts, []).length === 11);
+  check('a new question has no saved blanks to misplace',
+    misplacedBlanks([], [newBlankDraft([])]).length === 0);
+  const warning = misplacedAnswersWarning(['3', '4', '5', '6', '7', '8', '9', '10']);
+  check('the warning names the first five blanks and counts the rest',
+    warning.includes('blanks "3", "4", "5", "6", "7" and 3 more') &&
+      misplacedAnswersWarning(['0']).includes('blank "0" will'));
+
+  // (4) What blocks a save, each named by its blank.
+  const problems = (ds: FillInBlankDraft[]) => fillInProblems(ds);
+  check('a sound list has no problems', problems(drafts).length === 0);
+  check('zero blanks cannot be saved', problems([]).length === 1);
+  check('an empty label is named',
+    problems([draft('  ', false, 'x')]).includes('Blank #1 needs a label.'));
+  check('a repeated label is named, pointing at the first',
+    problems([draft('a', false, 'x'), draft(' a ', false, 'y')])
+      .includes('Blank #2 repeats the label "a" of blank #1.'));
+  check('an empty answer is named (the grader never passes an empty box)',
+    problems([draft('a', false, '   ')]).includes('Blank #1 needs an answer.'));
+  check('letters in a digits-only answer are named (the student could never type them)',
+    problems([draft('a', false, 'x'), draft('b', true, '1O1')])
+      .some((p) => p.startsWith('Blank #2 is digits-only')));
+
+  // (5) The student's copy: the key is gone and the spec carries nothing else.
+  const authoredQ: AssignmentQuestion = {
+    id: 1,
+    label: 'Problem 1',
+    statement: 'Fill in the blanks.',
+    buildMode: 'open',
+    representation: 'binary',
+    ...fields,
+  };
+  const authored: AssignmentData = { id: 'authored-fill-in', title: 'Authored', questions: [authoredQ] };
+  const studentQ = stripAnswers(authored).questions[0];
+  check('the student copy has an empty answer key', studentQ.fill_in_answers?.length === 0);
+  check('the student copy\'s fill_in has only labels and numericOnly',
+    Object.keys(studentQ.fill_in ?? {}).every((k) => k === 'labels' || k === 'numericOnly'));
+  check('...and is the authored spec unchanged (the prompts and per-blank flags)',
+    canonicalJson(studentQ.fill_in) === canonicalJson(authoredQ.fill_in));
+  check('no answer appears anywhere in the student copy',
+    !['111', 'Paris'].some((a) => JSON.stringify(studentQ).includes(a)));
+
+  // (6) Submit → graded, exactly as a student's Submit does.
+  const submitWith = (fillAnswers: string[]) => {
+    const circuits = new Map([[1, { ...emptyQuestionCircuit(), fillAnswers }]]);
+    const built = buildSubmission(authored, circuits, { student: 'author@example.com', submittedAt: NOW_ISO });
+    return gradeSubmission(authored, built).questions[0];
+  };
+  const right = submitWith(['111', ' Paris ', '0100']);
+  check('the right answers grade 3/3 through buildSubmission → gradeSubmission',
+    right.status === 'graded' && right.passed === 3 && right.total === 3);
+  const oneOff = submitWith(['111', 'London', '100']);
+  check('one wrong answer grades 2/3 and names that blank',
+    oneOff.passed === 2 && (oneOff.fillCases ?? []).filter((c) => !c.pass).map((c) => c.label).join() === 'the capital of France');
+  check('letters on a digits-only blank fail',
+    (submitWith(['seven', 'Paris', '100']).fillCases ?? [])[0]?.pass === false);
+
+  // (7) One classifier decides the panel, the grader branch and the answer.
+  check('HW1 P11 is a fill-in task, chipped "open - fill-in"',
+    questionTask(p11) === 'fill-in' && questionModeLabel(p11) === 'open - fill-in');
+  const prose = hw1.questions.find((x) => x.id === 10)!;
+  check('a prose open question is an open task, graded pending',
+    questionTask(prose) === 'open' && gradeQuestion(prose, undefined, 'my answer').status === 'pending');
+  const everyQ = [assignment, ...[1, 2, 3, 4, 5, 6, 7].map(readHw)].flatMap((a) => a.questions);
+  const offMode = everyQ.filter((q) => !QUESTION_TASKS[q.buildMode].includes(questionTask(q)));
+  check(`every sample + HW1–HW7 question's task is one its mode offers (${everyQ.length} questions)`,
+    offMode.length === 0);
+  const ccWithBlanks: AssignmentQuestion = {
+    id: 99, label: 'x', statement: '', buildMode: 'CC', representation: 'binary',
+    fill_in: { labels: ['a'] }, fill_in_answers: ['1'],
+  };
+  check('a fill_in on a CC question is NOT a fill-in task (nor graded as one)',
+    questionTask(ccWithBlanks) === 'function' &&
+      gradeQuestion(ccWithBlanks, undefined, undefined, ['1']).fillCases === undefined);
+
+  // (8) One reader (engine/fillIn.ts fillInBlanks) and one writer
+  // (instructor/fillInAuthoring.ts fillInFields) of `numericOnly`: an array
+  // is truthy, so any other `if (spec.numericOnly)` would lock every blank.
+  const root = fileURLToPath(new URL('../../', import.meta.url));
+  const walk = (dir: string): string[] =>
+    readdirSync(dir).flatMap((name) => {
+      const p = join(dir, name);
+      if (name === 'node_modules') return [];
+      return statSync(p).isDirectory() ? walk(p) : /\.(ts|tsx)$/.test(name) ? [p] : [];
+    });
+  const allowed = ['app/src/types.ts', 'app/src/engine/fillIn.ts', 'app/src/instructor/fillInAuthoring.ts'];
+  const mentions = [...walk(join(root, 'app/src')), ...walk(join(root, 'server/src'))]
+    .filter((f) => readFileSync(f, 'utf8').includes('numericOnly'))
+    .map((f) => relative(root, f).split('\\').join('/'));
+  const strays = mentions.filter((f) => !allowed.includes(f));
+  check('`numericOnly` is named only in types.ts, engine/fillIn.ts and instructor/fillInAuthoring.ts',
+    strays.length === 0 && allowed.every((f) => mentions.includes(f)));
+  for (const f of strays) console.log(`        → ${f}`);
 }
 
 // ── The student's own grade sheet (gradeDisplay.questionVerdict) ────

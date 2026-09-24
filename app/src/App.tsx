@@ -16,6 +16,7 @@ import { useInstructorRoute } from './instructor/useInstructorRoute';
 import { VisitorBanner } from './components/VisitorBanner';
 import { useStore, selectEffectiveMode } from './store';
 import { useAuth } from './auth';
+import { questionTask } from './types';
 import { useEffect } from 'react';
 
 function App() {
@@ -54,15 +55,16 @@ function App() {
   if (assignment && assignmentView === 'overview') return <AssignmentOverview />;
 
   // Open questions: same chrome (menu + question nav), but the workspace is a
-  // writing panel — no palette, canvas, or data tables. A `fill_in` spec
-  // narrows that panel to a list of labelled boxes, which IS autograded.
+  // writing panel — no palette, canvas, or data tables. A fill-in question
+  // (types.ts questionTask) narrows that panel to a list of labelled boxes,
+  // which IS autograded.
   if (buildMode === 'open') {
     const q = assignment?.questions[currentQuestionIndex];
     return (
       <div className="app">
         <MenuBar />
         <TabBar />
-        {q?.fill_in ? <FillInPanel /> : <OpenResponsePanel />}
+        {q && questionTask(q) === 'fill-in' ? <FillInPanel /> : <OpenResponsePanel />}
       </div>
     );
   }
