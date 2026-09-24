@@ -219,7 +219,7 @@ if (typeof (globalThis as { localStorage?: unknown }).localStorage === 'undefine
 }
 
 // Import AFTER the shims (static imports would hoist above them).
-const { useStore, selectCodecWindow } = await import('../src/store');
+const { useStore, selectCodecWindow, selectScRunWindow } = await import('../src/store');
 
 async function waitUntil(pred: () => boolean, timeoutMs = 30000): Promise<boolean> {
   const start = Date.now();
@@ -283,6 +283,8 @@ console.log('\n[store: SC tally question runs feed the codec stream]');
   openQuestion(q, hw3p7.correct);
   check(`hw3-p7: selectCodecWindow sees the question window (${win})`,
     selectCodecWindow(useStore.getState()) === win);
+  check('hw3-p7: the SC run-end rule (selectScRunWindow) IS the codec window on a value question',
+    selectScRunWindow(useStore.getState()) === win);
 
   check('hw3-p7: run terminates on its own', await scTypeAndRun('11'));
   const s = useStore.getState();

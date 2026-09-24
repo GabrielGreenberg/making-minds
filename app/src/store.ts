@@ -42,6 +42,7 @@ import {
 } from './types';
 import { topologicalSort, evaluateGate, evaluateCC, scNetlist, evaluateSCStep, boxMemoryOutputs, stepBoxedMemory, memorySlots, withMemState, zeroMemState, hasMemory, isSequentialBox, hasCombinationalLoop, sortStateComponents, evaluateFSMSymbolStep, evaluateTMSingleStep, evaluateTMSequence, DEFAULT_TM_MAX_STEPS, notationForRepresentation, encodeTM, stepCountFor, encodeInput, valueToBits, bitsToValue, bitsToTally, bitsToBinary, sortByLabel, fsmNotation, turbotFsmNotation, tmNotation, turbotInternalNotation, turbotExternalNotation, questionLayout, caseStimulus, recordedCaseSeparations, gradedMachineKey, gradingCircuit, type CodecLayout, type TransitionNotation } from './engine';
 import { senseAheadSymbol, applyMotorCommand, initialBrainState, runBrainStep, stateKindOf, type BrainState } from './engine/turbot';
+import { framesToLanes } from './engine/perception';
 import { getAssignment, listAssignments } from './assignments';
 import { emptyQuestionCircuit, restoreQuestionCircuits } from './storage/workbookStore';
 import { buildSubmission } from './storage/submissionStore';
@@ -215,6 +216,43 @@ export function selectCodecWindow(s: {
 }): number | null {
   const layout = selectCodecLayout(s);
   return layout ? stepCountFor(layout) : null;
+}
+
+/**
+ * The retina width of the open SC perception question — the height of its
+ * frame player (components/PerceptionFramePlayer.tsx) — or null: the
+ * sandbox, a value question, a CC perception question (one frame, no clock).
+ * Reads the authored spec only, never perception_cases (a remote student's
+ * copy has none).
+ */
+export function selectPerceptionRetina(s: {
+  assignment: AssignmentData | null;
+  currentQuestionIndex: number;
+}): number | null {
+  const q = s.assignment?.questions[s.currentQuestionIndex];
+  if (!q || q.buildMode !== 'SC' || questionTask(q) !== 'perception') return null;
+  return q.perception?.width ?? null;
+}
+
+/**
+ * The ONE end of an SC question run, in time steps: a value question's codec
+ * window (selectCodecWindow); an SC perception question's film length L —
+ * the grader clocks a case's frames and nothing after them
+ * (runPerceptionCase), so no per-MEM drain step follows. Null in the sandbox
+ * and for a perception question with no frames yet: the sandbox's own end
+ * applies (L + one 0-drain step per MEM). scStep's refusal, scRun's stop and
+ * the I/O panel's Run/Step all read this.
+ */
+export function selectScRunWindow(s: {
+  assignment: AssignmentData | null;
+  currentQuestionIndex: number;
+  scInputSequence: number[][];
+}): number | null {
+  const codecWindow = selectCodecWindow(s);
+  if (codecWindow !== null) return codecWindow;
+  if (selectPerceptionRetina(s) === null) return null;
+  const frames = Math.max(0, ...s.scInputSequence.map((lane) => lane.length));
+  return frames > 0 ? frames : null;
 }
 
 /** Parse display-order digits as a numeral under `rep` — exactly how the A/V
@@ -835,6 +873,11 @@ interface AppState {
   scReset: () => void; // reset to t=1, preserve circuit structure and input sequence
   scGlobalReset: () => void; // reset to t=1, clear all inputs and memory
   setScInputBit: (inputIndex: number, timeStep: number, value: number) => void;
+  // Load a perception film (frames, IN1-first bit-vectors, t1 first) as the
+  // run's input lanes (engine/perception.ts framesToLanes) and reset the run
+  // to t=1 — the SC perception frame player's one write. Stimulus, not an
+  // edit: never locked, no undo entry, no editing record.
+  setScFrames: (frames: number[][]) => void;
 
   // Global I/O sequences (each entry = one run with input string and output string)
   scGlobalSequences: { inputStr: string; outputStr: string }[];
@@ -3407,11 +3450,12 @@ export const useStore = create<AppState>()((set, get) => ({
     const state = get();
     const { components, wires, scTimeStep, scHistory, scInputSequence } = state;
 
-    // Question runs are bounded by the codec window — the exact step count
-    // the grader runs (engine stepCountFor). Steps past it would show state
-    // the grader never reads. Sandbox (window null): unbounded stepping.
-    const codecWindow = selectCodecWindow(state);
-    if (codecWindow !== null && scTimeStep > codecWindow) return;
+    // Question runs are bounded by the grader's run length — a value
+    // question's codec window (engine stepCountFor), a perception question's
+    // frame count (selectScRunWindow). Steps past it would show state the
+    // grader never reads. Sandbox (window null): unbounded stepping.
+    const runWindow = selectScRunWindow(state);
+    if (runWindow !== null && scTimeStep > runWindow) return;
 
     // The machine as the engine clocks it (memory-holding boxes inlined —
     // engine/netlist.ts), and its memory in memorySlots order: top-level
@@ -3533,11 +3577,12 @@ export const useStore = create<AppState>()((set, get) => ({
     if (state.scRunning) return;
     const intervalId = window.setInterval(() => {
       const s = get();
-      // Question runs execute exactly the codec window (the grader's run
-      // length — see selectCodecWindow), 0-padding past the typed input.
-      const codecWindow = selectCodecWindow(s);
-      if (codecWindow !== null) {
-        if (s.scTimeStep > codecWindow) {
+      // Question runs execute exactly the grader's run length (the codec
+      // window, 0-padding past the typed input; a perception film's frames
+      // — see selectScRunWindow).
+      const runWindow = selectScRunWindow(s);
+      if (runWindow !== null) {
+        if (s.scTimeStep > runWindow) {
           s.scPause();
           return;
         }
@@ -3624,6 +3669,16 @@ export const useStore = create<AppState>()((set, get) => ({
       newSeq[inputIndex] = arr;
       return { scInputSequence: newSeq };
     });
+  },
+
+  setScFrames: (frames) => {
+    // No isCurrentQuestionLocked: a film is stimulus, like the typed SC rows —
+    // a done or frozen question's player still runs. The lanes ARE
+    // scInputSequence, so both reset laws and the edit law's restart
+    // (scReset keeps the lanes) cover the film with no slice of its own.
+    const width = selectPerceptionRetina(get()) ?? Math.max(0, ...frames.map((f) => f.length));
+    set({ scInputSequence: framesToLanes(frames, width) });
+    get().scReset();
   },
 
   setScGlobalSequenceInput: (index, value) => {

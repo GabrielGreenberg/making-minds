@@ -273,6 +273,36 @@ export function validatePerceptionMachine(
   return { ok: true };
 }
 
+// ── Frames ↔ the SC run's input lanes (the student's frame player) ──
+
+/**
+ * A film of frames as the SC run's input LANES — the store's
+ * `scInputSequence`: lane i is wire IN(i+1)'s bit at every step, t1 first.
+ * The store's scStep feeds lane i to the i-th INPUT in label order, exactly
+ * how evaluateSCSequence feeds frame bit i (runPerceptionCase below), so a
+ * film loaded as lanes and clocked in the store IS the grader's run of it.
+ * A frame shorter than `width` reads 0 in its missing bits.
+ */
+export function framesToLanes(frames: number[][], width: number): number[][] {
+  return Array.from({ length: width }, (_, i) => frames.map((f) => f[i] ?? 0));
+}
+
+/** The film the lanes hold — the inverse of framesToLanes: one frame per step
+ *  of the LONGEST lane, `width` bits each; a bit a short or missing lane
+ *  lacks reads 0, as scStep feeds it. */
+export function lanesToFrames(lanes: number[][], width: number): number[][] {
+  const steps = Math.max(0, ...lanes.map((l) => l.length));
+  return Array.from({ length: steps }, (_, t) =>
+    Array.from({ length: width }, (_, i) => lanes[i]?.[t] ?? 0));
+}
+
+/** A frame shifted one wire up — toward IN1, the motion rule's "up" — or
+ *  down; the vacated end reads 0 and the bit pushed off the edge is lost. */
+export function shiftFrame(frame: number[], dir: 'up' | 'down'): number[] {
+  if (frame.length === 0) return [];
+  return dir === 'up' ? [...frame.slice(1), 0] : [0, ...frame.slice(0, -1)];
+}
+
 /**
  * Run one perception case and return the machine's output bit per time step
  * (parallel to `tc.expected`). CC evaluates each frame combinationally (a CC

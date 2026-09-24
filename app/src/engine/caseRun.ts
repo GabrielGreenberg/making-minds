@@ -82,11 +82,14 @@ const NO_INNER_MODE = 'question has no inner mode (CC/SC/FSM/TM) set';
  * The codec layout of a value question — the grader's view of it. TM: the
  * tape axis (widths are content-relative, so no cc_spec is needed). CC/SC/
  * FSM: the per-group widths from the authoring spec, or null without one.
- * Turbot and open questions have no value layout (null).
+ * Turbot and open questions have no value layout (null), nor has a
+ * perception question: its frames are raw bits, clocked outside the codec
+ * (engine/perception.ts) — a stray cc_spec must never route them through it.
  */
 export function questionLayout(question: AssignmentQuestion): CodecLayout | null {
   const mode = question.buildMode;
   if (mode === 'turbot' || mode === 'open') return null;
+  if (question.perception) return null;
   const rep = question.representation ?? 'binary';
   const axis = axisForMode(mode);
   if (axis === 'tape') return { axis: 'tape', rep, inputWidths: [], outputWidths: [] };
