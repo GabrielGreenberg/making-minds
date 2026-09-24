@@ -8,9 +8,9 @@ requires:
 area: app
 source: chat
 created: 2026-09-23T22:45:00-07:00
-status: in-progress
+status: done
 after:
-branch: task/038-box-across-wires-port-binding
+branch:
 merged_into:
 ---
 
