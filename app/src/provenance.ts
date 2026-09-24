@@ -38,8 +38,8 @@
 //            slot instead of pasting it silently. Forging an id gains nothing —
 //            the inserted text is still the slot's. Problem-statement text
 //            copies natively (the PDFs are public), so pasting it into an
-//            answer is refused like any outside text — a reversible default
-//            (task 033's progress log).
+//            answer is refused like any outside text (Gabriel's decision,
+//            2026-09-23; task 033's progress log).
 //
 // Pure policy + a module-memory store: no React, no DOM, so the harness
 // imports it directly. It lives outside engine/ because grading never asks
