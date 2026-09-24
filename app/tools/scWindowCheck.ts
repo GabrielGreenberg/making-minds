@@ -36,7 +36,8 @@
 //     NON-palindrome "110" so a reversed feed/display cannot sneak through.
 //
 // Sandbox behavior (no open question / no cc_spec) is also pinned: SC runs
-// L + one 0-drain step per MEM; FSM runs L; both feed raw typed bits.
+// L + one 0-drain step per MEM (just the drain with nothing typed); FSM runs
+// L; both feed raw typed bits.
 //
 // BOXED (task 004): the same hw3-p7 machine boxed whole (its MEMs inside a
 // placed box) runs the same window, feeds the same stream and decodes the
@@ -489,6 +490,14 @@ console.log('\n[store: sandbox unchanged]');
   check(`SC sandbox run is L + one drain step per MEM: ${ran} steps (want 4)`, done && ran === 4);
   check('SC sandbox feeds the raw typed bits (ones first)',
     sameSteps(scFedSteps(), [[1], [1], [1], [0]]));
+
+  // Nothing typed: the INPUT toggles feed the run, which stops after the drain
+  // (one step per MEM) — the I/O panel's Run drives this same loop (scRun).
+  useStore.getState().scGlobalReset();
+  useStore.getState().scRun(10);
+  const drained = await waitUntil(() => !useStore.getState().scRunning);
+  check(`SC sandbox run with nothing typed stops after the drain: ${useStore.getState().scHistory.length} step(s) (want 1)`,
+    drained && useStore.getState().scHistory.length === 1);
 
   useStore.getState().fsmGlobalReset();
   useStore.setState({ components: fsmIdentity.components, wires: fsmIdentity.wires, buildMode: 'FSM' });

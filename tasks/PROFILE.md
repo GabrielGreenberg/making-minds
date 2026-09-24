@@ -107,6 +107,9 @@ State each such gap in the task's `## Verify` as owed, with the recipe.
    principal change resets the whole editor store** and the provenance clipboard (and loads
    that person's sandbox) via `resetForPrincipal()`, called by the auth provider in both modes
    (`navResetCheck`). A canvas swap never clears that clipboard (copy in P1, paste in P2).
+   A machine edit (`gradedMachineKey` changes) restarts every live run at t=1 keeping its
+   input and undo — the store's machine-key subscriber, never an action or a component
+   (`navResetCheck [edit during run]`).
 7. **`CLAUDE.md` stays ≤ 40 KB** and is never appended to (§9).
 8. **Assignment content enters only through the provenance seam** (`app/src/provenance.ts`
    `canPaste` + `app/src/usePasteGuard.ts`): a paste into an assignment takes only what this
