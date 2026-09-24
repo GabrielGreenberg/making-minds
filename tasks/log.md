@@ -22,3 +22,4 @@
 2026-09-21-011 · feature · Reset or flag a live run when the machine is edited mid-run (turbot and TM) · 2026-09-24T01:02:21-0700 · task/011-invalidate-run-on-edit · b951340
 2026-09-21-012 · feature · Give students a frame player for SC perception questions · 2026-09-24T01:59:05-0700 · task/012-sc-perception-frame-player · b93edcb
 2026-09-21-015 · chore · Browser-verify the CSS-only fixes landed without a browser (2026-09-17 pass + two legacy layout items) · 2026-09-24T02:07:33-0700 · task/015-browser-verify-css-fixes · b6d813c
+2026-09-21-024 · feature · Shift-click a gate to rotate it, with a light "(shift+click to ↻)" hint beside the Rotate button · 2026-09-24T02:46:34-0700 · task/024-shift-click-rotate · 008b735
