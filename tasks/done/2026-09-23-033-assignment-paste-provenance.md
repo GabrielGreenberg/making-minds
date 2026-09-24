@@ -8,9 +8,9 @@ requires: browser
 area: app
 source: chat
 created: 2026-09-23T11:30:00-07:00
-status: in-progress
+status: done
 after: 2026-09-23-032
-branch: task/033-assignment-paste-provenance
+branch:
 merged_into:
 ---
 
