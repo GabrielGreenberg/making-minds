@@ -1619,6 +1619,12 @@ console.log('[own submissions]');
   const callers = walk(srcRoot).filter((f) => readFileSync(new URL(f, srcRoot), 'utf8').includes('listAll('));
   check('listAll( appears only under instructor/ and storage/',
     callers.length > 0 && callers.every((f) => f.startsWith('instructor/') || f.startsWith('storage/')));
+  // The API client's own everyone-read reaches /submissions/all directly, so it
+  // is gated too: only the client (which defines it) and the remote seam use it.
+  const rawCallers = walk(srcRoot).filter((f) => f !== 'api/client.ts' &&
+    readFileSync(new URL(f, srcRoot), 'utf8').includes('listAllSubmissions'));
+  check('listAllSubmissions appears only in api/client.ts and storage/ (the remote seam)',
+    rawCallers.length > 0 && rawCallers.every((f) => f.startsWith('storage/')), rawCallers.join(', '));
   check('…and the gradebook and the dashboard read through it',
     callers.includes('instructor/GradebookView.tsx') && callers.includes('instructor/InstructorDashboard.tsx'));
 }

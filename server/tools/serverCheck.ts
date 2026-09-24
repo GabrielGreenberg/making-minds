@@ -860,6 +860,39 @@ check('saving again overwrites the single row (not a second one)',
   }
 }
 
+// ── task 037: an instructor's own read, non-empty ─────────────────
+// The earlier pin runs before the instructor has submitted, so it would also
+// pass for a server that always answered [] to instructors. Here the
+// instructor submits once (the Student view's Submit): the plain route
+// returns exactly that attempt, /all gains it, and the student's own list
+// is unchanged. Last, so no earlier `attempt === 1` lookup can meet it.
+{
+  const iSubmit = await api<{ record: SubmissionRecord }>(
+    'POST',
+    `/assignments/${SAMPLE_ASSIGNMENT_ID}/submissions`,
+    { token: iTok, body: { answers: buildCorrectSubmission(instructor.email).answers } },
+  );
+  const iOwn = await api<{ records: SubmissionRecord[] }>(
+    'GET', `/assignments/${SAMPLE_ASSIGNMENT_ID}/submissions`, { token: iTok },
+  );
+  const iAll = await api<{ records: SubmissionRecord[] }>(
+    'GET', `/assignments/${SAMPLE_ASSIGNMENT_ID}/submissions/all`, { token: iTok },
+  );
+  const sOwn = await api<{ records: SubmissionRecord[] }>(
+    'GET', `/assignments/${SAMPLE_ASSIGNMENT_ID}/submissions`, { token: sTok },
+  );
+  check("instructor GET /submissions after submitting: exactly the instructor's own attempt 1",
+    iSubmit.status === 201 && iOwn.status === 200 && iOwn.json.records.length === 1 &&
+      iOwn.json.records[0].submission.student === instructor.email.toLowerCase() &&
+      iOwn.json.records[0].attempt === 1);
+  check("…/submissions/all gains it beside the student's attempts",
+    iAll.json.records.some((r) => r.submission.student === instructor.email.toLowerCase()) &&
+      iAll.json.records.some((r) => r.submission.student === student.email.toLowerCase()));
+  check("…and the student's own list never shows the instructor's attempt",
+    sOwn.json.records.length > 0 &&
+      sOwn.json.records.every((r) => r.submission.student === student.email.toLowerCase()));
+}
+
 // ── logout ───────────────────────────────────────────────────────
 await api('POST', '/auth/logout', { token: sTok });
 const afterLogout = await api('GET', '/auth/me', { token: sTok });

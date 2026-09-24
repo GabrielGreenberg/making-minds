@@ -117,3 +117,25 @@ only the instructor's own attempts.
 
 **NEXT STEP:** loop session: visual check if owed (both browser recipes above), then land
 per PROFILE §5.
+
+### 2026-09-24 — loop browser check and land
+- **Fixed here, from the review nits:**
+  - `serverCheck`'s instructor "own read" pin covered only the empty case. A new block at the
+    end of the file has the instructor submit once. The plain route then returns exactly that
+    attempt 1, `/all` gains it beside the student's, and the student's own list never shows
+    it. It sits last, so no earlier `attempt === 1` lookup meets it.
+  - The navResetCheck grep gate matched only `listAll(`. It now also gates the API client's
+    `listAllSubmissions`, allowed only in `api/client.ts` and the remote seam under
+    `storage/`.
+  - serverCheck: all checks passed. navResetCheck: 476 passed. server typecheck: 0.
+- **Browser, local mode (dev server restarted on the branch), with the old shared list in
+  localStorage (`mm:sub:hw1` = alice#1, alice#2, bob#3, carol#4, john#5).**
+  - John's Home: HW1 "✓ Submitted Sep 23, 9:21 PM", his own attempt.
+  - Prof. Ada's Student view: **HW1 "Not submitted"**, and no "Submitted" anywhere. Before
+    this change (task 015's first screenshot) the same page showed "✓ Submitted Sep 23…" on
+    every homework, from other people's attempts.
+  - Ada's HW1 gradebook still lists everyone: 4 students, 5 submissions.
+- **Owed to Gabriel (release):** hard-reload the instructor tab after `deploy/release.sh`,
+  because the plain submissions route changed meaning for instructors (recipe above). Also
+  the remote-mode Student view round trip (recipe above).
+- Landed via a merge into `main`.
