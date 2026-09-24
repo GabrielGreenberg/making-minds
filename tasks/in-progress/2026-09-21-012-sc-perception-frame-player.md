@@ -87,3 +87,22 @@ the player keeps working; a ≤ 0.6-scale width screenshot at the 260px panel fo
 Nothing is owed to Gabriel (no ssh or real data; remote mode reads only the sanitized
 `q.perception`).
 **Next step.** Loop session: the visual check above, then land per PROFILE §5.
+
+### 2026-09-24 — loop browser check and land
+- **Fixed here: the review's leftover nit.** The frame player didn't render until the canvas
+  had an INPUT, because DataTable's empty-canvas early return came first. A student opening a
+  perception question saw no player. The empty-canvas branch now mounts
+  `PerceptionFramePlayer` too (it depends only on the retina). Checked with app tsc, build,
+  perceptionCheck and themeCheck, all exit 0.
+- **Browser, local mode (dev server restarted on the branch), Ada, HW3 P11 "Change
+  detector".**
+  - On an empty canvas, "RETINA FRAMES" shows IN1–IN8 and OUT1, a "+" to add frames,
+    Run/Step/Reset, "0 / 24 frames", the 1x chip, and the Stage-1 warning "expected 8 input
+    wires, found 0 — the grader rejects this machine; the run still plays". Frames step there
+    with no errors.
+  - With `perceptionChangeCorrect` loaded and frames blank, 10100000, 10100000, 10100001,
+    Step×4 gives OUT **0,1,0,1**. A 5th Step does nothing (no drain column). Reset → t=1 with
+    the 4 frames kept. Adding a NOT mid-run → t=1 with the frames kept (task 011's law).
+- **Still owed:** a width screenshot at the default 260 px panel (the pane was hidden), and the
+  motion question's "shift up" tools by eye (pinned in perceptionCheck).
+- Landed via a merge into `main`.

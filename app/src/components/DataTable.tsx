@@ -892,6 +892,11 @@ export function DataTable() {
             <div style={{ padding: 12, color: '#999', fontSize: 12 }}>
               Add inputs and outputs to see the I/O table.
             </div>
+            {/* The film depends only on the retina, not the circuit: a student
+                can draw the frames before wiring the retina's inputs. */}
+            {isSC && retina !== null && (
+              <PerceptionFramePlayer width={retina} runSpeed={runSpeed} onRunSpeedChange={setRunSpeed} />
+            )}
           </div>
         </div>
       </div>
