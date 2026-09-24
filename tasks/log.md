@@ -13,3 +13,4 @@
 2026-09-23-035 · bug · Import the registrar's class list as exported — skip its preamble, read its columns and name format, leave out withdrawn students · 2026-09-23T14:34:45-0700 · task/035-registrar-roster-import · cde8684
 2026-09-23-032 · bug · Scope editor state to its user and canvas — sign-out hands one user's work to the next; undo reaches across questions; one sandbox per person · 2026-09-23T16:27:08-0700 · task/032-scope-editor-state · 306691d
 2026-09-23-033 · feature · Anti-cheating paste constraints — in an assignment, accept only content copied there in this window by this user; the sandbox stays free · 2026-09-23T17:36:42-0700 · task/033-assignment-paste-provenance · ee74c79
+2026-09-23-034 · feature · Quiet provenance watermark for circuits and paragraphs — keyed ids and text stamps, a signed writing/build trace, verify at submit, plain integrity notices · 2026-09-23T19:03:27-0700 · task/034-provenance-watermark · e78764f
