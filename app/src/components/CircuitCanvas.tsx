@@ -324,7 +324,9 @@ interface DragInfo {
   // for 'move'
   componentId?: string;
   moveOffsets?: Map<string, { dx: number; dy: number }>;
-  shiftKey?: boolean;
+  // for 'boxselect': shift or cmd/ctrl held — the rectangle adds to the
+  // selection instead of replacing it (modifier map, handlePointerDown)
+  additive?: boolean;
   // for 'wire'
   sourceCompId?: string;
   sourcePortId?: string;
@@ -2133,6 +2135,13 @@ export function CircuitCanvas() {
     fromY: number;
   } | null>(null);
 
+  // A Mac ctrl-click is also a context-menu click: set by a ctrl+left press
+  // that ran a gesture (swallowMacMenu, modifier map), it tells onContextMenu
+  // to swallow the menu that follows. Pointer-up clears it (the Mac menu comes
+  // on pointer-down, before it), so a Windows/Linux ctrl-click, which raises
+  // no menu, leaves nothing armed.
+  const menuSuppressRef = useRef(false);
+
   const pendingWireMove = useCallback(
     (e: PointerEvent) => {
       const p = pendingWireRef.current;
@@ -2510,7 +2519,12 @@ export function CircuitCanvas() {
               return wd.labelPos != null && inRect(wd.labelPos);
             })
             .map((w) => w.id);
-          state.setSelectedIds([...compIds, ...transitionIds]);
+          const captured = [...compIds, ...transitionIds];
+          // Additive: the selection held at pointer-down (never cleared) plus
+          // what the rectangle caught.
+          state.setSelectedIds(
+            drag.additive ? [...new Set([...state.selectedIds, ...captured])] : captured
+          );
         }
         pendingOverlay.current.boxSelect = null;
         requestOverlayUpdate();
@@ -2561,6 +2575,39 @@ export function CircuitCanvas() {
   // ─── Unified pointer down ─────────────────────────────────────
   const handlePointerDown = useCallback(
     (e: React.PointerEvent) => {
+      // ── Modifier map ─────────────────────────────────────────────
+      // Every pointer-down gesture on the canvas, in the order the branches
+      // below test it. A new gesture is written here first; the branches
+      // point back here rather than re-explaining.
+      //   a pending (armed) wire         → this click completes it (or cancels)
+      //   middle button / alt+left       → pan (wins over everything below)
+      //   a wire's middle segment        → plain: drag the segment;
+      //                                    shift or cmd/ctrl: the wire click below
+      //   box resize handle / box edge   → resize / move the box, any modifier
+      //   box name                       → nothing (the dblclick renames)
+      //   a port or a component body, through modifierClick (the port circles
+      //   cover most of a small part — NOT, MEM, IN/OUT, a gate's edges, a
+      //   state's rim — so both mean the same; the body first lets the INPUT
+      //   toggle tab flip its value under any modifier):
+      //     shift, STATE → STATE (FSM/TM)    → connect the one selected state to it
+      //     shift, any non-STATE part        → rotate it 90° (rotateComponent: the
+      //                                        Rotate button's lock, undo, re-route)
+      //     shift, a STATE, nothing to connect → legacy: the body toggles it in
+      //                                        the selection, the rim starts a wire
+      //     cmd/ctrl                         → toggle it in/out of the selection
+      //   shift or cmd/ctrl+wire         → toggle it in/out of the selection
+      //   detail ≥ 3 on a component, no modifier → select everything on the canvas
+      //   plain port / wire / component  → a port arms a wire; select (drag moves)
+      //   background, a palette tool armed → draw the box / place the part, any
+      //                                    modifier (the tool stays armed)
+      //   background, shift or cmd/ctrl  → additive box-select (a drag adds the
+      //                                    rectangle; a click keeps the selection)
+      //   background, plain              → clear the selection, box-select
+      // A ctrl+left press that ran a toggle or an additive box-select is also
+      // the Mac context-menu click: swallowMacMenu has onContextMenu swallow
+      // that one menu (menuSuppressRef). Rapid shift-clicks count up e.detail
+      // too, so every modifier is tested BEFORE the triple-click.
+      menuSuppressRef.current = false; // before the early return: only this press may arm it
       if (e.button !== 0 && e.button !== 1) return;
 
       // If an input/textarea is currently focused (e.g. editing a box name or
@@ -2584,6 +2631,16 @@ export function CircuitCanvas() {
       const state = useStore.getState();
       const canvasPos = screenToCanvas(e.clientX, e.clientY);
       const hit = findTarget(e);
+      const mod = e.metaKey || e.ctrlKey; // cmd on a Mac, ctrl elsewhere
+
+      // Called where a cmd/ctrl gesture actually ran (modifier map): on a Mac
+      // a ctrl+left press also raises the context menu, which onContextMenu
+      // then swallows. Pointer-up disarms it, whatever the platform.
+      const swallowMacMenu = () => {
+        if (!e.ctrlKey) return;
+        menuSuppressRef.current = true;
+        window.addEventListener('pointerup', () => { menuSuppressRef.current = false; }, { once: true, capture: true });
+      };
 
       // FSM/TM: with a single state s1 selected, shift-clicking another state
       // s2 creates the transition s1 → s2 directly (no drag needed). Returns
@@ -2600,6 +2657,29 @@ export function CircuitCanvas() {
         // Move the selection along so connections can be chained s1→s2→s3…
         state.setSelectedIds([targetCompId]);
         return true;
+      };
+
+      // shift / cmd-ctrl on a component (modifier map). Called from the port
+      // branch AND the component branch: the port hit circles cover most of a
+      // small part (NOT, MEM, IN/OUT, a gate's edges, a state's rim), so a
+      // modifier-click landing on a "port" must mean the same. True when it
+      // handled the click; false leaves a STATE's legacy shift-click to its
+      // branch. Rotation is the clicked component only — the Rotate button
+      // rotates the selection.
+      const modifierClick = (comp: CircuitComponent): boolean => {
+        if (e.shiftKey) {
+          if (tryShiftConnect(comp.id)) return true;
+          if (comp.type === 'STATE') return false;
+          if (!state.selectedIds.includes(comp.id)) state.setSelectedIds([comp.id]);
+          state.rotateComponent(comp.id);
+          return true;
+        }
+        if (mod) {
+          state.toggleSelected(comp.id);
+          swallowMacMenu();
+          return true;
+        }
+        return false;
       };
 
       // A pending (armed) wire completes on the next click: connect to the
@@ -2619,7 +2699,7 @@ export function CircuitCanvas() {
         // No valid target — the pending wire is cancelled; the click behaves normally.
       }
 
-      // Middle-click or alt+left-click → pan
+      // Middle-click or alt+left-click → pan (modifier map)
       if (e.button === 1 || (e.button === 0 && e.altKey)) {
         dragRef.current = {
           type: 'pan',
@@ -2642,7 +2722,9 @@ export function CircuitCanvas() {
       }
 
       // ─── Wire segment drag ─────────────────────────────────
-      if (hit.type === 'wiresegment') {
+      // A modifier-click on a segment is the wire's click (modifier map): the
+      // segment's hit line lies over the middle of the wire.
+      if (hit.type === 'wiresegment' && !e.shiftKey && !mod) {
         e.preventDefault();
         e.stopPropagation();
         const wire = state.wires.find((w) => w.id === hit.wireId);
@@ -2762,9 +2844,8 @@ export function CircuitCanvas() {
         const comp = state.components.find((c) => c.id === hit.compId);
         if (!comp) return;
 
-        // Shift-click connect (FSM/TM): the rim hit areas cover most of a
-        // state, so a shift-click landing on a "port" must connect too.
-        if (tryShiftConnect(hit.compId)) return;
+        // shift / cmd-ctrl mean the same on a port as on the body (modifier map)
+        if (modifierClick(comp)) return;
 
         // Always select the component when clicking its port, so Delete still works
         state.setSelectedIds([hit.compId]);
@@ -2840,16 +2921,17 @@ export function CircuitCanvas() {
         return;
       }
 
-      // ─── Wire click ───────────────────────────────────────────
-      if (hit.type === 'wire') {
+      // ─── Wire click (a segment's too, under a modifier) ─────────
+      if (hit.type === 'wire' || hit.type === 'wiresegment') {
         e.preventDefault();
         e.stopPropagation();
 
         if (state.selectedTool) {
           state.setSelectedTool(null);
         }
-        if (e.shiftKey) {
+        if (e.shiftKey || mod) { // modifier map
           state.toggleSelected(hit.wireId);
+          if (mod) swallowMacMenu();
         } else {
           state.setSelectedIds([hit.wireId]);
         }
@@ -2890,17 +2972,17 @@ export function CircuitCanvas() {
           return;
         }
 
-        // Triple-click a component → select everything on the canvas
-        if (e.detail >= 3) {
-          state.setSelectedIds(state.components.map((c) => c.id));
+        // Modifiers before the triple-click (modifier map): connect / rotate /
+        // toggle, then a STATE's legacy shift-click toggles it.
+        if (modifierClick(comp)) return;
+        if (e.shiftKey) {
+          state.toggleSelected(comp.id);
           return;
         }
 
-        if (e.shiftKey) {
-          // FSM/TM: selected state + shift-click another state → transition
-          if (tryShiftConnect(hit.compId)) return;
-          // Otherwise shift-click toggles the component in/out of the selection
-          state.toggleSelected(hit.compId);
+        // Triple-click a component → select everything on the canvas
+        if (e.detail >= 3) {
+          state.setSelectedIds(state.components.map((c) => c.id));
           return;
         }
 
@@ -2936,7 +3018,6 @@ export function CircuitCanvas() {
           currentCanvasY: canvasPos.y,
           componentId: hit.compId,
           moveOffsets,
-          shiftKey: e.shiftKey,
           hasMoved: false,
           pointerId: e.pointerId,
           clickedInputToggle: false,
@@ -2979,9 +3060,12 @@ export function CircuitCanvas() {
         return;
       }
 
-      // Box select
-      if (!e.shiftKey) {
+      // Box select — additive under shift or cmd/ctrl (modifier map)
+      const additive = e.shiftKey || mod;
+      if (!additive) {
         state.clearSelection();
+      } else if (mod) {
+        swallowMacMenu(); // or the Mac menu would take the drag
       }
       dragRef.current = {
         type: 'boxselect',
@@ -2991,6 +3075,7 @@ export function CircuitCanvas() {
         anchorCanvasY: canvasPos.y,
         currentCanvasX: canvasPos.x,
         currentCanvasY: canvasPos.y,
+        additive,
         pointerId: e.pointerId,
       };
       pendingOverlay.current.boxSelect = null;
@@ -3540,15 +3625,20 @@ export function CircuitCanvas() {
         ref={svgRef}
         onPointerDown={handlePointerDown}
         onContextMenu={(e) => {
-          // Right-click disarms the palette tool (and cancels a pending wire)
-          // instead of opening the browser menu. With nothing armed the menu
-          // behaves normally.
+          // A Mac ctrl-click whose pointer-down already ran a cmd/ctrl gesture
+          // (swallowMacMenu, modifier map) gets no menu on top of it.
+          const swallow = menuSuppressRef.current;
+          menuSuppressRef.current = false;
+          // Right-click — a Mac ctrl-click too — disarms the palette tool (and
+          // cancels a pending wire) instead of opening the browser menu. With
+          // nothing armed and nothing to swallow the menu behaves normally.
           const state = useStore.getState();
           const armed = state.selectedTool !== null || pendingWireRef.current !== null;
-          if (!armed) return;
-          e.preventDefault();
-          state.setSelectedTool(null);
-          clearPendingWire();
+          if (armed) {
+            state.setSelectedTool(null);
+            clearPendingWire();
+          }
+          if (armed || swallow) e.preventDefault();
         }}
         onDoubleClick={(e) => {
           // Double-click on a box name → enter rename mode

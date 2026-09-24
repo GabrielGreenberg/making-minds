@@ -318,6 +318,15 @@ html, body, #root {
   font-size: 10px;
 }
 
+/* A muted gesture hint beside a toolbar button, e.g. "(shift+click to ↻)". */
+.toolbar-hint {
+  font-size: 11px;
+  font-weight: 400;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  user-select: none;
+}
+
 .toolbar-menu-label {
   font-size: 12px;
   font-weight: 500;

@@ -38,6 +38,13 @@
 // edit (gradedMachineKey changes) restarts every live run — SC, FSM, TM,
 // turbot — at t=1 keeping its input and the undo history; moves, rotation,
 // the run's own steps and a locked canvas's refused edits restart nothing.
+// [canvas gestures] (task 024) pins the canvas's modifier map in its source:
+// shift-click rotates through rotateComponent (locked like every edit — the
+// live pins sit in [mark as done] and [viewing a submission]) and never a
+// STATE, cmd/ctrl-click only toggles, a modifier-click on a wire segment is
+// the wire's toggle, the Mac ctrl-click menu is swallowed only after a gesture
+// ran, modifiers are tested before the triple-click, and the Rotate button
+// shows its hint.
 
 // The store registers window/document listeners at import time (and must NOT
 // read the sandbox then — [no load at import]), so install minimal shims
@@ -301,8 +308,21 @@ console.log('[mark as done]');
   const isDone = () => useStore.getState().questionCircuits.get(q0.id)?.done === true;
 
   check('a fresh question starts NOT done', !isDone());
+  // A gate to rotate: rotation (the Rotate button and the canvas's
+  // shift-click, task 024 — both call rotateComponent) is an edit, so the
+  // lock refuses it too.
+  useStore.getState().addComponent('AND', 60, 60);
+  const gate = useStore.getState().components.at(-1)!;
+  const rotationOf = (id: string) => useStore.getState().components.find((c) => c.id === id)?.rotation ?? 0;
   useStore.getState().toggleCurrentQuestionDone();
   check('toggleCurrentQuestionDone marks it done', isDone());
+
+  {
+    const undoBefore = useStore.getState().undoStack.length;
+    useStore.getState().rotateComponent(gate.id);
+    check('rotateComponent is refused while locked (no turn, no history)',
+      rotationOf(gate.id) === 0 && useStore.getState().undoStack.length === undoBefore);
+  }
 
   const before = useStore.getState().components.length;
   useStore.getState().addComponent('AND', 100, 100);
@@ -328,6 +348,18 @@ console.log('[mark as done]');
   const afterUnlock = useStore.getState().components.length;
   useStore.getState().addComponent('AND', 100, 100);
   check('editing works again once unlocked', useStore.getState().components.length === afterUnlock + 1);
+
+  {
+    const id = useStore.getState().components.at(-1)!.id;
+    const undoBefore = useStore.getState().undoStack.length;
+    useStore.getState().rotateComponent(id);
+    check('rotateComponent works once unlocked: 90°, exactly one history step',
+      rotationOf(id) === 90 && useStore.getState().undoStack.length === undoBefore + 1);
+    useStore.getState().undo();
+    check('undo restores the rotation', rotationOf(id) === 0);
+    for (let i = 0; i < 4; i++) useStore.getState().rotateComponent(id);
+    check('four rotations come back to 0°', rotationOf(id) === 0);
+  }
 }
 
 // ── frozen assignments show the SUBMISSION read-only, not diverged live
@@ -471,6 +503,14 @@ console.log('[viewing a submission]');
   check('addComponent is refused', useStore.getState().components.length === 1);
   useStore.getState().paste();
   check('paste is refused', useStore.getState().components.length === 1);
+  {
+    const only = useStore.getState().components[0];
+    const undoBefore = useStore.getState().undoStack.length;
+    useStore.getState().rotateComponent(only.id);
+    check('rotateComponent is refused',
+      (useStore.getState().components[0].rotation ?? 0) === (only.rotation ?? 0) &&
+      useStore.getState().undoStack.length === undoBefore);
+  }
   useStore.getState().setOpenResponse('sneaking in an edit');
   check('setOpenResponse is refused', useStore.getState().openResponse === '');
   useStore.setState({ undoStack: [{ components: [], wires: [], boxes: [], confirmedBoxes: [] }] });
@@ -1551,6 +1591,75 @@ console.log('[auth provider wiring]');
   }
   check('RemoteAuthProvider boots as the stored token\'s owner, never a bare visitor',
     /reportPrincipal\(readPrincipalHint\(\)\)/.test(block(topLevel('RemoteAuthProvider'), 'useState<AuthUser | null>(() =>')));
+}
+
+// ═════ The canvas's pointer gestures (task 024) ═════════════════
+
+console.log('[canvas gestures]');
+{
+  // No DOM here, so the gesture layer (React pointer events) is pinned in the
+  // source; what shift-click DOES is rotateComponent, pinned live above in
+  // [mark as done] and [viewing a submission].
+  const { readFileSync } = await import('node:fs');
+  const read = (rel: string) => readFileSync(new URL(rel, import.meta.url), 'utf8');
+  const canvas = read('../src/components/CircuitCanvas.tsx');
+  const start = canvas.indexOf('const handlePointerDown = useCallback(');
+  const handler = start < 0 ? '' : canvas.slice(start, canvas.indexOf('\n  );\n', start));
+  const mapAt = handler.indexOf('// ── Modifier map');
+  const map = mapAt < 0 ? '' : (handler.slice(mapAt).match(/^(?:\s*\/\/.*\n)+/)?.[0] ?? '');
+  check('handlePointerDown opens with the ONE modifier map (shift, cmd/ctrl, alt, detail)',
+    mapAt >= 0 && mapAt < handler.indexOf('if (e.button !== 0') &&
+    ['shift', 'cmd/ctrl', 'alt', 'detail'].every((word) => map.includes(word)));
+  // modifierClick: the shift branch connects (STATE → STATE), refuses a
+  // STATE, then rotates; the cmd/ctrl branch only toggles. Rotation happens
+  // nowhere else in the handler.
+  const mcAt = handler.indexOf('const modifierClick = ');
+  const mc = mcAt < 0 ? '' : handler.slice(mcAt, handler.indexOf('\n      };\n', mcAt));
+  const shiftAt = mc.indexOf('if (e.shiftKey) {');
+  const modAt = mc.indexOf('if (mod) {');
+  const shiftBranch = shiftAt >= 0 && modAt > shiftAt ? mc.slice(shiftAt, modAt) : '';
+  const modBranch = modAt >= 0 ? mc.slice(modAt) : '';
+  const at = (s: string) => shiftBranch.indexOf(s);
+  check('shift-click rotates through the store (rotateComponent), after the STATE connect and the STATE guard',
+    at('tryShiftConnect(') >= 0 &&
+    at('tryShiftConnect(') < at("if (comp.type === 'STATE') return false;") &&
+    at("if (comp.type === 'STATE') return false;") < at('state.rotateComponent(comp.id)'));
+  check('cmd/ctrl-click only toggles the selection (never rotates)',
+    modBranch.includes('state.toggleSelected(comp.id)') && !modBranch.includes('rotateComponent'));
+  check('rotateComponent is called once in the handler: the shift branch of modifierClick',
+    handler.split('rotateComponent(').length === 2);
+  // A modifier-click on a wire's middle segment (whose hit line lies over the
+  // wire) is the wire's toggle, not a segment drag.
+  check('a modifier-click on a wire segment reaches the wire toggle, not the segment drag',
+    handler.includes("if (hit.type === 'wiresegment' && !e.shiftKey && !mod)") &&
+    handler.includes("if (hit.type === 'wire' || hit.type === 'wiresegment')"));
+  // The Mac ctrl-click menu: armed only where a cmd/ctrl gesture ran, never
+  // for every ctrl press; right-click's disarm still runs when it swallows.
+  const menuWrites = [...handler.matchAll(/menuSuppressRef\.current = ([^;]+);/g)].map((m) => m[1]);
+  const menuArms = menuWrites.every((v) => v === 'true' || v === 'false')
+    ? menuWrites.filter((v) => v === 'true').length : -1;
+  const ctxAt = canvas.indexOf('onContextMenu={(e) => {');
+  const ctx = ctxAt < 0 ? '' : canvas.slice(ctxAt, canvas.indexOf('\n        }}', ctxAt));
+  check('the Mac ctrl-click menu is swallowed only after a gesture ran (swallowMacMenu), and right-click still disarms',
+    menuArms === 1 && /const swallowMacMenu = \(\) => \{\s*if \(!e\.ctrlKey\) return;/.test(handler) &&
+    mc.includes('swallowMacMenu()') &&
+    ctx.includes('state.setSelectedTool(null)') && !/\breturn\b/.test(ctx));
+  check('the canvas holds no lock of its own (law 3: the store\'s one lock)',
+    !/isCurrentQuestionLocked|selectQuestionLocked|selectAssignmentFrozen/.test(canvas));
+  const compAt = handler.indexOf("if (hit.type === 'component')");
+  const compBranch = compAt < 0 ? '' : handler.slice(compAt, handler.indexOf('// ─── Canvas background', compAt));
+  check('the component branch tests the modifiers BEFORE the triple-click (rapid shift-clicks count up e.detail)',
+    compBranch.includes('modifierClick(') && compBranch.includes('e.detail >= 3') &&
+    compBranch.indexOf('modifierClick(') < compBranch.indexOf('e.detail >= 3'));
+  const portAt = handler.indexOf("if (hit.type === 'port')");
+  const wireAt = handler.indexOf("if (hit.type === 'wire' ", portAt);
+  check('the port branch routes modifier-clicks the same way (port circles cover small parts)',
+    portAt >= 0 && wireAt > portAt && handler.slice(portAt, wireAt).includes('modifierClick('));
+  const panel = read('../src/components/SimulationPanel.tsx');
+  const css = read('../src/index.css');
+  check('the Rotate button carries the muted "(shift+click to ↻)" hint',
+    /<span className="toolbar-hint">\(shift\+click to ↻\)<\/span>/.test(panel) &&
+    /\.toolbar-hint\s*\{[^}]*color:\s*var\(--text-secondary\)/.test(css));
 }
 
 await flushTimers();

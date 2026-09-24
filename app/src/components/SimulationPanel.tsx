@@ -91,10 +91,13 @@ export function SimulationToolbar() {
               state.rotateComponent(id);
             }
           }}
-          title="Rotate selected components 90°"
+          title="Rotate selected components 90° (or shift+click a component)"
         >
           <span className="toolbar-icon">{'↻'}</span> Rotate
         </button>
+        {/* A sibling, not inside the button: a disabled button (nothing
+            selected — most of the time) would fade the hint with it. */}
+        <span className="toolbar-hint">(shift+click to ↻)</span>
 
         {/* Turbot TM: flip selected states between internal (circle, tape
             ops) and external (square, sense/move ops) — textbook convention. */}
