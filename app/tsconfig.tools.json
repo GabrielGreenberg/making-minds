@@ -1,0 +1,17 @@
+// The harness tools' type-check (task 039). `tsx` runs app/tools/*.ts WITHOUT
+// type-checking and tsconfig.app.json includes only src/, so a tool could drift
+// from the types it tests (a stale result literal, a dropped argument) and still
+// "pass". This program is the app's own strictness over src/ AND tools/.
+// `npm run typecheck:tools` runs it (first in `npm run check`, and in CI);
+// portabilityCheck's [type-check coverage] pins that every tool is in it.
+// Deliberately NOT in tsconfig.json's references: `tsc -b` (npm run build) would
+// then need server/node_modules (remoteStoreCheck boots the real server), and
+// tsx reads only tsconfig.json, so runtime is untouched either way.
+{
+  "extends": "./tsconfig.app.json",
+  "compilerOptions": {
+    "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.tools.tsbuildinfo",
+    "types": ["vite/client", "node"]
+  },
+  "include": ["src", "tools"]
+}

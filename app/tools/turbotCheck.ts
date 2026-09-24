@@ -927,6 +927,7 @@ console.log('\n[trajectory & orientation independence]');
     haltedByBrain: false,
     stopped: opts.stopped ?? true,
     hitStepLimit: opts.hitStepLimit ?? false,
+    tapeCellsUsed: 0,
   });
 
   // reach-and-stop: identical rest position, every possible final facing.

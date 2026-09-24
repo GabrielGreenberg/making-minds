@@ -78,7 +78,11 @@ const REGISTRATION_UNSUPPORTED: RegisterResult = {
  * already granted, never opening a new one.
  */
 export class PasswordAuthProvider implements AuthProvider {
-  constructor(private db: Db) {}
+  private readonly db: Db;
+
+  constructor(db: Db) {
+    this.db = db;
+  }
 
   capabilities(): AuthCapabilities {
     return {
@@ -154,7 +158,11 @@ const DUMMY_HASH = hashPassword(randomBytes(32).toString('hex'));
 
 /** Passwordless dev login: any email present in the `users` roster table. */
 export class DevAuthProvider implements AuthProvider {
-  constructor(private db: Db) {}
+  private readonly db: Db;
+
+  constructor(db: Db) {
+    this.db = db;
+  }
 
   capabilities(): AuthCapabilities {
     return {
@@ -186,10 +194,13 @@ export class DevAuthProvider implements AuthProvider {
  * job is deciding role.
  */
 export class SsoAuthProvider implements AuthProvider {
-  constructor(
-    private db: Db,
-    private loginUrl: string,
-  ) {}
+  private readonly db: Db;
+  private readonly loginUrl: string;
+
+  constructor(db: Db, loginUrl: string) {
+    this.db = db;
+    this.loginUrl = loginUrl;
+  }
 
   capabilities(): AuthCapabilities {
     return {
@@ -289,11 +300,13 @@ export function requireInstructor(req: Request, res: Response, next: NextFunctio
  */
 export class LoginThrottle {
   private hits = new Map<string, { count: number; first: number }>();
+  private readonly limit: number;
+  private readonly windowMs: number;
 
-  constructor(
-    private limit = 10,
-    private windowMs = 10 * 60 * 1000,
-  ) {}
+  constructor(limit = 10, windowMs = 10 * 60 * 1000) {
+    this.limit = limit;
+    this.windowMs = windowMs;
+  }
 
   private key(email: string, ip: string): string {
     return `${email} ${ip}`;

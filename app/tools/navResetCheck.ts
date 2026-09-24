@@ -106,13 +106,13 @@ const clipboardEmpty = () => peekClipboard().canvas === null && peekClipboard().
 
 let passed = 0;
 let failed = 0;
-function check(name: string, cond: boolean) {
+function check(name: string, cond: boolean, detail?: string) {
   if (cond) {
     passed++;
     console.log(`  ✓ ${name}`);
   } else {
     failed++;
-    console.log(`  ✗ ${name}`);
+    console.log(`  ✗ ${name}${detail ? ` — ${detail}` : ''}`);
   }
 }
 

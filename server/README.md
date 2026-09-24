@@ -28,14 +28,16 @@ Sanity: `curl localhost:8133/api/health` → `{"ok":true}`.
 Checks:
 
 ```sh
-npm run typecheck   # tsc --noEmit over server + the shared app sources
-npm run check       # serverCheck (full student → instructor flow over HTTP)
+npm run typecheck   # tsc --noEmit over server + tools/ + the shared app sources
+npm run check       # typecheck first, then serverCheck (full student →
+                    #   instructor flow over HTTP)
                     # + rosterCheck (the class-list reader: registrar export,
                     #   header discovery, names, statuses, the import report)
                     # + authCheck (the account system: roster parsing, password
                     #   hashing, the providers, registration/sign-in/reset/access
                     #   requests end to end)
                     # + parityCheck (server grades ≡ in-process grades)
+                    # + homeworkSyncCheck (the HW1–HW7 repo → DB sync)
 npm run roster      # roster + account admin CLI; see "Accounts" below
 ```
 

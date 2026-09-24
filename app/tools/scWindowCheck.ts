@@ -263,6 +263,14 @@ function avQuestionBits(outputWidths: number[]): number[] {
   return outputWidths.flatMap((w, j) => timeOutputBits(steps, w, j));
 }
 
+/** A k=1 FSM history symbol as the bit it is. The store keeps single-bit
+ *  symbols NUMERIC (store.ts fsmStep; multi-bit ones are strings), so a
+ *  string here means that shape broke: it maps to NaN and fails every
+ *  comparison below instead of being silently coerced. */
+function bitOf(v: number | string): number {
+  return typeof v === 'number' ? v : NaN;
+}
+
 function sameSteps(a: number[][], b: number[][]): boolean {
   return JSON.stringify(a) === JSON.stringify(b);
 }
@@ -419,7 +427,7 @@ console.log('\n[store: FSM question runs]');
   const s = useStore.getState();
   check(`fsmRun executed the full window: ${s.fsmHistory.length} steps (want ${win})`,
     s.fsmHistory.length === win);
-  const fed = s.fsmHistory.slice().sort((a, b) => a.t - b.t).map((h) => [h.input]);
+  const fed = s.fsmHistory.slice().sort((a, b) => a.t - b.t).map((h) => [bitOf(h.input)]);
   const wantStream = encodeInput([6], layoutOf(qBinFsm));
   check('fed input stream EQUALS codec encodeInput([6]) — MSB-left numeral, LSB at t1',
     wantStream.axis === 'time' && sameSteps(fed, wantStream.steps));
@@ -429,13 +437,13 @@ console.log('\n[store: FSM question runs]');
     useStore.getState().fsmHistory.length === win);
 
   // Identity machine: the window decodes back to x = 6, as the grader would.
-  const series = s.fsmHistory.slice().sort((a, b) => a.t - b.t).map((h) => [h.output]);
+  const series = s.fsmHistory.slice().sort((a, b) => a.t - b.t).map((h) => [bitOf(h.output)]);
   const decoded = bitsToValue(timeOutputBits(series, qBinFsm.cc_spec!.outputs[0].width, 0), 'binary');
   check(`window decodes to the typed value (got ${decoded}, want 6)`, decoded === 6);
 
   // The Input/Output row's OUT display: t1 rightmost, so the passing identity
   // shows an OUT that READS "110" as a numeral (leading zeros aside).
-  const display = outputDisplayString(s.fsmHistory.map((h) => ({ t: h.t, bits: [h.output] })));
+  const display = outputDisplayString(s.fsmHistory.map((h) => ({ t: h.t, bits: [bitOf(h.output)] })));
   check(`OUT display reads 110 as a numeral, t1 rightmost (got "${display}")`,
     display.length === win && display.endsWith('110') &&
     bitsToValue(display.split('').map(Number), 'binary') === 6);
@@ -457,18 +465,18 @@ console.log('\n[store: FSM question runs]');
   const s = useStore.getState();
   check(`FSM tally: executed the window (${s.fsmHistory.length} steps, want ${win})`,
     s.fsmHistory.length === win);
-  const fed = s.fsmHistory.slice().sort((a, b) => a.t - b.t).map((h) => [h.input]);
+  const fed = s.fsmHistory.slice().sort((a, b) => a.t - b.t).map((h) => [bitOf(h.input)]);
   const wantStream = encodeInput([2], layoutOf(qTallyFsm));
   check('FSM tally: fed stream EQUALS codec encodeInput([2]) — ones arrive last',
     wantStream.axis === 'time' && sameSteps(fed, wantStream.steps));
-  const series = s.fsmHistory.slice().sort((a, b) => a.t - b.t).map((h) => [h.output]);
+  const series = s.fsmHistory.slice().sort((a, b) => a.t - b.t).map((h) => [bitOf(h.output)]);
   const decoded = bitsToValue(timeOutputBits(series, qTallyFsm.cc_spec!.outputs[0].width, 0), 'tally');
   check(`FSM tally: window decodes to the typed value (got ${decoded}, want 2)`, decoded === 2);
 
   // OUT display: with t1 rightmost the echoed ones sit LEFTMOST — a VALID
   // tally numeral for 2 ("11" then zeros). Built t-ascending it would read
   // "0…011", which tally rejects ('/').
-  const display = outputDisplayString(s.fsmHistory.map((h) => ({ t: h.t, bits: [h.output] })));
+  const display = outputDisplayString(s.fsmHistory.map((h) => ({ t: h.t, bits: [bitOf(h.output)] })));
   check(`FSM tally: OUT display is a VALID tally numeral for 2 (got "${display}")`,
     display.length === win && bitsToTally(display.split('').map(Number)) === 2);
 }
@@ -517,7 +525,7 @@ console.log('\n[store: sandbox unchanged]');
   const fsmRan = useStore.getState().fsmHistory.length;
   check(`FSM sandbox run stops at the typed length: ${fsmRan} steps (want 3)`, fsmDone && fsmRan === 3);
   check('FSM sandbox feeds the raw typed bits, t1 = rightmost char (matches SC; P1.10)',
-    sameSteps(useStore.getState().fsmHistory.slice().sort((a, b) => a.t - b.t).map((h) => [h.input]),
+    sameSteps(useStore.getState().fsmHistory.slice().sort((a, b) => a.t - b.t).map((h) => [bitOf(h.input)]),
       [[0], [1], [1]]));
 }
 
