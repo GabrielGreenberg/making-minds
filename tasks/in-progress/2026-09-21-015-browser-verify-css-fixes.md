@@ -8,9 +8,9 @@ requires: browser
 area: app
 source: claude-md
 created: 2026-09-21T15:30:00-07:00
-status: ready
+status: in-progress
 after:
-branch:
+branch: task/015-browser-verify-css-fixes
 merged_into:
 ---
 
