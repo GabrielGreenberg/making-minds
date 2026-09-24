@@ -34,6 +34,10 @@
 // and the live editing record (the next person mints under their own key only
 // once their open registers it), and [provenance across canvas swaps] — every
 // swap carries each question's record through the ONE fold / load helper.
+// [edit during run] (task 011) pins the EDIT law beside the two: a machine
+// edit (gradedMachineKey changes) restarts every live run — SC, FSM, TM,
+// turbot — at t=1 keeping its input and the undo history; moves, rotation,
+// the run's own steps and a locked canvas's refused edits restart nothing.
 
 // The store registers window/document listeners at import time (and must NOT
 // read the sandbox then — [no load at import]), so install minimal shims
@@ -73,7 +77,7 @@ backing.set(VISITOR_KEY, JSON.stringify({
 
 const { useStore, selectTurbotArena, selectAssignmentFrozen, selectQuestionLocked, showsSubmission } =
   await import('../src/store');
-const { buildSampleAssignment, scCorrect, fsmCorrect, tmCorrect, turbotCorrect, SAMPLE_ASSIGNMENT_ID } =
+const { buildSampleAssignment, ccCorrect, scCorrect, fsmCorrect, tmCorrect, turbotCorrect, turbotTmCorrect, SAMPLE_ASSIGNMENT_ID } =
   await import('../src/devData/sampleData');
 const { localAssignmentStore } = await import('../src/storage/AssignmentStore');
 const { backendMode, workbookStore, submissionStore } = await import('../src/storage/backend');
@@ -844,6 +848,275 @@ console.log('[undo scope]');
   useStore.getState().closeAssignment();
   check('closeAssignment empties both history stacks',
     useStore.getState().undoStack.length === 0 && useStore.getState().redoStack.length === 0);
+}
+
+// ═════ The edit law: a machine edit restarts every live run ═════
+
+console.log('[edit during run]');
+{
+  await useStore.getState().openAssignment(SAMPLE_ASSIGNMENT_ID); // registers the mint key
+  /** Open question `i` with `machine` on its canvas, unlocked. */
+  const onQuestion = (i: number, machine: { components: unknown[]; wires: unknown[] }) => {
+    useStore.getState().switchQuestion(i);
+    const q = useStore.getState().assignment!.questions[i];
+    if (useStore.getState().questionCircuits.get(q.id)?.done) useStore.getState().toggleCurrentQuestionDone();
+    useStore.setState(JSON.parse(JSON.stringify({ components: machine.components, wires: machine.wires })));
+  };
+  const mem = () => useStore.getState().components.find((c) => c.type === 'MEM');
+  const hasWire = (id: string) => useStore.getState().wires.some((w) => w.id === id);
+  /** The typed '0110' loaded and stepped `n` times on the SC question. */
+  const scRunSteps = (n: number) => {
+    useStore.getState().loadScGlobalSequence(0);
+    for (let i = 0; i < n; i++) useStore.getState().scStep();
+  };
+  const scAtRest = (s = useStore.getState()) =>
+    !s.scRunning && s.scRunIntervalId === null && s.scTimeStep === 1 && s.scHistory.length === 0;
+
+  // SC (Q2): the run's own steps, a move, a rotation and a rerouted wire are
+  // not edits of the machine — the run carries on.
+  onQuestion(1, scCorrect());
+  useStore.getState().setScGlobalSequenceInput(0, '0110');
+  scRunSteps(3);
+  check('SC: the run\'s own steps keep their history (3 steps, MEM 1)',
+    useStore.getState().scHistory.length === 3 && useStore.getState().scTimeStep === 4 && mem()?.storedValue === 1);
+  useStore.getState().moveComponent('sc-mem', 400, 200);
+  useStore.getState().rotateComponent('sc-out1');
+  useStore.getState().updateWireManualSegments('sc-w1', [{ segmentIndex: 0, offset: 20, axis: 'y' }]);
+  {
+    const s = useStore.getState();
+    check('SC: a move, a rotation and a rerouted wire mid-run restart nothing',
+      s.scHistory.length === 3 && s.scTimeStep === 4 && mem()?.storedValue === 1 &&
+        s.scGlobalSequences[0]?.outputStr === '100');
+  }
+
+  // …a removed wire, with Run in flight, is.
+  useStore.getState().scRun();
+  check('(SC: Run is in flight)', useStore.getState().scRunning && useStore.getState().scRunIntervalId !== null);
+  const seqBefore = JSON.stringify(useStore.getState().scInputSequence);
+  useStore.getState().removeWire('sc-w2');
+  {
+    const s = useStore.getState();
+    check('SC: an edit mid-run stops Run and restarts at t=1 (history empty)', scAtRest(s));
+    check('SC: …with every MEM back at 0', mem()?.storedValue === 0);
+    check('SC: …keeping the typed input (sequence and row), the old output gone',
+      JSON.stringify(s.scInputSequence) === seqBefore &&
+        JSON.stringify(s.scGlobalSequences) === JSON.stringify([{ inputStr: '0110', outputStr: '' }]));
+    check('SC: …and the edit\'s own undo entry (not a canvas swap)', s.undoStack.length > 0);
+  }
+  await flushTimers();
+  check('SC: the deferred re-evaluation adds no I/O row', useStore.getState().tableRows.length === 0);
+
+  // Undo after the reset lands at rest: the snapshot the edit pushed held the
+  // run's MEM contents, which must not come back at t=1.
+  useStore.getState().undo();
+  check('SC: undo after an edit-restart restores the wire at rest, every MEM 0',
+    hasWire('sc-w2') && scAtRest() && mem()?.storedValue === 0);
+  useStore.getState().redo(); // sc-w2 removed again, at rest
+  scRunSteps(3);
+  check('(SC: a second run is live)', useStore.getState().scHistory.length === 3);
+  useStore.getState().undo(); // restores sc-w2 — a machine change mid-run
+  check('SC: undo mid-run restarts the run', hasWire('sc-w2') && scAtRest() && mem()?.storedValue === 0);
+
+  // Any path that changes the machine — a raw setState, no action involved.
+  scRunSteps(3);
+  useStore.setState({ wires: useStore.getState().wires.filter((w) => w.id !== 'sc-w2') });
+  check('SC: a raw setState of the wires mid-run restarts it too (no action opts in)', scAtRest());
+
+  // A locked question refuses the edit, and its run — never locked — goes on.
+  onQuestion(1, scCorrect());
+  scRunSteps(2);
+  useStore.getState().toggleCurrentQuestionDone();
+  check('(SC: the question is locked)', selectQuestionLocked(useStore.getState()));
+  useStore.getState().removeWire('sc-w1');
+  {
+    const s = useStore.getState();
+    check('SC: locked — the edit is refused and the run is intact',
+      hasWire('sc-w1') && s.scHistory.length === 2 && s.scTimeStep === 3);
+  }
+  useStore.getState().scStep();
+  check('SC: locked — Step still runs', useStore.getState().scHistory.length === 3);
+  useStore.getState().toggleCurrentQuestionDone();
+  check('(SC: unlocked again)', !selectQuestionLocked(useStore.getState()));
+
+  // FSM (Q3): a relabelled transition restarts the run, input kept.
+  onQuestion(2, fsmCorrect());
+  useStore.getState().setFsmInputSequence([1, 0, 1]);
+  useStore.getState().fsmStep();
+  useStore.getState().fsmStep();
+  check('(FSM: 2 steps ran)', useStore.getState().fsmHistory.length === 2 && useStore.getState().fsmCurrentStateId !== null);
+  useStore.getState().setTransitionLabel('fsm-t1', '0:1');
+  {
+    const s = useStore.getState();
+    check('FSM: an edit mid-run restarts at t=1, input kept',
+      s.fsmTimeStep === 1 && s.fsmHistory.length === 0 && s.fsmCurrentStateId === null && !s.fsmHalted &&
+        JSON.stringify(s.fsmInputSequence) === '[1,0,1]');
+  }
+  // A halt is part of the run: supplying the missing transition clears it,
+  // so Step works without a manual Reset.
+  useStore.setState({ wires: fsmCorrect().wires.filter((w) => w.id === 'fsm-t1') }); // only 0:0
+  useStore.getState().setFsmInputSequence([1]);
+  useStore.getState().fsmReset();
+  useStore.getState().fsmStep();
+  check('(FSM: no 1-transition — the machine halts)', useStore.getState().fsmHalted);
+  {
+    const before = new Set(useStore.getState().wires.map((w) => w.id));
+    useStore.getState().addWire('fsm-s0', 'right', 'fsm-s0', 'left');
+    const added = useStore.getState().wires.find((w) => !before.has(w.id));
+    check('FSM: adding a transition clears the halt', added != null && !useStore.getState().fsmHalted);
+    useStore.getState().setTransitionLabel(added!.id, '1:1');
+    useStore.getState().fsmStep();
+    check('FSM: …and Step advances on the fixed machine', useStore.getState().fsmHistory.length === 1);
+  }
+
+  // TM (Q4): back to the tape the run started from.
+  onQuestion(3, tmCorrect());
+  useStore.getState().setTmCell(0);
+  const initialTape = JSON.stringify(useStore.getState().tmInitialTape);
+  useStore.getState().tmStep();
+  useStore.getState().tmStep();
+  check('(TM: 2 steps wrote the tape)', useStore.getState().tmHistory.length === 2 &&
+    JSON.stringify(useStore.getState().tmTape) !== initialTape);
+  const tmBefore = new Set(useStore.getState().components.map((c) => c.id));
+  useStore.getState().addComponent('STATE', 300, 300);
+  const tmAdded = useStore.getState().components.find((c) => !tmBefore.has(c.id));
+  const tmAtStart = () => {
+    const s = useStore.getState();
+    return s.tmTimeStep === 1 && s.tmHistory.length === 0 && !s.tmHalted && s.tmCurrentStateId === null &&
+      JSON.stringify(s.tmTape) === initialTape && JSON.stringify(s.tmInitialTape) === initialTape &&
+      s.tmInitialTape.cells[0] === '1';
+  };
+  check('TM: an edit mid-run restarts on the initial tape (cell 0 = 1)', tmAdded != null && tmAtStart());
+  for (let i = 0; i < 10 && !useStore.getState().tmHalted; i++) useStore.getState().tmStep();
+  check('(TM: the machine halted)', useStore.getState().tmHalted);
+  useStore.getState().setTmCell(5);
+  check('(TM: a halted run refuses tape edits)', JSON.stringify(useStore.getState().tmInitialTape) === initialTape);
+  useStore.getState().removeComponent(tmAdded!.id);
+  check('TM: an edit after the halt restarts on the initial tape', tmAtStart());
+  useStore.getState().setTmCell(1);
+  check('TM: …and the tape is editable again', useStore.getState().tmInitialTape.cells[1] === '1');
+
+  // Turbot, CC brain (Q5): back to the arena's start pose.
+  onQuestion(4, turbotCorrect());
+  const turbotAtStart = () => {
+    const s = useStore.getState();
+    return s.turbotHistory.length === 0 && !s.turbotHalted && s.turbotStopReason === null && !s.turbotRunning &&
+      JSON.stringify(s.turbotState) === JSON.stringify(selectTurbotArena(s).start);
+  };
+  for (let i = 0; i < 3; i++) useStore.getState().turbotStep();
+  check('(turbot: 3 cycles moved it)', useStore.getState().turbotHistory.length === 3 &&
+    useStore.getState().turbotState.x === 3);
+  useStore.getState().removeWire('tb-w3');
+  check('turbot CC: an edit mid-run re-seats it at the start', turbotAtStart());
+  useStore.getState().undo();
+  useStore.getState().turbotRun();
+  for (let i = 0; i < 25 && !useStore.getState().turbotHalted; i++) useStore.getState().turbotStep();
+  check('(turbot: it stopped at the wall)', useStore.getState().turbotHalted && useStore.getState().turbotStopReason === 'motor');
+  useStore.getState().removeWire('tb-w3');
+  check('turbot CC: an edit after the stop re-seats it too (Run stopped)',
+    turbotAtStart() && useStore.getState().turbotRunIntervalId === null);
+
+  // Turbot, TM brain (Q8): a state-kind flip is a machine edit.
+  onQuestion(7, turbotTmCorrect());
+  for (let i = 0; i < 3; i++) useStore.getState().turbotStep();
+  check('(turbot TM: 3 cycles ran)', useStore.getState().turbotHistory.length === 3);
+  useStore.getState().toggleStateKind('ttm-s2');
+  check('turbot TM: toggleStateKind mid-run restarts it', turbotAtStart());
+
+  // CC (Q1) at rest: an edit keeps the INPUT toggles and restarts nothing.
+  onQuestion(0, ccCorrect());
+  const ccIn = useStore.getState().components.find((c) => c.type === 'INPUT')!;
+  useStore.getState().setInputValue(ccIn.id, 1);
+  useStore.getState().addComponent('AND', 300, 300);
+  {
+    const s = useStore.getState();
+    check('CC: an edit keeps the INPUT toggle and restarts nothing',
+      s.components.find((c) => c.id === ccIn.id)?.value === 1 && s.scTimeStep === 1 && s.undoStack.length > 0);
+  }
+  await flushTimers();
+
+  // Sandbox: the same law on a scratch sheet.
+  useStore.getState().enterSandbox();
+  useStore.getState().addTab('Edit law', 'SC', 'arithmetic');
+  runScOnLiveCanvas();
+  check('(sandbox: an SC run is live)', useStore.getState().scHistory.length === 3);
+  useStore.getState().removeWire('sc-w2');
+  check('sandbox: an edit mid-run restarts at t=1, input kept',
+    scAtRest() && mem()?.storedValue === 0 && useStore.getState().scGlobalSequences[0]?.inputStr === '0110');
+
+  // Nothing typed: the INPUT toggles ARE the run's input — the restart keeps
+  // them (so Run again feeds what this run did), memory and history go.
+  const in1 = () => useStore.getState().components.find((c) => c.id === 'sc-in1')?.value;
+  useStore.getState().scGlobalReset();
+  useStore.getState().setInputValue('sc-in1', 1);
+  useStore.getState().scStep();
+  useStore.getState().scStep();
+  check('(sandbox: a toggle-fed run is live, MEM 1)', useStore.getState().scHistory.length === 2 && mem()?.storedValue === 1);
+  useStore.getState().addComponent('AND', 500, 500);
+  check('sandbox: an edit mid a toggle-fed run restarts it keeping the INPUT toggle',
+    scAtRest() && in1() === 1 && mem()?.storedValue === 0);
+  await flushTimers();
+
+  // An edit that adds an INPUT re-splits the typed row for the INPUTs now on
+  // the canvas: the old split would feed another stream and never record the
+  // row's output.
+  runScOnLiveCanvas();
+  const beforeIn2 = new Set(useStore.getState().components.map((c) => c.id));
+  useStore.getState().addComponent('INPUT', 40, 300);
+  const in2 = useStore.getState().components.find((c) => !beforeIn2.has(c.id));
+  check('sandbox: an INPUT added mid-run restarts on the row split for two INPUTs (t1 = IN1 1, IN2 0)',
+    in2?.type === 'INPUT' && scAtRest() && JSON.stringify(useStore.getState().scInputSequence) === '[[1,0],[0,1]]');
+  for (let i = 0; i < 3; i++) useStore.getState().scStep();
+  {
+    const s = useStore.getState();
+    check('sandbox: …Run again feeds that stream and records the row\'s output',
+      JSON.stringify(s.scHistory.map((h) => h.inputBits)) === '[[1,0],[0,1],[0,0]]' &&
+        s.scGlobalSequences[0]?.outputStr === '010');
+  }
+  useStore.getState().loadScGlobalSequence(0); // at rest, the row loaded
+  useStore.getState().removeComponent(in2!.id);
+  check('sandbox: an INPUT removed at rest re-splits the loaded row too (nothing restarted)',
+    scAtRest() && JSON.stringify(useStore.getState().scInputSequence) === '[[0,1,1,0]]');
+  await flushTimers();
+
+  // Undo/redo restore structure, never live values. Mid-run, undoing the
+  // snapshot a mousedown pushed (no machine change) leaves the run where it
+  // stands: the next step reads the memory the run holds, not the snapshot's.
+  runScOnLiveCanvas(); // t=4, MEM 1
+  useStore.getState().pushHistory();
+  useStore.getState().scStep(); // t4 feeds 0: MEM 0
+  useStore.getState().undo();
+  {
+    const s = useStore.getState();
+    check('sandbox: undoing a move mid-run leaves the run as it stands (t=5, MEM 0)',
+      s.scTimeStep === 5 && s.scHistory.length === 4 && mem()?.storedValue === 0);
+  }
+  useStore.getState().scStep();
+  check('sandbox: …and the next step reads the run\'s memory (OUT 0)',
+    useStore.getState().scHistory[4]?.outputBits.join('') === '0');
+  await flushTimers();
+
+  // At rest: a MEM override set after the snapshot, and a local-step row
+  // selected before it, both survive undoing a move.
+  useStore.getState().scReset();
+  await flushTimers();
+  useStore.getState().pushHistory();
+  useStore.getState().moveComponent('sc-mem', 320, 220);
+  useStore.getState().setMemStoredValue('sc-mem', 1);
+  useStore.getState().undo();
+  check('sandbox: undoing a move at rest keeps a MEM override', scAtRest() && mem()?.storedValue === 1);
+  await flushTimers();
+  useStore.getState().setMemStoredValue('sc-mem', 0);
+  useStore.getState().localStepSelect([1], [1]);
+  useStore.getState().pushHistory();
+  useStore.getState().moveComponent('sc-mem', 340, 240);
+  useStore.getState().undo();
+  check('sandbox: …and a selected local-step row (MEM 1, still active)',
+    useStore.getState().localStepActive && mem()?.storedValue === 1);
+  useStore.getState().localStepClear();
+  await flushTimers();
+  useStore.getState().removeTab(useStore.getState().activeTabId);
+  await flushTimers();
+  useStore.getState().goHome();
 }
 
 // ═════ Principal change resets the whole editor store (reset law 2) ═══

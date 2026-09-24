@@ -373,7 +373,8 @@ export function runTurbotCase(
  * never positions, rotation, wire geometry or live simulation values (INPUT
  * toggles, MEM contents). Two machines with the same key grade the same.
  * Replay uses it to say whether the canvas still holds the machine that was
- * graded.
+ * graded, and the store as its "the machine changed" test (an edit restarts
+ * every live run). Tolerant of a legacy component saved without ports.
  */
 export function gradedMachineKey(circuit: CircuitData): string {
   const comps = circuit.components
@@ -382,7 +383,7 @@ export function gradedMachineKey(circuit: CircuitData): string {
         c.id,
         c.type,
         c.label,
-        c.ports.map((p) => `${p.side}${p.index}:${p.id}`),
+        (c.ports ?? []).map((p) => `${p.side}${p.index}:${p.id}`),
         c.memDirection ?? '',
         c.stateKind === 'external' ? 'external' : '', // absent = internal
         c.boxedCircuitId ?? '',
@@ -390,7 +391,7 @@ export function gradedMachineKey(circuit: CircuitData): string {
       ]),
     )
     .sort();
-  const wires = circuit.wires
+  const wires = (circuit.wires ?? [])
     .map((w) =>
       JSON.stringify([w.sourceComponentId, w.sourcePortId, w.targetComponentId, w.targetPortId, w.transitionLabel ?? '']),
     )

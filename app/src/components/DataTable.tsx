@@ -67,8 +67,9 @@ export function DataTable() {
   const localStepOne = useStore((s) => s.localStepOne);
   const localStepReset = useStore((s) => s.localStepReset);
 
-  // For animated sequence playback
-  const [isRunning, setIsRunning] = useState(false);
+  // Sequence playback runs in the store (scRun), so every reset stops it —
+  // a canvas swap, Reset, and an edit mid-run (the store's edit law).
+  const isRunning = useStore((s) => s.scRunning);
   const [localIsRunning, setLocalIsRunning] = useState(false);
   const [autoFocusIndex, setAutoFocusIndex] = useState<number | null>(null);
 
@@ -147,21 +148,8 @@ export function DataTable() {
         return;
       }
       if (remaining <= 0) return;
-      setIsRunning(true);
-      let step = 0;
-      const interval = setInterval(() => {
-        const s = useStore.getState();
-        const end = selectCodecWindow(s) ??
-          Math.max(...s.scInputSequence.map((sq) => sq.length), 0) +
-          memorySlots(s.components).length;
-        if (step >= remaining || s.scTimeStep > end) {
-          clearInterval(interval);
-          setIsRunning(false);
-          return;
-        }
-        s.scStep();
-        step++;
-      }, Math.round(300 / runSpeed));
+      // The store's run loop stops itself at the same end (scRun).
+      state.scRun(Math.round(300 / runSpeed));
     }, 0);
   }, [runSpeed, ensureSequenceLoaded]);
 

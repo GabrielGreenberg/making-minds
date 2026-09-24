@@ -31,7 +31,9 @@
 //     reason / got.
 //   [same question]  a load on the question already open, mid-run, restarts
 //     every run slice (intervals stopped, no leftover history) and keeps the
-//     undo history.
+//     undo history. An edit after a case ran (the store's edit law) restarts
+//     the run on the CASE's input — its tape, its arena — with the case still
+//     loaded, and the banner reads the edited machine.
 //   [older results]  a result graded before cases recorded their TM block
 //     separations: studentRecord(record, released, assignment) fills them
 //     from the server's bank (case k, same input only), so a remote student's
@@ -474,6 +476,33 @@ console.log('\n[same question: a load mid-run restarts the run, keeps undo]');
   check('TM: the in-flight run stopped, the case tape is loaded',
     !t.tmRunning && t.tmRunIntervalId === null &&
       same(t.tmInitialTape, encodeTM('binary', tmFull.cases[tk].input, tmFull.cases[tk].separations)));
+
+  // The edit law on a loaded case: an edit restarts the run on the CASE's
+  // input and the case stays loaded; the banner recomputes from the edited
+  // machine instead of keeping the old run's verdict.
+  const caseTape = clone(t.tmInitialTape);
+  check('(TM: the case ran)', t.tmHistory.length > 0 || t.tmHalted);
+  useStore.getState().removeWire(useStore.getState().wires[0].id);
+  {
+    const e = useStore.getState();
+    check('TM: an edit after the case ran restarts it on the case tape, the case still loaded',
+      e.tmTimeStep === 1 && e.tmHistory.length === 0 && !e.tmHalted && same(e.tmTape, caseTape) &&
+        same(e.tmInitialTape, caseTape) && e.loadedCase?.caseIndex === tk);
+    const v = gradedCaseView(tm.question, e.loadedCase!, { components: e.components, wires: e.wires },
+      Object.values(e.submissions)[0]?.attempt);
+    check(`…and the banner reads the edited machine (${v.note})`, v.note === 'changed');
+  }
+  const tb = loadFixture('hw3-p14');
+  openGraded(tb.question, tb.correct);
+  await useStore.getState().loadCaseInput(tb.question.id, 1);
+  check('(turbot: arena 1 ran)', useStore.getState().turbotHistory.length > 0 && useStore.getState().turbotCaseIndex === 1);
+  useStore.getState().removeWire(useStore.getState().wires[0].id);
+  {
+    const b = useStore.getState();
+    check("turbot: an edit after the case ran re-seats it on the CASE's arena, the case still loaded",
+      b.turbotHistory.length === 0 && !b.turbotHalted && b.turbotCaseIndex === 1 &&
+        same(b.turbotState, tb.question.turbot_cases![1].arena.start) && b.loadedCase?.caseIndex === 1);
+  }
 
   // A stale load (superseded before its deferred run) applies nothing.
   const fsm = loadFixture('hw4-p11');

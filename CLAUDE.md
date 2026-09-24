@@ -10,7 +10,7 @@ by `tasks/tools/check-budgets.mjs` (runs in CI and in app `npm run check`).
 > story lives in its task file's `## Progress log` and one line in `tasks/log.md`, never
 > here; the pre-pipeline changelog (2026-07 → 2026-09-21) is frozen in `docs/HISTORY.md`.
 
-_Last updated: 2026-09-23_
+_Last updated: 2026-09-24_
 
 ## How work flows — the task pipeline (`tasks/`)
 
@@ -88,9 +88,8 @@ submission** (task 003): the sheet opens the graded attempt read-only at any due
 (`#/a/:id/submission/:n`: Run/Step work, edits refused, "Back to my work"). **Freezing** (past
 due AND submitted) forces it onto the latest attempt, no way back; never-submitted stays
 editable and can submit late.
-**Mark done**: a per-question self-lock toggle with an "N of M done" summary; every lock shares
-`isCurrentQuestionLocked`. A **Feedback** link files platform/homework reports (category,
-message, ≤ 2 downscaled screenshots). Editor chrome is minimal (Home + Submit + session).
+**Mark done**: a per-question self-lock toggle with an "N of M done" summary. A **Feedback**
+link files platform/homework reports (category, message, ≤ 2 downscaled screenshots).
 **Paste provenance** (task 033): in an assignment a paste (canvas or answer field) takes only
 what this user copied in an assignment in this window; nothing copied
 there reaches the system clipboard. The sandbox is free. **Watermark** (task 034): ids carry a
@@ -153,8 +152,8 @@ PDFs themselves). **The repo is the source; every release syncs it into the pilo
 (`deploy/release.sh` → `npm run homeworks -- sync`), and local mode's "Load HW1–HW7" runs the same planner.
 
 **Reference-fixture coverage:** 56/56 at-tier — 46 exact (correct passes every case, broken
-fails) + 10 interface (navigation/capstone: a plausible attempt validates and grades
-end-to-end; score reported, never asserted) — behind `app/tools/coverageCheck.ts`.
+fails) + 10 interface (a plausible attempt grades end-to-end; score never asserted) — behind
+`app/tools/coverageCheck.ts`.
 
 ## What's next
 
@@ -173,7 +172,7 @@ the worker routine.
 An interactive web platform for **PHIL 133 ("Making Minds")**, a philosophy/computation
 course (~80 students): students build circuits, finite state machines, Turing machines and
 grid-based agents ("turbots") in autograded homeworks. A **single-page React + TypeScript
-app** (`app/`, Vite) over the two backends of Part 1 (`VITE_API_BASE` picks remote at build).
+app** (`app/`, Vite) over the two backends of Part 1.
 
 ## Architecture principle: seams
 
@@ -211,7 +210,7 @@ wrappers over it.
 | Engine | `app/src/engine/representation.ts`, `index.ts` | value↔bits core (`valueToBits`/`isValidCodeword`/`bitsToValue`), display helpers; barrel exports. |
 | Engine | `app/src/engine/turbot.ts` | Arena driver loop: `senseAhead`/`senseAheadSymbol` (B/E/F), `applyMotorCommand`, `runBrainStep`/`initialBrainState` (CC/SC circuit brains; the turbot FSM with 2-bit motor outputs `in:ij` via `turbotFsmNotation`; the textbook **turbot TM** — internal (circle) states do single tape ops on the encoding's alphabet, external (square) states sense B/E/F and move ↑/↱/↰; `validateTurbotTM`/`validateTurbotFSM`), `runTurbot` (`stopped` = motor 00 or TM halt). `evaluateTurbotCriterion` + `criterionRequiresStop` (pass-through is trace-satisfiable: `pass: true` with `hitStepLimit: true` is legitimate) + `explainTurbotCriterionFailure`. |
 | Engine | `app/src/engine/perception.ts`, `fillIn.ts` | Perception rules (`min-run`/`exact-run`/`pattern` for CC; `change`/`motion` for SC — "up" = toward IN1; the pre-first-frame "previous input" is the all-zero frame), `buildPerceptionCases` (CC exhaustive ≤ 10 wires; SC fixed battery), `validatePerceptionMachine`, `runPerceptionCase`. Fill-in grading. |
-| Store | `app/src/store.ts` | Zustand UI state delegating simulation to `engine/`. Sim slices (SC/FSM/TM/turbot + I/O `tableRows`) and undo/redo are app-wide — hence the two reset laws (Critical design rules). Selectors: `selectEffectiveMode` (turbot → inner mode; drives every editor branch), `selectTmNotation`, `selectTurbotArena`/`selectTurbotInnerMode` (sandbox falls back to the active tab's own `arena`/`innerMode`), `selectAllowedComponents`, `selectLiveFsmStateId`, `selectCodecLayout`/`selectCodecWindow`/`selectQuestionStepBudget` (question runs mirror the grader), `selectAssignmentFrozen`, `selectQuestionLocked`. `isCurrentQuestionLocked(state)` (done OR a submission on show) is inlined at the top of every mutating action. `viewingSubmission`: a submitted attempt on show (`viewSubmission`), never folded or saved. `loadCaseInput` replays a graded case (`loadedCase`, `turbotCaseIndex`). Boxes: `confirmedBoxLibrary` is per HOMEWORK in an assignment (`AssignmentState.boxLibrary`), per TAB in the sandbox; `nextBoxName`/`takenBoxNames` keep default names unique; `renameBox` is the ONE rename path (library, drawn box, every placed instance). |
+| Store | `app/src/store.ts` | Zustand UI state delegating simulation to `engine/`. Sim slices (SC/FSM/TM/turbot + I/O `tableRows`) and undo/redo are app-wide — hence the two reset laws (Critical design rules). Selectors: `selectEffectiveMode` (turbot → inner mode; drives every editor branch), `selectTmNotation`, `selectTurbotArena`/`selectTurbotInnerMode` (sandbox falls back to the active tab's own `arena`/`innerMode`), `selectAllowedComponents`, `selectLiveFsmStateId`, `selectCodecLayout`/`selectCodecWindow`/`selectQuestionStepBudget` (question runs mirror the grader), `selectAssignmentFrozen`, `selectQuestionLocked`. `isCurrentQuestionLocked(state)` (done OR a submission on show) heads every mutating action. `viewingSubmission`: a submitted attempt on show (`viewSubmission`), never folded or saved. `loadCaseInput` replays a graded case (`loadedCase`, `turbotCaseIndex`). Boxes: `confirmedBoxLibrary` is per HOMEWORK in an assignment (`AssignmentState.boxLibrary`), per TAB in the sandbox; `nextBoxName`/`takenBoxNames` keep default names unique; `renameBox` is the ONE rename path (library, drawn box, every placed instance). |
 | Problem-set document | `app/src/problemSet.ts`, `components/ProblemSetDocument.tsx`, `statementFormat.ts`, `components/StatementBody.tsx` | The document level over `questions[]` (design memo `docs/buildout/designs/problem-set-document.md`). `problemSet.ts` (pure): `documentSections` (no `sections` → one unnamed section; unlisted questions trail; ids used once), continuous `problemNumber`, `problemShape` table / compact / full → `problemRuns` grid / columns / stack (a section's `layout` overrides), `figureUrl` (data URL or public path under the base URL), `validateDocument`. `ProblemSetDocument` renders the overview and lends `ProblemBody` / `ProblemContext` to the three editor panels. `statementFormat.ts`: the markup parser (`$…$` KaTeX, `` `code` ``, bold, italic, paragraphs, line breaks, `- ` / `1. ` lists with two-space nesting, `(a)` or line-start `a.` parts; inline `IN1=0,IN2=1 -> OUT=1` profiles lifted into tables), `statementProse` for previews; `StatementBody` the one JSX renderer (`lead` runs a title into the first paragraph). Styling: `.ps-*` and `.statement-*` in `pages.css`. |
 | Due dates | `app/src/dueDates.ts` | Pure policy: `dueStatus` (green > 3 days / amber < 3 days / red overdue), `lateBy` (0 = on time = no signal), `formatDuration`/`formatDueDate`, and `isFrozen(dueDate, now, hasSubmission)` — the ONE exception to "a due date never gates anything": editing is gated only once past due AND submitted; submitting never is. |
 | Routing | `app/src/routing.ts`, `useRoute.ts` | `Route` union (incl. `grades`, Home's Grades tab; `attempt` = `#/a/:id/submission/:n`, `caseIndex` = `…/q/:i/case/:k`), `parseHash`/`routeToHash`, `navigate()`; `useRoute()` is the hash as React state (the student Home's tabs and `useInstructorRoute` read it). |
@@ -229,7 +228,7 @@ wrappers over it.
 | Dev tool | `app/tools/shootProblemSets.mjs` | Headless-Chrome screenshots of every HW document, the canvas panel and the editor (it seeds local mode itself) — the visual proof when the browser pane is unavailable. |
 | Server | `server/src/app.ts`, `db.ts`, `auth.ts`, `password.ts`, `roster.ts`, `rosterImport.ts`, `sanitize.ts`, `config.ts`, `seed.ts`, `roster-cli.ts`, `homeworks.ts`, `homeworks-cli.ts` | Routes, SQLite storage, the `AuthProvider` seam (`createAuthProvider` — `MM_AUTH_MODE`: `password` default / `dev` / `sso`; `LoginThrottle`), scrypt credentials (`scrypt$N$r$p$salt$hash`, self-describing), the pure roster reader (`roster.ts`, the registrar's export as-is) + `rosterImport.ts` (never removes; lists who left), redaction + grade-release withholding (`sanitize.ts`: students get no `test_cases`/`perception_cases`/`fill_in_answers`; their own results keep safe per-case fields but never `expected`/`got` or `integrity`), env config, seeding, the admin CLI (`npm run roster`). The homework sync (`homeworks.ts`: a copy is pristine iff its content hash is a committed version of its file — `gitLineage` over the box's clone — or one the sync wrote, the `content_sync` table; `seed.ts --homeworks` runs it too). Tools: `serverCheck.ts`, `rosterCheck.ts`, `authCheck.ts`, `parityCheck.ts` (server ≡ in-process grading, deep-compared), `homeworkSyncCheck.ts`. |
 | Dev/sample | `app/src/devData/sampleData.ts`, `seed.ts`, `homeworks.ts`, `homeworks/hw{1..7}.json` | Sample assignment for all modes (netlist-built perception circuits, one turbot question per inner mode, open Q14) + sample submissions; `seedHomeworks()` syncs the real HW1–HW7 (record `mm:seeded-homework:<id>`) + reseeds 22 sample submissions; `homeworkSync.ts` is the pure planner it shares with the server (content hash = canonical JSON minus the instructor-owned `order`/`dueDate`; insert / unchanged / refresh / edited). |
-| Tools | `app/tools/*.ts` | The headless harness — the project's test suite, all in `npm run check` (plus `grade.ts`, the CLI grader; `builder.ts`, the netlist builder; `layoutCheck.ts`, the canvas layout oracle): `codecCheck`, `dueDateCheck`, `statementFormatCheck` (markup grammar, document model, every HW valid with its figures), `notationCheck` (grammar pins + label-dissection grep gate), `themeCheck` (the Page surfaces gate), `tmCheck`, `turbotCheck` (all four brains; `[multi-arena]`, `[pass-through step-limit]`, trajectory/orientation independence), `perceptionCheck`, `scWindowCheck` (question runs ≡ grader), `caseRunCheck` (caseRun ≡ grader; replay per mode, remote shape, budgets), `routerCheck` (fallback budget 2; hw3-p4 pin), `bumpCheck`, `pipelineCheck` (submit → grade, every mode), `navResetCheck` (both reset laws; the done / frozen / viewed-submission locks), `routingCheck` (route access, landing, held routes, principal change), `boxScopeCheck` (box library scope, sequential boxes ≡ unboxed, `[naming]`), `pasteCheck` (paste policy + the provenance grep gates), `provenanceCheck` (mint/verify, attribution, paste re-mint, stamp + trace flags, uuid grep gate), `remoteStoreCheck` (boots the REAL server; grader-import grep gate; auth client against a password-mode server), `coverageCheck` (the two-tier reference-fixture ledger + `allowed_components` self-test pins). |
+| Tools | `app/tools/*.ts` | The headless harness — the project's test suite, all in `npm run check` (plus `grade.ts`, the CLI grader; `builder.ts`, the netlist builder; `layoutCheck.ts`, the canvas layout oracle): `codecCheck`, `dueDateCheck`, `statementFormatCheck` (markup grammar, document model, every HW valid with its figures), `notationCheck` (grammar pins + label-dissection grep gate), `themeCheck` (the Page surfaces gate), `tmCheck`, `turbotCheck` (all four brains; `[multi-arena]`, `[pass-through step-limit]`, trajectory/orientation independence), `perceptionCheck`, `scWindowCheck` (question runs ≡ grader), `caseRunCheck` (caseRun ≡ grader; replay per mode, remote shape, budgets), `routerCheck` (fallback budget 2; hw3-p4 pin), `bumpCheck`, `pipelineCheck` (submit → grade, every mode), `navResetCheck` (both reset laws, `[edit during run]`; the done / frozen / viewed-submission locks), `routingCheck` (route access, landing, held routes, principal change), `boxScopeCheck` (box library scope, sequential boxes ≡ unboxed, `[naming]`), `pasteCheck` (paste policy + the provenance grep gates), `provenanceCheck` (mint/verify, attribution, paste re-mint, stamp + trace flags, uuid grep gate), `remoteStoreCheck` (boots the REAL server; grader-import grep gate; auth client against a password-mode server), `coverageCheck` (the two-tier reference-fixture ledger + `allowed_components` self-test pins). |
 | Queue | `tasks/` | The task pipeline (top of this file). `tasks/tools/check-budgets.mjs` is the size guard on this file. |
 
 ## Reference-function DSL (instructor authoring)
@@ -330,7 +329,9 @@ sees the formula, it runs against the generated numeric `test_cases`.
 - **Every canvas swap resets sim state AND undo/redo** via `resetAllSimState()`; **every
   principal change** (sign-in/out, 401) resets the whole editor store and loads that person's
   sandbox via `resetForPrincipal()`, called by the auth provider (`navResetCheck`); a
-  background-tab removal deliberately leaves the live run alone.
+  background-tab removal deliberately leaves the live run alone. **A machine edit**
+  (`gradedMachineKey` changes; not a move) restarts every live run at t=1, input and undo
+  kept — a `store.ts` subscriber, so no action or component decides.
 - **Assignment content enters only through the provenance seam** — canvas paste and every
   answer field (open response, fill-in, box rename) ask `provenance.ts`; no clipboard API
   outside `usePasteGuard.ts`, which every new answer field must wear (`pasteCheck` grep gate).

@@ -827,7 +827,10 @@ interface AppState {
   scRunning: boolean;
   scRunIntervalId: number | null;
   scStep: () => void; // advance one clock cycle
-  scRun: () => void; // start continuous execution
+  // Start continuous execution, one step per `intervalMs` (default 300) — the
+  // ONE SC run loop (the I/O panel's Run drives it), so every reset, the edit
+  // law's included, stops it.
+  scRun: (intervalMs?: number) => void;
   scPause: () => void; // pause continuous execution
   scReset: () => void; // reset to t=1, preserve circuit structure and input sequence
   scGlobalReset: () => void; // reset to t=1, clear all inputs and memory
@@ -937,7 +940,9 @@ interface AppState {
   // alike — because the sim slices and the history stacks are shared
   // app-wide, not per-canvas: a run left in them shows up against the next
   // canvas's circuit, and an undo would write the previous canvas's snapshot
-  // over this one.
+  // over this one. (Its sibling, the EDIT law — a machine edit restarts every
+  // live run at t=1 keeping its input, undo history untouched — is not an
+  // action: the machine-key subscriber at the end of this file, restartLiveRuns.)
   resetAllSimState: () => void;
   // Reset law 2 — the PRINCIPAL change (sign-in, sign-out, a 401, a restored
   // session; null = the visitor). Called by the auth provider in both modes,
@@ -1071,9 +1076,10 @@ function resolveMemDirections(
 
 const defaultTabId = 'tab-1';
 
-// When the circuit's structure changes, the table is wiped but input values are
-// kept. This flag suppresses evaluateCircuit's auto-add so the re-evaluation
-// that an edit triggers doesn't immediately re-populate the current row. It
+// When the machine changes (the edit law — restartLiveRuns), the table is
+// wiped but input values are kept. This flag suppresses evaluateCircuit's
+// auto-add so the re-evaluation that an edit triggers doesn't immediately
+// re-populate the current row. It
 // stays set until the user next acts on an input (setInputValue / row select),
 // which is the signal that they want this combo evaluated again.
 let suppressAutoAddRow = false;
@@ -1870,13 +1876,15 @@ export const useStore = create<AppState>()((set, get) => ({
           confirmedBoxes: JSON.parse(JSON.stringify(state.confirmedBoxLibrary)),
         },
       ],
-      components: prev.components,
-      wires: prev.wires,
+      // The snapshot's structure with today's live values (withLiveValues).
+      ...withLiveValues(prev, state),
       boxes: prev.boxes,
       confirmedBoxLibrary: prev.confirmedBoxes,
       // An edit action, adding nothing new (what it restores was counted).
       ...recordEdit(state, {}),
     });
+    // A restore that changes the machine re-evaluates, as every edit does.
+    if (gradedMachineKey(prev) !== gradedMachineKey(state)) setTimeout(() => get().evaluateCircuit(), 0);
   },
   redo: () => {
     const state = get();
@@ -1893,12 +1901,12 @@ export const useStore = create<AppState>()((set, get) => ({
           confirmedBoxes: JSON.parse(JSON.stringify(state.confirmedBoxLibrary)),
         },
       ],
-      components: next.components,
-      wires: next.wires,
+      ...withLiveValues(next, state), // as undo
       boxes: next.boxes,
       confirmedBoxLibrary: next.confirmedBoxes,
       ...recordEdit(state, {}),
     });
+    if (gradedMachineKey(next) !== gradedMachineKey(state)) setTimeout(() => get().evaluateCircuit(), 0);
   },
 
   // Assignment mode
@@ -3520,7 +3528,7 @@ export const useStore = create<AppState>()((set, get) => ({
     }
   },
 
-  scRun: () => {
+  scRun: (intervalMs = 300) => {
     const state = get();
     if (state.scRunning) return;
     const intervalId = window.setInterval(() => {
@@ -3534,19 +3542,19 @@ export const useStore = create<AppState>()((set, get) => ({
           return;
         }
       } else {
-        // Sandbox: stop once all input is consumed AND the memory pipeline
-        // has been flushed (one extra 0-input step per MEM, boxed ones
-        // included, so delayed bits — e.g. a serial adder's final carry —
-        // still reach the outputs).
+        // Sandbox: stop once all input is consumed (none typed: the INPUT
+        // toggles feed the run) AND the memory pipeline has been flushed
+        // (one extra 0-input step per MEM, boxed ones included, so delayed
+        // bits — e.g. a serial adder's final carry — still reach the outputs).
         const maxLen = Math.max(...s.scInputSequence.map((seq) => seq.length), 0);
         const drain = memorySlots(s.components).length;
-        if (maxLen > 0 && s.scTimeStep > maxLen + drain) {
+        if (s.scTimeStep > maxLen + drain) {
           s.scPause();
           return;
         }
       }
       s.scStep();
-    }, 300);
+    }, intervalMs);
     set({ scRunning: true, scRunIntervalId: intervalId });
   },
 
@@ -3637,27 +3645,8 @@ export const useStore = create<AppState>()((set, get) => ({
       window.clearInterval(state.scRunIntervalId);
     }
 
-    // Parse the input string into per-input sequences
-    // For a single input: "0110" → scInputSequence[0] = [0,1,1,0]
-    // For multiple inputs: each char is a time step, bits split across inputs
-    const inputs = state.components
-      .filter((c) => c.type === 'INPUT')
-      .sort((a, b) => parseInt(a.label.replace('IN', '')) - parseInt(b.label.replace('IN', '')));
-    const numInputs = inputs.length;
-    const chars = seq.inputStr.replace(/[^01]/g, '');
-    const stepsCount = numInputs > 0 ? Math.floor(chars.length / numInputs) : 0;
-
-    const newSeq: number[][] = [];
-    for (let i = 0; i < numInputs; i++) {
-      newSeq.push([]);
-    }
-    // Read right-to-left: rightmost character is first time step
-    for (let t = 0; t < stepsCount; t++) {
-      const srcT = stepsCount - 1 - t; // reverse: last char group → first step
-      for (let i = 0; i < numInputs; i++) {
-        newSeq[i].push(parseInt(chars[srcT * numInputs + i]) || 0);
-      }
-    }
+    // Parse the input string into per-input sequences (splitScRow).
+    const newSeq = splitScRow(seq.inputStr, inputCount(state.components));
 
     set({
       scTimeStep: 1,
@@ -4767,55 +4756,167 @@ document.addEventListener('visibilitychange', () => {
   if (document.visibilityState === 'hidden') flushAutoSave({ journal: true });
 });
 
-/**
- * Signature of the circuit's *structure* — component ids/types (plus the fields
- * that affect evaluation) and wire connections — but NOT positions or runtime
- * values. Two layouts that differ only by where things sit hash the same.
- */
-function connectivitySignature(components: CircuitComponent[], wires: Wire[]): string {
-  const comps = components
-    .map((c) =>
-      [
-        c.id,
-        c.type,
-        c.memDirection ?? '',
-        c.boxedCircuitId ?? '',
-        c.internalCircuit
-          ? `${c.internalCircuit.components.length}/${c.internalCircuit.wires.length}`
-          : '',
-      ].join(':'),
-    )
-    .sort()
-    .join('|');
-  const ws = wires
-    .map(
-      (w) =>
-        `${w.sourceComponentId}.${w.sourcePortId}->${w.targetComponentId}.${w.targetPortId}:${w.transitionLabel ?? ''}`,
-    )
-    .sort()
-    .join('|');
-  return comps + '#' + ws;
+// ─── The edit law: a machine edit restarts every live run ─────────
+// A run (SC/FSM/TM/turbot) computes over the machine it started on. Once the
+// machine changes — gradedMachineKey differs: a component, wire, label, port,
+// MEM direction, state kind or box internal; never a move, a rotation, wire
+// geometry or a live value (INPUT toggles, MEM contents), so neither a drag
+// nor the run's own steps count — every live run restarts at t=1 KEEPING ITS
+// INPUT (the typed sequence, the initial tape, the arena and any graded case
+// loaded into it), and everything the old machine computed is discarded: the
+// I/O table, the local step, the SC rows' outputs. Pressing Run again runs the
+// machine now on the canvas. This is the store's rule, not an action's and
+// not a component's: the subscriber below watches components/wires, so every
+// edit path — each action, undo/redo, paste, a raw setState — is covered
+// without opting in. It needs no lock check: a locked canvas refuses edits
+// before they change anything, so its key never changes and its run (never
+// locked) is left alone. It is NOT resetAllSimState (reset law 1): the canvas
+// stays, and so do the undo history and the typed input.
+
+/** Mid-run: a slice holds a run of the machine as it was, not at rest. */
+function scLive(s: AppState): boolean {
+  return s.scRunning || s.scTimeStep > 1 || s.scHistory.length > 0;
+}
+function fsmLive(s: AppState): boolean {
+  return s.fsmRunning || s.fsmTimeStep > 1 || s.fsmHistory.length > 0 || s.fsmHalted || s.fsmCurrentStateId !== null;
+}
+function tmLive(s: AppState): boolean {
+  return s.tmRunning || s.tmTimeStep > 1 || s.tmHistory.length > 0 || s.tmHalted || s.tmCurrentStateId !== null;
+}
+function turbotLive(s: AppState): boolean {
+  return s.turbotRunning || s.turbotHistory.length > 0 || s.turbotHalted;
 }
 
-// Wipe the cached I/O evaluation when the circuit's connectivity/components
-// change — but NOT when elements are merely moved, since position changes don't
-// alter the signature. Input values are kept (surviving input nodes retain their
-// values, so the student needn't re-enter them); instead we set suppressAutoAddRow
-// so the re-evaluation an edit triggers does NOT re-populate the selected row.
-// The table stays empty until the user next acts on an input.
-let lastConnSig: string | null = null;
-useStore.subscribe((state) => {
-  const sig = connectivitySignature(state.components, state.wires);
-  if (lastConnSig === null) {
-    lastConnSig = sig;
+function inputCount(components: CircuitComponent[]): number {
+  return components.filter((c) => c.type === 'INPUT').length;
+}
+
+/** A typed SC row split into per-INPUT streams, t1 first — how
+ *  loadScGlobalSequence loads it: stray characters ignored, the rightmost
+ *  group of `numInputs` digits is t1 (IN1 first), and a ragged tail (fewer
+ *  digits than a whole step) is dropped. */
+function splitScRow(inputStr: string, numInputs: number): number[][] {
+  const chars = inputStr.replace(/[^01]/g, '');
+  const steps = numInputs > 0 ? Math.floor(chars.length / numInputs) : 0;
+  const out: number[][] = Array.from({ length: numInputs }, () => []);
+  for (let t = 0; t < steps; t++) {
+    const srcT = steps - 1 - t; // the last digit group is the first step
+    for (let i = 0; i < numInputs; i++) out[i].push(parseInt(chars[srcT * numInputs + i]) || 0);
+  }
+  return out;
+}
+
+/** The typed row the loaded SC stream was split from, split for `numInputs`
+ *  INPUTs (the canvas's count when it was loaded) — or -1: nothing loaded,
+ *  or bits set lane by lane on the timeline. */
+function scLoadedRow(s: AppState, numInputs: number): number {
+  if (!s.scInputSequence.some((q) => q.length > 0)) return -1;
+  const loaded = JSON.stringify(s.scInputSequence);
+  return s.scGlobalSequences.findIndex((q) => JSON.stringify(splitScRow(q.inputStr, numInputs)) === loaded);
+}
+
+/** The SC run back at t=1 on ITS input. A typed row is loaded again, split
+ *  for the INPUTs now on the canvas (an edit may have added or removed one —
+ *  the old split would feed another stream and never record the row's
+ *  output). Timeline bits: scReset keeps them. Nothing typed: the INPUT
+ *  toggles ARE the run's input, so only the memory and history go. */
+function restartScRun(prevInputCount: number): void {
+  const s = useStore.getState();
+  const row = scLoadedRow(s, prevInputCount);
+  if (row >= 0) {
+    s.loadScGlobalSequence(row);
     return;
   }
-  if (sig === lastConnSig) return;
-  lastConnSig = sig;
+  if (s.scInputSequence.some((q) => q.length > 0)) {
+    s.scReset();
+    return;
+  }
+  if (s.scRunIntervalId !== null) window.clearInterval(s.scRunIntervalId);
+  useStore.setState({
+    scTimeStep: 1,
+    scHistory: [],
+    scRunning: false,
+    scRunIntervalId: null,
+    tableRows: [],
+    components: zeroMemState(s.components),
+  });
+  setTimeout(() => useStore.getState().evaluateCircuit(), 0);
+}
+
+/** Each live slice's SOFT reset — back to t=1 with its interval stopped and
+ *  its input kept (restartScRun; fsmReset keeps fsmInputSequence, tmReset
+ *  returns to tmInitialTape, turbotReset re-seats on the arena the Map
+ *  shows). Only live slices: a slice at rest keeps its MEM overrides and
+ *  toggles — though a typed SC row loaded at rest is re-split when the
+ *  INPUT count changed, or Run would feed the old split. turbotReset last:
+ *  it derives the brain's start from the machine now on the canvas. */
+function restartLiveRuns(prevInputCount: number): void {
+  const s = useStore.getState();
+  if (scLive(s)) {
+    restartScRun(prevInputCount);
+  } else if (inputCount(s.components) !== prevInputCount) {
+    const row = scLoadedRow(s, prevInputCount);
+    if (row >= 0) {
+      useStore.setState({ scInputSequence: splitScRow(s.scGlobalSequences[row].inputStr, inputCount(s.components)) });
+    }
+  }
+  if (fsmLive(s)) s.fsmReset();
+  if (tmLive(s)) s.tmReset();
+  if (turbotLive(s)) s.turbotReset();
+}
+
+/** What undo/redo restore: the snapshot's STRUCTURE with today's LIVE values.
+ *  Every component and wire still on the canvas keeps what it holds now —
+ *  INPUT toggles, MEM contents (boxed ones too), displayed values — so undoing
+ *  a move mid-run leaves the run where it stands, and at rest leaves a MEM
+ *  override or a selected local-step row alone. What the restore brings back
+ *  holds 0 in its memory: the snapshot's contents are old run scratch. If the
+ *  restore changes the machine, the edit law restarts the run anyway. */
+function withLiveValues(
+  snap: { components: CircuitComponent[]; wires: Wire[] },
+  live: AppState,
+): { components: CircuitComponent[]; wires: Wire[] } {
+  const liveComp = new Map(live.components.map((c) => [c.id, c]));
+  const comps = snap.components.map((c) => {
+    const cur = liveComp.get(c.id);
+    return cur && cur.type === c.type ? { ...c, value: cur.value, inputValues: cur.inputValues } : c;
+  });
+  const liveMem = new Map(memorySlots(live.components).map((m) => [m.key, m.value]));
+  const liveWire = new Map(live.wires.map((w) => [w.id, w.value]));
+  return {
+    components: withMemState(comps, memorySlots(comps).map((m) => liveMem.get(m.key) ?? 0)),
+    wires: snap.wires.map((w) => (liveWire.has(w.id) ? { ...w, value: liveWire.get(w.id)! } : w)),
+  };
+}
+
+// Input values are kept (surviving INPUT nodes keep their toggles, so the
+// student needn't re-enter them); suppressAutoAddRow stops the re-evaluation
+// an edit triggers from re-populating the selected row, so the table stays
+// empty until the user next acts on an input. Registered LAST among the
+// module's subscribers: its resets set state from inside a notification, and
+// later listeners of the outer notification would see stale arguments.
+// lastMachineKey is updated BEFORE those nested sets, which re-enter here and
+// see "unchanged".
+let lastMachineKey: string | null = null;
+useStore.subscribe((state, prev) => {
+  if (lastMachineKey !== null && state.components === prev.components && state.wires === prev.wires) return;
+  const key = gradedMachineKey({ components: state.components, wires: state.wires });
+  if (lastMachineKey === null) {
+    lastMachineKey = key;
+    return;
+  }
+  if (key === lastMachineKey) return;
+  lastMachineKey = key;
 
   suppressAutoAddRow = true;
   if (state.tableRows.length > 0) useStore.getState().clearTableRows();
   if (state.localStepActive) useStore.getState().localStepClear();
+  // The SC rows keep what was typed; what the old machine output is gone.
+  const seqs = useStore.getState().scGlobalSequences;
+  if (seqs.some((q) => q.outputStr !== '')) {
+    useStore.setState({ scGlobalSequences: seqs.map((q) => ({ ...q, outputStr: '' })) });
+  }
+  restartLiveRuns(inputCount(prev.components));
 });
 
 // ─── The sandbox's per-person load (reset law 2) ───────────────────
