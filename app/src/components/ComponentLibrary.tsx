@@ -1,9 +1,8 @@
 import { useState } from 'react';
-import { useStore, selectEffectiveMode, selectAllowedComponents } from '../store';
+import { useStore, selectEffectiveMode, selectAllowedComponents, selectPlaceableBoxKinds } from '../store';
 import { isComponentTypeAllowed, disallowedComponentTypes } from '../engine/machineValidation';
 import { usePasteGuard } from '../usePasteGuard';
 import type { ComponentType } from '../types';
-import { placeableBoxKinds } from '../types';
 
 interface LibraryEntry {
   type: ComponentType;
@@ -228,6 +227,7 @@ export function ComponentLibrary() {
   // outside the allowed set are hidden. The grader's Stage-1 check enforces
   // the same rule (engine/machineValidation.ts owns the semantics).
   const allowedComponents = useStore(selectAllowedComponents);
+  const placeableKinds = useStore(selectPlaceableBoxKinds);
 
   // TM shares the FSM editor palette (STATE nodes + transition wires).
   const allItems = effectiveMode === 'FSM' || effectiveMode === 'TM' ? FSM_LIBRARY_ITEMS : CC_LIBRARY_ITEMS;
@@ -316,16 +316,18 @@ export function ComponentLibrary() {
         </div>
       </div>}
 
-      {/* Box Menu — which kinds this canvas may place is placeableBoxKinds
-          (types.ts). Under a component restriction, a box whose internals
-          contain a disallowed type is hidden too (a boxed OR must not smuggle
-          an OR in). */}
+      {/* Box Menu — which kinds this canvas may place is
+          selectPlaceableBoxKinds (store.ts; types.ts placeableBoxKinds): CC
+          boxes on CC and SC canvases, sequential (SC) boxes on SC ones only.
+          Under a component restriction, a box whose internals contain a
+          disallowed type is hidden too (a boxed OR must not smuggle an OR
+          in). */}
       {(() => {
-        const placeableKinds = placeableBoxKinds(effectiveMode);
-        const visibleBoxes = confirmedBoxLibrary.filter((b) =>
-          (b.kind ?? 'CC') === 'CC' && placeableKinds.includes('CC') &&
-          disallowedComponentTypes(b.internalComponents, allowedComponents).length === 0
-        );
+        const visibleBoxes = confirmedBoxLibrary.filter((b) => {
+          const kind = b.kind ?? 'CC';
+          return kind !== 'FSM' && placeableKinds.includes(kind) &&
+            disallowedComponentTypes(b.internalComponents, allowedComponents).length === 0;
+        });
         if (visibleBoxes.length === 0) return null;
         return (
           <div>

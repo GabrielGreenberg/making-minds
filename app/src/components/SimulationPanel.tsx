@@ -1,11 +1,12 @@
 import { useState } from 'react';
 import { useStore, selectEffectiveMode } from '../store';
+import { hasMemory } from '../engine';
 
 export function SimulationToolbar() {
   const buildMode = useStore((s) => s.buildMode);
   const effectiveMode = useStore(selectEffectiveMode);
   const components = useStore((s) => s.components);
-  const hasMem = components.some((c) => c.type === 'MEM');
+  const hasMem = hasMemory(components); // boxed MEMs count: a sequential box is SC
   const isSC = buildMode === 'SC' || hasMem;
   const autoSaveStatus = useStore((s) => s.autoSaveStatus);
   const selectedIds = useStore((s) => s.selectedIds);

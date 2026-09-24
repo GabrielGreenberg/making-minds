@@ -1,6 +1,6 @@
 import { useRef, useState, useCallback, useEffect, useMemo } from 'react';
 import { useStore, selectEffectiveMode, selectLiveFsmStateId, selectTransitionNotationForSource, selectPasteScope } from '../store';
-import { inputCharTokens } from '../engine';
+import { inputCharTokens, hasCombinationalLoop, memorySlots } from '../engine';
 import { usePasteGuard, useNotice } from '../usePasteGuard';
 import type {
   CircuitComponent,
@@ -1868,36 +1868,10 @@ export function CircuitCanvas() {
     const w: string[] = [];
     // Skip circuit validation warnings in FSM/TM mode — loops and merged links are expected
     if (effectiveMode === 'FSM' || effectiveMode === 'TM') return w;
-    {
-      const compMap = new Map(components.map((c) => [c.id, c]));
-      const visited = new Set<string>();
-      const recStack = new Set<string>();
-      const adj = new Map<string, string[]>();
-      for (const c of components) adj.set(c.id, []);
-      for (const wire of wires) {
-        // Skip wires into MEM input ports — MEM breaks feedback loops
-        const targetComp = compMap.get(wire.targetComponentId);
-        if (targetComp?.type === 'MEM' && isMemSinkPort(targetComp, wire.targetPortId)) continue;
-        const list = adj.get(wire.sourceComponentId) || [];
-        list.push(wire.targetComponentId);
-        adj.set(wire.sourceComponentId, list);
-      }
-      function hasCycle(id: string): boolean {
-        visited.add(id);
-        recStack.add(id);
-        for (const next of adj.get(id) || []) {
-          if (!visited.has(next) && hasCycle(next)) return true;
-          if (recStack.has(next)) return true;
-        }
-        recStack.delete(id);
-        return false;
-      }
-      for (const c of components) {
-        if (!visited.has(c.id) && hasCycle(c.id)) {
-          w.push('Warning: Loop detected in combinatorial circuit');
-          break;
-        }
-      }
+    // A loop no MEM breaks — looking through sequential boxes, whose inner
+    // MEM may be what breaks a loop drawn around them.
+    if (hasCombinationalLoop(components, wires)) {
+      w.push('Warning: Loop detected in combinatorial circuit');
     }
     const inputPortConnections = new Map<string, number>();
     for (const wire of wires) {
@@ -2905,10 +2879,9 @@ export function CircuitCanvas() {
               const inputs = s.components
                 .filter((c) => c.type === 'INPUT')
                 .sort((a, b) => parseInt(a.label.replace('IN', '')) - parseInt(b.label.replace('IN', '')));
-              const mems = s.components.filter((c) => c.type === 'MEM')
-                .sort((a, b) => parseInt(a.label.replace('M', '')) - parseInt(b.label.replace('M', '')));
+              const mems = memorySlots(s.components); // boxed MEMs included
               const inBits = inputs.map((c) => c.value ?? 0);
-              const memBits = mems.length > 0 ? mems.map((c) => c.storedValue ?? 0) : undefined;
+              const memBits = mems.length > 0 ? mems.map((m) => m.value) : undefined;
               s.localStepSelect(inBits, memBits);
             }, 0);
           }

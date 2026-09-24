@@ -37,6 +37,10 @@
 //
 // Sandbox behavior (no open question / no cc_spec) is also pinned: SC runs
 // L + one 0-drain step per MEM; FSM runs L; both feed raw typed bits.
+//
+// BOXED (task 004): the same hw3-p7 machine boxed whole (its MEMs inside a
+// placed box) runs the same window, feeds the same stream and decodes the
+// same numeral as unboxed and as the grader.
 
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -53,7 +57,7 @@ import {
   type CodecLayout,
 } from '../src/engine';
 import { outputDisplayString } from '../src/components/outputDisplay';
-import { comp, wire, transition, circuit } from './builder';
+import { comp, wire, transition, circuit, boxWhole } from './builder';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 
@@ -293,6 +297,33 @@ console.log('\n[store: SC tally question runs feed the codec stream]');
   const avVal = bitsToTally(avBits);
   check(`hw3-p7: windowed decode is the CORRECT numeral (got ${avVal}, grader expects ${expected})`,
     avVal !== null && avVal === expected);
+}
+
+{
+  // The same machine boxed whole: its MEMs live inside a placed box, and the
+  // question run must not notice (task 004).
+  const q = hw3p7.question;
+  const win = windowOf(q);
+  const layout = layoutOf(q);
+  const boxedMachine = boxWhole(hw3p7.correct);
+  const boxedGrade = gradeQuestion(q, boxedMachine);
+  check(`hw3-p7 boxed: the grader passes it as it passes the unboxed machine (${boxedGrade.passed}/${boxedGrade.total})`,
+    JSON.stringify(boxedGrade) === JSON.stringify(hw3p7Grade));
+  openQuestion(q, boxedMachine);
+  check('hw3-p7 boxed: run terminates on its own', await scTypeAndRun('11'));
+  const s = useStore.getState();
+  check(`hw3-p7 boxed: run stopped at the same codec window (${s.scHistory.length} steps, want ${win})`,
+    s.scHistory.length === win && s.scTimeStep === win + 1);
+  const wantStream = encodeInput([2], layout);
+  check('hw3-p7 boxed: fed input stream EQUALS codec encodeInput([2])',
+    wantStream.axis === 'time' && sameSteps(scFedSteps(), wantStream.steps));
+  const expected = q.test_cases!.find((tc) => tc.inputs[0] === 2)!.outputs[0];
+  const avVal = bitsToTally(avQuestionBits(q.cc_spec!.outputs.map((g) => g.width)));
+  check(`hw3-p7 boxed: windowed decode is the grader's numeral (got ${avVal}, grader expects ${expected})`,
+    avVal !== null && avVal === expected);
+  const memCount = hw3p7.correct.components.filter((c: { type: string }) => c.type === 'MEM').length;
+  check(`hw3-p7 boxed: its ${memCount} boxed MEMs are the state the history records`,
+    memCount > 0 && s.scHistory.every((h) => h.memValues.length === memCount));
 }
 
 {

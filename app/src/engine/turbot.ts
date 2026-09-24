@@ -14,7 +14,7 @@
 // transition matches — for a turbot TM, halting IS stopping.
 //
 // This module is a driver loop around the per-mode single-step evaluators
-// (evaluateCCInputs, evaluateSCSingleStep, evaluateFSMSingleStep) plus the
+// (evaluateCCInputs, evaluateSCStep, evaluateFSMSingleStep) plus the
 // turbot-TM step defined here, mirroring evaluateTMSequence's
 // step/halt/history loop.
 
@@ -35,7 +35,8 @@ import type {
   TMNotation,
 } from '../types';
 import { evaluateCCInputs } from './cc';
-import { evaluateSCSingleStep } from './sc';
+import { scNetlist, evaluateSCStep } from './sc';
+import { memorySlots } from './netlist';
 import { sortStateComponents, evaluateFSMSymbolStep } from './fsm';
 import { turbotFsmNotation, validateTransitionTable } from './notation';
 import { readCell } from './tm';
@@ -295,7 +296,7 @@ export function validateTurbotTM(
 // current state id for FSM/TM); CC is stateless per spec §9.3.
 
 export interface BrainState {
-  memValues?: number[];   // SC: current MEM stored values
+  memValues?: number[];   // SC: current MEM stored values (memorySlots order, boxed MEMs included)
   stateId?: string;       // FSM/TM: current control-state component id
   tape?: TMTape;          // TM: the private tape (blank at start, per the textbook)
 }
@@ -311,10 +312,7 @@ export interface BrainStepResult {
 /** Initial brain state for a given inner mode. */
 export function initialBrainState(components: CircuitComponent[], innerMode: BuildMode): BrainState {
   if (innerMode === 'SC') {
-    const sortedMems = components
-      .filter((c) => c.type === 'MEM')
-      .sort((a, b) => (parseInt(a.label.replace(/\D/g, '')) || 0) - (parseInt(b.label.replace(/\D/g, '')) || 0));
-    return { memValues: sortedMems.map((m) => m.storedValue ?? 0) };
+    return { memValues: memorySlots(components).map((s) => s.value) };
   }
   if (innerMode === 'FSM' || innerMode === 'TM') {
     const states = sortStateComponents(components);
@@ -349,19 +347,7 @@ export function runBrainStep(
   }
 
   if (innerMode === 'SC') {
-    const sortedInputs = components
-      .filter((c) => c.type === 'INPUT')
-      .sort((a, b) => (parseInt(a.label.replace('IN', '')) || 0) - (parseInt(b.label.replace('IN', '')) || 0));
-    const sortedOutputs = components
-      .filter((c) => c.type === 'OUTPUT')
-      .sort((a, b) => (parseInt(a.label.replace('OUT', '')) || 0) - (parseInt(b.label.replace('OUT', '')) || 0));
-    const sortedMems = components
-      .filter((c) => c.type === 'MEM')
-      .sort((a, b) => (parseInt(a.label.replace(/\D/g, '')) || 0) - (parseInt(b.label.replace(/\D/g, '')) || 0));
-    const step = evaluateSCSingleStep(
-      components, wires, [sensorBit],
-      sortedInputs, sortedOutputs, sortedMems, brainState.memValues ?? []
-    );
+    const step = evaluateSCStep(scNetlist(components, wires), [sensorBit], brainState.memValues ?? []);
     const motor = decodeMotorCommand(step.outputBits);
     return { motor, input: String(sensorBit), action: motor, brainState: { memValues: step.newMemValues } };
   }
