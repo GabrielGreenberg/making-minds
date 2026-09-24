@@ -68,9 +68,9 @@ the wrong tree).
 | --- | --- | --- |
 | `app/` | `npx tsc -p tsconfig.app.json --noEmit` | strict types (`noUnusedLocals/Parameters` — CI is strict) |
 | `app/` | `npm run build` | the production bundle builds |
-| `app/` | `npm run check` | the budget guard + 22 headless harness tools (`app/tools/*Check.ts`; several boot a real server — minutes, not seconds) |
+| `app/` | `npm run check` | the budget guard, the tools type-check (`tsconfig.tools.json`) + 22 headless harness tools (`app/tools/*Check.ts`; several boot a real server — minutes, not seconds) |
 | `server/` | `npm run typecheck` | server types |
-| `server/` | `npm run check` | serverCheck + authCheck + parityCheck (server ≡ engine grading) |
+| `server/` | `npm run check` | typecheck + serverCheck + authCheck + parityCheck (server ≡ engine grading) |
 
 Fast loop while working: both `tsc`s plus the ONE harness tool that pins the area you're
 touching (`npx tsx tools/<name>Check.ts` from `app/`). Before landing: everything in the

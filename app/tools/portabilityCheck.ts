@@ -47,6 +47,22 @@
 //               names the file; the negative controls stay clean.
 //   [sweep]     zero violations over the real tree, with count pins so a
 //               wrong root cannot pass vacuously.
+//
+// Second family (task 039): a harness tool outside every type-checked program.
+// `tsx` strips types without checking them, so a tool drifts from the types it
+// tests — turbotCheck built a TurbotRunResult without `tapeCellsUsed`,
+// navResetCheck passed a `detail` its check() silently dropped — and still
+// passes. app/tsconfig.tools.json (the app's strictness over src/ + tools/,
+// `npm run typecheck:tools`) and server/tsconfig.json (which includes tools/)
+// are those programs; this gate keeps them from rotting:
+//
+//   [type-check coverage]  every .ts tool the sweep walks is in its
+//               directory's program (JavaScript is exempt and counted; a .ts
+//               in tasks/tools has no program and fails); both programs are at
+//               least as strict as tsconfig.app.json (the server's own gate
+//               then enforces what the tools program demands of server/src);
+//               the scripts and CI steps that run them; and the stale literal
+//               re-created in memory still fails under the parsed options.
 
 import ts from 'typescript';
 import { isBuiltin } from 'node:module';
@@ -360,8 +376,9 @@ console.log('\n[tripwire: every rule bites and names the file]');
 
 // ─── [sweep] ─────────────────────────────────────────────────────────
 
-console.log('\n[sweep: every harness tool is portable]');
-{
+/** Every code file under TOOL_DIRS (recursive, no node_modules), absolute —
+ *  the one walk both the sweep and the type-check coverage judge. */
+function toolFiles(): string[] {
   const files: string[] = [];
   const walk = (dir: string) => {
     for (const name of readdirSync(dir)) {
@@ -372,6 +389,12 @@ console.log('\n[sweep: every harness tool is portable]');
     }
   };
   for (const dir of TOOL_DIRS) walk(join(REPO, ...dir.split('/')));
+  return files;
+}
+
+console.log('\n[sweep: every harness tool is portable]');
+{
+  const files = toolFiles();
 
   let specifiers = 0;
   const violations: string[] = [];
@@ -393,6 +416,140 @@ console.log('\n[sweep: every harness tool is portable]');
     check(`the sweep covers ${must}`, scanned.has(must));
   }
   check(`saw more than 200 import specifiers (${specifiers})`, specifiers > 200);
+}
+
+// ─── [type-check coverage] ───────────────────────────────────────────
+
+/** A tsconfig parsed the way tsc parses it (JSONC, `extends`, include globs).
+ *  An unreadable config throws instead of yielding an empty program. */
+function parseConfig(rel: string): ts.ParsedCommandLine {
+  const host: ts.ParseConfigFileHost = {
+    ...ts.sys,
+    onUnRecoverableConfigFileDiagnostic: (d) => {
+      throw new Error(`${rel}: ${ts.flattenDiagnosticMessageText(d.messageText, '\n')}`);
+    },
+  };
+  const parsed = ts.getParsedCommandLineOfConfigFile(join(REPO, ...rel.split('/')), {}, host);
+  if (!parsed) throw new Error(`${rel}: tsc could not parse it`);
+  return parsed;
+}
+
+console.log('\n[type-check coverage: every TypeScript tool is in a strict program]');
+{
+  const TS_FILE = /\.(?:ts|tsx|mts|cts)$/;
+  // The program that type-checks each tool directory. tasks/tools has none:
+  // it holds JavaScript only, and a .ts dropped there fails as uncovered.
+  const programs = [
+    { dir: 'app/tools/', config: 'app/tsconfig.tools.json' },
+    { dir: 'server/tools/', config: 'server/tsconfig.json' },
+  ].map((p) => {
+    const parsed = parseConfig(p.config);
+    return { ...p, parsed, files: new Set(parsed.fileNames.map(repoRel)), tsTools: 0 };
+  });
+  const [tools, server] = programs;
+  const app = parseConfig('app/tsconfig.app.json');
+  for (const [rel, parsed] of [['app/tsconfig.app.json', app] as const,
+    ...programs.map((p) => [p.config, p.parsed] as const)]) {
+    for (const d of parsed.errors) console.log(`        → ${ts.flattenDiagnosticMessageText(d.messageText, ' ')}`);
+    check(`${rel} parses with no errors`, parsed.errors.length === 0);
+  }
+
+  // Coverage: every TypeScript tool is a root of its directory's program.
+  const uncovered: string[] = [];
+  let jsExempt = 0;
+  for (const rel of toolFiles().map(repoRel)) {
+    if (!TS_FILE.test(rel)) { jsExempt++; continue; }
+    const program = programs.find((p) => rel.startsWith(p.dir));
+    if (program?.files.has(rel)) program.tsTools++;
+    else uncovered.push(`${rel}: ${program ? `not in ${program.config}` : 'no type-checked program covers its directory'}`);
+  }
+  for (const u of uncovered) console.log(`        → ${u}`);
+  check(`every TypeScript tool is type-checked (${tools.tsTools + server.tsTools}; ${jsExempt} JavaScript files exempt)`,
+    uncovered.length === 0);
+  check(`${tools.config} covers more than 20 app tools (${tools.tsTools})`, tools.tsTools > 20);
+  check(`${server.config} covers 5 or more server tools (${server.tsTools})`, server.tsTools >= 5);
+
+  // Strictness. The tools program adds tools/ to the app's own; the server
+  // program must be no looser than the app on any flag, because the tools
+  // program follows remoteStoreCheck into server/src — a flag only the app
+  // sets would turn server code green under `npm run typecheck` red here.
+  for (const flag of ['strict', 'noUnusedLocals', 'noUnusedParameters', 'noEmit'] as const) {
+    check(`${tools.config} sets ${flag}`, tools.parsed.options[flag] === true);
+  }
+  const STRICTNESS = ['strict', 'noUnusedLocals', 'noUnusedParameters', 'noFallthroughCasesInSwitch',
+    'erasableSyntaxOnly', 'verbatimModuleSyntax', 'noUncheckedSideEffectImports'] as const;
+  const appSets = STRICTNESS.filter((flag) => app.options[flag] === true);
+  check(`tsconfig.app.json sets strictness flags to hold the others to (${appSets.length})`, appSets.length >= 3);
+  for (const { config, parsed } of programs) {
+    const looser = appSets.filter((flag) => parsed.options[flag] !== true);
+    check(`${config} is at least as strict as tsconfig.app.json${looser.length ? ` (missing ${looser.join(', ')})` : ''}`,
+      looser.length === 0);
+  }
+
+  // Wiring: the scripts and CI steps that run the two programs.
+  const scriptsOf = (rel: string): Record<string, string> =>
+    (JSON.parse(readFileSync(join(REPO, ...rel.split('/')), 'utf8')) as { scripts?: Record<string, string> }).scripts ?? {};
+  const appScripts = scriptsOf('app/package.json');
+  const serverScripts = scriptsOf('server/package.json');
+  check('app "typecheck:tools" runs tsconfig.tools.json',
+    (appScripts['typecheck:tools'] ?? '').includes('tsconfig.tools.json'));
+  const chain = appScripts.check ?? '';
+  const typecheckAt = chain.indexOf('npm run typecheck:tools');
+  check('app "check" runs typecheck:tools before the harness (before codecCheck)',
+    typecheckAt >= 0 && typecheckAt < chain.indexOf('codecCheck'));
+  check('server "check" starts with its typecheck (which covers server/tools)',
+    (serverScripts.check ?? '').startsWith('npm run typecheck &&') && (serverScripts.typecheck ?? '').includes('tsc'));
+
+  const workflow = readFileSync(join(REPO, '.github', 'workflows', 'deploy.yml'), 'utf8');
+  /** A job's steps: its block runs from its key to the next job key. */
+  const stepsOf = (job: string): string[] => {
+    const start = workflow.indexOf(`\n  ${job}:`);
+    if (start < 0) return [];
+    const block = workflow.slice(start + 1);
+    const end = block.slice(1).search(/\n {2}[\w-]+:/);
+    return (end < 0 ? block : block.slice(0, end + 1)).split(/\n\s+- /);
+  };
+  const deploySteps = stepsOf('build-and-deploy');
+  const stepAt = (pred: (step: string) => boolean) => deploySteps.findIndex(pred);
+  const serverInstall = stepAt((s) => s.includes('working-directory: server') && s.includes('npm ci'));
+  const toolsTypecheck = stepAt((s) => s.includes('npm run typecheck:tools'));
+  const build = stepAt((s) => s.includes('npm run build'));
+  check(`CI build-and-deploy: server npm ci → typecheck:tools → Build (steps ${serverInstall}, ${toolsTypecheck}, ${build})`,
+    serverInstall >= 0 && serverInstall < toolsTypecheck && toolsTypecheck < build);
+  check('CI server-checks runs server "npm run check"', stepsOf('server-checks').some((s) =>
+    s.includes('working-directory: server') && /run: .*npm run check/.test(s)));
+
+  // [tripwire] the drift itself, compiled in memory under the parsed tools
+  // options: task 039's stale TMEvalResult literal fails, an unused
+  // parameter fails, the corrected literal is clean.
+  const virtualPath = (name: string) => join(REPO, 'app', 'tools', name).split(sep).join('/');
+  const LITERAL = "{ tape: { cells: {}, head: 0 }, halted: true, steps: 0, hitStepLimit: false, history: []";
+  const HEADER = "import type { TMEvalResult } from '../src/engine/tm';\n";
+  const sources = new Map([
+    [virtualPath('__tripwire_stale__.ts'), `${HEADER}export const r: TMEvalResult = ${LITERAL} };\n`],
+    [virtualPath('__tripwire_fixed__.ts'), `${HEADER}export const r: TMEvalResult = ${LITERAL}, finalStateId: null };\n`],
+    [virtualPath('__tripwire_unused__.ts'), 'export function one(x: number): number { return 1; }\n'],
+  ]);
+  const norm = (f: string) => f.replace(/\\/g, '/');
+  const host = ts.createCompilerHost(tools.parsed.options, true);
+  const { getSourceFile, fileExists, readFile } = host;
+  host.getSourceFile = (f, lang, onError, fresh) => {
+    const text = sources.get(norm(f));
+    return text === undefined ? getSourceFile.call(host, f, lang, onError, fresh) : ts.createSourceFile(f, text, lang, true);
+  };
+  host.fileExists = (f) => sources.has(norm(f)) || fileExists.call(host, f);
+  host.readFile = (f) => sources.get(norm(f)) ?? readFile.call(host, f);
+  const program = ts.createProgram([...sources.keys()], tools.parsed.options, host);
+  const codes = (name: string): number[] => {
+    const sf = program.getSourceFile(virtualPath(name));
+    return sf ? [...program.getSyntacticDiagnostics(sf), ...program.getSemanticDiagnostics(sf)].map((d) => d.code) : [-1];
+  };
+  const stale = codes('__tripwire_stale__.ts');
+  const unused = codes('__tripwire_unused__.ts');
+  const fixed = codes('__tripwire_fixed__.ts');
+  check(`a TMEvalResult literal without finalStateId fails (TS2741; got ${stale.join(', ') || 'none'})`, stale.includes(2741));
+  check(`an unused parameter fails (TS6133; got ${unused.join(', ') || 'none'})`, unused.includes(6133));
+  check(`the corrected literal type-checks clean (got ${fixed.join(', ') || 'none'})`, fixed.length === 0);
 }
 
 // ─── verdict ─────────────────────────────────────────────────────────

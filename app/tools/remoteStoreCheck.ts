@@ -41,6 +41,10 @@
 //
 // Exits non-zero on the first tally of failures.
 
+// Type-only, so erased at runtime (verbatimModuleSyntax): it loads nothing and
+// the shim below still runs before the client module does.
+import type { ApiError } from '../src/api/client';
+
 // The api client reads the bearer token from localStorage (lazily, per call);
 // give Node a minimal shim BEFORE importing anything that might touch it.
 const backing = new Map<string, string>();
@@ -129,7 +133,7 @@ api.setOnUnauthorized(() => unauthorizedFires++);
 
 const unauthenticated = await remoteWorkbookStore
   .loadAssignmentState(SAMPLE_ASSIGNMENT_ID)
-  .then(() => null as api.ApiError | null)
+  .then(() => null as ApiError | null)
   .catch((e: unknown) => (e instanceof api.ApiError ? e : null));
 check('unauthenticated seam call rejects with ApiError(401)', unauthenticated?.status === 401);
 check('…and fires the onUnauthorized hook', unauthorizedFires === 1);
@@ -387,7 +391,7 @@ check(
 {
   const denied = await remoteSubmissionStore
     .listAll(SAMPLE_ASSIGNMENT_ID)
-    .then(() => null as api.ApiError | null)
+    .then(() => null as ApiError | null)
     .catch((e: unknown) => (e instanceof api.ApiError ? e : null));
   check('a student listAll() rejects with ApiError(403)', denied?.status === 403);
 }
@@ -396,7 +400,7 @@ check(
 api.setToken('garbage-token');
 const dead = await remoteSubmissionStore
   .listOwn(SAMPLE_ASSIGNMENT_ID, null)
-  .then(() => null as api.ApiError | null)
+  .then(() => null as ApiError | null)
   .catch((e: unknown) => (e instanceof api.ApiError ? e : null));
 check('dead token rejects with ApiError(401) and fires the hook', dead?.status === 401 && unauthorizedFires === 2);
 
@@ -648,7 +652,7 @@ check(
 
 const badLogin = await api
   .login('new@ucla.edu', 'nopasswordyet')
-  .then(() => null as api.ApiError | null, (e: unknown) => (e instanceof api.ApiError ? e : null));
+  .then(() => null as ApiError | null, (e: unknown) => (e instanceof api.ApiError ? e : null));
 check('a roster member with no account cannot sign in', badLogin?.status === 401);
 check('…and the refusal carries a displayable message', (badLogin?.message.length ?? 0) > 0);
 
@@ -667,7 +671,7 @@ check('…and the new password is what signs in', (await api.me()).email === 'ne
 
 const studentBlocked = await api
   .getRoster()
-  .then(() => null as api.ApiError | null, (e: unknown) => (e instanceof api.ApiError ? e : null));
+  .then(() => null as ApiError | null, (e: unknown) => (e instanceof api.ApiError ? e : null));
 check('a student calling getRoster() is refused (403)', studentBlocked?.status === 403);
 
 await api.requestAccess({ email: 'offroster@ucla.edu', name: 'Off Roster', studentId: '9' });

@@ -230,13 +230,13 @@ check('grader: gap=1-only adder passes the default case but FAILS the separation
 // ── acceptor edge cases (constructed tapes) ────────────────────
 console.log('\n[acceptor]');
 function halted(tape: TMTape): TMEvalResult {
-  return { tape, halted: true, steps: 0, hitStepLimit: false, history: [] };
+  return { tape, halted: true, steps: 0, hitStepLimit: false, history: [], finalStateId: null };
 }
 
 const twoBlocks = halted({ cells: { 0: '1', 2: '1' }, head: 2 });
 check('two stroke blocks → reject', acceptTM('unary', twoBlocks) !== null);
 
-const stepLimited: TMEvalResult = { tape: { cells: {}, head: 0 }, halted: false, steps: 10000, hitStepLimit: true, history: [] };
+const stepLimited: TMEvalResult = { tape: { cells: {}, head: 0 }, halted: false, steps: 10000, hitStepLimit: true, history: [], finalStateId: null };
 check('no halt (step limit) → reject', acceptTM('unary', stepLimited) !== null);
 
 const offPosition = halted({ cells: { 0: '1', 1: '1' }, head: 0 }); // head left of rightmost '1'
