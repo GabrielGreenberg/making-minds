@@ -18,3 +18,4 @@
 2026-09-21-003 · feature · Let a student view a submitted snapshot read-only at any time, not only once past due · 2026-09-23T21:24:57-0700 · task/003-view-submission-mode · 6269f85
 2026-09-21-004 · feature · Allow boxing a sequential (MEM-containing) sub-circuit on SC canvases · 2026-09-23T22:49:05-0700 · task/004-box-sequential-subcircuit · 2978b7b
 2026-09-21-005 · feature · Author fill-in-the-blank questions in the question creator · 2026-09-23T23:24:21-0700 · task/005-fill-in-authoring-ui · 0a2e76e
+2026-09-21-010 · feature · Author an arena family (several turbot_cases) in the question creator · 2026-09-24T00:04:10-0700 · task/010-turbot-multi-arena-authoring · d20b75d
