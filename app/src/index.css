@@ -963,6 +963,179 @@ thead .sc-label-col {
   padding: 0 !important;
 }
 
+/* ── SC perception frame player (components/PerceptionFramePlayer.tsx) ──
+   Time flows right to left like the SC tables: t1 is the rightmost column,
+   so the scroller opens scrolled to the right. */
+.pf-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.pf-scroll {
+  overflow-x: auto;
+  direction: rtl;
+}
+
+.pf-scroll > .pf-grid {
+  direction: ltr;
+}
+
+.pf-grid {
+  border-collapse: collapse;
+  margin-left: auto;
+  font-size: 11px;
+}
+
+.pf-grid td,
+.pf-grid th {
+  padding: 1px;
+  text-align: center;
+}
+
+.pf-t {
+  min-width: 20px;
+  font-size: 10px;
+  font-weight: 500;
+  color: #888;
+  cursor: pointer;
+  user-select: none;
+}
+
+.pf-t.pf-col-selected {
+  color: var(--accent);
+  font-weight: 700;
+  text-decoration: underline;
+}
+
+.pf-label {
+  position: sticky;
+  right: 0;
+  background: white;
+  font-size: 10px;
+  font-weight: 600;
+  color: #666;
+  text-align: left !important;
+  padding: 0 6px !important;
+}
+
+.pf-bit {
+  display: block;
+  width: 20px;
+  height: 18px;
+  padding: 0;
+  border: 1px solid #ddd;
+  border-radius: 2px;
+  background: transparent;
+  color: #bbb;
+  font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+  font-size: 10px;
+  cursor: pointer;
+}
+
+.pf-bit.on {
+  background: #fdecea;
+  border-color: #f3aca8;
+  color: var(--wire-1);
+  font-weight: 700;
+}
+
+.pf-bit:hover {
+  border-color: #999;
+}
+
+.pf-col-selected .pf-bit {
+  border-color: var(--accent);
+}
+
+.pf-col-current {
+  background: rgba(74, 144, 226, 0.14);
+}
+
+.pf-out td {
+  border-top: 1.5px solid #ccc;
+}
+
+.pf-out-bit {
+  height: 18px;
+  font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+  color: #333;
+}
+
+.pf-out-bit.val-1 {
+  color: var(--wire-1);
+  font-weight: 600;
+}
+
+.pf-add {
+  vertical-align: middle;
+  padding-right: 4px !important;
+}
+
+.pf-add-btn {
+  width: 18px;
+  min-height: 60px;
+  padding: 0;
+  border: 1px dashed #bbb;
+  border-radius: 3px;
+  background: white;
+  color: #444;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.pf-add-btn:hover:not(:disabled) {
+  border-color: #888;
+  background: #f5f5f5;
+}
+
+.pf-add-btn:disabled {
+  color: #ccc;
+  border-color: #e0e0e0;
+  cursor: default;
+}
+
+.pf-tools {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  padding: 5px 0 3px;
+}
+
+.pf-small {
+  padding: 2px 8px;
+  font-size: 11px;
+}
+
+.pf-small:disabled {
+  color: #ccc;
+  cursor: default;
+}
+
+.pf-hint {
+  font-size: 11px;
+  color: #888;
+}
+
+.pf-end {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.pf-warning {
+  margin-top: 4px;
+  padding: 4px 6px;
+  border: 1px solid #ffe0a3;
+  border-radius: 3px;
+  background: #fff8e1;
+  color: #8a5a00;
+  font-size: 11px;
+}
+
 /* ── Modal / Dialog ── */
 .modal-overlay {
   position: fixed;

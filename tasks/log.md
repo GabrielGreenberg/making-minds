@@ -20,3 +20,4 @@
 2026-09-21-005 · feature · Author fill-in-the-blank questions in the question creator · 2026-09-23T23:24:21-0700 · task/005-fill-in-authoring-ui · 0a2e76e
 2026-09-21-010 · feature · Author an arena family (several turbot_cases) in the question creator · 2026-09-24T00:04:10-0700 · task/010-turbot-multi-arena-authoring · d20b75d
 2026-09-21-011 · feature · Reset or flag a live run when the machine is edited mid-run (turbot and TM) · 2026-09-24T01:02:21-0700 · task/011-invalidate-run-on-edit · b951340
+2026-09-21-012 · feature · Give students a frame player for SC perception questions · 2026-09-24T01:59:05-0700 · task/012-sc-perception-frame-player · b93edcb
