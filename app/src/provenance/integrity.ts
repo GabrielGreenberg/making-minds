@@ -148,14 +148,14 @@ function checkQuestion(
   for (const o of otherIds) {
     flags.push({
       code: 'ids-other',
-      detail: `${o.count} of ${plural(ids.length, 'id')} were created in ${o.email}'s editor for this assignment — to look at.`,
+      detail: `${o.count} of ${plural(ids.length, 'id')} ${o.count === 1 ? 'was' : 'were'} created in ${o.email}'s editor for this assignment — to look at.`,
     });
   }
   if (unbound > 0) {
     flags.push({
       code: 'ids-unbound',
       detail:
-        `${unbound} of ${plural(ids.length, 'id')} were not created in this student's editor for this assignment ` +
+        `${unbound} of ${plural(ids.length, 'id')} ${unbound === 1 ? 'was' : 'were'} not created in this student's editor for this assignment ` +
         '(brought in from the sandbox, a file, the browser console or another tool?) — to look at.',
     });
   }

@@ -328,3 +328,30 @@ before anyone submits HW1 (due 2026-10-04). Gabriel (website): post the Policies
 above and confirm assumptions (a)–(c).
 
 **Next step:** loop session: the owed visual/browser checks above, then land per PROFILE §5.
+
+### 2026-09-23 — loop browser check and land
+- **Browser, local mode (dev server :5173 restarted on the branch).** As John, three gates were
+  placed by hand in HW1 P5 and the assignment submitted. The confirm dialog ends with "The
+  platform checks that submitted work was created in your own editor."
+
+  Ada's HW1 gradebook shows ⚑ exactly where expected:
+  - P1 and P2 hold circuits built with plain random ids before this change (from task 033's
+    browser pass), so they are unbound and have no editing record.
+  - P6 and P11 hold text written before this change, so they have no stamp.
+  - P5, built by hand just now, has no flag. Neither does P3, which is empty.
+
+  The expanded attempt shows "Integrity — to look at, not a verdict" and a plain reason per
+  problem. At 375 px the page doesn't scroll sideways. The list sits in the attempt table's own
+  sideways scroll, like the failed-case tables above it.
+- **Fixed here:** the flag details said "1 of 1 id were"; they now say "was"/"were" by count
+  (`integrity.ts`). Also fixed the `CLAUDE.md` path to `docs/buildout/designs/remote-stores.md`
+  (a review nit). Re-ran app tsc, provenanceCheck, the budget guard, server typecheck and server
+  check: all exit 0.
+- **Owed to Gabriel:**
+  - Release before any student submits HW1 (the term starts 2026-09-24; HW1 is due 2026-10-04),
+    so the legacy class stays empty.
+  - After the release, the ssh check of `mintKey` and the stored secret.
+  - The Policies-page sentence.
+  - Confirm assumptions (a)–(c).
+  - Confirm the in-app-paste flag decision.
+- Landed via a merge into `main`.

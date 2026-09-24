@@ -350,7 +350,7 @@ sees the formula, it runs against the generated numeric `test_cases`.
   the migration guard.
   Old local data is never deleted (first remote login uploads it fill-empty).
 - **Remote workbooks are last-write-wins across devices** (accepted pilot trade-off,
-  `designs/remote-stores.md` §5; an If-Match precondition is the follow-up if it bites).
+  `docs/buildout/designs/remote-stores.md` §5; an If-Match precondition is the follow-up if it bites).
 - **Releasing = `deploy/release.sh`** after a push to `main` (box backup + pull + homework sync + restart over ssh,
   then the Pages upload; refuses unless local main == origin/main; needs the gitignored
   `secrets/cloudflare.env` and an `ssh/` key — `deploy/README.md` §0).
