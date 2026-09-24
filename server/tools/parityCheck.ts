@@ -34,6 +34,12 @@
 //      `result` (so the answers echo and the grade stay byte-equal), a review
 //      leaves it untouched, and answers carrying signed editing records grade
 //      exactly as the same answers without them.
+//   7. A TM case's block separations (task 002, "Run this input") reach the
+//      student: their copy of an hw5-p4 result keeps each gap case's
+//      `separations` (input layout — the tape the grader laid out) while
+//      `expected`/`got` stay blank, and a case without gaps gains no key; a
+//      result stored before cases recorded them gets them from the server's
+//      bank on the student's submissions route.
 //
 // ── What is (and is not) normalized in the comparison ──────────────────────
 // The compared payload is `record.result` (the SubmissionResult) plus the
@@ -76,7 +82,8 @@ import { createApp } from '../src/app';
 import { Db } from '../src/db';
 import type { ServerConfig } from '../src/config';
 import { TOY_ACCOUNTS } from '../../app/src/auth/accounts';
-import { gradeSubmission } from '../../app/src/engine/grader';
+import { gradeSubmission, gradeQuestion } from '../../app/src/engine/grader';
+import { studentRecord } from '../src/sanitize';
 import { applyManualReview } from '../../app/src/storage/manualReview';
 import { buildSampleAssignment } from '../../app/src/devData/sampleData';
 import { nextTrace } from '../../app/src/provenance/trace';
@@ -598,6 +605,51 @@ const a3 = diffPaths(canon(provenanced), canon(rec3?.submission.answers));
 check('…and are stored verbatim, provenance included', a3.length === 0, a3.join(' | '));
 check("…whose records the server reads as this student's own",
   (rec3?.integrity?.questions ?? []).every((q) => q.record === 'self'));
+
+// ── 7. TM block separations reach the student, the key does not ─────────────
+{
+  const gap = loadFixture('hw5-p4');
+  const graded = gradeQuestion(gap.question, gap.broken);
+  const at = '2026-09-23T00:00:00.000Z';
+  const full: SubmissionRecord = {
+    assignmentId: 'gap',
+    attempt: 1,
+    submittedAt: at,
+    submission: { assignmentTitle: 'gap', submittedAt: at, answers: [{ questionId: gap.question.id, circuit: gap.broken! }] },
+    result: { student: studentEmail, questions: [graded], passed: graded.passed, total: graded.total },
+  };
+  const bank = gap.question.test_cases ?? [];
+  const mine = canon(studentRecord(full, true)).result!.questions[0].cases;
+  check('hw5-p4: the grader carries each gap case\'s separations onto its result',
+    bank.filter((tc) => tc.separations).length >= 48 &&
+      graded.cases.every((c, k) => JSON.stringify(c.separations) === JSON.stringify(bank[k].separations)));
+  check("a student's copy keeps every case's separations (input layout, not the key)",
+    mine.length === bank.length &&
+      mine.every((c, k) => JSON.stringify(c.separations) === JSON.stringify(bank[k].separations)));
+  check('…a case without gaps gains no separations key',
+    mine.every((c, k) => bank[k].separations != null || !('separations' in c)));
+  const gapLeaks = findLeaks(mine, new Set(['expected', 'got']));
+  check('…and expected/got stay blank', gapLeaks.length === 0, gapLeaks.join(', '));
+
+  // A result graded BEFORE cases recorded their separations (stored as-is in
+  // the pilot DB): the student's submissions route fills them from the
+  // server's own bank, so their replay is still the grader's tape.
+  const GAP_ID = 'parity-gap';
+  const gapAssignment: AssignmentData = { id: GAP_ID, title: 'gap', questions: [gap.question] };
+  await api('PUT', `/assignments/${GAP_ID}`, { token: iTok, body: gapAssignment });
+  await api('PUT', `/assignments/${GAP_ID}/visibility`, { token: iTok, body: { visible: true } });
+  await api('PUT', `/assignments/${GAP_ID}/grades-release`, { token: iTok, body: { released: true } });
+  const older = canon(full);
+  for (const c of older.result!.questions[0].cases) delete c.separations;
+  db.addSubmission(GAP_ID, studentEmail, older.submission, older.result);
+  const served = await api<{ records: SubmissionRecord[] }>('GET', `/assignments/${GAP_ID}/submissions`, { token: sTok });
+  const olderMine = served.json.records[0]?.result?.questions[0].cases ?? [];
+  check("an older stored result: the student's route fills every case's separations from the bank",
+    olderMine.length === bank.length &&
+      olderMine.every((c, k) => JSON.stringify(c.separations) === JSON.stringify(bank[k].separations)));
+  const olderLeaks = findLeaks(olderMine, new Set(['expected', 'got']));
+  check('…still with expected/got blank', olderLeaks.length === 0, olderLeaks.join(', '));
+}
 
 server.close();
 db.close();

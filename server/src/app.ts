@@ -529,7 +529,7 @@ export function createApp(config: ServerConfig, db: Db) {
       record:
         req.user!.role === 'instructor'
           ? record
-          : studentRecord(record, db.getGradesReleased(assignment.id)),
+          : studentRecord(record, db.getGradesReleased(assignment.id), assignment),
     });
   });
 
@@ -540,7 +540,9 @@ export function createApp(config: ServerConfig, db: Db) {
     }
     const released = db.getGradesReleased(String(req.params.id));
     const own = db.listSubmissions(String(req.params.id), req.user!.email);
-    res.json({ records: own.map((r) => studentRecord(r, released)) });
+    // The full assignment fills older results' case separations (sanitize.ts).
+    const assignment = db.getAssignment(String(req.params.id)) ?? undefined;
+    res.json({ records: own.map((r) => studentRecord(r, released, assignment)) });
   });
 
   // ── manual review (instructor) ─────────────────────────────────

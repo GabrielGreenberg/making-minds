@@ -254,6 +254,8 @@
   font-size: var(--mm-fs-meta);
 }
 .grades-failed-list { margin: 0 0 6px; padding-left: 18px; color: var(--mm-ink-2); }
+.grades-failed-list li + li { margin-top: 2px; }
+.grades-run-case { margin-left: 6px; white-space: nowrap; }
 .grades-verdict { white-space: nowrap; font-weight: 600; }
 .grades-verdict--pass { color: var(--mm-ok); }
 .grades-verdict--fail { color: var(--mm-danger); }

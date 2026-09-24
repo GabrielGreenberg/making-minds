@@ -17,7 +17,9 @@ export type Route =
   | { kind: 'home' }
   | { kind: 'sandbox' }
   | { kind: 'grades'; id?: string }
-  | { kind: 'assignment'; id: string; questionIndex?: number }
+  // caseIndex: a graded case to load into the question's run ("Run this
+  // input" on the grade sheet) — only meaningful with a questionIndex.
+  | { kind: 'assignment'; id: string; questionIndex?: number; caseIndex?: number }
   | { kind: 'instructor' }
   | { kind: 'instructor-new-assignment' }
   | { kind: 'instructor-edit'; id: string }
@@ -25,6 +27,13 @@ export type Route =
   | { kind: 'instructor-roster' }
   | { kind: 'instructor-feedback' }
   | { kind: 'instructor-notes' };
+
+/** A non-negative integer URL segment, or undefined. */
+function indexSegment(part: string | undefined): number | undefined {
+  if (part == null) return undefined;
+  const n = Number(part);
+  return Number.isInteger(n) && n >= 0 ? n : undefined;
+}
 
 /** Parse a location hash (e.g. "#/a/hw1/q/2") into a Route. Pure. */
 export function parseHash(hash: string): Route {
@@ -53,9 +62,14 @@ export function parseHash(hash: string): Route {
   }
   if (parts[0] === 'a' && parts[1]) {
     const id = decodeURIComponent(parts[1]);
-    if (parts[2] === 'q' && parts[3] != null) {
-      const qi = Number(parts[3]);
-      if (Number.isInteger(qi) && qi >= 0) return { kind: 'assignment', id, questionIndex: qi };
+    // #/a/:id/q/:i[/case/:k] — a malformed case segment is dropped, the
+    // question kept.
+    const qi = parts[2] === 'q' ? indexSegment(parts[3]) : undefined;
+    if (qi !== undefined) {
+      const k = parts[4] === 'case' ? indexSegment(parts[5]) : undefined;
+      return k !== undefined
+        ? { kind: 'assignment', id, questionIndex: qi, caseIndex: k }
+        : { kind: 'assignment', id, questionIndex: qi };
     }
     return { kind: 'assignment', id };
   }
@@ -72,9 +86,10 @@ export function routeToHash(route: Route): string {
     case 'grades':
       return route.id ? `#/grades/${encodeURIComponent(route.id)}` : '#/grades';
     case 'assignment':
-      return route.questionIndex != null
-        ? `#/a/${encodeURIComponent(route.id)}/q/${route.questionIndex}`
-        : `#/a/${encodeURIComponent(route.id)}`;
+      if (route.questionIndex == null) return `#/a/${encodeURIComponent(route.id)}`;
+      return route.caseIndex != null
+        ? `#/a/${encodeURIComponent(route.id)}/q/${route.questionIndex}/case/${route.caseIndex}`
+        : `#/a/${encodeURIComponent(route.id)}/q/${route.questionIndex}`;
     case 'instructor':
       return '#/instructor';
     case 'instructor-roster':
@@ -231,6 +246,11 @@ function applyRoute(route: Route): void {
             switchQuestion(route.questionIndex);
           }
           useStore.setState({ assignmentView: 'question' });
+          // A graded case to replay: load its input into the (now open)
+          // question's run. The question may have been open all along — the
+          // load restarts the run itself.
+          const q = assignment?.questions[route.questionIndex];
+          if (route.caseIndex != null && q) void useStore.getState().loadCaseInput(q.id, route.caseIndex);
         } else {
           // No question in the URL → the assignment's question list.
           useStore.setState({ assignmentView: 'overview' });

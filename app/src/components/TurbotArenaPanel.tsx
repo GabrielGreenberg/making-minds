@@ -129,6 +129,10 @@ export function TurbotArenaPanel() {
 
   const innerMode = useStore(selectTurbotInnerMode);
   const notation = useStore(selectTmNotation);
+  // A question with several arenas shows the primary one — or the one a
+  // graded case loaded (store turbotCaseIndex); say which.
+  const arenaCount = useStore((s) => s.assignment?.questions[s.currentQuestionIndex]?.turbot_cases?.length ?? 0);
+  const turbotCaseIndex = useStore((s) => s.turbotCaseIndex);
 
   // Sandbox turbot tabs own their arena, so the Map is editable there;
   // a question's arena is part of the assignment and stays read-only.
@@ -248,6 +252,11 @@ export function TurbotArenaPanel() {
     <div className="table-section">
       <div className="table-section-label">
         <span>Map</span>
+        {arenaCount > 1 && (
+          <span className="turbot-arena-which">
+            arena {Math.min(turbotCaseIndex, arenaCount - 1) + 1} of {arenaCount}
+          </span>
+        )}
         <span className="turbot-zoom">
           <button
             className="turbot-zoom-btn"

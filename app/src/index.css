@@ -1274,6 +1274,49 @@ thead .sc-label-col {
   color: #444;
 }
 
+/* A graded case loaded into the run ("Run this input" on the grade sheet —
+   GradedCaseBanner): what was recorded, what this run gives, whether they
+   are the same run. */
+.graded-case {
+  margin: 6px 10px 2px;
+  padding: 7px 9px;
+  border: 1px solid #c5d6f0;
+  border-left: 3px solid var(--accent);
+  background: #f4f8fe;
+  border-radius: 4px;
+  font-size: 12px;
+  line-height: 1.45;
+}
+.graded-case-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  color: var(--text-secondary);
+}
+.graded-case-close {
+  border: 0;
+  background: none;
+  cursor: pointer;
+  color: var(--text-secondary);
+  font-size: 12px;
+  padding: 0 2px;
+}
+.graded-case-close:hover { color: var(--text); }
+.graded-case-what { font-weight: 600; margin: 2px 0 4px; }
+.graded-case-row { display: flex; gap: 8px; }
+.graded-case-label { flex: 0 0 76px; color: var(--text-secondary); }
+.graded-case-pass { color: #2e7d32; }
+.graded-case-fail { color: #c62828; }
+.graded-case-same { margin: 4px 0 0; color: #2e7d32; }
+.graded-case-note { margin: 4px 0 0; color: #8a5a00; }
+.graded-case-actions { display: flex; align-items: center; gap: 8px; margin-top: 6px; }
+.graded-case-actions .action-btn { white-space: nowrap; }
+.graded-case-hint { color: var(--text-secondary); font-size: 11px; }
+
 /* A question's optional short name — bold, on a line of its own above the
    statement (both the panel and the open-question workspace). */
 .question-title {
@@ -1376,6 +1419,14 @@ thead .sc-label-col {
      whole data panel; TurbotArenaPanel auto-scrolls this container to keep
      the turbot in view during step/run. Small arenas are unaffected. */
   max-height: 340px;
+}
+
+/* Which of a question's arenas the Map shows ("arena 2 of 3"). */
+.turbot-arena-which {
+  margin-left: 8px;
+  font-weight: 500;
+  text-transform: none;
+  letter-spacing: 0;
 }
 
 /* Map zoom controls, in the "Map" section header beside the Edit map toggle. */

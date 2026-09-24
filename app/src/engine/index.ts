@@ -10,6 +10,7 @@ export {
   evaluateBoxedCircuit,
   evaluateCC,
   evaluateCCInputs,
+  sortByLabel,
 } from './cc';
 export type { CCEvalResult } from './cc';
 export { evaluateSCSingleStep, evaluateSCSequence } from './sc';
@@ -85,6 +86,17 @@ export {
 } from './machineValidation';
 export type { MachineValidation } from './machineValidation';
 export { generateTestCases } from './testVectorGen';
+export {
+  questionLayout,
+  gradingCircuit,
+  validateQuestionMachine,
+  caseStimulus,
+  recordedCaseSeparations,
+  runValueCase,
+  runTurbotCase,
+  gradedMachineKey,
+} from './caseRun';
+export type { StageOne, ValueCaseRun, CaseStimulus } from './caseRun';
 export { gradeQuestion, gradeSubmission, summarizeResult } from './grader';
 export type { CaseResult, QuestionResult, SubmissionResult } from './grader';
 export {
