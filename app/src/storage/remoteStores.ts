@@ -9,6 +9,7 @@
 // Contract notes, per seam:
 //   - RemoteWorkbookStore: workbooks are per-(user, assignment) server-side;
 //     the session token identifies the user, so the seam shape is unchanged.
+//     The same fetch carries the user's mint key (task 034, loadForOpen).
 //   - RemoteAssignmentStore: what `get` returns depends on the session's role
 //     — students receive the assignment with `test_cases`/`perception_cases`
 //     stripped by the server (sanitize.ts). Nothing here compensates: remote
@@ -43,6 +44,7 @@ import type { NotesStore } from './NotesStore';
 import {
   ApiError,
   getWorkbook,
+  getWorkbookFull,
   putWorkbook,
   listAssignments as apiListAssignments,
   getAssignment as apiGetAssignment,
@@ -81,6 +83,13 @@ class RemoteWorkbookStore implements WorkbookStore {
     opts?: { keepalive?: boolean },
   ): Promise<void> {
     return putWorkbook(id, state, opts);
+  }
+
+  async loadForOpen(id: string): Promise<{ state: AssignmentState | null; mintKey: string | null }> {
+    // One GET: the session names the person; the server derives their key
+    // and returns it beside the state.
+    const { state, mintKey } = await getWorkbookFull(id);
+    return { state, mintKey: mintKey ?? null };
   }
 }
 

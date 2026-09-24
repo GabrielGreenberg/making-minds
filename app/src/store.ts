@@ -1,5 +1,4 @@
 import { create } from 'zustand';
-import { v4 as uuid } from 'uuid';
 import type {
   BuildMode,
   RepSystem,
@@ -19,6 +18,7 @@ import type {
   WorksheetData,
   SubmissionRecord,
   QuestionCircuit,
+  QuestionProvenance,
   TMTape,
   TMSymbol,
   TMNotation,
@@ -58,6 +58,10 @@ import {
   type PasteScope,
   type Provenance,
 } from './provenance';
+// The minting seam and the writing/build trace (task 034).
+import { mintId, setMintKey, clearMintKeys, mintKeyFor, type MintScope } from './provenance/ids';
+import { nextTrace, insertedChars, type TraceChange, type TextContent } from './provenance/trace';
+import { INTEGRITY_NOTICE } from './provenance/notice';
 
 /**
  * TM tape notation (alphabet) for the current context. Inside an assignment
@@ -509,7 +513,10 @@ interface AppState {
   // Undo/Redo
   undoStack: HistoryEntry[];
   redoStack: HistoryEntry[];
-  pushHistory: () => void;
+  // Every canvas edit's history step — and so the choke point where the
+  // writing/build trace counts it (recordEdit). `added`: components this edit
+  // adds (addComponent / placeBoxInstance 1, paste n).
+  pushHistory: (added?: number) => void;
   undo: () => void;
   redo: () => void;
 
@@ -531,6 +538,11 @@ interface AppState {
   // order. Synced into questionCircuits.fillAnswers alongside openResponse.
   fillAnswers: string[];
   setFillAnswer: (index: number, value: string) => void;
+  // The live signed editing record of the current question (task 034,
+  // provenance/trace.ts): advanced by recordEdit at every edit, synced into
+  // questionCircuits.provenance at the same points as the canvas (one fold,
+  // foldLiveQuestion). null before the question's first edit.
+  questionTrace: QuestionProvenance | null;
   loadAssignment: (assignment: AssignmentData) => void;
   // Open an assignment by id and show its workbook. Resolves false if the id is
   // unknown. A stale open (one superseded by a newer navigation while its seam
@@ -895,6 +907,127 @@ function pasteProvenance(state: { assignment: AssignmentData | null }): Provenan
   return { scope: selectPasteScope(state), user: currentPrincipal };
 }
 
+/** A copy of `clip` with every component and wire id freshly minted in
+ *  `scope`, recursing into BOXED internals (their wires re-pointed with them).
+ *  A box's boxedCircuitId is a library reference and stays; cc.ts evaluates
+ *  internals self-contained, by label order, so fresh internal ids are safe. */
+function remint(clip: CanvasClip, scope: MintScope): CanvasClip {
+  const idMap = new Map<string, string>();
+  const components = clip.components.map((c) => {
+    const id = mintId(scope);
+    idMap.set(c.id, id);
+    return c.internalCircuit ? { ...c, id, internalCircuit: remint(c.internalCircuit, scope) } : { ...c, id };
+  });
+  const wires = clip.wires.map((w) => ({
+    ...w,
+    id: mintId(scope),
+    sourceComponentId: idMap.get(w.sourceComponentId) ?? w.sourceComponentId,
+    targetComponentId: idMap.get(w.targetComponentId) ?? w.targetComponentId,
+  }));
+  return { components, wires };
+}
+
+// ─── The writing/build trace (task 034, provenance/trace.ts) ────────
+// When this window's previous edit happened (active-time gaps). Module
+// memory; a principal change resets it.
+let lastEditAt = 0;
+
+// The values each answer field held recently in this window, per field
+// (`<assignment>:<question>:r` for the prose answer, `…:f<i>` for a blank).
+// A change BACK to one of them — the browser's own undo or redo in a text box
+// — restores what the record already counted when it first arrived, so it
+// inserts nothing new; everything else counts what it inserts. Module memory;
+// a principal change resets it.
+const RECENT_TEXTS_PER_FIELD = 50;
+const recentTexts = new Map<string, string[]>();
+
+/** Characters one text change inserts, for the record: 0 when it restores a
+ *  value this field held recently (an undo/redo), else insertedChars. */
+function textInsertion(field: string, before: string, after: string): number {
+  let seen = recentTexts.get(field);
+  if (!seen) recentTexts.set(field, (seen = []));
+  const restores = seen.includes(after);
+  if (seen[seen.length - 1] !== before) seen.push(before);
+  if (seen.length > RECENT_TEXTS_PER_FIELD) seen.shift();
+  return restores ? 0 : insertedChars(before, after);
+}
+
+/** The recent-values key of an answer field of the live question. */
+function textFieldKey(state: AppState, field: string): string {
+  const q = state.assignment?.questions[state.currentQuestionIndex];
+  return `${state.assignment?.id ?? ''}:${q?.id ?? ''}:${field}`;
+}
+
+/**
+ * The trace update for one edit of the live question, merged into that
+ * edit's own set(). Called by every edit AFTER its isCurrentQuestionLocked
+ * return — through pushHistory (every canvas edit), undo/redo and the two
+ * text setters — and a no-op on a locked question anyway (belt and braces)
+ * and in the sandbox, which keeps no trace. `textAfter`: the answer text the
+ * edit leaves (text setters); canvas edits leave it as it was.
+ */
+function recordEdit(
+  state: AppState,
+  change: TraceChange,
+  textAfter?: TextContent,
+): Partial<Pick<AppState, 'questionTrace'>> {
+  const a = state.assignment;
+  const q = a?.questions[state.currentQuestionIndex];
+  if (!a || !q || isCurrentQuestionLocked(state)) return {};
+  const now = Date.now();
+  const gapMs = lastEditAt > 0 ? now - lastEditAt : 0;
+  lastEditAt = now;
+  const textBefore: TextContent = { responseText: state.openResponse, fillAnswers: state.fillAnswers };
+  return {
+    questionTrace: nextTrace(
+      state.questionTrace,
+      change,
+      {
+        questionId: q.id,
+        textBefore,
+        textAfter: textAfter ?? textBefore,
+        countBefore: state.components.length,
+        gapMs,
+      },
+      mintKeyFor(a.id),
+    ),
+  };
+}
+
+/** The live question folded into its saved container — THE one fold, shared
+ *  by every canvas swap and save (goHome, switchQuestion, the done toggle,
+ *  syncedQuestionCircuits), so no live field (the done lock, the editing
+ *  record) can be dropped on the way. */
+function foldLiveQuestion(
+  s: AppState,
+  questionId: number,
+  overrides: Partial<QuestionCircuit> = {},
+): QuestionCircuit {
+  return {
+    components: s.components,
+    wires: s.wires,
+    boxes: s.boxes,
+    responseText: s.openResponse,
+    fillAnswers: s.fillAnswers,
+    done: s.questionCircuits.get(questionId)?.done,
+    ...(s.questionTrace ? { provenance: s.questionTrace } : {}),
+    ...overrides,
+  };
+}
+
+/** A saved question's live fields — THE one load, foldLiveQuestion's inverse
+ *  (openAssignment, switchQuestion, the frozen view). */
+function loadQuestionFields(saved: QuestionCircuit) {
+  return {
+    components: saved.components,
+    wires: saved.wires,
+    boxes: saved.boxes,
+    openResponse: saved.responseText ?? '',
+    fillAnswers: saved.fillAnswers ?? [],
+    questionTrace: saved.provenance ?? null,
+  };
+}
+
 export const useStore = create<AppState>()((set, get) => ({
   autoSaveStatus: 'saved' as const,
 
@@ -943,7 +1076,7 @@ export const useStore = create<AppState>()((set, get) => ({
   },
 
   newWorkbook: () => {
-    const tabId = uuid();
+    const tabId = mintId({ kind: 'sandbox' });
     set({
       assignment: null,
       workbookOpen: true,
@@ -997,6 +1130,8 @@ export const useStore = create<AppState>()((set, get) => ({
 
     const workbook: WorkbookData = {
       formatVersion: 2,
+      // Read by whoever opens the file — a person or an AI tool (task 034).
+      notice: INTEGRITY_NOTICE,
       metadata: {
         title: state.workbookTitle,
         author: '',
@@ -1079,7 +1214,7 @@ export const useStore = create<AppState>()((set, get) => ({
         setTimeout(() => get().evaluateCircuit(), 0);
       } else if (data.circuit) {
         // Legacy single-circuit format — wrap in a one-worksheet workbook
-        const wsId = uuid();
+        const wsId = mintId({ kind: 'sandbox' });
         const importedComponents = data.circuit.components || [];
         const importedWires = data.circuit.wires || [];
         const resolvedComponents = resolveMemDirections(importedComponents, importedWires);
@@ -1154,7 +1289,7 @@ export const useStore = create<AppState>()((set, get) => ({
   addComponent: (type, x, y) => {
     const state = get();
     if (isCurrentQuestionLocked(state)) return;
-    state.pushHistory();
+    state.pushHistory(1);
     const sx = snapToGrid(x);
     const sy = snapToGrid(y);
     let label = '';
@@ -1193,7 +1328,7 @@ export const useStore = create<AppState>()((set, get) => ({
     }
 
     const comp: CircuitComponent = {
-      id: uuid(),
+      id: mintId(selectPasteScope(state)),
       type,
       x: sx,
       y: sy,
@@ -1317,7 +1452,7 @@ export const useStore = create<AppState>()((set, get) => ({
       ? selectTransitionNotationForSource(state, sourceComp).defaultLabel
       : undefined;
     const wire: Wire = {
-      id: uuid(),
+      id: mintId(selectPasteScope(state)),
       sourceComponentId: sourceCompId,
       sourcePortId: sourcePortId,
       targetComponentId: targetCompId,
@@ -1470,7 +1605,7 @@ export const useStore = create<AppState>()((set, get) => ({
   // Undo/Redo
   undoStack: [],
   redoStack: [],
-  pushHistory: () => {
+  pushHistory: (added = 0) => {
     const state = get();
     set({
       undoStack: [
@@ -1483,6 +1618,7 @@ export const useStore = create<AppState>()((set, get) => ({
         },
       ],
       redoStack: [],
+      ...recordEdit(state, { compIns: added }),
     });
   },
   undo: () => {
@@ -1504,6 +1640,8 @@ export const useStore = create<AppState>()((set, get) => ({
       wires: prev.wires,
       boxes: prev.boxes,
       confirmedBoxLibrary: prev.confirmedBoxes,
+      // An edit action, adding nothing new (what it restores was counted).
+      ...recordEdit(state, {}),
     });
   },
   redo: () => {
@@ -1525,6 +1663,7 @@ export const useStore = create<AppState>()((set, get) => ({
       wires: next.wires,
       boxes: next.boxes,
       confirmedBoxLibrary: next.confirmedBoxes,
+      ...recordEdit(state, {}),
     });
   },
 
@@ -1534,20 +1673,38 @@ export const useStore = create<AppState>()((set, get) => ({
   currentQuestionIndex: 0,
   questionCircuits: new Map(),
   openResponse: '',
+  // The text setters stamp the answer as they change it (recordEdit): the
+  // record is signed at EDIT time, never at save time.
   setOpenResponse: (text) => {
-    if (isCurrentQuestionLocked(get())) return;
-    set({ openResponse: text });
+    const state = get();
+    if (isCurrentQuestionLocked(state)) return;
+    set({
+      openResponse: text,
+      ...recordEdit(
+        state,
+        { textIns: textInsertion(textFieldKey(state, 'r'), state.openResponse, text) },
+        { responseText: text, fillAnswers: state.fillAnswers },
+      ),
+    });
   },
   fillAnswers: [],
   setFillAnswer: (index, value) => {
-    if (isCurrentQuestionLocked(get())) return;
-    set((state) => {
-      const next = state.fillAnswers.slice();
-      while (next.length <= index) next.push('');
-      next[index] = value;
-      return { fillAnswers: next };
+    const state = get();
+    if (isCurrentQuestionLocked(state)) return;
+    const next = state.fillAnswers.slice();
+    while (next.length <= index) next.push('');
+    const before = next[index];
+    next[index] = value;
+    set({
+      fillAnswers: next,
+      ...recordEdit(
+        state,
+        { textIns: textInsertion(textFieldKey(state, `f${index}`), before, value) },
+        { responseText: state.openResponse, fillAnswers: next },
+      ),
     });
   },
+  questionTrace: null,
   loadAssignment: (assignment) => {
     const questionCircuits = new Map<number, QuestionCircuit>();
     for (const q of assignment.questions) {
@@ -1563,6 +1720,7 @@ export const useStore = create<AppState>()((set, get) => ({
       confirmedBoxLibrary: [],
       openResponse: '',
       fillAnswers: [],
+      questionTrace: null,
       buildMode: assignment.questions[0]?.buildMode || 'CC',
     });
     get().resetAllSimState();
@@ -1577,9 +1735,12 @@ export const useStore = create<AppState>()((set, get) => ({
       return true;
     }
     const seq = ++openAssignmentSeq;
-    const [def, fetched, latestSubmission] = await Promise.all([
+    const [def, { state: fetched, mintKey }, latestSubmission] = await Promise.all([
       getAssignment(id),
-      workbookStore.loadAssignmentState(id),
+      // The saved work AND this person's mint key for this assignment (task
+      // 034), in one fetch: ids minted and editing records signed from here
+      // on bind to them.
+      workbookStore.loadForOpen(id, currentPrincipal),
       // Fetched directly, not read off the separately-hydrated `submissions`
       // map: that hydration (App.tsx's mount effect) races this open on a
       // fresh deep link, and the freeze check below needs THIS assignment's
@@ -1587,8 +1748,11 @@ export const useStore = create<AppState>()((set, get) => ({
       submissionStore.getLatest(id),
     ]);
     // Superseded while in flight — drop this resolve (see the AppState note).
+    // A stale resolve registers no key either: it may be a previous
+    // principal's.
     if (seq !== openAssignmentSeq) return true;
     if (!def) return false;
+    if (mintKey) setMintKey(id, mintKey);
     // An unpublished assignment is not openable by a student, by URL or
     // otherwise. Remotely the server already refuses (the fetch 404s, so
     // `def` is undefined above); local mode has no server to refuse, so the
@@ -1631,14 +1795,10 @@ export const useStore = create<AppState>()((set, get) => ({
     set({
       questionCircuits,
       currentQuestionIndex,
-      components: activeCircuit.components,
-      wires: activeCircuit.wires,
-      boxes: activeCircuit.boxes,
+      ...loadQuestionFields(activeCircuit),
       // Assignment-wide: a box built for one question is available in every
       // question of the homework that can place its kind.
       confirmedBoxLibrary: boxLibrary,
-      openResponse: activeCircuit.responseText ?? '',
-      fillAnswers: activeCircuit.fillAnswers ?? [],
       buildMode: activeQ?.buildMode || 'CC',
       workbookOpen: true,
     });
@@ -1652,14 +1812,7 @@ export const useStore = create<AppState>()((set, get) => ({
       const q = state.assignment.questions[state.currentQuestionIndex];
       if (q) {
         const qc = new Map(state.questionCircuits);
-        qc.set(q.id, {
-          components: state.components,
-          wires: state.wires,
-          boxes: state.boxes,
-          responseText: state.openResponse,
-          fillAnswers: state.fillAnswers,
-          done: state.questionCircuits.get(q.id)?.done,
-        });
+        qc.set(q.id, foldLiveQuestion(state, q.id));
         set({ questionCircuits: qc });
       }
       // Flush immediately so a quick Home click persists (don't wait for
@@ -1724,11 +1877,7 @@ export const useStore = create<AppState>()((set, get) => ({
       const saved = frozenQuestionCircuit(record, nextQ.id);
       set({
         currentQuestionIndex: index,
-        components: saved.components,
-        wires: saved.wires,
-        boxes: saved.boxes,
-        openResponse: saved.responseText ?? '',
-        fillAnswers: saved.fillAnswers ?? [],
+        ...loadQuestionFields(saved),
         buildMode: nextQ.buildMode,
       });
       get().resetAllSimState();
@@ -1737,26 +1886,15 @@ export const useStore = create<AppState>()((set, get) => ({
 
     // Save the live question's canvas, load the target question's.
     const updatedMap = new Map(state.questionCircuits);
-    updatedMap.set(currentQ.id, {
-      components: state.components,
-      wires: state.wires,
-      boxes: state.boxes,
-      responseText: state.openResponse,
-      fillAnswers: state.fillAnswers,
-      done: state.questionCircuits.get(currentQ.id)?.done,
-    });
+    updatedMap.set(currentQ.id, foldLiveQuestion(state, currentQ.id));
 
     const saved = updatedMap.get(nextQ.id) ?? emptyQuestionCircuit();
     set({
       currentQuestionIndex: index,
       questionCircuits: updatedMap,
-      components: saved.components,
-      wires: saved.wires,
-      boxes: saved.boxes,
       // confirmedBoxLibrary deliberately NOT swapped: it belongs to the
       // assignment, not the question (notes/pset_updates.md item 8).
-      openResponse: saved.responseText ?? '',
-      fillAnswers: saved.fillAnswers ?? [],
+      ...loadQuestionFields(saved),
       buildMode: nextQ.buildMode,
     });
     get().resetAllSimState();
@@ -1770,14 +1908,7 @@ export const useStore = create<AppState>()((set, get) => ({
     // edit made since the last navigation.
     const qc = new Map(state.questionCircuits);
     const wasDone = qc.get(q.id)?.done ?? false;
-    qc.set(q.id, {
-      components: state.components,
-      wires: state.wires,
-      boxes: state.boxes,
-      responseText: state.openResponse,
-      fillAnswers: state.fillAnswers,
-      done: !wasDone,
-    });
+    qc.set(q.id, foldLiveQuestion(state, q.id, { done: !wasDone }));
     set({ questionCircuits: qc });
   },
   closeAssignment: () => {
@@ -1791,6 +1922,7 @@ export const useStore = create<AppState>()((set, get) => ({
       confirmedBoxLibrary: [],
       openResponse: '',
       fillAnswers: [],
+      questionTrace: null,
       undoStack: [],
       redoStack: [],
     });
@@ -1801,6 +1933,7 @@ export const useStore = create<AppState>()((set, get) => ({
     const state = get();
     return JSON.stringify(
       {
+        notice: INTEGRITY_NOTICE,
         metadata: {
           title: 'Untitled',
           author: '',
@@ -1827,7 +1960,7 @@ export const useStore = create<AppState>()((set, get) => ({
       student,
       submittedAt: new Date().toISOString(),
     });
-    return JSON.stringify(submission, null, 2);
+    return JSON.stringify({ notice: INTEGRITY_NOTICE, ...submission }, null, 2);
   },
   submitAssignment: async (id, student) => {
     const epoch = principalEpoch;
@@ -2212,7 +2345,7 @@ export const useStore = create<AppState>()((set, get) => ({
     const outPortIds = libEntry?.outputPortIds || localBox?.outputPortIds || [];
 
     if (!name) return;
-    state.pushHistory();
+    state.pushHistory(1);
 
     // Get internal circuit from library snapshot, or gather from current tab
     let internalComps: CircuitComponent[];
@@ -2245,7 +2378,7 @@ export const useStore = create<AppState>()((set, get) => ({
     }));
 
     const comp: CircuitComponent = {
-      id: uuid(),
+      id: mintId(selectPasteScope(state)),
       type: 'BOXED',
       x: snapToGrid(x),
       y: snapToGrid(y),
@@ -2347,9 +2480,11 @@ export const useStore = create<AppState>()((set, get) => ({
       allowed: selectAllowedComponents(state),
     });
     if (!verdict.ok) return verdict.message;
-    // A fresh copy per paste: two pastes of one item never share objects.
-    const clip = JSON.parse(JSON.stringify(verdict.clip)) as CanvasClip;
-    state.pushHistory();
+    // A fresh copy per paste, every id (BOXED internals too) minted anew in
+    // the TARGET's scope: two pastes of one item never share objects or ids,
+    // and a paste carried between assignments binds to the one it lands in.
+    const clip = remint(JSON.parse(JSON.stringify(verdict.clip)) as CanvasClip, selectPasteScope(state));
+    state.pushHistory(clip.components.length);
 
     // Compute next available label numbers from existing components on canvas
     const inNums = state.components.filter((c) => c.type === 'INPUT').map((c) => parseInt(c.label.replace('IN', '')) || 0);
@@ -2359,10 +2494,7 @@ export const useStore = create<AppState>()((set, get) => ({
     let nextOut = outNums.length === 0 ? 1 : Math.max(...outNums) + 1;
     let nextMem = memNums.length === 0 ? 1 : Math.max(...memNums) + 1;
 
-    const idMap = new Map<string, string>();
     const newComps = clip.components.map((c) => {
-      const newId = uuid();
-      idMap.set(c.id, newId);
       let label = c.label;
       if (c.type === 'INPUT') {
         label = `IN${nextIn}`;
@@ -2374,18 +2506,12 @@ export const useStore = create<AppState>()((set, get) => ({
         label = `M${nextMem}`;
         nextMem++;
       }
-      return { ...c, id: newId, x: c.x + 40, y: c.y + 40, label };
+      return { ...c, x: c.x + 40, y: c.y + 40, label };
     });
-    const newWires = clip.wires.map((w) => ({
-      ...w,
-      id: uuid(),
-      sourceComponentId: idMap.get(w.sourceComponentId) || w.sourceComponentId,
-      targetComponentId: idMap.get(w.targetComponentId) || w.targetComponentId,
-    }));
 
     set({
       components: [...state.components, ...newComps],
-      wires: [...state.wires, ...newWires],
+      wires: [...state.wires, ...clip.wires],
       selectedIds: newComps.map((c) => c.id),
     });
     setTimeout(() => get().evaluateCircuit(), 0);
@@ -2399,7 +2525,7 @@ export const useStore = create<AppState>()((set, get) => ({
 
   addTab: (title, buildMode, activeTask, innerMode) => {
     const state = get();
-    const newId = uuid();
+    const newId = mintId({ kind: 'sandbox' });
     const task = activeTask || 'arithmetic';
     // Save current tab
     const updatedTabCircuits = new Map(state.tabCircuits);
@@ -3712,8 +3838,13 @@ export const useStore = create<AppState>()((set, get) => ({
     currentPrincipal = email;
     principalReported = true;
     // The clipboard lives in the provenance seam, not in store state: empty
-    // it here too, and hand the seam the arriving principal.
+    // it here too, and hand the seam the arriving principal. So do the mint
+    // keys (task 034): they are the leaving person's; the arriving person's
+    // come with their own opens. (questionTrace resets with the store.)
     resetClipboard(email);
+    clearMintKeys();
+    lastEditAt = 0;
+    recentTexts.clear();
     set({ ...useStore.getInitialState(), ...readSandbox(email) });
     if (keepSandboxOpen) get().enterSandbox();
     // The reset's own set() armed the autosave, and so did entering the
@@ -3762,6 +3893,20 @@ if (import.meta.env?.DEV === true && typeof window !== 'undefined') {
 // sandboxKey is the ONE place the key is spelled.
 const SANDBOX_KEY_PREFIX = 'making-minds-autosave';
 const AUTO_SAVE_DELAY = 1500; // ms debounce
+// …but never put off longer than this after the first unsaved change: a save
+// lands at least once per burst of editing, so the server's per-save history
+// (task 034, the "appeared between two saves" check) has the resolution to
+// tell a burst from a steady build — and a long unbroken session is not all
+// riding on one debounce.
+export const AUTO_SAVE_MAX_WAIT = 10_000;
+// When the oldest change not yet in a save was made (null: none pending).
+let autoSavePendingSince: number | null = null;
+
+/** The debounce for a change made at `now`, when the oldest unsaved change
+ *  was made at `pendingSince`: the usual pause, cut short by the max wait. */
+export function autoSaveDelay(pendingSince: number, now: number): number {
+  return Math.max(0, Math.min(AUTO_SAVE_DELAY, pendingSince + AUTO_SAVE_MAX_WAIT - now));
+}
 
 function sandboxKey(principal: string | null): string {
   // Lowercased like the crash journal's keys (storage/journal.ts).
@@ -3823,6 +3968,7 @@ function frozenQuestionCircuit(record: SubmissionRecord, questionId: number): Qu
     boxes: [],
     responseText: answer.responseText,
     fillAnswers: answer.fillAnswers,
+    ...(answer.provenance ? { provenance: answer.provenance } : {}),
   };
 }
 
@@ -3837,16 +3983,7 @@ function frozenQuestionCircuit(record: SubmissionRecord, questionId: number): Qu
 function syncedQuestionCircuits(s: AppState): Map<number, QuestionCircuit> {
   const circuits = new Map(s.questionCircuits);
   const q = s.assignment?.questions[s.currentQuestionIndex];
-  if (q) {
-    circuits.set(q.id, {
-      components: s.components,
-      wires: s.wires,
-      boxes: s.boxes,
-      responseText: s.openResponse,
-      fillAnswers: s.fillAnswers,
-      done: s.questionCircuits.get(q.id)?.done,
-    });
-  }
+  if (q) circuits.set(q.id, foldLiveQuestion(s, q.id));
   return circuits;
 }
 
@@ -3909,6 +4046,9 @@ const AUTO_SAVE_BACKOFF_MAX = 30000;
 let autoSaveBackoff = AUTO_SAVE_BACKOFF_INITIAL;
 
 async function performAutoSave(keepalive = false): Promise<void> {
+  // This save (or the trailing rerun it queues) takes everything changed so
+  // far; a change from here on starts a new max-wait window.
+  autoSavePendingSince = null;
   if (autoSaveInFlight) {
     autoSaveTrailing = true;
     return;
@@ -4012,10 +4152,12 @@ useStore.subscribe((state, prev) => {
   if (!changed) return;
 
   useStore.setState({ autoSaveStatus: 'unsaved' });
+  const now = Date.now();
+  if (autoSavePendingSince === null) autoSavePendingSince = now;
   if (autoSaveTimer) clearTimeout(autoSaveTimer);
   autoSaveTimer = setTimeout(() => {
     void performAutoSave();
-  }, AUTO_SAVE_DELAY);
+  }, autoSaveDelay(autoSavePendingSince, now));
 });
 
 // Flush a pending debounced save immediately — e.g. when the tab is closing or
@@ -4088,6 +4230,7 @@ function saveForLeavingPrincipal(): void {
 function cancelPendingAutoSave() {
   if (autoSaveTimer) clearTimeout(autoSaveTimer);
   autoSaveTimer = null;
+  autoSavePendingSince = null;
   autoSaveTrailing = false;
   autoSaveBackoff = AUTO_SAVE_BACKOFF_INITIAL;
   useStore.setState({ autoSaveStatus: 'saved' });

@@ -96,6 +96,16 @@ Updates: `deploy/release.sh` (section 0). By hand, as the `makingminds` user:
 (`sqlite3 .../making-minds.sqlite ".backup /srv/making-minds/data/backup-$(date +%a).sqlite"`)
 plus Lightsail's instance snapshots is enough.
 
+**`MM_MINT_SECRET`** (optional; task 034, the provenance watermark): the secret
+every student's per-assignment mint key is derived from — the key that binds
+the ids of their circuits and signs their editing records, checked at submit.
+Leave it unset and the server generates one on first boot and keeps it in the
+database (`server_meta`), so restarts never change keys and a forgotten env var
+never causes an outage. If you set it (a long random string in the systemd
+unit's `Environment=`), keep it secret and **never rotate it mid-term**: every
+id minted before the change would read as nobody's. The backup of the SQLite
+file carries the generated one; the client's dev secret is never used here.
+
 ## 2. Cloudflare Pages (frontend)
 
 Create a Pages project connected to the repo:

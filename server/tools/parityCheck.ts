@@ -30,6 +30,10 @@
 //      same records (reviewedAt is server-stamped, so the server's stamp is
 //      injected into the in-process side — the submittedAt pattern) — and the
 //      released student view carries the verdict but still no per-case detail.
+//   6. Provenance never grades (task 034): the integrity summary sits beside
+//      `result` (so the answers echo and the grade stay byte-equal), a review
+//      leaves it untouched, and answers carrying signed editing records grade
+//      exactly as the same answers without them.
 //
 // ── What is (and is not) normalized in the comparison ──────────────────────
 // The compared payload is `record.result` (the SubmissionResult) plus the
@@ -75,6 +79,8 @@ import { TOY_ACCOUNTS } from '../../app/src/auth/accounts';
 import { gradeSubmission } from '../../app/src/engine/grader';
 import { applyManualReview } from '../../app/src/storage/manualReview';
 import { buildSampleAssignment } from '../../app/src/devData/sampleData';
+import { nextTrace } from '../../app/src/provenance/trace';
+import { prepareKey } from '../../app/src/provenance/ids';
 import { comp, transition, circuit } from '../../app/tools/builder';
 import type {
   AssignmentData,
@@ -551,6 +557,47 @@ check(
 );
 const reviewLeaks = sAfterReview.json.records.flatMap((r) => findLeaks(r.result, new Set(['expected', 'got'])));
 check('reviewed student records still leak no answer keys', reviewLeaks.length === 0, reviewLeaks.join(', '));
+
+// ── Provenance never grades (task 034) ──────────────────────────────────────
+const preIntegrity = all.json.records.find((r) => r.attempt === 1)?.integrity;
+const postIntegrity = afterReview.json.records.find((r) => r.attempt === 1)?.integrity;
+check('the stored record carries an integrity summary beside its result',
+  preIntegrity != null && preIntegrity.questions.length === correctAnswers.length);
+const dIntegrity = diffPaths(canon(preIntegrity), canon(postIntegrity));
+check('manual review preserves record.integrity', postIntegrity != null && dIntegrity.length === 0, dIntegrity.join(' | '));
+check('students never receive it', sAfterReview.json.records.every((r) => !('integrity' in r)));
+
+// The same correct answers, each carrying a signed editing record, graded
+// through the server: the grade must equal the plain direct grade, deeply.
+const wbKey = (
+  await api<{ mintKey?: string }>('GET', `/workbooks/${ASSIGNMENT_ID}`, { token: sTok })
+).json.mintKey;
+const signer = wbKey ? prepareKey(wbKey) : null;
+check('the workbook fetch hands the student a mint key', signer != null);
+const provenanced: Answers = correctAnswers.map((a) => ({
+  ...a,
+  provenance: nextTrace(
+    null,
+    { compIns: a.circuit.components.length },
+    { questionId: a.questionId, textBefore: {}, textAfter: a, countBefore: 0, gapMs: 0 },
+    signer,
+  ),
+}));
+const post3 = await api<{ record: SubmissionRecord }>(
+  'POST',
+  `/assignments/${ASSIGNMENT_ID}/submissions`,
+  { token: sTok, body: { answers: provenanced } },
+);
+const rec3 = (
+  await api<{ records: SubmissionRecord[] }>('GET', `/assignments/${ASSIGNMENT_ID}/submissions`, { token: iTok })
+).json.records.find((r) => r.attempt === 3);
+const d3 = diffPaths(canon(directCorrect), canon(rec3?.result));
+check('PARITY: answers with provenance grade exactly as without it',
+  post3.status === 201 && rec3 != null && d3.length === 0, d3.join(' | '));
+const a3 = diffPaths(canon(provenanced), canon(rec3?.submission.answers));
+check('…and are stored verbatim, provenance included', a3.length === 0, a3.join(' | '));
+check("…whose records the server reads as this student's own",
+  (rec3?.integrity?.questions ?? []).every((q) => q.record === 'self'));
 
 server.close();
 db.close();

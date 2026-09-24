@@ -9,6 +9,7 @@ import { assignmentStore } from '../storage/backend';
 import { figureUrl } from '../problemSet';
 import { questionVerdict } from '../gradeDisplay';
 import { formatDueDate } from '../dueDates';
+import { submitConfirmMessage } from '../provenance/notice';
 import type { AssignmentQuestion } from '../types';
 
 /**
@@ -52,10 +53,7 @@ export function AssignmentOverview() {
   });
 
   const handleSubmit = () => {
-    const ok = confirm(
-      `Submit "${assignment.title}"? This records a snapshot of your current work.\n\n` +
-      'Note: only your most recent submission is graded — submitting again replaces any earlier submission for grading purposes.'
-    );
+    const ok = confirm(submitConfirmMessage(assignment.title));
     if (!ok) return;
     // Online-only submit: a failure records nothing and asks for a visible
     // retry — never a silent (late) queue. See MenuBar's handler.

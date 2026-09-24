@@ -26,6 +26,10 @@
 // sandbox of their own; the legacy key is adopted as the visitor's), [principal
 // change mid-save] (a save in flight swallows none of the leaving person's
 // edits) and [auth provider wiring] (both providers report every change).
+// Task 034 adds the provenance slice: a principal change drops the mint keys
+// and the live editing record (the next person mints under their own key only
+// once their open registers it), and [provenance across canvas swaps] — every
+// swap carries each question's record through the ONE fold / load helper.
 
 // The store registers window/document listeners at import time (and must NOT
 // read the sandbox then — [no load at import]), so install minimal shims
@@ -70,6 +74,8 @@ const { localAssignmentStore } = await import('../src/storage/AssignmentStore');
 const { backendMode, workbookStore } = await import('../src/storage/backend');
 // The clipboard lives in the provenance seam, not in store state (task 033).
 const { peekClipboard, stampText, currentProvenance } = await import('../src/provenance');
+// …and the mint keys in the minting seam (task 034).
+const { mintKeyFor, mintId, verifyId, deriveMintKey, DEV_MINT_SECRET } = await import('../src/provenance/ids');
 /** Both of the seam's slots empty. */
 const clipboardEmpty = () => peekClipboard().canvas === null && peekClipboard().text === null;
 
@@ -643,6 +649,10 @@ console.log('[principal change]');
   const before = new Set(useStore.getState().components.map((c) => c.id));
   useStore.getState().addComponent('AND', 200, 200);
   const aGate = useStore.getState().components.find((c) => !before.has(c.id))!;
+  const keyOf = (who: string) => deriveMintKey(DEV_MINT_SECRET, who, SAMPLE_ASSIGNMENT_ID);
+  check("A's open registered A's mint key: A's gate binds to A",
+    mintKeyFor(SAMPLE_ASSIGNMENT_ID) != null && verifyId(aGate.id, keyOf(A)));
+  check('…and the edit started a live editing record', useStore.getState().questionTrace != null);
   useStore.setState({ selectedIds: [aGate.id] });
   useStore.getState().copySelected();
   // …and a sentence copied in an answer field (usePasteGuard's text slot).
@@ -667,6 +677,8 @@ console.log('[principal change]');
     check('sign-out: selection empty', s.selectedIds.length === 0);
     check('sign-out: submissions map empty', Object.keys(s.submissions).length === 0);
     check('sign-out: back to the welcome state', !s.workbookOpen && s.autoSaveStatus === 'saved');
+    check("sign-out: the mint keys are gone (they were A's)", mintKeyFor(SAMPLE_ASSIGNMENT_ID) === null);
+    check('sign-out: no live editing record', s.questionTrace === null);
   }
   checkAllSimFresh('after sign-out');
   useStore.getState().resetForPrincipal(null);
@@ -682,7 +694,20 @@ console.log('[principal change]');
     boxLibrary: [],
   });
   useStore.getState().resetForPrincipal(B);
+  {
+    const early = mintId({ kind: 'assignment', assignmentId: SAMPLE_ASSIGNMENT_ID });
+    check("before B's open, an assignment mint binds to nobody (never A's key)",
+      !verifyId(early, keyOf(A)) && !verifyId(early, keyOf(B)));
+  }
   check('B opens HW', (await useStore.getState().openAssignment(SAMPLE_ASSIGNMENT_ID)) === true);
+  {
+    const seen = new Set(useStore.getState().components.map((c) => c.id));
+    useStore.getState().addComponent('OR', 300, 300);
+    const bGate = useStore.getState().components.find((c) => !seen.has(c.id))!;
+    check("after B's open, B's ids bind to B's own key, not A's",
+      verifyId(bGate.id, keyOf(B)) && !verifyId(bGate.id, keyOf(A)));
+    useStore.getState().undo();
+  }
   {
     const s = useStore.getState();
     check("B sees B's stored workbook", s.components.some((c) => c.id === 'b-sentinel'));
@@ -709,6 +734,57 @@ console.log('[principal change]');
   useStore.getState().resetForPrincipal(B);
   check('a submit started before the change still records', (await staleSubmit) != null);
   check("…but does not badge the next person's submissions map", Object.keys(useStore.getState().submissions).length === 0);
+}
+
+// ═════ Each question's editing record rides every canvas swap ═══
+
+console.log('[provenance across canvas swaps]');
+{
+  // The fold and the load are written ONCE (store.ts foldLiveQuestion /
+  // loadQuestionFields), so no swap can drop a live field on the way.
+  const { readFileSync } = await import('node:fs');
+  const storeSrc = readFileSync(new URL('../src/store.ts', import.meta.url), 'utf8');
+  const folds = storeSrc.match(/boxes: \w+\.boxes,\s*\n\s*responseText: \w+\.openResponse/g) ?? [];
+  check('one fold: the live canvas + text are folded into a container in one place only', folds.length === 1);
+  check('one load: a container is loaded into the live text in one place only',
+    storeSrc.split('openResponse: saved.responseText').length - 1 === 1 &&
+    !storeSrc.includes('openResponse: activeCircuit.responseText'));
+
+  useStore.getState().resetForPrincipal('swap@x.test');
+  await useStore.getState().openAssignment(SAMPLE_ASSIGNMENT_ID);
+  const asg = useStore.getState().assignment!;
+  const [q1, q2] = [asg.questions[0].id, asg.questions[1].id];
+  const trace = () => JSON.stringify(useStore.getState().questionTrace);
+  const saved = (qid: number) => JSON.stringify(useStore.getState().questionCircuits.get(qid)?.provenance ?? null);
+  useStore.getState().switchQuestion(0);
+  if (useStore.getState().questionCircuits.get(q1)?.done) useStore.getState().toggleCurrentQuestionDone();
+  useStore.getState().addComponent('AND', 120, 120);
+  const t1 = trace();
+  check('an edit on P1 writes its live record', useStore.getState().questionTrace != null);
+  useStore.getState().switchQuestion(1);
+  check('switchQuestion folds P1\'s record into its container', saved(q1) === t1);
+  check('…and loads P2\'s own (none yet), not P1\'s', trace() !== t1);
+  useStore.getState().addComponent('AND', 140, 140);
+  const t2 = trace();
+  useStore.getState().switchQuestion(0);
+  check('P1 → P2 → P1 keeps P1\'s record byte-equal', trace() === t1);
+  check('…and P2\'s is kept in its container', saved(q2) === t2);
+  useStore.getState().toggleCurrentQuestionDone();
+  check('the done toggle folds the record too', saved(q1) === t1);
+  useStore.getState().toggleCurrentQuestionDone();
+  const exported = JSON.parse(useStore.getState().exportSubmission('swap@x.test') ?? '{}');
+  check('the submission build carries each record beside its answer',
+    JSON.stringify(exported.answers?.find((a: { questionId: number }) => a.questionId === q1)?.provenance) === t1 &&
+    JSON.stringify(exported.answers?.find((a: { questionId: number }) => a.questionId === q2)?.provenance) === t2);
+  useStore.getState().goHome();
+  check('goHome folds the live record', saved(q1) === t1);
+  useStore.getState().closeAssignment();
+  check('closeAssignment drops the live record', useStore.getState().questionTrace === null);
+  await useStore.getState().openAssignment(SAMPLE_ASSIGNMENT_ID);
+  useStore.getState().switchQuestion(0);
+  check('openAssignment loads each record back from the workbook seam, byte-equal',
+    trace() === t1 && saved(q2) === t2);
+  useStore.getState().goHome();
 }
 
 // ═════ One sandbox per person per browser ═══════════════════════

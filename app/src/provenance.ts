@@ -47,10 +47,13 @@
 //
 // Limits — what this does NOT stop, and cannot from the client: editing
 // localStorage (the crash journal replayed on the next open, the first-login
-// migration), scripting the API with the student's own bearer token, and
-// redrawing a friend's circuit by hand. Those need detection at grading time
-// (tasks 031 and 034). The console one-liner is closed separately:
-// window.__store exists only in dev builds (store.ts).
+// migration), scripting the API with the student's own bearer token, a paste
+// through a patched app, and redrawing a friend's circuit by hand. The first
+// three are DETECTED at submit instead (task 034, provenance/: keyed ids,
+// the text stamp and the writing/build trace, checked on the server); the
+// last is out of reach by design. The console one-liner is closed separately:
+// window.__store exists only in dev builds (store.ts). A paste accepted here
+// is re-minted by store.paste in the target's scope (provenance/ids.ts).
 
 import type { BuildMode, CircuitComponent, ComponentType, Wire } from './types';
 import { disallowedComponentTypes } from './engine/machineValidation';

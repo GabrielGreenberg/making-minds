@@ -81,11 +81,14 @@ export function stripResultDetail(result: SubmissionResult): SubmissionResult {
 /**
  * A student's own submission record. Grades are withheld entirely until the
  * instructor releases them for the assignment ("release grades"); once
- * released, the student sees scores but never the per-case detail.
+ * released, the student sees scores but never the per-case detail. The
+ * integrity check (task 034) is instructor-only, released or not: it never
+ * reaches a student.
  */
 export function studentRecord(record: SubmissionRecord, gradesReleased: boolean): SubmissionRecord {
+  const { integrity: _instructorOnly, ...rest } = record;
   return {
-    ...record,
+    ...rest,
     result: gradesReleased && record.result ? stripResultDetail(record.result) : undefined,
   };
 }

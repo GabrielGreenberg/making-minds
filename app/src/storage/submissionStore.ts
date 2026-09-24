@@ -20,6 +20,9 @@ import type {
 import { emptyQuestionCircuit } from './workbookStore';
 import { gradeSubmission } from '../engine/grader';
 import { applyManualReview } from './manualReview';
+import { assessIntegrity } from '../provenance/integrity';
+import { deriveMintKey, DEV_MINT_SECRET } from '../provenance/ids';
+import { TOY_ACCOUNTS } from '../auth/accounts';
 
 // The pure review helper lives in storage/manualReview.ts (a types-only leaf)
 // so the server's review endpoint can import it without pulling this
@@ -53,6 +56,9 @@ export function buildSubmission(
       // question's is its prose.
       if (q.fill_in) answer.fillAnswers = c.fillAnswers ?? [];
       else if (q.buildMode === 'open') answer.responseText = c.responseText ?? '';
+      // The signed editing record rides beside the answer (task 034): the
+      // integrity check reads it, the grader never does.
+      if (c.provenance) answer.provenance = c.provenance;
       return answer;
     }),
   };
@@ -135,12 +141,23 @@ class LocalSubmissionStore implements SubmissionStore {
     const { getAssignment } = await import('../assignments');
     const def = await getAssignment(id);
     const result = def ? gradeSubmission(def, submission) : undefined;
+    // The integrity check the server runs (task 034), with the dev keys of the
+    // toy accounts; no save history or legacy snapshot exists locally.
+    const keyFor = (email: string) => deriveMintKey(DEV_MINT_SECRET, email, id);
+    const self = (submission.student ?? '').toLowerCase();
+    const integrity = assessIntegrity({
+      questionIds: def?.questions.map((q) => q.id) ?? [],
+      answers: submission.answers,
+      self: { email: self, key: keyFor(self) },
+      others: TOY_ACCOUNTS.map((a) => ({ email: a.email.toLowerCase(), key: keyFor(a.email) })),
+    });
     const record: SubmissionRecord = {
       assignmentId: id,
       attempt: all.length + 1,
       submittedAt: submission.submittedAt,
       submission,
       result,
+      integrity,
     };
     try {
       localStorage.setItem(KEY_PREFIX + id, JSON.stringify([...all, record]));

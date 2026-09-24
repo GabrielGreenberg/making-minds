@@ -389,7 +389,94 @@ export interface SubmissionData {
     responseText?: string;
     /** Fill-in questions: one typed answer per blank, in the spec's order. */
     fillAnswers?: string[];
+    /** The question's signed editing record (task 034), copied from the
+     *  workbook; checked at submit, never graded. */
+    provenance?: QuestionProvenance;
   }[];
+}
+
+// ─── Provenance and integrity (task 034) ─────────────────────────
+// app/src/provenance/ (ids.ts, trace.ts, integrity.ts). Integrity is a set of
+// flags TO LOOK AT, never a verdict: it sits beside `result` and never
+// changes a score, and students never see it (server/src/sanitize.ts).
+
+/**
+ * One question's signed editing record: aggregates only, never a keystroke
+ * log. Kept BESIDE the answer (QuestionCircuit.provenance), never inside the
+ * text, and re-signed by the store at every edit (store.ts recordEdit) —
+ * never at save time, which would launder an injected save.
+ */
+export interface QuestionProvenance {
+  v: 1;
+  /** Edit actions (canvas history steps, undo/redo, text changes). */
+  edits: number;
+  /** Active editing time: gaps between edits summed, each capped at 60 s. */
+  activeMs: number;
+  /** Characters inserted, in total and in the largest single insertion. */
+  textIns: number;
+  maxTextIns: number;
+  /** Components added (add, box placement, paste), in total and in the
+   *  largest single action. */
+  compAdded: number;
+  maxCompIns: number;
+  /** Times the text was found changed outside the editor (sticky). */
+  outside: number;
+  /** What the question already held when its record began (legacy work). */
+  base?: { c: number; t: number };
+  /** 64-bit digest of the answer text (responseText + fillAnswers), hex. */
+  td: string;
+  /** HMAC under the mint key over the question id and every field; '' when
+   *  no key was loaded. */
+  sig: string;
+}
+
+export type IntegrityFlagCode =
+  | 'ids-other'        // ids minted under a classmate's key
+  | 'ids-unbound'      // ids not minted in this student's editor for this assignment
+  | 'text-other'       // the text's stamp is a classmate's
+  | 'text-mismatch'    // the text differs from its own stamp
+  | 'text-unsigned'    // text with no valid stamp
+  | 'outside'          // the text was changed outside the editor, then edited
+  | 'record-other'     // the editing record is a classmate's
+  | 'record-missing'   // content with no valid editing record
+  | 'one-piece-text'   // most of the text arrived in one insertion
+  | 'too-fast'         // text entered faster than a person types
+  | 'one-piece-circuit'// most of the circuit arrived in one in-app paste
+  | 'unaccounted'      // more content than the record's insertions explain
+  | 'one-save';        // most of the work appeared between two saves
+
+export interface IntegrityFlag {
+  code: IntegrityFlagCode;
+  /** Plain words for the instructor, phrased as something to look at. */
+  detail: string;
+}
+
+export interface QuestionIntegrity {
+  questionId: number;
+  ids: {
+    total: number;
+    self: number;
+    unbound: number;
+    legacy: number;
+    /** Ids minted under another person's key, by email. */
+    others: { email: string; count: number }[];
+  };
+  text: 'none' | 'self' | 'other' | 'mismatch' | 'unsigned' | 'legacy';
+  /** The editing record's signer. */
+  record: 'none' | 'self' | 'other' | 'invalid';
+  /** When `text` or `record` is 'other': whose. */
+  from?: string;
+  /** The record's aggregates when it is this student's own. */
+  trace?: Omit<QuestionProvenance, 'v' | 'td' | 'sig'>;
+  flags: IntegrityFlag[];
+}
+
+/** The integrity summary stored on a submission (instructor-only). */
+export interface SubmissionIntegrity {
+  v: 1;
+  questions: QuestionIntegrity[];
+  /** How many questions carry at least one flag. */
+  flagged: number;
 }
 
 // ─── Autograding results ─────────────────────────────────────────
@@ -473,6 +560,9 @@ export interface SubmissionRecord {
   submittedAt: string;     // ISO timestamp (canonical)
   submission: SubmissionData;
   result?: SubmissionResult; // autograde computed at receipt (see SubmissionStore)
+  /** Provenance check computed at receipt (task 034) — instructor-only,
+   *  stripped from every student copy, never part of the score. */
+  integrity?: SubmissionIntegrity;
 }
 
 // ── Platform feedback (notes/todos.md item 9) ──────────────────────────────
@@ -531,6 +621,8 @@ export interface QuestionCircuit {
    *  accidental edits, toggled from the question workspace. Absent/false =
    *  unlocked (back-compat with saves that predate this). */
   done?: boolean;
+  /** The signed editing record (task 034); absent before the first edit. */
+  provenance?: QuestionProvenance;
 }
 
 /** A student's in-progress work for one assignment — the persisted payload. */
@@ -569,6 +661,9 @@ export interface WorksheetData {
 
 export interface WorkbookData {
   formatVersion: 2;
+  /** The integrity notice (task 034, provenance/notice.ts) — written on
+   *  export, ignored on import. */
+  notice?: string;
   metadata: {
     title: string;
     author: string;

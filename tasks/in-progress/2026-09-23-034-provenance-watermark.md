@@ -143,3 +143,188 @@ be sealed in the browser, because any lock's key lives in the browser.
   prints.
 
 ## Progress log
+
+### 2026-09-23 — implemented (work loop, Implement stage)
+**Built.** One minting seam, `app/src/provenance/ids.ts`: every component, wire, box and tab id
+comes from `mintId(scope)` — an ordinary v4 UUID whose 122 free bits are a 74-bit nonce and a
+48-bit tag, HMAC(mint key, 'mm-id-v1' ‖ nonce). The mint key is HMAC(secret, ['mm-mint-v1',
+email, assignmentId]); the server derives it (MM_MINT_SECRET, else a secret generated once and
+kept in `server_meta`) and returns it with GET /api/workbooks/:id; the client holds it in module
+memory only (`setMintKey` in `store.openAssignment` under the seq guard, `clearMintKeys` in
+`resetForPrincipal`); local mode derives it from `DEV_MINT_SECRET` (no /api). Sandbox and
+key-less mints are all-random. The crypto is a synchronous pure SHA-256/HMAC
+(`provenance/sha256.ts`, WebCrypto is async-only); `uuid` is imported nowhere (grep-gated; the
+dependency itself is left in package.json). Paste re-mints recursively under the TARGET scope
+(BOXED internals and their wires; `boxedCircuitId` untouched); undo/redo, confirmBox, box
+instances and journal replay keep ids. Each question carries a signed editing record
+(`QuestionCircuit.provenance`, `provenance/trace.ts`): edits, active time (gaps capped at 60 s),
+characters inserted (total, largest), components added (total, largest), `outside` (sticky),
+`base` and a 64-bit text stamp `td` beside the text — advanced and re-signed by `store.ts
+recordEdit` at EDIT time (pushHistory with the components it adds, undo/redo, the two text
+setters), never at save; a record that fails verification is not continued (restart with
+`base`). The live record is `questionTrace`; every fold/load goes through ONE
+`foldLiveQuestion` / `loadQuestionFields` (5 folds + 3 loads replaced). The server keeps a
+coarse per-save history (`workbook_saves`, sizes only, deduplicated) and, on the boot that
+creates `legacy_content`, snapshots every existing workbook's ids and per-question sizes as
+legacy. At submit, `assessIntegrity` (`provenance/integrity.ts`, pure, no grader) checks every
+id and record against the student's key, then every known email's (roster ∪ workbook owners),
+and stores `submissions.integrity` beside `result` (never in it); `sanitize.ts studentRecord`
+strips it from every student copy; `LocalSubmissionStore` does the same with the toy accounts'
+dev keys. Flags: ids-other (names the classmate), ids-unbound, text-other / text-mismatch /
+text-unsigned, outside, record-other, record-missing, one-piece-text, one-piece-circuit,
+unaccounted, one-save — each worded "to look at". Gradebook: a quiet ⚑ with the details as its
+title on the question cell, and an "Integrity — to look at, not a verdict" list in the attempt
+detail (existing classes only). Notices (`provenance/notice.ts`): the PROD-only console banner,
+`notice` in exported workbook / worksheet / submission files (ignored on import), the bundle's
+leading `/*! … */` comment (vite `generateBundle`, after minification), and one
+`submitConfirmMessage` for the three Submit buttons carrying the disclosure sentence.
+
+**Settled from the task file (the loop session; open to Gabriel's revision):** an in-app paste
+of the student's own work between their own questions or assignments (allowed by 033) is NOT
+exempt from "arrived in one piece". Done-when 8 gives no exemption, and the Correction paragraph
+makes a paste through a patched app (DevTools Local Overrides) exactly the route the trace
+backstops, so exempting pastes would reopen it. The flag's detail says the circuit "arrived in
+one in-app paste (the student's own work carried from another question or assignment?)", so an
+instructor can tell it from an out-of-app transplant, whose ids name someone else or nobody.
+Flags are never verdicts and never change a score.
+
+**Policies page (draft for Gabriel to put on the website):** "To protect the integrity of
+everyone's work, the platform checks that submitted work was created in your own editor. These
+checks never change a grade by themselves; anything they notice is looked at by an instructor,
+who will talk with you before drawing any conclusion." (The submit dialog carries the first
+sentence; the mechanism is not disclosed.)
+
+**Browser pass (remote mode, own scratch API + dev server, dev auth):** as john.doe, a component
+placed by a real canvas click and components added through the store all verified under the
+server-derived key; a sandbox mint did not. Setting the Problem 6 answer box from the console
+(native value setter + input event) produced a VALID stamp with maxTextIns = 173 of 173 → the
+gradebook shows one-piece-text; text typed key by key in Problem 7 was not flagged. The Submit
+confirm carried the disclosure sentence. B's workbook set to A's with curl and submitted →
+ids-other / text-other / record-other naming john.doe; B's console-injected random-id circuit →
+ids-unbound + record-missing. The student POST response and GET carried no `integrity`. The
+gradebook showed ⚑ tags and the wrapped integrity list. The production build (vite preview)
+printed the banner, began with the `/*!` notice, and had no `window.__store`.
+
+**Observed, for Gabriel:** (1) one-save fires on an honest but unbroken burst of editing,
+because autosave waits for a 1.5 s pause — seen when a 5-component circuit was built in one
+scripted batch. Kept as specified; its detail now carries the record's own account (edits,
+active seconds, largest single insertion) for the instructor to weigh. (2) A student whose
+first remote login uploads local-prototype work (`migrateLocal`) brings dev-signed records; the
+first edit restarts them, and that content reads "unaccounted" unless the legacy snapshot backs
+it. Pilot-only.
+
+**For task 031:** its flags slice (viii) must read `SubmissionRecord.integrity` (per question
+`flags[]`, `ids`, `text`, `record`, `trace`), which exists only on instructor copies.
+
+**Hardening beyond the plan:** attribution searches (one MAC per known key) are capped at
+`MAX_ATTRIBUTION_SEARCHES` = 2000 ids per submission (~0.4 s at 80 keys); past it an id that is
+not the student's own counts as unbound, so a padded submission cannot tie up the server.
+`legacy_content` stores each workbook's per-question sizes (`summary`) rather than a bare list
+of text question ids: the text ids are the questions with t > 0, and the sizes also let the
+one-save series start from the legacy content and bound what a record's `base` may claim.
+
+**Pins.** New `app/tools/provenanceCheck.ts` (in `npm run check`): [sha256/hmac] (≡ node:crypto,
+RFC 4231), [mint], [attribution] (incl. the search cap), [store], [stamp], [trace], [history],
+[never scores], [grep gate], [notices]. `serverCheck` (mint key per person/assignment, stable
+across a restart with no MM_MINT_SECRET, deduplicated save history, the transplant named,
+sandbox ids unbound, no `integrity` on student copies pre/post release, legacy DB read as
+legacy), `parityCheck` (provenance never grades; review preserves `integrity`), `navResetCheck`
+(principal change drops keys + record; one fold/load; P1 → P2 → P1 byte-equal),
+`remoteStoreCheck` (`loadMintKey` ≡ the server's derivation; grader gate over provenance/).
+
+**Gates (exit codes):** app tsc 0 · server typecheck 0 · app build 0 · app `npm run check` 0 ·
+server `npm run check` 0 · check-budgets 0 (CLAUDE.md 39966 B, from 39973).
+
+### 2026-09-23 — review fixes (work loop, Fix stage)
+**Settled (confirmed from the task file by the loop session; open to Gabriel's revision):** an
+in-app paste of the student's own work between their own assignments is NOT exempt from
+"arrived in one piece" — flagged, its detail naming "one in-app paste" so an instructor can tell
+it from an out-of-app transplant (Done-when 8 gives no exemption; the Correction paragraph makes
+a paste through a patched app exactly what the trace backstops). Never a verdict, never a score.
+
+**Fixed (seven review findings):**
+- *Machine-speed "typing".* A new `too-fast` flag: the characters of a record's smaller
+  insertions (all but the largest, which one-piece-text judges) per second of active editing
+  above `MAX_TYPING_CHARS_PER_SEC` = 25 (300 wpm), once ≥ 40 were typed. A zero-delay script
+  entering a paragraph one character per input event is now flagged; 100 ms a character is not.
+- *One save = one burst.* Autosave keeps its 1.5 s debounce but never puts a save off more than
+  `AUTO_SAVE_MAX_WAIT` = 10 s after the first unsaved change (`store.ts autoSaveDelay`), so
+  "appeared between two saves" means within one ~10 s burst, not a whole unbroken session. This
+  supersedes "kept as specified" in Observed (1) above. The [history] pin now uses a
+  machine-speed build, not an honest one.
+- *Legacy box libraries.* The one-time legacy snapshot takes ids through the new pure
+  `provenance/ids.ts idsOfWorkbook`: every circuit plus the internals of `boxLibrary` and the
+  older per-question `confirmedBoxes`, so a pre-watermark library box placed later is legacy,
+  never unbound.
+- *The graded answer is the assessed one.* `assessIntegrity` takes the assignment's
+  `questionIds` and assesses one answer per question, the LAST for its id (the grader's Map).
+  A decoy first answer can no longer hide the graded transplant's ⚑; ids the assignment lacks
+  are never read (the gradebook's duplicate React key goes with it).
+- *Bounded work.* Following from that, record attribution and the one-save series run once per
+  assignment question, whatever the submission's size: 60,000 padded answers, 80 keys and 2,000
+  saves assess in milliseconds (pinned). This makes true the "cannot tie up the server" claim in
+  "Hardening" above, which was true then only for id searches.
+- *Undo is not arrival.* A text box's own undo or redo (a change back to a value the field held
+  recently in this window, `store.ts textInsertion`, 50 per field) inserts nothing new. The
+  one-save check measures each save against the most any earlier save held (a high-water mark),
+  so delete, save, undo is not a jump.
+- *One fetch per open.* `WorkbookStore.loadMintKey` became `loadForOpen(id, email)` →
+  `{ state, mintKey }`: remotely ONE GET /api/workbooks/:id (pinned by counting requests in
+  `remoteStoreCheck`); `openAssignment` reads both from it.
+
+**Pins added.** provenanceCheck [attribution] (last answer wins; foreign ids never read; the
+padded submission; `idsOfWorkbook`), [trace] (too-fast at 0 and 30 ms a character, not at 100 ms,
+not stacked on one-piece-text; the store's undo restore), [history] (high-water; the max-wait
+pure and in the store with a simulated 10 s unbroken burst); serverCheck (the legacy snapshot
+holds the library internals; a library box placed later reads as the student's own instance with
+legacy internals); remoteStoreCheck (`loadForOpen`, one request).
+
+**Gates (exit codes, after the fixes):** app tsc 0 · app build 0 · app `npm run check` 0 ·
+server typecheck 0 · server `npm run check` 0 (CLAUDE.md unchanged, 39966 B).
+
+### 2026-09-23 — implemented (work loop)
+**Built.** Every id the editor makes (components, wires, boxes, tabs) now comes from one
+`mintId(scope)` (`app/src/provenance/ids.ts`): an ordinary-looking v4 UUID that, inside an
+assignment, carries a 48-bit MAC under a per-(student, assignment) key the server derives from
+MM_MINT_SECRET and hands over with the workbook fetch (memory only; local mode uses a dev key;
+sandbox mints are key-less). Answer text carries a stamp beside it and each question a signed
+editing record (edits, active time, largest insertion, components added). The server keeps a
+coarse per-save size history and, at submit, `assessIntegrity` stores an instructor-only
+`integrity` summary beside the grade: whose ids and stamps these are (a classmate named),
+unbound or legacy, plus "arrived in one piece" / too-fast / one-save flags — shown in the
+gradebook as a quiet ⚑ "to look at, not a verdict"; it never changes a score. Notices: PROD
+console banner, `notice` in exported files, `/*!` bundle comment, the disclosure sentence in
+the three Submit dialogs. Settled from the task file (open to Gabriel's revision): an in-app
+paste of one's own work is flagged, not exempt, and its detail says "one in-app paste".
+
+**Pins.** `app/tools/provenanceCheck.ts` (new, in `npm run check`): [sha256/hmac] [mint]
+[attribution] [store] [stamp] [trace] [history] [never scores] [grep gate] [notices];
+`serverCheck` (key per person/assignment and stable across restarts, save history, transplant
+named, sandbox unbound, no `integrity` on student copies pre/post release, legacy incl. box
+libraries); `parityCheck` (provenance never grades; review keeps `integrity`); `navResetCheck`
+(principal change drops keys + record; one fold/load); `remoteStoreCheck` (`loadForOpen` ≡ the
+server's key, one request; grader gate over provenance/).
+
+**Gates (exit codes):** app tsc 0 · app build 0 · app `npm run check` 0 · server typecheck 0 ·
+server `npm run check` 0.
+
+**Review:** 7 findings fixed (too-fast flag; autosave max wait 10 s; legacy box-library ids;
+last answer per question assessed; bounded assessment work; undo is not arrival; one fetch per
+open), 0 skipped. Nits left alone: the provenanceCheck "sandbox keeps no trace" pin is
+vacuous (`assignment === null` holds by definition); CLAUDE.md's shortened
+`designs/remote-stores.md` should read `docs/buildout/designs/remote-stores.md`. (The
+double-fetch nit is already gone with `loadForOpen`.)
+
+**Owed.** Loop session: the browser pass in local mode (John Doe: honest HW1 P1 submit → no
+tag; console-injected sandbox circuit → "not created in this assignment's editor" tag; tag look
+and wrapping at desktop and 375 px, theme vocabulary only), remote mode (scratch API :8199 +
+:5174: A's workbook PUT into B's → gradebook names A; answer box set from the console → stamp
+valid, trace flags one insertion; honest typed answer unflagged), and the production build
+(`/*!` notice at the head of `dist/assets/index-*.js`, banner under `vite preview`, none on the
+dev server, disclosure in all three Submit dialogs). Gabriel (ssh, human-run): after
+`deploy/release.sh`, confirm `GET /api/workbooks/<id>` returns `mintKey` and the secret persisted
+(`server_meta` one row, or MM_MINT_SECRET in the unit); never rotate it mid-term; land and release
+before anyone submits HW1 (due 2026-10-04). Gabriel (website): post the Policies-page sentence
+above and confirm assumptions (a)–(c).
+
+**Next step:** loop session: the owed visual/browser checks above, then land per PROFILE §5.

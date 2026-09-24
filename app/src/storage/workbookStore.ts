@@ -10,6 +10,7 @@
 // lands the localStorage write.
 
 import type { AssignmentData, AssignmentState, ConfirmedBoxDef, QuestionCircuit } from '../types';
+import { deriveMintKey, DEV_MINT_SECRET } from '../provenance/ids';
 
 export interface WorkbookStore {
   loadAssignmentState(id: string): Promise<AssignmentState | null>;
@@ -23,6 +24,15 @@ export interface WorkbookStore {
     state: AssignmentState,
     opts?: { keepalive?: boolean },
   ): Promise<void>;
+  /**
+   * Opening an assignment: the saved state (as `loadAssignmentState`) AND this
+   * person's mint key (hex) for it (task 034, provenance/ids.ts), in ONE
+   * fetch. The server derives the key from its secret and returns it with the
+   * workbook (the session names the person; `email` is ignored); local mode
+   * derives it from the dev secret, with no /api call. `mintKey` is null when
+   * there is none (a visitor; an older server).
+   */
+  loadForOpen(id: string, email: string | null): Promise<{ state: AssignmentState | null; mintKey: string | null }>;
 }
 
 /** Fresh, empty canvas state for one question. */
@@ -121,6 +131,13 @@ class LocalWorkbookStore implements WorkbookStore {
     } catch {
       // localStorage full or unavailable — silent fail (matches sandbox autosave).
     }
+  }
+
+  async loadForOpen(id: string, email: string | null): Promise<{ state: AssignmentState | null; mintKey: string | null }> {
+    return {
+      state: await this.loadAssignmentState(id),
+      mintKey: email ? deriveMintKey(DEV_MINT_SECRET, email, id) : null,
+    };
   }
 }
 
