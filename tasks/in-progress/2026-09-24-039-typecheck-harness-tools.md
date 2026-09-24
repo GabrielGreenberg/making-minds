@@ -99,3 +99,15 @@ deliberately wrong literal in a tool fails it (neuter test, reverted).
   "Harness-tool type-check" step log (server `npm ci` on node 20 only warns EBADENGINE).
   No visual check owed; nothing owed to Gabriel.
 - **NEXT STEP:** loop session: run the owed neuter tests, then land per PROFILE §5.
+
+### 2026-09-24 — neuter test and land (work loop)
+- **Neuter test (loop session, reverted):** removed `tapeCellsUsed: 0` from turbotCheck's
+  `mkRun`. `npm run typecheck:tools` then exited **2** with "tools/turbotCheck.ts(920,26):
+  error TS2741: Property 'tapeCellsUsed' is missing…". After restoring from a copy it exited
+  **0**, and the tree is clean apart from the comment fix below.
+- **Fixed here:** the review nit. `tsconfig.tools.json`'s header said the type-check runs
+  "first in `npm run check`"; it runs after the budget guard and the portability gate, and in
+  CI before Build. The other nit (the CLAUDE.md CI bullet) was already fixed in the Fix stage.
+- **Owed after push:** the CI log's "Harness-tool type-check" step passes on a fresh Linux
+  runner. That is checked when this merge is pushed.
+- Landed via a merge into `main`.

@@ -2,7 +2,8 @@
 // type-checking and tsconfig.app.json includes only src/, so a tool could drift
 // from the types it tests (a stale result literal, a dropped argument) and still
 // "pass". This program is the app's own strictness over src/ AND tools/.
-// `npm run typecheck:tools` runs it (first in `npm run check`, and in CI);
+// `npm run typecheck:tools` runs it (in `npm run check` after the budget guard and
+// the portability gate, and in CI before Build);
 // portabilityCheck's [type-check coverage] pins that every tool is in it.
 // Deliberately NOT in tsconfig.json's references: `tsc -b` (npm run build) would
 // then need server/node_modules (remoteStoreCheck boots the real server), and
