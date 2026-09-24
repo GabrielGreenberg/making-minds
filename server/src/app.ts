@@ -31,10 +31,13 @@
 //                                              coarse per-save history)
 //   POST   /api/assignments/:id/submissions    submit → server autogrades → record
 //                                              (+ the integrity check, instructor-only)
-//   GET    /api/assignments/:id/submissions    student: own attempts (no grades until
+//   GET    /api/assignments/:id/submissions    the caller's own attempts, any role
+//                                              (task 037) — student: no grades until
 //                                              released, then scores only; never
-//                                              integrity); instructor: all attempts,
-//                                              full detail
+//                                              integrity; instructor: their own, full
+//   GET    /api/assignments/:id/submissions/all
+//                                              instructor: every student's attempts,
+//                                              full detail (the gradebook feed)
 //   POST   /api/assignments/:id/submissions/:attempt/review
 //                                              instructor: manual verdict on a pending
 //                                              open question — {student, questionId,
@@ -533,16 +536,23 @@ export function createApp(config: ServerConfig, db: Db) {
     });
   });
 
+  // The caller's OWN attempts, for every role (task 037): an instructor's
+  // Student view is a student-side read, so it sees only the instructor's
+  // own attempts. Everyone's is the gradebook's route below.
   app.get('/api/assignments/:id/submissions', auth, (req, res) => {
+    const own = db.listSubmissions(String(req.params.id), req.user!.email);
     if (req.user!.role === 'instructor') {
-      res.json({ records: db.listSubmissions(String(req.params.id)) });
+      res.json({ records: own });
       return;
     }
     const released = db.getGradesReleased(String(req.params.id));
-    const own = db.listSubmissions(String(req.params.id), req.user!.email);
     // The full assignment fills older results' case separations (sanitize.ts).
     const assignment = db.getAssignment(String(req.params.id)) ?? undefined;
     res.json({ records: own.map((r) => studentRecord(r, released, assignment)) });
+  });
+
+  app.get('/api/assignments/:id/submissions/all', auth, requireInstructor, (req, res) => {
+    res.json({ records: db.listSubmissions(String(req.params.id)) });
   });
 
   // ── manual review (instructor) ─────────────────────────────────

@@ -825,7 +825,9 @@ interface AppState {
   exportProject: () => string;
   // Submission export (null when no assignment is loaded)
   exportSubmission: (student?: string) => string | null;
-  // Latest recorded submission per assignment id (reactive; for status badges).
+  // This principal's OWN latest submission per assignment id (reactive; for
+  // status badges, the frozen view, the Grades tab) — never anyone else's,
+  // an instructor's Student view included (the seam's Own reads, task 037).
   // Starts empty; hydrated from the submission seam via hydrateSubmissions().
   submissions: Record<string, SubmissionRecord>;
   // Refresh `submissions` from the seam. Called on auth-ready (App mount) —
@@ -1488,10 +1490,12 @@ export const useStore = create<AppState>()((set, get) => ({
   submissions: {},
 
   hydrateSubmissions: async () => {
+    // Whose submissions: captured with the epoch, never reread after an await.
     const epoch = principalEpoch;
+    const who = currentPrincipal;
     const assignments = await listAssignments();
     const latests = await Promise.all(
-      assignments.map((a) => submissionStore.getLatest(a.id)),
+      assignments.map((a) => submissionStore.getLatestOwn(a.id, who)),
     );
     // The principal changed while this was in flight: these are the previous
     // person's submissions.
@@ -2170,7 +2174,8 @@ export const useStore = create<AppState>()((set, get) => ({
       // map: that hydration (App.tsx's mount effect) races this open on a
       // fresh deep link, and the freeze check below needs THIS assignment's
       // latest submission to be accurate the instant the question loads.
-      submissionStore.getLatest(id),
+      // Own only: a previous principal's resolve is dropped by the seq guard.
+      submissionStore.getLatestOwn(id, currentPrincipal),
     ]);
     // Superseded while in flight — drop this resolve (see the AppState note).
     // A stale resolve registers no key either: it may be a previous
@@ -2382,6 +2387,7 @@ export const useStore = create<AppState>()((set, get) => ({
   viewSubmission: async (attempt) => {
     // This call supersedes any lookup still in flight (viewSubmissionSeq).
     const viewSeq = ++viewSubmissionSeq;
+    const who = currentPrincipal;
     const a = get().assignment;
     if (!a) return attempt == null;
     // The record to show; null = the live workbook — except while frozen,
@@ -2397,11 +2403,13 @@ export const useStore = create<AppState>()((set, get) => ({
       // is whatever was fetched when it began.
       target = [s.submissions[a.id], s.viewingSubmission].find((r) => r?.attempt === attempt) ?? null;
       if (!target) {
-        const all = await submissionStore.listSubmissions(a.id);
+        // Own attempts only: attempt numbers count per student, and another
+        // person's attempt k is never "yours" (task 037).
+        const own = await submissionStore.listOwn(a.id, who);
         // Superseded (a newer view, open, Home or principal change — on
         // this assignment or another): apply nothing.
         if (viewSeq !== viewSubmissionSeq || get().assignment?.id !== a.id) return true;
-        target = all.find((r) => r.attempt === attempt) ?? null;
+        target = own.find((r) => r.attempt === attempt) ?? null;
         if (!target) return false;
       }
     }

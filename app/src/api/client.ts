@@ -7,7 +7,7 @@
 //
 //   RemoteWorkbookStore   → getWorkbook / getWorkbookFull / putWorkbook
 //   RemoteAssignmentStore → listAssignments / getAssignment / putAssignment / deleteAssignment
-//   RemoteSubmissionStore → submitAssignment / listSubmissions / reviewSubmission
+//   RemoteSubmissionStore → submitAssignment / listSubmissions / listAllSubmissions / reviewSubmission
 //   remote auth           → login / logout / me
 //
 // Configuration: VITE_API_BASE (e.g. "https://api.phil133.example.edu") set at
@@ -444,11 +444,23 @@ export async function submitAssignment(
   return record;
 }
 
-/** Student: own attempts. Instructor: every student's attempts (gradebook). */
+/**
+ * The caller's own attempts, any role — the session names the person (an
+ * instructor's Student view sees only the instructor's own; task 037).
+ */
 export async function listSubmissions(assignmentId: string): Promise<SubmissionRecord[]> {
   const { records } = await request<{ records: SubmissionRecord[] }>(
     'GET',
     `/assignments/${encodeURIComponent(assignmentId)}/submissions`,
+  );
+  return records;
+}
+
+/** Instructor only: every student's attempts, full detail (the gradebook). */
+export async function listAllSubmissions(assignmentId: string): Promise<SubmissionRecord[]> {
+  const { records } = await request<{ records: SubmissionRecord[] }>(
+    'GET',
+    `/assignments/${encodeURIComponent(assignmentId)}/submissions/all`,
   );
   return records;
 }

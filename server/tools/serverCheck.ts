@@ -9,6 +9,8 @@
 //   workbook save + reload round-trip
 //   submit correct + incorrect sample circuits → server-side grades
 //   student sees scores but no per-case detail; instructor sees everything
+//     through the gradebook's /submissions/all (403 for a student), while the
+//     plain /submissions is the caller's own for every role (task 037)
 //   authorization: student PUT assignment → 403, no token → 401
 //   provenance (task 034): the workbook fetch's mint key (per person, per
 //     assignment, stable across restarts with no MM_MINT_SECRET), the
@@ -264,10 +266,36 @@ check(
   ownHidden.json.records.length === 2 && ownHidden.json.records.every((r) => r.result === undefined),
 );
 
-const all = await api<{ records: SubmissionRecord[] }>(
+// Task 037: the plain route is the caller's OWN attempts for every role —
+// an instructor's Student view must never show a student's attempt as theirs.
+const instructorOwn = await api<{ records: SubmissionRecord[] }>(
   'GET',
   `/assignments/${SAMPLE_ASSIGNMENT_ID}/submissions`,
   { token: iTok },
+);
+check(
+  "instructor GET /submissions is the instructor's own attempts only (none yet)",
+  instructorOwn.status === 200 &&
+    instructorOwn.json.records.every((r) => r.submission.student === instructor.email.toLowerCase()) &&
+    instructorOwn.json.records.length === 0,
+);
+const allForbidden = await api(
+  'GET',
+  `/assignments/${SAMPLE_ASSIGNMENT_ID}/submissions/all`,
+  { token: sTok },
+);
+check('student GET /submissions/all → 403', allForbidden.status === 403);
+
+const all = await api<{ records: SubmissionRecord[] }>(
+  'GET',
+  `/assignments/${SAMPLE_ASSIGNMENT_ID}/submissions/all`,
+  { token: iTok },
+);
+check(
+  "instructor GET /submissions/all is everyone's: the student's two attempts",
+  all.status === 200 &&
+    all.json.records.length === 2 &&
+    all.json.records.every((r) => r.submission.student === student.email.toLowerCase()),
 );
 const iFirst = all.json.records.find((r) => r.attempt === 1)?.result;
 const iSecond = all.json.records.find((r) => r.attempt === 2)?.result;
@@ -447,7 +475,7 @@ check('review of a non-pending question → 404', reviewNotPending.status === 40
 
 const allReviewed = await api<{ records: SubmissionRecord[] }>(
   'GET',
-  `/assignments/${SAMPLE_ASSIGNMENT_ID}/submissions`,
+  `/assignments/${SAMPLE_ASSIGNMENT_ID}/submissions/all`,
   { token: iTok },
 );
 const storedVerdict = allReviewed.json.records
@@ -693,7 +721,7 @@ check('saving again overwrites the single row (not a second one)',
     body: { answers: [{ questionId: q1, circuit: sandboxCircuit }] },
   });
 
-  const iRecs = (await api<{ records: SubmissionRecord[] }>('GET', `/assignments/${PROV_ID}/submissions`, { token: iTok })).json.records;
+  const iRecs = (await api<{ records: SubmissionRecord[] }>('GET', `/assignments/${PROV_ID}/submissions/all`, { token: iTok })).json.records;
   const q1Of = (r: SubmissionRecord | undefined) => r?.integrity?.questions.find((x) => x.questionId === q1);
   const aRec = iRecs.find((r) => r.submission.student === aEmail);
   const bRecs = iRecs.filter((r) => r.submission.student === bEmail);

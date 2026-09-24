@@ -18,7 +18,9 @@
 //     are the server's word (app.ts stamps both), so whatever the client put
 //     in `submission.student`/`submittedAt` is deliberately dropped. Grading
 //     happens on the server, on receipt; pre-release, a student's returned
-//     record carries no `result` at all.
+//     record carries no `result` at all. The Own reads ignore their `email`:
+//     the session names the person, for every role; `listAll` is the
+//     instructor-only /submissions/all.
 //
 // GRADER-FREE ZONE: this module (with backend.ts and api/client.ts) must not
 // import the engine grader — remote students must never grade client-side.
@@ -54,6 +56,7 @@ import {
   setVisible as apiSetVisible,
   submitAssignment as apiSubmitAssignment,
   listSubmissions as apiListSubmissions,
+  listAllSubmissions as apiListAllSubmissions,
   reviewSubmission,
   submitFeedback,
   listFeedback,
@@ -139,15 +142,21 @@ class RemoteSubmissionStore implements SubmissionStore {
     return apiSubmitAssignment(id, submission.answers);
   }
 
-  listSubmissions(id: string): Promise<SubmissionRecord[]> {
+  listOwn(id: string, _email: string | null): Promise<SubmissionRecord[]> {
+    // The session names the person (any role), so the email is not sent —
+    // the WorkbookStore.loadForOpen precedent.
     return apiListSubmissions(id);
   }
 
-  async getLatest(id: string): Promise<SubmissionRecord | null> {
-    // Students receive only their own attempts, in order — the last one is
-    // the graded latest (mirrors the local store's read).
-    const all = await this.listSubmissions(id);
-    return all.length ? all[all.length - 1] : null;
+  async getLatestOwn(id: string, email: string | null): Promise<SubmissionRecord | null> {
+    // Own attempts arrive in order — the last one is the latest (mirrors the
+    // local store's read).
+    const own = await this.listOwn(id, email);
+    return own.length ? own[own.length - 1] : null;
+  }
+
+  listAll(id: string): Promise<SubmissionRecord[]> {
+    return apiListAllSubmissions(id);
   }
 
   recordManualReview(

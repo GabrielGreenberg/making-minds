@@ -24,7 +24,7 @@ export function InstructorDashboard() {
   } = useAsyncValue(async () => {
     const summaries = await listAssignments();
     const submissionLists = await Promise.all(
-      summaries.map((a) => submissionStore.listSubmissions(a.id)),
+      summaries.map((a) => submissionStore.listAll(a.id)),
     );
     return summaries.map((a, i) => ({ ...a, submissionCount: submissionLists[i].length }));
   }, []);
