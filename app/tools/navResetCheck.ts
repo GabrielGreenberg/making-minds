@@ -45,6 +45,11 @@
 // the wire's toggle, the Mac ctrl-click menu is swallowed only after a gesture
 // ran, modifiers are tested before the triple-click, and the Rotate button
 // shows its hint.
+// [turbot goal flash] (task 025): the step that moves the turbot onto a goal
+// (from off it) carries the goal-reached event; a Run holds 2 ticks of its
+// one interval (Step never), Pause drops the hold, Reset and an edit clear
+// both; the Map's pulse is pinned in the source (≤ 600 ms, reduced-motion
+// off, the live Map only, no timer).
 
 // The store registers window/document listeners at import time (and must NOT
 // read the sandbox then — [no load at import]), so install minimal shims
@@ -82,9 +87,9 @@ backing.set(VISITOR_KEY, JSON.stringify({
   tabCircuits: { 'import-tab': { components: [{ id: 'import-sentinel', type: 'AND', x: 0, y: 0 }], wires: [], boxes: [] } },
 }));
 
-const { useStore, selectTurbotArena, selectAssignmentFrozen, selectQuestionLocked, showsSubmission } =
+const { useStore, selectTurbotArena, selectAssignmentFrozen, selectQuestionLocked, showsSubmission, selectTurbotGoalHit, TURBOT_GOAL_HOLD_TICKS } =
   await import('../src/store');
-const { buildSampleAssignment, ccCorrect, scCorrect, fsmCorrect, tmCorrect, turbotCorrect, turbotTmCorrect, SAMPLE_ASSIGNMENT_ID } =
+const { buildSampleAssignment, ccCorrect, scCorrect, fsmCorrect, tmCorrect, turbotCorrect, turbotFsmCorrect, turbotTmCorrect, SAMPLE_ASSIGNMENT_ID } =
   await import('../src/devData/sampleData');
 const { localAssignmentStore } = await import('../src/storage/AssignmentStore');
 const { backendMode, workbookStore, submissionStore } = await import('../src/storage/backend');
@@ -125,7 +130,7 @@ function checkAllSimFresh(label: string) {
     s.tmTimeStep === 1 && s.tmHistory.length === 0 && !s.tmRunning && !s.tmHalted);
   check(`${label}: turbot slice fresh`,
     s.turbotHistory.length === 0 && !s.turbotRunning && !s.turbotHalted &&
-    s.turbotStopReason === null);
+    s.turbotStopReason === null && s.turbotLastEvent === null && s.turbotHoldTicks === 0);
   // A graded case loaded into the run ("Run this input") and the arena it
   // put on the Map belong to the canvas they were loaded on.
   check(`${label}: no graded case loaded, primary arena`, s.loadedCase === null && s.turbotCaseIndex === 0);
@@ -162,6 +167,8 @@ function plantSimJunk() {
     turbotHistory: [{ t: 1, kind: 'external', input: 'E', action: '↑', x: 0, y: 0, facing: 'N' }],
     turbotHalted: true,
     turbotStopReason: 'motor',
+    turbotLastEvent: { kind: 'goal-reached', t: 1 },
+    turbotHoldTicks: 2,
     turbotCaseIndex: 2,
     loadedCase: { kind: 'value', questionId: 1, caseIndex: 3, attempt: 1, gradedKey: null, input: [1, 2], recorded: { pass: false } },
     selectedTool: 'AND',
@@ -1157,6 +1164,181 @@ console.log('[edit during run]');
   useStore.getState().removeTab(useStore.getState().activeTabId);
   await flushTimers();
   useStore.getState().goHome();
+}
+
+// ═════ The goal-reached cue and the Run's hold (task 025) ═══════
+
+console.log('[turbot goal flash]');
+{
+  await useStore.getState().openAssignment(SAMPLE_ASSIGNMENT_ID);
+  // Q5: the CC corridor — 1×5, goal at x=4, start (0,0) facing E,
+  // reach-and-stop; the sample brain walks until blocked, then stops.
+  useStore.getState().switchQuestion(4);
+  {
+    const q = useStore.getState().assignment!.questions[4];
+    if (useStore.getState().questionCircuits.get(q.id)?.done) useStore.getState().toggleCurrentQuestionDone();
+  }
+  useStore.setState(JSON.parse(JSON.stringify({ components: turbotCorrect().components, wires: turbotCorrect().wires })));
+  const tb = () => useStore.getState();
+
+  // Step: the event names the step that moved onto the goal; Step never holds.
+  for (let i = 0; i < 3; i++) tb().turbotStep();
+  check('steps 1-3 (off the goal): no event', tb().turbotHistory.length === 3 && tb().turbotLastEvent === null);
+  tb().turbotStep();
+  check('step 4 lands on the goal: goal-reached at t=4, selectTurbotGoalHit',
+    tb().turbotState.x === 4 && tb().turbotLastEvent?.kind === 'goal-reached' && tb().turbotLastEvent?.t === 4 &&
+      selectTurbotGoalHit(tb()));
+  check('…and Step never holds', tb().turbotHoldTicks === 0);
+  tb().turbotStep();
+  check('step 5 (motor 00 on the goal — goal to goal is no arrival): event cleared, halted',
+    tb().turbotHistory.length === 5 && tb().turbotHalted && tb().turbotStopReason === 'motor' &&
+      tb().turbotLastEvent === null && !selectTurbotGoalHit(tb()));
+  // Reset from a LIVE event (steps 1-4 again, onto the goal): event gone,
+  // back to the start pose. (The hold is Run-only — pinned mid-hold below.)
+  tb().turbotReset();
+  for (let i = 0; i < 4; i++) tb().turbotStep();
+  const liveStepEvent = tb().turbotLastEvent;
+  tb().turbotReset();
+  check('turbotReset clears a live event (Step path)',
+    liveStepEvent?.kind === 'goal-reached' && liveStepEvent.t === 4 &&
+      tb().turbotLastEvent === null && !selectTurbotGoalHit(tb()) &&
+      tb().turbotHistory.length === 0 && tb().turbotState.x === 0);
+
+  // Run: the hold is skipped ticks of the ONE interval — tick it by hand.
+  const win = (globalThis as unknown as { window: { setInterval: (fn: () => void, ms: number) => number } }).window;
+  const realSetInterval = win.setInterval;
+  let tick: (() => void) | null = null;
+  let armed = 0;
+  win.setInterval = (fn: () => void) => { tick = fn; armed++; return 90210; };
+  try {
+    const runTicks = (n: number) => { for (let i = 0; i < n; i++) tick!(); };
+    tb().turbotRun();
+    check('(Run armed one interval)', armed === 1 && tb().turbotRunning && tb().turbotRunIntervalId === 90210);
+    runTicks(4);
+    check('Run: ticks 1-4 reach the goal (t=4) and arm a 2-tick hold',
+      tb().turbotHistory.length === 4 && tb().turbotState.x === 4 && selectTurbotGoalHit(tb()) &&
+        tb().turbotHoldTicks === TURBOT_GOAL_HOLD_TICKS && TURBOT_GOAL_HOLD_TICKS === 2);
+    runTicks(1);
+    check('Run: tick 5 holds (no step, hold 1)', tb().turbotHistory.length === 4 && tb().turbotHoldTicks === 1);
+    runTicks(1);
+    check('Run: tick 6 holds (no step, hold 0), the pulse still live',
+      tb().turbotHistory.length === 4 && tb().turbotHoldTicks === 0 && selectTurbotGoalHit(tb()));
+    runTicks(1);
+    check('Run: tick 7 steps on (motor 00: halted on the goal), no new hold',
+      tb().turbotHistory.length === 5 && tb().turbotHalted && tb().turbotStopReason === 'motor' && tb().turbotHoldTicks === 0);
+    runTicks(1);
+    check('Run: tick 8 sees the halt and stops the loop',
+      !tb().turbotRunning && tb().turbotRunIntervalId === null && tb().turbotHistory.length === 5);
+
+    // Reset mid-hold (event live, hold 2) clears both and stops the loop.
+    tb().turbotReset();
+    tb().turbotRun();
+    runTicks(4);
+    check('(Run: at the goal, holding, event live)',
+      tb().turbotHoldTicks === 2 && tb().turbotLastEvent?.kind === 'goal-reached' && tb().turbotRunning);
+    tb().turbotReset();
+    check('turbotReset mid-hold clears the event and the hold, stops the run',
+      tb().turbotLastEvent === null && tb().turbotHoldTicks === 0 && !tb().turbotRunning &&
+        tb().turbotRunIntervalId === null && tb().turbotHistory.length === 0);
+
+    // Pause mid-hold drops the rest of it; Run again steps on its first tick.
+    tb().turbotRun();
+    runTicks(4);
+    check('(Run: at the goal, holding)', tb().turbotHoldTicks === 2 && tb().turbotRunning);
+    tb().turbotPause();
+    check('Pause mid-hold: hold 0, not running', tb().turbotHoldTicks === 0 && !tb().turbotRunning);
+    tick = null;
+    tb().turbotRun();
+    check('(Run again armed a fresh interval)', armed === 4 && tick !== null);
+    runTicks(1);
+    check('Run after a mid-hold Pause steps on its first tick', tb().turbotHistory.length === 5);
+    tb().turbotReset();
+
+    // A machine edit right after a goal hit clears the event and the hold
+    // (the edit law restarts the run through turbotReset).
+    tb().turbotRun();
+    runTicks(4);
+    check('(Run: at the goal again, holding)', selectTurbotGoalHit(tb()) && tb().turbotHoldTicks === 2);
+    tb().removeWire('tb-w3');
+    check('an edit mid-hold restarts the run: no event, no hold, not running',
+      tb().turbotLastEvent === null && tb().turbotHoldTicks === 0 && !tb().turbotRunning &&
+        tb().turbotHistory.length === 0 && tb().turbotRunIntervalId === null);
+
+    // Sandbox: an arena with two goals side by side — only the arrival counts.
+    tb().enterSandbox();
+    tb().addTab('Turbot g', 'turbot', 'turbot', 'CC');
+    tb().setTabArena({
+      width: 4,
+      height: 1,
+      cells: [['empty', 'goal', 'goal', 'empty']],
+      start: { x: 0, y: 0, facing: 'E' },
+    });
+    useStore.setState(JSON.parse(JSON.stringify({ components: turbotCorrect().components, wires: turbotCorrect().wires })));
+    tb().turbotStep();
+    check('sandbox: step 1 onto the first goal is an arrival (t=1)',
+      tb().turbotLastEvent?.kind === 'goal-reached' && tb().turbotLastEvent?.t === 1 && selectTurbotGoalHit(tb()));
+    tb().turbotStep();
+    check('sandbox: step 2, goal to goal, is not', tb().turbotState.x === 2 && tb().turbotLastEvent === null);
+    tb().removeTab(tb().activeTabId);
+
+    // A brain that halts right after arriving (FSM, no transition on a
+    // block): the halting tick records no entry, so the event stays live —
+    // the pulse is not cut — and must not re-arm the hold.
+    tb().addTab('Turbot h', 'turbot', 'turbot', 'FSM');
+    tb().setTabArena({ width: 2, height: 1, cells: [['empty', 'goal']], start: { x: 0, y: 0, facing: 'E' } });
+    const forwardOnly = turbotFsmCorrect();
+    useStore.setState(JSON.parse(JSON.stringify({
+      components: forwardOnly.components,
+      wires: forwardOnly.wires.filter((w) => w.id === 'tfsm-t1'), // 0:11 only
+    })));
+    tb().turbotRun();
+    runTicks(1);
+    check('(FSM: tick 1 arrives, holding)', selectTurbotGoalHit(tb()) && tb().turbotHoldTicks === 2);
+    runTicks(3);
+    check('Run: the brain\'s halt after the hold keeps the event (same t) and arms no second hold',
+      tb().turbotHalted && tb().turbotStopReason === 'brain' && tb().turbotHistory.length === 1 &&
+        selectTurbotGoalHit(tb()) && tb().turbotHoldTicks === 0);
+    runTicks(1);
+    check('…and the next tick stops the loop', !tb().turbotRunning && tb().turbotRunIntervalId === null);
+    tb().removeTab(tb().activeTabId);
+  } finally {
+    win.setInterval = realSetInterval;
+  }
+  await flushTimers();
+  tb().goHome();
+
+  // The Map's side, pinned in the source (no DOM here).
+  const { readFileSync } = await import('node:fs');
+  const read = (rel: string) => readFileSync(new URL(rel, import.meta.url), 'utf8');
+  const css = read('../src/index.css');
+  const pulseMs = Number(css.match(/\.arena-goal--hit\s*\{\s*animation:\s*arena-goal-hit\s+(\d+)ms/)?.[1] ?? NaN);
+  // The whole rule: name, duration, easing and nothing else, so no repeat count
+  // (`infinite`, `2`) can slip in and the pulse plays exactly once.
+  const pulseRule = css.match(/\.arena-goal--hit\s*\{([^}]*)\}/)?.[1] ?? '';
+  check(`index.css: .arena-goal--hit pulses once in ≤ 600 ms (${pulseMs} ms)`,
+    pulseMs > 0 && pulseMs <= 600 &&
+      /^\s*animation:\s*arena-goal-hit\s+\d+ms\s+[a-z-]+;\s*$/.test(pulseRule) &&
+      !/iteration-count/.test(pulseRule));
+  check('index.css: prefers-reduced-motion turns the pulse off',
+    /@media \(prefers-reduced-motion: reduce\)\s*\{\s*\.arena-goal--hit\s*\{\s*animation:\s*none;\s*\}\s*\}/.test(css));
+  check('TurbotArenaPanel: an event already live at mount is suppressed (no replay on return)',
+    /useState<TurbotEvent \| null>\(\s*\(\) => useStore\.getState\(\)\.turbotLastEvent,?\s*\)/
+      .test(read('../src/components/TurbotArenaPanel.tsx')));
+  const canvas = read('../src/components/ArenaCanvas.tsx');
+  check('ArenaCanvas: the class only under highlightGoal, on the turbot\'s cell, never with onCellClick',
+    canvas.split("' arena-goal--hit'").length === 2 &&
+      /highlightGoal && hasTurbot && !onCellClick \? ' arena-goal--hit'/.test(canvas));
+  const panel = read('../src/components/TurbotArenaPanel.tsx');
+  check('TurbotArenaPanel: highlightGoal gated on !editingMap, and no timer of its own',
+    /highlightGoal=\{!editingMap && goalHit && /.test(panel) && !/setTimeout|setInterval/.test(panel));
+  check('the instructor arena editor and the problem-set document never pass highlightGoal',
+    !read('../src/instructor/TurbotArenasEditor.tsx').includes('highlightGoal') &&
+      !read('../src/components/ProblemSetDocument.tsx').includes('highlightGoal'));
+  const storeSrc = read('../src/store.ts');
+  const sliceAt = storeSrc.indexOf('// ─── Turbot state');
+  const slice = sliceAt < 0 ? '' : storeSrc.slice(sliceAt, storeSrc.indexOf('// ─── Graded-case replay', sliceAt));
+  check('the turbot slice runs on ONE timer (turbotRun\'s interval), no setTimeout',
+    slice.split('window.setInterval(').length === 2 && !slice.includes('setTimeout'));
 }
 
 // ═════ Principal change resets the whole editor store (reset law 2) ═══

@@ -125,6 +125,7 @@ export {
   runTurbot,
   evaluateTurbotCriterion,
   criterionRequiresStop,
+  isGoalCell,
   stateKindOf,
   parseTurbotInternalLabel,
   parseTurbotExternalLabel,

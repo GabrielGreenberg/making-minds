@@ -123,6 +123,11 @@ _(textbook ch. 22, pp. 99–103; mockup `Mock_Ups-9.jpg`)_
   mockups' yellow — Gabriel's call); **block = gray square** (impassable);
   **food/goal = green circle**. Arena boundary is an implicit wall. One item
   per cell.
+- **Goal reached** (task 025): the step that moves the turbot onto a goal from
+  off it pulses that goal's circle once (scale + soft green glow, ≤ 600 ms;
+  nothing on the turbot); a Run holds 2 ticks there, Step never holds.
+  `prefers-reduced-motion` drops the motion (the hold stays). Only the live Map
+  animates — "Edit map" and the instructor's arena editor never do.
 - **Sensor (1 bit):** 0 = empty ahead, 1 = block/boundary ahead. Food reads as
   passable/empty (the goal is invisible to the turbot — HW3 Note 2).
 - **Motor (2 bits)** `ij` (i = left wheel, j = right wheel): `00` stop, `01` turn
