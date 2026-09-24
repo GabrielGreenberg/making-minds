@@ -182,3 +182,8 @@ equals the case's expected. Browser eyeball of all five paths (owed until done).
 - **For Gabriel to confirm:** both loop-settled decisions: the divergence note (runs the current
   machine), and TM and turbot question runs always stopping at the grader's step budgets.
 - Landed via a merge into `main`.
+
+### 2026-09-23 — Gabriel confirmed
+Both loop-settled decisions stand, confirmed by Gabriel in the loop session: "Run this input"
+on an edited question runs the current machine with the divergence note, and TM and turbot
+question runs always stop at the grader's step budgets.

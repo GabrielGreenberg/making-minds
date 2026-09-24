@@ -355,3 +355,9 @@ above and confirm assumptions (a)–(c).
   - Confirm assumptions (a)–(c).
   - Confirm the in-app-paste flag decision.
 - Landed via a merge into `main`.
+
+### 2026-09-23 — Gabriel confirmed
+The in-app paste decision stands, confirmed by Gabriel in the loop session: a student's own
+paste between their assignments is flagged "arrived in one in-app paste", not exempted.
+Assumptions (a)–(c), the Policies-page sentence, the release before HW1 submissions and the
+post-release ssh check are still his.
