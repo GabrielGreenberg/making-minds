@@ -158,3 +158,27 @@ equals the case's expected. Browser eyeball of all five paths (owed until done).
   whose record response must carry `separations` and no expected/got. If a launch
   configuration will not start, record that part as owed under Verify.
 - **Next step:** loop session: visual check (owed above), then land per PROFILE §5.
+
+### 2026-09-23 — loop browser check and land
+- **Browser, local mode, after the review fixes (dev server restarted on the branch).**
+  Setup: John's HW1 P1 was rebuilt through store actions as IN1, IN2 → AND → OUT (a valid
+  machine, but NAND is expected), submitted, and HW1 grades released.
+  - Grades → HW1 → Problem 1 → ▾ failed inputs lists all four inputs, each with "Run this input →".
+  - "a = 1, b = 0" opened `#/a/hw1/q/0/case/2` with IN1 = 1 and IN2 = 0. The banner read
+    "Graded input · attempt 6 … When graded ✗ wrong output · This run output y = 0 · Same as
+    when graded." The loaded case holds no expected or got.
+  - After an AND → NOT → OUT edit, Run again gave y = 1 and the note "You've changed this
+    question since you submitted — this runs your current machine."
+  - Submitting again with the banner open switched the note to "You've submitted again since
+    attempt 6 was graded — this runs your current machine."
+  - At 375 px the Grades page doesn't scroll sideways, and the links use the site's link colour
+    and IBM Plex. The page layer has no dark theme, so there is no separate dark rendering to
+    check.
+  - The SC, FSM, TM-gap and turbot paths were checked in the browser before the review fixes
+    (entry above) and are pinned by `caseRunCheck` after them.
+- **Still owed:** the remote-mode HW5 P4 round trip over HTTP. The sanitized record carrying
+  `separations` is pinned in-process by `parityCheck` §7 and `caseRunCheck [store load: remote
+  shape]`.
+- **For Gabriel to confirm:** both loop-settled decisions: the divergence note (runs the current
+  machine), and TM and turbot question runs always stopping at the grader's step budgets.
+- Landed via a merge into `main`.
