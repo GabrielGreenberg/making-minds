@@ -156,6 +156,14 @@ export function selectQuestionLocked(s: {
   return lockReason(s) !== null;
 }
 
+/** Whether the canvas shows its "draw and place it again" warning for a box
+ *  whose ports no rule could bind (task 038). Not on a locked canvas (marked
+ *  done, frozen, a viewed submission): the re-place it asks for is refused
+ *  there. The store decides it, so the canvas holds no lock of its own (law 3). */
+export function selectShowUnboundBoxWarning(s: Parameters<typeof selectQuestionLocked>[0]): boolean {
+  return !selectQuestionLocked(s);
+}
+
 /** The answer panels' line for a locked question (null when unlocked). */
 export function selectLockNotice(s: Parameters<typeof lockReason>[0]): string | null {
   const reason = lockReason(s);
