@@ -29,6 +29,15 @@ export type ComponentType =
   | 'BOXED'
   | 'STATE';
 
+// Every ComponentType, once — a Record so the compiler refuses a list that
+// misses a member (or names one that isn't). Read where untyped data is
+// checked against the union (workbookFile.ts, a file being opened).
+const COMPONENT_TYPE_SET: Record<ComponentType, true> = {
+  INPUT: true, OUTPUT: true, NOT: true, AND: true, OR: true, XOR: true,
+  HA: true, MEM: true, BOXED: true, STATE: true,
+};
+export const COMPONENT_TYPES = Object.keys(COMPONENT_TYPE_SET) as ComponentType[];
+
 export interface CircuitComponent {
   id: string;
   type: ComponentType;

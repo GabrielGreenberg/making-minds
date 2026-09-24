@@ -75,8 +75,10 @@ html, body, #root {
   min-width: 200px;
   z-index: 200;
   border-radius: 4px;
-  /* visible so hover submenus (Import flyout) positioned at left:100% aren't clipped */
+  /* visible so hover submenus (File ▸ New) positioned at left:100% aren't clipped */
   overflow: visible;
+  font-weight: 400;
+  cursor: default;
 }
 
 .menu-dropdown-item {
@@ -163,6 +165,42 @@ html, body, #root {
 .workbook-close-btn:hover {
   background: #d0d0d0;
   color: #444;
+}
+
+/* ── Sandbox File menu (WorkbookFileMenu) ── */
+.menu-shortcut {
+  color: #999;
+  font-size: 12px;
+  margin-left: 16px;
+}
+
+.menu-dropdown-item:hover .menu-shortcut {
+  color: inherit;
+}
+
+/* The workbook's name beside File, and the note a save or open leaves. */
+.workbook-name {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 10px;
+  color: var(--text-secondary);
+  font-size: 13px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 40vw;
+  user-select: none;
+}
+
+.workbook-save-note {
+  color: #2e7d32;
+  font-size: 12px;
+}
+
+/* The unsaved-changes question's buttons, clear of its text. */
+.workbook-prompt-actions {
+  margin-top: 18px;
 }
 
 /* ── Tabs ── */

@@ -21,25 +21,14 @@
 // in the JSON at all (they are store-level flags), so no sync can touch them.
 
 import type { AssignmentData } from '../types';
+import { canonicalJson } from '../canonicalJson';
+
+// Re-exported: the sync's comparison, which pipelineCheck imports from here.
+export { canonicalJson };
 
 /** Fields a deployment sets on its copy; never part of the repo's content. */
 export const INSTRUCTOR_OWNED_FIELDS = ['order', 'dueDate'] as const;
 type InstructorOwned = (typeof INSTRUCTOR_OWNED_FIELDS)[number];
-
-/** JSON with object keys sorted at every level, so two copies of the same
- *  content compare equal however their keys were ordered on the way. */
-export function canonicalJson(value: unknown): string {
-  if (Array.isArray(value)) return `[${value.map(canonicalJson).join(',')}]`;
-  if (value && typeof value === 'object') {
-    const obj = value as Record<string, unknown>;
-    return `{${Object.keys(obj)
-      .filter((k) => obj[k] !== undefined)
-      .sort()
-      .map((k) => `${JSON.stringify(k)}:${canonicalJson(obj[k])}`)
-      .join(',')}}`;
-  }
-  return JSON.stringify(value);
-}
 
 /** The assignment without its instructor-owned fields. */
 export function homeworkContent(a: AssignmentData): Omit<AssignmentData, InstructorOwned> {

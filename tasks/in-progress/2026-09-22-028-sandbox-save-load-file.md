@@ -52,5 +52,87 @@ per-browser autosave blob `making-minds-autosave` (`store.ts:3760`).
 ## Verify
 - Gates: `tsc`, build, the round-trip pin. Browser: build a CC + FSM worksheet → Save →
   New → Open the file → identical tabs; visitor and John Doe alike.
+- Done (2026-09-24, implement stage): app tsc, `npm run build`, server typecheck;
+  `workbookFileCheck` (113 pins: round trip, legacy, invalid files, unsaved baseline, sandbox
+  only + paste refusal, principal, file handle both paths with stubbed pickers / fake DOM,
+  names, menu wiring, grep gates); navResetCheck, pasteCheck, provenanceCheck, boxScopeCheck
+  green. Browser pane (dev server, John Doe, local mode): File ▾ menu and New ▸ flyout render;
+  New ▸ FSM on unsaved work shows the Unsaved changes modal, Cancel keeps the tabs; the '+'
+  tab menu (now the shared MachineMenu) still adds a tab; with `showSaveFilePicker` /
+  `showOpenFilePicker` stubbed in the page, Save wrote the export (notice, suggested name
+  `Untitled Workbook.json`, "Saved to …" note) and Open read it back as identical tabs with
+  no prompt; the saved baseline survived a reload.
+- OWED (Gabriel, a real browser — the pane can't drive native dialogs):
+  1. Chrome/Edge, File System Access path: `npm run dev` → `#/sandbox` → build a CC sheet
+     (IN×2 → AND → OUT) + an FSM tab → File ▸ Save as… → pick `adder.json` (title becomes
+     "adder") → edit → ⌘S (no dialog; writes the same file) → File ▸ New ▸ Logic Circuit →
+     the Unsaved changes modal → Save → fresh sheet → File ▸ Open… → `adder.json` → the same
+     tabs. Also: Open… on unsaved work → Save → "Saved — choose the file to open" → Open….
+  2. Safari or Firefox (no pickers): Save / Save as… download `<title>.json`; Open… uses the
+     file input; dismissing it leaves the menu usable (the input's `cancel` event). A download
+     is not a save: File ▸ New afterwards still asks ("…was downloaded, but this page can't
+     tell…"); its Save downloads again and stops at "Downloaded" — nothing is replaced until
+     "New workbook" / "Open…" is clicked. Also cancel the browser's own save dialog (Firefox
+     "Always ask where to save files") → the work is still there and New still asks.
+  3. As a visitor (signed out, `#/sandbox`) and as John Doe: the File menu is there for both;
+     a visitor who opens a file then signs in as a first-time account keeps those tabs.
+  4. Open a hand-broken file (e.g. an AND renamed to "FOO"): the alert names the file and
+     the component.
 
 ## Progress log
+- 2026-09-24 — Implemented. New pure `app/src/workbookFile.ts` (parseWorkbookFile: size cap,
+  structure/required fields/component types/wire ends/arena bounds, never label syntax;
+  legacy single-circuit → one sheet; `workbookContentKey`/`workbookKeyHash`, the unsaved
+  baseline minus ids/titles/view/run state; file names) and `app/src/canonicalJson.ts`
+  (moved out of homeworkSync, re-exported there). `fileHandle.ts` rewritten to tagged
+  results (saved / downloaded / cancelled / failed; `typeof` detection, AbortError-only
+  cancel, SecurityError → download, no file-input fallback without activation, input
+  `cancel` event). Store: `freshSandboxTab` (one tab factory), `sandboxTabCircuits` /
+  `sandboxWorkbookData` (the live canvas folds in only when no assignment is in memory),
+  `hasUnsavedWorkbookChanges`, `captureSandboxSession`; `newWorkbook(mode, innerMode,
+  title)` and `importWorkbook(json, handle, fileName) → ImportResult` leave an open
+  assignment through goHome first, no alert(); `markWorkbookSaved` (baseline from the
+  written JSON); `openWorkbook` removed; `workbookSavedKey` persisted in the sandbox blob.
+  UI: `components/MachineMenu.tsx` (shared by the '+' tab menu and File ▸ New),
+  `components/WorkbookFileMenu.tsx` (File ▾ + workbook name + note, the Unsaved changes
+  modal, ⌘S / ⇧⌘S), mounted by MenuBar when no assignment is open. New
+  `app/tools/workbookFileCheck.ts` in `npm run check`. CLAUDE.md updated in place;
+  PROFILE §6 tool count fixed (21).
+- 2026-09-24 — Review fixes. (1) Save never writes a file Open refuses: `serializeWorkbook`
+  indents only while that fits under the cap (compact past it); the menu asks
+  `unopenableReason` (UTF-8 bytes + Open's parse) before any dialog; `markWorkbookSaved`
+  reads the written JSON back without the cap. (2) [menu wiring] pins assert every token
+  present and in order, and match the File items inside the dropdown markup with their
+  actions (mutation-tested: dropping an item or a session guard now fails). (3) A download is
+  not a save: `markWorkbookDownloaded` records it (memory only), the baseline stays, New/Open
+  still ask saying it was downloaded, and the question's Save stops at a "Downloaded" step
+  (a second click continues). Pins: [download], [file size]. Browser pane: both prompts and
+  the Downloaded step render (download stubbed; the sandbox restored after).
+
+### 2026-09-24 — implemented (work loop)
+- **Built:** the sandbox now has a File ▾ menu (New ▸ machine · Open… · Save · Save as…,
+  ⌘S / ⇧⌘S) for visitors and signed-in people alike, hidden inside an assignment. Save writes
+  the workbook JSON to a file on this computer (a picked file when the browser allows it,
+  else a download, which is not counted as a save); Open reads one back as sandbox tabs
+  only. New and Open ask first when the work differs from its last save. Nothing is
+  uploaded. Code: `workbookFile.ts` (pure parse/validate, content key, `serializeWorkbook`,
+  `unopenableReason`), `canonicalJson.ts`, `fileHandle.ts` (tagged results),
+  `components/WorkbookFileMenu.tsx`, `components/MachineMenu.tsx` (shared with the '+' tab
+  menu), store actions (`newWorkbook`, `importWorkbook → ImportResult`, `markWorkbookSaved`,
+  `markWorkbookDownloaded`, `workbookSaveState`, `captureSandboxSession`).
+- **Pins:** new `app/tools/workbookFileCheck.ts` in `npm run check`, 142 checks: [round trip]
+  [legacy] [invalid files] [unsaved] [download] [file size] [sandbox only] [principal]
+  [file handle] [names] [menu wiring] [grep gate].
+- **Gates (exit codes):** app-tsc=0 app-build=0 app-check=0 server-tsc=0 server-check=0;
+  rechecked at checkpoint: app tsc 0, `workbookFileCheck` 0, budgets 0 (CLAUDE.md 39,983 B).
+- **Review:** 3 fixed (Save never writes a file Open refuses; menu-wiring pins
+  mutation-proof; a download is not a save). 0 skipped. Nits left: the item is labelled
+  "New ▸", not "New worksheet"; the prompt's principal-change branch in `saveThenContinue`
+  is unreachable (save() already returns false), so the prompt can outlive a sign-out;
+  CLAUDE.md "Build phases" was trimmed to fit the budget.
+- **Remaining (owed):** the loop session's browser checks (stubbed pickers in local mode:
+  Save as → New → Open ≡ with a CC + FSM sheet; the Unsaved modal's Cancel / Don't save /
+  Save; the download + file-input fallback; an invalid file; visitor → John Doe keeps
+  the sheet; no File menu in HW1; no `/api` traffic), then Gabriel's real-dialog recipes
+  (Verify OWED 1–4).
+- **NEXT STEP:** loop session: run the owed browser checks, then land per PROFILE §5.
