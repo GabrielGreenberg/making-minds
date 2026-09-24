@@ -1559,6 +1559,25 @@ thead .sc-label-col {
   background: #2e7d32;
 }
 
+/* The goal-reached cue (task 025): the live Map's goal circle pulses once,
+   with a glow reaching past the turbot drawn over it. Only the live Map sets
+   it (ArenaCanvas highlightGoal); editors never animate. */
+.arena-goal--hit {
+  animation: arena-goal-hit 500ms ease-out;
+}
+
+@keyframes arena-goal-hit {
+  0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(46, 125, 50, 0.55); }
+  50% { transform: scale(1.35); box-shadow: 0 0 0 5px rgba(46, 125, 50, 0.35); }
+  100% { transform: scale(1); box-shadow: 0 0 0 9px rgba(46, 125, 50, 0); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .arena-goal--hit {
+    animation: none;
+  }
+}
+
 .arena-turbot {
   position: absolute;
   inset: 12%;

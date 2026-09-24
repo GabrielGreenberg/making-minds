@@ -495,7 +495,9 @@ export function runTurbot(
 
 // ─── Success criteria (spec §12.5) ───────────────────────────────────
 
-function isGoal(arena: ArenaConfig, x: number, y: number): boolean {
+/** Is (x, y) a goal cell? The criteria below judge by it; the live Map's
+ *  goal-reached cue (store.ts `turbotStep`) asks the same question. */
+export function isGoalCell(arena: ArenaConfig, x: number, y: number): boolean {
   return cellAt(arena, x, y) === 'goal';
 }
 
@@ -523,17 +525,17 @@ export function evaluateTurbotCriterion(
 ): boolean {
   switch (criterion) {
     case 'reach-and-stop':
-      return run.stopped && isGoal(arena, run.finalState.x, run.finalState.y);
+      return run.stopped && isGoalCell(arena, run.finalState.x, run.finalState.y);
     case 'pass-through':
-      if (isGoal(arena, arena.start.x, arena.start.y)) return true;
-      return run.history.some((h) => isGoal(arena, h.x, h.y));
+      if (isGoalCell(arena, arena.start.x, arena.start.y)) return true;
+      return run.history.some((h) => isGoalCell(arena, h.x, h.y));
     case 'return-to-start': {
       if (run.finalState.x !== arena.start.x || run.finalState.y !== arena.start.y) return false;
       if (!arenaHasGoal(arena)) return true;
       // A goal on the start cell is visited by construction (arenaEditing
       // allows that authoring pattern), mirroring pass-through's rule.
-      if (isGoal(arena, arena.start.x, arena.start.y)) return true;
-      return run.history.some((h) => isGoal(arena, h.x, h.y));
+      if (isGoalCell(arena, arena.start.x, arena.start.y)) return true;
+      return run.history.some((h) => isGoalCell(arena, h.x, h.y));
     }
   }
 }

@@ -41,7 +41,7 @@ import {
   toSubscript,
 } from './types';
 import { topologicalSort, evaluateGate, evaluateCC, scNetlist, evaluateSCStep, boxMemoryOutputs, stepBoxedMemory, memorySlots, withMemState, zeroMemState, hasMemory, isSequentialBox, hasCombinationalLoop, sortStateComponents, evaluateFSMSymbolStep, evaluateTMSingleStep, evaluateTMSequence, DEFAULT_TM_MAX_STEPS, notationForRepresentation, encodeTM, stepCountFor, encodeInput, valueToBits, bitsToValue, bitsToTally, bitsToBinary, sortByLabel, fsmNotation, turbotFsmNotation, tmNotation, turbotInternalNotation, turbotExternalNotation, questionLayout, caseStimulus, recordedCaseSeparations, gradedMachineKey, gradingCircuit, type CodecLayout, type TransitionNotation } from './engine';
-import { senseAheadSymbol, applyMotorCommand, initialBrainState, runBrainStep, stateKindOf, type BrainState } from './engine/turbot';
+import { senseAheadSymbol, applyMotorCommand, initialBrainState, runBrainStep, stateKindOf, isGoalCell, type BrainState } from './engine/turbot';
 import { framesToLanes } from './engine/perception';
 import { getAssignment, listAssignments } from './assignments';
 import { emptyQuestionCircuit, restoreQuestionCircuits } from './storage/workbookStore';
@@ -411,6 +411,28 @@ export function selectTurbotArena(s: {
 
 /** The step cap on a sandbox TM or turbot Run (a runaway machine in the UI). */
 export const UI_RUN_STEP_CAP = 1000;
+
+/**
+ * A moment in a turbot run worth a cue on the Map — today only the step that
+ * moved the turbot onto a goal cell from a non-goal cell; `t` is that step's
+ * history entry. The shape leaves room for a 'halted' or 'blocked' cue.
+ */
+export type TurbotEvent = { kind: 'goal-reached'; t: number };
+
+/** Run-loop ticks a turbot Run holds after a goal-reached step (2 × 300 ms). */
+export const TURBOT_GOAL_HOLD_TICKS = 2;
+
+/**
+ * Did the LATEST step land the turbot on a goal? True while the event names
+ * the newest history entry — a halt that appends no entry keeps it (the pulse
+ * is neither cut nor restarted), the next recorded step replaces it.
+ */
+export function selectTurbotGoalHit(s: {
+  turbotLastEvent: TurbotEvent | null;
+  turbotHistory: TurbotHistoryEntry[];
+}): boolean {
+  return s.turbotLastEvent?.kind === 'goal-reached' && s.turbotLastEvent.t === s.turbotHistory.length;
+}
 
 /**
  * The GRADER's step budget for the open question's TM or turbot run, or null
@@ -946,6 +968,14 @@ interface AppState {
   turbotRunIntervalId: number | null;
   turbotHalted: boolean;
   turbotStopReason: 'motor' | 'brain' | 'limit' | null;
+  // The Map's cue: the last recorded step's event (turbotStep writes it,
+  // null for an eventless step; the panel pulses the goal while
+  // selectTurbotGoalHit holds).
+  turbotLastEvent: TurbotEvent | null;
+  // Run-loop pacing: ticks turbotRun's interval skips after a goal hit —
+  // counted inside the one interval, never a timer of its own. Step never
+  // sets it; Pause and Reset zero it.
+  turbotHoldTicks: number;
   turbotStep: () => void;
   turbotRun: () => void;
   turbotPause: () => void;
@@ -4086,6 +4116,8 @@ export const useStore = create<AppState>()((set, get) => ({
   turbotRunIntervalId: null,
   turbotHalted: false,
   turbotStopReason: null,
+  turbotLastEvent: null,
+  turbotHoldTicks: 0,
 
   turbotStep: () => {
     const state = get();
@@ -4129,11 +4161,15 @@ export const useStore = create<AppState>()((set, get) => ({
       y: nextPose.y,
       facing: nextPose.facing,
     };
+    // Goal reached = a move from off-goal onto a goal cell (a turn, a stop or
+    // a turbot-TM internal op on the goal is not a new arrival).
+    const reached = !isGoalCell(arena, turbotState.x, turbotState.y) && isGoalCell(arena, nextPose.x, nextPose.y);
 
     set({
       turbotState: nextPose,
       turbotBrainState: result.brainState,
       turbotHistory: [...turbotHistory, entry],
+      turbotLastEvent: reached ? { kind: 'goal-reached', t: entry.t } : null,
       ...(result.motor === 'stop' ? { turbotHalted: true, turbotStopReason: 'motor' as const } : {}),
     });
   },
@@ -4143,6 +4179,13 @@ export const useStore = create<AppState>()((set, get) => ({
     if (state.turbotRunning) return;
     const intervalId = window.setInterval(() => {
       const s = get();
+      // A goal hit holds the run for TURBOT_GOAL_HOLD_TICKS ticks (the Map's
+      // pulse plays) — skipped ticks of this one interval, so Pause/Reset
+      // need no timer of their own.
+      if (s.turbotHoldTicks > 0) {
+        set({ turbotHoldTicks: s.turbotHoldTicks - 1 });
+        return;
+      }
       // Question runs stop at the arena's maxSteps (the grader's budget);
       // the sandbox stops a runaway turbot at the UI cap.
       const cap = selectQuestionStepBudget(s) ?? UI_RUN_STEP_CAP;
@@ -4151,7 +4194,15 @@ export const useStore = create<AppState>()((set, get) => ({
         if (!s.turbotHalted) set({ turbotHalted: true, turbotStopReason: 'limit' });
         return;
       }
+      const before = s.turbotHistory.length;
       s.turbotStep();
+      // The loop, not turbotStep, arms the hold: Step never holds. Only a
+      // step that recorded an entry counts — a halting tick keeps the old
+      // event (same t) and must not re-arm it.
+      const after = get();
+      if (after.turbotHistory.length > before && selectTurbotGoalHit(after)) {
+        set({ turbotHoldTicks: TURBOT_GOAL_HOLD_TICKS });
+      }
     }, 300);
     set({ turbotRunning: true, turbotRunIntervalId: intervalId });
   },
@@ -4161,7 +4212,8 @@ export const useStore = create<AppState>()((set, get) => ({
     if (state.turbotRunIntervalId !== null) {
       window.clearInterval(state.turbotRunIntervalId);
     }
-    set({ turbotRunning: false, turbotRunIntervalId: null });
+    // A pause mid-hold drops the rest of it: the next Run steps at once.
+    set({ turbotRunning: false, turbotRunIntervalId: null, turbotHoldTicks: 0 });
   },
 
   turbotReset: () => {
@@ -4178,6 +4230,8 @@ export const useStore = create<AppState>()((set, get) => ({
       turbotRunIntervalId: null,
       turbotHalted: false,
       turbotStopReason: null,
+      turbotLastEvent: null,
+      turbotHoldTicks: 0,
     });
   },
   turbotCaseIndex: 0,

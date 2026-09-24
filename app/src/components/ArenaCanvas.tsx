@@ -17,9 +17,12 @@ interface Props {
   turbot?: TurbotState | null;
   cellSize?: number;
   onCellClick?: (x: number, y: number) => void;
+  /** Pulse the goal under the turbot (`.arena-goal--hit`) — only the live Map
+   *  passes it (store.ts selectTurbotGoalHit); an editor never animates. */
+  highlightGoal?: boolean;
 }
 
-export function ArenaCanvas({ arena, turbot, cellSize = 40, onCellClick }: Props) {
+export function ArenaCanvas({ arena, turbot, cellSize = 40, onCellClick, highlightGoal }: Props) {
   const pose = turbot ?? arena.start;
   return (
     <div
@@ -40,7 +43,11 @@ export function ArenaCanvas({ arena, turbot, cellSize = 40, onCellClick }: Props
               style={{ width: cellSize, height: cellSize }}
               onClick={onCellClick ? () => onCellClick(x, y) : undefined}
             >
-              {cell === 'goal' && <span className="arena-goal" />}
+              {cell === 'goal' && (
+                <span
+                  className={'arena-goal' + (highlightGoal && hasTurbot && !onCellClick ? ' arena-goal--hit' : '')}
+                />
+              )}
               {hasTurbot && (
                 <svg
                   className="arena-turbot"
