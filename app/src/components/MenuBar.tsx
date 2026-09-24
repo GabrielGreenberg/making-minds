@@ -5,6 +5,7 @@ import { AccountPanel } from '../auth/AccountPanel';
 import { navigate } from '../routing';
 import { signOut } from './SessionControls';
 import { FeedbackPanel } from './FeedbackPanel';
+import { WorkbookFileMenu } from './WorkbookFileMenu';
 import { submitConfirmMessage } from '../provenance/notice';
 
 export function MenuBar() {
@@ -37,6 +38,11 @@ export function MenuBar() {
           ⌂ Home
         </div>
       )}
+
+      {/* File — the sandbox as a workbook file on this computer (New, Open…,
+          Save, Save as…), for visitors and signed-in people alike. Never in
+          an assignment: a file only ever opens as sandbox tabs. */}
+      {!assignment && <WorkbookFileMenu />}
 
       {/* Submit — record an immutable snapshot of the current assignment.
           Hidden while the canvas shows a submission — frozen (item 3), or a

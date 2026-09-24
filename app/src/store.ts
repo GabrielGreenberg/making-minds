@@ -67,6 +67,8 @@ import {
 import { mintId, setMintKey, clearMintKeys, mintKeyFor, type MintScope } from './provenance/ids';
 import { nextTrace, insertedChars, type TraceChange, type TextContent } from './provenance/trace';
 import { INTEGRITY_NOTICE } from './provenance/notice';
+// The sandbox workbook file (task 028): parsing, the saved-content key.
+import { parseWorkbookFile, serializeWorkbook, titleFromFileName, workbookKeyHash } from './workbookFile';
 
 /**
  * TM tape notation (alphabet) for the current context. Inside an assignment
@@ -639,15 +641,43 @@ interface AppState {
   // crash buffer holds the state and a backoff retry is scheduled.
   autoSaveStatus: 'saved' | 'unsaved' | 'saving' | 'error';
 
-  // Workbook
+  // Workbook — the sandbox's tabs as one file (task 028: File ▸ New / Open… /
+  // Save / Save as…, components/WorkbookFileMenu.tsx). Everything here reads
+  // and writes the SANDBOX only: an open assignment is left first through
+  // goHome's fold-and-save, never exported, never written over.
   workbookOpen: boolean;
   workbookTitle: string;
+  // The file Save writes back to (File System Access). Never persisted; a
+  // principal change resets it (it belongs to the person who picked it).
   workbookFileHandle: FileSystemFileHandle | null;
+  // workbookKeyHash of the content last saved to a file, opened from one, or
+  // started fresh — the "unsaved changes" baseline (hasUnsavedWorkbookChanges).
+  // null = never saved: compared against a pristine one-sheet sandbox.
+  // Persisted in the sandbox blob, so it moves with the sandbox.
+  workbookSavedKey: string | null;
+  // workbookKeyHash of the content last handed to the browser as a DOWNLOAD
+  // (no save picker here). The browser may still ask where to put it, or
+  // refuse it, and the page can't see which — so it is not the baseline; it
+  // only lets New / Open's question say the work was downloaded. Memory only;
+  // reset wherever the baseline is (a save, an open, New, a principal change).
+  workbookDownloadedKey: string | null;
   closeWorkbook: () => void;
-  newWorkbook: () => void;
-  openWorkbook: (json: string, handle?: FileSystemFileHandle | null) => void;
+  // A fresh one-sheet sandbox of machine `mode` (a turbot's brain is
+  // `innerMode`) titled `title`. A canvas swap: sim state and undo reset.
+  newWorkbook: (mode?: BuildMode, innerMode?: BuildMode, title?: string) => void;
+  // The sandbox as a workbook file (WorkbookData JSON, with the integrity
+  // notice) — never an open assignment's canvas.
   exportWorkbook: () => string;
-  importWorkbook: (json: string, handle?: FileSystemFileHandle | null) => void;
+  // Open a workbook file (or a legacy single-circuit one) as the sandbox's
+  // tabs. A bad file changes nothing and says why. `fileName` titles it.
+  importWorkbook: (json: string, handle?: FileSystemFileHandle | null, fileName?: string) => ImportResult;
+  // After a save: `writtenJson` (what was actually written — an edit made
+  // while the picker was open stays unsaved) becomes the baseline; the file
+  // and its name become the workbook's.
+  markWorkbookSaved: (writtenJson: string, handle: FileSystemFileHandle | null, fileName?: string) => void;
+  // After a download: `downloadedJson` is recorded as downloaded, NOT saved —
+  // New and Open still ask (workbookSaveState 'downloaded').
+  markWorkbookDownloaded: (downloadedJson: string) => void;
 
   // Build mode
   buildMode: BuildMode;
@@ -1345,6 +1375,107 @@ function loadQuestionFields(saved: QuestionCircuit) {
   };
 }
 
+// ─── The sandbox as a workbook (task 028) ─────────────────────────────
+
+/** What importWorkbook reports: a bad file changed nothing, and why. */
+export type ImportResult = { ok: true } | { ok: false; reason: string };
+
+/** A new sandbox tab — THE one factory (the initial sandbox, New, the '+'
+ *  menu). A turbot tab is born with its brain kind and the starter arena:
+ *  the sandbox analog of a turbot question's innerMode + turbot_cases[0].arena,
+ *  read through the SAME selectors (selectTurbotInnerMode/selectTurbotArena). */
+function freshSandboxTab(
+  id: string,
+  title = 'Circuit 1',
+  buildMode: BuildMode = 'CC',
+  innerMode?: BuildMode,
+  activeTask: ActiveTask = buildMode === 'turbot' ? 'turbot' : 'arithmetic',
+): SandboxTab {
+  return {
+    id,
+    title,
+    buildMode,
+    activeTask,
+    ...(buildMode === 'turbot' ? { innerMode: innerMode ?? 'CC', arena: sandboxDefaultArena() } : {}),
+  };
+}
+
+/** The sandbox's sheets, the live canvas folded into the active tab ONLY
+ *  while the sandbox is what the live fields hold (no assignment in memory):
+ *  an assignment's canvas is never a sandbox sheet — not in a file, not in
+ *  the autosave, not in the unsaved-changes key. */
+function sandboxTabCircuits(s: AppState): Map<string, TabCircuitData> {
+  const sheets = new Map(s.tabCircuits);
+  if (s.assignment === null) {
+    sheets.set(s.activeTabId, {
+      components: s.components,
+      wires: s.wires,
+      boxes: s.boxes,
+      confirmedBoxes: s.confirmedBoxLibrary,
+    });
+  }
+  return sheets;
+}
+
+/** The sandbox's worksheets in tab order — what a workbook file holds and
+ *  what its saved-content key is computed over (exportWorkbook, the key). */
+function sandboxWorkbookData(s: AppState): Pick<WorkbookData, 'worksheets' | 'activeWorksheetId'> {
+  const sheets = sandboxTabCircuits(s);
+  const worksheets: WorksheetData[] = s.tabs.map((tab) => {
+    const circuit = sheets.get(tab.id) || { components: [], wires: [], boxes: [], confirmedBoxes: [] };
+    return {
+      id: tab.id,
+      title: tab.title,
+      buildMode: tab.buildMode,
+      activeTask: tab.activeTask,
+      circuit: { components: circuit.components, wires: circuit.wires },
+      boxes: circuit.boxes,
+      confirmedBoxes: circuit.confirmedBoxes,
+      // Turbot tabs: the brain kind + sandbox arena travel with the sheet.
+      ...(tab.innerMode ? { innerMode: tab.innerMode } : {}),
+      ...(tab.arena ? { arena: tab.arena } : {}),
+    };
+  });
+  return { worksheets, activeWorksheetId: s.activeTabId };
+}
+
+/** The baseline of a sandbox never saved to a file: one empty Logic Circuit
+ *  sheet, the sandbox everyone starts with — so a fresh sandbox has nothing
+ *  unsaved, and work that was never saved does. */
+const PRISTINE_WORKBOOK_KEY = workbookKeyHash({
+  worksheets: [{ ...freshSandboxTab(''), circuit: { components: [], wires: [] }, boxes: [], confirmedBoxes: [] }],
+});
+
+/** Is the sandbox's work in a file? 'saved': its last save (or open, or New)
+ *  holds it. 'downloaded': not saved, but exactly what was last handed to the
+ *  browser as a download, which may or may not have landed. 'unsaved': work
+ *  in neither. Toggles, runs, the active tab and the view are not work
+ *  (workbookContentKey). */
+export function workbookSaveState(s: AppState): 'saved' | 'downloaded' | 'unsaved' {
+  const key = workbookKeyHash(sandboxWorkbookData(s));
+  if (key === (s.workbookSavedKey ?? PRISTINE_WORKBOOK_KEY)) return 'saved';
+  return key === s.workbookDownloadedKey ? 'downloaded' : 'unsaved';
+}
+
+/** Does the sandbox hold work its last save (or open, or New) doesn't? Asked
+ *  at click time by File ▸ New / Open…, before any picker opens. A download
+ *  alone doesn't count as saved (workbookSaveState). */
+export function hasUnsavedWorkbookChanges(s: AppState): boolean {
+  return workbookSaveState(s) !== 'saved';
+}
+
+/** A check to run after an await in the file menu: is this still the same
+ *  person's open sandbox? A principal change (reset law 2 — a 401, a sign-in
+ *  behind the dialog) or leaving the sandbox while a picker was open means
+ *  the file must not land (nor a save be marked) in what is there now. */
+export function captureSandboxSession(): () => boolean {
+  const epoch = principalEpoch;
+  return () => {
+    const s = useStore.getState();
+    return epoch === principalEpoch && s.assignment === null && s.workbookOpen;
+  };
+}
+
 export const useStore = create<AppState>()((set, get) => ({
   autoSaveStatus: 'saved' as const,
 
@@ -1352,6 +1483,8 @@ export const useStore = create<AppState>()((set, get) => ({
   workbookOpen: false,
   workbookTitle: 'Untitled Workbook',
   workbookFileHandle: null,
+  workbookSavedKey: null,
+  workbookDownloadedKey: null,
   submissions: {},
 
   hydrateSubmissions: async () => {
@@ -1376,7 +1509,9 @@ export const useStore = create<AppState>()((set, get) => ({
       workbookOpen: false,
       workbookTitle: 'Untitled Workbook',
       workbookFileHandle: null,
-      tabs: [{ id: defaultTabId, title: 'Circuit 1', buildMode: 'CC' as BuildMode, activeTask: 'arithmetic' as ActiveTask }],
+      workbookSavedKey: null,
+      workbookDownloadedKey: null,
+      tabs: [freshSandboxTab(defaultTabId)],
       activeTabId: defaultTabId,
       tabCircuits: new Map(),
       components: [],
@@ -1392,59 +1527,37 @@ export const useStore = create<AppState>()((set, get) => ({
     try { localStorage.removeItem(sandboxKey(currentPrincipal)); } catch { /* ignore */ }
   },
 
-  newWorkbook: () => {
-    const tabId = mintId({ kind: 'sandbox' });
+  newWorkbook: (mode = 'CC', innerMode, title = 'Circuit 1') => {
+    // An open assignment is left the way Home leaves it — its live canvas
+    // folded and saved — before the live fields become the sandbox's.
+    if (get().assignment) get().goHome();
+    const tab = freshSandboxTab(mintId({ kind: 'sandbox' }), title, mode, innerMode);
     set({
       assignment: null,
+      viewingSubmission: null,
       workbookOpen: true,
       workbookTitle: 'Untitled Workbook',
       workbookFileHandle: null,
-      tabs: [{ id: tabId, title: 'Circuit 1', buildMode: 'CC' as BuildMode, activeTask: 'arithmetic' as ActiveTask }],
-      activeTabId: tabId,
+      workbookDownloadedKey: null,
+      tabs: [tab],
+      activeTabId: tab.id,
       tabCircuits: new Map(),
       components: [],
       wires: [],
       boxes: [],
       confirmedBoxLibrary: [],
-      buildMode: 'CC',
-      activeTask: 'arithmetic',
+      buildMode: tab.buildMode,
+      activeTask: tab.activeTask,
       undoStack: [],
       redoStack: [],
     });
     get().resetAllSimState();
-  },
-
-  openWorkbook: (json, handle) => {
-    get().importWorkbook(json, handle);
+    // A fresh sheet has nothing unsaved.
+    set({ workbookSavedKey: workbookKeyHash(sandboxWorkbookData(get())) });
   },
 
   exportWorkbook: () => {
     const state = get();
-    // Save current tab's circuit into tabCircuits for serialization
-    const allTabCircuits = new Map(state.tabCircuits);
-    allTabCircuits.set(state.activeTabId, {
-      components: state.components,
-      wires: state.wires,
-      boxes: state.boxes,
-      confirmedBoxes: state.confirmedBoxLibrary,
-    });
-
-    const worksheets: WorksheetData[] = state.tabs.map((tab) => {
-      const circuit = allTabCircuits.get(tab.id) || { components: [], wires: [], boxes: [], confirmedBoxes: [] };
-      return {
-        id: tab.id,
-        title: tab.title,
-        buildMode: tab.buildMode,
-        activeTask: tab.activeTask,
-        circuit: { components: circuit.components, wires: circuit.wires },
-        boxes: circuit.boxes,
-        confirmedBoxes: circuit.confirmedBoxes,
-        // Turbot tabs: the brain kind + sandbox arena travel with the sheet.
-        ...(tab.innerMode ? { innerMode: tab.innerMode } : {}),
-        ...(tab.arena ? { arena: tab.arena } : {}),
-      };
-    });
-
     const workbook: WorkbookData = {
       formatVersion: 2,
       // Read by whoever opens the file — a person or an AI tool (task 034).
@@ -1455,8 +1568,7 @@ export const useStore = create<AppState>()((set, get) => ({
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       },
-      worksheets,
-      activeWorksheetId: state.activeTabId,
+      ...sandboxWorkbookData(state),
       viewPreferences: {
         zoom: state.zoom,
         panX: state.panX,
@@ -1467,109 +1579,104 @@ export const useStore = create<AppState>()((set, get) => ({
         repSystem: state.repSystem,
       },
     };
-    return JSON.stringify(workbook, null, 2);
+    // Indented unless that alone would take it past Open's size cap.
+    return serializeWorkbook(workbook);
   },
 
-  importWorkbook: (json, handle) => {
-    try {
-      const data = JSON.parse(json);
+  importWorkbook: (json, handle, fileName) => {
+    // Parse (and validate) first: a bad file changes nothing.
+    const parsed = parseWorkbookFile(json);
+    if (!parsed.ok) return parsed;
+    const wb = parsed.workbook;
+    // A file never writes into an assignment: one that is open is left the
+    // way Home leaves it (folded and saved), and the file opens as the
+    // sandbox's tabs — sandbox content to the paste seam (law 8).
+    if (get().assignment) get().goHome();
 
-      if (data.formatVersion === 2) {
-        // New workbook format
-        const wb = data as WorkbookData;
-        const tabCircuits = new Map<string, TabCircuitData>();
-        const tabs = wb.worksheets.map((ws) => {
-          const resolvedComponents = resolveMemDirections(ws.circuit.components || [], ws.circuit.wires || []);
-          tabCircuits.set(ws.id, {
-            components: resolvedComponents,
-            wires: ws.circuit.wires || [],
-            boxes: ws.boxes || [],
-            confirmedBoxes: ws.confirmedBoxes || [],
-          });
-          return {
-            id: ws.id,
-            title: ws.title,
-            buildMode: ws.buildMode || 'CC' as BuildMode,
-            activeTask: ws.activeTask || 'arithmetic' as ActiveTask,
-            // Turbot worksheets: restore brain kind + arena (seed defaults for
-            // files predating / hand-authored without them).
-            ...(ws.buildMode === 'turbot'
-              ? { innerMode: ws.innerMode ?? 'CC' as BuildMode, arena: ws.arena ?? sandboxDefaultArena() }
-              : {}),
-          };
-        });
+    const tabCircuits = new Map<string, TabCircuitData>();
+    const tabs = wb.worksheets.map((ws) => {
+      tabCircuits.set(ws.id, {
+        components: resolveMemDirections(ws.circuit.components, ws.circuit.wires),
+        wires: ws.circuit.wires,
+        boxes: ws.boxes,
+        confirmedBoxes: ws.confirmedBoxes ?? [],
+      });
+      // Turbot worksheets: restore brain kind + arena (the starter arena for
+      // files predating / hand-authored without one).
+      return {
+        id: ws.id,
+        title: ws.title,
+        buildMode: ws.buildMode,
+        activeTask: ws.activeTask,
+        ...(ws.buildMode === 'turbot'
+          ? { innerMode: ws.innerMode ?? 'CC' as BuildMode, arena: ws.arena ?? sandboxDefaultArena() }
+          : {}),
+      };
+    });
+    const activeId = wb.activeWorksheetId;
+    const activeCircuit = tabCircuits.get(activeId)!;
+    const activeTab = tabs.find((t) => t.id === activeId)!;
+    const vp = wb.viewPreferences;
 
-        const activeId = wb.activeWorksheetId || tabs[0]?.id || defaultTabId;
-        const activeCircuit = tabCircuits.get(activeId) || { components: [], wires: [], boxes: [], confirmedBoxes: [] };
-        const activeTab = tabs.find((t) => t.id === activeId);
+    set({
+      assignment: null,
+      viewingSubmission: null,
+      workbookOpen: true,
+      workbookTitle: titleFromFileName(fileName) || wb.metadata.title || 'Untitled Workbook',
+      workbookFileHandle: handle ?? null,
+      workbookDownloadedKey: null,
+      tabs,
+      activeTabId: activeId,
+      tabCircuits,
+      components: activeCircuit.components,
+      wires: activeCircuit.wires,
+      boxes: activeCircuit.boxes,
+      confirmedBoxLibrary: activeCircuit.confirmedBoxes,
+      buildMode: activeTab.buildMode,
+      activeTask: activeTab.activeTask,
+      zoom: vp.zoom ?? 1,
+      panX: vp.panX ?? 0,
+      panY: vp.panY ?? 0,
+      showGrid: vp.showGrid ?? true,
+      showWireValues: vp.showWireValues ?? true,
+      snapToAlign: vp.snapToAlign ?? true,
+      repSystem: vp.repSystem ?? 'binary',
+      undoStack: [],
+      redoStack: [],
+    });
+    get().resetAllSimState();
+    // What was opened is what is saved (after any MEM directions resolved).
+    set({ workbookSavedKey: workbookKeyHash(sandboxWorkbookData(get())) });
+    setTimeout(() => get().evaluateCircuit(), 0);
+    return { ok: true };
+  },
 
-        set({
-          assignment: null,
-          workbookOpen: true,
-          workbookTitle: wb.metadata?.title || 'Untitled Workbook',
-          workbookFileHandle: handle || null,
-          tabs,
-          activeTabId: activeId,
-          tabCircuits,
-          components: activeCircuit.components,
-          wires: activeCircuit.wires,
-          boxes: activeCircuit.boxes,
-          confirmedBoxLibrary: activeCircuit.confirmedBoxes,
-          buildMode: activeTab?.buildMode || 'CC',
-          activeTask: activeTab?.activeTask || 'arithmetic',
-          zoom: wb.viewPreferences?.zoom ?? 1,
-          panX: wb.viewPreferences?.panX ?? 0,
-          panY: wb.viewPreferences?.panY ?? 0,
-          showGrid: wb.viewPreferences?.showGrid ?? true,
-          showWireValues: wb.viewPreferences?.showWireValues ?? true,
-          snapToAlign: wb.viewPreferences?.snapToAlign ?? true,
-          repSystem: wb.viewPreferences?.repSystem || 'binary',
-          undoStack: [],
-          redoStack: [],
-        });
-        get().resetAllSimState();
-        setTimeout(() => get().evaluateCircuit(), 0);
-      } else if (data.circuit) {
-        // Legacy single-circuit format — wrap in a one-worksheet workbook
-        const wsId = mintId({ kind: 'sandbox' });
-        const importedComponents = data.circuit.components || [];
-        const importedWires = data.circuit.wires || [];
-        const resolvedComponents = resolveMemDirections(importedComponents, importedWires);
-        const tabCircuits = new Map<string, TabCircuitData>();
-        tabCircuits.set(wsId, {
-          components: resolvedComponents,
-          wires: importedWires,
-          boxes: data.boxes || [],
-          confirmedBoxes: data.confirmedBoxes || [],
-        });
-        const bm = data.metadata?.buildType || 'CC';
-        set({
-          assignment: null,
-          workbookOpen: true,
-          workbookTitle: data.metadata?.title || 'Imported Circuit',
-          workbookFileHandle: handle || null,
-          tabs: [{ id: wsId, title: data.metadata?.title || 'Circuit 1', buildMode: bm, activeTask: 'arithmetic' as ActiveTask }],
-          activeTabId: wsId,
-          tabCircuits,
-          components: resolvedComponents,
-          wires: importedWires,
-          boxes: data.boxes || [],
-          confirmedBoxLibrary: data.confirmedBoxes || [],
-          buildMode: bm,
-          activeTask: 'arithmetic',
-          repSystem: data.repSystem || 'binary',
-          undoStack: [],
-          redoStack: [],
-        });
-        get().resetAllSimState();
-        setTimeout(() => get().evaluateCircuit(), 0);
-      } else {
-        alert('Invalid file format. Expected a workbook or circuit file.');
-      }
-    } catch (e) {
-      console.error('Invalid workbook JSON:', e);
-      alert('Invalid file. Please check the JSON format.');
-    }
+  markWorkbookSaved: (writtenJson, handle, fileName) => {
+    // Read back without Open's size cap: what was written is saved, whatever
+    // its size (Save itself refuses a file Open would refuse).
+    const written = parseWorkbookFile(writtenJson, { sizeCap: false });
+    set({
+      // The baseline is what the file now holds, not the live state: an edit
+      // made while the picker was open is still unsaved.
+      ...(written.ok ? { workbookSavedKey: workbookKeyHash(written.workbook) } : {}),
+      workbookDownloadedKey: null,
+      workbookFileHandle: handle,
+      // The workbook takes its file's name (the title is not in the key, so
+      // this never makes the sheet look unsaved).
+      ...(titleFromFileName(fileName) ? { workbookTitle: titleFromFileName(fileName) } : {}),
+    });
+  },
+
+  markWorkbookDownloaded: (downloadedJson) => {
+    const downloaded = parseWorkbookFile(downloadedJson, { sizeCap: false });
+    set({
+      // The baseline stays put: until a picked file holds it (or the person
+      // says don't save), New and Open keep asking.
+      workbookDownloadedKey: downloaded.ok ? workbookKeyHash(downloaded.workbook) : null,
+      // No file this page can write back to (a handle that just failed and
+      // fell back to a download is not one); the title stays.
+      workbookFileHandle: null,
+    });
   },
 
   buildMode: 'CC',
@@ -2913,14 +3020,14 @@ export const useStore = create<AppState>()((set, get) => ({
   },
 
   // Tabs (worksheets)
-  tabs: [{ id: defaultTabId, title: 'Circuit 1', buildMode: 'CC' as BuildMode, activeTask: 'arithmetic' as ActiveTask }],
+  tabs: [freshSandboxTab(defaultTabId)],
   activeTabId: defaultTabId,
   tabCircuits: new Map(),
 
   addTab: (title, buildMode, activeTask, innerMode) => {
     const state = get();
-    const newId = mintId({ kind: 'sandbox' });
-    const task = activeTask || 'arithmetic';
+    // A turbot tab carries its brain kind and its own arena (freshSandboxTab).
+    const tab = freshSandboxTab(mintId({ kind: 'sandbox' }), title, buildMode, innerMode, activeTask || 'arithmetic');
     // Save current tab
     const updatedTabCircuits = new Map(state.tabCircuits);
     updatedTabCircuits.set(state.activeTabId, {
@@ -2929,22 +3036,16 @@ export const useStore = create<AppState>()((set, get) => ({
       boxes: state.boxes,
       confirmedBoxes: state.confirmedBoxLibrary,
     });
-    // A turbot tab carries its brain kind and its own arena — the sandbox
-    // analog of a turbot question's innerMode + turbot_cases[0].arena, read
-    // through the SAME selectors (selectTurbotInnerMode/selectTurbotArena).
-    const turbotFields = buildMode === 'turbot'
-      ? { innerMode: innerMode ?? 'CC' as BuildMode, arena: sandboxDefaultArena() }
-      : {};
     set({
-      tabs: [...state.tabs, { id: newId, title, buildMode, activeTask: task, ...turbotFields }],
-      activeTabId: newId,
+      tabs: [...state.tabs, tab],
+      activeTabId: tab.id,
       tabCircuits: updatedTabCircuits,
       components: [],
       wires: [],
       boxes: [],
       confirmedBoxLibrary: [],
       buildMode,
-      activeTask: task,
+      activeTask: tab.activeTask,
     });
     get().resetAllSimState();
   },
@@ -4514,22 +4615,16 @@ let autoSaveTimer: ReturnType<typeof setTimeout> | null = null;
 
 function getAutoSaveData() {
   const s = useStore.getState();
-  // Use the workbook export format for auto-save
-  // Save current tab circuit into tabCircuits
-  const allTabCircuits = new Map(s.tabCircuits);
-  allTabCircuits.set(s.activeTabId, {
-    components: s.components,
-    wires: s.wires,
-    boxes: s.boxes,
-    confirmedBoxes: s.confirmedBoxLibrary,
-  });
+  // The sandbox blob: the tabs with the live canvas folded in (the same fold
+  // as a workbook file) and the file baseline, which moves with the sandbox.
   return {
     formatVersion: 2,
     workbookOpen: s.workbookOpen,
     workbookTitle: s.workbookTitle,
+    workbookSavedKey: s.workbookSavedKey,
     tabs: s.tabs,
     activeTabId: s.activeTabId,
-    tabCircuits: Object.fromEntries(allTabCircuits),
+    tabCircuits: Object.fromEntries(sandboxTabCircuits(s)),
     viewPreferences: {
       zoom: s.zoom,
       panX: s.panX,
@@ -4769,7 +4864,8 @@ useStore.subscribe((state, prev) => {
       state.buildMode !== prev.buildMode ||
       state.tabCircuits !== prev.tabCircuits ||
       state.workbookOpen !== prev.workbookOpen ||
-      state.workbookTitle !== prev.workbookTitle;
+      state.workbookTitle !== prev.workbookTitle ||
+      state.workbookSavedKey !== prev.workbookSavedKey;
   }
   if (!changed) return;
 
@@ -5159,6 +5255,7 @@ function sandboxPatchFrom(raw: string | null): Partial<AppState> {
       return {
         workbookOpen: false, // home-first: restore the sandbox into memory but land on Home
         workbookTitle: data.workbookTitle || 'Untitled Workbook',
+        workbookSavedKey: typeof data.workbookSavedKey === 'string' ? data.workbookSavedKey : null,
         tabs,
         activeTabId: activeId,
         tabCircuits,

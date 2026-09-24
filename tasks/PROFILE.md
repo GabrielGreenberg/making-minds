@@ -68,7 +68,7 @@ the wrong tree).
 | --- | --- | --- |
 | `app/` | `npx tsc -p tsconfig.app.json --noEmit` | strict types (`noUnusedLocals/Parameters` — CI is strict) |
 | `app/` | `npm run build` | the production bundle builds |
-| `app/` | `npm run check` | the budget guard + 18 headless harness tools (`app/tools/*Check.ts`; several boot a real server — minutes, not seconds) |
+| `app/` | `npm run check` | the budget guard + 21 headless harness tools (`app/tools/*Check.ts`; several boot a real server — minutes, not seconds) |
 | `server/` | `npm run typecheck` | server types |
 | `server/` | `npm run check` | serverCheck + authCheck + parityCheck (server ≡ engine grading) |
 

@@ -24,3 +24,4 @@
 2026-09-21-015 · chore · Browser-verify the CSS-only fixes landed without a browser (2026-09-17 pass + two legacy layout items) · 2026-09-24T02:07:33-0700 · task/015-browser-verify-css-fixes · b6d813c
 2026-09-21-024 · feature · Shift-click a gate to rotate it, with a light "(shift+click to ↻)" hint beside the Rotate button · 2026-09-24T02:46:34-0700 · task/024-shift-click-rotate · 008b735
 2026-09-21-025 · feature · Flash and briefly hold when the turbot reaches the goal, then continue the run · 2026-09-24T03:22:50-0700 · task/025-turbot-goal-flash · 3efc8a1
+2026-09-22-028 · feature · Save and load a sandbox worksheet as a file (visitor-mode bells and whistles) · 2026-09-24T04:31:36-0700 · task/028-sandbox-save-load-file · 772a1fa
