@@ -8,9 +8,9 @@ requires: browser
 area: app
 source: chat
 created: 2026-09-21T17:40:00-07:00
-status: in-progress
+status: done
 after:
-branch: task/024-shift-click-rotate
+branch:
 merged_into:
 ---
 
