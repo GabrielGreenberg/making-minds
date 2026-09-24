@@ -23,6 +23,8 @@ export {
 export type { SCNetlist, SCStepResult } from './sc';
 export {
   inlineSequentialBoxes,
+  boxInterior,
+  parsePortKey,
   memorySlots,
   withMemState,
   zeroMemState,
@@ -30,7 +32,7 @@ export {
   isSequentialBox,
   hasCombinationalLoop,
 } from './netlist';
-export type { Netlist, MemSlot } from './netlist';
+export type { Netlist, MemSlot, BoxInterior } from './netlist';
 export {
   sortStateComponents,
   evaluateFSMSymbolStep,

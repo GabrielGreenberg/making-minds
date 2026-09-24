@@ -1,5 +1,5 @@
 import { useRef, useState, useCallback, useEffect, useMemo } from 'react';
-import { useStore, selectEffectiveMode, selectLiveFsmStateId, selectTransitionNotationForSource, selectPasteScope } from '../store';
+import { useStore, selectEffectiveMode, selectLiveFsmStateId, selectTransitionNotationForSource, selectPasteScope, selectQuestionLocked } from '../store';
 import { inputCharTokens, hasCombinationalLoop, memorySlots } from '../engine';
 import { usePasteGuard, useNotice } from '../usePasteGuard';
 import type {
@@ -16,6 +16,7 @@ import {
   isMemSinkPort,
 } from '../types';
 import { mintId } from '../provenance/ids';
+import { unboundBoxes } from '../boxPorts';
 import {
   routeAllWires,
   validateSegmentPosition,
@@ -1847,6 +1848,9 @@ export function CircuitCanvas() {
   // For turbot questions the canvas edits the inner brain circuit, so
   // editor-behavior branches key off the effective (inner) mode.
   const effectiveMode = useStore(selectEffectiveMode);
+  // A locked canvas (marked done, frozen, a viewed submission) refuses the
+  // re-place the unbound-box warning asks for, so it isn't shown there.
+  const questionLocked = useStore(selectQuestionLocked);
   const selectedTool = useStore((s) => s.selectedTool);
   const boxes = useStore((s) => s.boxes);
   const boxDrawing = useStore((s) => s.boxDrawing);
@@ -1885,8 +1889,15 @@ export function CircuitCanvas() {
         w.push(`Warning: Merged link detected on port ${key.split(':')[1]}`);
       }
     }
+    // A box saved before 038 whose ports no rule could bind (boxPorts.ts):
+    // those ports read 0 until it is placed again.
+    if (!questionLocked) {
+      for (const label of unboundBoxes(components)) {
+        w.push(`Warning: ${label} has ports not connected to anything inside — draw and place it again`);
+      }
+    }
     return w;
-  }, [components, wires, effectiveMode]);
+  }, [components, wires, effectiveMode, questionLocked]);
 
   // ─── Keyboard shortcuts ──────────────────────────────────────
   useEffect(() => {

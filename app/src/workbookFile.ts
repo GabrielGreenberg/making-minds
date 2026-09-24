@@ -206,6 +206,9 @@ function componentCheck(comp: unknown, where: string, depth: number): void {
   if (!Array.isArray(comp.ports) || !comp.ports.every((p) => isObj(p) && typeof p.id === 'string')) {
     fail(`${where} (${comp.type}) has no port list`);
   }
+  if (!(comp.ports as Obj[]).every((p) => p.bind === undefined || typeof p.bind === 'string')) {
+    fail(`${where} (${comp.type}) has a bad port binding`);
+  }
   if (comp.rotation !== undefined && !isFiniteNum(comp.rotation)) fail(`${where} (${comp.type}) has a bad rotation`);
   if (comp.internalCircuit !== undefined) {
     if (!isObj(comp.internalCircuit)) fail(`${where} (${comp.type}) has a bad boxed circuit`);

@@ -45,11 +45,12 @@ import {
   buildSampleAssignment,
   buildCorrectSubmission,
   buildIncorrectSubmission,
+  ccCorrect,
   scCorrect,
   turbotCorrect,
   turbotIncorrect,
 } from '../src/devData/sampleData';
-import { boxWhole } from './builder';
+import { boxAcross, boxWhole } from './builder';
 import { gradeQuestion, gradeSubmission, summarizeResult } from '../src/engine/grader';
 import { applyManualReview, buildSubmission } from '../src/storage/submissionStore';
 import { emptyQuestionCircuit } from '../src/storage/workbookStore';
@@ -153,6 +154,29 @@ console.log('\n[boxed SC answer]');
     boxedQ.status === 'graded' && boxedQ.total > 0 && boxedQ.passed === boxedQ.total);
   check('...its per-case results equal the unboxed grade',
     JSON.stringify(boxedQ) === JSON.stringify(plainQ));
+}
+
+// A box drawn across wires (task 038): the CC and SC answers with everything
+// but their INs/OUTs in one box, its ports bound to the wires it cuts (no
+// IN/OUT inside), grade exactly as unboxed through the same submit path.
+console.log('\n[boxed-across answers]');
+{
+  const acrossSub = buildCorrectSubmission('across@example.com');
+  acrossSub.answers = acrossSub.answers.map((a) =>
+    a.questionId === 1 ? { ...a, circuit: boxAcross(ccCorrect()) }
+      : a.questionId === 2 ? { ...a, circuit: boxAcross(scCorrect()) }
+      : a);
+  const acrossResult = gradeSubmission(assignment, acrossSub);
+  for (const [id, mode] of [[1, 'CC'], [2, 'SC']] as const) {
+    const acrossQ = acrossResult.questions.find((q) => q.questionId === id)!;
+    const plainQ = correct.questions.find((q) => q.questionId === id)!;
+    const box = acrossSub.answers.find((a) => a.questionId === id)!.circuit.components.find((c) => c.type === 'BOXED');
+    check(`the ${mode} answer boxed across (no IN/OUT inside) grades 100% (${acrossQ.passed}/${acrossQ.total})`,
+      box != null && !box.internalCircuit!.components.some((c) => c.type === 'INPUT' || c.type === 'OUTPUT') &&
+      acrossQ.status === 'graded' && acrossQ.total > 0 && acrossQ.passed === acrossQ.total);
+    check(`...its per-case results equal the unboxed ${mode} grade`,
+      JSON.stringify(acrossQ) === JSON.stringify(plainQ));
+  }
 }
 
 // Manual review of the pending open question (the instructor grading seam):

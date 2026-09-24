@@ -386,7 +386,9 @@ export function gradedMachineKey(circuit: CircuitData): string {
         c.id,
         c.type,
         c.label,
-        (c.ports ?? []).map((p) => `${p.side}${p.index}:${p.id}`),
+        // A box port's binding (task 038) only when it has one, so a key
+        // from before it is unchanged.
+        (c.ports ?? []).map((p) => `${p.side}${p.index}:${p.id}` + (p.bind !== undefined ? `=${p.bind}` : '')),
         c.memDirection ?? '',
         c.stateKind === 'external' ? 'external' : '', // absent = internal
         c.boxedCircuitId ?? '',
