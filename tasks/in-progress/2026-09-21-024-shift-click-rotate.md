@@ -248,3 +248,25 @@ None skipped. Nits left alone: `rotationOf`'s `?? 0` would also pass if undo rem
   that way because the task says the hint shows whenever the button does.
 - Spec §2.2 multi-select wording was edited.
 **NEXT STEP:** loop session: do the owed browser/visual checks above, then land per PROFILE §5.
+
+### 2026-09-24 — loop browser check and land
+- **Browser, local mode (dev server restarted on the branch), John's sandbox, real modifier
+  clicks.**
+  - Logic tab, an AND and a NOT. Four fast shift-clicks on the AND gave 90° after the first and
+    0° after the fourth, with no select-all (the `detail ≥ 3` branch comes after
+    modifierClick). Undo restored the previous angle (270°).
+  - With nothing selected, cmd-click on the AND gave [AND]; cmd-click on the NOT gave
+    [AND, NOT]; a second cmd-click on the NOT gave [AND]. (The first try looked wrong because
+    my "background" click had landed in the right panel, so the AND was still selected.)
+  - The toolbar reads "↻ Rotate (shift+click to ↻)". The hint stays legible when the button is
+    disabled.
+  - FSM tab, S₀ and S₁. Click S₀, shift-click S₁: the transition S₀→S₁ is created, nothing
+    rotates, and the selection moves to S₁.
+- **For Gabriel to confirm:**
+  - Intake assumptions (a) and (b) as implemented. (a) The component multi-select toggle is now
+    cmd/ctrl-click; shift still toggles wires and STATE nodes, and shift+drag stays additive.
+    (b) MEM, BOXED and IN/OUT rotate too.
+  - The hint also shows on FSM/TM canvases, where shift-click connects states. That is as
+    specified ("visible whenever the button is").
+  - Spec §2.2's multi-select line was edited to match.
+- Landed via a merge into `main`.
