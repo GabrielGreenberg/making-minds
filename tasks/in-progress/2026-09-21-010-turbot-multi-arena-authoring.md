@@ -66,3 +66,20 @@ HW6 P2's 30×30 arenas scroll in their box; a new turbot question starts with on
 disabled; ~375px wraps with no page scroll; student smoke — after moving an arena to #1, the
 student Map and problem page show it. Nothing owed to Gabriel.
 **Next step.** Loop session: the owed browser check above, then land per PROFILE §5.
+
+### 2026-09-24 — loop browser check and land
+- **Browser, local mode (dev server restarted on the branch), Prof. Ada.** HW3 → Edit →
+  Problem 14 shows Arenas with 3 rows ("6×6 · Reach goal and stop · 20 steps", 7×5, 4×6),
+  #1 marked "Editing".
+  - Edit on #2 loads it into the editor: "Arena #2", width 7, height 5, max steps 20.
+  - Duplicate on #2 gives 4 rows with the copy (#3) active.
+  - Moving the copy up raises the misplaced-runs warning (role=alert) naming arenas #2 and #3.
+  - Cancel leaves the stored family unchanged (3 arenas: 6×6, 7×5, 4×6).
+- **Fixed here:** the review nits. The `turbotCheck [goal-less arenas]` run literal gains
+  `tapeCellsUsed`. The CLAUDE.md Instructor UI row names `TurbotArenasEditor`, paid for in the
+  same row (39,995 B, within budget). An older literal at `turbotCheck.ts:920` (2026-07) has
+  the same missing field. Tools are outside `tsconfig.app.json`, so CI never sees it; that is
+  close to task 016's scope and is left alone. turbotCheck passes.
+- **Still owed:** Save → reopen of an edited family in the browser (round-trip pinned in
+  `pipelineCheck` for every sample and HW turbot question), and HW6 P2's 30×30 rendering.
+- Landed via a merge into `main`.

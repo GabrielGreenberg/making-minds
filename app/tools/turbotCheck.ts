@@ -1027,6 +1027,7 @@ console.log('\n[goal-less arenas]');
     haltedByBrain: false,
     stopped: true,
     hitStepLimit: false,
+    tapeCellsUsed: 0,
   });
   // Rest on each cell after a trace that has crossed all three.
   const everyRun = [run(0, [1, 2, 1, 0]), run(1, [1, 2, 1]), run(2, [1, 2, 1, 0, 1, 2])];
