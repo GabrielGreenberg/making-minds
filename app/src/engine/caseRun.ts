@@ -33,6 +33,7 @@ import type {
 } from '../types';
 import { evaluateCCInputs } from './cc';
 import { evaluateSCSequence } from './sc';
+import { zeroMemState } from './netlist';
 import { evaluateFSMSymbolSequence } from './fsm';
 import { fsmNotation } from './notation';
 import { evaluateTMSequence, tapeCellsUsed } from './tm';
@@ -100,21 +101,17 @@ export function questionLayout(question: AssignmentQuestion): CodecLayout | null
 }
 
 /**
- * The machine as graded: every top-level MEM starts at 0 ("all memory
- * initializes to 0"). A saved circuit carries whatever `storedValue` the
- * student's last UI run left behind — autosaved and submitted as-is — and
- * the SC engine, a turbot's SC brain and SC perception all seed their MEMs
- * from it; grading that scratch state would let a correct serial adder
- * submitted mid-run fail. (SC boxing refuses MEM, so boxed internals carry
- * none.) Returns the circuit itself when there is nothing to zero.
+ * The machine as graded: every MEM starts at 0 ("all memory initializes to
+ * 0"), a MEM inside a placed box included. A saved circuit carries whatever
+ * `storedValue` the student's last UI run left behind — autosaved and
+ * submitted as-is — and the SC engine, a turbot's SC brain and SC perception
+ * all seed their MEMs from it; grading that scratch state would let a correct
+ * serial adder submitted mid-run fail. Returns the circuit itself when there
+ * is nothing to zero (engine/netlist.ts zeroMemState).
  */
 export function gradingCircuit(circuit: CircuitData): CircuitData {
-  const dirty = circuit.components.some((c) => c.type === 'MEM' && (c.storedValue ?? 0) !== 0);
-  if (!dirty) return circuit;
-  return {
-    ...circuit,
-    components: circuit.components.map((c) => (c.type === 'MEM' ? { ...c, storedValue: 0 } : c)),
-  };
+  const components = zeroMemState(circuit.components);
+  return components === circuit.components ? circuit : { ...circuit, components };
 }
 
 /** The two question-wide component rules, checked together at the head of

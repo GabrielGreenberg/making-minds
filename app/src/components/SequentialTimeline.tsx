@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { useStore } from '../store';
+import { hasMemory } from '../engine';
 
 export function SequentialTimeline() {
   const components = useStore((s) => s.components);
@@ -8,7 +9,7 @@ export function SequentialTimeline() {
   const scTimeStep = useStore((s) => s.scTimeStep);
   const setScInputBit = useStore((s) => s.setScInputBit);
   const buildMode = useStore((s) => s.buildMode);
-  const hasMem = components.some((c) => c.type === 'MEM');
+  const hasMem = hasMemory(components); // boxed MEMs count: a sequential box is SC
   const isSC = buildMode === 'SC' || hasMem;
 
   const [open, setOpen] = useState(true);

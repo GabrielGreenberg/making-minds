@@ -7,6 +7,11 @@
 
 import type { CircuitComponent, Wire, ComponentType } from '../types';
 import { getMemOutputPortId, getMemInputPortId } from '../types';
+import { sortByLabel, inlineSequentialBoxes } from './netlist';
+
+// The IN/OUT label-ordering convention lives beside the box-port splicing
+// that must agree with it (engine/netlist.ts); re-exported here, its old home.
+export { sortByLabel };
 
 /**
  * Topologically order components for evaluation. Wires feeding a MEM block's
@@ -91,25 +96,6 @@ export function evaluateGate(type: ComponentType, inputs: number[], comp?: Circu
   }
 }
 
-/**
- * The ONE IN/OUT label-ordering convention: select a circuit's INPUT (or
- * OUTPUT) components and order them by the numeric suffix of their permanent
- * label ("IN2" → 2; unparseable → 0). Both the top-level grading path
- * (`evaluateCCInputs`) and boxed-circuit internal binding
- * (`evaluateBoxedCircuit`) MUST bind bit vectors through this helper so the
- * two can never desync — and so does the store's graded-case loader
- * (`loadCaseInput`), which sets a CC case's INPUT toggles through it.
- */
-export function sortByLabel(components: CircuitComponent[], prefix: 'IN' | 'OUT'): CircuitComponent[] {
-  return components
-    .filter((c) => (prefix === 'IN' ? c.type === 'INPUT' : c.type === 'OUTPUT'))
-    .sort((a, b) => {
-      const na = parseInt(a.label.replace(prefix, '')) || 0;
-      const nb = parseInt(b.label.replace(prefix, '')) || 0;
-      return na - nb;
-    });
-}
-
 /** Simulate the internal circuit of a BOXED component */
 export function evaluateBoxedCircuit(comp: CircuitComponent | undefined, externalInputs: number[]): number[] {
   if (!comp?.internalCircuit) return externalInputs.map(() => 0);
@@ -126,8 +112,13 @@ export function evaluateBoxedCircuit(comp: CircuitComponent | undefined, externa
     return { ...c };
   });
 
-  // Topologically sort and evaluate the internal circuit
-  const sorted = topologicalSort(preppedComps, intWires);
+  // Topologically sort and evaluate the internal circuit. A clocked run
+  // never evaluates a box holding memory here (engine/netlist.ts inlines it),
+  // but the store's local I/O step evaluates a placed box as one gate — so a
+  // MEM inside reads out what it holds, and a memory-holding box nested
+  // inside is inlined, as everywhere, so a loop through it resolves.
+  const net = inlineSequentialBoxes(preppedComps, intWires);
+  const sorted = topologicalSort(net.components, net.wires);
   const portValues = new Map<string, number>();
 
   for (const ic of sorted) {
@@ -135,11 +126,15 @@ export function evaluateBoxedCircuit(comp: CircuitComponent | undefined, externa
       portValues.set(`${ic.id}:out`, ic.value ?? 0);
       continue;
     }
+    if (ic.type === 'MEM') {
+      portValues.set(`${ic.id}:${getMemOutputPortId(ic)}`, ic.storedValue ?? 0);
+      continue;
+    }
 
     const inputPorts = ic.ports.filter((p) => p.side === 'left');
     const inputVals: number[] = [];
     for (const port of inputPorts) {
-      const wire = intWires.find(
+      const wire = net.wires.find(
         (w) => w.targetComponentId === ic.id && w.targetPortId === port.id
       );
       if (wire) {
@@ -184,8 +179,31 @@ export interface CCEvalResult {
  * (blank) input propagates as undefined through gates; OUTPUT ports are only
  * set when actually wired. The caller decides how to render absent wire values
  * (the store maps them to the -1 sentinel).
+ *
+ * A placed box holding memory is evaluated inlined (engine/netlist.ts), so a
+ * feedback loop through it resolves like the unboxed circuit; its output
+ * ports still read under their own keys (`boxId:out1`), and `wireValues`
+ * covers the wires as given.
  */
 export function evaluateCC(
+  components: CircuitComponent[],
+  wires: Wire[]
+): CCEvalResult {
+  const net = inlineSequentialBoxes(components, wires);
+  if (net.components === components) return evaluateFlatCC(components, wires);
+  const { portValues } = evaluateFlatCC(net.components, net.wires);
+  for (const [alias, src] of net.portAlias) {
+    portValues.set(alias, src === null ? undefined : portValues.get(src));
+  }
+  const wireValues = new Map<string, number>();
+  for (const w of wires) {
+    const v = portValues.get(`${w.sourceComponentId}:${w.sourcePortId}`);
+    if (v != null) wireValues.set(w.id, v);
+  }
+  return { portValues, wireValues };
+}
+
+function evaluateFlatCC(
   components: CircuitComponent[],
   wires: Wire[]
 ): CCEvalResult {

@@ -1,6 +1,6 @@
 import { useMemo, useState, useCallback, useRef, useEffect } from 'react';
 import { useStore, selectTmNotation, selectEffectiveMode, selectCodecWindow, selectFsmNotation } from '../store';
-import { tmNotation } from '../engine';
+import { tmNotation, memorySlots, hasMemory } from '../engine';
 import { outputDisplayString } from './outputDisplay';
 import { TurbotArenaPanel } from './TurbotArenaPanel';
 import { ProblemBody, ProblemContext } from './ProblemSetDocument';
@@ -105,9 +105,9 @@ export function DataTable() {
   const ensureSequenceLoaded = useCallback(() => {
     const state = useStore.getState();
     const maxLen = Math.max(...state.scInputSequence.map((s) => s.length), 0);
-    const drain = state.components.filter((c) => c.type === 'MEM').length;
+    const drain = memorySlots(state.components).length;
     // Question runs end at the codec window (grader's run length); sandbox
-    // runs at L + one 0-drain step per MEM.
+    // runs at L + one 0-drain step per MEM (boxed ones included).
     const runEnd = selectCodecWindow(state) ?? maxLen + drain;
     if (maxLen > 0 && state.scTimeStep <= runEnd) return; // already loaded and in progress
 
@@ -137,7 +137,7 @@ export function DataTable() {
       // Question runs execute exactly the codec window (the steps the grader
       // reads), feeding the codec's stream for the typed value (see scStep).
       // Sandbox: L plus one 0-input flush step per MEM so delayed bits drain.
-      const drain = state.components.filter((c) => c.type === 'MEM').length;
+      const drain = memorySlots(state.components).length;
       const win = selectCodecWindow(state);
       const runEnd = win ?? maxLen + drain;
       const remaining = runEnd - (state.scTimeStep - 1);
@@ -153,7 +153,7 @@ export function DataTable() {
         const s = useStore.getState();
         const end = selectCodecWindow(s) ??
           Math.max(...s.scInputSequence.map((sq) => sq.length), 0) +
-          s.components.filter((c) => c.type === 'MEM').length;
+          memorySlots(s.components).length;
         if (step >= remaining || s.scTimeStep > end) {
           clearInterval(interval);
           setIsRunning(false);
@@ -171,7 +171,7 @@ export function DataTable() {
     setTimeout(() => {
       const state = useStore.getState();
       const maxLen = Math.max(...state.scInputSequence.map((s) => s.length), 0);
-      const drain = state.components.filter((c) => c.type === 'MEM').length;
+      const drain = memorySlots(state.components).length;
       // Question steps stop at the codec window; sandbox at L + per-MEM drain.
       const win = selectCodecWindow(state);
       if (win !== null ? state.scTimeStep <= win : (maxLen === 0 || state.scTimeStep <= maxLen + drain)) {
@@ -241,7 +241,8 @@ export function DataTable() {
   const effectiveMode = useStore(selectEffectiveMode);
 
   const wires = useStore((s) => s.wires);
-  const hasMem = components.some((c) => c.type === 'MEM');
+  // Memory anywhere — a canvas holding only a sequential box is SC too.
+  const hasMem = hasMemory(components);
   const isTurbot = buildMode === 'turbot';
   const isCC = buildMode === 'CC';
   const isSC = buildMode === 'SC' || hasMem;
@@ -292,13 +293,10 @@ export function DataTable() {
       return numA - numB;
     });
 
-  const mems = components
-    .filter((c) => c.type === 'MEM')
-    .sort((a, b) => {
-      const numA = parseInt(a.label.replace('M', ''));
-      const numB = parseInt(b.label.replace('M', ''));
-      return numA - numB;
-    });
+  // The state columns: every MEM the machine clocks, in the engine's order —
+  // top-level ones, then each sequential box's ('Box 1·M1'). The table is
+  // keyed by the machine's whole state, so a boxed MEM is a column too.
+  const mems = useMemo(() => memorySlots(components), [components]);
 
   // Check which outputs are actually connected (have an incoming wire)
   const outputConnected = useMemo(() =>
@@ -323,7 +321,7 @@ export function DataTable() {
     // start stepping — otherwise the "current" row looks active but is
     // unclickable, leaving Run/Step/Reset stuck disabled.
     const key = isSC
-      ? inputKey([...inputs.map((c) => c.value ?? 0), ...mems.map((c) => c.storedValue ?? 0)])
+      ? inputKey([...inputs.map((c) => c.value ?? 0), ...mems.map((m) => m.value)])
       : inputKey(inputs.map((c) => c.value ?? 0));
     return tableRows.some((r) => inputKey([...r.inputBits, ...(r.memBits || [])]) === key)
       ? key
@@ -976,7 +974,7 @@ export function DataTable() {
                 <tr>
                   <th style={{ border: 'none', background: 'transparent' }} />
                   {inputs.map((inp) => <th key={inp.id}>{inp.label}</th>)}
-                  {mems.map((mem) => <th key={mem.id}>{mem.label}</th>)}
+                  {mems.map((mem) => <th key={mem.key}>{mem.label}</th>)}
                   {outputs.map((out) => <th key={out.id}>{out.label}</th>)}
                 </tr>
               </thead>

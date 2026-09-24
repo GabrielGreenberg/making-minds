@@ -34,10 +34,12 @@ import {
   getMemOutputPortId,
   getMemInputPortId,
   isMemSinkPort,
+  placeableBoxKinds,
+  CC_AND_SC_BOXES,
   GRID_SIZE,
   toSubscript,
 } from './types';
-import { topologicalSort, evaluateGate, evaluateCC, evaluateSCSingleStep, sortStateComponents, evaluateFSMSymbolStep, evaluateTMSingleStep, evaluateTMSequence, DEFAULT_TM_MAX_STEPS, notationForRepresentation, encodeTM, stepCountFor, encodeInput, valueToBits, bitsToValue, bitsToTally, bitsToBinary, sortByLabel, fsmNotation, turbotFsmNotation, tmNotation, turbotInternalNotation, turbotExternalNotation, questionLayout, caseStimulus, recordedCaseSeparations, gradedMachineKey, gradingCircuit, type CodecLayout, type TransitionNotation } from './engine';
+import { topologicalSort, evaluateGate, evaluateCC, scNetlist, evaluateSCStep, boxMemoryOutputs, stepBoxedMemory, memorySlots, withMemState, zeroMemState, hasMemory, isSequentialBox, hasCombinationalLoop, sortStateComponents, evaluateFSMSymbolStep, evaluateTMSingleStep, evaluateTMSequence, DEFAULT_TM_MAX_STEPS, notationForRepresentation, encodeTM, stepCountFor, encodeInput, valueToBits, bitsToValue, bitsToTally, bitsToBinary, sortByLabel, fsmNotation, turbotFsmNotation, tmNotation, turbotInternalNotation, turbotExternalNotation, questionLayout, caseStimulus, recordedCaseSeparations, gradedMachineKey, gradingCircuit, type CodecLayout, type TransitionNotation } from './engine';
 import { senseAheadSymbol, applyMotorCommand, initialBrainState, runBrainStep, stateKindOf, type BrainState } from './engine/turbot';
 import { getAssignment, listAssignments } from './assignments';
 import { emptyQuestionCircuit, restoreQuestionCircuits } from './storage/workbookStore';
@@ -427,6 +429,25 @@ export function selectEffectiveMode(s: {
 }
 
 /**
+ * Which kinds of confirmed box this canvas may place — the palette filters
+ * by it and placeBoxInstance / confirmBox enforce it. A question (or turbot
+ * brain) follows its mode (types.ts placeableBoxKinds). The sandbox's Logic
+ * Circuit tab is buildMode CC but carries MEM and runs as SC once it holds
+ * any, so it takes sequential boxes too. Returns shared constants (stable
+ * for a zustand selector).
+ */
+export function selectPlaceableBoxKinds(s: {
+  buildMode: BuildMode;
+  assignment: AssignmentData | null;
+  currentQuestionIndex: number;
+  tabs?: SandboxTab[];
+  activeTabId?: string;
+}): ReadonlyArray<'CC' | 'SC'> {
+  if (!s.assignment && s.buildMode === 'CC') return CC_AND_SC_BOXES;
+  return placeableBoxKinds(selectEffectiveMode(s));
+}
+
+/**
  * The currently-live FSM control state (component id) — the ONE source of
  * truth for the canvas's green state highlight, fed by whichever simulation
  * is active. An FSM sim run carries it in fsmCurrentStateId; a turbot arena
@@ -744,7 +765,7 @@ interface AppState {
   // depends on where you are:
   //   - in an assignment: the whole ASSIGNMENT (notes item 8). A box built for
   //     one question is available in every question of that homework which can
-  //     place its kind (`placeableBoxKinds`), so it does not swap on question
+  //     place its kind (`selectPlaceableBoxKinds`), so it does not swap on question
   //     navigation; it persists as `AssignmentState.boxLibrary`.
   //   - in the sandbox: per TAB. It swaps with `boxes` on tab navigation and
   //     persists as `WorksheetData.confirmedBoxes`, so scratch sheets stay
@@ -1055,6 +1076,44 @@ const defaultTabId = 'tab-1';
 // stays set until the user next acts on an input (setInputValue / row select),
 // which is the signal that they want this combo evaluated again.
 let suppressAutoAddRow = false;
+
+/**
+ * The outputs of a sequential box that its memory alone decides
+ * (boxMemoryOutputs), as `comp:port` keys → value. The local step seeds them
+ * as sources, exactly like a MEM's output, and never re-derives them from the
+ * box's inputs: a free end on another input port must not blank them.
+ */
+function boxMemoryPortValues(comp: CircuitComponent): Map<string, number> {
+  const known = new Map<string, number>();
+  if (!isSequentialBox(comp)) return known;
+  const values = boxMemoryOutputs(comp);
+  comp.ports.filter((p) => p.side === 'right').forEach((p, j) => {
+    if (values[j] !== undefined) known.set(`${comp.id}:${p.id}`, values[j]);
+  });
+  return known;
+}
+
+/**
+ * The local I/O row being stepped: its input bits and its memory (memorySlots
+ * order) as they stood when the row was selected. localStepSelectedKey holds
+ * exactly those bits joined, so it is read back from there — the MEM update
+ * steps move the machine to its NEXT state mid-step, and the row must not
+ * move with it. With no (matching) selection: the machine as it is now.
+ */
+function localStepRow(s: {
+  components: CircuitComponent[];
+  localStepSelectedKey: string | null;
+}): { inputBits: number[]; memBits: number[] } {
+  const inputs = s.components
+    .filter((c) => c.type === 'INPUT')
+    .sort((a, b) => parseInt(a.label.replace('IN', '')) - parseInt(b.label.replace('IN', '')));
+  const slots = memorySlots(s.components);
+  const bits = s.localStepSelectedKey?.split(',').map(Number) ?? [];
+  if (bits.length === inputs.length + slots.length && bits.every((b) => b === 0 || b === 1)) {
+    return { inputBits: bits.slice(0, inputs.length), memBits: bits.slice(inputs.length) };
+  }
+  return { inputBits: inputs.map((c) => c.value ?? 0), memBits: slots.map((m) => m.value) };
+}
 
 // Monotonic token for openAssignment: each open bumps it, and an open whose
 // seam reads resolve after a newer open started applies nothing — a stale
@@ -1733,7 +1792,9 @@ export const useStore = create<AppState>()((set, get) => ({
 
     // CC mode: auto-populate the I/O table with the current input→output row
     // Auto-populate the I/O table with the current input→output row
-    const hasMem = updatedComponents.some((c) => c.type === 'MEM');
+    // Memory counts wherever it sits: a canvas holding only a sequential box
+    // is still an SC circuit, and its boxed MEMs are state-table columns.
+    const hasMem = hasMemory(updatedComponents);
     if ((state.buildMode === 'CC' || hasMem) && !suppressAutoAddRow) {
       const inputs = updatedComponents
         .filter((c) => c.type === 'INPUT')
@@ -1749,18 +1810,12 @@ export const useStore = create<AppState>()((set, get) => ({
           const numB = parseInt(b.label.replace('OUT', ''));
           return numA - numB;
         });
-      const mems = updatedComponents
-        .filter((c) => c.type === 'MEM')
-        .sort((a, b) => {
-          const numA = parseInt(a.label.replace('M', ''));
-          const numB = parseInt(b.label.replace('M', ''));
-          return numA - numB;
-        });
+      const mems = memorySlots(updatedComponents);
 
       const allInputsSet = inputs.every((c) => c.value != null);
       if (inputs.length > 0 && outputs.length > 0 && allInputsSet) {
         const inputBits = inputs.map((c) => c.value!);
-        const memBits = mems.map((c) => c.storedValue ?? 0);
+        const memBits = mems.map((m) => m.value);
         const outputBits = outputs.map((c) => c.value != null ? c.value : 0);
         const key = [...inputBits, ...memBits].join(',');
 
@@ -2418,55 +2473,25 @@ export const useStore = create<AppState>()((set, get) => ({
       insideIds.has(w.sourceComponentId) && insideIds.has(w.targetComponentId)
     );
 
-    // ── MEM may not be boxed (SC boxing, notes item 23) ──
-    // A boxed circuit is evaluated statelessly (engine/cc.ts
-    // evaluateBoxedCircuit), and evaluateSCSequence only gives clocked state to
-    // TOP-LEVEL MEM blocks — it does not look inside BOXED internals. A boxed
-    // MEM would therefore never advance: the one-tick delay IN1→MEM→OUT1
-    // yields 0,1,0,1 unboxed and 0,0,0,0 boxed. So an SC canvas can box its
-    // combinational sub-circuits (that is what item 23 asks for), but the MEM
-    // itself stays outside the box until the engine can carry nested state.
-    {
-      const mems = insideComps.filter((c) => c.type === 'MEM');
-      if (mems.length > 0) {
-        return `Memory cannot go inside a box: ${mems.map((m) => m.label).join(', ')}. ` +
-          'A boxed circuit has no clock of its own, so a boxed MEM would never ' +
-          'update. Box the gates around it and leave the MEM on the canvas.';
-      }
+    // ── Memory: a box holding a MEM is a SEQUENTIAL box ──
+    // Its memory is clocked with the machine wherever it is placed — every
+    // run inlines it (engine/netlist.ts), so boxed ≡ unboxed. It is placeable
+    // only where a machine may be sequential (selectPlaceableBoxKinds), so a
+    // canvas that cannot place one does not confirm one either.
+    const sequential = hasMemory(insideComps);
+    if (sequential && !selectPlaceableBoxKinds(state).includes('SC')) {
+      const mems = insideComps.filter((c) => c.type === 'MEM' || isSequentialBox(c));
+      return `Memory cannot go inside a box here: ${mems.map((m) => m.label).join(', ')}. ` +
+        'A box holding memory is a sequential circuit, and this canvas takes ' +
+        'combinational boxes only. Box the gates around it and leave the ' +
+        'memory on the canvas.';
     }
 
     // ── Textbook Rule 1: No loops ──
-    // Check for cycles among inside components using internal wires.
-    // MEM blocks break feedback loops (like in topological sort), so skip
-    // wires feeding into a MEM's input port.
-    {
-      const compMap = new Map(insideComps.map((c) => [c.id, c]));
-      const adj = new Map<string, string[]>();
-      for (const c of insideComps) adj.set(c.id, []);
-      for (const w of internalWires) {
-        // Skip wires into MEM input ports — MEM breaks the cycle
-        const targetComp = compMap.get(w.targetComponentId);
-        if (targetComp?.type === 'MEM' && isMemSinkPort(targetComp, w.targetPortId)) continue;
-        const list = adj.get(w.sourceComponentId);
-        if (list) list.push(w.targetComponentId);
-      }
-      const visited = new Set<string>();
-      const recStack = new Set<string>();
-      function hasCycle(nodeId: string): boolean {
-        visited.add(nodeId);
-        recStack.add(nodeId);
-        for (const next of adj.get(nodeId) || []) {
-          if (!visited.has(next) && hasCycle(next)) return true;
-          if (recStack.has(next)) return true;
-        }
-        recStack.delete(nodeId);
-        return false;
-      }
-      for (const c of insideComps) {
-        if (!visited.has(c.id) && hasCycle(c.id)) {
-          return 'Loop detected: boxed circuits cannot contain loops.';
-        }
-      }
+    // No cycle among the inside components that a MEM does not break —
+    // looking through any sequential box placed inside.
+    if (hasCombinationalLoop(insideComps, internalWires)) {
+      return 'Loop detected: boxed circuits cannot contain loops.';
     }
 
     // ── Textbook Rule 2: No merged links ──
@@ -2516,12 +2541,15 @@ export const useStore = create<AppState>()((set, get) => ({
       }
     }
 
-    // Check every port on every inside component
+    // Check every port on every inside component. A MEM's ports play the
+    // roles its direction gives them, not their sides: its left `mout` port
+    // is the SOURCE when data flows right-to-left (the default).
     for (const comp of insideComps) {
       for (const port of comp.ports) {
         const key = `${comp.id}:${port.id}`;
+        const isInputPort = comp.type === 'MEM' ? isMemSinkPort(comp, port.id) : port.side === 'left';
 
-        if (port.side === 'left') {
+        if (isInputPort) {
           // Input port: must have an internal wire OR a crossing wire coming in
           const hasInternal = internalWires.some(
             (w) => w.targetComponentId === comp.id && w.targetPortId === port.id
@@ -2587,9 +2615,11 @@ export const useStore = create<AppState>()((set, get) => ({
         {
           id,
           name: suggestedName,
+          kind: sequential ? 'SC' : 'CC',
           inputPortIds,
           outputPortIds,
-          internalComponents: JSON.parse(JSON.stringify(insideComps)),
+          // A stamped copy starts at rest, whatever the canvas was holding.
+          internalComponents: zeroMemState(JSON.parse(JSON.stringify(insideComps)) as CircuitComponent[]),
           internalWires: JSON.parse(JSON.stringify(internalWires)),
         },
       ],
@@ -2610,7 +2640,6 @@ export const useStore = create<AppState>()((set, get) => ({
     const outPortIds = libEntry?.outputPortIds || localBox?.outputPortIds || [];
 
     if (!name) return;
-    state.pushHistory(1);
 
     // Get internal circuit from library snapshot, or gather from current tab
     let internalComps: CircuitComponent[];
@@ -2627,6 +2656,13 @@ export const useStore = create<AppState>()((set, get) => ({
     } else {
       return;
     }
+
+    // Only a kind this canvas may place (the palette offers no other; this is
+    // the store's own guard). A box holding memory is sequential, whatever
+    // an older entry's `kind` says.
+    const kind = libEntry?.kind === 'FSM' ? 'FSM' : hasMemory(internalComps) ? 'SC' : 'CC';
+    if (kind === 'FSM' || !selectPlaceableBoxKinds(state).includes(kind)) return;
+    state.pushHistory(1);
 
     // Build ports: inputs on left, outputs on right
     const inputPorts: import('./types').Port[] = inPortIds.map((_, i) => ({
@@ -2652,7 +2688,8 @@ export const useStore = create<AppState>()((set, get) => ({
       value: 0,
       boxedCircuitId: boxId,
       internalCircuit: {
-        components: JSON.parse(JSON.stringify(internalComps)),
+        // Each instance keeps its own memory, starting at rest.
+        components: zeroMemState(JSON.parse(JSON.stringify(internalComps)) as CircuitComponent[]),
         wires: JSON.parse(JSON.stringify(internalWires)),
       },
     };
@@ -2745,6 +2782,16 @@ export const useStore = create<AppState>()((set, get) => ({
       allowed: selectAllowedComponents(state),
     });
     if (!verdict.ok) return verdict.message;
+    // A box holding memory goes only where a sequential box may be placed —
+    // placeBoxInstance's rule, which a paste must not route around (both CC
+    // and SC canvases are paste kind 'circuit'). Canvases that take no boxes
+    // at all (a sandbox FSM/TM tab, where paste is free) are left alone.
+    const kinds = selectPlaceableBoxKinds(state);
+    const sequentialBoxes = verdict.clip.components.filter(isSequentialBox);
+    if (sequentialBoxes.length > 0 && kinds.includes('CC') && !kinds.includes('SC')) {
+      return `A box holding memory can't go on this canvas: ${sequentialBoxes.map((b) => b.label).join(', ')}. ` +
+        'It is a sequential circuit, and this canvas takes combinational boxes only.';
+    }
     // A fresh copy per paste, every id (BOXED internals too) minted anew in
     // the TARGET's scope: two pastes of one item never share objects or ids,
     // and a paste carried between assignments binds to the one it lands in.
@@ -2987,56 +3034,51 @@ export const useStore = create<AppState>()((set, get) => ({
       .filter((c) => c.type === 'MEM')
       .sort((a, b) => parseInt(a.label.replace('M', '')) - parseInt(b.label.replace('M', '')));
 
-    // Set INPUT values and MEM stored values; clear everything else
-    const updatedComps = components.map((c) => {
+    // Set INPUT values and the machine's memory (memorySlots order: top-level
+    // MEMs, then boxed ones — the row's state columns); clear everything else
+    const cleared = components.map((c) => {
       if (c.type === 'INPUT') {
         const idx = inputs.indexOf(c);
         const val = idx >= 0 && idx < inBits.length ? inBits[idx] : 0;
         return { ...c, value: val, inputValues: [val] };
       }
-      if (c.type === 'MEM') {
-        const idx = mems.indexOf(c);
-        const val = memBits && idx >= 0 && idx < memBits.length ? memBits[idx] : (c.storedValue ?? 0);
-        return { ...c, storedValue: val, value: undefined };
-      }
       return { ...c, value: undefined };
     });
+    const updatedComps = memBits ? withMemState(cleared, memBits) : cleared;
 
-    // Initialize port values with INPUT and MEM outputs only
+    // Initialize port values with INPUT and MEM outputs only — and the
+    // outputs of a sequential box that its memory alone decides, which are
+    // sources exactly like a MEM's (so a loop through the box still steps).
     const portValues: Record<string, number | undefined> = {};
+    const memoryPorts = new Set<string>();
     for (const comp of updatedComps) {
       if (comp.type === 'INPUT') {
         portValues[`${comp.id}:out`] = comp.value;
       } else if (comp.type === 'MEM') {
         portValues[`${comp.id}:${getMemOutputPortId(comp)}`] = comp.storedValue ?? 0;
+      } else {
+        for (const [key, value] of boxMemoryPortValues(comp)) {
+          portValues[key] = value;
+          memoryPorts.add(key);
+        }
       }
     }
+    const fromMemoryPort = (w: Wire) => memoryPorts.has(`${w.sourceComponentId}:${w.sourcePortId}`);
 
     // Build wire evaluation order: follow topological sort of components.
     // For each component in topo order, collect its outgoing wires.
     // Inputs come first, then memories, then gates — all via topo sort.
-    const sorted = topologicalSort(updatedComps, wires);
+    // A wire leaving a box's memory-decided output is not an ordering edge
+    // (its value is known up front), so a loop through that box sorts.
+    const sorted = topologicalSort(updatedComps, wires.filter((w) => !fromMemoryPort(w)));
     // Separate: INPUTs first, then MEMs, then the rest (topo order handles the rest)
     const inputComps = sorted.filter((c) => c.type === 'INPUT');
     const memComps = sorted.filter((c) => c.type === 'MEM');
     const otherComps = sorted.filter((c) => c.type !== 'INPUT' && c.type !== 'MEM');
-    const orderedSources = [...inputComps, ...memComps, ...otherComps];
 
     const wireOrder: string[] = [];
     const addedWires = new Set<string>();
-    for (const comp of orderedSources) {
-      // Collect all outgoing wires from this component
-      const outgoing: Wire[] = [];
-      for (const w of wires) {
-        if (w.sourceComponentId === comp.id && !addedWires.has(w.id)) {
-          // Skip feedback wires into MEM min ports
-          if (comp.type !== 'INPUT' && comp.type !== 'MEM') {
-            const targetComp = updatedComps.find((c) => c.id === w.targetComponentId);
-            if (targetComp?.type === 'MEM' && w.targetPortId === getMemInputPortId(targetComp)) continue;
-          }
-          outgoing.push(w);
-        }
-      }
+    const emit = (outgoing: Wire[]) => {
       // Sort fan-out wires: last in render order (highest z-index, on top) first,
       // so the visually closest wire gets annotated first, working backwards.
       if (outgoing.length > 1) {
@@ -3046,21 +3088,51 @@ export const useStore = create<AppState>()((set, get) => ({
         wireOrder.push(w.id);
         addedWires.add(w.id);
       }
+    };
+    const isMemFeedback = (w: Wire) => {
+      const targetComp = updatedComps.find((c) => c.id === w.targetComponentId);
+      return targetComp?.type === 'MEM' && w.targetPortId === getMemInputPortId(targetComp);
+    };
+    const emitFrom = (comp: CircuitComponent) => {
+      // Collect all outgoing wires from this component
+      const outgoing: Wire[] = [];
+      for (const w of wires) {
+        if (w.sourceComponentId === comp.id && !addedWires.has(w.id)) {
+          // Skip feedback wires into MEM min ports
+          if (comp.type !== 'INPUT' && comp.type !== 'MEM' && isMemFeedback(w)) continue;
+          outgoing.push(w);
+        }
+      }
+      emit(outgoing);
+    };
+    inputComps.forEach(emitFrom);
+    memComps.forEach(emitFrom);
+    // Right after the memories: the memory-decided box outputs.
+    emit(wires.filter((w) => fromMemoryPort(w) && !isMemFeedback(w)));
+    otherComps.forEach(emitFrom);
+    // Wires the sort could not order (a loop no MEM breaks — the canvas
+    // warns about it) are still annotated, in drawing order.
+    for (const w of wires) {
+      if (!addedWires.has(w.id) && !isMemFeedback(w)) {
+        wireOrder.push(w.id);
+        addedWires.add(w.id);
+      }
     }
 
     // MEM feedback wires (value going INTO memory) — fill memories before outputs
     for (const w of wires) {
-      if (!addedWires.has(w.id)) {
-        const targetComp = updatedComps.find((c) => c.id === w.targetComponentId);
-        if (targetComp?.type === 'MEM' && w.targetPortId === getMemInputPortId(targetComp)) {
-          wireOrder.push(w.id);
-          addedWires.add(w.id);
-        }
+      if (!addedWires.has(w.id) && isMemFeedback(w)) {
+        wireOrder.push(w.id);
+        addedWires.add(w.id);
       }
     }
-    // MEM update steps (show value being received)
+    // MEM update steps (show value being received), then each sequential
+    // box's memory taking its next value
     for (const mem of mems) {
       wireOrder.push(`comp:${mem.id}`);
+    }
+    for (const box of updatedComps.filter(isSequentialBox)) {
+      wireOrder.push(`comp:${box.id}`);
     }
 
     // OUTPUT evaluations come last
@@ -3071,8 +3143,9 @@ export const useStore = create<AppState>()((set, get) => ({
       wireOrder.push(`comp:${out.id}`);
     }
 
-    // Build selected key
-    const keyBits = [...inBits, ...(memBits || mems.map((m) => m.storedValue ?? 0))];
+    // Build selected key — the row as it stands BEFORE the step (the MEM
+    // update steps change what the machine holds; the row does not move)
+    const keyBits = [...inBits, ...memorySlots(updatedComps).map((m) => m.value)];
     const selectedKey = keyBits.join(',');
 
     // Clear all wire values
@@ -3126,6 +3199,12 @@ export const useStore = create<AppState>()((set, get) => ({
       }
       if (comp.type === 'OUTPUT') {
         newPortValues[`${comp.id}:in`] = hasUndefined ? undefined : (inputVals[0] ?? 0);
+      } else if (isSequentialBox(comp)) {
+        // A sequential box's memory takes its next value from the inputs
+        // now on its wires — its MEMs' counterpart of the step below.
+        const next = stepBoxedMemory(comp, inputVals.map((v) => v ?? 0));
+        set({ components: components.map((c) => (c.id === compId ? next : c)), localStepIndex: localStepIndex + 1 });
+        return localStepIndex + 1 < localStepSorted.length;
       } else if (comp.type === 'MEM') {
         // MEM "evaluation" at end of cycle: read value from the feedback wire
         // into the MEM input port and record it as the next stored value.
@@ -3161,23 +3240,19 @@ export const useStore = create<AppState>()((set, get) => ({
       // When an OUTPUT is evaluated, upsert the I/O table row with current output values
       const updates: Record<string, unknown> = { components: updatedComps, localStepIndex: localStepIndex + 1, localStepPortValues: newPortValues };
       if (comp.type === 'OUTPUT') {
-        const hasMem = components.some((c) => c.type === 'MEM');
-        const sortedInputs = components
-          .filter((c) => c.type === 'INPUT')
-          .sort((a, b) => parseInt(a.label.replace('IN', '')) - parseInt(b.label.replace('IN', '')));
         const sortedOutputs = components
           .filter((c) => c.type === 'OUTPUT')
           .sort((a, b) => parseInt(a.label.replace('OUT', '')) - parseInt(b.label.replace('OUT', '')));
-        const sortedMems = components
-          .filter((c) => c.type === 'MEM')
-          .sort((a, b) => parseInt(a.label.replace('M', '')) - parseInt(b.label.replace('M', '')));
-
-        const inputBits = sortedInputs.map((c) => c.value ?? 0);
         const outputBits = sortedOutputs.map((c) => {
           const val = newPortValues[`${c.id}:in`];
           return val !== undefined ? val : 0;
         });
-        const memBitsVal = hasMem ? sortedMems.map((c) => c.storedValue ?? 0) : undefined;
+        // The row is the one SELECTED — inputs and memory as they stood
+        // before the step. (The MEM update steps have already moved the
+        // machine to its next state; keying by that filed the outputs under
+        // the wrong row.)
+        const { inputBits, memBits } = localStepRow(state);
+        const memBitsVal = hasMemory(components) ? memBits : undefined;
 
         const localKey = [...inputBits, ...(memBitsVal || [])].join(',');
         const existingRows = state.tableRows;
@@ -3247,17 +3322,16 @@ export const useStore = create<AppState>()((set, get) => ({
           }
         }
 
-        if (hasUndefined) {
-          const outputPorts = targetComp.ports.filter((p) => p.side === 'right');
-          for (const op of outputPorts) {
-            newPortValues[`${targetComp.id}:${op.id}`] = undefined;
-          }
-        } else {
-          const outputs = evaluateGate(targetComp.type, inputVals as number[], targetComp);
-          const outputPorts = targetComp.ports.filter((p) => p.side === 'right');
-          for (let i = 0; i < outputPorts.length; i++) {
-            newPortValues[`${targetComp.id}:${outputPorts[i].id}`] = outputs[i] ?? 0;
-          }
+        // A sequential box's memory-decided outputs were seeded at select
+        // time (boxMemoryPortValues) and stay: only the outputs its inputs
+        // decide are blanked or evaluated here.
+        const seeded = boxMemoryPortValues(targetComp);
+        const outputPorts = targetComp.ports.filter((p) => p.side === 'right');
+        const outputs = hasUndefined ? [] : evaluateGate(targetComp.type, inputVals as number[], targetComp);
+        for (let i = 0; i < outputPorts.length; i++) {
+          const key = `${targetComp.id}:${outputPorts[i].id}`;
+          if (seeded.has(key)) continue;
+          newPortValues[key] = hasUndefined ? undefined : (outputs[i] ?? 0);
         }
 
         // Update the target component's displayed value
@@ -3288,14 +3362,9 @@ export const useStore = create<AppState>()((set, get) => ({
   localStepReset: () => {
     const state = get();
     if (!state.localStepActive) return;
-    const inputs = state.components
-      .filter((c) => c.type === 'INPUT')
-      .sort((a, b) => parseInt(a.label.replace('IN', '')) - parseInt(b.label.replace('IN', '')));
-    const mems = state.components
-      .filter((c) => c.type === 'MEM')
-      .sort((a, b) => parseInt(a.label.replace('M', '')) - parseInt(b.label.replace('M', '')));
-    const inBits = inputs.map((c) => c.value ?? 0);
-    const memBits = mems.length > 0 ? mems.map((c) => c.storedValue ?? 0) : undefined;
+    // Re-run the selected row (inputs and memory as they stood before the step).
+    const { inputBits: inBits, memBits: rowMem } = localStepRow(state);
+    const memBits = rowMem.length > 0 ? rowMem : undefined;
 
     // Remove the output for this row from tableRows
     const key = [...inBits, ...(memBits || [])].join(',');
@@ -3335,16 +3404,12 @@ export const useStore = create<AppState>()((set, get) => ({
     const codecWindow = selectCodecWindow(state);
     if (codecWindow !== null && scTimeStep > codecWindow) return;
 
-    // Sorted component lists (consistent with the engine's ordering)
-    const sortedInputs = components
-      .filter((c) => c.type === 'INPUT')
-      .sort((a, b) => (parseInt(a.label.replace('IN', '')) || 0) - (parseInt(b.label.replace('IN', '')) || 0));
-    const sortedOutputs = components
-      .filter((c) => c.type === 'OUTPUT')
-      .sort((a, b) => (parseInt(a.label.replace('OUT', '')) || 0) - (parseInt(b.label.replace('OUT', '')) || 0));
-    const sortedMems = components
-      .filter((c) => c.type === 'MEM')
-      .sort((a, b) => (parseInt(a.label.replace(/\D/g, '')) || 0) - (parseInt(b.label.replace(/\D/g, '')) || 0));
+    // The machine as the engine clocks it (memory-holding boxes inlined —
+    // engine/netlist.ts), and its memory in memorySlots order: top-level
+    // MEMs, then boxed ones. The same netlist the grader runs.
+    const net = scNetlist(components, wires);
+    const sortedInputs = net.inputs;
+    const slots = memorySlots(components);
 
     const tIdx = scTimeStep - 1;
     const seqLoaded = scInputSequence.some((s) => s.length > 0);
@@ -3374,25 +3439,20 @@ export const useStore = create<AppState>()((set, get) => ({
               ? 0
               : (inp.value ?? 0)
         );
-    const memStoredValues = sortedMems.map((m) => m.storedValue ?? 0);
+    const memStoredValues = slots.map((m) => m.value);
 
     // Delegate propagation to the engine (same logic used by the grader)
-    const { outputBits, newMemValues, portValues } = evaluateSCSingleStep(
-      components, wires, inputBitVector,
-      sortedInputs, sortedOutputs, sortedMems, memStoredValues
-    );
+    const { outputBits, newMemValues, portValues } = evaluateSCStep(net, inputBitVector, memStoredValues);
 
-    // Update components
-    const newComponents = components.map((c) => {
+    // Update components (a box's ports read under its own keys — portValues
+    // carries them — and every MEM, boxed ones too, takes its next value)
+    const newComponents = withMemState(components.map((c) => {
       if (c.type === 'INPUT') {
         const idx = sortedInputs.findIndex((inp) => inp.id === c.id);
         const val = idx >= 0 ? inputBitVector[idx] : (c.value ?? 0);
         return { ...c, value: val, inputValues: [val] };
       }
-      if (c.type === 'MEM') {
-        const idx = sortedMems.findIndex((m) => m.id === c.id);
-        return { ...c, storedValue: idx >= 0 ? newMemValues[idx] : (c.storedValue ?? 0) };
-      }
+      if (c.type === 'MEM') return c;
       if (c.type === 'OUTPUT') {
         return { ...c, value: portValues.get(`${c.id}:in`) ?? 0 };
       }
@@ -3401,7 +3461,7 @@ export const useStore = create<AppState>()((set, get) => ({
         return { ...c, value: portValues.get(`${c.id}:${outputPort.id}`) ?? 0 };
       }
       return c;
-    });
+    }), newMemValues);
 
     // Update wire values
     const newWireValues = new Map<string, number>();
@@ -3422,9 +3482,9 @@ export const useStore = create<AppState>()((set, get) => ({
     let newTableRows = existingRows;
     if (localIdx >= 0) {
       newTableRows = [...existingRows];
-      newTableRows[localIdx] = { inputBits, memBits: sortedMems.length > 0 ? memBits : undefined, outputBits };
+      newTableRows[localIdx] = { inputBits, memBits: slots.length > 0 ? memBits : undefined, outputBits };
     } else {
-      newTableRows = [...existingRows, { inputBits, memBits: sortedMems.length > 0 ? memBits : undefined, outputBits }];
+      newTableRows = [...existingRows, { inputBits, memBits: slots.length > 0 ? memBits : undefined, outputBits }];
     }
 
     set({
@@ -3474,10 +3534,11 @@ export const useStore = create<AppState>()((set, get) => ({
         }
       } else {
         // Sandbox: stop once all input is consumed AND the memory pipeline
-        // has been flushed (one extra 0-input step per MEM, so delayed bits —
-        // e.g. a serial adder's final carry — still reach the outputs).
+        // has been flushed (one extra 0-input step per MEM, boxed ones
+        // included, so delayed bits — e.g. a serial adder's final carry —
+        // still reach the outputs).
         const maxLen = Math.max(...s.scInputSequence.map((seq) => seq.length), 0);
-        const drain = s.components.filter((c) => c.type === 'MEM').length;
+        const drain = memorySlots(s.components).length;
         if (maxLen > 0 && s.scTimeStep > maxLen + drain) {
           s.scPause();
           return;
@@ -3501,18 +3562,17 @@ export const useStore = create<AppState>()((set, get) => ({
     if (state.scRunIntervalId !== null) {
       window.clearInterval(state.scRunIntervalId);
     }
-    // Reset MEM blocks to 0 and inputs to undefined, keep input sequence
+    // Reset every MEM (boxed ones too) to 0 and inputs to undefined, keep input sequence
     set({
       scTimeStep: 1,
       scHistory: [],
       scRunning: false,
       scRunIntervalId: null,
       tableRows: [],
-      components: state.components.map((c) => {
-        if (c.type === 'MEM') return { ...c, storedValue: 0 };
+      components: zeroMemState(state.components.map((c) => {
         if (c.type === 'INPUT') return { ...c, value: undefined, inputValues: [undefined as unknown as number] };
         return c;
-      }),
+      })),
     });
     setTimeout(() => get().evaluateCircuit(), 0);
   },
@@ -3522,7 +3582,7 @@ export const useStore = create<AppState>()((set, get) => ({
     if (state.scRunIntervalId !== null) {
       window.clearInterval(state.scRunIntervalId);
     }
-    // Reset everything: MEM to 0, inputs to 0, clear input sequence
+    // Reset everything: every MEM (boxed ones too) to 0, inputs to 0, clear input sequence
     set({
       scTimeStep: 1,
       scHistory: [],
@@ -3531,11 +3591,10 @@ export const useStore = create<AppState>()((set, get) => ({
       scRunIntervalId: null,
       tableRows: [],
       scGlobalSequences: [],
-      components: state.components.map((c) => {
-        if (c.type === 'MEM') return { ...c, storedValue: 0 };
+      components: zeroMemState(state.components.map((c) => {
         if (c.type === 'INPUT') return { ...c, value: undefined, inputValues: [undefined as unknown as number] };
         return c;
-      }),
+      })),
     });
     setTimeout(() => get().evaluateCircuit(), 0);
   },
@@ -3605,11 +3664,10 @@ export const useStore = create<AppState>()((set, get) => ({
       scRunning: false,
       scRunIntervalId: null,
       scInputSequence: newSeq,
-      components: state.components.map((c) => {
-        if (c.type === 'MEM') return { ...c, storedValue: 0 };
+      components: zeroMemState(state.components.map((c) => {
         if (c.type === 'INPUT') return { ...c, value: undefined, inputValues: [undefined as unknown as number] };
         return c;
-      }),
+      })),
     });
     setTimeout(() => get().evaluateCircuit(), 0);
   },

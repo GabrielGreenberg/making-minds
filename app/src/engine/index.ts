@@ -13,8 +13,24 @@ export {
   sortByLabel,
 } from './cc';
 export type { CCEvalResult } from './cc';
-export { evaluateSCSingleStep, evaluateSCSequence } from './sc';
-export type { SCSingleStepResult } from './sc';
+export {
+  scNetlist,
+  evaluateSCStep,
+  evaluateSCSequence,
+  boxMemoryOutputs,
+  stepBoxedMemory,
+} from './sc';
+export type { SCNetlist, SCStepResult } from './sc';
+export {
+  inlineSequentialBoxes,
+  memorySlots,
+  withMemState,
+  zeroMemState,
+  hasMemory,
+  isSequentialBox,
+  hasCombinationalLoop,
+} from './netlist';
+export type { Netlist, MemSlot } from './netlist';
 export {
   sortStateComponents,
   evaluateFSMSymbolStep,

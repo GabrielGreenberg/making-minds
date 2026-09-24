@@ -17,7 +17,9 @@ import {
   buildSampleAssignment,
   buildCorrectSubmission,
   buildIncorrectSubmission,
+  scCorrect,
 } from '../src/devData/sampleData';
+import { boxWhole } from './builder';
 import { gradeQuestion, gradeSubmission, summarizeResult } from '../src/engine/grader';
 import { applyManualReview, buildSubmission } from '../src/storage/submissionStore';
 import { emptyQuestionCircuit } from '../src/storage/workbookStore';
@@ -76,6 +78,23 @@ for (const q of wrong.questions) {
 }
 const ws = summarizeResult(wrong);
 check('incorrect: 0/13 autograded questions', ws.questionsPassed === 0 && ws.questionsTotal === 13);
+
+// A sequential sub-circuit boxed (task 004): the SC answer with its whole
+// circuit — MEM included — inside one placed box grades exactly as unboxed,
+// through the same submit path.
+console.log('\n[boxed SC answer]');
+{
+  const boxedSub = buildCorrectSubmission('boxed@example.com');
+  boxedSub.answers = boxedSub.answers.map((a) =>
+    a.questionId === 2 ? { ...a, circuit: boxWhole(scCorrect()) } : a);
+  const boxedResult = gradeSubmission(assignment, boxedSub);
+  const boxedQ = boxedResult.questions.find((q) => q.questionId === 2)!;
+  const plainQ = correct.questions.find((q) => q.questionId === 2)!;
+  check(`the SC answer boxed whole grades 100% (${boxedQ.passed}/${boxedQ.total})`,
+    boxedQ.status === 'graded' && boxedQ.total > 0 && boxedQ.passed === boxedQ.total);
+  check('...its per-case results equal the unboxed grade',
+    JSON.stringify(boxedQ) === JSON.stringify(plainQ));
+}
 
 // Manual review of the pending open question (the instructor grading seam):
 // the verdict lands on the stored record's result and the gradebook then

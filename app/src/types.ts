@@ -295,10 +295,20 @@ export function questionModeLabel(
   return q.perception ? `${q.buildMode} - perception` : q.buildMode;
 }
 
+export const CC_BOXES: ReadonlyArray<'CC' | 'SC'> = ['CC'];
+export const CC_AND_SC_BOXES: ReadonlyArray<'CC' | 'SC'> = ['CC', 'SC'];
+const NO_BOXES: ReadonlyArray<'CC' | 'SC'> = [];
+
 /** Which kinds of confirmed box a canvas may place (the palette's "Boxes"
- *  section reads this; boxScopeCheck pins it).
- *    CC, SC → CC boxes. Gate-level boxes are always combinational (boxing
- *             refuses MEM), so the same box is usable on either canvas.
+ *  section and placeBoxInstance read it through the store's
+ *  selectPlaceableBoxKinds; boxScopeCheck pins it).
+ *    CC     → CC boxes (combinational). A box holding memory would make the
+ *             machine sequential, which a CC question does not ask for.
+ *    SC     → CC and SC boxes. An SC box holds a MEM (at any depth); its
+ *             memory is clocked with the machine — engine/netlist.ts inlines
+ *             it for every run, so a boxed sub-circuit behaves exactly as it
+ *             would unboxed. (The sandbox's Logic Circuit tab is buildMode CC
+ *             but is also its SC canvas: the store selector adds SC there.)
  *    FSM    → none (notes/todos.md item 2). An earlier attempt (git a05e3d6)
  *             got as far as confirm + place — `confirmBox`'s FSM rules
  *             required exactly one entry state (S_A, lowest-numbered) and one
@@ -307,8 +317,10 @@ export function questionModeLabel(
  *             symbols — tracking its own internal position across steps —
  *             before handing control back to whatever the placed instance's
  *             own outgoing transitions say next. That is not a stateless
- *             function call like a boxed CC/SC circuit (evaluateBoxedCircuit,
- *             engine/cc.ts, runs once and returns instantly); it needs the
+ *             function call like a boxed CC circuit (evaluateBoxedCircuit,
+ *             engine/cc.ts, runs once and returns instantly), nor a boxed SC
+ *             circuit's memory (more clocked state, inlined beside the rest
+ *             by engine/netlist.ts, with control still one tick); it needs the
  *             SAME kind of invented call/return convention TM boxing is
  *             refused for, below — the running machine's "current state"
  *             would have to become a stack (plain state, or box instance +
@@ -335,15 +347,19 @@ export function questionModeLabel(
  *             tape, an invented call/return convention) — a different, much
  *             larger feature, not an extension of CC/SC boxing. TM boxing is
  *             refused for the same "don't build something semantically
- *             wrong" reason SC refuses to box MEM, and FSM boxing, above.
- *  Absent `kind` on an older entry counts as CC. */
-export function placeableBoxKinds(mode: BuildMode): 'CC'[] {
+ *             wrong" reason FSM boxing is, above. (A boxed MEM is different:
+ *             it still sits on a wire boundary, and its clocked state inlines
+ *             into the one netlist the SC step already runs.)
+ *  Absent `kind` on an older entry counts as CC. The arrays are shared
+ *  constants, so a store selector can return them without re-rendering. */
+export function placeableBoxKinds(mode: BuildMode): ReadonlyArray<'CC' | 'SC'> {
   switch (mode) {
     case 'CC':
+      return CC_BOXES;
     case 'SC':
-      return ['CC'];
+      return CC_AND_SC_BOXES;
     default:
-      return [];
+      return NO_BOXES;
   }
 }
 
@@ -700,13 +716,14 @@ export interface WorkbookData {
 export interface ConfirmedBoxDef {
   id: string; // same id as the BoxDefinition it was confirmed from
   name: string;
-  /** Which canvas the box was confirmed on, which decides where it may be
-   *  placed (see placeableBoxKinds). Absent = CC (older entries). A box drawn
-   *  on an SC canvas is a CC box: boxing refuses a selection containing MEM,
-   *  so every gate-level box is purely combinational. A saved `'FSM'` value
-   *  can still appear on data from before FSM boxing was retired (notes/
-   *  todos.md item 2); placeableBoxKinds never offers it for placement. */
-  kind?: 'CC' | 'FSM';
+  /** What the box computes, which decides where it may be placed (see
+   *  placeableBoxKinds): 'SC' when its internals hold a MEM at any depth (a
+   *  sequential box, placeable only where a machine may be sequential), else
+   *  'CC'. confirmBox always writes it; absent = CC (older entries, from when
+   *  boxing refused MEM). A saved `'FSM'` value can still appear on data from
+   *  before FSM boxing was retired (notes/todos.md item 2); placeableBoxKinds
+   *  never offers it for placement. */
+  kind?: 'CC' | 'SC' | 'FSM';
   inputPortIds: string[];
   outputPortIds: string[];
   internalComponents: CircuitComponent[];
