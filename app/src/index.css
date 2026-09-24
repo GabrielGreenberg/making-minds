@@ -1711,7 +1711,10 @@ thead .sc-label-col {
 
 .turbot-glossary-cols {
   display: flex;
-  gap: 18px;
+  /* The lines never break, so at the default panel width the OUTPUT column
+     drops below INPUT instead of running past the panel edge. */
+  flex-wrap: wrap;
+  gap: 6px 18px;
 }
 
 .turbot-glossary-head {
