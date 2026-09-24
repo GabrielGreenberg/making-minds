@@ -8,9 +8,9 @@ requires:
 area: app
 source: claude-md
 created: 2026-09-21T15:30:00-07:00
-status: ready
+status: in-progress
 after: 2026-09-21-012
-branch:
+branch: task/013-perception-custom-sequences
 merged_into:
 ---
 
