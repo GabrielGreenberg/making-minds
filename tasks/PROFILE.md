@@ -16,10 +16,10 @@ shallow — relocate the change, don't shrink it.
 and `server/` (Express 5 + `node:sqlite`; it imports `app/src/engine/*` directly). **One
 long-lived branch, `main`**, not protected; every landing is a **merge commit, never a
 squash**. CI (`.github/workflows/deploy.yml`) runs on every push to `main`: server
-typecheck + check, the context-budget guard, app build → GitHub Pages. The pilot deploy
-(Cloudflare Pages + Lightsail) is manual — `deploy/README.md`. **Routines never push or
-deploy.** Interactive sessions push only when Gabriel says so, and after any push confirm
-`gh run list --limit 1` is green before reporting done.
+typecheck + check, the context-budget guard, the harness-tool portability gate, app build →
+GitHub Pages. The pilot deploy (Cloudflare Pages + Lightsail) is manual — `deploy/README.md`.
+**Routines never push or deploy.** Interactive sessions push only when Gabriel says so, and
+after any push confirm `gh run list --limit 1` is green before reporting done.
 
 ## 3. The main checkout is live and shared
 
@@ -68,7 +68,7 @@ the wrong tree).
 | --- | --- | --- |
 | `app/` | `npx tsc -p tsconfig.app.json --noEmit` | strict types (`noUnusedLocals/Parameters` — CI is strict) |
 | `app/` | `npm run build` | the production bundle builds |
-| `app/` | `npm run check` | the budget guard + 21 headless harness tools (`app/tools/*Check.ts`; several boot a real server — minutes, not seconds) |
+| `app/` | `npm run check` | the budget guard + 22 headless harness tools (`app/tools/*Check.ts`; several boot a real server — minutes, not seconds) |
 | `server/` | `npm run typecheck` | server types |
 | `server/` | `npm run check` | serverCheck + authCheck + parityCheck (server ≡ engine grading) |
 
