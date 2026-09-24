@@ -8,9 +8,9 @@ requires: browser
 area: app
 source: chat
 created: 2026-09-22T10:30:00-07:00
-status: in-progress
+status: done
 after: 2026-09-22-027
-branch: task/028-sandbox-save-load-file
+branch:
 merged_into:
 ---
 
