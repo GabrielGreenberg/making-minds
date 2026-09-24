@@ -47,6 +47,10 @@ jobs:
       - name: Context budget (CLAUDE.md size guard — tasks/PROFILE.md)
         run: node tasks/tools/check-budgets.mjs
 
+      - name: Harness-tool portability gate (tasks/PROFILE.md §6)
+        working-directory: app
+        run: npx tsx tools/portabilityCheck.ts
+
       - name: Build
         working-directory: app
         run: npm run build
