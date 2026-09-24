@@ -8,9 +8,9 @@ requires: browser
 area: app
 source: chat
 created: 2026-09-23T12:15:00-07:00
-status: ready
+status: in-progress
 after: 2026-09-23-033
-branch:
+branch: task/034-provenance-watermark
 merged_into:
 ---
 
