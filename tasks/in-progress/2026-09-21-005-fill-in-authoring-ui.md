@@ -115,3 +115,20 @@ grader, student panel, gradebook, replay and mode chip ask); `numericOnly` may b
   shows a pass rate, not ✎. Optional remote: GET /api/assignments/:id carries
   `fill_in_answers: []`. Nothing owed to Gabriel (no ssh; the homework sync is a no-op).
 - **Next step:** loop session: visual check of the owed items above, then land per PROFILE §5.
+
+### 2026-09-23 — loop browser check and land
+- **Browser, local mode (dev server restarted on the branch), Prof. Ada.** HW1 → Edit →
+  Problem 11 opens with Mode Open and Task "Fill-in blanks" active (the segmented control),
+  with 11 rows labelled 0–10, answers 0 … 1010, all digits-only.
+  - Moving row #1 down shows the misplaced-answers warning (role=alert) naming blanks "0" and
+    "1".
+  - Emptying a label shows "needs a label" and disables Save Question.
+  - Cancel leaves the stored blanks unchanged.
+- **Fixed here:** the review nit at `pipelineCheck.ts` (6). The fill-in submit → graded pin now
+  builds the submission from the stripped student copy (`stripAnswers(authored)`) and grades it
+  against the authored key. The Verify chain "author → save → student payload stripped →
+  submit → graded" is now one pipeline. pipelineCheck passes and app tsc is 0.
+- **Still owed:** a visual eyeball of a new mixed-digits question on the student side (the
+  panel's letters-vs-digits boxes). The workflow's DOM-level pass and `pipelineCheck` cover the
+  behaviour.
+- Landed via a merge into `main`.

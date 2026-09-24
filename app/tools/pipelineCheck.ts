@@ -336,10 +336,12 @@ console.log('\n[fill-in authoring]');
   check('no answer appears anywhere in the student copy',
     !['111', 'Paris'].some((a) => JSON.stringify(studentQ).includes(a)));
 
-  // (6) Submit → graded, exactly as a student's Submit does.
+  // (6) Submit → graded, as one pipeline: the student builds the submission from
+  // the STRIPPED copy they were sent, and the key-holding side grades it.
+  const studentCopy = stripAnswers(authored);
   const submitWith = (fillAnswers: string[]) => {
     const circuits = new Map([[1, { ...emptyQuestionCircuit(), fillAnswers }]]);
-    const built = buildSubmission(authored, circuits, { student: 'author@example.com', submittedAt: NOW_ISO });
+    const built = buildSubmission(studentCopy, circuits, { student: 'author@example.com', submittedAt: NOW_ISO });
     return gradeSubmission(authored, built).questions[0];
   };
   const right = submitWith(['111', ' Paris ', '0100']);
