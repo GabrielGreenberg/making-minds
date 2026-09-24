@@ -80,7 +80,8 @@ All routes are under `/api`, JSON in/out, auth via `Authorization: Bearer <token
 | `GET /api/workbooks/:assignmentId`      | logged in  | the caller's saved canvas state (`{state}` — null if none)           |
 | `PUT /api/workbooks/:assignmentId`      | logged in  | autosave target (body = `AssignmentState`)                           |
 | `POST /api/assignments/:id/submissions` | logged in  | `{answers}` → server stamps identity/time, **grades**, stores, returns `{record}`; the student's copy carries **no grade** until grades are released (then scores only, never per-case detail) |
-| `GET /api/assignments/:id/submissions`  | logged in  | student: own attempts — no grades before release, scores-only after; instructor: all attempts, full detail (the gradebook feed) |
+| `GET /api/assignments/:id/submissions`  | logged in  | the caller's own attempts, any role — student: no grades before release, scores-only after; instructor: their own, full detail |
+| `GET /api/assignments/:id/submissions/all` | instructor | every student's attempts, full detail (the gradebook feed) |
 
 The browser counterpart is `app/src/api/client.ts` — a typed function per
 endpoint, ready to back `Remote*` implementations of the `WorkbookStore` /

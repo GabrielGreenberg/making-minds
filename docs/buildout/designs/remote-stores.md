@@ -57,7 +57,8 @@ interface AssignmentStore {
 }
 interface SubmissionStore {                             // buildSubmission/applyManualReview stay pure+sync
   submit(id, submission): Promise<SubmissionRecord>;    // remote sends answers only; identity+time = server's word
-  listSubmissions(id) / getLatest(id) / recordManualReview(...): Promise<...>;
+  listOwn(id, email) / getLatestOwn(id, email)          // task 037: the principal's own only
+  listAll(id) / recordManualReview(...): Promise<...>;  //   (remote: the session's); listAll = gradebook
 }
 ```
 

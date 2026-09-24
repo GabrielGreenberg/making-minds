@@ -30,6 +30,10 @@
 // any due date is a canvas swap both ways, refuses every edit but runs, and
 // never lands in the live workbook (no fold, no save, a submit records the
 // live work); [frozen assignment] is the same view, forced on by the freeze.
+// [own submissions] (task 037): every student-side submission read — the
+// seam's Own pair, the hydrated map, the frozen view, viewSubmission — sees
+// only the principal's own attempts (an instructor's Student view too),
+// numbered per student; only the gradebook reads everyone's (`listAll`).
 // Task 034 adds the provenance slice: a principal change drops the mint keys
 // and the live editing record (the next person mints under their own key only
 // once their open registers it), and [provenance across canvas swaps] — every
@@ -373,6 +377,9 @@ console.log('[mark as done]');
 // work (notes/todos.md item 3) ──
 console.log('[frozen assignment]');
 {
+  // Submission reads are the principal's own (task 037), so this section and
+  // [viewing a submission] run as the student who submits in them.
+  useStore.getState().resetForPrincipal('student@example.com');
   const FROZEN_ID = `${SAMPLE_ASSIGNMENT_ID}-frozen`;
   const futureDate = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
   const pastDate = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
@@ -623,11 +630,11 @@ console.log('[viewing a submission]');
   // work" before a slow remote fetch lands) applies nothing: the newer route
   // owns the canvas. The seam is held open here as a remote fetch would be.
   {
-    const realList = submissionStore.listSubmissions.bind(submissionStore);
+    const realList = submissionStore.listOwn.bind(submissionStore);
     let release = () => {};
-    submissionStore.listSubmissions = async (id) => {
+    submissionStore.listOwn = async (id, email) => {
       await new Promise<void>((r) => { release = r; });
-      return realList(id);
+      return realList(id, email);
     };
     try {
       const stale = useStore.getState().viewSubmission(n); // older attempt → the (held) seam
@@ -661,11 +668,13 @@ console.log('[viewing a submission]');
       check('a lookup overtaken by Home applies nothing',
         useStore.getState().viewingSubmission === null && useStore.getState().components.length === 3);
     } finally {
-      submissionStore.listSubmissions = realList;
+      submissionStore.listOwn = realList;
     }
   }
   useStore.getState().closeAssignment();
   check('closeAssignment clears the view', useStore.getState().viewingSubmission === null);
+  // The sandbox sections below run as the visitor.
+  useStore.getState().resetForPrincipal(null);
 }
 
 // ═════ Sandbox tabs share the same fresh-machine contract ═══════
@@ -1383,6 +1392,9 @@ console.log('[principal change]');
   useStore.getState().copySelected();
   // …and a sentence copied in an answer field (usePasteGuard's text slot).
   stampText("A's sentence", currentProvenance({ kind: 'assignment', assignmentId: SAMPLE_ASSIGNMENT_ID }));
+  // A's own submission (the map holds only the principal's own — task 037).
+  // The sample has no due date, so this never freezes it.
+  await useStore.getState().submitAssignment(SAMPLE_ASSIGNMENT_ID, A);
   await useStore.getState().hydrateSubmissions();
   {
     const s = useStore.getState();
@@ -1455,17 +1467,166 @@ console.log('[principal change]');
   useStore.getState().resetForPrincipal(B);
   check('an open started before the change resolves as a no-op', (await staleOpen) === true);
   check('…and opens nothing for the next person', useStore.getState().assignment === null && !useStore.getState().workbookOpen);
-  const staleHydrate = useStore.getState().hydrateSubmissions();
+  // The stale hydrate starts under A, who owns a submission (above): hydrate
+  // reads only the principal's own (task 037), so under anyone who never
+  // submitted it would write {} with or without the epoch guard.
   useStore.getState().resetForPrincipal(A);
+  await useStore.getState().hydrateSubmissions();
+  check("(control) a hydration under A that runs to completion writes A's submission",
+    Object.keys(useStore.getState().submissions).length > 0);
+  const staleHydrate = useStore.getState().hydrateSubmissions();
+  useStore.getState().resetForPrincipal(B);
   await staleHydrate;
   check("a hydration started before the change writes nothing after it", Object.keys(useStore.getState().submissions).length === 0);
   const EPOCH_ID = `${SAMPLE_ASSIGNMENT_ID}-epoch`;
   await localAssignmentStore.save({ ...buildSampleAssignment(), id: EPOCH_ID, dueDate: new Date(Date.now() + 86_400_000).toISOString() });
   await localAssignmentStore.setVisible(EPOCH_ID, true);
+  useStore.getState().resetForPrincipal(A);
   const staleSubmit = useStore.getState().submitAssignment(EPOCH_ID, A);
   useStore.getState().resetForPrincipal(B);
   check('a submit started before the change still records', (await staleSubmit) != null);
   check("…but does not badge the next person's submissions map", Object.keys(useStore.getState().submissions).length === 0);
+}
+
+// ═════ Every student-side read sees only the principal's own (task 037) ═══
+
+console.log('[own submissions]');
+{
+  const { buildCorrectSubmission } = await import('../src/devData/sampleData');
+  const { readdirSync, readFileSync, statSync } = await import('node:fs');
+  const OWN_ID = `${SAMPLE_ASSIGNMENT_ID}-own`;
+  const A = 'own-a@x.test';
+  const B = 'own-b@x.test';
+  const C = 'own-c@x.test'; // never submits
+  const I = 'ada.instructor@example.com';
+  const dayMs = 24 * 60 * 60 * 1000;
+  const ownAsg = { ...buildSampleAssignment(), id: OWN_ID, title: 'Own Sample', dueDate: new Date(Date.now() + dayMs).toISOString() };
+  await localAssignmentStore.save(ownAsg);
+  await localAssignmentStore.setVisible(OWN_ID, true);
+
+  // Law 5: local mode never touches the network — count every fetch.
+  const realFetch = globalThis.fetch;
+  let fetchCalls = 0;
+  globalThis.fetch = ((...args: Parameters<typeof fetch>) => {
+    fetchCalls++;
+    return realFetch(...args);
+  }) as typeof fetch;
+  try {
+    // Seam level. B submits first, so a read of everyone's list would meet
+    // B's attempt 1 before A's.
+    const sub = (who: string) =>
+      submissionStore.submit(OWN_ID, { ...buildCorrectSubmission(who), submittedAt: new Date().toISOString() });
+    const b1 = await sub(B);
+    const a1 = await sub(A);
+    const a2 = await sub(A);
+    const i1 = await sub(I);
+    const anon = await sub(''); // a dev-seed style anonymous attempt
+    check('attempts count per (assignment, student): B 1; A 1, 2 (not 2, 3); I 1; anonymous 1',
+      b1.attempt === 1 && a1.attempt === 1 && a2.attempt === 2 && i1.attempt === 1 && anon.attempt === 1);
+    const ownA = await submissionStore.listOwn(OWN_ID, A);
+    check("listOwn(A) is exactly A's two attempts, in order",
+      ownA.length === 2 && ownA.map((r) => r.attempt).join() === '1,2' &&
+        ownA.every((r) => r.submission.student === A));
+    const latestB = await submissionStore.getLatestOwn(OWN_ID, B);
+    check("getLatestOwn(B) is B's attempt 1", latestB?.attempt === 1 && latestB.submission.student === B);
+    const latestAUpper = await submissionStore.getLatestOwn(OWN_ID, ` ${A.toUpperCase()} `);
+    check('the email matches trimmed and case-insensitively',
+      latestAUpper?.attempt === 2 && latestAUpper.submission.student === A);
+    check('a visitor (null) owns nothing — not even the anonymous attempt',
+      (await submissionStore.listOwn(OWN_ID, null)).length === 0 &&
+        (await submissionStore.getLatestOwn(OWN_ID, null)) === null);
+    check('C, who never submitted, owns nothing', (await submissionStore.getLatestOwn(OWN_ID, C)) === null);
+    check("listAll (the gradebook's read) holds everyone's five attempts",
+      (await submissionStore.listAll(OWN_ID)).length === 5);
+
+    // A manual review lands on the named student's attempt only.
+    const openQ = b1.result?.questions.find((q) => q.status === 'pending')?.questionId;
+    check('the sample has a pending open question to review', openQ != null);
+    const reviewed = await submissionStore.recordManualReview(OWN_ID, B, 1, openQ!, { pass: true, note: 'ok' });
+    check("recordManualReview(B, attempt 1) returns B's attempt 1, reviewed",
+      reviewed?.submission.student === B && reviewed.attempt === 1 &&
+        reviewed.result?.questions.find((q) => q.questionId === openQ)?.manual?.pass === true);
+    const a1After = (await submissionStore.listOwn(OWN_ID, A))[0];
+    const b1After = await submissionStore.getLatestOwn(OWN_ID, B);
+    check("…stored on B's record, and A's attempt 1 is still unreviewed",
+      b1After?.result?.questions.find((q) => q.questionId === openQ)?.manual?.pass === true &&
+        a1After.result?.questions.find((q) => q.questionId === openQ)?.manual === undefined &&
+        (await submissionStore.listAll(OWN_ID)).length === 5);
+
+    // Store level: the hydrated map, the open, viewSubmission.
+    useStore.getState().resetForPrincipal(A);
+    await useStore.getState().hydrateSubmissions();
+    {
+      const r = useStore.getState().submissions[OWN_ID];
+      check("A's hydrated map holds A's own latest (attempt 2)", r?.attempt === 2 && r.submission.student === A);
+    }
+    check('A opens the assignment', (await useStore.getState().openAssignment(OWN_ID)) === true);
+    check('A views attempt 1 through the seam', (await useStore.getState().viewSubmission(1)) === true);
+    {
+      const v = useStore.getState().viewingSubmission;
+      check("…and it is A's own attempt 1, never B's", v?.attempt === 1 && v.submission.student === A);
+    }
+    await useStore.getState().viewSubmission(null);
+    useStore.getState().closeAssignment();
+
+    // The deadline passes: a freeze needs the principal's OWN submission.
+    await localAssignmentStore.save({ ...ownAsg, dueDate: new Date(Date.now() - dayMs).toISOString() });
+    useStore.getState().resetForPrincipal(C);
+    await useStore.getState().hydrateSubmissions();
+    check("C's hydrated map has no entry (no \"Last submitted\" from anyone else's)",
+      !(OWN_ID in useStore.getState().submissions));
+    check('C opens the past-due assignment', (await useStore.getState().openAssignment(OWN_ID)) === true);
+    {
+      const s = useStore.getState();
+      check("…still no entry, not frozen by others' submissions, nothing on show",
+        !(OWN_ID in s.submissions) && !selectAssignmentFrozen(s) && s.viewingSubmission === null);
+    }
+    useStore.getState().closeAssignment();
+    useStore.getState().resetForPrincipal(A);
+    await useStore.getState().openAssignment(OWN_ID);
+    {
+      const s = useStore.getState();
+      check("A's past-due open freezes on A's own latest (attempt 2)",
+        selectAssignmentFrozen(s) && s.viewingSubmission?.attempt === 2 && s.viewingSubmission.submission.student === A);
+    }
+    useStore.getState().closeAssignment();
+
+    // An instructor's Student view is a student-side read too.
+    useStore.getState().resetForPrincipal(I);
+    await useStore.getState().hydrateSubmissions();
+    {
+      const r = useStore.getState().submissions[OWN_ID];
+      check("the instructor's Student view sees only the instructor's own attempt",
+        r?.attempt === 1 && r.submission.student === I);
+    }
+    useStore.getState().resetForPrincipal(null);
+  } finally {
+    globalThis.fetch = realFetch;
+  }
+  check('…all with zero network traffic (law 5)', fetchCalls === 0);
+
+  // Only the gradebook may read everyone's: `listAll(` appears under
+  // instructor/ (the gradebook, the dashboard's counts) and storage/ (the
+  // seam) alone, so no student surface can reach it.
+  const srcRoot = new URL('../src/', import.meta.url);
+  const walk = (dir: URL, rel = ''): string[] =>
+    readdirSync(dir).flatMap((name) => {
+      const path = new URL(name, dir);
+      return statSync(path).isDirectory()
+        ? walk(new URL(`${name}/`, dir), `${rel}${name}/`)
+        : /\.tsx?$/.test(name) ? [`${rel}${name}`] : [];
+    });
+  const callers = walk(srcRoot).filter((f) => readFileSync(new URL(f, srcRoot), 'utf8').includes('listAll('));
+  check('listAll( appears only under instructor/ and storage/',
+    callers.length > 0 && callers.every((f) => f.startsWith('instructor/') || f.startsWith('storage/')));
+  // The API client's own everyone-read reaches /submissions/all directly, so it
+  // is gated too: only the client (which defines it) and the remote seam use it.
+  const rawCallers = walk(srcRoot).filter((f) => f !== 'api/client.ts' &&
+    readFileSync(new URL(f, srcRoot), 'utf8').includes('listAllSubmissions'));
+  check('listAllSubmissions appears only in api/client.ts and storage/ (the remote seam)',
+    rawCallers.length > 0 && rawCallers.every((f) => f.startsWith('storage/')), rawCallers.join(', '));
+  check('…and the gradebook and the dashboard read through it',
+    callers.includes('instructor/GradebookView.tsx') && callers.includes('instructor/InstructorDashboard.tsx'));
 }
 
 // ═════ Each question's editing record rides every canvas swap ═══

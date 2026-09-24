@@ -25,3 +25,4 @@
 2026-09-21-024 · feature · Shift-click a gate to rotate it, with a light "(shift+click to ↻)" hint beside the Rotate button · 2026-09-24T02:46:34-0700 · task/024-shift-click-rotate · 008b735
 2026-09-21-025 · feature · Flash and briefly hold when the turbot reaches the goal, then continue the run · 2026-09-24T03:22:50-0700 · task/025-turbot-goal-flash · 3efc8a1
 2026-09-22-028 · feature · Save and load a sandbox worksheet as a file (visitor-mode bells and whistles) · 2026-09-24T04:31:36-0700 · task/028-sandbox-save-load-file · 772a1fa
+2026-09-23-037 · bug · Show a principal only their own submissions — an instructor's Student view and local mode's shared list can surface another person's attempt as "yours" · 2026-09-24T05:06:15-0700 · task/037-own-submissions-only · 0ae2359

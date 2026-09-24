@@ -367,9 +367,10 @@ check(
 );
 
 // ── Fetch the stored records as the INSTRUCTOR (full, unsanitized) ───────────
+// The gradebook's route: the plain /submissions is the caller's own (task 037).
 const all = await api<{ records: SubmissionRecord[] }>(
   'GET',
-  `/assignments/${ASSIGNMENT_ID}/submissions`,
+  `/assignments/${ASSIGNMENT_ID}/submissions/all`,
   { token: iTok },
 );
 const rec1 = all.json.records.find((r) => r.attempt === 1);
@@ -538,7 +539,7 @@ const inProcess = applyManualReview(canon(all.json.records), 1, 7, {
 });
 const afterReview = await api<{ records: SubmissionRecord[] }>(
   'GET',
-  `/assignments/${ASSIGNMENT_ID}/submissions`,
+  `/assignments/${ASSIGNMENT_ID}/submissions/all`,
   { token: iTok },
 );
 const dReview = diffPaths(
@@ -596,7 +597,7 @@ const post3 = await api<{ record: SubmissionRecord }>(
   { token: sTok, body: { answers: provenanced } },
 );
 const rec3 = (
-  await api<{ records: SubmissionRecord[] }>('GET', `/assignments/${ASSIGNMENT_ID}/submissions`, { token: iTok })
+  await api<{ records: SubmissionRecord[] }>('GET', `/assignments/${ASSIGNMENT_ID}/submissions/all`, { token: iTok })
 ).json.records.find((r) => r.attempt === 3);
 const d3 = diffPaths(canon(directCorrect), canon(rec3?.result));
 check('PARITY: answers with provenance grade exactly as without it',

@@ -18,6 +18,9 @@
 //     identity + timestamp are the server's word; no grade shown) →
 //     instructor reads server grades → manual review through the seam →
 //     release/unrelease gates what the student's records carry
+//   - own reads for every role (task 037): an instructor's own-read (the
+//     Student view) holds only the instructor's attempts, whatever email is
+//     passed; `listAll` is the gradebook's, and a student's 403s
 //
 // S4 additions (the cutover's resilience slice):
 //
@@ -288,15 +291,15 @@ check(
 
 const rec2 = await remoteSubmissionStore.submit(SAMPLE_ASSIGNMENT_ID, buildIncorrectSubmission(student.email));
 check('second submit is attempt 2', rec2.attempt === 2);
-check('getLatest() returns the newest attempt', (await remoteSubmissionStore.getLatest(SAMPLE_ASSIGNMENT_ID))?.attempt === 2);
+check('getLatestOwn() returns the newest attempt', (await remoteSubmissionStore.getLatestOwn(SAMPLE_ASSIGNMENT_ID, student.email))?.attempt === 2);
 
 // ── instructor: server grades + manual review through the seam ───
 api.setToken(iTok);
-const graded = await remoteSubmissionStore.listSubmissions(SAMPLE_ASSIGNMENT_ID);
+const graded = await remoteSubmissionStore.listAll(SAMPLE_ASSIGNMENT_ID);
 const g1 = graded.find((r) => r.attempt === 1)?.result;
 const g2 = graded.find((r) => r.attempt === 2)?.result;
 check(
-  'instructor listSubmissions carries server grades (correct all-pass, incorrect fails)',
+  'instructor listAll carries server grades (correct all-pass, incorrect fails)',
   !!g1 && g1.passed === g1.total && g1.total > 0 && !!g2 && g2.passed < g2.total,
   JSON.stringify({ first: [g1?.passed, g1?.total], second: [g2?.passed, g2?.total] }),
 );
@@ -326,8 +329,8 @@ check('review of a non-pending question resolves null (404 → seam null)', notP
 // ── release gates what the student's records carry ───────────────
 await remoteAssignmentStore.setGradesReleased(SAMPLE_ASSIGNMENT_ID, true);
 api.setToken(sTok);
-const releasedLatest = await remoteSubmissionStore.getLatest(SAMPLE_ASSIGNMENT_ID);
-check('after release, student getLatest() carries scores', releasedLatest?.result != null);
+const releasedLatest = await remoteSubmissionStore.getLatestOwn(SAMPLE_ASSIGNMENT_ID, student.email);
+check('after release, student getLatestOwn() carries scores', releasedLatest?.result != null);
 // notes/todos.md item 4: per-case detail is now safe-widened (which input,
 // pass/fail) — server/tools/parityCheck.ts pins the widening itself; here
 // just confirm the answer key stays hidden through the seam too.
@@ -347,13 +350,52 @@ await remoteAssignmentStore.setGradesReleased(SAMPLE_ASSIGNMENT_ID, false);
 api.setToken(sTok);
 check(
   'unrelease hides grades again',
-  (await remoteSubmissionStore.getLatest(SAMPLE_ASSIGNMENT_ID))?.result === undefined,
+  (await remoteSubmissionStore.getLatestOwn(SAMPLE_ASSIGNMENT_ID, student.email))?.result === undefined,
 );
+
+// ── own reads for every role (task 037): the session names the person ──
+api.setToken(iTok);
+const iRec = await remoteSubmissionStore.submit(SAMPLE_ASSIGNMENT_ID, buildCorrectSubmission(instructor.email));
+check('the instructor submits (their Student view): attempt 1 of their own', iRec.attempt === 1);
+{
+  // The email argument is ignored remotely: the session decides whose.
+  const iLatest = await remoteSubmissionStore.getLatestOwn(SAMPLE_ASSIGNMENT_ID, 'ignored@x');
+  check(
+    "instructor getLatestOwn() is the instructor's own attempt 1, never a student's",
+    iLatest?.attempt === 1 && iLatest.submission.student === instructor.email.toLowerCase(),
+  );
+  const iOwn = await remoteSubmissionStore.listOwn(SAMPLE_ASSIGNMENT_ID, null);
+  check(
+    'instructor listOwn() holds only the instructor\'s records',
+    iOwn.length === 1 && iOwn.every((r) => r.submission.student === instructor.email.toLowerCase()),
+  );
+  const everyone = await remoteSubmissionStore.listAll(SAMPLE_ASSIGNMENT_ID);
+  check(
+    "instructor listAll() holds the student's two attempts and the instructor's one",
+    everyone.length === 3 &&
+      everyone.filter((r) => r.submission.student === student.email.toLowerCase()).length === 2 &&
+      everyone.filter((r) => r.submission.student === instructor.email.toLowerCase()).length === 1,
+  );
+}
+api.setToken(sTok);
+check(
+  "student getLatestOwn() is still the student's attempt 2",
+  (await remoteSubmissionStore.getLatestOwn(SAMPLE_ASSIGNMENT_ID, 'ignored@x'))?.submission.student ===
+    student.email.toLowerCase() &&
+    (await remoteSubmissionStore.getLatestOwn(SAMPLE_ASSIGNMENT_ID, student.email))?.attempt === 2,
+);
+{
+  const denied = await remoteSubmissionStore
+    .listAll(SAMPLE_ASSIGNMENT_ID)
+    .then(() => null as api.ApiError | null)
+    .catch((e: unknown) => (e instanceof api.ApiError ? e : null));
+  check('a student listAll() rejects with ApiError(403)', denied?.status === 403);
+}
 
 // ── dead token: 401 hook fires on an authenticated-looking call ──
 api.setToken('garbage-token');
 const dead = await remoteSubmissionStore
-  .listSubmissions(SAMPLE_ASSIGNMENT_ID)
+  .listOwn(SAMPLE_ASSIGNMENT_ID, null)
   .then(() => null as api.ApiError | null)
   .catch((e: unknown) => (e instanceof api.ApiError ? e : null));
 check('dead token rejects with ApiError(401) and fires the hook', dead?.status === 401 && unauthorizedFires === 2);

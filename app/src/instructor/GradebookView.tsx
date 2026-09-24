@@ -51,7 +51,8 @@ export function GradebookView({ id }: { id: string }) {
   } = useAsyncValue(async () => {
     const [assignment, records, released] = await Promise.all([
       getAssignment(id),
-      submissionStore.listSubmissions(id),
+      // Everyone's attempts — the seam's instructor-only read (task 037).
+      submissionStore.listAll(id),
       assignmentStore.getGradesReleased(id),
     ]);
     return { assignment, records, released };
@@ -615,9 +616,8 @@ function ManualReviewControls({
   const [note, setNote] = useState(manual?.note ?? '');
 
   const save = async (pass: boolean) => {
-    // The student email disambiguates WHOSE attempt server-side (remote
-    // attempt numbers count per student); the local store ignores it, so
-    // legacy anonymous local records still review fine.
+    // The student email disambiguates WHOSE attempt: attempt numbers count
+    // per student in both stores ('' = a legacy anonymous local record).
     await submissionStore.recordManualReview(
       record.assignmentId,
       record.submission.student ?? '',
