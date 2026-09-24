@@ -8,9 +8,9 @@ requires:
 area: app
 source: claude-md
 created: 2026-09-21T15:30:00-07:00
-status: in-progress
+status: done
 after:
-branch: task/003-view-submission-mode
+branch:
 merged_into:
 ---
 
