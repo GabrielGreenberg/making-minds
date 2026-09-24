@@ -28,3 +28,4 @@
 2026-09-23-037 · bug · Show a principal only their own submissions — an instructor's Student view and local mode's shared list can surface another person's attempt as "yours" · 2026-09-24T05:06:15-0700 · task/037-own-submissions-only · 0ae2359
 2026-09-23-038 · bug · A box drawn across wires (no IN/OUT of its own) confirms but its placed copy outputs 0 — bind box ports to the wires the box cuts · 2026-09-24T06:18:26-0700 · task/038-box-across-wires-port-binding · c6e8a8a
 2026-09-21-016 · chore · Add the harness-tool portability grep gate (P-TOOLS-1) · 2026-09-24T07:09:13-0700 · task/016-harness-tool-portability-gate · f31776f
+2026-09-24-039 · chore · Type-check the harness tools — app/tools and server/tools are outside every tsconfig, so stale literals and wrong signatures pass silently · 2026-09-24T07:51:19-0700 · task/039-typecheck-harness-tools · c68bda3

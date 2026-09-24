@@ -8,9 +8,9 @@ requires:
 area: app
 source: chat
 created: 2026-09-24T07:30:00-07:00
-status: in-progress
+status: done
 after:
-branch: task/039-typecheck-harness-tools
+branch:
 merged_into:
 ---
 
