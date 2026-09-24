@@ -1312,9 +1312,18 @@ console.log('[turbot goal flash]');
   const read = (rel: string) => readFileSync(new URL(rel, import.meta.url), 'utf8');
   const css = read('../src/index.css');
   const pulseMs = Number(css.match(/\.arena-goal--hit\s*\{\s*animation:\s*arena-goal-hit\s+(\d+)ms/)?.[1] ?? NaN);
-  check(`index.css: .arena-goal--hit pulses once in ≤ 600 ms (${pulseMs} ms)`, pulseMs > 0 && pulseMs <= 600);
+  // The whole rule: name, duration, easing and nothing else, so no repeat count
+  // (`infinite`, `2`) can slip in and the pulse plays exactly once.
+  const pulseRule = css.match(/\.arena-goal--hit\s*\{([^}]*)\}/)?.[1] ?? '';
+  check(`index.css: .arena-goal--hit pulses once in ≤ 600 ms (${pulseMs} ms)`,
+    pulseMs > 0 && pulseMs <= 600 &&
+      /^\s*animation:\s*arena-goal-hit\s+\d+ms\s+[a-z-]+;\s*$/.test(pulseRule) &&
+      !/iteration-count/.test(pulseRule));
   check('index.css: prefers-reduced-motion turns the pulse off',
     /@media \(prefers-reduced-motion: reduce\)\s*\{\s*\.arena-goal--hit\s*\{\s*animation:\s*none;\s*\}\s*\}/.test(css));
+  check('TurbotArenaPanel: an event already live at mount is suppressed (no replay on return)',
+    /useState<TurbotEvent \| null>\(\s*\(\) => useStore\.getState\(\)\.turbotLastEvent,?\s*\)/
+      .test(read('../src/components/TurbotArenaPanel.tsx')));
   const canvas = read('../src/components/ArenaCanvas.tsx');
   check('ArenaCanvas: the class only under highlightGoal, on the turbot\'s cell, never with onCellClick',
     canvas.split("' arena-goal--hit'").length === 2 &&

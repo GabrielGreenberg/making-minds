@@ -211,3 +211,28 @@ Two things are owed to Gabriel:
 - Confirm intake assumptions (a)–(c) at landing.
 
 **Next step.** Loop session: do the visual check if it is still owed, then land per PROFILE §5.
+
+### 2026-09-24 — loop browser check and land
+- **Fixed here, from the review nits:**
+  - Coming back to a turbot question from its overview remounts the Map, which replayed a
+    still-live pulse. `TurbotArenaPanel`'s `suppressedEvent` is now seeded with the event
+    already live at mount, so a remount never replays and a new arrival still pulses. Pinned
+    in navResetCheck.
+  - The "pulses once" pin read only the duration. It now checks the whole `.arena-goal--hit`
+    rule (name, duration, easing, nothing else) and that there is no iteration count.
+  - navResetCheck 452 passed; app tsc and build exit 0.
+- **Browser, local mode (dev server restarted on the branch), John's sandbox Turbot tab (CC
+  brain IN1 → NOT → OUT1, OUT2), goal added 3 cells ahead at (4,6).**
+  - Run, sampled every 50 ms: steps at 318, 631 and 943 ms. At 943 the turbot is on the goal
+    (x=4), `.arena-goal--hit` is on and hold = 2. The next step comes at **1,832 ms (≈ 890 ms
+    later, against ≈ 313 ms normally)**, so the hold is ≈ 600 ms. It then drives on to the
+    wall and stops (motor).
+  - Reset, then Step×3: the pulse class is on with hold = 0 (Step never holds).
+  - Home and back to the sandbox resets the run (a canvas swap), so there is no pulse on
+    return.
+- **Still owed:** the `prefers-reduced-motion` OS check (Gabriel, real browser) and the
+  HW6 P2 TM-brain eyeball. The headless pins cover both: the CSS media rule, and the store
+  loop that is shared by every brain.
+- **For Gabriel to confirm:** intake assumptions (a) hold ≈ 600 ms (two ticks), (b) only the
+  goal circle pulses, (c) same in the sandbox and in questions. All as implemented.
+- Landed via a merge into `main`.

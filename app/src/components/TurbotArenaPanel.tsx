@@ -146,7 +146,11 @@ export function TurbotArenaPanel() {
   const [mapTool, setMapTool] = useState<MapTool>('block');
   // The event live when "Edit map" opened: Done must not replay its pulse.
   // By identity — t restarts after a reset, so a later hit may repeat it.
-  const [suppressedEvent, setSuppressedEvent] = useState<TurbotEvent | null>(null);
+  // Seeded with the event already live at mount: coming back to this question
+  // (overview → question remounts the Map) must not replay an old pulse.
+  const [suppressedEvent, setSuppressedEvent] = useState<TurbotEvent | null>(
+    () => useStore.getState().turbotLastEvent,
+  );
 
   const [cellSize, setCellSizeState] = useState(() =>
     clampCell(numericPref(loadUiPrefs(), 'arenaCellSize', DEFAULT_CELL)),
