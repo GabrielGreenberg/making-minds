@@ -8,9 +8,9 @@ requires:
 area: app
 source: chat
 created: 2026-09-23T21:40:00-07:00
-status: ready
+status: in-progress
 after:
-branch:
+branch: task/037-own-submissions-only
 merged_into:
 ---
 
