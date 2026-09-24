@@ -8,9 +8,9 @@ requires:
 area: app
 source: claude-md
 created: 2026-09-21T15:30:00-07:00
-status: ready
+status: in-progress
 after:
-branch:
+branch: task/010-turbot-multi-arena-authoring
 merged_into:
 ---
 
