@@ -121,3 +121,22 @@ input 0.
   Gabriel (ssh, read-only): count the pilot workbooks that hold legacy drawn-across boxes,
   counts only.
 - **Next step:** loop session: visual check if owed, then land per PROFILE §5.
+
+### 2026-09-24 — loop browser check and land
+- **Fixed here: the review nit.** The canvas's "has ports not connected to anything inside —
+  draw and place it again" warning showed on a locked canvas (marked done, frozen, a viewed
+  submission), where the re-place it asks for is refused and a submitted snapshot is never
+  re-bound. `CircuitCanvas` now reads `selectQuestionLocked` and skips that warning when
+  locked. app tsc and build exit 0; boxScopeCheck 194 passed.
+- **Browser, local mode (dev server restarted on the branch), sandbox Logic Circuit tab: the
+  task's repro.** IN1 → NOT → OUT1, with a box drawn around the NOT only. confirmBox accepted
+  it as "Box 1", kind CC, with `in ['<not>:in']` and `out ['<not>:out']`. After clearing the
+  canvas, placing the box and wiring a fresh INPUT → in1 and out1 → OUTPUT, OUTPUT reads **1
+  at input 0 and 0 at input 1**; before 038 it read 0 at both. No unbound-box warning.
+- **Still owed:** the SC drawn-across delay and the legacy re-bind by eye (pinned headless:
+  boxScopeCheck `[drawn-across boxes: engine / store / legacy / legacy own IN/OUT]`, parityCheck
+  §8). Also Gabriel's optional read-only count of legacy drawn-across boxes in the pilot DB
+  (ssh; recipe above).
+- **For Gabriel to confirm:** already-saved drawn-across boxes are re-bound on load, not
+  flagged, and only ports the old rule left dead take the recorded crossing (loop-settled).
+- Landed via a merge into `main`.
