@@ -733,8 +733,8 @@ console.log('\n[menu wiring]');
   check('(setup) the File dropdown markup is found', dropdown.length > 0 && !dropdown.includes('mm-modal'));
   const item = (action: string, label: string) =>
     new RegExp(`className="menu-dropdown-item"\\s+onClick=\\{\\(\\)\\s*=>\\s*${action}\\s*\\}\\s*>\\s*${label}\\s*(<|\\{)`);
-  check('the menu offers New ▸ — the shared machine list, each pick through the guard',
-    /className="menu-dropdown-item"\s+onClick=\{\(\)\s*=>\s*setNewOpen\(true\)\s*\}\s*>\s*New\s*</.test(dropdown) &&
+  check('the menu offers New worksheet ▸ — the shared machine list, each pick through the guard',
+    /className="menu-dropdown-item"\s+onClick=\{\(\)\s*=>\s*setNewOpen\(true\)\s*\}\s*>\s*New worksheet\s*</.test(dropdown) &&
       /<MachineMenu\s+onPickMachine=\{newMachine\}\s+onPickTurbot=\{newTurbot\}/.test(dropdown) &&
       /const newMachine = [^;]*guarded\(\{ kind: 'new'/.test(menu) &&
       /const newTurbot = [^;]*guarded\(\{ kind: 'new'/.test(menu) &&

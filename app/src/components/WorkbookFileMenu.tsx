@@ -209,7 +209,7 @@ export function WorkbookFileMenu() {
               onMouseLeave={() => setNewOpen(false)}
             >
               <div className="menu-dropdown-item" onClick={() => setNewOpen(true)}>
-                New <span className="menu-shortcut">▸</span>
+                New worksheet <span className="menu-shortcut">▸</span>
               </div>
               {newOpen && (
                 <div className="submenu-dropdown">

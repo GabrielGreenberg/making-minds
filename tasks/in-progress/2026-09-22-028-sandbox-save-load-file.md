@@ -136,3 +136,24 @@ per-browser autosave blob `making-minds-autosave` (`store.ts:3760`).
   the sheet; no File menu in HW1; no `/api` traffic), then Gabriel's real-dialog recipes
   (Verify OWED 1–4).
 - **NEXT STEP:** loop session: run the owed browser checks, then land per PROFILE §5.
+
+### 2026-09-24 — loop browser check and land
+- **Fixed here:** the review's label nit. The File item read "New ▸"; it now reads **"New
+  worksheet ▸"**, as the Done-when says. The `workbookFileCheck [menu wiring]` pin follows it
+  (142 checks OK); app tsc is 0.
+- **Browser, local mode (dev server restarted on the branch), John's sandbox with 4 tabs
+  (Circuit, TM, Turbot, FSM).** The native pickers were stubbed as in the recipe.
+  - The header shows "File ▾ · Untitled Workbook". The menu reads **New worksheet ▸ · Open… ·
+    Save ⌘S · Save as… ⇧⌘S**.
+  - Save as… wrote `Untitled Workbook.json` (formatVersion, notice, metadata, 4 worksheets),
+    and the header read "Saved to Untitled Workbook.json".
+  - New worksheet ▸ Logic Circuit gave one empty tab with no prompt (the work was saved).
+  - Open… brought back all 4 worksheets identical (titles, modes, component types, wires:
+    "Turbot 1|turbot|INPUT,NOT,OUTPUT,OUTPUT|3", "FSM|STATE,STATE|1"), and the header read
+    "Opened Untitled Workbook.json".
+  - Adding an OR, then File ▸ Open…, showed the **Unsaved changes** modal ("…Opening a file
+    will replace it. Save it first?" Don't save · Cancel · Save). Cancel kept the work.
+  - No `/api` requests (only Vite's module load of `api/client.ts`).
+- **Owed to Gabriel:** the real OS dialogs. Chrome: Save as → Save in place → New → Open,
+  identical. Safari/Firefox: the download plus file-chooser fallback. Recipe above.
+- Landed via a merge into `main`.
