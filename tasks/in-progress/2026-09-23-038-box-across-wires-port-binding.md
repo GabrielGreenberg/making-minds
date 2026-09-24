@@ -62,3 +62,62 @@ Both `tsc`s, build, `npm run check` (`boxScopeCheck` with the drawn-across pins,
 input 0.
 
 ## Progress log
+- 2026-09-24 — Implement (uncommitted). **Loop-settled decision, open to Gabriel's revision:
+  boxes already saved the drawn-across way are RE-BOUND on load, not flagged** (the task's own
+  lean: they computed 0; the term starts 2026-09-24 and HW1 is due 2026-10-04, so no graded
+  work depends on the old behaviour). A submitted snapshot is never re-bound and a stored
+  result is never regraded. Built the deep fix: `Port.bind` + `engine/netlist.ts boxInterior`
+  (the one port-binding model, read by `evaluateBoxedCircuit`, the inlining,
+  `boxMemoryOutputs`, `stepBoxedMemory`); new `app/src/boxPorts.ts` (THE port order,
+  `rebindLegacyBoxes`, `unboundBoxes` → a canvas warning); confirm/place/paste/load paths in
+  `store.ts` and `restoreQuestionCircuits`. Re-bind rule as built: an unbound box is re-bound
+  when its confirmed map (library keys, else its internals' free ends) fits its ports and
+  differs from what the label rule binds — slightly wider than "the label rule can't bind
+  every port", so an own-IN-that-fed-outside box with a cut wire is caught too; own-IN boxes
+  stay untouched. Memo `docs/buildout/designs/box-port-binding.md`. Pins: `boxScopeCheck
+  [drawn-across boxes: engine | fixture parity | store | legacy]`, `pipelineCheck
+  [boxed-across answers]`, server `parityCheck` §8. Browser repro owed (Verify).
+- 2026-09-24 — Fix (uncommitted), after review. **Re-bind rule narrowed** (still loop-settled:
+  re-bound, not flagged; open to Gabriel's revision): a pre-038 box is re-bound only when the
+  label rule leaves a port dead, and every port the label rule reaches KEEPS its own IN/OUT;
+  only the dead ports take the confirmed map's remaining keys (`boxPorts.ts legacyBindings`).
+  The earlier rule re-bound the whole recorded order, which moved a live port when pre-038
+  `confirmBox` had dropped an own IN that also fed outside (or an own OUT fed from outside).
+  Sandbox loads now re-bind the library too (`rebindLegacyLibrary` in `storedTabCircuit` and
+  `importWorkbook`, as `restoreQuestionCircuits` does), and the pre-formatVersion-2 autosave
+  re-binds its canvas. Pins: `boxScopeCheck [drawn-across boxes: legacy]` (library entry
+  holding a pre-038 box, autosave + workbook file; the v1 autosave) and `[drawn-across boxes:
+  legacy own IN/OUT]` (the review's own-IN repro, the own-OUT analogue, a fully label-bound box
+  untouched) — each checked to fail with its fix removed. Memo updated in place.
+
+### 2026-09-24 — implemented (work loop)
+- **Built.** A box drawn across wires now computes what it enclosed. Each placed port records
+  the internal endpoint it stands for (`Port.bind`), and `engine/netlist.ts boxInterior` is
+  the one port-binding model, read by `evaluateBoxedCircuit`, the sequential inlining,
+  `boxMemoryOutputs` and `stepBoxedMemory`. `app/src/boxPorts.ts` holds THE port order
+  (`orderBoxPorts`), the legacy re-bind (`rebindLegacyBoxes`/`rebindLegacyLibrary`) and
+  `unboundBoxes` (a canvas warning). A box with no port bound keeps the label rule exactly,
+  and `gradedMachineKey` adds a binding only when one exists, so own-IN/OUT boxes and 004's
+  behaviour are unchanged. Memo: `docs/buildout/designs/box-port-binding.md`.
+- **Legacy rule (loop-settled, open to Gabriel's revision): re-bound, not flagged.** On load
+  (an assignment, the sandbox autosave incl. v1, an opened workbook file), a pre-038 box is
+  re-bound only when the label rule leaves a port dead. Every live port keeps its own IN/OUT,
+  and only the dead ports take the confirmed map's remaining keys. A submitted snapshot is
+  never re-bound, and a stored result is never regraded.
+- **Pins.** `boxScopeCheck [drawn-across boxes: engine | fixture parity (62 HW1–HW3
+  machines) | store | legacy | legacy own IN/OUT]` (194 pass). `pipelineCheck [boxed-across
+  answers]`. Server `parityCheck` §8 (boxed-across answers plus a pre-038 re-bound save, both
+  ≡ unboxed).
+- **Gates.** app tsc 0, build 0, `npm run check` 0; server typecheck 0, `npm run check` 0.
+- **Review.** 1 major and 1 minor finding fixed (the narrowed re-bind rule; sandbox and
+  workbook-file loads re-bind the library). None skipped. One nit left alone: the
+  `unboundBoxes` warning also shows on a frozen question or a viewed submission, where it
+  cannot be cleared.
+- **Owed (browser, loop session).** (1) The sandbox CC repro: the OUTPUT reads 1 at 0 and 0
+  at 1; screenshot the port markers and the placed box. (2) An SC MEM-only box: Run 1010
+  gives 0101 and shows the `Box 1·M1` column; also a mixed box. (3) A legacy re-bind via
+  a stripped `bind` in the `making-minds-autosave:*` save, plus the fan-out warning. (4) Local
+  HW SC question: place, reopen, Run, submit, and the gradebook shows the pass. Optional for
+  Gabriel (ssh, read-only): count the pilot workbooks that hold legacy drawn-across boxes,
+  counts only.
+- **Next step:** loop session: visual check if owed, then land per PROFILE §5.

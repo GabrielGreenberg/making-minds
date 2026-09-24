@@ -16,6 +16,7 @@ import {
   isMemSinkPort,
 } from '../types';
 import { mintId } from '../provenance/ids';
+import { unboundBoxes } from '../boxPorts';
 import {
   routeAllWires,
   validateSegmentPosition,
@@ -1884,6 +1885,11 @@ export function CircuitCanvas() {
       if (count > 1) {
         w.push(`Warning: Merged link detected on port ${key.split(':')[1]}`);
       }
+    }
+    // A box saved before 038 whose ports no rule could bind (boxPorts.ts):
+    // those ports read 0 until it is placed again.
+    for (const label of unboundBoxes(components)) {
+      w.push(`Warning: ${label} has ports not connected to anything inside — draw and place it again`);
     }
     return w;
   }, [components, wires, effectiveMode]);

@@ -27,10 +27,11 @@ box-by-box evaluation (compute each box from its inputs) sees that as a cycle.
 ## Decision
 Option 2 (`app/src/engine/netlist.ts`). Only boxes holding memory are inlined,
 so every existing circuit evaluates as it always has (same arrays, same
-topological order). Ports bind exactly as `evaluateBoxedCircuit` binds them
-(left port k ↔ k-th internal IN by label, right port j ↔ j-th OUT); an
-inlined id is its box path joined with its own id, the path kept as a
-`string[]` and never recovered by splitting.
+topological order). Ports bind through the one port-binding model that
+`evaluateBoxedCircuit` also reads (`boxInterior`, task 038 —
+[box-port-binding.md](box-port-binding.md)); an inlined id is its box path
+joined with its own id, the path kept as a `string[]` and never recovered by
+splitting.
 
 Nested state lives where top-level state lives: on the nested MEM's own
 `storedValue`, inside the placed instance's `internalCircuit`. Undo snapshots,

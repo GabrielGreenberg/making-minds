@@ -40,6 +40,11 @@
 //      `expected`/`got` stay blank, and a case without gaps gains no key; a
 //      result stored before cases recorded them gets them from the server's
 //      bank on the student's submissions route.
+//   8. Boxes drawn across wires (task 038): attempt 4 answers the CC (hw2-p7)
+//      and SC (hw3-p6) questions with everything but their INs/OUTs in one
+//      box whose ports are bound to the wires it cuts. The server grades it
+//      exactly as in process, and exactly as the unboxed machines; the same
+//      box saved before 038 and re-bound by the load rule grades the same.
 //
 // ── What is (and is not) normalized in the comparison ──────────────────────
 // The compared payload is `record.result` (the SubmissionResult) plus the
@@ -88,7 +93,8 @@ import { applyManualReview } from '../../app/src/storage/manualReview';
 import { buildSampleAssignment } from '../../app/src/devData/sampleData';
 import { nextTrace } from '../../app/src/provenance/trace';
 import { prepareKey } from '../../app/src/provenance/ids';
-import { comp, transition, circuit } from '../../app/tools/builder';
+import { comp, transition, circuit, boxAcross, unbind } from '../../app/tools/builder';
+import { rebindLegacyBoxes } from '../../app/src/boxPorts';
 import type {
   AssignmentData,
   AssignmentQuestion,
@@ -650,6 +656,53 @@ check("…whose records the server reads as this student's own",
       olderMine.every((c, k) => JSON.stringify(c.separations) === JSON.stringify(bank[k].separations)));
   const olderLeaks = findLeaks(olderMine, new Set(['expected', 'got']));
   check('…still with expected/got blank', olderLeaks.length === 0, olderLeaks.join(', '));
+}
+
+// ── 8. Boxes drawn across wires grade as the machines they enclose ─────────
+{
+  const across = (i: number) => boxAcross(fixtures[i].correct);
+  const acrossAnswers: Answers = correctAnswers.map((a) =>
+    a.questionId === 1 || a.questionId === 2 ? { ...a, circuit: across(a.questionId - 1) } : a);
+  const boxes = acrossAnswers.slice(0, 2).map((a) => a.circuit.components.find((c) => c.type === 'BOXED'));
+  check('attempt 4: hw2-p7 (CC) and hw3-p6 (SC) boxed across, no IN/OUT inside, every port bound',
+    boxes.every((b) => b != null && b.ports.length > 0 && b.ports.every((p) => p.bind !== undefined) &&
+      !b.internalCircuit!.components.some((c) => c.type === 'INPUT' || c.type === 'OUTPUT')));
+  const post4 = await api<{ record: SubmissionRecord }>(
+    'POST',
+    `/assignments/${ASSIGNMENT_ID}/submissions`,
+    { token: sTok, body: { answers: acrossAnswers } },
+  );
+  const rec4 = (
+    await api<{ records: SubmissionRecord[] }>('GET', `/assignments/${ASSIGNMENT_ID}/submissions/all`, { token: iTok })
+  ).json.records.find((r) => r.attempt === post4.json.record?.attempt);
+  const direct4 = directGrade(acrossAnswers);
+  const d4 = diffPaths(canon(direct4), canon(rec4?.result));
+  check('PARITY: boxed-across answers — server grade ≡ direct gradeSubmission',
+    post4.status === 201 && rec4 != null && d4.length === 0, d4.join(' | '));
+  const a4 = diffPaths(canon(acrossAnswers), canon(rec4?.submission.answers));
+  check('…stored verbatim, port bindings included', a4.length === 0, a4.join(' | '));
+  const same = [1, 2].map((id) => diffPaths(canon(q(directCorrect, id)), canon(q(direct4, id))));
+  check('…and hw2-p7 / hw3-p6 grade exactly as the unboxed machines',
+    same.every((d) => d.length === 0) && q(direct4, 1).passed === q(direct4, 1).total && q(direct4, 2).passed === q(direct4, 2).total,
+    same.flat().join(' | '));
+
+  // The same boxes saved before 038 (no binding), re-bound by the load rule
+  // (from their library entry, as restoreQuestionCircuits does).
+  const rebound: Answers = acrossAnswers.map((a) => {
+    if (a.questionId !== 1 && a.questionId !== 2) return a;
+    const box = a.circuit.components.find((c) => c.type === 'BOXED')!;
+    const entry = {
+      id: box.boxedCircuitId!, name: box.label,
+      inputPortIds: box.ports.filter((p) => p.side === 'left').map((p) => p.bind!),
+      outputPortIds: box.ports.filter((p) => p.side === 'right').map((p) => p.bind!),
+      internalComponents: box.internalCircuit!.components, internalWires: box.internalCircuit!.wires,
+    };
+    const legacy = unbind(a.circuit);
+    return { ...a, circuit: { ...legacy, components: rebindLegacyBoxes(legacy.components, [entry]) } };
+  });
+  const dr = diffPaths(canon(directCorrect), canon(directGrade(rebound)));
+  check('a pre-038 save of those boxes, re-bound on load, grades ≡ the unboxed answers',
+    dr.length === 0, dr.join(' | '));
 }
 
 server.close();

@@ -10,7 +10,7 @@
 import type { CircuitComponent, Wire } from '../types';
 import { getMemOutputPortId, getMemInputPortId } from '../types';
 import { topologicalSort, evaluateGate, evaluateCC } from './cc';
-import { inlineSequentialBoxes, memorySlots, sortByLabel, withMemState, type Netlist } from './netlist';
+import { boxInterior, inlineSequentialBoxes, memorySlots, sortByLabel, withMemState, type Netlist } from './netlist';
 
 /** A machine ready to clock: the inlined netlist plus everything a step
  *  needs that depends only on its structure. */
@@ -134,12 +134,14 @@ export function evaluateSCSequence(
  * feedback loop through the box still animates.
  */
 export function boxMemoryOutputs(box: CircuitComponent): (number | undefined)[] {
-  const ic = box.internalCircuit;
-  if (!ic) return [];
-  const ins = sortByLabel(ic.components, 'IN');
-  const blank = ic.components.map((c) => (ins.includes(c) ? { ...c, value: undefined } : c));
-  const { portValues } = evaluateCC(blank, ic.wires);
-  return sortByLabel(blank, 'OUT').map((o) => portValues.get(`${o.id}:in`));
+  if (!box.internalCircuit) return [];
+  // Ports read through the one binding (netlist.ts boxInterior): the port
+  // nodes blank, an IN no port reaches 0 (as a step reads it).
+  const inside = boxInterior(box);
+  const blank = inside.components.map((c) =>
+    inside.ins.includes(c) ? { ...c, value: undefined } : c.type === 'INPUT' ? { ...c, value: 0 } : c);
+  const { portValues } = evaluateCC(blank, inside.wires);
+  return inside.outs.map((o) => portValues.get(`${o.id}:in`));
 }
 
 /** The box after one clock tick on `inputs` (left-port order): its MEMs, at
@@ -147,8 +149,12 @@ export function boxMemoryOutputs(box: CircuitComponent): (number | undefined)[] 
 export function stepBoxedMemory(box: CircuitComponent, inputs: number[]): CircuitComponent {
   const ic = box.internalCircuit;
   if (!ic) return box;
+  // Clock the interior (same MEMs, same slots) with its inputs in PORT order,
+  // not scNetlist's label order.
+  const inside = boxInterior(box);
   const now = memorySlots(ic.components).map((s) => s.value);
-  const { newMemValues } = evaluateSCStep(scNetlist(ic.components, ic.wires), inputs, now);
+  const net = scNetlist(inside.components, inside.wires);
+  const { newMemValues } = evaluateSCStep({ ...net, inputs: inside.ins }, inputs, now);
   const components = withMemState(ic.components, newMemValues);
   return components === ic.components ? box : { ...box, internalCircuit: { ...ic, components } };
 }

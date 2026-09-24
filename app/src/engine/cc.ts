@@ -7,7 +7,7 @@
 
 import type { CircuitComponent, Wire, ComponentType } from '../types';
 import { getMemOutputPortId, getMemInputPortId } from '../types';
-import { sortByLabel, inlineSequentialBoxes } from './netlist';
+import { sortByLabel, inlineSequentialBoxes, boxInterior } from './netlist';
 
 // The IN/OUT label-ordering convention lives beside the box-port splicing
 // that must agree with it (engine/netlist.ts); re-exported here, its old home.
@@ -96,20 +96,23 @@ export function evaluateGate(type: ComponentType, inputs: number[], comp?: Circu
   }
 }
 
-/** Simulate the internal circuit of a BOXED component */
+/** Simulate the internal circuit of a BOXED component: its k-th input feeds
+ *  the node behind its k-th left port, and it returns what the node behind
+ *  each right port reads (engine/netlist.ts boxInterior — the one binding). */
 export function evaluateBoxedCircuit(comp: CircuitComponent | undefined, externalInputs: number[]): number[] {
   if (!comp?.internalCircuit) return externalInputs.map(() => 0);
-  const { components: intComps, wires: intWires } = comp.internalCircuit;
-  if (intComps.length === 0) return externalInputs.map(() => 0);
+  if (comp.internalCircuit.components.length === 0) return externalInputs.map(() => 0);
+  const inside = boxInterior(comp);
 
-  // Set INPUT component values from external inputs (bound in label order)
-  const inputComps = sortByLabel(intComps, 'IN');
-  const preppedComps = intComps.map((c) => {
-    const idx = inputComps.indexOf(c);
+  // Each port's node takes its input; an IN no port reaches reads 0. Every
+  // other component is read, never written, so it stays the same object (a
+  // nested box keeps its memoised interior).
+  const preppedComps = inside.components.map((c) => {
+    const idx = inside.ins.indexOf(c);
     if (idx >= 0) {
       return { ...c, value: externalInputs[idx] ?? 0 };
     }
-    return { ...c };
+    return c.type === 'INPUT' ? { ...c, value: 0 } : c;
   });
 
   // Topologically sort and evaluate the internal circuit. A clocked run
@@ -117,7 +120,7 @@ export function evaluateBoxedCircuit(comp: CircuitComponent | undefined, externa
   // but the store's local I/O step evaluates a placed box as one gate — so a
   // MEM inside reads out what it holds, and a memory-holding box nested
   // inside is inlined, as everywhere, so a loop through it resolves.
-  const net = inlineSequentialBoxes(preppedComps, intWires);
+  const net = inlineSequentialBoxes(preppedComps, inside.wires);
   const sorted = topologicalSort(net.components, net.wires);
   const portValues = new Map<string, number>();
 
@@ -156,10 +159,8 @@ export function evaluateBoxedCircuit(comp: CircuitComponent | undefined, externa
     }
   }
 
-  // Collect outputs from OUTPUT components, sorted by label
-  const outputComps = sortByLabel(preppedComps, 'OUT');
-
-  return outputComps.map((oc) => portValues.get(`${oc.id}:in`) ?? 0);
+  // What the node behind each right port reads.
+  return inside.outs.map((oc) => portValues.get(`${oc.id}:in`) ?? 0);
 }
 
 /** Result of a pure combinatorial-circuit evaluation. */

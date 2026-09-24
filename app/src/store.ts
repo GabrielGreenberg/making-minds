@@ -40,7 +40,7 @@ import {
   GRID_SIZE,
   toSubscript,
 } from './types';
-import { topologicalSort, evaluateGate, evaluateCC, scNetlist, evaluateSCStep, boxMemoryOutputs, stepBoxedMemory, memorySlots, withMemState, zeroMemState, hasMemory, isSequentialBox, hasCombinationalLoop, sortStateComponents, evaluateFSMSymbolStep, evaluateTMSingleStep, evaluateTMSequence, DEFAULT_TM_MAX_STEPS, notationForRepresentation, encodeTM, stepCountFor, encodeInput, valueToBits, bitsToValue, bitsToTally, bitsToBinary, sortByLabel, fsmNotation, turbotFsmNotation, tmNotation, turbotInternalNotation, turbotExternalNotation, questionLayout, caseStimulus, recordedCaseSeparations, gradedMachineKey, gradingCircuit, type CodecLayout, type TransitionNotation } from './engine';
+import { topologicalSort, evaluateGate, evaluateCC, scNetlist, evaluateSCStep, boxMemoryOutputs, stepBoxedMemory, memorySlots, withMemState, zeroMemState, hasMemory, isSequentialBox, hasCombinationalLoop, sortStateComponents, evaluateFSMSymbolStep, evaluateTMSingleStep, evaluateTMSequence, DEFAULT_TM_MAX_STEPS, notationForRepresentation, encodeTM, stepCountFor, encodeInput, valueToBits, bitsToValue, bitsToTally, bitsToBinary, sortByLabel, fsmNotation, turbotFsmNotation, tmNotation, turbotInternalNotation, turbotExternalNotation, questionLayout, caseStimulus, recordedCaseSeparations, gradedMachineKey, gradingCircuit, parsePortKey, type CodecLayout, type TransitionNotation } from './engine';
 import { senseAheadSymbol, applyMotorCommand, initialBrainState, runBrainStep, stateKindOf, isGoalCell, type BrainState } from './engine/turbot';
 import { framesToLanes } from './engine/perception';
 import { getAssignment, listAssignments } from './assignments';
@@ -69,6 +69,7 @@ import { nextTrace, insertedChars, type TraceChange, type TextContent } from './
 import { INTEGRITY_NOTICE } from './provenance/notice';
 // The sandbox workbook file (task 028): parsing, the saved-content key.
 import { parseWorkbookFile, serializeWorkbook, titleFromFileName, workbookKeyHash } from './workbookFile';
+import { orderBoxPorts, rebindLegacyBoxes, rebindLegacyLibrary } from './boxPorts';
 
 /**
  * TM tape notation (alphabet) for the current context. Inside an assignment
@@ -1258,14 +1259,25 @@ function pasteProvenance(state: { assignment: AssignmentData | null }): Provenan
 
 /** A copy of `clip` with every component and wire id freshly minted in
  *  `scope`, recursing into BOXED internals (their wires re-pointed with them).
- *  A box's boxedCircuitId is a library reference and stays; cc.ts evaluates
- *  internals self-contained, by label order, so fresh internal ids are safe. */
+ *  A box's boxedCircuitId is a library reference and stays; each of its
+ *  ports' bindings (`Port.bind`, an internal `compId:portId`) follows its
+ *  internal component to the fresh id. */
 function remint(clip: CanvasClip, scope: MintScope): CanvasClip {
+  return remintIds(clip, scope).clip;
+}
+function remintIds(clip: CanvasClip, scope: MintScope): { clip: CanvasClip; idMap: Map<string, string> } {
   const idMap = new Map<string, string>();
   const components = clip.components.map((c) => {
     const id = mintId(scope);
     idMap.set(c.id, id);
-    return c.internalCircuit ? { ...c, id, internalCircuit: remint(c.internalCircuit, scope) } : { ...c, id };
+    if (!c.internalCircuit) return { ...c, id };
+    const inner = remintIds(c.internalCircuit, scope);
+    const ports = c.ports.map((p) => {
+      if (p.bind === undefined) return p;
+      const { compId, portId } = parsePortKey(p.bind);
+      return { ...p, bind: `${inner.idMap.get(compId) ?? compId}:${portId}` };
+    });
+    return { ...c, id, ports, internalCircuit: inner.clip };
   });
   const wires = clip.wires.map((w) => ({
     ...w,
@@ -1273,7 +1285,7 @@ function remint(clip: CanvasClip, scope: MintScope): CanvasClip {
     sourceComponentId: idMap.get(w.sourceComponentId) ?? w.sourceComponentId,
     targetComponentId: idMap.get(w.targetComponentId) ?? w.targetComponentId,
   }));
-  return { components, wires };
+  return { clip: { components, wires }, idMap };
 }
 
 // ─── The writing/build trace (task 034, provenance/trace.ts) ────────
@@ -1599,11 +1611,16 @@ export const useStore = create<AppState>()((set, get) => ({
 
     const tabCircuits = new Map<string, TabCircuitData>();
     const tabs = wb.worksheets.map((ws) => {
+      // A box placed before 038 — on the canvas or inside a library entry —
+      // is re-bound by the stated rule (boxPorts.ts rebindLegacyBoxes /
+      // rebindLegacyLibrary), as an assignment's load re-binds it: a load
+      // normalisation, not an edit.
+      const confirmedBoxes = rebindLegacyLibrary(ws.confirmedBoxes ?? []);
       tabCircuits.set(ws.id, {
-        components: resolveMemDirections(ws.circuit.components, ws.circuit.wires),
+        components: rebindLegacyBoxes(resolveMemDirections(ws.circuit.components, ws.circuit.wires), confirmedBoxes),
         wires: ws.circuit.wires,
         boxes: ws.boxes,
-        confirmedBoxes: ws.confirmedBoxes ?? [],
+        confirmedBoxes,
       });
       // Turbot worksheets: restore brain kind + arena (the starter arena for
       // files predating / hand-authored without one).
@@ -2770,27 +2787,18 @@ export const useStore = create<AppState>()((set, get) => ({
       }
     }
 
-    // Identify box inputs and outputs
-    // Crossing wires define ports at the boundary
-    const inputPortIds = Array.from(crossingInputKeys);
-    const outputPortIds = Array.from(crossingOutputKeys);
-
-    // Additionally, INPUT components inside the box serve as box inputs
-    // and OUTPUT components inside serve as box outputs
-    for (const comp of insideComps) {
-      if (comp.type === 'INPUT') {
-        const key = `${comp.id}:out`;
-        if (!outputPortIds.includes(key) && !inputPortIds.includes(key)) {
-          inputPortIds.push(key);
-        }
-      }
-      if (comp.type === 'OUTPUT') {
-        const key = `${comp.id}:in`;
-        if (!inputPortIds.includes(key) && !outputPortIds.includes(key)) {
-          outputPortIds.push(key);
-        }
-      }
-    }
+    // The box's ports, each the internal endpoint it stands for (task 038 —
+    // placeBoxInstance binds each placed port to one; engine/netlist.ts
+    // boxInterior evaluates through them): the inner end of every wire the
+    // box cuts, and the box's own INPUT (OUTPUT) nodes — always inputs
+    // (outputs), also when one of them feeds (is fed from) outside too, which
+    // makes it a pass-through port on both sides. In THE port order
+    // (boxPorts.ts orderBoxPorts): own INs/OUTs by label, then top to bottom.
+    const { inputs: inputPortIds, outputs: outputPortIds } = orderBoxPorts(
+      insideComps,
+      [...crossingInputKeys, ...insideComps.filter((c) => c.type === 'INPUT').map((c) => `${c.id}:out`)],
+      [...crossingOutputKeys, ...insideComps.filter((c) => c.type === 'OUTPUT').map((c) => `${c.id}:in`)],
+    );
 
     // Auto-suggest name
     const suggestedName = nextBoxName(
@@ -2861,18 +2869,23 @@ export const useStore = create<AppState>()((set, get) => ({
     if (kind === 'FSM' || !selectPlaceableBoxKinds(state).includes(kind)) return;
     state.pushHistory(1);
 
-    // Build ports: inputs on left, outputs on right
-    const inputPorts: import('./types').Port[] = inPortIds.map((_, i) => ({
+    // Build ports: inputs on left, outputs on right, each bound to the
+    // internal endpoint it stands for (task 038), in THE port order — which
+    // also orders an entry confirmed before 038 the way a fresh one is.
+    const keys = orderBoxPorts(internalComps, inPortIds, outPortIds);
+    const inputPorts: import('./types').Port[] = keys.inputs.map((bind, i) => ({
       id: `in${i + 1}`,
       label: `in${i + 1}`,
       side: 'left' as const,
       index: i,
+      bind,
     }));
-    const outputPorts: import('./types').Port[] = outPortIds.map((_, i) => ({
+    const outputPorts: import('./types').Port[] = keys.outputs.map((bind, i) => ({
       id: `out${i + 1}`,
       label: `out${i + 1}`,
       side: 'right' as const,
       index: i,
+      bind,
     }));
 
     const comp: CircuitComponent = {
@@ -5229,6 +5242,20 @@ function readSandbox(principal: string | null): Partial<AppState> {
   return sandboxPatchFrom(readStored(sandboxKey(principal)));
 }
 
+/** One autosaved sandbox tab as the store holds it: its library defaulted,
+ *  and a box placed before 038 — on the canvas or inside a library entry —
+ *  re-bound by the stated rule, as an assignment's load re-binds it
+ *  (boxPorts.ts rebindLegacyBoxes / rebindLegacyLibrary — a load
+ *  normalisation, not an edit). A save too damaged to hold lists is passed
+ *  on as it is. */
+function storedTabCircuit(c: TabCircuitData): TabCircuitData {
+  const stored = c.confirmedBoxes || [];
+  const confirmedBoxes = Array.isArray(stored) ? rebindLegacyLibrary(stored) : stored;
+  const library = Array.isArray(confirmedBoxes) ? confirmedBoxes : [];
+  const components = Array.isArray(c.components) ? rebindLegacyBoxes(c.components, library) : c.components;
+  return { ...c, components, confirmedBoxes };
+}
+
 /** Parse one stored sandbox blob into a store patch; {} when absent or
  *  corrupt (stay on the welcome state, workbookOpen false). */
 function sandboxPatchFrom(raw: string | null): Partial<AppState> {
@@ -5241,8 +5268,7 @@ function sandboxPatchFrom(raw: string | null): Partial<AppState> {
       const tabCircuits = new Map<string, TabCircuitData>();
       if (data.tabCircuits) {
         for (const [k, v] of Object.entries(data.tabCircuits)) {
-          const c = v as TabCircuitData;
-          tabCircuits.set(k, { ...c, confirmedBoxes: c.confirmedBoxes || [] });
+          tabCircuits.set(k, storedTabCircuit(v as TabCircuitData));
         }
       }
       // Ensure tabs have activeTask (migration for old auto-saves) and that
@@ -5286,8 +5312,7 @@ function sandboxPatchFrom(raw: string | null): Partial<AppState> {
       const tabCircuits = new Map<string, TabCircuitData>();
       if (data.tabCircuits) {
         for (const [k, v] of Object.entries(data.tabCircuits)) {
-          const c = v as TabCircuitData;
-          tabCircuits.set(k, { ...c, confirmedBoxes: c.confirmedBoxes || [] });
+          tabCircuits.set(k, storedTabCircuit(v as TabCircuitData));
         }
       }
       const tabs = (data.tabs || []).map((t: { id: string; title?: string; name?: string; buildMode?: BuildMode }) => ({
@@ -5296,16 +5321,23 @@ function sandboxPatchFrom(raw: string | null): Partial<AppState> {
         buildMode: t.buildMode || 'CC',
         activeTask: 'arithmetic' as ActiveTask,
       }));
+      const activeTabId = data.activeTabId || tabs[0]?.id || defaultTabId;
+      // The active canvas, re-bound by the same rule as every tab (its tab's
+      // library, when the save kept one).
+      const activeLibrary = tabCircuits.get(activeTabId)?.confirmedBoxes;
+      const components = Array.isArray(data.components)
+        ? rebindLegacyBoxes(data.components, Array.isArray(activeLibrary) ? activeLibrary : [])
+        : data.components || [];
       return {
         workbookOpen: false, // home-first: restore the sandbox but land on Home
         workbookTitle: 'Untitled Workbook',
         buildMode: data.buildMode || 'CC',
         repSystem: data.repSystem || 'binary',
-        components: data.components || [],
+        components,
         wires: data.wires || [],
         boxes: data.boxes || [],
         tabs,
-        activeTabId: data.activeTabId || tabs[0]?.id || defaultTabId,
+        activeTabId,
         ...(tabCircuits.size > 0 ? { tabCircuits } : {}),
       };
     }

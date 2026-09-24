@@ -15,6 +15,13 @@ export interface Port {
   label: string;
   side: 'left' | 'right';
   index: number; // vertical order on that side
+  /** BOXED ports only (task 038): the internal endpoint this port stands for,
+   *  `${compId}:${portId}` — an internal INPUT's `:out`, OUTPUT's `:in`, or
+   *  the inner end of a wire the box was drawn across. Only
+   *  engine/netlist.ts `boxInterior` resolves it. Absent on every port of a
+   *  box placed before 038: its k-th left port binds to the k-th internal IN
+   *  by label, its j-th right port to the j-th OUT. */
+  bind?: string;
 }
 
 export type ComponentType =
