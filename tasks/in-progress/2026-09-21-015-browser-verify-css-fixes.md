@@ -45,3 +45,40 @@ Verification task; fixes, if any, are CSS.
 Screenshots in `tasks/attachments/2026-09-21-015-*.png`.
 
 ## Progress log
+
+### 2026-09-24 — verified in the browser and landed (work loop)
+Browser pane, local mode, dev server on `main`'s code (= this branch), HW1–HW7 loaded, sample
+submissions present. Each member was eyeballed with a pane screenshot and measured in the
+DOM. The pane returns screenshots to the session, not to disk, so the `tasks/attachments/`
+PNGs were not written; the measurements below stand in for them.
+- **Submissions pane:** HW1 gradebook table in an `overflow-x: auto` box (content 2,308 px in
+  944 px); the page doesn't scroll sideways (1024 = viewport). SCORE is `position: sticky;
+  right: 0` and stays at the box's right edge (984) after scrolling 400 px. ✓
+  *Observation (not a member):* the Student column is not pinned, so once scrolled a row's
+  owner is off-screen.
+- **Dashboard action buttons:** Hide and every Publish are 88 px (`min-width: 88px`) at the same
+  x = 689. ✓
+- **TM tape strip:** rows and cells `user-select: none`. The wrapper is `max-width: 100%;
+  overflow-x: auto` (840 px strip in 700 px) with no page overflow. Shift-click moved the head
+  0 → 3 with an empty selection. ✓
+- **Top bar:** John's reads "John Doe · Feedback · Log out", with no role (Ada's shows
+  "Prof. Ada · Instructor"). ✓
+- **Feedback link:** present in the Home header and in the editor's MenuBar header. ✓
+- **Resize grip (legacy):** handle centre minus divider centre = **0 px** on an HW1 CC
+  question, the sandbox SC circuit (boxed MEM), a TM tab and a Turbot tab (`left: -5px`,
+  9 px wide, 1 px border). ✓
+- **Overview submit row (legacy):** the class is now `.overview-submit`, since task 020 renamed
+  it. It is a flex row with `align-items: center; justify-content: space-between`.
+  - Frozen ("🔒 Past due — showing your submission"): the status line and the actions share
+    a centre line at y = 637.6. ✓
+  - Submitted, not frozen: "✓ Submitted …", "View grades" and "Submit assignment" are all at
+    y = 637.6. ✓ This was the reported bug.
+  - Not submitted: not reachable for John in local mode, because task 037's shared-list leak
+    shows another student's "Submitted". It is one flex row with a single child, so there is
+    no alignment to get wrong.
+- **Defect found and fixed:** the turbot Map's sensor/motor legend (`.turbot-glossary-cols`,
+  two `nowrap` columns plus an 18 px gap = 275 px) overflowed its 243 px row at the default
+  panel width and was cut at the panel edge ("00 = both motors o…"). The columns now
+  `flex-wrap` (gap `6px 18px`), so OUTPUT drops below INPUT: 243 px wide, every line fully
+  visible. Build and themeCheck exit 0.
+- Landed via a merge into `main`.
