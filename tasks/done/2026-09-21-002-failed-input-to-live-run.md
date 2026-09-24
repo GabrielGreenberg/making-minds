@@ -8,9 +8,9 @@ requires:
 area: app
 source: claude-md
 created: 2026-09-21T15:30:00-07:00
-status: in-progress
+status: done
 after:
-branch: task/002-failed-input-to-live-run
+branch:
 merged_into:
 ---
 
