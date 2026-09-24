@@ -12,6 +12,10 @@
 // input and each failed turbot arena links into the question with that case
 // loaded into a live run ("Run this input" — store loadCaseInput), so the
 // student sees the output their machine gave without the sheet ever showing it.
+// That run is on the student's CURRENT machine (task 002's settled wording
+// says so when it has changed); "Open my submission" instead opens the attempt
+// this sheet grades — `record`, the latest, the one that counts — read-only,
+// at any due date (#/a/:id/submission/:n, store viewSubmission; task 003).
 
 import { useState } from 'react';
 import type { AssignmentQuestion, QuestionResult, SubmissionRecord } from '../types';
@@ -119,6 +123,9 @@ export function GradeSheet({ assignmentId, record }: { assignmentId: string; rec
   const correct = counted.filter((q) => questionVerdict(byId.get(q.id)).tone === 'pass').length;
 
   const goToQuestion = (i: number) => navigate({ kind: 'assignment', id: assignmentId, questionIndex: i });
+  // The graded attempt, read-only (one question, or the whole problem set).
+  const openSubmission = (i?: number) =>
+    navigate({ kind: 'assignment', id: assignmentId, attempt: record.attempt, questionIndex: i });
   const runCase = (i: number, caseIndex: number) =>
     navigate({ kind: 'assignment', id: assignmentId, questionIndex: i, caseIndex });
 
@@ -163,7 +170,7 @@ export function GradeSheet({ assignmentId, record }: { assignmentId: string; rec
                   {failed && expanded === q.id && qr && (
                     <div className="grades-failed-dropdown">
                       <FailedInputs qr={qr} question={q} runCase={(k) => runCase(i, k)} />
-                      <button className="mm-link" onClick={() => goToQuestion(i)}>
+                      <button className="mm-link" onClick={() => openSubmission(i)} title={`This question as submitted in attempt ${record.attempt}, read-only`}>
                         Open my submission →
                       </button>
                     </div>
@@ -179,7 +186,10 @@ export function GradeSheet({ assignmentId, record }: { assignmentId: string; rec
       <p className="grades-foot">
         {correct} of {counted.length} graded question{counted.length === 1 ? '' : 's'} correct.
         {counted.length < questions.length &&
-          ` ${questions.length - counted.length} not counted yet.`}
+          ` ${questions.length - counted.length} not counted yet.`}{' '}
+        <button className="mm-link" onClick={() => openSubmission()} title="Every answer as submitted in this attempt, read-only">
+          Open submission {record.attempt} →
+        </button>
       </p>
     </div>
   );

@@ -1,4 +1,4 @@
-import { useStore, selectQuestionLocked } from '../store';
+import { useStore, selectLockNotice } from '../store';
 import { usePasteGuard } from '../usePasteGuard';
 import { ProblemBody, ProblemContext } from './ProblemSetDocument';
 
@@ -19,7 +19,9 @@ export function OpenResponsePanel() {
   const question = assignment?.questions[currentQuestionIndex];
   const response = useStore((s) => s.openResponse);
   const setOpenResponse = useStore((s) => s.setOpenResponse);
-  const locked = useStore(selectQuestionLocked);
+  // Why the question refuses edits (marked done, or it shows a submission).
+  const lockNotice = useStore(selectLockNotice);
+  const locked = lockNotice !== null;
   const { ref: pasteGuardRef, notice: pasteNotice } = usePasteGuard();
 
   if (!assignment || !question) return null;
@@ -52,9 +54,7 @@ export function OpenResponsePanel() {
             <span className="paste-notice" role="status">{pasteNotice}</span>
           ) : (
             <span>
-              {locked
-                ? 'Marked done — unlock this question to keep editing.'
-                : "Saved automatically — submit the assignment when you're done."}
+              {lockNotice ?? "Saved automatically — submit the assignment when you're done."}
             </span>
           )}
         </div>

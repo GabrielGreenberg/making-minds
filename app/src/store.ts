@@ -97,21 +97,64 @@ export function selectAssignmentFrozen(
 }
 
 /**
- * Is the open question locked against edits — either the student marked it
- * done, or the whole assignment is frozen past its due date (item 3)? The
- * single read-side answer UI components use; store.ts's mutating actions use
- * the module-private `isCurrentQuestionLocked(state)` on the full AppState.
+ * Is the open assignment's canvas showing a SUBMISSION rather than the live
+ * workbook (task 003)? True while the student views one of their submitted
+ * attempts (`viewingSubmission`, from the grade sheet at any due date) or
+ * the assignment is frozen (past due + submitted — frozen is the one trigger
+ * that forces the view on). The guard every save path shares: nothing shown
+ * then is the student's work in progress.
+ */
+export function showsSubmission(s: {
+  assignment: AssignmentData | null;
+  submissions: Record<string, SubmissionRecord>;
+  viewingSubmission: SubmissionRecord | null;
+}): boolean {
+  if (!s.assignment) return false;
+  return s.viewingSubmission != null || selectAssignmentFrozen(s);
+}
+
+/**
+ * Why the open question refuses edits, or null when it doesn't: it shows a
+ * submission (viewed, or the assignment is frozen — showsSubmission), or the
+ * student marked it done. The one answer behind every lock (selectQuestionLocked)
+ * and every lock notice (selectLockNotice, the store's refusal strings).
+ */
+function lockReason(s: {
+  assignment: AssignmentData | null;
+  currentQuestionIndex: number;
+  questionCircuits: Map<number, QuestionCircuit>;
+  submissions: Record<string, SubmissionRecord>;
+  viewingSubmission: SubmissionRecord | null;
+}): 'submission' | 'done' | null {
+  const q = s.assignment?.questions[s.currentQuestionIndex];
+  if (!q) return null;
+  if (showsSubmission(s)) return 'submission';
+  return s.questionCircuits.get(q.id)?.done ? 'done' : null;
+}
+
+/**
+ * Is the open question locked against edits — the student marked it done, or
+ * the canvas shows a submission (viewed from the grade sheet, or the whole
+ * assignment frozen past its due date)? The single read-side answer UI
+ * components use; store.ts's mutating actions use the module-private
+ * `isCurrentQuestionLocked(state)` on the full AppState.
  */
 export function selectQuestionLocked(s: {
   assignment: AssignmentData | null;
   currentQuestionIndex: number;
   questionCircuits: Map<number, QuestionCircuit>;
   submissions: Record<string, SubmissionRecord>;
+  viewingSubmission: SubmissionRecord | null;
 }): boolean {
-  const q = s.assignment?.questions[s.currentQuestionIndex];
-  if (!q) return false;
-  if (selectAssignmentFrozen(s)) return true;
-  return s.questionCircuits.get(q.id)?.done ?? false;
+  return lockReason(s) !== null;
+}
+
+/** The answer panels' line for a locked question (null when unlocked). */
+export function selectLockNotice(s: Parameters<typeof lockReason>[0]): string | null {
+  const reason = lockReason(s);
+  if (reason === 'submission') return 'Showing your submission — read-only.';
+  if (reason === 'done') return 'Marked done — unlock this question to keep editing.';
+  return null;
 }
 
 /**
@@ -636,8 +679,28 @@ interface AppState {
   openAssignment: (id: string) => Promise<boolean>;
   switchQuestion: (index: number) => void;
   // Toggle the current question's self-imposed "done" lock (notes/todos.md
-  // item 8). No-op outside an assignment.
+  // item 8). No-op outside an assignment, and while the canvas shows a
+  // submission (there is no live question to lock).
   toggleCurrentQuestionDone: () => void;
+  // The submitted attempt the canvas shows instead of the live workbook
+  // (task 003), or null for the live workbook. Every question then shows
+  // THAT attempt's answer, read-only (selectQuestionLocked) — Run/Step still
+  // work — and nothing shown is ever folded into questionCircuits or saved
+  // (syncedQuestionCircuits, goHome, switchQuestion, the done toggle). Set by
+  // viewSubmission (the `#/a/:id/submission/:n` route) and forced to the
+  // latest submission while the assignment is frozen (openAssignment,
+  // switchQuestion). Starts null; a new assignment, closing it, the sandbox
+  // and a principal change clear it.
+  viewingSubmission: SubmissionRecord | null;
+  // Show submitted attempt `attempt` of the open assignment (null = the live
+  // workbook — or, while frozen, the latest submission: frozen has no way
+  // back). Found in `submissions`, the current view, or the submission seam.
+  // A canvas swap (reset law 1) unless the target is what is already shown,
+  // which is a no-op (a re-applied route never wipes a run). Resolves false,
+  // changing nothing, for an attempt that doesn't exist; a seam lookup
+  // overtaken by any newer viewSubmission, open, Home or principal change —
+  // a navigation on the SAME assignment included — applies nothing (true).
+  viewSubmission: (attempt: number | null) => Promise<boolean>;
   closeAssignment: () => void;
   // Navigation between the catalog (Home) and the editor.
   goHome: () => void;          // hide the editor, return to the catalog (preserves in-memory work)
@@ -997,6 +1060,14 @@ let suppressAutoAddRow = false;
 // seam reads resolve after a newer open started applies nothing — a stale
 // resolve must never clobber a newer navigation.
 let openAssignmentSeq = 0;
+
+// Monotonic token for viewSubmission's seam lookup (an older attempt, not in
+// memory): every viewSubmission call bumps it, and so does every open, Home
+// and principal change. A lookup that resolves after any of them applies
+// nothing — openAssignmentSeq alone can't tell, since a navigation within
+// the SAME assignment (the question arrows, "Back to my work", Back/Forward)
+// never bumps it, and the stale view would land under the newer route.
+let viewSubmissionSeq = 0;
 
 // Who the editor store currently belongs to (reset law 2, resetForPrincipal):
 // the signed-in email, or null for the visitor. It keys the sandbox autosave.
@@ -1828,6 +1899,7 @@ export const useStore = create<AppState>()((set, get) => ({
       openResponse: '',
       fillAnswers: [],
       questionTrace: null,
+      viewingSubmission: null,
       buildMode: assignment.questions[0]?.buildMode || 'CC',
     });
     get().resetAllSimState();
@@ -1836,6 +1908,8 @@ export const useStore = create<AppState>()((set, get) => ({
     // Flush any pending debounced save for the canvas we're leaving so its
     // last edit is persisted before another workbook takes over the live state.
     flushAutoSave();
+    // A newer navigation: a submission lookup still in flight applies nothing.
+    viewSubmissionSeq++;
     // Same assignment already in memory → resume without wiping in-progress work.
     if (get().assignment?.id === id) {
       set({ workbookOpen: true });
@@ -1892,16 +1966,18 @@ export const useStore = create<AppState>()((set, get) => ({
     const { questionCircuits, currentQuestionIndex, boxLibrary } = restoreQuestionCircuits(def, saved);
     const activeQ = def.questions[currentQuestionIndex];
     // Frozen (item 3): show what was actually SUBMITTED, read-only, not the
-    // live in-progress work — even if the two have since diverged.
-    const frozen = latestSubmission != null && selectAssignmentFrozen(get());
+    // live in-progress work — even if the two have since diverged. Frozen is
+    // the trigger that forces the submission view on (viewingSubmission).
+    const view = latestSubmission && selectAssignmentFrozen(get()) ? latestSubmission : null;
     const activeCircuit = activeQ
-      ? frozen
-        ? frozenQuestionCircuit(latestSubmission!, activeQ.id)
+      ? view
+        ? submittedQuestionCircuit(view, activeQ.id)
         : questionCircuits.get(activeQ.id) ?? emptyQuestionCircuit()
       : emptyQuestionCircuit();
     set({
       questionCircuits,
       currentQuestionIndex,
+      viewingSubmission: view,
       ...loadQuestionFields(activeCircuit),
       // Assignment-wide: a box built for one question is available in every
       // question of the homework that can place its kind.
@@ -1913,11 +1989,16 @@ export const useStore = create<AppState>()((set, get) => ({
     return true;
   },
   goHome: () => {
+    // Leaving the editor: a submission lookup still in flight applies nothing.
+    viewSubmissionSeq++;
     const state = get();
-    // Sync the live canvas into its container so nothing in memory is lost.
+    // Sync the live canvas into its container so nothing in memory is lost —
+    // never a submission on show (viewingSubmission): the live work is
+    // already in the map, and folding the SUBMITTED canvas there would
+    // overwrite it in the save below.
     if (state.assignment) {
       const q = state.assignment.questions[state.currentQuestionIndex];
-      if (q) {
+      if (q && !state.viewingSubmission) {
         const qc = new Map(state.questionCircuits);
         qc.set(q.id, foldLiveQuestion(state, q.id));
         set({ questionCircuits: qc });
@@ -1959,6 +2040,7 @@ export const useStore = create<AppState>()((set, get) => ({
     const tab = state.tabs.find((t) => t.id === state.activeTabId);
     set({
       assignment: null,
+      viewingSubmission: null,
       workbookOpen: true,
       components: saved.components,
       wires: saved.wires,
@@ -1977,14 +2059,27 @@ export const useStore = create<AppState>()((set, get) => ({
     const nextQ = a.questions[index];
     if (!currentQ || !nextQ) return;
 
-    // Frozen (item 3): every question shows its own submitted answer,
-    // read-only — there is no live canvas to save on the way out.
-    if (selectAssignmentFrozen(state)) {
-      const record = state.submissions[a.id]!;
-      const saved = frozenQuestionCircuit(record, nextQ.id);
+    // Showing a submission (task 003): every question shows its own answer
+    // in THAT attempt, read-only. Frozen (item 3) forces the latest one on.
+    const view =
+      state.viewingSubmission ??
+      (selectAssignmentFrozen(state) ? state.submissions[a.id] ?? null : null);
+    if (view) {
+      // Already viewing → the canvas is a submission, nothing live to save.
+      // Not yet → the freeze just began mid-session (the deadline passed, or
+      // a late submit): the canvas still holds the LIVE work, which lands in
+      // the map (and any pending save goes out) before the view replaces it.
+      let questionCircuits = state.questionCircuits;
+      if (!state.viewingSubmission) {
+        flushAutoSave();
+        questionCircuits = new Map(questionCircuits);
+        questionCircuits.set(currentQ.id, foldLiveQuestion(state, currentQ.id));
+      }
       set({
         currentQuestionIndex: index,
-        ...loadQuestionFields(saved),
+        questionCircuits,
+        viewingSubmission: view,
+        ...loadQuestionFields(submittedQuestionCircuit(view, nextQ.id)),
         buildMode: nextQ.buildMode,
       });
       get().resetAllSimState();
@@ -2010,6 +2105,10 @@ export const useStore = create<AppState>()((set, get) => ({
     const state = get();
     const q = state.assignment?.questions[state.currentQuestionIndex];
     if (!q) return;
+    // Not behind isCurrentQuestionLocked — done IS that lock, and unlocking
+    // must stay possible — but never while a submission is on show: the fold
+    // below would write the SUBMITTED canvas into the live workbook.
+    if (showsSubmission(state)) return;
     // Fold in the live canvas (mirrors switchQuestion/goHome's sync) rather
     // than the possibly-stale map entry, so toggling done never discards an
     // edit made since the last navigation.
@@ -2021,6 +2120,7 @@ export const useStore = create<AppState>()((set, get) => ({
   closeAssignment: () => {
     set({
       assignment: null,
+      viewingSubmission: null,
       currentQuestionIndex: 0,
       questionCircuits: new Map(),
       components: [],
@@ -2033,6 +2133,64 @@ export const useStore = create<AppState>()((set, get) => ({
       undoStack: [],
       redoStack: [],
     });
+  },
+  viewingSubmission: null,
+  viewSubmission: async (attempt) => {
+    // This call supersedes any lookup still in flight (viewSubmissionSeq).
+    const viewSeq = ++viewSubmissionSeq;
+    const a = get().assignment;
+    if (!a) return attempt == null;
+    // The record to show; null = the live workbook — except while frozen,
+    // which stays locked to the latest submission.
+    let target: SubmissionRecord | null;
+    if (attempt == null) {
+      const s = get();
+      target = selectAssignmentFrozen(s) ? s.submissions[a.id] ?? null : null;
+    } else {
+      const s = get();
+      // The fresher copy first: `submissions` is re-read on every visit (a
+      // grade release adds the result a graded-case replay reads); the view
+      // is whatever was fetched when it began.
+      target = [s.submissions[a.id], s.viewingSubmission].find((r) => r?.attempt === attempt) ?? null;
+      if (!target) {
+        const all = await submissionStore.listSubmissions(a.id);
+        // Superseded (a newer view, open, Home or principal change — on
+        // this assignment or another): apply nothing.
+        if (viewSeq !== viewSubmissionSeq || get().assignment?.id !== a.id) return true;
+        target = all.find((r) => r.attempt === attempt) ?? null;
+        if (!target) return false;
+      }
+    }
+
+    const s = get();
+    const shown = s.viewingSubmission;
+    if ((shown?.attempt ?? null) === (target?.attempt ?? null)) {
+      // Already on show: no canvas swap — a re-applied route, or the arrows,
+      // must not wipe a run. Only a fresher copy of the record is taken.
+      if (target && target !== shown) set({ viewingSubmission: target });
+      return true;
+    }
+    const q = a.questions[s.currentQuestionIndex];
+    let questionCircuits = s.questionCircuits;
+    if (!shown) {
+      // Leaving the live workbook: its pending save goes out NOW (the
+      // snapshot is taken synchronously, before the swap — the autosave
+      // refuses while a submission is on show), and the live canvas lands in
+      // the map, which the view never writes to.
+      flushAutoSave();
+      if (q) {
+        questionCircuits = new Map(questionCircuits);
+        questionCircuits.set(q.id, foldLiveQuestion(s, q.id));
+      }
+    }
+    const canvas = !q
+      ? emptyQuestionCircuit()
+      : target
+        ? submittedQuestionCircuit(target, q.id)
+        : questionCircuits.get(q.id) ?? emptyQuestionCircuit();
+    set({ viewingSubmission: target, questionCircuits, ...loadQuestionFields(canvas) });
+    get().resetAllSimState();
+    return true;
   },
 
   // Save/Load
@@ -2186,7 +2344,7 @@ export const useStore = create<AppState>()((set, get) => ({
   },
   renameBox: (id, name) => {
     const state = get();
-    if (isCurrentQuestionLocked(state)) return 'This question is marked done — unlock it to rename a box.';
+    if (isCurrentQuestionLocked(state)) return lockRefusal(state, 'rename a box');
     const trimmed = name.trim();
     if (!trimmed) return 'A box needs a name.';
     if (takenBoxNames(state.confirmedBoxLibrary, state.boxes, id).has(trimmed))
@@ -2228,7 +2386,7 @@ export const useStore = create<AppState>()((set, get) => ({
   },
   confirmBox: (id) => {
     const state = get();
-    if (isCurrentQuestionLocked(state)) return 'This question is marked done — unlock it to confirm a box.';
+    if (isCurrentQuestionLocked(state)) return lockRefusal(state, 'confirm a box');
     const box = state.boxes.find((b) => b.id === id);
     if (!box) return 'Box not found.';
 
@@ -3933,10 +4091,11 @@ export const useStore = create<AppState>()((set, get) => ({
     // not perception frames, fill-in blanks or open prose).
     if (!a || !q || q.id !== questionId) return Promise.resolve();
     if (q.perception || q.fill_in || q.buildMode === 'open') return Promise.resolve();
-    // The latest recorded submission's result — remotely the student's own
-    // sanitized copy (present once grades are released): input, pass,
-    // reason, separations; never the key.
-    const record = state.submissions[a.id];
+    // The result of the attempt on show (viewingSubmission — its own
+    // machine is on the canvas), else the latest recorded submission's —
+    // remotely the student's own sanitized copy (present once grades are
+    // released): input, pass, reason, separations; never the key.
+    const record = state.viewingSubmission ?? state.submissions[a.id];
     const qr = record?.result?.questions.find((r) => r.questionId === q.id);
     if (!record || !qr) return Promise.resolve();
     // The machine this attempt was graded on, as the banner compares it.
@@ -4110,9 +4269,10 @@ export const useStore = create<AppState>()((set, get) => ({
     const keepSandboxOpen = principalReported && s.workbookOpen && s.assignment === null;
     // Stops any run interval before the fields holding their ids are wiped.
     get().resetAllSimState();
-    // In-flight opens and submission hydrations belong to the leaving
-    // principal: their resolves must apply nothing.
+    // In-flight opens, submission lookups and hydrations belong to the
+    // leaving principal: their resolves must apply nothing.
     openAssignmentSeq++;
+    viewSubmissionSeq++;
     principalEpoch++;
     currentPrincipal = email;
     principalReported = true;
@@ -4224,12 +4384,21 @@ function getAutoSaveData() {
   };
 }
 
-/** Is the currently-open question marked done? Outside an assignment (the
- *  sandbox has no "done" concept) this is always false. Read at the top of
- *  every action that would edit a question's persisted answer state, so a
- *  student can't accidentally change work they've locked. */
+/** Is the currently-open question locked — marked done, or showing a
+ *  submission (viewed or frozen)? Outside an assignment (the sandbox has no
+ *  lock) this is always false. Read at the top of every action that would
+ *  edit a question's persisted answer state, so a student can't change work
+ *  they've locked, or a submitted snapshot. */
 function isCurrentQuestionLocked(state: AppState): boolean {
   return selectQuestionLocked(state);
+}
+
+/** A locked question's refusal for `what` (e.g. 'rename a box'), in the
+ *  lock's own words. */
+function lockRefusal(state: AppState, what: string): string {
+  return lockReason(state) === 'submission'
+    ? `This question shows your submission, read-only — you can't ${what} here.`
+    : `This question is marked done — unlock it to ${what}.`;
 }
 
 /** A turbot brain's state before its first cycle, from the canvas as it is
@@ -4243,13 +4412,14 @@ function turbotBrainStart(state: AppState): BrainState {
   return initialBrainState(components, selectTurbotInnerMode(state));
 }
 
-/** One question's canvas as it was actually SUBMITTED, for the frozen
- *  read-only view (item 3) — never the live in-progress work. `boxes` (the
+/** One question's canvas as it was actually SUBMITTED in `record`, for the
+ *  read-only submission view (viewingSubmission; the frozen view, item 3) —
+ *  never the live in-progress work. `boxes` (the
  *  draw-a-rectangle-around-existing-gates overlay) isn't captured by
- *  buildSubmission, so a frozen view of a boxed selection renders/simulates
+ *  buildSubmission, so a viewed boxed selection renders/simulates
  *  correctly but loses the box's visual rectangle; cosmetic, not a
  *  correctness gap (the underlying components/wires are all there). */
-function frozenQuestionCircuit(record: SubmissionRecord, questionId: number): QuestionCircuit {
+function submittedQuestionCircuit(record: SubmissionRecord, questionId: number): QuestionCircuit {
   const answer = record.submission.answers.find((a) => a.questionId === questionId);
   if (!answer) return emptyQuestionCircuit();
   return {
@@ -4268,12 +4438,16 @@ function frozenQuestionCircuit(record: SubmissionRecord, questionId: number): Qu
  * The assignment's per-question circuits with the live canvas folded into the
  * current question (the same save step as switchQuestion/goHome), so callers see
  * the latest in-progress work for the open question. Caller must ensure an
- * assignment is active.
+ * assignment is active. While a submission is on show (viewingSubmission) the
+ * canvas is NOT live work and is never folded — the map already holds the
+ * live work (viewSubmission folded it on the way in) — so every save built
+ * on this (the autosave, the crash journal, the leaving principal's save, a
+ * submit, the export) carries the live workbook, never the viewed attempt.
  */
 function syncedQuestionCircuits(s: AppState): Map<number, QuestionCircuit> {
   const circuits = new Map(s.questionCircuits);
   const q = s.assignment?.questions[s.currentQuestionIndex];
-  if (q) circuits.set(q.id, foldLiveQuestion(s, q.id));
+  if (q && !s.viewingSubmission) circuits.set(q.id, foldLiveQuestion(s, q.id));
   return circuits;
 }
 
@@ -4407,12 +4581,12 @@ async function performAutoSave(keepalive = false): Promise<void> {
 // Subscribe to state changes that should trigger auto-save. Routes by context:
 // assignment mode → per-assignment storage; sandbox mode → the sandbox blob.
 useStore.subscribe((state, prev) => {
-  // Frozen (notes/todos.md item 3): the canvas is showing the submission,
-  // not live work-in-progress, so nothing here should ever overwrite the
+  // A submission on show (viewed, task 003, or frozen, item 3): the canvas
+  // is not live work-in-progress, so nothing here should ever overwrite the
   // real saved workbook. (Mutations are already refused at the source —
-  // isCurrentQuestionLocked — so in practice nothing changes anyway; this is
-  // the belt on top of that suspender.)
-  if (selectAssignmentFrozen(state)) return;
+  // isCurrentQuestionLocked — and the fold skips a viewed canvas
+  // (syncedQuestionCircuits); this is the belt on top of those suspenders.)
+  if (showsSubmission(state)) return;
   const canvasChanged =
     state.components !== prev.components ||
     state.wires !== prev.wires ||
@@ -4479,7 +4653,10 @@ function flushAutoSave(opts?: { journal?: boolean; keepalive?: boolean }) {
 // - The sandbox (no assignment in memory): one synchronous localStorage write,
 //   made here directly. What is in memory is this person's by construction
 //   (the last reset loaded it for them).
-// - An open assignment (never a frozen one — its canvas is the submission):
+// - An open assignment — also one showing a submission (viewed or frozen):
+//   the snapshot never folds a viewed canvas (syncedQuestionCircuits), so it
+//   is the live workbook, whose save on the way into the view may still be
+//   in flight or queued as a trailing rerun (which the reset cancels):
 //   locally, the seam's synchronous write, directly. Remotely, the crash
 //   journal first (synchronous, so it holds even if the PUT fails or the tab
 //   dies), then one PUT through the single-flight path: with a save already in
@@ -4502,7 +4679,6 @@ function saveForLeavingPrincipal(): void {
     }
     return;
   }
-  if (selectAssignmentFrozen(s)) return;
   if (backendMode === 'local') {
     void saveAssignmentState().catch(() => {});
     return;

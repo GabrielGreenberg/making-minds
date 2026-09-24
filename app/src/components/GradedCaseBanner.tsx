@@ -8,7 +8,7 @@
 // run (engine/caseRun.ts), so a remote student sees the output their machine
 // gave without the server ever sending it — and whether the two are the same
 // run. They are the same when the canvas holds the machine that was graded
-// (a frozen question always does) — the machine of the case's own attempt,
+// (a viewed submission — frozen or not — always does) — the machine of the case's own attempt,
 // even after a later submit. When it does not — grades released before the
 // due date and the question edited, or resubmitted, since — the run is of the
 // CURRENT machine, and the banner says so rather than claim a match. The
@@ -23,6 +23,7 @@ export function GradedCaseBanner() {
   const loadedCase = useStore((s) => s.loadedCase);
   const assignment = useStore((s) => s.assignment);
   const currentQuestionIndex = useStore((s) => s.currentQuestionIndex);
+  const viewedAttempt = useStore((s) => s.viewingSubmission?.attempt);
   const components = useStore((s) => s.components);
   const wires = useStore((s) => s.wires);
   const latestAttempt = useStore((s) => (s.assignment ? s.submissions[s.assignment.id]?.attempt : undefined));
@@ -46,8 +47,9 @@ export function GradedCaseBanner() {
 
   const close = () => {
     clearLoadedCase();
-    // Drop the case from the URL, so a reload does not load it again.
-    navigate({ kind: 'assignment', id: assignment.id, questionIndex: currentQuestionIndex }, { replace: true });
+    // Drop the case from the URL, so a reload does not load it again — and
+    // only the case: a submission on show stays on show.
+    navigate({ kind: 'assignment', id: assignment.id, attempt: viewedAttempt, questionIndex: currentQuestionIndex }, { replace: true });
   };
 
   return (

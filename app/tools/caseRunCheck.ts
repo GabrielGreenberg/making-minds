@@ -41,6 +41,10 @@
 //     with the machine graded in the case's OWN attempt: after a fixed
 //     machine is resubmitted, attempt 1's ✗ is never "Same as when graded";
 //     the settled divergence wording; Run again moves to the latest attempt.
+//   [viewed attempt]  while a submitted attempt is on show (store
+//     viewSubmission, task 003) and a later one is the latest, a case replays
+//     the attempt ON SHOW — its recorded verdict, its machine (so the banner
+//     reads "Same as when graded"); without the view, the latest (task 002).
 //   [dismiss]  ✕ (clearLoadedCase) puts the Map back on the primary arena,
 //     the turbot at its start, runs at its budget.
 //   [step budgets]  question TM/turbot runs stop at the grader's budgets
@@ -65,6 +69,7 @@ import {
   caseStimulus,
   questionLayout,
   gradingCircuit,
+  gradedMachineKey,
 } from '../src/engine/caseRun';
 import {
   sortByLabel,
@@ -571,6 +576,38 @@ console.log("\n[resubmit: the banner compares against the case's own attempt]");
   await useStore.getState().loadCaseInput(q.id, k);
   useStore.setState({ submissions: { [full.id]: gradedRecord(full, q, fx.broken!, 2) } });
   check('a resubmit of the very machine graded in attempt 1 stays "same"', view().note === 'same');
+}
+
+// ── [viewed attempt] ────────────────────────────────────────────────────────
+console.log('\n[viewed attempt: a case replays the attempt on show]');
+{
+  const fx = loadFixture('hw2-p1');
+  const q = fx.question;
+  const full: AssignmentData = { id: 'case-run-viewed', title: 'case run check', questions: [q] };
+  const first = gradedRecord(full, q, fx.broken!, 1);
+  const k = failingIndices(first.result!.questions[0], 1)[0];
+  // The live canvas holds the fix; attempt 1 (the broken machine) is viewed…
+  useStore.getState().loadAssignment(full);
+  useStore.setState({ components: clone(fx.correct.components), wires: clone(fx.correct.wires), submissions: { [full.id]: first } });
+  check('viewSubmission(1) resolves true', (await useStore.getState().viewSubmission(1)) === true);
+  check("…and the canvas holds attempt 1's machine",
+    gradedMachineKey({ components: useStore.getState().components, wires: useStore.getState().wires }) === gradedMachineKey(fx.broken!));
+  // …and then the fix is submitted: attempt 2 is the latest.
+  useStore.setState({ submissions: { [full.id]: gradedRecord(full, q, fx.correct, 2) } });
+  await useStore.getState().loadCaseInput(q.id, k);
+  {
+    const s = useStore.getState();
+    const lc = s.loadedCase;
+    check("the case is attempt 1's (the attempt on show), its ✗ recorded",
+      lc?.attempt === 1 && lc.kind === 'value' && !lc.recorded.pass && lc.gradedKey === gradedMachineKey(fx.broken!));
+    const v = gradedCaseView(q, lc!, { components: s.components, wires: s.wires }, s.submissions[full.id]?.attempt);
+    check('…so the banner reads "Same as when graded."', v.note === 'same' && v.noteText === 'Same as when graded.');
+  }
+  // Back to the live work: the same load replays the latest attempt (002).
+  await useStore.getState().viewSubmission(null);
+  await useStore.getState().loadCaseInput(q.id, k);
+  check("on the live work the case is the latest attempt's (2)", useStore.getState().loadedCase?.attempt === 2);
+  useStore.getState().closeAssignment();
 }
 
 // ── [dismiss] ───────────────────────────────────────────────────────────────

@@ -26,6 +26,10 @@
 // sandbox of their own; the legacy key is adopted as the visitor's), [principal
 // change mid-save] (a save in flight swallows none of the leaving person's
 // edits) and [auth provider wiring] (both providers report every change).
+// [viewing a submission] (task 003): a submitted attempt opened read-only at
+// any due date is a canvas swap both ways, refuses every edit but runs, and
+// never lands in the live workbook (no fold, no save, a submit records the
+// live work); [frozen assignment] is the same view, forced on by the freeze.
 // Task 034 adds the provenance slice: a principal change drops the mint keys
 // and the live editing record (the next person mints under their own key only
 // once their open registers it), and [provenance across canvas swaps] — every
@@ -67,11 +71,12 @@ backing.set(VISITOR_KEY, JSON.stringify({
   tabCircuits: { 'import-tab': { components: [{ id: 'import-sentinel', type: 'AND', x: 0, y: 0 }], wires: [], boxes: [] } },
 }));
 
-const { useStore, selectTurbotArena, selectAssignmentFrozen, selectQuestionLocked } = await import('../src/store');
+const { useStore, selectTurbotArena, selectAssignmentFrozen, selectQuestionLocked, showsSubmission } =
+  await import('../src/store');
 const { buildSampleAssignment, scCorrect, fsmCorrect, tmCorrect, turbotCorrect, SAMPLE_ASSIGNMENT_ID } =
   await import('../src/devData/sampleData');
 const { localAssignmentStore } = await import('../src/storage/AssignmentStore');
-const { backendMode, workbookStore } = await import('../src/storage/backend');
+const { backendMode, workbookStore, submissionStore } = await import('../src/storage/backend');
 // The clipboard lives in the provenance seam, not in store state (task 033).
 const { peekClipboard, stampText, currentProvenance } = await import('../src/provenance');
 // …and the mint keys in the minting seam (task 034).
@@ -365,6 +370,27 @@ console.log('[frozen assignment]');
   useStore.getState().switchQuestion(0);
   check('switching back shows the SUBMITTED circuit, not the diverged live work',
     useStore.getState().components.length === submittedCount);
+  check('the freeze forced the submission view on (the latest attempt)',
+    useStore.getState().viewingSubmission?.attempt === rec?.attempt);
+  // Frozen has no way back: asking for the live workbook shows the latest
+  // submission still, locked.
+  check('viewSubmission(null) while frozen resolves', (await useStore.getState().viewSubmission(null)) === true);
+  check('…and still shows the submission, locked',
+    useStore.getState().components.length === submittedCount &&
+      useStore.getState().viewingSubmission?.attempt === rec?.attempt &&
+      selectQuestionLocked(useStore.getState()));
+  const doneBefore = useStore.getState().questionCircuits;
+  useStore.getState().toggleCurrentQuestionDone();
+  check('the done toggle is refused while frozen (it would fold the submission into the live work)',
+    useStore.getState().questionCircuits === doneBefore);
+  // Going Home saves the workbook directly: the LIVE work, never a fold of
+  // the submission on show (the latent overwrite this pin retires).
+  useStore.getState().goHome();
+  {
+    const stored = await workbookStore.loadAssignmentState(FROZEN_ID);
+    check('goHome while frozen leaves the diverged live work in the saved workbook',
+      stored?.questionCircuits[frozenAsg.questions[0].id]?.components.length === divergedCount);
+  }
 
   // A close + reopen re-fetches the assignment DEFINITION from storage, so
   // the persisted copy's dueDate must reflect the passed deadline too — the
@@ -376,6 +402,8 @@ console.log('[frozen assignment]');
     useStore.getState().components.length === submittedCount);
   check('the frozen tag reads through the selector on a fresh open too',
     selectAssignmentFrozen(useStore.getState()));
+  check('a fresh open views the latest submission',
+    useStore.getState().viewingSubmission?.attempt === rec?.attempt && showsSubmission(useStore.getState()));
 
   // A never-submitted, past-due assignment is NOT frozen — nothing to freeze
   // (late submissions stay accepted, per dueDates.ts's policy).
@@ -389,6 +417,204 @@ console.log('[frozen assignment]');
     !selectAssignmentFrozen(useStore.getState()));
   useStore.getState().addComponent('AND', 100, 100);
   check('…and editing still works', useStore.getState().components.length === 1);
+}
+
+// ── viewing a submission (task 003): a submitted attempt opened read-only
+// at ANY due date — Run/Step live, edits refused, the live workbook never
+// written, and a way back ──
+console.log('[viewing a submission]');
+{
+  const VIEW_ID = `${SAMPLE_ASSIGNMENT_ID}-view`;
+  const futureDate = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+  const viewAsg = { ...buildSampleAssignment(), id: VIEW_ID, title: 'View Sample', dueDate: futureDate };
+  const q1 = viewAsg.questions[0]; // CC
+  const SC_INDEX = 1; // Q2 (SC)
+  await localAssignmentStore.save(viewAsg);
+  await localAssignmentStore.setVisible(VIEW_ID, true);
+  useStore.getState().closeAssignment();
+  await useStore.getState().openAssignment(VIEW_ID);
+
+  // What gets submitted: an SC circuit on Q2, one gate on Q1.
+  useStore.getState().switchQuestion(SC_INDEX);
+  useStore.setState({ components: scCorrect().components, wires: scCorrect().wires });
+  useStore.getState().switchQuestion(0);
+  useStore.getState().addComponent('AND', 100, 100);
+  const rec = await useStore.getState().submitAssignment(VIEW_ID, 'student@example.com');
+  const n = rec!.attempt;
+  check('submitted Q1 with 1 component',
+    rec?.submission.answers.find((a) => a.questionId === q1.id)?.circuit?.components.length === 1);
+  // Keep working before the deadline: the live work diverges.
+  useStore.setState({ selectedIds: [useStore.getState().components[0].id] });
+  useStore.getState().copySelected(); // something a paste could land, were it allowed
+  useStore.getState().addComponent('OR', 200, 100);
+  const liveTrace = useStore.getState().questionTrace;
+  check('live Q1 diverged to 2 components; not frozen (due in the future)',
+    useStore.getState().components.length === 2 && !selectAssignmentFrozen(useStore.getState()));
+
+  // (a) Entering the view is a canvas swap (reset law 1).
+  plantSimJunk();
+  check(`viewSubmission(${n}) resolves true`, (await useStore.getState().viewSubmission(n)) === true);
+  {
+    const s = useStore.getState();
+    check('the canvas shows the SUBMITTED Q1 (1 component), attempt on record',
+      s.components.length === 1 && s.viewingSubmission?.attempt === n && showsSubmission(s));
+  }
+  checkAllSimFresh('entering a submission');
+
+  // (b) Every edit is refused — through the one lock.
+  check('the question reads locked', selectQuestionLocked(useStore.getState()));
+  useStore.getState().addComponent('NOT', 300, 100);
+  check('addComponent is refused', useStore.getState().components.length === 1);
+  useStore.getState().paste();
+  check('paste is refused', useStore.getState().components.length === 1);
+  useStore.getState().setOpenResponse('sneaking in an edit');
+  check('setOpenResponse is refused', useStore.getState().openResponse === '');
+  useStore.setState({ undoStack: [{ components: [], wires: [], boxes: [], confirmedBoxes: [] }] });
+  useStore.getState().undo();
+  check('undo is refused', useStore.getState().components.length === 1 && useStore.getState().undoStack.length === 1);
+  useStore.setState({ undoStack: [] });
+  {
+    const before = useStore.getState().questionCircuits;
+    useStore.getState().toggleCurrentQuestionDone();
+    check('the done toggle is refused (no fold of the submission)', useStore.getState().questionCircuits === before);
+  }
+
+  // (c) Simulation still runs — on the submitted machine of every question.
+  useStore.getState().switchQuestion(SC_INDEX);
+  {
+    const s = useStore.getState();
+    check('switching question stays on the attempt: the SUBMITTED SC circuit',
+      s.viewingSubmission?.attempt === n && s.components.length === 3 && s.wires.length === 2);
+  }
+  checkAllSimFresh('switching question in a submission');
+  // An INPUT toggle — the one canvas mutation never locked — arms no save of
+  // the viewed canvas (the autosave subscriber's showsSubmission guard). The
+  // submitted SC circuit has an INPUT, so the toggle really happens.
+  await flushTimers();
+  {
+    const saveBefore = useStore.getState().autoSaveStatus;
+    const input = useStore.getState().components.find((c) => c.type === 'INPUT');
+    check('the viewed SC canvas has an INPUT to toggle', input !== undefined);
+    if (input) useStore.getState().setInputValue(input.id, 1);
+    check('…and the toggle lands on the viewed canvas',
+      useStore.getState().components.find((c) => c.id === input?.id)?.value === 1);
+    check('…which arms no save (the chip stays saved)',
+      saveBefore === 'saved' && useStore.getState().autoSaveStatus === 'saved');
+    await flushTimers();
+    check('the autosave stays idle while viewing', useStore.getState().autoSaveStatus === 'saved');
+  }
+  useStore.getState().setScGlobalSequenceInput(0, '0110');
+  useStore.getState().loadScGlobalSequence(0);
+  for (let i = 0; i < 3; i++) useStore.getState().scStep();
+  check('an SC run steps on the viewed submission', useStore.getState().scHistory.length === 3);
+  useStore.getState().switchQuestion(0);
+  check('back on Q1: still the submitted canvas', useStore.getState().components.length === 1);
+
+  // (d) The live work is untouched in memory…
+  {
+    const live = useStore.getState().questionCircuits.get(q1.id);
+    check('questionCircuits holds the diverged live Q1 (2 components)', live?.components.length === 2);
+    check("…and the live Q1's editing record, unchanged",
+      JSON.stringify(live?.provenance ?? null) === JSON.stringify(liveTrace ?? null));
+  }
+  // (e) …and in the saved workbook: goHome's direct save writes the live map.
+  useStore.getState().goHome();
+  {
+    const stored = await workbookStore.loadAssignmentState(VIEW_ID);
+    check('goHome while viewing: the saved Q1 is the live work (2 components)',
+      stored?.questionCircuits[q1.id]?.components.length === 2);
+  }
+  await useStore.getState().openAssignment(VIEW_ID); // resume (same assignment)
+  check('resuming the same assignment keeps the view (the route decides)',
+    useStore.getState().viewingSubmission?.attempt === n && useStore.getState().components.length === 1);
+
+  // (f) A submit while viewing records the LIVE work, not the attempt shown.
+  const rec2 = await useStore.getState().submitAssignment(VIEW_ID, 'student@example.com');
+  check(`a submit while viewing records attempt ${n + 1} from the live work`,
+    rec2?.attempt === n + 1 &&
+      rec2.submission.answers.find((a) => a.questionId === q1.id)?.circuit?.components.length === 2 &&
+      rec2.submission.answers.find((a) => a.questionId === viewAsg.questions[SC_INDEX].id)?.circuit?.components.length === 3);
+  check('…and the view stays on the attempt it showed', useStore.getState().viewingSubmission?.attempt === n);
+
+  // (g) The attempt already on show: no swap, the run survives.
+  plantSimJunk();
+  check(`viewSubmission(${n}) again resolves true`, (await useStore.getState().viewSubmission(n)) === true);
+  check('…as a no-op (the planted run survives)',
+    useStore.getState().scTimeStep === 7 && useStore.getState().undoStack.length === 1);
+  // (h) An attempt that doesn't exist changes nothing.
+  check('viewSubmission(999) resolves false', (await useStore.getState().viewSubmission(999)) === false);
+  check('…and changes nothing',
+    useStore.getState().viewingSubmission?.attempt === n && useStore.getState().components.length === 1 &&
+      useStore.getState().scTimeStep === 7);
+
+  // (i) Back to the live work: a canvas swap, unlocked, editable.
+  check('viewSubmission(null) resolves true', (await useStore.getState().viewSubmission(null)) === true);
+  {
+    const s = useStore.getState();
+    check('back on the live Q1 (2 components), unlocked',
+      s.viewingSubmission === null && s.components.length === 2 && !selectQuestionLocked(s) && !showsSubmission(s));
+  }
+  checkAllSimFresh('leaving a submission');
+  useStore.getState().addComponent('NOT', 300, 100);
+  check('editing works again', useStore.getState().components.length === 3);
+
+  // An older attempt (no longer the latest in `submissions`) comes through
+  // the submission seam; the live edit just made lands in the map first.
+  check(`viewSubmission(${n}) of an older attempt resolves true`, (await useStore.getState().viewSubmission(n)) === true);
+  check('…showing that attempt (1 component)', useStore.getState().components.length === 1);
+  check('…with the live edit folded into the map on the way in',
+    useStore.getState().questionCircuits.get(q1.id)?.components.length === 3);
+  await useStore.getState().viewSubmission(null);
+  check('…and back to it', useStore.getState().components.length === 3);
+
+  // (j) A seam lookup overtaken by a newer navigation on the SAME assignment
+  // (Back/Forward onto an older attempt, then the arrows or "Back to my
+  // work" before a slow remote fetch lands) applies nothing: the newer route
+  // owns the canvas. The seam is held open here as a remote fetch would be.
+  {
+    const realList = submissionStore.listSubmissions.bind(submissionStore);
+    let release = () => {};
+    submissionStore.listSubmissions = async (id) => {
+      await new Promise<void>((r) => { release = r; });
+      return realList(id);
+    };
+    try {
+      const stale = useStore.getState().viewSubmission(n); // older attempt → the (held) seam
+      check('a newer live route on the same assignment resolves true',
+        (await useStore.getState().viewSubmission(null)) === true);
+      release();
+      check('the overtaken lookup resolves true', (await stale) === true);
+      {
+        const s = useStore.getState();
+        check('…and applies nothing: still the live Q1 (3 components), unlocked',
+          s.viewingSubmission === null && s.components.length === 3 && !showsSubmission(s));
+      }
+      // Overtaken by a view of ANOTHER attempt (the latest, found in memory).
+      await useStore.getState().viewSubmission(null); // from the live work, whatever happened above
+      const stale2 = useStore.getState().viewSubmission(n);
+      check(`a newer view of attempt ${n + 1} resolves true`,
+        (await useStore.getState().viewSubmission(n + 1)) === true);
+      release();
+      await stale2;
+      {
+        const s = useStore.getState();
+        check(`…and the overtaken lookup leaves attempt ${n + 1} on show (2 components)`,
+          s.viewingSubmission?.attempt === n + 1 && s.components.length === 2);
+      }
+      // Overtaken by going Home: nothing lands behind the catalog either.
+      await useStore.getState().viewSubmission(null);
+      const stale3 = useStore.getState().viewSubmission(n);
+      useStore.getState().goHome();
+      release();
+      await stale3;
+      check('a lookup overtaken by Home applies nothing',
+        useStore.getState().viewingSubmission === null && useStore.getState().components.length === 3);
+    } finally {
+      submissionStore.listSubmissions = realList;
+    }
+  }
+  useStore.getState().closeAssignment();
+  check('closeAssignment clears the view', useStore.getState().viewingSubmission === null);
 }
 
 // ═════ Sandbox tabs share the same fresh-machine contract ═══════
@@ -674,10 +900,14 @@ console.log('[principal change]');
   // loaded, a second arena on the Map — which must not reach the visitor.)
   useStore.getState().goHome();
   plantSimJunk();
+  // …and one of A's submissions on show (task 003).
+  useStore.setState({ viewingSubmission: Object.values(useStore.getState().submissions)[0] ?? null });
+  check('A has a submission on show', useStore.getState().viewingSubmission != null);
   useStore.getState().resetForPrincipal(null);
   {
     const s = useStore.getState();
     check('sign-out: no assignment in memory', s.assignment === null && s.questionCircuits.size === 0);
+    check("sign-out: no submission on show (it was A's)", s.viewingSubmission === null);
     check('sign-out: live canvas empty', s.components.length === 0 && s.wires.length === 0 && s.boxes.length === 0);
     check('sign-out: box library empty', s.confirmedBoxLibrary.length === 0);
     check('sign-out: clipboard empty (both seam slots)', clipboardEmpty());
@@ -975,6 +1205,26 @@ console.log('[principal change mid-save]');
     useStore.getState().resetForPrincipal(null); // sign-out
     check("a sandbox edit made while a save was in flight is stored under the leaving person's key",
       storedSandboxIds(keyOf(E)).includes(sbId));
+    await Promise.all(inFlight);
+
+    // Task 003: a submission VIEWED at the change. Entering the view only
+    // flushes the live save, which, with a save already in flight, waits as
+    // the trailing rerun the reset cancels — the leaving save must still land
+    // the live work (its snapshot never folds the viewed canvas).
+    useStore.getState().resetForPrincipal(E);
+    const qv = await openQ1();
+    const vrec = await useStore.getState().submitAssignment(SAMPLE_ASSIGNMENT_ID, E);
+    check('a seam save is in flight a third time', await startSlowSave());
+    const beforeV = new Set(useStore.getState().components.map((c) => c.id));
+    useStore.getState().addComponent('OR', 320, 320);
+    const newerV = useStore.getState().components.find((c) => !beforeV.has(c.id))!;
+    check('the submission opens for viewing with that live edit unsaved',
+      vrec != null && (await useStore.getState().viewSubmission(vrec.attempt)) === true &&
+        showsSubmission(useStore.getState()));
+    useStore.getState().resetForPrincipal(null); // a 401 while viewing: no goHome
+    const storedV = await workbookStore.loadAssignmentState(SAMPLE_ASSIGNMENT_ID);
+    check('a live edit left unsaved behind a viewed submission reaches the seam at the change',
+      storedV?.questionCircuits[qv.id]?.components.some((c) => c.id === newerV.id) === true);
   } finally {
     seam.saveAssignmentState = realSave;
     await Promise.all(inFlight);

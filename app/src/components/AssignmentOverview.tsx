@@ -8,7 +8,7 @@ import { useAsyncValue } from '../useAsyncValue';
 import { assignmentStore } from '../storage/backend';
 import { figureUrl } from '../problemSet';
 import { questionVerdict } from '../gradeDisplay';
-import { formatDueDate } from '../dueDates';
+import { formatDueDate, formatDateTime } from '../dueDates';
 import { submitConfirmMessage } from '../provenance/notice';
 import type { AssignmentQuestion } from '../types';
 
@@ -17,7 +17,9 @@ import type { AssignmentQuestion } from '../types';
  * date, preamble, sections, numbered problems — components/ProblemSetDocument).
  * Clicking a problem opens its dedicated canvas (#/a/:id/q/:i); the canvas's
  * nav bar leads back here or to the neighbouring problems. Submit covers the
- * whole assignment.
+ * whole assignment. While a submitted attempt is on show (#/a/:id/submission/:n,
+ * store viewingSubmission) the page says so, its problems open that attempt,
+ * and Submit gives way to the way back to the live work.
  */
 export function AssignmentOverview() {
   const assignment = useStore((s) => s.assignment);
@@ -26,6 +28,7 @@ export function AssignmentOverview() {
   const hydrateSubmissions = useStore((s) => s.hydrateSubmissions);
   const questionCircuits = useStore((s) => s.questionCircuits);
   const frozen = useStore(selectAssignmentFrozen);
+  const viewing = useStore((s) => s.viewingSubmission);
   // Release is policy on the seam, not part of the assignment, so the page has
   // to ask for it (the home catalog gets it on the summary).
   const { value: released } = useAsyncValue(
@@ -97,7 +100,7 @@ export function AssignmentOverview() {
 
       <ProblemSetDocument
         assignment={assignment}
-        route={(index) => ({ kind: 'assignment', id: assignment.id, questionIndex: index })}
+        route={(index) => ({ kind: 'assignment', id: assignment.id, attempt: viewing?.attempt, questionIndex: index })}
         status={status}
       />
 
@@ -121,6 +124,13 @@ export function AssignmentOverview() {
               title="This assignment closed after its due date — each question shows your submission, read-only."
             >
               🔒 Past due — showing your submission
+            </span>
+          ) : viewing ? (
+            <span className="dim" title="Each problem opens your answer as submitted in this attempt — Run and Step still work, edits are off.">
+              Viewing submission {viewing.attempt}, submitted {formatDateTime(viewing.submittedAt)} — read-only ·{' '}
+              <button className="mm-link" onClick={() => navigate({ kind: 'assignment', id: assignment.id })}>
+                Back to my work
+              </button>
             </span>
           ) : (
             <button className="mm-btn mm-btn--primary" onClick={handleSubmit}>

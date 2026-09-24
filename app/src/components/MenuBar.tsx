@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useStore, selectAssignmentFrozen } from '../store';
+import { useStore, selectAssignmentFrozen, showsSubmission } from '../store';
 import { getCurrentUserEmail, useAuth } from '../auth';
 import { AccountPanel } from '../auth/AccountPanel';
 import { navigate } from '../routing';
@@ -9,8 +9,9 @@ import { submitConfirmMessage } from '../provenance/notice';
 
 export function MenuBar() {
   const { user, isVisitor, logout } = useAuth();
-  const { assignment, submitAssignment, submissions } = useStore();
+  const { assignment, submitAssignment, submissions, viewingSubmission } = useStore();
   const frozen = useStore(selectAssignmentFrozen);
+  const showingSubmission = useStore(showsSubmission);
   const [showFeedback, setShowFeedback] = useState(false);
 
   const handleSubmitAssignment = () => {
@@ -38,9 +39,10 @@ export function MenuBar() {
       )}
 
       {/* Submit — record an immutable snapshot of the current assignment.
-          Hidden once frozen (item 3): the canvas is already showing exactly
-          what was submitted, so there is nothing new to record. */}
-      {assignment && !frozen && (
+          Hidden while the canvas shows a submission — frozen (item 3), or a
+          submitted attempt viewed from the grade sheet (task 003): what is on
+          screen is not the work a submit would record. */}
+      {assignment && !showingSubmission && (
         <div
           className="menu-item menu-submit"
           onClick={handleSubmitAssignment}
@@ -56,6 +58,11 @@ export function MenuBar() {
       {assignment && frozen && (
         <div className="menu-item menu-frozen" title="This assignment closed after its due date — you're viewing your submission, read-only.">
           🔒 Past due — viewing your submission
+        </div>
+      )}
+      {assignment && !frozen && viewingSubmission && (
+        <div className="menu-item menu-frozen" title="Your answers as submitted in this attempt — Run and Step still work, edits are off.">
+          Viewing submission {viewingSubmission.attempt} — read-only
         </div>
       )}
 

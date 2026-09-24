@@ -8,7 +8,12 @@
 // every Route kind is classified). [case route] — `#/a/:id/q/:i/case/:k`
 // ("Run this input") parses and round-trips, a malformed case segment is
 // dropped (the question kept), and applying it loads case k of question i
-// into the run after the question opens. [landing] — a browser with no trace of a
+// into the run after the question opens. [submission route] —
+// `#/a/:id/submission/:n[/q/:i[/case/:k]]` (a submitted attempt shown
+// read-only, task 003) parses and round-trips, a malformed attempt is dropped
+// (the rest kept), and applying it shows the attempt (store viewSubmission)
+// BEFORE the question opens; an unknown attempt repairs the URL to the live
+// route; a superseded apply does nothing. [landing] — a browser with no trace of a
 // previous sign-in opening `#/` lands in the sandbox; one with a trace, or
 // any deep link, is left alone. [held routes] — with nobody signed in, a
 // route that needs sign-in is never applied to the store (no unauthenticated
@@ -65,6 +70,9 @@ const ALL: Route[] = [
   { kind: 'assignment', id: 'hw1' },
   { kind: 'assignment', id: 'hw1', questionIndex: 2 },
   { kind: 'assignment', id: 'hw1', questionIndex: 2, caseIndex: 5 },
+  { kind: 'assignment', id: 'hw1', attempt: 2 },
+  { kind: 'assignment', id: 'hw1', attempt: 2, questionIndex: 3 },
+  { kind: 'assignment', id: 'hw1', attempt: 2, questionIndex: 3, caseIndex: 1 },
   { kind: 'instructor' },
   { kind: 'instructor-new-assignment' },
   { kind: 'instructor-edit', id: 'hw1' },
@@ -100,6 +108,26 @@ console.log('[case route]');
   check('a case without a question is not a route to one',
     routeToHash({ kind: 'assignment', id: 'hw1', caseIndex: 5 }) === '#/a/hw1');
   check('the case route needs sign-in', routeAccess(r) === 'signed-in');
+}
+
+console.log('[submission route]');
+{
+  for (const hash of ['#/a/hw1/submission/2', '#/a/hw1/submission/2/q/3', '#/a/hw1/submission/2/q/3/case/1']) {
+    const r = parseHash(hash);
+    check(`'${hash}' → attempt 2, and round-trips`,
+      r.kind === 'assignment' && r.id === 'hw1' && r.attempt === 2 && routeToHash(r) === hash);
+  }
+  const deep = parseHash('#/a/hw1/submission/2/q/3/case/1');
+  check('…the question and case after the attempt are kept',
+    deep.kind === 'assignment' && deep.questionIndex === 3 && deep.caseIndex === 1);
+  for (const bad of ['0', '-1', 'x', '1.5']) {
+    const b = parseHash(`#/a/hw1/submission/${bad}/q/3`);
+    check(`'/submission/${bad}' drops the attempt but keeps the question`,
+      b.kind === 'assignment' && b.attempt === undefined && b.questionIndex === 3 && routeToHash(b) === '#/a/hw1/q/3');
+  }
+  const plain = parseHash('#/a/hw1/q/2');
+  check('a plain question route has no attempt', plain.kind === 'assignment' && plain.attempt === undefined);
+  check('the submission route needs sign-in', routeAccess(parseHash('#/a/hw1/submission/2')) === 'signed-in');
 }
 
 console.log('[landing]');
@@ -187,6 +215,58 @@ console.log('[case route: applied]');
   navigate({ kind: 'assignment', id: 'hwc', questionIndex: 1 });
   await new Promise((r) => setTimeout(r, 0));
   check('a plain question route loads no case', loads.length === 2);
+  useStore.setState({ assignment: null, currentQuestionIndex: 0 });
+}
+
+// Applying a submission route, signed in: the attempt is shown (the store's
+// viewSubmission) BEFORE the question opens and its case loads; a plain route
+// shows the live workbook; an attempt the store doesn't know repairs the URL.
+console.log('[submission route: applied]');
+{
+  const calls: string[] = [];
+  const questions = [0, 1, 2].map((i) => ({ id: 200 + i, label: `Q${i}`, statement: '', buildMode: 'CC', representation: 'binary' }));
+  // Attempt 7's lookup stays in flight until the check releases it.
+  const slow: { release?: (ok: boolean) => void } = {};
+  useStore.setState({
+    assignment: { id: 'hws', title: 'submission route', questions } as unknown as import('../src/types').AssignmentData,
+    currentQuestionIndex: 0,
+    viewSubmission: (attempt: number | null) => {
+      calls.push(`view:${attempt}`);
+      if (attempt === 7) return new Promise<boolean>((r) => { slow.release = r; });
+      return Promise.resolve(attempt !== 9);
+    },
+    switchQuestion: (i: number) => {
+      calls.push(`switch:${i}`);
+      useStore.setState({ currentQuestionIndex: i });
+    },
+    loadCaseInput: async (qid: number, k: number) => {
+      calls.push(`case:${qid}:${k}`);
+    },
+  });
+  const tick = () => new Promise((r) => setTimeout(r, 0));
+  navigate({ kind: 'assignment', id: 'hws', attempt: 2, questionIndex: 1, caseIndex: 4 });
+  await tick();
+  check('an attempt route shows the attempt, THEN opens the question, THEN loads the case',
+    calls.join() === 'view:2,switch:1,case:201:4');
+  calls.length = 0;
+  navigate({ kind: 'assignment', id: 'hws', questionIndex: 2 });
+  await tick();
+  check('a plain question route asks for the live workbook (viewSubmission(null)) first',
+    calls.join() === 'view:null,switch:2');
+  calls.length = 0;
+  navigate({ kind: 'assignment', id: 'hws', attempt: 9, questionIndex: 1 });
+  await tick();
+  check('an unknown attempt repairs the URL to the live question route', loc.hash === '#/a/hws/q/1');
+  check('…and applies that one (the live workbook, then the question)', calls.join() === 'view:9,view:null,switch:1');
+  calls.length = 0;
+  navigate({ kind: 'assignment', id: 'hws', attempt: 7, questionIndex: 0 });
+  await tick();
+  navigate({ kind: 'assignment', id: 'hws', questionIndex: 2 });
+  await tick();
+  slow.release?.(false);
+  await tick();
+  check('a superseded apply does nothing (no switch, no URL repair)',
+    calls.join() === 'view:7,view:null,switch:2' && loc.hash === '#/a/hws/q/2');
   useStore.setState({ assignment: null, currentQuestionIndex: 0 });
 }
 

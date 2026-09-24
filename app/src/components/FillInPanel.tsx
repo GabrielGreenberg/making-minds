@@ -9,7 +9,7 @@
 // (usePasteGuard; law 8): only text copied in the student's own assignments
 // pastes in, and nothing copied here reaches the system clipboard.
 
-import { useStore, selectQuestionLocked } from '../store';
+import { useStore, selectLockNotice } from '../store';
 import { usePasteGuard } from '../usePasteGuard';
 import { ProblemBody, ProblemContext } from './ProblemSetDocument';
 
@@ -19,7 +19,9 @@ export function FillInPanel() {
   const question = assignment?.questions[currentQuestionIndex];
   const answers = useStore((s) => s.fillAnswers);
   const setFillAnswer = useStore((s) => s.setFillAnswer);
-  const locked = useStore(selectQuestionLocked);
+  // Why the question refuses edits (marked done, or it shows a submission).
+  const lockNotice = useStore(selectLockNotice);
+  const locked = lockNotice !== null;
   const { ref: pasteGuardRef, notice: pasteNotice } = usePasteGuard();
 
   const spec = question?.fill_in;
@@ -66,9 +68,7 @@ export function FillInPanel() {
             <span className="paste-notice" role="status">{pasteNotice}</span>
           ) : (
             <span>
-              {locked
-                ? 'Marked done — unlock this question to keep editing.'
-                : "Saved automatically — submit the assignment when you're done."}
+              {lockNotice ?? "Saved automatically — submit the assignment when you're done."}
             </span>
           )}
         </div>
