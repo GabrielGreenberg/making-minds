@@ -8,9 +8,9 @@ requires: browser
 area: app
 source: audit
 created: 2026-09-25T10:35:00-07:00
-status: in-progress
+status: done
 after:
-branch: task/044-tally-ones-on-the-right
+branch:
 merged_into:
 ---
 
@@ -83,3 +83,8 @@ worktree cannot run a dev server.
   The seeded sample submissions answered the tally questions with exact copies of the old
   fixtures — swapped for the new correct/broken (17 answers, hw1/hw3/hw4). COVERAGE.md rows
   rewritten; CLAUDE.md "fallback budget 0".
+- 2026-09-25 — landed. main merged into the branch first (042's release gate + the origin
+  boxing fix; clean), re-gated (tsc ×2, codec/boxScope/coverage). Browser: HW1 P16 with the
+  textbook answer on the worktree's dev server — IN1 = 0 gives O₁O₂ = `01`. The SC/FSM tally
+  run is pinned headlessly (scWindowCheck); an eyeball of an HW3/HW4 tally run is still owed
+  when those homeworks are prepared for release.
