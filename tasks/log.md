@@ -36,3 +36,4 @@
 2026-09-25-044 · bug · Write tally numerals with their 1s on the right, as the textbook and the spec do, on every axis · 2026-09-25T11:02:12-0700 · task/044-tally-ones-on-the-right · c026cdb
 2026-09-25-045 · bug · A combinatorial-circuit canvas never offers or accepts a memory (MEM) block · 2026-09-25T11:04:44-0700 · task/045-no-memory-in-cc · fc60a4c
 2026-09-25-046 · feature · Make HW1 release-ready — a box per part, autograded parts, typable symbols, a prominent schematic, an unclipped overview · 2026-09-25T11:16:30-0700 · task/046-hw1-release-ready · 279acc6
+2026-09-25-050 · chore · Stop linking HW1's PDF from the app — the app's HW1 now differs from the printed one · 2026-09-25T11:30:23-0700 · task/050-unlink-hw1-pdf · b4681fa
