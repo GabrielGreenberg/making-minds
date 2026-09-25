@@ -156,8 +156,8 @@ PDFs themselves). **The repo is the source; every release syncs it into the pilo
 
 The open work is the queue (`tasks/incoming/` ready, `tasks/blocked/` waiting on Gabriel);
 `/work` offers it. Headline on 2026-09-24: **UCLA SSO** (006, parked on UCLA IT), the
-grading interface (031), pilot domain + backups (008), the feedback triage routine (029);
-last, the worker routine.
+grading interface (031), the robot pipeline (041 backups → 042 release gate → 029 → 043),
+the pilot domain (008).
 
 ---
 

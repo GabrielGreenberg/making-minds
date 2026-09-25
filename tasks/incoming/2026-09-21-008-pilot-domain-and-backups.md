@@ -1,7 +1,7 @@
 ---
 id: 2026-09-21-008
 type: chore
-title: Give the pilot box a real domain and a SQLite backup cron
+title: Give the pilot a real domain (the sslip.io placeholder retires)
 priority: normal
 size: large
 requires: ssh, human
@@ -16,7 +16,8 @@ merged_into:
 
 ## Description
 The pilot API runs at the placeholder hostname `https://100-22-69-95.sslip.io`; the domain
-swap is three edits (`deploy/README.md` §2). There is no backup of the SQLite file.
+swap is three edits (`deploy/README.md` §2). (The backup half of this task was split out as
+041 on 2026-09-25, because the robot pipeline needs it first and the domain waits on UCLA.)
 
 **Found 2026-09-24 (release of 018): some networks block the placeholder outright.** On the
 Wi-Fi Gabriel's Mac was on, every HTTPS connection naming `100-22-69-95.sslip.io` got a
@@ -30,15 +31,15 @@ from UCLA campus Wi-Fi before students arrive; a real domain retires the risk en
 
 ## Done when
 - The API answers on the chosen domain with a valid cert; the Pages build points at it;
-  `MM_CORS_ORIGINS` updated; the old hostname documented as retired.
-- A daily cron on the box copies the SQLite file (WAL-safe: `sqlite3 .backup` or a
-  checkpoint first) to a dated file with rotation, and the recipe is in `deploy/README.md`.
+  `MM_CORS_ORIGINS` updated; the old hostname documented as retired; `secrets/feedback.env`
+  and 042's release gate use the new API base.
 
 ## Design
 Human decides the domain (Gabriel). Everything else is `deploy/README.md` procedure; the
 repo change is the docs + the Pages env value.
 
 ## Verify
-`curl` the health probe on the new domain; a restored backup boots the server.
+`curl` the health probe on the new domain; sign in on the site from a phone on cellular and
+from UCLA campus Wi-Fi.
 
 ## Progress log

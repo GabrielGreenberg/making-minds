@@ -16,6 +16,9 @@ spend). The routine never does.
 
 ## Activating the worker routine (when the heavy lifts are done)
 
+> **Superseded (2026-09-25):** don't schedule `/worker`. Task 029 (the robot pipeline) replaces
+> this section with §"The robot"; 017 is merged into it.
+
 1. Make sure at least one `size: small` task with no `requires:` sits in `tasks/incoming/`.
 2. Run it by hand once: open a session at the repo root, `/worker`. Grant the tools it asks
    for (Bash, Read, Edit, Write, Glob, Grep) with "always allow", so an unattended run never

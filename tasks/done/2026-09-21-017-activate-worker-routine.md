@@ -8,10 +8,10 @@ requires: human
 area: pipeline
 source: chat
 created: 2026-09-21T15:30:00-07:00
-status: ready
+status: merged
 after:
 branch:
-merged_into:
+merged_into: 2026-09-22-029
 ---
 
 ## Description
@@ -30,3 +30,5 @@ n/a.
 `tasks/log.md` shows a routine-landed task; probe numbers recorded in the progress log.
 
 ## Progress log
+- 2026-09-25 (`/work`, Gabriel): merged into 029, the robot pipeline — its hourly work
+  routine is this scheduled worker, widened; the transcript probe moved to 043's Verify.
