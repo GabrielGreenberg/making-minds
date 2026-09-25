@@ -32,3 +32,4 @@
 2026-09-21-018 · feature · Pull open feedback reports from the server into a private folder outside the repo, with the author's role and a server-side triage mark (stage 1 of the feedback pipeline) · 2026-09-24T21:27:52-0700 · task/018-feedback-pull · 0009c75
 2026-09-23-036 · feature · Identify students by UID, not only email — 37 of 87 class-list emails are not UCLA addresses · 2026-09-24T23:17:44-0700 · task/036-identity-by-uid · 9494934
 2026-09-25-041 · chore · Back up the pilot database daily and keep the copies for weeks, independent of releases · 2026-09-25T10:13:41-0700 · task/041-daily-backups · 58aac12
+2026-09-25-042 · feature · Release guardrails for unattended releases — a hold list, quiet hours, a deadline freeze, and a one-line note per release · 2026-09-25T10:45:51-0700 · task/042-release-gate · 0b91b2a
