@@ -266,7 +266,7 @@ sees the formula, it runs against the generated numeric `test_cases`.
 
 ## Build phases (from the spec) — all built
 
-1. **CC** — gates, I/O, boxed circuits. 2. **SC** — MEM, clocked time, right-to-left table; a
+1. **CC** — gates, I/O, boxed circuits; no memory. 2. **SC** — MEM, clocked time, right-to-left table; a
 box may hold MEM (kind `SC`, SC canvases only). 3. **FSM** — k-bit `input:output` transitions.
 4. **Turbots** — arena Map, CC/SC/FSM/TM brains. 5. **Turing machines** — two-output
 `read:write,move` labels (the one deliberate textbook departure, spec §10.3). 6. **TM

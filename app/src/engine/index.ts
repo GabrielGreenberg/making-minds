@@ -98,6 +98,7 @@ export {
 export type { Axis, CodecLayout, EncodedInput, RawOutput } from './codec';
 export {
   validateMachine,
+  validateModeMemory,
   validateAllowedComponents,
   disallowedComponentTypes,
   isComponentTypeAllowed,

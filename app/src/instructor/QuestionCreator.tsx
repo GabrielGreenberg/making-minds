@@ -10,7 +10,7 @@ import type {
   PerceptionRule,
   QuestionTask,
 } from '../types';
-import { QUESTION_TASKS, questionTask } from '../types';
+import { QUESTION_TASKS, questionTask, modeHoldsMemory } from '../types';
 import { FillInBlanksEditor } from './FillInBlanksEditor';
 import {
   blankDraftsOf,
@@ -301,9 +301,14 @@ export function QuestionCreator({ assignment, existingQuestion, onSave, onCancel
   // (function or perception) and turbot questions whose brain is CC/SC.
   const canRestrictComponents =
     mode === 'CC' || mode === 'SC' || (isTurbot && (innerMode === 'CC' || innerMode === 'SC'));
+  // The canvas's own vocabulary: a combinatorial canvas holds no memory
+  // (types.ts modeHoldsMemory), so MEM is neither offered nor saved there.
+  const canvasHoldsMemory = modeHoldsMemory(isTurbot ? innerMode : mode);
+  const restrictableGates = RESTRICTABLE_GATES.filter((g) => g.type !== 'MEM' || canvasHoldsMemory);
+  const budgetableComponents = BUDGETABLE_COMPONENTS.filter((b) => b.type !== 'MEM' || canvasHoldsMemory);
   const allowedComponentsField: Pick<AssignmentQuestion, 'allowed_components'> =
     canRestrictComponents && restrictComponents
-      ? { allowed_components: ['INPUT', 'OUTPUT', ...allowedGates] }
+      ? { allowed_components: ['INPUT', 'OUTPUT', ...allowedGates.filter((t) => restrictableGates.some((g) => g.type === t))] }
       : {};
 
   // A tape budget only means something where there is a tape.
@@ -321,7 +326,7 @@ export function QuestionCreator({ assignment, existingQuestion, onSave, onCancel
   const componentLimitsField: Pick<AssignmentQuestion, 'component_limits'> = (() => {
     if (!canLimitComponents || !limitComponents) return {};
     const limits: Partial<Record<ComponentType, number>> = {};
-    for (const b of BUDGETABLE_COMPONENTS) {
+    for (const b of budgetableComponents) {
       const raw = (componentLimits[b.type] ?? '').trim();
       if (raw === '') continue;
       const n = Number(raw);
@@ -712,7 +717,7 @@ export function QuestionCreator({ assignment, existingQuestion, onSave, onCancel
             </label>
             {restrictComponents && (
               <div className="instructor-criterion-row">
-                {RESTRICTABLE_GATES.map((g) => (
+                {restrictableGates.map((g) => (
                   <label key={g.type} className="mm-inline-field">
                     <input
                       type="checkbox"
@@ -745,7 +750,7 @@ export function QuestionCreator({ assignment, existingQuestion, onSave, onCancel
             </label>
             {limitComponents && (
               <div className="instructor-criterion-row">
-                {BUDGETABLE_COMPONENTS.map((b) => (
+                {budgetableComponents.map((b) => (
                   <label key={b.type} className="mm-inline-field">
                     {b.label}
                     <input
