@@ -12,7 +12,8 @@ Commands run from `<repo>`; every edit takes an absolute path.
 `git -C <repo> status --porcelain` must be empty and the branch `main`; then
 `git -C <repo> fetch origin` and `git -C <repo> merge --ff-only origin/main`. If `main` is
 *ahead* of `origin/main` (a push that failed last run — its reports are still unmarked),
-push it and run §5's marks for those filings before pulling anything; a push that still
+push it and run §5's marks for those filings (each names its report id) before pulling
+anything; a push that still
 fails, a dirty clone or a diverged `main` → nothing to catch safely this run: note it for
 §7, go to §6.
 

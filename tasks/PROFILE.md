@@ -166,4 +166,5 @@ before a targeted edit.
 Clickable links for every file written; a compact running list of tasks touched, refreshed
 as it changes; end every catcher/work response with **"Done."**; commit messages end with
 the `Co-Authored-By:` line naming the model that ran (the harness supplies it); plain
-language first, code vocabulary second. The robot's runs keep only the last two.
+language first, code vocabulary second. An unattended robot run has no reader for the
+running list, the links or "Done.": it keeps the co-author line and the plain language.

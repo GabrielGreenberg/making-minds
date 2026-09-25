@@ -13,7 +13,8 @@ Read this after a break. Keep it current.
 
 Pushing to GitHub `main` is shipping: the robot releases whatever is new there within the
 hour, unless the gate holds it (grading, homework content, sign-in, the database, `deploy/`,
-missing backups) — then it tells you and you release by hand (`deploy/release.sh`).
+missing backups, a failed CI) — then it tells you once and you release by hand
+(`deploy/release.sh`). Pushes that touch only `tasks/` or docs never release anything.
 
 ## The robot
 

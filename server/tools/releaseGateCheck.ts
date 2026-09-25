@@ -6,11 +6,13 @@
 //                only), the box or the API unreachable → wait (never hold,
 //                never release), stale or missing backups → hold, nothing new
 //                → current, only the queue/docs changed → current at any hour
-//                (task 029), the strictest verdict wins, and the note says only
-//                what a hold is waiting on
+//                (task 029), CI on the commit: passed → fine, failed → hold,
+//                running / cancelled / not run / unreadable → wait, the
+//                strictest verdict wins, and the note says only what a hold is
+//                waiting on
 //   [note key]   a hold is keyed by its commit and rules, not the time of day
 //   [facts]      gatherFacts() over a real git history (changed paths, landed
-//                tasks from `tasks: land` subjects) with the box injected;
+//                tasks from `tasks: land` subjects) with the box and CI injected;
 //                listPilotAssignments() against a real password-mode server
 //                (published + due date — the fields the freeze reads)
 //   [release.sh] --unattended asks the gate and obeys its exit codes; the
@@ -66,6 +68,8 @@ function facts(over: Partial<Facts> = {}): Facts {
     apiProblem: null,
     boxProblem: null,
     backup: { timerActive: true, newestAt: new Date(now.getTime() - 2 * HOUR) },
+    ci: { status: 'completed', conclusion: 'success' },
+    ciProblem: null,
     ...over,
   };
 }
@@ -100,6 +104,13 @@ section('[verdicts]');
   check('only the queue, docs or session config changed → current, even at 03:00', quiet.verdict === 'current' && quiet.note === '', JSON.stringify(quiet.reasons));
   check('quiet → current even with stale backups (nothing to release)', verdict({ changedFiles: queueOnly, backup: { timerActive: false, newestAt: null } }) === 'current');
   check('a quiet range plus one app file → release', verdict({ changedFiles: [...queueOnly, 'app/src/components/HomeScreen.tsx'] }) === 'release');
+  const redCi = decide(facts({ ci: { status: 'completed', conclusion: 'failure' } }));
+  check('CI failed on the commit → hold, and the note says so', redCi.verdict === 'hold' && redCi.note.includes('CI run that did not pass'), redCi.note);
+  check('CI still running → wait', verdict({ ci: { status: 'in_progress', conclusion: '' } }) === 'wait');
+  check('no CI run for the commit yet → wait', verdict({ ci: { status: 'none', conclusion: '' } }) === 'wait');
+  check('CI unreadable (gh failed) → wait, never release blind', verdict({ ci: null, ciProblem: 'gh: not logged in' }) === 'wait');
+  check('a cancelled run (superseded by a newer push) is unproven → wait', verdict({ ci: { status: 'completed', conclusion: 'cancelled' } }) === 'wait');
+  check('a timed-out run is not a pass → hold', verdict({ ci: { status: 'completed', conclusion: 'timed_out' } }) === 'hold');
   check('quiet prefixes are exact', !quietOnly(['tasksx/a.md']) && !quietOnly(['CLAUDE.md.bak']) && !quietOnly(['app/tasks/x.ts']) && !quietOnly([]));
 
   const at = (iso: string) => verdict({ now: new Date(iso), backup: { timerActive: true, newestAt: new Date(new Date(iso).getTime() - HOUR) } });
@@ -186,7 +197,9 @@ const tmp = mkdtempSync(join(tmpdir(), 'mm-gate-'));
     now: TEN_AM_PDT,
     probeBox: () => ({ head: released, timerActive: true, newestAt: TEN_AM_PDT }),
     listAssignments: async () => [{ id: 'hw1', title: 'HW1', visible: true }],
+    probeCi: (_root, sha) => ({ status: sha === head ? 'completed' : 'none', conclusion: sha === head ? 'success' : '' }),
   });
+  check('CI is asked about HEAD', f.ci?.status === 'completed' && f.ciProblem === null);
   check('head and last-released come from git and the box', f.head === head && f.lastReleased === released);
   check('the changed paths span last-released..head', JSON.stringify(f.changedFiles) === '["app/src/engine/grader.ts"]', JSON.stringify(f.changedFiles));
   check('landed tasks come from `tasks: land` subjects', JSON.stringify(f.landed) === '[{"id":"2026-09-25-099","title":"A test task"}]', JSON.stringify(f.landed));
@@ -201,7 +214,11 @@ const tmp = mkdtempSync(join(tmpdir(), 'mm-gate-'));
     listAssignments: async () => {
       throw new Error('Cannot reach the server');
     },
+    probeCi: () => {
+      throw new Error('gh: could not resolve to a Repository');
+    },
   });
+  check('gh failing is a ciProblem, never a pass', down.ci === null && down.ciProblem?.includes('could not resolve') === true);
   check(
     'a box that does not answer is a boxProblem; an API that does not, an apiProblem',
     down.boxProblem?.includes('timed out') === true && down.apiProblem?.includes('Cannot reach') === true && down.lastReleased === null,

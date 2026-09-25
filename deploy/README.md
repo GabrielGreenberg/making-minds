@@ -26,14 +26,16 @@ deploy/release.sh --unattended # the robot's release: only if the gate says so (
 **The release gate** (`deploy/release-gate.mjs`, task 042) decides whether an
 *unattended* release may go out now: **release**, **hold** (the new commits
 touch the hold list — grading, homework content and answer keys, what students
-may see, sign-in, passwords, the database schema, `deploy/` itself — or the daily
-backups aren't running; Gabriel releases by hand), **wait** (outside 07:00–22:00
-Pacific, within 24 h before a published assignment is due, or the box / the
-pilot API can't be asked; a later run releases), or **current** (nothing new).
-The strictest reason wins; every rule is data at the top of the file, with a
-comment. It reads what the box runs and whether its backups are alive over ssh,
-and the due dates from the pilot API as an instructor (`secrets/feedback.env`,
-the same sign-in as `tasks/tools/feedback.mjs`). `--unattended` ends with one
+may see, sign-in, passwords, the database schema, `deploy/` itself — the daily
+backups aren't running, or CI failed on the commit; Gabriel releases by hand),
+**wait** (outside 07:00–22:00 Pacific, within 24 h before a published assignment
+is due, CI still running or not yet run on the commit, or the box / the pilot
+API / GitHub can't be asked; a later run releases), or **current** (nothing new,
+or only the task queue, docs or session config changed — the robot pushes those
+hourly). The strictest reason wins; every rule is data at the top of the file,
+with a comment. It reads what the box runs and whether its backups are alive over
+ssh, the due dates from the pilot API as an instructor (`secrets/feedback.env`,
+the same sign-in as `tasks/tools/feedback.mjs`), and HEAD's CI run with `gh`. `--unattended` ends with one
 `note: …` line for Gabriel: what was released, what is held and why (said once,
 not every hour — `.claude/release-gate.last` remembers), or a failed smoke test
 with the last good commit. A hand run never asks the gate: Gabriel's release is

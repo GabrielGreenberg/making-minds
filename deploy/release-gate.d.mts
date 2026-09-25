@@ -42,6 +42,14 @@ export interface Facts {
   apiProblem: string | null;
   boxProblem: string | null;
   backup: { timerActive: boolean; newestAt: Date | null } | null;
+  /** HEAD's CI run on main; status 'none' = no run yet; null = gh couldn't say. */
+  ci: CiRun | null;
+  ciProblem: string | null;
+}
+
+export interface CiRun {
+  status: string; // 'completed' | 'in_progress' | 'queued' | … | 'none'
+  conclusion: string; // 'success' | 'failure' | 'cancelled' | … | ''
 }
 
 export const HOLD_PATHS: [string, string][];
@@ -55,6 +63,7 @@ export function quietOnly(changedFiles: string[]): boolean;
 export function decide(facts: Facts): GateResult;
 export function noteKey(result: GateResult, head: string): string;
 export function sshProbeBox(root: string): BoxFacts;
+export function ghCiRun(root: string, head: string): CiRun;
 export function listPilotAssignments(envPath: string): Promise<AssignmentFact[]>;
 export function gatherFacts(opts?: {
   root?: string;
@@ -62,4 +71,5 @@ export function gatherFacts(opts?: {
   now?: Date;
   probeBox?: (root: string) => BoxFacts | Promise<BoxFacts>;
   listAssignments?: (envPath: string) => Promise<AssignmentFact[]>;
+  probeCi?: (root: string, head: string) => CiRun | Promise<CiRun>;
 }): Promise<Facts>;
