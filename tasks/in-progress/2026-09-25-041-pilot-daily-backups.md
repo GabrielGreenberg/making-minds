@@ -8,9 +8,9 @@ requires: ssh
 area: deploy
 source: chat
 created: 2026-09-25T10:00:00-07:00
-status: ready
+status: in-progress
 after:
-branch:
+branch: task/041-daily-backups
 merged_into:
 ---
 
