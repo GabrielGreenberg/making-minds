@@ -8,7 +8,7 @@ requires: ssh
 area: deploy
 source: chat
 created: 2026-09-25T10:00:00-07:00
-status: ready
+status: done
 after:
 branch:
 merged_into:
@@ -53,3 +53,21 @@ rehearsal into a scratch path boots `npm start` against it. Owed: a copy aged pa
 is pruned (check after five weeks, or rehearse with a back-dated file).
 
 ## Progress log
+- 2026-09-25 (`/work`): built and installed. `deploy/backup-daily.sh` (VACUUM INTO →
+  integrity check under `.partial` → rename; prunes only `daily-*.sqlite` past 35 days;
+  umask 077), `deploy/systemd/makingminds-backup.{service,timer}` (User=makingminds, runs the
+  INSTALLED copy `/usr/local/lib/making-minds/backup-daily.sh`, 03:30 America/Los_Angeles,
+  Persistent), `deploy/backup-install.sh` (idempotent, root). Done-when 4 went further than
+  "warn": `release.sh` runs the installer on every release and a failure stops the release
+  before the restart. Release backups made owner-only (they were 644 with password hashes),
+  on the box now and in `release.sh`. `server/tools/backupCheck.ts` (23 pins, in server
+  `check`; neutered: umask 022 + a `*.sqlite` prune → 2 FAIL; a plain file copy that loses
+  the WAL → 3 FAIL). On the box: installed by piping the three files over ssh (no release, so
+  036 was not shipped with it); a hand run wrote `daily-2026-09-25.sqlite` (464K, 600); live
+  vs copy row counts equal (users 92, feedback 1, assignments 8, submissions 5, workbooks 13),
+  integrity ok on both; a restore rehearsal booted a scratch server on 127.0.0.1:8199 from
+  the copy (health + auth config answered), then removed (a self-matching `pkill` cut the
+  first cleanup short; the leftover temp copy was deleted and the port freed by hand); the
+  real API healthy throughout. All gates green. Owed: the first scheduled run (tonight 03:33
+  Pacific — `systemctl list-timers makingminds-backup.timer`, `journalctl -u
+  makingminds-backup`) and pruning at day 36 on the box (pinned locally with back-dated files).

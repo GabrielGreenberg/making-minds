@@ -1,0 +1,12 @@
+# Once a day at 03:30 Pacific (the box's clock is UTC). Persistent: a run missed while
+# the box was down happens at the next boot.
+[Unit]
+Description=Making Minds: run the daily database backup
+
+[Timer]
+OnCalendar=*-*-* 03:30:00 America/Los_Angeles
+Persistent=true
+RandomizedDelaySec=5min
+
+[Install]
+WantedBy=timers.target
