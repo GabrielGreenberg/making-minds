@@ -25,10 +25,15 @@
       "heading": "II. Functions",
       "questionIds": [
         6,
+        18,
+        19,
         7,
         8,
         9,
-        10
+        20,
+        10,
+        21,
+        22
       ]
     },
     {
@@ -37,13 +42,15 @@
         11,
         12,
         13,
+        23,
         14,
         15
       ],
       "callouts": [
         {
           "kind": "challenge",
-          "body": "define a function which maps strings of 1’s and 0’s of *arbitrary length* to their numerical values. This is the general problem of semantics for binary."
+          "body": "Define a function which maps strings of 1’s and 0’s of *arbitrary length* to their numerical values. This is the general problem of semantics for binary.",
+          "title": "Challenge problem (optional, not collected)"
         }
       ]
     },
@@ -57,14 +64,6 @@
         {
           "kind": "hint",
           "body": "these two problems look complex, but they are just asking you to apply the intuitive concept of **computation** we have been discussing in the course so far. First figure out what table of input and output symbols would satisfy the equations given. Only then solve for the underlying circuit."
-        }
-      ],
-      "figures": [
-        {
-          "src": "problem-sets/hw1-schematic-mn.svg",
-          "alt": "Schematic for M and N: a box with one input I entering from the left and two outputs O1 and O2 leaving to the right",
-          "placement": "aside",
-          "width": 180
         }
       ]
     }
@@ -442,14 +441,38 @@
             1
           ]
         }
-      ]
+      ],
+      "hint": "You can box your XOR circuit from Problem 4 and reuse it here."
     },
     {
       "id": 6,
-      "label": "Problem 6",
-      "statement": "Consider the function *m*(⋅) defined by the following **equation**: for any integers *x*, *y*, and *z*: *m*(*x*, *y*, *z*) = 3 + (*x* • *y* • *z*)\na. Describe the function with an English sentence using each of the terms “argument”, “value”, “apply”, and “return” correctly.\nb. Describe the function with another English sentence using the phrase “maps ... to”.\nc. How many **places** does this function have?",
+      "label": "Problem 6a",
+      "statement": "Consider the function *m*(⋅) defined by the following **equation**: for any integers *x*, *y*, and *z*: *m*(*x*, *y*, *z*) = 3 + (*x* • *y* • *z*)\n\nDescribe the function with an English sentence using each of the terms “argument”, “value”, “apply”, and “return” correctly.",
       "buildMode": "open",
       "representation": "binary"
+    },
+    {
+      "id": 18,
+      "label": "Problem 6b",
+      "statement": "Describe the function *m*(⋅) from 6a with another English sentence, using the phrase “maps ... to”.",
+      "buildMode": "open",
+      "representation": "binary"
+    },
+    {
+      "id": 19,
+      "label": "Problem 6c",
+      "statement": "How many **places** does the function *m*(⋅) from 6a have?",
+      "buildMode": "open",
+      "representation": "binary",
+      "fill_in": {
+        "labels": [
+          "Number of places"
+        ],
+        "numericOnly": true
+      },
+      "fill_in_answers": [
+        "3"
+      ]
     },
     {
       "id": 7,
@@ -461,21 +484,67 @@
     {
       "id": 8,
       "label": "Problem 8",
-      "statement": "This is a problem about **function composition**. Let *s*(⋅) be the **successor function**. Let *a*(⋅) be the **addition function**. Suppose that *p*() is a 2-place function composed of successor functions and addition functions. Given that *p*(1, 2) = 5, provide two possible definitions of *p*().",
+      "statement": "This is a problem about **function composition**. Let *s*(⋅) be the **successor function**. Let *a*(⋅) be the **addition function**. Suppose that *p*(⋅) is a 2-place function composed of successor functions and addition functions. Given only that *p*(1, 2) = 5, provide two possible definitions of *p*(⋅).\n\nYour two definitions should define *different* functions: functions that agree on the arguments (1, 2) but disagree on some other arguments.",
       "buildMode": "open",
       "representation": "binary"
     },
     {
       "id": 9,
-      "label": "Problem 9",
-      "statement": "Consider the function *j*( ) that maps two integers *x* and *y* to their product, so long as both *x* and *y* are equal to or greater than 0, and equal to or less than two. For any other arguments, it is undefined.\na. Define *j*(⋅) with an equation.\nb. Define *j*(⋅) with a table.\n\nThis is a problem about **partial functions**.",
+      "label": "Problem 9a",
+      "statement": "Consider the function *j*(⋅) that maps two integers *x* and *y* to their product, so long as both *x* and *y* are between 0 and 2, inclusive. For any other arguments, it is undefined. This is a problem about **partial functions**.\n\nDefine *j*(⋅) with an equation.",
       "buildMode": "open",
       "representation": "binary"
     },
     {
+      "id": 20,
+      "label": "Problem 9b",
+      "statement": "Define *j*(⋅) from 9a with a table: give its value for each pair of arguments where it is defined.",
+      "buildMode": "open",
+      "representation": "binary",
+      "fill_in": {
+        "labels": [
+          "j(0, 0)",
+          "j(0, 1)",
+          "j(0, 2)",
+          "j(1, 0)",
+          "j(1, 1)",
+          "j(1, 2)",
+          "j(2, 0)",
+          "j(2, 1)",
+          "j(2, 2)"
+        ],
+        "numericOnly": true
+      },
+      "fill_in_answers": [
+        "0",
+        "0",
+        "0",
+        "0",
+        "1",
+        "2",
+        "0",
+        "2",
+        "4"
+      ]
+    },
+    {
       "id": 10,
-      "label": "Problem 10",
-      "statement": "The **Boolean numbers** are 0 and 1, where 0 and 1 are considered to be the “opposites” of one another. A **Boolean function** is a function which has only Boolean numbers as arguments and values.\na. Using one equation, define a Boolean function which maps any Boolean number to its opposite.\nb. Provide two different definitions of the Boolean function which maps any Boolean number to itself. This is called the **identity function**.\nc. Provide two different definitions of the Boolean function which maps any Boolean number to the number one. This is called a **constant function**.",
+      "label": "Problem 10a",
+      "statement": "The **Boolean numbers** are 0 and 1, where 0 and 1 are considered to be the “opposites” of one another. A **Boolean function** is a function which has only Boolean numbers as arguments and values.\n\nUsing one equation, define a Boolean function which maps any Boolean number to its opposite.",
+      "buildMode": "open",
+      "representation": "binary"
+    },
+    {
+      "id": 21,
+      "label": "Problem 10b",
+      "statement": "Provide two different definitions of the Boolean function which maps any Boolean number to itself. This is called the **identity function**.\n\nThe two definitions should be written differently but define the same function. A table counts as a definition.",
+      "buildMode": "open",
+      "representation": "binary"
+    },
+    {
+      "id": 22,
+      "label": "Problem 10c",
+      "statement": "Provide two different definitions of the Boolean function which maps any Boolean number to the number one. This is called a **constant function**.\n\nAs in 10b, the two definitions should be written differently but define the same function.",
       "buildMode": "open",
       "representation": "binary"
     },
@@ -488,17 +557,17 @@
       "representation": "binary",
       "fill_in": {
         "labels": [
-          "0",
-          "1",
-          "2",
-          "3",
-          "4",
-          "5",
-          "6",
-          "7",
-          "8",
-          "9",
-          "10"
+          "zero",
+          "one",
+          "two",
+          "three",
+          "four",
+          "five",
+          "six",
+          "seven",
+          "eight",
+          "nine",
+          "ten"
         ],
         "numericOnly": true
       },
@@ -519,32 +588,68 @@
     {
       "id": 12,
       "label": "Problem 12",
-      "statement": "Invent a new **base-6 counting system**, with all new symbols for the 6 digits (including zero!). List your basic symbols and their meanings. Then represent the number thirty-two in this system.",
+      "statement": "Invent a new **base-6 counting system**, with all new symbols for the 6 digits (including zero!). List your basic symbols and their meanings. Then represent the number thirty-two in this system.\n\nFor your symbols, use characters you can type (letters, punctuation marks, emoji), but not the digits 0–9.",
       "buildMode": "open",
       "representation": "binary"
     },
     {
       "id": 13,
-      "label": "Problem 13",
-      "statement": "a. Add the binary number 1111 to the binary number 1.\nb. Add the binary number 1011 to the binary number 11001.\n\nUse one of the methods of addition from the Petzold reading; show your work!",
+      "label": "Problem 13a",
+      "statement": "Add the binary number 1111 to the binary number 1, using one of the methods of addition from the Petzold reading. Type the sum as a binary numeral.",
       "buildMode": "open",
-      "representation": "binary"
+      "representation": "binary",
+      "fill_in": {
+        "labels": [
+          "1111 + 1 ="
+        ],
+        "numericOnly": true
+      },
+      "fill_in_answers": [
+        "10000"
+      ]
+    },
+    {
+      "id": 23,
+      "label": "Problem 13b",
+      "statement": "Add the binary number 1011 to the binary number 11001.",
+      "buildMode": "open",
+      "representation": "binary",
+      "fill_in": {
+        "labels": [
+          "1011 + 11001 ="
+        ],
+        "numericOnly": true
+      },
+      "fill_in_answers": [
+        "100100"
+      ]
     },
     {
       "id": 14,
       "label": "Problem 14",
-      "statement": "Define a function *f* which maps the symbol “○” to the number zero and the symbol “●” to the number one. Use a table or an equation.",
+      "statement": "Define a function *f* which maps the symbol “@” to the number zero and the symbol “#” to the number one, by giving its table: the value of *f* for each symbol.",
       "buildMode": "open",
-      "representation": "binary"
+      "representation": "binary",
+      "fill_in": {
+        "labels": [
+          "f(@)",
+          "f(#)"
+        ],
+        "numericOnly": true
+      },
+      "fill_in_answers": [
+        "0",
+        "1"
+      ]
     },
     {
       "id": 15,
       "label": "Problem 15",
-      "statement": "Suppose we use the symbols in Problem 14 to form a base-2 counting system. Let’s call these symbols “dots”. A dot can be black or white. Using an equation, define a 3-place function *g* which takes any three dots in a row and maps them onto the numerical value of that string of dots in that base-2 system. You will have to use the function in Problem 14 as part of the definition.\n\nSo, for example, your function should predict that *g*(○, ○, ●) = one, *g*(○, ●, ○) = two, and so on…\n\nYour answer should take the form: “for any series of three dots *x*, *y*, *z*: *g*(*x*, *y*, *z*) = …”",
+      "statement": "Suppose we use the symbols in Problem 14 to form a base-2 counting system. Let’s call these symbols “marks”: a mark is either @ or #. Using an equation, define a 3-place function *g* which takes any three marks in a row and maps them onto the numerical value of that string of marks in that base-2 system. You will have to use the function in Problem 14 as part of the definition.\n\nSo, for example, your function should predict that *g*(@, @, #) = one, *g*(@, #, @) = two, and so on…\n\nYour answer should take the form: “for any series of three marks *x*, *y*, *z*: *g*(*x*, *y*, *z*) = …”",
       "callouts": [
         {
           "kind": "hint",
-          "body": "there are two things going on in Problem 15. It asks you to use your knowledge of functions to define the numerical values of symbols in a base-2 counting system. The method of computing binary values described by Petzold will be of help here. But it is also asking you to keep track of the difference between a *symbol* and its *content*, in this case the difference between “●” and *the number one*. Remember that only numbers, but not symbols, can be added and multiplied! At a deeper level, this problem asks you to give a partial **semantics** for a 2-place representational system. The science of formal semantics extends this kind of analysis to the domain of language."
+          "body": "there are two things going on in Problem 15. It asks you to use your knowledge of functions to define the numerical values of symbols in a base-2 counting system. The method of computing binary values described by Petzold will be of help here. But it is also asking you to keep track of the difference between a *symbol* and its *content*, in this case the difference between “#” and *the number one*. Remember that only numbers, but not symbols, can be added and multiplied! At a deeper level, this problem asks you to give a partial **semantics** for a 3-place representational system. The science of formal semantics extends this kind of analysis to the domain of language."
         }
       ],
       "buildMode": "open",
@@ -553,7 +658,7 @@
     {
       "id": 16,
       "label": "Problem 16",
-      "statement": "Let *tal*(⋅) be a function which maps strings of tally 1’s and 0’s to their numerical values. For example, *tal*(0)=zero, *tal*(1)=one, *tal*(00)=zero, *tal*(01)=one, *tal*(11)=two, and so on.\n\nConsider a machine *M* which, on any one occasion, takes as input a single atomic symbol *I*, and produces two atomic symbols as output, *O*₁ and *O*₂, such that, in any context, *successor*(*tal*(*I*)) = *tal*(*O*₁*O*₂). Design a combinatorial circuit for machine *M*, with the schematic form shown.",
+      "statement": "Let *tal*(⋅) be a function which maps strings of tally 1’s and 0’s to their numerical values. For example, *tal*(0)=zero, *tal*(1)=one, *tal*(00)=zero, *tal*(01)=one, *tal*(11)=two, and so on.\n\nConsider a machine *M* which, on any one occasion, takes as input a single atomic symbol *I*, and produces two atomic symbols as output, *O*₁ and *O*₂, such that, in any context, *successor*(*tal*(*I*)) = *tal*(*O*₁*O*₂). Design a combinatorial circuit for machine *M*, with the schematic form shown below. On the canvas, *I* is IN1, *O*₁ is OUT1 and *O*₂ is OUT2.",
       "buildMode": "CC",
       "representation": "tally",
       "cc_spec": {
@@ -589,12 +694,19 @@
             2
           ]
         }
+      ],
+      "figures": [
+        {
+          "src": "problem-sets/hw1-schematic-mn.svg",
+          "alt": "Schematic for M and N: a box with one input I entering from the left (IN1 on the canvas) and two outputs O1 and O2 leaving to the right (OUT1 and OUT2)",
+          "width": 280
+        }
       ]
     },
     {
       "id": 17,
       "label": "Problem 17",
-      "statement": "Let *bin*(⋅) be a function which maps strings of binary 1’s and 0’s to their numerical values. For example, *bin*(0)=zero, *bin*(1)=one, *bin*(00)=zero, *bin*(01)=one, *bin*(10)=two, *bin*(11)=three, and so on.\n\nConsider a machine *N* which, on any one occasion, takes as input a single atomic symbol *I*, and produces two atomic symbols as output, *O*₁ and *O*₂, such that, in any context, *successor*(*bin*(*I*)) = *bin*(*O*₁*O*₂). Design a combinatorial circuit for machine *N*.",
+      "statement": "Let *bin*(⋅) be a function which maps strings of binary 1’s and 0’s to their numerical values. For example, *bin*(0)=zero, *bin*(1)=one, *bin*(00)=zero, *bin*(01)=one, *bin*(10)=two, *bin*(11)=three, and so on.\n\nConsider a machine *N* which, on any one occasion, takes as input a single atomic symbol *I*, and produces two atomic symbols as output, *O*₁ and *O*₂, such that, in any context, *successor*(*bin*(*I*)) = *bin*(*O*₁*O*₂). Design a combinatorial circuit for machine *N*, with the same schematic form. On the canvas, *I* is IN1, *O*₁ is OUT1 and *O*₂ is OUT2.",
       "buildMode": "CC",
       "representation": "binary",
       "cc_spec": {
@@ -629,6 +741,13 @@
           "outputs": [
             2
           ]
+        }
+      ],
+      "figures": [
+        {
+          "src": "problem-sets/hw1-schematic-mn.svg",
+          "alt": "Schematic for M and N: a box with one input I entering from the left (IN1 on the canvas) and two outputs O1 and O2 leaving to the right (OUT1 and OUT2)",
+          "width": 280
         }
       ]
     }

@@ -272,10 +272,12 @@ console.log('\n[corpus: the seeded HW1-HW7 documents]');
   // anything else joining them is a false positive of the profile regex.
   check(`exactly the five HW1 truth tables tabulate (${tabulated.join(', ')})`,
     tabulated.join('|') === 'hw1 Problem 1|hw1 Problem 2|hw1 Problem 3|hw1 Problem 4|hw1 Problem 5');
-  // Only the four genuinely multi-part HW1 questions split into parts — no
-  // "p(1, 2)", "j( )" or "(1)" reference is mistaken for a marker anywhere.
-  check(`exactly the four multi-part HW1 questions split (${parted.join(', ')})`,
-    parted.join('|') === 'hw1 Problem 6|hw1 Problem 9|hw1 Problem 10|hw1 Problem 13');
+  // No statement splits into parts: HW1's multi-part problems are lettered
+  // questions now ("Problem 6a", task 046), and no "p(1, 2)", "j(⋅)" or "(1)"
+  // reference is mistaken for a marker anywhere. (The part grammar itself is
+  // pinned in [multi-part questions] above.)
+  check(`no HW statement splits into parts (${parted.join(', ') || 'none'})`,
+    parted.length === 0);
 }
 
 console.log(`\nstatementFormatCheck: ${passed} passed, ${failed} failed`);
