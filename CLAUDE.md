@@ -24,9 +24,10 @@ the id rule: `tasks/README.md`; shared operating rules every role reads first:
 - **`/work`** — the work session: it surveys the queue, proposes merges, offers options;
   Gabriel picks; the session works one task in depth on a `task/NNN-slug` branch and lands
   it with a merge commit.
-- **`/worker`** — the unattended routine (written, **not yet scheduled**): claims one
-  `size: small` task, works it in a worktree, merges. `large`/`unknown` tasks and anything
-  with `requires:` are interactive-only by construction.
+- **The robot** — Gabriel's always-on Mac, own clones: an hourly catch (`ROBOT-CATCH.md`:
+  Feedback → tasks; student fixes wait in `blocked/` for his yes) starts one work run
+  (`ROBOT-WORK.md`: one task, landed, pushed, released via the gate). Land = push
+  everywhere; GitHub `main` ships hourly.
 
 ---
 
@@ -156,7 +157,7 @@ PDFs themselves). **The repo is the source; every release syncs it into the pilo
 
 The open work is the queue (`tasks/incoming/` ready, `tasks/blocked/` waiting on Gabriel);
 `/work` offers it. Headline on 2026-09-24: **UCLA SSO** (006, parked on UCLA IT), the
-grading interface (031), the robot pipeline (029 → 043),
+grading interface (031), the robot's setup (043),
 the pilot domain (008).
 
 ---
@@ -222,7 +223,7 @@ wrappers over it.
 | Instructor UI | `app/src/instructor/` | `InstructorApp`, `InstructorGate`, `InstructorDashboard`, `RosterView`, `FeedbackQueueView`, `NotesView`, `AssignmentEditor`, `dragReorder.ts` (pure `moveItem` + `useDragReorder`; pinned rows immovable), `QuestionCreator` (+ `ccPreview.ts`, `arenaEditing.ts`, `turbotCaseAuthoring.ts` / `TurbotArenasEditor`, `fillInAuthoring.ts`), `Gradebook.ts`/`GradebookView.tsx`, `DocumentEditors.tsx` (callout/figure list widgets shared by the assignment editor and creator; `readFigureFile` caps an upload at 300 KB, downscaling rasters). |
 | Student UI | `app/src/components/` | `CircuitCanvas`, `ComponentLibrary`, `DataTable`, `PerceptionFramePlayer`, `StudentLayout` (the Home tabs), `HomeScreen` (Assignments tab + up-next box), `GradesView` + `GradeSheet` (the Grades tab and its inline sheet), `GradedCaseBanner`, `AssignmentOverview` (the document page), `ProblemSetDocument`, `MenuBar`, `FeedbackPanel`, `SequentialTimeline`, `TMTapePanel`, `ArenaCanvas`, `TurbotArenaPanel` (Map + run controls; sandbox "Edit map"), `TurbotTapePanel`, `OpenResponsePanel`/`FillInPanel` (read-only when locked; paste-guarded), `SimulationPanel`, `TabBar` (question nav + Mark done / 🔒 tag; sandbox + menu), `outputDisplay.ts` (t1-rightmost OUT rows). |
 | API client | `app/src/api/client.ts` | One typed function per endpoint; bearer token under `mm:auth:token`; `onUnauthorized` hook; `health()`; auth/roster/feedback/notes calls; `putWorkbook` takes `keepalive`. `setApiBase` is the harness override. |
-| Dev tool | `app/tools/shootProblemSets.mjs` | Headless-Chrome screenshots of every HW document, the canvas panel and the editor (it seeds local mode itself) — the visual proof when the browser pane is unavailable. |
+| Dev tool | `app/tools/shootProblemSets.mjs` | Headless-Chrome screenshots of every HW document, the canvas panel and the editor — the visual proof when the browser pane is unavailable. |
 | Server | `server/src/app.ts`, `db.ts`, `auth.ts`, `identity.ts`, `password.ts`, `roster.ts`, `rosterImport.ts`, `sanitize.ts`, `config.ts`, `seed.ts`, `roster-cli.ts`, `homeworks.ts`, `homeworks-cli.ts` | Routes, SQLite storage, the `AuthProvider` seam (`createAuthProvider` — `MM_AUTH_MODE`; `LoginThrottle`), scrypt credentials (`scrypt$N$r$p$salt$hash`, self-describing), `identity.ts` (the ONE place an email or UID resolves to an account; `users.uid` unique, `user_emails` aliases, keys never rekeyed), the pure roster reader (`roster.ts`, the registrar's export as-is) + `rosterImport.ts` (never removes; lists who left), redaction + grade-release withholding (`sanitize.ts`; what is stripped: Things to watch), env config, seeding, the admin CLI (`npm run roster`). The homework sync (`homeworks.ts`: a copy is pristine iff its content hash is a committed version of its file — `gitLineage` over the box's clone — or one the sync wrote, the `content_sync` table; `seed.ts --homeworks` runs it too). Tools: `server/tools/*Check.ts` (`parityCheck`: server ≡ in-process grading, deep-compared). |
 | Dev/sample | `app/src/devData/sampleData.ts`, `seed.ts`, `homeworks.ts`, `homeworks/hw{1..7}.json` | Sample assignment for all modes (netlist-built perception circuits, one turbot question per inner mode, open Q14) + sample submissions; `seedHomeworks()` syncs the real HW1–HW7 (record `mm:seeded-homework:<id>`) + reseeds 22 sample submissions; `homeworkSync.ts` is the pure planner it shares with the server (content hash = canonical JSON minus the instructor-owned `order`/`dueDate`; insert / unchanged / refresh / edited). |
 | Tools | `app/tools/*.ts` | The headless harness — the test suite, all in `npm run check` (plus `grade.ts` CLI grader, `builder.ts` netlist builder, `layoutCheck.ts` layout oracle): `portabilityCheck` (first: tool imports in-repo, exact-case, declared; tools type-checked), `codecCheck`, `dueDateCheck`, `statementFormatCheck` (markup grammar, document model, every HW + figures valid), `notationCheck` (grammar pins + label-dissection grep gate), `themeCheck` (Page surfaces gate), `tmCheck`, `turbotCheck` (all four brains; `[multi-arena]`, `[pass-through step-limit]`, path/facing independence), `perceptionCheck`, `scWindowCheck` (question runs ≡ grader), `caseRunCheck` (caseRun ≡ grader; replay per mode, remote shape, budgets), `routerCheck` (fallback budget 0; hw3-p4 pin), `bumpCheck`, `pipelineCheck` (submit → grade, every mode), `navResetCheck` (both reset laws, `[edit during run]`; done / frozen / viewed-submission locks), `routingCheck` (route access, landing, held routes, principal change), `boxScopeCheck` (box library scope, sequential + drawn-across boxes ≡ unboxed, `[naming]`), `pasteCheck` (paste policy + provenance grep gates), `provenanceCheck` (mint/verify, attribution, paste re-mint, stamp + trace flags, uuid grep gate), `workbookFileCheck` (round trip, bad files, unsaved baseline, file handle), `remoteStoreCheck` (boots the REAL server; grader-import grep gate; password auth client), `coverageCheck` (two-tier reference-fixture ledger + `allowed_components` pins). |
@@ -345,9 +346,9 @@ turbots** — the textbook model (internal/external states, B/E/F senses, ↑/�
   Old local data is never deleted (first remote login uploads it fill-empty).
 - **Remote workbooks are last-write-wins across devices** (accepted pilot trade-off,
   `docs/buildout/designs/remote-stores.md` §5; an If-Match precondition is the follow-up if it bites).
-- **Releasing = `deploy/release.sh`** after a push to `main` (box backup + pull + homework sync + restart over ssh,
-  Pages upload, smoke test; refuses unless local main == origin/main; needs the gitignored
-  `secrets/` + `ssh/` key — `deploy/README.md` §0). `--unattended` obeys `deploy/release-gate.mjs`.
+- **Releasing = `deploy/release.sh`** (box backup, pull, homework sync, restart; Pages upload;
+  smoke test; needs main == origin/main and the gitignored `secrets/` + `ssh/` key —
+  `deploy/README.md` §0); the robot runs it `--unattended`, via `deploy/release-gate.mjs`.
 - **Deploy knobs live in `deploy/README.md`**: Pages sets `VITE_API_BASE` and
   `VITE_BASE_PATH=/` at build; the Lightsail unit sets `MM_AUTH_MODE=password`,
   `MM_CORS_ORIGINS` and friends; backups: daily, kept 35 days (§Backups there, task 041).

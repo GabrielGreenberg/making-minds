@@ -670,8 +670,11 @@ export type FeedbackStatus = 'open' | 'resolved';
  *  or joined, the listed tasks; `personal` — it is about the student, not
  *  the platform or a homework, so it is left for the instructor and never
  *  filed; `dismissed` — noise, a duplicate or already done (`note` says
- *  which). Independent of `status`: resolving stays the instructor's act. */
-export type FeedbackTriageOutcome = 'filed' | 'personal' | 'dismissed';
+ *  which); `review` — a student's feature request, bigger change or unclear
+ *  report, waiting for the instructor's call in `/catch` (task 029), which
+ *  re-marks it `filed` or `dismissed`. Independent of `status`: resolving
+ *  stays the instructor's act. */
+export type FeedbackTriageOutcome = 'filed' | 'personal' | 'dismissed' | 'review';
 
 export interface FeedbackTriage {
   outcome: FeedbackTriageOutcome;
