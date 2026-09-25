@@ -12,14 +12,17 @@ function formatTime(iso: string): string {
   );
 }
 
-/** What the task pipeline made of a report (task 018), as a tag. */
+/** What the task pipeline made of a report (task 018), as a tag. `review`
+ *  waits for the instructor's file / not now / discard in `/catch` (task 029). */
 function TriageMark({ triage }: { triage: FeedbackTriage }) {
   const [className, label] =
     triage.outcome === 'filed'
       ? ['tag tag--ok', `Filed → ${triage.tasks?.length === 1 ? 'task' : 'tasks'} ${(triage.tasks ?? []).join(', ')}`]
       : triage.outcome === 'personal'
         ? ['tag tag--warn', 'Personal — for you']
-        : ['tag', 'Dismissed'];
+        : triage.outcome === 'review'
+          ? ['tag tag--warn', 'Needs your call']
+          : ['tag', 'Dismissed'];
   return (
     <span className="feedback-triage" title={`Processed ${formatTime(triage.at)}`}>
       <span className={className}>{label}</span>

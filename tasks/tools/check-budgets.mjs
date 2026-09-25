@@ -14,7 +14,9 @@ const budgets = [
   ['tasks/CATCHER.md', 14_000],
   ['tasks/WORK.md', 14_000],
   ['tasks/LOOP.md', 14_000],
-  ['tasks/WORKER.md', 14_000],
+  ['tasks/ROBOT-CATCH.md', 10_000],
+  ['tasks/ROBOT-WORK.md', 10_000],
+  ['tasks/START.md', 10_000],
 ];
 let failed = 0;
 for (const [rel, max] of budgets) {

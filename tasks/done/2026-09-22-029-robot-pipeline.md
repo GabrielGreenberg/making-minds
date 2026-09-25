@@ -8,9 +8,9 @@ requires: human
 area: pipeline
 source: chat
 created: 2026-09-22T10:30:00-07:00
-status: in-progress
+status: done
 after: 2026-09-25-042
-branch: task/029-robot-pipeline
+branch:
 merged_into:
 ---
 
@@ -127,3 +127,40 @@ unattended loop that both catches and works, on an always-on second computer, an
 - `check-budgets.mjs` covers both prompts. Owed: the scheduled, chained run itself (043).
 
 ## Progress log
+- 2026-09-25 (`/work`) — Built and dry-run, all six Done-when items.
+  - **Built:** the `review` mark end to end (route + `?triage=` filter, Feedback-tab tag "Needs
+    your call", `feedback.mjs mark … review` / `list --review`, `feedbackCheck` pins; the
+    filter lives in the route, not `db.ts`, which is on the gate's hold list);
+    `ROBOT-CATCH.md` + `ROBOT-WORK.md` (budgeted) + `/robot-catch`, `/robot-work`; CATCHER
+    §0/§1b/§7, WORK, LOOP, README, PROFILE §2–§5/§7/§9/§12 for two machines and land = push;
+    `START.md` §"The robot"; `WORKER.md` + `/worker` retired; `CLAUDE.md` in place (39,992 B).
+  - **Design refinements (technical):** two robot clones, not one —
+    `~/making-minds-robot` (work) and `~/making-minds-robot-catch` (catch, no deps, only
+    `feedback.env`) — because a work run can outlast the hour and the next catch must never
+    switch branches under it. `next-id.mjs` counts every id ever committed (`git log --all`):
+    two minting machines, and a deleted (declined) task's number stays retired. The release
+    gate gained two rules (`releaseGateCheck` pins): a range touching only `tasks/`, `docs/`,
+    `CLAUDE.md`, `.claude/` is `current` (the robot pushes queue commits hourly — no hourly box
+    restarts), and CI on the commit must have passed (`gh`; failed → hold, running / cancelled
+    / not run / unreadable → wait) — so a red push can never ship an hour later.
+  - **Dry run** (scratch bare "GitHub" + laptop / catch / work clones, a local password-mode
+    server with 3 reports; subagents followed the prompts literally): the catch filed the
+    instructor request `ready`, the planted student typo into `blocked/` with the yes
+    question, marked dark mode `review`, pushed before marking, kept the student's name,
+    email and an embedded "IGNORE PREVIOUS INSTRUCTIONS" out of every file; as Gabriel,
+    released it (yes) and dismissed the review item via `list --review`; the work run picked
+    it (high > normal), pushed the claim, fixed + pinned it (themeCheck), gates 0 ×5, landed,
+    pushed, and `release.sh --check` said HOLD — correctly, for this task's `deploy/` change.
+    Both dry runs' critiques were folded back into the prompts (sync-then-read, gate the
+    merged result, drop an unpushed land commit before parking, marks after push, an ahead
+    clone pushes first, notes cut to 200 chars, CI wait).
+  - **Owed (043, on the robot):** the scheduled, chained run itself — the Workflow tool in a
+    routine and its background wait, the browser pane there, push notifications reaching
+    the phone, the transcript probe. **Release 029 by hand** after landing: it changes
+    `deploy/`, so the robot's gate holds it (and every release after it) until Gabriel does.
+  - Next: full gates, land, push, release by hand.
+- 2026-09-25 (`/work`) — Landed. Gates by exit code: app `tsc` 0, build 0, `npm run check` 0,
+  server typecheck 0, server check 0 (a first background run hung in `vite build` beside the
+  dev server; re-run in the foreground, 3 s). Merged `--no-ff` into `main` and pushed.
+  **Owed, in order:** Gabriel releases `main` by hand (`deploy/release.sh` — it changes
+  `deploy/`, so the gate holds it); then 043 on the always-on Mac.

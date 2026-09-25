@@ -18,11 +18,16 @@ merged_into:
 The machine-local half of the robot pipeline (029): everything that cannot live in the repo.
 Done ON the other computer (Gabriel's always-on Mac — the Mac Studio, to confirm), by a Claude
 session there told "set up the robot using `tasks/START.md`", with Gabriel present for the
-steps only he can do.
+steps only he can do. **First, 029 must be released by hand** (`deploy/release.sh`
+from the laptop): it changes `deploy/`, so the robot's gate holds it and everything after it.
+Things only a real routine can show (029's dry run couldn't): the Workflow tool runs inside a
+routine and the run waits for its background completion; the browser pane works there; a
+push notification reaches the phone; `gh` is signed in for the gate's CI check.
 
 ## Done when
-1. The recipe in `tasks/START.md` §"The robot" is followed end to end: the robot's own clone
-   (`~/making-minds-robot`) with dependencies installed; the three private files copied by
+1. The recipe in `tasks/START.md` §"The robot" is followed end to end: the robot's two clones
+   (`~/making-minds-robot` for work, with dependencies installed; `~/making-minds-robot-catch`
+   for catch); the three private files copied by
    Gabriel by hand (never through git or a chat); `gh` signed in; the two scheduled tasks
    created in the Claude app with the robot copy as working folder; tool approvals granted
    once; the app set to stay open and the Mac never to sleep.

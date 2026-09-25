@@ -5,16 +5,21 @@
 //                triage column starts empty
 //   [filing]     a report carries the role its author filed in (the session's
 //                word, never the client's)
-//   [list]       ?status= and ?triaged= narrow the queue; bad values are 400s
+//   [list]       ?status=, ?triaged= and ?triage=<outcome> narrow the queue;
+//                bad values are 400s
 //   [triage]     PUT /api/feedback/:id/triage — instructor-only; filed needs
-//                task ids, dismissed a note, only filed names tasks; set and
-//                clear; never touches `status`; unknown id → 404
+//                task ids, dismissed a note, only filed names tasks; review
+//                (task 029) is a mark like personal; set and clear; never
+//                touches `status`; unknown id → 404
 //   [script]     tasks/tools/feedback.mjs against a real password-mode server:
 //                pull writes each open, unprocessed report outside the repo
 //                (role, no email, screenshot bytes intact), a re-pull is a
 //                no-op, mark sets the server's mark and drops the working
 //                copy, a report processed elsewhere is dropped on the next
-//                pull, no session is left behind, and the refusals (an --out
+//                pull, no session is left behind, a review mark keeps the
+//                copy and leaves it out of the pull's list, `list --review`
+//                prints id/role/category/date and never the report's words
+//                (task 029), and the refusals (an --out
 //                inside the repo, no credentials file, bad usage, a wrong
 //                password)
 //
@@ -188,7 +193,8 @@ section('[list]');
   check('?triaged=false lists only unprocessed ones', (await list('?triaged=false')).every((f) => !f.triage));
   const badStatus = await api('GET', '/feedback?status=closed', { token: iTok });
   const badTriaged = await api('GET', '/feedback?triaged=maybe', { token: iTok });
-  check('a bad filter value is a 400', badStatus.status === 400 && badTriaged.status === 400);
+  const badTriage = await api('GET', '/feedback?triage=maybe', { token: iTok });
+  check('a bad filter value is a 400', badStatus.status === 400 && badTriaged.status === 400 && badTriage.status === 400);
   check('a student still cannot list the queue', (await api('GET', '/feedback', { token: sTok })).status === 403);
 }
 
@@ -220,6 +226,13 @@ section('[triage]');
   check('marking never touches status', after?.status === 'open');
   check('?triaged=true lists it; ?triaged=false does not', (await list('?triaged=true')).some((f) => f.id === profReport) &&
     !(await list('?triaged=false')).some((f) => f.id === profReport));
+  const review = await put({ outcome: 'review' });
+  check('review: a mark with no tasks and no note needed', review.status === 200 && review.json.triage?.outcome === 'review');
+  check('review naming tasks → 400', (await put({ outcome: 'review', tasks: ['2026-09-24-040'] })).status === 400);
+  check(
+    '?triage=review lists only review marks',
+    (await list('?triage=review')).map((f) => f.id).join() === profReport && (await list('?triage=filed')).length === 0,
+  );
   const cleared = await put({ clear: true });
   check(
     'clear removes the mark',
@@ -343,6 +356,54 @@ const sessionsBefore = sessionCount();
     personal.stderr,
   );
   check('marks sign out again too', sessionCount() === sessionsBefore);
+}
+
+// ── [script] review (task 029): Gabriel's call, not the pipeline's input ──
+{
+  const DARK = 'Could the editor have a dark mode?';
+  const request = await file(sTok, DARK, { category: 'platform design' });
+  const pulled = await run('pull', '--env', envFile, '--out', out);
+  check('a new report is pulled as pending', pulled.code === 0 && existsSync(mdPath(request)), pulled.stdout + pulled.stderr);
+  const marked = await run('mark', request, 'review', '--env', envFile, '--out', out);
+  check(
+    'mark review exits 0, sets the mark, and keeps the working copy',
+    marked.code === 0 && (await list()).find((f) => f.id === request)?.triage?.outcome === 'review' && existsSync(mdPath(request)),
+    marked.stdout + marked.stderr,
+  );
+  const again = await run('pull', '--env', envFile, '--out', out);
+  check(
+    'the next pull keeps its copy but lists it only as a count, never as pending',
+    again.code === 0 &&
+      again.stdout.includes('0 pending reports') &&
+      again.stdout.includes('(1 more marked review') &&
+      !again.stdout.includes(`feedback-${request}.md`) &&
+      existsSync(mdPath(request)),
+    again.stdout + again.stderr,
+  );
+  rmSync(mdPath(request));
+  const listed = await run('list', '--review', '--env', envFile, '--out', out);
+  check(
+    'list --review prints id, role, category and date, and rewrites the copy',
+    listed.code === 0 &&
+      listed.stdout.includes('1 report marked review') &&
+      new RegExp(`feedback-${request}\\.md · student · platform design · filed \\d{4}-\\d{2}-\\d{2}`).test(listed.stdout) &&
+      existsSync(mdPath(request)),
+    listed.stdout + listed.stderr,
+  );
+  check(
+    "list --review never prints the report's words or its author",
+    !listed.stdout.includes('dark mode') && !listed.stdout.includes(STUDENT),
+  );
+  const decided = await run('mark', request, 'dismissed', 'not now (Gabriel)', '--env', envFile, '--out', out);
+  const after = await run('list', '--review', '--env', envFile, '--out', out);
+  check(
+    "Gabriel's call re-marks it; the copy goes and the review list empties",
+    decided.code === 0 && !existsSync(mdPath(request)) && after.code === 0 && after.stdout.includes('0 reports marked review'),
+    decided.stderr + after.stdout + after.stderr,
+  );
+  const badList = await run('list', '--env', envFile, '--out', out);
+  check('list without --review is a usage error (exit 2)', badList.code === 2);
+  check('the review commands sign out again too', sessionCount() === sessionsBefore);
 }
 
 {

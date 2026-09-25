@@ -12,22 +12,25 @@ your context, don't re-read them.
 
 - Claim, branch, implement, verify, land (merge `--no-ff` into `main`) without asking.
 - Run Workflows: one per task, serial. Starting this loop is the explicit opt-in.
-- **Not granted:** pushing, releasing, answering product questions, working `blocked/` tasks,
-  deleting branches or worktrees you didn't create.
-- **Arguments** (after `/loop /work-loop`): `push` = after each land, push `main` and confirm
-  `gh run list --limit 1` is green; `release` = `push` plus `deploy/release.sh` after each
-  push; `max=N` = stop after N landed tasks; a task id or list = work only those.
+- Push: claims and parks at once, each land at once, then confirm `gh run list --limit 1`
+  is green (land = push, PROFILE §2; the robot releases pushed work through the gate).
+- **Not granted:** releasing by hand, answering product questions, working `blocked/` tasks,
+  deleting branches or worktrees you didn't create, touching `robot/` branches.
+- **Arguments** (after `/loop /work-loop`): `release` = `deploy/release.sh` by hand after
+  each push, instead of waiting for the robot; `max=N` = stop after N landed tasks; a task
+  id or list = work only those.
 
 ## 2. One iteration = one task
 
-1. **Orient** (WORK §A, abridged). If on a `task/` branch whose task is in `in-progress/`,
-   resume it. If the checkout has modified files you didn't make (someone's work in
+1. **Orient** (WORK §A, abridged — the fetch included). If on a `task/` branch whose task
+   is in `in-progress/`, resume it. If the checkout has modified files you didn't make (someone's work in
    flight), wait: ScheduleWakeup 1200 s and re-check; on the third sight, stop (§6).
 2. **Select.** Eligible: `tasks/incoming/`, `status: ready`, its `after:` id in `done/`,
    `requires:` empty or only `browser`, not parked this session. Order: priority
    (urgent > high > normal > low); within it, a task whose `after:` just landed; then
    oldest id. Nothing eligible → §6.
-3. **Claim** (WORK §C.2): the claim commit on `main`, then `task/NNN-slug`.
+3. **Claim** (WORK §C.2): the claim commit on `main`, pushed at once (rejected because the
+   robot took it → select again), then `task/NNN-slug`.
 4. **Run the task workflow** (§3), in the background, with a ScheduleWakeup fallback of
    1800 s. When it completes, read its result. `needsGabriel` non-empty → park it (§4).
 5. **Visual check** yourself, in this session, for `requires: browser` or any visible change.
@@ -36,8 +39,8 @@ your context, don't re-read them.
    scale ≤ 0.6. Attachments: headless Chrome `--screenshot` with a fresh `--user-data-dir`
    writes the file then hangs, so `pkill -f headless=new` after it. Fix small misses
    yourself; send anything bigger back into the workflow (resume it with the finding).
-6. **Land** (WORK §E, PROFILE §5): gates green by exit code, the land commit, merge, delete
-   the branch, CLAUDE.md status in place (§5). Then `push`/`release` if granted.
+6. **Land** (WORK §E, PROFILE §5): gates green by exit code, the land commit, merge, push,
+   delete the branch, CLAUDE.md status in place (§5). Then `release` if granted.
 7. **Ledger:** one line in `<scratchpad>/loop-ledger.md` (id · outcome · merge commit), and
    print the compact running list. Then ScheduleWakeup 60 s with the same `/loop` prompt:
    the next iteration.
@@ -77,7 +80,7 @@ anything needing ssh, credentials or a real device. Do this:
 - write `## Questions` in the task file, each answerable in a line, your recommendation
   first;
 - set `status: blocked` and note the branch;
-- `git mv` the file to `blocked/` and commit on `main`;
+- `git mv` the file to `blocked/`, commit on `main`, push;
 - check out `main` and go to the next task.
 
 Technical choices are yours: take the deepest fix the evidence warrants (PROFILE §1) and
@@ -102,7 +105,7 @@ leave the checkout on `main` and clean. The final report:
 - **Landed**: id · title · merge commit.
 - **Parked**: id · its questions, verbatim, so Gabriel can answer them in one `/catch`.
 - **Skipped**: id · why (`requires: human/ssh`, `after:` pending).
-- **Pushed/released**: whether they happened, with the CI state.
+- **Released**: whether `release` ran, with the CI state of the last push.
 - The one next step you recommend.
 
 End with **"Done."**

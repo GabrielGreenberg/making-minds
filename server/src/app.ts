@@ -46,10 +46,12 @@
 //   POST   /api/feedback                       any signed-in user: file a platform/homework
 //                                              report, screenshots as base64 data URLs
 //   GET    /api/feedback                       instructor: the queue, newest first;
-//                                              ?status=open|resolved, ?triaged=true|false
+//                                              ?status=open|resolved, ?triaged=true|false,
+//                                              ?triage=<outcome>
 //   PUT    /api/feedback/:id/status            instructor: {status: 'open'|'resolved'}
 //   PUT    /api/feedback/:id/triage            instructor: what the task pipeline made of
-//                                              it — {outcome, tasks?, note?} | {clear: true}
+//                                              it — {outcome: filed|personal|dismissed|review,
+//                                              tasks?, note?} | {clear: true}
 //   GET    /api/instructor-notes               instructor: the one shared markdown note
 //   PUT    /api/instructor-notes               instructor: {content: string} → saves it
 //   GET    /api/health                         unauthenticated liveness probe
@@ -63,7 +65,7 @@
 
 import express from 'express';
 import type { Request, Response, NextFunction } from 'express';
-import type { AssignmentData, AssignmentState, FeedbackTriage, SubmissionData } from '../../app/src/types';
+import type { AssignmentData, AssignmentState, FeedbackTriage, FeedbackTriageOutcome, SubmissionData } from '../../app/src/types';
 import { gradeSubmission } from '../../app/src/engine/grader';
 import { applyManualReview } from '../../app/src/storage/manualReview';
 import { deriveMintKey } from '../../app/src/provenance/ids';
@@ -759,8 +761,11 @@ export function createApp(config: ServerConfig, db: Db) {
     res.status(201).json({ feedback });
   });
 
+  const TRIAGE_OUTCOMES: readonly FeedbackTriageOutcome[] = ['filed', 'personal', 'dismissed', 'review'];
+  const isTriageOutcome = (v: unknown): v is FeedbackTriageOutcome => TRIAGE_OUTCOMES.includes(v as FeedbackTriageOutcome);
+
   app.get('/api/feedback', auth, requireInstructor, (req, res) => {
-    const { status, triaged } = req.query;
+    const { status, triaged, triage } = req.query;
     if (status !== undefined && status !== 'open' && status !== 'resolved') {
       res.status(400).json({ error: 'status must be "open" or "resolved"' });
       return;
@@ -769,12 +774,16 @@ export function createApp(config: ServerConfig, db: Db) {
       res.status(400).json({ error: 'triaged must be "true" or "false"' });
       return;
     }
-    res.json({
-      feedback: db.listFeedback({
-        status,
-        triaged: triaged === undefined ? undefined : triaged === 'true',
-      }),
+    if (triage !== undefined && !isTriageOutcome(triage)) {
+      res.status(400).json({ error: `triage must be one of ${TRIAGE_OUTCOMES.join(', ')}` });
+      return;
+    }
+    const feedback = db.listFeedback({
+      status,
+      triaged: triaged === undefined ? undefined : triaged === 'true',
     });
+    // ?triage=review is what `feedback.mjs list --review` asks for (task 029).
+    res.json({ feedback: triage === undefined ? feedback : feedback.filter((f) => f.triage?.outcome === triage) });
   });
 
   app.put('/api/feedback/:id/status', auth, requireInstructor, (req, res) => {
@@ -804,8 +813,8 @@ export function createApp(config: ServerConfig, db: Db) {
       triage = null;
     } else {
       const { outcome, tasks, note } = body;
-      if (outcome !== 'filed' && outcome !== 'personal' && outcome !== 'dismissed') {
-        res.status(400).json({ error: 'outcome must be "filed", "personal" or "dismissed" (or send {clear: true})' });
+      if (!isTriageOutcome(outcome)) {
+        res.status(400).json({ error: 'outcome must be "filed", "personal", "dismissed" or "review" (or send {clear: true})' });
         return;
       }
       if (note !== undefined && (typeof note !== 'string' || note.length > MAX_TRIAGE_NOTE_LENGTH)) {

@@ -3,20 +3,23 @@
 //
 // The one decision in front of `deploy/release.sh --unattended` (and `--check`):
 //
-//   current  nothing new since the last release — nothing to do
+//   current  nothing new since the last release, or nothing that ships
+//            (QUIET_PATHS: the queue, docs) — nothing to do
 //   hold     do not release until Gabriel does, by hand: the new commits touch
-//            something on HOLD_PATHS, or the daily backups (task 041) are not
-//            running
+//            something on HOLD_PATHS, the daily backups (task 041) are not
+//            running, or CI failed on the commit to ship
 //   wait     not now, the next run may: outside the release hours, inside a
-//            deadline freeze, or the box / the pilot API cannot be asked
-//            (never release blind)
+//            deadline freeze, CI still running (or not yet run) on the commit,
+//            or the box / the pilot API / CI cannot be asked (never release
+//            blind)
 //   release  go
 //
 // Every rule that fires is reported with its reason; the strictest decides
 // (hold > wait > release). The rules are data below, each with a comment —
 // Gabriel tunes them (tasks/done/…-042 §Resolved decisions). The decision
 // itself is `decide(facts)`, pure; `gatherFacts()` is the I/O (git, an ssh
-// probe of the box, the pilot API as an instructor via deploy/pilot-api.mjs).
+// probe of the box, the pilot API as an instructor via deploy/pilot-api.mjs,
+// GitHub's CI runs via `gh`).
 // A hand run of release.sh never asks this gate: Gabriel's "release" is the
 // override.
 //
@@ -47,6 +50,16 @@ export const HOLD_PATHS = [
   ['app/src/auth/', 'sign-in'],
   ['server/src/db.ts', 'the database schema and its migrations'],
   ['deploy/', 'the release and backup machinery itself'],
+];
+
+/** Paths that never reach the pilot. A range touching nothing else is
+ *  "current": the robot pushes queue commits every hour (task 029), and none
+ *  of them is worth a release (a box restart, a Pages upload). */
+export const QUIET_PATHS = [
+  ['tasks/', 'the task queue'],
+  ['docs/', 'design docs'],
+  ['CLAUDE.md', 'the session index'],
+  ['.claude/', 'session commands and workflows'],
 ];
 
 /** Unattended releases only in these hours (Pacific): a broken release at
@@ -88,10 +101,17 @@ function whenLabel(date) {
 
 /** Which HOLD_PATHS entries these changed files touch: `[{ path, why }]`,
  *  one per changed file that matches. */
+const under = (prefix, file) => (prefix.endsWith('/') ? file.startsWith(prefix) : file === prefix);
+
+/** True when every changed path is on QUIET_PATHS: nothing that ships. */
+export function quietOnly(changedFiles) {
+  return changedFiles.length > 0 && changedFiles.every((file) => QUIET_PATHS.some(([prefix]) => under(prefix, file)));
+}
+
 export function heldPaths(changedFiles) {
   const out = [];
   for (const file of changedFiles) {
-    const hit = HOLD_PATHS.find(([prefix]) => (prefix.endsWith('/') ? file.startsWith(prefix) : file === prefix));
+    const hit = HOLD_PATHS.find(([prefix]) => under(prefix, file));
     if (hit) out.push({ path: file, why: hit[1] });
   }
   return out;
@@ -106,6 +126,9 @@ export function heldPaths(changedFiles) {
  *   assignments               — [{ id, title, visible, dueDate? }] (null = API problem)
  *   apiProblem, boxProblem    — why a source couldn't be asked, or null
  *   backup                    — { timerActive, newestAt: Date|null } (null = unknown)
+ *   ci                        — HEAD's CI run on main: { status, conclusion }; status
+ *                               'none' = no run for it yet (null = gh couldn't say)
+ *   ciProblem                 — why CI couldn't be asked, or null
  * }
  * → { verdict, reasons: [{ verdict, rule, detail }], summary, note }
  */
@@ -129,6 +152,18 @@ export function decide(facts) {
     };
   } else if (!facts.changedFiles) {
     add('wait', 'diff', `the released commit ${short(facts.lastReleased)} is not in this clone's history`);
+  } else if (quietOnly(facts.changedFiles)) {
+    return {
+      verdict: 'current',
+      reasons: [{
+        verdict: 'current',
+        rule: 'quiet',
+        detail: `only the task queue, docs or session config changed since ${short(facts.lastReleased)}`,
+        brief: 'nothing that ships',
+      }],
+      summary: '',
+      note: '',
+    };
   } else {
     const byWhy = new Map();
     for (const { path, why } of heldPaths(facts.changedFiles)) {
@@ -152,6 +187,22 @@ export function decide(facts) {
     if (ageH > BACKUP_MAX_AGE_HOURS) {
       add('hold', 'backup', `the newest daily backup is ${Math.floor(ageH)} h old (limit ${BACKUP_MAX_AGE_HOURS} h)`);
     }
+  }
+
+  // A commit ships only once CI has passed on it (task 029): the robot pushes
+  // and releases in one run, and a red run must never go out an hour later.
+  const at = short(facts.head);
+  if (!facts.ci) {
+    add('wait', 'ci', `cannot read CI for ${at}: ${facts.ciProblem ?? 'no answer'}`);
+  } else if (facts.ci.status === 'none') {
+    add('wait', 'ci', `CI has not run on ${at} yet`);
+  } else if (facts.ci.status !== 'completed') {
+    add('wait', 'ci', `CI is still running on ${at} (${facts.ci.status})`);
+  } else if (facts.ci.conclusion === 'cancelled' || facts.ci.conclusion === 'skipped') {
+    // deploy.yml cancels a run a newer push supersedes: unproven, not failed.
+    add('wait', 'ci', `CI was ${facts.ci.conclusion} on ${at} (superseded?) — not proven`);
+  } else if (facts.ci.conclusion !== 'success') {
+    add('hold', 'ci', `CI ${facts.ci.conclusion || 'did not pass'} on ${at}`, 'a CI run that did not pass');
   }
 
   const { hour, label } = pacific(facts.now);
@@ -195,6 +246,18 @@ function git(root, ...args) {
   return execFileSync('git', ['-C', root, ...args], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim();
 }
 
+/** HEAD's run of the deploy workflow on main, from GitHub via `gh` (signed in
+ *  on this machine). No run for HEAD yet → status 'none'. */
+export function ghCiRun(root, head) {
+  const out = execFileSync(
+    'gh',
+    ['run', 'list', '--workflow', 'deploy.yml', '--branch', 'main', '--limit', '30', '--json', 'headSha,status,conclusion'],
+    { cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], timeout: 30_000 },
+  );
+  const run = JSON.parse(out).find((r) => r.headSha === head);
+  return run ? { status: run.status, conclusion: run.conclusion ?? '' } : { status: 'none', conclusion: '' };
+}
+
 const BOX_HOST = '100.22.69.95';
 const BOX_USER = 'ubuntu';
 
@@ -232,8 +295,16 @@ export async function gatherFacts({
   now = new Date(),
   probeBox = sshProbeBox,
   listAssignments = listPilotAssignments,
+  probeCi = ghCiRun,
 } = {}) {
   const head = git(root, 'rev-parse', 'HEAD');
+  let ci = null;
+  let ciProblem = null;
+  try {
+    ci = await probeCi(root, head);
+  } catch (e) {
+    ciProblem = (e.stderr?.toString().trim() || e.message).split('\n')[0];
+  }
   let box = null;
   let boxProblem = null;
   try {
@@ -274,6 +345,8 @@ export async function gatherFacts({
     apiProblem,
     boxProblem,
     backup: box ? { timerActive: box.timerActive, newestAt: box.newestAt } : null,
+    ci,
+    ciProblem,
   };
 }
 
