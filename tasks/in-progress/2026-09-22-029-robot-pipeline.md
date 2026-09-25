@@ -8,9 +8,9 @@ requires: human
 area: pipeline
 source: chat
 created: 2026-09-22T10:30:00-07:00
-status: ready
+status: in-progress
 after: 2026-09-25-042
-branch:
+branch: task/029-robot-pipeline
 merged_into:
 ---
 
@@ -107,6 +107,14 @@ unattended loop that both catches and works, on an always-on second computer, an
    go straight through.
 5. The robot runs on Gabriel's other, always-on computer, in its own copy of the repo; the
    pieces are built here, the setup is done there (043).
+6. (2026-09-25, `/work`) **Land = push, on every machine**: every land is pushed at once, so
+   `main` never holds unpushed work and a pushed claim carries nothing else. Pushing to
+   GitHub `main` is shipping: the robot releases it through 042's gate within the hour; hand
+   releases stay Gabriel's.
+7. (2026-09-25, `/work`, technical) Both routines run on Opus 5.5; `WORKER.md` and `/worker`
+   are retired (the work routine replaces them); the work routine runs the `mm-task`
+   workflow (its adversarial review matters most when nobody watches); the catch routine
+   also files `tasks/inbox/` notes (Gabriel's own, so filed like instructor reports).
 
 ## Verify
 - Dry run on this laptop against a local server (the 018 recipe): file one report as the
