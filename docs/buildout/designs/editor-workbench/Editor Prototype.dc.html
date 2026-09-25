@@ -1,0 +1,870 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Serif:wght@500;600;700&display=swap" rel="stylesheet">
+<style>
+html,body{margin:0;padding:0;background:#FBFAFD;height:100%;overflow:hidden;}
+*{box-sizing:border-box;}
+a{color:#1382D6;text-decoration:none;}
+a:hover{text-decoration:underline;}
+input,textarea,button{font-family:inherit;}
+</style>
+</helmet>
+<div style="height:100vh;display:flex;flex-direction:column;background:#FBFAFD;font-family:'IBM Plex Sans',sans-serif;color:#2A2A2A;overflow:hidden">
+  <div style="height:48px;background:#FFFFFF;border-bottom:1px solid #E5E5E5;display:flex;align-items:center;gap:18px;padding:0 20px;flex-shrink:0">
+    <span style="display:flex;align-items:baseline;gap:10px;white-space:nowrap;flex-shrink:0"><span style="font-family:'IBM Plex Serif',serif;font-weight:700;font-size:17px">Making Minds</span><span style="font-size:11px;letter-spacing:0.09em;font-weight:600;color:#C255B9">PHIL 133</span></span>
+    <span style="font-size:13.5px;color:#7B7B7B;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Assignments <span style="color:#D5D5D5;padding:0 4px">/</span> <span style="color:#2A2A2A;font-weight:500">HW1. Basics: Circuits, Functions, and Representations</span></span>
+    <span style="margin-left:auto;font-size:12.5px;color:#7B7B7B;white-space:nowrap">{{ savedLabel }}</span>
+    <sc-if value="{{ submittedLabel }}" hint-placeholder-val="{{ false }}"><span style="font-size:12.5px;color:#4A4A4A;white-space:nowrap">{{ submittedLabel }}</span></sc-if>
+    <span onClick="{{ submit }}" style="padding:6px 12px;font-size:13px;font-weight:600;background:#C255B9;color:#FFFFFF;cursor:pointer;white-space:nowrap" style-hover="background:#A8449F">{{ submitText }}</span>
+    <span onClick="{{ resetDemo }}" title="Reset the prototype to its starting state" style="font-size:12.5px;color:#7B7B7B;cursor:pointer;white-space:nowrap" style-hover="color:#C255B9">Reset demo</span>
+    <span style="font-size:13.5px;color:#4A4A4A;white-space:nowrap">John Doe ▾</span>
+  </div>
+  <div style="height:4px;background:#E2B4FF;flex-shrink:0"></div>
+
+  <div style="flex:1;display:flex;min-height:0">
+
+    <sc-if value="{{ leftOpen }}" hint-placeholder-val="{{ true }}">
+      <div style="width:{{ leftW }}px;display:flex;flex-direction:column;flex-shrink:0;min-height:0;background:#FBFAFD">
+        <div style="height:34px;flex-shrink:0;background:#F7F5FA;border-bottom:1px solid #E5E5E5;display:flex;align-items:center;gap:2px;padding:0 6px 0 10px">
+          <span onClick="{{ prev }}" style="height:26px;padding:0 8px;display:flex;align-items:center;font-size:12.5px;font-weight:500;color:{{ prevColor }};cursor:pointer" style-hover="background:#F2E6FF">← Prev</span>
+          <span onClick="{{ next }}" style="height:26px;padding:0 8px;display:flex;align-items:center;font-size:12.5px;font-weight:500;color:{{ nextColor }};cursor:pointer" style-hover="background:#F2E6FF">Next →</span>
+          <span style="margin-left:auto;font-size:12px;color:#7B7B7B;font-variant-numeric:tabular-nums">{{ posLabel }}</span>
+          <span onClick="{{ toggleLeft }}" title="Hide the question panel" style="width:28px;height:26px;margin-left:6px;display:flex;align-items:center;justify-content:center;color:#7B7B7B;cursor:pointer;font-size:14px" style-hover="background:#F2E6FF;color:#C255B9">«</span>
+        </div>
+        <div style="background:#FFFFFF;padding:16px 20px 22px;display:flex;flex-direction:column;gap:12px;flex-shrink:1;min-height:0;max-height:64%;overflow-y:auto">
+          <span style="font-size:11px;letter-spacing:0.08em;text-transform:uppercase;color:#C255B9;font-weight:600">{{ q.section }}</span>
+          <span style="font-family:'IBM Plex Serif',serif;font-size:19px;font-weight:600;line-height:1.25;text-wrap:balance;margin-top:-6px">{{ q.heading }}</span>
+          {{ stmtEl }}
+          <sc-if value="{{ q.caution }}" hint-placeholder-val="{{ false }}">
+            <div style="background:#FBF1DE;padding:10px 12px;font-size:14px;line-height:1.45;color:#2A2A2A"><b style="font-weight:600;color:#8A5A08">Caution: </b>{{ q.caution }}</div>
+          </sc-if>
+          <sc-if value="{{ q.hasTable }}" hint-placeholder-val="{{ true }}">
+            <div style="display:flex;flex-direction:column;align-self:flex-start;margin-top:6px;font-family:'IBM Plex Mono',monospace;font-size:14px">
+              <div style="display:flex;border-bottom:1px solid #D5D5D5">
+                <sc-for list="{{ goalCols }}" as="col" hint-placeholder-count="3"><span style="width:60px;padding:6px 0;text-align:center;font-family:'IBM Plex Sans',sans-serif;font-size:11px;letter-spacing:0.08em;color:#7B7B7B;font-weight:600;border-left:{{ col.bl }}">{{ col.label }}</span></sc-for>
+              </div>
+              <sc-for list="{{ goalRows }}" as="row" hint-placeholder-count="4">
+                <div style="display:flex;border-bottom:1px solid #E5E5E5">
+                  <sc-for list="{{ row.cells }}" as="cell" hint-placeholder-count="3"><span style="width:60px;padding:8px 0;text-align:center;border-left:{{ cell.bl }}">{{ cell.v }}</span></sc-for>
+                </div>
+              </sc-for>
+            </div>
+          </sc-if>
+          {{ figEl }}
+          <div style="display:flex;flex-direction:column;gap:6px;margin-top:2px">
+            <sc-if value="{{ q.hint }}" hint-placeholder-val="{{ false }}">
+              <span onClick="{{ toggleHint }}" style="font-size:13.5px;font-weight:500;color:#1382D6;cursor:pointer;align-self:flex-start">{{ hintToggleLabel }}</span>
+              <sc-if value="{{ hintOpen }}" hint-placeholder-val="{{ false }}">{{ hintEl }}</sc-if>
+            </sc-if>
+            <sc-if value="{{ q.noteLabel }}" hint-placeholder-val="{{ false }}">
+              <span onClick="{{ toggleNote }}" style="font-size:13.5px;font-weight:500;color:#1382D6;cursor:pointer;align-self:flex-start">{{ noteToggleLabel }}</span>
+              <sc-if value="{{ noteOpen }}" hint-placeholder-val="{{ false }}">{{ noteEl }}</sc-if>
+            </sc-if>
+          </div>
+          <span onClick="{{ toggleDone }}" style="font-size:13.5px;color:#4A4A4A;display:flex;align-items:center;gap:8px;margin-top:6px;cursor:pointer;align-self:flex-start;min-height:32px">
+            <span style="width:18px;height:18px;border:1px solid {{ doneBorder }};background:{{ doneBg }};color:#FFFFFF;font-size:12px;display:flex;align-items:center;justify-content:center">{{ doneTick }}</span>I'm done with this question
+          </span>
+        </div>
+        <div style="height:34px;flex-shrink:0;display:flex;align-items:center;padding:0 20px;background:#F1EEF5;border-top:1px solid #CFC8D8;border-bottom:1px solid #E5E5E5;font-size:11.5px;letter-spacing:0.09em;text-transform:uppercase;color:#2A2A2A;font-weight:600">HW1 · Questions</div>
+        <div style="flex:1;min-height:0;overflow-y:auto;display:flex;flex-direction:column;padding-bottom:12px">
+          <sc-for list="{{ listSections }}" as="sec" hint-placeholder-count="4">
+            <span style="padding:12px 20px 4px;font-size:10.5px;letter-spacing:0.08em;text-transform:uppercase;color:#7B7B7B;font-weight:600">{{ sec.h }}</span>
+            <sc-for list="{{ sec.items }}" as="it" hint-placeholder-count="5">
+              <div onClick="{{ it.go }}" style="display:grid;grid-template-columns:30px minmax(0,1fr) auto 50px;gap:8px;align-items:center;min-height:36px;padding:0 20px;font-size:13.5px;cursor:pointer;background:{{ it.bg }}" style-hover="background:#F2E6FF">
+                <span style="font-family:'IBM Plex Mono',monospace;font-size:12px;color:#7B7B7B">{{ it.n }}</span>
+                <span style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:{{ it.nameColor }};font-weight:{{ it.fw }}">{{ it.name }}</span>
+                <span style="font-family:{{ it.tagFont }};font-size:10.5px;font-weight:{{ it.tagFw }};padding:1px 5px;background:{{ it.tagBg }};color:{{ it.tagColor }}">{{ it.tag }}</span>
+                <span style="font-size:11.5px;font-weight:{{ it.stFw }};color:{{ it.stColor }}">{{ it.status }}</span>
+              </div>
+            </sc-for>
+          </sc-for>
+        </div>
+      </div>
+      <div onPointerDown="{{ onLeftDown }}" title="Drag to resize" style="flex:0 0 9px;margin:0 -4px;position:relative;z-index:8;cursor:col-resize;display:flex;justify-content:center;touch-action:none" style-hover="background:rgba(194,85,185,0.12)"><span style="width:1px;height:100%;background:#D5D5D5"></span><span style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:7px;height:30px;background:#FFFFFF;border:1px solid #CFC8D8;display:flex;align-items:center;justify-content:center"><span style="width:1px;height:14px;background:#B9B2C4"></span></span></div>
+    </sc-if>
+    <sc-if value="{{ leftClosed }}" hint-placeholder-val="{{ false }}">
+      <div onClick="{{ toggleLeft }}" title="Show the question panel" style="width:40px;flex-shrink:0;background:#FFFFFF;border-right:1px solid #D5D5D5;display:flex;flex-direction:column;align-items:center;gap:14px;padding-top:12px;cursor:pointer" style-hover="background:#F7F5FA">
+        <span style="width:30px;height:30px;display:flex;align-items:center;justify-content:center;color:#C255B9;font-size:15px">»</span>
+        <span style="writing-mode:vertical-rl;font-family:'IBM Plex Serif',serif;font-size:15px;font-weight:600;white-space:nowrap">{{ q.heading }}</span>
+      </div>
+    </sc-if>
+
+    <div style="flex:1;min-width:0;display:flex;flex-direction:column;position:relative">
+      <sc-if value="{{ isCC }}" hint-placeholder-val="{{ true }}">
+        <div ref="{{ canvasRef }}" style="flex:1;position:relative;overflow:hidden;background-color:#FFFFFF;background-image:radial-gradient(#DAD4E2 1px,transparent 1.2px);background-size:{{ gridSize }};background-position:{{ gridPos }};cursor:{{ canvasCursor }};touch-action:none">
+          {{ canvasSvg }}
+          <sc-if value="{{ noParts }}" hint-placeholder-val="{{ false }}">
+            <div style="position:absolute;left:0;right:0;top:42%;display:flex;justify-content:center;pointer-events:none">
+              <span style="font-size:15px;color:#7B7B7B;max-width:340px;text-align:center;line-height:1.5">Drag parts from the toolbar onto the canvas, or click a part and then click here.</span>
+            </div>
+          </sc-if>
+
+          <div ref="{{ palRef }}" style="position:absolute;left:{{ px }}px;top:{{ py }}px;z-index:5;display:flex;flex-direction:{{ dir }};align-items:center;background:#FFFFFF;border:1px solid {{ palBorder }};box-shadow:{{ palShadow }};touch-action:none">
+            <span onPointerDown="{{ onGripDown }}" title="Drag to move" style="align-self:stretch;flex:0 0 16px;display:flex;align-items:center;justify-content:center;background:#F7F5FA;cursor:grab" style-hover="background:#F2E6FF"><svg width="12" height="12" viewBox="0 0 12 12"><circle cx="3" cy="3" r="1.2" style="fill:#7B7B7B"></circle><circle cx="9" cy="3" r="1.2" style="fill:#7B7B7B"></circle><circle cx="3" cy="9" r="1.2" style="fill:#7B7B7B"></circle><circle cx="9" cy="9" r="1.2" style="fill:#7B7B7B"></circle><circle cx="6" cy="6" r="1.2" style="fill:#7B7B7B"></circle></svg></span>
+            <span style="display:flex;flex-direction:{{ dir }};padding:3px">
+              <span onPointerDown="{{ tileDown.INPUT }}" title="Input" style="width:58px;min-height:44px;padding:7px 0 6px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;font-size:10.5px;font-weight:500;color:#4A4A4A;cursor:grab;background:{{ tb.INPUT }};opacity:{{ top.INPUT }}" style-hover="background:#F2E6FF"><svg width="36" height="26" viewBox="0 0 36 26"><rect x="4" y="5" width="16" height="16" style="fill:none;stroke:#2A2A2A;stroke-width:1.6"></rect><line x1="20" y1="13" x2="30" y2="13" style="fill:none;stroke:#2A2A2A;stroke-width:1.6"></line><circle cx="30" cy="13" r="2.2" style="fill:#2A2A2A"></circle></svg><sc-if value="{{ showLabels }}" hint-placeholder-val="{{ true }}"><span style="line-height:1">Input</span></sc-if></span>
+              <span onPointerDown="{{ tileDown.OUTPUT }}" title="Output" style="width:58px;min-height:44px;padding:7px 0 6px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;font-size:10.5px;font-weight:500;color:#4A4A4A;cursor:grab;background:{{ tb.OUTPUT }};opacity:{{ top.OUTPUT }}" style-hover="background:#F2E6FF"><svg width="36" height="26" viewBox="0 0 36 26"><rect x="16" y="5" width="16" height="16" style="fill:none;stroke:#2A2A2A;stroke-width:1.6"></rect><line x1="6" y1="13" x2="16" y2="13" style="fill:none;stroke:#2A2A2A;stroke-width:1.6"></line><circle cx="6" cy="13" r="2.2" style="fill:#2A2A2A"></circle></svg><sc-if value="{{ showLabels }}" hint-placeholder-val="{{ true }}"><span style="line-height:1">Output</span></sc-if></span>
+            </span>
+            <span style="align-self:stretch;flex:0 0 1px;background:#E5E5E5"></span>
+            <span style="display:flex;flex-direction:{{ dir }};padding:3px">
+              <span onPointerDown="{{ tileDown.AND }}" title="{{ ttl.AND }}" style="width:58px;min-height:44px;padding:7px 0 6px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;font-size:10.5px;font-weight:500;color:#4A4A4A;cursor:grab;background:{{ tb.AND }};opacity:{{ top.AND }}" style-hover="background:#F2E6FF"><svg width="36" height="26" viewBox="0 0 36 26"><path d="M8 3 H18 A10 10 0 0 1 18 23 H8 Z" style="fill:none;stroke:#2A2A2A;stroke-width:1.6;stroke-linejoin:round"></path><path d="M13 16 L16.5 9.5 L20 16" style="fill:none;stroke:#2A2A2A;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round"></path></svg><sc-if value="{{ showLabels }}" hint-placeholder-val="{{ true }}"><span style="line-height:1">AND</span></sc-if></span>
+              <span onPointerDown="{{ tileDown.OR }}" title="{{ ttl.OR }}" style="width:58px;min-height:44px;padding:7px 0 6px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;font-size:10.5px;font-weight:500;color:#4A4A4A;cursor:grab;background:{{ tb.OR }};opacity:{{ top.OR }}" style-hover="background:#F2E6FF"><svg width="36" height="26" viewBox="0 0 36 26"><path d="M7 3 H15 Q27 4 31 13 Q27 22 15 23 H7 Q11 13 7 3 Z" style="fill:none;stroke:#2A2A2A;stroke-width:1.6;stroke-linejoin:round"></path><path d="M14 10 L17.5 16.5 L21 10" style="fill:none;stroke:#2A2A2A;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round"></path></svg><sc-if value="{{ showLabels }}" hint-placeholder-val="{{ true }}"><span style="line-height:1">OR</span></sc-if></span>
+              <span onPointerDown="{{ tileDown.NOT }}" title="{{ ttl.NOT }}" style="width:58px;min-height:44px;padding:7px 0 6px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;font-size:10.5px;font-weight:500;color:#4A4A4A;cursor:grab;background:{{ tb.NOT }};opacity:{{ top.NOT }}" style-hover="background:#F2E6FF"><svg width="36" height="26" viewBox="0 0 36 26"><polygon points="9,3 30,13 9,23" style="fill:none;stroke:#2A2A2A;stroke-width:1.6;stroke-linejoin:round"></polygon><path d="M12 11.5 H17.5 V15" style="fill:none;stroke:#2A2A2A;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round"></path></svg><sc-if value="{{ showLabels }}" hint-placeholder-val="{{ true }}"><span style="line-height:1">NOT</span></sc-if></span>
+            </span>
+            <span style="align-self:stretch;flex:0 0 1px;background:#E5E5E5"></span>
+            <span style="display:flex;flex-direction:{{ dir }};padding:3px">
+              <sc-for list="{{ pinnedTiles }}" as="b" hint-placeholder-count="0">
+                <span onPointerDown="{{ b.down }}" title="{{ b.name }}" style="width:58px;min-height:44px;padding:7px 0 6px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;font-size:10.5px;font-weight:500;color:#4A4A4A;cursor:grab;background:{{ b.bg }}" style-hover="background:#F2E6FF"><svg width="36" height="26" viewBox="0 0 36 26"><rect x="8" y="4" width="20" height="18" style="fill:#F7F5FA;stroke:#2A2A2A;stroke-width:1.6"></rect><line x1="3" y1="10" x2="8" y2="10" style="stroke:#2A2A2A;stroke-width:1.6"></line><line x1="3" y1="16" x2="8" y2="16" style="stroke:#2A2A2A;stroke-width:1.6"></line><line x1="28" y1="13" x2="33" y2="13" style="stroke:#2A2A2A;stroke-width:1.6"></line></svg><span style="line-height:1;max-width:54px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ b.name }}</span></span>
+              </sc-for>
+              <span onClick="{{ toggleFlyout }}" title="Your boxes" style="width:58px;min-height:44px;padding:7px 0 6px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;font-size:10.5px;font-weight:500;color:#4A4A4A;cursor:pointer;position:relative;background:{{ flyTileBg }}" style-hover="background:#F2E6FF"><svg width="36" height="26" viewBox="0 0 36 26"><rect x="5" y="7" width="18" height="15" style="fill:#FFFFFF;stroke:#2A2A2A;stroke-width:1.4"></rect><rect x="10" y="3" width="18" height="15" style="fill:#FFFFFF;stroke:#2A2A2A;stroke-width:1.4"></rect><polyline points="29,21 32,24 32,18" style="fill:#2A2A2A;stroke:none"></polyline></svg><sc-if value="{{ showLabels }}" hint-placeholder-val="{{ true }}"><span style="line-height:1">Boxes</span></sc-if><sc-if value="{{ boxCount }}" hint-placeholder-val="{{ false }}"><span style="position:absolute;right:6px;top:4px;min-width:16px;height:16px;padding:0 4px;background:#C255B9;color:#FFFFFF;font-family:'IBM Plex Mono',monospace;font-size:10px;font-weight:600;display:flex;align-items:center;justify-content:center">{{ boxCount }}</span></sc-if></span>
+            </span>
+            <span style="align-self:stretch;flex:0 0 1px;background:#E5E5E5"></span>
+            <span onClick="{{ flip }}" title="Turn toolbar" style="align-self:stretch;flex:0 0 24px;display:flex;align-items:center;justify-content:center;cursor:pointer;color:#7B7B7B" style-hover="color:#C255B9;background:#F7F5FA"><svg width="14" height="14" viewBox="0 0 14 14"><path d="M3 5 A5 5 0 0 1 12 6" style="fill:none;stroke:currentColor;stroke-width:1.4"></path><polyline points="10,3.5 12,6 9.2,7" style="fill:none;stroke:currentColor;stroke-width:1.4"></polyline><path d="M11 9 A5 5 0 0 1 2 8" style="fill:none;stroke:currentColor;stroke-width:1.4"></path><polyline points="4,10.5 2,8 4.8,7" style="fill:none;stroke:currentColor;stroke-width:1.4"></polyline></svg></span>
+          </div>
+
+          <sc-if value="{{ flyoutOpen }}" hint-placeholder-val="{{ false }}">
+            <div onPointerDown="{{ stop }}" style="position:absolute;left:{{ flyX }}px;top:{{ flyY }}px;z-index:6;width:260px;background:#FFFFFF;border:1px solid #D5D5D5;box-shadow:0 10px 28px rgba(3,13,36,0.16);display:flex;flex-direction:column">
+              <div style="display:flex;align-items:center;padding:10px 12px 8px;border-bottom:1px solid #E5E5E5">
+                <span style="font-size:11.5px;letter-spacing:0.09em;text-transform:uppercase;font-weight:600;margin-right:auto">Your boxes</span>
+                <span onClick="{{ toggleFlyout }}" style="width:26px;height:26px;display:flex;align-items:center;justify-content:center;color:#7B7B7B;cursor:pointer" style-hover="color:#C255B9">×</span>
+              </div>
+              <sc-if value="{{ noBoxes }}" hint-placeholder-val="{{ false }}">
+                <span style="padding:14px 12px;font-size:13px;line-height:1.5;color:#4A4A4A">Boxes you make are kept here and can be used in later questions.</span>
+              </sc-if>
+              <div style="display:flex;flex-direction:column;max-height:300px;overflow-y:auto">
+                <sc-for list="{{ boxList }}" as="b" hint-placeholder-count="2">
+                  <div onPointerDown="{{ b.down }}" title="Drag onto the canvas, or onto the toolbar to keep it there" style="display:grid;grid-template-columns:36px minmax(0,1fr) auto;gap:10px;align-items:center;padding:8px 12px;cursor:grab;background:{{ b.bg }}" style-hover="background:#F7F5FA">
+                    <svg width="36" height="26" viewBox="0 0 36 26"><rect x="8" y="4" width="20" height="18" style="fill:#F7F5FA;stroke:#2A2A2A;stroke-width:1.6"></rect><line x1="3" y1="10" x2="8" y2="10" style="stroke:#2A2A2A;stroke-width:1.6"></line><line x1="3" y1="16" x2="8" y2="16" style="stroke:#2A2A2A;stroke-width:1.6"></line><line x1="28" y1="13" x2="33" y2="13" style="stroke:#2A2A2A;stroke-width:1.6"></line></svg>
+                    <span style="display:flex;flex-direction:column;gap:1px;min-width:0"><span style="font-size:13.5px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ b.name }}</span><span style="font-size:11.5px;color:#7B7B7B">{{ b.meta }}</span></span>
+                    <span onPointerDown="{{ stop }}" onClick="{{ b.togglePin }}" style="font-size:12px;padding:4px 8px;border:1px solid {{ b.pinBorder }};color:{{ b.pinColor }};cursor:pointer;white-space:nowrap" style-hover="background:#F2E6FF">{{ b.pinLabel }}</span>
+                  </div>
+                </sc-for>
+              </div>
+              <div style="border-top:1px solid #E5E5E5;padding:10px 12px 12px;display:flex;flex-direction:column;gap:8px">
+                <sc-if value="{{ naming }}" hint-placeholder-val="{{ false }}">
+                  <span style="font-size:12.5px;color:#4A4A4A">Name this box</span>
+                  <div style="display:flex;gap:6px">
+                    <input value="{{ newBoxName }}" onChange="{{ onNewBoxName }}" onKeyDown="{{ onNewBoxKey }}" autoFocus="{{ true }}" style="flex:1;min-width:0;height:32px;border:1px solid #D5D5D5;padding:0 8px;font-size:13.5px;outline-color:#C255B9">
+                    <span onClick="{{ saveNewBox }}" style="height:32px;padding:0 12px;display:flex;align-items:center;background:#C255B9;color:#FFFFFF;font-size:13px;font-weight:600;cursor:pointer">Save</span>
+                  </div>
+                  <sc-if value="{{ newBoxErr }}" hint-placeholder-val="{{ false }}"><span style="font-size:12.5px;color:#B3261E">{{ newBoxErr }}</span></sc-if>
+                  <span onClick="{{ cancelNewBox }}" style="font-size:12.5px;color:#7B7B7B;cursor:pointer;align-self:flex-start">Cancel</span>
+                </sc-if>
+                <sc-if value="{{ notNaming }}" hint-placeholder-val="{{ true }}">
+                  <span onClick="{{ openNewBox }}" style="height:34px;display:flex;align-items:center;justify-content:center;border:1px solid #D5D5D5;font-size:13px;font-weight:600;cursor:pointer" style-hover="background:#F2E6FF">+ Box this circuit</span>
+                  <span style="font-size:12px;line-height:1.45;color:#7B7B7B">Drag a box onto the toolbar to keep it there.</span>
+                </sc-if>
+              </div>
+            </div>
+          </sc-if>
+
+          <div style="position:absolute;right:14px;top:12px;z-index:4;display:flex;border:1px solid #D5D5D5;background:#FFFFFF;font-size:13px">
+            <span onClick="{{ undo }}" title="Undo (Ctrl+Z)" style="padding:6px 12px;color:{{ undoColor }};cursor:pointer" style-hover="background:#F2E6FF">↶ Undo</span>
+            <span onClick="{{ redo }}" title="Redo" style="padding:6px 10px;border-left:1px solid #E5E5E5;color:{{ redoColor }};cursor:pointer" style-hover="background:#F2E6FF">↷</span>
+            <span onClick="{{ deleteSel }}" title="Delete (Del)" style="padding:6px 12px;border-left:1px solid #E5E5E5;color:{{ delColor }};cursor:pointer" style-hover="background:#F2E6FF">Delete</span>
+          </div>
+          <span style="position:absolute;left:16px;right:230px;bottom:14px;z-index:3;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:12.5px;color:#7B7B7B;pointer-events:none;background:rgba(255,255,255,0.85);padding:2px 4px">{{ canvasHint }}</span>
+          <div style="position:absolute;right:12px;bottom:12px;z-index:4;display:flex;border:1px solid #D5D5D5;background:#FFFFFF;font-size:12.5px">
+            <span onClick="{{ zoomOut }}" style="padding:5px 11px;cursor:pointer" style-hover="background:#F2E6FF">−</span><span style="padding:5px 8px;border-left:1px solid #E5E5E5;font-family:'IBM Plex Mono',monospace;font-size:11.5px;color:#4A4A4A;min-width:48px;text-align:center">{{ zoomLabel }}</span><span onClick="{{ zoomIn }}" style="padding:5px 11px;border-left:1px solid #E5E5E5;cursor:pointer" style-hover="background:#F2E6FF">+</span><span onClick="{{ fit }}" style="padding:5px 11px;border-left:1px solid #E5E5E5;color:#4A4A4A;cursor:pointer" style-hover="background:#F2E6FF">Fit</span>
+          </div>
+        </div>
+      </sc-if>
+
+      <sc-if value="{{ isOpenQ }}" hint-placeholder-val="{{ false }}">
+        <div style="flex:1;overflow-y:auto;background:#FFFFFF;padding:40px 48px">
+          <div style="max-width:640px;display:flex;flex-direction:column;gap:14px">
+            <span style="font-size:11.5px;letter-spacing:0.09em;text-transform:uppercase;color:#7B7B7B;font-weight:600">Your answer</span>
+            <sc-if value="{{ hasFields }}" hint-placeholder-val="{{ false }}">
+              <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:12px 16px">
+                <sc-for list="{{ fields }}" as="f" hint-placeholder-count="2">
+                  <label style="display:flex;flex-direction:column;gap:5px;font-size:13.5px;color:#4A4A4A">
+                    <span>{{ f.label }}</span>
+                    <input value="{{ f.value }}" onChange="{{ f.onChange }}" inputMode="numeric" style="height:44px;border:1px solid #D5D5D5;padding:0 12px;font-family:'IBM Plex Mono',monospace;font-size:16px;color:#2A2A2A;outline-color:#C255B9">
+                  </label>
+                </sc-for>
+              </div>
+            </sc-if>
+            <sc-if value="{{ hasText }}" hint-placeholder-val="{{ true }}">
+              <textarea value="{{ answerText }}" onChange="{{ onAnswer }}" placeholder="Write your answer here." style="min-height:260px;border:1px solid #D5D5D5;padding:14px 16px;font-size:16px;line-height:1.6;color:#2A2A2A;resize:vertical;outline-color:#C255B9"></textarea>
+            </sc-if>
+            <span style="font-size:12.5px;color:#7B7B7B">Saved as you type.</span>
+          </div>
+        </div>
+      </sc-if>
+    </div>
+
+    <sc-if value="{{ showRight }}" hint-placeholder-val="{{ true }}">
+      <div onPointerDown="{{ onRightDown }}" title="Drag to resize" style="flex:0 0 9px;margin:0 -4px;position:relative;z-index:8;cursor:col-resize;display:flex;justify-content:center;touch-action:none" style-hover="background:rgba(194,85,185,0.12)"><span style="width:1px;height:100%;background:#D5D5D5"></span><span style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:7px;height:30px;background:#FFFFFF;border:1px solid #CFC8D8;display:flex;align-items:center;justify-content:center"><span style="width:1px;height:14px;background:#B9B2C4"></span></span></div>
+      <div style="width:{{ rightW }}px;background:#FFFFFF;padding:16px 22px;display:flex;flex-direction:column;flex-shrink:0;min-height:0;overflow-y:auto">
+        <div style="display:flex;align-items:center">
+          <span style="font-size:11.5px;letter-spacing:0.09em;text-transform:uppercase;color:#7B7B7B;font-weight:600;margin-right:auto">Output</span>
+          <span onClick="{{ toggleRight }}" title="Hide the output panel" style="width:32px;height:32px;display:flex;align-items:center;justify-content:center;color:#7B7B7B;cursor:pointer;font-size:15px" style-hover="background:#F2E6FF;color:#C255B9">»</span>
+        </div>
+        <div style="display:flex;gap:6px;margin-top:8px">
+          <span onClick="{{ runToggle }}" style="height:34px;padding:0 12px;display:flex;align-items:center;gap:6px;font-size:13px;font-weight:600;border:1px solid #D5D5D5;cursor:pointer" style-hover="background:#F2E6FF"><span style="color:#C255B9">{{ runIcon }}</span>{{ runText }}</span>
+          <span onClick="{{ step }}" style="height:34px;padding:0 12px;display:flex;align-items:center;font-size:13px;font-weight:600;border:1px solid #D5D5D5;cursor:pointer" style-hover="background:#F2E6FF">Step</span>
+          <span onClick="{{ resetInputs }}" title="Set every input to 0" style="height:34px;padding:0 12px;display:flex;align-items:center;font-size:13px;font-weight:600;border:1px solid #D5D5D5;cursor:pointer" style-hover="background:#F2E6FF">Reset</span>
+        </div>
+        <sc-if value="{{ hasOutTable }}" hint-placeholder-val="{{ true }}">
+          <div style="display:flex;flex-direction:column;align-self:flex-start;margin-top:14px;font-family:'IBM Plex Mono',monospace;font-size:14px">
+            <div style="display:flex;border-bottom:1px solid #D5D5D5">
+              <sc-for list="{{ outCols }}" as="col" hint-placeholder-count="3"><span style="width:60px;padding:6px 0;text-align:center;font-family:'IBM Plex Sans',sans-serif;font-size:11px;letter-spacing:0.08em;color:#7B7B7B;font-weight:600;border-left:{{ col.bl }}">{{ col.label }}</span></sc-for>
+            </div>
+            <sc-for list="{{ outRows }}" as="row" hint-placeholder-count="4">
+              <div onClick="{{ row.go }}" style="display:flex;border-bottom:1px solid #E5E5E5;background:{{ row.bg }};cursor:pointer" style-hover="background:#F7F0FB">
+                <sc-for list="{{ row.cells }}" as="cell" hint-placeholder-count="3"><span style="width:60px;padding:8px 0;text-align:center;border-left:{{ cell.bl }};color:{{ cell.color }};font-weight:{{ cell.fw }}">{{ cell.v }}</span></sc-for>
+              </div>
+            </sc-for>
+          </div>
+          <span style="margin-top:10px;font-size:12.5px;color:#7B7B7B">Click a row to set the inputs.</span>
+        </sc-if>
+        <sc-if value="{{ noOutTable }}" hint-placeholder-val="{{ false }}">
+          <span style="margin-top:18px;font-size:13.5px;line-height:1.5;color:#7B7B7B">Add at least one Input and one Output to see your circuit's table.</span>
+        </sc-if>
+      </div>
+    </sc-if>
+    <sc-if value="{{ showRightStrip }}" hint-placeholder-val="{{ false }}">
+      <div onClick="{{ toggleRight }}" title="Show the output panel" style="width:40px;flex-shrink:0;background:#FFFFFF;border-left:1px solid #D5D5D5;display:flex;flex-direction:column;align-items:center;gap:14px;padding-top:12px;cursor:pointer" style-hover="background:#F7F5FA">
+        <span style="width:30px;height:30px;display:flex;align-items:center;justify-content:center;color:#C255B9;font-size:15px">«</span>
+        <span style="writing-mode:vertical-rl;font-size:11.5px;letter-spacing:0.09em;text-transform:uppercase;font-weight:600;color:#4A4A4A;white-space:nowrap">Output</span>
+      </div>
+    </sc-if>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;startState&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;Mid-assignment&quot;,&quot;Fresh&quot;],&quot;default&quot;:&quot;Mid-assignment&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Prototype&quot;},&quot;showLabels&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Toolbar&quot;}}">
+class Component extends DCLogic {
+  SECTIONS = [
+    { h: 'I. Combinatorial Circuits', intro: 'Design **combinatorial circuits** with the following input-output profiles:', noteLabel: 'Hint for this section', note: 'you might think about the circuits here as systematically analogous to equations in propositional logic, and the input-output tables as analogous to truth-tables. In many cases, you can use your knowledge of logic to work backwards to find the appropriate circuit.' },
+    { h: 'II. Functions' },
+    { h: 'III. Representations', noteLabel: 'Challenge problem (optional, not collected)', note: 'Define a function which maps strings of 1’s and 0’s of *arbitrary length* to their numerical values. This is the general problem of semantics for binary.' },
+    { h: 'IV. Synthesis', noteLabel: 'Hint for this section', note: 'these two problems look complex, but they are just asking you to apply the intuitive concept of **computation** we have been discussing in the course so far. First figure out what table of input and output symbols would satisfy the equations given. Only then solve for the underlying circuit.' },
+  ];
+  QS = [
+    { id: 1, n: '1', title: 'NAND', sec: 0, kind: 'CC', nIn: 2, tc: [[0,0,1],[0,1,1],[1,0,1],[1,1,0]] },
+    { id: 2, n: '2', title: 'Reconstructing OR', sec: 0, kind: 'CC', nIn: 2, tc: [[0,0,0],[0,1,1],[1,0,1],[1,1,1]], allowed: ['INPUT','OUTPUT','NOT','AND'], caution: 'For this problem, do not use OR-gates.', hint: '*DeMorgan’s Law* is useful here!' },
+    { id: 3, n: '3', title: 'Splitting outputs', sec: 0, kind: 'CC', nIn: 2, tc: [[0,0,0,1],[0,1,0,1],[1,0,0,1],[1,1,1,0]] },
+    { id: 4, n: '4', title: 'XOR (exclusive OR)', sec: 0, kind: 'CC', nIn: 2, tc: [[0,0,0],[0,1,1],[1,0,1],[1,1,0]] },
+    { id: 5, n: '5', title: 'Combining circuits', sec: 0, kind: 'CC', nIn: 2, tc: [[0,0,0,0],[0,1,1,0],[1,0,1,0],[1,1,0,1]], hint: 'You can box your XOR circuit from Problem 4 and reuse it here.' },
+    { id: 6, n: '6a', sec: 1, kind: 'open', st: 'Consider the function *m*(⋅) defined by the following **equation**: for any integers *x*, *y*, and *z*: *m*(*x*, *y*, *z*) = 3 + (*x* • *y* • *z*)\n\nDescribe the function with an English sentence using each of the terms “argument”, “value”, “apply”, and “return” correctly.' },
+    { id: 18, n: '6b', sec: 1, kind: 'open', st: 'Describe the function *m*(⋅) from 6a with another English sentence, using the phrase “maps ... to”.' },
+    { id: 19, n: '6c', sec: 1, kind: 'open', st: 'How many **places** does the function *m*(⋅) from 6a have?', fill: ['Number of places'] },
+    { id: 7, n: '7', sec: 1, kind: 'open', st: 'Consider the function *k*(⋅) that takes two integers *x* and *y* as arguments, and returns the **successor** of their product as its value. Define this function with an equation.' },
+    { id: 8, n: '8', sec: 1, kind: 'open', st: 'This is a problem about **function composition**. Let *s*(⋅) be the **successor function**. Let *a*(⋅) be the **addition function**. Suppose that *p*(⋅) is a 2-place function composed of successor functions and addition functions. Given only that *p*(1, 2) = 5, provide two possible definitions of *p*(⋅).\n\nYour two definitions should define *different* functions: functions that agree on the arguments (1, 2) but disagree on some other arguments.' },
+    { id: 9, n: '9a', sec: 1, kind: 'open', st: 'Consider the function *j*(⋅) that maps two integers *x* and *y* to their product, so long as both *x* and *y* are between 0 and 2, inclusive. For any other arguments, it is undefined. This is a problem about **partial functions**.\n\nDefine *j*(⋅) with an equation.' },
+    { id: 20, n: '9b', sec: 1, kind: 'open', st: 'Define *j*(⋅) from 9a with a table: give its value for each pair of arguments where it is defined.', fill: ['j(0, 0)','j(0, 1)','j(0, 2)','j(1, 0)','j(1, 1)','j(1, 2)','j(2, 0)','j(2, 1)','j(2, 2)'] },
+    { id: 10, n: '10a', sec: 1, kind: 'open', st: 'The **Boolean numbers** are 0 and 1, where 0 and 1 are considered to be the “opposites” of one another. A **Boolean function** is a function which has only Boolean numbers as arguments and values.\n\nUsing one equation, define a Boolean function which maps any Boolean number to its opposite.' },
+    { id: 21, n: '10b', sec: 1, kind: 'open', st: 'Provide two different definitions of the Boolean function which maps any Boolean number to itself. This is called the **identity function**.\n\nThe two definitions should be written differently but define the same function. A table counts as a definition.' },
+    { id: 22, n: '10c', sec: 1, kind: 'open', st: 'Provide two different definitions of the Boolean function which maps any Boolean number to the number one. This is called a **constant function**.\n\nAs in 10b, the two definitions should be written differently but define the same function.' },
+    { id: 11, n: '11', sec: 2, kind: 'open', st: 'Represent the numbers zero through ten in **binary**.', hint: 'Type each binary numeral in the box labelled with the number it represents.', fill: ['zero','one','two','three','four','five','six','seven','eight','nine','ten'] },
+    { id: 12, n: '12', sec: 2, kind: 'open', st: 'Invent a new **base-6 counting system**, with all new symbols for the 6 digits (including zero!). List your basic symbols and their meanings. Then represent the number thirty-two in this system.\n\nFor your symbols, use characters you can type (letters, punctuation marks, emoji), but not the digits 0–9.' },
+    { id: 13, n: '13a', sec: 2, kind: 'open', st: 'Add the binary number 1111 to the binary number 1, using one of the methods of addition from the Petzold reading. Type the sum as a binary numeral.', fill: ['1111 + 1 ='] },
+    { id: 23, n: '13b', sec: 2, kind: 'open', st: 'Add the binary number 1011 to the binary number 11001.', fill: ['1011 + 11001 ='] },
+    { id: 14, n: '14', sec: 2, kind: 'open', st: 'Define a function *f* which maps the symbol “@” to the number zero and the symbol “#” to the number one, by giving its table: the value of *f* for each symbol.', fill: ['f(@)','f(#)'] },
+    { id: 15, n: '15', sec: 2, kind: 'open', st: 'Suppose we use the symbols in Problem 14 to form a base-2 counting system. Let’s call these symbols “marks”: a mark is either @ or #. Using an equation, define a 3-place function *g* which takes any three marks in a row and maps them onto the numerical value of that string of marks in that base-2 system. You will have to use the function in Problem 14 as part of the definition.\n\nSo, for example, your function should predict that *g*(@, @, #) = one, *g*(@, #, @) = two, and so on…\n\nYour answer should take the form: “for any series of three marks *x*, *y*, *z*: *g*(*x*, *y*, *z*) = …”', hint: 'there are two things going on in Problem 15. It asks you to use your knowledge of functions to define the numerical values of symbols in a base-2 counting system. The method of computing binary values described by Petzold will be of help here. But it is also asking you to keep track of the difference between a *symbol* and its *content*, in this case the difference between “#” and *the number one*. Remember that only numbers, but not symbols, can be added and multiplied! At a deeper level, this problem asks you to give a partial **semantics** for a 3-place representational system. The science of formal semantics extends this kind of analysis to the domain of language.' },
+    { id: 16, n: '16', sec: 3, kind: 'CC', st: 'Let *tal*(⋅) be a function which maps strings of tally 1’s and 0’s to their numerical values. For example, *tal*(0)=zero, *tal*(1)=one, *tal*(00)=zero, *tal*(01)=one, *tal*(11)=two, and so on.\n\nConsider a machine *M* which, on any one occasion, takes as input a single atomic symbol *I*, and produces two atomic symbols as output, *O*₁ and *O*₂, such that, in any context, *successor*(*tal*(*I*)) = *tal*(*O*₁*O*₂). Design a combinatorial circuit for machine *M*, with the schematic form shown below. On the canvas, *I* is IN1, *O*₁ is OUT1 and *O*₂ is OUT2.', fig: 'assets/hw1-schematic-mn.svg' },
+    { id: 17, n: '17', sec: 3, kind: 'CC', st: 'Let *bin*(⋅) be a function which maps strings of binary 1’s and 0’s to their numerical values. For example, *bin*(0)=zero, *bin*(1)=one, *bin*(00)=zero, *bin*(01)=one, *bin*(10)=two, *bin*(11)=three, and so on.\n\nConsider a machine *N* which, on any one occasion, takes as input a single atomic symbol *I*, and produces two atomic symbols as output, *O*₁ and *O*₂, such that, in any context, *successor*(*bin*(*I*)) = *bin*(*O*₁*O*₂). Design a combinatorial circuit for machine *N*, with the same schematic form. On the canvas, *I* is IN1, *O*₁ is OUT1 and *O*₂ is OUT2.', fig: 'assets/hw1-schematic-mn.svg' },
+  ];
+  KEY = 'mm-editor-proto-v2';
+  canvasRef = React.createRef();
+  palRef = React.createRef();
+  hist = {};
+  palSize = { w: 66, h: 420 };
+  UI = { leftW: 320, rightW: 300, leftOpen: true, rightOpen: true, px: 14, py: 14, horiz: false, flyout: false, tool: null, sel: null, ghost: null, wireTmp: null, zoom: 1, panX: 90, panY: 50, hintOpen: false, noteOpen: false, running: false, saving: false, savedAt: Date.now(), submittedAt: null, newBox: null, palDrop: false, dragging: false };
+  state = this.initial();
+
+  mode() { return this.props.startState ?? 'Mid-assignment'; }
+  initial() {
+    try {
+      const s = JSON.parse(localStorage.getItem(this.KEY) || 'null');
+      if (s && s.v === 1 && s.mode === this.mode()) return { ...this.UI, ...s.data };
+    } catch (e) {}
+    return { ...this.UI, ...this.seed(this.mode()) };
+  }
+  mk(parts, wires) {
+    return {
+      parts: parts.map(([id, type, x, y]) => ({ id, type, x, y, val: 0 })),
+      wires: wires.map(([fp, fi, tp, ti], k) => ({ id: 'w' + k, f: { p: fp, i: fi }, t: { p: tp, i: ti } })),
+      n: 100,
+    };
+  }
+  seed(mode) {
+    const base = { circuits: {}, boxes: [], pinned: [], done: {}, answers: {}, qi: 0 };
+    if (mode !== 'Mid-assignment') return base;
+    const c1 = this.mk([['a','INPUT',80,60],['b','INPUT',80,180],['g','AND',220,110],['n','NOT',340,110],['o','OUTPUT',460,120]], [['a',0,'g',0],['b',0,'g',1],['g',0,'n',0],['n',0,'o',0]]);
+    const c2 = this.mk([['a','INPUT',80,60],['b','INPUT',80,200],['na','NOT',200,50],['nb','NOT',200,190],['g','AND',320,120],['n','NOT',440,120],['o','OUTPUT',560,130]], [['a',0,'na',0],['b',0,'nb',0],['na',0,'g',0],['nb',0,'g',1],['g',0,'n',0],['n',0,'o',0]]);
+    const c3 = this.mk([['a','INPUT',80,60],['b','INPUT',80,180],['g','AND',220,110],['o1','OUTPUT',420,120],['n','NOT',340,170],['o2','OUTPUT',460,180]], [['a',0,'g',0],['b',0,'g',1],['g',0,'o1',0],['g',0,'n',0],['n',0,'o2',0]]);
+    const c4 = this.mk([['a','INPUT',80,80],['b','INPUT',80,220],['o','OUTPUT',520,150]], []);
+    const tt = (c) => this.truthTable(c, []).rows.map(r => r.out);
+    base.circuits = { 1: c1, 2: c2, 3: c3, 4: c4 };
+    base.done = { 1: true, 2: true, 3: true };
+    base.boxes = [
+      { id: 'bNAND', name: 'NAND', nIn: 2, nOut: 1, table: tt(c1), from: 'Problem 1' },
+      { id: 'bOR', name: 'OR from AND/NOT', nIn: 2, nOut: 1, table: tt(c2), from: 'Problem 2' },
+    ];
+    base.qi = 3;
+    return base;
+  }
+
+  componentDidMount() {
+    this.onKey = (e) => {
+      const tag = (e.target && e.target.tagName) || '';
+      if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+      if ((e.key === 'Delete' || e.key === 'Backspace') && this.state.sel) { e.preventDefault(); this.deleteSel(); }
+      else if (e.key === 'Escape') this.setState({ tool: null, flyout: false, newBox: null, sel: null });
+      else if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'z') { e.preventDefault(); e.shiftKey ? this.redo() : this.undo(); }
+    };
+    window.addEventListener('keydown', this.onKey);
+    this.tick = setInterval(() => this.forceUpdate(), 30000);
+    requestAnimationFrame(() => this.fit());
+  }
+  componentWillUnmount() {
+    window.removeEventListener('keydown', this.onKey);
+    clearInterval(this.tick); clearInterval(this.runTimer);
+  }
+  componentDidUpdate(prevProps) {
+    if (prevProps.startState !== this.props.startState) { this.resetDemo(); return; }
+    const p = this.palRef.current;
+    if (p && (p.offsetWidth !== this.palSize.w || p.offsetHeight !== this.palSize.h)) { this.palSize = { w: p.offsetWidth, h: p.offsetHeight }; this.forceUpdate(); }
+    clearTimeout(this.persistT);
+    this.persistT = setTimeout(() => {
+      const s = this.state;
+      const data = { circuits: s.circuits, boxes: s.boxes, pinned: s.pinned, done: s.done, answers: s.answers, qi: s.qi, leftW: s.leftW, rightW: s.rightW, leftOpen: s.leftOpen, rightOpen: s.rightOpen, px: s.px, py: s.py, horiz: s.horiz };
+      try { localStorage.setItem(this.KEY, JSON.stringify({ v: 1, mode: this.mode(), data })); } catch (e) {}
+    }, 300);
+  }
+  resetDemo = () => {
+    this.hist = {}; clearInterval(this.runTimer);
+    this.setState({ ...this.UI, savedAt: Date.now(), ...this.seed(this.mode()) }, () => requestAnimationFrame(() => this.fit()));
+  };
+
+  q() { return this.QS[this.state.qi]; }
+  cur() { return this.state.circuits[this.q().id] || { parts: [], wires: [], n: 0 }; }
+  markSaved() {
+    this.setState({ saving: true });
+    clearTimeout(this.saveT);
+    this.saveT = setTimeout(() => this.setState({ saving: false, savedAt: Date.now() }), 600);
+  }
+  setCircuit(c, history) {
+    const qid = this.q().id;
+    if (history) {
+      const h = this.hist[qid] || (this.hist[qid] = { past: [], future: [] });
+      h.past.push(this.cur()); if (h.past.length > 80) h.past.shift(); h.future = [];
+    }
+    this.setState(s => ({ circuits: { ...s.circuits, [qid]: c } }));
+    this.markSaved();
+  }
+  undo = () => {
+    const h = this.hist[this.q().id]; if (!h || !h.past.length) return;
+    h.future.push(this.cur()); const c = h.past.pop();
+    this.setState(s => ({ circuits: { ...s.circuits, [this.q().id]: c }, sel: null })); this.markSaved();
+  };
+  redo = () => {
+    const h = this.hist[this.q().id]; if (!h || !h.future.length) return;
+    h.past.push(this.cur()); const c = h.future.pop();
+    this.setState(s => ({ circuits: { ...s.circuits, [this.q().id]: c }, sel: null })); this.markSaved();
+  };
+  deleteSel = () => {
+    const sel = this.state.sel; if (!sel) return;
+    const c = this.cur();
+    if (sel.type === 'part') this.setCircuit({ ...c, parts: c.parts.filter(p => p.id !== sel.id), wires: c.wires.filter(w => w.f.p !== sel.id && w.t.p !== sel.id) }, true);
+    else this.setCircuit({ ...c, wires: c.wires.filter(w => w.id !== sel.id) }, true);
+    this.setState({ sel: null });
+  };
+
+  box(id) { return this.state.boxes.find(b => b.id === id); }
+  geom(p) {
+    switch (p.type) {
+      case 'INPUT': return { w: 40, h: 40, ins: [], outs: [[40, 20]] };
+      case 'OUTPUT': return { w: 40, h: 40, ins: [[0, 20]], outs: [] };
+      case 'AND': case 'OR': return { w: 60, h: 60, ins: [[0, 20], [0, 40]], outs: [[60, 30]] };
+      case 'NOT': return { w: 50, h: 60, ins: [[0, 30]], outs: [[50, 30]] };
+      case 'BOX': {
+        const b = this.box(p.boxId) || { nIn: 1, nOut: 1 };
+        const m = Math.max(b.nIn, b.nOut, 2), hh = m * 20 + 20;
+        const sp = (n) => Array.from({ length: n }, (_, i) => (hh - (n - 1) * 20) / 2 + i * 20);
+        return { w: 100, h: hh, ins: sp(b.nIn).map(y => [0, y]), outs: sp(b.nOut).map(y => [100, y]) };
+      }
+    }
+    return { w: 40, h: 40, ins: [], outs: [] };
+  }
+  evalC(c, boxes, ov) {
+    const parts = {}; c.parts.forEach(p => parts[p.id] = p);
+    const into = {}; c.wires.forEach(w => into[w.t.p + ':' + w.t.i] = w);
+    const memo = {}, busy = {};
+    const inV = (pid, i) => { const w = into[pid + ':' + i]; if (!w) return 0; return outs(w.f.p)[w.f.i] || 0; };
+    const outs = (pid) => {
+      if (memo[pid]) return memo[pid];
+      if (busy[pid]) return [0];
+      busy[pid] = 1;
+      const p = parts[pid]; let r = [];
+      if (p) {
+        if (p.type === 'INPUT') r = [ov && pid in ov ? ov[pid] : (p.val || 0)];
+        else if (p.type === 'AND') r = [inV(pid, 0) & inV(pid, 1)];
+        else if (p.type === 'OR') r = [inV(pid, 0) | inV(pid, 1)];
+        else if (p.type === 'NOT') r = [1 - inV(pid, 0)];
+        else if (p.type === 'BOX') {
+          const b = boxes.find(x => x.id === p.boxId);
+          if (b) { let idx = 0; for (let i = 0; i < b.nIn; i++) idx = idx * 2 + inV(pid, i); r = b.table[idx] || []; }
+        }
+      }
+      busy[pid] = 0; memo[pid] = r; return r;
+    };
+    return { outs, inV };
+  }
+  truthTable(c, boxes) {
+    const ins = c.parts.filter(p => p.type === 'INPUT'), os = c.parts.filter(p => p.type === 'OUTPUT');
+    const n = Math.min(ins.length, 8), rows = [];
+    if (!ins.length || !os.length) return { ins, os, rows };
+    for (let r = 0; r < (1 << n); r++) {
+      const ov = {}, bits = [];
+      ins.forEach((p, k) => { const b = k < n ? (r >> (n - 1 - k)) & 1 : 0; ov[p.id] = b; bits.push(b); });
+      const e = this.evalC(c, boxes, ov);
+      rows.push({ in: bits, out: os.map(o => e.inV(o.id, 0)) });
+    }
+    return { ins, os, rows };
+  }
+  scale() { const c = this.canvasRef.current; if (!c) return 1; return c.getBoundingClientRect().width / c.offsetWidth || 1; }
+  toCanvas(e) {
+    const c = this.canvasRef.current; if (!c) return { x: 0, y: 0, inside: false };
+    const r = c.getBoundingClientRect(), s = r.width / c.offsetWidth || 1;
+    const lx = (e.clientX - r.left) / s, ly = (e.clientY - r.top) / s;
+    return { x: (lx - this.state.panX) / this.state.zoom, y: (ly - this.state.panY) / this.state.zoom, inside: lx >= 0 && ly >= 0 && lx <= c.offsetWidth && ly <= c.offsetHeight };
+  }
+  overPalette(e) {
+    const p = this.palRef.current; if (!p) return false;
+    const r = p.getBoundingClientRect();
+    return e.clientX >= r.left && e.clientX <= r.right && e.clientY >= r.top && e.clientY <= r.bottom;
+  }
+  clampPal(x, y) {
+    const c = this.canvasRef.current, p = this.palRef.current;
+    if (!c || !p) return { px: x, py: y };
+    return { px: Math.max(8, Math.min(c.offsetWidth - p.offsetWidth - 8, x)), py: Math.max(8, Math.min(c.offsetHeight - p.offsetHeight - 8, y)) };
+  }
+
+  beginDrag(e, d) {
+    this.drag = { sx: e.clientX, sy: e.clientY, moved: false, ...d };
+    window.addEventListener('pointermove', this.onMove);
+    window.addEventListener('pointerup', this.onUp);
+  }
+  onMove = (e) => {
+    const d = this.drag; if (!d) return;
+    const dx = e.clientX - d.sx, dy = e.clientY - d.sy;
+    if (Math.hypot(dx, dy) > 4) d.moved = true;
+    const s = this.scale();
+    if (d.kind === 'move') {
+      if (!d.moved) return;
+      const z = this.state.zoom, c = this.cur();
+      const nx = Math.round((d.ox + dx / s / z) / 10) * 10, ny = Math.round((d.oy + dy / s / z) / 10) * 10;
+      this.setState(st => ({ circuits: { ...st.circuits, [this.q().id]: { ...c, parts: c.parts.map(p => p.id === d.pid ? { ...p, x: nx, y: ny } : p) } } }));
+    } else if (d.kind === 'pan') {
+      if (!d.moved) return;
+      this.setState({ panX: d.ox + dx / s, panY: d.oy + dy / s });
+    } else if (d.kind === 'wire') {
+      const pt = this.toCanvas(e);
+      this.setState({ wireTmp: { x1: d.x1, y1: d.y1, x2: pt.x, y2: pt.y } });
+    } else if (d.kind === 'new') {
+      if (!d.moved) return;
+      const pt = this.toCanvas(e), palDrop = !!(d.fromFly && this.overPalette(e));
+      this.setState({ ghost: { type: d.type, boxId: d.boxId, x: pt.x, y: pt.y, show: pt.inside && !palDrop && !this.overPalette(e) }, palDrop });
+    } else if (d.kind === 'pal') {
+      this.setState({ dragging: true, ...this.clampPal(d.ox + dx / s, d.oy + dy / s) });
+    } else if (d.kind === 'resize') {
+      this.setState({ [d.key]: Math.max(d.min, Math.min(d.max, d.o + d.sign * dx / s)) });
+    }
+  };
+  onUp = (e) => {
+    window.removeEventListener('pointermove', this.onMove);
+    window.removeEventListener('pointerup', this.onUp);
+    const d = this.drag; this.drag = null; if (!d) return;
+    if (d.kind === 'move') {
+      if (d.moved) {
+        const qid = this.q().id, h = this.hist[qid] || (this.hist[qid] = { past: [], future: [] });
+        h.past.push(d.before); h.future = []; this.markSaved();
+      } else if (d.ptype === 'INPUT') {
+        const c = this.cur();
+        this.setCircuit({ ...c, parts: c.parts.map(p => p.id === d.pid ? { ...p, val: p.val ? 0 : 1 } : p) }, false);
+      }
+    } else if (d.kind === 'pan') {
+      if (!d.moved) this.setState({ sel: null });
+    } else if (d.kind === 'wire') {
+      this.finishWire(d, this.toCanvas(e));
+      this.setState({ wireTmp: null });
+    } else if (d.kind === 'new') {
+      const pt = this.toCanvas(e);
+      if (!d.moved) {
+        const t = this.state.tool;
+        this.setState({ tool: t && t.type === d.type && t.boxId === d.boxId ? null : { type: d.type, boxId: d.boxId } });
+      } else if (d.fromFly && this.overPalette(e)) {
+        if (!this.state.pinned.includes(d.boxId)) this.setState(s => ({ pinned: [...s.pinned, d.boxId] }));
+      } else if (pt.inside && !this.overPalette(e)) this.place(d.type, d.boxId, pt.x, pt.y);
+      this.setState({ ghost: null, palDrop: false });
+    } else if (d.kind === 'pal' || d.kind === 'resize') {
+      this.setState({ dragging: false, ...this.clampPal(this.state.px, this.state.py) });
+    }
+  };
+  place(type, boxId, x, y) {
+    const c = this.cur(), g = this.geom({ type, boxId }), id = 'p' + (c.n + 1);
+    const part = { id, type, boxId, x: Math.round((x - g.w / 2) / 10) * 10, y: Math.round((y - g.h / 2) / 10) * 10, val: 0 };
+    this.setCircuit({ ...c, n: c.n + 1, parts: [...c.parts, part] }, true);
+    this.setState({ sel: { type: 'part', id } });
+  }
+  portAbs(p, side, i) { const g = this.geom(p), pt = (side === 'in' ? g.ins : g.outs)[i]; return pt ? [p.x + pt[0], p.y + pt[1]] : [p.x, p.y]; }
+  finishWire(d, pt) {
+    const c = this.cur(), want = d.side === 'out' ? 'in' : 'out';
+    let best = null, bd = 16 / this.state.zoom;
+    c.parts.forEach(p => {
+      if (p.id === d.pid) return;
+      const g = this.geom(p);
+      (want === 'in' ? g.ins : g.outs).forEach((_, i) => {
+        const [ax, ay] = this.portAbs(p, want, i), dd = Math.hypot(ax - pt.x, ay - pt.y);
+        if (dd < bd) { bd = dd; best = { pid: p.id, i }; }
+      });
+    });
+    if (!best) return;
+    const f = d.side === 'out' ? { p: d.pid, i: d.idx } : { p: best.pid, i: best.i };
+    const t = d.side === 'out' ? { p: best.pid, i: best.i } : { p: d.pid, i: d.idx };
+    const wires = c.wires.filter(w => !(w.t.p === t.p && w.t.i === t.i));
+    this.setCircuit({ ...c, n: c.n + 1, wires: [...wires, { id: 'w' + (c.n + 1), f, t }] }, true);
+  }
+
+  canvasDown = (e) => {
+    if (e.button !== undefined && e.button !== 0) return;
+    const t = this.state.tool;
+    if (t) {
+      const pt = this.toCanvas(e); this.place(t.type, t.boxId, pt.x, pt.y);
+      if (!e.shiftKey) this.setState({ tool: null });
+      return;
+    }
+    this.setState({ flyout: false, newBox: null });
+    this.beginDrag(e, { kind: 'pan', ox: this.state.panX, oy: this.state.panY });
+  };
+  partDown(e, p) {
+    e.stopPropagation();
+    this.setState({ sel: { type: 'part', id: p.id }, tool: null });
+    this.beginDrag(e, { kind: 'move', pid: p.id, ptype: p.type, ox: p.x, oy: p.y, before: this.cur() });
+  }
+  portDown(e, p, side, idx) {
+    e.stopPropagation();
+    const [x, y] = this.portAbs(p, side, idx);
+    this.setState({ wireTmp: { x1: x, y1: y, x2: x, y2: y } });
+    this.beginDrag(e, { kind: 'wire', pid: p.id, side, idx, x1: x, y1: y });
+  }
+  wireDown(e, w) { e.stopPropagation(); this.setState({ sel: { type: 'wire', id: w.id } }); }
+  tileDown(type, boxId, fromFly) {
+    return (e) => {
+      e.stopPropagation(); e.preventDefault();
+      const q = this.q();
+      if (q.allowed && type !== 'BOX' && !q.allowed.includes(type)) return;
+      this.beginDrag(e, { kind: 'new', type, boxId, fromFly });
+    };
+  }
+  onGripDown = (e) => { e.preventDefault(); e.stopPropagation(); this.beginDrag(e, { kind: 'pal', ox: this.state.px, oy: this.state.py }); };
+  startResize(e, key, sign, min, max) { e.preventDefault(); e.stopPropagation(); this.beginDrag(e, { kind: 'resize', key, sign, min, max, o: this.state[key] }); }
+  onLeftDown = (e) => this.startResize(e, 'leftW', 1, 260, 480);
+  onRightDown = (e) => this.startResize(e, 'rightW', -1, 240, 480);
+  flip = () => this.setState(s => ({ horiz: !s.horiz }), () => requestAnimationFrame(() => this.setState(this.clampPal(this.state.px, this.state.py))));
+  toggleFlyout = () => this.setState(s => ({ flyout: !s.flyout, newBox: null }));
+
+  zoomBy(f) {
+    const c = this.canvasRef.current; if (!c) return;
+    const { zoom, panX, panY } = this.state, nz = Math.max(0.4, Math.min(2.5, zoom * f));
+    const cx = c.offsetWidth / 2, cy = c.offsetHeight / 2;
+    this.setState({ zoom: nz, panX: cx - (cx - panX) * nz / zoom, panY: cy - (cy - panY) * nz / zoom });
+  }
+  fit = () => {
+    const cv = this.canvasRef.current; if (!cv) return;
+    const c = this.cur();
+    if (!c.parts.length) { this.setState({ zoom: 1, panX: 90, panY: 50 }); return; }
+    let x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9;
+    c.parts.forEach(p => { const g = this.geom(p); x0 = Math.min(x0, p.x); y0 = Math.min(y0, p.y - 18); x1 = Math.max(x1, p.x + g.w); y1 = Math.max(y1, p.y + g.h); });
+    const left = this.state.horiz ? 30 : 110, top = this.state.horiz ? 110 : 40;
+    const aw = cv.offsetWidth - left - 30, ah = cv.offsetHeight - top - 50;
+    const z = Math.max(0.8, Math.min(1.4, aw / (x1 - x0), ah / (y1 - y0)));
+    if (z === 0.8 && aw < (x1 - x0) * z) { this.setState({ zoom: z, panX: left - x0 * z + 10, panY: top + Math.max(0, (ah - (y1 - y0) * z) / 2) - y0 * z }); return; }
+    this.setState({ zoom: z, panX: left + (aw - (x1 - x0) * z) / 2 - x0 * z, panY: top + (ah - (y1 - y0) * z) / 2 - y0 * z });
+  };
+
+  go(i) {
+    clearInterval(this.runTimer);
+    this.setState({ qi: i, sel: null, tool: null, newBox: null, wireTmp: null, running: false, hintOpen: false, noteOpen: false }, () => requestAnimationFrame(() => this.fit()));
+  }
+  setRow(r) {
+    const c = this.cur(), ins = c.parts.filter(p => p.type === 'INPUT'), n = ins.length;
+    const vals = {}; ins.forEach((p, k) => vals[p.id] = (r >> (n - 1 - k)) & 1);
+    this.setCircuit({ ...c, parts: c.parts.map(p => p.id in vals ? { ...p, val: vals[p.id] } : p) }, false);
+  }
+  curRow() { return this.cur().parts.filter(p => p.type === 'INPUT').reduce((a, p) => a * 2 + (p.val || 0), 0); }
+  step = () => {
+    const n = this.cur().parts.filter(p => p.type === 'INPUT').length; if (!n) return;
+    this.setRow((this.curRow() + 1) % (1 << Math.min(n, 8)));
+  };
+  runToggle = () => {
+    if (this.state.running) { clearInterval(this.runTimer); this.setState({ running: false }); return; }
+    const n = this.cur().parts.filter(p => p.type === 'INPUT').length; if (!n) return;
+    const total = 1 << Math.min(n, 8); let r = 0;
+    this.setRow(0); this.setState({ running: true });
+    this.runTimer = setInterval(() => {
+      r++;
+      if (r >= total) { clearInterval(this.runTimer); this.setState({ running: false }); return; }
+      this.setRow(r);
+    }, 700);
+  };
+  resetInputs = () => { clearInterval(this.runTimer); this.setState({ running: false }); this.setRow(0); };
+
+  openNewBox = () => { const q = this.q(); this.setState({ newBox: { name: q.title || ('Box ' + (this.state.boxes.length + 1)), err: '' } }); };
+  saveNewBox = () => {
+    const nb = this.state.newBox; if (!nb) return;
+    const name = nb.name.trim(), c = this.cur();
+    const t = this.truthTable(c, this.state.boxes);
+    if (!name) return this.setState({ newBox: { ...nb, err: 'Give the box a name.' } });
+    if (this.state.boxes.some(b => b.name.toLowerCase() === name.toLowerCase())) return this.setState({ newBox: { ...nb, err: 'You already have a box with that name.' } });
+    if (!t.ins.length || !t.os.length) return this.setState({ newBox: { ...nb, err: 'Add at least one Input and one Output first.' } });
+    const b = { id: 'b' + Date.now(), name, nIn: Math.min(t.ins.length, 8), nOut: t.os.length, table: t.rows.map(r => r.out), from: this.q().label || ('Problem ' + this.q().n) };
+    this.setState(s => ({ boxes: [...s.boxes, b], newBox: null })); this.markSaved();
+  };
+
+  setAnswer(patch) {
+    const qid = this.q().id;
+    this.setState(s => ({ answers: { ...s.answers, [qid]: { text: '', fields: [], ...(s.answers[qid] || {}), ...patch } } }));
+    this.markSaved();
+  }
+  md(s) {
+    const esc = s.replace(/&/g, '&amp;').replace(/</g, '&lt;');
+    return esc.split(/\n\n/).map(p => '<p style="margin:0">' + p.replace(/\*\*(.+?)\*\*/g, '<b style="font-weight:600;color:#2A2A2A">$1</b>').replace(/\*(.+?)\*/g, '<i>$1</i>') + '</p>').join('');
+  }
+  rich(html, style) { return React.createElement('div', { style: { display: 'flex', flexDirection: 'column', gap: 10, fontSize: 15, lineHeight: 1.5, color: '#4A4A4A', textWrap: 'pretty', ...style }, dangerouslySetInnerHTML: { __html: html } }); }
+  started(q) {
+    if (q.kind === 'CC') { const c = this.state.circuits[q.id]; return !!(c && c.parts.length); }
+    const a = this.state.answers[q.id]; return !!(a && ((a.text || '').trim() || (a.fields || []).some(f => f)));
+  }
+
+  wirePath(x1, y1, x2, y2) {
+    if (x2 - x1 > 20) { const mx = Math.round(x1 + (x2 - x1) / 2); return `M${x1} ${y1} H${mx} V${y2} H${x2}`; }
+    const my = (y1 + y2) / 2;
+    return `M${x1} ${y1} H${x1 + 15} V${my} H${x2 - 15} V${y2} H${x2}`;
+  }
+  body(p, g, sel, e, labelIdx, ghost) {
+    const h = React.createElement, stroke = sel ? '#C255B9' : '#2A2A2A', sw = sel ? 2.5 : 1.5;
+    const fill = sel ? '#F7F0FB' : '#FFFFFF';
+    const mono = "'IBM Plex Mono',monospace", kids = [];
+    const txt = (x, y, s, size, color, extra) => h('text', { key: 't' + x + y + s, x, y, style: { fontFamily: "'IBM Plex Sans',sans-serif", fontSize: size, fontWeight: 600, fill: color, textAnchor: 'middle', dominantBaseline: 'central', fontVariantNumeric: 'tabular-nums', letterSpacing: extra && extra.label ? '0.04em' : 0, pointerEvents: 'none' } }, s);
+    const symS = { fill: 'none', stroke: '#2A2A2A', strokeWidth: 2, strokeLinecap: 'round', strokeLinejoin: 'round', pointerEvents: 'none' };
+    const sym = (kind, cx, cy, k) => {
+      const d = kind === 'and' ? `M${cx - 7 * k} ${cy + 6 * k} L${cx} ${cy - 7 * k} L${cx + 7 * k} ${cy + 6 * k}`
+        : kind === 'or' ? `M${cx - 7 * k} ${cy - 6 * k} L${cx} ${cy + 7 * k} L${cx + 7 * k} ${cy - 6 * k}`
+        : `M${cx - 7 * k} ${cy - 3 * k} H${cx + 6 * k} V${cy + 4 * k}`;
+      return h('path', { key: 'sym', d, style: symS });
+    };
+    if (p.type === 'INPUT' || p.type === 'OUTPUT') {
+      const v = ghost ? 0 : (p.type === 'INPUT' ? (p.val || 0) : e.inV(p.id, 0));
+      kids.push(h('rect', { key: 'r', x: 0, y: 0, width: 40, height: 40, style: { fill: v ? '#FCEBEB' : '#FFFFFF', stroke: sel ? '#C255B9' : (v && p.type === 'INPUT' ? '#E53935' : '#2A2A2A'), strokeWidth: sw } }));
+      kids.push(txt(20, 21, String(v), 17, v ? '#E53935' : '#2A2A2A'));
+      if (!ghost) kids.push(txt(20, -10, (p.type === 'INPUT' ? 'IN' : 'OUT') + labelIdx, 11, '#7B7B7B', { label: true }));
+    } else if (p.type === 'AND') {
+      kids.push(h('path', { key: 'b', d: 'M0 0 H30 A30 30 0 0 1 30 60 H0 Z', style: { fill, stroke, strokeWidth: sw, strokeLinejoin: 'round' } }));
+      kids.push(sym('and', 28, 30, 1));
+    } else if (p.type === 'OR') {
+      kids.push(h('path', { key: 'b', d: 'M0 0 H24 Q50 3 60 30 Q50 57 24 60 H0 Q12 30 0 0 Z', style: { fill, stroke, strokeWidth: sw, strokeLinejoin: 'round' } }));
+      kids.push(h('path', { key: 's', d: 'M0 20 H5.3 M0 40 H5.3', style: { fill: 'none', stroke, strokeWidth: 1.5 } }));
+      kids.push(sym('or', 30, 30, 1));
+    } else if (p.type === 'NOT') {
+      kids.push(h('polygon', { key: 'b', points: '0,8 50,30 0,52', style: { fill, stroke, strokeWidth: sw, strokeLinejoin: 'round' } }));
+      kids.push(sym('not', 16, 29, 0.85));
+    } else if (p.type === 'BOX') {
+      const b = this.box(p.boxId);
+      kids.push(h('rect', { key: 'b', x: 0, y: 0, width: g.w, height: g.h, style: { fill: sel ? '#F7F0FB' : '#F7F5FA', stroke, strokeWidth: sw } }));
+      kids.push(txt(g.w / 2, g.h / 2, b ? (b.name.length > 13 ? b.name.slice(0, 12) + '…' : b.name) : '?', 13, '#2A2A2A'));
+    }
+    return kids;
+  }
+  renderCanvas(c, e) {
+    const h = React.createElement, { zoom, panX, panY, sel, wireTmp, ghost } = this.state;
+    const col = v => v ? '#E53935' : '#2A2A2A';
+    const byId = {}; c.parts.forEach(p => byId[p.id] = p);
+    const wires = c.wires.map(w => {
+      const fp = byId[w.f.p], tp = byId[w.t.p]; if (!fp || !tp) return null;
+      const [x1, y1] = this.portAbs(fp, 'out', w.f.i), [x2, y2] = this.portAbs(tp, 'in', w.t.i);
+      const d = this.wirePath(x1, y1, x2, y2), v = e.outs(w.f.p)[w.f.i] || 0, isSel = sel && sel.type === 'wire' && sel.id === w.id;
+      return h('g', { key: w.id }, [
+        isSel ? h('path', { key: 'h', d, style: { fill: 'none', stroke: '#E2B4FF', strokeWidth: 8, strokeLinejoin: 'round' } }) : null,
+        h('path', { key: 'l', d, style: { fill: 'none', stroke: col(v), strokeWidth: 2, strokeLinejoin: 'round' } }),
+        h('path', { key: 'x', d, onPointerDown: ev => this.wireDown(ev, w), style: { fill: 'none', stroke: 'transparent', strokeWidth: 14, cursor: 'pointer' } }),
+      ]);
+    });
+    const counters = { INPUT: 0, OUTPUT: 0 };
+    const parts = c.parts.map(p => {
+      const g = this.geom(p), isSel = sel && sel.type === 'part' && sel.id === p.id;
+      const li = p.type in counters ? ++counters[p.type] : 0;
+      const ports = [];
+      g.ins.forEach(([x, y], i) => {
+        const v = e.inV(p.id, i);
+        ports.push(h('circle', { key: 'pi' + i, cx: x, cy: y, r: 3.5, style: { fill: col(v), pointerEvents: 'none' } }));
+        ports.push(h('circle', { key: 'hi' + i, cx: x, cy: y, r: 11, onPointerDown: ev => this.portDown(ev, p, 'in', i), style: { fill: 'transparent', cursor: 'crosshair' } }));
+      });
+      g.outs.forEach(([x, y], i) => {
+        const v = e.outs(p.id)[i] || 0;
+        ports.push(h('circle', { key: 'po' + i, cx: x, cy: y, r: 3.5, style: { fill: col(v), pointerEvents: 'none' } }));
+        ports.push(h('circle', { key: 'ho' + i, cx: x, cy: y, r: 11, onPointerDown: ev => this.portDown(ev, p, 'out', i), style: { fill: 'transparent', cursor: 'crosshair' } }));
+      });
+      return h('g', { key: p.id, transform: `translate(${p.x} ${p.y})` }, [
+        h('g', { key: 'body', onPointerDown: ev => this.partDown(ev, p), style: { cursor: p.type === 'INPUT' ? 'pointer' : 'move' } }, this.body(p, g, isSel, e, li, false)),
+        ...ports,
+      ]);
+    });
+    let ghostEl = null;
+    if (ghost && ghost.show) {
+      const gp = { type: ghost.type, boxId: ghost.boxId, id: '_g' }, g = this.geom(gp);
+      ghostEl = h('g', { key: 'ghost', transform: `translate(${ghost.x - g.w / 2} ${ghost.y - g.h / 2})`, style: { opacity: 0.55, pointerEvents: 'none' } }, this.body(gp, g, true, e, 0, true));
+    }
+    const tmp = wireTmp ? h('path', { key: 'tmp', d: `M${wireTmp.x1} ${wireTmp.y1} L${wireTmp.x2} ${wireTmp.y2}`, style: { fill: 'none', stroke: '#C255B9', strokeWidth: 2, strokeDasharray: '5 4', pointerEvents: 'none' } }) : null;
+    return h('svg', { width: '100%', height: '100%', onPointerDown: this.canvasDown, style: { position: 'absolute', inset: 0, display: 'block', overflow: 'hidden' } },
+      h('g', { transform: `translate(${panX} ${panY}) scale(${zoom})` }, [...wires, ...parts, tmp, ghostEl]));
+  }
+
+  renderVals() {
+    const s = this.state, q = this.q(), sec = this.SECTIONS[q.sec], isCC = q.kind === 'CC';
+    const c = this.cur(), e = this.evalC(c, s.boxes);
+    const qi = s.qi, last = this.QS.length - 1;
+    const label = q.label || ('Problem ' + q.n);
+    const heading = q.title ? `Problem ${q.n} · ${q.title}` : `Problem ${q.n}`;
+    const stmtText = q.tc ? sec.intro : q.st;
+    const goalCols = [], goalRows = [];
+    if (q.tc) {
+      const nOut = q.tc[0].length - q.nIn;
+      for (let i = 0; i < q.nIn; i++) goalCols.push({ label: 'IN' + (i + 1), bl: 'none' });
+      for (let i = 0; i < nOut; i++) goalCols.push({ label: nOut === 1 ? 'OUT' : 'OUT' + (i + 1), bl: i === 0 ? '1px solid #D5D5D5' : 'none' });
+      q.tc.forEach(r => goalRows.push({ cells: r.map((v, k) => ({ v, bl: k === q.nIn ? '1px solid #D5D5D5' : 'none' })) }));
+    }
+    const t = isCC ? this.truthTable(c, s.boxes) : { ins: [], os: [], rows: [] };
+    const cr = this.curRow();
+    const outCols = [...t.ins.slice(0, 8).map((p, i) => ({ label: 'IN' + (i + 1), bl: 'none' })), ...t.os.map((p, i) => ({ label: 'OUT' + (i + 1), bl: i === 0 ? '1px solid #D5D5D5' : 'none' }))];
+    const red = (v) => v ? '#E53935' : '#2A2A2A';
+    const outRows = t.rows.map((r, ri) => ({
+      bg: ri === cr ? '#F2E6FF' : 'transparent',
+      go: () => this.setRow(ri),
+      cells: [...r.in.map(v => ({ v, bl: 'none', color: red(v), fw: v ? 600 : 400 })), ...r.out.map((v, k) => ({ v, bl: k === 0 ? '1px solid #D5D5D5' : 'none', color: red(v), fw: v ? 600 : 400 }))],
+    }));
+
+    const listSections = this.SECTIONS.map((sc, si) => ({
+      h: sc.h,
+      items: this.QS.map((qq, i) => ({ qq, i })).filter(x => x.qq.sec === si).map(({ qq, i }) => {
+        const cur = i === qi, done = !!s.done[qq.id], st = !done && this.started(qq);
+        const tag = qq.kind === 'CC' ? 'CC' : (qq.fill ? 'Number' : 'Written');
+        return {
+          n: qq.n, name: qq.title || ('Problem ' + qq.n), go: () => this.go(i),
+          bg: cur ? '#F2E6FF' : 'transparent', fw: cur ? 600 : 400, nameColor: qq.title || cur ? '#2A2A2A' : '#7B7B7B',
+          tag, tagFont: tag === 'CC' ? "'IBM Plex Mono',monospace" : "'IBM Plex Sans',sans-serif", tagFw: tag === 'CC' ? 600 : 500,
+          tagBg: tag === 'CC' ? '#F7E6F5' : '#F1EEF5', tagColor: tag === 'CC' ? '#C255B9' : '#4A4A4A',
+          status: done ? 'done' : st ? 'started' : '', stColor: done ? '#C255B9' : '#A8700F', stFw: done ? 600 : 400,
+        };
+      }),
+    }));
+
+    const allowed = (ty) => !q.allowed || q.allowed.includes(ty);
+    const tool = s.tool;
+    const tb = {}, top = {}, ttl = {}, tileDown = {};
+    ['INPUT', 'OUTPUT', 'AND', 'OR', 'NOT'].forEach(ty => {
+      tb[ty] = tool && tool.type === ty ? '#F2E6FF' : 'transparent';
+      top[ty] = allowed(ty) ? 1 : 0.3;
+      ttl[ty] = allowed(ty) ? ty : ty + ' is not used in this problem';
+      tileDown[ty] = this.tileDown(ty, undefined, false);
+    });
+    const pinnedTiles = s.pinned.map(id => this.box(id)).filter(Boolean).map(b => ({ name: b.name, down: this.tileDown('BOX', b.id, false), bg: tool && tool.boxId === b.id ? '#F2E6FF' : 'transparent' }));
+    const boxList = s.boxes.map(b => {
+      const pinned = s.pinned.includes(b.id);
+      return {
+        name: b.name, meta: `${b.nIn} in · ${b.nOut} out · ${b.from}`, down: this.tileDown('BOX', b.id, true),
+        bg: tool && tool.boxId === b.id ? '#F2E6FF' : 'transparent',
+        pinLabel: pinned ? 'On toolbar' : 'Add to toolbar', pinBorder: pinned ? '#DCC6F2' : '#D5D5D5', pinColor: pinned ? '#C255B9' : '#4A4A4A',
+        togglePin: () => this.setState(st => ({ pinned: pinned ? st.pinned.filter(x => x !== b.id) : [...st.pinned, b.id] })),
+      };
+    });
+    const pw = this.palSize.w, ph = this.palSize.h;
+    const flyX = s.horiz ? s.px : s.px + pw + 8, flyY = s.horiz ? s.py + ph + 8 : s.py;
+
+    const toolName = tool ? (tool.type === 'BOX' ? ((this.box(tool.boxId) || {}).name || 'box') : tool.type) : '';
+    let canvasHint = 'Click an input to switch it between 0 and 1.';
+    if (tool) canvasHint = `Click the canvas to place ${toolName}. Shift-click to place several. Esc cancels.`;
+    else if (s.sel) canvasHint = s.sel.type === 'part' ? 'Drag to move. Delete removes it.' : 'Delete removes this wire.';
+    else if (c.parts.length > 1 && !c.wires.length) canvasHint = 'Drag from one dot to another to connect parts.';
+    else if (!c.parts.length) canvasHint = '';
+
+    const h = this.hist[q.id] || { past: [], future: [] };
+    const a = s.answers[q.id] || { text: '', fields: [] };
+    const mins = Math.floor((Date.now() - s.savedAt) / 60000);
+    const savedLabel = s.saving ? 'Saving…' : mins < 1 ? 'Saved just now' : `Saved ${mins} min ago`;
+    const fmtTime = (ts) => new Date(ts).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+
+    return {
+      q: { section: sec.h, heading, caution: q.caution || '', hasTable: !!q.tc, fig: q.fig || '', figAlt: 'Schematic: a box with one input I (IN1) and two outputs O1 and O2 (OUT1 and OUT2)', hint: !!q.hint, noteLabel: sec.noteLabel || '' },
+      stmtEl: this.rich(this.md(stmtText)),
+      figEl: q.fig ? React.createElement('img', { src: q.fig, alt: 'Schematic: a box with one input I (IN1) and two outputs O1 and O2 (OUT1 and OUT2)', style: { width: 260, maxWidth: '100%', alignSelf: 'flex-start', marginTop: 4 } }) : null,
+      hintEl: q.hint ? this.rich('<p style="margin:0"><b style="font-weight:600;color:#2A2A2A">Hint: </b>' + this.md(q.hint).replace(/^<p style="margin:0">/, ''), { fontSize: 14, background: '#F7F5FA', padding: '10px 12px' }) : null,
+      noteEl: sec.note ? this.rich('<p style="margin:0"><b style="font-weight:600;color:#2A2A2A">' + (sec.noteLabel.startsWith('Hint') ? 'Hint: ' : '') + '</b>' + this.md(sec.note).replace(/^<p style="margin:0">/, ''), { fontSize: 14, background: '#F7F5FA', padding: '10px 12px' }) : null,
+      hintOpen: s.hintOpen, noteOpen: s.noteOpen,
+      hintToggleLabel: (s.hintOpen ? '▾ ' : '▸ ') + 'Hint',
+      noteToggleLabel: (s.noteOpen ? '▾ ' : '▸ ') + (sec.noteLabel || ''),
+      toggleHint: () => this.setState(st => ({ hintOpen: !st.hintOpen })),
+      toggleNote: () => this.setState(st => ({ noteOpen: !st.noteOpen })),
+      goalCols, goalRows,
+      toggleDone: () => { this.setState(st => ({ done: { ...st.done, [q.id]: !st.done[q.id] } })); this.markSaved(); },
+      doneBg: s.done[q.id] ? '#C255B9' : '#FFFFFF', doneBorder: s.done[q.id] ? '#C255B9' : '#B9B2C4', doneTick: s.done[q.id] ? '✓' : '',
+      prev: () => qi > 0 && this.go(qi - 1), next: () => qi < last && this.go(qi + 1),
+      prevColor: qi > 0 ? '#2A2A2A' : '#C9C3D1', nextColor: qi < last ? '#2A2A2A' : '#C9C3D1',
+      posLabel: `${qi + 1} of ${this.QS.length}`,
+      listSections,
+      leftOpen: s.leftOpen, leftClosed: !s.leftOpen, leftW: s.leftW,
+      toggleLeft: () => this.setState(st => ({ leftOpen: !st.leftOpen })),
+      toggleRight: () => this.setState(st => ({ rightOpen: !st.rightOpen })),
+      showRight: isCC && s.rightOpen, showRightStrip: isCC && !s.rightOpen, rightW: s.rightW,
+      onLeftDown: this.onLeftDown, onRightDown: this.onRightDown,
+      isCC, isOpenQ: !isCC,
+      canvasRef: this.canvasRef, palRef: this.palRef,
+      canvasSvg: isCC ? this.renderCanvas(c, e) : null,
+      noParts: isCC && !c.parts.length && !s.ghost,
+      gridSize: `${20 * s.zoom}px ${20 * s.zoom}px`, gridPos: `${s.panX}px ${s.panY}px`,
+      canvasCursor: tool ? 'crosshair' : 'default',
+      px: s.px, py: s.py, dir: s.horiz ? 'row' : 'column',
+      palShadow: s.dragging ? '0 10px 28px rgba(3,13,36,0.22)' : '0 2px 8px rgba(3,13,36,0.08)',
+      palBorder: s.palDrop ? '#C255B9' : '#D5D5D5',
+      onGripDown: this.onGripDown, flip: this.flip,
+      showLabels: this.props.showLabels ?? true,
+      tb, top, ttl, tileDown, pinnedTiles,
+      boxCount: s.boxes.length || '', toggleFlyout: this.toggleFlyout, flyoutOpen: s.flyout, flyTileBg: s.flyout ? '#F2E6FF' : 'transparent',
+      flyX, flyY, boxList, noBoxes: !s.boxes.length,
+      naming: !!s.newBox, notNaming: !s.newBox, newBoxName: s.newBox ? s.newBox.name : '', newBoxErr: s.newBox ? s.newBox.err : '',
+      onNewBoxName: (ev) => this.setState({ newBox: { name: ev.target.value, err: '' } }),
+      onNewBoxKey: (ev) => { if (ev.key === 'Enter') this.saveNewBox(); if (ev.key === 'Escape') this.setState({ newBox: null }); },
+      openNewBox: this.openNewBox, saveNewBox: this.saveNewBox, cancelNewBox: () => this.setState({ newBox: null }),
+      stop: (ev) => ev.stopPropagation(),
+      undo: this.undo, redo: this.redo, deleteSel: this.deleteSel,
+      undoColor: h.past.length ? '#2A2A2A' : '#C9C3D1', redoColor: h.future.length ? '#2A2A2A' : '#C9C3D1', delColor: s.sel ? '#2A2A2A' : '#C9C3D1',
+      canvasHint,
+      zoomIn: () => this.zoomBy(1.2), zoomOut: () => this.zoomBy(1 / 1.2), fit: this.fit, zoomLabel: Math.round(s.zoom * 100) + '%',
+      runToggle: this.runToggle, step: this.step, resetInputs: this.resetInputs,
+      runIcon: s.running ? '■' : '▶', runText: s.running ? 'Stop' : 'Run',
+      hasOutTable: t.rows.length > 0, noOutTable: isCC && !t.rows.length, outCols, outRows,
+      hasFields: !!q.fill, hasText: !isCC && !q.fill,
+      fields: (q.fill || []).map((lab, i) => ({ label: lab, value: (a.fields || [])[i] || '', onChange: (ev) => { const f = [...(a.fields || [])]; f[i] = ev.target.value; this.setAnswer({ fields: f }); } })),
+      answerText: a.text || '', onAnswer: (ev) => this.setAnswer({ text: ev.target.value }),
+      savedLabel,
+      submit: () => this.setState({ submittedAt: Date.now() }),
+      submitText: s.submittedAt ? 'Submit again' : 'Submit assignment',
+      submittedLabel: s.submittedAt ? 'Submitted ' + fmtTime(s.submittedAt) : '',
+      resetDemo: this.resetDemo,
+    };
+  }
+}
+</script>
+</body>
+</html>
