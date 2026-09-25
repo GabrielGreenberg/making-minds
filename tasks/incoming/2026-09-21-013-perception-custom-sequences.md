@@ -8,7 +8,7 @@ requires:
 area: app
 source: claude-md
 created: 2026-09-21T15:30:00-07:00
-status: blocked
+status: ready
 after: 2026-09-21-012
 branch:
 merged_into:
@@ -56,27 +56,21 @@ below are answered, the plan is:
 - **Pitfalls:** never touch hw2/hw3.json. `buildPerceptionCases(spec)` output stays identical
   for today's specs.
 
+### Resolved decisions
+Gabriel, 2026-09-25 (catch):
+1. **Authored films ADD to the generated battery** (as recommended). Expected bits always
+   come from the rule, never typed by hand.
+2. **A per-film "show to students as an example" flag** (not the recommendation). It is a new
+   student-visible field, so it is its own follow-up task (see the progress log); THIS task
+   keeps every authored film in the stripped grading bank (law 1) and adds no student-visible
+   field.
+3. **Multi-object motion as recommended:** output 1 iff SOME object image (a maximal run of
+   exactly k 1s) in the current frame sits one unit up / down / either from an object image in
+   the previous frame, whatever else is in view; today's single-object rule stays, chosen by a
+   "scene: single object / any number of objects" switch on the motion rule.
+
 ## Verify
 `perceptionCheck`, `pipelineCheck`.
-
-## Questions
-Parked by the work loop on 2026-09-24. Each can be answered in a line; the recommendation is
-listed first.
-1. **Do authored films add to the generated battery, or replace it?** Recommended: **add**.
-   The battery always follows the rule, so a rule edit can never leave a bank missing
-   coverage. Films are appended, and their expected bits always come from the rule, never
-   typed by hand. Alternative: films replace the battery (fully hand-curated banks), with a
-   "standard sequences" button to reseed.
-2. **Do students see authored films before grading?** Recommended: **no**. They stay in the
-   stripped grading bank, like every other grading input (law 1). Students play a film through
-   "Run this input" once grades are released. Alternative: a per-film "show to students as an
-   example" flag, which would be a new student-visible field, filed as a follow-up.
-3. **What does multi-object motion mean?** Recommended: output 1 iff SOME object image (a
-   maximal run of exactly k 1s) in the current frame sits one unit up (or down, or either, per
-   the chosen direction) from an object image in the previous frame, whatever else is in view.
-   Today's single-object rule stays: the frame must be exactly one object and nothing else.
-   Built as a "scene: single object / any number of objects" switch on the motion rule, not a
-   new rule kind.
 
 ## Progress log
 
@@ -85,3 +79,8 @@ Claimed, and the Plan stage ran (design above). It stopped on three product and 
 questions that the task file doesn't settle (## Questions). There is no code: the empty
 branch `task/013-perception-custom-sequences` was deleted. Next step: answer the questions,
 then `/work` or the loop claims 013 again and implements the plan above.
+
+### 2026-09-25 — released (catch)
+Gabriel answered the three questions (### Resolved decisions). Decision 2 spawned a follow-up
+task for the per-film example flag, filed after this one. Next step: `/work` or the loop claims
+013 and implements the plan in ## Design unchanged.
