@@ -13,15 +13,16 @@
 //   WINDOW CONTENT (P1.9b) the fed input stream must be the codec's, not the
 //     typed chars: the typed string is parsed as a VALUE per input group
 //     (tally "11" = 2) and laid on
-//     the time axis by encodeInput. For tally that means zeros LEAD and the
-//     ones arrive LAST — the reverse of feeding typed chars at t1..tL. Feeding
-//     raw chars made a grader-passing tally machine (hw3-p7's correct machine)
-//     decode to no value, and a direct-wire tally identity decode '/'
-//     instead of its typed value. Binary is unaffected (typed numeral LSB-first
-//     coincides with the raw right-to-left feed).
+//     the time axis by encodeInput, then padded with 0s to the window. A tally
+//     numeral is written `0…01…1` (textbook pp. 26–27, spec §Tally; task 044),
+//     so its ones arrive FIRST, at t1..tn — the same order as the typed chars
+//     fed right to left. (Before task 044 the codec wrote tally ones-first in
+//     the bit vector, so the zeros led in time and the ones came last, against
+//     the book.) Binary is unaffected (typed numeral LSB-first coincides with
+//     the raw right-to-left feed).
 //
 //   Invalid input policy: a typed string that is not a valid numeral for the
-//     representation (tally with a 1 after a 0, e.g. "101") denotes no value,
+//     representation (tally with a 0 after a 1, e.g. "101") denotes no value,
 //     so there is no grader stream to match — the run falls back to feeding
 //     the raw typed bits (window-bounded), and the input reads as no value
 //     ('/') exactly as it always has.
@@ -32,7 +33,7 @@
 //     the SC Global I/O rows. A question run's OUT therefore reads as a
 //     numeral exactly like the typed IN: the binary identity on "110" shows
 //     an OUT reading 110 (= 6), the tally identity on "11" a valid tally
-//     numeral (ones leftmost). The FSM-binary stream pins below use the
+//     numeral (ones rightmost, `0…011`). The FSM-binary stream pins below use the
 //     NON-palindrome "110" so a reversed feed/display cannot sneak through.
 //
 // Sandbox behavior (no open question / no cc_spec) is also pinned: SC runs
@@ -166,11 +167,13 @@ check('control: direct-wire identity passes every tally case',
 const exhibitB = gradeQuestion(qTally, delayed);
 check('exhibit B: identity + redundant MEM FAILS the grader',
   exhibitB.status === 'graded' && exhibitB.passed < exhibitB.total);
-// The delayed machine shifts the stream one step, so the window sees one one
-// too few: the grader decodes a valid-but-WRONG tally value (x − 1).
+// The delayed machine shifts the stream one step: t1 reads 0 and the ones
+// follow it, so the window holds `…01110` — a 0 right of the ones, which is no
+// tally numeral. The grader rejects it as malformed rather than decoding a
+// wrong value.
 const bX3 = exhibitB.cases.find((c) => c.input[0] === 3);
-check(`exhibit B: the x=3 case fails with a wrong decoded value (got ${JSON.stringify(bX3?.got)})`,
-  bX3 !== undefined && !bX3.pass && bX3.got[0] === 2);
+check(`exhibit B: the x=3 case fails as malformed output (got ${JSON.stringify(bX3?.got)})`,
+  bX3 !== undefined && !bX3.pass && bX3.got.length === 0);
 
 const exhibitC = gradeQuestion(qBinSc, garbageAfterWindow());
 check('exhibit C: post-window garbage PASSES the grader (window never sees it)',
@@ -300,7 +303,7 @@ console.log('\n[store: SC tally question runs feed the codec stream]');
     s.scHistory.length === win && s.scTimeStep === win + 1);
 
   const wantStream = encodeInput([2], layout);
-  check('hw3-p7: fed input stream EQUALS codec encodeInput([2]) — zeros leading, ones last',
+  check('hw3-p7: fed input stream EQUALS codec encodeInput([2]) — ones first, at t1..t2',
     wantStream.axis === 'time' && sameSteps(scFedSteps(), wantStream.steps));
 
   const expected = q.test_cases!.find((tc) => tc.inputs[0] === 2)!.outputs[0];
@@ -339,8 +342,7 @@ console.log('\n[store: SC tally question runs feed the codec stream]');
 
 {
   // Regression pin: a zero-MEM direct-wire tally identity, typed "111",
-  // decodes to 3 again (via the correct zeros-leading stream — pre-round-1 it
-  // read 3 off the ones-first stream; round 1 alone showed '/').
+  // decodes to 3 via the codec's stream (ones first, then 0s to the window).
   const win = windowOf(qTally);
   openQuestion(qTally, direct);
   check('tally identity (direct wire): run terminates', await scTypeAndRun('111'));
@@ -354,8 +356,8 @@ console.log('\n[store: SC tally question runs feed the codec stream]');
 }
 
 {
-  // Exhibit B's machine in the store: the UI now shows the SAME wrong value
-  // the grader decodes (x − 1), instead of a stream the grader never feeds.
+  // Exhibit B's machine in the store: the UI reads the window as no numeral
+  // ('/'), the same verdict the grader gives (malformed), never the typed 3.
   const win = windowOf(qTally);
   openQuestion(qTally, delayed);
   check('exhibit B (store): run terminates', await scTypeAndRun('111'));
@@ -368,8 +370,8 @@ console.log('\n[store: SC tally question runs feed the codec stream]');
     useStore.getState().scHistory.length === win);
 
   const avVal = bitsToTally(avQuestionBits(qTally.cc_spec!.outputs.map((g) => g.width)));
-  check(`exhibit B (store): windowed decode equals the grader's decoded got (${JSON.stringify(bX3?.got)}) — not the typed 3`,
-    bX3 !== undefined && avVal === bX3.got[0] && avVal !== 3);
+  check(`exhibit B (store): the windowed decode is no numeral (got ${avVal}), as the grader found (${JSON.stringify(bX3?.got)}) — not the typed 3`,
+    bX3 !== undefined && bX3.got.length === 0 && avVal === null);
 }
 
 // ── SC binary question runs: typed numeral = tested value (unchanged feed) ──
@@ -451,7 +453,7 @@ console.log('\n[store: FSM question runs]');
 
 {
   // TALLY direction for FSM: typed "11" (= 2) must be fed as the codec lays
-  // it (ones LAST), and the echo machine's window must decode back to 2.
+  // it (ones first, then 0s), and the echo machine's window must decode back to 2.
   const win = windowOf(qTallyFsm);
   openQuestion(qTallyFsm, fsmIdentity);
   useStore.getState().fsmGlobalReset();
@@ -467,15 +469,15 @@ console.log('\n[store: FSM question runs]');
     s.fsmHistory.length === win);
   const fed = s.fsmHistory.slice().sort((a, b) => a.t - b.t).map((h) => [bitOf(h.input)]);
   const wantStream = encodeInput([2], layoutOf(qTallyFsm));
-  check('FSM tally: fed stream EQUALS codec encodeInput([2]) — ones arrive last',
+  check('FSM tally: fed stream EQUALS codec encodeInput([2]) — ones arrive first',
     wantStream.axis === 'time' && sameSteps(fed, wantStream.steps));
   const series = s.fsmHistory.slice().sort((a, b) => a.t - b.t).map((h) => [bitOf(h.output)]);
   const decoded = bitsToValue(timeOutputBits(series, qTallyFsm.cc_spec!.outputs[0].width, 0), 'tally');
   check(`FSM tally: window decodes to the typed value (got ${decoded}, want 2)`, decoded === 2);
 
-  // OUT display: with t1 rightmost the echoed ones sit LEFTMOST — a VALID
-  // tally numeral for 2 ("11" then zeros). Built t-ascending it would read
-  // "0…011", which tally rejects ('/').
+  // OUT display: with t1 rightmost the echoed ones sit RIGHTMOST — "0…011",
+  // a VALID tally numeral for 2. Built t-ascending it would read "110…0",
+  // which tally rejects ('/').
   const display = outputDisplayString(s.fsmHistory.map((h) => ({ t: h.t, bits: [bitOf(h.output)] })));
   check(`FSM tally: OUT display is a VALID tally numeral for 2 (got "${display}")`,
     display.length === win && bitsToTally(display.split('').map(Number)) === 2);

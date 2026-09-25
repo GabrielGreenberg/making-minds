@@ -11,6 +11,7 @@ import type { CodecLayout } from '../src/engine/codec';
 import {
   valueToBits,
   bitsToValue,
+  bitsToTally,
   isValidCodeword,
   encodeInput,
   decodeOutput,
@@ -33,11 +34,14 @@ console.log('[rep core]');
 check('binary valueToBits 5/3 → [1,0,1] (MSB-first)', eq(valueToBits(5, 3, 'binary'), [1, 0, 1]));
 check('binary round-trip 13/4', bitsToValue(valueToBits(13, 4, 'binary'), 'binary') === 13);
 check('binary width is the modulus (6 into 2 bits → 2)', bitsToValue(valueToBits(6, 2, 'binary'), 'binary') === 2);
-check('tally valueToBits 2/4 → [1,1,0,0]', eq(valueToBits(2, 4, 'tally'), [1, 1, 0, 0]));
+check('tally valueToBits 2/4 → [0,0,1,1] (the textbook\'s 0…01…1)', eq(valueToBits(2, 4, 'tally'), [0, 0, 1, 1]));
 check('tally round-trip 3/5', bitsToValue(valueToBits(3, 5, 'tally'), 'tally') === 3);
 check('tally clamps to width (9 into 4 → 4)', bitsToValue(valueToBits(9, 4, 'tally'), 'tally') === 4);
 check('isValidCodeword rejects 101 tally', isValidCodeword([1, 0, 1], 'tally') === false);
-check('isValidCodeword accepts 110 tally', isValidCodeword([1, 1, 0], 'tally') === true);
+check('isValidCodeword accepts 011 tally', isValidCodeword([0, 1, 1], 'tally') === true);
+check('isValidCodeword rejects 110 tally (ones must end the numeral)', isValidCodeword([1, 1, 0], 'tally') === false);
+check('bitsToTally reads 0011 as two, 1000 as no numeral (textbook pp. 26–27)',
+  bitsToTally([0, 0, 1, 1]) === 2 && bitsToTally([1, 0, 0, 0]) === null);
 check('isValidCodeword: binary always valid', isValidCodeword([1, 0, 1], 'binary') === true);
 
 // ── axis selection ──────────────────────────────────────────────
@@ -58,6 +62,14 @@ check('space encode is MSB-first within a group (5/3 → 101)', sEncWide.axis ==
 check('space decode slices by output widths', eq(decodeOutput({ axis: 'space', bits: [1, 0, 1] }, spaceWide), [5]));
 check('space tally rejects malformed output 101',
   outputAccepted({ axis: 'space', bits: [1, 0, 1] }, { axis: 'space', rep: 'tally', inputWidths: [3], outputWidths: [3] }) === false);
+const spaceTally: CodecLayout = { axis: 'space', rep: 'tally', inputWidths: [1], outputWidths: [2] };
+check('space tally: one on two wires is OUT1=0, OUT2=1 (HW1 P16: tal(01) = one)',
+  eq(decodeOutput({ axis: 'space', bits: [0, 1] }, spaceTally), [1])
+  && outputAccepted({ axis: 'space', bits: [1, 0] }, spaceTally) === false);
+const timeTally: CodecLayout = { axis: 'time', rep: 'tally', inputWidths: [4], outputWidths: [4] };
+const tEncTally = encodeInput([2], timeTally);
+check('time tally: the ones arrive FIRST (2 over 4 steps → t1..t4 = 1,1,0,0)',
+  tEncTally.axis === 'time' && eq(tEncTally.steps.slice(0, 4).map((r) => r[0]), [1, 1, 0, 0]));
 
 // ── time axis (1-step delay register decodes to 2x) ─────────────
 console.log('\n[time]');
