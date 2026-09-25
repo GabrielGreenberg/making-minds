@@ -13,10 +13,12 @@
 //                  the API strips answers before sending to students)
 //   workbooks    — per-(user, assignment) saved canvas state (WorkbookStore seam)
 //   submissions  — immutable graded attempts (SubmissionStore seam)
-//   feedback     — student reports on the platform/homeworks, an instructor's
+//   feedback     — reports on the platform/homeworks, an instructor's
 //                  queue (FeedbackStore seam); screenshots ride as base64 in
 //                  the JSON `screenshots` column, capped client- and
-//                  server-side — see app.ts's POST /api/feedback
+//                  server-side — see app.ts's POST /api/feedback. Each row
+//                  carries the author's role as filed and, once the task
+//                  pipeline has processed it, a `triage` mark (task 018)
 //   instructor_notes — ONE shared markdown note (NotesStore seam); a single
 //                  row, id pinned to 1 by a CHECK constraint
 //   server_meta  — server-owned settings; today the generated provenance
@@ -40,6 +42,7 @@ import type {
   FeedbackCategory,
   FeedbackScreenshot,
   FeedbackStatus,
+  FeedbackTriage,
   InstructorNote,
   PlatformFeedback,
   SubmissionData,
@@ -220,12 +223,26 @@ export class Db {
       // The provenance check computed on receipt (task 034) — JSON, beside
       // `result`, never part of it.
       'ALTER TABLE submissions ADD COLUMN integrity TEXT;',
+      // What the task pipeline made of a report (task 018) — JSON
+      // FeedbackTriage, NULL until processed.
+      'ALTER TABLE feedback ADD COLUMN triage TEXT;',
     ]) {
       try {
         this.db.exec(sql);
       } catch {
         // already present
       }
+    }
+    // The author's role as filed (task 018). The boot that adds the column
+    // backfills it once from the roster; a report whose author has since
+    // left stays NULL (unknown) rather than being guessed.
+    try {
+      this.db.exec('ALTER TABLE feedback ADD COLUMN author_role TEXT;');
+      this.db.exec(
+        'UPDATE feedback SET author_role = (SELECT role FROM users WHERE users.email = feedback.email)',
+      );
+    } catch {
+      // already present
     }
     if (firstWatermarkBoot) this.snapshotLegacyContent();
   }
@@ -499,6 +516,7 @@ export class Db {
 
   addFeedback(input: {
     email: string;
+    authorRole: Role;
     category: FeedbackCategory;
     message: string;
     screenshots: FeedbackScreenshot[];
@@ -508,12 +526,13 @@ export class Db {
     const createdAt = new Date().toISOString();
     this.db
       .prepare(
-        `INSERT INTO feedback (id, email, category, message, screenshots, context, status, created_at)
-         VALUES (?, ?, ?, ?, ?, ?, 'open', ?)`,
+        `INSERT INTO feedback (id, email, author_role, category, message, screenshots, context, status, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, 'open', ?)`,
       )
       .run(
         id,
         input.email,
+        input.authorRole,
         input.category,
         input.message,
         JSON.stringify(input.screenshots),
@@ -523,6 +542,7 @@ export class Db {
     return {
       id,
       student: input.email,
+      authorRole: input.authorRole,
       category: input.category,
       message: input.message,
       screenshots: input.screenshots,
@@ -532,35 +552,59 @@ export class Db {
     };
   }
 
-  listFeedback(): PlatformFeedback[] {
+  /** The queue, newest first. `status` narrows to open or resolved reports;
+   *  `triaged: false` to those the task pipeline has not processed yet (what
+   *  `tasks/tools/feedback.mjs pull` asks for). */
+  listFeedback(filter: { status?: FeedbackStatus; triaged?: boolean } = {}): PlatformFeedback[] {
+    const where: string[] = [];
+    const params: string[] = [];
+    if (filter.status) {
+      where.push('status = ?');
+      params.push(filter.status);
+    }
+    if (filter.triaged !== undefined) where.push(filter.triaged ? 'triage IS NOT NULL' : 'triage IS NULL');
     const rows = this.db
       .prepare(
-        'SELECT id, email, category, message, screenshots, context, status, created_at FROM feedback ORDER BY created_at DESC',
+        `SELECT id, email, author_role, category, message, screenshots, context, status, created_at, triage
+         FROM feedback ${where.length ? `WHERE ${where.join(' AND ')}` : ''} ORDER BY created_at DESC`,
       )
-      .all() as unknown as {
+      .all(...params) as unknown as {
       id: string;
       email: string;
+      author_role: Role | null;
       category: FeedbackCategory;
       message: string;
       screenshots: string;
       context: string | null;
       status: FeedbackStatus;
       created_at: string;
+      triage: string | null;
     }[];
     return rows.map((r) => ({
       id: r.id,
       student: r.email,
+      ...(r.author_role ? { authorRole: r.author_role } : {}),
       category: r.category,
       message: r.message,
       screenshots: JSON.parse(r.screenshots) as FeedbackScreenshot[],
       createdAt: r.created_at,
       status: r.status,
       context: r.context ? (JSON.parse(r.context) as { assignmentId?: string; questionId?: number }) : undefined,
+      ...(r.triage ? { triage: JSON.parse(r.triage) as FeedbackTriage } : {}),
     }));
   }
 
   setFeedbackStatus(id: string, status: FeedbackStatus): boolean {
     const result = this.db.prepare('UPDATE feedback SET status = ? WHERE id = ?').run(status, id);
+    return result.changes > 0;
+  }
+
+  /** Record (or, with null, clear) what the task pipeline made of a report.
+   *  Leaves `status` alone. False when there is no such report. */
+  setFeedbackTriage(id: string, triage: FeedbackTriage | null): boolean {
+    const result = this.db
+      .prepare('UPDATE feedback SET triage = ? WHERE id = ?')
+      .run(triage ? JSON.stringify(triage) : null, id);
     return result.changes > 0;
   }
 

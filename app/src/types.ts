@@ -1,5 +1,7 @@
 // Core types for the Making Minds platform
 
+import type { Role } from './auth/accounts';
+
 // 'open' is the one non-machine mode: a free-text ("open question") answer with
 // no canvas, no engine, and no autograding — reviewed manually by the
 // instructor (or, later, by an LLM). Its student answer travels as
@@ -646,11 +648,28 @@ export interface SubmissionRecord {
 }
 
 // ── Platform feedback (notes/todos.md item 9) ──────────────────────────────
-// A student's report on the platform or a homework, queued for an instructor.
+// A report on the platform or a homework, queued for an instructor.
 // Not grading, not a submission — its own small seam (FeedbackStore).
 
 export type FeedbackCategory = 'platform design' | 'homework content';
 export type FeedbackStatus = 'open' | 'resolved';
+
+/** What the task pipeline made of a report (task 018; set by
+ *  `tasks/tools/feedback.mjs mark`, never by the app): `filed` — it became,
+ *  or joined, the listed tasks; `personal` — it is about the student, not
+ *  the platform or a homework, so it is left for the instructor and never
+ *  filed; `dismissed` — noise, a duplicate or already done (`note` says
+ *  which). Independent of `status`: resolving stays the instructor's act. */
+export type FeedbackTriageOutcome = 'filed' | 'personal' | 'dismissed';
+
+export interface FeedbackTriage {
+  outcome: FeedbackTriageOutcome;
+  /** `filed` only: task ids in the `tasks/` queue (`2026-09-24-040`). */
+  tasks?: string[];
+  /** A line on why; required for `dismissed`. */
+  note?: string;
+  at: string; // ISO; the server's word
+}
 
 /** One attached screenshot, downscaled and base64-encoded client-side before
  *  it ever reaches the store (see components/FeedbackPanel.tsx). */
@@ -662,6 +681,10 @@ export interface FeedbackScreenshot {
 export interface PlatformFeedback {
   id: string;
   student: string; // email — feedback is tied to identity so an instructor can follow up
+  /** The capacity they filed in, stamped at filing from the session (task
+   *  018). Absent = unknown: a report older than the stamp whose author has
+   *  since left the roster. */
+  authorRole?: Role;
   category: FeedbackCategory;
   message: string;
   screenshots: FeedbackScreenshot[];
@@ -670,6 +693,8 @@ export interface PlatformFeedback {
   /** Where the student was when they filed it, if anywhere — helps triage
    *  "homework content" reports. Auto-filled from the current route. */
   context?: { assignmentId?: string; questionId?: number };
+  /** Absent = the task pipeline has not processed it yet. */
+  triage?: FeedbackTriage;
 }
 
 // ── Instructor notes (notes/todos.md item 12) ──────────────────────────────

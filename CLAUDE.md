@@ -20,16 +20,13 @@ the id rule: `tasks/README.md`; shared operating rules every role reads first:
 
 - **`/catch`** — the catcher session: Gabriel describes problems and ideas, it diagnoses
   (root cause, class, deep vs surgical fix) and files task files, surfacing parked questions
-  from `tasks/blocked/` first.
+  from `tasks/blocked/` first; it drains app Feedback (`tasks/tools/feedback.mjs`).
 - **`/work`** — the work session: it surveys the queue, proposes merges, offers options;
   Gabriel picks; the session works one task in depth on a `task/NNN-slug` branch and lands
   it with a merge commit.
 - **`/worker`** — the unattended routine (written, **not yet scheduled**): claims one
-  `size: small` task, fixes it in a worktree, verifies by the gates, merges. `large`/`unknown`
-  tasks and anything with `requires:` are interactive-only by construction.
-
-The former build-out loop (`/handoff`) is retired; of `docs/buildout/` only `NORTH_STAR.md`
-and `VISUAL_VOCAB.md` stay live (Source-of-truth docs).
+  `size: small` task, works it in a worktree, merges. `large`/`unknown` tasks and anything
+  with `requires:` are interactive-only by construction.
 
 ---
 
@@ -121,7 +118,7 @@ seam).
 **Instructor side** (`#/instructor`, the **Dashboard**: the student pages' shell and column, its sections
 as tabs — Assignments · Roster & accounts · Feedback · Notes): **Roster & accounts** (remote — the registrar's class list as exported,
 a status report + who-left review; who has an account, password reset, add/remove, access requests),
-**Feedback** queue (open/resolved/all), shared **Notes** page (one markdown document,
+**Feedback** queue (open/resolved/all; instructor tag, triage mark), shared **Notes** page (one markdown document,
 `marked` + `dompurify`, save-only-on-Save, warns before overwriting a newer save),
 dashboard (drag-to-reorder, **Publish/Hide** — every assignment hidden until published;
 local-mode "Load HW1–HW7"), assignment editor (drag-to-reorder questions; the document around them — preamble, source
@@ -140,7 +137,7 @@ drill-down per mode; ✓/✗ + note manual review of open questions; ⚑ integri
 import (UI + CLI), the **homework sync** (`npm run homeworks -- sync |
 status`, task 007 — HW1–HW7 from the repo into the DB: missing ones added unpublished, copies
 nobody edited refreshed, instructor-edited ones left alone and listed), assignment CRUD, workbooks (+ mint key, per-save size history), submit-with-grading + integrity,
-manual review, grade release, feedback, notes, `/api/health`. SQLite, WAL (gates: the Server row, Part 2).
+manual review, grade release, feedback (+ role, triage mark), notes, `/api/health`. SQLite, WAL (gates: the Server row, Part 2).
 
 **Deployment — pilot live.** Cloudflare Pages `https://making-minds.pages.dev` → Lightsail
 API at the placeholder `https://100-22-69-95.sslip.io` (Caddy TLS). Not yet fit for students:
@@ -152,17 +149,15 @@ intros, callouts, SVG figures cropped from the PDFs under `app/public/problem-se
 PDFs themselves). **The repo is the source; every release syncs it into the pilot DB**
 (`deploy/release.sh` → `npm run homeworks -- sync`), and local mode's "Load HW1–HW7" runs the same planner.
 
-**Reference-fixture coverage:** 56/56 at-tier — 46 exact (correct passes every case, broken
-fails) + 10 interface (a plausible attempt grades end-to-end; score never asserted) — behind
-`app/tools/coverageCheck.ts`.
+**Reference-fixture coverage:** 56/56 at-tier — 46 exact (correct passes, broken fails) +
+10 interface (a plausible attempt grades end-to-end) — `app/tools/coverageCheck.ts`.
 
 ## What's next
 
-The open work is the queue: `tasks/incoming/` (ready) and `tasks/blocked/` (waiting on
-Gabriel) — run `/work` to see it offered. Headline items on 2026-09-22: **UCLA SSO** (blocked
-on UCLA IdP details), a real domain + scheduled SQLite backup for the pilot box,
-LLM-assisted open-question grading, and — last — activating
-the worker routine.
+The open work is the queue (`tasks/incoming/` ready, `tasks/blocked/` waiting on Gabriel);
+`/work` offers it. Headline on 2026-09-24: UID identity (036) → **UCLA SSO** (006), the
+grading interface (031), pilot domain + backups (008), the feedback triage routine (029);
+last, the worker routine.
 
 ---
 
@@ -228,7 +223,7 @@ wrappers over it.
 | Student UI | `app/src/components/` | `CircuitCanvas`, `ComponentLibrary`, `DataTable`, `PerceptionFramePlayer`, `StudentLayout` (the Home tabs), `HomeScreen` (Assignments tab + up-next box), `GradesView` + `GradeSheet` (the Grades tab and its inline sheet), `GradedCaseBanner`, `AssignmentOverview` (the document page), `ProblemSetDocument`, `MenuBar`, `FeedbackPanel`, `SequentialTimeline`, `TMTapePanel`, `ArenaCanvas`, `TurbotArenaPanel` (Map + run controls; sandbox "Edit map"), `TurbotTapePanel`, `OpenResponsePanel`/`FillInPanel` (read-only when locked; paste-guarded), `SimulationPanel`, `TabBar` (question nav + Mark done / 🔒 tag; sandbox + menu), `outputDisplay.ts` (t1-rightmost OUT rows). |
 | API client | `app/src/api/client.ts` | One typed function per endpoint; bearer token under `mm:auth:token`; `onUnauthorized` hook; `health()`; auth/roster/feedback/notes calls; `putWorkbook` takes `keepalive`. `setApiBase` is the harness override. |
 | Dev tool | `app/tools/shootProblemSets.mjs` | Headless-Chrome screenshots of every HW document, the canvas panel and the editor (it seeds local mode itself) — the visual proof when the browser pane is unavailable. |
-| Server | `server/src/app.ts`, `db.ts`, `auth.ts`, `password.ts`, `roster.ts`, `rosterImport.ts`, `sanitize.ts`, `config.ts`, `seed.ts`, `roster-cli.ts`, `homeworks.ts`, `homeworks-cli.ts` | Routes, SQLite storage, the `AuthProvider` seam (`createAuthProvider` — `MM_AUTH_MODE`: `password` default / `dev` / `sso`; `LoginThrottle`), scrypt credentials (`scrypt$N$r$p$salt$hash`, self-describing), the pure roster reader (`roster.ts`, the registrar's export as-is) + `rosterImport.ts` (never removes; lists who left), redaction + grade-release withholding (`sanitize.ts`: students get no `test_cases`/`perception_cases`/`fill_in_answers`; their own results keep safe per-case fields but never `expected`/`got` or `integrity`), env config, seeding, the admin CLI (`npm run roster`). The homework sync (`homeworks.ts`: a copy is pristine iff its content hash is a committed version of its file — `gitLineage` over the box's clone — or one the sync wrote, the `content_sync` table; `seed.ts --homeworks` runs it too). Tools: `serverCheck.ts`, `rosterCheck.ts`, `authCheck.ts`, `parityCheck.ts` (server ≡ in-process grading, deep-compared), `homeworkSyncCheck.ts`. |
+| Server | `server/src/app.ts`, `db.ts`, `auth.ts`, `password.ts`, `roster.ts`, `rosterImport.ts`, `sanitize.ts`, `config.ts`, `seed.ts`, `roster-cli.ts`, `homeworks.ts`, `homeworks-cli.ts` | Routes, SQLite storage, the `AuthProvider` seam (`createAuthProvider` — `MM_AUTH_MODE`: `password` default / `dev` / `sso`; `LoginThrottle`), scrypt credentials (`scrypt$N$r$p$salt$hash`, self-describing), the pure roster reader (`roster.ts`, the registrar's export as-is) + `rosterImport.ts` (never removes; lists who left), redaction + grade-release withholding (`sanitize.ts`: students get no `test_cases`/`perception_cases`/`fill_in_answers`; their own results keep safe per-case fields but never `expected`/`got` or `integrity`), env config, seeding, the admin CLI (`npm run roster`). The homework sync (`homeworks.ts`: a copy is pristine iff its content hash is a committed version of its file — `gitLineage` over the box's clone — or one the sync wrote, the `content_sync` table; `seed.ts --homeworks` runs it too). Tools: `serverCheck.ts`, `feedbackCheck.ts`, `rosterCheck.ts`, `authCheck.ts`, `parityCheck.ts` (server ≡ in-process grading, deep-compared), `homeworkSyncCheck.ts`. |
 | Dev/sample | `app/src/devData/sampleData.ts`, `seed.ts`, `homeworks.ts`, `homeworks/hw{1..7}.json` | Sample assignment for all modes (netlist-built perception circuits, one turbot question per inner mode, open Q14) + sample submissions; `seedHomeworks()` syncs the real HW1–HW7 (record `mm:seeded-homework:<id>`) + reseeds 22 sample submissions; `homeworkSync.ts` is the pure planner it shares with the server (content hash = canonical JSON minus the instructor-owned `order`/`dueDate`; insert / unchanged / refresh / edited). |
 | Tools | `app/tools/*.ts` | The headless harness — the test suite, all in `npm run check` (plus `grade.ts` CLI grader, `builder.ts` netlist builder, `layoutCheck.ts` layout oracle): `portabilityCheck` (first: tool imports in-repo, exact-case, declared; tools type-checked), `codecCheck`, `dueDateCheck`, `statementFormatCheck` (markup grammar, document model, every HW + figures valid), `notationCheck` (grammar pins + label-dissection grep gate), `themeCheck` (Page surfaces gate), `tmCheck`, `turbotCheck` (all four brains; `[multi-arena]`, `[pass-through step-limit]`, path/facing independence), `perceptionCheck`, `scWindowCheck` (question runs ≡ grader), `caseRunCheck` (caseRun ≡ grader; replay per mode, remote shape, budgets), `routerCheck` (fallback budget 2; hw3-p4 pin), `bumpCheck`, `pipelineCheck` (submit → grade, every mode), `navResetCheck` (both reset laws, `[edit during run]`; done / frozen / viewed-submission locks), `routingCheck` (route access, landing, held routes, principal change), `boxScopeCheck` (box library scope, sequential + drawn-across boxes ≡ unboxed, `[naming]`), `pasteCheck` (paste policy + provenance grep gates), `provenanceCheck` (mint/verify, attribution, paste re-mint, stamp + trace flags, uuid grep gate), `workbookFileCheck` (round trip, bad files, unsaved baseline, file handle), `remoteStoreCheck` (boots the REAL server; grader-import grep gate; password auth client), `coverageCheck` (two-tier reference-fixture ledger + `allowed_components` pins). |
 | Queue | `tasks/` | The task pipeline (top of this file). `tasks/tools/check-budgets.mjs` is the size guard on this file. |
@@ -336,6 +331,8 @@ turbots** — the textbook model (internal/external states, B/E/F senses, ↑/�
 
 ## Things to watch
 
+- **The repo is PUBLIC: student data never enters git** (class lists → gitignored
+  `rosters/`; feedback reports → `tasks/CATCHER.md` §3).
 - **Test cases never ship to the client in production — SOLVED in remote mode.** The server
   strips `test_cases`/`perception_cases`/`fill_in_answers` from student copies and the answer
   key (`expected`/`got`) and `integrity` from student results, keeping safe per-case fields

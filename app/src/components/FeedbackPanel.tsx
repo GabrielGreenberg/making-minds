@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import type { FeedbackCategory, FeedbackScreenshot } from '../types';
 import { feedbackStore } from '../storage/backend';
-import { getCurrentUserEmail } from '../auth';
+import { useAuth } from '../auth';
 import { useStore } from '../store';
 
 const MAX_SCREENSHOTS = 2;
@@ -35,6 +35,7 @@ function fileToScreenshot(file: File): Promise<FeedbackScreenshot> {
 }
 
 export function FeedbackPanel({ onClose }: { onClose: () => void }) {
+  const { user } = useAuth();
   const assignment = useStore((s) => s.assignment);
   const currentQuestionIndex = useStore((s) => s.currentQuestionIndex);
   const [category, setCategory] = useState<FeedbackCategory>('platform design');
@@ -61,11 +62,16 @@ export function FeedbackPanel({ onClose }: { onClose: () => void }) {
       setError('Say a little about what happened.');
       return;
     }
+    if (!user) {
+      setError('Sign in to send feedback.');
+      return;
+    }
     setBusy(true);
     setError(null);
     try {
       await feedbackStore.submit({
-        student: getCurrentUserEmail(),
+        student: user.email,
+        authorRole: user.role,
         category,
         message: message.trim(),
         screenshots,
@@ -93,6 +99,8 @@ export function FeedbackPanel({ onClose }: { onClose: () => void }) {
         </div>
         <p className="mm-modal-sub">
           Something broken, confusing, or wrong in a homework? Tell the instructors.
+          This form is for the platform and the homeworks only: for anything personal
+          (an extension, an absence, a grade), email your instructor instead.
         </p>
         {sent ? (
           <p className="feedback-sent">Thanks — an instructor will take a look.</p>

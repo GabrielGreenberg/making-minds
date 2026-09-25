@@ -37,7 +37,8 @@ tasks/
   done/           landed (merged to main), or merged into another task
   attachments/    screenshots etc. referenced by tasks, named <id>-<n>.<ext>
   log.md          append-only: one line per landed task
-  tools/          next-id.mjs (id minting) · check-budgets.mjs (the size guard)
+  tools/          next-id.mjs (id minting) · check-budgets.mjs (the size guard) ·
+                  feedback.mjs (app feedback reports → a private copy; CATCHER §3)
 ```
 
 ## Task file

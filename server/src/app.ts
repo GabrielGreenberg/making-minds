@@ -44,8 +44,11 @@
 //                                              pass, note?} → updated record
 //   POST   /api/feedback                       any signed-in user: file a platform/homework
 //                                              report, screenshots as base64 data URLs
-//   GET    /api/feedback                       instructor: the full queue, newest first
+//   GET    /api/feedback                       instructor: the queue, newest first;
+//                                              ?status=open|resolved, ?triaged=true|false
 //   PUT    /api/feedback/:id/status            instructor: {status: 'open'|'resolved'}
+//   PUT    /api/feedback/:id/triage            instructor: what the task pipeline made of
+//                                              it — {outcome, tasks?, note?} | {clear: true}
 //   GET    /api/instructor-notes               instructor: the one shared markdown note
 //   PUT    /api/instructor-notes               instructor: {content: string} → saves it
 //   GET    /api/health                         unauthenticated liveness probe
@@ -59,7 +62,7 @@
 
 import express from 'express';
 import type { Request, Response, NextFunction } from 'express';
-import type { AssignmentData, AssignmentState, SubmissionData } from '../../app/src/types';
+import type { AssignmentData, AssignmentState, FeedbackTriage, SubmissionData } from '../../app/src/types';
 import { gradeSubmission } from '../../app/src/engine/grader';
 import { applyManualReview } from '../../app/src/storage/manualReview';
 import { deriveMintKey } from '../../app/src/provenance/ids';
@@ -668,6 +671,7 @@ export function createApp(config: ServerConfig, db: Db) {
         : undefined;
     const feedback = db.addFeedback({
       email: req.user!.email,
+      authorRole: req.user!.role,
       category: body.category,
       message: body.message.trim(),
       screenshots: shots as { dataUrl: string; filename?: string }[],
@@ -676,8 +680,22 @@ export function createApp(config: ServerConfig, db: Db) {
     res.status(201).json({ feedback });
   });
 
-  app.get('/api/feedback', auth, requireInstructor, (_req, res) => {
-    res.json({ feedback: db.listFeedback() });
+  app.get('/api/feedback', auth, requireInstructor, (req, res) => {
+    const { status, triaged } = req.query;
+    if (status !== undefined && status !== 'open' && status !== 'resolved') {
+      res.status(400).json({ error: 'status must be "open" or "resolved"' });
+      return;
+    }
+    if (triaged !== undefined && triaged !== 'true' && triaged !== 'false') {
+      res.status(400).json({ error: 'triaged must be "true" or "false"' });
+      return;
+    }
+    res.json({
+      feedback: db.listFeedback({
+        status,
+        triaged: triaged === undefined ? undefined : triaged === 'true',
+      }),
+    });
   });
 
   app.put('/api/feedback/:id/status', auth, requireInstructor, (req, res) => {
@@ -691,6 +709,61 @@ export function createApp(config: ServerConfig, db: Db) {
       return;
     }
     res.json({ ok: true });
+  });
+
+  // The task pipeline's mark (task 018), set by `tasks/tools/feedback.mjs
+  // mark` from the instructor's machine once the catcher has processed a
+  // report. It never touches `status`: resolving stays the instructor's act.
+  const TASK_ID = /^\d{4}-\d{2}-\d{2}-\d{3}$/;
+  const MAX_TRIAGE_TASKS = 10;
+  const MAX_TRIAGE_NOTE_LENGTH = 300;
+
+  app.put('/api/feedback/:id/triage', auth, requireInstructor, (req, res) => {
+    const body = (req.body ?? {}) as { outcome?: unknown; tasks?: unknown; note?: unknown; clear?: unknown };
+    let triage: FeedbackTriage | null;
+    if (body.clear === true) {
+      triage = null;
+    } else {
+      const { outcome, tasks, note } = body;
+      if (outcome !== 'filed' && outcome !== 'personal' && outcome !== 'dismissed') {
+        res.status(400).json({ error: 'outcome must be "filed", "personal" or "dismissed" (or send {clear: true})' });
+        return;
+      }
+      if (note !== undefined && (typeof note !== 'string' || note.length > MAX_TRIAGE_NOTE_LENGTH)) {
+        res.status(400).json({ error: `note must be a string under ${MAX_TRIAGE_NOTE_LENGTH} characters` });
+        return;
+      }
+      const cleanNote = typeof note === 'string' && note.trim() !== '' ? note.trim() : undefined;
+      if (outcome === 'filed') {
+        if (
+          !Array.isArray(tasks) ||
+          tasks.length === 0 ||
+          tasks.length > MAX_TRIAGE_TASKS ||
+          !tasks.every((t) => typeof t === 'string' && TASK_ID.test(t))
+        ) {
+          res.status(400).json({ error: 'a filed report names 1–10 task ids like 2026-09-24-040' });
+          return;
+        }
+      } else if (tasks !== undefined) {
+        res.status(400).json({ error: 'only a filed report names tasks' });
+        return;
+      }
+      if (outcome === 'dismissed' && !cleanNote) {
+        res.status(400).json({ error: 'a dismissed report needs a note saying why' });
+        return;
+      }
+      triage = {
+        outcome,
+        ...(outcome === 'filed' ? { tasks: [...new Set(tasks as string[])] } : {}),
+        ...(cleanNote ? { note: cleanNote } : {}),
+        at: new Date().toISOString(),
+      };
+    }
+    if (!db.setFeedbackTriage(String(req.params.id), triage)) {
+      res.status(404).json({ error: 'unknown feedback id' });
+      return;
+    }
+    res.json({ ok: true, triage });
   });
 
   // ── instructor notes (notes/todos.md item 12) ───────────────────

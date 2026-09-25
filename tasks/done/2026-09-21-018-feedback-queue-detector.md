@@ -8,9 +8,9 @@ requires: browser, human
 area: pipeline
 source: chat
 created: 2026-09-21T15:30:00-07:00
-status: in-progress
+status: done
 after:
-branch: task/018-feedback-pull
+branch:
 merged_into:
 ---
 
@@ -98,9 +98,25 @@ de-identified task may.
    needs a server-issued key instead — noted on 006.
 
 ## Verify
-`server/tools/feedbackCheck.ts` (above). Browser pass (local mode, and remote mode against a
-local server): the form note, the queue's instructor tag and triage marks. **Owed:** a real
-pull against the pilot — needs the server change released (`deploy/release.sh`) and
-Gabriel's `secrets/feedback.env`.
+`server/tools/feedbackCheck.ts` (above). Browser pass (remote mode against a local server):
+the form note, the queue's instructor tag and triage marks. **Owed:** a real pull against the
+pilot — needs the server change released (`deploy/release.sh`) and Gabriel's
+`secrets/feedback.env` (three lines: `MM_API_BASE=https://100-22-69-95.sslip.io`,
+`MM_FEEDBACK_EMAIL=<his instructor account>`, `MM_FEEDBACK_PASSWORD=<its password>`), then
+`node tasks/tools/feedback.mjs pull`.
 
 ## Progress log
+- 2026-09-24 (`/work`): re-diagnosed with Gabriel — the repo is public, so raw reports never
+  enter git (decisions above); size small → large. Built: `feedback.author_role` (stamped at
+  filing, backfilled once) and `feedback.triage` (`server/src/db.ts`), `?status`/`?triaged`
+  filters and `PUT /api/feedback/:id/triage` (`server/src/app.ts`), `authorRole`/`triage` on
+  `PlatformFeedback` and the seam, the queue's instructor tag + mark, the form's personal-
+  matters note, `tasks/tools/feedback.mjs pull|mark` (working copy outside the repo, no
+  email, refuses an in-repo `--out`, signs out every run), `server/tools/feedbackCheck.ts`
+  (52 pins; neutered twice — a wrong role stamp → 3 FAIL; an unfiltered, email-carrying,
+  no-logout script → 7 FAIL), a `remoteStoreCheck` role pin, CATCHER §3 intake rules,
+  PROFILE law 9, 029 rebased (review becomes a server mark, no committed ledger), 006 noted
+  (SSO needs a server-issued key for the script). Browser (remote mode, local server, dev
+  auth): a report filed from the form; `pull` wrote 3 files, roles right, no email; `mark`
+  filed / personal / dismissed each render in the Feedback tab, desktop and 375 px; no
+  console errors. All gates green. Owed: the pilot run (Verify).

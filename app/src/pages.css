@@ -613,7 +613,18 @@
 
 .feedback-card-foot {
   display: flex;
+  align-items: center;
   justify-content: flex-end;
+  gap: 10px;
+}
+
+/* What the task pipeline made of the report (task 018) — left of the toggle. */
+.feedback-triage {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-right: auto;
 }
 
 /* ── Instructor notes ── */
