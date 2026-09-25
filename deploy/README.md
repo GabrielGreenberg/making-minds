@@ -92,9 +92,31 @@ curl -s https://api.<domain>/api/health    # → {"ok":true}
 Updates: `deploy/release.sh` (section 0). By hand, as the `makingminds` user:
 `git pull && npm install && sudo systemctl restart makingminds-api`.
 
-**Backups**: the entire state is one SQLite file. A nightly cron
-(`sqlite3 .../making-minds.sqlite ".backup /srv/making-minds/data/backup-$(date +%a).sqlite"`)
-plus Lightsail's instance snapshots is enough.
+**Backups** (task 041): the entire state is one SQLite file, copied two ways, each
+with its own folder and rotation so neither can prune the other's files. Both are
+consistent online copies (`VACUUM INTO` through `node:sqlite`; the box has no
+`sqlite3` CLI) and owner-only, since they hold password hashes.
+
+| Copy | Where | Kept | Made by |
+| --- | --- | --- | --- |
+| Daily | `/srv/making-minds/backups/daily/daily-YYYY-MM-DD.sqlite` | 35 days | `makingminds-backup.timer`, 03:30 Pacific (`deploy/backup-daily.sh`; integrity-checked before it counts) |
+| Pre-release | `/srv/making-minds/data/backup-YYYY-MM-DD-HHMMSS.sqlite` | the last 7 | `deploy/release.sh`, before each pull |
+
+The daily job is installed and refreshed by `deploy/backup-install.sh`, which
+every release runs (so the box always carries the repo's version, and a new box
+gets it on its first release); by hand: `sudo bash
+/srv/making-minds/repo/deploy/backup-install.sh`. Check it: `systemctl list-timers
+makingminds-backup.timer`; run it now: `sudo systemctl start makingminds-backup`;
+its log: `journalctl -u makingminds-backup`.
+
+**Restore** a copy (as `ubuntu`): `sudo systemctl stop makingminds-api`, then
+`sudo -u makingminds cp <backup> /srv/making-minds/data/making-minds.sqlite` and
+`sudo rm -f /srv/making-minds/data/making-minds.sqlite-wal
+/srv/making-minds/data/making-minds.sqlite-shm` (the copy is self-contained; a
+stale WAL must not be replayed onto it), then `sudo systemctl start
+makingminds-api` and `curl -s http://127.0.0.1:8133/api/health`. Keep the file you
+replaced until you're sure. Not yet: an off-box copy (S3 or Lightsail snapshots);
+everything above lives on the one instance.
 
 **`MM_MINT_SECRET`** (optional; task 034, the provenance watermark): the secret
 every student's per-assignment mint key is derived from — the key that binds

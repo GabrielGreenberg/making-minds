@@ -156,7 +156,7 @@ PDFs themselves). **The repo is the source; every release syncs it into the pilo
 
 The open work is the queue (`tasks/incoming/` ready, `tasks/blocked/` waiting on Gabriel);
 `/work` offers it. Headline on 2026-09-24: **UCLA SSO** (006, parked on UCLA IT), the
-grading interface (031), the robot pipeline (041 backups → 042 release gate → 029 → 043),
+grading interface (031), the robot pipeline (042 release gate → 029 → 043),
 the pilot domain (008).
 
 ---
@@ -350,7 +350,7 @@ turbots** — the textbook model (internal/external states, B/E/F senses, ↑/�
   `secrets/cloudflare.env` and an `ssh/` key — `deploy/README.md` §0).
 - **Deploy knobs live in `deploy/README.md`**: Pages sets `VITE_API_BASE` and
   `VITE_BASE_PATH=/` at build; the Lightsail unit sets `MM_AUTH_MODE=password`,
-  `MM_CORS_ORIGINS` and friends; SQLite backup = copy the file (WAL-safe).
+  `MM_CORS_ORIGINS` and friends; backups: daily, kept 35 days (§Backups there, task 041).
 - **CI is strict TypeScript** (`noUnusedLocals`, `noUnusedParameters`): before committing
   run `npx tsc -p tsconfig.app.json --noEmit` and `npm run typecheck:tools` in `app/`
   (both gate the deploy); after any push check `gh run list --limit 1`.
