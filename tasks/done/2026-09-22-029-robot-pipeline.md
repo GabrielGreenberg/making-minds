@@ -8,9 +8,9 @@ requires: human
 area: pipeline
 source: chat
 created: 2026-09-22T10:30:00-07:00
-status: in-progress
+status: done
 after: 2026-09-25-042
-branch: task/029-robot-pipeline
+branch:
 merged_into:
 ---
 
@@ -159,3 +159,8 @@ unattended loop that both catches and works, on an always-on second computer, an
     the phone, the transcript probe. **Release 029 by hand** after landing: it changes
     `deploy/`, so the robot's gate holds it (and every release after it) until Gabriel does.
   - Next: full gates, land, push, release by hand.
+- 2026-09-25 (`/work`) — Landed. Gates by exit code: app `tsc` 0, build 0, `npm run check` 0,
+  server typecheck 0, server check 0 (a first background run hung in `vite build` beside the
+  dev server; re-run in the foreground, 3 s). Merged `--no-ff` into `main` and pushed.
+  **Owed, in order:** Gabriel releases `main` by hand (`deploy/release.sh` — it changes
+  `deploy/`, so the gate holds it); then 043 on the always-on Mac.

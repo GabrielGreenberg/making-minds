@@ -38,3 +38,4 @@
 2026-09-25-046 · feature · Make HW1 release-ready — a box per part, autograded parts, typable symbols, a prominent schematic, an unclipped overview · 2026-09-25T11:16:30-0700 · task/046-hw1-release-ready · 279acc6
 2026-09-25-050 · chore · Stop linking HW1's PDF from the app — the app's HW1 now differs from the printed one · 2026-09-25T11:30:23-0700 · task/050-unlink-hw1-pdf · b4681fa
 2026-09-25-051 · chore · Bring HW1 in the textbook deck (MM.key) up to date with the app's HW1 — handed to the MM class session · 2026-09-25T11:32:58-0700 · (none) · (memo only)
+2026-09-22-029 · feature · The robot pipeline — an hourly auto-catch that chains into a one-task work run, in the robot's own clones, releasing through the guardrails · 2026-09-25T15:08:04-0700 · task/029-robot-pipeline · 5c1386f
