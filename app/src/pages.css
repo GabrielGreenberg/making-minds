@@ -108,16 +108,20 @@
 .ps-section-aside { display: flex; flex-direction: column; gap: 12px; padding-top: 4px; }
 
 /* Runs of problems: stacked, two columns (the PDFs' numbered lists), or a
-   grid of truth tables / arenas several per row. */
+   grid of truth tables / arenas several per row. A grid cell is as wide as
+   its widest unbreakable content (a table, an arena) and never under 205px;
+   its text wraps to that width. Fixed 205px tracks clipped HW1 P3/P5's
+   four-column tables behind an invisible scrollbar (task 046). */
 .ps-run + .ps-run, .ps-attachments + .ps-run, .ps-run + .ps-attachments { margin-top: 10px; }
 .ps-run--columns { columns: 2; column-gap: 36px; }
 .ps-run--columns .ps-problem { break-inside: avoid; }
 .ps-run--grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(205px, 1fr));
+  display: flex;
+  flex-wrap: wrap;
   gap: 8px 20px;
-  align-items: start;
+  align-items: flex-start;
 }
+.ps-run--grid > .ps-problem { width: min-content; min-width: 205px; max-width: 100%; }
 /* A grid cell has no room for the mode tag; the section says what these are. */
 .ps-run--grid .ps-mode { display: none; }
 
@@ -184,7 +188,7 @@
 @media (max-width: 720px) {
   .ps-section-body--aside { grid-template-columns: minmax(0, 1fr); }
   .ps-run--columns { columns: 1; }
-  .ps-run--grid { grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); }
+  .ps-run--grid > .ps-problem { min-width: 200px; }
 }
 
 /* ── Rendered statement markup (components/StatementBody.tsx) ─────────

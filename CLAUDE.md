@@ -10,7 +10,7 @@ by `tasks/tools/check-budgets.mjs` (runs in CI and in app `npm run check`).
 > story lives in its task file's `## Progress log` and one line in `tasks/log.md`, never
 > here; the pre-pipeline changelog (2026-07 → 2026-09-21) is frozen in `docs/HISTORY.md`.
 
-_Last updated: 2026-09-24_
+_Last updated: 2026-09-25_
 
 ## How work flows — the task pipeline (`tasks/`)
 
@@ -143,7 +143,7 @@ manual review, grade release, feedback (+ role, triage mark), notes, `/api/healt
 API at the placeholder `https://100-22-69-95.sslip.io` (Caddy TLS). Not yet fit for students:
 UCLA SSO is a stub and the roster is the toy one (plus a leftover `cc-basics` demo row,
 deletable from the dashboard). **Content:** HW1–HW7 live in the repo as JSON
-(`app/src/devData/homeworks/`, 80 questions — machine problems from the reference fixtures,
+(`app/src/devData/homeworks/`, 86 questions — machine problems from the reference fixtures,
 prose problems as open questions), transcribed to their PDFs' document structure (sections,
 intros, callouts, SVG figures cropped from the PDFs under `app/public/problem-sets/` beside the
 PDFs themselves). **The repo is the source; every release syncs it into the pilot DB**
