@@ -156,7 +156,7 @@ PDFs themselves). **The repo is the source; every release syncs it into the pilo
 
 The open work is the queue (`tasks/incoming/` ready, `tasks/blocked/` waiting on Gabriel);
 `/work` offers it. Headline on 2026-09-24: **UCLA SSO** (006, parked on UCLA IT), the
-grading interface (031), the robot pipeline (042 release gate → 029 → 043),
+grading interface (031), the robot pipeline (029 → 043),
 the pilot domain (008).
 
 ---
@@ -346,8 +346,8 @@ turbots** — the textbook model (internal/external states, B/E/F senses, ↑/�
 - **Remote workbooks are last-write-wins across devices** (accepted pilot trade-off,
   `docs/buildout/designs/remote-stores.md` §5; an If-Match precondition is the follow-up if it bites).
 - **Releasing = `deploy/release.sh`** after a push to `main` (box backup + pull + homework sync + restart over ssh,
-  then the Pages upload; refuses unless local main == origin/main; needs the gitignored
-  `secrets/cloudflare.env` and an `ssh/` key — `deploy/README.md` §0).
+  Pages upload, smoke test; refuses unless local main == origin/main; needs the gitignored
+  `secrets/` + `ssh/` key — `deploy/README.md` §0). `--unattended` obeys `deploy/release-gate.mjs`.
 - **Deploy knobs live in `deploy/README.md`**: Pages sets `VITE_API_BASE` and
   `VITE_BASE_PATH=/` at build; the Lightsail unit sets `MM_AUTH_MODE=password`,
   `MM_CORS_ORIGINS` and friends; backups: daily, kept 35 days (§Backups there, task 041).

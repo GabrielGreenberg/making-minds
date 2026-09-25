@@ -8,9 +8,9 @@ requires: ssh, human
 area: deploy
 source: chat
 created: 2026-09-25T10:00:00-07:00
-status: in-progress
+status: done
 after: 2026-09-25-041
-branch: task/042-release-gate
+branch:
 merged_into:
 ---
 
@@ -78,3 +78,27 @@ The gate check (item 8). By hand: `release.sh --check` on a commit touching
 same at 10:00 → release. One real unattended-mode release watched by Gabriel.
 
 ## Progress log
+- 2026-09-25 (`/work`): built. `deploy/release-gate.mjs` — pure `decide(facts)` (release /
+  hold / wait / **current**, a fourth verdict for "nothing new", exit 5, so an hourly run with
+  nothing to ship is a quiet no-op) + `gatherFacts` (git; an ssh probe of the box: its HEAD,
+  the backup timer, the newest daily copy's age; the pilot API's assignments as an instructor)
+  + a CLI (`--json`, `--note-state`: a hold note is keyed by commit + rules and said once).
+  Rules as data: `HOLD_PATHS` (the decided list plus `server/src/homeworks.ts` and
+  `app/src/devData/homeworkSync.ts`, which decide how homework content reaches the database —
+  in the spirit of "answer keys"; Gabriel may drop them), `RELEASE_HOURS` 07–22 Pacific
+  (DST-correct via Intl), `FREEZE_HOURS` 24 (published assignments only, before the due time
+  only), `BACKUP_MAX_AGE_HOURS` 30. Box or API unreachable → wait, never hold or release.
+  `deploy/pilot-api.mjs`: the sign-in helpers moved out of `tasks/tools/feedback.mjs` and
+  shared (feedbackCheck still green). `release.sh`: `--check` (verdict only), `--unattended`
+  (gate first; 3/4 exit, 5 → exit 0; refuses other options), a smoke test after every full
+  release (the page's script loads, `/api/auth/config` answers; unattended failure → a note
+  naming the last good commit), and a `note: Released …` line. Done-when 6's channel: the
+  script prints the note, the robot's work routine (029) delivers it — written into 029.
+  Done-when 7's "sign-in page renders" is approximated without a browser (script + config).
+  `server/tools/releaseGateCheck.ts` (63 pins, in server `check`; neutered: UTC instead of
+  Pacific, a freeze ignoring "published", wait outranking hold → 6 FAIL). Real run against
+  the pilot: `release.sh --check` → HOLD (036's sign-in + database changes and 041's
+  `deploy/` files pending; backups healthy; no deadline in 24 h).
+  All gates green (one app build hung idle at startup while another session ran its checks in
+  parallel; stopped and re-run clean). Owed: one real unattended release that goes through
+  (today's pending changes all hold), watched by Gabriel; the smoke test's first real run.
