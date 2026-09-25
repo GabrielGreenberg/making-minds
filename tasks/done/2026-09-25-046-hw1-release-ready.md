@@ -8,9 +8,9 @@ requires: browser
 area: app
 source: audit
 created: 2026-09-25T10:35:00-07:00
-status: in-progress
+status: done
 after: 2026-09-25-044
-branch: task/046-hw1-release-ready
+branch:
 merged_into:
 ---
 
@@ -79,3 +79,21 @@ Browser or `tools/shootProblemSets.mjs`: the overview and all 23 screens.
 
 ## Progress log
 - 2026-09-25 — claimed after 044 landed; worked in the worktree `.claude/worktrees/hw1-release`. Next: apply the scripted hw1.json + sample-submission rewrite, the overview grid CSS, then screenshots.
+- 2026-09-25 — built and landed. `hw1.json` rewritten by a script (the file's own JSON
+  format, so the diff is only real changes): 23 questions — 6a/6b text + 6c fill-in "3"; 9a text +
+  9b nine blanks j(0, 0)…j(2, 2); 10a/b/c text; 13a/13b fill-ins (10000, 100100), "show your work"
+  dropped; P14 fill-in f(@)/f(#); P15 "marks" @/#, hint "3-place"; P8 "two different functions";
+  P9 j(⋅), "between 0 and 2, inclusive"; P10b/c say what "different" means; P11 labels zero…ten;
+  P12 typable symbols; P5 hint to reuse the boxed XOR; P16/P17 carry the schematic as a problem
+  figure (the SVG redrawn at 210pt, capped 280px) plus "On the canvas, I is IN1, O₁ is OUT1 and O₂
+  is OUT2"; the section IV figure removed; the challenge box titled "Challenge problem (optional,
+  not collected)". Ids: unchanged problems keep theirs; parts after the first take 18–23. The seeded
+  sample submissions follow (alice's answers split into parts, her base-6 symbols typable; bob
+  gets two wrong fill-ins). Overview grid (`pages.css`): a flex row of cells each `min-content`
+  wide (≥ 205px) with an `auto` body column and `min-width: auto` body — a `1fr` track or a
+  `min-width: 0` body counts as zero in a min-content size, which is why the first attempt still
+  clipped; P3/P5 cells now 247px, nothing clipped at 1280/700/375, no page scroll at 375. Pins
+  moved with the content: `pipelineCheck` (P11 word labels; the creator's "next number" rule keeps
+  its 0–10 → "11" pin on a numbered copy), `statementFormatCheck` (no HW statement splits into
+  parts now). Screenshots: `tasks/attachments/2026-09-25-046-*.png`. Gates: tsc ×2,
+  `npm run check`, build, server check — all green. Code commit 279acc6.
