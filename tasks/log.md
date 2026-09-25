@@ -34,3 +34,4 @@
 2026-09-25-041 · chore · Back up the pilot database daily and keep the copies for weeks, independent of releases · 2026-09-25T10:13:41-0700 · task/041-daily-backups · 58aac12
 2026-09-25-042 · feature · Release guardrails for unattended releases — a hold list, quiet hours, a deadline freeze, and a one-line note per release · 2026-09-25T10:45:51-0700 · task/042-release-gate · 0b91b2a
 2026-09-25-044 · bug · Write tally numerals with their 1s on the right, as the textbook and the spec do, on every axis · 2026-09-25T11:02:12-0700 · task/044-tally-ones-on-the-right · c026cdb
+2026-09-25-045 · bug · A combinatorial-circuit canvas never offers or accepts a memory (MEM) block · 2026-09-25T11:04:44-0700 · task/045-no-memory-in-cc · fc60a4c

@@ -521,6 +521,16 @@ export function selectPlaceableBoxKinds(s: {
 }
 
 /**
+ * May this canvas hold memory — a MEM, or a box with one inside? Exactly
+ * where a sequential box may be placed (types.ts modeHoldsMemory), the
+ * sandbox's Logic Circuit tab included. Without it the palette hides MEM and
+ * addComponent / paste refuse one; the grader's Stage 1 is the backstop.
+ */
+export function selectMayHoldMemory(s: Parameters<typeof selectPlaceableBoxKinds>[0]): boolean {
+  return selectPlaceableBoxKinds(s).includes('SC');
+}
+
+/**
  * The currently-live FSM control state (component id) — the ONE source of
  * truth for the canvas's green state highlight, fed by whichever simulation
  * is active. An FSM sim run carries it in fsmCurrentStateId; a turbot arena
@@ -1743,6 +1753,8 @@ export const useStore = create<AppState>()((set, get) => ({
   addComponent: (type, x, y) => {
     const state = get();
     if (isCurrentQuestionLocked(state)) return;
+    // A combinatorial canvas holds no memory (selectMayHoldMemory).
+    if (type === 'MEM' && !selectMayHoldMemory(state)) return;
     state.pushHistory(1);
     const sx = snapToGrid(x);
     const sy = snapToGrid(y);
@@ -3001,15 +3013,16 @@ export const useStore = create<AppState>()((set, get) => ({
       allowed: selectAllowedComponents(state),
     });
     if (!verdict.ok) return verdict.message;
-    // A box holding memory goes only where a sequential box may be placed —
-    // placeBoxInstance's rule, which a paste must not route around (both CC
-    // and SC canvases are paste kind 'circuit'). Canvases that take no boxes
-    // at all (a sandbox FSM/TM tab, where paste is free) are left alone.
+    // Memory — a MEM, or a box holding one — goes only on a canvas that may
+    // hold it (selectMayHoldMemory: the palette's and addComponent's rule),
+    // which a paste must not route around (both CC and SC canvases are paste
+    // kind 'circuit'). Canvases that take no boxes at all (a sandbox FSM/TM
+    // tab, where paste is free) are left alone.
     const kinds = selectPlaceableBoxKinds(state);
-    const sequentialBoxes = verdict.clip.components.filter(isSequentialBox);
-    if (sequentialBoxes.length > 0 && kinds.includes('CC') && !kinds.includes('SC')) {
-      return `A box holding memory can't go on this canvas: ${sequentialBoxes.map((b) => b.label).join(', ')}. ` +
-        'It is a sequential circuit, and this canvas takes combinational boxes only.';
+    const memoryParts = verdict.clip.components.filter((c) => c.type === 'MEM' || isSequentialBox(c));
+    if (memoryParts.length > 0 && kinds.includes('CC') && !selectMayHoldMemory(state)) {
+      return `Memory can't go on this canvas: ${memoryParts.map((b) => b.label).join(', ')}. ` +
+        'This is a combinatorial circuit, which holds no MEM and no box holding memory.';
     }
     // A fresh copy per paste, every id (BOXED internals too) minted anew in
     // the TARGET's scope: two pastes of one item never share objects or ids,

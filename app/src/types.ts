@@ -421,6 +421,17 @@ export function placeableBoxKinds(mode: BuildMode): ReadonlyArray<'CC' | 'SC'> {
   }
 }
 
+/** May a canvas of this mode hold memory — a MEM, or a box with one inside?
+ *  Exactly where a sequential box may be placed: one rule, not two. A CC
+ *  question (a CC turbot brain, CC perception) is a combinatorial circuit and
+ *  holds none; SC holds both. The palette, the store's placement and paste,
+ *  the question creator and the grader's Stage 1 all ask this (the sandbox's
+ *  Logic Circuit tab, CC mode that may turn SC, is store.ts
+ *  selectMayHoldMemory's one exception). */
+export function modeHoldsMemory(mode: BuildMode): boolean {
+  return placeableBoxKinds(mode).includes('SC');
+}
+
 export interface AssignmentData {
   id: string;                  // stable slug (e.g. "hw1"); keys the registry/persistence
   title: string;
