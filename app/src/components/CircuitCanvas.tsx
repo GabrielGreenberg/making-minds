@@ -1651,6 +1651,7 @@ function BoxView({
             autoFocus
             ref={pasteGuardRef}
             defaultValue={box.name}
+            onFocus={(e) => e.target.select()}
             onBlur={(e) => {
               const name = e.target.value.trim();
               if (name && name !== box.name) {
@@ -2562,9 +2563,11 @@ export function CircuitCanvas() {
             outputPortIds: [],
           };
           state.addBox(newBox);
-          state.setDraftBox(newBox);
-          state.setBoxDrawingPhase('adjusting');
           state.setSelectedTool(null);
+          if (useStore.getState().boxes.some((b) => b.id === newBox.id)) {
+            state.setDraftBox(newBox);
+            state.setBoxDrawingPhase('adjusting');
+          }
         }
         return;
       }
@@ -3613,6 +3616,8 @@ export function CircuitCanvas() {
               const error = useStore.getState().confirmBox(draftBox.id);
               if (error) {
                 alert(error);
+              } else {
+                setEditingBoxId(draftBox.id);
               }
             }}
           >

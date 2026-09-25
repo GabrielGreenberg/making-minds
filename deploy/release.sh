@@ -14,11 +14,18 @@
 #   3. the site   — the frontend is built in remote mode and uploaded to Cloudflare
 #                   Pages (needs secrets/cloudflare.env)
 #   4. proof      — the API answers /api/health and the site serves the new build
+#   5. smoke      — the site's script loads and the API's sign-in config answers
 #
 # Usage:  deploy/release.sh [--dry-run] [--frontend-only] [--box-only]
+#         deploy/release.sh --unattended | --check
 #   --dry-run        preflight + build, but no ssh and no upload
 #   --frontend-only  skip the box (ONLY when server/ and app/src/engine/ did not change)
 #   --box-only       skip the site
+#   --unattended     for the robot (task 042): ask deploy/release-gate.mjs first and
+#                    release only on its "release"; a hold or a wait exits 3 or 4, "nothing
+#                    new" exits 0. Prints one `note: …` line for Gabriel (released, held,
+#                    or a failed smoke test). A hand run never asks the gate.
+#   --check          print the gate's verdict and reasons; release nothing
 #
 # Knobs (hostnames) live here and in deploy/README.md; the domain swap edits them.
 set -euo pipefail
@@ -30,19 +37,27 @@ BOX_USER="ubuntu"
 PAGES_PROJECT="making-minds"
 SITE="https://making-minds.pages.dev"
 
-DRY_RUN=0; DO_BOX=1; DO_SITE=1
+DRY_RUN=0; DO_BOX=1; DO_SITE=1; UNATTENDED=0; CHECK=0
 for arg in "$@"; do
   case "$arg" in
     --dry-run) DRY_RUN=1 ;;
     --frontend-only) DO_BOX=0 ;;
     --box-only) DO_SITE=0 ;;
-    -h|--help) sed -n '2,20p' "${BASH_SOURCE[0]}"; exit 0 ;;
+    --unattended) UNATTENDED=1 ;;
+    --check) CHECK=1 ;;
+    -h|--help) sed -n '2,29p' "${BASH_SOURCE[0]}"; exit 0 ;;
     *) echo "unknown option: $arg" >&2; exit 2 ;;
   esac
 done
+if [ "$UNATTENDED" = 1 ] && { [ "$DRY_RUN" = 1 ] || [ "$DO_BOX" = 0 ] || [ "$DO_SITE" = 0 ] || [ "$CHECK" = 1 ]; }; then
+  echo "--unattended releases everything or nothing; it takes no other option" >&2; exit 2
+fi
 
 say()  { printf '\n\033[1m== %s\033[0m\n' "$*"; }
 fail() { printf '\033[31m%s\033[0m\n' "$*" >&2; exit 1; }
+
+# --check: the gate's verdict on this checkout's HEAD, and nothing else.
+[ "$CHECK" = 1 ] && exec node "$ROOT/deploy/release-gate.mjs"
 
 # ---------------------------------------------------------------- 1. preflight
 say "Preflight"
@@ -59,6 +74,24 @@ remote_sha="$(git rev-parse origin/main)"
 short="$(git rev-parse --short HEAD)"
 subject="$(git log -1 --format=%s)"
 echo "Releasing $short — $subject"
+
+# ---------------------------------------------------------------- the gate (--unattended)
+gate_summary=""; gate_last=""
+if [ "$UNATTENDED" = 1 ]; then
+  say "Release gate"
+  mkdir -p "$ROOT/.claude"   # gitignored: remembers the last hold note, so it isn't repeated hourly
+  gate_code=0
+  gate_json="$(node "$ROOT/deploy/release-gate.mjs" --json --note-state "$ROOT/.claude/release-gate.last")" || gate_code=$?
+  case "$gate_code" in
+    0) ;;
+    5) echo "nothing new to release"; exit 0 ;;
+    3|4) exit "$gate_code" ;;   # the gate printed its reasons (and a hold's note)
+    *) fail "the release gate failed (exit $gate_code); not releasing" ;;
+  esac
+  gate_field() { node -e 'const j = JSON.parse(process.argv[1]); console.log(j[process.argv[2]] ?? "")' "$gate_json" "$1"; }
+  gate_summary="$(gate_field summary)"
+  gate_last="$(gate_field lastReleased)"
+fi
 
 # ---------------------------------------------------------------- 2. the box
 # Runs on the box as `ubuntu` (passwordless sudo). The repo is owned by the
@@ -160,6 +193,28 @@ if [ "$DO_SITE" = 1 ]; then
   fi
 fi
 
+# ---------------------------------------------------------------- 5. smoke
+# Past "it answers": the page's own script loads, and the API answers the call
+# the sign-in screen makes first.
+if [ "$DRY_RUN" = 0 ] && [ "$DO_SITE" = 1 ] && [ "$DO_BOX" = 1 ]; then
+  say "Smoke test"
+  smoke_fail=""
+  index="$(curl -fsS "$SITE/")" || smoke_fail="the site did not answer"
+  js="$(printf '%s' "$index" | grep -o '/assets/[^"]*\.js' | head -1 || true)"
+  [ -n "$smoke_fail" ] || [ -n "$js" ] || smoke_fail="the site's page names no script"
+  [ -n "$smoke_fail" ] || curl -fsS -o /dev/null "$SITE$js" || smoke_fail="the site's script $js did not load"
+  config="$(curl -fsS "$API_BASE/api/auth/config" 2>/dev/null || true)"
+  [ -n "$smoke_fail" ] || [[ "$config" == *'"mode"'* ]] || smoke_fail="the API's sign-in configuration did not answer"
+  if [ -n "$smoke_fail" ]; then
+    if [ "$UNATTENDED" = 1 ]; then
+      echo "note: Released $short, but the smoke test FAILED: $smoke_fail. The last good release was ${gate_last:0:7}; revert to it and release by hand."
+    fi
+    fail "smoke test failed: $smoke_fail"
+  fi
+  echo "smoke: the site's script loads and the API's sign-in configuration answers"
+fi
+
 say "Done"
 [ "$DRY_RUN" = 1 ] && echo "(dry run — nothing was deployed)"
+[ "$UNATTENDED" = 1 ] && echo "note: Released $short — ${gate_summary:-$subject}."
 exit 0

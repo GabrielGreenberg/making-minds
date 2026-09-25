@@ -550,6 +550,11 @@ html, body, #root {
   line-height: 1;
 }
 
+.library-box-actions {
+  display: flex;
+  gap: 2px;
+}
+
 .library-box-rename-btn {
   font-size: 8px;
   line-height: 1;

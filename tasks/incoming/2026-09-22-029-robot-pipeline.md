@@ -44,7 +44,8 @@ unattended loop that both catches and works, on an always-on second computer, an
    claim commit before any work** (the claim is the lock between machines; a rejected push →
    re-fetch, re-check the task is still free). Work it (LOOP.md §3's task workflow), gates,
    land, push, then `deploy/release.sh --unattended` (042's gate decides release / hold /
-   wait). Unfinished → checkpoint in the progress log and push the branch; the next hour
+   wait) and forwards its `note: …` line, if any, to Gabriel (the app's push notification;
+   042 prints the note and suppresses a repeated hold, the routine only delivers it). Unfinished → checkpoint in the progress log and push the branch; the next hour
    resumes it. Nothing eligible → end within seconds. Never reads `~/making-minds-private/`.
 3. **The `review` outcome**: `FeedbackTriageOutcome` gains `'review'` (waiting for Gabriel's
    call); the route's validation, the Feedback tab's tag ("Needs your call"), `feedbackCheck`

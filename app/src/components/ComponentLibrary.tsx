@@ -199,17 +199,30 @@ function ConfirmedBoxItem({ box, numIn, numOut, isSelected }: {
         })}
         <text x="28" y="24" textAnchor="middle" fontSize="8" fontWeight="600" fill="#333">{box.name}</text>
       </svg>
-      <button
-        type="button"
-        className="library-box-rename-btn"
-        title="Rename box"
-        onClick={(e) => {
-          e.stopPropagation();
-          setEditing(true);
-        }}
-      >
-        ✎
-      </button>
+      <div className="library-box-actions">
+        <button
+          type="button"
+          className="library-box-rename-btn"
+          title="Rename box"
+          onClick={(e) => {
+            e.stopPropagation();
+            setEditing(true);
+          }}
+        >
+          ✎
+        </button>
+        <button
+          type="button"
+          className="library-box-rename-btn"
+          title="Delete box"
+          onClick={(e) => {
+            e.stopPropagation();
+            useStore.getState().removeConfirmedBox(box.id);
+          }}
+        >
+          ✕
+        </button>
+      </div>
     </div>
   );
 }
