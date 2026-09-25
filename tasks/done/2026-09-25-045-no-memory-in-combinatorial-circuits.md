@@ -8,9 +8,9 @@ requires: browser
 area: app
 source: audit
 created: 2026-09-25T10:35:00-07:00
-status: in-progress
+status: done
 after:
-branch: task/045-no-memory-in-cc
+branch:
 merged_into:
 ---
 
@@ -65,3 +65,7 @@ SC question's and the sandbox's still do.
   reference fixture held a MEM. Gates: app tsc, tools tsc, `npm run check` (56/56 coverage),
   build, server check — all green. Owed: a browser look at a CC palette (no Memory section) vs
   SC and the sandbox — the worktree has no dev server; done against the merged result.
+- 2026-09-25 — landed. main merged in first (042, the origin boxing fix — a collaborator's
+  box-delete button beside my MEM filter in ComponentLibrary, no conflict — and 044), re-gated
+  on the merged state: tsc ×2, `npm run check`, server check, all green. The browser look at a CC
+  palette is done with 046's screens.
