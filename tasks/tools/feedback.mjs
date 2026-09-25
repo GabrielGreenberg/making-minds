@@ -36,13 +36,10 @@
 import { existsSync, mkdirSync, readdirSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { basename, dirname, join, relative, resolve, sep } from 'node:path';
-import { fileURLToPath } from 'node:url';
+// Signing in to the pilot is shared with deploy/release-gate.mjs (task 042).
+import { DEFAULT_ENV, PilotError as Failure, REPO, call, readEnv, withSession } from '../../deploy/pilot-api.mjs';
 
-const REPO = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
-const DEFAULT_ENV = join(REPO, 'secrets', 'feedback.env');
 const DEFAULT_OUT = join(homedir(), 'making-minds-private', 'feedback');
-
-class Failure extends Error {}
 
 function usage(message) {
   if (message) console.error(message);
@@ -70,32 +67,6 @@ function parseArgs(argv) {
   return { opts, rest };
 }
 
-function readEnv(path) {
-  if (!existsSync(path)) {
-    throw new Failure(
-      `No credentials file at ${path}.\n` +
-        'Create it (secrets/ is gitignored) with three lines:\n' +
-        '  MM_API_BASE=https://<the API server>\n' +
-        '  MM_FEEDBACK_EMAIL=<an instructor account>\n' +
-        '  MM_FEEDBACK_PASSWORD=<its password>',
-    );
-  }
-  const env = {};
-  for (const line of readFileSync(path, 'utf8').split(/\r?\n/)) {
-    const m = /^\s*([A-Z_][A-Z0-9_]*)\s*=\s*(.*?)\s*$/.exec(line);
-    if (!m || line.trimStart().startsWith('#')) continue;
-    env[m[1]] = m[2].replace(/^(['"])(.*)\1$/, '$2');
-  }
-  for (const key of ['MM_API_BASE', 'MM_FEEDBACK_EMAIL', 'MM_FEEDBACK_PASSWORD']) {
-    if (!env[key]) throw new Failure(`${path} has no ${key}`);
-  }
-  return {
-    base: env.MM_API_BASE.replace(/\/+$/, '').replace(/\/api$/, ''),
-    email: env.MM_FEEDBACK_EMAIL,
-    password: env.MM_FEEDBACK_PASSWORD,
-  };
-}
-
 /** The working copy must live outside the repo, which is public. Checked on
  *  real paths (a symlink into the repo is still the repo). */
 function assertOutsideRepo(out) {
@@ -112,51 +83,6 @@ function assertOutsideRepo(out) {
       `Refusing --out ${out}: it is inside the repo (${relative(repo, real) || '.'}), which is public. ` +
         'Raw feedback never goes near git — pick a folder outside it.',
     );
-  }
-}
-
-// ── the API ─────────────────────────────────────────────────────
-
-async function call(base, method, path, { token, body } = {}) {
-  let res;
-  try {
-    res = await fetch(`${base}/api${path}`, {
-      method,
-      headers: {
-        ...(body !== undefined ? { 'Content-Type': 'application/json' } : {}),
-        ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      },
-      body: body !== undefined ? JSON.stringify(body) : undefined,
-    });
-  } catch (e) {
-    throw new Failure(`Cannot reach the server at ${base} (${e.cause?.code ?? e.message}).`);
-  }
-  const isJson = (res.headers.get('content-type') ?? '').includes('application/json');
-  const json = isJson ? await res.json() : null;
-  return { status: res.status, json };
-}
-
-async function signIn(env) {
-  const r = await call(env.base, 'POST', '/auth/login', { body: { email: env.email, password: env.password } });
-  if (r.status === 429) throw new Failure('Sign-in throttled after failed attempts — wait a few minutes.');
-  if (r.status !== 200 || !r.json?.token) {
-    throw new Failure(`Sign-in refused (${r.status}): check MM_FEEDBACK_EMAIL / MM_FEEDBACK_PASSWORD.`);
-  }
-  if (r.json.user?.role !== 'instructor') {
-    await call(env.base, 'POST', '/auth/logout', { token: r.json.token }).catch(() => {});
-    throw new Failure(`${env.email} is not an instructor account.`);
-  }
-  return r.json.token;
-}
-
-/** Sign in, run `body` with the token, always sign out again (no session
- *  left lying around on the server). */
-async function withSession(env, body) {
-  const token = await signIn(env);
-  try {
-    return await body(token);
-  } finally {
-    await call(env.base, 'POST', '/auth/logout', { token }).catch(() => {});
   }
 }
 
