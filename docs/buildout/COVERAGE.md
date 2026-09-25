@@ -51,7 +51,7 @@ validates + grades end-to-end) · `appr` = appearance matches VISUAL_VOCAB.
 | hw1-p3  | splitting outputs (2-in → 2-out) | logic | ✅ | ✅ | ✅ | ✅ | ✅ | `reference/hw1-p3.json`; AND splits to OUT1 + NOT→OUT2; junction dot verified |
 | hw1-p4  | XOR | logic | ✅ | ✅ | ✅ | ✅ | ✅ | `reference/hw1-p4.json`; primitives (2 NOT, 2 AND, OR); broken = plain OR fails on (1,1) |
 | hw1-p5  | combining circuits (2-in → 2-out) | logic | ✅ | ✅ | ✅ | ✅ | ✅ | `reference/hw1-p5.json`; half-adder (sum `x ^ y`, carry `x & y`); crossing bump verified |
-| hw1-p16 | M: successor of tal(I), 1-in → 2-out | arithmetic | ✅ | ✅ | ✅ | ✅ | ✅ | `reference/hw1-p16.json`; canonical tally forces O1=1, O2=I (PDF's position-insensitive tal() nuance noted in LOG); broken emits non-canonical `01` |
+| hw1-p16 | M: successor of tal(I), 1-in → 2-out | arithmetic | ✅ | ✅ | ✅ | ✅ | ✅ | `reference/hw1-p16.json`; the textbook's ones-right tally (`0…01…1`, task 044) forces O1=I, O2=1 (the 1 built as I OR NOT I); broken is the mirrored O1=1, O2=I, whose `10` for I=0 is no numeral |
 | hw1-p17 | N: successor of bin(I), 1-in → 2-out | arithmetic | ✅ | ✅ | ✅ | ✅ | ✅ | `reference/hw1-p17.json`; one 2-wide output group (OUT1 = MSB); broken = endianness swap |
 
 ### HW2 — Computing with CCs  ·  13/13 (10 exact + 3 interface) ✅-at-tier
@@ -82,9 +82,9 @@ validates + grades end-to-end) · `appr` = appearance matches VISUAL_VOCAB.
 | hw3-p4  | 2x+1 B | arithmetic | ✅ | ✅ | ✅ | ✅ | ✅ | `reference/hw3-p4.json`; delay + one-shot t1 OR (2x is even → no carry); broken = bare delay |
 | hw3-p5  | 2(x+1) B | arithmetic | ✅ | ✅ | ✅ | ✅ | ✅ | `reference/hw3-p5.json`; serial +1 then delay; broken = delay-then-+1 order swap |
 | hw3-p6  | x+y B | arithmetic | ✅ | ✅ | ✅ | ✅ | ✅ | `reference/hw3-p6.json`; serial full adder, 128-case bank; broken = carry-less XOR (57% fail) |
-| hw3-p7  | +3 T (feasible) | arithmetic | ✅ | ✅ | ✅ | ✅ | ✅ | `reference/hw3-p7.json`; window-aware counter (canonical tally: ones block must END at final step); every case exercises drain |
-| hw3-p8  | 2x T (feasible) | arithmetic | ✅ | ✅ | ✅ | ✅ | ✅ | `reference/hw3-p8.json`; window-aware (unbounded-stream version is FSM-infeasible — noted in LOG); 16-step runs |
-| hw3-p9  | x+y T (feasible) | arithmetic | ✅ | ✅ | ✅ | ✅ | ✅ | `reference/hw3-p9.json`; counter/latch over 81-case bank; layout uses the p7 right-to-left MEM-chain convention |
+| hw3-p7  | +3 T (feasible) | arithmetic | ✅ | ✅ | ✅ | ✅ | ✅ | `reference/hw3-p7.json`; 3-MEM delay line on the complemented input, OUT(t) = (t ≤ 3) OR IN(t−3) (tally ones arrive first, task 044); every case exercises drain; broken = the 2-stage line (+2) |
+| hw3-p8  | 2x T (feasible) | arithmetic | ✅ | ✅ | ✅ | ✅ | ✅ | `reference/hw3-p8.json`; 8-MEM unary stack — push while IN=1, pop while IN=0 via an AND push-chain, OUT = IN OR M1 (task 044); broken = one-MEM echo-and-repeat (x+1), fails 7/9 |
+| hw3-p9  | x+y T (feasible) | arithmetic | ✅ | ✅ | ✅ | ✅ | ✅ | `reference/hw3-p9.json`; the hw3-p8 stack plus a hold chain — push on IN1∧IN2, hold on exactly one, pop on neither, OUT = (IN1∨IN2) OR M1 (task 044); broken = IN1 OR IN2 (max), fails 64/81 |
 | hw3-p11 | change detector (current ≠ previous) | perception | ✅ | ✅ | ✅ | ✅ | ✅ | `reference/hw3-p11.json`; devData Q12 promoted at exact tier; per-lane XOR-vs-MEM + OR fold; broken (memoryless OR) fails 7/8; temporal semantics adversarially probed; bumpCheck CLEAN; routed fallback-free since the own-endpoint exemption erased the structural XOR floor (2026-07-07, P1.8 S3; was 48 pinned fallbacks) |
 | hw3-p12 | motion detector (object image moving up) | perception | ✅ | ✅ | ✅ | ✅ | ✅ | `reference/hw3-p12.json`; devData Q13 (motion k=3) promoted at exact tier; 146-comp PLA-matrix layout, ROTATED MEMs (sanctioned), 0 router fallbacks; broken fails 6/9; its 17 bumpless crossings (P1.8 S3 class) resolved by S3 — bump-clean since `d0214ec`; both cosmetic appr findings RESOLVED in the iteration-27 smalls sweep (toggle-tab elbow → `getComponentBounds` footprint seam makes INPUT tabs router obstacles; rotated-MEM label bisection → rotation-aware `getLabelAnchor`, M1–M8 verified 30px clear in-browser; re-confirmed by the iteration-28 sweep: 0 label/wire intersections across 451 paths) |
 | hw3-p13 | zig-zag: reach goal & keep going | navigation | ✅ | ✅ | ◐ | ✅ | ◐ | `reference/hw3-p13.json`; PDF 9×9 staircase + 6×6 family member; SC XOR-toggle alternating-turn brain 2/2; MEM rotated 270° after a router-budget fix (0 fallbacks) |
@@ -97,8 +97,8 @@ _Note: HW3 #10 (x·y B) is an impossibility argument (not SC-computable) — exc
 
 | id | problem | category | auth | build | grades | appr | status | notes |
 |----|---------|----------|:----:|:-----:|:------:|:----:|:------:|-------|
-| hw4-p3  | +1 T | arithmetic | ✅ | ✅ | ✅ | ✅ | ✅ | `reference/hw4-p3.json`; 10-state leading-zero counter (canonical tally: ones arrive last); broken fails 9/9 |
-| hw4-p4  | +2 T | arithmetic | ✅ | ✅ | ✅ | ✅ | ✅ | `reference/hw4-p4.json`; 12-state counted +2; broken = counted +1 (window degeneracy note in LOG: p3's saturating machine also passes p4 — do not use as its broken) |
+| hw4-p3  | +1 T | arithmetic | ✅ | ✅ | ✅ | ✅ | ✅ | `reference/hw4-p3.json`; the textbook's p. 101 machine (S₀ 1:1 loop, 0:1 → S₁, S₁ 0:0 loop) + an unused S₁ 1:1 edge for totality (task 047 would drop it); broken = echo, fails 9/9 |
+| hw4-p4  | +2 T | arithmetic | ✅ | ✅ | ✅ | ✅ | ✅ | `reference/hw4-p4.json`; three-state analogue — echo the 1s, emit two extra 1s, then 0s (task 044); broken = the +1 T machine, fails 9/9 |
 | hw4-p5  | +1 B | arithmetic | ✅ | ✅ | ✅ | ✅ | ✅ | `reference/hw4-p5.json`; 2-state carry FSM; broken = carry-dropper (62.5%) |
 | hw4-p6  | +2 B | arithmetic | ✅ | ✅ | ✅ | ✅ | ✅ | `reference/hw4-p6.json`; 3-state shifted carry |
 | hw4-p7  | +4 B | arithmetic | ✅ | ✅ | ✅ | ✅ | ✅ | `reference/hw4-p7.json`; 4-state (echo two bits + carry) |

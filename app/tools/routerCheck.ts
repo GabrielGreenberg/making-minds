@@ -24,11 +24,11 @@
 //      exempt) buries a stub tip.
 //
 //   3. FALLBACK BUDGET — route every CC/SC reference fixture exactly as the
-//      canvas would and pin the fallbackPath invocation counts: 2 total
+//      canvas would and pin the fallbackPath invocation counts: 0 total
 //      (was 283 before the MEM bounds fix, 147 before the own-endpoint
-//      exemption killed the structural XOR floor), with the residual
-//      distribution pinned per fixture. New fixtures must route
-//      fallback-free or be added to the table DELIBERATELY.
+//      exemption killed the structural XOR floor, 2 until task 044 re-authored
+//      hw3-p9), with the distribution pinned per fixture. New fixtures must
+//      route fallback-free or be added to the table DELIBERATELY.
 //      Every fixture must also stay oracle-clean (layoutCheck predicates).
 //
 //   4. DIVERGENCE DOTS — findDivergencePoints corpus (VISUAL_VOCAB: a split
@@ -41,10 +41,12 @@
 //
 //   5. ROUTE-QUALITY FLAGS — WireRouteResult.usedFallback / .violation (S4:
 //      warn-don't-block). The doomed tripwire wire carries BOTH flags (its
-//      phase-0 fallback L-path cuts through the foreign blocker); hw3-p9's
-//      residual w21 carries usedFallback with NO violation (its fallback is
-//      oracle-clean — which is exactly why the S4 lane-nudge was skipped);
-//      A*-routed wires carry neither.
+//      phase-0 fallback L-path cuts through the foreign blocker); A*-routed
+//      wires carry neither — pinned on hw3-p9, the densest fixture. (Until
+//      task 044, hw3-p9's old correct machine also held the one fallback
+//      that was oracle-clean — usedFallback with no violation, the reason the
+//      S4 lane-nudge was skipped; its re-authored machine routes entirely by
+//      A*, and no fixture exhibits that case now.)
 //
 //   6. PRE-FIX LAYOUT — the historical hw3-p4 layout (P1.3-era positions,
 //      git 0d0c5e5; 4 collinear-overlap pairs under the pre-P1.8 router —
@@ -210,21 +212,14 @@ console.log('\nMEM ROUTING — A* reaches MEM.min in a clean field (no fallback)
 // bounds — plus capacity misses from the old flat 5000-iteration A* cap,
 // which now scales with the grid). History: 283 → 99 (MEM 50×50 bounds fix)
 // → 147 (hw3-p11 added, 16 XOR-in wires) → 2 (own-endpoint exemption +
-// near-parallel overlap costs + scaled iteration cap).
-//
-// The residual is hw3-p9's w21 (MEM.mout → HA.in1 in the monster correct
-// machine): its only goal approach is occupied by a foreign parallel track,
-// so the cheapest legal path costs overlap-scale (~100k) and proving that
-// would take ~240k iterations — the scaled cap (grid nodes ≈ 35k) cuts the
-// search off and the wire takes an oracle-clean fallback instead. That is
-// the fallback lane doing its job on a genuinely cramped layout, not a
-// world-model bug. Update the table deliberately, never upward without a
-// design decision.
+// near-parallel overlap costs + scaled iteration cap) → 0 (task 044: the
+// tally fixtures re-authored for the textbook's `0…01…1`; hw3-p9's old
+// correct machine, whose cramped w21 took the last two, is gone).
+// Update the table deliberately, never upward without a design decision.
 
-const MAX_TOTAL_FALLBACKS = 2;
+const MAX_TOTAL_FALLBACKS = 0;
 const EXPECTED_FALLBACKS: Record<string, number> = {
-  'hw3-p9': 2, // w21, genuinely cramped goal approach — see header note
-  // every other CC/SC fixture: 0
+  // every CC/SC fixture: 0
 };
 
 console.log('\nFALLBACK BUDGET — CC/SC reference fixtures (canvas-identical routing)');
@@ -317,24 +312,16 @@ console.log('\nDIVERGENCE DOTS — junction dots on displayed fan-out paths');
 
 console.log('\nROUTE-QUALITY FLAGS — usedFallback / violation on WireRouteResult');
 {
-  // hw3-p9: the one fixture with residual fallbacks. w21's FINAL route must
-  // be flagged usedFallback; and it must be violation-free — the recorded
-  // rationale for skipping the S4 lane-nudge. Every A*-routed wire in the
-  // same machine carries neither flag.
+  // hw3-p9, the densest fixture: every wire routes by A*, so none carries
+  // either flag.
   const p9 = JSON.parse(
     readFileSync(join(FIXTURES, 'reference', 'hw3-p9.json'), 'utf8'),
   ) as { correct: CircuitData };
   resetFallbackCount();
   const p9Results = routeMachine(p9.correct);
-  const w21 = p9Results.find((r) => r.wireId === 'hw3-p9-w21');
-  const otherFlagged = p9Results.filter(
-    (r) => r.wireId !== 'hw3-p9-w21' && (r.usedFallback || r.violation),
-  );
-  check('hw3-p9 w21 (residual fallback) is flagged usedFallback',
-    w21?.usedFallback === true);
-  check('hw3-p9 w21 fallback is oracle-clean (no violation — lane-nudge not needed)',
-    w21 !== undefined && w21.violation === undefined);
-  check('no other hw3-p9 wire carries a flag', otherFlagged.length === 0);
+  const flagged = p9Results.filter((r) => r.usedFallback || r.violation);
+  check(`hw3-p9: all ${p9Results.length} wires route by A*, none flagged`,
+    p9Results.length > 0 && flagged.length === 0);
 
   // Doomed tripwire (same layout as §2): the OUTPUT's stub tip is buried in
   // a FOREIGN AND's bounds, so phase 0 sends the wire straight to the

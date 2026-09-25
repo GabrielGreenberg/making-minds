@@ -267,8 +267,8 @@ export function selectScRunWindow(s: {
 }
 
 /** Parse display-order digits as a numeral under `rep` — exactly how the A/V
- *  ARG column reads typed input (tally "11" = 2; binary "110" = 6). Returns
- *  null when the digits are not a valid codeword (tally with a 1 after a 0 —
+ *  ARG column reads typed input (tally "011" = 2; binary "110" = 6). Returns
+ *  null when the digits are not a valid codeword (tally with a 0 after a 1 —
  *  the same strings the ARG column flags '/'). */
 function numeralValue(digits: number[], rep: RepSystem): number | null {
   return rep === 'tally' ? bitsToTally(digits) : bitsToBinary(digits);
@@ -278,7 +278,7 @@ function numeralValue(digits: number[], rep: RepSystem): number | null {
  * The EXACT input stream the grader would feed for the student's typed input:
  * each input group's typed digits are read as a value and laid on the time
  * axis by the codec's own `encodeInput` (LSB at t1 — so a tally value's ones
- * arrive LAST, zeros leading; values wider than the group are clamped/masked
+ * arrive FIRST, at t1..tn, then 0s; values wider than the group are clamped/masked
  * by `valueToBits` exactly as the codec does). Returns null when codec feeding
  * doesn't apply and the caller must fall back to raw typed bits: no open
  * question (sandbox), the machine's input count differs from the question
@@ -329,9 +329,10 @@ function fsmGroupSequences(digits: number[], numGroups: number): number[][] {
  * (rightmost chunk = t1) with group i at position i of every chunk. The value
  * is first clamped/masked to its OWN width exactly as encodeInput does, so
  * reading the numeral back re-encodes to the grader's bits. Numerals are
- * padded by width, never by prepending zeros: a left-padded tally numeral
- * ("011") is not a codeword, and codecInputSteps would silently fall back to
- * the raw typed bits.
+ * re-laid by valueToBits at the widest width, never padded by hand: a tally
+ * numeral only stays a codeword with its zeros on the left ("0011"), and a
+ * hand-padded one would make codecInputSteps silently fall back to the raw
+ * typed bits.
  */
 function codecTypedDigits(values: number[], layout: CodecLayout): number[] {
   const width = Math.max(1, ...layout.inputWidths);
@@ -3642,7 +3643,7 @@ export const useStore = create<AppState>()((set, get) => ({
     // Question runs feed EXACTLY the grader's input stream: the typed string
     // is parsed as a value per input group (as the A/V ARG column reads it)
     // and laid on the time axis by the codec's encodeInput — for tally the
-    // ones arrive LAST (zeros leading), not in typed order. Falls back to raw
+    // ones arrive first (t1..tn), then 0s to the window. Falls back to raw
     // typed bits when the typed string is not a valid numeral (the ARG column
     // flags those '/') or the machine's input count doesn't match the spec.
     // scInputSequence is time-ordered (index 0 = t1 = rightmost typed char),
@@ -4020,11 +4021,11 @@ export const useStore = create<AppState>()((set, get) => ({
     if (codecWindow !== null ? tIdx >= codecWindow : tIdx >= typedSteps) return;
     // Question runs feed EXACTLY the grader's input stream: each group's
     // typed digits are read as one numeral under the question's
-    // representation (typed "110" = binary 6 / tally 2), laid on the time
+    // representation (typed "011" = binary 3 / tally 2), laid on the time
     // axis by the codec's encodeInput (LSB at t1; a tally value's ones
-    // arrive last), and the FULL encoded row is joined into one k-char input
+    // arrive first), and the FULL encoded row is joined into one k-char input
     // symbol per step — the same join the grader executes (symbol char i =
-    // input group i). An invalid numeral (tally with a 1 after a 0) falls
+    // input group i). An invalid numeral (tally with a 0 after a 1) falls
     // back to the raw typed digits. Sandbox and fallback both feed the typed
     // digits with the RIGHTMOST character at t1 — the same right-to-left
     // time direction as SC (P1.10; the old leftmost-first sandbox feed

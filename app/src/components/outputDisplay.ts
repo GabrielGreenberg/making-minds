@@ -4,7 +4,7 @@
 // later steps extend left (docs/buildout/VISUAL_VOCAB.md; CLAUDE.md design
 // rules). Concatenated this way, a question run's OUT string reads as a
 // NUMERAL (MSB left, the t1/LSB step rightmost) — the same way the typed IN
-// string is parsed for question runs (binary "110" = 6; tally "110" = 2).
+// string is parsed for question runs (binary "110" = 6; tally "011" = 2).
 
 /**
  * Concatenate a run history's per-step output bits t-DESCENDING (latest step

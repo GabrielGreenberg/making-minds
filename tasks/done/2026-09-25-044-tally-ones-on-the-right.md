@@ -8,9 +8,9 @@ requires: browser
 area: app
 source: audit
 created: 2026-09-25T10:35:00-07:00
-status: in-progress
+status: done
 after:
-branch: task/044-tally-ones-on-the-right
+branch:
 merged_into:
 ---
 
@@ -69,3 +69,22 @@ worktree cannot run a dev server.
 - 2026-09-25 — filed and claimed from the HW1 audit; worked in the worktree
   `.claude/worktrees/hw1-release` because the main checkout is on task/042. Next: flip the
   core, run the gates, re-author the six fixtures.
+- 2026-09-25 — built. `representation.ts`: `valueToBits` writes zeros then the ones,
+  `bitsToTally` accepts `0…01…1` only; the codec's axes, question runs, the data table and
+  test generation all follow (no per-axis code). Pins: `codecCheck` (core `0011` = 2, `1000`/`110`
+  no numeral; space: one on two wires is OUT1=0, OUT2=1; time: ones arrive first),
+  `scWindowCheck` (exhibit B's one-step delay now reads as malformed, not x−1 — grader and store
+  agree; comments rewritten), store/outputDisplay comments rewritten. Six fixtures re-authored
+  by a helper agent as textbook-shaped machines, layout oracle clean, 0 router fallbacks:
+  hw1-p16 (O1 = I, O2 = I OR NOT I), hw3-p7 (3-MEM delay line), hw3-p8 (8-MEM unary stack),
+  hw3-p9 (stack + hold chain), hw4-p3 (the p. 101 machine + an unused S₁ 1:1 edge — task 047),
+  hw4-p4 (3 states); each broken fails 50–100% of its bank. `routerCheck`: hw3-p9's old cramped w21 is gone,
+  so the fallback budget pins drop 2 → 0 (header notes the lost "clean fallback" example).
+  The seeded sample submissions answered the tally questions with exact copies of the old
+  fixtures — swapped for the new correct/broken (17 answers, hw1/hw3/hw4). COVERAGE.md rows
+  rewritten; CLAUDE.md "fallback budget 0".
+- 2026-09-25 — landed. main merged into the branch first (042's release gate + the origin
+  boxing fix; clean), re-gated (tsc ×2, codec/boxScope/coverage). Browser: HW1 P16 with the
+  textbook answer on the worktree's dev server — IN1 = 0 gives O₁O₂ = `01`. The SC/FSM tally
+  run is pinned headlessly (scWindowCheck); an eyeball of an HW3/HW4 tally run is still owed
+  when those homeworks are prepared for release.
