@@ -236,3 +236,6 @@ Two things are owed to Gabriel:
 - **For Gabriel to confirm:** intake assumptions (a) hold ≈ 600 ms (two ticks), (b) only the
   goal circle pulses, (c) same in the sandbox and in questions. All as implemented.
 - Landed via a merge into `main`.
+
+### 2026-09-24 — Gabriel confirmed
+Intake assumptions (a) ≈600 ms hold, (b) only the goal circle pulses, (c) the same in the sandbox and in questions stand, confirmed by Gabriel. The macOS Reduce-motion check is still his.

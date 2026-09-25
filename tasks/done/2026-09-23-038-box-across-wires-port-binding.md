@@ -140,3 +140,6 @@ input 0.
 - **For Gabriel to confirm:** already-saved drawn-across boxes are re-bound on load, not
   flagged, and only ports the old rule left dead take the recorded crossing (loop-settled).
 - Landed via a merge into `main`.
+
+### 2026-09-24 — Gabriel confirmed
+The loop-settled rule stands, confirmed by Gabriel: saved drawn-across boxes are re-bound on load (only ports the old rule left dead take the recorded crossing), not flagged.

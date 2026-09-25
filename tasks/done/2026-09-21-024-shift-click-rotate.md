@@ -270,3 +270,6 @@ None skipped. Nits left alone: `rotationOf`'s `?? 0` would also pass if undo rem
     specified ("visible whenever the button is").
   - Spec §2.2's multi-select line was edited to match.
 - Landed via a merge into `main`.
+
+### 2026-09-24 — Gabriel confirmed
+Everything stands, confirmed by Gabriel: intake assumptions (a) multi-select toggle on cmd/ctrl-click and (b) MEM/BOXED/IN/OUT rotating on shift-click; the hint showing on FSM/TM canvases too; the spec §2.2 edit.

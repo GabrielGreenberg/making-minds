@@ -103,3 +103,6 @@ brains) edit-mid-run recipes, a question's SC run, and Grades → "Run this inpu
 - **Still owed:** TM, FSM and turbot eyeballs of the same reset (pinned headless in
   `navResetCheck [edit during run]`, 45 checks, and `caseRunCheck [same question]`).
 - Landed via a merge into `main`.
+
+### 2026-09-24 — Gabriel confirmed
+The loop-settled policy stands, confirmed by Gabriel: a structural edit during a run resets it to t=1 and keeps the typed input.

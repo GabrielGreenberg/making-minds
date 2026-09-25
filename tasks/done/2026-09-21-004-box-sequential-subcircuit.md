@@ -233,3 +233,6 @@ Checkpoint (details in the two entries above).
 - **For Gabriel to confirm:** the "Box 1·M1" state column (loop-settled).
 - **Filed:** the box-drawn-across-wires bug as its own task (see `tasks/log.md` / incoming).
 - Landed via a merge into `main`.
+
+### 2026-09-24 — Gabriel confirmed
+The loop-settled nested-memory column ("Box 1·M1" in the state table and history) stands, confirmed by Gabriel.
