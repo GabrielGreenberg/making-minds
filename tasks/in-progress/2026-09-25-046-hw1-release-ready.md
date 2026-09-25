@@ -8,9 +8,9 @@ requires: browser
 area: app
 source: audit
 created: 2026-09-25T10:35:00-07:00
-status: ready
+status: in-progress
 after: 2026-09-25-044
-branch:
+branch: task/046-hw1-release-ready
 merged_into:
 ---
 
@@ -78,3 +78,4 @@ schematic more prominent.
 Browser or `tools/shootProblemSets.mjs`: the overview and all 23 screens.
 
 ## Progress log
+- 2026-09-25 — claimed after 044 landed; worked in the worktree `.claude/worktrees/hw1-release`. Next: apply the scripted hw1.json + sample-submission rewrite, the overview grid CSS, then screenshots.
