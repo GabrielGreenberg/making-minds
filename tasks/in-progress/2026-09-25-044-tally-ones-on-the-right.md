@@ -69,3 +69,17 @@ worktree cannot run a dev server.
 - 2026-09-25 — filed and claimed from the HW1 audit; worked in the worktree
   `.claude/worktrees/hw1-release` because the main checkout is on task/042. Next: flip the
   core, run the gates, re-author the six fixtures.
+- 2026-09-25 — built. `representation.ts`: `valueToBits` writes zeros then the ones,
+  `bitsToTally` accepts `0…01…1` only; the codec's axes, question runs, the data table and
+  test generation all follow (no per-axis code). Pins: `codecCheck` (core `0011` = 2, `1000`/`110`
+  no numeral; space: one on two wires is OUT1=0, OUT2=1; time: ones arrive first),
+  `scWindowCheck` (exhibit B's one-step delay now reads as malformed, not x−1 — grader and store
+  agree; comments rewritten), store/outputDisplay comments rewritten. Six fixtures re-authored
+  by a helper agent as textbook-shaped machines, layout oracle clean, 0 router fallbacks:
+  hw1-p16 (O1 = I, O2 = I OR NOT I), hw3-p7 (3-MEM delay line), hw3-p8 (8-MEM unary stack),
+  hw3-p9 (stack + hold chain), hw4-p3 (the p. 101 machine + an unused S₁ 1:1 edge — task 047),
+  hw4-p4 (3 states); each broken fails 50–100% of its bank. `routerCheck`: hw3-p9's old cramped w21 is gone,
+  so the fallback budget pins drop 2 → 0 (header notes the lost "clean fallback" example).
+  The seeded sample submissions answered the tally questions with exact copies of the old
+  fixtures — swapped for the new correct/broken (17 answers, hw1/hw3/hw4). COVERAGE.md rows
+  rewritten; CLAUDE.md "fallback budget 0".
