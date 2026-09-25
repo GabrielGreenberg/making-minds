@@ -60,8 +60,8 @@ All routes are under `/api`, JSON in/out, auth via `Authorization: Bearer <token
 | -------------------------------------- | ---------- | -------------------------------------------------------------------- |
 | `GET /api/health`                       | anyone     | liveness probe                                                       |
 | `GET /api/auth/config`                  | anyone     | what the sign-in system offers — the login screen renders from this  |
-| `POST /api/auth/login`                  | anyone     | `{email, password}` → `{token, user}` (password omitted in dev mode); any of the account's emails; throttled per email+IP; one message for every failure, so the roster can't be enumerated |
-| `POST /api/auth/register`               | anyone     | `{studentId, email, password}` → claims the **roster seat** the student ID names and signs them in; the email (the class-list one or a UCLA address) becomes a sign-in address; throttled per email and per ID |
+| `POST /api/auth/login`                  | anyone     | `{email, password}` → `{token, user}` (password omitted in dev mode); any of the account's emails; throttled per account+IP; one message for every failure, so the roster can't be enumerated |
+| `POST /api/auth/register`               | anyone     | `{studentId, email, password}` → claims the **roster seat** the student ID names and signs them in; the email (the class-list one or a UCLA address) becomes a sign-in address; throttled per email, per ID, and refusals per IP |
 | `POST /api/auth/password`               | logged in  | `{currentPassword, newPassword}` — ends every other session, re-issues this one |
 | `POST /api/auth/logout`                 | logged in  | invalidates the token                                                |
 | `GET /api/auth/me`                      | logged in  | `{user}`                                                             |
@@ -70,9 +70,9 @@ All routes are under `/api`, JSON in/out, auth via `Authorization: Bearer <token
 | `POST /api/roster/import`               | instructor | `{csv, defaultRole?}` → upsert + the import report (`headerLine`, columns, `statusCounts`, `noLongerListed`, issues); never removes anyone, never touches a password |
 | `POST /api/roster`                      | instructor | add or update one person (matched by student ID, then email; a new email becomes an alias; 409 on a conflict) |
 | `DELETE /api/roster/:email`             | instructor | remove from the roster (their submitted work is kept)                |
-| `DELETE /api/roster/:email/aliases/:alias` | instructor | drop one extra sign-in address                                    |
+| `DELETE /api/roster/:email/aliases/:alias` | instructor | drop one extra sign-in address; if the account was set up through it, that password is cleared and its sessions end |
 | `POST /api/roster/:email/reset-password`| instructor | clear the credential + all their sessions; they register again       |
-| `GET /api/access-requests`              | instructor | `?status=pending\|approved\|rejected`; each carries `match`, the roster account its ID or email already names |
+| `GET /api/access-requests`              | instructor | `?status=pending\|approved\|rejected`; each carries `match` (the roster account its ID or email already names) and `conflict` (why approving would be refused) |
 | `POST /api/access-requests/:id/approve` | instructor | adds them to the roster — or, when `match`, adds the email to that account — and resolves the request |
 | `POST /api/access-requests/:id/reject`  | instructor | resolves the request, adding nobody                                  |
 | `GET /api/assignments`                  | logged in  | `{assignments: [{id, title, questionCount}]}`                        |
@@ -96,7 +96,7 @@ endpoint, ready to back `Remote*` implementations of the `WorkbookStore` /
 | ----------------------- | ----------------------------------------------------------------------- |
 | `src/config.ts`         | env-driven `ServerConfig`                                               |
 | `src/db.ts`             | `node:sqlite` schema + typed accessors (users — `uid` unique — and `user_emails` aliases, sessions, assignments, workbooks, submissions) |
-| `src/identity.ts`       | who a person is (task 036): the ONE place an email or a student ID resolves to an account (`matchAccount`) and a roster entry lands on one (`placeRosterEntry` — import, add form, approval, CLI), plus sign-up's seat claim (`claimForSignUp`) and SSO's (`resolveAssertedIdentity`) |
+| `src/identity.ts`       | who a person is (task 036): the ONE place an email or a student ID resolves to an account (`matchAccount`) and a roster entry lands on one (`placeRosterEntry` — class-list / instructor / request modes), plus sign-up's seat claim (`claimForSignUp`) and SSO's (`resolveAssertedIdentity`). Claims have strengths: an ID is verified (`uid`) only from the class list, an instructor or SSO — a request's typed ID is not; a student's own sign-up alias yields to the class list, SSO or an approval |
 | `src/auth.ts`           | the auth seam: `AuthProvider` (authenticate / register / capabilities) with `PasswordAuthProvider`, `DevAuthProvider`, `SsoAuthProvider`; `createAuthProvider` is the one mode decision. Plus session issue/lookup, `requireAuth`/`requireInstructor`, and the failed-login `LoginThrottle` |
 | `src/password.ts`       | scrypt hashing (self-describing `scrypt$N$r$p$salt$hash`), constant-time verify, the length policy |
 | `src/roster.ts`         | `normalizeEmail` / `normalizeUid` / `isCampusEmail`; pure CSV roster parsing: RFC-4180 reader; header discovery past a preamble (the registrar's export as-is); strict column matching (exact, then whole word — no substring fallback) for email / name or first+last / student ID / role / section / status; `LAST, FIRST` → display name + surname sort key; `STATUS_TABLE` (E/W/H imported, D/C/withdrawn not); `rosterReview` (who is no longer on the class list, matched by ID or any email); per-row issues (incl. a repeated ID) |
@@ -122,7 +122,8 @@ class-list one or any UCLA address — becomes one they sign in with. An account
 keeps the email it was first rostered under as its key (all their work hangs
 off it, never rekeyed); every other address is an alias. Somebody the roster
 doesn't have files an access request instead, and an instructor approves it —
-into a new row, or as an alias when the request names someone already listed.
+into a new row (its typed ID stays unverified until the class list or the
+instructor confirms it), or as an alias when the request names someone listed.
 
 ```sh
 npm run roster -- import ~/rosters/class-list.csv   # the registrar export as-is, or any CSV with an email column; class lists never go in git

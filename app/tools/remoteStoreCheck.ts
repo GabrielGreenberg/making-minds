@@ -720,8 +720,9 @@ check(
   'approveAccessRequest() reports the account it added the email to',
   patApproved.account === 'pat.personal@gmail.com' && patApproved.accountName === 'Pat Personal' && patApproved.aliasAdded === 'pat.req@example.org',
 );
-await api.removeRosterAlias('pat.personal@gmail.com', 'pat@g.ucla.edu');
+const patRemoved = await api.removeRosterAlias('pat.personal@gmail.com', 'pat@g.ucla.edu');
 check('removeRosterAlias() drops just that address', (await patAliases()).join() === 'pat.more@ucla.edu,pat.req@example.org');
+check('…and reports the password set up through it cleared', patRemoved.credentialCleared === true);
 
 authServer.close();
 authDb.close();

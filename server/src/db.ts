@@ -261,9 +261,12 @@ export class Db {
       }
     }
     // The student ID as an identity (task 036): the boot that adds the column
-    // backfills it from student_id. Two rows sharing an ID keep theirs as
-    // written but only the first gets the uid — the index below forbids a
-    // second, and the roster screen still shows both for a human to settle.
+    // backfills it from student_id, in ONE transaction with the ALTER, so a
+    // crash part-way leaves no column and the next boot starts over. Two rows
+    // sharing an ID keep theirs as written but only the first gets the uid —
+    // the index below forbids a second; the other stays unverified (identity.ts
+    // still asks for its ID) and the roster screen shows both to settle.
+    this.db.exec('BEGIN');
     try {
       this.db.exec('ALTER TABLE users ADD COLUMN uid TEXT;');
       const rows = this.db
@@ -277,6 +280,14 @@ export class Db {
         taken.add(uid);
         bind.run(uid, r.email);
       }
+      this.db.exec('COMMIT');
+    } catch {
+      this.db.exec('ROLLBACK'); // already present
+    }
+    try {
+      // The address a person set their account up through (task 036): an
+      // instructor removing that alias also clears the credential it set.
+      this.db.exec('ALTER TABLE users ADD COLUMN registered_via TEXT;');
     } catch {
       // already present
     }
@@ -356,10 +367,12 @@ export class Db {
    * one (and its uid) alone, and so does a missing section (a re-import
    * without a Section column keeps it). The sort key follows the name: a
    * caller that keeps the name and sends no key (the CLI's `add`) keeps the
-   * stored one; a new name drops a stale one. Throws when the email is
-   * another account's alias or the UID another account's.
+   * stored one; a new name drops a stale one. The ID becomes the account's
+   * `uid` only when `verifiedId` (the default): an ID a student typed into an
+   * access request is stored as written and verifies nothing. Throws when the
+   * email is another account's alias or the UID another account's.
    */
-  upsertUser(user: Omit<UserRow, 'uid'>): void {
+  upsertUser(user: Omit<UserRow, 'uid'>, { verifiedId = true }: { verifiedId?: boolean } = {}): void {
     const email = user.email;
     const owner = this.aliasOwner(email);
     if (owner && owner !== email) {
@@ -385,7 +398,7 @@ export class Db {
         user.name,
         user.role,
         studentId,
-        normalizeUid(studentId) || null,
+        (verifiedId && normalizeUid(studentId)) || null,
         user.section ?? null,
         user.sortName ?? null,
       );
@@ -421,9 +434,34 @@ export class Db {
 
   /** The account an address signs in to: its key, or one of its aliases. */
   findUserByEmail(email: string): UserRow | null {
-    const normalized = normalizeEmail(email);
-    if (!normalized) return null;
-    return this.getUser(this.aliasOwner(normalized) ?? normalized);
+    return this.emailOwner(email)?.account ?? null;
+  }
+
+  /**
+   * The account an address signs in to and how it holds it: as its `key`, or
+   * as an alias from a source. A `signup` alias is the student's own word —
+   * identity.ts lets a stronger claim (the class list, SSO, an approved
+   * request) take the address from it.
+   */
+  emailOwner(email: string): { account: UserRow; source: 'key' | EmailAliasSource } | null {
+    const address = normalizeEmail(email);
+    if (!address) return null;
+    const alias = this.db.prepare('SELECT user_email, source FROM user_emails WHERE email = ?').get(address) as unknown as
+      | { user_email: string; source: EmailAliasSource }
+      | undefined;
+    const account = this.getUser(alias?.user_email ?? address);
+    return account ? { account, source: alias ? alias.source : 'key' } : null;
+  }
+
+  /** Accounts holding this student ID only as written — unverified (no uid):
+   *  an access request's typed ID, or the second of two rows sharing one. */
+  findUnverifiedIdHolders(studentId: string): UserRow[] {
+    const uid = normalizeUid(studentId);
+    if (!uid) return [];
+    const rows = this.db
+      .prepare(`SELECT ${Db.USER_COLUMNS} FROM users WHERE uid IS NULL AND student_id != ''`)
+      .all() as unknown as Parameters<typeof Db.toUser>[0][];
+    return rows.filter((r) => normalizeUid(r.student_id) === uid).map((r) => Db.toUser(r));
   }
 
   /** The account holding this student ID, compared in normalised form. */
@@ -453,18 +491,35 @@ export class Db {
 
   /**
    * Give an account another sign-in address. 'present' when it already signs
-   * in with it (its key or an alias); 'taken' when the address is another
-   * account's key or alias — nothing is stored then.
+   * in with it (a stronger source then replaces a `signup` one); 'taken' when
+   * the address is another account's key or alias — nothing is stored then —
+   * except that a stronger claim takes it from another account's `signup`
+   * alias ('added': a student's typed address yields to the class list, SSO or
+   * an approval).
    */
   addEmailAlias(accountEmail: string, alias: string, source: EmailAliasSource): AliasOutcome {
     const address = normalizeEmail(alias);
     if (address === accountEmail) return 'present';
-    const owner = this.aliasOwner(address) ?? (this.getUser(address) ? address : null);
-    if (owner) return owner === accountEmail ? 'present' : 'taken';
+    const owner = this.emailOwner(address);
+    const now = new Date().toISOString();
+    if (owner?.account.email === accountEmail) {
+      if (owner.source === 'signup' && source !== 'signup') {
+        this.db.prepare('UPDATE user_emails SET source = ? WHERE email = ?').run(source, address);
+      }
+      return 'present';
+    }
+    if (owner && !(owner.source === 'signup' && source !== 'signup')) return 'taken';
+    this.db.prepare('DELETE FROM user_emails WHERE email = ?').run(address);
     this.db
       .prepare('INSERT INTO user_emails (email, user_email, source, added_at) VALUES (?, ?, ?, ?)')
-      .run(address, accountEmail, source, new Date().toISOString());
+      .run(address, accountEmail, source, now);
     return 'added';
+  }
+
+  /** Let go of a `signup` alias so the address can be another account's key
+   *  (a class-list row or approval creating that account). */
+  releaseSignupAlias(email: string): void {
+    this.db.prepare("DELETE FROM user_emails WHERE email = ? AND source = 'signup'").run(normalizeEmail(email));
   }
 
   /** Remove one of an account's aliases; false when it has no such alias. */
@@ -473,6 +528,19 @@ export class Db {
       .prepare('DELETE FROM user_emails WHERE email = ? AND user_email = ?')
       .run(normalizeEmail(alias), accountEmail);
     return Number(result.changes) > 0;
+  }
+
+  /** Record the address an account was set up through (see registered_via). */
+  markRegisteredVia(accountEmail: string, address: string): void {
+    this.db.prepare('UPDATE users SET registered_via = ? WHERE email = ?').run(normalizeEmail(address), accountEmail);
+  }
+
+  /** The address the account was set up through; null when unknown or unset. */
+  registeredVia(accountEmail: string): string | null {
+    const row = this.db.prepare('SELECT registered_via FROM users WHERE email = ?').get(accountEmail) as unknown as
+      | { registered_via: string | null }
+      | undefined;
+    return row?.registered_via ?? null;
   }
 
   /** An account's aliases, oldest first. */
@@ -493,8 +561,12 @@ export class Db {
   /** Set (or, with null, clear) a credential. Clearing re-opens registration. */
   setPasswordHash(email: string, hash: string | null): void {
     this.db
-      .prepare('UPDATE users SET password_hash = ?, registered_at = ? WHERE email = ?')
-      .run(hash, hash ? new Date().toISOString() : null, email);
+      .prepare(
+        `UPDATE users SET password_hash = ?, registered_at = ?,
+           registered_via = CASE WHEN ? IS NULL THEN NULL ELSE registered_via END
+         WHERE email = ?`,
+      )
+      .run(hash, hash ? new Date().toISOString() : null, hash, email);
   }
 
   /** The full roster with account state, for the instructor's roster view:

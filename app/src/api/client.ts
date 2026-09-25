@@ -61,7 +61,11 @@ export interface RosterEntryView {
   email: string;
   name: string;
   role: 'student' | 'instructor';
+  /** The student ID as written. */
   studentId: string;
+  /** The same ID normalised when VERIFIED (class list, instructor, SSO); ''
+   *  when the ID on file was only typed into an access request. */
+  uid: string;
   /** Discussion section from the class list; null when none was imported. */
   section: string | null;
   registered: boolean;
@@ -84,6 +88,9 @@ export interface AccessRequestView {
   /** The roster account the request's student ID or email already names —
    *  approving then adds the email to it — or null for someone new. */
   match: { email: string; name: string } | null;
+  /** Why approving would be refused (the ID and email name different
+   *  people, …), or null. */
+  conflict: string | null;
 }
 
 /** Where an add or an approval landed: a new account, or an existing one
@@ -344,9 +351,11 @@ export async function addRosterEntry(input: {
   return request<RosterPlacement>('POST', '/roster', input);
 }
 
-/** Drop one of an account's extra sign-in addresses (never its key). */
-export async function removeRosterAlias(email: string, alias: string): Promise<void> {
-  await request('DELETE', `/roster/${encodeURIComponent(email)}/aliases/${encodeURIComponent(alias)}`);
+/** Drop one of an account's extra sign-in addresses (never its key). When it
+ *  is the address the account was set up through, the server also clears that
+ *  password and ends its sessions (`credentialCleared`). */
+export async function removeRosterAlias(email: string, alias: string): Promise<{ credentialCleared: boolean }> {
+  return request('DELETE', `/roster/${encodeURIComponent(email)}/aliases/${encodeURIComponent(alias)}`);
 }
 
 export async function removeRosterEntry(email: string): Promise<void> {

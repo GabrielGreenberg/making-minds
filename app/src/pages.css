@@ -731,7 +731,8 @@
   color: var(--mm-ink-2); font-size: 13px; line-height: 1;
 }
 .roster-alias-remove:hover:not(:disabled) { color: var(--mm-warn); }
-.roster-match { display: block; font-size: 12px; color: var(--mm-ink-2); }
+.roster-match { display: block; font-family: var(--mm-font-sans); font-size: 12px; color: var(--mm-ink-2); }
+.roster-conflict { color: var(--mm-warn); white-space: normal; max-width: 360px; }
 .roster-message { max-width: 320px; color: var(--mm-ink-2); }
 .roster-actions { white-space: nowrap; text-align: right; }
 .roster-actions .mm-btn + .mm-btn { margin-left: 6px; }

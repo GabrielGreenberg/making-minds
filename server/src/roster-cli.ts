@@ -88,7 +88,7 @@ switch (command) {
       name: flag('name') ?? '',
       role: flag('role') === 'instructor' ? 'instructor' : (known?.role ?? 'student'),
       studentId: flag('id') ?? '',
-    });
+    }, 'instructor');
     if (placed.kind === 'conflict') die(placed.reason);
     else if (placed.kind === 'added') console.log(`added ${email}`);
     else console.log(`updated ${placed.account.email}${placed.aliasAdded ? ` (+ sign-in address ${placed.aliasAdded})` : ''}`);

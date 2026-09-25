@@ -66,7 +66,8 @@ export type RegisterResult =
         | 'weak-password'
         | 'id-mismatch'
         | 'id-required'
-        | 'email-not-accepted';
+        | 'email-not-accepted'
+        | 'email-taken';
       message: string;
     };
 
@@ -135,9 +136,11 @@ export class PasswordAuthProvider implements AuthProvider {
     if (problem) return { ok: false, reason: 'weak-password', message: problem };
 
     // The address they chose becomes one they sign in with (claimForSignUp
-    // has vetted it: the account's own, or a UCLA one nobody else holds).
+    // has vetted it: the account's own, or a UCLA one nobody else holds), and
+    // is remembered as the one the credential was set through.
     this.db.addEmailAlias(account.email, email, 'signup');
     this.db.setPasswordHash(account.email, hashPassword(details.password as string));
+    this.db.markRegisteredVia(account.email, email);
     return { ok: true, user: this.db.getUser(account.email)! };
   }
 }

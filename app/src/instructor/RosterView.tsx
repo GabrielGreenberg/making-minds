@@ -171,11 +171,14 @@ function RosterRow({
                   onClick={() =>
                     confirm(
                       `Remove ${alias} from ${row.name}'s account?\n\n` +
-                        `It will no longer sign in. ${row.email} and their work are untouched.`,
+                        'It will no longer sign in. If the account was set up through it, that ' +
+                        'password is cleared too and they are signed out. Their work is untouched.',
                     ) &&
                     onAction(async () => {
-                      await api.removeRosterAlias(row.email, alias);
-                      return `${alias} no longer signs in to ${row.name}'s account.`;
+                      const { credentialCleared } = await api.removeRosterAlias(row.email, alias);
+                      return credentialCleared
+                        ? `${alias} no longer signs in, and the password set up through it is cleared — ${row.name} sets up their account again.`
+                        : `${alias} no longer signs in to ${row.name}'s account.`;
                     })
                   }
                 >
@@ -186,7 +189,14 @@ function RosterRow({
           </ul>
         )}
       </td>
-      <td>{row.studentId || '—'}</td>
+      <td>
+        {row.studentId || '—'}
+        {row.studentId && !row.uid && (
+          <span className="roster-match" title="Typed into an access request; not from the class list">
+            unverified
+          </span>
+        )}
+      </td>
       <td>{row.section ?? '—'}</td>
       <td>{row.role === 'instructor' ? 'Instructor' : 'Student'}</td>
       <td>
@@ -386,6 +396,7 @@ function AccessRequestsPanel({
                   {req.match && (
                     <span className="roster-match">→ {req.match.name}'s account</span>
                   )}
+                  {req.conflict && <span className="roster-match roster-conflict">⚠ {req.conflict}</span>}
                 </td>
                 <td>{req.studentId || '—'}</td>
                 <td className="roster-message">{req.message || '—'}</td>

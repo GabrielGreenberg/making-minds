@@ -46,7 +46,7 @@ export function importRosterCsv(db: Db, csv: string, defaultRole: Role): RosterI
   let updated = 0;
   const issues = [...parsed.issues];
   for (const entry of parsed.entries) {
-    const placed = placeRosterEntry(db, entry);
+    const placed = placeRosterEntry(db, entry, 'class-list');
     if (placed.kind === 'added') added++;
     else if (placed.kind === 'updated') updated++;
     else issues.push({ line: entry.line, reason: `${placed.reason} — row not imported` });

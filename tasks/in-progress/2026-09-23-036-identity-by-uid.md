@@ -69,6 +69,11 @@ personal addresses** (gmail, icloud, outlook, yahoo, me.com), not `@ucla.edu` or
 2. **Yes, interim:** until this lands, the sign-up pane tells students to use the email on
    their class-list record, which may be a personal address. That one-line change ships inside
    task 035 (its Done-when item 9).
+3. **Accepted until SSO (2026-09-24):** with no mail server, a typed UCLA address is unverified,
+   so whoever knows a classmate's UID can claim that classmate's UNCLAIMED seat. Guessing is
+   capped (per-IP refusal budget, no seat oracle); the targeted case is accepted for the pilot —
+   the victim sees "an account already exists" and the instructor resets it. UCLA SSO (006)
+   closes it.
 
 ### Plan (work session, 2026-09-24)
 One identity module, `server/src/identity.ts`, is the only place an email or a UID resolves to
@@ -101,6 +106,16 @@ loudly instead of splitting a person in two.
   a time (`DELETE /api/roster/:email/aliases/:alias`); the CLI `list` prints them.
 - **Client:** the set-up pane asks for UID first, then "your UCLA email or the email on your
   class-list record"; not-on-roster copy speaks of the UID; the sign-in pane says "your email".
+- **Trust levels (from the adversarial review):** an ID is VERIFIED (`uid`) only from the class
+  list, an instructor or SSO; an approved request's typed ID stays as written, and a class-list
+  row carrying it is a conflict until the instructor confirms it with the add form. An account
+  "has an ID on file" as written, verified or not. A `signup` alias is the student's own word:
+  the class list, SSO or an approval takes the address from it, a sign-up never does
+  (`email-taken`), and an ID-less entry under one is a conflict. The add form only adds an
+  address when a typed ID matches someone under another email (a typo never renames anyone).
+  Removing the alias an account was set up through (`registered_via`) clears that password and
+  its sessions. Sign-up checks the address before the ID (no seat oracle) and every refusal
+  counts toward a per-IP budget (100 / 10 min); sign-in throttles per account.
 
 ## Verify
 `authCheck` decision table (above); a browser pass of the three sign-in panes in remote mode.

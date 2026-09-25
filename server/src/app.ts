@@ -118,6 +118,11 @@ export function createApp(config: ServerConfig, db: Db) {
   // Access requests are unauthenticated writes: a looser per-IP budget, since
   // a shared campus NAT may legitimately carry several in one session.
   const requestThrottle = new LoginThrottle(20, 60 * 60 * 1000);
+  // Refused sign-ups per IP, whatever email or ID each one typed: guessing
+  // student IDs under fresh addresses never meets the per-key throttle, so
+  // this budget caps it. Generous, because a lecture hall setting up accounts
+  // together shares one campus address and mistypes a few.
+  const registerBudget = new LoginThrottle(100, 10 * 60 * 1000);
 
   const auth = requireAuth(db);
   // The watermark's secret: the configured one, else the one this database
@@ -142,7 +147,9 @@ export function createApp(config: ServerConfig, db: Db) {
   app.post('/api/auth/login', async (req, res) => {
     const email = normalizeEmail((req.body ?? {}).email);
     const ip = clientIp(req);
-    const wait = throttle.retryAfter(email, ip);
+    // Counted per ACCOUNT, so an account's several addresses share one budget.
+    const key = db.findUserByEmail(email)?.email ?? email;
+    const wait = throttle.retryAfter(key, ip);
     if (wait > 0) {
       res.setHeader('Retry-After', String(wait));
       res.status(429).json({
@@ -153,14 +160,14 @@ export function createApp(config: ServerConfig, db: Db) {
     }
     const user = await authProvider.authenticate(req.body ?? {});
     if (!user) {
-      throttle.recordFailure(email, ip);
+      throttle.recordFailure(key, ip);
       // One message for every failure: an unknown email, an email with no
       // account yet, and a wrong password are indistinguishable to the caller,
       // so the endpoint can't be used to enumerate the roster.
       res.status(401).json({ error: 'incorrect email or password' });
       return;
     }
-    throttle.recordSuccess(email, ip);
+    throttle.recordSuccess(key, ip);
     const token = issueSession(db, user, config.sessionTtlSeconds);
     res.json({ token, user });
   });
@@ -175,7 +182,7 @@ export function createApp(config: ServerConfig, db: Db) {
     const email = normalizeEmail((req.body ?? {}).email);
     const uid = normalizeUid((req.body ?? {}).studentId);
     const keys = uid ? [email, `uid:${uid}`] : [email];
-    const wait = Math.max(...keys.map((k) => throttle.retryAfter(k, ip)));
+    const wait = Math.max(registerBudget.retryAfter('register', ip), ...keys.map((k) => throttle.retryAfter(k, ip)));
     if (wait > 0) {
       res.setHeader('Retry-After', String(wait));
       res.status(429).json({ error: 'too many attempts — wait a few minutes and try again', retryAfter: wait });
@@ -183,7 +190,8 @@ export function createApp(config: ServerConfig, db: Db) {
     }
     const result = await authProvider.register(req.body ?? {});
     if (!result.ok) {
-      if (result.reason === 'id-mismatch' || result.reason === 'not-on-roster') {
+      registerBudget.recordFailure('register', ip);
+      if (result.reason !== 'weak-password' && result.reason !== 'email-not-accepted') {
         for (const k of keys) throttle.recordFailure(k, ip);
       }
       // 403 you may not have an account here · 409 the account's state says no
@@ -191,7 +199,7 @@ export function createApp(config: ServerConfig, db: Db) {
       const status =
         result.reason === 'not-on-roster'
           ? 403
-          : result.reason === 'already-registered' || result.reason === 'id-mismatch'
+          : result.reason === 'already-registered' || result.reason === 'id-mismatch' || result.reason === 'email-taken'
             ? 409
             : 400;
       res.status(status).json({ error: result.message, reason: result.reason });
@@ -268,7 +276,10 @@ export function createApp(config: ServerConfig, db: Db) {
     requestThrottle.recordFailure('access-request', ip);
     // Answer identically whether or not we act, so the endpoint reveals
     // nothing about who is on the roster and can't be spammed into duplicates.
-    const known = db.findUserByEmail(email) != null;
+    // An address that is only a student's own sign-up alias is not "known":
+    // its real owner may be asking, and approval can take it back.
+    const owner = db.emailOwner(email);
+    const known = owner != null && owner.source !== 'signup';
     if (!known && !db.hasPendingAccessRequest(email)) {
       db.addAccessRequest({
         email,
@@ -308,15 +319,19 @@ export function createApp(config: ServerConfig, db: Db) {
       res.status(400).json({ error: 'enter a valid email address' });
       return;
     }
-    // Through the identity module, like the import: an ID or an email the
-    // roster already has updates that person (a new email becomes an alias);
-    // a blank name keeps the one on file.
-    const placed = placeRosterEntry(db, {
-      email,
-      name: typeof body.name === 'string' ? body.name.trim() : '',
-      role: body.role === 'instructor' ? 'instructor' : 'student',
-      studentId: typeof body.studentId === 'string' ? body.studentId.trim() : '',
-    });
+    // Through the identity module, like the import: an email the roster
+    // already has updates that person (a blank name keeps theirs); an ID it
+    // already has under another email only adds that email as an alias.
+    const placed = placeRosterEntry(
+      db,
+      {
+        email,
+        name: typeof body.name === 'string' ? body.name.trim() : '',
+        role: body.role === 'instructor' ? 'instructor' : 'student',
+        studentId: typeof body.studentId === 'string' ? body.studentId.trim() : '',
+      },
+      'instructor',
+    );
     if (placed.kind === 'conflict') {
       res.status(409).json({ error: placed.reason });
       return;
@@ -347,18 +362,27 @@ export function createApp(config: ServerConfig, db: Db) {
   });
 
   // A wrong extra sign-in address (a typo at sign-up, a stale registrar
-  // email) is removed one at a time; the account's key is not an alias.
+  // email, a mistaken approval) is removed one at a time; the account's key
+  // is not an alias. When it is the address the account was SET UP through,
+  // whoever did that chose the password: it is cleared and every session
+  // ends, exactly as a reset, so removing the address actually locks them out.
   app.delete('/api/roster/:email/aliases/:alias', auth, requireInstructor, (req, res) => {
     const email = normalizeEmail(req.params.email);
+    const alias = normalizeEmail(req.params.alias);
     if (!db.getUser(email)) {
       res.status(404).json({ error: 'unknown account' });
       return;
     }
-    if (!db.removeEmailAlias(email, normalizeEmail(req.params.alias))) {
+    const setUpThrough = db.registeredVia(email) === alias;
+    if (!db.removeEmailAlias(email, alias)) {
       res.status(404).json({ error: 'that account has no such sign-in address' });
       return;
     }
-    res.json({ ok: true });
+    if (setUpThrough) {
+      db.setPasswordHash(email, null);
+      db.deleteSessionsFor(email);
+    }
+    res.json({ ok: true, credentialCleared: setUpThrough });
   });
 
   // Forgotten password, with no mail server in the loop: the instructor clears
@@ -384,8 +408,12 @@ export function createApp(config: ServerConfig, db: Db) {
     // Each request says which roster account its ID or email already names:
     // approving one of those adds the email to that account, not a new row.
     const requests = db.listAccessRequests(filter).map((r) => {
-      const { account } = matchAccount(db, { email: r.email, studentId: r.studentId });
-      return { ...r, match: account ? { email: account.email, name: account.name } : null };
+      const { account, conflict } = matchAccount(db, { email: r.email, studentId: r.studentId });
+      return {
+        ...r,
+        match: account && !conflict ? { email: account.email, name: account.name } : null,
+        conflict,
+      };
     });
     res.json({ requests });
   });

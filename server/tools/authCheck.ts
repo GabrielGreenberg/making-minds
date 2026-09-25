@@ -237,7 +237,16 @@ check('…and the refused address is not stored', idDb.findUserByEmail('hal.othe
 const othersEmail = await idPw.register({ email: 'gia.personal@gmail.com', password: 'longenough1', studentId: '004-333-444' });
 check("a UID with another student's email is refused (id mismatch)", !othersEmail.ok && othersEmail.reason === 'id-mismatch');
 const othersAlias = await idPw.register({ email: 'hal@g.ucla.edu', password: 'longenough1', studentId: '004-333-444' });
-check("…so is another student's alias", !othersAlias.ok && othersAlias.reason === 'id-mismatch');
+check(
+  "another student's own sign-up address is refused as taken (not as an ID mismatch)",
+  !othersAlias.ok && othersAlias.reason === 'email-taken',
+);
+const oracleReal = await idPw.register({ email: 'probe@gmail.com', password: 'longenough1', studentId: '004-333-444' });
+const oracleFake = await idPw.register({ email: 'probe@gmail.com', password: 'longenough1', studentId: '004-000-001' });
+check(
+  'a refused address answers the same for a real and an unknown ID (no seat oracle)',
+  !oracleReal.ok && !oracleFake.ok && oracleReal.reason === 'email-not-accepted' && oracleFake.reason === 'email-not-accepted',
+);
 const personal2 = await idPw.register({ email: 'cam.elsewhere@gmail.com', password: 'longenough1', studentId: '004-333-444' });
 check(
   'a personal address that is not the class-list one is refused',
@@ -278,11 +287,16 @@ check(
   clash.issues.some((i) => i.line === 2 && i.reason.includes('row not imported')) && idDb.listEmailAliases('gia.personal@gmail.com').length === 0,
   JSON.stringify(clash.issues),
 );
-const wrongIdForEmail = placeRosterEntry(idDb, { email: 'cam@ucla.edu', name: 'Cam', role: 'student', studentId: '004-777-888' });
+const wrongIdForEmail = placeRosterEntry(idDb, { email: 'cam@ucla.edu', name: 'Cam', role: 'student', studentId: '004-777-888' }, 'instructor');
 check('an email on file under a different UID is a conflict', wrongIdForEmail.kind === 'conflict' && idDb.findUserByUid('004777888') === null);
-const manual = placeRosterEntry(idDb, { email: 'late@ucla.edu', name: '', role: 'student', studentId: '' });
+const manual = placeRosterEntry(idDb, { email: 'late@ucla.edu', name: '', role: 'student', studentId: '' }, 'instructor');
 check('a manual add with no name takes the address', manual.kind === 'added' && manual.account.name === 'late');
-const bindId = placeRosterEntry(idDb, { email: 'late@ucla.edu', name: '', role: 'student', studentId: '004-121-212' });
+const bindId = placeRosterEntry(idDb, { email: 'late@ucla.edu', name: '', role: 'student', studentId: '004-121-212' }, 'instructor');
+const typoId = placeRosterEntry(idDb, { email: 'someone.new@ucla.edu', name: 'Some One', role: 'student', studentId: '004-121-212' }, 'instructor');
+check(
+  'the add form: an ID already on file under another email only adds the address (a typo never renames a classmate)',
+  typoId.kind === 'updated' && typoId.account.name === 'late' && typoId.aliasAdded === 'someone.new@ucla.edu',
+);
 check('…a later entry binds its UID and keeps the name', bindId.kind === 'updated' && bindId.account.uid === '4121212' && bindId.account.name === 'late');
 const byRequest = placeRosterEntry(idDb, { email: 'gia@g.ucla.edu', name: 'G. From A Request', role: 'instructor', studentId: '004111222' }, 'request');
 check(
@@ -304,7 +318,7 @@ try {
   twinUidRefused = true;
 }
 check('invariant: a UID is on at most one account', twinUidRefused && idDb.getUser('twin@ucla.edu') === null);
-check('addEmailAlias refuses another account\'s address', idDb.addEmailAlias('cam@ucla.edu', 'hal@g.ucla.edu', 'roster') === 'taken');
+check("addEmailAlias refuses another account's key or roster alias", idDb.addEmailAlias('cam@ucla.edu', 'hal.new@outlook.com', 'roster') === 'taken' && idDb.addEmailAlias('cam@ucla.edu', 'gia.personal@gmail.com', 'sso') === 'taken');
 
 const idSso = new SsoAuthProvider(idDb, 'https://sso.ucla.edu/login');
 const ssoCam = idSso.signInAsserted({ uid: '004333444', email: 'cam.logon@ucla.edu' });
@@ -318,6 +332,60 @@ check(
 const ssoProf = idSso.signInAsserted({ uid: '009-876-543', email: 'prof2@ucla.edu' });
 check('SSO matches an account with no UID by email, and binds the asserted UID', ssoProf?.email === 'prof2@ucla.edu' && ssoProf.uid === '9876543');
 check('dev provider signs in by an alias too', (await new DevAuthProvider(idDb).authenticate({ email: 'hal@g.ucla.edu' }))?.email === 'hal.personal@yahoo.com');
+// Review findings (task 036): trust levels.
+// (a) An access request's typed ID verifies nothing.
+const reqRow = placeRosterEntry(idDb, { email: 'mal@example.org', name: 'Mal', role: 'student', studentId: '004-707-070' }, 'request');
+check('a new row from an approved request keeps the typed ID unverified', reqRow.kind === 'added' && reqRow.account.uid === '' && reqRow.account.studentId === '004-707-070');
+check('…which still asks for it at sign-up', (await idPw.register({ email: 'mal@example.org', password: 'longenough1' })).ok === false);
+const carol = importRosterCsv(idDb, 'UID,Name,Email\n004-707-070,Carol Real,carol.real@gmail.com\n', 'student');
+check(
+  'a class-list row with an unverified ID is a conflict, never a merge into the requester',
+  carol.added === 0 && carol.updated === 0 && carol.issues.some((i) => i.reason.includes('never verified')) && idDb.getUser('mal@example.org')?.name === 'Mal',
+  JSON.stringify(carol),
+);
+const vouched = placeRosterEntry(idDb, { email: 'mal@example.org', name: '', role: 'student', studentId: '004-707-070' }, 'instructor');
+check('the instructor settles it with the add form (email + that ID): now verified', vouched.kind === 'updated' && vouched.account.uid === '4707070');
+const carolAgain = importRosterCsv(idDb, 'UID,Name,Email\n004-707-070,Carol Real,carol.real@gmail.com\n', 'student');
+check('…and the class list then lands on that account', carolAgain.updated === 1 && idDb.findUserByEmail('carol.real@gmail.com')?.email === 'mal@example.org');
+const malReg = await idPw.register({ email: 'mal@example.org', password: 'malpassword', studentId: '004707070' });
+check('an unverified-ID row registers with its own email and that ID', malReg.ok);
+
+// (b) A student's own sign-up alias yields to a stronger claim.
+idDb.upsertUser({ email: 'dan@gmail.com', name: 'Dan', role: 'student', studentId: '004-818-181' });
+idDb.upsertUser({ email: 'erin@yahoo.com', name: 'Erin', role: 'student', studentId: '004-828-282' });
+check('Dan signs up with Erin\'s UCLA address', (await idPw.register({ email: 'erin@g.ucla.edu', password: 'danpassword', studentId: '004818181' })).ok);
+const erinBlocked = await idPw.register({ email: 'erin@g.ucla.edu', password: 'erinpassword', studentId: '004828282' });
+check('Erin is told the address is taken', !erinBlocked.ok && erinBlocked.reason === 'email-taken');
+const erinList = importRosterCsv(idDb, 'UID,Name,Email\n004-828-282,Erin,erin@g.ucla.edu\n', 'student');
+check(
+  'the class list listing Erin under that address moves it to her (no conflict)',
+  erinList.issues.length === 0 && idDb.findUserByEmail('erin@g.ucla.edu')?.email === 'erin@yahoo.com',
+  JSON.stringify(erinList),
+);
+check('…Dan keeps his own account', idDb.listEmailAliases('dan@gmail.com').length === 0 && idDb.getUser('dan@gmail.com')?.registered === true);
+check(
+  'Dan signing in through it now fails',
+  (await idPw.authenticate({ email: 'erin@g.ucla.edu', password: 'danpassword' })) === null &&
+    (await idPw.authenticate({ email: 'dan@gmail.com', password: 'danpassword' }))?.email === 'dan@gmail.com',
+);
+idDb.addEmailAlias('dan@gmail.com', 'erin.sso@ucla.edu', 'signup');
+check(
+  "an SSO login takes back an address squatted as someone's sign-up alias",
+  new SsoAuthProvider(idDb, '').signInAsserted({ uid: '004828282', email: 'erin.sso@ucla.edu' })?.email === 'erin@yahoo.com' &&
+    idDb.findUserByEmail('erin.sso@ucla.edu')?.email === 'erin@yahoo.com',
+);
+idDb.addEmailAlias('dan@gmail.com', 'nobody.sure@ucla.edu', 'signup');
+const noIdRow = placeRosterEntry(idDb, { email: 'nobody.sure@ucla.edu', name: 'Who', role: 'student', studentId: '' }, 'class-list');
+check('an ID-less entry under a sign-up alias is a conflict (same person or not is unknowable)', noIdRow.kind === 'conflict');
+check('a sign-up alias can never out-rank a stronger one', idDb.addEmailAlias('dan@gmail.com', 'erin@g.ucla.edu', 'signup') === 'taken');
+
+// (c) The second row sharing an ID after the upgrade (unverified) still needs it.
+idDb.upsertUser({ email: 'twin.b@ucla.edu', name: 'Twin B', role: 'student', studentId: '004-818-181' }, { verifiedId: false });
+const twinNoId = await idPw.register({ email: 'twin.b@ucla.edu', password: 'longenough1' });
+check('an unverified ID on file is still required at sign-up', !twinNoId.ok && twinNoId.reason === 'id-required');
+const twinWithId = await idPw.register({ email: 'twin.b@ucla.edu', password: 'longenough1', studentId: '004818181' });
+check('…and a verified holder of that ID blocks the claim', !twinWithId.ok && twinWithId.reason === 'id-mismatch');
+
 idDb.removeUser('hal.personal@yahoo.com');
 check('removing an account removes its aliases', idDb.findUserByEmail('hal@g.ucla.edu') === null && idDb.addEmailAlias('cam@ucla.edu', 'hal@g.ucla.edu', 'roster') === 'added');
 idDb.close();
@@ -410,7 +478,7 @@ const preLogin = await api('POST', '/auth/login', { body: { email: 'rosa@ucla.ed
 check('roster member with no account cannot sign in', preLogin.status === 401);
 
 const noRosterReg = await api<{ reason: string }>('POST', '/auth/register', {
-  body: { email: 'stranger@gmail.com', password: 'longenough1', studentId: '1' },
+  body: { email: 'stranger@ucla.edu', password: 'longenough1', studentId: '1' },
 });
 check('off-roster registration is 403', noRosterReg.status === 403 && noRosterReg.json.reason === 'not-on-roster');
 
@@ -683,12 +751,14 @@ const piaRow = async () =>
   (await api<{ roster: AliasRow[] }>('GET', '/roster', { token: profToken })).json.roster.find((r) => r.email === 'pia.p@gmail.com');
 check('GET /roster lists the sign-in addresses', (await piaRow())?.aliases.join() === 'pia@g.ucla.edu');
 
-await api('POST', '/auth/access-requests', { body: { email: 'pia@g.ucla.edu', name: 'Pia' } });
+const pendingEmails = async () =>
+  (await api<{ requests: { email: string }[] }>('GET', '/access-requests?status=pending', { token: profToken })).json.requests.map((r) => r.email);
+await api('POST', '/auth/access-requests', { body: { email: 'pia.p@gmail.com', name: 'Pia' } });
+check('an access request under an account key records nothing (it is known)', !(await pendingEmails()).includes('pia.p@gmail.com'));
+await api('POST', '/auth/access-requests', { body: { email: 'pia@g.ucla.edu', name: 'Not Pia' } });
 check(
-  'an access request under an alias records nothing (it is known)',
-  !(await api<{ requests: { email: string }[] }>('GET', '/access-requests?status=pending', { token: profToken })).json.requests.some(
-    (r) => r.email === 'pia@g.ucla.edu',
-  ),
+  "…but one under a student's own sign-up address is recorded (its real owner may be asking)",
+  (await pendingEmails()).includes('pia@g.ucla.edu'),
 );
 await api('POST', '/auth/access-requests', { body: { email: 'pia.work@example.org', name: 'Pia P', studentId: '004800001' } });
 const piaRequests = await api<{ requests: { id: number; email: string; match: { email: string } | null }[] }>(
@@ -715,12 +785,16 @@ const addClash = await api<{ error: string }>('POST', '/roster', {
 });
 check("the add form refuses a UID with another person's email (409)", addClash.status === 409);
 
-const dropAlias = await api('DELETE', '/roster/pia.p%40gmail.com/aliases/pia%40g.ucla.edu', { token: profToken });
-check('the instructor removes a sign-in address', dropAlias.status === 200);
-check('…which no longer signs in', (await api('POST', '/auth/login', { body: { email: 'pia@g.ucla.edu', password: 'piapassword' } })).status === 401);
-check('…while the class-list email still does', (await api('POST', '/auth/login', { body: { email: 'pia.p@gmail.com', password: 'piapassword' } })).status === 200);
-check('removing it again is 404', (await api('DELETE', '/roster/pia.p%40gmail.com/aliases/pia%40g.ucla.edu', { token: profToken })).status === 404);
 check('students cannot remove addresses', (await api('DELETE', '/roster/pia.p%40gmail.com/aliases/pia.work%40example.org', { token: piaByAlias.json.token })).status === 403);
+const dropOther = await api<{ credentialCleared: boolean }>('DELETE', '/roster/pia.p%40gmail.com/aliases/pia.third%40ucla.edu', { token: profToken });
+check('the instructor removes a sign-in address', dropOther.status === 200 && dropOther.json.credentialCleared === false);
+check('…which no longer signs in', (await api('POST', '/auth/login', { body: { email: 'pia.third@ucla.edu', password: 'piapassword' } })).status === 401);
+check('…while her password and sessions stand', (await api('GET', '/auth/me', { token: piaByAlias.json.token })).status === 200);
+const dropSetup = await api<{ credentialCleared: boolean }>('DELETE', '/roster/pia.p%40gmail.com/aliases/pia%40g.ucla.edu', { token: profToken });
+check('removing the address the account was set up through clears that password', dropSetup.status === 200 && dropSetup.json.credentialCleared === true);
+check('…ends its sessions', (await api('GET', '/auth/me', { token: piaByAlias.json.token })).status === 401);
+check('…and the password no longer works by any address', (await api('POST', '/auth/login', { body: { email: 'pia.p@gmail.com', password: 'piapassword' } })).status === 401);
+check('removing it again is 404', (await api('DELETE', '/roster/pia.p%40gmail.com/aliases/pia%40g.ucla.edu', { token: profToken })).status === 404);
 
 section('[http: throttling]');
 
@@ -739,6 +813,33 @@ check(
   'a different email is unaffected by the throttle',
   (await api('POST', '/auth/login', { body: { email: 'prof@ucla.edu', password: 'instructorpass' } })).status === 200,
 );
+
+// One budget per ACCOUNT: an account's several addresses share it.
+await api('POST', '/roster/import', { token: profToken, body: { csv: 'UID,Name,Email\n004-900-900,Quinn,quinn@gmail.com\n' } });
+await api('POST', '/auth/register', { body: { email: 'quinn@g.ucla.edu', password: 'quinnpassword', studentId: '004900900' } });
+await api('POST', '/roster', { token: profToken, body: { email: 'quinn.third@ucla.edu', studentId: '004900900' } });
+let quinnTries = 0;
+for (const email of ['quinn@gmail.com', 'quinn@g.ucla.edu', 'quinn.third@ucla.edu'].flatMap((e) => [e, e, e, e])) {
+  if ((await api('POST', '/auth/login', { body: { email, password: 'wrongpass' } })).status === 429) break;
+  quinnTries++;
+}
+check('sign-in guesses across one account\'s addresses share one budget (10)', quinnTries === 10, `got ${quinnTries}`);
+
+// Sign-up refusals per IP, whatever email or ID each typed (the last check
+// here: it closes registration from this address for the rest of the run).
+let refused = 0;
+let sawRegisterBudget = false;
+for (let i = 0; i < 130; i++) {
+  const r = await api('POST', '/auth/register', {
+    body: { email: `guess${i}@ucla.edu`, password: 'longenough1', studentId: String(800000000 + i) },
+  });
+  if (r.status === 429) {
+    sawRegisterBudget = true;
+    break;
+  }
+  refused++;
+}
+check('ID guessing under fresh addresses meets a per-IP budget', sawRegisterBudget && refused <= 100, `refused ${refused} before 429`);
 
 section('[http: dev mode is still a separate world]');
 
