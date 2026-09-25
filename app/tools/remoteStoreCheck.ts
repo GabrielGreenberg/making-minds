@@ -541,12 +541,15 @@ check('no buffer → the fetched state passes through untouched',
 api.setToken(sTok);
 const filedViaSeam = await remoteFeedbackStore.submit({
   student: 'someone-else@ucla.edu', // deliberately wrong — the server's word wins
+  authorRole: 'instructor', // likewise (task 018)
   category: 'platform design',
   message: 'the TM tape is hard to scroll on a trackpad',
   screenshots: [],
 });
 check('the server stamps the caller\'s own identity, not the client-supplied one',
   filedViaSeam.student === student.email.toLowerCase());
+check('the server stamps the caller\'s own role, not the client-supplied one',
+  filedViaSeam.authorRole === 'student');
 check('a fresh report starts open', filedViaSeam.status === 'open');
 
 api.setToken(sTok);

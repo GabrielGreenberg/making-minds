@@ -70,7 +70,7 @@ the wrong tree).
 | `app/` | `npm run build` | the production bundle builds |
 | `app/` | `npm run check` | the budget guard, the tools type-check (`tsconfig.tools.json`) + 22 headless harness tools (`app/tools/*Check.ts`; several boot a real server — minutes, not seconds) |
 | `server/` | `npm run typecheck` | server types |
-| `server/` | `npm run check` | typecheck + serverCheck + authCheck + parityCheck (server ≡ engine grading) |
+| `server/` | `npm run check` | typecheck + serverCheck + feedbackCheck + rosterCheck + authCheck + parityCheck (server ≡ engine grading) + homeworkSyncCheck |
 
 Fast loop while working: both `tsc`s plus the ONE harness tool that pins the area you're
 touching (`npx tsx tools/<name>Check.ts` from `app/`). Before landing: everything in the
@@ -116,6 +116,10 @@ State each such gap in the task's `## Verify` as owed, with the recipe.
    user copied inside an assignment in this window; no clipboard API outside the hook, every
    answer field guarded (grep gate in `app/tools/pasteCheck.ts`). A new input or import path
    asks the seam — never its own rule.
+9. **Student data never enters git — the repo is public.** Class lists live in gitignored
+   `rosters/`; app feedback reports stay on the server and in `tasks/tools/feedback.mjs`'s
+   working copy outside the repo; a task distilled from one cites the report id and role,
+   never its author's name or email, their words, or their screenshots (`CATCHER.md` §3).
 Full rules: `CLAUDE.md` Part 2 "Critical design rules" and "Things to watch".
 
 ## 9. Context budget (a lesson from the Virgil pipeline — read twice)

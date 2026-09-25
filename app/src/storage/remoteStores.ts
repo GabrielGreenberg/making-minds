@@ -42,6 +42,7 @@ import type { WorkbookStore } from './workbookStore';
 import type { AssignmentStore } from './AssignmentStore';
 import type { SubmissionStore } from './submissionStore';
 import type { FeedbackStore } from './feedbackStore';
+import type { Role } from '../auth/accounts';
 import type { NotesStore } from './NotesStore';
 import {
   ApiError,
@@ -174,13 +175,15 @@ class RemoteSubmissionStore implements SubmissionStore {
 class RemoteFeedbackStore implements FeedbackStore {
   submit(input: {
     student: string;
+    authorRole: Role;
     category: FeedbackCategory;
     message: string;
     screenshots: FeedbackScreenshot[];
     context?: { assignmentId?: string; questionId?: number };
   }): Promise<PlatformFeedback> {
-    // `student` is the server's word (the session identifies who is posting),
-    // same discipline as submissions — the client's value is not sent.
+    // `student` and `authorRole` are the server's word (the session
+    // identifies who is posting, and in what role), same discipline as
+    // submissions — the client's values are not sent.
     return submitFeedback({
       category: input.category,
       message: input.message,
