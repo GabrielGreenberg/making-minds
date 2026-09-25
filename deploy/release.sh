@@ -3,10 +3,12 @@
 #
 #   1. preflight  — you are on main, nothing uncommitted, and HEAD == origin/main
 #                   (the box pulls from GitHub, so what you deploy must be pushed)
-#   2. the box    — the Lightsail API server pulls that commit, syncs HW1–HW7
-#                   from the repo into its database (npm run homeworks -- sync:
-#                   untouched copies refresh, instructor-edited ones are left
-#                   alone and listed) and restarts
+#   2. the box    — the Lightsail API server backs up its database, pulls that
+#                   commit, refreshes the daily backup job from it
+#                   (deploy/backup-install.sh), syncs HW1–HW7 from the repo into
+#                   its database (npm run homeworks -- sync: untouched copies
+#                   refresh, instructor-edited ones are left alone and listed)
+#                   and restarts
 #                   (needs a key in ssh/; without one the commands to paste into the
 #                   Lightsail browser terminal are printed instead)
 #   3. the site   — the frontend is built in remote mode and uploaded to Cloudflare
@@ -70,6 +72,9 @@ BK=/srv/making-minds/data/backup-$(date +%F-%H%M%S).sqlite
 REPO=/srv/making-minds/repo
 sudo node -e "const {DatabaseSync}=require('node:sqlite');const [db,bk]=process.argv.slice(1);new DatabaseSync(db).exec(\"VACUUM INTO '\"+bk+\"'\")" "$DB" "$BK" \
   || { sudo cp "$DB" "$BK"; sudo cp "$DB-wal" "$BK-wal" 2>/dev/null || true; }
+# Owner-only: a backup holds password hashes. (These are the last 7 releases'
+# snapshots; the daily ones, kept 35 days, live in /srv/making-minds/backups/.)
+sudo bash -c 'chmod 600 /srv/making-minds/data/backup-*.sqlite* 2>/dev/null || true'
 sudo bash -c 'ls -t /srv/making-minds/data/backup-*.sqlite 2>/dev/null | tail -n +8 | xargs -r rm -f'
 echo "backup: $BK"
 before=$(sudo -u makingminds -H git -C "$REPO" rev-parse --short HEAD)
@@ -81,6 +86,9 @@ if [ -n "${EXPECT:-}" ] && [ "$after" != "$EXPECT" ]; then
   echo "warning: box pulled ${after:0:7}, the release is ${EXPECT:0:7} (GitHub main moved?)" >&2
 fi
 sudo -u makingminds -H bash -c "cd '$REPO/server' && npm install --no-audit --no-fund --silent"
+# The daily backup job (task 041) follows the repo like the code does. A
+# failure stops the release before the restart: no release without backups.
+sudo bash "$REPO/deploy/backup-install.sh"
 # Homework content follows the repo like code does (server/src/homeworks.ts).
 # A failure stops the release before the restart; the old server keeps running.
 echo "homeworks:"

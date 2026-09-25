@@ -1,0 +1,14 @@
+# The pilot database's daily backup (task 041). Installed by deploy/backup-install.sh;
+# started by makingminds-backup.timer. `sudo systemctl start makingminds-backup` runs it now.
+[Unit]
+Description=Making Minds: daily backup of the pilot database
+
+[Service]
+Type=oneshot
+User=makingminds
+Group=makingminds
+Environment=MM_DB_PATH=/srv/making-minds/data/making-minds.sqlite
+Environment=MM_BACKUP_DIR=/srv/making-minds/backups/daily
+Environment=MM_BACKUP_KEEP_DAYS=35
+ExecStart=/usr/local/lib/making-minds/backup-daily.sh
+Nice=10
