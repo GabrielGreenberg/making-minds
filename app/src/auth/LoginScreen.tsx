@@ -16,10 +16,11 @@ import { PageShell, hashLink } from '../components/PageShell';
  * Remote mode: whatever the SERVER says it supports (`capabilities`, from
  * GET /api/auth/config), which is the whole point of the seam:
  *
- *   password — the launch system: sign in with your course email and the
- *              password you chose, create an account if you haven't yet (the
- *              roster decides who may), or ask to be added if your email
- *              isn't the one on file.
+ *   password — the launch system: sign in with your email and the password
+ *              you chose, set up your account if you haven't yet (your UID
+ *              finds your roster seat; your UCLA email or the class-list one
+ *              becomes your sign-in address), or ask to be added if the
+ *              roster doesn't have you.
  *   sso      — one "Sign in with UCLA" button; no password field, no account
  *              creation (the identity provider owns both).
  *   dev      — email only, passwordless. Development and the closed pilot.
@@ -83,7 +84,7 @@ function LocalLoginScreen() {
 
 type View = 'signin' | 'setup' | 'request';
 
-/** What the setup form hands the access request when the roster lacks the email. */
+/** What the setup form hands the access request when the roster lacks the person. */
 interface Prefill {
   email: string;
   studentId: string;
@@ -93,7 +94,7 @@ interface Prefill {
  * One screen, not three tabs: Sign in is what nearly everyone needs every
  * time, so it is the whole default view. First-time setup (a roster member
  * choosing a password) is one quiet link below it, and an access request is
- * not offered up front at all — it appears only when setup finds the email
+ * not offered up front at all — it appears only when setup finds the person
  * is not on the roster, pre-filled with what was just typed. (If a server
  * allows requests but not registration, the request link takes setup's
  * place.) The first-time step stays an explicit choice rather than being
@@ -208,7 +209,7 @@ function SignInPane({ capabilities }: { capabilities: AuthCapabilities }) {
     <>
       <p className="mm-lede">
         {capabilities.usesPassword
-          ? 'Sign in with your course email and password.'
+          ? 'Sign in with your email and password.'
           : 'Sign in with your course email.'}
       </p>
       <form className="mm-form login-form" onSubmit={(e) => void handleSubmit(e)}>
@@ -253,7 +254,7 @@ function CreateAccountPane({
   onNotOnRoster,
 }: {
   capabilities: AuthCapabilities;
-  /** Offered when the server says the email isn't on the roster (if requests are allowed). */
+  /** Offered when the server says the roster lacks them (if requests are allowed). */
   onNotOnRoster?: (prefill: Prefill) => void;
 }) {
   const { register } = useAuth();
@@ -263,7 +264,7 @@ function CreateAccountPane({
   const [confirm, setConfirm] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [notOnRoster, setNotOnRoster] = useState(false);
+  const [notOnRoster, setNotOnRoster] = useState<string | null>(null);
 
   const tooShort = password !== '' && password.length < capabilities.passwordMinLength;
   const mismatch = confirm !== '' && confirm !== password;
@@ -274,7 +275,7 @@ function CreateAccountPane({
     if (!ready || busy) return;
     setBusy(true);
     setError(null);
-    setNotOnRoster(false);
+    setNotOnRoster(null);
     const result = await register({
       email: email.trim(),
       password,
@@ -283,7 +284,7 @@ function CreateAccountPane({
     setBusy(false);
     // On success the provider sets the user and this screen unmounts.
     if (!result.ok) {
-      if (result.notOnRoster) setNotOnRoster(true);
+      if (result.notOnRoster) setNotOnRoster(result.error);
       else setError(result.error);
     }
   };
@@ -291,28 +292,28 @@ function CreateAccountPane({
   return (
     <>
       <p className="mm-lede">
-        Use the email on your class-list record — it may be a personal address rather than
-        your @ucla.edu one — and choose a password. Your student ID confirms the account is
-        yours.
+        Your UID (student ID) finds you on the class roster. Then choose the email you'll sign
+        in with — your UCLA address, or the email on your class-list record — and a password.
       </p>
       <form className="mm-form login-form" onSubmit={(e) => void handleSubmit(e)}>
         <input
           className="mm-input"
-          type="email"
+          type="text"
           autoFocus
-          autoComplete="username"
-          placeholder="Email on your class-list record"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
+          autoComplete="off"
+          inputMode="numeric"
+          placeholder="UID (student ID), e.g. 123-456-789"
+          value={studentId}
+          onChange={(e) => setStudentId(e.target.value)}
           disabled={busy}
         />
         <input
           className="mm-input"
-          type="text"
-          autoComplete="off"
-          placeholder="Student ID"
-          value={studentId}
-          onChange={(e) => setStudentId(e.target.value)}
+          type="email"
+          autoComplete="username"
+          placeholder="Your UCLA email or class-list email"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
           disabled={busy}
         />
         <input
@@ -346,7 +347,7 @@ function CreateAccountPane({
       {error && <p className="mm-error">{error}</p>}
       {notOnRoster && (
         <p className="mm-error">
-          That email isn't on the class roster.
+          {notOnRoster}
           {onNotOnRoster && (
             <>
               {' '}
@@ -398,7 +399,7 @@ function RequestAccessPane({ prefill, onDone }: { prefill: Prefill; onDone: () =
       <>
         <p className="mm-lede">
           Request sent. Your instructor will review it — once they add you, come back and set up
-          your account with this email.
+          your account.
         </p>
         <button className="mm-btn mm-btn--primary" onClick={onDone}>
           Back to sign in
@@ -410,8 +411,8 @@ function RequestAccessPane({ prefill, onDone }: { prefill: Prefill; onDone: () =
   return (
     <>
       <p className="mm-lede">
-        The class roster doesn't have this email (it may list a different one for you). Tell your
-        instructor and they'll add you.
+        We couldn't find you on the class roster. Tell your instructor who you are and they'll
+        add you.
       </p>
       <form className="mm-form login-form" onSubmit={(e) => void handleSubmit(e)}>
         <input
@@ -434,7 +435,7 @@ function RequestAccessPane({ prefill, onDone }: { prefill: Prefill; onDone: () =
         <input
           className="mm-input"
           type="text"
-          placeholder="Student ID"
+          placeholder="UID (student ID)"
           value={studentId}
           onChange={(e) => setStudentId(e.target.value)}
           disabled={busy}

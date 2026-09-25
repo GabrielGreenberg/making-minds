@@ -10,11 +10,23 @@
 //           can now register. Plus the refusals: off-roster registration,
 //           double registration, wrong password, wrong student ID, throttling,
 //           student-role access to instructor roster routes.
+//   [identity] task 036 — a person is their student ID, their emails are
+//           aliases: sign-up with a personal class-list email or a UCLA one
+//           (via the UID), sign-in by either, the refusals (wrong / claimed /
+//           missing UID, a non-campus address), a registrar email change on
+//           re-import, conflicts that never rebind, SSO resolution, the
+//           invariants the Db enforces, and the boot that backfills `uid`.
 //
 // Exits non-zero on the first failed assertion (like every other tool here).
 
+import { mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { DatabaseSync } from 'node:sqlite';
 import { createApp } from '../src/app';
 import { Db } from '../src/db';
+import { placeRosterEntry } from '../src/identity';
+import { importRosterCsv } from '../src/rosterImport';
 import type { ServerConfig } from '../src/config';
 import { parseRoster, parseCsv, normalizeEmail, isEmail } from '../src/roster';
 import { hashPassword, verifyPassword, passwordProblem, PASSWORD_MIN_LENGTH } from '../src/password';
@@ -166,7 +178,6 @@ check('sso capabilities carry the login url + hide the password form', (() => {
   const c = sso.capabilities();
   return c.mode === 'sso' && !c.usesPassword && c.ssoLoginUrl === 'https://sso.ucla.edu/login';
 })());
-check('sso role comes from the roster', sso.roleFor('noid@ucla.edu') === 'student');
 check('sso authenticate is an honest not-implemented', await sso.authenticate({}).then(() => false, () => true));
 
 const base: ServerConfig = { port: 0, dbPath: ':memory:', corsOrigins: [], authMode: 'password', sessionTtlSeconds: 3600 };
@@ -187,6 +198,152 @@ throttle.recordSuccess('a@b.edu', '1.1.1.1');
 check('a success clears the counter', throttle.retryAfter('a@b.edu', '1.1.1.1') === 0);
 
 unitDb.close();
+
+// ═══ [unit] identity by UID (task 036) ═══════════════════════════
+section('[identity]');
+
+const idDb = new Db(':memory:');
+// Two students whose class-list email is PERSONAL (43% of a real class list),
+// one on a UCLA address, and an instructor with no UID (a manual add).
+idDb.upsertUser({ email: 'gia.personal@gmail.com', name: 'Gia', role: 'student', studentId: '004-111-222' });
+idDb.upsertUser({ email: 'hal.personal@yahoo.com', name: 'Hal', role: 'student', studentId: '004-555-666' });
+idDb.upsertUser({ email: 'cam@ucla.edu', name: 'Cam', role: 'student', studentId: '004-333-444' });
+idDb.upsertUser({ email: 'prof2@ucla.edu', name: 'Prof Two', role: 'instructor' });
+const idPw = new PasswordAuthProvider(idDb);
+
+check('the UID is stored normalised beside the ID as written', (() => {
+  const gia = idDb.getUser('gia.personal@gmail.com');
+  return gia?.uid === '4111222' && gia.studentId === '004-111-222';
+})());
+check('findUserByUid ignores dashes and leading zeros', idDb.findUserByUid('4111222')?.email === 'gia.personal@gmail.com');
+
+const giaReg = await idPw.register({ email: 'Gia.Personal@gmail.com', password: 'giapassword', studentId: '004111222' });
+check('sign-up with a personal class-list email + UID', giaReg.ok && giaReg.user.email === 'gia.personal@gmail.com');
+check('…adds no alias (the email is the account key)', idDb.listEmailAliases('gia.personal@gmail.com').length === 0);
+
+const halReg = await idPw.register({ email: 'hal@g.ucla.edu', password: 'halpassword1', studentId: '004-555-666' });
+check('sign-up with a UCLA email via the UID', halReg.ok && halReg.user.email === 'hal.personal@yahoo.com', JSON.stringify(halReg));
+check('…the account keeps its roster key (nothing to rekey)', halReg.ok && halReg.user.name === 'Hal');
+check('…and the UCLA email becomes a sign-in address', idDb.listEmailAliases('hal.personal@yahoo.com').join() === 'hal@g.ucla.edu');
+check('sign-in by the UCLA email', (await idPw.authenticate({ email: 'HAL@g.ucla.edu', password: 'halpassword1' }))?.email === 'hal.personal@yahoo.com');
+check('sign-in by the class-list email', (await idPw.authenticate({ email: 'hal.personal@yahoo.com', password: 'halpassword1' }))?.email === 'hal.personal@yahoo.com');
+check('a wrong password by the alias still fails', (await idPw.authenticate({ email: 'hal@g.ucla.edu', password: 'halpassword2' })) === null);
+
+const wrongUid = await idPw.register({ email: 'someone@ucla.edu', password: 'longenough1', studentId: '004-999-999' });
+check('a UID the roster does not have is refused (not on roster)', !wrongUid.ok && wrongUid.reason === 'not-on-roster');
+const claimed = await idPw.register({ email: 'hal.other@ucla.edu', password: 'longenough1', studentId: '004555666' });
+check('an already-claimed UID is refused', !claimed.ok && claimed.reason === 'already-registered');
+check('…and the refused address is not stored', idDb.findUserByEmail('hal.other@ucla.edu') === null);
+const othersEmail = await idPw.register({ email: 'gia.personal@gmail.com', password: 'longenough1', studentId: '004-333-444' });
+check("a UID with another student's email is refused (id mismatch)", !othersEmail.ok && othersEmail.reason === 'id-mismatch');
+const othersAlias = await idPw.register({ email: 'hal@g.ucla.edu', password: 'longenough1', studentId: '004-333-444' });
+check("…so is another student's alias", !othersAlias.ok && othersAlias.reason === 'id-mismatch');
+const personal2 = await idPw.register({ email: 'cam.elsewhere@gmail.com', password: 'longenough1', studentId: '004-333-444' });
+check(
+  'a personal address that is not the class-list one is refused',
+  !personal2.ok && personal2.reason === 'email-not-accepted' && personal2.message.includes('UCLA'),
+);
+const noUid = await idPw.register({ email: 'cam@ucla.edu', password: 'longenough1' });
+check('no UID for an account that has one: asked for it', !noUid.ok && noUid.reason === 'id-required');
+check('a malformed email is refused', !(await idPw.register({ email: 'nope', password: 'longenough1', studentId: '004333444' })).ok);
+check(
+  'an account with no UID (instructor) registers by email alone',
+  (await idPw.register({ email: 'prof2@ucla.edu', password: 'longenough1' })).ok,
+);
+const camReg = await idPw.register({ email: 'cam@ucla.edu', password: 'campassword', studentId: '4333444' });
+check('a UCLA class-list email + UID registers as before', camReg.ok && idDb.listEmailAliases('cam@ucla.edu').length === 0);
+
+// The registrar changes Hal's preferred email mid-quarter (same UID).
+const reImport = importRosterCsv(
+  idDb,
+  'UID,Name,Email\n004-555-666,Hal Personal,hal.new@outlook.com\n004-111-222,Gia,gia.personal@gmail.com\n',
+  'student',
+);
+check('a re-import with a changed roster email updates the same person', reImport.added === 0 && reImport.updated === 2, JSON.stringify(reImport));
+check('…under the same key (nothing rekeyed)', idDb.getUser('hal.new@outlook.com') === null && idDb.getUser('hal.personal@yahoo.com')?.name === 'Hal Personal');
+check(
+  '…the sign-up alias survives and the new roster email joins it',
+  idDb.listEmailAliases('hal.personal@yahoo.com').sort().join() === 'hal.new@outlook.com,hal@g.ucla.edu',
+);
+check('…and all three sign in', await (async () => {
+  for (const email of ['hal.personal@yahoo.com', 'hal@g.ucla.edu', 'hal.new@outlook.com']) {
+    if ((await idPw.authenticate({ email, password: 'halpassword1' }))?.email !== 'hal.personal@yahoo.com') return false;
+  }
+  return true;
+})());
+
+const clash = importRosterCsv(idDb, 'UID,Name,Email\n004-111-222,Gia,cam@ucla.edu\n004-333-444,Cam,cam@ucla.edu\n', 'student');
+check(
+  "a row whose UID is one account's and email another's is an issue, not a write",
+  clash.issues.some((i) => i.line === 2 && i.reason.includes('row not imported')) && idDb.listEmailAliases('gia.personal@gmail.com').length === 0,
+  JSON.stringify(clash.issues),
+);
+const wrongIdForEmail = placeRosterEntry(idDb, { email: 'cam@ucla.edu', name: 'Cam', role: 'student', studentId: '004-777-888' });
+check('an email on file under a different UID is a conflict', wrongIdForEmail.kind === 'conflict' && idDb.findUserByUid('004777888') === null);
+const manual = placeRosterEntry(idDb, { email: 'late@ucla.edu', name: '', role: 'student', studentId: '' });
+check('a manual add with no name takes the address', manual.kind === 'added' && manual.account.name === 'late');
+const bindId = placeRosterEntry(idDb, { email: 'late@ucla.edu', name: '', role: 'student', studentId: '004-121-212' });
+check('…a later entry binds its UID and keeps the name', bindId.kind === 'updated' && bindId.account.uid === '4121212' && bindId.account.name === 'late');
+const byRequest = placeRosterEntry(idDb, { email: 'gia@g.ucla.edu', name: 'G. From A Request', role: 'instructor', studentId: '004111222' }, 'request');
+check(
+  "an approved request naming a roster UID adds the email to that account, roster facts untouched",
+  byRequest.kind === 'updated' && byRequest.aliasAdded === 'gia@g.ucla.edu' && byRequest.account.name === 'Gia' && byRequest.account.role === 'student',
+);
+
+let aliasKeyRefused = false;
+try {
+  idDb.upsertUser({ email: 'hal@g.ucla.edu', name: 'Split', role: 'student' });
+} catch {
+  aliasKeyRefused = true;
+}
+check("invariant: an alias can never become another account's key", aliasKeyRefused && idDb.getUser('hal@g.ucla.edu') === null);
+let twinUidRefused = false;
+try {
+  idDb.upsertUser({ email: 'twin@ucla.edu', name: 'Twin', role: 'student', studentId: '004-555-666' });
+} catch {
+  twinUidRefused = true;
+}
+check('invariant: a UID is on at most one account', twinUidRefused && idDb.getUser('twin@ucla.edu') === null);
+check('addEmailAlias refuses another account\'s address', idDb.addEmailAlias('cam@ucla.edu', 'hal@g.ucla.edu', 'roster') === 'taken');
+
+const idSso = new SsoAuthProvider(idDb, 'https://sso.ucla.edu/login');
+const ssoCam = idSso.signInAsserted({ uid: '004333444', email: 'cam.logon@ucla.edu' });
+check('SSO resolves the asserted UID to the roster account', ssoCam?.email === 'cam@ucla.edu');
+check('…and its asserted email only becomes an alias', idDb.listEmailAliases('cam@ucla.edu').join() === 'cam.logon@ucla.edu');
+check('SSO for a UID the roster lacks is refused', idSso.signInAsserted({ uid: '004000000', email: 'new@ucla.edu' }) === null);
+check(
+  "SSO never signs in by email to an account that has a different UID",
+  idSso.signInAsserted({ uid: '004000000', email: 'cam@ucla.edu' }) === null,
+);
+const ssoProf = idSso.signInAsserted({ uid: '009-876-543', email: 'prof2@ucla.edu' });
+check('SSO matches an account with no UID by email, and binds the asserted UID', ssoProf?.email === 'prof2@ucla.edu' && ssoProf.uid === '9876543');
+check('dev provider signs in by an alias too', (await new DevAuthProvider(idDb).authenticate({ email: 'hal@g.ucla.edu' }))?.email === 'hal.personal@yahoo.com');
+idDb.removeUser('hal.personal@yahoo.com');
+check('removing an account removes its aliases', idDb.findUserByEmail('hal@g.ucla.edu') === null && idDb.addEmailAlias('cam@ucla.edu', 'hal@g.ucla.edu', 'roster') === 'added');
+idDb.close();
+
+// The boot that brings task 036 to a database made before it: `uid` is
+// backfilled from the IDs as written; of two rows sharing one, the first.
+const migrateDir = mkdtempSync(join(tmpdir(), 'mm-auth-migrate-'));
+const legacyPath = join(migrateDir, 'legacy.db');
+const legacy = new DatabaseSync(legacyPath);
+legacy.exec(`CREATE TABLE users (email TEXT PRIMARY KEY, name TEXT NOT NULL, role TEXT NOT NULL CHECK (role IN ('student', 'instructor')));
+  ALTER TABLE users ADD COLUMN student_id TEXT NOT NULL DEFAULT '';
+  INSERT INTO users (email, name, role, student_id) VALUES
+    ('old1@gmail.com', 'Old One', 'student', '004-222-333'),
+    ('old2@ucla.edu', 'Old Two', 'student', '4222333'),
+    ('old3@ucla.edu', 'Old Three', 'student', ''),
+    ('old4@ucla.edu', 'Old Four', 'student', '004 444 555');`);
+legacy.close();
+const upgraded = new Db(legacyPath);
+check('the upgrade boot backfills uid from the ID as written', upgraded.findUserByUid('004444555')?.email === 'old4@ucla.edu');
+check('…a shared ID binds to the first row only', upgraded.findUserByUid('4222333')?.email === 'old1@gmail.com' && upgraded.getUser('old2@ucla.edu')?.uid === '');
+check('…a row with no ID has none', upgraded.getUser('old3@ucla.edu')?.uid === '');
+upgraded.close();
+const rebooted = new Db(legacyPath);
+check('…and a later boot changes nothing', rebooted.getUser('old2@ucla.edu')?.uid === '' && rebooted.listUsers().length === 4);
+rebooted.close();
+rmSync(migrateDir, { recursive: true, force: true });
 
 // ═══ [http] the real server in password mode ═════════════════════
 section('[http: account lifecycle]');
@@ -497,6 +654,73 @@ check(
   '…and a re-import without a Section column keeps the stored section',
   (await exampleRows()).find((r) => r.email === 'ana.zuber@example.com')?.section === '1B',
 );
+
+section('[http: identity by UID]');
+
+// Pia's class-list email is personal; she signs up with her UCLA one.
+await api('POST', '/roster/import', { token: profToken, body: { csv: 'UID,Name,Email\n004-800-001,Pia Personal,pia.p@gmail.com\n' } });
+type RegisterReply = { token: string; user: { email: string }; reason: string };
+const notCampus = await api<RegisterReply>('POST', '/auth/register', {
+  body: { email: 'pia.other@hotmail.com', password: 'piapassword', studentId: '004800001' },
+});
+check('HTTP sign-up with a non-campus, non-roster email is a 400', notCampus.status === 400 && notCampus.json.reason === 'email-not-accepted');
+const idRequired = await api<RegisterReply>('POST', '/auth/register', { body: { email: 'pia.p@gmail.com', password: 'piapassword' } });
+check('HTTP sign-up without the UID an account has is a 400', idRequired.status === 400 && idRequired.json.reason === 'id-required');
+const piaReg = await api<RegisterReply>('POST', '/auth/register', {
+  body: { email: 'pia@g.ucla.edu', password: 'piapassword', studentId: '004-800-001' },
+});
+check('HTTP sign-up with a UCLA email via the UID', piaReg.status === 200 && piaReg.json.user.email === 'pia.p@gmail.com', JSON.stringify(piaReg.json));
+const piaByAlias = await api<{ token: string; user: { email: string } }>('POST', '/auth/login', {
+  body: { email: 'pia@g.ucla.edu', password: 'piapassword' },
+});
+check('HTTP sign-in by the UCLA email lands on the one account', piaByAlias.status === 200 && piaByAlias.json.user.email === 'pia.p@gmail.com');
+check(
+  '…whose session restores that account',
+  (await api<{ user: { email: string } }>('GET', '/auth/me', { token: piaByAlias.json.token })).json.user.email === 'pia.p@gmail.com',
+);
+type AliasRow = { email: string; aliases: string[] };
+const piaRow = async () =>
+  (await api<{ roster: AliasRow[] }>('GET', '/roster', { token: profToken })).json.roster.find((r) => r.email === 'pia.p@gmail.com');
+check('GET /roster lists the sign-in addresses', (await piaRow())?.aliases.join() === 'pia@g.ucla.edu');
+
+await api('POST', '/auth/access-requests', { body: { email: 'pia@g.ucla.edu', name: 'Pia' } });
+check(
+  'an access request under an alias records nothing (it is known)',
+  !(await api<{ requests: { email: string }[] }>('GET', '/access-requests?status=pending', { token: profToken })).json.requests.some(
+    (r) => r.email === 'pia@g.ucla.edu',
+  ),
+);
+await api('POST', '/auth/access-requests', { body: { email: 'pia.work@example.org', name: 'Pia P', studentId: '004800001' } });
+const piaRequests = await api<{ requests: { id: number; email: string; match: { email: string } | null }[] }>(
+  'GET',
+  '/access-requests?status=pending',
+  { token: profToken },
+);
+const piaRequest = piaRequests.json.requests.find((r) => r.email === 'pia.work@example.org');
+check('the instructor sees which roster account a request names', piaRequest?.match?.email === 'pia.p@gmail.com', JSON.stringify(piaRequests.json));
+const piaApprove = await api<{ account: string; aliasAdded: string | null }>('POST', `/access-requests/${piaRequest?.id}/approve`, { token: profToken });
+check(
+  '…and approving it adds the email to that account',
+  piaApprove.status === 200 && piaApprove.json.account === 'pia.p@gmail.com' && piaApprove.json.aliasAdded === 'pia.work@example.org',
+);
+const addAlias = await api<{ updated: number; aliasAdded: string | null }>('POST', '/roster', {
+  token: profToken,
+  body: { email: 'pia.third@ucla.edu', studentId: '004800001' },
+});
+check('the add form with a known UID updates that person (+ alias)', addAlias.status === 200 && addAlias.json.updated === 1 && addAlias.json.aliasAdded === 'pia.third@ucla.edu');
+check('…keeping the name on file', (await api<{ roster: { email: string; name: string }[] }>('GET', '/roster', { token: profToken })).json.roster.find((r) => r.email === 'pia.p@gmail.com')?.name === 'Pia Personal');
+const addClash = await api<{ error: string }>('POST', '/roster', {
+  token: profToken,
+  body: { email: 'rosa@ucla.edu', studentId: '004800001' },
+});
+check("the add form refuses a UID with another person's email (409)", addClash.status === 409);
+
+const dropAlias = await api('DELETE', '/roster/pia.p%40gmail.com/aliases/pia%40g.ucla.edu', { token: profToken });
+check('the instructor removes a sign-in address', dropAlias.status === 200);
+check('…which no longer signs in', (await api('POST', '/auth/login', { body: { email: 'pia@g.ucla.edu', password: 'piapassword' } })).status === 401);
+check('…while the class-list email still does', (await api('POST', '/auth/login', { body: { email: 'pia.p@gmail.com', password: 'piapassword' } })).status === 200);
+check('removing it again is 404', (await api('DELETE', '/roster/pia.p%40gmail.com/aliases/pia%40g.ucla.edu', { token: profToken })).status === 404);
+check('students cannot remove addresses', (await api('DELETE', '/roster/pia.p%40gmail.com/aliases/pia.work%40example.org', { token: piaByAlias.json.token })).status === 403);
 
 section('[http: throttling]');
 

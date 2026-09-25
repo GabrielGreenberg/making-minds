@@ -697,6 +697,32 @@ check(
   !(await api.getRoster()).some((r) => r.email === 'offroster@ucla.edu'),
 );
 
+// Task 036, the client half: a person is their student ID; a UCLA address
+// beside a personal class-list one signs in to the same account.
+await api.importRoster('UID,Name,Email\n004-600-700,Pat Personal,pat.personal@gmail.com\n');
+const patUser = await api.register({ email: 'pat@g.ucla.edu', password: 'patpassword', studentId: '004600700' });
+check('register() with a UCLA email + UID returns the class-list account', patUser.email === 'pat.personal@gmail.com');
+await api.login('pat@g.ucla.edu', 'patpassword');
+check('login() by that UCLA email restores the same account', (await api.me()).email === 'pat.personal@gmail.com');
+await api.login('prof@ucla.edu', 'instructorpass');
+const patAliases = async () => (await api.getRoster()).find((r) => r.email === 'pat.personal@gmail.com')?.aliases ?? [];
+check('getRoster() rows carry their other sign-in addresses', (await patAliases()).join() === 'pat@g.ucla.edu');
+const patPlaced = await api.addRosterEntry({ email: 'pat.more@ucla.edu', studentId: '004-600-700' });
+check(
+  'addRosterEntry() reports the account a known UID names, and the address it added',
+  patPlaced.updated === 1 && patPlaced.account === 'pat.personal@gmail.com' && patPlaced.aliasAdded === 'pat.more@ucla.edu',
+);
+await api.requestAccess({ email: 'pat.req@example.org', name: 'Pat', studentId: '004600700' });
+const patRequest = (await api.listAccessRequests('pending')).find((r) => r.email === 'pat.req@example.org');
+check('listAccessRequests() names the roster account a request matches', patRequest?.match?.email === 'pat.personal@gmail.com');
+const patApproved = await api.approveAccessRequest(patRequest!.id);
+check(
+  'approveAccessRequest() reports the account it added the email to',
+  patApproved.account === 'pat.personal@gmail.com' && patApproved.accountName === 'Pat Personal' && patApproved.aliasAdded === 'pat.req@example.org',
+);
+await api.removeRosterAlias('pat.personal@gmail.com', 'pat@g.ucla.edu');
+check('removeRosterAlias() drops just that address', (await patAliases()).join() === 'pat.more@ucla.edu,pat.req@example.org');
+
 authServer.close();
 authDb.close();
 

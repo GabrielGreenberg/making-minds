@@ -57,6 +57,7 @@ export interface AuthCapabilities {
 
 /** One roster row with its account state — the instructor's roster screen. */
 export interface RosterEntryView {
+  /** The account's key: the email it was first rostered under. */
   email: string;
   name: string;
   role: 'student' | 'instructor';
@@ -65,6 +66,9 @@ export interface RosterEntryView {
   section: string | null;
   registered: boolean;
   registeredAt: string | null;
+  /** The account's other sign-in addresses (a UCLA one beside a personal
+   *  class-list one, a registrar change), oldest first. */
+  aliases: string[];
 }
 
 export interface AccessRequestView {
@@ -77,6 +81,18 @@ export interface AccessRequestView {
   createdAt: string;
   resolvedAt: string | null;
   resolvedBy: string | null;
+  /** The roster account the request's student ID or email already names —
+   *  approving then adds the email to it — or null for someone new. */
+  match: { email: string; name: string } | null;
+}
+
+/** Where an add or an approval landed: a new account, or an existing one
+ *  (`aliasAdded`: the email, now one of its sign-in addresses). */
+export interface RosterPlacement {
+  added: number;
+  updated: number;
+  account: string;
+  aliasAdded: string | null;
 }
 
 /** What a roster import did (server/src/rosterImport.ts). It never removes
@@ -240,9 +256,10 @@ export async function login(email: string, password?: string): Promise<ApiUser> 
 }
 
 /**
- * Create an account for a roster member. The server checks the email against
- * the roster (and the student ID against the one on file, when it has one) and
- * signs the caller straight in on success.
+ * Create an account for a roster member. The student ID says which roster seat
+ * (with none, the email must name an account that has no ID on file); the
+ * email — the class-list one or a UCLA address — becomes one they sign in
+ * with. The server signs the caller straight in on success.
  */
 export async function register(input: {
   email: string;
@@ -316,13 +333,20 @@ export async function importRoster(
   return request<RosterImportReport>('POST', '/roster/import', { csv, defaultRole });
 }
 
+/** Add one person — or, when the ID or email is already on the roster,
+ *  update them (a new email becoming one of their sign-in addresses). */
 export async function addRosterEntry(input: {
   email: string;
   name?: string;
   role?: 'student' | 'instructor';
   studentId?: string;
-}): Promise<void> {
-  await request('POST', '/roster', input);
+}): Promise<RosterPlacement> {
+  return request<RosterPlacement>('POST', '/roster', input);
+}
+
+/** Drop one of an account's extra sign-in addresses (never its key). */
+export async function removeRosterAlias(email: string, alias: string): Promise<void> {
+  await request('DELETE', `/roster/${encodeURIComponent(email)}/aliases/${encodeURIComponent(alias)}`);
 }
 
 export async function removeRosterEntry(email: string): Promise<void> {
@@ -344,12 +368,13 @@ export async function listAccessRequests(
   return requests;
 }
 
-/** Approving adds them to the roster; they then create an account normally. */
+/** Approving adds them to the roster (or, when the request names someone on
+ *  it, adds the email to that account); they then create an account normally. */
 export async function approveAccessRequest(
   id: number,
   role: 'student' | 'instructor' = 'student',
-): Promise<void> {
-  await request('POST', `/access-requests/${id}/approve`, { role });
+): Promise<{ email: string; account: string; accountName: string; aliasAdded: string | null }> {
+  return request('POST', `/access-requests/${id}/approve`, { role });
 }
 
 export async function rejectAccessRequest(id: number): Promise<void> {

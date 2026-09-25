@@ -35,10 +35,16 @@
 //
 // Rows without a usable email are reported as issues, not silently dropped —
 // an instructor importing 80 students must be told about the 3 that failed.
+//
+// The student ID (UCLA's UID) is who a row IS; its email is only how they
+// sign in, and the registrar's is often a personal address. Where a row lands
+// on an account is decided in src/identity.ts, never here.
 
 import type { Role } from '../../app/src/auth/accounts';
 
 export interface RosterEntry {
+  /** 1-based PHYSICAL line in the source CSV, for the import's issues. */
+  line: number;
   email: string;
   name: string;
   /** Campus ID as written in the export; '' when the CSV has no ID column. */
@@ -75,6 +81,8 @@ export interface StatusMeaning {
 export interface RosterStatusRow {
   line: number;
   email: string;
+  /** The row's student ID as written; '' when none. */
+  studentId: string;
   name: string;
   label: string;
   imported: boolean;
@@ -422,14 +430,35 @@ export function normalizeEmail(value: unknown): string {
 }
 
 /**
+ * Canonical form of a student ID — what `users.uid` stores and every
+ * comparison uses: spaces and dashes dropped, and an all-digit ID read as a
+ * number, so "004-125-678", "004125678" and "4125678" are one UID. Anything
+ * else compares case-insensitively. '' for a missing or blank ID.
+ */
+export function normalizeUid(value: unknown): string {
+  if (typeof value !== 'string') return '';
+  const stripped = value.replace(/[\s-]/g, '');
+  return /^\d+$/.test(stripped) ? String(Number(stripped)) : stripped.toLowerCase();
+}
+
+/** The campus's own mail domains: ucla.edu and any subdomain (g.ucla.edu). */
+const CAMPUS_DOMAIN = /(^|\.)ucla\.edu$/;
+
+/** True for a UCLA address — one a student may add to their account at sign-up. */
+export function isCampusEmail(email: string): boolean {
+  const at = email.lastIndexOf('@');
+  return at > 0 && isEmail(email) && CAMPUS_DOMAIN.test(email.slice(at + 1).toLowerCase());
+}
+
+/**
  * Parse a roster CSV into entries plus per-row issues. `defaultRole` applies
  * to rows with no role column (an instructor importing a TA list can pass
- * 'instructor'). Later duplicates of an email are reported and dropped — the
- * FIRST imported row for an email wins, so a re-export appended to a file
- * cannot silently demote someone. A row whose status is not imported
- * (dropped, cancelled, withdrawn) is never imported and never blocks a later
- * row for the same email; it is counted in statusRows only when no row for
- * that email was imported, once per email.
+ * 'instructor'). Later duplicates of an email, or of a student ID, are
+ * reported and dropped — the FIRST imported row for a person wins, so a
+ * re-export appended to a file cannot silently demote someone. A row whose
+ * status is not imported (dropped, cancelled, withdrawn) is never imported and
+ * never blocks a later row for the same person; it is counted in statusRows
+ * only when no row for that email was imported, once per email.
  */
 export function parseRoster(csv: string, defaultRole: Role = 'student'): RosterParse {
   // Blank rows are dropped AFTER each row's line is captured, so every issue
@@ -499,14 +528,17 @@ export function parseRoster(csv: string, defaultRole: Role = 'student'): RosterP
   // it is known who was imported (see below).
   const gathered: RosterStatusRow[] = [];
   const seen = new Set<string>();
+  const seenIds = new Set<string>();
   for (const { cells, line } of rows.slice(headerAt + 1)) {
     const at = (idx: number) => (idx >= 0 ? (cells[idx] ?? '').trim() : '');
     const email = normalizeEmail(at(emailIdx));
+    const studentId = at(idIdx);
+    const uid = normalizeUid(studentId);
     const named = at(nameIdx) ? normalizeRosterName(at(nameIdx)) : composeName(at(firstIdx), at(lastIdx));
     const statusCell = at(statusIdx);
     const status: StatusMeaning | undefined = statusCell ? statusMeaning(statusCell) : ENROLLED;
     if (status && !status.imported) {
-      gathered.push({ line, email, name: named.display, label: status.label, imported: false });
+      gathered.push({ line, email, studentId, name: named.display, label: status.label, imported: false });
       continue;
     }
 
@@ -522,13 +554,18 @@ export function parseRoster(csv: string, defaultRole: Role = 'student'): RosterP
       issues.push({ line, reason: `duplicate of an earlier row for ${email} (kept the first)` });
       continue;
     }
+    if (uid && seenIds.has(uid)) {
+      issues.push({ line, reason: `duplicate of an earlier row for student ID ${studentId} (kept the first)` });
+      continue;
+    }
     seen.add(email);
+    if (uid) seenIds.add(uid);
 
     // A nameless roster row is still a usable account; the email local part is
     // a better placeholder than a blank in the gradebook.
     const name = named.display || email.split('@')[0];
     if (!status) issues.push({ line, reason: `unrecognised status "${statusCell}" — imported` });
-    else if (status !== ENROLLED) gathered.push({ line, email, name, label: status.label, imported: true });
+    else if (status !== ENROLLED) gathered.push({ line, email, studentId, name, label: status.label, imported: true });
 
     const roleCell = at(roleIdx).toLowerCase();
     const role: Role =
@@ -539,9 +576,10 @@ export function parseRoster(csv: string, defaultRole: Role = 'student'): RosterP
           : defaultRole;
 
     entries.push({
+      line,
       email,
       name,
-      studentId: at(idIdx),
+      studentId,
       role,
       section: at(sectionIdx) || null,
       sortName: named.display ? named.sortName : null,
@@ -550,11 +588,12 @@ export function parseRoster(csv: string, defaultRole: Role = 'student'): RosterP
 
   // A not-imported row counts only for someone left out: a student listed D
   // in one section and E in another was imported, and a second D row for the
-  // same email is the same person — neither is "1 more dropped".
+  // same person (by email or student ID) — neither is "1 more dropped".
   const skippedEmails = new Set<string>();
   const statusRows = gathered.filter((row) => {
     if (row.imported || !row.email) return true;
-    if (seen.has(row.email) || skippedEmails.has(row.email)) return false;
+    const uid = normalizeUid(row.studentId);
+    if (seen.has(row.email) || (uid && seenIds.has(uid)) || skippedEmails.has(row.email)) return false;
     skippedEmails.add(row.email);
     return true;
   });
@@ -586,25 +625,35 @@ export interface RosterReviewItem {
 /**
  * Who on the platform a class list no longer carries: a STUDENT whose row now
  * has a status that is not imported (dropped, cancelled, withdrawn) or who is
- * missing from the file. Only a file with a status column is a class list —
- * a TA list or a three-row add-on says nothing about who has left — so any
- * other file reviews nobody. Nobody is removed: this is a list for a human.
+ * missing from the file. A row is theirs when it carries their student ID or
+ * any of their sign-in addresses (`aliases` — the registrar may have changed
+ * the email since). Only a file with a status column is a class list — a TA
+ * list or a three-row add-on says nothing about who has left — so any other
+ * file reviews nobody. Nobody is removed: this is a list for a human.
  */
 export function rosterReview(
-  users: readonly { email: string; name: string; role: Role }[],
+  users: readonly { email: string; name: string; role: Role; studentId?: string; aliases?: readonly string[] }[],
   parse: RosterParse,
 ): RosterReviewItem[] {
   if (!parse.statusColumn) return [];
-  const listed = new Set(parse.entries.map((e) => e.email));
-  const skipped = new Map<string, string>();
+  const listedEmails = new Set(parse.entries.map((e) => e.email));
+  const listedIds = new Set(parse.entries.map((e) => normalizeUid(e.studentId)).filter(Boolean));
+  const skippedEmails = new Map<string, string>();
+  const skippedIds = new Map<string, string>();
   for (const row of parse.statusRows) {
-    if (!row.imported && !skipped.has(row.email)) skipped.set(row.email, row.label);
+    if (row.imported) continue;
+    if (!skippedEmails.has(row.email)) skippedEmails.set(row.email, row.label);
+    const uid = normalizeUid(row.studentId);
+    if (uid && !skippedIds.has(uid)) skippedIds.set(uid, row.label);
   }
-  return users
-    .filter((u) => u.role === 'student' && !listed.has(u.email))
-    .map((u) => ({
-      email: u.email,
-      name: u.name,
-      reason: skipped.has(u.email) ? `status ${skipped.get(u.email)}` : 'not in this file',
-    }));
+  const review: RosterReviewItem[] = [];
+  for (const u of users) {
+    if (u.role !== 'student') continue;
+    const uid = normalizeUid(u.studentId);
+    const emails = [u.email, ...(u.aliases ?? [])];
+    if ((uid && listedIds.has(uid)) || emails.some((e) => listedEmails.has(e))) continue;
+    const label = (uid ? skippedIds.get(uid) : undefined) ?? emails.map((e) => skippedEmails.get(e)).find(Boolean);
+    review.push({ email: u.email, name: u.name, reason: label ? `status ${label}` : 'not in this file' });
+  }
+  return review;
 }

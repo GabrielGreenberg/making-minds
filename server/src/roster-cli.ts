@@ -20,6 +20,7 @@ import { loadConfig } from './config';
 import { Db } from './db';
 import { normalizeEmail, isEmail } from './roster';
 import { importRosterCsv, formatRosterReport } from './rosterImport';
+import { placeRosterEntry } from './identity';
 import { hashPassword, passwordProblem } from './password';
 
 const argv = process.argv.slice(2);
@@ -79,15 +80,18 @@ switch (command) {
   }
 
   case 'add': {
+    // Through the identity module, like the import and the dashboard's form.
     const email = requireEmail(positional[0]);
-    const existed = db.getUser(email) != null;
-    db.upsertUser({
+    const known = db.findUserByEmail(email) ?? db.findUserByUid(flag('id') ?? '');
+    const placed = placeRosterEntry(db, {
       email,
-      name: flag('name') ?? db.getUser(email)?.name ?? email.split('@')[0],
-      role: flag('role') === 'instructor' ? 'instructor' : (db.getUser(email)?.role ?? 'student'),
+      name: flag('name') ?? '',
+      role: flag('role') === 'instructor' ? 'instructor' : (known?.role ?? 'student'),
       studentId: flag('id') ?? '',
     });
-    console.log(`${existed ? 'updated' : 'added'} ${email}`);
+    if (placed.kind === 'conflict') die(placed.reason);
+    else if (placed.kind === 'added') console.log(`added ${email}`);
+    else console.log(`updated ${placed.account.email}${placed.aliasAdded ? ` (+ sign-in address ${placed.aliasAdded})` : ''}`);
     break;
   }
 
@@ -125,7 +129,8 @@ switch (command) {
     for (const r of rows) {
       const mark = r.registered ? '✓' : '·';
       console.log(
-        `${mark} ${r.email.padEnd(32)} ${r.role.padEnd(10)} ${r.studentId.padEnd(12)} ${(r.section ?? '').padEnd(4)} ${r.name}`,
+        `${mark} ${r.email.padEnd(32)} ${r.role.padEnd(10)} ${r.studentId.padEnd(12)} ${(r.section ?? '').padEnd(4)} ${r.name}` +
+          (r.aliases.length > 0 ? `  (also ${r.aliases.join(', ')})` : ''),
       );
     }
     console.log(`${rows.length} row(s); ✓ = account created`);

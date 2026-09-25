@@ -5,7 +5,13 @@
 // storage on a single box with trivial backup (copy one file).
 //
 // JSON-heavy tables mirror the client seams one-to-one:
-//   users        — the roster + local credentials (see src/auth.ts; SSO will upsert)
+//   users        — the roster + local credentials (see src/auth.ts). A row is
+//                  one person: `email` is the account's key (every table below
+//                  keys work by it), `uid` the normalised student ID — who they
+//                  are (unique; NULL for instructors and manual adds)
+//   user_emails  — an account's OTHER sign-in addresses (a UCLA address beside
+//                  a personal class-list one, a registrar change); never
+//                  another account's key. src/identity.ts decides what lands here
 //   sessions     — bearer tokens
 //   access_requests — people who want an account under an email the roster
 //                  does not have; an instructor approves or rejects each one
@@ -51,15 +57,20 @@ import type {
   SubmissionResult,
 } from '../../app/src/types';
 import type { Role } from '../../app/src/auth/accounts';
+import { normalizeEmail, normalizeUid } from './roster';
 import { idsOfWorkbook } from '../../app/src/provenance/ids';
 import { saveSummary, type LegacyContent, type SaveSummary } from '../../app/src/provenance/integrity';
 
 export interface UserRow {
+  /** The account's key: the email it was first rostered under. */
   email: string;
   name: string;
   role: Role;
-  /** Campus ID from the roster CSV; '' when the import had no ID column. */
+  /** Campus ID from the roster CSV, as written; '' when the import had no ID column. */
   studentId?: string;
+  /** The normalised student ID (roster.ts normalizeUid) — the identity the
+   *  roster, sign-up and SSO match on; '' when the account has none. */
+  uid?: string;
   /** Discussion section from the class list; absent/null leaves a stored one. */
   section?: string | null;
   /** "Last, First" sort key from the class list; null sorts by name. */
@@ -75,7 +86,15 @@ export interface RosterRow extends UserRow {
   section: string | null;
   registered: boolean;
   registeredAt: string | null;
+  /** The account's other sign-in addresses, oldest first. */
+  aliases: string[];
 }
+
+/** Where an extra sign-in address came from. */
+export type EmailAliasSource = 'roster' | 'signup' | 'sso' | 'request';
+
+/** addEmailAlias's answer: stored now, already this account's, or someone else's. */
+export type AliasOutcome = 'added' | 'present' | 'taken';
 
 export type AccessRequestStatus = 'pending' | 'approved' | 'rejected';
 
@@ -114,6 +133,14 @@ export class Db {
         name  TEXT NOT NULL,
         role  TEXT NOT NULL CHECK (role IN ('student', 'instructor'))
       );
+      CREATE TABLE IF NOT EXISTS user_emails (
+        email      TEXT PRIMARY KEY,
+        user_email TEXT NOT NULL REFERENCES users(email) ON DELETE CASCADE,
+        source     TEXT NOT NULL,
+        added_at   TEXT NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS idx_user_emails_user
+        ON user_emails (user_email);
       CREATE TABLE IF NOT EXISTS sessions (
         token      TEXT PRIMARY KEY,
         email      TEXT NOT NULL REFERENCES users(email) ON DELETE CASCADE,
@@ -233,6 +260,27 @@ export class Db {
         // already present
       }
     }
+    // The student ID as an identity (task 036): the boot that adds the column
+    // backfills it from student_id. Two rows sharing an ID keep theirs as
+    // written but only the first gets the uid — the index below forbids a
+    // second, and the roster screen still shows both for a human to settle.
+    try {
+      this.db.exec('ALTER TABLE users ADD COLUMN uid TEXT;');
+      const rows = this.db
+        .prepare("SELECT email, student_id FROM users WHERE student_id != '' ORDER BY rowid")
+        .all() as unknown as { email: string; student_id: string }[];
+      const taken = new Set<string>();
+      const bind = this.db.prepare('UPDATE users SET uid = ? WHERE email = ?');
+      for (const r of rows) {
+        const uid = normalizeUid(r.student_id);
+        if (!uid || taken.has(uid)) continue;
+        taken.add(uid);
+        bind.run(uid, r.email);
+      }
+    } catch {
+      // already present
+    }
+    this.db.exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_users_uid ON users (uid) WHERE uid IS NOT NULL;');
     // The author's role as filed (task 018). The boot that adds the column
     // backfills it once from the roster; a report whose author has since
     // left stays NULL (unknown) rather than being guessed.
@@ -293,47 +341,146 @@ export class Db {
   }
 
   // ── users ──────────────────────────────────────────────────────
+  //
+  // Primitives only: which account a roster entry, a sign-up or an SSO
+  // assertion lands on is decided in src/identity.ts. What these enforce is
+  // the invariant that keeps a person one account — a UID on at most one row
+  // (the unique index), and an address that is one account's key never an
+  // alias of another (upsertUser / addEmailAlias throw or refuse).
 
   /**
-   * Create or update a roster row. Deliberately does NOT touch the credential:
-   * re-importing the roster mid-quarter must not log everybody out or wipe the
-   * passwords they already chose. Name/role/studentId are the roster's word,
-   * except that a blank incoming studentId leaves an existing one alone, and so
-   * does a missing section (a re-import without a Section column keeps it).
-   * The sort key follows the name: a caller that keeps the name and sends no
-   * key (the CLI's `add`) keeps the stored one; a new name drops a stale one.
+   * Create or update a roster row by its key. Deliberately does NOT touch the
+   * credential: re-importing the roster mid-quarter must not log everybody out
+   * or wipe the passwords they already chose. Name/role/studentId are the
+   * roster's word, except that a blank incoming studentId leaves an existing
+   * one (and its uid) alone, and so does a missing section (a re-import
+   * without a Section column keeps it). The sort key follows the name: a
+   * caller that keeps the name and sends no key (the CLI's `add`) keeps the
+   * stored one; a new name drops a stale one. Throws when the email is
+   * another account's alias or the UID another account's.
    */
-  upsertUser(user: UserRow): void {
+  upsertUser(user: Omit<UserRow, 'uid'>): void {
+    const email = user.email;
+    const owner = this.aliasOwner(email);
+    if (owner && owner !== email) {
+      throw new Error(`${email} is a sign-in address of ${owner}; resolve it through identity.ts`);
+    }
+    const studentId = (user.studentId ?? '').trim();
     this.db
       .prepare(
-        `INSERT INTO users (email, name, role, student_id, section, sort_name) VALUES (?, ?, ?, ?, ?, ?)
+        `INSERT INTO users (email, name, role, student_id, uid, section, sort_name) VALUES (?, ?, ?, ?, ?, ?, ?)
          ON CONFLICT(email) DO UPDATE SET
            name = excluded.name,
            role = excluded.role,
            student_id = CASE WHEN excluded.student_id = '' THEN users.student_id
                              ELSE excluded.student_id END,
+           uid = COALESCE(excluded.uid, users.uid),
            section = COALESCE(excluded.section, users.section),
            sort_name = CASE WHEN excluded.name = users.name
                             THEN COALESCE(excluded.sort_name, users.sort_name)
                             ELSE excluded.sort_name END`,
       )
-      .run(user.email, user.name, user.role, user.studentId ?? '', user.section ?? null, user.sortName ?? null);
+      .run(
+        email,
+        user.name,
+        user.role,
+        studentId,
+        normalizeUid(studentId) || null,
+        user.section ?? null,
+        user.sortName ?? null,
+      );
   }
 
-  getUser(email: string): UserRow | null {
-    const row = this.db
-      .prepare('SELECT email, name, role, student_id, password_hash FROM users WHERE email = ?')
-      .get(email) as unknown as
-      | { email: string; name: string; role: Role; student_id: string; password_hash: string | null }
-      | undefined;
-    if (!row) return null;
+  private static readonly USER_COLUMNS = 'email, name, role, student_id, uid, password_hash';
+
+  private static toUser(row: {
+    email: string;
+    name: string;
+    role: Role;
+    student_id: string;
+    uid: string | null;
+    password_hash: string | null;
+  }): UserRow {
     return {
       email: row.email,
       name: row.name,
       role: row.role,
       studentId: row.student_id ?? '',
+      uid: row.uid ?? '',
       registered: row.password_hash != null,
     };
+  }
+
+  /** The account whose KEY is this email (exact; aliases are not consulted). */
+  getUser(email: string): UserRow | null {
+    const row = this.db.prepare(`SELECT ${Db.USER_COLUMNS} FROM users WHERE email = ?`).get(email) as unknown as
+      | Parameters<typeof Db.toUser>[0]
+      | undefined;
+    return row ? Db.toUser(row) : null;
+  }
+
+  /** The account an address signs in to: its key, or one of its aliases. */
+  findUserByEmail(email: string): UserRow | null {
+    const normalized = normalizeEmail(email);
+    if (!normalized) return null;
+    return this.getUser(this.aliasOwner(normalized) ?? normalized);
+  }
+
+  /** The account holding this student ID, compared in normalised form. */
+  findUserByUid(studentId: string): UserRow | null {
+    const uid = normalizeUid(studentId);
+    if (!uid) return null;
+    const row = this.db.prepare(`SELECT ${Db.USER_COLUMNS} FROM users WHERE uid = ?`).get(uid) as unknown as
+      | Parameters<typeof Db.toUser>[0]
+      | undefined;
+    return row ? Db.toUser(row) : null;
+  }
+
+  /** Bind a student ID to an account that has none (SSO's first sign-in of a
+   *  manual add). Throws when another account holds it. */
+  setUid(email: string, studentId: string): void {
+    this.db
+      .prepare("UPDATE users SET uid = ?, student_id = CASE WHEN student_id = '' THEN ? ELSE student_id END WHERE email = ?")
+      .run(normalizeUid(studentId) || null, studentId.trim(), email);
+  }
+
+  private aliasOwner(email: string): string | null {
+    const row = this.db.prepare('SELECT user_email FROM user_emails WHERE email = ?').get(email) as unknown as
+      | { user_email: string }
+      | undefined;
+    return row?.user_email ?? null;
+  }
+
+  /**
+   * Give an account another sign-in address. 'present' when it already signs
+   * in with it (its key or an alias); 'taken' when the address is another
+   * account's key or alias — nothing is stored then.
+   */
+  addEmailAlias(accountEmail: string, alias: string, source: EmailAliasSource): AliasOutcome {
+    const address = normalizeEmail(alias);
+    if (address === accountEmail) return 'present';
+    const owner = this.aliasOwner(address) ?? (this.getUser(address) ? address : null);
+    if (owner) return owner === accountEmail ? 'present' : 'taken';
+    this.db
+      .prepare('INSERT INTO user_emails (email, user_email, source, added_at) VALUES (?, ?, ?, ?)')
+      .run(address, accountEmail, source, new Date().toISOString());
+    return 'added';
+  }
+
+  /** Remove one of an account's aliases; false when it has no such alias. */
+  removeEmailAlias(accountEmail: string, alias: string): boolean {
+    const result = this.db
+      .prepare('DELETE FROM user_emails WHERE email = ? AND user_email = ?')
+      .run(normalizeEmail(alias), accountEmail);
+    return Number(result.changes) > 0;
+  }
+
+  /** An account's aliases, oldest first. */
+  listEmailAliases(accountEmail: string): string[] {
+    const rows = this.db
+      .prepare('SELECT email FROM user_emails WHERE user_email = ? ORDER BY added_at, email')
+      .all(accountEmail) as unknown as { email: string }[];
+    return rows.map((r) => r.email);
   }
 
   /** The stored credential, or null when the account has no password yet. */
@@ -355,7 +502,7 @@ export class Db {
   listUsers(): RosterRow[] {
     const rows = this.db
       .prepare(
-        `SELECT email, name, role, student_id, section, password_hash, registered_at
+        `SELECT email, name, role, student_id, uid, section, password_hash, registered_at
          FROM users ORDER BY role DESC, COALESCE(sort_name, name) COLLATE NOCASE`,
       )
       .all() as unknown as {
@@ -363,22 +510,30 @@ export class Db {
       name: string;
       role: Role;
       student_id: string;
+      uid: string | null;
       section: string | null;
       password_hash: string | null;
       registered_at: string | null;
     }[];
+    const aliases = new Map<string, string[]>();
+    const aliasRows = this.db
+      .prepare('SELECT email, user_email FROM user_emails ORDER BY added_at, email')
+      .all() as unknown as { email: string; user_email: string }[];
+    for (const a of aliasRows) aliases.set(a.user_email, [...(aliases.get(a.user_email) ?? []), a.email]);
     return rows.map((r) => ({
       email: r.email,
       name: r.name,
       role: r.role,
       studentId: r.student_id ?? '',
+      uid: r.uid ?? '',
       section: r.section ?? null,
       registered: r.password_hash != null,
       registeredAt: r.registered_at ?? null,
+      aliases: aliases.get(r.email) ?? [],
     }));
   }
 
-  /** Remove a roster row (cascades to its sessions). Work is left in place. */
+  /** Remove a roster row (cascades to its sessions and aliases). Work is left in place. */
   removeUser(email: string): void {
     this.db.prepare('DELETE FROM users WHERE email = ?').run(email);
   }
@@ -395,31 +550,16 @@ export class Db {
   getSessionUser(token: string): UserRow | null {
     const row = this.db
       .prepare(
-        `SELECT u.email, u.name, u.role, u.student_id, u.password_hash, s.expires_at
+        `SELECT u.email, u.name, u.role, u.student_id, u.uid, u.password_hash, s.expires_at
          FROM sessions s JOIN users u ON u.email = s.email WHERE s.token = ?`,
       )
-      .get(token) as unknown as
-      | {
-          email: string;
-          name: string;
-          role: Role;
-          student_id: string;
-          password_hash: string | null;
-          expires_at: string;
-        }
-      | undefined;
+      .get(token) as unknown as (Parameters<typeof Db.toUser>[0] & { expires_at: string }) | undefined;
     if (!row) return null;
     if (new Date(row.expires_at).getTime() < Date.now()) {
       this.deleteSession(token);
       return null;
     }
-    return {
-      email: row.email,
-      name: row.name,
-      role: row.role,
-      studentId: row.student_id ?? '',
-      registered: row.password_hash != null,
-    };
+    return Db.toUser(row);
   }
 
   deleteSession(token: string): void {

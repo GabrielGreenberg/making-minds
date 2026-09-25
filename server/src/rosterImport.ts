@@ -6,10 +6,15 @@
 // a password: a mid-quarter re-import must not delete a student's work or sign
 // them out. Who a class list no longer carries is REPORTED (noLongerListed)
 // for a human to act on; removal is the explicit DELETE /api/roster/:email.
+//
+// Each row lands through src/identity.ts: matched by student ID first, so a
+// registrar email change updates the same person (the new address becomes an
+// alias) and a row that would rebind an account is an issue, never a write.
 
 import type { Role } from '../../app/src/auth/accounts';
 import { NO_LONGER_LISTED_TEXT, skippedLinesText, statusCountText } from '../../app/src/instructor/rosterReportText';
 import type { Db } from './db';
+import { placeRosterEntry } from './identity';
 import {
   parseRoster,
   rosterReview,
@@ -22,7 +27,7 @@ import {
 export interface RosterImportReport {
   added: number;
   updated: number;
-  /** Rows imported (added + updated). */
+  /** Rows imported (added + updated); a conflicting row is an issue instead. */
   total: number;
   /** Physical line of the header row; null when none was found. */
   headerLine: number | null;
@@ -39,19 +44,22 @@ export function importRosterCsv(db: Db, csv: string, defaultRole: Role): RosterI
   const before = db.listUsers();
   let added = 0;
   let updated = 0;
+  const issues = [...parsed.issues];
   for (const entry of parsed.entries) {
-    if (db.getUser(entry.email)) updated++;
-    else added++;
-    db.upsertUser(entry);
+    const placed = placeRosterEntry(db, entry);
+    if (placed.kind === 'added') added++;
+    else if (placed.kind === 'updated') updated++;
+    else issues.push({ line: entry.line, reason: `${placed.reason} — row not imported` });
   }
+  issues.sort((a, b) => a.line - b.line);
   return {
     added,
     updated,
-    total: parsed.entries.length,
+    total: added + updated,
     headerLine: parsed.headerLine,
     statusCounts: parsed.statusCounts,
     noLongerListed: rosterReview(before, parsed),
-    issues: parsed.issues,
+    issues,
     columns: parsed.columns,
   };
 }
