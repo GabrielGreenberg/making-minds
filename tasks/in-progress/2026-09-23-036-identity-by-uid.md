@@ -8,9 +8,9 @@ requires: human
 area: server
 source: chat
 created: 2026-09-23T14:00:00-07:00
-status: ready
+status: in-progress
 after: 2026-09-23-035
-branch:
+branch: task/036-identity-by-uid
 merged_into:
 ---
 
