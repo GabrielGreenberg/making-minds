@@ -8,9 +8,9 @@ requires: ssh, human
 area: deploy
 source: chat
 created: 2026-09-25T10:00:00-07:00
-status: ready
+status: in-progress
 after: 2026-09-25-041
-branch:
+branch: task/042-release-gate
 merged_into:
 ---
 
