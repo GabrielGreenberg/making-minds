@@ -8,9 +8,9 @@ requires: human
 area: server
 source: chat
 created: 2026-09-23T14:00:00-07:00
-status: in-progress
+status: done
 after: 2026-09-23-035
-branch: task/036-identity-by-uid
+branch:
 merged_into:
 ---
 
@@ -138,3 +138,16 @@ rosterCheck `[uid]` + UID-aware review, remoteStoreCheck client half. Gates: ser
 mode, scratch DB): set-up refusal copy, sign-up with a UCLA email onto a personal class-list
 account, sign-in by that alias, request match → approve → alias, alias ×. Docs: CLAUDE.md,
 server/README.md, deploy/README.md. Next: fold in the adversarial review's findings, then land.
+
+### 2026-09-24 — review folded in, landed (work session)
+An adversarial review found five real defects: an approved request's typed ID merged a later
+class-list student into the requester; a migrated second row sharing an ID was claimable by
+email alone; a sign-up alias could squat a classmate's UCLA address; removing an alias left the
+password it set; and unlimited ID guessing plus a seat oracle. All fixed as the trust levels
+in the Plan (commit 9494934), each pinned in authCheck (`[identity]` review block,
+`[http: identity by UID]`, per-account sign-in and per-IP sign-up budgets) and remoteStoreCheck.
+The residual (UID + an unverified UCLA address claims an unclaimed seat) is accepted until SSO
+(decision 3). Gates: server `npm run check`, app tsc + tools tsc + build + `npm run check`, all
+exit 0. Browser (remote mode): the request conflict note, the "unverified" ID tag. Owed: a real
+SSO round trip (006); the pilot DB's first boot on this code (the `uid` backfill + the
+`registered_via` column) happens at the next `deploy/release.sh`.
