@@ -33,7 +33,8 @@ export interface AuthAttemptResult {
   ok: boolean;
   /** Ready-to-display message; null on success. */
   error: string | null;
-  /** Registration only: refused because the email isn't on the roster. */
+  /** Registration only: refused because the roster has no seat for that
+   *  student ID (or, with none typed, that email). */
   notOnRoster?: boolean;
 }
 
@@ -68,8 +69,11 @@ export interface AuthContextValue {
   login(id: string, password?: string): Promise<AuthAttemptResult>;
   /**
    * Create an account for someone already on the roster, and sign them in.
-   * Refused (with a reason) off-roster, when an account already exists, when
-   * the password is too short, or when the student ID does not match.
+   * The student ID finds their roster seat; the email (the class-list one or
+   * a UCLA address) becomes one they sign in with. Refused (with a reason)
+   * off-roster, when an account already exists, when the password is too
+   * short, when the student ID is missing or does not match, or when the
+   * email is neither the class-list one nor a UCLA address.
    */
   register(input: {
     email: string;

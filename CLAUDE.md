@@ -56,9 +56,9 @@ instructor's "Student view" is the same page) with the tabs **Assignments** (the
 the website's up-next box — the soonest due homework) and **Grades** (`#/grades[/:id]`: a row per
 homework with the result once released, opening into the question-by-question sheet; task
 026). Sign in
-(local: toy-account picker; remote: email + password against the CSV roster; "First time
-here?" sets up a roster member's account (student ID), an access request only for an
-off-roster email; the screen renders from the server's reported capabilities, so SSO needs
+(local: toy-account picker; remote: any of a person's emails + password; "First time
+here?" claims the roster seat by UID with the class-list or a UCLA email, an access request
+only for someone the roster lacks; the screen renders from the server's reported capabilities, so SSO needs
 no frontend rebuild; a 30-day bearer session; a health retry screen while the server is
 down; a "Password" control) → browse
 **published** assignments (hidden until an instructor publishes) → the assignment as a
@@ -133,8 +133,8 @@ drill-down per mode; ✓/✗ + note manual review of open questions; ⚑ integri
 
 **Server** (`server/`, Express 5 + `node:sqlite`, zero native deps): auth providers behind
 `MM_AUTH_MODE` (`password` default — roster-gated registration, scrypt, login throttle;
-`dev` passwordless; `sso` — capabilities reported, `authenticate` is a TODO), roster
-import (UI + CLI), the **homework sync** (`npm run homeworks -- sync |
+`dev` passwordless; `sso` — capabilities reported, `authenticate` is a TODO), **identity by
+UID** (emails are aliases), roster import (UI + CLI), the **homework sync** (`npm run homeworks -- sync |
 status`, task 007 — HW1–HW7 from the repo into the DB: missing ones added unpublished, copies
 nobody edited refreshed, instructor-edited ones left alone and listed), assignment CRUD, workbooks (+ mint key, per-save size history), submit-with-grading + integrity,
 manual review, grade release, feedback (+ role, triage mark), notes, `/api/health`. SQLite, WAL (gates: the Server row, Part 2).
@@ -155,7 +155,7 @@ PDFs themselves). **The repo is the source; every release syncs it into the pilo
 ## What's next
 
 The open work is the queue (`tasks/incoming/` ready, `tasks/blocked/` waiting on Gabriel);
-`/work` offers it. Headline on 2026-09-24: UID identity (036) → **UCLA SSO** (006), the
+`/work` offers it. Headline on 2026-09-24: **UCLA SSO** (006, parked on UCLA IT), the
 grading interface (031), pilot domain + backups (008), the feedback triage routine (029);
 last, the worker routine.
 
@@ -223,7 +223,7 @@ wrappers over it.
 | Student UI | `app/src/components/` | `CircuitCanvas`, `ComponentLibrary`, `DataTable`, `PerceptionFramePlayer`, `StudentLayout` (the Home tabs), `HomeScreen` (Assignments tab + up-next box), `GradesView` + `GradeSheet` (the Grades tab and its inline sheet), `GradedCaseBanner`, `AssignmentOverview` (the document page), `ProblemSetDocument`, `MenuBar`, `FeedbackPanel`, `SequentialTimeline`, `TMTapePanel`, `ArenaCanvas`, `TurbotArenaPanel` (Map + run controls; sandbox "Edit map"), `TurbotTapePanel`, `OpenResponsePanel`/`FillInPanel` (read-only when locked; paste-guarded), `SimulationPanel`, `TabBar` (question nav + Mark done / 🔒 tag; sandbox + menu), `outputDisplay.ts` (t1-rightmost OUT rows). |
 | API client | `app/src/api/client.ts` | One typed function per endpoint; bearer token under `mm:auth:token`; `onUnauthorized` hook; `health()`; auth/roster/feedback/notes calls; `putWorkbook` takes `keepalive`. `setApiBase` is the harness override. |
 | Dev tool | `app/tools/shootProblemSets.mjs` | Headless-Chrome screenshots of every HW document, the canvas panel and the editor (it seeds local mode itself) — the visual proof when the browser pane is unavailable. |
-| Server | `server/src/app.ts`, `db.ts`, `auth.ts`, `password.ts`, `roster.ts`, `rosterImport.ts`, `sanitize.ts`, `config.ts`, `seed.ts`, `roster-cli.ts`, `homeworks.ts`, `homeworks-cli.ts` | Routes, SQLite storage, the `AuthProvider` seam (`createAuthProvider` — `MM_AUTH_MODE`: `password` default / `dev` / `sso`; `LoginThrottle`), scrypt credentials (`scrypt$N$r$p$salt$hash`, self-describing), the pure roster reader (`roster.ts`, the registrar's export as-is) + `rosterImport.ts` (never removes; lists who left), redaction + grade-release withholding (`sanitize.ts`: students get no `test_cases`/`perception_cases`/`fill_in_answers`; their own results keep safe per-case fields but never `expected`/`got` or `integrity`), env config, seeding, the admin CLI (`npm run roster`). The homework sync (`homeworks.ts`: a copy is pristine iff its content hash is a committed version of its file — `gitLineage` over the box's clone — or one the sync wrote, the `content_sync` table; `seed.ts --homeworks` runs it too). Tools: `serverCheck.ts`, `feedbackCheck.ts`, `rosterCheck.ts`, `authCheck.ts`, `parityCheck.ts` (server ≡ in-process grading, deep-compared), `homeworkSyncCheck.ts`. |
+| Server | `server/src/app.ts`, `db.ts`, `auth.ts`, `identity.ts`, `password.ts`, `roster.ts`, `rosterImport.ts`, `sanitize.ts`, `config.ts`, `seed.ts`, `roster-cli.ts`, `homeworks.ts`, `homeworks-cli.ts` | Routes, SQLite storage, the `AuthProvider` seam (`createAuthProvider` — `MM_AUTH_MODE`; `LoginThrottle`), scrypt credentials (`scrypt$N$r$p$salt$hash`, self-describing), `identity.ts` (the ONE place an email or UID resolves to an account; `users.uid` unique, `user_emails` aliases, keys never rekeyed), the pure roster reader (`roster.ts`, the registrar's export as-is) + `rosterImport.ts` (never removes; lists who left), redaction + grade-release withholding (`sanitize.ts`; what is stripped: Things to watch), env config, seeding, the admin CLI (`npm run roster`). The homework sync (`homeworks.ts`: a copy is pristine iff its content hash is a committed version of its file — `gitLineage` over the box's clone — or one the sync wrote, the `content_sync` table; `seed.ts --homeworks` runs it too). Tools: `server/tools/*Check.ts` (`parityCheck`: server ≡ in-process grading, deep-compared). |
 | Dev/sample | `app/src/devData/sampleData.ts`, `seed.ts`, `homeworks.ts`, `homeworks/hw{1..7}.json` | Sample assignment for all modes (netlist-built perception circuits, one turbot question per inner mode, open Q14) + sample submissions; `seedHomeworks()` syncs the real HW1–HW7 (record `mm:seeded-homework:<id>`) + reseeds 22 sample submissions; `homeworkSync.ts` is the pure planner it shares with the server (content hash = canonical JSON minus the instructor-owned `order`/`dueDate`; insert / unchanged / refresh / edited). |
 | Tools | `app/tools/*.ts` | The headless harness — the test suite, all in `npm run check` (plus `grade.ts` CLI grader, `builder.ts` netlist builder, `layoutCheck.ts` layout oracle): `portabilityCheck` (first: tool imports in-repo, exact-case, declared; tools type-checked), `codecCheck`, `dueDateCheck`, `statementFormatCheck` (markup grammar, document model, every HW + figures valid), `notationCheck` (grammar pins + label-dissection grep gate), `themeCheck` (Page surfaces gate), `tmCheck`, `turbotCheck` (all four brains; `[multi-arena]`, `[pass-through step-limit]`, path/facing independence), `perceptionCheck`, `scWindowCheck` (question runs ≡ grader), `caseRunCheck` (caseRun ≡ grader; replay per mode, remote shape, budgets), `routerCheck` (fallback budget 2; hw3-p4 pin), `bumpCheck`, `pipelineCheck` (submit → grade, every mode), `navResetCheck` (both reset laws, `[edit during run]`; done / frozen / viewed-submission locks), `routingCheck` (route access, landing, held routes, principal change), `boxScopeCheck` (box library scope, sequential + drawn-across boxes ≡ unboxed, `[naming]`), `pasteCheck` (paste policy + provenance grep gates), `provenanceCheck` (mint/verify, attribution, paste re-mint, stamp + trace flags, uuid grep gate), `workbookFileCheck` (round trip, bad files, unsaved baseline, file handle), `remoteStoreCheck` (boots the REAL server; grader-import grep gate; password auth client), `coverageCheck` (two-tier reference-fixture ledger + `allowed_components` pins). |
 | Queue | `tasks/` | The task pipeline (top of this file). `tasks/tools/check-budgets.mjs` is the size guard on this file. |

@@ -217,12 +217,16 @@ After that, everything else — importing the class, resetting passwords,
 approving access requests — is available in the instructor UI.
 
 **Forgotten passwords** have no email loop (there is no mail server): the
-instructor resets the credential and the student creates their account again
-with the same email. Their saved work and submissions are untouched.
+instructor resets the credential and the student sets their account up again
+with their student ID. Their saved work and submissions are untouched.
 
-**Student registration** requires the student ID when the roster carries one,
-which is the only evidence we have that the person claiming the seat owns it.
-A roster imported without an ID column skips that check.
+**Student registration** is student ID + an email + a password. The ID finds
+the roster seat (it is the only evidence we have that the person claiming it
+owns it); the email may be the one on the class list — often a personal
+address — or any UCLA one, and both then sign in to the same account. A
+re-import that changes a student's email updates the same person (matched by
+ID) and the new email joins their sign-in addresses. A roster row without an ID
+(an instructor, a manual add) registers by its email alone.
 
 ### What's intentionally NOT done yet
 

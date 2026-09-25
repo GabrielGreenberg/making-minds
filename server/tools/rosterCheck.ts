@@ -4,7 +4,8 @@
 // src/roster.ts: header discovery past a preamble, strict column matching,
 // registrar names to display form, enrollment status (W = Wait List is
 // imported; D/C/withdrawn are not), the "no longer on the class list"
-// review, and the report's words (shared with the dashboard through
+// review (matched by student ID or any sign-in address — task 036), the UID
+// and campus-address rules, and the report's words (shared with the dashboard through
 // app/src/instructor/rosterReportText.ts). The HTTP half (import report, section on GET /roster, the review
 // through the real server) is in authCheck's [http: roster administration].
 //
@@ -21,6 +22,8 @@ import {
   normalizeRosterName,
   titleCaseName,
   rosterReview,
+  normalizeUid,
+  isCampusEmail,
   type RosterEntry,
 } from '../src/roster';
 import { formatRosterReport } from '../src/rosterImport';
@@ -140,9 +143,10 @@ check('the suffix row sorts by surname', byEmail('john.roe@example.com')?.sortNa
 check(
   'Major, Classification and Grade Type are never read into an entry',
   reg.entries.every(
-    (e) => Object.keys(e).sort().join(',') === 'email,name,role,section,sortName,studentId',
+    (e) => Object.keys(e).sort().join(',') === 'email,line,name,role,section,sortName,studentId',
   ),
 );
+check('each entry names its physical line (Jane: 10)', byEmail('jane.doe@example.com')?.line === 10);
 check(
   '…nor echoed anywhere in the parse',
   !['Philosophy', 'Cognitive Science', 'Junior', 'Senior', 'Sophomore'].some((v) => JSON.stringify(reg).includes(v)),
@@ -304,6 +308,52 @@ check('nobody else is listed', review.length === 2, JSON.stringify(review));
 check(
   'a file without a status column reviews nobody',
   rosterReview(onPlatform, parseRoster('Email,Name\njane.doe@example.com,Jane Ann Doe\n')).length === 0,
+);
+
+// Task 036: a person is their student ID; the email is only how they sign in.
+// The export after that: Jane's registrar email changed (same UID), Rory is
+// listed under an address that is one of his aliases, and Dana-style: Luis
+// shows up DROPPED under a new email — his UID still says it is him.
+const onPlatformWithIds = [
+  ...reg.entries.map((e) => ({
+    email: e.email,
+    name: e.name,
+    role: e.role,
+    // Rory has no ID on file here, so only his alias can match him.
+    studentId: e.email === 'rory.mcd@example.com' ? '' : e.studentId,
+    aliases: e.email === 'rory.mcd@example.com' ? ['rory@g.ucla.edu'] : [],
+  })),
+];
+const movedRows = ROWS.map((r) => r.replace('Jane.Doe@Example.COM', 'jane.doe@g.ucla.edu'))
+  .map((r) => r.replace('999-000-003,"MCDONALD, RORY",rory.mcd@example.com', '999-000-003,"MCDONALD, RORY",rory@g.ucla.edu'))
+  .map((r) => (r.includes('luis.machado@') ? r.replace('luis.machado@example.com', 'luis@new.example.com').replace(',E,', ',D,') : r));
+const moved = rosterReview(onPlatformWithIds, parseRoster(crlf([...PREAMBLE, REGISTRAR_HEADER, ...movedRows])));
+check('a registrar email change (same UID) is not "no longer listed"', !moved.some((r) => r.email === 'jane.doe@example.com'), JSON.stringify(moved));
+check('a row under one of their aliases counts as theirs', !moved.some((r) => r.email === 'rory.mcd@example.com'));
+check(
+  'a dropped row under a new email is matched by UID ("status dropped")',
+  moved.some((r) => r.email === 'luis.machado@example.com' && r.reason === 'status dropped'),
+  JSON.stringify(moved),
+);
+check('…and nobody else is listed', moved.length === 1, JSON.stringify(moved));
+
+// ═══ [uid] ═══════════════════════════════════════════════════════
+section('[uid]');
+
+check('normalizeUid: dashes, spaces and leading zeros are one UID', normalizeUid('004-125-678') === '4125678' && normalizeUid(' 004 125 678 ') === '4125678' && normalizeUid('4125678') === '4125678');
+check('normalizeUid: blank or missing is empty', normalizeUid('  ') === '' && normalizeUid(undefined) === '');
+check('normalizeUid: a non-numeric ID compares case-insensitively', normalizeUid('AB-12x') === 'ab12x');
+check('isCampusEmail: ucla.edu and its subdomains', isCampusEmail('a@ucla.edu') && isCampusEmail('a@g.ucla.edu') && isCampusEmail('A@Math.UCLA.edu'));
+check(
+  'isCampusEmail: nothing else',
+  !isCampusEmail('a@gmail.com') && !isCampusEmail('a@notucla.edu') && !isCampusEmail('a@ucla.edu.example.com') && !isCampusEmail('ucla.edu'),
+);
+const twinIds = parseRoster('UID,Name,Email\n999-000-001,Jane,jane@example.com\n999000001,Jane Again,jane@g.ucla.edu\n');
+check('a later row repeating a student ID is dropped (the first wins)', twinIds.entries.length === 1 && twinIds.entries[0].email === 'jane@example.com');
+check(
+  '…and reported on its line, naming the ID',
+  twinIds.issues.length === 1 && twinIds.issues[0].line === 3 && twinIds.issues[0].reason.includes('999000001'),
+  JSON.stringify(twinIds.issues),
 );
 
 // ═══ [report] ════════════════════════════════════════════════════

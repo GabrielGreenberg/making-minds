@@ -60,19 +60,20 @@ All routes are under `/api`, JSON in/out, auth via `Authorization: Bearer <token
 | -------------------------------------- | ---------- | -------------------------------------------------------------------- |
 | `GET /api/health`                       | anyone     | liveness probe                                                       |
 | `GET /api/auth/config`                  | anyone     | what the sign-in system offers — the login screen renders from this  |
-| `POST /api/auth/login`                  | anyone     | `{email, password}` → `{token, user}` (password omitted in dev mode); throttled per email+IP; one message for every failure, so the roster can't be enumerated |
-| `POST /api/auth/register`               | anyone     | `{email, password, studentId?}` → creates the account for a **roster member** and signs them in |
+| `POST /api/auth/login`                  | anyone     | `{email, password}` → `{token, user}` (password omitted in dev mode); any of the account's emails; throttled per account+IP; one message for every failure, so the roster can't be enumerated |
+| `POST /api/auth/register`               | anyone     | `{studentId, email, password}` → claims the **roster seat** the student ID names and signs them in; the email (the class-list one or a UCLA address) becomes a sign-in address; throttled per email, per ID, and refusals per IP |
 | `POST /api/auth/password`               | logged in  | `{currentPassword, newPassword}` — ends every other session, re-issues this one |
 | `POST /api/auth/logout`                 | logged in  | invalidates the token                                                |
 | `GET /api/auth/me`                      | logged in  | `{user}`                                                             |
 | `POST /api/auth/access-requests`        | anyone     | `{email, name, studentId?, message?}` — "my email isn't on the roster"; always answers ok |
-| `GET /api/roster`                       | instructor | the roster with per-row account state                                |
+| `GET /api/roster`                       | instructor | the roster with per-row account state and each account's other sign-in addresses (`aliases`) |
 | `POST /api/roster/import`               | instructor | `{csv, defaultRole?}` → upsert + the import report (`headerLine`, columns, `statusCounts`, `noLongerListed`, issues); never removes anyone, never touches a password |
-| `POST /api/roster`                      | instructor | add or update one person                                             |
+| `POST /api/roster`                      | instructor | add or update one person (matched by student ID, then email; a new email becomes an alias; 409 on a conflict) |
 | `DELETE /api/roster/:email`             | instructor | remove from the roster (their submitted work is kept)                |
+| `DELETE /api/roster/:email/aliases/:alias` | instructor | drop one extra sign-in address; if the account was set up through it, that password is cleared and its sessions end |
 | `POST /api/roster/:email/reset-password`| instructor | clear the credential + all their sessions; they register again       |
-| `GET /api/access-requests`              | instructor | `?status=pending\|approved\|rejected`                                |
-| `POST /api/access-requests/:id/approve` | instructor | adds them to the roster and resolves the request                     |
+| `GET /api/access-requests`              | instructor | `?status=pending\|approved\|rejected`; each carries `match` (the roster account its ID or email already names) and `conflict` (why approving would be refused) |
+| `POST /api/access-requests/:id/approve` | instructor | adds them to the roster — or, when `match`, adds the email to that account — and resolves the request |
 | `POST /api/access-requests/:id/reject`  | instructor | resolves the request, adding nobody                                  |
 | `GET /api/assignments`                  | logged in  | `{assignments: [{id, title, questionCount}]}`                        |
 | `GET /api/assignments/:id`              | logged in  | full assignment; **students get `test_cases` stripped**              |
@@ -94,11 +95,12 @@ endpoint, ready to back `Remote*` implementations of the `WorkbookStore` /
 | File                    | What's there                                                            |
 | ----------------------- | ----------------------------------------------------------------------- |
 | `src/config.ts`         | env-driven `ServerConfig`                                               |
-| `src/db.ts`             | `node:sqlite` schema + typed accessors (users, sessions, assignments, workbooks, submissions) |
+| `src/db.ts`             | `node:sqlite` schema + typed accessors (users — `uid` unique — and `user_emails` aliases, sessions, assignments, workbooks, submissions) |
+| `src/identity.ts`       | who a person is (task 036): the ONE place an email or a student ID resolves to an account (`matchAccount`) and a roster entry lands on one (`placeRosterEntry` — class-list / instructor / request modes), plus sign-up's seat claim (`claimForSignUp`) and SSO's (`resolveAssertedIdentity`). Claims have strengths: an ID is verified (`uid`) only from the class list, an instructor or SSO — a request's typed ID is not; a student's own sign-up alias yields to the class list, SSO or an approval |
 | `src/auth.ts`           | the auth seam: `AuthProvider` (authenticate / register / capabilities) with `PasswordAuthProvider`, `DevAuthProvider`, `SsoAuthProvider`; `createAuthProvider` is the one mode decision. Plus session issue/lookup, `requireAuth`/`requireInstructor`, and the failed-login `LoginThrottle` |
 | `src/password.ts`       | scrypt hashing (self-describing `scrypt$N$r$p$salt$hash`), constant-time verify, the length policy |
-| `src/roster.ts`         | pure CSV roster parsing: RFC-4180 reader; header discovery past a preamble (the registrar's export as-is); strict column matching (exact, then whole word — no substring fallback) for email / name or first+last / student ID / role / section / status; `LAST, FIRST` → display name + surname sort key; `STATUS_TABLE` (E/W/H imported, D/C/withdrawn not); `rosterReview` (who is no longer on the class list); per-row issues |
-| `src/rosterImport.ts`   | `importRosterCsv` — parse, upsert, and the import report (added / updated / statuses / columns / no longer listed), shared by `POST /api/roster/import` and the CLI |
+| `src/roster.ts`         | `normalizeEmail` / `normalizeUid` / `isCampusEmail`; pure CSV roster parsing: RFC-4180 reader; header discovery past a preamble (the registrar's export as-is); strict column matching (exact, then whole word — no substring fallback) for email / name or first+last / student ID / role / section / status; `LAST, FIRST` → display name + surname sort key; `STATUS_TABLE` (E/W/H imported, D/C/withdrawn not); `rosterReview` (who is no longer on the class list, matched by ID or any email); per-row issues (incl. a repeated ID) |
+| `src/rosterImport.ts`   | `importRosterCsv` — parse, place each row (identity.ts; a conflict becomes an issue), and the import report (added / updated / statuses / columns / no longer listed), shared by `POST /api/roster/import` and the CLI |
 | `src/sanitize.ts`       | student-facing redaction: `stripAnswers` (no `test_cases`), `stripResultDetail` (scores only), `studentRecord` (no grade at all until grades are released) |
 | `src/app.ts`            | the Express app (factory, no `listen`) — all routes                     |
 | `src/index.ts`          | entry point: config → db → listen, graceful shutdown                    |
@@ -106,13 +108,22 @@ endpoint, ready to back `Remote*` implementations of the `WorkbookStore` /
 | `src/roster-cli.ts`     | roster + account admin from the shell (`npm run roster -- <command>`)   |
 | `tools/serverCheck.ts`  | end-to-end HTTP smoke test (`npm run check`)                            |
 | `tools/rosterCheck.ts`  | the class-list reader against a synthetic registrar-shaped fixture (never a real class list) |
-| `tools/authCheck.ts`    | the account system: roster parsing, passwords, providers, and the whole sign-in lifecycle over HTTP |
+| `tools/authCheck.ts`    | the account system: roster parsing, passwords, providers, identity by UID (`[identity]`), the `uid` backfill, and the whole sign-in lifecycle over HTTP |
 
 ## Accounts
 
 The roster decides **who may have an account**; each person creates their own by
-choosing a password. Nobody can register for an email the roster doesn't carry —
-they file an access request instead, and an instructor approves it.
+choosing a password. A person is their **student ID** (UCLA's UID — the one
+identifier the registrar, UCLA's identity provider and the student share); an
+email is only how they sign in. The registrar exports each student's preferred
+email, which for a large share of a class is a personal address, so sign-up is
+UID + an email + a password: the UID finds the roster seat, and the email — the
+class-list one or any UCLA address — becomes one they sign in with. An account
+keeps the email it was first rostered under as its key (all their work hangs
+off it, never rekeyed); every other address is an alias. Somebody the roster
+doesn't have files an access request instead, and an instructor approves it —
+into a new row (its typed ID stays unverified until the class list or the
+instructor confirms it), or as an alias when the request names someone listed.
 
 ```sh
 npm run roster -- import ~/rosters/class-list.csv   # the registrar export as-is, or any CSV with an email column; class lists never go in git
@@ -129,11 +140,12 @@ exists because the *first* instructor account has to come from somewhere.
 Passwords are scrypt-hashed with per-password salts and the cost parameters
 stored alongside each hash, so raising the cost later doesn't invalidate
 anyone. There is no password-reset email (no mail server): an instructor clears
-the credential and the student registers again with the same email — their
-saved work and submissions are untouched.
+the credential and the student sets their account up again (student ID + either
+email) — their saved work and submissions are untouched.
 
-Swapping in UCLA SSO is one class: fill in `SsoAuthProvider.authenticate` and
-set `MM_AUTH_MODE=sso`. Sessions, every route, the role gate, and the frontend
+Swapping in UCLA SSO is one class: fill in `SsoAuthProvider.authenticate`
+(validate the assertion, then `signInAsserted({uid, email})`, which already
+resolves the UID to the roster account) and set `MM_AUTH_MODE=sso`. Sessions, every route, the role gate, and the frontend
 are already provider-agnostic — the login screen reads
 `GET /api/auth/config` and renders the SSO button on its own.
 

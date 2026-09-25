@@ -13,10 +13,13 @@ import { NO_LONGER_LISTED_TEXT, sentenceCase, skippedLinesText, statusCountText 
  *     as-is) — upsert only, so a mid-quarter re-import never removes anyone or
  *     resets a password; who the class list no longer carries is listed for
  *     review instead
- *   · see who has created an account and who hasn't
+ *   · see who has created an account and who hasn't, and each account's
+ *     other sign-in addresses (a UCLA one beside a personal class-list one;
+ *     the student ID is who they are — server/src/identity.ts) — a wrong one
+ *     is removed with its ×
  *   · reset a forgotten password (clears it; the student registers again)
  *   · add or remove one person
- *   · approve or reject "my email isn't on the roster" requests
+ *   · approve or reject "the roster doesn't have me" requests
  *
  * Remote mode only: local mode has no server to hold a roster, and its two toy
  * accounts are a hardcoded mockup (see auth/accounts.ts).
@@ -70,6 +73,7 @@ function RemoteRosterView() {
     if (!q) return true;
     return (
       r.email.includes(q) ||
+      r.aliases.some((a) => a.includes(q)) ||
       r.name.toLowerCase().includes(q) ||
       r.studentId.includes(q) ||
       (r.section ?? '').toLowerCase().includes(q)
@@ -151,8 +155,48 @@ function RosterRow({
   return (
     <tr>
       <td>{row.name}</td>
-      <td className="roster-email">{row.email}</td>
-      <td>{row.studentId || '—'}</td>
+      <td className="roster-email">
+        {row.email}
+        {row.aliases.length > 0 && (
+          <ul className="roster-aliases" aria-label="Also signs in with">
+            {row.aliases.map((alias) => (
+              <li key={alias}>
+                + {alias}
+                <button
+                  type="button"
+                  className="roster-alias-remove"
+                  title={`Stop ${alias} signing in to this account`}
+                  aria-label={`Remove ${alias}`}
+                  disabled={busy}
+                  onClick={() =>
+                    confirm(
+                      `Remove ${alias} from ${row.name}'s account?\n\n` +
+                        'It will no longer sign in. If the account was set up through it, that ' +
+                        'password is cleared too and they are signed out. Their work is untouched.',
+                    ) &&
+                    onAction(async () => {
+                      const { credentialCleared } = await api.removeRosterAlias(row.email, alias);
+                      return credentialCleared
+                        ? `${alias} no longer signs in, and the password set up through it is cleared — ${row.name} sets up their account again.`
+                        : `${alias} no longer signs in to ${row.name}'s account.`;
+                    })
+                  }
+                >
+                  ×
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+      </td>
+      <td>
+        {row.studentId || '—'}
+        {row.studentId && !row.uid && (
+          <span className="roster-match" title="Typed into an access request; not from the class list">
+            unverified
+          </span>
+        )}
+      </td>
       <td>{row.section ?? '—'}</td>
       <td>{row.role === 'instructor' ? 'Instructor' : 'Student'}</td>
       <td>
@@ -169,7 +213,7 @@ function RosterRow({
               confirm(
                 `Reset the password for ${row.email}?\n\n` +
                   'Their password is cleared and they are signed out everywhere. ' +
-                  'They create their account again with the same email; their work is untouched.',
+                  'They set up their account again with their student ID; their work is untouched.',
               ) &&
               onAction(async () => {
                 await api.resetRosterPassword(row.email);
@@ -328,8 +372,9 @@ function AccessRequestsPanel({
         Access requests ({requests.length} waiting)
       </h2>
       <p className="mm-note mm-hint">
-        People who asked to be added under an email the roster doesn't have. Approving adds them —
-        they then create their account the same way everyone else does.
+        People the roster doesn't have, asking to be added. Approving adds them — they then create
+        their account the same way everyone else does. When a request's ID or email is already on
+        the roster, approving adds its email to that person's account instead.
       </p>
       <div className="instructor-table-scroll">
         <table className="mm-table roster-table">
@@ -346,7 +391,13 @@ function AccessRequestsPanel({
             {requests.map((req) => (
               <tr key={req.id}>
                 <td>{req.name}</td>
-                <td className="roster-email">{req.email}</td>
+                <td className="roster-email">
+                  {req.email}
+                  {req.match && (
+                    <span className="roster-match">→ {req.match.name}'s account</span>
+                  )}
+                  {req.conflict && <span className="roster-match roster-conflict">⚠ {req.conflict}</span>}
+                </td>
                 <td>{req.studentId || '—'}</td>
                 <td className="roster-message">{req.message || '—'}</td>
                 <td className="roster-actions">
@@ -355,8 +406,10 @@ function AccessRequestsPanel({
                     disabled={busy}
                     onClick={() =>
                       onAction(async () => {
-                        await api.approveAccessRequest(req.id, 'student');
-                        return `${req.email} added to the roster.`;
+                        const approved = await api.approveAccessRequest(req.id, 'student');
+                        return approved.account === req.email
+                          ? `${req.email} added to the roster.`
+                          : `${req.email} now signs in to ${approved.accountName}'s account.`;
                       })
                     }
                   >
@@ -398,7 +451,7 @@ function AddPersonPanel({
 
   const submit = () =>
     onAdd(async () => {
-      await api.addRosterEntry({
+      const placed = await api.addRosterEntry({
         email: email.trim(),
         name: name.trim() || undefined,
         studentId: studentId.trim() || undefined,
@@ -408,7 +461,10 @@ function AddPersonPanel({
       setEmail('');
       setName('');
       setStudentId('');
-      return `${added} is on the roster — they can now create their account.`;
+      if (placed.added) return `${added} is on the roster — they can now create their account.`;
+      return placed.aliasAdded
+        ? `Updated ${placed.account} — ${placed.aliasAdded} now signs in to that account too.`
+        : `Updated ${placed.account}.`;
     });
 
   return (
@@ -418,7 +474,7 @@ function AddPersonPanel({
         <input
           className="mm-input"
           type="email"
-          placeholder="email@ucla.edu"
+          placeholder="Email"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
           disabled={busy}
@@ -434,7 +490,7 @@ function AddPersonPanel({
         <input
           className="mm-input"
           type="text"
-          placeholder="Student ID"
+          placeholder="UID (student ID)"
           value={studentId}
           onChange={(e) => setStudentId(e.target.value)}
           disabled={busy}

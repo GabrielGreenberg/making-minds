@@ -723,6 +723,16 @@
 .roster-review-head { margin: 12px 0 0; font-weight: 600; color: var(--mm-ink); }
 .roster-table td, .roster-table th { font-size: 13px; }
 .roster-email { font-family: var(--mm-font-mono); font-size: 12px; }
+/* An account's other sign-in addresses, under its key (task 036). */
+.roster-aliases { list-style: none; margin: 2px 0 0; padding: 0; color: var(--mm-ink-2); }
+.roster-aliases li { display: flex; align-items: center; gap: 4px; }
+.roster-alias-remove {
+  border: none; background: none; padding: 0 2px; cursor: pointer;
+  color: var(--mm-ink-2); font-size: 13px; line-height: 1;
+}
+.roster-alias-remove:hover:not(:disabled) { color: var(--mm-warn); }
+.roster-match { display: block; font-family: var(--mm-font-sans); font-size: 12px; color: var(--mm-ink-2); }
+.roster-conflict { color: var(--mm-warn); white-space: normal; max-width: 360px; }
 .roster-message { max-width: 320px; color: var(--mm-ink-2); }
 .roster-actions { white-space: nowrap; text-align: right; }
 .roster-actions .mm-btn + .mm-btn { margin-left: 6px; }

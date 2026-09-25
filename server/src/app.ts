@@ -3,7 +3,7 @@
 //
 //   GET    /api/auth/config                    unauthenticated: what the login screen offers
 //   POST   /api/auth/login                     email (+ password) → bearer token
-//   POST   /api/auth/register                  roster member creates their account
+//   POST   /api/auth/register                  roster member creates their account (student ID + email)
 //   POST   /api/auth/password                  change own password
 //   POST   /api/auth/logout
 //   GET    /api/auth/me
@@ -12,9 +12,10 @@
 //   POST   /api/roster/import                  instructor: {csv, defaultRole?} → upsert
 //   POST   /api/roster                         instructor: add one person
 //   DELETE /api/roster/:email                  instructor: remove from the roster
+//   DELETE /api/roster/:email/aliases/:alias    instructor: drop one extra sign-in address
 //   POST   /api/roster/:email/reset-password   instructor: clear the credential + sessions
-//   GET    /api/access-requests                instructor: pending/all requests
-//   POST   /api/access-requests/:id/approve    instructor: add to roster, mark approved
+//   GET    /api/access-requests                instructor: pending/all requests (+ the account each names)
+//   POST   /api/access-requests/:id/approve    instructor: add to roster (or as an alias), mark approved
 //   POST   /api/access-requests/:id/reject     instructor
 //   GET    /api/assignments                    summaries (any logged-in user)
 //   GET    /api/assignments/:id                student: answers stripped; instructor: full
@@ -79,7 +80,8 @@ import {
   type AuthProvider,
 } from './auth';
 import { hashPassword, passwordProblem, verifyPassword } from './password';
-import { isEmail, normalizeEmail } from './roster';
+import { isEmail, normalizeEmail, normalizeUid } from './roster';
+import { matchAccount, placeRosterEntry } from './identity';
 import { importRosterCsv } from './rosterImport';
 import { stripAnswers, studentRecord } from './sanitize';
 
@@ -116,6 +118,11 @@ export function createApp(config: ServerConfig, db: Db) {
   // Access requests are unauthenticated writes: a looser per-IP budget, since
   // a shared campus NAT may legitimately carry several in one session.
   const requestThrottle = new LoginThrottle(20, 60 * 60 * 1000);
+  // Refused sign-ups per IP, whatever email or ID each one typed: guessing
+  // student IDs under fresh addresses never meets the per-key throttle, so
+  // this budget caps it. Generous, because a lecture hall setting up accounts
+  // together shares one campus address and mistypes a few.
+  const registerBudget = new LoginThrottle(100, 10 * 60 * 1000);
 
   const auth = requireAuth(db);
   // The watermark's secret: the configured one, else the one this database
@@ -140,7 +147,9 @@ export function createApp(config: ServerConfig, db: Db) {
   app.post('/api/auth/login', async (req, res) => {
     const email = normalizeEmail((req.body ?? {}).email);
     const ip = clientIp(req);
-    const wait = throttle.retryAfter(email, ip);
+    // Counted per ACCOUNT, so an account's several addresses share one budget.
+    const key = db.findUserByEmail(email)?.email ?? email;
+    const wait = throttle.retryAfter(key, ip);
     if (wait > 0) {
       res.setHeader('Retry-After', String(wait));
       res.status(429).json({
@@ -151,14 +160,14 @@ export function createApp(config: ServerConfig, db: Db) {
     }
     const user = await authProvider.authenticate(req.body ?? {});
     if (!user) {
-      throttle.recordFailure(email, ip);
+      throttle.recordFailure(key, ip);
       // One message for every failure: an unknown email, an email with no
       // account yet, and a wrong password are indistinguishable to the caller,
       // so the endpoint can't be used to enumerate the roster.
       res.status(401).json({ error: 'incorrect email or password' });
       return;
     }
-    throttle.recordSuccess(email, ip);
+    throttle.recordSuccess(key, ip);
     const token = issueSession(db, user, config.sessionTtlSeconds);
     res.json({ token, user });
   });
@@ -166,12 +175,14 @@ export function createApp(config: ServerConfig, db: Db) {
   // Create an account for someone the roster already contains. On success the
   // caller is signed straight in — one step, not register-then-log-in.
   app.post('/api/auth/register', async (req, res) => {
-    // Throttled like sign-in: when the roster carries student IDs, registration
-    // takes one, and an unthrottled endpoint would let someone guess a
-    // classmate's ID and claim their seat.
+    // Throttled like sign-in, per email AND per student ID: registration takes
+    // an ID, and an unthrottled endpoint would let someone guess a classmate's
+    // ID and claim their seat — under a fresh address each time, too.
     const ip = clientIp(req);
     const email = normalizeEmail((req.body ?? {}).email);
-    const wait = throttle.retryAfter(email, ip);
+    const uid = normalizeUid((req.body ?? {}).studentId);
+    const keys = uid ? [email, `uid:${uid}`] : [email];
+    const wait = Math.max(registerBudget.retryAfter('register', ip), ...keys.map((k) => throttle.retryAfter(k, ip)));
     if (wait > 0) {
       res.setHeader('Retry-After', String(wait));
       res.status(429).json({ error: 'too many attempts — wait a few minutes and try again', retryAfter: wait });
@@ -179,15 +190,16 @@ export function createApp(config: ServerConfig, db: Db) {
     }
     const result = await authProvider.register(req.body ?? {});
     if (!result.ok) {
-      if (result.reason === 'id-mismatch' || result.reason === 'not-on-roster') {
-        throttle.recordFailure(email, ip);
+      registerBudget.recordFailure('register', ip);
+      if (result.reason !== 'weak-password' && result.reason !== 'email-not-accepted') {
+        for (const k of keys) throttle.recordFailure(k, ip);
       }
       // 403 you may not have an account here · 409 the account's state says no
       // · 400 the request itself is bad.
       const status =
         result.reason === 'not-on-roster'
           ? 403
-          : result.reason === 'already-registered' || result.reason === 'id-mismatch'
+          : result.reason === 'already-registered' || result.reason === 'id-mismatch' || result.reason === 'email-taken'
             ? 409
             : 400;
       res.status(status).json({ error: result.message, reason: result.reason });
@@ -264,7 +276,10 @@ export function createApp(config: ServerConfig, db: Db) {
     requestThrottle.recordFailure('access-request', ip);
     // Answer identically whether or not we act, so the endpoint reveals
     // nothing about who is on the roster and can't be spammed into duplicates.
-    const known = db.getUser(email) != null;
+    // An address that is only a student's own sign-up alias is not "known":
+    // its real owner may be asking, and approval can take it back.
+    const owner = db.emailOwner(email);
+    const known = owner != null && owner.source !== 'signup';
     if (!known && !db.hasPendingAccessRequest(email)) {
       db.addAccessRequest({
         email,
@@ -304,12 +319,30 @@ export function createApp(config: ServerConfig, db: Db) {
       res.status(400).json({ error: 'enter a valid email address' });
       return;
     }
-    const name = typeof body.name === 'string' && body.name.trim() ? body.name.trim() : email.split('@')[0];
-    const role = body.role === 'instructor' ? 'instructor' : 'student';
-    const studentId = typeof body.studentId === 'string' ? body.studentId.trim() : '';
-    const existed = db.getUser(email) != null;
-    db.upsertUser({ email, name, role, studentId });
-    res.json({ ok: true, added: existed ? 0 : 1, updated: existed ? 1 : 0 });
+    // Through the identity module, like the import: an email the roster
+    // already has updates that person (a blank name keeps theirs); an ID it
+    // already has under another email only adds that email as an alias.
+    const placed = placeRosterEntry(
+      db,
+      {
+        email,
+        name: typeof body.name === 'string' ? body.name.trim() : '',
+        role: body.role === 'instructor' ? 'instructor' : 'student',
+        studentId: typeof body.studentId === 'string' ? body.studentId.trim() : '',
+      },
+      'instructor',
+    );
+    if (placed.kind === 'conflict') {
+      res.status(409).json({ error: placed.reason });
+      return;
+    }
+    res.json({
+      ok: true,
+      added: placed.kind === 'added' ? 1 : 0,
+      updated: placed.kind === 'updated' ? 1 : 0,
+      account: placed.account.email,
+      aliasAdded: placed.kind === 'updated' ? placed.aliasAdded : null,
+    });
   });
 
   app.delete('/api/roster/:email', auth, requireInstructor, (req, res) => {
@@ -328,8 +361,33 @@ export function createApp(config: ServerConfig, db: Db) {
     res.json({ ok: true });
   });
 
+  // A wrong extra sign-in address (a typo at sign-up, a stale registrar
+  // email, a mistaken approval) is removed one at a time; the account's key
+  // is not an alias. When it is the address the account was SET UP through,
+  // whoever did that chose the password: it is cleared and every session
+  // ends, exactly as a reset, so removing the address actually locks them out.
+  app.delete('/api/roster/:email/aliases/:alias', auth, requireInstructor, (req, res) => {
+    const email = normalizeEmail(req.params.email);
+    const alias = normalizeEmail(req.params.alias);
+    if (!db.getUser(email)) {
+      res.status(404).json({ error: 'unknown account' });
+      return;
+    }
+    const setUpThrough = db.registeredVia(email) === alias;
+    if (!db.removeEmailAlias(email, alias)) {
+      res.status(404).json({ error: 'that account has no such sign-in address' });
+      return;
+    }
+    if (setUpThrough) {
+      db.setPasswordHash(email, null);
+      db.deleteSessionsFor(email);
+    }
+    res.json({ ok: true, credentialCleared: setUpThrough });
+  });
+
   // Forgotten password, with no mail server in the loop: the instructor clears
-  // the credential and the student creates their account again, same email.
+  // the credential and the student sets up their account again (student ID +
+  // either email).
   app.post('/api/roster/:email/reset-password', auth, requireInstructor, (req, res) => {
     const email = normalizeEmail(req.params.email);
     if (!db.getUser(email)) {
@@ -347,7 +405,17 @@ export function createApp(config: ServerConfig, db: Db) {
     const status = req.query.status;
     const filter =
       status === 'pending' || status === 'approved' || status === 'rejected' ? status : undefined;
-    res.json({ requests: db.listAccessRequests(filter) });
+    // Each request says which roster account its ID or email already names:
+    // approving one of those adds the email to that account, not a new row.
+    const requests = db.listAccessRequests(filter).map((r) => {
+      const { account, conflict } = matchAccount(db, { email: r.email, studentId: r.studentId });
+      return {
+        ...r,
+        match: account && !conflict ? { email: account.email, name: account.name } : null,
+        conflict,
+      };
+    });
+    res.json({ requests });
   });
 
   app.post('/api/access-requests/:id/approve', auth, requireInstructor, (req, res) => {
@@ -359,15 +427,26 @@ export function createApp(config: ServerConfig, db: Db) {
     }
     const role = (req.body ?? {}).role === 'instructor' ? 'instructor' : 'student';
     // Approving IS adding them to the roster; they then create an account the
-    // same way everyone else does.
-    db.upsertUser({
-      email: request.email,
-      name: request.name,
-      role,
-      studentId: request.studentId,
-    });
+    // same way everyone else does. When the request's ID or email names
+    // someone already on it, the email becomes one of that person's sign-in
+    // addresses instead, and their roster facts stand.
+    const placed = placeRosterEntry(
+      db,
+      { email: request.email, name: request.name, role, studentId: request.studentId },
+      'request',
+    );
+    if (placed.kind === 'conflict') {
+      res.status(409).json({ error: placed.reason });
+      return;
+    }
     db.resolveAccessRequest(id, 'approved', req.user!.email);
-    res.json({ ok: true, email: request.email });
+    res.json({
+      ok: true,
+      email: request.email,
+      account: placed.account.email,
+      accountName: placed.account.name,
+      aliasAdded: placed.kind === 'updated' ? placed.aliasAdded : null,
+    });
   });
 
   app.post('/api/access-requests/:id/reject', auth, requireInstructor, (req, res) => {
