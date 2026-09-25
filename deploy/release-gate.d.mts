@@ -45,11 +45,13 @@ export interface Facts {
 }
 
 export const HOLD_PATHS: [string, string][];
+export const QUIET_PATHS: [string, string][];
 export const RELEASE_HOURS: { start: number; end: number; timeZone: string };
 export const FREEZE_HOURS: number;
 export const BACKUP_MAX_AGE_HOURS: number;
 
 export function heldPaths(changedFiles: string[]): { path: string; why: string }[];
+export function quietOnly(changedFiles: string[]): boolean;
 export function decide(facts: Facts): GateResult;
 export function noteKey(result: GateResult, head: string): string;
 export function sshProbeBox(root: string): BoxFacts;

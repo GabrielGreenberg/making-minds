@@ -7,7 +7,8 @@
 // copy OUTSIDE the repo for the catcher to distil. The repo is public: a raw
 // report (a student's words, screenshots showing their name and their work)
 // never enters git; only the catcher's de-identified task does
-// (tasks/CATCHER.md §3). The working copy never carries the author's email.
+// (tasks/CATCHER.md §3). The working copy's header never carries the author's
+// email; the message is theirs and may name anyone — distil it, never quote it.
 //
 //   node tasks/tools/feedback.mjs pull
 //       Sign in; fetch every open report the pipeline has not processed; write

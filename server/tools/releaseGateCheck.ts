@@ -5,7 +5,8 @@
 //                the deadline freeze (published only, before the due time
 //                only), the box or the API unreachable → wait (never hold,
 //                never release), stale or missing backups → hold, nothing new
-//                → current, the strictest verdict wins, and the note says only
+//                → current, only the queue/docs changed → current at any hour
+//                (task 029), the strictest verdict wins, and the note says only
 //                what a hold is waiting on
 //   [note key]   a hold is keyed by its commit and rules, not the time of day
 //   [facts]      gatherFacts() over a real git history (changed paths, landed
@@ -35,6 +36,7 @@ import {
   heldPaths,
   listPilotAssignments,
   noteKey,
+  quietOnly,
   type Facts,
 } from '../../deploy/release-gate.mjs';
 
@@ -91,6 +93,14 @@ section('[verdicts]');
   for (const path of ['app/src/engineering.ts', 'server/src/db.tsx', 'server/src/app.ts', 'deployment.md', 'app/src/authority/x.ts']) {
     check(`${path} is not (prefixes are exact)`, heldPaths([path]).length === 0);
   }
+
+  // The robot pushes queue commits hourly (task 029): none is worth a release.
+  const queueOnly = ['tasks/incoming/2026-09-25-052-x.md', 'tasks/log.md', 'docs/buildout/README.md', 'CLAUDE.md', '.claude/commands/x.md'];
+  const quiet = decide(facts({ changedFiles: queueOnly, landed: [], now: new Date('2026-10-01T10:00:00Z') }));
+  check('only the queue, docs or session config changed → current, even at 03:00', quiet.verdict === 'current' && quiet.note === '', JSON.stringify(quiet.reasons));
+  check('quiet → current even with stale backups (nothing to release)', verdict({ changedFiles: queueOnly, backup: { timerActive: false, newestAt: null } }) === 'current');
+  check('a quiet range plus one app file → release', verdict({ changedFiles: [...queueOnly, 'app/src/components/HomeScreen.tsx'] }) === 'release');
+  check('quiet prefixes are exact', !quietOnly(['tasksx/a.md']) && !quietOnly(['CLAUDE.md.bak']) && !quietOnly(['app/tasks/x.ts']) && !quietOnly([]));
 
   const at = (iso: string) => verdict({ now: new Date(iso), backup: { timerActive: true, newestAt: new Date(new Date(iso).getTime() - HOUR) } });
   check('06:59 Pacific (daylight) → wait', at('2026-10-01T13:59:00Z') === 'wait');

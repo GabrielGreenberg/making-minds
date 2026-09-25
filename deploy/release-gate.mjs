@@ -3,7 +3,8 @@
 //
 // The one decision in front of `deploy/release.sh --unattended` (and `--check`):
 //
-//   current  nothing new since the last release — nothing to do
+//   current  nothing new since the last release, or nothing that ships
+//            (QUIET_PATHS: the queue, docs) — nothing to do
 //   hold     do not release until Gabriel does, by hand: the new commits touch
 //            something on HOLD_PATHS, or the daily backups (task 041) are not
 //            running
@@ -49,6 +50,16 @@ export const HOLD_PATHS = [
   ['deploy/', 'the release and backup machinery itself'],
 ];
 
+/** Paths that never reach the pilot. A range touching nothing else is
+ *  "current": the robot pushes queue commits every hour (task 029), and none
+ *  of them is worth a release (a box restart, a Pages upload). */
+export const QUIET_PATHS = [
+  ['tasks/', 'the task queue'],
+  ['docs/', 'design docs'],
+  ['CLAUDE.md', 'the session index'],
+  ['.claude/', 'session commands and workflows'],
+];
+
 /** Unattended releases only in these hours (Pacific): a broken release at
  *  night would sit unnoticed while students work. [start, end) in hours. */
 export const RELEASE_HOURS = { start: 7, end: 22, timeZone: 'America/Los_Angeles' };
@@ -88,10 +99,17 @@ function whenLabel(date) {
 
 /** Which HOLD_PATHS entries these changed files touch: `[{ path, why }]`,
  *  one per changed file that matches. */
+const under = (prefix, file) => (prefix.endsWith('/') ? file.startsWith(prefix) : file === prefix);
+
+/** True when every changed path is on QUIET_PATHS: nothing that ships. */
+export function quietOnly(changedFiles) {
+  return changedFiles.length > 0 && changedFiles.every((file) => QUIET_PATHS.some(([prefix]) => under(prefix, file)));
+}
+
 export function heldPaths(changedFiles) {
   const out = [];
   for (const file of changedFiles) {
-    const hit = HOLD_PATHS.find(([prefix]) => (prefix.endsWith('/') ? file.startsWith(prefix) : file === prefix));
+    const hit = HOLD_PATHS.find(([prefix]) => under(prefix, file));
     if (hit) out.push({ path: file, why: hit[1] });
   }
   return out;
@@ -129,6 +147,18 @@ export function decide(facts) {
     };
   } else if (!facts.changedFiles) {
     add('wait', 'diff', `the released commit ${short(facts.lastReleased)} is not in this clone's history`);
+  } else if (quietOnly(facts.changedFiles)) {
+    return {
+      verdict: 'current',
+      reasons: [{
+        verdict: 'current',
+        rule: 'quiet',
+        detail: `only the task queue, docs or session config changed since ${short(facts.lastReleased)}`,
+        brief: 'nothing that ships',
+      }],
+      summary: '',
+      note: '',
+    };
   } else {
     const byWhy = new Map();
     for (const { path, why } of heldPaths(facts.changedFiles)) {

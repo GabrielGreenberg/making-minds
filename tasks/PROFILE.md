@@ -165,5 +165,5 @@ before a targeted edit.
 
 Clickable links for every file written; a compact running list of tasks touched, refreshed
 as it changes; end every catcher/work response with **"Done."**; commit messages end with
-`Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>`; plain language first, code
-vocabulary second.
+the `Co-Authored-By:` line naming the model that ran (the harness supplies it); plain
+language first, code vocabulary second. The robot's runs keep only the last two.

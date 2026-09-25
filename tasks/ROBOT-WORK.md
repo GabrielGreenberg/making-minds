@@ -62,7 +62,8 @@ result; spot-check it (`git diff --stat main`, a file or two).
    → fetch, `git merge --no-edit origin/main` (a conflict → `git merge --abort`,
    `git reset --hard origin/main`, park the task, whose branch still holds the work), push.
    Then `git branch -d robot/NNN-slug` and `git push origin --delete robot/NNN-slug` if it
-   was pushed.
+   was pushed. Wait for the push's CI run (`gh run watch` on `gh run list --limit 1`): red
+   → tell Gabriel and skip this run's release.
 3. **Release — every run, landed or not**: `deploy/release.sh --unattended`. Exit 0 =
    released or nothing new; 3 = held; 4 = wait (the next run asks again); anything else =
    failed. Forward every `note: …` line it prints to Gabriel (§7), except the one saying
