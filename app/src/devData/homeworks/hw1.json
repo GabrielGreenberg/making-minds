@@ -49,7 +49,7 @@
       "callouts": [
         {
           "kind": "challenge",
-          "body": "define a function which maps strings of 1’s and 0’s of *arbitrary length* to their numerical values. This is the general problem of semantics for binary.",
+          "body": "Define a function which maps strings of 1’s and 0’s of *arbitrary length* to their numerical values. This is the general problem of semantics for binary.",
           "title": "Challenge problem (optional, not collected)"
         }
       ]
@@ -699,7 +699,7 @@
         {
           "src": "problem-sets/hw1-schematic-mn.svg",
           "alt": "Schematic for M and N: a box with one input I entering from the left (IN1 on the canvas) and two outputs O1 and O2 leaving to the right (OUT1 and OUT2)",
-          "width": 260
+          "width": 280
         }
       ]
     },
@@ -747,7 +747,7 @@
         {
           "src": "problem-sets/hw1-schematic-mn.svg",
           "alt": "Schematic for M and N: a box with one input I entering from the left (IN1 on the canvas) and two outputs O1 and O2 leaving to the right (OUT1 and OUT2)",
-          "width": 260
+          "width": 280
         }
       ]
     }

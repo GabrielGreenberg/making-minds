@@ -121,7 +121,15 @@
   gap: 8px 20px;
   align-items: flex-start;
 }
-.ps-run--grid > .ps-problem { width: min-content; min-width: 205px; max-width: 100%; }
+/* The cell's body column sizes to its content here: a `1fr` track, or a body
+   with `min-width: 0`, counts as zero in a min-content size. */
+.ps-run--grid > .ps-problem {
+  width: min-content;
+  min-width: 205px;
+  max-width: 100%;
+  grid-template-columns: 2.2em auto;
+}
+.ps-run--grid .ps-problem-main { min-width: auto; }
 /* A grid cell has no room for the mode tag; the section says what these are. */
 .ps-run--grid .ps-mode { display: none; }
 
