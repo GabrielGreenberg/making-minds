@@ -407,7 +407,8 @@ HANDOFF's "do this next = P4.3". Task ids unchanged. -->
 
 ## Phase 5.5 — Small hardening (slot opportunistically before close-out)
 
-- [ ] **P-TOOLS-1 (portability grep-gate)** — _(discovered iteration 40, META-audit;
+- [x] **P-TOOLS-1 (portability grep-gate)** — _(done 2026-09-24 as task 016:
+  `app/tools/portabilityCheck.ts`)_ _(discovered iteration 40, META-audit;
   OPTIONAL / non-blocking)_ **No harness tool may import from an absolute machine
   path.** Family: a check tool with a hardcoded absolute import silently breaks
   `npm run check` on every machine except the author's, and it hides behind the

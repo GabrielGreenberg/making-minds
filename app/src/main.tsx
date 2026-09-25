@@ -8,22 +8,27 @@ import './index.css'
 import './pages.css'
 import App from './App.tsx'
 import { AuthProvider, AuthGate } from './auth'
-import { HealthGate } from './auth/HealthGate.tsx'
+import { ServerHealthProvider } from './auth/HealthGate.tsx'
+import { printIntegrityBanner } from './provenance/notice.ts'
 
-// Routing starts inside <AuthGate> once a user exists — a deep link must not
-// fire an unauthenticated openAssignment (see auth/AuthGate.tsx). In remote
-// mode, <HealthGate> holds everything (including session restore and the
-// login form) until the server's health probe answers; a down server shows a
-// retry screen instead of a white screen (see auth/HealthGate.tsx).
+// The plain integrity notice (task 034), addressed to the person at the
+// console and to any AI assistant helping them — production builds only.
+if (import.meta.env.PROD) printIntegrityBanner()
+
+// Access is decided per route inside <AuthGate> (see auth/AuthGate.tsx): the
+// sandbox is public — a visitor uses it without signing in, and without the
+// course server — while every other route needs a signed-in user. In remote
+// mode, <ServerHealthProvider> probes the server at boot without blocking;
+// the signed-in routes and the sign-in screen wait for it (auth/HealthGate.tsx).
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <HealthGate>
+    <ServerHealthProvider>
       <AuthProvider>
         <AuthGate>
           <App />
         </AuthGate>
       </AuthProvider>
-    </HealthGate>
+    </ServerHealthProvider>
   </StrictMode>,
 )

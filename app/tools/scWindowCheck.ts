@@ -36,7 +36,12 @@
 //     NON-palindrome "110" so a reversed feed/display cannot sneak through.
 //
 // Sandbox behavior (no open question / no cc_spec) is also pinned: SC runs
-// L + one 0-drain step per MEM; FSM runs L; both feed raw typed bits.
+// L + one 0-drain step per MEM (just the drain with nothing typed); FSM runs
+// L; both feed raw typed bits.
+//
+// BOXED (task 004): the same hw3-p7 machine boxed whole (its MEMs inside a
+// placed box) runs the same window, feeds the same stream and decodes the
+// same numeral as unboxed and as the grader.
 
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -53,7 +58,7 @@ import {
   type CodecLayout,
 } from '../src/engine';
 import { outputDisplayString } from '../src/components/outputDisplay';
-import { comp, wire, transition, circuit } from './builder';
+import { comp, wire, transition, circuit, boxWhole } from './builder';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 
@@ -214,7 +219,7 @@ if (typeof (globalThis as { localStorage?: unknown }).localStorage === 'undefine
 }
 
 // Import AFTER the shims (static imports would hoist above them).
-const { useStore, selectCodecWindow } = await import('../src/store');
+const { useStore, selectCodecWindow, selectScRunWindow } = await import('../src/store');
 
 async function waitUntil(pred: () => boolean, timeoutMs = 30000): Promise<boolean> {
   const start = Date.now();
@@ -258,6 +263,14 @@ function avQuestionBits(outputWidths: number[]): number[] {
   return outputWidths.flatMap((w, j) => timeOutputBits(steps, w, j));
 }
 
+/** A k=1 FSM history symbol as the bit it is. The store keeps single-bit
+ *  symbols NUMERIC (store.ts fsmStep; multi-bit ones are strings), so a
+ *  string here means that shape broke: it maps to NaN and fails every
+ *  comparison below instead of being silently coerced. */
+function bitOf(v: number | string): number {
+  return typeof v === 'number' ? v : NaN;
+}
+
 function sameSteps(a: number[][], b: number[][]): boolean {
   return JSON.stringify(a) === JSON.stringify(b);
 }
@@ -278,6 +291,8 @@ console.log('\n[store: SC tally question runs feed the codec stream]');
   openQuestion(q, hw3p7.correct);
   check(`hw3-p7: selectCodecWindow sees the question window (${win})`,
     selectCodecWindow(useStore.getState()) === win);
+  check('hw3-p7: the SC run-end rule (selectScRunWindow) IS the codec window on a value question',
+    selectScRunWindow(useStore.getState()) === win);
 
   check('hw3-p7: run terminates on its own', await scTypeAndRun('11'));
   const s = useStore.getState();
@@ -293,6 +308,33 @@ console.log('\n[store: SC tally question runs feed the codec stream]');
   const avVal = bitsToTally(avBits);
   check(`hw3-p7: windowed decode is the CORRECT numeral (got ${avVal}, grader expects ${expected})`,
     avVal !== null && avVal === expected);
+}
+
+{
+  // The same machine boxed whole: its MEMs live inside a placed box, and the
+  // question run must not notice (task 004).
+  const q = hw3p7.question;
+  const win = windowOf(q);
+  const layout = layoutOf(q);
+  const boxedMachine = boxWhole(hw3p7.correct);
+  const boxedGrade = gradeQuestion(q, boxedMachine);
+  check(`hw3-p7 boxed: the grader passes it as it passes the unboxed machine (${boxedGrade.passed}/${boxedGrade.total})`,
+    JSON.stringify(boxedGrade) === JSON.stringify(hw3p7Grade));
+  openQuestion(q, boxedMachine);
+  check('hw3-p7 boxed: run terminates on its own', await scTypeAndRun('11'));
+  const s = useStore.getState();
+  check(`hw3-p7 boxed: run stopped at the same codec window (${s.scHistory.length} steps, want ${win})`,
+    s.scHistory.length === win && s.scTimeStep === win + 1);
+  const wantStream = encodeInput([2], layout);
+  check('hw3-p7 boxed: fed input stream EQUALS codec encodeInput([2])',
+    wantStream.axis === 'time' && sameSteps(scFedSteps(), wantStream.steps));
+  const expected = q.test_cases!.find((tc) => tc.inputs[0] === 2)!.outputs[0];
+  const avVal = bitsToTally(avQuestionBits(q.cc_spec!.outputs.map((g) => g.width)));
+  check(`hw3-p7 boxed: windowed decode is the grader's numeral (got ${avVal}, grader expects ${expected})`,
+    avVal !== null && avVal === expected);
+  const memCount = hw3p7.correct.components.filter((c: { type: string }) => c.type === 'MEM').length;
+  check(`hw3-p7 boxed: its ${memCount} boxed MEMs are the state the history records`,
+    memCount > 0 && s.scHistory.every((h) => h.memValues.length === memCount));
 }
 
 {
@@ -385,7 +427,7 @@ console.log('\n[store: FSM question runs]');
   const s = useStore.getState();
   check(`fsmRun executed the full window: ${s.fsmHistory.length} steps (want ${win})`,
     s.fsmHistory.length === win);
-  const fed = s.fsmHistory.slice().sort((a, b) => a.t - b.t).map((h) => [h.input]);
+  const fed = s.fsmHistory.slice().sort((a, b) => a.t - b.t).map((h) => [bitOf(h.input)]);
   const wantStream = encodeInput([6], layoutOf(qBinFsm));
   check('fed input stream EQUALS codec encodeInput([6]) — MSB-left numeral, LSB at t1',
     wantStream.axis === 'time' && sameSteps(fed, wantStream.steps));
@@ -395,13 +437,13 @@ console.log('\n[store: FSM question runs]');
     useStore.getState().fsmHistory.length === win);
 
   // Identity machine: the window decodes back to x = 6, as the grader would.
-  const series = s.fsmHistory.slice().sort((a, b) => a.t - b.t).map((h) => [h.output]);
+  const series = s.fsmHistory.slice().sort((a, b) => a.t - b.t).map((h) => [bitOf(h.output)]);
   const decoded = bitsToValue(timeOutputBits(series, qBinFsm.cc_spec!.outputs[0].width, 0), 'binary');
   check(`window decodes to the typed value (got ${decoded}, want 6)`, decoded === 6);
 
   // The Input/Output row's OUT display: t1 rightmost, so the passing identity
   // shows an OUT that READS "110" as a numeral (leading zeros aside).
-  const display = outputDisplayString(s.fsmHistory.map((h) => ({ t: h.t, bits: [h.output] })));
+  const display = outputDisplayString(s.fsmHistory.map((h) => ({ t: h.t, bits: [bitOf(h.output)] })));
   check(`OUT display reads 110 as a numeral, t1 rightmost (got "${display}")`,
     display.length === win && display.endsWith('110') &&
     bitsToValue(display.split('').map(Number), 'binary') === 6);
@@ -423,18 +465,18 @@ console.log('\n[store: FSM question runs]');
   const s = useStore.getState();
   check(`FSM tally: executed the window (${s.fsmHistory.length} steps, want ${win})`,
     s.fsmHistory.length === win);
-  const fed = s.fsmHistory.slice().sort((a, b) => a.t - b.t).map((h) => [h.input]);
+  const fed = s.fsmHistory.slice().sort((a, b) => a.t - b.t).map((h) => [bitOf(h.input)]);
   const wantStream = encodeInput([2], layoutOf(qTallyFsm));
   check('FSM tally: fed stream EQUALS codec encodeInput([2]) — ones arrive last',
     wantStream.axis === 'time' && sameSteps(fed, wantStream.steps));
-  const series = s.fsmHistory.slice().sort((a, b) => a.t - b.t).map((h) => [h.output]);
+  const series = s.fsmHistory.slice().sort((a, b) => a.t - b.t).map((h) => [bitOf(h.output)]);
   const decoded = bitsToValue(timeOutputBits(series, qTallyFsm.cc_spec!.outputs[0].width, 0), 'tally');
   check(`FSM tally: window decodes to the typed value (got ${decoded}, want 2)`, decoded === 2);
 
   // OUT display: with t1 rightmost the echoed ones sit LEFTMOST — a VALID
   // tally numeral for 2 ("11" then zeros). Built t-ascending it would read
   // "0…011", which tally rejects ('/').
-  const display = outputDisplayString(s.fsmHistory.map((h) => ({ t: h.t, bits: [h.output] })));
+  const display = outputDisplayString(s.fsmHistory.map((h) => ({ t: h.t, bits: [bitOf(h.output)] })));
   check(`FSM tally: OUT display is a VALID tally numeral for 2 (got "${display}")`,
     display.length === win && bitsToTally(display.split('').map(Number)) === 2);
 }
@@ -459,6 +501,14 @@ console.log('\n[store: sandbox unchanged]');
   check('SC sandbox feeds the raw typed bits (ones first)',
     sameSteps(scFedSteps(), [[1], [1], [1], [0]]));
 
+  // Nothing typed: the INPUT toggles feed the run, which stops after the drain
+  // (one step per MEM) — the I/O panel's Run drives this same loop (scRun).
+  useStore.getState().scGlobalReset();
+  useStore.getState().scRun(10);
+  const drained = await waitUntil(() => !useStore.getState().scRunning);
+  check(`SC sandbox run with nothing typed stops after the drain: ${useStore.getState().scHistory.length} step(s) (want 1)`,
+    drained && useStore.getState().scHistory.length === 1);
+
   useStore.getState().fsmGlobalReset();
   useStore.setState({ components: fsmIdentity.components, wires: fsmIdentity.wires, buildMode: 'FSM' });
   // NON-palindrome "110": the old pin used the palindrome [1,0,1], which
@@ -475,7 +525,7 @@ console.log('\n[store: sandbox unchanged]');
   const fsmRan = useStore.getState().fsmHistory.length;
   check(`FSM sandbox run stops at the typed length: ${fsmRan} steps (want 3)`, fsmDone && fsmRan === 3);
   check('FSM sandbox feeds the raw typed bits, t1 = rightmost char (matches SC; P1.10)',
-    sameSteps(useStore.getState().fsmHistory.slice().sort((a, b) => a.t - b.t).map((h) => [h.input]),
+    sameSteps(useStore.getState().fsmHistory.slice().sort((a, b) => a.t - b.t).map((h) => [bitOf(h.input)]),
       [[0], [1], [1]]));
 }
 

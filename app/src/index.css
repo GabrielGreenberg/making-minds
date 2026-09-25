@@ -75,8 +75,10 @@ html, body, #root {
   min-width: 200px;
   z-index: 200;
   border-radius: 4px;
-  /* visible so hover submenus (Import flyout) positioned at left:100% aren't clipped */
+  /* visible so hover submenus (File ▸ New) positioned at left:100% aren't clipped */
   overflow: visible;
+  font-weight: 400;
+  cursor: default;
 }
 
 .menu-dropdown-item {
@@ -163,6 +165,42 @@ html, body, #root {
 .workbook-close-btn:hover {
   background: #d0d0d0;
   color: #444;
+}
+
+/* ── Sandbox File menu (WorkbookFileMenu) ── */
+.menu-shortcut {
+  color: #999;
+  font-size: 12px;
+  margin-left: 16px;
+}
+
+.menu-dropdown-item:hover .menu-shortcut {
+  color: inherit;
+}
+
+/* The workbook's name beside File, and the note a save or open leaves. */
+.workbook-name {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 10px;
+  color: var(--text-secondary);
+  font-size: 13px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 40vw;
+  user-select: none;
+}
+
+.workbook-save-note {
+  color: #2e7d32;
+  font-size: 12px;
+}
+
+/* The unsaved-changes question's buttons, clear of its text. */
+.workbook-prompt-actions {
+  margin-top: 18px;
 }
 
 /* ── Tabs ── */
@@ -316,6 +354,15 @@ html, body, #root {
 
 .toolbar-icon {
   font-size: 10px;
+}
+
+/* A muted gesture hint beside a toolbar button, e.g. "(shift+click to ↻)". */
+.toolbar-hint {
+  font-size: 11px;
+  font-weight: 400;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  user-select: none;
 }
 
 .toolbar-menu-label {
@@ -968,6 +1015,179 @@ thead .sc-label-col {
   padding: 0 !important;
 }
 
+/* ── SC perception frame player (components/PerceptionFramePlayer.tsx) ──
+   Time flows right to left like the SC tables: t1 is the rightmost column,
+   so the scroller opens scrolled to the right. */
+.pf-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.pf-scroll {
+  overflow-x: auto;
+  direction: rtl;
+}
+
+.pf-scroll > .pf-grid {
+  direction: ltr;
+}
+
+.pf-grid {
+  border-collapse: collapse;
+  margin-left: auto;
+  font-size: 11px;
+}
+
+.pf-grid td,
+.pf-grid th {
+  padding: 1px;
+  text-align: center;
+}
+
+.pf-t {
+  min-width: 20px;
+  font-size: 10px;
+  font-weight: 500;
+  color: #888;
+  cursor: pointer;
+  user-select: none;
+}
+
+.pf-t.pf-col-selected {
+  color: var(--accent);
+  font-weight: 700;
+  text-decoration: underline;
+}
+
+.pf-label {
+  position: sticky;
+  right: 0;
+  background: white;
+  font-size: 10px;
+  font-weight: 600;
+  color: #666;
+  text-align: left !important;
+  padding: 0 6px !important;
+}
+
+.pf-bit {
+  display: block;
+  width: 20px;
+  height: 18px;
+  padding: 0;
+  border: 1px solid #ddd;
+  border-radius: 2px;
+  background: transparent;
+  color: #bbb;
+  font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+  font-size: 10px;
+  cursor: pointer;
+}
+
+.pf-bit.on {
+  background: #fdecea;
+  border-color: #f3aca8;
+  color: var(--wire-1);
+  font-weight: 700;
+}
+
+.pf-bit:hover {
+  border-color: #999;
+}
+
+.pf-col-selected .pf-bit {
+  border-color: var(--accent);
+}
+
+.pf-col-current {
+  background: rgba(74, 144, 226, 0.14);
+}
+
+.pf-out td {
+  border-top: 1.5px solid #ccc;
+}
+
+.pf-out-bit {
+  height: 18px;
+  font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+  color: #333;
+}
+
+.pf-out-bit.val-1 {
+  color: var(--wire-1);
+  font-weight: 600;
+}
+
+.pf-add {
+  vertical-align: middle;
+  padding-right: 4px !important;
+}
+
+.pf-add-btn {
+  width: 18px;
+  min-height: 60px;
+  padding: 0;
+  border: 1px dashed #bbb;
+  border-radius: 3px;
+  background: white;
+  color: #444;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.pf-add-btn:hover:not(:disabled) {
+  border-color: #888;
+  background: #f5f5f5;
+}
+
+.pf-add-btn:disabled {
+  color: #ccc;
+  border-color: #e0e0e0;
+  cursor: default;
+}
+
+.pf-tools {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  padding: 5px 0 3px;
+}
+
+.pf-small {
+  padding: 2px 8px;
+  font-size: 11px;
+}
+
+.pf-small:disabled {
+  color: #ccc;
+  cursor: default;
+}
+
+.pf-hint {
+  font-size: 11px;
+  color: #888;
+}
+
+.pf-end {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.pf-warning {
+  margin-top: 4px;
+  padding: 4px 6px;
+  border: 1px solid #ffe0a3;
+  border-radius: 3px;
+  background: #fff8e1;
+  color: #8a5a00;
+  font-size: 11px;
+}
+
 /* ── Modal / Dialog ── */
 .modal-overlay {
   position: fixed;
@@ -1062,6 +1282,51 @@ thead .sc-label-col {
   font-size: 11px;
   box-shadow: 0 2px 8px rgba(0,0,0,0.1);
   white-space: nowrap;
+}
+
+/* ── Paste notices (provenance.ts refusalMessage) ── */
+/* On the canvas: top centre, clear of the validation warnings below. */
+.canvas-notice,
+.library-paste-notice {
+  background: #e8f1ff;
+  border: 1px solid var(--accent);
+  color: var(--text);
+  border-radius: 4px;
+  line-height: 1.4;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
+.canvas-notice {
+  position: absolute;
+  top: 10px;
+  left: 50%;
+  transform: translateX(-50%);
+  max-width: min(560px, calc(100% - 32px));
+  padding: 6px 14px;
+  font-size: 12px;
+  text-align: center;
+  z-index: 50;
+}
+
+/* Beside the palette's box rename. The 64px palette scrolls, so it would clip
+   anything wider: the notice is a fixed box at its static position, nudged
+   out over the canvas. */
+.library-paste-notice {
+  position: fixed;
+  align-self: flex-start;
+  margin-left: 58px;
+  width: 240px;
+  padding: 6px 10px;
+  font-size: 11px;
+  cursor: default;
+  z-index: 60;
+}
+
+/* In an answer field's footer (open response, fill-in). */
+.paste-notice {
+  color: var(--accent-hover);
+  font-weight: 500;
+  text-align: right;
 }
 
 /* ── Machine Type Selector ── */
@@ -1234,6 +1499,49 @@ thead .sc-label-col {
   color: #444;
 }
 
+/* A graded case loaded into the run ("Run this input" on the grade sheet —
+   GradedCaseBanner): what was recorded, what this run gives, whether they
+   are the same run. */
+.graded-case {
+  margin: 6px 10px 2px;
+  padding: 7px 9px;
+  border: 1px solid #c5d6f0;
+  border-left: 3px solid var(--accent);
+  background: #f4f8fe;
+  border-radius: 4px;
+  font-size: 12px;
+  line-height: 1.45;
+}
+.graded-case-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  color: var(--text-secondary);
+}
+.graded-case-close {
+  border: 0;
+  background: none;
+  cursor: pointer;
+  color: var(--text-secondary);
+  font-size: 12px;
+  padding: 0 2px;
+}
+.graded-case-close:hover { color: var(--text); }
+.graded-case-what { font-weight: 600; margin: 2px 0 4px; }
+.graded-case-row { display: flex; gap: 8px; }
+.graded-case-label { flex: 0 0 76px; color: var(--text-secondary); }
+.graded-case-pass { color: #2e7d32; }
+.graded-case-fail { color: #c62828; }
+.graded-case-same { margin: 4px 0 0; color: #2e7d32; }
+.graded-case-note { margin: 4px 0 0; color: #8a5a00; }
+.graded-case-actions { display: flex; align-items: center; gap: 8px; margin-top: 6px; }
+.graded-case-actions .action-btn { white-space: nowrap; }
+.graded-case-hint { color: var(--text-secondary); font-size: 11px; }
+
 /* A question's optional short name — bold, on a line of its own above the
    statement (both the panel and the open-question workspace). */
 .question-title {
@@ -1252,74 +1560,6 @@ thead .sc-label-col {
 
 .assignment-overview-title {
   color: #1a1a1a;
-}
-
-/* ── Rendered question statements (components/StatementBody.tsx) ── */
-
-.statement-para {
-  margin: 0;
-}
-
-.statement-para + .statement-para {
-  margin-top: 0.6em;
-}
-
-/* One part per line, its "(a)" marker hanging in the left margin. */
-.statement-part {
-  padding-left: 1.9em;
-  text-indent: -1.9em;
-}
-
-.statement-part-marker {
-  display: inline-block;
-  width: 1.9em;
-  text-indent: 0;
-  font-weight: 600;
-}
-
-.statement-code {
-  font-family: 'SF Mono', 'Fira Code', ui-monospace, monospace;
-  font-size: 0.92em;
-  padding: 0 3px;
-  border-radius: 3px;
-  background: #f2f2f2;
-  color: #333;
-}
-
-/* An input-output profile lifted out of the prose (statementFormat.ts). The
-   wrapper scrolls on its own so a wide profile never widens the panel. */
-.statement-io-wrap {
-  overflow-x: auto;
-  margin: 0.7em 0;
-}
-
-.statement-io-table {
-  border-collapse: collapse;
-  font-family: 'SF Mono', 'Fira Code', ui-monospace, monospace;
-  font-size: 0.95em;
-}
-
-.statement-io-table th,
-.statement-io-table td {
-  padding: 3px 10px;
-  text-align: center;
-  border: 1px solid #ddd;
-}
-
-.statement-io-table th {
-  background: #f4f4f4;
-  font-weight: 600;
-}
-
-/* The first output column carries the input/output divider. */
-.statement-io-table .statement-io-out {
-  border-left: 2px solid #bbb;
-}
-
-.statement-math--display {
-  display: block;
-  margin: 0.5em 0;
-  overflow-x: auto;
 }
 
 /* ─── Turbot arena (shared: instructor editor + student workspace) ─── */
@@ -1360,6 +1600,25 @@ thead .sc-label-col {
   height: 55%;
   border-radius: 50%;
   background: #2e7d32;
+}
+
+/* The goal-reached cue (task 025): the live Map's goal circle pulses once,
+   with a glow reaching past the turbot drawn over it. Only the live Map sets
+   it (ArenaCanvas highlightGoal); editors never animate. */
+.arena-goal--hit {
+  animation: arena-goal-hit 500ms ease-out;
+}
+
+@keyframes arena-goal-hit {
+  0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(46, 125, 50, 0.55); }
+  50% { transform: scale(1.35); box-shadow: 0 0 0 5px rgba(46, 125, 50, 0.35); }
+  100% { transform: scale(1); box-shadow: 0 0 0 9px rgba(46, 125, 50, 0); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .arena-goal--hit {
+    animation: none;
+  }
 }
 
 .arena-turbot {
@@ -1404,6 +1663,14 @@ thead .sc-label-col {
      whole data panel; TurbotArenaPanel auto-scrolls this container to keep
      the turbot in view during step/run. Small arenas are unaffected. */
   max-height: 340px;
+}
+
+/* Which of a question's arenas the Map shows ("arena 2 of 3"). */
+.turbot-arena-which {
+  margin-left: 8px;
+  font-weight: 500;
+  text-transform: none;
+  letter-spacing: 0;
 }
 
 /* Map zoom controls, in the "Map" section header beside the Edit map toggle. */
@@ -1515,7 +1782,10 @@ thead .sc-label-col {
 
 .turbot-glossary-cols {
   display: flex;
-  gap: 18px;
+  /* The lines never break, so at the default panel width the OUTPUT column
+     drops below INPUT instead of running past the panel edge. */
+  flex-wrap: wrap;
+  gap: 6px 18px;
 }
 
 .turbot-glossary-head {
@@ -1646,6 +1916,12 @@ thead .sc-label-col {
 .open-response-foot {
   display: flex;
   justify-content: space-between;
+  gap: 16px;
   font-size: 12px;
   color: var(--text-secondary);
+}
+
+/* The count keeps its line when a paste notice takes the right side. */
+.open-response-foot > :first-child {
+  white-space: nowrap;
 }

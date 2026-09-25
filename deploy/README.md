@@ -14,6 +14,37 @@ The frontend is a static SPA (hash routing — no redirect rules needed). The AP
 holds the test cases and does all grading; CORS restricts it to the Pages
 origin.
 
+## 0. Routine release — what to run after every push to `main`
+
+```sh
+deploy/release.sh            # box (backup + git pull + homework sync + restart) → site (build + upload) → proof
+deploy/release.sh --dry-run  # preflight + build only, nothing deployed
+```
+
+**Homework content ships with every release.** The box step runs
+`npm run homeworks -- sync` (server/src/homeworks.ts): HW1–HW7 in
+`app/src/devData/homeworks/` are copied into the database — a missing one is added
+(unpublished), a copy nobody has edited on the pilot is refreshed to the repo's
+version (keeping its order, due date, publish/release flags and submissions), and a
+copy an instructor edited in the dashboard is left alone and listed in the release
+output. "Nobody has edited it" means its content equals a committed version of its
+file or a version an earlier sync wrote. To overwrite an edited copy on purpose, on
+the box: `cd /srv/making-minds/repo/server && sudo -u makingminds -H
+MM_DB_PATH=/srv/making-minds/data/making-minds.sqlite npm run homeworks -- sync
+--force=hw3` (`-- status` previews without writing).
+
+It refuses to run unless local `main` is clean and identical to GitHub's, because
+the box pulls from GitHub — so the site can never be built from a commit the box
+cannot reach. It needs two gitignored things: `secrets/cloudflare.env`
+(`CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`) for the site, and a private key
+in `ssh/` for the box. **One-time setup for the key:** Bruin Cloud
+(https://bruincloud.awsapps.com/start) → Lightsail → the instance → Connect tab →
+"Download default key" (`LightsailDefaultKey-us-west-2.pem`) into `ssh/`. Until then the script prints the update
+commands to paste into Lightsail's browser terminal ("Connect using SSH") and
+stops before the site, so the site is never newer than the API; re-run with
+`--frontend-only` once the box is done. `--frontend-only` is also fine on its
+own when neither `server/` nor `app/src/engine/` changed.
+
 ## 1. Lightsail instance (API)
 
 1. Create an instance: **Ubuntu 24.04 LTS**, smallest plan is fine to start
@@ -40,9 +71,10 @@ cd /srv/making-minds/repo/server && sudo -u makingminds npm install
 # Seed the database (the toy roster; assignments are authored in the instructor UI)
 sudo -u makingminds MM_DB_PATH=/srv/making-minds/data/making-minds.sqlite npm run seed
 
-# Load the real class roster and give yourself an account (see section 3)
+# Load the real class roster and give yourself an account (see section 3).
+# The class list is a student record: copy it to the box OUTSIDE the repo.
 sudo -u makingminds MM_DB_PATH=/srv/making-minds/data/making-minds.sqlite \
-  npm run roster -- import /path/to/roster.csv
+  npm run roster -- import /srv/making-minds/rosters/class-list.csv
 sudo -u makingminds MM_DB_PATH=/srv/making-minds/data/making-minds.sqlite \
   npm run roster -- add you@ucla.edu --name "Your Name" --role instructor
 sudo -u makingminds MM_DB_PATH=/srv/making-minds/data/making-minds.sqlite \
@@ -57,11 +89,22 @@ sudo systemctl reload caddy
 curl -s https://api.<domain>/api/health    # → {"ok":true}
 ```
 
-Updates: `git pull && npm install && sudo systemctl restart makingminds-api`.
+Updates: `deploy/release.sh` (section 0). By hand, as the `makingminds` user:
+`git pull && npm install && sudo systemctl restart makingminds-api`.
 
 **Backups**: the entire state is one SQLite file. A nightly cron
 (`sqlite3 .../making-minds.sqlite ".backup /srv/making-minds/data/backup-$(date +%a).sqlite"`)
 plus Lightsail's instance snapshots is enough.
+
+**`MM_MINT_SECRET`** (optional; task 034, the provenance watermark): the secret
+every student's per-assignment mint key is derived from — the key that binds
+the ids of their circuits and signs their editing records, checked at submit.
+Leave it unset and the server generates one on first boot and keeps it in the
+database (`server_meta`), so restarts never change keys and a forgotten env var
+never causes an outage. If you set it (a long random string in the systemd
+unit's `Environment=`), keep it secret and **never rotate it mid-term**: every
+id minted before the change would read as nobody's. The backup of the SQLite
+file carries the generated one; the client's dev secret is never used here.
 
 ## 2. Cloudflare Pages (frontend)
 
@@ -103,8 +146,9 @@ The Pages project must be named **`making-minds`** so its default origin is
 `MM_CORS_ORIGINS`. A different name means updating that env and restarting
 `makingminds-api`.
 
-Direct upload (no Git integration) works too:
-`VITE_BASE_PATH=/ VITE_API_BASE=... npm run build && npx wrangler pages deploy dist --project-name making-minds` from `app/`.
+The pilot project **is** a direct upload (no Git integration) — `deploy/release.sh`
+does it. By hand, from `app/`:
+`VITE_BASE_PATH=/ VITE_API_BASE=... npm run build && npx wrangler pages deploy dist --project-name making-minds`.
 
 Then set the Pages URL (and any custom domain) in the API's
 `MM_CORS_ORIGINS` env (systemd unit) and restart the service.
@@ -131,15 +175,35 @@ thing through `POST /api/roster/import`):
 cd /srv/making-minds/repo/server
 export MM_DB_PATH=/srv/making-minds/data/making-minds.sqlite
 
-npm run roster -- import roster.csv        # any export with an email column;
-                                           # name / student ID / role picked up
+npm run roster -- import /srv/making-minds/rosters/class-list.csv
+                                           # the registrar's export as-is, or any
+                                           # export with an email column
 npm run roster -- list --unregistered      # who hasn't created an account yet
 npm run roster -- reset student@ucla.edu   # forgotten password → they re-register
 npm run roster -- requests                 # pending "I'm not on the roster" requests
 ```
 
+**The registrar's class-list export is imported unedited.** Its preamble
+(`Term:`, `Class:`, … and blank lines) is skipped — the header is the first row
+with an email column; `"LAST, FIRST MIDDLE"` names become `First Middle Last`
+(sorted by surname); `UID` is the student ID and `Section` is stored. Major,
+Classification and Grade Type are deliberately not read. The `Status` column
+decides who is imported: `E` enrolled, `W` wait list and `H` held are; `D`
+dropped (and cancelled / withdrawn) are not, and the report counts each
+(`1 dropped — not imported`). An unfamiliar status code is imported with a
+warning.
+
 Importing only **adds and updates**. It never removes anyone and never touches
 a password, so re-importing an updated enrollment list mid-quarter is safe.
+Instead, a re-import of a class list (a file with a `Status` column) lists the
+students already on the platform whose row is now dropped or who are missing
+from the file under **"no longer on the class list — review"**; remove them by
+hand once you have checked.
+
+**Class lists never go in git.** They are student records (FERPA). Keep them
+outside the repo — on the box, `/srv/making-minds/rosters/`; locally, anywhere
+outside the checkout or in the repo's ignored `rosters/` folder. `.gitignore`
+also ignores the registrar's download name, `*-csv.csv`.
 
 **Bootstrapping the first instructor** is the one thing that must happen on the
 box, because the web UI needs an instructor to sign in before it can be used:
@@ -153,12 +217,16 @@ After that, everything else — importing the class, resetting passwords,
 approving access requests — is available in the instructor UI.
 
 **Forgotten passwords** have no email loop (there is no mail server): the
-instructor resets the credential and the student creates their account again
-with the same email. Their saved work and submissions are untouched.
+instructor resets the credential and the student sets their account up again
+with their student ID. Their saved work and submissions are untouched.
 
-**Student registration** requires the student ID when the roster carries one,
-which is the only evidence we have that the person claiming the seat owns it.
-A roster imported without an ID column skips that check.
+**Student registration** is student ID + an email + a password. The ID finds
+the roster seat (it is the only evidence we have that the person claiming it
+owns it); the email may be the one on the class list — often a personal
+address — or any UCLA one, and both then sign in to the same account. A
+re-import that changes a student's email updates the same person (matched by
+ID) and the new email joins their sign-in addresses. A roster row without an ID
+(an instructor, a manual add) registers by its email alone.
 
 ### What's intentionally NOT done yet
 

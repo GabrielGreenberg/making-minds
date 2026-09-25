@@ -1,10 +1,12 @@
 import { createContext, useContext, useState, useCallback, useEffect } from 'react';
 import type { ReactNode } from 'react';
 import type { AuthUser, AuthContextValue, AuthCapabilities, AuthAttemptResult } from './types';
-import { SESSION_KEY, findAccount, readPersistedAccount } from './accounts';
+import { SESSION_KEY, KNOWN_KEY, findAccount, readPersistedAccount, markSignedInBefore, hasAnyKey } from './accounts';
 import { setSessionUser, getSessionUser } from './session';
 import { backendMode } from '../storage/backend';
 import { migrateLocalData } from '../storage/migrateLocal';
+import { useServerHealth } from './HealthGate';
+import { useStore } from '../store';
 import * as api from '../api/client';
 
 // The auth layer, both modes behind one set of exports (AuthProvider /
@@ -20,16 +22,30 @@ import * as api from '../api/client';
 //            email + password against the CSV roster today, a single SSO
 //            button once UCLA SSO lands, passwordless email in dev mode. Every
 //            path ends the same way: a bearer token (stored by api/client.ts
-//            under mm:auth:token) + the user the SERVER says you are. On
-//            mount, an existing token is resolved via me() (`loading` is true
-//            until it settles, and AuthGate holds rendering, so nothing behind
-//            the gate ever runs unauthenticated); any 401 from any call clears
-//            the token and drops to the login screen via the client's
-//            onUnauthorized hook.
+//            under mm:auth:token) + the user the SERVER says you are. Once the
+//            server answers the health probe, an existing token is resolved
+//            via me() (`loading` is true until it settles, and AuthGate holds
+//            the signed-in routes, so nothing behind them ever runs
+//            unauthenticated); any 401 from any call clears the token and
+//            drops to the login screen via the client's onUnauthorized hook.
+//
+// Neither mode requires a user: with nobody signed in and nothing resolving,
+// the principal is the VISITOR (`isVisitor`), who may use the public routes
+// (routing.ts `routeAccess`). Every successful sign-in or restore also sets
+// the durable "signed in before" marker (accounts.ts KNOWN_KEY) that the boot
+// landing rule reads.
 //
 // Identity and role are never the client's decision in remote mode — they are
 // whatever the server's AuthProvider returns (server/src/auth.ts), which is
 // the seam UCLA SSO swaps.
+//
+// Every principal change — boot, sign-in, sign-out, a restored session, a
+// 401 — is reported to the editor store (reportPrincipal → the store's
+// resetForPrincipal, reset law 2), which wipes the previous person's work
+// from memory and loads the arriving person's sandbox. A remote boot with a
+// stored token reports the person that token was issued to (the principal
+// hint below), never the visitor, so their sandbox edits made before me()
+// settles — or all through a server outage — are their own.
 
 const UNSUPPORTED: AuthAttemptResult = {
   ok: false,
@@ -47,6 +63,8 @@ const LOCAL_CAPABILITIES: AuthCapabilities = {
 const AuthContext = createContext<AuthContextValue>({
   user: null,
   loading: false,
+  isVisitor: true,
+  hasSignInTrace: () => false,
   capabilities: LOCAL_CAPABILITIES,
   login: async () => UNSUPPORTED,
   register: async () => UNSUPPORTED,
@@ -60,9 +78,58 @@ function accountToUser(account: ReturnType<typeof readPersistedAccount>): AuthUs
   return { email: account.email, name: account.name, role: account.role };
 }
 
+/**
+ * Hand the editor store to a new principal (null = the visitor). Called
+ * SYNCHRONOUSLY before the React user state changes — never from an effect:
+ * the children's effects that react to the new user (App's submission
+ * hydration, AuthGate's routing) run before a parent's effect would, and the
+ * reset would wipe what they just loaded. A repeat for the same principal is
+ * a no-op (StrictMode's double initializer, the 401 hook firing again).
+ */
+function reportPrincipal(email: string | null): void {
+  useStore.getState().resetForPrincipal(email);
+}
+
+// Remote mode: the email the stored session token was issued to, so a boot
+// with a token can hand the store to that person at once instead of to the
+// visitor while me() resolves. me() then confirms it (a no-op report) or
+// corrects it (a reset). Written on every sign-in, removed wherever the token
+// is; ignored without a token.
+const PRINCIPAL_HINT_KEY = 'mm:auth:principal';
+
+function readPrincipalHint(): string | null {
+  if (api.getToken() == null) return null;
+  try {
+    return localStorage.getItem(PRINCIPAL_HINT_KEY);
+  } catch {
+    return null;
+  }
+}
+
+function writePrincipalHint(email: string | null): void {
+  try {
+    if (email) localStorage.setItem(PRINCIPAL_HINT_KEY, email);
+    else localStorage.removeItem(PRINCIPAL_HINT_KEY);
+  } catch {
+    // localStorage unavailable — the next boot just starts as the visitor.
+  }
+}
+
+const localHasSignInTrace = () => hasAnyKey([SESSION_KEY, KNOWN_KEY]);
+
 function LocalAuthProvider({ children }: { children: ReactNode }) {
   // Seed from the persisted session so a reload stays logged in.
-  const [user, setUser] = useState<AuthUser | null>(() => accountToUser(readPersistedAccount()));
+  const [user, setUserState] = useState<AuthUser | null>(() => {
+    const u = accountToUser(readPersistedAccount());
+    if (u) markSignedInBefore();
+    reportPrincipal(u?.email ?? null);
+    return u;
+  });
+
+  const changeUser = useCallback((u: AuthUser | null) => {
+    reportPrincipal(u?.email ?? null);
+    setUserState(u);
+  }, []);
 
   const login = useCallback(async (accountId: string): Promise<AuthAttemptResult> => {
     const account = findAccount(accountId);
@@ -72,9 +139,10 @@ function LocalAuthProvider({ children }: { children: ReactNode }) {
     } catch {
       // localStorage unavailable — the session just won't persist across reloads.
     }
-    setUser(accountToUser(account));
+    markSignedInBefore();
+    changeUser(accountToUser(account));
     return { ok: true, error: null };
-  }, []);
+  }, [changeUser]);
 
   const logout = useCallback(() => {
     try {
@@ -82,8 +150,8 @@ function LocalAuthProvider({ children }: { children: ReactNode }) {
     } catch {
       // ignore
     }
-    setUser(null);
-  }, []);
+    changeUser(null);
+  }, [changeUser]);
 
   const unsupported = useCallback(async () => UNSUPPORTED, []);
 
@@ -92,6 +160,8 @@ function LocalAuthProvider({ children }: { children: ReactNode }) {
       value={{
         user,
         loading: false,
+        isVisitor: user == null,
+        hasSignInTrace: localHasSignInTrace,
         capabilities: LOCAL_CAPABILITIES,
         login,
         register: unsupported,
@@ -132,22 +202,43 @@ function describeError(e: unknown, fallback: string): string {
   return fallback;
 }
 
+const remoteHasSignInTrace = () => api.getToken() != null || hasAnyKey([KNOWN_KEY]);
+
 function RemoteAuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUserState] = useState<AuthUser | null>(null);
+  // Session restore and the capabilities fetch wait for the health probe: a
+  // visitor's sandbox renders without the server, but nothing here may read
+  // an outage as a dead session (or as a password-only server).
+  const serverUp = useServerHealth().status === 'ok';
+  // Boot with a stored token hands the store to the token's owner (the
+  // hint) while me() resolves; with none, to the visitor. AuthGate holds every
+  // signed-in route until it settles, so only the public sandbox can render
+  // meanwhile — and it must be that person's own, offline too.
+  const [user, setUserState] = useState<AuthUser | null>(() => {
+    reportPrincipal(readPrincipalHint());
+    return null;
+  });
   const [capabilities, setCapabilities] = useState<AuthCapabilities | null>(null);
   // Only an existing token needs resolving; with none we go straight to login.
   const [loading, setLoading] = useState<boolean>(() => api.getToken() != null);
 
-  // Keep the React state and the non-hook session cache in lockstep.
+  // Keep the React state and the non-hook session cache in lockstep. The
+  // store hears first, while the session cache still names the LEAVING user
+  // (its flush journals their unsaved work under their email).
   const setUser = useCallback((u: AuthUser | null) => {
+    reportPrincipal(u?.email ?? null);
     setSessionUser(u);
     setUserState(u);
+    if (u) {
+      markSignedInBefore();
+      writePrincipalHint(u.email);
+    }
   }, []);
 
   // Ask the server what its sign-in system offers. The login screen waits for
   // this rather than guessing, so it can never show a password box to an SSO
   // server (or hide one from a password server).
   useEffect(() => {
+    if (!serverUp) return;
     let cancelled = false;
     api.authConfig().then(
       (caps) => {
@@ -155,8 +246,8 @@ function RemoteAuthProvider({ children }: { children: ReactNode }) {
       },
       () => {
         // Unreachable/old server: fall back to the plainest thing that works.
-        // HealthGate has already vouched for the server being up, so this is
-        // a genuinely unexpected response, not an outage.
+        // The health probe has already vouched for the server being up, so
+        // this is a genuinely unexpected response, not an outage.
         if (!cancelled) {
           setCapabilities({
             mode: 'password',
@@ -171,15 +262,17 @@ function RemoteAuthProvider({ children }: { children: ReactNode }) {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [serverUp]);
 
   useEffect(() => {
     // Any 401 anywhere (expired session, revoked roster row) ends the session
     // cleanly: token gone, back to the login screen.
     api.setOnUnauthorized(() => {
       api.setToken(null);
+      writePrincipalHint(null);
       setUser(null);
     });
+    if (!serverUp) return;
     const token = api.getToken();
     if (!token) return;
     let cancelled = false;
@@ -198,7 +291,10 @@ function RemoteAuthProvider({ children }: { children: ReactNode }) {
         // gate) keeps the token so a reload can restore the session — either
         // way, resolve this boot to logged-out.
         if (!cancelled) {
-          if (e instanceof api.ApiError && e.status === 401) api.setToken(null);
+          if (e instanceof api.ApiError && e.status === 401) {
+            api.setToken(null);
+            writePrincipalHint(null);
+          }
           setUser(null);
           setLoading(false);
         }
@@ -207,7 +303,7 @@ function RemoteAuthProvider({ children }: { children: ReactNode }) {
     return () => {
       cancelled = true;
     };
-  }, [setUser]);
+  }, [setUser, serverUp]);
 
   const login = useCallback(
     async (email: string, password?: string): Promise<AuthAttemptResult> => {
@@ -237,6 +333,8 @@ function RemoteAuthProvider({ children }: { children: ReactNode }) {
         return {
           ok: false,
           error: describeError(e, 'Could not reach the server — check your connection.'),
+          // The server refuses an off-roster ID or email with 403 (and only that).
+          notOnRoster: e instanceof api.ApiError && e.status === 403,
         };
       }
     },
@@ -274,13 +372,25 @@ function RemoteAuthProvider({ children }: { children: ReactNode }) {
     // Drop the session locally first (the UI must log out even offline);
     // server-side session deletion is best-effort. api.logout() clears the
     // token in its finally block either way.
+    writePrincipalHint(null);
     setUser(null);
     void api.logout().catch(() => {});
   }, [setUser]);
 
   return (
     <AuthContext.Provider
-      value={{ user, loading, capabilities, login, register, requestAccess, changePassword, logout }}
+      value={{
+        user,
+        loading,
+        isVisitor: user == null && !loading,
+        hasSignInTrace: remoteHasSignInTrace,
+        capabilities,
+        login,
+        register,
+        requestAccess,
+        changePassword,
+        logout,
+      }}
     >
       {children}
     </AuthContext.Provider>
@@ -297,8 +407,8 @@ export function useAuth(): AuthContextValue {
  * Non-hook accessor for imperative call sites (e.g. submission tagging).
  * Local mode reads the persisted toy session directly; remote mode reads the
  * provider's session cache (populated before AuthGate renders anything).
- * Throws when logged out — every caller runs behind <AuthGate>, so a user is
- * always present.
+ * Throws when logged out — every caller sits on a signed-in route (the
+ * visitor's sandbox offers no submit or feedback), so a user is always present.
  */
 export function getCurrentUserEmail(): string {
   if (backendMode === 'remote') {

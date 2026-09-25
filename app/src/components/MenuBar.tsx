@@ -1,22 +1,23 @@
 import { useState } from 'react';
-import { useStore, selectAssignmentFrozen } from '../store';
+import { useStore, selectAssignmentFrozen, showsSubmission } from '../store';
 import { getCurrentUserEmail, useAuth } from '../auth';
 import { AccountPanel } from '../auth/AccountPanel';
 import { navigate } from '../routing';
+import { signOut } from './SessionControls';
 import { FeedbackPanel } from './FeedbackPanel';
+import { WorkbookFileMenu } from './WorkbookFileMenu';
+import { submitConfirmMessage } from '../provenance/notice';
 
 export function MenuBar() {
-  const { user, logout } = useAuth();
-  const { assignment, submitAssignment, submissions } = useStore();
+  const { user, isVisitor, logout } = useAuth();
+  const { assignment, submitAssignment, submissions, viewingSubmission } = useStore();
   const frozen = useStore(selectAssignmentFrozen);
+  const showingSubmission = useStore(showsSubmission);
   const [showFeedback, setShowFeedback] = useState(false);
 
   const handleSubmitAssignment = () => {
     if (!assignment) return;
-    const ok = confirm(
-      `Submit "${assignment.title}"? This records a snapshot of your current work.\n\n` +
-      'Note: only your most recent submission is graded — submitting again replaces any earlier submission for grading purposes.'
-    );
+    const ok = confirm(submitConfirmMessage(assignment.title));
     if (!ok) return;
     // Submit is online-only, never queued: a failure records NOTHING and asks
     // for a visible retry (the server stamps the submission time, so nothing
@@ -31,15 +32,23 @@ export function MenuBar() {
 
   return (
     <div className="menu-bar">
-      {/* Home — back to the assignment catalog */}
-      <div className="menu-item" onClick={() => navigate({ kind: 'home' })}>
-        ⌂ Home
-      </div>
+      {/* Home — back to the assignment catalog (a visitor has none) */}
+      {!isVisitor && (
+        <div className="menu-item" onClick={() => navigate({ kind: 'home' })}>
+          ⌂ Home
+        </div>
+      )}
+
+      {/* File — the sandbox as a workbook file on this computer (New, Open…,
+          Save, Save as…), for visitors and signed-in people alike. Never in
+          an assignment: a file only ever opens as sandbox tabs. */}
+      {!assignment && <WorkbookFileMenu />}
 
       {/* Submit — record an immutable snapshot of the current assignment.
-          Hidden once frozen (item 3): the canvas is already showing exactly
-          what was submitted, so there is nothing new to record. */}
-      {assignment && !frozen && (
+          Hidden while the canvas shows a submission — frozen (item 3), or a
+          submitted attempt viewed from the grade sheet (task 003): what is on
+          screen is not the work a submit would record. */}
+      {assignment && !showingSubmission && (
         <div
           className="menu-item menu-submit"
           onClick={handleSubmitAssignment}
@@ -57,6 +66,11 @@ export function MenuBar() {
           🔒 Past due — viewing your submission
         </div>
       )}
+      {assignment && !frozen && viewingSubmission && (
+        <div className="menu-item menu-frozen" title="Your answers as submitted in this attempt — Run and Step still work, edits are off.">
+          Viewing submission {viewingSubmission.attempt} — read-only
+        </div>
+      )}
 
       {/* Session controls — right-aligned. The instructor link is shown only to
           instructor accounts; students never see it (typing #/instructor hits the
@@ -71,18 +85,30 @@ export function MenuBar() {
           </button>
         )}
         {user && (
-          <span className="session-chip">
-            {user.name}
-            {user.role === 'instructor' ? ' · Instructor' : ''}
-          </span>
+          <>
+            <span className="session-chip">
+              {user.name}
+              {user.role === 'instructor' ? ' · Instructor' : ''}
+            </span>
+            <button className="menu-link-button" onClick={() => setShowFeedback(true)}>
+              Feedback
+            </button>
+            <AccountPanel />
+            <button className="menu-link-button" onClick={() => signOut(logout)}>
+              Log out
+            </button>
+          </>
         )}
-        <button className="menu-link-button" onClick={() => setShowFeedback(true)}>
-          Feedback
-        </button>
-        <AccountPanel />
-        <button className="menu-link-button" onClick={() => { logout(); navigate({ kind: 'home' }); }}>
-          Log out
-        </button>
+        {/* A visitor: who they are, and the way in. No Feedback — reports
+            are filed by a signed-in account (the server requires one). */}
+        {isVisitor && (
+          <>
+            <span className="session-chip session-chip--visitor">Visitor</span>
+            <button className="menu-link-button" onClick={() => navigate({ kind: 'home' })}>
+              Sign in
+            </button>
+          </>
+        )}
       </div>
       {showFeedback && <FeedbackPanel onClose={() => setShowFeedback(false)} />}
     </div>

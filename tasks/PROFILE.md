@@ -16,10 +16,10 @@ shallow — relocate the change, don't shrink it.
 and `server/` (Express 5 + `node:sqlite`; it imports `app/src/engine/*` directly). **One
 long-lived branch, `main`**, not protected; every landing is a **merge commit, never a
 squash**. CI (`.github/workflows/deploy.yml`) runs on every push to `main`: server
-typecheck + check, the context-budget guard, app build → GitHub Pages. The pilot deploy
-(Cloudflare Pages + Lightsail) is manual — `deploy/README.md`. **Routines never push or
-deploy.** Interactive sessions push only when Gabriel says so, and after any push confirm
-`gh run list --limit 1` is green before reporting done.
+typecheck + check, the context-budget guard, the harness-tool portability gate, app build →
+GitHub Pages. The pilot deploy (Cloudflare Pages + Lightsail) is manual — `deploy/README.md`.
+**Routines never push or deploy.** Interactive sessions push only when Gabriel says so, and
+after any push confirm `gh run list --limit 1` is green before reporting done.
 
 ## 3. The main checkout is live and shared
 
@@ -68,9 +68,9 @@ the wrong tree).
 | --- | --- | --- |
 | `app/` | `npx tsc -p tsconfig.app.json --noEmit` | strict types (`noUnusedLocals/Parameters` — CI is strict) |
 | `app/` | `npm run build` | the production bundle builds |
-| `app/` | `npm run check` | the budget guard + 15 headless harness tools (`app/tools/*Check.ts`; several boot a real server — minutes, not seconds) |
+| `app/` | `npm run check` | the budget guard, the tools type-check (`tsconfig.tools.json`) + 22 headless harness tools (`app/tools/*Check.ts`; several boot a real server — minutes, not seconds) |
 | `server/` | `npm run typecheck` | server types |
-| `server/` | `npm run check` | serverCheck + authCheck + parityCheck (server ≡ engine grading) |
+| `server/` | `npm run check` | typecheck + serverCheck + feedbackCheck + rosterCheck + authCheck + parityCheck (server ≡ engine grading) + homeworkSyncCheck |
 
 Fast loop while working: both `tsc`s plus the ONE harness tool that pins the area you're
 touching (`npx tsx tools/<name>Check.ts` from `app/`). Before landing: everything in the
@@ -103,8 +103,23 @@ State each such gap in the task's `## Verify` as owed, with the recipe.
 4. **Transition-label syntax lives only in `app/src/engine/notation.ts`** (grep gate in
    `notationCheck`).
 5. **Local mode stays byte-identical** with zero `/api` traffic when `VITE_API_BASE` is unset.
-6. **Every canvas swap resets sim state** via `resetAllSimState()` (`navResetCheck`).
+6. **Every canvas swap resets sim state AND undo/redo** via `resetAllSimState()`; **every
+   principal change resets the whole editor store** and the provenance clipboard (and loads
+   that person's sandbox) via `resetForPrincipal()`, called by the auth provider in both modes
+   (`navResetCheck`). A canvas swap never clears that clipboard (copy in P1, paste in P2).
+   A machine edit (`gradedMachineKey` changes) restarts every live run at t=1 keeping its
+   input and undo — the store's machine-key subscriber, never an action or a component
+   (`navResetCheck [edit during run]`).
 7. **`CLAUDE.md` stays ≤ 40 KB** and is never appended to (§9).
+8. **Assignment content enters only through the provenance seam** (`app/src/provenance.ts`
+   `canPaste` + `app/src/usePasteGuard.ts`): a paste into an assignment takes only what this
+   user copied inside an assignment in this window; no clipboard API outside the hook, every
+   answer field guarded (grep gate in `app/tools/pasteCheck.ts`). A new input or import path
+   asks the seam — never its own rule.
+9. **Student data never enters git — the repo is public.** Class lists live in gitignored
+   `rosters/`; app feedback reports stay on the server and in `tasks/tools/feedback.mjs`'s
+   working copy outside the repo; a task distilled from one cites the report id and role,
+   never its author's name or email, their words, or their screenshots (`CATCHER.md` §3).
 Full rules: `CLAUDE.md` Part 2 "Critical design rules" and "Things to watch".
 
 ## 9. Context budget (a lesson from the Virgil pipeline — read twice)

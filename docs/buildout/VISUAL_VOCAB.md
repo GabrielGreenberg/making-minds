@@ -123,6 +123,11 @@ _(textbook ch. 22, pp. 99–103; mockup `Mock_Ups-9.jpg`)_
   mockups' yellow — Gabriel's call); **block = gray square** (impassable);
   **food/goal = green circle**. Arena boundary is an implicit wall. One item
   per cell.
+- **Goal reached** (task 025): the step that moves the turbot onto a goal from
+  off it pulses that goal's circle once (scale + soft green glow, ≤ 600 ms;
+  nothing on the turbot); a Run holds 2 ticks there, Step never holds.
+  `prefers-reduced-motion` drops the motion (the hold stays). Only the live Map
+  animates — "Edit map" and the instructor's arena editor never do.
 - **Sensor (1 bit):** 0 = empty ahead, 1 = block/boundary ahead. Food reads as
   passable/empty (the goal is invisible to the turbot — HW3 Note 2).
 - **Motor (2 bits)** `ij` (i = left wheel, j = right wheel): `00` stop, `01` turn
@@ -160,7 +165,18 @@ literal or an undefined token. Task: `tasks/done/2026-09-21-019-*`._
   column as `.mm-tabs` (an optional eyebrow, then tabs; current tab underlined): the
   student Home's Assignments · Grades on the catalog, the Grades page and an
   assignment's overview; the Dashboard's Assignments · Roster & accounts · Feedback ·
-  Notes on every instructor page; the remote login's panes.
+  Notes on every instructor page. (The remote sign-in has no tabs: one form, with a quiet
+  "First time here?" link to setup and an access request only when setup finds the
+  email off-roster.)
+- **Visitor** (task 027) — someone not signed in reaches only the sandbox (the editor):
+  its menu bar shows a magenta-outlined "Visitor" chip and **Sign in** where the name /
+  Feedback / Log out sit (no ⌂ Home), and under it one dismissible lavender
+  `.visitor-banner` line ("…as a visitor — PHIL 133 student? Sign in"; dismissed for the
+  browser session). On page surfaces `SessionControls` shows Visitor · Sign in. Every
+  sign-in card (local picker; remote password / dev / SSO) OPENS with "Just exploring?…"
+  on white and a full-width **Continue as visitor** button in soft magenta
+  (`--mm-accent-soft` field, `--mm-accent` text), then a hairline, then Sign in; the
+  server-health card offers "Open the sandbox" beside Retry.
 - **Up next** — the site's `.next`/`.nx` box (`.mm-next`/`.mm-nx`): a lavender field with
   a chip on the left (NEXT DUE) and date-in-`--mm-date` + title + a detail line on the
   right, above the student's catalog; shown only when a homework has a future due date.

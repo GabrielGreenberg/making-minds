@@ -4,10 +4,11 @@ import { useAuth } from './authProvider';
 import { TOY_ACCOUNTS } from './accounts';
 import { backendMode } from '../storage/backend';
 import type { AuthCapabilities } from './types';
-import { PageShell } from '../components/PageShell';
+import { PageShell, hashLink } from '../components/PageShell';
 
 /**
- * The login screen, shown by <AuthGate> whenever no user is set.
+ * The sign-in screen, shown by <AuthGate> when a route that needs sign-in is
+ * requested and nobody is signed in.
  *
  * Local mode: one button per toy account — no passwords; picking an account
  * logs in as that identity and its `role` drives which views are reachable.
@@ -15,10 +16,11 @@ import { PageShell } from '../components/PageShell';
  * Remote mode: whatever the SERVER says it supports (`capabilities`, from
  * GET /api/auth/config), which is the whole point of the seam:
  *
- *   password — the launch system: sign in with your course email and the
- *              password you chose, create an account if you haven't yet (the
- *              roster decides who may), or ask to be added if your email
- *              isn't the one on file.
+ *   password — the launch system: sign in with your email and the password
+ *              you chose, set up your account if you haven't yet (your UID
+ *              finds your roster seat; your UCLA email or the class-list one
+ *              becomes your sign-in address), or ask to be added if the
+ *              roster doesn't have you.
  *   sso      — one "Sign in with UCLA" button; no password field, no account
  *              creation (the identity provider owns both).
  *   dev      — email only, passwordless. Development and the closed pilot.
@@ -31,11 +33,25 @@ export function LoginScreen() {
   return <LocalLoginScreen />;
 }
 
-/** The card variant of the page shell: the brand topbar and one centred card. */
+/**
+ * The card variant of the page shell: the brand topbar and one centred card.
+ * Every sign-in pane (the local picker; remote password / SSO / dev) OPENS
+ * with the way past it: continue as a visitor, into the sandbox — first, its
+ * button in the site's soft magenta, because most people arriving from the website just
+ * want to try the machines.
+ */
 function LoginCard({ children }: { children: ReactNode }) {
   return (
     <PageShell variant="card">
-      <div className="mm-card mm-card--narrow">{children}</div>
+      <div className="mm-card mm-card--narrow">
+        <div className="login-visitor">
+          <p>Just exploring? Build circuits, state machines and Turing machines. No account needed.</p>
+          <a className="mm-btn login-visitor-btn" {...hashLink({ kind: 'sandbox' })}>
+            Continue as visitor
+          </a>
+        </div>
+        {children}
+      </div>
     </PageShell>
   );
 }
@@ -66,14 +82,32 @@ function LocalLoginScreen() {
   );
 }
 
-type Pane = 'signin' | 'create' | 'request';
+type View = 'signin' | 'setup' | 'request';
 
+/** What the setup form hands the access request when the roster lacks the person. */
+interface Prefill {
+  email: string;
+  studentId: string;
+}
+
+/**
+ * One screen, not three tabs: Sign in is what nearly everyone needs every
+ * time, so it is the whole default view. First-time setup (a roster member
+ * choosing a password) is one quiet link below it, and an access request is
+ * not offered up front at all — it appears only when setup finds the person
+ * is not on the roster, pre-filled with what was just typed. (If a server
+ * allows requests but not registration, the request link takes setup's
+ * place.) The first-time step stays an explicit choice rather than being
+ * inferred from a failed sign-in: the server gives one message for every
+ * failed sign-in so the roster can't be enumerated.
+ */
 function RemoteLoginScreen() {
   const { capabilities } = useAuth();
-  const [pane, setPane] = useState<Pane>('signin');
+  const [view, setView] = useState<View>('signin');
+  const [prefill, setPrefill] = useState<Prefill>({ email: '', studentId: '' });
 
-  // The capabilities fetch is one request against a server HealthGate has
-  // already confirmed is up, so this is a blink, not a wait.
+  // The capabilities fetch is one request against a server the health probe
+  // has already confirmed is up, so this is a blink, not a wait.
   if (!capabilities) {
     return (
       <LoginCard>
@@ -85,35 +119,57 @@ function RemoteLoginScreen() {
 
   if (capabilities.mode === 'sso') return <SsoLoginScreen capabilities={capabilities} />;
 
-  const tabs: { key: Pane; label: string }[] = [
-    { key: 'signin', label: 'Sign in' },
-    ...(capabilities.allowsRegistration ? [{ key: 'create' as const, label: 'Create account' }] : []),
-    ...(capabilities.allowsAccessRequests ? [{ key: 'request' as const, label: 'Not on the roster?' }] : []),
-  ];
+  const back = (
+    <button type="button" className="login-switch" onClick={() => setView('signin')}>
+      ← Back to sign in
+    </button>
+  );
+
+  if (view === 'setup') {
+    return (
+      <LoginCard>
+        <h1>Set up your account</h1>
+        <CreateAccountPane
+          capabilities={capabilities}
+          onNotOnRoster={
+            capabilities.allowsAccessRequests
+              ? (p) => {
+                  setPrefill(p);
+                  setView('request');
+                }
+              : undefined
+          }
+        />
+        {back}
+      </LoginCard>
+    );
+  }
+
+  if (view === 'request') {
+    return (
+      <LoginCard>
+        <h1>Ask to be added</h1>
+        <RequestAccessPane prefill={prefill} onDone={() => setView('signin')} />
+        {back}
+      </LoginCard>
+    );
+  }
 
   return (
     <LoginCard>
-      {tabs.length > 1 ? (
-        <div className="mm-tabs" role="tablist">
-          {tabs.map((tab) => (
-            <button
-              key={tab.key}
-              role="tab"
-              aria-selected={pane === tab.key}
-              className={`mm-tab${pane === tab.key ? ' mm-tab--active' : ''}`}
-              data-text={tab.label}
-              onClick={() => setPane(tab.key)}
-            >
-              {tab.label}
-            </button>
-          ))}
-        </div>
+      <h1>Sign in</h1>
+      <SignInPane capabilities={capabilities} />
+      {capabilities.allowsRegistration ? (
+        <button type="button" className="login-switch" onClick={() => setView('setup')}>
+          First time here? Set up your account
+        </button>
       ) : (
-        <h1>Sign in</h1>
+        capabilities.allowsAccessRequests && (
+          <button type="button" className="login-switch" onClick={() => setView('request')}>
+            Not on the class roster? Ask to be added
+          </button>
+        )
       )}
-      {pane === 'signin' && <SignInPane capabilities={capabilities} />}
-      {pane === 'create' && <CreateAccountPane capabilities={capabilities} onDone={() => setPane('signin')} />}
-      {pane === 'request' && <RequestAccessPane onDone={() => setPane('signin')} />}
     </LoginCard>
   );
 }
@@ -153,7 +209,7 @@ function SignInPane({ capabilities }: { capabilities: AuthCapabilities }) {
     <>
       <p className="mm-lede">
         {capabilities.usesPassword
-          ? 'Sign in with your course email and password.'
+          ? 'Sign in with your email and password.'
           : 'Sign in with your course email.'}
       </p>
       <form className="mm-form login-form" onSubmit={(e) => void handleSubmit(e)}>
@@ -162,7 +218,7 @@ function SignInPane({ capabilities }: { capabilities: AuthCapabilities }) {
           type="email"
           autoFocus
           autoComplete="username"
-          placeholder="you@ucla.edu"
+          placeholder="Email"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
           disabled={busy}
@@ -195,10 +251,11 @@ function SignInPane({ capabilities }: { capabilities: AuthCapabilities }) {
 
 function CreateAccountPane({
   capabilities,
-  onDone,
+  onNotOnRoster,
 }: {
   capabilities: AuthCapabilities;
-  onDone: () => void;
+  /** Offered when the server says the roster lacks them (if requests are allowed). */
+  onNotOnRoster?: (prefill: Prefill) => void;
 }) {
   const { register } = useAuth();
   const [email, setEmail] = useState('');
@@ -207,6 +264,7 @@ function CreateAccountPane({
   const [confirm, setConfirm] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [notOnRoster, setNotOnRoster] = useState<string | null>(null);
 
   const tooShort = password !== '' && password.length < capabilities.passwordMinLength;
   const mismatch = confirm !== '' && confirm !== password;
@@ -217,42 +275,45 @@ function CreateAccountPane({
     if (!ready || busy) return;
     setBusy(true);
     setError(null);
+    setNotOnRoster(null);
     const result = await register({
       email: email.trim(),
       password,
       studentId: studentId.trim() || undefined,
     });
     setBusy(false);
-    // On success the provider sets the user and this screen unmounts; the
-    // onDone fallback only matters if that ever stops being true.
-    if (!result.ok) setError(result.error);
-    else onDone();
+    // On success the provider sets the user and this screen unmounts.
+    if (!result.ok) {
+      if (result.notOnRoster) setNotOnRoster(result.error);
+      else setError(result.error);
+    }
   };
 
   return (
     <>
       <p className="mm-lede">
-        Use the email your instructor has on file, and choose a password. Your student ID confirms
-        the account is yours.
+        Your UID (student ID) finds you on the class roster. Then choose the email you'll sign
+        in with — your UCLA address, or the email on your class-list record — and a password.
       </p>
       <form className="mm-form login-form" onSubmit={(e) => void handleSubmit(e)}>
         <input
           className="mm-input"
-          type="email"
+          type="text"
           autoFocus
-          autoComplete="username"
-          placeholder="you@ucla.edu"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
+          autoComplete="off"
+          inputMode="numeric"
+          placeholder="UID (student ID), e.g. 123-456-789"
+          value={studentId}
+          onChange={(e) => setStudentId(e.target.value)}
           disabled={busy}
         />
         <input
           className="mm-input"
-          type="text"
-          autoComplete="off"
-          placeholder="Student ID"
-          value={studentId}
-          onChange={(e) => setStudentId(e.target.value)}
+          type="email"
+          autoComplete="username"
+          placeholder="Your UCLA email or class-list email"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
           disabled={busy}
         />
         <input
@@ -274,7 +335,7 @@ function CreateAccountPane({
           disabled={busy}
         />
         <button className="mm-btn mm-btn--primary" type="submit" disabled={busy || !ready}>
-          {busy ? 'Creating…' : 'Create account'}
+          {busy ? 'Setting up…' : 'Set up account'}
         </button>
       </form>
       {tooShort && (
@@ -284,15 +345,32 @@ function CreateAccountPane({
       )}
       {mismatch && <p className="mm-error">The two passwords don't match.</p>}
       {error && <p className="mm-error">{error}</p>}
+      {notOnRoster && (
+        <p className="mm-error">
+          {notOnRoster}
+          {onNotOnRoster && (
+            <>
+              {' '}
+              <button
+                type="button"
+                className="login-switch login-switch--inline"
+                onClick={() => onNotOnRoster({ email: email.trim(), studentId: studentId.trim() })}
+              >
+                Ask to be added
+              </button>
+            </>
+          )}
+        </p>
+      )}
     </>
   );
 }
 
-function RequestAccessPane({ onDone }: { onDone: () => void }) {
+function RequestAccessPane({ prefill, onDone }: { prefill: Prefill; onDone: () => void }) {
   const { requestAccess } = useAuth();
-  const [email, setEmail] = useState('');
+  const [email, setEmail] = useState(prefill.email);
   const [name, setName] = useState('');
-  const [studentId, setStudentId] = useState('');
+  const [studentId, setStudentId] = useState(prefill.studentId);
   const [message, setMessage] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -320,8 +398,8 @@ function RequestAccessPane({ onDone }: { onDone: () => void }) {
     return (
       <>
         <p className="mm-lede">
-          Request sent. Your instructor will review it — once they add you, come back and create
-          your account with this email.
+          Request sent. Your instructor will review it — once they add you, come back and set up
+          your account.
         </p>
         <button className="mm-btn mm-btn--primary" onClick={onDone}>
           Back to sign in
@@ -333,8 +411,8 @@ function RequestAccessPane({ onDone }: { onDone: () => void }) {
   return (
     <>
       <p className="mm-lede">
-        If the course roster has a different email for you (or doesn't have you yet), tell your
-        instructor here.
+        We couldn't find you on the class roster. Tell your instructor who you are and they'll
+        add you.
       </p>
       <form className="mm-form login-form" onSubmit={(e) => void handleSubmit(e)}>
         <input
@@ -357,7 +435,7 @@ function RequestAccessPane({ onDone }: { onDone: () => void }) {
         <input
           className="mm-input"
           type="text"
-          placeholder="Student ID"
+          placeholder="UID (student ID)"
           value={studentId}
           onChange={(e) => setStudentId(e.target.value)}
           disabled={busy}

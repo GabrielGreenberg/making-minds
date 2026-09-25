@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import type { FeedbackStatus, PlatformFeedback } from '../types';
+import type { FeedbackStatus, FeedbackTriage, PlatformFeedback } from '../types';
 import { feedbackStore } from '../storage/backend';
 import { useAsyncValue } from '../useAsyncValue';
 
@@ -12,12 +12,30 @@ function formatTime(iso: string): string {
   );
 }
 
+/** What the task pipeline made of a report (task 018), as a tag. */
+function TriageMark({ triage }: { triage: FeedbackTriage }) {
+  const [className, label] =
+    triage.outcome === 'filed'
+      ? ['tag tag--ok', `Filed → ${triage.tasks?.length === 1 ? 'task' : 'tasks'} ${(triage.tasks ?? []).join(', ')}`]
+      : triage.outcome === 'personal'
+        ? ['tag tag--warn', 'Personal — for you']
+        : ['tag', 'Dismissed'];
+  return (
+    <span className="feedback-triage" title={`Processed ${formatTime(triage.at)}`}>
+      <span className={className}>{label}</span>
+      {triage.note && <span className="feedback-meta">{triage.note}</span>}
+    </span>
+  );
+}
+
 /**
- * The instructor's feedback queue (notes/todos.md item 9): every report a
- * student has filed on the platform or a homework, newest first, filterable
- * by open/resolved, with a status toggle. Works in both backends — the
- * `feedbackStore` seam is local-storage-backed in local mode, server-backed
- * remotely — unlike the roster, which is a remote-only concept.
+ * The instructor's feedback queue (notes/todos.md item 9): every report filed
+ * on the platform or a homework, newest first, filterable by open/resolved,
+ * with a status toggle; an instructor's own reports carry a tag, and a report
+ * the task pipeline has processed shows what it became (task 018). Works in
+ * both backends — the `feedbackStore` seam is local-storage-backed in local
+ * mode, server-backed remotely — unlike the roster, which is a remote-only
+ * concept.
  */
 export function FeedbackQueueView() {
   const { value: feedback, loading, error, reload } = useAsyncValue(() => feedbackStore.list(), []);
@@ -70,6 +88,7 @@ export function FeedbackQueueView() {
               <span className={`tag ${f.category === 'platform design' ? 'tag--date' : 'tag--ok'}`}>
                 {f.category}
               </span>
+              {f.authorRole === 'instructor' && <span className="tag tag--accent">instructor</span>}
               <span className="feedback-meta">{f.student} · {formatTime(f.createdAt)}</span>
               {f.context?.assignmentId && (
                 <span className="feedback-meta">
@@ -89,6 +108,7 @@ export function FeedbackQueueView() {
               </div>
             )}
             <div className="feedback-card-foot">
+              {f.triage && <TriageMark triage={f.triage} />}
               <button
                 className="mm-btn"
                 disabled={busyId === f.id}

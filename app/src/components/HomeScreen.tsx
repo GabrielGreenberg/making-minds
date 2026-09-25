@@ -17,6 +17,7 @@ import { useAsyncValue } from '../useAsyncValue';
 import { useRoute } from '../useRoute';
 import { GradesView } from './GradesView';
 import { StudentLayout } from './StudentLayout';
+import { submitConfirmMessage } from '../provenance/notice';
 import { useEffect } from 'react';
 
 /**
@@ -75,10 +76,7 @@ function AssignmentsTab() {
   const nextSub = next ? submissions[next.a.id] : undefined;
 
   const handleSubmit = async (id: string, title: string) => {
-    const ok = confirm(
-      `Submit "${title}"? This records a snapshot of your saved work.\n\n` +
-      'Note: only your most recent submission is graded — submitting again replaces any earlier submission for grading purposes.'
-    );
+    const ok = confirm(submitConfirmMessage(title, { saved: true }));
     if (!ok) return;
     let rec;
     try {

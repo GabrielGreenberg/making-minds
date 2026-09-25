@@ -5,7 +5,13 @@
 // storage on a single box with trivial backup (copy one file).
 //
 // JSON-heavy tables mirror the client seams one-to-one:
-//   users        — the roster + local credentials (see src/auth.ts; SSO will upsert)
+//   users        — the roster + local credentials (see src/auth.ts). A row is
+//                  one person: `email` is the account's key (every table below
+//                  keys work by it), `uid` the normalised student ID — who they
+//                  are (unique; NULL for instructors and manual adds)
+//   user_emails  — an account's OTHER sign-in addresses (a UCLA address beside
+//                  a personal class-list one, a registrar change); never
+//                  another account's key. src/identity.ts decides what lands here
 //   sessions     — bearer tokens
 //   access_requests — people who want an account under an email the roster
 //                  does not have; an instructor approves or rejects each one
@@ -13,44 +19,82 @@
 //                  the API strips answers before sending to students)
 //   workbooks    — per-(user, assignment) saved canvas state (WorkbookStore seam)
 //   submissions  — immutable graded attempts (SubmissionStore seam)
-//   feedback     — student reports on the platform/homeworks, an instructor's
+//   feedback     — reports on the platform/homeworks, an instructor's
 //                  queue (FeedbackStore seam); screenshots ride as base64 in
 //                  the JSON `screenshots` column, capped client- and
-//                  server-side — see app.ts's POST /api/feedback
+//                  server-side — see app.ts's POST /api/feedback. Each row
+//                  carries the author's role as filed and, once the task
+//                  pipeline has processed it, a `triage` mark (task 018)
 //   instructor_notes — ONE shared markdown note (NotesStore seam); a single
 //                  row, id pinned to 1 by a CHECK constraint
+//   server_meta  — server-owned settings; today the generated provenance
+//                  mint secret when MM_MINT_SECRET is unset (task 034)
+//   workbook_saves — a coarse per-save history of each workbook: time and,
+//                  per question, component/wire counts and text length —
+//                  never the work itself; one row per CHANGED summary
+//   legacy_content — what every workbook held when the watermark arrived
+//                  (its ids, box library internals included, + per-question
+//                  sizes), snapshotted ONCE, on the
+//                  boot that creates the table; the integrity check reads it
+//                  as "legacy", not unbound
+//   (submissions.integrity — the provenance check computed on receipt,
+//                  instructor-only; see app.ts and sanitize.ts)
 
 import { DatabaseSync } from 'node:sqlite';
+import { randomBytes } from 'node:crypto';
 import type {
   AssignmentData,
   AssignmentState,
   FeedbackCategory,
   FeedbackScreenshot,
   FeedbackStatus,
+  FeedbackTriage,
   InstructorNote,
   PlatformFeedback,
   SubmissionData,
+  SubmissionIntegrity,
   SubmissionRecord,
   SubmissionResult,
 } from '../../app/src/types';
 import type { Role } from '../../app/src/auth/accounts';
+import { normalizeEmail, normalizeUid } from './roster';
+import { idsOfWorkbook } from '../../app/src/provenance/ids';
+import { saveSummary, type LegacyContent, type SaveSummary } from '../../app/src/provenance/integrity';
 
 export interface UserRow {
+  /** The account's key: the email it was first rostered under. */
   email: string;
   name: string;
   role: Role;
-  /** Campus ID from the roster CSV; '' when the import had no ID column. */
+  /** Campus ID from the roster CSV, as written; '' when the import had no ID column. */
   studentId?: string;
+  /** The normalised student ID (roster.ts normalizeUid) — the identity the
+   *  roster, sign-up and SSO match on; '' when the account has none. */
+  uid?: string;
+  /** Discussion section from the class list; absent/null leaves a stored one. */
+  section?: string | null;
+  /** "Last, First" sort key from the class list; null sorts by name. */
+  sortName?: string | null;
   /** True once the person has created an account (set a password). */
   registered?: boolean;
 }
 
-/** A roster row plus its account state — the instructor's roster view. */
+/** A roster row plus its account state — the instructor's roster view.
+ *  Instructor-only: `section` never reaches a student (getUser omits it). */
 export interface RosterRow extends UserRow {
   studentId: string;
+  section: string | null;
   registered: boolean;
   registeredAt: string | null;
+  /** The account's other sign-in addresses, oldest first. */
+  aliases: string[];
 }
+
+/** Where an extra sign-in address came from. */
+export type EmailAliasSource = 'roster' | 'signup' | 'sso' | 'request';
+
+/** addEmailAlias's answer: stored now, already this account's, or someone else's. */
+export type AliasOutcome = 'added' | 'present' | 'taken';
 
 export type AccessRequestStatus = 'pending' | 'approved' | 'rejected';
 
@@ -78,12 +122,25 @@ export class Db {
   }
 
   private migrate(): void {
+    // Is this the boot that brings the provenance watermark (task 034)? Asked
+    // BEFORE the CREATE below: only then is what the workbooks hold legacy.
+    const firstWatermarkBoot = !this.db
+      .prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'legacy_content'")
+      .get();
     this.db.exec(`
       CREATE TABLE IF NOT EXISTS users (
         email TEXT PRIMARY KEY,
         name  TEXT NOT NULL,
         role  TEXT NOT NULL CHECK (role IN ('student', 'instructor'))
       );
+      CREATE TABLE IF NOT EXISTS user_emails (
+        email      TEXT PRIMARY KEY,
+        user_email TEXT NOT NULL REFERENCES users(email) ON DELETE CASCADE,
+        source     TEXT NOT NULL,
+        added_at   TEXT NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS idx_user_emails_user
+        ON user_emails (user_email);
       CREATE TABLE IF NOT EXISTS sessions (
         token      TEXT PRIMARY KEY,
         email      TEXT NOT NULL REFERENCES users(email) ON DELETE CASCADE,
@@ -138,11 +195,40 @@ export class Db {
       );
       CREATE INDEX IF NOT EXISTS idx_feedback_status
         ON feedback (status, created_at);
+      -- Every homework content version the repo sync wrote (server/src/homeworks.ts):
+      -- a copy still equal to one of them is untouched since, so it may refresh.
+      CREATE TABLE IF NOT EXISTS content_sync (
+        assignment_id TEXT NOT NULL,
+        hash          TEXT NOT NULL,
+        synced_at     TEXT NOT NULL,
+        PRIMARY KEY (assignment_id, hash)
+      );
       CREATE TABLE IF NOT EXISTS instructor_notes (
         id         INTEGER PRIMARY KEY CHECK (id = 1),
         content    TEXT NOT NULL DEFAULT '',
         updated_at TEXT NOT NULL,
         updated_by TEXT NOT NULL
+      );
+      CREATE TABLE IF NOT EXISTS server_meta (
+        key   TEXT PRIMARY KEY,
+        value TEXT NOT NULL
+      );
+      CREATE TABLE IF NOT EXISTS workbook_saves (
+        id            INTEGER PRIMARY KEY AUTOINCREMENT,
+        email         TEXT NOT NULL,
+        assignment_id TEXT NOT NULL,
+        saved_at      TEXT NOT NULL,
+        summary       TEXT NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS idx_workbook_saves
+        ON workbook_saves (email, assignment_id, id);
+      CREATE TABLE IF NOT EXISTS legacy_content (
+        email         TEXT NOT NULL,
+        assignment_id TEXT NOT NULL,
+        ids           TEXT NOT NULL,
+        summary       TEXT NOT NULL,
+        recorded_at   TEXT NOT NULL,
+        PRIMARY KEY (email, assignment_id)
       );
     `);
     // Columns added after the initial schema; ALTER is a no-op error on re-run.
@@ -157,6 +243,16 @@ export class Db {
       "ALTER TABLE users ADD COLUMN student_id TEXT NOT NULL DEFAULT '';",
       'ALTER TABLE users ADD COLUMN password_hash TEXT;',
       'ALTER TABLE users ADD COLUMN registered_at TEXT;',
+      // From the registrar's class list (task 035): the discussion section and
+      // a "Last, First" sort key. Nothing else from that file is stored.
+      'ALTER TABLE users ADD COLUMN section TEXT;',
+      'ALTER TABLE users ADD COLUMN sort_name TEXT;',
+      // The provenance check computed on receipt (task 034) — JSON, beside
+      // `result`, never part of it.
+      'ALTER TABLE submissions ADD COLUMN integrity TEXT;',
+      // What the task pipeline made of a report (task 018) — JSON
+      // FeedbackTriage, NULL until processed.
+      'ALTER TABLE feedback ADD COLUMN triage TEXT;',
     ]) {
       try {
         this.db.exec(sql);
@@ -164,47 +260,295 @@ export class Db {
         // already present
       }
     }
+    // The student ID as an identity (task 036): the boot that adds the column
+    // backfills it from student_id, in ONE transaction with the ALTER, so a
+    // crash part-way leaves no column and the next boot starts over. Two rows
+    // sharing an ID keep theirs as written but only the first gets the uid —
+    // the index below forbids a second; the other stays unverified (identity.ts
+    // still asks for its ID) and the roster screen shows both to settle.
+    this.db.exec('BEGIN');
+    try {
+      this.db.exec('ALTER TABLE users ADD COLUMN uid TEXT;');
+      const rows = this.db
+        .prepare("SELECT email, student_id FROM users WHERE student_id != '' ORDER BY rowid")
+        .all() as unknown as { email: string; student_id: string }[];
+      const taken = new Set<string>();
+      const bind = this.db.prepare('UPDATE users SET uid = ? WHERE email = ?');
+      for (const r of rows) {
+        const uid = normalizeUid(r.student_id);
+        if (!uid || taken.has(uid)) continue;
+        taken.add(uid);
+        bind.run(uid, r.email);
+      }
+      this.db.exec('COMMIT');
+    } catch {
+      this.db.exec('ROLLBACK'); // already present
+    }
+    try {
+      // The address a person set their account up through (task 036): an
+      // instructor removing that alias also clears the credential it set.
+      this.db.exec('ALTER TABLE users ADD COLUMN registered_via TEXT;');
+    } catch {
+      // already present
+    }
+    this.db.exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_users_uid ON users (uid) WHERE uid IS NOT NULL;');
+    // The author's role as filed (task 018). The boot that adds the column
+    // backfills it once from the roster; a report whose author has since
+    // left stays NULL (unknown) rather than being guessed.
+    try {
+      this.db.exec('ALTER TABLE feedback ADD COLUMN author_role TEXT;');
+      this.db.exec(
+        'UPDATE feedback SET author_role = (SELECT role FROM users WHERE users.email = feedback.email)',
+      );
+    } catch {
+      // already present
+    }
+    if (firstWatermarkBoot) this.snapshotLegacyContent();
+  }
+
+  /** Record every existing workbook's ids and per-question sizes as legacy:
+   *  work made before ids carried a mark. Runs once (see migrate). */
+  private snapshotLegacyContent(): void {
+    const rows = this.db
+      .prepare('SELECT email, assignment_id, state FROM workbooks')
+      .all() as unknown as { email: string; assignment_id: string; state: string }[];
+    const insert = this.db.prepare(
+      `INSERT OR IGNORE INTO legacy_content (email, assignment_id, ids, summary, recorded_at)
+       VALUES (?, ?, ?, ?, ?)`,
+    );
+    const now = new Date().toISOString();
+    for (const r of rows) {
+      let state: AssignmentState | null = null;
+      try {
+        state = JSON.parse(r.state) as AssignmentState;
+      } catch {
+        continue;
+      }
+      // The box library's internals too: an instance placed from it later
+      // keeps them (store.placeBoxInstance).
+      const ids = idsOfWorkbook(state);
+      insert.run(r.email, r.assignment_id, JSON.stringify(ids), JSON.stringify(saveSummary(state)), now);
+    }
   }
 
   close(): void {
     this.db.close();
   }
 
+  // ── server meta ────────────────────────────────────────────────
+
+  /** The provenance mint secret when MM_MINT_SECRET is unset: generated once,
+   *  then kept, so a restart (or a forgotten env var) never changes keys. */
+  mintSecret(): string {
+    const row = this.db
+      .prepare("SELECT value FROM server_meta WHERE key = 'mint_secret'")
+      .get() as unknown as { value: string } | undefined;
+    if (row) return row.value;
+    const secret = randomBytes(32).toString('hex');
+    this.db
+      .prepare("INSERT OR IGNORE INTO server_meta (key, value) VALUES ('mint_secret', ?)")
+      .run(secret);
+    return this.mintSecret();
+  }
+
   // ── users ──────────────────────────────────────────────────────
+  //
+  // Primitives only: which account a roster entry, a sign-up or an SSO
+  // assertion lands on is decided in src/identity.ts. What these enforce is
+  // the invariant that keeps a person one account — a UID on at most one row
+  // (the unique index), and an address that is one account's key never an
+  // alias of another (upsertUser / addEmailAlias throw or refuse).
 
   /**
-   * Create or update a roster row. Deliberately does NOT touch the credential:
-   * re-importing the roster mid-quarter must not log everybody out or wipe the
-   * passwords they already chose. Name/role/studentId are the roster's word,
-   * except that a blank incoming studentId leaves an existing one alone.
+   * Create or update a roster row by its key. Deliberately does NOT touch the
+   * credential: re-importing the roster mid-quarter must not log everybody out
+   * or wipe the passwords they already chose. Name/role/studentId are the
+   * roster's word, except that a blank incoming studentId leaves an existing
+   * one (and its uid) alone, and so does a missing section (a re-import
+   * without a Section column keeps it). The sort key follows the name: a
+   * caller that keeps the name and sends no key (the CLI's `add`) keeps the
+   * stored one; a new name drops a stale one. The ID becomes the account's
+   * `uid` only when `verifiedId` (the default): an ID a student typed into an
+   * access request is stored as written and verifies nothing. Throws when the
+   * email is another account's alias or the UID another account's.
    */
-  upsertUser(user: UserRow): void {
+  upsertUser(user: Omit<UserRow, 'uid'>, { verifiedId = true }: { verifiedId?: boolean } = {}): void {
+    const email = user.email;
+    const owner = this.aliasOwner(email);
+    if (owner && owner !== email) {
+      throw new Error(`${email} is a sign-in address of ${owner}; resolve it through identity.ts`);
+    }
+    const studentId = (user.studentId ?? '').trim();
     this.db
       .prepare(
-        `INSERT INTO users (email, name, role, student_id) VALUES (?, ?, ?, ?)
+        `INSERT INTO users (email, name, role, student_id, uid, section, sort_name) VALUES (?, ?, ?, ?, ?, ?, ?)
          ON CONFLICT(email) DO UPDATE SET
            name = excluded.name,
            role = excluded.role,
            student_id = CASE WHEN excluded.student_id = '' THEN users.student_id
-                             ELSE excluded.student_id END`,
+                             ELSE excluded.student_id END,
+           uid = COALESCE(excluded.uid, users.uid),
+           section = COALESCE(excluded.section, users.section),
+           sort_name = CASE WHEN excluded.name = users.name
+                            THEN COALESCE(excluded.sort_name, users.sort_name)
+                            ELSE excluded.sort_name END`,
       )
-      .run(user.email, user.name, user.role, user.studentId ?? '');
+      .run(
+        email,
+        user.name,
+        user.role,
+        studentId,
+        (verifiedId && normalizeUid(studentId)) || null,
+        user.section ?? null,
+        user.sortName ?? null,
+      );
   }
 
-  getUser(email: string): UserRow | null {
-    const row = this.db
-      .prepare('SELECT email, name, role, student_id, password_hash FROM users WHERE email = ?')
-      .get(email) as unknown as
-      | { email: string; name: string; role: Role; student_id: string; password_hash: string | null }
-      | undefined;
-    if (!row) return null;
+  private static readonly USER_COLUMNS = 'email, name, role, student_id, uid, password_hash';
+
+  private static toUser(row: {
+    email: string;
+    name: string;
+    role: Role;
+    student_id: string;
+    uid: string | null;
+    password_hash: string | null;
+  }): UserRow {
     return {
       email: row.email,
       name: row.name,
       role: row.role,
       studentId: row.student_id ?? '',
+      uid: row.uid ?? '',
       registered: row.password_hash != null,
     };
+  }
+
+  /** The account whose KEY is this email (exact; aliases are not consulted). */
+  getUser(email: string): UserRow | null {
+    const row = this.db.prepare(`SELECT ${Db.USER_COLUMNS} FROM users WHERE email = ?`).get(email) as unknown as
+      | Parameters<typeof Db.toUser>[0]
+      | undefined;
+    return row ? Db.toUser(row) : null;
+  }
+
+  /** The account an address signs in to: its key, or one of its aliases. */
+  findUserByEmail(email: string): UserRow | null {
+    return this.emailOwner(email)?.account ?? null;
+  }
+
+  /**
+   * The account an address signs in to and how it holds it: as its `key`, or
+   * as an alias from a source. A `signup` alias is the student's own word —
+   * identity.ts lets a stronger claim (the class list, SSO, an approved
+   * request) take the address from it.
+   */
+  emailOwner(email: string): { account: UserRow; source: 'key' | EmailAliasSource } | null {
+    const address = normalizeEmail(email);
+    if (!address) return null;
+    const alias = this.db.prepare('SELECT user_email, source FROM user_emails WHERE email = ?').get(address) as unknown as
+      | { user_email: string; source: EmailAliasSource }
+      | undefined;
+    const account = this.getUser(alias?.user_email ?? address);
+    return account ? { account, source: alias ? alias.source : 'key' } : null;
+  }
+
+  /** Accounts holding this student ID only as written — unverified (no uid):
+   *  an access request's typed ID, or the second of two rows sharing one. */
+  findUnverifiedIdHolders(studentId: string): UserRow[] {
+    const uid = normalizeUid(studentId);
+    if (!uid) return [];
+    const rows = this.db
+      .prepare(`SELECT ${Db.USER_COLUMNS} FROM users WHERE uid IS NULL AND student_id != ''`)
+      .all() as unknown as Parameters<typeof Db.toUser>[0][];
+    return rows.filter((r) => normalizeUid(r.student_id) === uid).map((r) => Db.toUser(r));
+  }
+
+  /** The account holding this student ID, compared in normalised form. */
+  findUserByUid(studentId: string): UserRow | null {
+    const uid = normalizeUid(studentId);
+    if (!uid) return null;
+    const row = this.db.prepare(`SELECT ${Db.USER_COLUMNS} FROM users WHERE uid = ?`).get(uid) as unknown as
+      | Parameters<typeof Db.toUser>[0]
+      | undefined;
+    return row ? Db.toUser(row) : null;
+  }
+
+  /** Bind a student ID to an account that has none (SSO's first sign-in of a
+   *  manual add). Throws when another account holds it. */
+  setUid(email: string, studentId: string): void {
+    this.db
+      .prepare("UPDATE users SET uid = ?, student_id = CASE WHEN student_id = '' THEN ? ELSE student_id END WHERE email = ?")
+      .run(normalizeUid(studentId) || null, studentId.trim(), email);
+  }
+
+  private aliasOwner(email: string): string | null {
+    const row = this.db.prepare('SELECT user_email FROM user_emails WHERE email = ?').get(email) as unknown as
+      | { user_email: string }
+      | undefined;
+    return row?.user_email ?? null;
+  }
+
+  /**
+   * Give an account another sign-in address. 'present' when it already signs
+   * in with it (a stronger source then replaces a `signup` one); 'taken' when
+   * the address is another account's key or alias — nothing is stored then —
+   * except that a stronger claim takes it from another account's `signup`
+   * alias ('added': a student's typed address yields to the class list, SSO or
+   * an approval).
+   */
+  addEmailAlias(accountEmail: string, alias: string, source: EmailAliasSource): AliasOutcome {
+    const address = normalizeEmail(alias);
+    if (address === accountEmail) return 'present';
+    const owner = this.emailOwner(address);
+    const now = new Date().toISOString();
+    if (owner?.account.email === accountEmail) {
+      if (owner.source === 'signup' && source !== 'signup') {
+        this.db.prepare('UPDATE user_emails SET source = ? WHERE email = ?').run(source, address);
+      }
+      return 'present';
+    }
+    if (owner && !(owner.source === 'signup' && source !== 'signup')) return 'taken';
+    this.db.prepare('DELETE FROM user_emails WHERE email = ?').run(address);
+    this.db
+      .prepare('INSERT INTO user_emails (email, user_email, source, added_at) VALUES (?, ?, ?, ?)')
+      .run(address, accountEmail, source, now);
+    return 'added';
+  }
+
+  /** Let go of a `signup` alias so the address can be another account's key
+   *  (a class-list row or approval creating that account). */
+  releaseSignupAlias(email: string): void {
+    this.db.prepare("DELETE FROM user_emails WHERE email = ? AND source = 'signup'").run(normalizeEmail(email));
+  }
+
+  /** Remove one of an account's aliases; false when it has no such alias. */
+  removeEmailAlias(accountEmail: string, alias: string): boolean {
+    const result = this.db
+      .prepare('DELETE FROM user_emails WHERE email = ? AND user_email = ?')
+      .run(normalizeEmail(alias), accountEmail);
+    return Number(result.changes) > 0;
+  }
+
+  /** Record the address an account was set up through (see registered_via). */
+  markRegisteredVia(accountEmail: string, address: string): void {
+    this.db.prepare('UPDATE users SET registered_via = ? WHERE email = ?').run(normalizeEmail(address), accountEmail);
+  }
+
+  /** The address the account was set up through; null when unknown or unset. */
+  registeredVia(accountEmail: string): string | null {
+    const row = this.db.prepare('SELECT registered_via FROM users WHERE email = ?').get(accountEmail) as unknown as
+      | { registered_via: string | null }
+      | undefined;
+    return row?.registered_via ?? null;
+  }
+
+  /** An account's aliases, oldest first. */
+  listEmailAliases(accountEmail: string): string[] {
+    const rows = this.db
+      .prepare('SELECT email FROM user_emails WHERE user_email = ? ORDER BY added_at, email')
+      .all(accountEmail) as unknown as { email: string }[];
+    return rows.map((r) => r.email);
   }
 
   /** The stored credential, or null when the account has no password yet. */
@@ -217,36 +561,51 @@ export class Db {
   /** Set (or, with null, clear) a credential. Clearing re-opens registration. */
   setPasswordHash(email: string, hash: string | null): void {
     this.db
-      .prepare('UPDATE users SET password_hash = ?, registered_at = ? WHERE email = ?')
-      .run(hash, hash ? new Date().toISOString() : null, email);
+      .prepare(
+        `UPDATE users SET password_hash = ?, registered_at = ?,
+           registered_via = CASE WHEN ? IS NULL THEN NULL ELSE registered_via END
+         WHERE email = ?`,
+      )
+      .run(hash, hash ? new Date().toISOString() : null, hash, email);
   }
 
-  /** The full roster with account state, for the instructor's roster view. */
+  /** The full roster with account state, for the instructor's roster view:
+   *  students first (role DESC), then by surname where the class list gave one. */
   listUsers(): RosterRow[] {
     const rows = this.db
       .prepare(
-        `SELECT email, name, role, student_id, password_hash, registered_at
-         FROM users ORDER BY role DESC, name`,
+        `SELECT email, name, role, student_id, uid, section, password_hash, registered_at
+         FROM users ORDER BY role DESC, COALESCE(sort_name, name) COLLATE NOCASE`,
       )
       .all() as unknown as {
       email: string;
       name: string;
       role: Role;
       student_id: string;
+      uid: string | null;
+      section: string | null;
       password_hash: string | null;
       registered_at: string | null;
     }[];
+    const aliases = new Map<string, string[]>();
+    const aliasRows = this.db
+      .prepare('SELECT email, user_email FROM user_emails ORDER BY added_at, email')
+      .all() as unknown as { email: string; user_email: string }[];
+    for (const a of aliasRows) aliases.set(a.user_email, [...(aliases.get(a.user_email) ?? []), a.email]);
     return rows.map((r) => ({
       email: r.email,
       name: r.name,
       role: r.role,
       studentId: r.student_id ?? '',
+      uid: r.uid ?? '',
+      section: r.section ?? null,
       registered: r.password_hash != null,
       registeredAt: r.registered_at ?? null,
+      aliases: aliases.get(r.email) ?? [],
     }));
   }
 
-  /** Remove a roster row (cascades to its sessions). Work is left in place. */
+  /** Remove a roster row (cascades to its sessions and aliases). Work is left in place. */
   removeUser(email: string): void {
     this.db.prepare('DELETE FROM users WHERE email = ?').run(email);
   }
@@ -263,31 +622,16 @@ export class Db {
   getSessionUser(token: string): UserRow | null {
     const row = this.db
       .prepare(
-        `SELECT u.email, u.name, u.role, u.student_id, u.password_hash, s.expires_at
+        `SELECT u.email, u.name, u.role, u.student_id, u.uid, u.password_hash, s.expires_at
          FROM sessions s JOIN users u ON u.email = s.email WHERE s.token = ?`,
       )
-      .get(token) as unknown as
-      | {
-          email: string;
-          name: string;
-          role: Role;
-          student_id: string;
-          password_hash: string | null;
-          expires_at: string;
-        }
-      | undefined;
+      .get(token) as unknown as (Parameters<typeof Db.toUser>[0] & { expires_at: string }) | undefined;
     if (!row) return null;
     if (new Date(row.expires_at).getTime() < Date.now()) {
       this.deleteSession(token);
       return null;
     }
-    return {
-      email: row.email,
-      name: row.name,
-      role: row.role,
-      studentId: row.student_id ?? '',
-      registered: row.password_hash != null,
-    };
+    return Db.toUser(row);
   }
 
   deleteSession(token: string): void {
@@ -384,6 +728,7 @@ export class Db {
 
   addFeedback(input: {
     email: string;
+    authorRole: Role;
     category: FeedbackCategory;
     message: string;
     screenshots: FeedbackScreenshot[];
@@ -393,12 +738,13 @@ export class Db {
     const createdAt = new Date().toISOString();
     this.db
       .prepare(
-        `INSERT INTO feedback (id, email, category, message, screenshots, context, status, created_at)
-         VALUES (?, ?, ?, ?, ?, ?, 'open', ?)`,
+        `INSERT INTO feedback (id, email, author_role, category, message, screenshots, context, status, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, 'open', ?)`,
       )
       .run(
         id,
         input.email,
+        input.authorRole,
         input.category,
         input.message,
         JSON.stringify(input.screenshots),
@@ -408,6 +754,7 @@ export class Db {
     return {
       id,
       student: input.email,
+      authorRole: input.authorRole,
       category: input.category,
       message: input.message,
       screenshots: input.screenshots,
@@ -417,35 +764,59 @@ export class Db {
     };
   }
 
-  listFeedback(): PlatformFeedback[] {
+  /** The queue, newest first. `status` narrows to open or resolved reports;
+   *  `triaged: false` to those the task pipeline has not processed yet (what
+   *  `tasks/tools/feedback.mjs pull` asks for). */
+  listFeedback(filter: { status?: FeedbackStatus; triaged?: boolean } = {}): PlatformFeedback[] {
+    const where: string[] = [];
+    const params: string[] = [];
+    if (filter.status) {
+      where.push('status = ?');
+      params.push(filter.status);
+    }
+    if (filter.triaged !== undefined) where.push(filter.triaged ? 'triage IS NOT NULL' : 'triage IS NULL');
     const rows = this.db
       .prepare(
-        'SELECT id, email, category, message, screenshots, context, status, created_at FROM feedback ORDER BY created_at DESC',
+        `SELECT id, email, author_role, category, message, screenshots, context, status, created_at, triage
+         FROM feedback ${where.length ? `WHERE ${where.join(' AND ')}` : ''} ORDER BY created_at DESC`,
       )
-      .all() as unknown as {
+      .all(...params) as unknown as {
       id: string;
       email: string;
+      author_role: Role | null;
       category: FeedbackCategory;
       message: string;
       screenshots: string;
       context: string | null;
       status: FeedbackStatus;
       created_at: string;
+      triage: string | null;
     }[];
     return rows.map((r) => ({
       id: r.id,
       student: r.email,
+      ...(r.author_role ? { authorRole: r.author_role } : {}),
       category: r.category,
       message: r.message,
       screenshots: JSON.parse(r.screenshots) as FeedbackScreenshot[],
       createdAt: r.created_at,
       status: r.status,
       context: r.context ? (JSON.parse(r.context) as { assignmentId?: string; questionId?: number }) : undefined,
+      ...(r.triage ? { triage: JSON.parse(r.triage) as FeedbackTriage } : {}),
     }));
   }
 
   setFeedbackStatus(id: string, status: FeedbackStatus): boolean {
     const result = this.db.prepare('UPDATE feedback SET status = ? WHERE id = ?').run(status, id);
+    return result.changes > 0;
+  }
+
+  /** Record (or, with null, clear) what the task pipeline made of a report.
+   *  Leaves `status` alone. False when there is no such report. */
+  setFeedbackTriage(id: string, triage: FeedbackTriage | null): boolean {
+    const result = this.db
+      .prepare('UPDATE feedback SET triage = ? WHERE id = ?')
+      .run(triage ? JSON.stringify(triage) : null, id);
     return result.changes > 0;
   }
 
@@ -492,6 +863,23 @@ export class Db {
          ON CONFLICT(id) DO UPDATE SET data = excluded.data, updated_at = excluded.updated_at`,
       )
       .run(assignment.id, JSON.stringify(assignment), new Date().toISOString());
+  }
+
+  /** Content hashes the homework sync has written for this assignment. */
+  syncedHashes(id: string): Set<string> {
+    const rows = this.db
+      .prepare('SELECT hash FROM content_sync WHERE assignment_id = ?')
+      .all(id) as { hash: string }[];
+    return new Set(rows.map((r) => r.hash));
+  }
+
+  recordSync(id: string, hash: string): void {
+    this.db
+      .prepare(
+        `INSERT INTO content_sync (assignment_id, hash, synced_at) VALUES (?, ?, ?)
+         ON CONFLICT(assignment_id, hash) DO UPDATE SET synced_at = excluded.synced_at`,
+      )
+      .run(id, hash, new Date().toISOString());
   }
 
   removeAssignment(id: string): void {
@@ -566,6 +954,52 @@ export class Db {
       .run(email, assignmentId, JSON.stringify(state), new Date().toISOString());
   }
 
+  /** Every email that has a roster row or a saved workbook — whose mint keys
+   *  the integrity check tries (someone removed from the roster included). */
+  knownEmails(): string[] {
+    const rows = this.db
+      .prepare('SELECT email FROM users UNION SELECT email FROM workbooks')
+      .all() as unknown as { email: string }[];
+    return rows.map((r) => r.email);
+  }
+
+  /** Append a save to the workbook's coarse history — only when its summary
+   *  differs from the last one recorded (an unchanged autosave adds nothing). */
+  addWorkbookSave(email: string, assignmentId: string, summary: SaveSummary): void {
+    const json = JSON.stringify(summary);
+    const last = this.db
+      .prepare(
+        `SELECT summary FROM workbook_saves WHERE email = ? AND assignment_id = ?
+         ORDER BY id DESC LIMIT 1`,
+      )
+      .get(email, assignmentId) as unknown as { summary: string } | undefined;
+    if (last?.summary === json) return;
+    this.db
+      .prepare('INSERT INTO workbook_saves (email, assignment_id, saved_at, summary) VALUES (?, ?, ?, ?)')
+      .run(email, assignmentId, new Date().toISOString(), json);
+  }
+
+  /** The workbook's save history, oldest first. */
+  listWorkbookSaves(email: string, assignmentId: string): { savedAt: string; summary: SaveSummary }[] {
+    const rows = this.db
+      .prepare(
+        `SELECT saved_at, summary FROM workbook_saves WHERE email = ? AND assignment_id = ?
+         ORDER BY id`,
+      )
+      .all(email, assignmentId) as unknown as { saved_at: string; summary: string }[];
+    return rows.map((r) => ({ savedAt: r.saved_at, summary: JSON.parse(r.summary) as SaveSummary }));
+  }
+
+  /** What this workbook held when the watermark arrived, if it existed then. */
+  legacyFor(email: string, assignmentId: string): LegacyContent | null {
+    const row = this.db
+      .prepare('SELECT ids, summary FROM legacy_content WHERE email = ? AND assignment_id = ?')
+      .get(email, assignmentId) as unknown as { ids: string; summary: string } | undefined;
+    return row
+      ? { ids: JSON.parse(row.ids) as string[], summary: JSON.parse(row.summary) as SaveSummary }
+      : null;
+  }
+
   // ── submissions ────────────────────────────────────────────────
 
   /** Append a graded attempt; the attempt number is per (assignment, student). */
@@ -574,6 +1008,7 @@ export class Db {
     email: string,
     submission: SubmissionData,
     result: SubmissionResult | undefined,
+    integrity?: SubmissionIntegrity,
   ): SubmissionRecord {
     const prev = this.db
       .prepare(
@@ -583,8 +1018,8 @@ export class Db {
     const attempt = prev.n + 1;
     this.db
       .prepare(
-        `INSERT INTO submissions (assignment_id, email, attempt, submitted_at, submission, result)
-         VALUES (?, ?, ?, ?, ?, ?)`,
+        `INSERT INTO submissions (assignment_id, email, attempt, submitted_at, submission, result, integrity)
+         VALUES (?, ?, ?, ?, ?, ?, ?)`,
       )
       .run(
         assignmentId,
@@ -593,8 +1028,16 @@ export class Db {
         submission.submittedAt,
         JSON.stringify(submission),
         result ? JSON.stringify(result) : null,
+        integrity ? JSON.stringify(integrity) : null,
       );
-    return { assignmentId, attempt, submittedAt: submission.submittedAt, submission, result };
+    return {
+      assignmentId,
+      attempt,
+      submittedAt: submission.submittedAt,
+      submission,
+      result,
+      ...(integrity ? { integrity } : {}),
+    };
   }
 
   /** All attempts for one assignment; optionally scoped to one student. */
@@ -603,23 +1046,30 @@ export class Db {
       email
         ? this.db
             .prepare(
-              `SELECT attempt, submitted_at, submission, result FROM submissions
+              `SELECT attempt, submitted_at, submission, result, integrity FROM submissions
                WHERE assignment_id = ? AND email = ? ORDER BY email, attempt`,
             )
             .all(assignmentId, email)
         : this.db
             .prepare(
-              `SELECT attempt, submitted_at, submission, result FROM submissions
+              `SELECT attempt, submitted_at, submission, result, integrity FROM submissions
                WHERE assignment_id = ? ORDER BY email, attempt`,
             )
             .all(assignmentId)
-    ) as unknown as { attempt: number; submitted_at: string; submission: string; result: string | null }[];
+    ) as unknown as {
+      attempt: number;
+      submitted_at: string;
+      submission: string;
+      result: string | null;
+      integrity: string | null;
+    }[];
     return rows.map((r) => ({
       assignmentId,
       attempt: r.attempt,
       submittedAt: r.submitted_at,
       submission: JSON.parse(r.submission) as SubmissionData,
       result: r.result ? (JSON.parse(r.result) as SubmissionResult) : undefined,
+      ...(r.integrity ? { integrity: JSON.parse(r.integrity) as SubmissionIntegrity } : {}),
     }));
   }
 
@@ -627,7 +1077,8 @@ export class Db {
    * Overwrite the stored grade of one attempt — the manual-review write path.
    * The submission snapshot is immutable; `result` is the grade side of the
    * record, which the server owns and may amend (a review annotates the
-   * stored SubmissionResult via the pure applyManualReview).
+   * stored SubmissionResult via the pure applyManualReview). `integrity`
+   * is a column of its own and untouched here.
    */
   updateSubmissionResult(
     assignmentId: string,

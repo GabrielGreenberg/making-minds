@@ -1,5 +1,7 @@
 // Core types for the Making Minds platform
 
+import type { Role } from './auth/accounts';
+
 // 'open' is the one non-machine mode: a free-text ("open question") answer with
 // no canvas, no engine, and no autograding — reviewed manually by the
 // instructor (or, later, by an LLM). Its student answer travels as
@@ -15,6 +17,13 @@ export interface Port {
   label: string;
   side: 'left' | 'right';
   index: number; // vertical order on that side
+  /** BOXED ports only (task 038): the internal endpoint this port stands for,
+   *  `${compId}:${portId}` — an internal INPUT's `:out`, OUTPUT's `:in`, or
+   *  the inner end of a wire the box was drawn across. Only
+   *  engine/netlist.ts `boxInterior` resolves it. Absent on every port of a
+   *  box placed before 038: its k-th left port binds to the k-th internal IN
+   *  by label, its j-th right port to the j-th OUT. */
+  bind?: string;
 }
 
 export type ComponentType =
@@ -28,6 +37,15 @@ export type ComponentType =
   | 'MEM'
   | 'BOXED'
   | 'STATE';
+
+// Every ComponentType, once — a Record so the compiler refuses a list that
+// misses a member (or names one that isn't). Read where untyped data is
+// checked against the union (workbookFile.ts, a file being opened).
+const COMPONENT_TYPE_SET: Record<ComponentType, true> = {
+  INPUT: true, OUTPUT: true, NOT: true, AND: true, OR: true, XOR: true,
+  HA: true, MEM: true, BOXED: true, STATE: true,
+};
+export const COMPONENT_TYPES = Object.keys(COMPONENT_TYPE_SET) as ComponentType[];
 
 export interface CircuitComponent {
   id: string;
@@ -151,8 +169,11 @@ export interface TestCase {
  */
 export interface FillInSpec {
   labels: string[];
-  /** Restrict the boxes to digits (the HW1 P11 binary-numeral case). */
-  numericOnly?: boolean;
+  /** Restrict boxes to digits: `true` = every blank (the HW1 P11
+   *  binary-numeral case), an array = per blank, parallel to `labels`.
+   *  Read it ONLY through engine/fillIn.ts `fillInBlanks` — an array is
+   *  truthy, so a bare `if (spec.numericOnly)` would lock every blank. */
+  numericOnly?: boolean | boolean[];
 }
 
 /** One blank's outcome — instructor-only, like CaseResult. */
@@ -161,6 +182,70 @@ export interface FillInCaseResult {
   expected: string;
   got: string;
   pass: boolean;
+}
+
+// ── The problem-set document (task 2026-09-21-020) ─────────────────────────
+// A homework is a DOCUMENT — the PDFs under problem sets/ have a preamble,
+// sections whose intro sentence carries the instruction for a run of problems
+// ("Design SCs that compute the following functions."), boxed callouts that
+// belong to a section or a problem, and figures. These types give that level a
+// home in the data so one renderer (components/ProblemSetDocument.tsx) can show
+// any assignment the way its author laid it out. `questions[]` stays flat and
+// stays the grading unit; everything here is display-only — the grader,
+// submissions, workbooks and the server's sanitizer never read it. Semantics
+// (section normalisation, numbering, layout) live in src/problemSet.ts.
+
+export type CalloutKind = 'hint' | 'challenge' | 'advice' | 'caution' | 'note';
+export const CALLOUT_KINDS: readonly CalloutKind[] = ['hint', 'challenge', 'advice', 'caution', 'note'];
+
+/** Where an attachment sits relative to the thing it belongs to: before its
+ *  problems (a section's instruction box), beside them on wide screens (the
+ *  PDFs' sidebar boxes and margin notes), or after them (the default). */
+export type Placement = 'before' | 'aside' | 'after';
+
+export interface Figure {
+  /** A data URL (instructor upload, size-capped by the editor) or a path
+   *  under the app's public root such as `problem-sets/hw1-mn.svg`, resolved
+   *  against the app's base URL at render time (src/problemSet.ts figureUrl). */
+  src: string;
+  alt: string;
+  caption?: string;
+  /** CSS pixel cap on the rendered width. Absent = the natural size, capped
+   *  by the column. */
+  width?: number;
+  placement?: Placement;
+}
+
+/** A boxed aside — the PDFs' "Hint:", "Challenge problem:", "Advice!",
+ *  "Caution!" and plain note boxes. `body` is statement markup. */
+export interface Callout {
+  kind: CalloutKind;
+  /** Heading; absent = the kind's default ("Hint", "Challenge problem", …). */
+  title?: string;
+  body: string;
+  placement?: Placement;
+  figures?: Figure[];
+}
+
+/** How a section's run of compact problems flows. Absent = `auto`: consecutive
+ *  truth-table problems form a grid, consecutive one-liners form columns,
+ *  anything longer takes the full width (src/problemSet.ts problemShape). */
+export type SectionLayout = 'auto' | 'list' | 'columns' | 'grid';
+
+export interface AssignmentSection {
+  /** "I. Combinatorial Circuits". Empty = a continuation: no heading or rule
+   *  is drawn, only the intro — for a fresh instruction mid-section (HW3 §I
+   *  switches from "design" to "is it possible?" after problem 6). */
+  heading: string;
+  /** Statement markup: the instruction carried by the whole run of problems. */
+  intro?: string;
+  /** The problems, in order, by AssignmentQuestion.id. Together the sections
+   *  partition the assignment's question ids; a question listed nowhere is
+   *  rendered in a trailing unnamed section so it is never lost. */
+  questionIds: number[];
+  callouts?: Callout[];
+  figures?: Figure[];
+  layout?: SectionLayout;
 }
 
 export interface AssignmentQuestion {
@@ -212,25 +297,76 @@ export interface AssignmentQuestion {
   // copies like `test_cases` (see engine/fillIn.ts + server/src/sanitize.ts).
   fill_in?: FillInSpec;
   fill_in_answers?: string[];
+  /** Boxed asides and figures that belong to this problem alone (the
+   *  document level, above; a `hint` is the lighter margin-note idiom). */
+  callouts?: Callout[];
+  figures?: Figure[];
   notes?: string;
 }
 
 /**
  * Display label for a question's mode chip. A turbot question names its inner
  * machine too ("turbot - TM"), since the brain's mode is what the student
- * actually edits; a perception question flags its bit-level task.
+ * actually edits; a perception or fill-in question flags its task.
  */
 export function questionModeLabel(
-  q: Pick<AssignmentQuestion, 'buildMode' | 'innerMode' | 'perception'>,
+  q: Pick<AssignmentQuestion, 'buildMode' | 'innerMode' | 'perception' | 'fill_in'>,
 ): string {
-  if (q.buildMode === 'turbot') return `turbot - ${q.innerMode ?? 'CC'}`;
-  return q.perception ? `${q.buildMode} - perception` : q.buildMode;
+  const task = questionTask(q);
+  if (task === 'turbot') return `turbot - ${q.innerMode ?? 'CC'}`;
+  if (task === 'fill-in') return 'open - fill-in';
+  return task === 'perception' ? `${q.buildMode} - perception` : q.buildMode;
 }
 
+/**
+ * What a question asks for — the ONE place that decides which student panel
+ * it gets, which grader branch scores it, what its answer carries and whether
+ * a graded case replays (task 005). `buildMode` picks the canvas; the task
+ * says what is done on it:
+ *   function   — a machine computing f, graded on `test_cases` (value codec)
+ *   perception — a CC/SC classifier graded bit-level on `perception_cases`
+ *   turbot     — a brain driven through `turbot_cases` arenas
+ *   open       — free prose, `pending` manual review
+ *   fill-in    — labelled blanks, autograded against `fill_in_answers`
+ * The order below is the grader's historical precedence, so classification
+ * never moved a grade. Pure (no engine import), so every side can call it.
+ */
+export type QuestionTask = 'function' | 'perception' | 'turbot' | 'open' | 'fill-in';
+
+/** The tasks each canvas mode can author, the default first (the creator's
+ *  Task toggle, coerced when the mode flips). Perception is a spatial (CC) or
+ *  temporal (SC) classification of raw bits, so only those canvases offer it. */
+export const QUESTION_TASKS: Record<BuildMode, readonly QuestionTask[]> = {
+  CC: ['function', 'perception'],
+  SC: ['function', 'perception'],
+  FSM: ['function'],
+  TM: ['function'],
+  turbot: ['turbot'],
+  open: ['open', 'fill-in'],
+};
+
+export function questionTask(
+  q: Pick<AssignmentQuestion, 'buildMode' | 'perception' | 'fill_in'>,
+): QuestionTask {
+  if (q.buildMode === 'open') return q.fill_in ? 'fill-in' : 'open';
+  if (q.buildMode === 'turbot') return 'turbot';
+  return q.perception ? 'perception' : 'function';
+}
+
+export const CC_BOXES: ReadonlyArray<'CC' | 'SC'> = ['CC'];
+export const CC_AND_SC_BOXES: ReadonlyArray<'CC' | 'SC'> = ['CC', 'SC'];
+const NO_BOXES: ReadonlyArray<'CC' | 'SC'> = [];
+
 /** Which kinds of confirmed box a canvas may place (the palette's "Boxes"
- *  section reads this; boxScopeCheck pins it).
- *    CC, SC → CC boxes. Gate-level boxes are always combinational (boxing
- *             refuses MEM), so the same box is usable on either canvas.
+ *  section and placeBoxInstance read it through the store's
+ *  selectPlaceableBoxKinds; boxScopeCheck pins it).
+ *    CC     → CC boxes (combinational). A box holding memory would make the
+ *             machine sequential, which a CC question does not ask for.
+ *    SC     → CC and SC boxes. An SC box holds a MEM (at any depth); its
+ *             memory is clocked with the machine — engine/netlist.ts inlines
+ *             it for every run, so a boxed sub-circuit behaves exactly as it
+ *             would unboxed. (The sandbox's Logic Circuit tab is buildMode CC
+ *             but is also its SC canvas: the store selector adds SC there.)
  *    FSM    → none (notes/todos.md item 2). An earlier attempt (git a05e3d6)
  *             got as far as confirm + place — `confirmBox`'s FSM rules
  *             required exactly one entry state (S_A, lowest-numbered) and one
@@ -239,8 +375,10 @@ export function questionModeLabel(
  *             symbols — tracking its own internal position across steps —
  *             before handing control back to whatever the placed instance's
  *             own outgoing transitions say next. That is not a stateless
- *             function call like a boxed CC/SC circuit (evaluateBoxedCircuit,
- *             engine/cc.ts, runs once and returns instantly); it needs the
+ *             function call like a boxed CC circuit (evaluateBoxedCircuit,
+ *             engine/cc.ts, runs once and returns instantly), nor a boxed SC
+ *             circuit's memory (more clocked state, inlined beside the rest
+ *             by engine/netlist.ts, with control still one tick); it needs the
  *             SAME kind of invented call/return convention TM boxing is
  *             refused for, below — the running machine's "current state"
  *             would have to become a stack (plain state, or box instance +
@@ -267,15 +405,19 @@ export function questionModeLabel(
  *             tape, an invented call/return convention) — a different, much
  *             larger feature, not an extension of CC/SC boxing. TM boxing is
  *             refused for the same "don't build something semantically
- *             wrong" reason SC refuses to box MEM, and FSM boxing, above.
- *  Absent `kind` on an older entry counts as CC. */
-export function placeableBoxKinds(mode: BuildMode): 'CC'[] {
+ *             wrong" reason FSM boxing is, above. (A boxed MEM is different:
+ *             it still sits on a wire boundary, and its clocked state inlines
+ *             into the one netlist the SC step already runs.)
+ *  Absent `kind` on an older entry counts as CC. The arrays are shared
+ *  constants, so a store selector can return them without re-rendering. */
+export function placeableBoxKinds(mode: BuildMode): ReadonlyArray<'CC' | 'SC'> {
   switch (mode) {
     case 'CC':
+      return CC_BOXES;
     case 'SC':
-      return ['CC'];
+      return CC_AND_SC_BOXES;
     default:
-      return [];
+      return NO_BOXES;
   }
 }
 
@@ -291,6 +433,17 @@ export interface AssignmentData {
    *  keeps a stable place. Set by the dashboard's ↑/↓ buttons. */
   order?: number;
   questions: AssignmentQuestion[];
+  /** Statement markup shown under the title, before the first section
+   *  (HW1's "Note: I have put key words in bold …"). */
+  preamble?: string;
+  /** The document structure over `questions` — see AssignmentSection. Absent
+   *  = one unnamed section holding every question, so every existing
+   *  assignment renders unchanged. */
+  sections?: AssignmentSection[];
+  /** The original handout, as a path under the app's public root
+   *  (`problem-sets/hw1.pdf`) or an absolute URL; rendered as an "Original
+   *  PDF" link. */
+  sourcePdf?: string;
 }
 
 /**
@@ -310,7 +463,94 @@ export interface SubmissionData {
     responseText?: string;
     /** Fill-in questions: one typed answer per blank, in the spec's order. */
     fillAnswers?: string[];
+    /** The question's signed editing record (task 034), copied from the
+     *  workbook; checked at submit, never graded. */
+    provenance?: QuestionProvenance;
   }[];
+}
+
+// ─── Provenance and integrity (task 034) ─────────────────────────
+// app/src/provenance/ (ids.ts, trace.ts, integrity.ts). Integrity is a set of
+// flags TO LOOK AT, never a verdict: it sits beside `result` and never
+// changes a score, and students never see it (server/src/sanitize.ts).
+
+/**
+ * One question's signed editing record: aggregates only, never a keystroke
+ * log. Kept BESIDE the answer (QuestionCircuit.provenance), never inside the
+ * text, and re-signed by the store at every edit (store.ts recordEdit) —
+ * never at save time, which would launder an injected save.
+ */
+export interface QuestionProvenance {
+  v: 1;
+  /** Edit actions (canvas history steps, undo/redo, text changes). */
+  edits: number;
+  /** Active editing time: gaps between edits summed, each capped at 60 s. */
+  activeMs: number;
+  /** Characters inserted, in total and in the largest single insertion. */
+  textIns: number;
+  maxTextIns: number;
+  /** Components added (add, box placement, paste), in total and in the
+   *  largest single action. */
+  compAdded: number;
+  maxCompIns: number;
+  /** Times the text was found changed outside the editor (sticky). */
+  outside: number;
+  /** What the question already held when its record began (legacy work). */
+  base?: { c: number; t: number };
+  /** 64-bit digest of the answer text (responseText + fillAnswers), hex. */
+  td: string;
+  /** HMAC under the mint key over the question id and every field; '' when
+   *  no key was loaded. */
+  sig: string;
+}
+
+export type IntegrityFlagCode =
+  | 'ids-other'        // ids minted under a classmate's key
+  | 'ids-unbound'      // ids not minted in this student's editor for this assignment
+  | 'text-other'       // the text's stamp is a classmate's
+  | 'text-mismatch'    // the text differs from its own stamp
+  | 'text-unsigned'    // text with no valid stamp
+  | 'outside'          // the text was changed outside the editor, then edited
+  | 'record-other'     // the editing record is a classmate's
+  | 'record-missing'   // content with no valid editing record
+  | 'one-piece-text'   // most of the text arrived in one insertion
+  | 'too-fast'         // text entered faster than a person types
+  | 'one-piece-circuit'// most of the circuit arrived in one in-app paste
+  | 'unaccounted'      // more content than the record's insertions explain
+  | 'one-save';        // most of the work appeared between two saves
+
+export interface IntegrityFlag {
+  code: IntegrityFlagCode;
+  /** Plain words for the instructor, phrased as something to look at. */
+  detail: string;
+}
+
+export interface QuestionIntegrity {
+  questionId: number;
+  ids: {
+    total: number;
+    self: number;
+    unbound: number;
+    legacy: number;
+    /** Ids minted under another person's key, by email. */
+    others: { email: string; count: number }[];
+  };
+  text: 'none' | 'self' | 'other' | 'mismatch' | 'unsigned' | 'legacy';
+  /** The editing record's signer. */
+  record: 'none' | 'self' | 'other' | 'invalid';
+  /** When `text` or `record` is 'other': whose. */
+  from?: string;
+  /** The record's aggregates when it is this student's own. */
+  trace?: Omit<QuestionProvenance, 'v' | 'td' | 'sig'>;
+  flags: IntegrityFlag[];
+}
+
+/** The integrity summary stored on a submission (instructor-only). */
+export interface SubmissionIntegrity {
+  v: 1;
+  questions: QuestionIntegrity[];
+  /** How many questions carry at least one flag. */
+  flagged: number;
 }
 
 // ─── Autograding results ─────────────────────────────────────────
@@ -320,11 +560,13 @@ export interface SubmissionData {
 // grader.ts re-exports these.
 
 /**
- * One case's outcome for a question (instructor-only — students never see failed
- * cases). All modes are value-based: `input` is the input value list `x`,
- * `expected` is `f(x)`, and `got` is the decoded output value list — empty `[]`
- * when the output was rejected before decoding. `reason` carries a rejection /
- * syntax-error explanation (malformed output, no halt, invalid machine table).
+ * One case's outcome for a question (the answer key — `expected`/`got` — is
+ * instructor-only; a student's copy keeps `input`/`pass`/`reason`/
+ * `separations`, server/src/sanitize.ts). All modes are value-based: `input`
+ * is the input value list `x`, `expected` is `f(x)`, and `got` is the decoded
+ * output value list — empty `[]` when the output was rejected before decoding.
+ * `reason` carries a rejection / syntax-error explanation (malformed output,
+ * no halt, invalid machine table).
  */
 export interface CaseResult {
   input: number[];
@@ -332,6 +574,10 @@ export interface CaseResult {
   got: number[];
   pass: boolean;
   reason?: string;
+  /** The case's TM block separations (TestCase.separations), present only
+   *  when the case has them — part of the INPUT, not the key, so a student
+   *  replaying the case gets the grader's exact tape. */
+  separations?: number[];
 }
 
 /**
@@ -362,6 +608,8 @@ export interface QuestionResult {
   manual?: ManualReview;   // open questions: the instructor's recorded verdict
   passed: number;          // test cases passed
   total: number;           // test cases total
+  // Parallel to the question's bank: cases[k] is test_cases[k] (and
+  // turbotCases[k] is turbot_cases[k]) — a replay of case k relies on it.
   cases: CaseResult[];
   // Populated instead of `cases` for turbot questions — arena grading
   // doesn't produce an f(x) value comparison, so it gets its own result shape.
@@ -394,14 +642,34 @@ export interface SubmissionRecord {
   submittedAt: string;     // ISO timestamp (canonical)
   submission: SubmissionData;
   result?: SubmissionResult; // autograde computed at receipt (see SubmissionStore)
+  /** Provenance check computed at receipt (task 034) — instructor-only,
+   *  stripped from every student copy, never part of the score. */
+  integrity?: SubmissionIntegrity;
 }
 
 // ── Platform feedback (notes/todos.md item 9) ──────────────────────────────
-// A student's report on the platform or a homework, queued for an instructor.
+// A report on the platform or a homework, queued for an instructor.
 // Not grading, not a submission — its own small seam (FeedbackStore).
 
 export type FeedbackCategory = 'platform design' | 'homework content';
 export type FeedbackStatus = 'open' | 'resolved';
+
+/** What the task pipeline made of a report (task 018; set by
+ *  `tasks/tools/feedback.mjs mark`, never by the app): `filed` — it became,
+ *  or joined, the listed tasks; `personal` — it is about the student, not
+ *  the platform or a homework, so it is left for the instructor and never
+ *  filed; `dismissed` — noise, a duplicate or already done (`note` says
+ *  which). Independent of `status`: resolving stays the instructor's act. */
+export type FeedbackTriageOutcome = 'filed' | 'personal' | 'dismissed';
+
+export interface FeedbackTriage {
+  outcome: FeedbackTriageOutcome;
+  /** `filed` only: task ids in the `tasks/` queue (`2026-09-24-040`). */
+  tasks?: string[];
+  /** A line on why; required for `dismissed`. */
+  note?: string;
+  at: string; // ISO; the server's word
+}
 
 /** One attached screenshot, downscaled and base64-encoded client-side before
  *  it ever reaches the store (see components/FeedbackPanel.tsx). */
@@ -413,6 +681,10 @@ export interface FeedbackScreenshot {
 export interface PlatformFeedback {
   id: string;
   student: string; // email — feedback is tied to identity so an instructor can follow up
+  /** The capacity they filed in, stamped at filing from the session (task
+   *  018). Absent = unknown: a report older than the stamp whose author has
+   *  since left the roster. */
+  authorRole?: Role;
   category: FeedbackCategory;
   message: string;
   screenshots: FeedbackScreenshot[];
@@ -421,6 +693,8 @@ export interface PlatformFeedback {
   /** Where the student was when they filed it, if anywhere — helps triage
    *  "homework content" reports. Auto-filled from the current route. */
   context?: { assignmentId?: string; questionId?: number };
+  /** Absent = the task pipeline has not processed it yet. */
+  triage?: FeedbackTriage;
 }
 
 // ── Instructor notes (notes/todos.md item 12) ──────────────────────────────
@@ -452,6 +726,8 @@ export interface QuestionCircuit {
    *  accidental edits, toggled from the question workspace. Absent/false =
    *  unlocked (back-compat with saves that predate this). */
   done?: boolean;
+  /** The signed editing record (task 034); absent before the first edit. */
+  provenance?: QuestionProvenance;
 }
 
 /** A student's in-progress work for one assignment — the persisted payload. */
@@ -490,6 +766,9 @@ export interface WorksheetData {
 
 export interface WorkbookData {
   formatVersion: 2;
+  /** The integrity notice (task 034, provenance/notice.ts) — written on
+   *  export, ignored on import. */
+  notice?: string;
   metadata: {
     title: string;
     author: string;
@@ -518,13 +797,14 @@ export interface WorkbookData {
 export interface ConfirmedBoxDef {
   id: string; // same id as the BoxDefinition it was confirmed from
   name: string;
-  /** Which canvas the box was confirmed on, which decides where it may be
-   *  placed (see placeableBoxKinds). Absent = CC (older entries). A box drawn
-   *  on an SC canvas is a CC box: boxing refuses a selection containing MEM,
-   *  so every gate-level box is purely combinational. A saved `'FSM'` value
-   *  can still appear on data from before FSM boxing was retired (notes/
-   *  todos.md item 2); placeableBoxKinds never offers it for placement. */
-  kind?: 'CC' | 'FSM';
+  /** What the box computes, which decides where it may be placed (see
+   *  placeableBoxKinds): 'SC' when its internals hold a MEM at any depth (a
+   *  sequential box, placeable only where a machine may be sequential), else
+   *  'CC'. confirmBox always writes it; absent = CC (older entries, from when
+   *  boxing refused MEM). A saved `'FSM'` value can still appear on data from
+   *  before FSM boxing was retired (notes/todos.md item 2); placeableBoxKinds
+   *  never offers it for placement. */
+  kind?: 'CC' | 'SC' | 'FSM';
   inputPortIds: string[];
   outputPortIds: string[];
   internalComponents: CircuitComponent[];

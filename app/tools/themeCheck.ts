@@ -34,6 +34,8 @@ const PAGE_COMPONENTS = [
   'components/SessionControls.tsx',
   'components/HomeScreen.tsx',
   'components/AssignmentOverview.tsx',
+  'components/ProblemSetDocument.tsx',
+  'components/StatementBody.tsx',
   'components/GradesView.tsx',
   'components/GradeSheet.tsx',
   'components/StudentLayout.tsx',

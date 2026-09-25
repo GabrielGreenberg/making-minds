@@ -1,22 +1,39 @@
 import { useState } from 'react';
+import type { Callout, Figure } from '../types';
+import { CalloutsEditor, FiguresEditor } from './DocumentEditors';
 import type {
   AssignmentData,
   AssignmentQuestion,
   BuildMode,
   ComponentType,
   RepSystem,
-  ArenaConfig,
-  TurbotSuccessCriterion,
   PerceptionRule,
+  QuestionTask,
 } from '../types';
+import { QUESTION_TASKS, questionTask } from '../types';
+import { FillInBlanksEditor } from './FillInBlanksEditor';
+import {
+  blankDraftsOf,
+  fillInFields,
+  fillInProblems,
+  misplacedAnswersWarning,
+  misplacedBlanks,
+  newBlankDraft,
+} from './fillInAuthoring';
 import {
   buildPerceptionCases,
   describePerceptionRule,
   MAX_PERCEPTION_WIDTH,
   MIN_PERCEPTION_WIDTH,
 } from '../engine/perception';
-import { ArenaCanvas } from '../components/ArenaCanvas';
-import { blankArena, resizeArena, setArenaCell, placeStart, MAX_ARENA_SIZE } from './arenaEditing';
+import { TurbotArenasEditor } from './TurbotArenasEditor';
+import {
+  misplacedArenas,
+  misplacedArenasWarning,
+  turbotCaseDraftsOf,
+  turbotCaseProblems,
+  turbotCasesField,
+} from './turbotCaseAuthoring';
 import {
   buildQuestionBank,
   type AuthoredInputGroup,
@@ -51,7 +68,8 @@ interface Props {
 // tested on a fixed sample of values across a range of input lengths and have
 // no size field at all. 'Open' is the odd one out: a free-text question is
 // just a name + statement — no representation, formula, or test bank — and is
-// reviewed manually instead of autograded.
+// reviewed manually instead of autograded; its fill-in task adds labelled
+// blanks with an answer each, and is autograded by string comparison.
 const MODES: { mode: BuildMode; label: string }[] = [
   { mode: 'CC', label: 'CC' },
   { mode: 'SC', label: 'SC' },
@@ -61,19 +79,13 @@ const MODES: { mode: BuildMode; label: string }[] = [
   { mode: 'open', label: 'Open' },
 ];
 
-// A turbot's brain is one of the four machine kinds (spec §9.3); the arena
-// and criterion are shared regardless of which brain drives the turbot.
+// A turbot's brain is one of the four machine kinds (spec §9.3); the arenas
+// and their criteria are the same whichever brain drives the turbot.
 const INNER_MODES: { mode: BuildMode; label: string }[] = [
   { mode: 'CC', label: 'CC' },
   { mode: 'SC', label: 'SC' },
   { mode: 'FSM', label: 'FSM' },
   { mode: 'TM', label: 'TM' },
-];
-
-const CRITERIA: { value: TurbotSuccessCriterion; label: string; hint: string }[] = [
-  { value: 'reach-and-stop', label: 'Reach goal and stop', hint: 'The turbot must halt itself (motor 00) on the goal cell.' },
-  { value: 'pass-through', label: 'Pass through goal', hint: 'The turbot must visit the goal cell at some step.' },
-  { value: 'return-to-start', label: 'Return to start', hint: 'The turbot must end on its starting cell — first visiting the goal cell, if the arena has one.' },
 ];
 
 // The restrictable gate vocabulary (`allowed_components`, semantics in
@@ -97,15 +109,6 @@ const BUDGETABLE_COMPONENTS: { type: ComponentType; label: string }[] = [
   { type: 'BOXED', label: 'Boxed sub-parts' },
 ];
 
-type ArenaTool = 'block' | 'goal' | 'erase' | 'start';
-
-const ARENA_TOOLS: { tool: ArenaTool; label: string }[] = [
-  { tool: 'block', label: 'Block' },
-  { tool: 'goal', label: 'Goal' },
-  { tool: 'erase', label: 'Erase' },
-  { tool: 'start', label: 'Turbot' },
-];
-
 const SAMPLING_NOTE: Partial<Record<BuildMode, string>> = {
   SC: 'SC inputs stream over time, so this question is tested on a sample of input values across a range of input lengths.',
   FSM: 'FSM inputs stream over time, so this question is tested on a sample of input values across a range of input lengths.',
@@ -115,6 +118,16 @@ const SAMPLING_NOTE: Partial<Record<BuildMode, string>> = {
 function blankInput(): AuthoredInputGroup {
   return { name: '', maxVal: 1 };
 }
+
+// The Task toggle's words for each task a mode offers (types.ts QUESTION_TASKS;
+// a mode with one task shows no toggle).
+const TASK_LABELS: Record<QuestionTask, string> = {
+  function: 'Function',
+  perception: 'Perception',
+  turbot: 'Turbot',
+  open: 'Free response',
+  'fill-in': 'Fill-in blanks',
+};
 
 // Representation systems the codec grades against (the display-only 'plus' is not
 // a grading representation, so it isn't offered here).
@@ -212,13 +225,30 @@ export function QuestionCreator({ assignment, existingQuestion, onSave, onCancel
   const [title, setTitle] = useState(existingQuestion?.title ?? '');
   // Optional nudge, rendered italic on its own line under the statement.
   const [hint, setHint] = useState(existingQuestion?.hint ?? '');
+  // The problem's own callout boxes and figures (the document level).
+  const [callouts, setCallouts] = useState<Callout[]>(existingQuestion?.callouts ?? []);
+  const [figures, setFigures] = useState<Figure[]>(existingQuestion?.figures ?? []);
+
+  // What the question asks for (types.ts questionTask) — a choice among the
+  // tasks its mode offers: Function/Perception on CC and SC, Free response/
+  // Fill-in blanks on Open. Held as picked and coerced to the mode below, so
+  // flipping the mode away and back keeps the choice.
+  const [task, setTask] = useState<QuestionTask>(
+    existingQuestion ? questionTask(existingQuestion) : 'function',
+  );
+
+  // ── Fill-in fields (open questions with task === 'fill-in') ────
+  // One row per blank — label, digits-only flag and answer together
+  // (./fillInAuthoring.ts); saved as `fill_in` + the stripped `fill_in_answers`.
+  // `savedBlanks` are the rows the question opened with: students' answers
+  // are stored by position, so the ones that no longer keep their slot are
+  // warned about in the editor and confirmed at save.
+  const [savedBlanks] = useState(() => blankDraftsOf(existingQuestion));
+  const [blankDrafts, setBlankDrafts] = useState(savedBlanks);
 
   // ── Perception fields (CC/SC questions with task === 'perception') ──
   // Perception questions grade raw bit frames against a rule, not a formula
   // (engine/perception.ts); representation is implicitly binary bits.
-  const [task, setTask] = useState<'function' | 'perception'>(
-    existingQuestion?.perception ? 'perception' : 'function',
-  );
   const [pKind, setPKind] = useState<PerceptionKind>(
     existingQuestion?.perception?.rule.kind ?? 'min-run',
   );
@@ -235,30 +265,18 @@ export function QuestionCreator({ assignment, existingQuestion, onSave, onCancel
   });
 
   // ── Turbot-only fields (mode === 'turbot') ─────────────────────
-  // One primary arena per question for now; the data model (`turbot_cases`)
-  // is a list so held-out grading arenas can be added without a migration.
+  // The arena family (`turbot_cases`): one draft per arena, each with its own
+  // criterion and step budget (./turbotCaseAuthoring.ts), never fewer than
+  // one. The arena being edited is held by its draft key, so reordering or
+  // removing arenas never points the editor at another one. `savedArenas` are
+  // the rows the question opened with (none for a new question or one of
+  // another mode): graded runs are stored by position, so the saved arenas
+  // that no longer keep their slot are warned about and confirmed at save.
   const [innerMode, setInnerMode] = useState<BuildMode>(existingQuestion?.innerMode ?? 'CC');
-  const [arena, setArena] = useState<ArenaConfig>(
-    () => existingQuestion?.turbot_cases?.[0]?.arena ?? blankArena(),
-  );
-  const [maxSteps, setMaxSteps] = useState<number>(
-    existingQuestion?.turbot_cases?.[0]?.maxSteps ?? 100,
-  );
-  const [criterion, setCriterion] = useState<TurbotSuccessCriterion>(
-    existingQuestion?.turbot_cases?.[0]?.criterion ?? 'reach-and-stop',
-  );
-  const [arenaTool, setArenaTool] = useState<ArenaTool>('block');
-
-  const handleArenaClick = (x: number, y: number) => {
-    setArena((a) => {
-      switch (arenaTool) {
-        case 'block': return setArenaCell(a, x, y, 'block');
-        case 'goal': return setArenaCell(a, x, y, 'goal');
-        case 'erase': return setArenaCell(a, x, y, 'empty');
-        case 'start': return placeStart(a, x, y);
-      }
-    });
-  };
+  const [caseDrafts, setCaseDrafts] = useState(() => turbotCaseDraftsOf(existingQuestion));
+  const [savedArenas] = useState(() =>
+    (existingQuestion?.turbot_cases?.length ?? 0) > 0 ? caseDrafts : []);
+  const [activeArenaKey, setActiveArenaKey] = useState(() => caseDrafts[0].key);
 
   // The single input the live probe evaluates the formulas on. Keyed by group
   // name (robust to add/remove/reorder); unset groups default to their max value.
@@ -271,8 +289,13 @@ export function QuestionCreator({ assignment, existingQuestion, onSave, onCancel
   // ── Live, per-keystroke validation (all O(#groups), no space enumeration) ──
   const isTurbot = mode === 'turbot';
   const isOpen = mode === 'open';
-  const canPerceive = mode === 'CC' || mode === 'SC';
-  const isPerception = canPerceive && task === 'perception';
+  const taskChoices = QUESTION_TASKS[mode];
+  const effTask: QuestionTask = taskChoices.includes(task) ? task : taskChoices[0];
+  const isPerception = effTask === 'perception';
+  const isFillIn = effTask === 'fill-in';
+  const fillInErrors = isFillIn ? fillInProblems(blankDrafts) : [];
+  // Saving anything but these blanks (another task, another mode) drops them.
+  const misplacedAnswers = misplacedBlanks(savedBlanks, isFillIn ? blankDrafts : []);
 
   // The restriction applies to gate-vocabulary canvases: CC/SC questions
   // (function or perception) and turbot questions whose brain is CC/SC.
@@ -354,22 +377,24 @@ export function QuestionCreator({ assignment, existingQuestion, onSave, onCancel
     : null;
   const formulasOk = probe ? probe.outputErrors.every((e) => e == null) : false;
 
-  // Turbot questions are gated on the arena instead of the formula pipeline:
-  // goal-directed criteria need at least one goal cell to be satisfiable.
-  const arenaHasGoal = arena.cells.some((row) => row.some((c) => c === 'goal'));
-  const needsGoal = criterion === 'reach-and-stop' || criterion === 'pass-through';
-  const arenaError = isTurbot && needsGoal && !arenaHasGoal
-    ? 'This success criterion needs at least one goal cell in the arena.'
-    : null;
+  // Turbot questions are gated on their arenas instead of the formula
+  // pipeline: every arena must be passable (goal-directed criteria need a
+  // goal cell) with a step budget of at least 1.
+  const turbotProblems = isTurbot ? turbotCaseProblems(caseDrafts) : [];
+  // Saving another mode drops every arena, so every graded run loses its own.
+  const misplacedRuns = misplacedArenas(savedArenas, isTurbot ? caseDrafts : []);
 
-  // Open questions are just a name + statement; nothing else gates saving.
+  // A free-response question is just a name + statement; a fill-in one also
+  // needs a sound list of blanks. A problem may be its title alone ("Spiral"
+  // over an arena, "+1 T"), so either the title or the statement must say
+  // something.
   const saveable =
     label.trim().length > 0 &&
-    statement.trim().length > 0 &&
+    (statement.trim().length > 0 || title.trim().length > 0) &&
     (isOpen
-      ? true
+      ? fillInErrors.length === 0
       : isTurbot
-        ? maxSteps >= 1 && !arenaError
+        ? turbotProblems.length === 0
         : isPerception
           ? !perceptionError
           : structurallyValid && !tooLarge && formulasOk);
@@ -380,30 +405,41 @@ export function QuestionCreator({ assignment, existingQuestion, onSave, onCancel
 
   const handleSave = () => {
     if (!saveable) return;
+    // What this save would misplace in work already stored by position.
+    const misplacing = [
+      ...(misplacedAnswers.length > 0 ? [misplacedAnswersWarning(misplacedAnswers)] : []),
+      ...(misplacedRuns.length > 0 ? [misplacedArenasWarning(misplacedRuns)] : []),
+    ];
+    if (misplacing.length > 0 && !window.confirm(`${misplacing.join('\n\n')}\n\nSave anyway?`)) {
+      return;
+    }
 
     const existingQsForId = assignment.questions;
     const newId =
       existingQuestion?.id ??
       existingQsForId.reduce((max, q) => Math.max(max, q.id), 0) + 1;
 
-    // Open questions carry only their prompt — no test bank, no grading
-    // machinery. The representation field is meaningless for them; store the
-    // default so the type stays uniform.
+    // Open questions carry their prompt and, for fill-in, the blanks + their
+    // key — no test bank, no machine. A free-response save drops any blanks.
+    // The representation field is meaningless for them; store the default so
+    // the type stays uniform.
     if (mode === 'open') {
       onSave({
         id: newId,
         label: label.trim(),
         ...(title.trim() ? { title: title.trim() } : {}),
-      ...(hint.trim() ? { hint: hint.trim() } : {}),
         ...(hint.trim() ? { hint: hint.trim() } : {}),
+        ...(callouts.length ? { callouts } : {}),
+        ...(figures.length ? { figures } : {}),
         statement: statement.trim(),
         buildMode: 'open',
         representation: 'binary',
+        ...(isFillIn ? fillInFields(blankDrafts) : {}),
       });
       return;
     }
 
-    // Turbot questions carry an arena + criterion, not a generated test bank.
+    // Turbot questions carry their arenas + criteria, not a generated test bank.
     // The authored encoding still matters: it picks a turbot-TM brain's
     // internal tape alphabet (binary {0,1,*}, unary {0,1}) for the editor,
     // the arena driver loop, and grading.
@@ -412,8 +448,9 @@ export function QuestionCreator({ assignment, existingQuestion, onSave, onCancel
         id: newId,
         label: label.trim(),
         ...(title.trim() ? { title: title.trim() } : {}),
-      ...(hint.trim() ? { hint: hint.trim() } : {}),
         ...(hint.trim() ? { hint: hint.trim() } : {}),
+        ...(callouts.length ? { callouts } : {}),
+        ...(figures.length ? { figures } : {}),
         statement: statement.trim(),
         buildMode: 'turbot',
         representation: rep,
@@ -421,7 +458,7 @@ export function QuestionCreator({ assignment, existingQuestion, onSave, onCancel
         ...componentLimitsField,
         ...maxTapeCellsField,
         innerMode,
-        turbot_cases: [{ arena, maxSteps, criterion }],
+        turbot_cases: turbotCasesField(caseDrafts),
       });
       return;
     }
@@ -440,8 +477,9 @@ export function QuestionCreator({ assignment, existingQuestion, onSave, onCancel
         id: newId,
         label: label.trim(),
         ...(title.trim() ? { title: title.trim() } : {}),
-      ...(hint.trim() ? { hint: hint.trim() } : {}),
         ...(hint.trim() ? { hint: hint.trim() } : {}),
+        ...(callouts.length ? { callouts } : {}),
+        ...(figures.length ? { figures } : {}),
         statement: statement.trim(),
         buildMode: mode,
         representation: 'binary',
@@ -472,6 +510,8 @@ export function QuestionCreator({ assignment, existingQuestion, onSave, onCancel
       label: label.trim(),
       ...(title.trim() ? { title: title.trim() } : {}),
       ...(hint.trim() ? { hint: hint.trim() } : {}),
+      ...(callouts.length ? { callouts } : {}),
+      ...(figures.length ? { figures } : {}),
       statement: statement.trim(),
       buildMode: mode,
       representation: rep,
@@ -544,19 +584,23 @@ export function QuestionCreator({ assignment, existingQuestion, onSave, onCancel
             ))}
           </div>
         </div>
-        {canPerceive && (
+        {taskChoices.length > 1 && (
           <div className="mm-section-head">
             <h3>Task</h3>
             <div className="mm-segmented">
-              {(['function', 'perception'] as const).map((t) => (
+              {taskChoices.map((t) => (
                 <button
                   key={t}
                   className={
-                    'mm-segmented-btn' + (task === t ? ' mm-segmented-btn--active' : '')
+                    'mm-segmented-btn' + (effTask === t ? ' mm-segmented-btn--active' : '')
                   }
-                  onClick={() => setTask(t)}
+                  onClick={() => {
+                    setTask(t);
+                    // A first switch to fill-in starts with one blank to fill.
+                    if (t === 'fill-in' && blankDrafts.length === 0) setBlankDrafts([newBlankDraft([])]);
+                  }}
                 >
-                  {t === 'function' ? 'Function' : 'Perception'}
+                  {TASK_LABELS[t]}
                 </button>
               ))}
             </div>
@@ -595,11 +639,23 @@ export function QuestionCreator({ assignment, existingQuestion, onSave, onCancel
             </span>
           </label>
         )}
-        {isOpen && (
+        {isOpen && !isFillIn && (
           <p className="mm-note mm-hint">
             An open question is answered in free text and is not autograded — review the
             responses in the gradebook. (LLM-assisted grading may plug in here later.)
           </p>
+        )}
+        {isFillIn && (
+          <>
+            <p className="mm-note mm-hint">
+              The student types an answer into each labelled blank, and it is autograded by
+              string comparison — surrounding spaces and leading zeros are ignored
+              (&#8220;0011&#8221; matches &#8220;11&#8221;). A digits-only blank refuses every
+              other character. Answers match blanks by position: once students have started,
+              relabel blanks in place and add new ones at the end.
+            </p>
+            <FillInBlanksEditor drafts={blankDrafts} saved={savedBlanks} onChange={setBlankDrafts} />
+          </>
         )}
         {isTurbot && (
           <>
@@ -710,97 +766,17 @@ export function QuestionCreator({ assignment, existingQuestion, onSave, onCancel
         )}
       </section>
 
-      {/* Turbot: arena editor + success criterion (replaces the value-based
-          inputs/target-function pipeline below) */}
+      {/* Turbot: the arena family, each arena with its own success criterion
+          and step budget (replaces the value-based inputs/target-function
+          pipeline below) */}
       {isTurbot && (
-        <>
-          <section className="instructor-creator-section">
-            <div className="mm-section-head">
-              <h3>Arena</h3>
-              <div className="mm-segmented">
-                {ARENA_TOOLS.map((t) => (
-                  <button
-                    key={t.tool}
-                    className={
-                      'mm-segmented-btn' +
-                      (arenaTool === t.tool ? ' mm-segmented-btn--active' : '')
-                    }
-                    onClick={() => setArenaTool(t.tool)}
-                  >
-                    {t.label}
-                  </button>
-                ))}
-              </div>
-            </div>
-            <p className="mm-note mm-hint">
-              Click cells to paint with the selected tool. With the Turbot tool, click a cell to
-              move the start there; click the turbot again to rotate it.
-            </p>
-            <div className="instructor-arena-size">
-              <label className="mm-inline-field">
-                width
-                <input
-                  className="mm-input mm-input--num"
-                  type="number"
-                  min={1}
-                  max={MAX_ARENA_SIZE}
-                  value={arena.width}
-                  onChange={(e) => setArena((a) => resizeArena(a, Number(e.target.value), a.height))}
-                />
-              </label>
-              <label className="mm-inline-field">
-                height
-                <input
-                  className="mm-input mm-input--num"
-                  type="number"
-                  min={1}
-                  max={MAX_ARENA_SIZE}
-                  value={arena.height}
-                  onChange={(e) => setArena((a) => resizeArena(a, a.width, Number(e.target.value)))}
-                />
-              </label>
-            </div>
-            {/* Scroll container: a max-size (30×30) arena is ~1200px square at the
-                default cell size, well past the editor panel — let it scroll in
-                both axes instead of blowing out the form layout. */}
-            <div style={{ overflow: 'auto', maxWidth: '100%', maxHeight: '60vh' }}>
-              <ArenaCanvas arena={arena} onCellClick={handleArenaClick} />
-            </div>
-            {arenaError && <p className="instructor-preview-warning">{arenaError}</p>}
-          </section>
-
-          <section className="instructor-creator-section">
-            <div className="mm-section-head">
-              <h3>Success criterion</h3>
-            </div>
-            <div className="instructor-criterion-row">
-              <select
-                className="mm-input"
-                value={criterion}
-                onChange={(e) => setCriterion(e.target.value as TurbotSuccessCriterion)}
-              >
-                {CRITERIA.map((c) => (
-                  <option key={c.value} value={c.value}>{c.label}</option>
-                ))}
-              </select>
-              <label className="mm-inline-field">
-                max steps
-                <input
-                  className="mm-input mm-input--num"
-                  type="number"
-                  min={1}
-                  max={10000}
-                  value={maxSteps}
-                  onChange={(e) => setMaxSteps(Math.max(1, Math.trunc(Number(e.target.value)) || 1))}
-                />
-              </label>
-            </div>
-            <p className="mm-note mm-hint">
-              {CRITERIA.find((c) => c.value === criterion)?.hint} The turbot fails if it exceeds
-              the step budget.
-            </p>
-          </section>
-        </>
+        <TurbotArenasEditor
+          drafts={caseDrafts}
+          saved={savedArenas}
+          activeKey={activeArenaKey}
+          onChange={setCaseDrafts}
+          onSelect={setActiveArenaKey}
+        />
       )}
 
       {/* Perception: rule + retina size (replaces the value-based
@@ -983,9 +959,11 @@ export function QuestionCreator({ assignment, existingQuestion, onSave, onCancel
             value={statement}
             onChange={(e) => setStatement(e.target.value)}
             placeholder={
-              isOpen
-                ? 'Write the question the student answers in prose (mention the expected length, e.g. ~1 paragraph)…'
-                : "Describe the function the student's circuit must compute…"
+              isFillIn
+                ? 'Write the question the blanks answer (e.g. Represent the numbers zero through ten in binary.)…'
+                : isOpen
+                  ? 'Write the question the student answers in prose (mention the expected length, e.g. ~1 paragraph)…'
+                  : "Describe the function the student's circuit must compute…"
             }
           />
         </label>
@@ -1003,6 +981,8 @@ export function QuestionCreator({ assignment, existingQuestion, onSave, onCancel
             onChange={(e) => setHint(e.target.value)}
           />
         </label>
+        <CalloutsEditor label="Callout boxes for this problem" callouts={callouts} onChange={setCallouts} />
+        <FiguresEditor label="Figures for this problem" figures={figures} onChange={setFigures} />
         {statement.trim() && (
           <div className="instructor-statement-preview">
             <div className="mm-label">Preview</div>

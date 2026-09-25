@@ -14,7 +14,7 @@
 // transition matches — for a turbot TM, halting IS stopping.
 //
 // This module is a driver loop around the per-mode single-step evaluators
-// (evaluateCCInputs, evaluateSCSingleStep, evaluateFSMSingleStep) plus the
+// (evaluateCCInputs, evaluateSCStep, evaluateFSMSingleStep) plus the
 // turbot-TM step defined here, mirroring evaluateTMSequence's
 // step/halt/history loop.
 
@@ -35,7 +35,8 @@ import type {
   TMNotation,
 } from '../types';
 import { evaluateCCInputs } from './cc';
-import { evaluateSCSingleStep } from './sc';
+import { scNetlist, evaluateSCStep } from './sc';
+import { memorySlots } from './netlist';
 import { sortStateComponents, evaluateFSMSymbolStep } from './fsm';
 import { turbotFsmNotation, validateTransitionTable } from './notation';
 import { readCell } from './tm';
@@ -295,7 +296,7 @@ export function validateTurbotTM(
 // current state id for FSM/TM); CC is stateless per spec §9.3.
 
 export interface BrainState {
-  memValues?: number[];   // SC: current MEM stored values
+  memValues?: number[];   // SC: current MEM stored values (memorySlots order, boxed MEMs included)
   stateId?: string;       // FSM/TM: current control-state component id
   tape?: TMTape;          // TM: the private tape (blank at start, per the textbook)
 }
@@ -311,10 +312,7 @@ export interface BrainStepResult {
 /** Initial brain state for a given inner mode. */
 export function initialBrainState(components: CircuitComponent[], innerMode: BuildMode): BrainState {
   if (innerMode === 'SC') {
-    const sortedMems = components
-      .filter((c) => c.type === 'MEM')
-      .sort((a, b) => (parseInt(a.label.replace(/\D/g, '')) || 0) - (parseInt(b.label.replace(/\D/g, '')) || 0));
-    return { memValues: sortedMems.map((m) => m.storedValue ?? 0) };
+    return { memValues: memorySlots(components).map((s) => s.value) };
   }
   if (innerMode === 'FSM' || innerMode === 'TM') {
     const states = sortStateComponents(components);
@@ -349,19 +347,7 @@ export function runBrainStep(
   }
 
   if (innerMode === 'SC') {
-    const sortedInputs = components
-      .filter((c) => c.type === 'INPUT')
-      .sort((a, b) => (parseInt(a.label.replace('IN', '')) || 0) - (parseInt(b.label.replace('IN', '')) || 0));
-    const sortedOutputs = components
-      .filter((c) => c.type === 'OUTPUT')
-      .sort((a, b) => (parseInt(a.label.replace('OUT', '')) || 0) - (parseInt(b.label.replace('OUT', '')) || 0));
-    const sortedMems = components
-      .filter((c) => c.type === 'MEM')
-      .sort((a, b) => (parseInt(a.label.replace(/\D/g, '')) || 0) - (parseInt(b.label.replace(/\D/g, '')) || 0));
-    const step = evaluateSCSingleStep(
-      components, wires, [sensorBit],
-      sortedInputs, sortedOutputs, sortedMems, brainState.memValues ?? []
-    );
+    const step = evaluateSCStep(scNetlist(components, wires), [sensorBit], brainState.memValues ?? []);
     const motor = decodeMotorCommand(step.outputBits);
     return { motor, input: String(sensorBit), action: motor, brainState: { memValues: step.newMemValues } };
   }
@@ -509,7 +495,9 @@ export function runTurbot(
 
 // ─── Success criteria (spec §12.5) ───────────────────────────────────
 
-function isGoal(arena: ArenaConfig, x: number, y: number): boolean {
+/** Is (x, y) a goal cell? The criteria below judge by it; the live Map's
+ *  goal-reached cue (store.ts `turbotStep`) asks the same question. */
+export function isGoalCell(arena: ArenaConfig, x: number, y: number): boolean {
   return cellAt(arena, x, y) === 'goal';
 }
 
@@ -537,18 +525,17 @@ export function evaluateTurbotCriterion(
 ): boolean {
   switch (criterion) {
     case 'reach-and-stop':
-      return run.stopped && isGoal(arena, run.finalState.x, run.finalState.y);
+      return run.stopped && isGoalCell(arena, run.finalState.x, run.finalState.y);
     case 'pass-through':
-      if (isGoal(arena, arena.start.x, arena.start.y)) return true;
-      return run.history.some((h) => isGoal(arena, h.x, h.y));
+      if (isGoalCell(arena, arena.start.x, arena.start.y)) return true;
+      return run.history.some((h) => isGoalCell(arena, h.x, h.y));
     case 'return-to-start': {
       if (run.finalState.x !== arena.start.x || run.finalState.y !== arena.start.y) return false;
-      const hasGoal = arena.cells.some((row) => row.some((c) => c === 'goal'));
-      if (!hasGoal) return true;
+      if (!arenaHasGoal(arena)) return true;
       // A goal on the start cell is visited by construction (arenaEditing
       // allows that authoring pattern), mirroring pass-through's rule.
-      if (isGoal(arena, arena.start.x, arena.start.y)) return true;
-      return run.history.some((h) => isGoal(arena, h.x, h.y));
+      if (isGoalCell(arena, arena.start.x, arena.start.y)) return true;
+      return run.history.some((h) => isGoalCell(arena, h.x, h.y));
     }
   }
 }
@@ -599,4 +586,21 @@ export function explainTurbotCriterionFailure(
  */
 export function criterionRequiresStop(criterion: TurbotSuccessCriterion): boolean {
   return criterion !== 'pass-through';
+}
+
+/** Whether the arena declares at least one goal cell. */
+export function arenaHasGoal(arena: ArenaConfig): boolean {
+  return arena.cells.some((row) => row.some((c) => c === 'goal'));
+}
+
+/**
+ * Whether a criterion can only ever be met in an arena with a goal cell —
+ * the authoring-side reading of evaluateTurbotCriterion. `reach-and-stop`
+ * must stop ON a goal and `pass-through` must cross one, so in a goal-less
+ * arena no brain can pass them: such an arena would fail every submission.
+ * `return-to-start` stands alone (its goal-visit clause applies only when the
+ * arena has a goal), so a goal-less arena is a sound return-to-start case.
+ */
+export function criterionNeedsGoal(criterion: TurbotSuccessCriterion): boolean {
+  return criterion !== 'return-to-start';
 }

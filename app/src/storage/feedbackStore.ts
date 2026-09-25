@@ -7,10 +7,14 @@
 // storage/backend.ts.
 
 import type { FeedbackCategory, FeedbackScreenshot, FeedbackStatus, PlatformFeedback } from '../types';
+import type { Role } from '../auth/accounts';
 
 export interface FeedbackStore {
+  /** `student` and `authorRole` are the principal filing it — the record's
+   *  word locally; remotely the server takes both from the session. */
   submit(input: {
     student: string;
+    authorRole: Role;
     category: FeedbackCategory;
     message: string;
     screenshots: FeedbackScreenshot[];
@@ -48,6 +52,7 @@ class LocalFeedbackStore implements FeedbackStore {
 
   async submit(input: {
     student: string;
+    authorRole: Role;
     category: FeedbackCategory;
     message: string;
     screenshots: FeedbackScreenshot[];
@@ -57,6 +62,7 @@ class LocalFeedbackStore implements FeedbackStore {
     const record: PlatformFeedback = {
       id: `fb-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
       student: input.student,
+      authorRole: input.authorRole,
       category: input.category,
       message: input.message,
       screenshots: input.screenshots,

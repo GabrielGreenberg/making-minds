@@ -1,9 +1,12 @@
 import { useMemo, useState, useCallback, useRef, useEffect } from 'react';
-import { useStore, selectTmNotation, selectEffectiveMode, selectCodecWindow, selectFsmNotation } from '../store';
-import { tmNotation } from '../engine';
+import { useStore, selectTmNotation, selectEffectiveMode, selectCodecWindow, selectScRunWindow, selectPerceptionRetina, selectFsmNotation } from '../store';
+import { tmNotation, memorySlots, hasMemory } from '../engine';
 import { outputDisplayString } from './outputDisplay';
 import { TurbotArenaPanel } from './TurbotArenaPanel';
-import { StatementBody } from './StatementBody';
+import { ProblemBody, ProblemContext } from './ProblemSetDocument';
+import { GradedCaseBanner } from './GradedCaseBanner';
+import { PerceptionFramePlayer } from './PerceptionFramePlayer';
+import { RunSpeedControl } from './RunSpeedControl';
 import type { TMSymbol } from '../types';
 import { loadUiPrefs, saveUiPref } from '../uiPrefs';
 
@@ -12,26 +15,27 @@ function inputKey(bits: number[]): string {
   return bits.join(',');
 }
 
-/** The open assignment question's statement, shown above the tables in every
- *  mode's panel. Renders nothing in the sandbox. */
+/** The open assignment question, shown above the tables in every mode's
+ *  panel: its section's instruction as context, then the problem itself
+ *  (the document's own parts — components/ProblemSetDocument.tsx), then any
+ *  graded case loaded into the run (GradedCaseBanner). Renders nothing in
+ *  the sandbox. */
 function QuestionStatement() {
   const assignment = useStore((s) => s.assignment);
   const currentQuestionIndex = useStore((s) => s.currentQuestionIndex);
   const question = assignment?.questions[currentQuestionIndex];
-  if (!question?.statement) return null;
+  if (!assignment || !question) return null;
   return (
     <div className="table-section">
       <div className="table-section-label">
-        <span>Question</span>
+        <span>{question.label}</span>
         <span className="question-rep-badge">{question.representation} representation</span>
       </div>
       <div className="question-statement">
-        {question.title && <div className="question-title">{question.title}</div>}
-        <StatementBody text={question.statement} />
-        {question.hint && (
-          <div className="question-hint"><StatementBody text={question.hint} /></div>
-        )}
+        <ProblemContext assignment={assignment} questionId={question.id} />
+        <ProblemBody question={question} showArena={false} />
       </div>
+      <GradedCaseBanner />
     </div>
   );
 }
@@ -47,6 +51,9 @@ export function DataTable() {
   // question runs execute exactly the steps the grader reads, so UI verdicts
   // match grades.
   const codecWindow = useStore(selectCodecWindow);
+  // An SC perception question's retina width (null otherwise): its frame
+  // player takes the Global I/O rows' place.
+  const retina = useStore(selectPerceptionRetina);
 
   // SC state
   const scHistory = useStore((s) => s.scHistory);
@@ -65,8 +72,9 @@ export function DataTable() {
   const localStepOne = useStore((s) => s.localStepOne);
   const localStepReset = useStore((s) => s.localStepReset);
 
-  // For animated sequence playback
-  const [isRunning, setIsRunning] = useState(false);
+  // Sequence playback runs in the store (scRun), so every reset stops it —
+  // a canvas swap, Reset, and an edit mid-run (the store's edit law).
+  const isRunning = useStore((s) => s.scRunning);
   const [localIsRunning, setLocalIsRunning] = useState(false);
   const [autoFocusIndex, setAutoFocusIndex] = useState<number | null>(null);
 
@@ -79,7 +87,6 @@ export function DataTable() {
 
   // Run speed: multiplier (1 = 300ms per step, 2 = 150ms, 0.5 = 600ms, etc.)
   const [runSpeed, setRunSpeed] = useState(() => (typeof _prefs.current.runSpeed === 'number' ? _prefs.current.runSpeed as number : 1));
-  const [showSpeedSlider, setShowSpeedSlider] = useState(false);
 
   // Which global I/O row is currently selected
   const [activeGlobalIndex, setActiveGlobalIndex] = useState<number | null>(null);
@@ -103,10 +110,10 @@ export function DataTable() {
   const ensureSequenceLoaded = useCallback(() => {
     const state = useStore.getState();
     const maxLen = Math.max(...state.scInputSequence.map((s) => s.length), 0);
-    const drain = state.components.filter((c) => c.type === 'MEM').length;
-    // Question runs end at the codec window (grader's run length); sandbox
-    // runs at L + one 0-drain step per MEM.
-    const runEnd = selectCodecWindow(state) ?? maxLen + drain;
+    const drain = memorySlots(state.components).length;
+    // Question runs end at the grader's run length (selectScRunWindow);
+    // sandbox runs at L + one 0-drain step per MEM (boxed ones included).
+    const runEnd = selectScRunWindow(state) ?? maxLen + drain;
     if (maxLen > 0 && state.scTimeStep <= runEnd) return; // already loaded and in progress
 
     // Try active index first, then fall back to first sequence with input
@@ -132,11 +139,12 @@ export function DataTable() {
       const numInputs = state.components.filter((c) => c.type === 'INPUT').length;
       if (numInputs === 0) return;
       const maxLen = Math.max(...state.scInputSequence.map((s) => s.length), 0);
-      // Question runs execute exactly the codec window (the steps the grader
-      // reads), feeding the codec's stream for the typed value (see scStep).
-      // Sandbox: L plus one 0-input flush step per MEM so delayed bits drain.
-      const drain = state.components.filter((c) => c.type === 'MEM').length;
-      const win = selectCodecWindow(state);
+      // Question runs execute exactly the grader's run length (the steps the
+      // grader reads — selectScRunWindow), feeding the codec's stream for the
+      // typed value (see scStep). Sandbox: L plus one 0-input flush step per
+      // MEM so delayed bits drain.
+      const drain = memorySlots(state.components).length;
+      const win = selectScRunWindow(state);
       const runEnd = win ?? maxLen + drain;
       const remaining = runEnd - (state.scTimeStep - 1);
       // If no sequence loaded (sandbox), just do a single step
@@ -145,21 +153,8 @@ export function DataTable() {
         return;
       }
       if (remaining <= 0) return;
-      setIsRunning(true);
-      let step = 0;
-      const interval = setInterval(() => {
-        const s = useStore.getState();
-        const end = selectCodecWindow(s) ??
-          Math.max(...s.scInputSequence.map((sq) => sq.length), 0) +
-          s.components.filter((c) => c.type === 'MEM').length;
-        if (step >= remaining || s.scTimeStep > end) {
-          clearInterval(interval);
-          setIsRunning(false);
-          return;
-        }
-        s.scStep();
-        step++;
-      }, Math.round(300 / runSpeed));
+      // The store's run loop stops itself at the same end (scRun).
+      state.scRun(Math.round(300 / runSpeed));
     }, 0);
   }, [runSpeed, ensureSequenceLoaded]);
 
@@ -169,9 +164,10 @@ export function DataTable() {
     setTimeout(() => {
       const state = useStore.getState();
       const maxLen = Math.max(...state.scInputSequence.map((s) => s.length), 0);
-      const drain = state.components.filter((c) => c.type === 'MEM').length;
-      // Question steps stop at the codec window; sandbox at L + per-MEM drain.
-      const win = selectCodecWindow(state);
+      const drain = memorySlots(state.components).length;
+      // Question steps stop at the grader's run length; sandbox at L +
+      // per-MEM drain.
+      const win = selectScRunWindow(state);
       if (win !== null ? state.scTimeStep <= win : (maxLen === 0 || state.scTimeStep <= maxLen + drain)) {
         state.scStep();
       }
@@ -239,7 +235,8 @@ export function DataTable() {
   const effectiveMode = useStore(selectEffectiveMode);
 
   const wires = useStore((s) => s.wires);
-  const hasMem = components.some((c) => c.type === 'MEM');
+  // Memory anywhere — a canvas holding only a sequential box is SC too.
+  const hasMem = hasMemory(components);
   const isTurbot = buildMode === 'turbot';
   const isCC = buildMode === 'CC';
   const isSC = buildMode === 'SC' || hasMem;
@@ -290,13 +287,10 @@ export function DataTable() {
       return numA - numB;
     });
 
-  const mems = components
-    .filter((c) => c.type === 'MEM')
-    .sort((a, b) => {
-      const numA = parseInt(a.label.replace('M', ''));
-      const numB = parseInt(b.label.replace('M', ''));
-      return numA - numB;
-    });
+  // The state columns: every MEM the machine clocks, in the engine's order —
+  // top-level ones, then each sequential box's ('Box 1·M1'). The table is
+  // keyed by the machine's whole state, so a boxed MEM is a column too.
+  const mems = useMemo(() => memorySlots(components), [components]);
 
   // Check which outputs are actually connected (have an incoming wire)
   const outputConnected = useMemo(() =>
@@ -321,7 +315,7 @@ export function DataTable() {
     // start stepping — otherwise the "current" row looks active but is
     // unclickable, leaving Run/Step/Reset stuck disabled.
     const key = isSC
-      ? inputKey([...inputs.map((c) => c.value ?? 0), ...mems.map((c) => c.storedValue ?? 0)])
+      ? inputKey([...inputs.map((c) => c.value ?? 0), ...mems.map((m) => m.value)])
       : inputKey(inputs.map((c) => c.value ?? 0));
     return tableRows.some((r) => inputKey([...r.inputBits, ...(r.memBits || [])]) === key)
       ? key
@@ -898,6 +892,11 @@ export function DataTable() {
             <div style={{ padding: 12, color: '#999', fontSize: 12 }}>
               Add inputs and outputs to see the I/O table.
             </div>
+            {/* The film depends only on the retina, not the circuit: a student
+                can draw the frames before wiring the retina's inputs. */}
+            {isSC && retina !== null && (
+              <PerceptionFramePlayer width={retina} runSpeed={runSpeed} onRunSpeedChange={setRunSpeed} />
+            )}
           </div>
         </div>
       </div>
@@ -974,7 +973,7 @@ export function DataTable() {
                 <tr>
                   <th style={{ border: 'none', background: 'transparent' }} />
                   {inputs.map((inp) => <th key={inp.id}>{inp.label}</th>)}
-                  {mems.map((mem) => <th key={mem.id}>{mem.label}</th>)}
+                  {mems.map((mem) => <th key={mem.key}>{mem.label}</th>)}
                   {outputs.map((out) => <th key={out.id}>{out.label}</th>)}
                 </tr>
               </thead>
@@ -1151,8 +1150,13 @@ export function DataTable() {
           )}
         </div>
 
+        {/* ── SC perception: the frame player (the grader's frames) ── */}
+        {isSC && retina !== null && (
+          <PerceptionFramePlayer width={retina} runSpeed={runSpeed} onRunSpeedChange={setRunSpeed} />
+        )}
+
         {/* ── Global I/O Table (SC only) ─────────────────────── */}
-        {isSC && (
+        {isSC && retina === null && (
           <div className="table-section">
             <div className="table-section-label" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 4, cursor: 'pointer' }} onClick={() => setGlobalOpen(!globalOpen)}>
@@ -1349,53 +1353,7 @@ export function DataTable() {
               >
                 Reset
               </button>
-              <div style={{ position: 'relative', marginLeft: 'auto' }}>
-                <span
-                  onClick={() => setShowSpeedSlider(!showSpeedSlider)}
-                  style={{
-                    fontSize: 10, padding: '2px 4px',
-                    color: '#888',
-                    cursor: 'pointer',
-                    fontFamily: 'monospace',
-                  }}
-                  title="Run speed"
-                >
-                  {runSpeed >= 1 ? Math.round(runSpeed) : runSpeed.toFixed(2).replace(/0+$/, '').replace(/\.$/, '')}x
-                </span>
-                {showSpeedSlider && (
-                  <div
-                    style={{
-                      position: 'absolute', bottom: '100%', right: 0,
-                      background: 'white', border: '1px solid #ccc',
-                      borderRadius: 4, padding: '8px 12px',
-                      boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
-                      zIndex: 100, whiteSpace: 'nowrap',
-                    }}
-                    onMouseLeave={() => setShowSpeedSlider(false)}
-                  >
-                    <div style={{ fontSize: 10, color: '#888', marginBottom: 4, textAlign: 'center' }}>Run Speed</div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                      <span style={{ fontSize: 10, color: '#aaa' }}>slow</span>
-                      <input
-                        type="range"
-                        min={-2}
-                        max={3}
-                        step={0.5}
-                        value={Math.log2(runSpeed)}
-                        onChange={(e) => {
-                          const exp = parseFloat(e.target.value);
-                          const speed = Math.pow(2, exp);
-                          setRunSpeed(speed);
-                          saveUiPref('runSpeed', speed);
-                        }}
-                        style={{ width: 80 }}
-                      />
-                      <span style={{ fontSize: 10, color: '#aaa' }}>fast</span>
-                    </div>
-                    <div style={{ fontSize: 11, textAlign: 'center', marginTop: 2, fontFamily: 'monospace' }}>{runSpeed >= 1 ? Math.round(runSpeed) : runSpeed.toFixed(2).replace(/0+$/, '').replace(/\.$/, '')}x</div>
-                  </div>
-                )}
-              </div>
+              <RunSpeedControl speed={runSpeed} onChange={setRunSpeed} />
             </div>
           </>}
           </div>

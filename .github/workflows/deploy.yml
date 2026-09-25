@@ -24,9 +24,9 @@ jobs:
       - name: Install server dependencies
         working-directory: server
         run: npm ci
-      - name: Server typecheck + checks (incl. grading-parity pin)
+      - name: Server checks (typecheck first; incl. grading-parity pin)
         working-directory: server
-        run: npm run typecheck && npm run check
+        run: npm run check
 
   build-and-deploy:
     runs-on: ubuntu-latest
@@ -46,6 +46,18 @@ jobs:
 
       - name: Context budget (CLAUDE.md size guard — tasks/PROFILE.md)
         run: node tasks/tools/check-budgets.mjs
+
+      - name: Harness-tool portability gate (tasks/PROFILE.md §6)
+        working-directory: app
+        run: npx tsx tools/portabilityCheck.ts
+
+      - name: Install server dependencies (the tools type-check follows remoteStoreCheck into server/src)
+        working-directory: server
+        run: npm ci
+
+      - name: Harness-tool type-check (tsconfig.tools.json)
+        working-directory: app
+        run: npm run typecheck:tools
 
       - name: Build
         working-directory: app

@@ -3,7 +3,8 @@
 // exists because the FIRST instructor account has to come from somewhere, and
 // because importing 80 students is easier with a file path than a paste box.
 //
-//   npm run roster -- import roster.csv [--role instructor]
+//   npm run roster -- import ~/rosters/class-list.csv [--role instructor]
+//       (the registrar's export as-is; class lists never live in the repo)
 //   npm run roster -- add ada@ucla.edu --name "Prof. Ada" --role instructor
 //   npm run roster -- set-password ada@ucla.edu [--password ...]
 //   npm run roster -- reset student@ucla.edu      # clear password + sessions
@@ -17,7 +18,9 @@ import { readFileSync } from 'node:fs';
 import { createInterface } from 'node:readline/promises';
 import { loadConfig } from './config';
 import { Db } from './db';
-import { parseRoster, normalizeEmail, isEmail } from './roster';
+import { normalizeEmail, isEmail } from './roster';
+import { importRosterCsv, formatRosterReport } from './rosterImport';
+import { placeRosterEntry } from './identity';
 import { hashPassword, passwordProblem } from './password';
 
 const argv = process.argv.slice(2);
@@ -71,33 +74,24 @@ switch (command) {
     const path = positional[0];
     if (!path) die(USAGE);
     const defaultRole = flag('role') === 'instructor' ? 'instructor' : 'student';
-    const parsed = parseRoster(readFileSync(path, 'utf8'), defaultRole);
-    let added = 0;
-    let updated = 0;
-    for (const entry of parsed.entries) {
-      if (db.getUser(entry.email)) updated++;
-      else added++;
-      db.upsertUser(entry);
-    }
-    const cols = parsed.columns;
-    console.log(
-      `columns: email=${cols.email ?? '-'} name=${cols.name ?? '-'} id=${cols.studentId ?? '-'} role=${cols.role ?? '-'}`,
-    );
-    console.log(`imported ${parsed.entries.length}: ${added} added, ${updated} updated`);
-    for (const issue of parsed.issues) console.warn(`  line ${issue.line}: ${issue.reason}`);
+    const report = importRosterCsv(db, readFileSync(path, 'utf8'), defaultRole);
+    for (const line of formatRosterReport(report)) console.log(line);
     break;
   }
 
   case 'add': {
+    // Through the identity module, like the import and the dashboard's form.
     const email = requireEmail(positional[0]);
-    const existed = db.getUser(email) != null;
-    db.upsertUser({
+    const known = db.findUserByEmail(email) ?? db.findUserByUid(flag('id') ?? '');
+    const placed = placeRosterEntry(db, {
       email,
-      name: flag('name') ?? db.getUser(email)?.name ?? email.split('@')[0],
-      role: flag('role') === 'instructor' ? 'instructor' : (db.getUser(email)?.role ?? 'student'),
+      name: flag('name') ?? '',
+      role: flag('role') === 'instructor' ? 'instructor' : (known?.role ?? 'student'),
       studentId: flag('id') ?? '',
-    });
-    console.log(`${existed ? 'updated' : 'added'} ${email}`);
+    }, 'instructor');
+    if (placed.kind === 'conflict') die(placed.reason);
+    else if (placed.kind === 'added') console.log(`added ${email}`);
+    else console.log(`updated ${placed.account.email}${placed.aliasAdded ? ` (+ sign-in address ${placed.aliasAdded})` : ''}`);
     break;
   }
 
@@ -134,7 +128,10 @@ switch (command) {
     const rows = db.listUsers().filter((r) => !hasFlag('unregistered') || !r.registered);
     for (const r of rows) {
       const mark = r.registered ? '✓' : '·';
-      console.log(`${mark} ${r.email.padEnd(32)} ${r.role.padEnd(10)} ${r.studentId.padEnd(12)} ${r.name}`);
+      console.log(
+        `${mark} ${r.email.padEnd(32)} ${r.role.padEnd(10)} ${r.studentId.padEnd(12)} ${(r.section ?? '').padEnd(4)} ${r.name}` +
+          (r.aliases.length > 0 ? `  (also ${r.aliases.join(', ')})` : ''),
+      );
     }
     console.log(`${rows.length} row(s); ✓ = account created`);
     break;

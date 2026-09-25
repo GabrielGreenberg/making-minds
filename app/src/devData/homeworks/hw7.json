@@ -1,12 +1,31 @@
 {
   "id": "hw7",
   "title": "HW7. Final Project",
+  "sourcePdf": "problem-sets/hw7.pdf",
+  "sections": [
+    {
+      "heading": "Outline",
+      "intro": "Read this entire document carefully.\n\n**Length.** The assignment should be 6-10 pages in length, ~1.5 spaced. Be sure to cover your topic, but there is no bonus for extra length.\n\n**Format.** The assignment should be a roughly equal mix of prose and diagrams. (Be creative!) Be sure to explain your diagrams in the text. (Look at the Petzold readings for a good model here.)\n\n**Ethos.** The point of the assignment is to get you to both (1) engage with the big philosophical ideas in the course, but also (2) apply the technical ideas you’ve learned to specific cases. Ask not: how little can I do to do well on this assignment? Ask instead: how much knowledge can I effectively deploy in such a short space? Above all, I would ideally like this to be *interesting to you.* It will show.\n\n**Content.**\n- Your final assignment is to write an essay that connects the subject matter of this class to a particular philosophical or scientific theme of your choice. Potential themes are listed below.\n- Your paper must address the relationship between your theme and the Computational Theory of Mind.\n- At some point in your essay, you should address these questions:\n  - What are the key claims of the Computational Theory of Mind?\n  - How should we understand the concepts of representation, computation, and algorithm?\n  - Is the Computational Theory of Mind plausible? Is the computational approach the right one to explain how physical cognition is possible?\n- Whenever possible, illustrate your ideas with application to specific examples.",
+      "questionIds": []
+    },
+    {
+      "heading": "Possible themes",
+      "intro": "1. **A topic of your choosing from cognitive science or philosophy.** Investigate a topic of your choosing from contemporary cognitive science, using the tools and techniques developed in this class. (Cognitive science construed broadly to include: psychology, neuroscience, computer science, linguistics, philosophy.) Show how something similar (perhaps radically simplified) could be analyzed using circuits, FSAs or TMs.\n2. **Letter to Leibniz.** Write a letter to Leibniz responding to his argument that physical cognition is impossible. Was he right? Why or why not? How does the material from the course bear on this question?\n3. **The Long View.** Summarize the whole class, from logic gates and functions to UTM. This is an exercise in efficiently compressing a lot of information into a short space, while carefully choosing what to highlight, and what to skip.\n4. **Lessons Learned.** What are the 3 most important lessons you’ve learned in this class about computation? What are the 3 most important lessons you’ve learned in this class about the philosophy of mind? How are these lessons related?\n5. **Levels of abstraction.** Explain the idea of abstraction. Illustrate the four different levels of abstraction discussed in this class, from physics up to functions. Discuss how to shift from one level up to the next. Explain the idea of multiple realizability. Give examples of multiple-realizability at every stage.\n6. **Levels of power.** Explain the idea of computational power. Illustrate the four different levels of power discussed in this class, from logic gates up to Turing Machines. Discuss the physical differences between each type of machine (i.e. different uses of memory). Illustrate the differences in power between each level (i.e. functions that one level can compute but the other can’t).\n7. **Navigation.** Come up with an interesting navigation problem that goes beyond the dead-reckoning problem discussed in class. It should have some real-world counterpart. Solve the problem both in outline (as a flowchart) and as a state diagram. Discuss the role that representations play in the solution.\n8. **Universal Turing Machine.** Develop a detailed design for a UTM. It need not be an actual Turing Diagram. But the description should break down the operation into small enough parts that you can be confident that someone would be able to actually build it.",
+      "questionIds": []
+    },
+    {
+      "heading": "Your essay",
+      "questionIds": [
+        1
+      ]
+    }
+  ],
   "questions": [
     {
       "id": 1,
       "label": "Problem 1",
       "title": "Final Project essay",
-      "statement": "Write an essay (6–10 pages, ~1.5 spaced) that connects the subject matter of this class to a particular philosophical or scientific theme of your choice. The assignment should be a roughly equal mix of prose and diagrams; be sure to explain your diagrams in the text (the Petzold readings are a good model). Your paper must address the relationship between your theme and the Computational Theory of Mind, and at some point should address: What are the key claims of the Computational Theory of Mind? How should we understand the concepts of representation, computation, and algorithm? Is the Computational Theory of Mind plausible — is the computational approach the right one to explain how physical cognition is possible? Whenever possible, illustrate your ideas with specific examples. Possible themes (see the HW7 handout for details): (1) a topic of your choosing from cognitive science or philosophy; (2) Letter to Leibniz; (3) The Long View — summarize the whole class, from logic gates and functions to UTM; (4) Lessons Learned — the 3 most important lessons about computation and the 3 most important about the philosophy of mind, and how they relate; (5) Levels of abstraction; (6) Levels of power; (7) Navigation — an interesting navigation problem beyond dead reckoning, solved in outline and as a state diagram; (8) Universal Turing Machine — a detailed design for a UTM.",
+      "statement": "Write your essay on the theme you chose, following the outline above.",
       "buildMode": "open",
       "representation": "binary"
     }

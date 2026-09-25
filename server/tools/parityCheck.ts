@@ -30,6 +30,21 @@
 //      same records (reviewedAt is server-stamped, so the server's stamp is
 //      injected into the in-process side — the submittedAt pattern) — and the
 //      released student view carries the verdict but still no per-case detail.
+//   6. Provenance never grades (task 034): the integrity summary sits beside
+//      `result` (so the answers echo and the grade stay byte-equal), a review
+//      leaves it untouched, and answers carrying signed editing records grade
+//      exactly as the same answers without them.
+//   7. A TM case's block separations (task 002, "Run this input") reach the
+//      student: their copy of an hw5-p4 result keeps each gap case's
+//      `separations` (input layout — the tape the grader laid out) while
+//      `expected`/`got` stay blank, and a case without gaps gains no key; a
+//      result stored before cases recorded them gets them from the server's
+//      bank on the student's submissions route.
+//   8. Boxes drawn across wires (task 038): attempt 4 answers the CC (hw2-p7)
+//      and SC (hw3-p6) questions with everything but their INs/OUTs in one
+//      box whose ports are bound to the wires it cuts. The server grades it
+//      exactly as in process, and exactly as the unboxed machines; the same
+//      box saved before 038 and re-bound by the load rule grades the same.
 //
 // ── What is (and is not) normalized in the comparison ──────────────────────
 // The compared payload is `record.result` (the SubmissionResult) plus the
@@ -72,10 +87,14 @@ import { createApp } from '../src/app';
 import { Db } from '../src/db';
 import type { ServerConfig } from '../src/config';
 import { TOY_ACCOUNTS } from '../../app/src/auth/accounts';
-import { gradeSubmission } from '../../app/src/engine/grader';
+import { gradeSubmission, gradeQuestion } from '../../app/src/engine/grader';
+import { studentRecord } from '../src/sanitize';
 import { applyManualReview } from '../../app/src/storage/manualReview';
 import { buildSampleAssignment } from '../../app/src/devData/sampleData';
-import { comp, transition, circuit } from '../../app/tools/builder';
+import { nextTrace } from '../../app/src/provenance/trace';
+import { prepareKey } from '../../app/src/provenance/ids';
+import { comp, transition, circuit, boxAcross, unbind } from '../../app/tools/builder';
+import { rebindLegacyBoxes } from '../../app/src/boxPorts';
 import type {
   AssignmentData,
   AssignmentQuestion,
@@ -354,9 +373,10 @@ check(
 );
 
 // ── Fetch the stored records as the INSTRUCTOR (full, unsanitized) ───────────
+// The gradebook's route: the plain /submissions is the caller's own (task 037).
 const all = await api<{ records: SubmissionRecord[] }>(
   'GET',
-  `/assignments/${ASSIGNMENT_ID}/submissions`,
+  `/assignments/${ASSIGNMENT_ID}/submissions/all`,
   { token: iTok },
 );
 const rec1 = all.json.records.find((r) => r.attempt === 1);
@@ -525,7 +545,7 @@ const inProcess = applyManualReview(canon(all.json.records), 1, 7, {
 });
 const afterReview = await api<{ records: SubmissionRecord[] }>(
   'GET',
-  `/assignments/${ASSIGNMENT_ID}/submissions`,
+  `/assignments/${ASSIGNMENT_ID}/submissions/all`,
   { token: iTok },
 );
 const dReview = diffPaths(
@@ -551,6 +571,139 @@ check(
 );
 const reviewLeaks = sAfterReview.json.records.flatMap((r) => findLeaks(r.result, new Set(['expected', 'got'])));
 check('reviewed student records still leak no answer keys', reviewLeaks.length === 0, reviewLeaks.join(', '));
+
+// ── Provenance never grades (task 034) ──────────────────────────────────────
+const preIntegrity = all.json.records.find((r) => r.attempt === 1)?.integrity;
+const postIntegrity = afterReview.json.records.find((r) => r.attempt === 1)?.integrity;
+check('the stored record carries an integrity summary beside its result',
+  preIntegrity != null && preIntegrity.questions.length === correctAnswers.length);
+const dIntegrity = diffPaths(canon(preIntegrity), canon(postIntegrity));
+check('manual review preserves record.integrity', postIntegrity != null && dIntegrity.length === 0, dIntegrity.join(' | '));
+check('students never receive it', sAfterReview.json.records.every((r) => !('integrity' in r)));
+
+// The same correct answers, each carrying a signed editing record, graded
+// through the server: the grade must equal the plain direct grade, deeply.
+const wbKey = (
+  await api<{ mintKey?: string }>('GET', `/workbooks/${ASSIGNMENT_ID}`, { token: sTok })
+).json.mintKey;
+const signer = wbKey ? prepareKey(wbKey) : null;
+check('the workbook fetch hands the student a mint key', signer != null);
+const provenanced: Answers = correctAnswers.map((a) => ({
+  ...a,
+  provenance: nextTrace(
+    null,
+    { compIns: a.circuit.components.length },
+    { questionId: a.questionId, textBefore: {}, textAfter: a, countBefore: 0, gapMs: 0 },
+    signer,
+  ),
+}));
+const post3 = await api<{ record: SubmissionRecord }>(
+  'POST',
+  `/assignments/${ASSIGNMENT_ID}/submissions`,
+  { token: sTok, body: { answers: provenanced } },
+);
+const rec3 = (
+  await api<{ records: SubmissionRecord[] }>('GET', `/assignments/${ASSIGNMENT_ID}/submissions/all`, { token: iTok })
+).json.records.find((r) => r.attempt === 3);
+const d3 = diffPaths(canon(directCorrect), canon(rec3?.result));
+check('PARITY: answers with provenance grade exactly as without it',
+  post3.status === 201 && rec3 != null && d3.length === 0, d3.join(' | '));
+const a3 = diffPaths(canon(provenanced), canon(rec3?.submission.answers));
+check('…and are stored verbatim, provenance included', a3.length === 0, a3.join(' | '));
+check("…whose records the server reads as this student's own",
+  (rec3?.integrity?.questions ?? []).every((q) => q.record === 'self'));
+
+// ── 7. TM block separations reach the student, the key does not ─────────────
+{
+  const gap = loadFixture('hw5-p4');
+  const graded = gradeQuestion(gap.question, gap.broken);
+  const at = '2026-09-23T00:00:00.000Z';
+  const full: SubmissionRecord = {
+    assignmentId: 'gap',
+    attempt: 1,
+    submittedAt: at,
+    submission: { assignmentTitle: 'gap', submittedAt: at, answers: [{ questionId: gap.question.id, circuit: gap.broken! }] },
+    result: { student: studentEmail, questions: [graded], passed: graded.passed, total: graded.total },
+  };
+  const bank = gap.question.test_cases ?? [];
+  const mine = canon(studentRecord(full, true)).result!.questions[0].cases;
+  check('hw5-p4: the grader carries each gap case\'s separations onto its result',
+    bank.filter((tc) => tc.separations).length >= 48 &&
+      graded.cases.every((c, k) => JSON.stringify(c.separations) === JSON.stringify(bank[k].separations)));
+  check("a student's copy keeps every case's separations (input layout, not the key)",
+    mine.length === bank.length &&
+      mine.every((c, k) => JSON.stringify(c.separations) === JSON.stringify(bank[k].separations)));
+  check('…a case without gaps gains no separations key',
+    mine.every((c, k) => bank[k].separations != null || !('separations' in c)));
+  const gapLeaks = findLeaks(mine, new Set(['expected', 'got']));
+  check('…and expected/got stay blank', gapLeaks.length === 0, gapLeaks.join(', '));
+
+  // A result graded BEFORE cases recorded their separations (stored as-is in
+  // the pilot DB): the student's submissions route fills them from the
+  // server's own bank, so their replay is still the grader's tape.
+  const GAP_ID = 'parity-gap';
+  const gapAssignment: AssignmentData = { id: GAP_ID, title: 'gap', questions: [gap.question] };
+  await api('PUT', `/assignments/${GAP_ID}`, { token: iTok, body: gapAssignment });
+  await api('PUT', `/assignments/${GAP_ID}/visibility`, { token: iTok, body: { visible: true } });
+  await api('PUT', `/assignments/${GAP_ID}/grades-release`, { token: iTok, body: { released: true } });
+  const older = canon(full);
+  for (const c of older.result!.questions[0].cases) delete c.separations;
+  db.addSubmission(GAP_ID, studentEmail, older.submission, older.result);
+  const served = await api<{ records: SubmissionRecord[] }>('GET', `/assignments/${GAP_ID}/submissions`, { token: sTok });
+  const olderMine = served.json.records[0]?.result?.questions[0].cases ?? [];
+  check("an older stored result: the student's route fills every case's separations from the bank",
+    olderMine.length === bank.length &&
+      olderMine.every((c, k) => JSON.stringify(c.separations) === JSON.stringify(bank[k].separations)));
+  const olderLeaks = findLeaks(olderMine, new Set(['expected', 'got']));
+  check('…still with expected/got blank', olderLeaks.length === 0, olderLeaks.join(', '));
+}
+
+// ── 8. Boxes drawn across wires grade as the machines they enclose ─────────
+{
+  const across = (i: number) => boxAcross(fixtures[i].correct);
+  const acrossAnswers: Answers = correctAnswers.map((a) =>
+    a.questionId === 1 || a.questionId === 2 ? { ...a, circuit: across(a.questionId - 1) } : a);
+  const boxes = acrossAnswers.slice(0, 2).map((a) => a.circuit.components.find((c) => c.type === 'BOXED'));
+  check('attempt 4: hw2-p7 (CC) and hw3-p6 (SC) boxed across, no IN/OUT inside, every port bound',
+    boxes.every((b) => b != null && b.ports.length > 0 && b.ports.every((p) => p.bind !== undefined) &&
+      !b.internalCircuit!.components.some((c) => c.type === 'INPUT' || c.type === 'OUTPUT')));
+  const post4 = await api<{ record: SubmissionRecord }>(
+    'POST',
+    `/assignments/${ASSIGNMENT_ID}/submissions`,
+    { token: sTok, body: { answers: acrossAnswers } },
+  );
+  const rec4 = (
+    await api<{ records: SubmissionRecord[] }>('GET', `/assignments/${ASSIGNMENT_ID}/submissions/all`, { token: iTok })
+  ).json.records.find((r) => r.attempt === post4.json.record?.attempt);
+  const direct4 = directGrade(acrossAnswers);
+  const d4 = diffPaths(canon(direct4), canon(rec4?.result));
+  check('PARITY: boxed-across answers — server grade ≡ direct gradeSubmission',
+    post4.status === 201 && rec4 != null && d4.length === 0, d4.join(' | '));
+  const a4 = diffPaths(canon(acrossAnswers), canon(rec4?.submission.answers));
+  check('…stored verbatim, port bindings included', a4.length === 0, a4.join(' | '));
+  const same = [1, 2].map((id) => diffPaths(canon(q(directCorrect, id)), canon(q(direct4, id))));
+  check('…and hw2-p7 / hw3-p6 grade exactly as the unboxed machines',
+    same.every((d) => d.length === 0) && q(direct4, 1).passed === q(direct4, 1).total && q(direct4, 2).passed === q(direct4, 2).total,
+    same.flat().join(' | '));
+
+  // The same boxes saved before 038 (no binding), re-bound by the load rule
+  // (from their library entry, as restoreQuestionCircuits does).
+  const rebound: Answers = acrossAnswers.map((a) => {
+    if (a.questionId !== 1 && a.questionId !== 2) return a;
+    const box = a.circuit.components.find((c) => c.type === 'BOXED')!;
+    const entry = {
+      id: box.boxedCircuitId!, name: box.label,
+      inputPortIds: box.ports.filter((p) => p.side === 'left').map((p) => p.bind!),
+      outputPortIds: box.ports.filter((p) => p.side === 'right').map((p) => p.bind!),
+      internalComponents: box.internalCircuit!.components, internalWires: box.internalCircuit!.wires,
+    };
+    const legacy = unbind(a.circuit);
+    return { ...a, circuit: { ...legacy, components: rebindLegacyBoxes(legacy.components, [entry]) } };
+  });
+  const dr = diffPaths(canon(directCorrect), canon(directGrade(rebound)));
+  check('a pre-038 save of those boxes, re-bound on load, grades ≡ the unboxed answers',
+    dr.length === 0, dr.join(' | '));
+}
 
 server.close();
 db.close();

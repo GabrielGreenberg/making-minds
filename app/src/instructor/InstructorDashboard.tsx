@@ -4,6 +4,7 @@ import { assignmentStore, submissionStore, backendMode } from '../storage/backen
 import { navigate } from '../routing';
 import { seedSampleData } from '../devData/seed';
 import { seedHomeworks } from '../devData/homeworks';
+import { describeSyncStep } from '../devData/homeworkSync';
 import { useAsyncValue } from '../useAsyncValue';
 import { useDragReorder } from './dragReorder';
 
@@ -23,7 +24,7 @@ export function InstructorDashboard() {
   } = useAsyncValue(async () => {
     const summaries = await listAssignments();
     const submissionLists = await Promise.all(
-      summaries.map((a) => submissionStore.listSubmissions(a.id)),
+      summaries.map((a) => submissionStore.listAll(a.id)),
     );
     return summaries.map((a, i) => ({ ...a, submissionCount: submissionLists[i].length }));
   }, []);
@@ -80,16 +81,13 @@ export function InstructorDashboard() {
   };
 
   const handleSeedHomeworks = async () => {
-    const { seeded, skipped, submissionCount } = await seedHomeworks();
+    const { steps, submissionCount } = await seedHomeworks();
     reload();
+    const edited = steps.some((s) => s.action === 'edited');
     window.alert(
-      (seeded.length
-        ? `Loaded ${seeded.length} homework assignment${seeded.length === 1 ? '' : 's'} (${seeded.join(', ')})`
-        : 'All homework assignments already exist — none reloaded') +
-        ` and reseeded ${submissionCount} autograded sample submissions.` +
-        (skipped.length
-          ? ` Skipped ${skipped.join(', ')} (already present; delete one first to restore its pristine copy).`
-          : ''),
+      `HW1–HW7 synced with the repo:\n${steps.map((s) => describeSyncStep(s)).join('\n')}\n\n` +
+        `Reseeded ${submissionCount} autograded sample submissions.` +
+        (edited ? '\n\nTo reload a homework left as is, delete it here first.' : ''),
     );
   };
 
@@ -104,7 +102,7 @@ export function InstructorDashboard() {
             </button>
           )}
           {backendMode === 'local' && (
-            <button className="mm-btn mm-btn--quiet" onClick={() => void handleSeedHomeworks()} title="Load the real PHIL 133 homeworks (HW1–HW7) as editable assignments; existing copies are never overwritten">
+            <button className="mm-btn mm-btn--quiet" onClick={() => void handleSeedHomeworks()} title="Load the real PHIL 133 homeworks (HW1–HW7) as editable assignments; a copy you have not edited is refreshed to the repo version, an edited one is left alone">
               Load HW1–HW7
             </button>
           )}

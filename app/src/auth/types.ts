@@ -33,6 +33,9 @@ export interface AuthAttemptResult {
   ok: boolean;
   /** Ready-to-display message; null on success. */
   error: string | null;
+  /** Registration only: refused because the roster has no seat for that
+   *  student ID (or, with none typed, that email). */
+  notOnRoster?: boolean;
 }
 
 export interface AuthContextValue {
@@ -40,6 +43,19 @@ export interface AuthContextValue {
   user: AuthUser | null;
   /** True while the initial session is being resolved. */
   loading: boolean;
+  /**
+   * Nobody is signed in and nothing is being resolved: the visitor — a
+   * first-class principal, not "loading" and not an error. A visitor may use
+   * the public routes (routing.ts `routeAccess`: the sandbox); every other
+   * route shows the sign-in screen.
+   */
+  isVisitor: boolean;
+  /**
+   * Whether this browser shows any trace of a previous sign-in (a session
+   * record, a token, or the durable marker). Read once at boot for the
+   * landing rule (routing.ts `landingRoute`).
+   */
+  hasSignInTrace(): boolean;
   /**
    * What this server's sign-in system supports. Null while it is still being
    * fetched (remote mode, first paint).
@@ -53,8 +69,11 @@ export interface AuthContextValue {
   login(id: string, password?: string): Promise<AuthAttemptResult>;
   /**
    * Create an account for someone already on the roster, and sign them in.
-   * Refused (with a reason) off-roster, when an account already exists, when
-   * the password is too short, or when the student ID does not match.
+   * The student ID finds their roster seat; the email (the class-list one or
+   * a UCLA address) becomes one they sign in with. Refused (with a reason)
+   * off-roster, when an account already exists, when the password is too
+   * short, when the student ID is missing or does not match, or when the
+   * email is neither the class-list one nor a UCLA address.
    */
   register(input: {
     email: string;
@@ -70,6 +89,6 @@ export interface AuthContextValue {
   }): Promise<AuthAttemptResult>;
   /** Change the signed-in user's own password. */
   changePassword(currentPassword: string, newPassword: string): Promise<AuthAttemptResult>;
-  /** Clear the session, returning to the login screen. */
+  /** Clear the session (the sign-in screen follows — see SessionControls). */
   logout(): void;
 }

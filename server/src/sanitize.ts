@@ -18,10 +18,18 @@
 // running it, todos.md item 3 — no reason to ship it from the server too).
 // TurbotCaseResult has no `expected`/`got` at all (grading is positional
 // pass/fail against the arena's success criterion) so it passes through
-// whole, same as `turbot_cases` above.
+// whole, same as `turbot_cases` above. A case's `separations` (TM block
+// gaps, HW5 P4) stay too: they are INPUT layout — the tape the grader laid
+// out — not the key, and without them a student replaying the case ("Run
+// this input", store loadCaseInput) would get a different tape from the one
+// that was graded. A result graded before cases recorded them gets them here,
+// from this server's own bank (engine recordedCaseSeparations — case k, when
+// it is still the same input): the student's copy has no bank to fall back on.
 
+import { recordedCaseSeparations } from '../../app/src/engine/caseRun';
 import type {
   AssignmentData,
+  AssignmentQuestion,
   CaseResult,
   FillInCaseResult,
   PerceptionCaseResult,
@@ -50,9 +58,19 @@ export function stripAnswers(assignment: AssignmentData): AssignmentData {
   };
 }
 
-/** Keep `input`/`pass`/`reason` (safe — see header); blank the answer key. */
-function stripCaseResult(c: CaseResult): CaseResult {
-  return { input: c.input, expected: [], got: [], pass: c.pass, reason: c.reason };
+/** Keep `input`/`pass`/`reason` and the case's `separations` (safe — see
+ *  header); blank the answer key. `separations` is the recorded case's, or —
+ *  a result graded before cases carried them — the bank's (`question`). */
+function stripCaseResult(c: CaseResult, k: number, question: AssignmentQuestion | undefined): CaseResult {
+  const separations = question ? recordedCaseSeparations(question, k, c) : c.separations;
+  return {
+    input: c.input,
+    expected: [],
+    got: [],
+    pass: c.pass,
+    reason: c.reason,
+    ...(separations ? { separations } : {}),
+  };
 }
 
 function stripPerceptionCaseResult(c: PerceptionCaseResult): PerceptionCaseResult {
@@ -63,29 +81,44 @@ function stripFillInCaseResult(c: FillInCaseResult): FillInCaseResult {
   return { label: c.label, expected: '', got: '', pass: c.pass };
 }
 
-function stripQuestionResult(qr: QuestionResult): QuestionResult {
+function stripQuestionResult(qr: QuestionResult, question: AssignmentQuestion | undefined): QuestionResult {
   return {
     ...qr,
-    cases: qr.cases.map(stripCaseResult),
+    cases: qr.cases.map((c, k) => stripCaseResult(c, k, question)),
     turbotCases: qr.turbotCases, // no answer key in this shape — passes through whole
     perceptionCases: qr.perceptionCases?.map(stripPerceptionCaseResult),
     fillCases: qr.fillCases?.map(stripFillInCaseResult),
   };
 }
 
-/** Grade as shown to the student: scores only, no per-case detail. */
-export function stripResultDetail(result: SubmissionResult): SubmissionResult {
-  return { ...result, questions: result.questions.map(stripQuestionResult) };
+/** Grade as shown to the student: scores only, no per-case detail.
+ *  `assignment` (the full, server-side copy) fills in older results' case
+ *  separations; without it they pass through as recorded. */
+export function stripResultDetail(result: SubmissionResult, assignment?: AssignmentData): SubmissionResult {
+  return {
+    ...result,
+    questions: result.questions.map((qr) =>
+      stripQuestionResult(qr, assignment?.questions.find((q) => q.id === qr.questionId)),
+    ),
+  };
 }
 
 /**
  * A student's own submission record. Grades are withheld entirely until the
  * instructor releases them for the assignment ("release grades"); once
- * released, the student sees scores but never the per-case detail.
+ * released, the student sees scores but never the per-case detail. The
+ * integrity check (task 034) is instructor-only, released or not: it never
+ * reaches a student. Pass the full `assignment` so a result graded before
+ * cases recorded their TM block separations gets them (stripResultDetail).
  */
-export function studentRecord(record: SubmissionRecord, gradesReleased: boolean): SubmissionRecord {
+export function studentRecord(
+  record: SubmissionRecord,
+  gradesReleased: boolean,
+  assignment?: AssignmentData,
+): SubmissionRecord {
+  const { integrity: _instructorOnly, ...rest } = record;
   return {
-    ...record,
-    result: gradesReleased && record.result ? stripResultDetail(record.result) : undefined,
+    ...rest,
+    result: gradesReleased && record.result ? stripResultDetail(record.result, assignment) : undefined,
   };
 }

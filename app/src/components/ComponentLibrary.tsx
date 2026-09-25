@@ -1,8 +1,8 @@
 import { useState } from 'react';
-import { useStore, selectEffectiveMode, selectAllowedComponents } from '../store';
+import { useStore, selectEffectiveMode, selectAllowedComponents, selectPlaceableBoxKinds } from '../store';
 import { isComponentTypeAllowed, disallowedComponentTypes } from '../engine/machineValidation';
+import { usePasteGuard } from '../usePasteGuard';
 import type { ComponentType } from '../types';
-import { placeableBoxKinds } from '../types';
 
 interface LibraryEntry {
   type: ComponentType;
@@ -125,6 +125,9 @@ function ConfirmedBoxItem({ box, numIn, numOut, isSelected }: {
   isSelected: boolean;
 }) {
   const [editing, setEditing] = useState(false);
+  // Box names are part of the graded circuit: the rename wears the provenance
+  // guard like every assignment answer field (law 8).
+  const { ref: pasteGuardRef, notice: pasteNotice } = usePasteGuard();
 
   // Rename: students label their boxes ("XOR box"), so the palette item is the
   // place to do it — a box built on another question has no drawn rectangle on
@@ -142,6 +145,7 @@ function ConfirmedBoxItem({ box, numIn, numOut, isSelected }: {
       <div className="library-item library-box-rename">
         <input
           autoFocus
+          ref={pasteGuardRef}
           defaultValue={box.name}
           onBlur={(e) => commitRename(e.target.value)}
           onKeyDown={(e) => {
@@ -153,6 +157,7 @@ function ConfirmedBoxItem({ box, numIn, numOut, isSelected }: {
             }
           }}
         />
+        {pasteNotice && <div className="library-paste-notice" role="status">{pasteNotice}</div>}
       </div>
     );
   }
@@ -227,7 +232,6 @@ export function ComponentLibrary() {
   // Turbot questions edit the inner brain circuit, so the palette (and
   // boxing rules below) follow the question's innerMode, not 'turbot'.
   const effectiveMode = useStore(selectEffectiveMode);
-  const boxedLibrary = useStore((s) => s.boxedLibrary);
   const confirmedBoxLibrary = useStore((s) => s.confirmedBoxLibrary);
   const selectedTool = useStore((s) => s.selectedTool);
   const setSelectedTool = useStore((s) => s.setSelectedTool);
@@ -236,13 +240,11 @@ export function ComponentLibrary() {
   // outside the allowed set are hidden. The grader's Stage-1 check enforces
   // the same rule (engine/machineValidation.ts owns the semantics).
   const allowedComponents = useStore(selectAllowedComponents);
+  const placeableKinds = useStore(selectPlaceableBoxKinds);
 
   // TM shares the FSM editor palette (STATE nodes + transition wires).
   const allItems = effectiveMode === 'FSM' || effectiveMode === 'TM' ? FSM_LIBRARY_ITEMS : CC_LIBRARY_ITEMS;
   const items = allItems.filter((item) => isComponentTypeAllowed(item.type, allowedComponents));
-  const visibleLegacyBoxes = boxedLibrary.filter(
-    (b) => disallowedComponentTypes(b.circuit, allowedComponents).length === 0,
-  );
 
   // Group by section
   const sections = new Map<string, LibraryEntry[]>();
@@ -327,16 +329,18 @@ export function ComponentLibrary() {
         </div>
       </div>}
 
-      {/* Box Menu — which kinds this canvas may place is placeableBoxKinds
-          (types.ts). Under a component restriction, a box whose internals
-          contain a disallowed type is hidden too (a boxed OR must not smuggle
-          an OR in). */}
+      {/* Box Menu — which kinds this canvas may place is
+          selectPlaceableBoxKinds (store.ts; types.ts placeableBoxKinds): CC
+          boxes on CC and SC canvases, sequential (SC) boxes on SC ones only.
+          Under a component restriction, a box whose internals contain a
+          disallowed type is hidden too (a boxed OR must not smuggle an OR
+          in). */}
       {(() => {
-        const placeableKinds = placeableBoxKinds(effectiveMode);
-        const visibleBoxes = confirmedBoxLibrary.filter((b) =>
-          (b.kind ?? 'CC') === 'CC' && placeableKinds.includes('CC') &&
-          disallowedComponentTypes(b.internalComponents, allowedComponents).length === 0
-        );
+        const visibleBoxes = confirmedBoxLibrary.filter((b) => {
+          const kind = b.kind ?? 'CC';
+          return kind !== 'FSM' && placeableKinds.includes(kind) &&
+            disallowedComponentTypes(b.internalComponents, allowedComponents).length === 0;
+        });
         if (visibleBoxes.length === 0) return null;
         return (
           <div>
@@ -353,26 +357,6 @@ export function ComponentLibrary() {
           </div>
         );
       })()}
-
-      {/* Legacy boxed library (same restriction rule as the Box Menu above) */}
-      {visibleLegacyBoxes.length > 0 && (
-        <div>
-          <div className="library-section-title">Boxed</div>
-          {visibleLegacyBoxes.map((b, i) => (
-            <div
-              key={i}
-              className="library-item"
-              draggable
-              onDragStart={(e) => {
-                e.dataTransfer.setData('componentType', 'BOXED');
-                e.dataTransfer.setData('boxedName', b.name);
-              }}
-            >
-              <PaletteIcon type="BOXED" />
-            </div>
-          ))}
-        </div>
-      )}
     </div>
   );
 }

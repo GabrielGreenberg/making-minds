@@ -1,11 +1,12 @@
 import { useState } from 'react';
 import { useStore, selectEffectiveMode } from '../store';
+import { hasMemory } from '../engine';
 
 export function SimulationToolbar() {
   const buildMode = useStore((s) => s.buildMode);
   const effectiveMode = useStore(selectEffectiveMode);
   const components = useStore((s) => s.components);
-  const hasMem = components.some((c) => c.type === 'MEM');
+  const hasMem = hasMemory(components); // boxed MEMs count: a sequential box is SC
   const isSC = buildMode === 'SC' || hasMem;
   const autoSaveStatus = useStore((s) => s.autoSaveStatus);
   const selectedIds = useStore((s) => s.selectedIds);
@@ -90,10 +91,13 @@ export function SimulationToolbar() {
               state.rotateComponent(id);
             }
           }}
-          title="Rotate selected components 90°"
+          title="Rotate selected components 90° (or shift+click a component)"
         >
           <span className="toolbar-icon">{'↻'}</span> Rotate
         </button>
+        {/* A sibling, not inside the button: a disabled button (nothing
+            selected — most of the time) would fade the hint with it. */}
+        <span className="toolbar-hint">(shift+click to ↻)</span>
 
         {/* Turbot TM: flip selected states between internal (circle, tape
             ops) and external (square, sense/move ops) — textbook convention. */}

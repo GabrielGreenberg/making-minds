@@ -42,6 +42,20 @@ each raw item:
   not the changelog.
 After filing, `git mv` the inbox source to `inbox/_processed/` (keep its name).
 
+**App feedback reports** (a third source, when `secrets/feedback.env` exists): run
+`node tasks/tools/feedback.mjs pull`. It copies each open, unprocessed report from the
+server into a private folder OUTSIDE the repo (default `~/making-minds-private/feedback/`),
+as `feedback-<id>.md` plus screenshots. The repo is public, so:
+- Distil each report in your own words. The task cites the report id, `author-role` and
+  category (`source: feedback`), and never the author's name or email, their text quoted,
+  or a screenshot. Reproduce the problem and attach your own screenshots instead.
+- A report about the student rather than the platform or a homework (health, family, an
+  extension, a grade) is **personal**. Never file it. Tell Gabriel in one line, with no
+  details.
+- Close every report with `node tasks/tools/feedback.mjs mark <id> filed <task-id>… |
+  personal | dismissed "<why>"`. The mark shows in the app's Feedback tab, and the next
+  pull skips the report. Marking never resolves a report; that stays Gabriel's call.
+
 ### 4. Diagnose deeply — this is your whole value
 Per task, before writing: reproduce the path (from the code — you have no browser unless
 Gabriel drives one); find the root-cause mechanism with `file:line`; name the **class**

@@ -13,10 +13,14 @@ import { HomeScreen } from './components/HomeScreen';
 import { AssignmentOverview } from './components/AssignmentOverview';
 import { InstructorApp } from './instructor/InstructorApp';
 import { useInstructorRoute } from './instructor/useInstructorRoute';
+import { VisitorBanner } from './components/VisitorBanner';
 import { useStore, selectEffectiveMode } from './store';
+import { useAuth } from './auth';
+import { questionTask } from './types';
 import { useEffect } from 'react';
 
 function App() {
+  const { user, isVisitor } = useAuth();
   const instructorRoute = useInstructorRoute();
   const workbookOpen = useStore((s) => s.workbookOpen);
   const buildMode = useStore((s) => s.buildMode);
@@ -25,39 +29,42 @@ function App() {
   const assignmentView = useStore((s) => s.assignmentView);
   const currentQuestionIndex = useStore((s) => s.currentQuestionIndex);
 
-  // Hydrate the latest-submission map from the submission seam once the app is
-  // up (App renders inside AuthGate, so mount = auth-ready). Replaces the old
-  // sync-at-module-init hydration; idempotent, so StrictMode's double effect
-  // is harmless.
+  // Hydrate the latest-submission map from the submission seam once someone
+  // is signed in (a visitor's sandbox reads no seam). Idempotent, so
+  // StrictMode's double effect and a re-sign-in are harmless.
   useEffect(() => {
+    if (!user) return;
     // A transient fetch failure just leaves the latest-submission map empty
     // (cards read "Not submitted" until the next mount); don't crash the shell.
     useStore.getState().hydrateSubmissions().catch((e: unknown) => {
       console.warn('submission hydration failed:', e);
     });
-  }, []);
+  }, [user]);
 
   // Instructor frontend: a separate mode of the same SPA, gated behind the
   // instructor role. It bypasses the student Zustand store and reads the hash
   // directly (see useInstructorRoute).
   if (instructorRoute) return <InstructorApp route={instructorRoute} />;
 
-  if (!workbookOpen) return <HomeScreen />;
+  // A visitor only ever reaches the sandbox (AuthGate), which the routing
+  // opens in an effect — render nothing for that first frame, never Home.
+  if (!workbookOpen) return user ? <HomeScreen /> : null;
 
   // An open assignment shows its question list first; a question's dedicated
   // canvas (below) is entered by picking a question (#/a/:id/q/:i).
   if (assignment && assignmentView === 'overview') return <AssignmentOverview />;
 
   // Open questions: same chrome (menu + question nav), but the workspace is a
-  // writing panel — no palette, canvas, or data tables. A `fill_in` spec
-  // narrows that panel to a list of labelled boxes, which IS autograded.
+  // writing panel — no palette, canvas, or data tables. A fill-in question
+  // (types.ts questionTask) narrows that panel to a list of labelled boxes,
+  // which IS autograded.
   if (buildMode === 'open') {
     const q = assignment?.questions[currentQuestionIndex];
     return (
       <div className="app">
         <MenuBar />
         <TabBar />
-        {q?.fill_in ? <FillInPanel /> : <OpenResponsePanel />}
+        {q && questionTask(q) === 'fill-in' ? <FillInPanel /> : <OpenResponsePanel />}
       </div>
     );
   }
@@ -65,6 +72,7 @@ function App() {
   return (
     <div className="app">
       <MenuBar />
+      {isVisitor && <VisitorBanner />}
       <TabBar />
       <SimulationToolbar />
       <div className="main-area">

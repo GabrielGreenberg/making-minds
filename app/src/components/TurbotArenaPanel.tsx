@@ -5,7 +5,7 @@
 // slice; the canvas column stays the inner machine's normal editor.
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { useStore, selectTurbotArena, selectTurbotInnerMode, selectTmNotation } from '../store';
+import { useStore, selectTurbotArena, selectTurbotInnerMode, selectTmNotation, selectTurbotGoalHit, type TurbotEvent } from '../store';
 import {
   senseAhead,
   senseAheadSymbol,
@@ -126,9 +126,17 @@ export function TurbotArenaPanel() {
   const turbotRun = useStore((s) => s.turbotRun);
   const turbotPause = useStore((s) => s.turbotPause);
   const turbotReset = useStore((s) => s.turbotReset);
+  // The goal-reached cue (the store owns the moment and the Run's hold; the
+  // Map only pulses the circle while it is the latest step's event).
+  const goalHit = useStore(selectTurbotGoalHit);
+  const turbotLastEvent = useStore((s) => s.turbotLastEvent);
 
   const innerMode = useStore(selectTurbotInnerMode);
   const notation = useStore(selectTmNotation);
+  // A question with several arenas shows the primary one — or the one a
+  // graded case loaded (store turbotCaseIndex); say which.
+  const arenaCount = useStore((s) => s.assignment?.questions[s.currentQuestionIndex]?.turbot_cases?.length ?? 0);
+  const turbotCaseIndex = useStore((s) => s.turbotCaseIndex);
 
   // Sandbox turbot tabs own their arena, so the Map is editable there;
   // a question's arena is part of the assignment and stays read-only.
@@ -136,6 +144,13 @@ export function TurbotArenaPanel() {
   const setTabArena = useStore((s) => s.setTabArena);
   const [editingMap, setEditingMap] = useState(false);
   const [mapTool, setMapTool] = useState<MapTool>('block');
+  // The event live when "Edit map" opened: Done must not replay its pulse.
+  // By identity — t restarts after a reset, so a later hit may repeat it.
+  // Seeded with the event already live at mount: coming back to this question
+  // (overview → question remounts the Map) must not replay an old pulse.
+  const [suppressedEvent, setSuppressedEvent] = useState<TurbotEvent | null>(
+    () => useStore.getState().turbotLastEvent,
+  );
 
   const [cellSize, setCellSizeState] = useState(() =>
     clampCell(numericPref(loadUiPrefs(), 'arenaCellSize', DEFAULT_CELL)),
@@ -248,6 +263,11 @@ export function TurbotArenaPanel() {
     <div className="table-section">
       <div className="table-section-label">
         <span>Map</span>
+        {arenaCount > 1 && (
+          <span className="turbot-arena-which">
+            arena {Math.min(turbotCaseIndex, arenaCount - 1) + 1} of {arenaCount}
+          </span>
+        )}
         <span className="turbot-zoom">
           <button
             className="turbot-zoom-btn"
@@ -274,6 +294,7 @@ export function TurbotArenaPanel() {
             className="map-edit-toggle"
             onClick={() => {
               if (!editingMap && turbotRunning) turbotPause();
+              if (!editingMap) setSuppressedEvent(turbotLastEvent);
               setEditingMap((e) => !e);
             }}
             title={editingMap ? 'Back to running the turbot' : 'Paint blocks/goals and place the start'}
@@ -293,6 +314,7 @@ export function TurbotArenaPanel() {
               turbot={turbotState}
               cellSize={cellSize}
               onCellClick={editingMap ? handleMapClick : undefined}
+              highlightGoal={!editingMap && goalHit && turbotLastEvent !== suppressedEvent}
             />
           </div>
           {editingMap ? (

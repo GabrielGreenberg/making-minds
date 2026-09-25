@@ -9,6 +9,7 @@
 // Contract notes, per seam:
 //   - RemoteWorkbookStore: workbooks are per-(user, assignment) server-side;
 //     the session token identifies the user, so the seam shape is unchanged.
+//     The same fetch carries the user's mint key (task 034, loadForOpen).
 //   - RemoteAssignmentStore: what `get` returns depends on the session's role
 //     — students receive the assignment with `test_cases`/`perception_cases`
 //     stripped by the server (sanitize.ts). Nothing here compensates: remote
@@ -17,7 +18,9 @@
 //     are the server's word (app.ts stamps both), so whatever the client put
 //     in `submission.student`/`submittedAt` is deliberately dropped. Grading
 //     happens on the server, on receipt; pre-release, a student's returned
-//     record carries no `result` at all.
+//     record carries no `result` at all. The Own reads ignore their `email`:
+//     the session names the person, for every role; `listAll` is the
+//     instructor-only /submissions/all.
 //
 // GRADER-FREE ZONE: this module (with backend.ts and api/client.ts) must not
 // import the engine grader — remote students must never grade client-side.
@@ -39,10 +42,12 @@ import type { WorkbookStore } from './workbookStore';
 import type { AssignmentStore } from './AssignmentStore';
 import type { SubmissionStore } from './submissionStore';
 import type { FeedbackStore } from './feedbackStore';
+import type { Role } from '../auth/accounts';
 import type { NotesStore } from './NotesStore';
 import {
   ApiError,
   getWorkbook,
+  getWorkbookFull,
   putWorkbook,
   listAssignments as apiListAssignments,
   getAssignment as apiGetAssignment,
@@ -52,6 +57,7 @@ import {
   setVisible as apiSetVisible,
   submitAssignment as apiSubmitAssignment,
   listSubmissions as apiListSubmissions,
+  listAllSubmissions as apiListAllSubmissions,
   reviewSubmission,
   submitFeedback,
   listFeedback,
@@ -81,6 +87,13 @@ class RemoteWorkbookStore implements WorkbookStore {
     opts?: { keepalive?: boolean },
   ): Promise<void> {
     return putWorkbook(id, state, opts);
+  }
+
+  async loadForOpen(id: string): Promise<{ state: AssignmentState | null; mintKey: string | null }> {
+    // One GET: the session names the person; the server derives their key
+    // and returns it beside the state.
+    const { state, mintKey } = await getWorkbookFull(id);
+    return { state, mintKey: mintKey ?? null };
   }
 }
 
@@ -130,15 +143,21 @@ class RemoteSubmissionStore implements SubmissionStore {
     return apiSubmitAssignment(id, submission.answers);
   }
 
-  listSubmissions(id: string): Promise<SubmissionRecord[]> {
+  listOwn(id: string, _email: string | null): Promise<SubmissionRecord[]> {
+    // The session names the person (any role), so the email is not sent —
+    // the WorkbookStore.loadForOpen precedent.
     return apiListSubmissions(id);
   }
 
-  async getLatest(id: string): Promise<SubmissionRecord | null> {
-    // Students receive only their own attempts, in order — the last one is
-    // the graded latest (mirrors the local store's read).
-    const all = await this.listSubmissions(id);
-    return all.length ? all[all.length - 1] : null;
+  async getLatestOwn(id: string, email: string | null): Promise<SubmissionRecord | null> {
+    // Own attempts arrive in order — the last one is the latest (mirrors the
+    // local store's read).
+    const own = await this.listOwn(id, email);
+    return own.length ? own[own.length - 1] : null;
+  }
+
+  listAll(id: string): Promise<SubmissionRecord[]> {
+    return apiListAllSubmissions(id);
   }
 
   recordManualReview(
@@ -156,13 +175,15 @@ class RemoteSubmissionStore implements SubmissionStore {
 class RemoteFeedbackStore implements FeedbackStore {
   submit(input: {
     student: string;
+    authorRole: Role;
     category: FeedbackCategory;
     message: string;
     screenshots: FeedbackScreenshot[];
     context?: { assignmentId?: string; questionId?: number };
   }): Promise<PlatformFeedback> {
-    // `student` is the server's word (the session identifies who is posting),
-    // same discipline as submissions — the client's value is not sent.
+    // `student` and `authorRole` are the server's word (the session
+    // identifies who is posting, and in what role), same discipline as
+    // submissions — the client's values are not sent.
     return submitFeedback({
       category: input.category,
       message: input.message,

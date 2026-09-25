@@ -5,9 +5,9 @@
 // (storage/remoteStores.ts) and the remote AuthProvider (src/auth) are its
 // consumers, selected by `backendMode` (storage/backend.ts):
 //
-//   RemoteWorkbookStore   → getWorkbook / putWorkbook
+//   RemoteWorkbookStore   → getWorkbook / getWorkbookFull / putWorkbook
 //   RemoteAssignmentStore → listAssignments / getAssignment / putAssignment / deleteAssignment
-//   RemoteSubmissionStore → submitAssignment / listSubmissions / reviewSubmission
+//   RemoteSubmissionStore → submitAssignment / listSubmissions / listAllSubmissions / reviewSubmission
 //   remote auth           → login / logout / me
 //
 // Configuration: VITE_API_BASE (e.g. "https://api.phil133.example.edu") set at
@@ -57,12 +57,22 @@ export interface AuthCapabilities {
 
 /** One roster row with its account state — the instructor's roster screen. */
 export interface RosterEntryView {
+  /** The account's key: the email it was first rostered under. */
   email: string;
   name: string;
   role: 'student' | 'instructor';
+  /** The student ID as written. */
   studentId: string;
+  /** The same ID normalised when VERIFIED (class list, instructor, SSO); ''
+   *  when the ID on file was only typed into an access request. */
+  uid: string;
+  /** Discussion section from the class list; null when none was imported. */
+  section: string | null;
   registered: boolean;
   registeredAt: string | null;
+  /** The account's other sign-in addresses (a UCLA one beside a personal
+   *  class-list one, a registrar change), oldest first. */
+  aliases: string[];
 }
 
 export interface AccessRequestView {
@@ -75,14 +85,44 @@ export interface AccessRequestView {
   createdAt: string;
   resolvedAt: string | null;
   resolvedBy: string | null;
+  /** The roster account the request's student ID or email already names —
+   *  approving then adds the email to it — or null for someone new. */
+  match: { email: string; name: string } | null;
+  /** Why approving would be refused (the ID and email name different
+   *  people, …), or null. */
+  conflict: string | null;
 }
 
+/** Where an add or an approval landed: a new account, or an existing one
+ *  (`aliasAdded`: the email, now one of its sign-in addresses). */
+export interface RosterPlacement {
+  added: number;
+  updated: number;
+  account: string;
+  aliasAdded: string | null;
+}
+
+/** What a roster import did (server/src/rosterImport.ts). It never removes
+ *  anyone: `noLongerListed` is a list for the instructor to review. */
 export interface RosterImportReport {
   added: number;
   updated: number;
   total: number;
+  /** Physical line of the header row (a registrar preamble is skipped); null when none was found. */
+  headerLine: number | null;
+  /** Non-enrolled statuses seen: waitlisted/held imported, dropped/cancelled/withdrawn not. */
+  statusCounts: { label: string; count: number; imported: boolean }[];
+  /** Students a class list no longer carries: reason "status dropped" or "not in this file". */
+  noLongerListed: { email: string; name: string; reason: string }[];
   issues: { line: number; reason: string }[];
-  columns: { email: string | null; name: string | null; studentId: string | null; role: string | null };
+  columns: {
+    email: string | null;
+    name: string | null;
+    studentId: string | null;
+    role: string | null;
+    section: string | null;
+    status: string | null;
+  };
 }
 
 export interface AssignmentSummary {
@@ -223,9 +263,10 @@ export async function login(email: string, password?: string): Promise<ApiUser> 
 }
 
 /**
- * Create an account for a roster member. The server checks the email against
- * the roster (and the student ID against the one on file, when it has one) and
- * signs the caller straight in on success.
+ * Create an account for a roster member. The student ID says which roster seat
+ * (with none, the email must name an account that has no ID on file); the
+ * email — the class-list one or a UCLA address — becomes one they sign in
+ * with. The server signs the caller straight in on success.
  */
 export async function register(input: {
   email: string;
@@ -299,13 +340,22 @@ export async function importRoster(
   return request<RosterImportReport>('POST', '/roster/import', { csv, defaultRole });
 }
 
+/** Add one person — or, when the ID or email is already on the roster,
+ *  update them (a new email becoming one of their sign-in addresses). */
 export async function addRosterEntry(input: {
   email: string;
   name?: string;
   role?: 'student' | 'instructor';
   studentId?: string;
-}): Promise<void> {
-  await request('POST', '/roster', input);
+}): Promise<RosterPlacement> {
+  return request<RosterPlacement>('POST', '/roster', input);
+}
+
+/** Drop one of an account's extra sign-in addresses (never its key). When it
+ *  is the address the account was set up through, the server also clears that
+ *  password and ends its sessions (`credentialCleared`). */
+export async function removeRosterAlias(email: string, alias: string): Promise<{ credentialCleared: boolean }> {
+  return request('DELETE', `/roster/${encodeURIComponent(email)}/aliases/${encodeURIComponent(alias)}`);
 }
 
 export async function removeRosterEntry(email: string): Promise<void> {
@@ -327,12 +377,13 @@ export async function listAccessRequests(
   return requests;
 }
 
-/** Approving adds them to the roster; they then create an account normally. */
+/** Approving adds them to the roster (or, when the request names someone on
+ *  it, adds the email to that account); they then create an account normally. */
 export async function approveAccessRequest(
   id: number,
   role: 'student' | 'instructor' = 'student',
-): Promise<void> {
-  await request('POST', `/access-requests/${id}/approve`, { role });
+): Promise<{ email: string; account: string; accountName: string; aliasAdded: string | null }> {
+  return request('POST', `/access-requests/${id}/approve`, { role });
 }
 
 export async function rejectAccessRequest(id: number): Promise<void> {
@@ -387,11 +438,18 @@ export async function setVisible(id: string, visible: boolean): Promise<void> {
 // ── workbooks (autosave) ─────────────────────────────────────────
 
 export async function getWorkbook(assignmentId: string): Promise<AssignmentState | null> {
-  const { state } = await request<{ state: AssignmentState | null }>(
+  return (await getWorkbookFull(assignmentId)).state;
+}
+
+/** The workbook fetch in full: the saved state plus the caller's mint key for
+ *  the assignment (task 034; absent from a server that predates it). */
+export async function getWorkbookFull(
+  assignmentId: string,
+): Promise<{ state: AssignmentState | null; mintKey?: string }> {
+  return request<{ state: AssignmentState | null; mintKey?: string }>(
     'GET',
     `/workbooks/${encodeURIComponent(assignmentId)}`,
   );
-  return state;
 }
 
 export async function putWorkbook(
@@ -420,11 +478,23 @@ export async function submitAssignment(
   return record;
 }
 
-/** Student: own attempts. Instructor: every student's attempts (gradebook). */
+/**
+ * The caller's own attempts, any role — the session names the person (an
+ * instructor's Student view sees only the instructor's own; task 037).
+ */
 export async function listSubmissions(assignmentId: string): Promise<SubmissionRecord[]> {
   const { records } = await request<{ records: SubmissionRecord[] }>(
     'GET',
     `/assignments/${encodeURIComponent(assignmentId)}/submissions`,
+  );
+  return records;
+}
+
+/** Instructor only: every student's attempts, full detail (the gradebook). */
+export async function listAllSubmissions(assignmentId: string): Promise<SubmissionRecord[]> {
+  const { records } = await request<{ records: SubmissionRecord[] }>(
+    'GET',
+    `/assignments/${encodeURIComponent(assignmentId)}/submissions/all`,
   );
   return records;
 }

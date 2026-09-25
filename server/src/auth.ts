@@ -11,24 +11,29 @@
 //
 //   PasswordAuthProvider — the launch system. The roster (imported from a CSV,
 //     see roster.ts) decides WHO may have an account; each person creates one
-//     by choosing a password, and signs in with email + password afterwards.
-//     Someone whose email is not on the roster files an access request instead.
+//     with their student ID, an email and a password of their choosing, and
+//     signs in with any of their emails + password afterwards. Someone the
+//     roster does not have files an access request instead.
 //
 //   DevAuthProvider — passwordless login by known roster email. Development
 //     and the headless harnesses only; MM_AUTH_MODE=dev.
 //
-//   SsoAuthProvider — the UCLA SSO shape, unimplemented pending the campus
-//     integration details. When it lands, fill in `authenticate` (validate the
-//     SSO assertion, map attributes → {email, name, role}, upsert the user) and
-//     nothing else in the codebase changes: capabilities() already tells the
-//     client to render a single "Sign in with UCLA" button instead of the
-//     email/password form.
+//   SsoAuthProvider — the UCLA SSO shape, pending the campus integration
+//     details. When it lands, fill in `authenticate` (validate the SSO
+//     assertion, read its UID + email + name) and hand the result to
+//     `signInAsserted`, which already resolves it to a roster account; nothing
+//     else in the codebase changes: capabilities() already tells the client to
+//     render a single "Sign in with UCLA" button instead of the form.
+//
+// Which account an email or a student ID means is never decided here — that
+// is src/identity.ts, shared with the roster import.
 
 import { randomBytes } from 'node:crypto';
 import type { Request, Response, NextFunction } from 'express';
 import type { Db, UserRow } from './db';
 import { hashPassword, verifyPassword, passwordProblem, PASSWORD_MIN_LENGTH } from './password';
 import { normalizeEmail } from './roster';
+import { claimForSignUp, resolveAssertedIdentity } from './identity';
 import type { ServerConfig } from './config';
 
 /**
@@ -40,7 +45,7 @@ export interface AuthCapabilities {
   mode: 'password' | 'dev' | 'sso';
   /** Show a password field on the sign-in form. */
   usesPassword: boolean;
-  /** Offer "Create an account" (roster email + a password of their choosing). */
+  /** Offer "Create an account" (student ID + an email + a password of their choosing). */
   allowsRegistration: boolean;
   /** Offer "My email isn't on the roster" → an instructor-reviewed request. */
   allowsAccessRequests: boolean;
@@ -54,7 +59,15 @@ export type RegisterResult =
   | { ok: true; user: UserRow }
   | {
       ok: false;
-      reason: 'unsupported' | 'not-on-roster' | 'already-registered' | 'weak-password' | 'id-mismatch';
+      reason:
+        | 'unsupported'
+        | 'not-on-roster'
+        | 'already-registered'
+        | 'weak-password'
+        | 'id-mismatch'
+        | 'id-required'
+        | 'email-not-accepted'
+        | 'email-taken';
       message: string;
     };
 
@@ -75,10 +88,16 @@ const REGISTRATION_UNSUPPORTED: RegisterResult = {
 /**
  * Email + password against the roster. The roster row must exist BEFORE an
  * account can be created: registration is claiming a seat the instructor
- * already granted, never opening a new one.
+ * already granted, never opening a new one. The student ID says which seat —
+ * it is the one piece of evidence that the person claiming it is its owner and
+ * not someone who knows a classmate's email.
  */
 export class PasswordAuthProvider implements AuthProvider {
-  constructor(private db: Db) {}
+  private readonly db: Db;
+
+  constructor(db: Db) {
+    this.db = db;
+  }
 
   capabilities(): AuthCapabilities {
     return {
@@ -91,10 +110,9 @@ export class PasswordAuthProvider implements AuthProvider {
   }
 
   async authenticate(credentials: Record<string, unknown>): Promise<UserRow | null> {
-    const email = normalizeEmail(credentials.email);
-    if (!email) return null;
-    const user = this.db.getUser(email);
-    const stored = this.db.getPasswordHash(email);
+    // Any of the account's emails signs in; the credential lives on its key.
+    const user = this.db.findUserByEmail(normalizeEmail(credentials.email));
+    const stored = user ? this.db.getPasswordHash(user.email) : null;
     // Verify even when the account is unknown or unregistered, against a dummy
     // hash, so a wrong email and a wrong password cost the same wall-clock
     // time and cannot be told apart by timing.
@@ -104,49 +122,27 @@ export class PasswordAuthProvider implements AuthProvider {
   }
 
   async register(details: Record<string, unknown>): Promise<RegisterResult> {
-    const email = normalizeEmail(details.email);
-    const user = email ? this.db.getUser(email) : null;
-    if (!user) {
-      return {
-        ok: false,
-        reason: 'not-on-roster',
-        message: 'That email is not on the course roster.',
-      };
-    }
-    if (this.db.getPasswordHash(email) != null) {
+    const claim = claimForSignUp(this.db, { email: details.email, studentId: details.studentId });
+    if (!claim.ok) return claim;
+    const { account, email } = claim;
+    if (this.db.getPasswordHash(account.email) != null) {
       return {
         ok: false,
         reason: 'already-registered',
-        message: 'An account already exists for that email — sign in instead.',
+        message: 'An account already exists for you — sign in instead.',
       };
     }
     const problem = passwordProblem(details.password);
     if (problem) return { ok: false, reason: 'weak-password', message: problem };
 
-    // When the roster carries a campus ID, require it: it is the one piece of
-    // evidence we have that the person claiming the seat is its owner and not
-    // someone who guessed a classmate's email.
-    const rosterId = (user.studentId ?? '').trim();
-    if (rosterId) {
-      const claimed = typeof details.studentId === 'string' ? details.studentId.trim() : '';
-      if (normalizeId(claimed) !== normalizeId(rosterId)) {
-        return {
-          ok: false,
-          reason: 'id-mismatch',
-          message: 'That student ID does not match the one on file for this email.',
-        };
-      }
-    }
-
-    this.db.setPasswordHash(email, hashPassword(details.password as string));
-    return { ok: true, user: this.db.getUser(email)! };
+    // The address they chose becomes one they sign in with (claimForSignUp
+    // has vetted it: the account's own, or a UCLA one nobody else holds), and
+    // is remembered as the one the credential was set through.
+    this.db.addEmailAlias(account.email, email, 'signup');
+    this.db.setPasswordHash(account.email, hashPassword(details.password as string));
+    this.db.markRegisteredVia(account.email, email);
+    return { ok: true, user: this.db.getUser(account.email)! };
   }
-}
-
-/** Compare IDs ignoring leading zeros, spaces and dashes ("004-125-678"). */
-function normalizeId(id: string): string {
-  const stripped = id.replace(/[\s-]/g, '');
-  return /^\d+$/.test(stripped) ? String(Number(stripped)) : stripped.toLowerCase();
 }
 
 /** A well-formed hash of an unguessable value, for equal-cost failed logins. */
@@ -154,7 +150,11 @@ const DUMMY_HASH = hashPassword(randomBytes(32).toString('hex'));
 
 /** Passwordless dev login: any email present in the `users` roster table. */
 export class DevAuthProvider implements AuthProvider {
-  constructor(private db: Db) {}
+  private readonly db: Db;
+
+  constructor(db: Db) {
+    this.db = db;
+  }
 
   capabilities(): AuthCapabilities {
     return {
@@ -167,9 +167,7 @@ export class DevAuthProvider implements AuthProvider {
   }
 
   async authenticate(credentials: Record<string, unknown>): Promise<UserRow | null> {
-    const email = normalizeEmail(credentials.email);
-    if (!email) return null;
-    return this.db.getUser(email);
+    return this.db.findUserByEmail(normalizeEmail(credentials.email));
   }
 
   async register(): Promise<RegisterResult> {
@@ -181,15 +179,18 @@ export class DevAuthProvider implements AuthProvider {
  * UCLA SSO — the shape the campus integration will take, not yet implemented.
  * It constructs and reports its capabilities (so the frontend renders the SSO
  * button and hides the password form), and refuses to authenticate until the
- * assertion handling below is filled in. Accounts are not managed here: with
- * SSO, the identity provider owns credentials, and the roster's only remaining
- * job is deciding role.
+ * assertion handling below is filled in. Credentials are not managed here:
+ * with SSO the identity provider owns them, and the roster decides who has a
+ * seat (matched by UID) and their role.
  */
 export class SsoAuthProvider implements AuthProvider {
-  constructor(
-    private db: Db,
-    private loginUrl: string,
-  ) {}
+  private readonly db: Db;
+  private readonly loginUrl: string;
+
+  constructor(db: Db, loginUrl: string) {
+    this.db = db;
+    this.loginUrl = loginUrl;
+  }
 
   capabilities(): AuthCapabilities {
     return {
@@ -203,18 +204,20 @@ export class SsoAuthProvider implements AuthProvider {
   }
 
   /**
-   * Role for an SSO-authenticated identity: the roster's word when it knows
-   * them, plain 'student' otherwise. Ready for the implementation below — SSO
-   * assertions typically carry affiliation, not course role.
+   * The roster account a validated assertion signs in to, or null when the
+   * roster has no seat for it. Matched on the UID the identity provider
+   * asserts — never on its email, which for 43% of a class is not the one on
+   * the class list; the asserted email becomes a sign-in alias. Role, name and
+   * section stay the roster's word.
    */
-  roleFor(email: string): UserRow['role'] {
-    return this.db.getUser(normalizeEmail(email))?.role ?? 'student';
+  signInAsserted(asserted: { uid: string; email: string }): UserRow | null {
+    return resolveAssertedIdentity(this.db, asserted);
   }
 
   async authenticate(_credentials: Record<string, unknown>): Promise<UserRow | null> {
-    // TODO(UCLA SSO): validate the assertion/ticket in `_credentials`, map its
-    // attributes to {email, name}, take the role from `this.roleFor(email)`,
-    // `this.db.upsertUser(...)`, and return the row.
+    // TODO(UCLA SSO, task 006): validate the assertion/ticket in
+    // `_credentials`, read its UID and email attributes, and
+    // `return this.signInAsserted({ uid, email })`.
     throw new Error('MM_AUTH_MODE=sso is not implemented yet (waiting on UCLA SSO details)');
   }
 
@@ -289,11 +292,13 @@ export function requireInstructor(req: Request, res: Response, next: NextFunctio
  */
 export class LoginThrottle {
   private hits = new Map<string, { count: number; first: number }>();
+  private readonly limit: number;
+  private readonly windowMs: number;
 
-  constructor(
-    private limit = 10,
-    private windowMs = 10 * 60 * 1000,
-  ) {}
+  constructor(limit = 10, windowMs = 10 * 60 * 1000) {
+    this.limit = limit;
+    this.windowMs = windowMs;
+  }
 
   private key(email: string, ip: string): string {
     return `${email} ${ip}`;

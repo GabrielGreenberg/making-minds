@@ -10,10 +10,29 @@ export {
   evaluateBoxedCircuit,
   evaluateCC,
   evaluateCCInputs,
+  sortByLabel,
 } from './cc';
 export type { CCEvalResult } from './cc';
-export { evaluateSCSingleStep, evaluateSCSequence } from './sc';
-export type { SCSingleStepResult } from './sc';
+export {
+  scNetlist,
+  evaluateSCStep,
+  evaluateSCSequence,
+  boxMemoryOutputs,
+  stepBoxedMemory,
+} from './sc';
+export type { SCNetlist, SCStepResult } from './sc';
+export {
+  inlineSequentialBoxes,
+  boxInterior,
+  parsePortKey,
+  memorySlots,
+  withMemState,
+  zeroMemState,
+  hasMemory,
+  isSequentialBox,
+  hasCombinationalLoop,
+} from './netlist';
+export type { Netlist, MemSlot, BoxInterior } from './netlist';
 export {
   sortStateComponents,
   evaluateFSMSymbolStep,
@@ -85,6 +104,17 @@ export {
 } from './machineValidation';
 export type { MachineValidation } from './machineValidation';
 export { generateTestCases } from './testVectorGen';
+export {
+  questionLayout,
+  gradingCircuit,
+  validateQuestionMachine,
+  caseStimulus,
+  recordedCaseSeparations,
+  runValueCase,
+  runTurbotCase,
+  gradedMachineKey,
+} from './caseRun';
+export type { StageOne, ValueCaseRun, CaseStimulus } from './caseRun';
 export { gradeQuestion, gradeSubmission, summarizeResult } from './grader';
 export type { CaseResult, QuestionResult, SubmissionResult } from './grader';
 export {
@@ -97,6 +127,7 @@ export {
   runTurbot,
   evaluateTurbotCriterion,
   criterionRequiresStop,
+  isGoalCell,
   stateKindOf,
   parseTurbotInternalLabel,
   parseTurbotExternalLabel,

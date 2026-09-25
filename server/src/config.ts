@@ -25,6 +25,14 @@ export interface ServerConfig {
   ssoLoginUrl?: string;
   /** Session lifetime in seconds (default 30 days). */
   sessionTtlSeconds: number;
+  /**
+   * The provenance watermark's secret (task 034, MM_MINT_SECRET): every
+   * student's mint key is derived from it. Optional — unset, the server
+   * generates one on first boot and keeps it in the database (server_meta),
+   * so restarts never change keys. Never rotate it mid-term: every id minted
+   * before would read as nobody's.
+   */
+  mintSecret?: string;
 }
 
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): ServerConfig {
@@ -40,5 +48,6 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): ServerConfig {
       .filter(Boolean),
     authMode,
     sessionTtlSeconds: Number(env.MM_SESSION_TTL_SECONDS) || 30 * 24 * 60 * 60,
+    mintSecret: env.MM_MINT_SECRET || undefined,
   };
 }

@@ -1,6 +1,6 @@
-import type { ClipboardEvent, DragEvent } from 'react';
-import { useStore, selectQuestionLocked } from '../store';
-import { StatementBody } from './StatementBody';
+import { useStore, selectLockNotice } from '../store';
+import { usePasteGuard } from '../usePasteGuard';
+import { ProblemBody, ProblemContext } from './ProblemSetDocument';
 
 /**
  * The workspace for an open (free-text) question — the text-panel analogue of
@@ -8,20 +8,24 @@ import { StatementBody } from './StatementBody';
  * Submit), but the "canvas" is one writing area bound to the store's
  * openResponse, which persists/travels exactly like a circuit.
  *
- * Copy, cut, paste, and drag-and-drop are blocked in the writing area to
- * discourage pasting in prepared (or generated) text and copying answers out —
- * students type their answer here. This is a soft deterrent, not a security
- * boundary.
+ * The writing area wears the provenance guard (usePasteGuard; law 8): the
+ * student may copy, cut and paste their OWN assignment text, but text from
+ * outside the assignments (another app, a chat, the sandbox) is refused with a
+ * notice, and nothing copied here reaches the system clipboard.
  */
 export function OpenResponsePanel() {
-  const question = useStore((s) => s.assignment?.questions[s.currentQuestionIndex]);
+  const assignment = useStore((s) => s.assignment);
+  const currentQuestionIndex = useStore((s) => s.currentQuestionIndex);
+  const question = assignment?.questions[currentQuestionIndex];
   const response = useStore((s) => s.openResponse);
   const setOpenResponse = useStore((s) => s.setOpenResponse);
-  const locked = useStore(selectQuestionLocked);
+  // Why the question refuses edits (marked done, or it shows a submission).
+  const lockNotice = useStore(selectLockNotice);
+  const locked = lockNotice !== null;
+  const { ref: pasteGuardRef, notice: pasteNotice } = usePasteGuard();
 
-  if (!question) return null;
+  if (!assignment || !question) return null;
 
-  const block = (e: ClipboardEvent | DragEvent) => e.preventDefault();
   const words = response.trim() === '' ? 0 : response.trim().split(/\s+/).length;
 
   return (
@@ -32,31 +36,27 @@ export function OpenResponsePanel() {
           <span className="open-response-mode">open question</span>
         </div>
         <div className="open-response-statement">
-          {question.title && <div className="question-title">{question.title}</div>}
-          <StatementBody text={question.statement} />
-          {question.hint && (
-            <div className="question-hint"><StatementBody text={question.hint} /></div>
-          )}
+          <ProblemContext assignment={assignment} questionId={question.id} />
+          <ProblemBody question={question} />
         </div>
         <textarea
           className="open-response-textarea"
           value={response}
           onChange={(e) => setOpenResponse(e.target.value)}
-          onCopy={block}
-          onCut={block}
-          onPaste={block}
-          onDrop={block}
+          ref={pasteGuardRef}
           placeholder="Type your answer here…"
           spellCheck
           readOnly={locked}
         />
         <div className="open-response-foot">
           <span>{words} word{words === 1 ? '' : 's'}</span>
-          <span>
-            {locked
-              ? 'Marked done — unlock this question to keep editing.'
-              : "Saved automatically — submit the assignment when you're done."}
-          </span>
+          {pasteNotice ? (
+            <span className="paste-notice" role="status">{pasteNotice}</span>
+          ) : (
+            <span>
+              {lockNotice ?? "Saved automatically — submit the assignment when you're done."}
+            </span>
+          )}
         </div>
       </div>
     </div>

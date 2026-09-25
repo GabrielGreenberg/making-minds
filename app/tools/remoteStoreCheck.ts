@@ -18,6 +18,9 @@
 //     identity + timestamp are the server's word; no grade shown) →
 //     instructor reads server grades → manual review through the seam →
 //     release/unrelease gates what the student's records carry
+//   - own reads for every role (task 037): an instructor's own-read (the
+//     Student view) holds only the instructor's attempts, whatever email is
+//     passed; `listAll` is the gradebook's, and a student's 403s
 //
 // S4 additions (the cutover's resilience slice):
 //
@@ -31,7 +34,16 @@
 //     lab browsers), replay supersedes the fetched server state, re-uploads
 //     through the seam, and clears itself on the confirmed upload
 //
+// Task 034: RemoteWorkbookStore.loadForOpen returns, in ONE GET, the saved
+// state and the key the server derives from ITS secret for the session's
+// person (never the dev key), and the grader grep gate covers
+// provenance/integrity.ts too.
+//
 // Exits non-zero on the first tally of failures.
+
+// Type-only, so erased at runtime (verbatimModuleSyntax): it loads nothing and
+// the shim below still runs before the client module does.
+import type { ApiError } from '../src/api/client';
 
 // The api client reads the bearer token from localStorage (lazily, per call);
 // give Node a minimal shim BEFORE importing anything that might touch it.
@@ -84,6 +96,10 @@ for (const rel of [
   '../src/api/client.ts',
   '../src/storage/journal.ts',
   '../src/storage/migrateLocal.ts',
+  // The integrity check runs beside the grade, never through it.
+  '../src/provenance/integrity.ts',
+  '../src/provenance/ids.ts',
+  '../src/provenance/trace.ts',
 ]) {
   const source = readFileSync(new URL(rel, import.meta.url), 'utf8');
   check(
@@ -117,7 +133,7 @@ api.setOnUnauthorized(() => unauthorizedFires++);
 
 const unauthenticated = await remoteWorkbookStore
   .loadAssignmentState(SAMPLE_ASSIGNMENT_ID)
-  .then(() => null as api.ApiError | null)
+  .then(() => null as ApiError | null)
   .catch((e: unknown) => (e instanceof api.ApiError ? e : null));
 check('unauthenticated seam call rejects with ApiError(401)', unauthenticated?.status === 401);
 check('…and fires the onUnauthorized hook', unauthorizedFires === 1);
@@ -232,6 +248,33 @@ check(
   wbBack?.currentQuestionIndex === 2 && wbBack.questionCircuits[1] != null,
 );
 
+// The mint key (task 034): the server's derivation for the session's person.
+{
+  const { deriveMintKey, DEV_MINT_SECRET } = await import('../src/provenance/ids');
+  const serverKey = deriveMintKey(db.mintSecret(), student.email, SAMPLE_ASSIGNMENT_ID);
+  // Count the requests the open makes: the key rides the workbook fetch.
+  const realFetch = globalThis.fetch;
+  const seen: string[] = [];
+  globalThis.fetch = ((input: Parameters<typeof fetch>[0], init?: Parameters<typeof fetch>[1]) => {
+    seen.push(`${init?.method ?? 'GET'} ${String(input)}`);
+    return realFetch(input, init);
+  }) as typeof fetch;
+  let opened: { state: unknown; mintKey: string | null };
+  try {
+    opened = await remoteWorkbookStore.loadForOpen(SAMPLE_ASSIGNMENT_ID, 'ignored@example.com');
+  } finally {
+    globalThis.fetch = realFetch;
+  }
+  const got = opened.mintKey;
+  check('loadForOpen returns the server-derived key for the session\'s person (the email argument is ignored)',
+    got === serverKey);
+  check('…beside the saved state, in ONE request',
+    JSON.stringify(opened.state) === JSON.stringify(wbBack) && seen.length === 1 && /GET .*\/api\/workbooks\//.test(seen[0]),
+    seen.join(' | '));
+  check('…never the client\'s dev key', got !== deriveMintKey(DEV_MINT_SECRET, student.email, SAMPLE_ASSIGNMENT_ID));
+  check('…per assignment', (await remoteWorkbookStore.loadForOpen('another-asg', null)).mintKey !== got);
+}
+
 // ── student: submit — answers only, server's word, no grade ──────
 const spoofed = {
   ...buildCorrectSubmission(student.email),
@@ -252,15 +295,15 @@ check(
 
 const rec2 = await remoteSubmissionStore.submit(SAMPLE_ASSIGNMENT_ID, buildIncorrectSubmission(student.email));
 check('second submit is attempt 2', rec2.attempt === 2);
-check('getLatest() returns the newest attempt', (await remoteSubmissionStore.getLatest(SAMPLE_ASSIGNMENT_ID))?.attempt === 2);
+check('getLatestOwn() returns the newest attempt', (await remoteSubmissionStore.getLatestOwn(SAMPLE_ASSIGNMENT_ID, student.email))?.attempt === 2);
 
 // ── instructor: server grades + manual review through the seam ───
 api.setToken(iTok);
-const graded = await remoteSubmissionStore.listSubmissions(SAMPLE_ASSIGNMENT_ID);
+const graded = await remoteSubmissionStore.listAll(SAMPLE_ASSIGNMENT_ID);
 const g1 = graded.find((r) => r.attempt === 1)?.result;
 const g2 = graded.find((r) => r.attempt === 2)?.result;
 check(
-  'instructor listSubmissions carries server grades (correct all-pass, incorrect fails)',
+  'instructor listAll carries server grades (correct all-pass, incorrect fails)',
   !!g1 && g1.passed === g1.total && g1.total > 0 && !!g2 && g2.passed < g2.total,
   JSON.stringify({ first: [g1?.passed, g1?.total], second: [g2?.passed, g2?.total] }),
 );
@@ -290,8 +333,8 @@ check('review of a non-pending question resolves null (404 → seam null)', notP
 // ── release gates what the student's records carry ───────────────
 await remoteAssignmentStore.setGradesReleased(SAMPLE_ASSIGNMENT_ID, true);
 api.setToken(sTok);
-const releasedLatest = await remoteSubmissionStore.getLatest(SAMPLE_ASSIGNMENT_ID);
-check('after release, student getLatest() carries scores', releasedLatest?.result != null);
+const releasedLatest = await remoteSubmissionStore.getLatestOwn(SAMPLE_ASSIGNMENT_ID, student.email);
+check('after release, student getLatestOwn() carries scores', releasedLatest?.result != null);
 // notes/todos.md item 4: per-case detail is now safe-widened (which input,
 // pass/fail) — server/tools/parityCheck.ts pins the widening itself; here
 // just confirm the answer key stays hidden through the seam too.
@@ -311,14 +354,53 @@ await remoteAssignmentStore.setGradesReleased(SAMPLE_ASSIGNMENT_ID, false);
 api.setToken(sTok);
 check(
   'unrelease hides grades again',
-  (await remoteSubmissionStore.getLatest(SAMPLE_ASSIGNMENT_ID))?.result === undefined,
+  (await remoteSubmissionStore.getLatestOwn(SAMPLE_ASSIGNMENT_ID, student.email))?.result === undefined,
 );
+
+// ── own reads for every role (task 037): the session names the person ──
+api.setToken(iTok);
+const iRec = await remoteSubmissionStore.submit(SAMPLE_ASSIGNMENT_ID, buildCorrectSubmission(instructor.email));
+check('the instructor submits (their Student view): attempt 1 of their own', iRec.attempt === 1);
+{
+  // The email argument is ignored remotely: the session decides whose.
+  const iLatest = await remoteSubmissionStore.getLatestOwn(SAMPLE_ASSIGNMENT_ID, 'ignored@x');
+  check(
+    "instructor getLatestOwn() is the instructor's own attempt 1, never a student's",
+    iLatest?.attempt === 1 && iLatest.submission.student === instructor.email.toLowerCase(),
+  );
+  const iOwn = await remoteSubmissionStore.listOwn(SAMPLE_ASSIGNMENT_ID, null);
+  check(
+    'instructor listOwn() holds only the instructor\'s records',
+    iOwn.length === 1 && iOwn.every((r) => r.submission.student === instructor.email.toLowerCase()),
+  );
+  const everyone = await remoteSubmissionStore.listAll(SAMPLE_ASSIGNMENT_ID);
+  check(
+    "instructor listAll() holds the student's two attempts and the instructor's one",
+    everyone.length === 3 &&
+      everyone.filter((r) => r.submission.student === student.email.toLowerCase()).length === 2 &&
+      everyone.filter((r) => r.submission.student === instructor.email.toLowerCase()).length === 1,
+  );
+}
+api.setToken(sTok);
+check(
+  "student getLatestOwn() is still the student's attempt 2",
+  (await remoteSubmissionStore.getLatestOwn(SAMPLE_ASSIGNMENT_ID, 'ignored@x'))?.submission.student ===
+    student.email.toLowerCase() &&
+    (await remoteSubmissionStore.getLatestOwn(SAMPLE_ASSIGNMENT_ID, student.email))?.attempt === 2,
+);
+{
+  const denied = await remoteSubmissionStore
+    .listAll(SAMPLE_ASSIGNMENT_ID)
+    .then(() => null as ApiError | null)
+    .catch((e: unknown) => (e instanceof api.ApiError ? e : null));
+  check('a student listAll() rejects with ApiError(403)', denied?.status === 403);
+}
 
 // ── dead token: 401 hook fires on an authenticated-looking call ──
 api.setToken('garbage-token');
 const dead = await remoteSubmissionStore
-  .listSubmissions(SAMPLE_ASSIGNMENT_ID)
-  .then(() => null as api.ApiError | null)
+  .listOwn(SAMPLE_ASSIGNMENT_ID, null)
+  .then(() => null as ApiError | null)
   .catch((e: unknown) => (e instanceof api.ApiError ? e : null));
 check('dead token rejects with ApiError(401) and fires the hook', dead?.status === 401 && unauthorizedFires === 2);
 
@@ -412,7 +494,7 @@ check('the student-carried authored assignment never reached the server',
   (await remoteAssignmentStore.get('student-carried-asg')) === null);
 
 // ── crash-buffer journal (storage/journal.ts) ────────────────────
-const { writeJournal, readJournal, clearJournal, reconcileJournal } = await import(
+const { writeJournal, readJournal, clearJournal, clearJournalIfHolds, reconcileJournal } = await import(
   '../src/storage/journal'
 );
 const jState = {
@@ -426,6 +508,18 @@ check('journal round-trips for its own (email, assignment)',
   readJournal('alice@example.com', 'jr-asg')?.currentQuestionIndex === 7);
 clearJournal('alice@example.com', 'jr-asg');
 check('clearJournal removes the buffer', readJournal('alice@example.com', 'jr-asg') === null);
+
+// A save confirmed after its user left (a sign-out mid-save, store.ts
+// performAutoSave) clears the buffer only if it holds exactly what was saved:
+// an equal buffer is obsolete (replaying it would overwrite later work from
+// another device), a newer one is work still owed to the next open.
+writeJournal('alice@example.com', 'jr-asg', jState);
+clearJournalIfHolds('alice@example.com', 'jr-asg', { ...jState, currentQuestionIndex: 6 });
+check('clearJournalIfHolds keeps a buffer NEWER than the confirmed save',
+  readJournal('alice@example.com', 'jr-asg')?.currentQuestionIndex === 7);
+clearJournalIfHolds('alice@example.com', 'jr-asg', { ...jState });
+check('clearJournalIfHolds removes a buffer equal to the confirmed save',
+  readJournal('alice@example.com', 'jr-asg') === null);
 
 // Replay: a surviving buffer supersedes the fetched server state, is
 // re-uploaded through the seam, and is cleared on the confirmed upload.
@@ -447,12 +541,15 @@ check('no buffer → the fetched state passes through untouched',
 api.setToken(sTok);
 const filedViaSeam = await remoteFeedbackStore.submit({
   student: 'someone-else@ucla.edu', // deliberately wrong — the server's word wins
+  authorRole: 'instructor', // likewise (task 018)
   category: 'platform design',
   message: 'the TM tape is hard to scroll on a trackpad',
   screenshots: [],
 });
 check('the server stamps the caller\'s own identity, not the client-supplied one',
   filedViaSeam.student === student.email.toLowerCase());
+check('the server stamps the caller\'s own role, not the client-supplied one',
+  filedViaSeam.authorRole === 'student');
 check('a fresh report starts open', filedViaSeam.status === 'open');
 
 api.setToken(sTok);
@@ -531,10 +628,34 @@ check(
   'getRoster() carries account state',
   rosterRows.find((r) => r.email === 'new@ucla.edu')?.registered === false,
 );
+// The registrar's class list as exported (synthetic): the client's report and
+// row types against the real server's shapes.
+const classReport = await api.importRoster(
+  [
+    'Term: 26F',
+    'Students: 2',
+    '',
+    'UID,Name,E-mail,Major,Classification,Grade Type,Status,Section',
+    '999-000-201,"DOE, JANE",jane.doe@example.com,Philosophy,Junior,LG,E,1A',
+    '999-000-202,"ROE, RAY",ray.roe@example.com,Philosophy,Junior,LG,D,1B',
+  ].join('\r\n'),
+);
+check(
+  'importRoster() returns the registrar report (header line, status counts, review list)',
+  classReport.headerLine === 4 &&
+    classReport.statusCounts.some((s) => s.label === 'dropped' && s.count === 1 && !s.imported) &&
+    Array.isArray(classReport.noLongerListed) &&
+    classReport.columns.section === 'Section' &&
+    classReport.columns.status === 'Status',
+);
+check(
+  'getRoster() rows carry the section and the display name',
+  (await api.getRoster()).some((r) => r.email === 'jane.doe@example.com' && r.section === '1A' && r.name === 'Jane Doe'),
+);
 
 const badLogin = await api
   .login('new@ucla.edu', 'nopasswordyet')
-  .then(() => null as api.ApiError | null, (e: unknown) => (e instanceof api.ApiError ? e : null));
+  .then(() => null as ApiError | null, (e: unknown) => (e instanceof api.ApiError ? e : null));
 check('a roster member with no account cannot sign in', badLogin?.status === 401);
 check('…and the refusal carries a displayable message', (badLogin?.message.length ?? 0) > 0);
 
@@ -553,7 +674,7 @@ check('…and the new password is what signs in', (await api.me()).email === 'ne
 
 const studentBlocked = await api
   .getRoster()
-  .then(() => null as api.ApiError | null, (e: unknown) => (e instanceof api.ApiError ? e : null));
+  .then(() => null as ApiError | null, (e: unknown) => (e instanceof api.ApiError ? e : null));
 check('a student calling getRoster() is refused (403)', studentBlocked?.status === 403);
 
 await api.requestAccess({ email: 'offroster@ucla.edu', name: 'Off Roster', studentId: '9' });
@@ -575,6 +696,33 @@ check(
   'removeRosterEntry() drops the row',
   !(await api.getRoster()).some((r) => r.email === 'offroster@ucla.edu'),
 );
+
+// Task 036, the client half: a person is their student ID; a UCLA address
+// beside a personal class-list one signs in to the same account.
+await api.importRoster('UID,Name,Email\n004-600-700,Pat Personal,pat.personal@gmail.com\n');
+const patUser = await api.register({ email: 'pat@g.ucla.edu', password: 'patpassword', studentId: '004600700' });
+check('register() with a UCLA email + UID returns the class-list account', patUser.email === 'pat.personal@gmail.com');
+await api.login('pat@g.ucla.edu', 'patpassword');
+check('login() by that UCLA email restores the same account', (await api.me()).email === 'pat.personal@gmail.com');
+await api.login('prof@ucla.edu', 'instructorpass');
+const patAliases = async () => (await api.getRoster()).find((r) => r.email === 'pat.personal@gmail.com')?.aliases ?? [];
+check('getRoster() rows carry their other sign-in addresses', (await patAliases()).join() === 'pat@g.ucla.edu');
+const patPlaced = await api.addRosterEntry({ email: 'pat.more@ucla.edu', studentId: '004-600-700' });
+check(
+  'addRosterEntry() reports the account a known UID names, and the address it added',
+  patPlaced.updated === 1 && patPlaced.account === 'pat.personal@gmail.com' && patPlaced.aliasAdded === 'pat.more@ucla.edu',
+);
+await api.requestAccess({ email: 'pat.req@example.org', name: 'Pat', studentId: '004600700' });
+const patRequest = (await api.listAccessRequests('pending')).find((r) => r.email === 'pat.req@example.org');
+check('listAccessRequests() names the roster account a request matches', patRequest?.match?.email === 'pat.personal@gmail.com');
+const patApproved = await api.approveAccessRequest(patRequest!.id);
+check(
+  'approveAccessRequest() reports the account it added the email to',
+  patApproved.account === 'pat.personal@gmail.com' && patApproved.accountName === 'Pat Personal' && patApproved.aliasAdded === 'pat.req@example.org',
+);
+const patRemoved = await api.removeRosterAlias('pat.personal@gmail.com', 'pat@g.ucla.edu');
+check('removeRosterAlias() drops just that address', (await patAliases()).join() === 'pat.more@ucla.edu,pat.req@example.org');
+check('…and reports the password set up through it cleared', patRemoved.credentialCleared === true);
 
 authServer.close();
 authDb.close();

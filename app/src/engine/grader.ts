@@ -20,7 +20,13 @@
 // machine is valid AND every case passes. A case passes iff its output is
 // accepted and decodes to f(x). No partial credit — a rejected output and a wrong
 // value fail identically. A Stage-1-invalid machine fails every case (0/total),
-// never `skipped`. Failing cases are recorded for the INSTRUCTOR only.
+// never `skipped`. The answer key in each case (expected/got) is recorded for
+// the INSTRUCTOR only (server/src/sanitize.ts).
+//
+// Everything up to "decode" — Stage 1, the grading circuit, running one case —
+// lives in engine/caseRun.ts, which never sees an expected output; this module
+// is that plus the comparison. The student's replay of a failed case (store
+// `loadCaseInput`) runs the same functions, so it is the grader's run.
 
 import type {
   CircuitData,
@@ -28,35 +34,27 @@ import type {
   AssignmentQuestion,
   SubmissionData,
   TestCase,
-  TurbotTestCase,
   TurbotCaseResult,
   PerceptionTestCase,
   PerceptionCaseResult,
-  RepSystem,
-  BuildMode,
-  TMNotation,
   CaseResult,
   QuestionResult,
   SubmissionResult,
 } from '../types';
-import { evaluateCCInputs } from './cc';
-import { evaluateSCSequence } from './sc';
-import { evaluateFSMSymbolSequence } from './fsm';
-import { fsmNotation } from './notation';
-import { evaluateTMSequence, tapeCellsUsed } from './tm';
-import { runTurbot, evaluateTurbotCriterion, explainTurbotCriterionFailure, criterionRequiresStop, validateTurbotTM, validateTurbotFSM } from './turbot';
+import { questionTask } from '../types';
 import { validatePerceptionMachine, runPerceptionCase } from './perception';
 import { gradeFillIn } from './fillIn';
-import { validateMachine, validateAllowedComponents, validateComponentLimits } from './machineValidation';
+import { notationForRepresentation } from './tmCodec';
 import {
-  axisForMode,
-  encodeInput,
-  decodeOutput,
-  outputAccepted,
-  type CodecLayout,
-  type RawOutput,
-} from './codec';
-import { encodeTM, acceptTM, decodeTM, notationForRepresentation } from './tmCodec';
+  gradingCircuit,
+  questionComponentRules,
+  questionLayout,
+  validateQuestionMachine,
+  runValidatedValueCase,
+  runValidatedTurbotCase,
+  rejectedTurbotCase,
+  type ValueCaseRun,
+} from './caseRun';
 
 // The grading result types live in types.ts (so SubmissionRecord can carry a
 // result without a types→engine dependency). Re-exported here for the existing
@@ -75,8 +73,24 @@ function skip(questionId: number, reason: string): QuestionResult {
   return { questionId, status: 'skipped', reason, passed: 0, total: 0, cases: [] };
 }
 
+/** A case's TM block separations, carried onto its result only when the case
+ *  has them: they are part of the INPUT (the tape the grader laid out), so a
+ *  student replaying the case — whose copy of the question has no bank —
+ *  gets the grader's tape (engine/caseRun.ts, store loadCaseInput). */
+function layoutHint(tc: TestCase): Pick<CaseResult, 'separations'> {
+  return tc.separations ? { separations: tc.separations } : {};
+}
+
 function reject(tc: TestCase, reason: string): CaseResult {
-  return { input: tc.inputs, expected: tc.outputs, got: [], pass: false, reason };
+  return { input: tc.inputs, expected: tc.outputs, got: [], pass: false, reason, ...layoutHint(tc) };
+}
+
+/** Hold one case's run (engine/caseRun.ts) against the bank's answer. The
+ *  tape axis decodes a single value and compares it alone. */
+function caseResult(tc: TestCase, run: ValueCaseRun, tape: boolean): CaseResult {
+  if (run.reason !== undefined) return reject(tc, run.reason);
+  const pass = tape ? run.got[0] === tc.outputs[0] : valuesEqual(run.got, tc.outputs);
+  return { input: tc.inputs, expected: tc.outputs, got: run.got, pass, ...layoutHint(tc) };
 }
 
 /** Stage-1 failure: an invalid machine fails every case (never `skipped`). */
@@ -106,18 +120,6 @@ function pendingOpen(questionId: number, responseText: string | undefined): Ques
     total: 0,
     cases: [],
   };
-}
-
-/** The two question-wide component rules, checked together at the head of
- *  Stage 1 in every grading branch: which types are allowed, and how many of
- *  each. Both are absent by default and both recurse into BOXED internals. */
-function questionComponentRules(
-  question: AssignmentQuestion,
-  circuit: CircuitData,
-): { ok: boolean; reason?: string } {
-  const allowed = validateAllowedComponents(circuit, question.allowed_components);
-  if (!allowed.ok) return allowed;
-  return validateComponentLimits(circuit, question.component_limits);
 }
 
 /**
@@ -150,6 +152,9 @@ function gradeFillInQuestion(
  * Grade a single question's circuit against its numeric test cases.
  * `responseText` is the free-text answer for open questions, `fillAnswers`
  * the typed blanks of a fill-in question (each unused otherwise).
+ *
+ * Results are PARALLEL to the question's banks: `cases[k]` is `test_cases[k]`
+ * and `turbotCases[k]` is `turbot_cases[k]` (a replay of case k relies on it).
  */
 export function gradeQuestion(
   question: AssignmentQuestion,
@@ -157,135 +162,39 @@ export function gradeQuestion(
   responseText?: string,
   fillAnswers?: string[],
 ): QuestionResult {
+  // The question's task (types.ts questionTask) picks the branch — the same
+  // classifier that picks the student's panel and what the answer carries.
+  const task = questionTask(question);
   // A fill-in question is an open question that CAN be autograded: string
   // answers, no machine to run (engine/fillIn.ts).
-  if (question.fill_in) return gradeFillInQuestion(question, fillAnswers);
-  if (question.buildMode === 'open') return pendingOpen(question.id, responseText);
+  if (task === 'fill-in') return gradeFillInQuestion(question, fillAnswers);
+  if (task === 'open') return pendingOpen(question.id, responseText);
   if (!circuit) return skip(question.id, 'no circuit submitted');
-  if (question.buildMode === 'turbot') return gradeTurbot(question, circuit);
-  if (question.perception) return gradePerception(question, circuit);
+  // Every machine is graded from rest: MEMs at 0, whatever the saved circuit
+  // carried from the student's last UI run (engine/caseRun.ts).
+  const machine = gradingCircuit(circuit);
+  if (task === 'turbot') return gradeTurbot(question, machine);
+  if (task === 'perception') return gradePerception(question, machine);
 
   const cases = question.test_cases;
   if (!cases || cases.length === 0) return skip(question.id, 'question has no test cases');
 
-  // Stage 1 (question-wide): the component restriction and budget, before any
-  // per-mode interface check — covers both the tape and space/time branches
-  // below. Semantics + helpers live in machineValidation.ts
-  // (allowed_components / component_limits).
-  const restriction = questionComponentRules(question, circuit);
-  if (!restriction.ok) return failEvery(question.id, cases, restriction.reason!);
+  // Stage 1 (engine/caseRun.ts validateQuestionMachine): the question-wide
+  // component restriction and budget first, then the per-mode interface or
+  // table check. A question whose group widths are unknown (no cc_spec on a
+  // space/time axis) cannot be graded at all — skipped, not failed. An
+  // invalid machine fails every case with the reason, no testing.
+  const valid = validateQuestionMachine(question, machine);
+  if (valid.skip) return skip(question.id, valid.reason!);
+  if (!valid.ok) return failEvery(question.id, cases, valid.reason!);
 
-  const mode = question.buildMode;
-  const rep: RepSystem = question.representation ?? 'binary';
-  const axis = axisForMode(mode);
-
-  // Tape axis (TM): widths are content-relative — the tape codec lays values out
-  // and locates the output block by content, so no cc_spec is required.
-  if (axis === 'tape') {
-    return gradeTape(question.id, circuit, cases, rep, {
-      requireStandardHaltPosition: question.requireStandardHaltPosition,
-      maxTapeCells: question.maxTapeCells,
-    });
-  }
-
-  // Space/time axes need the per-group widths from the authoring spec.
-  const spec = question.cc_spec;
-  if (!spec) return skip(question.id, 'question has no spec (group widths unknown)');
-  const layout: CodecLayout = {
-    axis,
-    rep,
-    inputWidths: spec.inputs.map((g) => g.width),
-    outputWidths: spec.outputs.map((g) => g.width),
-  };
-
-  // Stage 1: machine validation. Invalid ⇒ fail every case with no testing.
-  const valid = validateMachine(circuit, mode, layout, rep);
-  if (!valid.ok) return failEvery(question.id, cases, valid.reason ?? 'invalid machine');
-
-  // Stage 2: test each case through the codec.
-  const results = cases.map((tc) => gradeSpaceTimeCase(circuit, mode, layout, tc));
+  // Stage 2: run each case (encode → run → accept → decode) and compare.
+  const layout = questionLayout(question)!;
+  const tape = layout.axis === 'tape';
+  const results = cases.map((tc) =>
+    caseResult(tc, runValidatedValueCase(question, machine, layout, tc.inputs, tc.separations), tape),
+  );
   return tally(question.id, results);
-}
-
-/** One case on the space (CC) or time (SC/FSM) axis. */
-function gradeSpaceTimeCase(
-  circuit: CircuitData,
-  mode: BuildMode,
-  layout: CodecLayout,
-  tc: TestCase,
-): CaseResult {
-  const enc = encodeInput(tc.inputs, layout);
-
-  let raw: RawOutput;
-  if (enc.axis === 'space') {
-    // CC — one combinational evaluation.
-    const bits = evaluateCCInputs(circuit.components, circuit.wires, enc.bits);
-    raw = { axis: 'space', bits };
-  } else if (mode === 'SC') {
-    const steps = evaluateSCSequence(circuit.components, circuit.wires, enc.steps);
-    raw = { axis: 'time', steps };
-  } else {
-    // FSM — feed the FULL encoded row per step as one input symbol: symbol
-    // char i = input wire i (cc_spec declaration order = codec wire order).
-    // Stage 1 validated totality over this notation's whole alphabet, so a
-    // valid FSM cannot halt mid-run; guard anyway.
-    const notation = fsmNotation(layout.inputWidths.length, layout.outputWidths.length);
-    const symbols = enc.steps.map((s) => s.join(''));
-    const r = evaluateFSMSymbolSequence(circuit.components, circuit.wires, symbols, notation);
-    if (r.halted) return reject(tc, 'machine halted before consuming the input');
-    raw = { axis: 'time', steps: r.outputs.map((sym) => sym.split('').map(Number)) };
-  }
-
-  // Acceptor (rep-level) before decoding; decode is total.
-  if (!outputAccepted(raw, layout)) return reject(tc, 'malformed output');
-  const got = decodeOutput(raw, layout);
-  return { input: tc.inputs, expected: tc.outputs, got, pass: valuesEqual(got, tc.outputs) };
-}
-
-/** TM grading — the codec's tape axis, delegated to tmCodec.
- *  `requireStandardHaltPosition` (question-level, optional) tightens the
- *  acceptor: the head must halt on the output block's rightmost cell.
- *  Absent/false keeps the default position-agnostic acceptance.
- *  `maxTapeCells` (optional) additionally caps how many cells the head may
- *  occupy over the whole run — "use at most 20 cells of the tape". It is
- *  checked AFTER acceptance, so a run that never halted is reported as such
- *  rather than as a tape overrun. */
-function gradeTape(
-  questionId: number,
-  circuit: CircuitData,
-  cases: TestCase[],
-  rep: RepSystem,
-  opts: { requireStandardHaltPosition?: boolean; maxTapeCells?: number } = {},
-): QuestionResult {
-  const notation = notationForRepresentation(rep);
-  const layout: CodecLayout = { axis: 'tape', rep, inputWidths: [], outputWidths: [] };
-
-  // Stage 1: an ill-formed table fails every case with the syntax error.
-  const valid = validateMachine(circuit, 'TM', layout, rep);
-  if (!valid.ok) return failEvery(questionId, cases, valid.reason ?? 'invalid machine');
-
-  const results = cases.map((tc) => {
-    // The case's optional layout hint (block separations) rides through
-    // untouched — the codec owns what it means; the grader stays agnostic.
-    const initialTape = encodeTM(notation, tc.inputs, tc.separations);
-    const run = evaluateTMSequence(circuit.components, circuit.wires, initialTape, notation);
-    const rej = acceptTM(notation, run, {
-      requireStandardHaltPosition: opts.requireStandardHaltPosition,
-    });
-    if (rej) return reject(tc, rej.reason);
-    const overrun = tapeOverrun(tapeCellsUsed(run, initialTape), opts.maxTapeCells);
-    if (overrun) return reject(tc, overrun);
-    const got = decodeTM(notation, run.tape);
-    return { input: tc.inputs, expected: tc.outputs, got: [got], pass: got === tc.outputs[0] };
-  });
-  return tally(questionId, results);
-}
-
-/** The rejection reason for a run that used more tape than the question
- *  allows, or undefined when it is within budget (or unbudgeted). */
-function tapeOverrun(used: number, maxTapeCells: number | undefined): string | undefined {
-  if (maxTapeCells === undefined || used <= maxTapeCells) return undefined;
-  return `machine used ${used} tape cells — this question allows at most ${maxTapeCells}`;
 }
 
 /**
@@ -340,18 +249,8 @@ function gradePerceptionCase(
   };
 }
 
-/**
- * Structural layout for a turbot brain's fixed sensor/motor interface, keyed
- * by inner mode. Only CC/SC brains reach validateMachine (FSM brains
- * validate against turbotFsmNotation via validateTurbotFSM above; TM brains
- * against validateTurbotTM), so only those two rows are read.
- */
-function turbotLayout(innerMode: BuildMode): CodecLayout {
-  if (innerMode === 'SC') return { axis: 'time', rep: 'binary', inputWidths: [1], outputWidths: [1, 1] };
-  return { axis: 'space', rep: 'binary', inputWidths: [1], outputWidths: [2] };
-}
-
-/** Turbot grading — runs the arena driver loop per case and checks the success criterion. */
+/** Turbot grading — runs the arena driver loop per case and checks the
+ *  success criterion (engine/caseRun.ts runValidatedTurbotCase). */
 function gradeTurbot(question: AssignmentQuestion, circuit: CircuitData): QuestionResult {
   const innerMode = question.innerMode;
   if (!innerMode) return skip(question.id, 'question has no inner mode (CC/SC/FSM/TM) set');
@@ -359,89 +258,22 @@ function gradeTurbot(question: AssignmentQuestion, circuit: CircuitData): Questi
   const cases = question.turbot_cases;
   if (!cases || cases.length === 0) return skip(question.id, 'question has no turbot cases');
 
-  // Stage 1: a TM brain is a *turbot TM* (per-state internal/external
-  // grammar, single actions) with its own validator; an FSM brain validates
-  // through validateTurbotFSM, which delegates to turbotFsmNotation — the
-  // SAME notation runBrainStep executes and the store's label editor accepts
-  // (legacy 1-bit aliases and canonical 2-bit motor labels alike); CC/SC
-  // brains reuse the shared machine validation.
-  // The question's encoding (representation) picks a turbot TM's internal
-  // tape alphabet: binary {0,1,*}, unary (tally) {0,1}.
-  const notation = notationForRepresentation(question.representation ?? 'binary');
-  // Stage 1 starts with the question-wide component rules (the type
-  // restriction is vacuous for STATE-vocabulary FSM/TM brains — STATE is
-  // infrastructure — but uniform; a budget can still bite).
-  const restriction = questionComponentRules(question, circuit);
-  let valid: { ok: boolean; reason?: string };
-  if (!restriction.ok) {
-    valid = restriction;
-  } else if (innerMode === 'TM' || innerMode === 'FSM') {
-    const errors = innerMode === 'TM'
-      ? validateTurbotTM(circuit.components, circuit.wires, notation)
-      : validateTurbotFSM(circuit.components, circuit.wires);
-    valid = errors.length === 0 ? { ok: true } : { ok: false, reason: errors.map((e) => e.message).join(' ') };
-  } else {
-    valid = validateMachine(circuit, innerMode, turbotLayout(innerMode), question.representation ?? 'binary');
-  }
+  // Stage 1 (validateQuestionMachine): the question-wide component rules,
+  // then the brain's own validator per inner mode.
+  const valid = validateQuestionMachine(question, circuit);
   if (!valid.ok) {
-    const rejected: TurbotCaseResult[] = cases.map((tc) => ({
-      pass: false,
-      stepsTaken: 0,
-      finalPosition: { ...tc.arena.start },
-      hitStepLimit: false,
-      reason: valid.reason,
-    }));
+    const rejected: TurbotCaseResult[] = cases.map((tc) => rejectedTurbotCase(tc, valid.reason));
     return { questionId: question.id, status: 'graded', passed: 0, total: rejected.length, cases: [], turbotCases: rejected };
   }
 
+  // The question's encoding (representation) picks a turbot TM's internal
+  // tape alphabet: binary {0,1,*}, unary (tally) {0,1}.
+  const notation = notationForRepresentation(question.representation ?? 'binary');
   const turbotCases = cases.map((tc) =>
-    gradeTurbotCase(circuit, innerMode, tc, notation, question.maxTapeCells),
+    runValidatedTurbotCase(circuit, innerMode, tc, notation, question.maxTapeCells),
   );
   const passed = turbotCases.filter((c) => c.pass).length;
   return { questionId: question.id, status: 'graded', passed, total: turbotCases.length, cases: [], turbotCases };
-}
-
-function gradeTurbotCase(
-  circuit: CircuitData,
-  innerMode: BuildMode,
-  tc: TurbotTestCase,
-  notation: TMNotation,
-  maxTapeCells?: number,
-): TurbotCaseResult {
-  const run = runTurbot(circuit.components, circuit.wires, innerMode, tc.arena, tc.maxSteps, notation);
-  // The step limit bounds SIMULATION; whether a truncated run also fails is
-  // the criterion's call (criterionRequiresStop, engine/turbot.ts). Stop-
-  // requiring criteria (reach-and-stop, return-to-start) judge how the run
-  // ends, so a turbot that never came to rest fails outright. pass-through
-  // is trace-satisfiable (HW2 §III: cross the goal, "need not stop"), so a
-  // step-limited run is still judged on the trace it produced.
-  if (run.hitStepLimit && criterionRequiresStop(tc.criterion)) {
-    return { pass: false, stepsTaken: tc.maxSteps, finalPosition: run.finalState, hitStepLimit: true, reason: 'exceeded max steps' };
-  }
-  // A TM brain's private tape is budgeted the same way as a base TM's
-  // (HW6 P2: "Use at most 20 cells of the Turing machine tape"). Checked
-  // before the criterion: a navigation that only succeeds by overrunning the
-  // budget has not solved the problem as set.
-  const overrun = tapeOverrun(run.tapeCellsUsed, maxTapeCells);
-  if (overrun) {
-    return { pass: false, stepsTaken: run.history.length, finalPosition: run.finalState, hitStepLimit: run.hitStepLimit, reason: overrun };
-  }
-  const pass = evaluateTurbotCriterion(tc.arena, run, tc.criterion);
-  // Failure reasons — EVERY failing case carries one: a step-limited trace
-  // that never satisfied its criterion names the criterion (the limit is not
-  // why it failed); a halted-but-not-stopped brain (a dead FSM — a turbot
-  // TM's halt counts as its stop) gets the explanatory reason; any other
-  // failure (a clean stop that just doesn't satisfy the criterion, e.g.
-  // halting at the start without visiting the goal) is explained in the
-  // criterion's own terms by explainTurbotCriterionFailure.
-  const reason = pass
-    ? undefined
-    : run.hitStepLimit
-      ? `'${tc.criterion}' criterion not satisfied within max steps`
-      : run.haltedByBrain && !run.stopped
-        ? 'brain halted without a matching transition'
-        : explainTurbotCriterionFailure(tc.arena, run, tc.criterion);
-  return { pass, stepsTaken: run.history.length, finalPosition: run.finalState, hitStepLimit: run.hitStepLimit, reason };
 }
 
 /**

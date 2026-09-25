@@ -1,17 +1,25 @@
 import { useStore, selectAssignmentFrozen } from '../store';
 import { navigate } from '../routing';
 import { getCurrentUserEmail } from '../auth';
-import { questionModeLabel } from '../types';
-import { statementProse } from '../statementFormat';
 import { StudentLayout } from './StudentLayout';
+import { ProblemSetDocument, type ProblemStatus } from './ProblemSetDocument';
 import { useEffect } from 'react';
 import { useAsyncValue } from '../useAsyncValue';
 import { assignmentStore } from '../storage/backend';
+import { figureUrl } from '../problemSet';
+import { questionVerdict } from '../gradeDisplay';
+import { formatDueDate, formatDateTime } from '../dueDates';
+import { submitConfirmMessage } from '../provenance/notice';
+import type { AssignmentQuestion } from '../types';
 
 /**
- * The question list an assignment opens to. Clicking a question opens its
- * dedicated canvas (#/a/:id/q/:i); the canvas's nav bar leads back here or to
- * the neighbouring questions. Submit covers the whole assignment.
+ * The page an assignment opens to: the problem set as a document (title, due
+ * date, preamble, sections, numbered problems — components/ProblemSetDocument).
+ * Clicking a problem opens its dedicated canvas (#/a/:id/q/:i); the canvas's
+ * nav bar leads back here or to the neighbouring problems. Submit covers the
+ * whole assignment. While a submitted attempt is on show (#/a/:id/submission/:n,
+ * store viewingSubmission) the page says so, its problems open that attempt,
+ * and Submit gives way to the way back to the live work.
  */
 export function AssignmentOverview() {
   const assignment = useStore((s) => s.assignment);
@@ -20,6 +28,7 @@ export function AssignmentOverview() {
   const hydrateSubmissions = useStore((s) => s.hydrateSubmissions);
   const questionCircuits = useStore((s) => s.questionCircuits);
   const frozen = useStore(selectAssignmentFrozen);
+  const viewing = useStore((s) => s.viewingSubmission);
   // Release is policy on the seam, not part of the assignment, so the page has
   // to ask for it (the home catalog gets it on the summary).
   const { value: released } = useAsyncValue(
@@ -38,12 +47,16 @@ export function AssignmentOverview() {
   const sub = submissions[assignment.id];
   const total = assignment.questions.length;
   const done = assignment.questions.filter((q) => questionCircuits.get(q.id)?.done).length;
+  const results = released && sub?.result
+    ? new Map(sub.result.questions.map((r) => [r.questionId, r]))
+    : null;
+  const status = (q: AssignmentQuestion): ProblemStatus => ({
+    done: questionCircuits.get(q.id)?.done,
+    verdict: results ? questionVerdict(results.get(q.id)) : undefined,
+  });
 
   const handleSubmit = () => {
-    const ok = confirm(
-      `Submit "${assignment.title}"? This records a snapshot of your current work.\n\n` +
-      'Note: only your most recent submission is graded — submitting again replaces any earlier submission for grading purposes.'
-    );
+    const ok = confirm(submitConfirmMessage(assignment.title));
     if (!ok) return;
     // Online-only submit: a failure records nothing and asks for a visible
     // retry — never a silent (late) queue. See MenuBar's handler.
@@ -66,34 +79,30 @@ export function AssignmentOverview() {
           ← All assignments
         </a>
         <h1>{assignment.title}</h1>
-        <p className="mm-lede">
-          {total} question{total === 1 ? '' : 's'} — pick one to work on
-          {total > 0 && ` · ${done} of ${total} marked done`}
+        <p className="mm-lede overview-meta">
+          {assignment.dueDate && <span>Due {formatDueDate(assignment.dueDate)}</span>}
+          <span>
+            {total} problem{total === 1 ? '' : 's'}
+            {total > 0 && ` · ${done} of ${total} marked done`}
+          </span>
+          {assignment.sourcePdf && (
+            <a
+              className="mm-link"
+              href={figureUrl(assignment.sourcePdf, import.meta.env.BASE_URL)}
+              target="_blank"
+              rel="noopener"
+            >
+              Original PDF ↗
+            </a>
+          )}
         </p>
       </div>
 
-      <div className="mm-list">
-        {assignment.questions.map((q, i) => (
-          <button
-            key={q.id}
-            className="overview-row"
-            onClick={() => navigate({ kind: 'assignment', id: assignment.id, questionIndex: i })}
-          >
-            <span className="overview-label">
-              {q.label}
-              {questionCircuits.get(q.id)?.done && (
-                <span className="overview-done" title="Marked done">✓</span>
-              )}
-            </span>
-            <span className="tag tag--accent">{questionModeLabel(q)}</span>
-            <span className="overview-statement">
-              {q.title && <strong>{q.title}. </strong>}
-              {statementProse(q.statement)}
-            </span>
-          </button>
-        ))}
-        {total === 0 && <p className="mm-empty">This assignment has no questions yet.</p>}
-      </div>
+      <ProblemSetDocument
+        assignment={assignment}
+        route={(index) => ({ kind: 'assignment', id: assignment.id, attempt: viewing?.attempt, questionIndex: index })}
+        status={status}
+      />
 
       <div className="overview-submit">
         {sub ? (
@@ -115,6 +124,13 @@ export function AssignmentOverview() {
               title="This assignment closed after its due date — each question shows your submission, read-only."
             >
               🔒 Past due — showing your submission
+            </span>
+          ) : viewing ? (
+            <span className="dim" title="Each problem opens your answer as submitted in this attempt — Run and Step still work, edits are off.">
+              Viewing submission {viewing.attempt}, submitted {formatDateTime(viewing.submittedAt)} — read-only ·{' '}
+              <button className="mm-link" onClick={() => navigate({ kind: 'assignment', id: assignment.id })}>
+                Back to my work
+              </button>
             </span>
           ) : (
             <button className="mm-btn mm-btn--primary" onClick={handleSubmit}>

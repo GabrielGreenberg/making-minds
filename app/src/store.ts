@@ -1,5 +1,4 @@
 import { create } from 'zustand';
-import { v4 as uuid } from 'uuid';
 import type {
   BuildMode,
   RepSystem,
@@ -19,6 +18,7 @@ import type {
   WorksheetData,
   SubmissionRecord,
   QuestionCircuit,
+  QuestionProvenance,
   TMTape,
   TMSymbol,
   TMNotation,
@@ -27,27 +27,49 @@ import type {
   ArenaConfig,
   TurbotState,
   TurbotHistoryEntry,
+  TurbotCaseResult,
 } from './types';
 import {
   getPortsForType,
   getMemOutputPortId,
   getMemInputPortId,
   isMemSinkPort,
+  placeableBoxKinds,
+  questionTask,
+  CC_AND_SC_BOXES,
   GRID_SIZE,
   toSubscript,
 } from './types';
-import { topologicalSort, evaluateGate, evaluateCC, evaluateSCSingleStep, sortStateComponents, evaluateFSMSymbolStep, evaluateTMSingleStep, notationForRepresentation, stepCountFor, encodeInput, bitsToTally, bitsToBinary, fsmNotation, turbotFsmNotation, tmNotation, turbotInternalNotation, turbotExternalNotation, type CodecLayout, type TransitionNotation } from './engine';
-import { senseAheadSymbol, applyMotorCommand, initialBrainState, runBrainStep, stateKindOf, type BrainState } from './engine/turbot';
+import { topologicalSort, evaluateGate, evaluateCC, scNetlist, evaluateSCStep, boxMemoryOutputs, stepBoxedMemory, memorySlots, withMemState, zeroMemState, hasMemory, isSequentialBox, hasCombinationalLoop, sortStateComponents, evaluateFSMSymbolStep, evaluateTMSingleStep, evaluateTMSequence, DEFAULT_TM_MAX_STEPS, notationForRepresentation, encodeTM, stepCountFor, encodeInput, valueToBits, bitsToValue, bitsToTally, bitsToBinary, sortByLabel, fsmNotation, turbotFsmNotation, tmNotation, turbotInternalNotation, turbotExternalNotation, questionLayout, caseStimulus, recordedCaseSeparations, gradedMachineKey, gradingCircuit, parsePortKey, type CodecLayout, type TransitionNotation } from './engine';
+import { senseAheadSymbol, applyMotorCommand, initialBrainState, runBrainStep, stateKindOf, isGoalCell, type BrainState } from './engine/turbot';
+import { framesToLanes } from './engine/perception';
 import { getAssignment, listAssignments } from './assignments';
 import { emptyQuestionCircuit, restoreQuestionCircuits } from './storage/workbookStore';
 import { buildSubmission } from './storage/submissionStore';
 // Store INSTANCES come from the backend seam (local vs. remote is decided
 // there, nowhere else); the modules above supply only pure helpers + types.
 import { workbookStore, submissionStore, assignmentStore, backendMode } from './storage/backend';
-import { writeJournal, clearJournal, reconcileJournal } from './storage/journal';
+import { writeJournal, clearJournal, clearJournalIfHolds, reconcileJournal } from './storage/journal';
 import { isFrozen } from './dueDates';
 import { getSessionUser } from './auth/session';
 import { instructorRole } from './auth/instructorRole';
+import {
+  canvasKind,
+  canvasPasteVerdict,
+  peekClipboard,
+  resetClipboard,
+  stampCanvas,
+  type CanvasClip,
+  type PasteScope,
+  type Provenance,
+} from './provenance';
+// The minting seam and the writing/build trace (task 034).
+import { mintId, setMintKey, clearMintKeys, mintKeyFor, type MintScope } from './provenance/ids';
+import { nextTrace, insertedChars, type TraceChange, type TextContent } from './provenance/trace';
+import { INTEGRITY_NOTICE } from './provenance/notice';
+// The sandbox workbook file (task 028): parsing, the saved-content key.
+import { parseWorkbookFile, serializeWorkbook, titleFromFileName, workbookKeyHash } from './workbookFile';
+import { orderBoxPorts, rebindLegacyBoxes, rebindLegacyLibrary } from './boxPorts';
 
 /**
  * TM tape notation (alphabet) for the current context. Inside an assignment
@@ -82,21 +104,72 @@ export function selectAssignmentFrozen(
 }
 
 /**
- * Is the open question locked against edits — either the student marked it
- * done, or the whole assignment is frozen past its due date (item 3)? The
- * single read-side answer UI components use; store.ts's mutating actions use
- * the module-private `isCurrentQuestionLocked(state)` on the full AppState.
+ * Is the open assignment's canvas showing a SUBMISSION rather than the live
+ * workbook (task 003)? True while the student views one of their submitted
+ * attempts (`viewingSubmission`, from the grade sheet at any due date) or
+ * the assignment is frozen (past due + submitted — frozen is the one trigger
+ * that forces the view on). The guard every save path shares: nothing shown
+ * then is the student's work in progress.
+ */
+export function showsSubmission(s: {
+  assignment: AssignmentData | null;
+  submissions: Record<string, SubmissionRecord>;
+  viewingSubmission: SubmissionRecord | null;
+}): boolean {
+  if (!s.assignment) return false;
+  return s.viewingSubmission != null || selectAssignmentFrozen(s);
+}
+
+/**
+ * Why the open question refuses edits, or null when it doesn't: it shows a
+ * submission (viewed, or the assignment is frozen — showsSubmission), or the
+ * student marked it done. The one answer behind every lock (selectQuestionLocked)
+ * and every lock notice (selectLockNotice, the store's refusal strings).
+ */
+function lockReason(s: {
+  assignment: AssignmentData | null;
+  currentQuestionIndex: number;
+  questionCircuits: Map<number, QuestionCircuit>;
+  submissions: Record<string, SubmissionRecord>;
+  viewingSubmission: SubmissionRecord | null;
+}): 'submission' | 'done' | null {
+  const q = s.assignment?.questions[s.currentQuestionIndex];
+  if (!q) return null;
+  if (showsSubmission(s)) return 'submission';
+  return s.questionCircuits.get(q.id)?.done ? 'done' : null;
+}
+
+/**
+ * Is the open question locked against edits — the student marked it done, or
+ * the canvas shows a submission (viewed from the grade sheet, or the whole
+ * assignment frozen past its due date)? The single read-side answer UI
+ * components use; store.ts's mutating actions use the module-private
+ * `isCurrentQuestionLocked(state)` on the full AppState.
  */
 export function selectQuestionLocked(s: {
   assignment: AssignmentData | null;
   currentQuestionIndex: number;
   questionCircuits: Map<number, QuestionCircuit>;
   submissions: Record<string, SubmissionRecord>;
+  viewingSubmission: SubmissionRecord | null;
 }): boolean {
-  const q = s.assignment?.questions[s.currentQuestionIndex];
-  if (!q) return false;
-  if (selectAssignmentFrozen(s)) return true;
-  return s.questionCircuits.get(q.id)?.done ?? false;
+  return lockReason(s) !== null;
+}
+
+/** Whether the canvas shows its "draw and place it again" warning for a box
+ *  whose ports no rule could bind (task 038). Not on a locked canvas (marked
+ *  done, frozen, a viewed submission): the re-place it asks for is refused
+ *  there. The store decides it, so the canvas holds no lock of its own (law 3). */
+export function selectShowUnboundBoxWarning(s: Parameters<typeof selectQuestionLocked>[0]): boolean {
+  return !selectQuestionLocked(s);
+}
+
+/** The answer panels' line for a locked question (null when unlocked). */
+export function selectLockNotice(s: Parameters<typeof lockReason>[0]): string | null {
+  const reason = lockReason(s);
+  if (reason === 'submission') return 'Showing your submission — read-only.';
+  if (reason === 'done') return 'Marked done — unlock this question to keep editing.';
+  return null;
 }
 
 /**
@@ -116,7 +189,17 @@ export function selectAllowedComponents(s: {
 }
 
 /**
- * The codec layout of the open SC/FSM question (the grader's view of it), or
+ * Where a copy is made or a paste lands, for the provenance seam
+ * (provenance.ts): the open assignment, else the sandbox. The canvas and the
+ * guarded answer fields (usePasteGuard) both read it, so they agree on scope.
+ */
+export function selectPasteScope(s: { assignment: AssignmentData | null }): PasteScope {
+  return s.assignment ? { kind: 'assignment', assignmentId: s.assignment.id } : { kind: 'sandbox' };
+}
+
+/**
+ * The codec layout of the open SC/FSM question (the grader's view of it —
+ * engine/caseRun.ts questionLayout, the very function the grader reads), or
  * null in the sandbox (no open question, or a question without a time-axis
  * cc_spec). Everything question-run-specific — the run window, the exact input
  * stream to feed — derives from this one selector.
@@ -126,14 +209,8 @@ export function selectCodecLayout(s: {
   currentQuestionIndex: number;
 }): CodecLayout | null {
   const q = s.assignment?.questions[s.currentQuestionIndex];
-  if (!q?.cc_spec) return null;
-  if (q.buildMode !== 'SC' && q.buildMode !== 'FSM') return null;
-  return {
-    axis: 'time',
-    rep: q.representation,
-    inputWidths: q.cc_spec.inputs.map((g) => g.width),
-    outputWidths: q.cc_spec.outputs.map((g) => g.width),
-  };
+  if (!q || (q.buildMode !== 'SC' && q.buildMode !== 'FSM')) return null;
+  return questionLayout(q);
 }
 
 /**
@@ -150,6 +227,43 @@ export function selectCodecWindow(s: {
 }): number | null {
   const layout = selectCodecLayout(s);
   return layout ? stepCountFor(layout) : null;
+}
+
+/**
+ * The retina width of the open SC perception question — the height of its
+ * frame player (components/PerceptionFramePlayer.tsx) — or null: the
+ * sandbox, a value question, a CC perception question (one frame, no clock).
+ * Reads the authored spec only, never perception_cases (a remote student's
+ * copy has none).
+ */
+export function selectPerceptionRetina(s: {
+  assignment: AssignmentData | null;
+  currentQuestionIndex: number;
+}): number | null {
+  const q = s.assignment?.questions[s.currentQuestionIndex];
+  if (!q || q.buildMode !== 'SC' || questionTask(q) !== 'perception') return null;
+  return q.perception?.width ?? null;
+}
+
+/**
+ * The ONE end of an SC question run, in time steps: a value question's codec
+ * window (selectCodecWindow); an SC perception question's film length L —
+ * the grader clocks a case's frames and nothing after them
+ * (runPerceptionCase), so no per-MEM drain step follows. Null in the sandbox
+ * and for a perception question with no frames yet: the sandbox's own end
+ * applies (L + one 0-drain step per MEM). scStep's refusal, scRun's stop and
+ * the I/O panel's Run/Step all read this.
+ */
+export function selectScRunWindow(s: {
+  assignment: AssignmentData | null;
+  currentQuestionIndex: number;
+  scInputSequence: number[][];
+}): number | null {
+  const codecWindow = selectCodecWindow(s);
+  if (codecWindow !== null) return codecWindow;
+  if (selectPerceptionRetina(s) === null) return null;
+  const frames = Math.max(0, ...s.scInputSequence.map((lane) => lane.length));
+  return frames > 0 ? frames : null;
 }
 
 /** Parse display-order digits as a numeral under `rep` — exactly how the A/V
@@ -207,6 +321,28 @@ function fsmGroupSequences(digits: number[], numGroups: number): number[][] {
   return seqs;
 }
 
+/**
+ * The typed-input digits (SC's global input string, FSM's IN field) that make
+ * a question run feed EXACTLY the codec's stream for `values` — the inverse
+ * of how scStep/fsmStep read typed input (codecInputSteps): each group's
+ * value as one numeral of the widest group's width, chunked right-to-left
+ * (rightmost chunk = t1) with group i at position i of every chunk. The value
+ * is first clamped/masked to its OWN width exactly as encodeInput does, so
+ * reading the numeral back re-encodes to the grader's bits. Numerals are
+ * padded by width, never by prepending zeros: a left-padded tally numeral
+ * ("011") is not a codeword, and codecInputSteps would silently fall back to
+ * the raw typed bits.
+ */
+function codecTypedDigits(values: number[], layout: CodecLayout): number[] {
+  const width = Math.max(1, ...layout.inputWidths);
+  const numerals = layout.inputWidths.map((w, i) =>
+    valueToBits(bitsToValue(valueToBits(values[i] ?? 0, w, layout.rep), layout.rep), width, layout.rep),
+  );
+  const digits: number[] = [];
+  for (let c = 0; c < width; c++) for (const n of numerals) digits.push(n[c]);
+  return digits;
+}
+
 /** A blank arena for the sandbox / question-authoring preview (no assignment context). */
 export function defaultArenaConfig(): ArenaConfig {
   return {
@@ -260,20 +396,77 @@ function activeSandboxTab(s: {
 }
 
 /**
- * The active turbot context's arena. Inside an assignment: the open turbot
- * question's primary arena (its first `turbot_cases` entry — the one the
- * student sees and simulates against; see engine/turbot.ts). In the sandbox:
- * the active turbot tab's own arena (seeded by addTab, edited via
+ * The active turbot context's arena. Inside an assignment: one of the open
+ * turbot question's `turbot_cases` arenas — `turbotCaseIndex`, which is 0
+ * (the primary arena, the one the student sees and simulates against; see
+ * engine/turbot.ts) unless a graded case was loaded into the run
+ * (loadCaseInput); an index past the bank falls back to the primary. In the
+ * sandbox: the active turbot tab's own arena (seeded by addTab, edited via
  * setTabArena). Falls back to a blank arena outside any turbot context.
  */
 export function selectTurbotArena(s: {
   assignment: AssignmentData | null;
   currentQuestionIndex: number;
+  turbotCaseIndex?: number;
   tabs?: SandboxTab[];
   activeTabId?: string;
 }): ArenaConfig {
   const q = s.assignment?.questions[s.currentQuestionIndex];
-  return q?.turbot_cases?.[0]?.arena ?? activeSandboxTab(s)?.arena ?? FALLBACK_ARENA;
+  return (
+    q?.turbot_cases?.[s.turbotCaseIndex ?? 0]?.arena ??
+    q?.turbot_cases?.[0]?.arena ??
+    activeSandboxTab(s)?.arena ??
+    FALLBACK_ARENA
+  );
+}
+
+/** The step cap on a sandbox TM or turbot Run (a runaway machine in the UI). */
+export const UI_RUN_STEP_CAP = 1000;
+
+/**
+ * A moment in a turbot run worth a cue on the Map — today only the step that
+ * moved the turbot onto a goal cell from a non-goal cell; `t` is that step's
+ * history entry. The shape leaves room for a 'halted' or 'blocked' cue.
+ */
+export type TurbotEvent = { kind: 'goal-reached'; t: number };
+
+/** Run-loop ticks a turbot Run holds after a goal-reached step (2 × 300 ms). */
+export const TURBOT_GOAL_HOLD_TICKS = 2;
+
+/**
+ * Did the LATEST step land the turbot on a goal? True while the event names
+ * the newest history entry — a halt that appends no entry keeps it (the pulse
+ * is neither cut nor restarted), the next recorded step replaces it.
+ */
+export function selectTurbotGoalHit(s: {
+  turbotLastEvent: TurbotEvent | null;
+  turbotHistory: TurbotHistoryEntry[];
+}): boolean {
+  return s.turbotLastEvent?.kind === 'goal-reached' && s.turbotLastEvent.t === s.turbotHistory.length;
+}
+
+/**
+ * The GRADER's step budget for the open question's TM or turbot run, or null
+ * outside one (the sandbox, other modes). Question runs ARE the grader's
+ * runs (the SC/FSM codec-window rule, extended): a TM question's Step/Run
+ * stop where the grader's TM run stops (DEFAULT_TM_MAX_STEPS), a turbot's at
+ * the shown arena's `maxSteps` — so a run the grader cut off is cut off on
+ * screen too, and one it let finish is never cut short. Sandbox runs keep
+ * UI_RUN_STEP_CAP (Run only; sandbox Step is unbounded).
+ */
+export function selectQuestionStepBudget(s: {
+  buildMode: BuildMode;
+  assignment: AssignmentData | null;
+  currentQuestionIndex: number;
+  turbotCaseIndex?: number;
+}): number | null {
+  const q = s.assignment?.questions[s.currentQuestionIndex];
+  if (!q) return null;
+  if (s.buildMode === 'turbot') {
+    const cases = q.turbot_cases;
+    return cases?.[s.turbotCaseIndex ?? 0]?.maxSteps ?? cases?.[0]?.maxSteps ?? null;
+  }
+  return q.buildMode === 'TM' ? DEFAULT_TM_MAX_STEPS : null;
 }
 
 /**
@@ -305,6 +498,25 @@ export function selectEffectiveMode(s: {
   activeTabId?: string;
 }): BuildMode {
   return s.buildMode === 'turbot' ? selectTurbotInnerMode(s) : s.buildMode;
+}
+
+/**
+ * Which kinds of confirmed box this canvas may place — the palette filters
+ * by it and placeBoxInstance / confirmBox enforce it. A question (or turbot
+ * brain) follows its mode (types.ts placeableBoxKinds). The sandbox's Logic
+ * Circuit tab is buildMode CC but carries MEM and runs as SC once it holds
+ * any, so it takes sequential boxes too. Returns shared constants (stable
+ * for a zustand selector).
+ */
+export function selectPlaceableBoxKinds(s: {
+  buildMode: BuildMode;
+  assignment: AssignmentData | null;
+  currentQuestionIndex: number;
+  tabs?: SandboxTab[];
+  activeTabId?: string;
+}): ReadonlyArray<'CC' | 'SC'> {
+  if (!s.assignment && s.buildMode === 'CC') return CC_AND_SC_BOXES;
+  return placeableBoxKinds(selectEffectiveMode(s));
 }
 
 /**
@@ -392,6 +604,38 @@ export function selectTransitionNotationForSource(
   return selectFsmNotation(s);
 }
 
+/**
+ * A graded case loaded into the open question's run ("Run this input" on the
+ * grade sheet, loadCaseInput): which case of which attempt, its INPUT, the
+ * verdict recorded for it, and `gradedKey` — engine gradedMachineKey of the
+ * machine THAT attempt submitted for the question (null when it submitted
+ * none), so the banner can tell whether the canvas still holds the graded
+ * machine even after a later attempt replaces the latest record. Never the
+ * answer key — no expected/got, even in local mode where the full result is
+ * at hand; the live output comes from running the canvas machine
+ * (engine/caseRun.ts).
+ */
+export type LoadedCase =
+  | {
+      kind: 'value';
+      questionId: number;
+      caseIndex: number;
+      attempt: number;
+      gradedKey: string | null;
+      input: number[];
+      separations?: number[];
+      recorded: { pass: boolean; reason?: string };
+    }
+  | {
+      kind: 'turbot';
+      questionId: number;
+      caseIndex: number;
+      attempt: number;
+      gradedKey: string | null;
+      // A turbot case's result has no answer key (positional pass/fail).
+      recorded: TurbotCaseResult;
+    };
+
 interface HistoryEntry {
   components: CircuitComponent[];
   wires: Wire[];
@@ -406,15 +650,43 @@ interface AppState {
   // crash buffer holds the state and a backoff retry is scheduled.
   autoSaveStatus: 'saved' | 'unsaved' | 'saving' | 'error';
 
-  // Workbook
+  // Workbook — the sandbox's tabs as one file (task 028: File ▸ New / Open… /
+  // Save / Save as…, components/WorkbookFileMenu.tsx). Everything here reads
+  // and writes the SANDBOX only: an open assignment is left first through
+  // goHome's fold-and-save, never exported, never written over.
   workbookOpen: boolean;
   workbookTitle: string;
+  // The file Save writes back to (File System Access). Never persisted; a
+  // principal change resets it (it belongs to the person who picked it).
   workbookFileHandle: FileSystemFileHandle | null;
+  // workbookKeyHash of the content last saved to a file, opened from one, or
+  // started fresh — the "unsaved changes" baseline (hasUnsavedWorkbookChanges).
+  // null = never saved: compared against a pristine one-sheet sandbox.
+  // Persisted in the sandbox blob, so it moves with the sandbox.
+  workbookSavedKey: string | null;
+  // workbookKeyHash of the content last handed to the browser as a DOWNLOAD
+  // (no save picker here). The browser may still ask where to put it, or
+  // refuse it, and the page can't see which — so it is not the baseline; it
+  // only lets New / Open's question say the work was downloaded. Memory only;
+  // reset wherever the baseline is (a save, an open, New, a principal change).
+  workbookDownloadedKey: string | null;
   closeWorkbook: () => void;
-  newWorkbook: () => void;
-  openWorkbook: (json: string, handle?: FileSystemFileHandle | null) => void;
+  // A fresh one-sheet sandbox of machine `mode` (a turbot's brain is
+  // `innerMode`) titled `title`. A canvas swap: sim state and undo reset.
+  newWorkbook: (mode?: BuildMode, innerMode?: BuildMode, title?: string) => void;
+  // The sandbox as a workbook file (WorkbookData JSON, with the integrity
+  // notice) — never an open assignment's canvas.
   exportWorkbook: () => string;
-  importWorkbook: (json: string, handle?: FileSystemFileHandle | null) => void;
+  // Open a workbook file (or a legacy single-circuit one) as the sandbox's
+  // tabs. A bad file changes nothing and says why. `fileName` titles it.
+  importWorkbook: (json: string, handle?: FileSystemFileHandle | null, fileName?: string) => ImportResult;
+  // After a save: `writtenJson` (what was actually written — an edit made
+  // while the picker was open stays unsaved) becomes the baseline; the file
+  // and its name become the workbook's.
+  markWorkbookSaved: (writtenJson: string, handle: FileSystemFileHandle | null, fileName?: string) => void;
+  // After a download: `downloadedJson` is recorded as downloaded, NOT saved —
+  // New and Open still ask (workbookSaveState 'downloaded').
+  markWorkbookDownloaded: (downloadedJson: string) => void;
 
   // Build mode
   buildMode: BuildMode;
@@ -490,7 +762,10 @@ interface AppState {
   // Undo/Redo
   undoStack: HistoryEntry[];
   redoStack: HistoryEntry[];
-  pushHistory: () => void;
+  // Every canvas edit's history step — and so the choke point where the
+  // writing/build trace counts it (recordEdit). `added`: components this edit
+  // adds (addComponent / placeBoxInstance 1, paste n).
+  pushHistory: (added?: number) => void;
   undo: () => void;
   redo: () => void;
 
@@ -512,6 +787,11 @@ interface AppState {
   // order. Synced into questionCircuits.fillAnswers alongside openResponse.
   fillAnswers: string[];
   setFillAnswer: (index: number, value: string) => void;
+  // The live signed editing record of the current question (task 034,
+  // provenance/trace.ts): advanced by recordEdit at every edit, synced into
+  // questionCircuits.provenance at the same points as the canvas (one fold,
+  // foldLiveQuestion). null before the question's first edit.
+  questionTrace: QuestionProvenance | null;
   loadAssignment: (assignment: AssignmentData) => void;
   // Open an assignment by id and show its workbook. Resolves false if the id is
   // unknown. A stale open (one superseded by a newer navigation while its seam
@@ -520,19 +800,43 @@ interface AppState {
   openAssignment: (id: string) => Promise<boolean>;
   switchQuestion: (index: number) => void;
   // Toggle the current question's self-imposed "done" lock (notes/todos.md
-  // item 8). No-op outside an assignment.
+  // item 8). No-op outside an assignment, and while the canvas shows a
+  // submission (there is no live question to lock).
   toggleCurrentQuestionDone: () => void;
+  // The submitted attempt the canvas shows instead of the live workbook
+  // (task 003), or null for the live workbook. Every question then shows
+  // THAT attempt's answer, read-only (selectQuestionLocked) — Run/Step still
+  // work — and nothing shown is ever folded into questionCircuits or saved
+  // (syncedQuestionCircuits, goHome, switchQuestion, the done toggle). Set by
+  // viewSubmission (the `#/a/:id/submission/:n` route) and forced to the
+  // latest submission while the assignment is frozen (openAssignment,
+  // switchQuestion). Starts null; a new assignment, closing it, the sandbox
+  // and a principal change clear it.
+  viewingSubmission: SubmissionRecord | null;
+  // Show submitted attempt `attempt` of the open assignment (null = the live
+  // workbook — or, while frozen, the latest submission: frozen has no way
+  // back). Found in `submissions`, the current view, or the submission seam.
+  // A canvas swap (reset law 1) unless the target is what is already shown,
+  // which is a no-op (a re-applied route never wipes a run). Resolves false,
+  // changing nothing, for an attempt that doesn't exist; a seam lookup
+  // overtaken by any newer viewSubmission, open, Home or principal change —
+  // a navigation on the SAME assignment included — applies nothing (true).
+  viewSubmission: (attempt: number | null) => Promise<boolean>;
   closeAssignment: () => void;
   // Navigation between the catalog (Home) and the editor.
   goHome: () => void;          // hide the editor, return to the catalog (preserves in-memory work)
   enterSandbox: () => void;    // open the freeform sandbox workbook (clears any active assignment)
 
-  // Save/Load (legacy single-circuit export for "Export Worksheet")
+  // Legacy single-circuit export for "Export Worksheet". (Its importProject
+  // twin wrote a whole canvas with no lock or provenance check and had no
+  // caller — removed with task 033; imports go through importWorkbook, which
+  // only ever writes sandbox tabs.)
   exportProject: () => string;
-  importProject: (json: string) => void;
   // Submission export (null when no assignment is loaded)
   exportSubmission: (student?: string) => string | null;
-  // Latest recorded submission per assignment id (reactive; for status badges).
+  // This principal's OWN latest submission per assignment id (reactive; for
+  // status badges, the frozen view, the Grades tab) — never anyone else's,
+  // an instructor's Student view included (the seam's Own reads, task 037).
   // Starts empty; hydrated from the submission seam via hydrateSubmissions().
   submissions: Record<string, SubmissionRecord>;
   // Refresh `submissions` from the seam. Called on auth-ready (App mount) —
@@ -546,12 +850,7 @@ interface AppState {
   // Rotation
   rotateComponent: (id: string) => void;
 
-  // Boxed circuits (legacy library-based)
-  importBoxedCircuit: (name: string, json: string) => void;
-  boxCurrentCircuit: (name: string) => string | null;
-  boxedLibrary: { name: string; type: ComponentType; circuit: CircuitComponent[]; wires: Wire[]; ports: import('./types').Port[] }[];
-
-  // Box definitions (new draw-on-canvas boxing)
+  // Box definitions (draw-on-canvas boxing)
   boxes: BoxDefinition[];
   addBox: (box: BoxDefinition) => void;
   updateBox: (id: string, updates: Partial<BoxDefinition>) => void;
@@ -568,7 +867,7 @@ interface AppState {
   // depends on where you are:
   //   - in an assignment: the whole ASSIGNMENT (notes item 8). A box built for
   //     one question is available in every question of that homework which can
-  //     place its kind (`placeableBoxKinds`), so it does not swap on question
+  //     place its kind (`selectPlaceableBoxKinds`), so it does not swap on question
   //     navigation; it persists as `AssignmentState.boxLibrary`.
   //   - in the sandbox: per TAB. It swaps with `boxes` on tab navigation and
   //     persists as `WorksheetData.confirmedBoxes`, so scratch sheets stay
@@ -581,10 +880,15 @@ interface AppState {
   // Delete selected
   deleteSelected: () => void;
 
-  // Copy/paste
-  clipboard: { components: CircuitComponent[]; wires: Wire[] } | null;
+  // Copy/paste. The clipboard is NOT store state: it lives in the provenance
+  // seam (provenance.ts), stamped with where and by whom it was copied, so a
+  // question or canvas swap keeps it and only a principal change clears it.
+  // copySelected stamps the selection (an empty selection is a no-op). paste
+  // returns the refusal message when the seam's policy, the canvas kind or
+  // the question's allowed_components says no — or null (pasted, or the
+  // question is locked).
   copySelected: () => void;
-  paste: () => void;
+  paste: () => string | null;
 
   // Tabs (worksheets)
   tabs: SandboxTab[];
@@ -624,11 +928,19 @@ interface AppState {
   scRunning: boolean;
   scRunIntervalId: number | null;
   scStep: () => void; // advance one clock cycle
-  scRun: () => void; // start continuous execution
+  // Start continuous execution, one step per `intervalMs` (default 300) — the
+  // ONE SC run loop (the I/O panel's Run drives it), so every reset, the edit
+  // law's included, stops it.
+  scRun: (intervalMs?: number) => void;
   scPause: () => void; // pause continuous execution
   scReset: () => void; // reset to t=1, preserve circuit structure and input sequence
   scGlobalReset: () => void; // reset to t=1, clear all inputs and memory
   setScInputBit: (inputIndex: number, timeStep: number, value: number) => void;
+  // Load a perception film (frames, IN1-first bit-vectors, t1 first) as the
+  // run's input lanes (engine/perception.ts framesToLanes) and reset the run
+  // to t=1 — the SC perception frame player's one write. Stimulus, not an
+  // edit: never locked, no undo entry, no editing record.
+  setScFrames: (frames: number[][]) => void;
 
   // Global I/O sequences (each entry = one run with input string and output string)
   scGlobalSequences: { inputStr: string; outputStr: string }[];
@@ -697,6 +1009,14 @@ interface AppState {
   turbotRunIntervalId: number | null;
   turbotHalted: boolean;
   turbotStopReason: 'motor' | 'brain' | 'limit' | null;
+  // The Map's cue: the last recorded step's event (turbotStep writes it,
+  // null for an eventless step; the panel pulses the goal while
+  // selectTurbotGoalHit holds).
+  turbotLastEvent: TurbotEvent | null;
+  // Run-loop pacing: ticks turbotRun's interval skips after a goal hit —
+  // counted inside the one interval, never a timer of its own. Step never
+  // sets it; Pause and Reset zero it.
+  turbotHoldTicks: number;
   turbotStep: () => void;
   turbotRun: () => void;
   turbotPause: () => void;
@@ -705,13 +1025,50 @@ interface AppState {
   // (square, sense/move ops). Outgoing transition labels are reset to the new
   // kind's default since the grammars are disjoint.
   toggleStateKind: (id: string) => void;
+  // Which of the open turbot question's arenas (a `turbot_cases` index) the
+  // Map shows and the turbot slice runs — 0 unless a graded case put another
+  // there (loadCaseInput). Canvas-scoped: resetAllSimState zeroes it.
+  turbotCaseIndex: number;
 
-  // Flush EVERY mode's transient sim state (SC/FSM/TM/turbot + the I/O table).
-  // Every canvas swap must call this — question navigation and sandbox
-  // tab/workbook entry alike — because the sim slices are shared app-wide,
-  // not per-canvas, so anything left in them shows up against the next
-  // canvas's circuit.
+  // Graded-case replay ("Run this input" on the grade sheet): the recorded
+  // case the run slices hold, or null. Canvas-scoped: resetAllSimState
+  // clears it.
+  loadedCase: LoadedCase | null;
+  // Load case `caseIndex` of the open question's latest recorded result into
+  // the run and run it to the grader's end: CC sets the INPUT toggles, SC/FSM
+  // the typed input, TM the tape, a turbot the arena — each exactly the
+  // grader's stimulus (engine/caseRun.ts). Every run slice restarts (Reset
+  // then replays from t=1); the undo history stays — this is the same canvas,
+  // and loading an input is not an edit. NOT gated by the question locks:
+  // simulation is never locked. Resolves once the run has reached its end (or
+  // was superseded); a no-op unless `questionId` is the open question and a
+  // recorded result has that case.
+  loadCaseInput: (questionId: number, caseIndex: number) => Promise<void>;
+  // Drop the loaded case (the banner's ✕); the Map returns to the primary
+  // arena if the case had put another there.
+  clearLoadedCase: () => void;
+
+  // Reset law 1 — the CANVAS swap. Flush EVERY mode's transient sim state
+  // (SC/FSM/TM/turbot + the I/O table) AND the undo/redo history. Every canvas
+  // swap must call this — question navigation and sandbox tab/workbook entry
+  // alike — because the sim slices and the history stacks are shared
+  // app-wide, not per-canvas: a run left in them shows up against the next
+  // canvas's circuit, and an undo would write the previous canvas's snapshot
+  // over this one. (Its sibling, the EDIT law — a machine edit restarts every
+  // live run at t=1 keeping its input, undo history untouched — is not an
+  // action: the machine-key subscriber at the end of this file, restartLiveRuns.)
   resetAllSimState: () => void;
+  // Reset law 2 — the PRINCIPAL change (sign-in, sign-out, a 401, a restored
+  // session; null = the visitor). Called by the auth provider in both modes,
+  // synchronously, before React sees the new user. Saves what the leaving
+  // principal had pending under ITS keys, then resets the WHOLE editor store
+  // to its initial state (assignment, question circuits, box library,
+  // history, submissions, every sim slice), empties the provenance seam's
+  // clipboard (resetClipboard) and loads the arriving
+  // principal's own sandbox — so the next openAssignment reads the seam, never
+  // the previous person's memory. A repeat call for the same principal is a
+  // no-op.
+  resetForPrincipal: (email: string | null) => void;
 }
 
 function snapToGrid(val: number): number {
@@ -833,17 +1190,313 @@ function resolveMemDirections(
 
 const defaultTabId = 'tab-1';
 
-// When the circuit's structure changes, the table is wiped but input values are
-// kept. This flag suppresses evaluateCircuit's auto-add so the re-evaluation
-// that an edit triggers doesn't immediately re-populate the current row. It
+// When the machine changes (the edit law — restartLiveRuns), the table is
+// wiped but input values are kept. This flag suppresses evaluateCircuit's
+// auto-add so the re-evaluation that an edit triggers doesn't immediately
+// re-populate the current row. It
 // stays set until the user next acts on an input (setInputValue / row select),
 // which is the signal that they want this combo evaluated again.
 let suppressAutoAddRow = false;
+
+/**
+ * The outputs of a sequential box that its memory alone decides
+ * (boxMemoryOutputs), as `comp:port` keys → value. The local step seeds them
+ * as sources, exactly like a MEM's output, and never re-derives them from the
+ * box's inputs: a free end on another input port must not blank them.
+ */
+function boxMemoryPortValues(comp: CircuitComponent): Map<string, number> {
+  const known = new Map<string, number>();
+  if (!isSequentialBox(comp)) return known;
+  const values = boxMemoryOutputs(comp);
+  comp.ports.filter((p) => p.side === 'right').forEach((p, j) => {
+    if (values[j] !== undefined) known.set(`${comp.id}:${p.id}`, values[j]);
+  });
+  return known;
+}
+
+/**
+ * The local I/O row being stepped: its input bits and its memory (memorySlots
+ * order) as they stood when the row was selected. localStepSelectedKey holds
+ * exactly those bits joined, so it is read back from there — the MEM update
+ * steps move the machine to its NEXT state mid-step, and the row must not
+ * move with it. With no (matching) selection: the machine as it is now.
+ */
+function localStepRow(s: {
+  components: CircuitComponent[];
+  localStepSelectedKey: string | null;
+}): { inputBits: number[]; memBits: number[] } {
+  const inputs = s.components
+    .filter((c) => c.type === 'INPUT')
+    .sort((a, b) => parseInt(a.label.replace('IN', '')) - parseInt(b.label.replace('IN', '')));
+  const slots = memorySlots(s.components);
+  const bits = s.localStepSelectedKey?.split(',').map(Number) ?? [];
+  if (bits.length === inputs.length + slots.length && bits.every((b) => b === 0 || b === 1)) {
+    return { inputBits: bits.slice(0, inputs.length), memBits: bits.slice(inputs.length) };
+  }
+  return { inputBits: inputs.map((c) => c.value ?? 0), memBits: slots.map((m) => m.value) };
+}
 
 // Monotonic token for openAssignment: each open bumps it, and an open whose
 // seam reads resolve after a newer open started applies nothing — a stale
 // resolve must never clobber a newer navigation.
 let openAssignmentSeq = 0;
+
+// Monotonic token for viewSubmission's seam lookup (an older attempt, not in
+// memory): every viewSubmission call bumps it, and so does every open, Home
+// and principal change. A lookup that resolves after any of them applies
+// nothing — openAssignmentSeq alone can't tell, since a navigation within
+// the SAME assignment (the question arrows, "Back to my work", Back/Forward)
+// never bumps it, and the stale view would land under the newer route.
+let viewSubmissionSeq = 0;
+
+// Who the editor store currently belongs to (reset law 2, resetForPrincipal):
+// the signed-in email, or null for the visitor. It keys the sandbox autosave.
+// `principalReported` is false until the auth provider first reports, so the
+// boot report (visitor included) always loads that principal's sandbox.
+// `principalEpoch` bumps on every change: an async resolve that started under
+// an earlier principal (hydrateSubmissions, submitAssignment, an autosave in
+// flight) applies nothing to the next person's store.
+let currentPrincipal: string | null = null;
+let principalReported = false;
+let principalEpoch = 0;
+
+/** The provenance of a canvas copy made / paste landing in `state` now. */
+function pasteProvenance(state: { assignment: AssignmentData | null }): Provenance {
+  return { scope: selectPasteScope(state), user: currentPrincipal };
+}
+
+/** A copy of `clip` with every component and wire id freshly minted in
+ *  `scope`, recursing into BOXED internals (their wires re-pointed with them).
+ *  A box's boxedCircuitId is a library reference and stays; each of its
+ *  ports' bindings (`Port.bind`, an internal `compId:portId`) follows its
+ *  internal component to the fresh id. */
+function remint(clip: CanvasClip, scope: MintScope): CanvasClip {
+  return remintIds(clip, scope).clip;
+}
+function remintIds(clip: CanvasClip, scope: MintScope): { clip: CanvasClip; idMap: Map<string, string> } {
+  const idMap = new Map<string, string>();
+  const components = clip.components.map((c) => {
+    const id = mintId(scope);
+    idMap.set(c.id, id);
+    if (!c.internalCircuit) return { ...c, id };
+    const inner = remintIds(c.internalCircuit, scope);
+    const ports = c.ports.map((p) => {
+      if (p.bind === undefined) return p;
+      const { compId, portId } = parsePortKey(p.bind);
+      return { ...p, bind: `${inner.idMap.get(compId) ?? compId}:${portId}` };
+    });
+    return { ...c, id, ports, internalCircuit: inner.clip };
+  });
+  const wires = clip.wires.map((w) => ({
+    ...w,
+    id: mintId(scope),
+    sourceComponentId: idMap.get(w.sourceComponentId) ?? w.sourceComponentId,
+    targetComponentId: idMap.get(w.targetComponentId) ?? w.targetComponentId,
+  }));
+  return { clip: { components, wires }, idMap };
+}
+
+// ─── The writing/build trace (task 034, provenance/trace.ts) ────────
+// When this window's previous edit happened (active-time gaps). Module
+// memory; a principal change resets it.
+let lastEditAt = 0;
+
+// The values each answer field held recently in this window, per field
+// (`<assignment>:<question>:r` for the prose answer, `…:f<i>` for a blank).
+// A change BACK to one of them — the browser's own undo or redo in a text box
+// — restores what the record already counted when it first arrived, so it
+// inserts nothing new; everything else counts what it inserts. Module memory;
+// a principal change resets it.
+const RECENT_TEXTS_PER_FIELD = 50;
+const recentTexts = new Map<string, string[]>();
+
+/** Characters one text change inserts, for the record: 0 when it restores a
+ *  value this field held recently (an undo/redo), else insertedChars. */
+function textInsertion(field: string, before: string, after: string): number {
+  let seen = recentTexts.get(field);
+  if (!seen) recentTexts.set(field, (seen = []));
+  const restores = seen.includes(after);
+  if (seen[seen.length - 1] !== before) seen.push(before);
+  if (seen.length > RECENT_TEXTS_PER_FIELD) seen.shift();
+  return restores ? 0 : insertedChars(before, after);
+}
+
+/** The recent-values key of an answer field of the live question. */
+function textFieldKey(state: AppState, field: string): string {
+  const q = state.assignment?.questions[state.currentQuestionIndex];
+  return `${state.assignment?.id ?? ''}:${q?.id ?? ''}:${field}`;
+}
+
+/**
+ * The trace update for one edit of the live question, merged into that
+ * edit's own set(). Called by every edit AFTER its isCurrentQuestionLocked
+ * return — through pushHistory (every canvas edit), undo/redo and the two
+ * text setters — and a no-op on a locked question anyway (belt and braces)
+ * and in the sandbox, which keeps no trace. `textAfter`: the answer text the
+ * edit leaves (text setters); canvas edits leave it as it was.
+ */
+function recordEdit(
+  state: AppState,
+  change: TraceChange,
+  textAfter?: TextContent,
+): Partial<Pick<AppState, 'questionTrace'>> {
+  const a = state.assignment;
+  const q = a?.questions[state.currentQuestionIndex];
+  if (!a || !q || isCurrentQuestionLocked(state)) return {};
+  const now = Date.now();
+  const gapMs = lastEditAt > 0 ? now - lastEditAt : 0;
+  lastEditAt = now;
+  const textBefore: TextContent = { responseText: state.openResponse, fillAnswers: state.fillAnswers };
+  return {
+    questionTrace: nextTrace(
+      state.questionTrace,
+      change,
+      {
+        questionId: q.id,
+        textBefore,
+        textAfter: textAfter ?? textBefore,
+        countBefore: state.components.length,
+        gapMs,
+      },
+      mintKeyFor(a.id),
+    ),
+  };
+}
+
+/** The live question folded into its saved container — THE one fold, shared
+ *  by every canvas swap and save (goHome, switchQuestion, the done toggle,
+ *  syncedQuestionCircuits), so no live field (the done lock, the editing
+ *  record) can be dropped on the way. */
+function foldLiveQuestion(
+  s: AppState,
+  questionId: number,
+  overrides: Partial<QuestionCircuit> = {},
+): QuestionCircuit {
+  return {
+    components: s.components,
+    wires: s.wires,
+    boxes: s.boxes,
+    responseText: s.openResponse,
+    fillAnswers: s.fillAnswers,
+    done: s.questionCircuits.get(questionId)?.done,
+    ...(s.questionTrace ? { provenance: s.questionTrace } : {}),
+    ...overrides,
+  };
+}
+
+/** A saved question's live fields — THE one load, foldLiveQuestion's inverse
+ *  (openAssignment, switchQuestion, the frozen view). */
+function loadQuestionFields(saved: QuestionCircuit) {
+  return {
+    components: saved.components,
+    wires: saved.wires,
+    boxes: saved.boxes,
+    openResponse: saved.responseText ?? '',
+    fillAnswers: saved.fillAnswers ?? [],
+    questionTrace: saved.provenance ?? null,
+  };
+}
+
+// ─── The sandbox as a workbook (task 028) ─────────────────────────────
+
+/** What importWorkbook reports: a bad file changed nothing, and why. */
+export type ImportResult = { ok: true } | { ok: false; reason: string };
+
+/** A new sandbox tab — THE one factory (the initial sandbox, New, the '+'
+ *  menu). A turbot tab is born with its brain kind and the starter arena:
+ *  the sandbox analog of a turbot question's innerMode + turbot_cases[0].arena,
+ *  read through the SAME selectors (selectTurbotInnerMode/selectTurbotArena). */
+function freshSandboxTab(
+  id: string,
+  title = 'Circuit 1',
+  buildMode: BuildMode = 'CC',
+  innerMode?: BuildMode,
+  activeTask: ActiveTask = buildMode === 'turbot' ? 'turbot' : 'arithmetic',
+): SandboxTab {
+  return {
+    id,
+    title,
+    buildMode,
+    activeTask,
+    ...(buildMode === 'turbot' ? { innerMode: innerMode ?? 'CC', arena: sandboxDefaultArena() } : {}),
+  };
+}
+
+/** The sandbox's sheets, the live canvas folded into the active tab ONLY
+ *  while the sandbox is what the live fields hold (no assignment in memory):
+ *  an assignment's canvas is never a sandbox sheet — not in a file, not in
+ *  the autosave, not in the unsaved-changes key. */
+function sandboxTabCircuits(s: AppState): Map<string, TabCircuitData> {
+  const sheets = new Map(s.tabCircuits);
+  if (s.assignment === null) {
+    sheets.set(s.activeTabId, {
+      components: s.components,
+      wires: s.wires,
+      boxes: s.boxes,
+      confirmedBoxes: s.confirmedBoxLibrary,
+    });
+  }
+  return sheets;
+}
+
+/** The sandbox's worksheets in tab order — what a workbook file holds and
+ *  what its saved-content key is computed over (exportWorkbook, the key). */
+function sandboxWorkbookData(s: AppState): Pick<WorkbookData, 'worksheets' | 'activeWorksheetId'> {
+  const sheets = sandboxTabCircuits(s);
+  const worksheets: WorksheetData[] = s.tabs.map((tab) => {
+    const circuit = sheets.get(tab.id) || { components: [], wires: [], boxes: [], confirmedBoxes: [] };
+    return {
+      id: tab.id,
+      title: tab.title,
+      buildMode: tab.buildMode,
+      activeTask: tab.activeTask,
+      circuit: { components: circuit.components, wires: circuit.wires },
+      boxes: circuit.boxes,
+      confirmedBoxes: circuit.confirmedBoxes,
+      // Turbot tabs: the brain kind + sandbox arena travel with the sheet.
+      ...(tab.innerMode ? { innerMode: tab.innerMode } : {}),
+      ...(tab.arena ? { arena: tab.arena } : {}),
+    };
+  });
+  return { worksheets, activeWorksheetId: s.activeTabId };
+}
+
+/** The baseline of a sandbox never saved to a file: one empty Logic Circuit
+ *  sheet, the sandbox everyone starts with — so a fresh sandbox has nothing
+ *  unsaved, and work that was never saved does. */
+const PRISTINE_WORKBOOK_KEY = workbookKeyHash({
+  worksheets: [{ ...freshSandboxTab(''), circuit: { components: [], wires: [] }, boxes: [], confirmedBoxes: [] }],
+});
+
+/** Is the sandbox's work in a file? 'saved': its last save (or open, or New)
+ *  holds it. 'downloaded': not saved, but exactly what was last handed to the
+ *  browser as a download, which may or may not have landed. 'unsaved': work
+ *  in neither. Toggles, runs, the active tab and the view are not work
+ *  (workbookContentKey). */
+export function workbookSaveState(s: AppState): 'saved' | 'downloaded' | 'unsaved' {
+  const key = workbookKeyHash(sandboxWorkbookData(s));
+  if (key === (s.workbookSavedKey ?? PRISTINE_WORKBOOK_KEY)) return 'saved';
+  return key === s.workbookDownloadedKey ? 'downloaded' : 'unsaved';
+}
+
+/** Does the sandbox hold work its last save (or open, or New) doesn't? Asked
+ *  at click time by File ▸ New / Open…, before any picker opens. A download
+ *  alone doesn't count as saved (workbookSaveState). */
+export function hasUnsavedWorkbookChanges(s: AppState): boolean {
+  return workbookSaveState(s) !== 'saved';
+}
+
+/** A check to run after an await in the file menu: is this still the same
+ *  person's open sandbox? A principal change (reset law 2 — a 401, a sign-in
+ *  behind the dialog) or leaving the sandbox while a picker was open means
+ *  the file must not land (nor a save be marked) in what is there now. */
+export function captureSandboxSession(): () => boolean {
+  const epoch = principalEpoch;
+  return () => {
+    const s = useStore.getState();
+    return epoch === principalEpoch && s.assignment === null && s.workbookOpen;
+  };
+}
 
 export const useStore = create<AppState>()((set, get) => ({
   autoSaveStatus: 'saved' as const,
@@ -852,13 +1505,21 @@ export const useStore = create<AppState>()((set, get) => ({
   workbookOpen: false,
   workbookTitle: 'Untitled Workbook',
   workbookFileHandle: null,
+  workbookSavedKey: null,
+  workbookDownloadedKey: null,
   submissions: {},
 
   hydrateSubmissions: async () => {
+    // Whose submissions: captured with the epoch, never reread after an await.
+    const epoch = principalEpoch;
+    const who = currentPrincipal;
     const assignments = await listAssignments();
     const latests = await Promise.all(
-      assignments.map((a) => submissionStore.getLatest(a.id)),
+      assignments.map((a) => submissionStore.getLatestOwn(a.id, who)),
     );
+    // The principal changed while this was in flight: these are the previous
+    // person's submissions.
+    if (epoch !== principalEpoch) return;
     const out: Record<string, SubmissionRecord> = {};
     assignments.forEach((a, i) => {
       const latest = latests[i];
@@ -872,7 +1533,9 @@ export const useStore = create<AppState>()((set, get) => ({
       workbookOpen: false,
       workbookTitle: 'Untitled Workbook',
       workbookFileHandle: null,
-      tabs: [{ id: defaultTabId, title: 'Circuit 1', buildMode: 'CC' as BuildMode, activeTask: 'arithmetic' as ActiveTask }],
+      workbookSavedKey: null,
+      workbookDownloadedKey: null,
+      tabs: [freshSandboxTab(defaultTabId)],
       activeTabId: defaultTabId,
       tabCircuits: new Map(),
       components: [],
@@ -884,73 +1547,52 @@ export const useStore = create<AppState>()((set, get) => ({
       undoStack: [],
       redoStack: [],
     });
-    // Clear auto-save so next load shows welcome screen
-    try { localStorage.removeItem('making-minds-autosave'); } catch { /* ignore */ }
+    // Clear THIS principal's sandbox autosave (never another person's).
+    try { localStorage.removeItem(sandboxKey(currentPrincipal)); } catch { /* ignore */ }
   },
 
-  newWorkbook: () => {
-    const tabId = uuid();
+  newWorkbook: (mode = 'CC', innerMode, title = 'Circuit 1') => {
+    // An open assignment is left the way Home leaves it — its live canvas
+    // folded and saved — before the live fields become the sandbox's.
+    if (get().assignment) get().goHome();
+    const tab = freshSandboxTab(mintId({ kind: 'sandbox' }), title, mode, innerMode);
     set({
       assignment: null,
+      viewingSubmission: null,
       workbookOpen: true,
       workbookTitle: 'Untitled Workbook',
       workbookFileHandle: null,
-      tabs: [{ id: tabId, title: 'Circuit 1', buildMode: 'CC' as BuildMode, activeTask: 'arithmetic' as ActiveTask }],
-      activeTabId: tabId,
+      workbookDownloadedKey: null,
+      tabs: [tab],
+      activeTabId: tab.id,
       tabCircuits: new Map(),
       components: [],
       wires: [],
       boxes: [],
       confirmedBoxLibrary: [],
-      buildMode: 'CC',
-      activeTask: 'arithmetic',
+      buildMode: tab.buildMode,
+      activeTask: tab.activeTask,
       undoStack: [],
       redoStack: [],
     });
     get().resetAllSimState();
-  },
-
-  openWorkbook: (json, handle) => {
-    get().importWorkbook(json, handle);
+    // A fresh sheet has nothing unsaved.
+    set({ workbookSavedKey: workbookKeyHash(sandboxWorkbookData(get())) });
   },
 
   exportWorkbook: () => {
     const state = get();
-    // Save current tab's circuit into tabCircuits for serialization
-    const allTabCircuits = new Map(state.tabCircuits);
-    allTabCircuits.set(state.activeTabId, {
-      components: state.components,
-      wires: state.wires,
-      boxes: state.boxes,
-      confirmedBoxes: state.confirmedBoxLibrary,
-    });
-
-    const worksheets: WorksheetData[] = state.tabs.map((tab) => {
-      const circuit = allTabCircuits.get(tab.id) || { components: [], wires: [], boxes: [], confirmedBoxes: [] };
-      return {
-        id: tab.id,
-        title: tab.title,
-        buildMode: tab.buildMode,
-        activeTask: tab.activeTask,
-        circuit: { components: circuit.components, wires: circuit.wires },
-        boxes: circuit.boxes,
-        confirmedBoxes: circuit.confirmedBoxes,
-        // Turbot tabs: the brain kind + sandbox arena travel with the sheet.
-        ...(tab.innerMode ? { innerMode: tab.innerMode } : {}),
-        ...(tab.arena ? { arena: tab.arena } : {}),
-      };
-    });
-
     const workbook: WorkbookData = {
       formatVersion: 2,
+      // Read by whoever opens the file — a person or an AI tool (task 034).
+      notice: INTEGRITY_NOTICE,
       metadata: {
         title: state.workbookTitle,
         author: '',
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       },
-      worksheets,
-      activeWorksheetId: state.activeTabId,
+      ...sandboxWorkbookData(state),
       viewPreferences: {
         zoom: state.zoom,
         panX: state.panX,
@@ -961,109 +1603,109 @@ export const useStore = create<AppState>()((set, get) => ({
         repSystem: state.repSystem,
       },
     };
-    return JSON.stringify(workbook, null, 2);
+    // Indented unless that alone would take it past Open's size cap.
+    return serializeWorkbook(workbook);
   },
 
-  importWorkbook: (json, handle) => {
-    try {
-      const data = JSON.parse(json);
+  importWorkbook: (json, handle, fileName) => {
+    // Parse (and validate) first: a bad file changes nothing.
+    const parsed = parseWorkbookFile(json);
+    if (!parsed.ok) return parsed;
+    const wb = parsed.workbook;
+    // A file never writes into an assignment: one that is open is left the
+    // way Home leaves it (folded and saved), and the file opens as the
+    // sandbox's tabs — sandbox content to the paste seam (law 8).
+    if (get().assignment) get().goHome();
 
-      if (data.formatVersion === 2) {
-        // New workbook format
-        const wb = data as WorkbookData;
-        const tabCircuits = new Map<string, TabCircuitData>();
-        const tabs = wb.worksheets.map((ws) => {
-          const resolvedComponents = resolveMemDirections(ws.circuit.components || [], ws.circuit.wires || []);
-          tabCircuits.set(ws.id, {
-            components: resolvedComponents,
-            wires: ws.circuit.wires || [],
-            boxes: ws.boxes || [],
-            confirmedBoxes: ws.confirmedBoxes || [],
-          });
-          return {
-            id: ws.id,
-            title: ws.title,
-            buildMode: ws.buildMode || 'CC' as BuildMode,
-            activeTask: ws.activeTask || 'arithmetic' as ActiveTask,
-            // Turbot worksheets: restore brain kind + arena (seed defaults for
-            // files predating / hand-authored without them).
-            ...(ws.buildMode === 'turbot'
-              ? { innerMode: ws.innerMode ?? 'CC' as BuildMode, arena: ws.arena ?? sandboxDefaultArena() }
-              : {}),
-          };
-        });
+    const tabCircuits = new Map<string, TabCircuitData>();
+    const tabs = wb.worksheets.map((ws) => {
+      // A box placed before 038 — on the canvas or inside a library entry —
+      // is re-bound by the stated rule (boxPorts.ts rebindLegacyBoxes /
+      // rebindLegacyLibrary), as an assignment's load re-binds it: a load
+      // normalisation, not an edit.
+      const confirmedBoxes = rebindLegacyLibrary(ws.confirmedBoxes ?? []);
+      tabCircuits.set(ws.id, {
+        components: rebindLegacyBoxes(resolveMemDirections(ws.circuit.components, ws.circuit.wires), confirmedBoxes),
+        wires: ws.circuit.wires,
+        boxes: ws.boxes,
+        confirmedBoxes,
+      });
+      // Turbot worksheets: restore brain kind + arena (the starter arena for
+      // files predating / hand-authored without one).
+      return {
+        id: ws.id,
+        title: ws.title,
+        buildMode: ws.buildMode,
+        activeTask: ws.activeTask,
+        ...(ws.buildMode === 'turbot'
+          ? { innerMode: ws.innerMode ?? 'CC' as BuildMode, arena: ws.arena ?? sandboxDefaultArena() }
+          : {}),
+      };
+    });
+    const activeId = wb.activeWorksheetId;
+    const activeCircuit = tabCircuits.get(activeId)!;
+    const activeTab = tabs.find((t) => t.id === activeId)!;
+    const vp = wb.viewPreferences;
 
-        const activeId = wb.activeWorksheetId || tabs[0]?.id || defaultTabId;
-        const activeCircuit = tabCircuits.get(activeId) || { components: [], wires: [], boxes: [], confirmedBoxes: [] };
-        const activeTab = tabs.find((t) => t.id === activeId);
+    set({
+      assignment: null,
+      viewingSubmission: null,
+      workbookOpen: true,
+      workbookTitle: titleFromFileName(fileName) || wb.metadata.title || 'Untitled Workbook',
+      workbookFileHandle: handle ?? null,
+      workbookDownloadedKey: null,
+      tabs,
+      activeTabId: activeId,
+      tabCircuits,
+      components: activeCircuit.components,
+      wires: activeCircuit.wires,
+      boxes: activeCircuit.boxes,
+      confirmedBoxLibrary: activeCircuit.confirmedBoxes,
+      buildMode: activeTab.buildMode,
+      activeTask: activeTab.activeTask,
+      zoom: vp.zoom ?? 1,
+      panX: vp.panX ?? 0,
+      panY: vp.panY ?? 0,
+      showGrid: vp.showGrid ?? true,
+      showWireValues: vp.showWireValues ?? true,
+      snapToAlign: vp.snapToAlign ?? true,
+      repSystem: vp.repSystem ?? 'binary',
+      undoStack: [],
+      redoStack: [],
+    });
+    get().resetAllSimState();
+    // What was opened is what is saved (after any MEM directions resolved).
+    set({ workbookSavedKey: workbookKeyHash(sandboxWorkbookData(get())) });
+    setTimeout(() => get().evaluateCircuit(), 0);
+    return { ok: true };
+  },
 
-        set({
-          assignment: null,
-          workbookOpen: true,
-          workbookTitle: wb.metadata?.title || 'Untitled Workbook',
-          workbookFileHandle: handle || null,
-          tabs,
-          activeTabId: activeId,
-          tabCircuits,
-          components: activeCircuit.components,
-          wires: activeCircuit.wires,
-          boxes: activeCircuit.boxes,
-          confirmedBoxLibrary: activeCircuit.confirmedBoxes,
-          buildMode: activeTab?.buildMode || 'CC',
-          activeTask: activeTab?.activeTask || 'arithmetic',
-          zoom: wb.viewPreferences?.zoom ?? 1,
-          panX: wb.viewPreferences?.panX ?? 0,
-          panY: wb.viewPreferences?.panY ?? 0,
-          showGrid: wb.viewPreferences?.showGrid ?? true,
-          showWireValues: wb.viewPreferences?.showWireValues ?? true,
-          snapToAlign: wb.viewPreferences?.snapToAlign ?? true,
-          repSystem: wb.viewPreferences?.repSystem || 'binary',
-          undoStack: [],
-          redoStack: [],
-        });
-        get().resetAllSimState();
-        setTimeout(() => get().evaluateCircuit(), 0);
-      } else if (data.circuit) {
-        // Legacy single-circuit format — wrap in a one-worksheet workbook
-        const wsId = uuid();
-        const importedComponents = data.circuit.components || [];
-        const importedWires = data.circuit.wires || [];
-        const resolvedComponents = resolveMemDirections(importedComponents, importedWires);
-        const tabCircuits = new Map<string, TabCircuitData>();
-        tabCircuits.set(wsId, {
-          components: resolvedComponents,
-          wires: importedWires,
-          boxes: data.boxes || [],
-          confirmedBoxes: data.confirmedBoxes || [],
-        });
-        const bm = data.metadata?.buildType || 'CC';
-        set({
-          assignment: null,
-          workbookOpen: true,
-          workbookTitle: data.metadata?.title || 'Imported Circuit',
-          workbookFileHandle: handle || null,
-          tabs: [{ id: wsId, title: data.metadata?.title || 'Circuit 1', buildMode: bm, activeTask: 'arithmetic' as ActiveTask }],
-          activeTabId: wsId,
-          tabCircuits,
-          components: resolvedComponents,
-          wires: importedWires,
-          boxes: data.boxes || [],
-          confirmedBoxLibrary: data.confirmedBoxes || [],
-          buildMode: bm,
-          activeTask: 'arithmetic',
-          repSystem: data.repSystem || 'binary',
-          undoStack: [],
-          redoStack: [],
-        });
-        get().resetAllSimState();
-        setTimeout(() => get().evaluateCircuit(), 0);
-      } else {
-        alert('Invalid file format. Expected a workbook or circuit file.');
-      }
-    } catch (e) {
-      console.error('Invalid workbook JSON:', e);
-      alert('Invalid file. Please check the JSON format.');
-    }
+  markWorkbookSaved: (writtenJson, handle, fileName) => {
+    // Read back without Open's size cap: what was written is saved, whatever
+    // its size (Save itself refuses a file Open would refuse).
+    const written = parseWorkbookFile(writtenJson, { sizeCap: false });
+    set({
+      // The baseline is what the file now holds, not the live state: an edit
+      // made while the picker was open is still unsaved.
+      ...(written.ok ? { workbookSavedKey: workbookKeyHash(written.workbook) } : {}),
+      workbookDownloadedKey: null,
+      workbookFileHandle: handle,
+      // The workbook takes its file's name (the title is not in the key, so
+      // this never makes the sheet look unsaved).
+      ...(titleFromFileName(fileName) ? { workbookTitle: titleFromFileName(fileName) } : {}),
+    });
+  },
+
+  markWorkbookDownloaded: (downloadedJson) => {
+    const downloaded = parseWorkbookFile(downloadedJson, { sizeCap: false });
+    set({
+      // The baseline stays put: until a picked file holds it (or the person
+      // says don't save), New and Open keep asking.
+      workbookDownloadedKey: downloaded.ok ? workbookKeyHash(downloaded.workbook) : null,
+      // No file this page can write back to (a handle that just failed and
+      // fell back to a download is not one); the title stays.
+      workbookFileHandle: null,
+    });
   },
 
   buildMode: 'CC',
@@ -1100,7 +1742,7 @@ export const useStore = create<AppState>()((set, get) => ({
   addComponent: (type, x, y) => {
     const state = get();
     if (isCurrentQuestionLocked(state)) return;
-    state.pushHistory();
+    state.pushHistory(1);
     const sx = snapToGrid(x);
     const sy = snapToGrid(y);
     let label = '';
@@ -1139,7 +1781,7 @@ export const useStore = create<AppState>()((set, get) => ({
     }
 
     const comp: CircuitComponent = {
-      id: uuid(),
+      id: mintId(selectPasteScope(state)),
       type,
       x: sx,
       y: sy,
@@ -1263,7 +1905,7 @@ export const useStore = create<AppState>()((set, get) => ({
       ? selectTransitionNotationForSource(state, sourceComp).defaultLabel
       : undefined;
     const wire: Wire = {
-      id: uuid(),
+      id: mintId(selectPasteScope(state)),
       sourceComponentId: sourceCompId,
       sourcePortId: sourcePortId,
       targetComponentId: targetCompId,
@@ -1366,7 +2008,9 @@ export const useStore = create<AppState>()((set, get) => ({
 
     // CC mode: auto-populate the I/O table with the current input→output row
     // Auto-populate the I/O table with the current input→output row
-    const hasMem = updatedComponents.some((c) => c.type === 'MEM');
+    // Memory counts wherever it sits: a canvas holding only a sequential box
+    // is still an SC circuit, and its boxed MEMs are state-table columns.
+    const hasMem = hasMemory(updatedComponents);
     if ((state.buildMode === 'CC' || hasMem) && !suppressAutoAddRow) {
       const inputs = updatedComponents
         .filter((c) => c.type === 'INPUT')
@@ -1382,18 +2026,12 @@ export const useStore = create<AppState>()((set, get) => ({
           const numB = parseInt(b.label.replace('OUT', ''));
           return numA - numB;
         });
-      const mems = updatedComponents
-        .filter((c) => c.type === 'MEM')
-        .sort((a, b) => {
-          const numA = parseInt(a.label.replace('M', ''));
-          const numB = parseInt(b.label.replace('M', ''));
-          return numA - numB;
-        });
+      const mems = memorySlots(updatedComponents);
 
       const allInputsSet = inputs.every((c) => c.value != null);
       if (inputs.length > 0 && outputs.length > 0 && allInputsSet) {
         const inputBits = inputs.map((c) => c.value!);
-        const memBits = mems.map((c) => c.storedValue ?? 0);
+        const memBits = mems.map((m) => m.value);
         const outputBits = outputs.map((c) => c.value != null ? c.value : 0);
         const key = [...inputBits, ...memBits].join(',');
 
@@ -1416,7 +2054,7 @@ export const useStore = create<AppState>()((set, get) => ({
   // Undo/Redo
   undoStack: [],
   redoStack: [],
-  pushHistory: () => {
+  pushHistory: (added = 0) => {
     const state = get();
     set({
       undoStack: [
@@ -1429,6 +2067,7 @@ export const useStore = create<AppState>()((set, get) => ({
         },
       ],
       redoStack: [],
+      ...recordEdit(state, { compIns: added }),
     });
   },
   undo: () => {
@@ -1446,11 +2085,15 @@ export const useStore = create<AppState>()((set, get) => ({
           confirmedBoxes: JSON.parse(JSON.stringify(state.confirmedBoxLibrary)),
         },
       ],
-      components: prev.components,
-      wires: prev.wires,
+      // The snapshot's structure with today's live values (withLiveValues).
+      ...withLiveValues(prev, state),
       boxes: prev.boxes,
       confirmedBoxLibrary: prev.confirmedBoxes,
+      // An edit action, adding nothing new (what it restores was counted).
+      ...recordEdit(state, {}),
     });
+    // A restore that changes the machine re-evaluates, as every edit does.
+    if (gradedMachineKey(prev) !== gradedMachineKey(state)) setTimeout(() => get().evaluateCircuit(), 0);
   },
   redo: () => {
     const state = get();
@@ -1467,11 +2110,12 @@ export const useStore = create<AppState>()((set, get) => ({
           confirmedBoxes: JSON.parse(JSON.stringify(state.confirmedBoxLibrary)),
         },
       ],
-      components: next.components,
-      wires: next.wires,
+      ...withLiveValues(next, state), // as undo
       boxes: next.boxes,
       confirmedBoxLibrary: next.confirmedBoxes,
+      ...recordEdit(state, {}),
     });
+    if (gradedMachineKey(next) !== gradedMachineKey(state)) setTimeout(() => get().evaluateCircuit(), 0);
   },
 
   // Assignment mode
@@ -1480,20 +2124,38 @@ export const useStore = create<AppState>()((set, get) => ({
   currentQuestionIndex: 0,
   questionCircuits: new Map(),
   openResponse: '',
+  // The text setters stamp the answer as they change it (recordEdit): the
+  // record is signed at EDIT time, never at save time.
   setOpenResponse: (text) => {
-    if (isCurrentQuestionLocked(get())) return;
-    set({ openResponse: text });
+    const state = get();
+    if (isCurrentQuestionLocked(state)) return;
+    set({
+      openResponse: text,
+      ...recordEdit(
+        state,
+        { textIns: textInsertion(textFieldKey(state, 'r'), state.openResponse, text) },
+        { responseText: text, fillAnswers: state.fillAnswers },
+      ),
+    });
   },
   fillAnswers: [],
   setFillAnswer: (index, value) => {
-    if (isCurrentQuestionLocked(get())) return;
-    set((state) => {
-      const next = state.fillAnswers.slice();
-      while (next.length <= index) next.push('');
-      next[index] = value;
-      return { fillAnswers: next };
+    const state = get();
+    if (isCurrentQuestionLocked(state)) return;
+    const next = state.fillAnswers.slice();
+    while (next.length <= index) next.push('');
+    const before = next[index];
+    next[index] = value;
+    set({
+      fillAnswers: next,
+      ...recordEdit(
+        state,
+        { textIns: textInsertion(textFieldKey(state, `f${index}`), before, value) },
+        { responseText: state.openResponse, fillAnswers: next },
+      ),
     });
   },
+  questionTrace: null,
   loadAssignment: (assignment) => {
     const questionCircuits = new Map<number, QuestionCircuit>();
     for (const q of assignment.questions) {
@@ -1509,6 +2171,8 @@ export const useStore = create<AppState>()((set, get) => ({
       confirmedBoxLibrary: [],
       openResponse: '',
       fillAnswers: [],
+      questionTrace: null,
+      viewingSubmission: null,
       buildMode: assignment.questions[0]?.buildMode || 'CC',
     });
     get().resetAllSimState();
@@ -1517,24 +2181,33 @@ export const useStore = create<AppState>()((set, get) => ({
     // Flush any pending debounced save for the canvas we're leaving so its
     // last edit is persisted before another workbook takes over the live state.
     flushAutoSave();
+    // A newer navigation: a submission lookup still in flight applies nothing.
+    viewSubmissionSeq++;
     // Same assignment already in memory → resume without wiping in-progress work.
     if (get().assignment?.id === id) {
       set({ workbookOpen: true });
       return true;
     }
     const seq = ++openAssignmentSeq;
-    const [def, fetched, latestSubmission] = await Promise.all([
+    const [def, { state: fetched, mintKey }, latestSubmission] = await Promise.all([
       getAssignment(id),
-      workbookStore.loadAssignmentState(id),
+      // The saved work AND this person's mint key for this assignment (task
+      // 034), in one fetch: ids minted and editing records signed from here
+      // on bind to them.
+      workbookStore.loadForOpen(id, currentPrincipal),
       // Fetched directly, not read off the separately-hydrated `submissions`
       // map: that hydration (App.tsx's mount effect) races this open on a
       // fresh deep link, and the freeze check below needs THIS assignment's
       // latest submission to be accurate the instant the question loads.
-      submissionStore.getLatest(id),
+      // Own only: a previous principal's resolve is dropped by the seq guard.
+      submissionStore.getLatestOwn(id, currentPrincipal),
     ]);
     // Superseded while in flight — drop this resolve (see the AppState note).
+    // A stale resolve registers no key either: it may be a previous
+    // principal's.
     if (seq !== openAssignmentSeq) return true;
     if (!def) return false;
+    if (mintKey) setMintKey(id, mintKey);
     // An unpublished assignment is not openable by a student, by URL or
     // otherwise. Remotely the server already refuses (the fetch 404s, so
     // `def` is undefined above); local mode has no server to refuse, so the
@@ -1567,24 +2240,22 @@ export const useStore = create<AppState>()((set, get) => ({
     const { questionCircuits, currentQuestionIndex, boxLibrary } = restoreQuestionCircuits(def, saved);
     const activeQ = def.questions[currentQuestionIndex];
     // Frozen (item 3): show what was actually SUBMITTED, read-only, not the
-    // live in-progress work — even if the two have since diverged.
-    const frozen = latestSubmission != null && selectAssignmentFrozen(get());
+    // live in-progress work — even if the two have since diverged. Frozen is
+    // the trigger that forces the submission view on (viewingSubmission).
+    const view = latestSubmission && selectAssignmentFrozen(get()) ? latestSubmission : null;
     const activeCircuit = activeQ
-      ? frozen
-        ? frozenQuestionCircuit(latestSubmission!, activeQ.id)
+      ? view
+        ? submittedQuestionCircuit(view, activeQ.id)
         : questionCircuits.get(activeQ.id) ?? emptyQuestionCircuit()
       : emptyQuestionCircuit();
     set({
       questionCircuits,
       currentQuestionIndex,
-      components: activeCircuit.components,
-      wires: activeCircuit.wires,
-      boxes: activeCircuit.boxes,
+      viewingSubmission: view,
+      ...loadQuestionFields(activeCircuit),
       // Assignment-wide: a box built for one question is available in every
       // question of the homework that can place its kind.
       confirmedBoxLibrary: boxLibrary,
-      openResponse: activeCircuit.responseText ?? '',
-      fillAnswers: activeCircuit.fillAnswers ?? [],
       buildMode: activeQ?.buildMode || 'CC',
       workbookOpen: true,
     });
@@ -1592,20 +2263,18 @@ export const useStore = create<AppState>()((set, get) => ({
     return true;
   },
   goHome: () => {
+    // Leaving the editor: a submission lookup still in flight applies nothing.
+    viewSubmissionSeq++;
     const state = get();
-    // Sync the live canvas into its container so nothing in memory is lost.
+    // Sync the live canvas into its container so nothing in memory is lost —
+    // never a submission on show (viewingSubmission): the live work is
+    // already in the map, and folding the SUBMITTED canvas there would
+    // overwrite it in the save below.
     if (state.assignment) {
       const q = state.assignment.questions[state.currentQuestionIndex];
-      if (q) {
+      if (q && !state.viewingSubmission) {
         const qc = new Map(state.questionCircuits);
-        qc.set(q.id, {
-          components: state.components,
-          wires: state.wires,
-          boxes: state.boxes,
-          responseText: state.openResponse,
-          fillAnswers: state.fillAnswers,
-          done: state.questionCircuits.get(q.id)?.done,
-        });
+        qc.set(q.id, foldLiveQuestion(state, q.id));
         set({ questionCircuits: qc });
       }
       // Flush immediately so a quick Home click persists (don't wait for
@@ -1624,7 +2293,9 @@ export const useStore = create<AppState>()((set, get) => ({
       });
       set({ tabCircuits: tc });
     }
-    set({ workbookOpen: false });
+    // History is canvas-scoped: an undo after coming back must not restore
+    // the canvas left here over whichever one is entered next.
+    set({ workbookOpen: false, undoStack: [], redoStack: [] });
   },
   enterSandbox: () => {
     const state = get();
@@ -1643,6 +2314,7 @@ export const useStore = create<AppState>()((set, get) => ({
     const tab = state.tabs.find((t) => t.id === state.activeTabId);
     set({
       assignment: null,
+      viewingSubmission: null,
       workbookOpen: true,
       components: saved.components,
       wires: saved.wires,
@@ -1661,18 +2333,27 @@ export const useStore = create<AppState>()((set, get) => ({
     const nextQ = a.questions[index];
     if (!currentQ || !nextQ) return;
 
-    // Frozen (item 3): every question shows its own submitted answer,
-    // read-only — there is no live canvas to save on the way out.
-    if (selectAssignmentFrozen(state)) {
-      const record = state.submissions[a.id]!;
-      const saved = frozenQuestionCircuit(record, nextQ.id);
+    // Showing a submission (task 003): every question shows its own answer
+    // in THAT attempt, read-only. Frozen (item 3) forces the latest one on.
+    const view =
+      state.viewingSubmission ??
+      (selectAssignmentFrozen(state) ? state.submissions[a.id] ?? null : null);
+    if (view) {
+      // Already viewing → the canvas is a submission, nothing live to save.
+      // Not yet → the freeze just began mid-session (the deadline passed, or
+      // a late submit): the canvas still holds the LIVE work, which lands in
+      // the map (and any pending save goes out) before the view replaces it.
+      let questionCircuits = state.questionCircuits;
+      if (!state.viewingSubmission) {
+        flushAutoSave();
+        questionCircuits = new Map(questionCircuits);
+        questionCircuits.set(currentQ.id, foldLiveQuestion(state, currentQ.id));
+      }
       set({
         currentQuestionIndex: index,
-        components: saved.components,
-        wires: saved.wires,
-        boxes: saved.boxes,
-        openResponse: saved.responseText ?? '',
-        fillAnswers: saved.fillAnswers ?? [],
+        questionCircuits,
+        viewingSubmission: view,
+        ...loadQuestionFields(submittedQuestionCircuit(view, nextQ.id)),
         buildMode: nextQ.buildMode,
       });
       get().resetAllSimState();
@@ -1681,26 +2362,15 @@ export const useStore = create<AppState>()((set, get) => ({
 
     // Save the live question's canvas, load the target question's.
     const updatedMap = new Map(state.questionCircuits);
-    updatedMap.set(currentQ.id, {
-      components: state.components,
-      wires: state.wires,
-      boxes: state.boxes,
-      responseText: state.openResponse,
-      fillAnswers: state.fillAnswers,
-      done: state.questionCircuits.get(currentQ.id)?.done,
-    });
+    updatedMap.set(currentQ.id, foldLiveQuestion(state, currentQ.id));
 
     const saved = updatedMap.get(nextQ.id) ?? emptyQuestionCircuit();
     set({
       currentQuestionIndex: index,
       questionCircuits: updatedMap,
-      components: saved.components,
-      wires: saved.wires,
-      boxes: saved.boxes,
       // confirmedBoxLibrary deliberately NOT swapped: it belongs to the
       // assignment, not the question (notes/pset_updates.md item 8).
-      openResponse: saved.responseText ?? '',
-      fillAnswers: saved.fillAnswers ?? [],
+      ...loadQuestionFields(saved),
       buildMode: nextQ.buildMode,
     });
     get().resetAllSimState();
@@ -1709,24 +2379,22 @@ export const useStore = create<AppState>()((set, get) => ({
     const state = get();
     const q = state.assignment?.questions[state.currentQuestionIndex];
     if (!q) return;
+    // Not behind isCurrentQuestionLocked — done IS that lock, and unlocking
+    // must stay possible — but never while a submission is on show: the fold
+    // below would write the SUBMITTED canvas into the live workbook.
+    if (showsSubmission(state)) return;
     // Fold in the live canvas (mirrors switchQuestion/goHome's sync) rather
     // than the possibly-stale map entry, so toggling done never discards an
     // edit made since the last navigation.
     const qc = new Map(state.questionCircuits);
     const wasDone = qc.get(q.id)?.done ?? false;
-    qc.set(q.id, {
-      components: state.components,
-      wires: state.wires,
-      boxes: state.boxes,
-      responseText: state.openResponse,
-      fillAnswers: state.fillAnswers,
-      done: !wasDone,
-    });
+    qc.set(q.id, foldLiveQuestion(state, q.id, { done: !wasDone }));
     set({ questionCircuits: qc });
   },
   closeAssignment: () => {
     set({
       assignment: null,
+      viewingSubmission: null,
       currentQuestionIndex: 0,
       questionCircuits: new Map(),
       components: [],
@@ -1735,7 +2403,71 @@ export const useStore = create<AppState>()((set, get) => ({
       confirmedBoxLibrary: [],
       openResponse: '',
       fillAnswers: [],
+      questionTrace: null,
+      undoStack: [],
+      redoStack: [],
     });
+  },
+  viewingSubmission: null,
+  viewSubmission: async (attempt) => {
+    // This call supersedes any lookup still in flight (viewSubmissionSeq).
+    const viewSeq = ++viewSubmissionSeq;
+    const who = currentPrincipal;
+    const a = get().assignment;
+    if (!a) return attempt == null;
+    // The record to show; null = the live workbook — except while frozen,
+    // which stays locked to the latest submission.
+    let target: SubmissionRecord | null;
+    if (attempt == null) {
+      const s = get();
+      target = selectAssignmentFrozen(s) ? s.submissions[a.id] ?? null : null;
+    } else {
+      const s = get();
+      // The fresher copy first: `submissions` is re-read on every visit (a
+      // grade release adds the result a graded-case replay reads); the view
+      // is whatever was fetched when it began.
+      target = [s.submissions[a.id], s.viewingSubmission].find((r) => r?.attempt === attempt) ?? null;
+      if (!target) {
+        // Own attempts only: attempt numbers count per student, and another
+        // person's attempt k is never "yours" (task 037).
+        const own = await submissionStore.listOwn(a.id, who);
+        // Superseded (a newer view, open, Home or principal change — on
+        // this assignment or another): apply nothing.
+        if (viewSeq !== viewSubmissionSeq || get().assignment?.id !== a.id) return true;
+        target = own.find((r) => r.attempt === attempt) ?? null;
+        if (!target) return false;
+      }
+    }
+
+    const s = get();
+    const shown = s.viewingSubmission;
+    if ((shown?.attempt ?? null) === (target?.attempt ?? null)) {
+      // Already on show: no canvas swap — a re-applied route, or the arrows,
+      // must not wipe a run. Only a fresher copy of the record is taken.
+      if (target && target !== shown) set({ viewingSubmission: target });
+      return true;
+    }
+    const q = a.questions[s.currentQuestionIndex];
+    let questionCircuits = s.questionCircuits;
+    if (!shown) {
+      // Leaving the live workbook: its pending save goes out NOW (the
+      // snapshot is taken synchronously, before the swap — the autosave
+      // refuses while a submission is on show), and the live canvas lands in
+      // the map, which the view never writes to.
+      flushAutoSave();
+      if (q) {
+        questionCircuits = new Map(questionCircuits);
+        questionCircuits.set(q.id, foldLiveQuestion(s, q.id));
+      }
+    }
+    const canvas = !q
+      ? emptyQuestionCircuit()
+      : target
+        ? submittedQuestionCircuit(target, q.id)
+        : questionCircuits.get(q.id) ?? emptyQuestionCircuit();
+    set({ viewingSubmission: target, questionCircuits, ...loadQuestionFields(canvas) });
+    get().resetAllSimState();
+    return true;
   },
 
   // Save/Load
@@ -1743,6 +2475,7 @@ export const useStore = create<AppState>()((set, get) => ({
     const state = get();
     return JSON.stringify(
       {
+        notice: INTEGRITY_NOTICE,
         metadata: {
           title: 'Untitled',
           author: '',
@@ -1769,9 +2502,10 @@ export const useStore = create<AppState>()((set, get) => ({
       student,
       submittedAt: new Date().toISOString(),
     });
-    return JSON.stringify(submission, null, 2);
+    return JSON.stringify({ notice: INTEGRITY_NOTICE, ...submission }, null, 2);
   },
   submitAssignment: async (id, student) => {
+    const epoch = principalEpoch;
     const def = await getAssignment(id);
     if (!def) return null;
     const state = get();
@@ -1787,30 +2521,9 @@ export const useStore = create<AppState>()((set, get) => ({
       submittedAt: new Date().toISOString(),
     });
     const record = await submissionStore.submit(id, submission);
-    set({ submissions: { ...get().submissions, [id]: record } });
+    // Recorded either way; only the SAME principal's badge map shows it.
+    if (epoch === principalEpoch) set({ submissions: { ...get().submissions, [id]: record } });
     return record;
-  },
-  importProject: (json) => {
-    try {
-      const data = JSON.parse(json);
-      if (data.circuit) {
-        const importedComponents = data.circuit.components || [];
-        const importedWires = data.circuit.wires || [];
-        const resolvedComponents = resolveMemDirections(importedComponents, importedWires);
-        set({
-          components: resolvedComponents,
-          wires: importedWires,
-          boxes: data.boxes || [],
-          confirmedBoxLibrary: data.confirmedBoxes || [],
-          buildMode: data.metadata?.buildType || 'CC',
-          repSystem: data.repSystem || 'binary',
-        });
-        setTimeout(() => get().evaluateCircuit(), 0);
-      }
-    } catch (e) {
-      console.error('Invalid project JSON:', e);
-      alert('Invalid project file. Please check the JSON format.');
-    }
   },
 
   // Rotation
@@ -1829,91 +2542,7 @@ export const useStore = create<AppState>()((set, get) => ({
     setTimeout(() => get().evaluateCircuit(), 0);
   },
 
-  // Boxed circuits (legacy library)
-  boxedLibrary: [],
-  importBoxedCircuit: (name, json) => {
-    try {
-      const data = JSON.parse(json);
-      const circuit = data.circuit || data;
-      set((state) => ({
-        boxedLibrary: [
-          ...state.boxedLibrary,
-          { name, type: 'BOXED' as ComponentType, circuit: circuit.components || circuit, wires: circuit.wires || [], ports: [] },
-        ],
-      }));
-    } catch (e) {
-      console.error('Invalid boxed circuit JSON:', e);
-    }
-  },
-
-  boxCurrentCircuit: (name) => {
-    const state = get();
-    const { components, wires } = state;
-
-    const inputs = components.filter((c) => c.type === 'INPUT');
-    const outputs = components.filter((c) => c.type === 'OUTPUT');
-
-    if (inputs.length === 0) return 'Circuit must have at least 1 INPUT.';
-    if (outputs.length === 0) return 'Circuit must have at least 1 OUTPUT.';
-
-    // Check for free ends: every input port on non-INPUT components should be connected
-    for (const comp of components) {
-      if (comp.type === 'INPUT') continue;
-      const inputPorts = comp.ports.filter((p) => p.side === 'left');
-      for (const port of inputPorts) {
-        const connected = wires.some(
-          (w) => w.targetComponentId === comp.id && w.targetPortId === port.id
-        );
-        if (!connected) {
-          return `Free end: port "${port.id}" on component "${comp.label}" is not connected.`;
-        }
-      }
-    }
-
-    // Build boxed circuit ports: inputs become left ports, outputs become right ports
-    const sortedInputs = [...inputs].sort((a, b) => {
-      const numA = parseInt(a.label.replace('IN', ''));
-      const numB = parseInt(b.label.replace('IN', ''));
-      return numA - numB;
-    });
-    const sortedOutputs = [...outputs].sort((a, b) => {
-      const numA = parseInt(a.label.replace('OUT', ''));
-      const numB = parseInt(b.label.replace('OUT', ''));
-      return numA - numB;
-    });
-
-    const boxedPorts: import('./types').Port[] = [
-      ...sortedInputs.map((inp, i) => ({
-        id: `in${i + 1}`,
-        label: inp.label,
-        side: 'left' as const,
-        index: i,
-      })),
-      ...sortedOutputs.map((out, i) => ({
-        id: `out${i + 1}`,
-        label: out.label,
-        side: 'right' as const,
-        index: i,
-      })),
-    ];
-
-    set((s) => ({
-      boxedLibrary: [
-        ...s.boxedLibrary,
-        {
-          name,
-          type: 'BOXED' as ComponentType,
-          circuit: JSON.parse(JSON.stringify(components)),
-          wires: JSON.parse(JSON.stringify(wires)),
-          ports: boxedPorts,
-        },
-      ],
-    }));
-
-    return null;
-  },
-
-  // Box definitions (new draw-on-canvas boxing)
+  // Box definitions (draw-on-canvas boxing)
   boxes: [],
   confirmedBoxLibrary: [],
   addBox: (box) => {
@@ -1992,7 +2621,7 @@ export const useStore = create<AppState>()((set, get) => ({
   },
   renameBox: (id, name) => {
     const state = get();
-    if (isCurrentQuestionLocked(state)) return 'This question is marked done — unlock it to rename a box.';
+    if (isCurrentQuestionLocked(state)) return lockRefusal(state, 'rename a box');
     const trimmed = name.trim();
     if (!trimmed) return 'A box needs a name.';
     if (takenBoxNames(state.confirmedBoxLibrary, state.boxes, id).has(trimmed))
@@ -2034,7 +2663,7 @@ export const useStore = create<AppState>()((set, get) => ({
   },
   confirmBox: (id) => {
     const state = get();
-    if (isCurrentQuestionLocked(state)) return 'This question is marked done — unlock it to confirm a box.';
+    if (isCurrentQuestionLocked(state)) return lockRefusal(state, 'confirm a box');
     const box = state.boxes.find((b) => b.id === id);
     if (!box) return 'Box not found.';
 
@@ -2066,55 +2695,25 @@ export const useStore = create<AppState>()((set, get) => ({
       insideIds.has(w.sourceComponentId) && insideIds.has(w.targetComponentId)
     );
 
-    // ── MEM may not be boxed (SC boxing, notes item 23) ──
-    // A boxed circuit is evaluated statelessly (engine/cc.ts
-    // evaluateBoxedCircuit), and evaluateSCSequence only gives clocked state to
-    // TOP-LEVEL MEM blocks — it does not look inside BOXED internals. A boxed
-    // MEM would therefore never advance: the one-tick delay IN1→MEM→OUT1
-    // yields 0,1,0,1 unboxed and 0,0,0,0 boxed. So an SC canvas can box its
-    // combinational sub-circuits (that is what item 23 asks for), but the MEM
-    // itself stays outside the box until the engine can carry nested state.
-    {
-      const mems = insideComps.filter((c) => c.type === 'MEM');
-      if (mems.length > 0) {
-        return `Memory cannot go inside a box: ${mems.map((m) => m.label).join(', ')}. ` +
-          'A boxed circuit has no clock of its own, so a boxed MEM would never ' +
-          'update. Box the gates around it and leave the MEM on the canvas.';
-      }
+    // ── Memory: a box holding a MEM is a SEQUENTIAL box ──
+    // Its memory is clocked with the machine wherever it is placed — every
+    // run inlines it (engine/netlist.ts), so boxed ≡ unboxed. It is placeable
+    // only where a machine may be sequential (selectPlaceableBoxKinds), so a
+    // canvas that cannot place one does not confirm one either.
+    const sequential = hasMemory(insideComps);
+    if (sequential && !selectPlaceableBoxKinds(state).includes('SC')) {
+      const mems = insideComps.filter((c) => c.type === 'MEM' || isSequentialBox(c));
+      return `Memory cannot go inside a box here: ${mems.map((m) => m.label).join(', ')}. ` +
+        'A box holding memory is a sequential circuit, and this canvas takes ' +
+        'combinational boxes only. Box the gates around it and leave the ' +
+        'memory on the canvas.';
     }
 
     // ── Textbook Rule 1: No loops ──
-    // Check for cycles among inside components using internal wires.
-    // MEM blocks break feedback loops (like in topological sort), so skip
-    // wires feeding into a MEM's input port.
-    {
-      const compMap = new Map(insideComps.map((c) => [c.id, c]));
-      const adj = new Map<string, string[]>();
-      for (const c of insideComps) adj.set(c.id, []);
-      for (const w of internalWires) {
-        // Skip wires into MEM input ports — MEM breaks the cycle
-        const targetComp = compMap.get(w.targetComponentId);
-        if (targetComp?.type === 'MEM' && isMemSinkPort(targetComp, w.targetPortId)) continue;
-        const list = adj.get(w.sourceComponentId);
-        if (list) list.push(w.targetComponentId);
-      }
-      const visited = new Set<string>();
-      const recStack = new Set<string>();
-      function hasCycle(nodeId: string): boolean {
-        visited.add(nodeId);
-        recStack.add(nodeId);
-        for (const next of adj.get(nodeId) || []) {
-          if (!visited.has(next) && hasCycle(next)) return true;
-          if (recStack.has(next)) return true;
-        }
-        recStack.delete(nodeId);
-        return false;
-      }
-      for (const c of insideComps) {
-        if (!visited.has(c.id) && hasCycle(c.id)) {
-          return 'Loop detected: boxed circuits cannot contain loops.';
-        }
-      }
+    // No cycle among the inside components that a MEM does not break —
+    // looking through any sequential box placed inside.
+    if (hasCombinationalLoop(insideComps, internalWires)) {
+      return 'Loop detected: boxed circuits cannot contain loops.';
     }
 
     // ── Textbook Rule 2: No merged links ──
@@ -2164,12 +2763,15 @@ export const useStore = create<AppState>()((set, get) => ({
       }
     }
 
-    // Check every port on every inside component
+    // Check every port on every inside component. A MEM's ports play the
+    // roles its direction gives them, not their sides: its left `mout` port
+    // is the SOURCE when data flows right-to-left (the default).
     for (const comp of insideComps) {
       for (const port of comp.ports) {
         const key = `${comp.id}:${port.id}`;
+        const isInputPort = comp.type === 'MEM' ? isMemSinkPort(comp, port.id) : port.side === 'left';
 
-        if (port.side === 'left') {
+        if (isInputPort) {
           // Input port: must have an internal wire OR a crossing wire coming in
           const hasInternal = internalWires.some(
             (w) => w.targetComponentId === comp.id && w.targetPortId === port.id
@@ -2193,27 +2795,18 @@ export const useStore = create<AppState>()((set, get) => ({
       }
     }
 
-    // Identify box inputs and outputs
-    // Crossing wires define ports at the boundary
-    const inputPortIds = Array.from(crossingInputKeys);
-    const outputPortIds = Array.from(crossingOutputKeys);
-
-    // Additionally, INPUT components inside the box serve as box inputs
-    // and OUTPUT components inside serve as box outputs
-    for (const comp of insideComps) {
-      if (comp.type === 'INPUT') {
-        const key = `${comp.id}:out`;
-        if (!outputPortIds.includes(key) && !inputPortIds.includes(key)) {
-          inputPortIds.push(key);
-        }
-      }
-      if (comp.type === 'OUTPUT') {
-        const key = `${comp.id}:in`;
-        if (!inputPortIds.includes(key) && !outputPortIds.includes(key)) {
-          outputPortIds.push(key);
-        }
-      }
-    }
+    // The box's ports, each the internal endpoint it stands for (task 038 —
+    // placeBoxInstance binds each placed port to one; engine/netlist.ts
+    // boxInterior evaluates through them): the inner end of every wire the
+    // box cuts, and the box's own INPUT (OUTPUT) nodes — always inputs
+    // (outputs), also when one of them feeds (is fed from) outside too, which
+    // makes it a pass-through port on both sides. In THE port order
+    // (boxPorts.ts orderBoxPorts): own INs/OUTs by label, then top to bottom.
+    const { inputs: inputPortIds, outputs: outputPortIds } = orderBoxPorts(
+      insideComps,
+      [...crossingInputKeys, ...insideComps.filter((c) => c.type === 'INPUT').map((c) => `${c.id}:out`)],
+      [...crossingOutputKeys, ...insideComps.filter((c) => c.type === 'OUTPUT').map((c) => `${c.id}:in`)],
+    );
 
     // Auto-suggest name
     const suggestedName = nextBoxName(
@@ -2235,9 +2828,11 @@ export const useStore = create<AppState>()((set, get) => ({
         {
           id,
           name: suggestedName,
+          kind: sequential ? 'SC' : 'CC',
           inputPortIds,
           outputPortIds,
-          internalComponents: JSON.parse(JSON.stringify(insideComps)),
+          // A stamped copy starts at rest, whatever the canvas was holding.
+          internalComponents: zeroMemState(JSON.parse(JSON.stringify(insideComps)) as CircuitComponent[]),
           internalWires: JSON.parse(JSON.stringify(internalWires)),
         },
       ],
@@ -2258,7 +2853,6 @@ export const useStore = create<AppState>()((set, get) => ({
     const outPortIds = libEntry?.outputPortIds || localBox?.outputPortIds || [];
 
     if (!name) return;
-    state.pushHistory();
 
     // Get internal circuit from library snapshot, or gather from current tab
     let internalComps: CircuitComponent[];
@@ -2276,22 +2870,34 @@ export const useStore = create<AppState>()((set, get) => ({
       return;
     }
 
-    // Build ports: inputs on left, outputs on right
-    const inputPorts: import('./types').Port[] = inPortIds.map((_, i) => ({
+    // Only a kind this canvas may place (the palette offers no other; this is
+    // the store's own guard). A box holding memory is sequential, whatever
+    // an older entry's `kind` says.
+    const kind = libEntry?.kind === 'FSM' ? 'FSM' : hasMemory(internalComps) ? 'SC' : 'CC';
+    if (kind === 'FSM' || !selectPlaceableBoxKinds(state).includes(kind)) return;
+    state.pushHistory(1);
+
+    // Build ports: inputs on left, outputs on right, each bound to the
+    // internal endpoint it stands for (task 038), in THE port order — which
+    // also orders an entry confirmed before 038 the way a fresh one is.
+    const keys = orderBoxPorts(internalComps, inPortIds, outPortIds);
+    const inputPorts: import('./types').Port[] = keys.inputs.map((bind, i) => ({
       id: `in${i + 1}`,
       label: `in${i + 1}`,
       side: 'left' as const,
       index: i,
+      bind,
     }));
-    const outputPorts: import('./types').Port[] = outPortIds.map((_, i) => ({
+    const outputPorts: import('./types').Port[] = keys.outputs.map((bind, i) => ({
       id: `out${i + 1}`,
       label: `out${i + 1}`,
       side: 'right' as const,
       index: i,
+      bind,
     }));
 
     const comp: CircuitComponent = {
-      id: uuid(),
+      id: mintId(selectPasteScope(state)),
       type: 'BOXED',
       x: snapToGrid(x),
       y: snapToGrid(y),
@@ -2300,7 +2906,8 @@ export const useStore = create<AppState>()((set, get) => ({
       value: 0,
       boxedCircuitId: boxId,
       internalCircuit: {
-        components: JSON.parse(JSON.stringify(internalComps)),
+        // Each instance keeps its own memory, starting at rest.
+        components: zeroMemState(JSON.parse(JSON.stringify(internalComps)) as CircuitComponent[]),
         wires: JSON.parse(JSON.stringify(internalWires)),
       },
     };
@@ -2364,30 +2971,50 @@ export const useStore = create<AppState>()((set, get) => ({
     setTimeout(() => get().evaluateCircuit(), 0);
   },
 
-  // Copy/Paste
-  clipboard: null,
+  // Copy/Paste — through the provenance seam (provenance.ts, law 8). Copying
+  // reads and is never locked; the stamp records where (this assignment, or
+  // the sandbox), by whom and from which kind of canvas.
   copySelected: () => {
     const state = get();
     const selectedComps = state.components.filter((c) =>
       state.selectedIds.includes(c.id)
     );
+    // Nothing selected: keep what was copied before rather than overwrite it.
+    const kind = canvasKind(state.buildMode, selectEffectiveMode(state));
+    if (selectedComps.length === 0 || !kind) return;
     const selectedCompIds = new Set(selectedComps.map((c) => c.id));
     const selectedWires = state.wires.filter(
       (w) =>
         selectedCompIds.has(w.sourceComponentId) &&
         selectedCompIds.has(w.targetComponentId)
     );
-    set({
-      clipboard: {
-        components: JSON.parse(JSON.stringify(selectedComps)),
-        wires: JSON.parse(JSON.stringify(selectedWires)),
-      },
-    });
+    stampCanvas({ components: selectedComps, wires: selectedWires }, pasteProvenance(state), kind);
   },
   paste: () => {
     const state = get();
-    if (!state.clipboard || isCurrentQuestionLocked(state)) return;
-    state.pushHistory();
+    if (isCurrentQuestionLocked(state)) return null;
+    // Refused before pushHistory, so a refused paste leaves no undo entry.
+    const verdict = canvasPasteVerdict(peekClipboard().canvas, {
+      prov: pasteProvenance(state),
+      kind: canvasKind(state.buildMode, selectEffectiveMode(state)),
+      allowed: selectAllowedComponents(state),
+    });
+    if (!verdict.ok) return verdict.message;
+    // A box holding memory goes only where a sequential box may be placed —
+    // placeBoxInstance's rule, which a paste must not route around (both CC
+    // and SC canvases are paste kind 'circuit'). Canvases that take no boxes
+    // at all (a sandbox FSM/TM tab, where paste is free) are left alone.
+    const kinds = selectPlaceableBoxKinds(state);
+    const sequentialBoxes = verdict.clip.components.filter(isSequentialBox);
+    if (sequentialBoxes.length > 0 && kinds.includes('CC') && !kinds.includes('SC')) {
+      return `A box holding memory can't go on this canvas: ${sequentialBoxes.map((b) => b.label).join(', ')}. ` +
+        'It is a sequential circuit, and this canvas takes combinational boxes only.';
+    }
+    // A fresh copy per paste, every id (BOXED internals too) minted anew in
+    // the TARGET's scope: two pastes of one item never share objects or ids,
+    // and a paste carried between assignments binds to the one it lands in.
+    const clip = remint(JSON.parse(JSON.stringify(verdict.clip)) as CanvasClip, selectPasteScope(state));
+    state.pushHistory(clip.components.length);
 
     // Compute next available label numbers from existing components on canvas
     const inNums = state.components.filter((c) => c.type === 'INPUT').map((c) => parseInt(c.label.replace('IN', '')) || 0);
@@ -2397,10 +3024,7 @@ export const useStore = create<AppState>()((set, get) => ({
     let nextOut = outNums.length === 0 ? 1 : Math.max(...outNums) + 1;
     let nextMem = memNums.length === 0 ? 1 : Math.max(...memNums) + 1;
 
-    const idMap = new Map<string, string>();
-    const newComps = state.clipboard.components.map((c) => {
-      const newId = uuid();
-      idMap.set(c.id, newId);
+    const newComps = clip.components.map((c) => {
       let label = c.label;
       if (c.type === 'INPUT') {
         label = `IN${nextIn}`;
@@ -2412,32 +3036,27 @@ export const useStore = create<AppState>()((set, get) => ({
         label = `M${nextMem}`;
         nextMem++;
       }
-      return { ...c, id: newId, x: c.x + 40, y: c.y + 40, label };
+      return { ...c, x: c.x + 40, y: c.y + 40, label };
     });
-    const newWires = state.clipboard.wires.map((w) => ({
-      ...w,
-      id: uuid(),
-      sourceComponentId: idMap.get(w.sourceComponentId) || w.sourceComponentId,
-      targetComponentId: idMap.get(w.targetComponentId) || w.targetComponentId,
-    }));
 
     set({
       components: [...state.components, ...newComps],
-      wires: [...state.wires, ...newWires],
+      wires: [...state.wires, ...clip.wires],
       selectedIds: newComps.map((c) => c.id),
     });
     setTimeout(() => get().evaluateCircuit(), 0);
+    return null;
   },
 
   // Tabs (worksheets)
-  tabs: [{ id: defaultTabId, title: 'Circuit 1', buildMode: 'CC' as BuildMode, activeTask: 'arithmetic' as ActiveTask }],
+  tabs: [freshSandboxTab(defaultTabId)],
   activeTabId: defaultTabId,
   tabCircuits: new Map(),
 
   addTab: (title, buildMode, activeTask, innerMode) => {
     const state = get();
-    const newId = uuid();
-    const task = activeTask || 'arithmetic';
+    // A turbot tab carries its brain kind and its own arena (freshSandboxTab).
+    const tab = freshSandboxTab(mintId({ kind: 'sandbox' }), title, buildMode, innerMode, activeTask || 'arithmetic');
     // Save current tab
     const updatedTabCircuits = new Map(state.tabCircuits);
     updatedTabCircuits.set(state.activeTabId, {
@@ -2446,22 +3065,16 @@ export const useStore = create<AppState>()((set, get) => ({
       boxes: state.boxes,
       confirmedBoxes: state.confirmedBoxLibrary,
     });
-    // A turbot tab carries its brain kind and its own arena — the sandbox
-    // analog of a turbot question's innerMode + turbot_cases[0].arena, read
-    // through the SAME selectors (selectTurbotInnerMode/selectTurbotArena).
-    const turbotFields = buildMode === 'turbot'
-      ? { innerMode: innerMode ?? 'CC' as BuildMode, arena: sandboxDefaultArena() }
-      : {};
     set({
-      tabs: [...state.tabs, { id: newId, title, buildMode, activeTask: task, ...turbotFields }],
-      activeTabId: newId,
+      tabs: [...state.tabs, tab],
+      activeTabId: tab.id,
       tabCircuits: updatedTabCircuits,
       components: [],
       wires: [],
       boxes: [],
       confirmedBoxLibrary: [],
       buildMode,
-      activeTask: task,
+      activeTask: tab.activeTask,
     });
     get().resetAllSimState();
   },
@@ -2633,56 +3246,51 @@ export const useStore = create<AppState>()((set, get) => ({
       .filter((c) => c.type === 'MEM')
       .sort((a, b) => parseInt(a.label.replace('M', '')) - parseInt(b.label.replace('M', '')));
 
-    // Set INPUT values and MEM stored values; clear everything else
-    const updatedComps = components.map((c) => {
+    // Set INPUT values and the machine's memory (memorySlots order: top-level
+    // MEMs, then boxed ones — the row's state columns); clear everything else
+    const cleared = components.map((c) => {
       if (c.type === 'INPUT') {
         const idx = inputs.indexOf(c);
         const val = idx >= 0 && idx < inBits.length ? inBits[idx] : 0;
         return { ...c, value: val, inputValues: [val] };
       }
-      if (c.type === 'MEM') {
-        const idx = mems.indexOf(c);
-        const val = memBits && idx >= 0 && idx < memBits.length ? memBits[idx] : (c.storedValue ?? 0);
-        return { ...c, storedValue: val, value: undefined };
-      }
       return { ...c, value: undefined };
     });
+    const updatedComps = memBits ? withMemState(cleared, memBits) : cleared;
 
-    // Initialize port values with INPUT and MEM outputs only
+    // Initialize port values with INPUT and MEM outputs only — and the
+    // outputs of a sequential box that its memory alone decides, which are
+    // sources exactly like a MEM's (so a loop through the box still steps).
     const portValues: Record<string, number | undefined> = {};
+    const memoryPorts = new Set<string>();
     for (const comp of updatedComps) {
       if (comp.type === 'INPUT') {
         portValues[`${comp.id}:out`] = comp.value;
       } else if (comp.type === 'MEM') {
         portValues[`${comp.id}:${getMemOutputPortId(comp)}`] = comp.storedValue ?? 0;
+      } else {
+        for (const [key, value] of boxMemoryPortValues(comp)) {
+          portValues[key] = value;
+          memoryPorts.add(key);
+        }
       }
     }
+    const fromMemoryPort = (w: Wire) => memoryPorts.has(`${w.sourceComponentId}:${w.sourcePortId}`);
 
     // Build wire evaluation order: follow topological sort of components.
     // For each component in topo order, collect its outgoing wires.
     // Inputs come first, then memories, then gates — all via topo sort.
-    const sorted = topologicalSort(updatedComps, wires);
+    // A wire leaving a box's memory-decided output is not an ordering edge
+    // (its value is known up front), so a loop through that box sorts.
+    const sorted = topologicalSort(updatedComps, wires.filter((w) => !fromMemoryPort(w)));
     // Separate: INPUTs first, then MEMs, then the rest (topo order handles the rest)
     const inputComps = sorted.filter((c) => c.type === 'INPUT');
     const memComps = sorted.filter((c) => c.type === 'MEM');
     const otherComps = sorted.filter((c) => c.type !== 'INPUT' && c.type !== 'MEM');
-    const orderedSources = [...inputComps, ...memComps, ...otherComps];
 
     const wireOrder: string[] = [];
     const addedWires = new Set<string>();
-    for (const comp of orderedSources) {
-      // Collect all outgoing wires from this component
-      const outgoing: Wire[] = [];
-      for (const w of wires) {
-        if (w.sourceComponentId === comp.id && !addedWires.has(w.id)) {
-          // Skip feedback wires into MEM min ports
-          if (comp.type !== 'INPUT' && comp.type !== 'MEM') {
-            const targetComp = updatedComps.find((c) => c.id === w.targetComponentId);
-            if (targetComp?.type === 'MEM' && w.targetPortId === getMemInputPortId(targetComp)) continue;
-          }
-          outgoing.push(w);
-        }
-      }
+    const emit = (outgoing: Wire[]) => {
       // Sort fan-out wires: last in render order (highest z-index, on top) first,
       // so the visually closest wire gets annotated first, working backwards.
       if (outgoing.length > 1) {
@@ -2692,21 +3300,51 @@ export const useStore = create<AppState>()((set, get) => ({
         wireOrder.push(w.id);
         addedWires.add(w.id);
       }
+    };
+    const isMemFeedback = (w: Wire) => {
+      const targetComp = updatedComps.find((c) => c.id === w.targetComponentId);
+      return targetComp?.type === 'MEM' && w.targetPortId === getMemInputPortId(targetComp);
+    };
+    const emitFrom = (comp: CircuitComponent) => {
+      // Collect all outgoing wires from this component
+      const outgoing: Wire[] = [];
+      for (const w of wires) {
+        if (w.sourceComponentId === comp.id && !addedWires.has(w.id)) {
+          // Skip feedback wires into MEM min ports
+          if (comp.type !== 'INPUT' && comp.type !== 'MEM' && isMemFeedback(w)) continue;
+          outgoing.push(w);
+        }
+      }
+      emit(outgoing);
+    };
+    inputComps.forEach(emitFrom);
+    memComps.forEach(emitFrom);
+    // Right after the memories: the memory-decided box outputs.
+    emit(wires.filter((w) => fromMemoryPort(w) && !isMemFeedback(w)));
+    otherComps.forEach(emitFrom);
+    // Wires the sort could not order (a loop no MEM breaks — the canvas
+    // warns about it) are still annotated, in drawing order.
+    for (const w of wires) {
+      if (!addedWires.has(w.id) && !isMemFeedback(w)) {
+        wireOrder.push(w.id);
+        addedWires.add(w.id);
+      }
     }
 
     // MEM feedback wires (value going INTO memory) — fill memories before outputs
     for (const w of wires) {
-      if (!addedWires.has(w.id)) {
-        const targetComp = updatedComps.find((c) => c.id === w.targetComponentId);
-        if (targetComp?.type === 'MEM' && w.targetPortId === getMemInputPortId(targetComp)) {
-          wireOrder.push(w.id);
-          addedWires.add(w.id);
-        }
+      if (!addedWires.has(w.id) && isMemFeedback(w)) {
+        wireOrder.push(w.id);
+        addedWires.add(w.id);
       }
     }
-    // MEM update steps (show value being received)
+    // MEM update steps (show value being received), then each sequential
+    // box's memory taking its next value
     for (const mem of mems) {
       wireOrder.push(`comp:${mem.id}`);
+    }
+    for (const box of updatedComps.filter(isSequentialBox)) {
+      wireOrder.push(`comp:${box.id}`);
     }
 
     // OUTPUT evaluations come last
@@ -2717,8 +3355,9 @@ export const useStore = create<AppState>()((set, get) => ({
       wireOrder.push(`comp:${out.id}`);
     }
 
-    // Build selected key
-    const keyBits = [...inBits, ...(memBits || mems.map((m) => m.storedValue ?? 0))];
+    // Build selected key — the row as it stands BEFORE the step (the MEM
+    // update steps change what the machine holds; the row does not move)
+    const keyBits = [...inBits, ...memorySlots(updatedComps).map((m) => m.value)];
     const selectedKey = keyBits.join(',');
 
     // Clear all wire values
@@ -2772,6 +3411,12 @@ export const useStore = create<AppState>()((set, get) => ({
       }
       if (comp.type === 'OUTPUT') {
         newPortValues[`${comp.id}:in`] = hasUndefined ? undefined : (inputVals[0] ?? 0);
+      } else if (isSequentialBox(comp)) {
+        // A sequential box's memory takes its next value from the inputs
+        // now on its wires — its MEMs' counterpart of the step below.
+        const next = stepBoxedMemory(comp, inputVals.map((v) => v ?? 0));
+        set({ components: components.map((c) => (c.id === compId ? next : c)), localStepIndex: localStepIndex + 1 });
+        return localStepIndex + 1 < localStepSorted.length;
       } else if (comp.type === 'MEM') {
         // MEM "evaluation" at end of cycle: read value from the feedback wire
         // into the MEM input port and record it as the next stored value.
@@ -2807,23 +3452,19 @@ export const useStore = create<AppState>()((set, get) => ({
       // When an OUTPUT is evaluated, upsert the I/O table row with current output values
       const updates: Record<string, unknown> = { components: updatedComps, localStepIndex: localStepIndex + 1, localStepPortValues: newPortValues };
       if (comp.type === 'OUTPUT') {
-        const hasMem = components.some((c) => c.type === 'MEM');
-        const sortedInputs = components
-          .filter((c) => c.type === 'INPUT')
-          .sort((a, b) => parseInt(a.label.replace('IN', '')) - parseInt(b.label.replace('IN', '')));
         const sortedOutputs = components
           .filter((c) => c.type === 'OUTPUT')
           .sort((a, b) => parseInt(a.label.replace('OUT', '')) - parseInt(b.label.replace('OUT', '')));
-        const sortedMems = components
-          .filter((c) => c.type === 'MEM')
-          .sort((a, b) => parseInt(a.label.replace('M', '')) - parseInt(b.label.replace('M', '')));
-
-        const inputBits = sortedInputs.map((c) => c.value ?? 0);
         const outputBits = sortedOutputs.map((c) => {
           const val = newPortValues[`${c.id}:in`];
           return val !== undefined ? val : 0;
         });
-        const memBitsVal = hasMem ? sortedMems.map((c) => c.storedValue ?? 0) : undefined;
+        // The row is the one SELECTED — inputs and memory as they stood
+        // before the step. (The MEM update steps have already moved the
+        // machine to its next state; keying by that filed the outputs under
+        // the wrong row.)
+        const { inputBits, memBits } = localStepRow(state);
+        const memBitsVal = hasMemory(components) ? memBits : undefined;
 
         const localKey = [...inputBits, ...(memBitsVal || [])].join(',');
         const existingRows = state.tableRows;
@@ -2893,17 +3534,16 @@ export const useStore = create<AppState>()((set, get) => ({
           }
         }
 
-        if (hasUndefined) {
-          const outputPorts = targetComp.ports.filter((p) => p.side === 'right');
-          for (const op of outputPorts) {
-            newPortValues[`${targetComp.id}:${op.id}`] = undefined;
-          }
-        } else {
-          const outputs = evaluateGate(targetComp.type, inputVals as number[], targetComp);
-          const outputPorts = targetComp.ports.filter((p) => p.side === 'right');
-          for (let i = 0; i < outputPorts.length; i++) {
-            newPortValues[`${targetComp.id}:${outputPorts[i].id}`] = outputs[i] ?? 0;
-          }
+        // A sequential box's memory-decided outputs were seeded at select
+        // time (boxMemoryPortValues) and stay: only the outputs its inputs
+        // decide are blanked or evaluated here.
+        const seeded = boxMemoryPortValues(targetComp);
+        const outputPorts = targetComp.ports.filter((p) => p.side === 'right');
+        const outputs = hasUndefined ? [] : evaluateGate(targetComp.type, inputVals as number[], targetComp);
+        for (let i = 0; i < outputPorts.length; i++) {
+          const key = `${targetComp.id}:${outputPorts[i].id}`;
+          if (seeded.has(key)) continue;
+          newPortValues[key] = hasUndefined ? undefined : (outputs[i] ?? 0);
         }
 
         // Update the target component's displayed value
@@ -2934,14 +3574,9 @@ export const useStore = create<AppState>()((set, get) => ({
   localStepReset: () => {
     const state = get();
     if (!state.localStepActive) return;
-    const inputs = state.components
-      .filter((c) => c.type === 'INPUT')
-      .sort((a, b) => parseInt(a.label.replace('IN', '')) - parseInt(b.label.replace('IN', '')));
-    const mems = state.components
-      .filter((c) => c.type === 'MEM')
-      .sort((a, b) => parseInt(a.label.replace('M', '')) - parseInt(b.label.replace('M', '')));
-    const inBits = inputs.map((c) => c.value ?? 0);
-    const memBits = mems.length > 0 ? mems.map((c) => c.storedValue ?? 0) : undefined;
+    // Re-run the selected row (inputs and memory as they stood before the step).
+    const { inputBits: inBits, memBits: rowMem } = localStepRow(state);
+    const memBits = rowMem.length > 0 ? rowMem : undefined;
 
     // Remove the output for this row from tableRows
     const key = [...inBits, ...(memBits || [])].join(',');
@@ -2975,22 +3610,19 @@ export const useStore = create<AppState>()((set, get) => ({
     const state = get();
     const { components, wires, scTimeStep, scHistory, scInputSequence } = state;
 
-    // Question runs are bounded by the codec window — the exact step count
-    // the grader runs (engine stepCountFor). Steps past it would show state
-    // the grader never reads. Sandbox (window null): unbounded stepping.
-    const codecWindow = selectCodecWindow(state);
-    if (codecWindow !== null && scTimeStep > codecWindow) return;
+    // Question runs are bounded by the grader's run length — a value
+    // question's codec window (engine stepCountFor), a perception question's
+    // frame count (selectScRunWindow). Steps past it would show state the
+    // grader never reads. Sandbox (window null): unbounded stepping.
+    const runWindow = selectScRunWindow(state);
+    if (runWindow !== null && scTimeStep > runWindow) return;
 
-    // Sorted component lists (consistent with the engine's ordering)
-    const sortedInputs = components
-      .filter((c) => c.type === 'INPUT')
-      .sort((a, b) => (parseInt(a.label.replace('IN', '')) || 0) - (parseInt(b.label.replace('IN', '')) || 0));
-    const sortedOutputs = components
-      .filter((c) => c.type === 'OUTPUT')
-      .sort((a, b) => (parseInt(a.label.replace('OUT', '')) || 0) - (parseInt(b.label.replace('OUT', '')) || 0));
-    const sortedMems = components
-      .filter((c) => c.type === 'MEM')
-      .sort((a, b) => (parseInt(a.label.replace(/\D/g, '')) || 0) - (parseInt(b.label.replace(/\D/g, '')) || 0));
+    // The machine as the engine clocks it (memory-holding boxes inlined —
+    // engine/netlist.ts), and its memory in memorySlots order: top-level
+    // MEMs, then boxed ones. The same netlist the grader runs.
+    const net = scNetlist(components, wires);
+    const sortedInputs = net.inputs;
+    const slots = memorySlots(components);
 
     const tIdx = scTimeStep - 1;
     const seqLoaded = scInputSequence.some((s) => s.length > 0);
@@ -3020,25 +3652,20 @@ export const useStore = create<AppState>()((set, get) => ({
               ? 0
               : (inp.value ?? 0)
         );
-    const memStoredValues = sortedMems.map((m) => m.storedValue ?? 0);
+    const memStoredValues = slots.map((m) => m.value);
 
     // Delegate propagation to the engine (same logic used by the grader)
-    const { outputBits, newMemValues, portValues } = evaluateSCSingleStep(
-      components, wires, inputBitVector,
-      sortedInputs, sortedOutputs, sortedMems, memStoredValues
-    );
+    const { outputBits, newMemValues, portValues } = evaluateSCStep(net, inputBitVector, memStoredValues);
 
-    // Update components
-    const newComponents = components.map((c) => {
+    // Update components (a box's ports read under its own keys — portValues
+    // carries them — and every MEM, boxed ones too, takes its next value)
+    const newComponents = withMemState(components.map((c) => {
       if (c.type === 'INPUT') {
         const idx = sortedInputs.findIndex((inp) => inp.id === c.id);
         const val = idx >= 0 ? inputBitVector[idx] : (c.value ?? 0);
         return { ...c, value: val, inputValues: [val] };
       }
-      if (c.type === 'MEM') {
-        const idx = sortedMems.findIndex((m) => m.id === c.id);
-        return { ...c, storedValue: idx >= 0 ? newMemValues[idx] : (c.storedValue ?? 0) };
-      }
+      if (c.type === 'MEM') return c;
       if (c.type === 'OUTPUT') {
         return { ...c, value: portValues.get(`${c.id}:in`) ?? 0 };
       }
@@ -3047,7 +3674,7 @@ export const useStore = create<AppState>()((set, get) => ({
         return { ...c, value: portValues.get(`${c.id}:${outputPort.id}`) ?? 0 };
       }
       return c;
-    });
+    }), newMemValues);
 
     // Update wire values
     const newWireValues = new Map<string, number>();
@@ -3068,9 +3695,9 @@ export const useStore = create<AppState>()((set, get) => ({
     let newTableRows = existingRows;
     if (localIdx >= 0) {
       newTableRows = [...existingRows];
-      newTableRows[localIdx] = { inputBits, memBits: sortedMems.length > 0 ? memBits : undefined, outputBits };
+      newTableRows[localIdx] = { inputBits, memBits: slots.length > 0 ? memBits : undefined, outputBits };
     } else {
-      newTableRows = [...existingRows, { inputBits, memBits: sortedMems.length > 0 ? memBits : undefined, outputBits }];
+      newTableRows = [...existingRows, { inputBits, memBits: slots.length > 0 ? memBits : undefined, outputBits }];
     }
 
     set({
@@ -3105,32 +3732,34 @@ export const useStore = create<AppState>()((set, get) => ({
     }
   },
 
-  scRun: () => {
+  scRun: (intervalMs = 300) => {
     const state = get();
     if (state.scRunning) return;
     const intervalId = window.setInterval(() => {
       const s = get();
-      // Question runs execute exactly the codec window (the grader's run
-      // length — see selectCodecWindow), 0-padding past the typed input.
-      const codecWindow = selectCodecWindow(s);
-      if (codecWindow !== null) {
-        if (s.scTimeStep > codecWindow) {
+      // Question runs execute exactly the grader's run length (the codec
+      // window, 0-padding past the typed input; a perception film's frames
+      // — see selectScRunWindow).
+      const runWindow = selectScRunWindow(s);
+      if (runWindow !== null) {
+        if (s.scTimeStep > runWindow) {
           s.scPause();
           return;
         }
       } else {
-        // Sandbox: stop once all input is consumed AND the memory pipeline
-        // has been flushed (one extra 0-input step per MEM, so delayed bits —
-        // e.g. a serial adder's final carry — still reach the outputs).
+        // Sandbox: stop once all input is consumed (none typed: the INPUT
+        // toggles feed the run) AND the memory pipeline has been flushed
+        // (one extra 0-input step per MEM, boxed ones included, so delayed
+        // bits — e.g. a serial adder's final carry — still reach the outputs).
         const maxLen = Math.max(...s.scInputSequence.map((seq) => seq.length), 0);
-        const drain = s.components.filter((c) => c.type === 'MEM').length;
-        if (maxLen > 0 && s.scTimeStep > maxLen + drain) {
+        const drain = memorySlots(s.components).length;
+        if (s.scTimeStep > maxLen + drain) {
           s.scPause();
           return;
         }
       }
       s.scStep();
-    }, 300);
+    }, intervalMs);
     set({ scRunning: true, scRunIntervalId: intervalId });
   },
 
@@ -3147,18 +3776,17 @@ export const useStore = create<AppState>()((set, get) => ({
     if (state.scRunIntervalId !== null) {
       window.clearInterval(state.scRunIntervalId);
     }
-    // Reset MEM blocks to 0 and inputs to undefined, keep input sequence
+    // Reset every MEM (boxed ones too) to 0 and inputs to undefined, keep input sequence
     set({
       scTimeStep: 1,
       scHistory: [],
       scRunning: false,
       scRunIntervalId: null,
       tableRows: [],
-      components: state.components.map((c) => {
-        if (c.type === 'MEM') return { ...c, storedValue: 0 };
+      components: zeroMemState(state.components.map((c) => {
         if (c.type === 'INPUT') return { ...c, value: undefined, inputValues: [undefined as unknown as number] };
         return c;
-      }),
+      })),
     });
     setTimeout(() => get().evaluateCircuit(), 0);
   },
@@ -3168,7 +3796,7 @@ export const useStore = create<AppState>()((set, get) => ({
     if (state.scRunIntervalId !== null) {
       window.clearInterval(state.scRunIntervalId);
     }
-    // Reset everything: MEM to 0, inputs to 0, clear input sequence
+    // Reset everything: every MEM (boxed ones too) to 0, inputs to 0, clear input sequence
     set({
       scTimeStep: 1,
       scHistory: [],
@@ -3177,11 +3805,10 @@ export const useStore = create<AppState>()((set, get) => ({
       scRunIntervalId: null,
       tableRows: [],
       scGlobalSequences: [],
-      components: state.components.map((c) => {
-        if (c.type === 'MEM') return { ...c, storedValue: 0 };
+      components: zeroMemState(state.components.map((c) => {
         if (c.type === 'INPUT') return { ...c, value: undefined, inputValues: [undefined as unknown as number] };
         return c;
-      }),
+      })),
     });
     setTimeout(() => get().evaluateCircuit(), 0);
   },
@@ -3204,6 +3831,16 @@ export const useStore = create<AppState>()((set, get) => ({
     });
   },
 
+  setScFrames: (frames) => {
+    // No isCurrentQuestionLocked: a film is stimulus, like the typed SC rows —
+    // a done or frozen question's player still runs. The lanes ARE
+    // scInputSequence, so both reset laws and the edit law's restart
+    // (scReset keeps the lanes) cover the film with no slice of its own.
+    const width = selectPerceptionRetina(get()) ?? Math.max(0, ...frames.map((f) => f.length));
+    set({ scInputSequence: framesToLanes(frames, width) });
+    get().scReset();
+  },
+
   setScGlobalSequenceInput: (index, value) => {
     set((state) => {
       const seqs = [...state.scGlobalSequences];
@@ -3223,27 +3860,8 @@ export const useStore = create<AppState>()((set, get) => ({
       window.clearInterval(state.scRunIntervalId);
     }
 
-    // Parse the input string into per-input sequences
-    // For a single input: "0110" → scInputSequence[0] = [0,1,1,0]
-    // For multiple inputs: each char is a time step, bits split across inputs
-    const inputs = state.components
-      .filter((c) => c.type === 'INPUT')
-      .sort((a, b) => parseInt(a.label.replace('IN', '')) - parseInt(b.label.replace('IN', '')));
-    const numInputs = inputs.length;
-    const chars = seq.inputStr.replace(/[^01]/g, '');
-    const stepsCount = numInputs > 0 ? Math.floor(chars.length / numInputs) : 0;
-
-    const newSeq: number[][] = [];
-    for (let i = 0; i < numInputs; i++) {
-      newSeq.push([]);
-    }
-    // Read right-to-left: rightmost character is first time step
-    for (let t = 0; t < stepsCount; t++) {
-      const srcT = stepsCount - 1 - t; // reverse: last char group → first step
-      for (let i = 0; i < numInputs; i++) {
-        newSeq[i].push(parseInt(chars[srcT * numInputs + i]) || 0);
-      }
-    }
+    // Parse the input string into per-input sequences (splitScRow).
+    const newSeq = splitScRow(seq.inputStr, inputCount(state.components));
 
     set({
       scTimeStep: 1,
@@ -3251,11 +3869,10 @@ export const useStore = create<AppState>()((set, get) => ({
       scRunning: false,
       scRunIntervalId: null,
       scInputSequence: newSeq,
-      components: state.components.map((c) => {
-        if (c.type === 'MEM') return { ...c, storedValue: 0 };
+      components: zeroMemState(state.components.map((c) => {
         if (c.type === 'INPUT') return { ...c, value: undefined, inputValues: [undefined as unknown as number] };
         return c;
-      }),
+      })),
     });
     setTimeout(() => get().evaluateCircuit(), 0);
   },
@@ -3525,6 +4142,10 @@ export const useStore = create<AppState>()((set, get) => ({
     const state = get();
     const { components, wires, tmTape, tmTimeStep, tmHistory, tmHalted } = state;
     if (tmHalted) return;
+    // A question run stops where the grader's does (its step budget); the
+    // sandbox steps without bound.
+    const budget = selectQuestionStepBudget(state);
+    if (budget !== null && tmHistory.length >= budget) return;
 
     const states = sortStateComponents(components);
     if (states.length === 0) return;
@@ -3562,10 +4183,12 @@ export const useStore = create<AppState>()((set, get) => ({
   tmRun: () => {
     const state = get();
     if (state.tmRunning) return;
-    const MAX_UI_TM_STEPS = 1000; // stop a runaway machine in the UI
     const intervalId = window.setInterval(() => {
       const s = get();
-      if (s.tmHalted || s.tmTimeStep > MAX_UI_TM_STEPS) {
+      // Question runs stop at the grader's budget; the sandbox stops a
+      // runaway machine at the UI cap.
+      const cap = selectQuestionStepBudget(s) ?? UI_RUN_STEP_CAP;
+      if (s.tmHalted || s.tmHistory.length >= cap) {
         s.tmPause();
         return;
       }
@@ -3623,20 +4246,29 @@ export const useStore = create<AppState>()((set, get) => ({
   turbotRunIntervalId: null,
   turbotHalted: false,
   turbotStopReason: null,
+  turbotLastEvent: null,
+  turbotHoldTicks: 0,
 
   turbotStep: () => {
     const state = get();
     const { components, wires, turbotHistory, turbotHalted, turbotState } = state;
     if (turbotHalted) return;
+    // A question run stops where the grader's does: the arena's maxSteps
+    // (grader: hitStepLimit). The sandbox steps without bound.
+    const budget = selectQuestionStepBudget(state);
+    if (budget !== null && turbotHistory.length >= budget) {
+      set({ turbotHalted: true, turbotStopReason: 'limit' });
+      return;
+    }
 
     const arena = selectTurbotArena(state);
-    const innerMode = selectTurbotInnerMode(state);
     // On the first cycle, derive the brain state from the circuit as it is
     // NOW — the student normally builds the brain after the last reset, so a
     // reset-time snapshot would still point at a state that didn't exist yet.
     const turbotBrainState = turbotHistory.length === 0
-      ? initialBrainState(components, innerMode)
+      ? turbotBrainStart(state)
       : state.turbotBrainState;
+    const innerMode = selectTurbotInnerMode(state);
     const sense = senseAheadSymbol(arena, turbotState);
     const result = runBrainStep(components, wires, innerMode, sense, turbotBrainState, selectTmNotation(state));
     if (!result) {
@@ -3659,11 +4291,15 @@ export const useStore = create<AppState>()((set, get) => ({
       y: nextPose.y,
       facing: nextPose.facing,
     };
+    // Goal reached = a move from off-goal onto a goal cell (a turn, a stop or
+    // a turbot-TM internal op on the goal is not a new arrival).
+    const reached = !isGoalCell(arena, turbotState.x, turbotState.y) && isGoalCell(arena, nextPose.x, nextPose.y);
 
     set({
       turbotState: nextPose,
       turbotBrainState: result.brainState,
       turbotHistory: [...turbotHistory, entry],
+      turbotLastEvent: reached ? { kind: 'goal-reached', t: entry.t } : null,
       ...(result.motor === 'stop' ? { turbotHalted: true, turbotStopReason: 'motor' as const } : {}),
     });
   },
@@ -3671,15 +4307,32 @@ export const useStore = create<AppState>()((set, get) => ({
   turbotRun: () => {
     const state = get();
     if (state.turbotRunning) return;
-    const MAX_UI_TURBOT_STEPS = 1000; // stop a runaway turbot in the UI
     const intervalId = window.setInterval(() => {
       const s = get();
-      if (s.turbotHalted || s.turbotHistory.length >= MAX_UI_TURBOT_STEPS) {
+      // A goal hit holds the run for TURBOT_GOAL_HOLD_TICKS ticks (the Map's
+      // pulse plays) — skipped ticks of this one interval, so Pause/Reset
+      // need no timer of their own.
+      if (s.turbotHoldTicks > 0) {
+        set({ turbotHoldTicks: s.turbotHoldTicks - 1 });
+        return;
+      }
+      // Question runs stop at the arena's maxSteps (the grader's budget);
+      // the sandbox stops a runaway turbot at the UI cap.
+      const cap = selectQuestionStepBudget(s) ?? UI_RUN_STEP_CAP;
+      if (s.turbotHalted || s.turbotHistory.length >= cap) {
         s.turbotPause();
         if (!s.turbotHalted) set({ turbotHalted: true, turbotStopReason: 'limit' });
         return;
       }
+      const before = s.turbotHistory.length;
       s.turbotStep();
+      // The loop, not turbotStep, arms the hold: Step never holds. Only a
+      // step that recorded an entry counts — a halting tick keeps the old
+      // event (same t) and must not re-arm it.
+      const after = get();
+      if (after.turbotHistory.length > before && selectTurbotGoalHit(after)) {
+        set({ turbotHoldTicks: TURBOT_GOAL_HOLD_TICKS });
+      }
     }, 300);
     set({ turbotRunning: true, turbotRunIntervalId: intervalId });
   },
@@ -3689,7 +4342,8 @@ export const useStore = create<AppState>()((set, get) => ({
     if (state.turbotRunIntervalId !== null) {
       window.clearInterval(state.turbotRunIntervalId);
     }
-    set({ turbotRunning: false, turbotRunIntervalId: null });
+    // A pause mid-hold drops the rest of it: the next Run steps at once.
+    set({ turbotRunning: false, turbotRunIntervalId: null, turbotHoldTicks: 0 });
   },
 
   turbotReset: () => {
@@ -3698,16 +4352,173 @@ export const useStore = create<AppState>()((set, get) => ({
       window.clearInterval(state.turbotRunIntervalId);
     }
     const arena = selectTurbotArena(state);
-    const innerMode = selectTurbotInnerMode(state);
     set({
       turbotState: { ...arena.start },
-      turbotBrainState: initialBrainState(state.components, innerMode),
+      turbotBrainState: turbotBrainStart(state),
       turbotHistory: [],
       turbotRunning: false,
       turbotRunIntervalId: null,
       turbotHalted: false,
       turbotStopReason: null,
+      turbotLastEvent: null,
+      turbotHoldTicks: 0,
     });
+  },
+  turbotCaseIndex: 0,
+
+  // ─── Graded-case replay ────────────────────────────────────────
+  loadedCase: null,
+
+  loadCaseInput: (questionId, caseIndex) => {
+    const state = get();
+    const a = state.assignment;
+    const q = a?.questions[state.currentQuestionIndex];
+    // Only the open question's own cases, and only tasks with a case bank
+    // shape the replay understands (value cases, turbot arenas — not
+    // perception frames, fill-in blanks or open prose; types.ts questionTask).
+    if (!a || !q || q.id !== questionId) return Promise.resolve();
+    const task = questionTask(q);
+    if (task !== 'function' && task !== 'turbot') return Promise.resolve();
+    // The result of the attempt on show (viewingSubmission — its own
+    // machine is on the canvas), else the latest recorded submission's —
+    // remotely the student's own sanitized copy (present once grades are
+    // released): input, pass, reason, separations; never the key.
+    const record = state.viewingSubmission ?? state.submissions[a.id];
+    const qr = record?.result?.questions.find((r) => r.questionId === q.id);
+    if (!record || !qr) return Promise.resolve();
+    // The machine this attempt was graded on, as the banner compares it.
+    const graded = record.submission.answers.find((ans) => ans.questionId === q.id)?.circuit;
+    const gradedKey = graded ? gradedMachineKey(graded) : null;
+
+    let loaded: LoadedCase;
+    if (q.buildMode === 'turbot') {
+      // Dispatch on the literal buildMode FIRST: selectEffectiveMode would
+      // answer a turbot's INNER mode (an FSM brain is not an FSM question).
+      const recorded = qr.turbotCases?.[caseIndex];
+      if (!recorded || !q.turbot_cases?.[caseIndex]) return Promise.resolve();
+      loaded = { kind: 'turbot', questionId, caseIndex, attempt: record.attempt, gradedKey, recorded: { ...recorded } };
+    } else {
+      const c = qr.cases[caseIndex];
+      if (!c || !questionLayout(q)) return Promise.resolve();
+      // Results graded before a case carried its separations: the server
+      // fills a student's own copy from its bank (sanitize.ts); locally the
+      // bank is at hand — the same rule either way.
+      const separations = recordedCaseSeparations(q, caseIndex, c);
+      loaded = {
+        kind: 'value',
+        questionId,
+        caseIndex,
+        attempt: record.attempt,
+        gradedKey,
+        input: [...c.input],
+        ...(separations ? { separations: [...separations] } : {}),
+        recorded: { pass: c.pass, ...(c.reason !== undefined ? { reason: c.reason } : {}) },
+      };
+    }
+
+    // A fresh run for the case: every run slice back to t=1 with its
+    // interval stopped and the canvas's MEMs at 0 (the grader's start) —
+    // whether this question was just opened or has been running all along
+    // (a route to the open question skips the canvas swap, so nothing else
+    // resets them). NOT the undo history: same canvas, and a stimulus is
+    // not an edit (no pushHistory, no recordEdit).
+    get().localStepClear();
+    get().scGlobalReset();
+    get().fsmGlobalReset();
+    get().tmGlobalReset();
+    set({ loadedCase: loaded, turbotCaseIndex: loaded.kind === 'turbot' ? caseIndex : 0 });
+    get().turbotReset();
+
+    // The grader's stimulus, then (deferred) the run to the grader's end.
+    let runToEnd: () => void;
+    if (loaded.kind === 'turbot') {
+      runToEnd = () => {
+        const budget = selectQuestionStepBudget(get()) ?? 0;
+        // turbotStep stops itself at the budget ('limit'), one call past it.
+        for (let i = 0; i <= budget && !get().turbotHalted; i++) get().turbotStep();
+      };
+    } else if (q.buildMode === 'CC') {
+      const stim = caseStimulus(q, loaded.input);
+      const bits = stim?.axis === 'space' ? stim.bits : [];
+      // The engine's IN-label order (cc.ts sortByLabel) — the order
+      // evaluateCCInputs binds the grader's wire vector in.
+      const inputs = sortByLabel(get().components, 'IN');
+      set({
+        components: get().components.map((c) => {
+          const i = inputs.indexOf(c);
+          if (i < 0) return c;
+          const v = bits[i] ?? 0;
+          return { ...c, value: v, inputValues: [v] };
+        }),
+      });
+      suppressAutoAddRow = false; // an explicit input: the I/O table records it
+      runToEnd = () => get().evaluateCircuit();
+    } else if (q.buildMode === 'SC' || q.buildMode === 'FSM') {
+      const layout = questionLayout(q)!;
+      const digits = codecTypedDigits(loaded.input, layout);
+      if (q.buildMode === 'SC') {
+        set({ scGlobalSequences: [{ inputStr: digits.join(''), outputStr: '' }] });
+        get().loadScGlobalSequence(0);
+      } else {
+        get().setFsmInputSequence(digits);
+      }
+      const isSC = q.buildMode === 'SC';
+      runToEnd = () => {
+        // Exactly the codec window (scStep/fsmStep refuse past it anyway);
+        // an FSM that halts mid-input stops there, as the grader's does.
+        const win = selectCodecWindow(get()) ?? 0;
+        for (let t = 0; t < win; t++) {
+          if (isSC) get().scStep();
+          else if (get().fsmHalted) break;
+          else get().fsmStep();
+        }
+      };
+    } else {
+      // TM: the grader's initial tape (block separations included), then ONE
+      // engine run to where the grader's stopped — a stepped fast-forward
+      // would copy the history per step, and a TM run can take thousands.
+      const tape = encodeTM(selectTmNotation(get()), loaded.input, loaded.separations);
+      set({ tmTape: tape, tmInitialTape: tape });
+      runToEnd = () => {
+        const s = get();
+        const run = evaluateTMSequence(
+          s.components,
+          s.wires,
+          s.tmInitialTape,
+          selectTmNotation(s),
+          selectQuestionStepBudget(s) ?? DEFAULT_TM_MAX_STEPS,
+        );
+        set({
+          tmTape: run.tape,
+          tmHistory: run.history,
+          tmTimeStep: run.steps + 1,
+          tmHalted: run.halted,
+          tmCurrentStateId: run.finalStateId,
+        });
+      };
+    }
+
+    // Deferred one task: the resets and the SC load above each queued a
+    // canvas re-evaluation (evaluateCircuit), which would otherwise land on
+    // top of the finished run and overwrite its display.
+    return new Promise<void>((resolve) => {
+      setTimeout(() => {
+        // Superseded (a newer load, a canvas swap, a principal change): the
+        // run slices are someone else's now.
+        if (get().loadedCase === loaded) runToEnd();
+        resolve();
+      }, 0);
+    });
+  },
+
+  // Dismissing the case also puts the Map back on the primary arena — the one
+  // the question's own URL shows, and whose budget its runs stop at — with
+  // the turbot re-seated at its start (the pose on the case's arena means
+  // nothing on another).
+  clearLoadedCase: () => {
+    const onCaseArena = get().turbotCaseIndex !== 0;
+    set({ loadedCase: null, turbotCaseIndex: 0 });
+    if (onCaseArena) get().turbotReset();
   },
 
   // One aggregate reset for canvas-swapping navigation (question navigation
@@ -3719,11 +4530,54 @@ export const useStore = create<AppState>()((set, get) => ({
     get().scGlobalReset();
     get().fsmGlobalReset();
     get().tmGlobalReset();
+    // A loaded graded case belongs to the canvas it was loaded on, and so
+    // does the arena it picked — cleared BEFORE turbotReset, which re-seats
+    // the turbot on the (now primary) arena's start.
+    set({ loadedCase: null, turbotCaseIndex: 0 });
     get().turbotReset();
     // The armed palette tool is canvas-scoped too: an AND armed on a CC
     // question must not survive into the next question's canvas and drop a
-    // gate on the first click there.
-    set({ selectedTool: null });
+    // gate on the first click there. So is the history: undo writes its
+    // snapshot into the CURRENT canvas, so a stack carried across a swap
+    // would restore the previous question (or sandbox tab) over this one.
+    set({ selectedTool: null, undoStack: [], redoStack: [] });
+  },
+
+  resetForPrincipal: (email) => {
+    if (principalReported && email === currentPrincipal) return;
+    // The leaving principal's pending edits land under ITS keys (the sandbox
+    // key and, remotely, the crash journal read currentPrincipal and the
+    // session cache — both still the leaving person's here).
+    saveForLeavingPrincipal();
+    // A sandbox on screen stays on screen — the arriving person's own. (A
+    // sign-out from the menu goes Home first, so this is a 401, a session
+    // restore resolving, or a sign-in from a sandbox left open behind the
+    // sign-in screen; routing may re-apply the URL after, which is harmless.)
+    const s = get();
+    const keepSandboxOpen = principalReported && s.workbookOpen && s.assignment === null;
+    // Stops any run interval before the fields holding their ids are wiped.
+    get().resetAllSimState();
+    // In-flight opens, submission lookups and hydrations belong to the
+    // leaving principal: their resolves must apply nothing.
+    openAssignmentSeq++;
+    viewSubmissionSeq++;
+    principalEpoch++;
+    currentPrincipal = email;
+    principalReported = true;
+    // The clipboard lives in the provenance seam, not in store state: empty
+    // it here too, and hand the seam the arriving principal. So do the mint
+    // keys (task 034): they are the leaving person's; the arriving person's
+    // come with their own opens. (questionTrace resets with the store.)
+    resetClipboard(email);
+    clearMintKeys();
+    lastEditAt = 0;
+    recentTexts.clear();
+    set({ ...useStore.getInitialState(), ...readSandbox(email) });
+    if (keepSandboxOpen) get().enterSandbox();
+    // The reset's own set() armed the autosave, and so did entering the
+    // sandbox; nothing here is an edit.
+    cancelPendingAutoSave();
+    setTimeout(() => get().evaluateCircuit(), 0);
   },
 
   toggleStateKind: (id) => {
@@ -3750,36 +4604,56 @@ export const useStore = create<AppState>()((set, get) => ({
   },
 }));
 
-// Expose for debugging
-if (typeof window !== 'undefined') {
+// Expose for debugging — DEV BUILDS ONLY. In production one console line on
+// window.__store could set any circuit, past every lock and the provenance
+// seam (task 033). `?.`: import.meta.env is undefined under tsx (the harness).
+if (import.meta.env?.DEV === true && typeof window !== 'undefined') {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   (window as any).__store = useStore;
 }
 
 // ─── Auto-save to localStorage ─────────────────────────────────────
-const AUTO_SAVE_KEY = 'making-minds-autosave';
+// The sandbox autosaves per PERSON on this browser (reset law 2 loads it):
+// `making-minds-autosave:<email>` for a signed-in user, one shared
+// `making-minds-autosave:visitor` for visitors. The bare prefix is the legacy
+// one-per-browser key, adopted as the visitor sandbox (adoptLegacySandbox).
+// sandboxKey is the ONE place the key is spelled.
+const SANDBOX_KEY_PREFIX = 'making-minds-autosave';
 const AUTO_SAVE_DELAY = 1500; // ms debounce
+// …but never put off longer than this after the first unsaved change: a save
+// lands at least once per burst of editing, so the server's per-save history
+// (task 034, the "appeared between two saves" check) has the resolution to
+// tell a burst from a steady build — and a long unbroken session is not all
+// riding on one debounce.
+export const AUTO_SAVE_MAX_WAIT = 10_000;
+// When the oldest change not yet in a save was made (null: none pending).
+let autoSavePendingSince: number | null = null;
+
+/** The debounce for a change made at `now`, when the oldest unsaved change
+ *  was made at `pendingSince`: the usual pause, cut short by the max wait. */
+export function autoSaveDelay(pendingSince: number, now: number): number {
+  return Math.max(0, Math.min(AUTO_SAVE_DELAY, pendingSince + AUTO_SAVE_MAX_WAIT - now));
+}
+
+function sandboxKey(principal: string | null): string {
+  // Lowercased like the crash journal's keys (storage/journal.ts).
+  return `${SANDBOX_KEY_PREFIX}:${principal ? principal.toLowerCase() : 'visitor'}`;
+}
 
 let autoSaveTimer: ReturnType<typeof setTimeout> | null = null;
 
 function getAutoSaveData() {
   const s = useStore.getState();
-  // Use the workbook export format for auto-save
-  // Save current tab circuit into tabCircuits
-  const allTabCircuits = new Map(s.tabCircuits);
-  allTabCircuits.set(s.activeTabId, {
-    components: s.components,
-    wires: s.wires,
-    boxes: s.boxes,
-    confirmedBoxes: s.confirmedBoxLibrary,
-  });
+  // The sandbox blob: the tabs with the live canvas folded in (the same fold
+  // as a workbook file) and the file baseline, which moves with the sandbox.
   return {
     formatVersion: 2,
     workbookOpen: s.workbookOpen,
     workbookTitle: s.workbookTitle,
+    workbookSavedKey: s.workbookSavedKey,
     tabs: s.tabs,
     activeTabId: s.activeTabId,
-    tabCircuits: Object.fromEntries(allTabCircuits),
+    tabCircuits: Object.fromEntries(sandboxTabCircuits(s)),
     viewPreferences: {
       zoom: s.zoom,
       panX: s.panX,
@@ -3792,21 +4666,42 @@ function getAutoSaveData() {
   };
 }
 
-/** Is the currently-open question marked done? Outside an assignment (the
- *  sandbox has no "done" concept) this is always false. Read at the top of
- *  every action that would edit a question's persisted answer state, so a
- *  student can't accidentally change work they've locked. */
+/** Is the currently-open question locked — marked done, or showing a
+ *  submission (viewed or frozen)? Outside an assignment (the sandbox has no
+ *  lock) this is always false. Read at the top of every action that would
+ *  edit a question's persisted answer state, so a student can't change work
+ *  they've locked, or a submitted snapshot. */
 function isCurrentQuestionLocked(state: AppState): boolean {
   return selectQuestionLocked(state);
 }
 
-/** One question's canvas as it was actually SUBMITTED, for the frozen
- *  read-only view (item 3) — never the live in-progress work. `boxes` (the
+/** A locked question's refusal for `what` (e.g. 'rename a box'), in the
+ *  lock's own words. */
+function lockRefusal(state: AppState, what: string): string {
+  return lockReason(state) === 'submission'
+    ? `This question shows your submission, read-only — you can't ${what} here.`
+    : `This question is marked done — unlock it to ${what}.`;
+}
+
+/** A turbot brain's state before its first cycle, from the canvas as it is
+ *  now. Inside a question the brain starts from rest like the grader's
+ *  (engine/caseRun.ts gradingCircuit: every MEM at 0), whatever a MEM
+ *  override left on the canvas; the sandbox seeds from the canvas as-is. */
+function turbotBrainStart(state: AppState): BrainState {
+  const components = state.assignment
+    ? gradingCircuit({ components: state.components, wires: state.wires }).components
+    : state.components;
+  return initialBrainState(components, selectTurbotInnerMode(state));
+}
+
+/** One question's canvas as it was actually SUBMITTED in `record`, for the
+ *  read-only submission view (viewingSubmission; the frozen view, item 3) —
+ *  never the live in-progress work. `boxes` (the
  *  draw-a-rectangle-around-existing-gates overlay) isn't captured by
- *  buildSubmission, so a frozen view of a boxed selection renders/simulates
+ *  buildSubmission, so a viewed boxed selection renders/simulates
  *  correctly but loses the box's visual rectangle; cosmetic, not a
  *  correctness gap (the underlying components/wires are all there). */
-function frozenQuestionCircuit(record: SubmissionRecord, questionId: number): QuestionCircuit {
+function submittedQuestionCircuit(record: SubmissionRecord, questionId: number): QuestionCircuit {
   const answer = record.submission.answers.find((a) => a.questionId === questionId);
   if (!answer) return emptyQuestionCircuit();
   return {
@@ -3815,6 +4710,7 @@ function frozenQuestionCircuit(record: SubmissionRecord, questionId: number): Qu
     boxes: [],
     responseText: answer.responseText,
     fillAnswers: answer.fillAnswers,
+    ...(answer.provenance ? { provenance: answer.provenance } : {}),
   };
 }
 
@@ -3824,21 +4720,16 @@ function frozenQuestionCircuit(record: SubmissionRecord, questionId: number): Qu
  * The assignment's per-question circuits with the live canvas folded into the
  * current question (the same save step as switchQuestion/goHome), so callers see
  * the latest in-progress work for the open question. Caller must ensure an
- * assignment is active.
+ * assignment is active. While a submission is on show (viewingSubmission) the
+ * canvas is NOT live work and is never folded — the map already holds the
+ * live work (viewSubmission folded it on the way in) — so every save built
+ * on this (the autosave, the crash journal, the leaving principal's save, a
+ * submit, the export) carries the live workbook, never the viewed attempt.
  */
 function syncedQuestionCircuits(s: AppState): Map<number, QuestionCircuit> {
   const circuits = new Map(s.questionCircuits);
   const q = s.assignment?.questions[s.currentQuestionIndex];
-  if (q) {
-    circuits.set(q.id, {
-      components: s.components,
-      wires: s.wires,
-      boxes: s.boxes,
-      responseText: s.openResponse,
-      fillAnswers: s.fillAnswers,
-      done: s.questionCircuits.get(q.id)?.done,
-    });
-  }
+  if (q && !s.viewingSubmission) circuits.set(q.id, foldLiveQuestion(s, q.id));
   return circuits;
 }
 
@@ -3861,12 +4752,15 @@ function snapshotAssignmentState(s: AppState): AssignmentState {
 // suspension), so unload-time flushes still land with the local store; remote
 // unload flushes additionally pass `keepalive` so the PUT can outlive the
 // page. Returns the saved assignment's id (null when no assignment is open).
-async function saveAssignmentState(keepalive = false): Promise<string | null> {
+async function saveAssignmentState(
+  keepalive = false,
+): Promise<{ id: string; state: AssignmentState } | null> {
   const s = useStore.getState();
   const a = s.assignment;
   if (!a) return null;
-  await workbookStore.saveAssignmentState(a.id, snapshotAssignmentState(s), { keepalive });
-  return a.id;
+  const state = snapshotAssignmentState(s);
+  await workbookStore.saveAssignmentState(a.id, state, { keepalive });
+  return { id: a.id, state };
 }
 
 // ── Remote-mode crash buffer (storage/journal.ts) ──────────────────
@@ -3898,28 +4792,48 @@ const AUTO_SAVE_BACKOFF_MAX = 30000;
 let autoSaveBackoff = AUTO_SAVE_BACKOFF_INITIAL;
 
 async function performAutoSave(keepalive = false): Promise<void> {
+  // This save (or the trailing rerun it queues) takes everything changed so
+  // far; a change from here on starts a new max-wait window.
+  autoSavePendingSince = null;
   if (autoSaveInFlight) {
     autoSaveTrailing = true;
     return;
   }
   autoSaveInFlight = true;
+  // Whose save this is, read BEFORE the seam await: a principal change while
+  // it is in flight must not touch the next person's journal or save chip.
+  const epoch = principalEpoch;
+  const email = getSessionUser()?.email;
   try {
     useStore.setState({ autoSaveStatus: 'saving' });
-    let savedAssignmentId: string | null = null;
+    let saved: { id: string; state: AssignmentState } | null = null;
     if (useStore.getState().assignment) {
-      savedAssignmentId = await saveAssignmentState(keepalive);
+      saved = await saveAssignmentState(keepalive);
     } else {
-      localStorage.setItem(AUTO_SAVE_KEY, JSON.stringify(getAutoSaveData()));
+      localStorage.setItem(sandboxKey(currentPrincipal), JSON.stringify(getAutoSaveData()));
+    }
+    if (epoch !== principalEpoch) {
+      // The principal changed mid-save, and the change journaled the leaving
+      // person's work (saveForLeavingPrincipal). This confirmed save makes
+      // that journal obsolete only if it holds exactly what was just
+      // confirmed — no edit came after this save started. A NEWER journal is
+      // kept for their next open to replay. Nothing else here is theirs any
+      // more (the save chip and the retry belong to the next person).
+      if (backendMode === 'remote' && saved && email) {
+        clearJournalIfHolds(email, saved.id, saved.state);
+      }
+      return;
     }
     useStore.setState({ autoSaveStatus: 'saved' });
     autoSaveBackoff = AUTO_SAVE_BACKOFF_INITIAL;
-    if (backendMode === 'remote' && savedAssignmentId) {
+    if (backendMode === 'remote' && saved) {
       // Confirmed on the server — the crash buffer for this assignment is
       // now obsolete (a newer edit's own flush would rewrite it anyway).
-      const email = getSessionUser()?.email;
-      if (email) clearJournal(email, savedAssignmentId);
+      if (email) clearJournal(email, saved.id);
     }
   } catch {
+    // As above: the previous principal's failed save is already journaled.
+    if (epoch !== principalEpoch) return;
     if (backendMode === 'remote') {
       // Server unreachable (or the write failed): buffer the state locally,
       // show the error chip, and retry with backoff. The student's work is
@@ -3949,12 +4863,12 @@ async function performAutoSave(keepalive = false): Promise<void> {
 // Subscribe to state changes that should trigger auto-save. Routes by context:
 // assignment mode → per-assignment storage; sandbox mode → the sandbox blob.
 useStore.subscribe((state, prev) => {
-  // Frozen (notes/todos.md item 3): the canvas is showing the submission,
-  // not live work-in-progress, so nothing here should ever overwrite the
+  // A submission on show (viewed, task 003, or frozen, item 3): the canvas
+  // is not live work-in-progress, so nothing here should ever overwrite the
   // real saved workbook. (Mutations are already refused at the source —
-  // isCurrentQuestionLocked — so in practice nothing changes anyway; this is
-  // the belt on top of that suspender.)
-  if (selectAssignmentFrozen(state)) return;
+  // isCurrentQuestionLocked — and the fold skips a viewed canvas
+  // (syncedQuestionCircuits); this is the belt on top of those suspenders.)
+  if (showsSubmission(state)) return;
   const canvasChanged =
     state.components !== prev.components ||
     state.wires !== prev.wires ||
@@ -3979,15 +4893,18 @@ useStore.subscribe((state, prev) => {
       state.buildMode !== prev.buildMode ||
       state.tabCircuits !== prev.tabCircuits ||
       state.workbookOpen !== prev.workbookOpen ||
-      state.workbookTitle !== prev.workbookTitle;
+      state.workbookTitle !== prev.workbookTitle ||
+      state.workbookSavedKey !== prev.workbookSavedKey;
   }
   if (!changed) return;
 
   useStore.setState({ autoSaveStatus: 'unsaved' });
+  const now = Date.now();
+  if (autoSavePendingSince === null) autoSavePendingSince = now;
   if (autoSaveTimer) clearTimeout(autoSaveTimer);
   autoSaveTimer = setTimeout(() => {
     void performAutoSave();
-  }, AUTO_SAVE_DELAY);
+  }, autoSaveDelay(autoSavePendingSince, now));
 });
 
 // Flush a pending debounced save immediately — e.g. when the tab is closing or
@@ -4009,70 +4926,349 @@ function flushAutoSave(opts?: { journal?: boolean; keepalive?: boolean }) {
   // (before the first suspension), so it lands even mid-unload.
   void performAutoSave(opts?.keepalive === true);
 }
+
+// Reset law 2's save step: land the LEAVING principal's unsaved work under
+// their keys before the reset wipes it from memory. Never left to the
+// debounced save or its trailing rerun — the reset cancels both
+// (cancelPendingAutoSave), and a save already in flight would otherwise
+// swallow the request. "Unsaved" = a debounced save armed, a trailing rerun
+// queued, or the chip not 'saved'.
+// - The sandbox (no assignment in memory): one synchronous localStorage write,
+//   made here directly. What is in memory is this person's by construction
+//   (the last reset loaded it for them).
+// - An open assignment — also one showing a submission (viewed or frozen):
+//   the snapshot never folds a viewed canvas (syncedQuestionCircuits), so it
+//   is the live workbook, whose save on the way into the view may still be
+//   in flight or queued as a trailing rerun (which the reset cancels):
+//   locally, the seam's synchronous write, directly. Remotely, the crash
+//   journal first (synchronous, so it holds even if the PUT fails or the tab
+//   dies), then one PUT through the single-flight path: with a save already in
+//   flight a second PUT could land before it, so the journal alone carries the
+//   newer work to their next open. A confirmed PUT clears the journal only
+//   while it holds exactly what was confirmed (performAutoSave), so a sign-out
+//   never leaves a stale buffer to replay over work done later on another
+//   device.
+function saveForLeavingPrincipal(): void {
+  if (!principalReported) return; // boot: nothing in memory is anyone's yet
+  const s = useStore.getState();
+  const unsaved = autoSaveTimer != null || autoSaveTrailing || s.autoSaveStatus !== 'saved';
+  if (!unsaved) return;
+  const a = s.assignment;
+  if (!a) {
+    try {
+      localStorage.setItem(sandboxKey(currentPrincipal), JSON.stringify(getAutoSaveData()));
+    } catch {
+      // storage full/unavailable — the same silent fail as the autosave
+    }
+    return;
+  }
+  if (backendMode === 'local') {
+    void saveAssignmentState().catch(() => {});
+    return;
+  }
+  const email = getSessionUser()?.email;
+  if (email) writeJournal(email, a.id, snapshotAssignmentState(s));
+  if (autoSaveTimer) clearTimeout(autoSaveTimer);
+  autoSaveTimer = null;
+  void performAutoSave();
+}
+
+// Drop the debounced save armed by resetForPrincipal's own set() (loading a
+// person's sandbox is not an edit), and any queued trailing rerun or retry
+// backoff left over from the previous principal.
+function cancelPendingAutoSave() {
+  if (autoSaveTimer) clearTimeout(autoSaveTimer);
+  autoSaveTimer = null;
+  autoSavePendingSince = null;
+  autoSaveTrailing = false;
+  autoSaveBackoff = AUTO_SAVE_BACKOFF_INITIAL;
+  useStore.setState({ autoSaveStatus: 'saved' });
+}
 window.addEventListener('beforeunload', () => flushAutoSave({ journal: true, keepalive: true }));
 window.addEventListener('pagehide', () => flushAutoSave({ journal: true, keepalive: true }));
 document.addEventListener('visibilitychange', () => {
   if (document.visibilityState === 'hidden') flushAutoSave({ journal: true });
 });
 
-/**
- * Signature of the circuit's *structure* — component ids/types (plus the fields
- * that affect evaluation) and wire connections — but NOT positions or runtime
- * values. Two layouts that differ only by where things sit hash the same.
- */
-function connectivitySignature(components: CircuitComponent[], wires: Wire[]): string {
-  const comps = components
-    .map((c) =>
-      [
-        c.id,
-        c.type,
-        c.memDirection ?? '',
-        c.boxedCircuitId ?? '',
-        c.internalCircuit
-          ? `${c.internalCircuit.components.length}/${c.internalCircuit.wires.length}`
-          : '',
-      ].join(':'),
-    )
-    .sort()
-    .join('|');
-  const ws = wires
-    .map(
-      (w) =>
-        `${w.sourceComponentId}.${w.sourcePortId}->${w.targetComponentId}.${w.targetPortId}:${w.transitionLabel ?? ''}`,
-    )
-    .sort()
-    .join('|');
-  return comps + '#' + ws;
+// ─── The edit law: a machine edit restarts every live run ─────────
+// A run (SC/FSM/TM/turbot) computes over the machine it started on. Once the
+// machine changes — gradedMachineKey differs: a component, wire, label, port,
+// MEM direction, state kind or box internal; never a move, a rotation, wire
+// geometry or a live value (INPUT toggles, MEM contents), so neither a drag
+// nor the run's own steps count — every live run restarts at t=1 KEEPING ITS
+// INPUT (the typed sequence, the initial tape, the arena and any graded case
+// loaded into it), and everything the old machine computed is discarded: the
+// I/O table, the local step, the SC rows' outputs. Pressing Run again runs the
+// machine now on the canvas. This is the store's rule, not an action's and
+// not a component's: the subscriber below watches components/wires, so every
+// edit path — each action, undo/redo, paste, a raw setState — is covered
+// without opting in. It needs no lock check: a locked canvas refuses edits
+// before they change anything, so its key never changes and its run (never
+// locked) is left alone. It is NOT resetAllSimState (reset law 1): the canvas
+// stays, and so do the undo history and the typed input.
+
+/** Mid-run: a slice holds a run of the machine as it was, not at rest. */
+function scLive(s: AppState): boolean {
+  return s.scRunning || s.scTimeStep > 1 || s.scHistory.length > 0;
+}
+function fsmLive(s: AppState): boolean {
+  return s.fsmRunning || s.fsmTimeStep > 1 || s.fsmHistory.length > 0 || s.fsmHalted || s.fsmCurrentStateId !== null;
+}
+function tmLive(s: AppState): boolean {
+  return s.tmRunning || s.tmTimeStep > 1 || s.tmHistory.length > 0 || s.tmHalted || s.tmCurrentStateId !== null;
+}
+function turbotLive(s: AppState): boolean {
+  return s.turbotRunning || s.turbotHistory.length > 0 || s.turbotHalted;
 }
 
-// Wipe the cached I/O evaluation when the circuit's connectivity/components
-// change — but NOT when elements are merely moved, since position changes don't
-// alter the signature. Input values are kept (surviving input nodes retain their
-// values, so the student needn't re-enter them); instead we set suppressAutoAddRow
-// so the re-evaluation an edit triggers does NOT re-populate the selected row.
-// The table stays empty until the user next acts on an input.
-let lastConnSig: string | null = null;
-useStore.subscribe((state) => {
-  const sig = connectivitySignature(state.components, state.wires);
-  if (lastConnSig === null) {
-    lastConnSig = sig;
+function inputCount(components: CircuitComponent[]): number {
+  return components.filter((c) => c.type === 'INPUT').length;
+}
+
+/** A typed SC row split into per-INPUT streams, t1 first — how
+ *  loadScGlobalSequence loads it: stray characters ignored, the rightmost
+ *  group of `numInputs` digits is t1 (IN1 first), and a ragged tail (fewer
+ *  digits than a whole step) is dropped. */
+function splitScRow(inputStr: string, numInputs: number): number[][] {
+  const chars = inputStr.replace(/[^01]/g, '');
+  const steps = numInputs > 0 ? Math.floor(chars.length / numInputs) : 0;
+  const out: number[][] = Array.from({ length: numInputs }, () => []);
+  for (let t = 0; t < steps; t++) {
+    const srcT = steps - 1 - t; // the last digit group is the first step
+    for (let i = 0; i < numInputs; i++) out[i].push(parseInt(chars[srcT * numInputs + i]) || 0);
+  }
+  return out;
+}
+
+/** The typed row the loaded SC stream was split from, split for `numInputs`
+ *  INPUTs (the canvas's count when it was loaded) — or -1: nothing loaded,
+ *  or bits set lane by lane on the timeline. */
+function scLoadedRow(s: AppState, numInputs: number): number {
+  if (!s.scInputSequence.some((q) => q.length > 0)) return -1;
+  const loaded = JSON.stringify(s.scInputSequence);
+  return s.scGlobalSequences.findIndex((q) => JSON.stringify(splitScRow(q.inputStr, numInputs)) === loaded);
+}
+
+/** The SC run back at t=1 on ITS input. A typed row is loaded again, split
+ *  for the INPUTs now on the canvas (an edit may have added or removed one —
+ *  the old split would feed another stream and never record the row's
+ *  output). Timeline bits: scReset keeps them. Nothing typed: the INPUT
+ *  toggles ARE the run's input, so only the memory and history go. */
+function restartScRun(prevInputCount: number): void {
+  const s = useStore.getState();
+  const row = scLoadedRow(s, prevInputCount);
+  if (row >= 0) {
+    s.loadScGlobalSequence(row);
     return;
   }
-  if (sig === lastConnSig) return;
-  lastConnSig = sig;
+  if (s.scInputSequence.some((q) => q.length > 0)) {
+    s.scReset();
+    return;
+  }
+  if (s.scRunIntervalId !== null) window.clearInterval(s.scRunIntervalId);
+  useStore.setState({
+    scTimeStep: 1,
+    scHistory: [],
+    scRunning: false,
+    scRunIntervalId: null,
+    tableRows: [],
+    components: zeroMemState(s.components),
+  });
+  setTimeout(() => useStore.getState().evaluateCircuit(), 0);
+}
+
+/** Each live slice's SOFT reset — back to t=1 with its interval stopped and
+ *  its input kept (restartScRun; fsmReset keeps fsmInputSequence, tmReset
+ *  returns to tmInitialTape, turbotReset re-seats on the arena the Map
+ *  shows). Only live slices: a slice at rest keeps its MEM overrides and
+ *  toggles — though a typed SC row loaded at rest is re-split when the
+ *  INPUT count changed, or Run would feed the old split. turbotReset last:
+ *  it derives the brain's start from the machine now on the canvas. */
+function restartLiveRuns(prevInputCount: number): void {
+  const s = useStore.getState();
+  if (scLive(s)) {
+    restartScRun(prevInputCount);
+  } else if (inputCount(s.components) !== prevInputCount) {
+    const row = scLoadedRow(s, prevInputCount);
+    if (row >= 0) {
+      useStore.setState({ scInputSequence: splitScRow(s.scGlobalSequences[row].inputStr, inputCount(s.components)) });
+    }
+  }
+  if (fsmLive(s)) s.fsmReset();
+  if (tmLive(s)) s.tmReset();
+  if (turbotLive(s)) s.turbotReset();
+}
+
+/** What undo/redo restore: the snapshot's STRUCTURE with today's LIVE values.
+ *  Every component and wire still on the canvas keeps what it holds now —
+ *  INPUT toggles, MEM contents (boxed ones too), displayed values — so undoing
+ *  a move mid-run leaves the run where it stands, and at rest leaves a MEM
+ *  override or a selected local-step row alone. What the restore brings back
+ *  holds 0 in its memory: the snapshot's contents are old run scratch. If the
+ *  restore changes the machine, the edit law restarts the run anyway. */
+function withLiveValues(
+  snap: { components: CircuitComponent[]; wires: Wire[] },
+  live: AppState,
+): { components: CircuitComponent[]; wires: Wire[] } {
+  const liveComp = new Map(live.components.map((c) => [c.id, c]));
+  const comps = snap.components.map((c) => {
+    const cur = liveComp.get(c.id);
+    return cur && cur.type === c.type ? { ...c, value: cur.value, inputValues: cur.inputValues } : c;
+  });
+  const liveMem = new Map(memorySlots(live.components).map((m) => [m.key, m.value]));
+  const liveWire = new Map(live.wires.map((w) => [w.id, w.value]));
+  return {
+    components: withMemState(comps, memorySlots(comps).map((m) => liveMem.get(m.key) ?? 0)),
+    wires: snap.wires.map((w) => (liveWire.has(w.id) ? { ...w, value: liveWire.get(w.id)! } : w)),
+  };
+}
+
+// Input values are kept (surviving INPUT nodes keep their toggles, so the
+// student needn't re-enter them); suppressAutoAddRow stops the re-evaluation
+// an edit triggers from re-populating the selected row, so the table stays
+// empty until the user next acts on an input. Registered LAST among the
+// module's subscribers: its resets set state from inside a notification, and
+// later listeners of the outer notification would see stale arguments.
+// lastMachineKey is updated BEFORE those nested sets, which re-enter here and
+// see "unchanged".
+let lastMachineKey: string | null = null;
+useStore.subscribe((state, prev) => {
+  if (lastMachineKey !== null && state.components === prev.components && state.wires === prev.wires) return;
+  const key = gradedMachineKey({ components: state.components, wires: state.wires });
+  if (lastMachineKey === null) {
+    lastMachineKey = key;
+    return;
+  }
+  if (key === lastMachineKey) return;
+  lastMachineKey = key;
 
   suppressAutoAddRow = true;
   if (state.tableRows.length > 0) useStore.getState().clearTableRows();
   if (state.localStepActive) useStore.getState().localStepClear();
+  // The SC rows keep what was typed; what the old machine output is gone.
+  const seqs = useStore.getState().scGlobalSequences;
+  if (seqs.some((q) => q.outputStr !== '')) {
+    useStore.setState({ scGlobalSequences: seqs.map((q) => ({ ...q, outputStr: '' })) });
+  }
+  restartLiveRuns(inputCount(prev.components));
 });
 
-// Load from localStorage on startup
+// ─── The sandbox's per-person load (reset law 2) ───────────────────
+// Nothing loads at module import: which sandbox appears depends on who is
+// here, so resetForPrincipal reads it (readSandbox) whenever that changes.
 type TabCircuitData = { components: CircuitComponent[]; wires: Wire[]; boxes: BoxDefinition[]; confirmedBoxes: ConfirmedBoxDef[] };
 
-function loadAutoSave() {
+function readStored(key: string): string | null {
   try {
-    const raw = localStorage.getItem(AUTO_SAVE_KEY);
-    if (!raw) return; // No saved data — stay on welcome screen (workbookOpen: false)
+    return localStorage.getItem(key);
+  } catch {
+    return null;
+  }
+}
+
+/** The legacy one-per-browser sandbox becomes the visitor sandbox, once. If a
+ *  visitor sandbox already exists the legacy blob is left untouched — never
+ *  overwrite, never delete what can't be placed. */
+function adoptLegacySandbox(): void {
+  try {
+    const legacy = localStorage.getItem(SANDBOX_KEY_PREFIX);
+    if (legacy == null || localStorage.getItem(sandboxKey(null)) != null) return;
+    localStorage.setItem(sandboxKey(null), legacy);
+    localStorage.removeItem(SANDBOX_KEY_PREFIX);
+  } catch {
+    // storage unavailable — nothing to adopt
+  }
+}
+
+/** Does a stored sandbox blob hold anything the person made — anything a
+ *  fresh sandbox (the store's initial state) doesn't? A component, box or
+ *  saved box on any sheet, a second tab, a renamed or re-moded tab, a turbot
+ *  tab's arena, a retitled workbook. Only an absent, unreadable or PRISTINE
+ *  blob counts as "no sandbox yet": a principal change and every Home visit
+ *  autosave one even when nothing was made, so a bare key-exists test would
+ *  never let a returning user receive a visitor's work — and anything short of
+ *  pristine is someone's sandbox, never overwritten. */
+function sandboxHasWork(raw: string | null): boolean {
+  if (!raw) return false;
+  let data: {
+    workbookTitle?: string;
+    tabs?: Array<Partial<SandboxTab> & { name?: string }>;
+    tabCircuits?: Record<string, Partial<TabCircuitData>>;
+    components?: unknown[];
+    boxes?: unknown[];
+  };
+  try {
+    data = JSON.parse(raw);
+  } catch {
+    return false;
+  }
+  if (!data || typeof data !== 'object') return false;
+  const sheetHasWork = (c: Partial<TabCircuitData> | undefined) =>
+    (c?.components?.length ?? 0) > 0 ||
+    (c?.boxes?.length ?? 0) > 0 ||
+    (c?.confirmedBoxes?.length ?? 0) > 0;
+  const fresh = useStore.getInitialState();
+  const freshTab = fresh.tabs[0];
+  const tabs = Array.isArray(data.tabs) ? data.tabs : [];
+  return (
+    Object.values(data.tabCircuits ?? {}).some(sheetHasWork) ||
+    // the legacy flat format's single canvas
+    (data.components?.length ?? 0) > 0 ||
+    (data.boxes?.length ?? 0) > 0 ||
+    (data.workbookTitle != null && data.workbookTitle !== fresh.workbookTitle) ||
+    tabs.length > 1 ||
+    tabs.some(
+      (t) =>
+        (t.title ?? t.name ?? freshTab.title) !== freshTab.title ||
+        (t.buildMode ?? freshTab.buildMode) !== freshTab.buildMode ||
+        (t.activeTask ?? freshTab.activeTask) !== freshTab.activeTask ||
+        t.arena != null ||
+        t.innerMode != null,
+    )
+  );
+}
+
+/** The arriving principal's sandbox as a store patch ({} when there is none).
+ *  A signed-in person with no sandbox here yet (none, or a pristine one —
+ *  sandboxHasWork) receives the visitor sandbox — MOVED, so a visitor who
+ *  signs in keeps their work and the next visitor doesn't see it. Nothing
+ *  is ever deleted otherwise: a signed-out person's sandbox just waits under
+ *  their key. */
+function readSandbox(principal: string | null): Partial<AppState> {
+  adoptLegacySandbox();
+  if (principal != null) {
+    const visitors = readStored(sandboxKey(null));
+    if (!sandboxHasWork(readStored(sandboxKey(principal))) && sandboxHasWork(visitors)) {
+      try {
+        localStorage.setItem(sandboxKey(principal), visitors!);
+        localStorage.removeItem(sandboxKey(null));
+      } catch {
+        // storage unavailable — they start from their own (empty) sandbox
+      }
+    }
+  }
+  return sandboxPatchFrom(readStored(sandboxKey(principal)));
+}
+
+/** One autosaved sandbox tab as the store holds it: its library defaulted,
+ *  and a box placed before 038 — on the canvas or inside a library entry —
+ *  re-bound by the stated rule, as an assignment's load re-binds it
+ *  (boxPorts.ts rebindLegacyBoxes / rebindLegacyLibrary — a load
+ *  normalisation, not an edit). A save too damaged to hold lists is passed
+ *  on as it is. */
+function storedTabCircuit(c: TabCircuitData): TabCircuitData {
+  const stored = c.confirmedBoxes || [];
+  const confirmedBoxes = Array.isArray(stored) ? rebindLegacyLibrary(stored) : stored;
+  const library = Array.isArray(confirmedBoxes) ? confirmedBoxes : [];
+  const components = Array.isArray(c.components) ? rebindLegacyBoxes(c.components, library) : c.components;
+  return { ...c, components, confirmedBoxes };
+}
+
+/** Parse one stored sandbox blob into a store patch; {} when absent or
+ *  corrupt (stay on the welcome state, workbookOpen false). */
+function sandboxPatchFrom(raw: string | null): Partial<AppState> {
+  if (!raw) return {};
+  try {
     const data = JSON.parse(raw);
 
     if (data.formatVersion === 2) {
@@ -4080,8 +5276,7 @@ function loadAutoSave() {
       const tabCircuits = new Map<string, TabCircuitData>();
       if (data.tabCircuits) {
         for (const [k, v] of Object.entries(data.tabCircuits)) {
-          const c = v as TabCircuitData;
-          tabCircuits.set(k, { ...c, confirmedBoxes: c.confirmedBoxes || [] });
+          tabCircuits.set(k, storedTabCircuit(v as TabCircuitData));
         }
       }
       // Ensure tabs have activeTask (migration for old auto-saves) and that
@@ -4099,9 +5294,10 @@ function loadAutoSave() {
       const activeTab = tabs.find((t: { id: string }) => t.id === activeId);
       const vp = data.viewPreferences || {};
 
-      useStore.setState({
+      return {
         workbookOpen: false, // home-first: restore the sandbox into memory but land on Home
         workbookTitle: data.workbookTitle || 'Untitled Workbook',
+        workbookSavedKey: typeof data.workbookSavedKey === 'string' ? data.workbookSavedKey : null,
         tabs,
         activeTabId: activeId,
         tabCircuits,
@@ -4118,15 +5314,13 @@ function loadAutoSave() {
         showGrid: vp.showGrid ?? true,
         showWireValues: vp.showWireValues ?? true,
         snapToAlign: vp.snapToAlign ?? true,
-      });
-      setTimeout(() => useStore.getState().evaluateCircuit(), 0);
+      };
     } else if (data.tabs) {
       // Legacy auto-save format (has tabs but no formatVersion)
       const tabCircuits = new Map<string, TabCircuitData>();
       if (data.tabCircuits) {
         for (const [k, v] of Object.entries(data.tabCircuits)) {
-          const c = v as TabCircuitData;
-          tabCircuits.set(k, { ...c, confirmedBoxes: c.confirmedBoxes || [] });
+          tabCircuits.set(k, storedTabCircuit(v as TabCircuitData));
         }
       }
       const tabs = (data.tabs || []).map((t: { id: string; title?: string; name?: string; buildMode?: BuildMode }) => ({
@@ -4135,23 +5329,28 @@ function loadAutoSave() {
         buildMode: t.buildMode || 'CC',
         activeTask: 'arithmetic' as ActiveTask,
       }));
-      useStore.setState({
+      const activeTabId = data.activeTabId || tabs[0]?.id || defaultTabId;
+      // The active canvas, re-bound by the same rule as every tab (its tab's
+      // library, when the save kept one).
+      const activeLibrary = tabCircuits.get(activeTabId)?.confirmedBoxes;
+      const components = Array.isArray(data.components)
+        ? rebindLegacyBoxes(data.components, Array.isArray(activeLibrary) ? activeLibrary : [])
+        : data.components || [];
+      return {
         workbookOpen: false, // home-first: restore the sandbox but land on Home
         workbookTitle: 'Untitled Workbook',
         buildMode: data.buildMode || 'CC',
         repSystem: data.repSystem || 'binary',
-        components: data.components || [],
+        components,
         wires: data.wires || [],
         boxes: data.boxes || [],
         tabs,
-        activeTabId: data.activeTabId || tabs[0]?.id || defaultTabId,
+        activeTabId,
         ...(tabCircuits.size > 0 ? { tabCircuits } : {}),
-      });
-      setTimeout(() => useStore.getState().evaluateCircuit(), 0);
+      };
     }
   } catch {
     // Corrupted data — ignore, stay on welcome screen
   }
+  return {};
 }
-
-loadAutoSave();

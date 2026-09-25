@@ -208,9 +208,10 @@ The editor provides a two-dimensional canvas for building circuits, FSMs, turbot
 **Editing functionality:**
 
 - Single select (click)
-- Multi-select (shift-click or cmd-click)
-- Box select (drag rectangle)
+- Multi-select (cmd/ctrl-click; shift-click on wires and FSM/TM states)
+- Box select (drag rectangle; shift or cmd/ctrl adds)
 - Move (drag selected components; preserves all existing wiring)
+- Rotate (↻ Rotate button, or shift-click a component)
 - Copy / Paste
 - Delete
 - Undo / Redo — covers all user actions: component creation, movement, wiring, deletion, parameter changes

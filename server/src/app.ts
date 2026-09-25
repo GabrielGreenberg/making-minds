@@ -3,7 +3,7 @@
 //
 //   GET    /api/auth/config                    unauthenticated: what the login screen offers
 //   POST   /api/auth/login                     email (+ password) → bearer token
-//   POST   /api/auth/register                  roster member creates their account
+//   POST   /api/auth/register                  roster member creates their account (student ID + email)
 //   POST   /api/auth/password                  change own password
 //   POST   /api/auth/logout
 //   GET    /api/auth/me
@@ -12,9 +12,10 @@
 //   POST   /api/roster/import                  instructor: {csv, defaultRole?} → upsert
 //   POST   /api/roster                         instructor: add one person
 //   DELETE /api/roster/:email                  instructor: remove from the roster
+//   DELETE /api/roster/:email/aliases/:alias    instructor: drop one extra sign-in address
 //   POST   /api/roster/:email/reset-password   instructor: clear the credential + sessions
-//   GET    /api/access-requests                instructor: pending/all requests
-//   POST   /api/access-requests/:id/approve    instructor: add to roster, mark approved
+//   GET    /api/access-requests                instructor: pending/all requests (+ the account each names)
+//   POST   /api/access-requests/:id/approve    instructor: add to roster (or as an alias), mark approved
 //   POST   /api/access-requests/:id/reject     instructor
 //   GET    /api/assignments                    summaries (any logged-in user)
 //   GET    /api/assignments/:id                student: answers stripped; instructor: full
@@ -25,34 +26,48 @@
 //                                              to students (list + fetch)
 //   PUT    /api/assignments/:id/grades-release instructor: {released: boolean} —
 //                                              students see no grades at all until released
-//   GET    /api/workbooks/:assignmentId        the caller's saved canvas state
-//   PUT    /api/workbooks/:assignmentId        autosave target
+//   GET    /api/workbooks/:assignmentId        the caller's saved canvas state + their
+//                                              mint key for it (task 034)
+//   PUT    /api/workbooks/:assignmentId        autosave target (also appends to the
+//                                              coarse per-save history)
 //   POST   /api/assignments/:id/submissions    submit → server autogrades → record
-//   GET    /api/assignments/:id/submissions    student: own attempts (no grades until
-//                                              released, then scores only);
-//                                              instructor: all attempts, full detail
+//                                              (+ the integrity check, instructor-only)
+//   GET    /api/assignments/:id/submissions    the caller's own attempts, any role
+//                                              (task 037) — student: no grades until
+//                                              released, then scores only; never
+//                                              integrity; instructor: their own, full
+//   GET    /api/assignments/:id/submissions/all
+//                                              instructor: every student's attempts,
+//                                              full detail (the gradebook feed)
 //   POST   /api/assignments/:id/submissions/:attempt/review
 //                                              instructor: manual verdict on a pending
 //                                              open question — {student, questionId,
 //                                              pass, note?} → updated record
 //   POST   /api/feedback                       any signed-in user: file a platform/homework
 //                                              report, screenshots as base64 data URLs
-//   GET    /api/feedback                       instructor: the full queue, newest first
+//   GET    /api/feedback                       instructor: the queue, newest first;
+//                                              ?status=open|resolved, ?triaged=true|false
 //   PUT    /api/feedback/:id/status            instructor: {status: 'open'|'resolved'}
+//   PUT    /api/feedback/:id/triage            instructor: what the task pipeline made of
+//                                              it — {outcome, tasks?, note?} | {clear: true}
 //   GET    /api/instructor-notes               instructor: the one shared markdown note
 //   PUT    /api/instructor-notes               instructor: {content: string} → saves it
 //   GET    /api/health                         unauthenticated liveness probe
 //
 // Grading happens HERE, with the same pure engine the browser uses
 // (app/src/engine/grader.ts) — the server holds the test cases, the client
-// never sees them. Exported as a factory (no listen()) so the smoke test can
+// never sees them. So does the provenance check (app/src/provenance/, task
+// 034): the server holds the mint secret, hands each student their own key,
+// and on submit tests every id and editing record against every known key. Exported as a factory (no listen()) so the smoke test can
 // boot it on an ephemeral port against a temp database.
 
 import express from 'express';
 import type { Request, Response, NextFunction } from 'express';
-import type { AssignmentData, AssignmentState, SubmissionData } from '../../app/src/types';
+import type { AssignmentData, AssignmentState, FeedbackTriage, SubmissionData } from '../../app/src/types';
 import { gradeSubmission } from '../../app/src/engine/grader';
 import { applyManualReview } from '../../app/src/storage/manualReview';
+import { deriveMintKey } from '../../app/src/provenance/ids';
+import { assessIntegrity, saveSummary } from '../../app/src/provenance/integrity';
 import type { ServerConfig } from './config';
 import { Db } from './db';
 import {
@@ -65,7 +80,9 @@ import {
   type AuthProvider,
 } from './auth';
 import { hashPassword, passwordProblem, verifyPassword } from './password';
-import { isEmail, normalizeEmail, parseRoster } from './roster';
+import { isEmail, normalizeEmail, normalizeUid } from './roster';
+import { matchAccount, placeRosterEntry } from './identity';
+import { importRosterCsv } from './rosterImport';
 import { stripAnswers, studentRecord } from './sanitize';
 
 export function createApp(config: ServerConfig, db: Db) {
@@ -101,8 +118,17 @@ export function createApp(config: ServerConfig, db: Db) {
   // Access requests are unauthenticated writes: a looser per-IP budget, since
   // a shared campus NAT may legitimately carry several in one session.
   const requestThrottle = new LoginThrottle(20, 60 * 60 * 1000);
+  // Refused sign-ups per IP, whatever email or ID each one typed: guessing
+  // student IDs under fresh addresses never meets the per-key throttle, so
+  // this budget caps it. Generous, because a lecture hall setting up accounts
+  // together shares one campus address and mistypes a few.
+  const registerBudget = new LoginThrottle(100, 10 * 60 * 1000);
 
   const auth = requireAuth(db);
+  // The watermark's secret: the configured one, else the one this database
+  // generated and keeps (db.mintSecret) — never the client's dev secret.
+  const mintSecret = config.mintSecret || db.mintSecret();
+  const mintKey = (email: string, assignmentId: string) => deriveMintKey(mintSecret, email, assignmentId);
   const clientIp = (req: Request): string => req.ip ?? req.socket.remoteAddress ?? 'unknown';
 
   // ── health ─────────────────────────────────────────────────────
@@ -121,7 +147,9 @@ export function createApp(config: ServerConfig, db: Db) {
   app.post('/api/auth/login', async (req, res) => {
     const email = normalizeEmail((req.body ?? {}).email);
     const ip = clientIp(req);
-    const wait = throttle.retryAfter(email, ip);
+    // Counted per ACCOUNT, so an account's several addresses share one budget.
+    const key = db.findUserByEmail(email)?.email ?? email;
+    const wait = throttle.retryAfter(key, ip);
     if (wait > 0) {
       res.setHeader('Retry-After', String(wait));
       res.status(429).json({
@@ -132,14 +160,14 @@ export function createApp(config: ServerConfig, db: Db) {
     }
     const user = await authProvider.authenticate(req.body ?? {});
     if (!user) {
-      throttle.recordFailure(email, ip);
+      throttle.recordFailure(key, ip);
       // One message for every failure: an unknown email, an email with no
       // account yet, and a wrong password are indistinguishable to the caller,
       // so the endpoint can't be used to enumerate the roster.
       res.status(401).json({ error: 'incorrect email or password' });
       return;
     }
-    throttle.recordSuccess(email, ip);
+    throttle.recordSuccess(key, ip);
     const token = issueSession(db, user, config.sessionTtlSeconds);
     res.json({ token, user });
   });
@@ -147,12 +175,14 @@ export function createApp(config: ServerConfig, db: Db) {
   // Create an account for someone the roster already contains. On success the
   // caller is signed straight in — one step, not register-then-log-in.
   app.post('/api/auth/register', async (req, res) => {
-    // Throttled like sign-in: when the roster carries student IDs, registration
-    // takes one, and an unthrottled endpoint would let someone guess a
-    // classmate's ID and claim their seat.
+    // Throttled like sign-in, per email AND per student ID: registration takes
+    // an ID, and an unthrottled endpoint would let someone guess a classmate's
+    // ID and claim their seat — under a fresh address each time, too.
     const ip = clientIp(req);
     const email = normalizeEmail((req.body ?? {}).email);
-    const wait = throttle.retryAfter(email, ip);
+    const uid = normalizeUid((req.body ?? {}).studentId);
+    const keys = uid ? [email, `uid:${uid}`] : [email];
+    const wait = Math.max(registerBudget.retryAfter('register', ip), ...keys.map((k) => throttle.retryAfter(k, ip)));
     if (wait > 0) {
       res.setHeader('Retry-After', String(wait));
       res.status(429).json({ error: 'too many attempts — wait a few minutes and try again', retryAfter: wait });
@@ -160,15 +190,16 @@ export function createApp(config: ServerConfig, db: Db) {
     }
     const result = await authProvider.register(req.body ?? {});
     if (!result.ok) {
-      if (result.reason === 'id-mismatch' || result.reason === 'not-on-roster') {
-        throttle.recordFailure(email, ip);
+      registerBudget.recordFailure('register', ip);
+      if (result.reason !== 'weak-password' && result.reason !== 'email-not-accepted') {
+        for (const k of keys) throttle.recordFailure(k, ip);
       }
       // 403 you may not have an account here · 409 the account's state says no
       // · 400 the request itself is bad.
       const status =
         result.reason === 'not-on-roster'
           ? 403
-          : result.reason === 'already-registered' || result.reason === 'id-mismatch'
+          : result.reason === 'already-registered' || result.reason === 'id-mismatch' || result.reason === 'email-taken'
             ? 409
             : 400;
       res.status(status).json({ error: result.message, reason: result.reason });
@@ -245,7 +276,10 @@ export function createApp(config: ServerConfig, db: Db) {
     requestThrottle.recordFailure('access-request', ip);
     // Answer identically whether or not we act, so the endpoint reveals
     // nothing about who is on the roster and can't be spammed into duplicates.
-    const known = db.getUser(email) != null;
+    // An address that is only a student's own sign-up alias is not "known":
+    // its real owner may be asking, and approval can take it back.
+    const owner = db.emailOwner(email);
+    const known = owner != null && owner.source !== 'signup';
     if (!known && !db.hasPendingAccessRequest(email)) {
       db.addAccessRequest({
         email,
@@ -263,20 +297,6 @@ export function createApp(config: ServerConfig, db: Db) {
     res.json({ roster: db.listUsers() });
   });
 
-  /** Upsert roster entries; returns what changed so the UI can report it. */
-  function applyRoster(
-    entries: { email: string; name: string; studentId: string; role: 'student' | 'instructor' }[],
-  ) {
-    let added = 0;
-    let updated = 0;
-    for (const entry of entries) {
-      if (db.getUser(entry.email)) updated++;
-      else added++;
-      db.upsertUser(entry);
-    }
-    return { added, updated };
-  }
-
   app.post('/api/roster/import', auth, requireInstructor, (req, res) => {
     const body = (req.body ?? {}) as Record<string, unknown>;
     if (typeof body.csv !== 'string' || body.csv.trim() === '') {
@@ -284,18 +304,12 @@ export function createApp(config: ServerConfig, db: Db) {
       return;
     }
     const defaultRole = body.defaultRole === 'instructor' ? 'instructor' : 'student';
-    const parsed = parseRoster(body.csv, defaultRole);
     // Re-importing never removes anyone and never touches a password: a
     // mid-quarter roster refresh must not delete a student's work or sign them
-    // out. Removal is the explicit DELETE below.
-    const { added, updated } = applyRoster(parsed.entries);
-    res.json({
-      added,
-      updated,
-      total: parsed.entries.length,
-      issues: parsed.issues,
-      columns: parsed.columns,
-    });
+    // out. Who the class list no longer carries comes back in the report
+    // (noLongerListed) for the instructor to review; removal is the explicit
+    // DELETE below.
+    res.json(importRosterCsv(db, body.csv, defaultRole));
   });
 
   app.post('/api/roster', auth, requireInstructor, (req, res) => {
@@ -305,12 +319,30 @@ export function createApp(config: ServerConfig, db: Db) {
       res.status(400).json({ error: 'enter a valid email address' });
       return;
     }
-    const name = typeof body.name === 'string' && body.name.trim() ? body.name.trim() : email.split('@')[0];
-    const role = body.role === 'instructor' ? 'instructor' : 'student';
-    const studentId = typeof body.studentId === 'string' ? body.studentId.trim() : '';
-    const existed = db.getUser(email) != null;
-    db.upsertUser({ email, name, role, studentId });
-    res.json({ ok: true, added: existed ? 0 : 1, updated: existed ? 1 : 0 });
+    // Through the identity module, like the import: an email the roster
+    // already has updates that person (a blank name keeps theirs); an ID it
+    // already has under another email only adds that email as an alias.
+    const placed = placeRosterEntry(
+      db,
+      {
+        email,
+        name: typeof body.name === 'string' ? body.name.trim() : '',
+        role: body.role === 'instructor' ? 'instructor' : 'student',
+        studentId: typeof body.studentId === 'string' ? body.studentId.trim() : '',
+      },
+      'instructor',
+    );
+    if (placed.kind === 'conflict') {
+      res.status(409).json({ error: placed.reason });
+      return;
+    }
+    res.json({
+      ok: true,
+      added: placed.kind === 'added' ? 1 : 0,
+      updated: placed.kind === 'updated' ? 1 : 0,
+      account: placed.account.email,
+      aliasAdded: placed.kind === 'updated' ? placed.aliasAdded : null,
+    });
   });
 
   app.delete('/api/roster/:email', auth, requireInstructor, (req, res) => {
@@ -329,8 +361,33 @@ export function createApp(config: ServerConfig, db: Db) {
     res.json({ ok: true });
   });
 
+  // A wrong extra sign-in address (a typo at sign-up, a stale registrar
+  // email, a mistaken approval) is removed one at a time; the account's key
+  // is not an alias. When it is the address the account was SET UP through,
+  // whoever did that chose the password: it is cleared and every session
+  // ends, exactly as a reset, so removing the address actually locks them out.
+  app.delete('/api/roster/:email/aliases/:alias', auth, requireInstructor, (req, res) => {
+    const email = normalizeEmail(req.params.email);
+    const alias = normalizeEmail(req.params.alias);
+    if (!db.getUser(email)) {
+      res.status(404).json({ error: 'unknown account' });
+      return;
+    }
+    const setUpThrough = db.registeredVia(email) === alias;
+    if (!db.removeEmailAlias(email, alias)) {
+      res.status(404).json({ error: 'that account has no such sign-in address' });
+      return;
+    }
+    if (setUpThrough) {
+      db.setPasswordHash(email, null);
+      db.deleteSessionsFor(email);
+    }
+    res.json({ ok: true, credentialCleared: setUpThrough });
+  });
+
   // Forgotten password, with no mail server in the loop: the instructor clears
-  // the credential and the student creates their account again, same email.
+  // the credential and the student sets up their account again (student ID +
+  // either email).
   app.post('/api/roster/:email/reset-password', auth, requireInstructor, (req, res) => {
     const email = normalizeEmail(req.params.email);
     if (!db.getUser(email)) {
@@ -348,7 +405,17 @@ export function createApp(config: ServerConfig, db: Db) {
     const status = req.query.status;
     const filter =
       status === 'pending' || status === 'approved' || status === 'rejected' ? status : undefined;
-    res.json({ requests: db.listAccessRequests(filter) });
+    // Each request says which roster account its ID or email already names:
+    // approving one of those adds the email to that account, not a new row.
+    const requests = db.listAccessRequests(filter).map((r) => {
+      const { account, conflict } = matchAccount(db, { email: r.email, studentId: r.studentId });
+      return {
+        ...r,
+        match: account && !conflict ? { email: account.email, name: account.name } : null,
+        conflict,
+      };
+    });
+    res.json({ requests });
   });
 
   app.post('/api/access-requests/:id/approve', auth, requireInstructor, (req, res) => {
@@ -360,15 +427,26 @@ export function createApp(config: ServerConfig, db: Db) {
     }
     const role = (req.body ?? {}).role === 'instructor' ? 'instructor' : 'student';
     // Approving IS adding them to the roster; they then create an account the
-    // same way everyone else does.
-    db.upsertUser({
-      email: request.email,
-      name: request.name,
-      role,
-      studentId: request.studentId,
-    });
+    // same way everyone else does. When the request's ID or email names
+    // someone already on it, the email becomes one of that person's sign-in
+    // addresses instead, and their roster facts stand.
+    const placed = placeRosterEntry(
+      db,
+      { email: request.email, name: request.name, role, studentId: request.studentId },
+      'request',
+    );
+    if (placed.kind === 'conflict') {
+      res.status(409).json({ error: placed.reason });
+      return;
+    }
     db.resolveAccessRequest(id, 'approved', req.user!.email);
-    res.json({ ok: true, email: request.email });
+    res.json({
+      ok: true,
+      email: request.email,
+      account: placed.account.email,
+      accountName: placed.account.name,
+      aliasAdded: placed.kind === 'updated' ? placed.aliasAdded : null,
+    });
   });
 
   app.post('/api/access-requests/:id/reject', auth, requireInstructor, (req, res) => {
@@ -477,8 +555,11 @@ export function createApp(config: ServerConfig, db: Db) {
 
   // ── workbooks (per-student autosave) ───────────────────────────
   app.get('/api/workbooks/:assignmentId', auth, (req, res) => {
-    const state = db.getWorkbook(req.user!.email, String(req.params.assignmentId));
-    res.json({ state });
+    const assignmentId = String(req.params.assignmentId);
+    const state = db.getWorkbook(req.user!.email, assignmentId);
+    // The caller's own mint key for this assignment: the ids they mint and
+    // the editing records they sign from now on bind to them.
+    res.json({ state, mintKey: mintKey(req.user!.email, assignmentId) });
   });
 
   app.put('/api/workbooks/:assignmentId', auth, (req, res) => {
@@ -487,7 +568,10 @@ export function createApp(config: ServerConfig, db: Db) {
       res.status(400).json({ error: 'malformed workbook state' });
       return;
     }
-    db.saveWorkbook(req.user!.email, String(req.params.assignmentId), state);
+    const assignmentId = String(req.params.assignmentId);
+    db.saveWorkbook(req.user!.email, assignmentId, state);
+    // The coarse history the "arrived in one save" check reads: sizes only.
+    db.addWorkbookSave(req.user!.email, assignmentId, saveSummary(state));
     res.json({ ok: true });
   });
 
@@ -511,25 +595,46 @@ export function createApp(config: ServerConfig, db: Db) {
       answers: body.answers,
     };
     const result = gradeSubmission(assignment, submission);
-    const record = db.addSubmission(assignment.id, req.user!.email, submission, result);
+    // Provenance (task 034): whose ids and editing records these are, tested
+    // against the student's own key and everyone else's. Beside the grade,
+    // never in it; instructor-only (sanitize.ts).
+    const email = req.user!.email;
+    const integrity = assessIntegrity({
+      questionIds: assignment.questions.map((q) => q.id),
+      answers: submission.answers,
+      self: { email, key: mintKey(email, assignment.id) },
+      others: db.knownEmails().map((e) => ({ email: e, key: mintKey(e, assignment.id) })),
+      legacy: db.legacyFor(email, assignment.id),
+      history: db.listWorkbookSaves(email, assignment.id).map((h) => h.summary),
+    });
+    const record = db.addSubmission(assignment.id, email, submission, result, integrity);
     // The grade is computed and stored NOW, but students don't see it until
     // the instructor releases grades — and even then, scores only.
     res.status(201).json({
       record:
         req.user!.role === 'instructor'
           ? record
-          : studentRecord(record, db.getGradesReleased(assignment.id)),
+          : studentRecord(record, db.getGradesReleased(assignment.id), assignment),
     });
   });
 
+  // The caller's OWN attempts, for every role (task 037): an instructor's
+  // Student view is a student-side read, so it sees only the instructor's
+  // own attempts. Everyone's is the gradebook's route below.
   app.get('/api/assignments/:id/submissions', auth, (req, res) => {
+    const own = db.listSubmissions(String(req.params.id), req.user!.email);
     if (req.user!.role === 'instructor') {
-      res.json({ records: db.listSubmissions(String(req.params.id)) });
+      res.json({ records: own });
       return;
     }
     const released = db.getGradesReleased(String(req.params.id));
-    const own = db.listSubmissions(String(req.params.id), req.user!.email);
-    res.json({ records: own.map((r) => studentRecord(r, released)) });
+    // The full assignment fills older results' case separations (sanitize.ts).
+    const assignment = db.getAssignment(String(req.params.id)) ?? undefined;
+    res.json({ records: own.map((r) => studentRecord(r, released, assignment)) });
+  });
+
+  app.get('/api/assignments/:id/submissions/all', auth, requireInstructor, (req, res) => {
+    res.json({ records: db.listSubmissions(String(req.params.id)) });
   });
 
   // ── manual review (instructor) ─────────────────────────────────
@@ -645,6 +750,7 @@ export function createApp(config: ServerConfig, db: Db) {
         : undefined;
     const feedback = db.addFeedback({
       email: req.user!.email,
+      authorRole: req.user!.role,
       category: body.category,
       message: body.message.trim(),
       screenshots: shots as { dataUrl: string; filename?: string }[],
@@ -653,8 +759,22 @@ export function createApp(config: ServerConfig, db: Db) {
     res.status(201).json({ feedback });
   });
 
-  app.get('/api/feedback', auth, requireInstructor, (_req, res) => {
-    res.json({ feedback: db.listFeedback() });
+  app.get('/api/feedback', auth, requireInstructor, (req, res) => {
+    const { status, triaged } = req.query;
+    if (status !== undefined && status !== 'open' && status !== 'resolved') {
+      res.status(400).json({ error: 'status must be "open" or "resolved"' });
+      return;
+    }
+    if (triaged !== undefined && triaged !== 'true' && triaged !== 'false') {
+      res.status(400).json({ error: 'triaged must be "true" or "false"' });
+      return;
+    }
+    res.json({
+      feedback: db.listFeedback({
+        status,
+        triaged: triaged === undefined ? undefined : triaged === 'true',
+      }),
+    });
   });
 
   app.put('/api/feedback/:id/status', auth, requireInstructor, (req, res) => {
@@ -668,6 +788,61 @@ export function createApp(config: ServerConfig, db: Db) {
       return;
     }
     res.json({ ok: true });
+  });
+
+  // The task pipeline's mark (task 018), set by `tasks/tools/feedback.mjs
+  // mark` from the instructor's machine once the catcher has processed a
+  // report. It never touches `status`: resolving stays the instructor's act.
+  const TASK_ID = /^\d{4}-\d{2}-\d{2}-\d{3}$/;
+  const MAX_TRIAGE_TASKS = 10;
+  const MAX_TRIAGE_NOTE_LENGTH = 300;
+
+  app.put('/api/feedback/:id/triage', auth, requireInstructor, (req, res) => {
+    const body = (req.body ?? {}) as { outcome?: unknown; tasks?: unknown; note?: unknown; clear?: unknown };
+    let triage: FeedbackTriage | null;
+    if (body.clear === true) {
+      triage = null;
+    } else {
+      const { outcome, tasks, note } = body;
+      if (outcome !== 'filed' && outcome !== 'personal' && outcome !== 'dismissed') {
+        res.status(400).json({ error: 'outcome must be "filed", "personal" or "dismissed" (or send {clear: true})' });
+        return;
+      }
+      if (note !== undefined && (typeof note !== 'string' || note.length > MAX_TRIAGE_NOTE_LENGTH)) {
+        res.status(400).json({ error: `note must be a string under ${MAX_TRIAGE_NOTE_LENGTH} characters` });
+        return;
+      }
+      const cleanNote = typeof note === 'string' && note.trim() !== '' ? note.trim() : undefined;
+      if (outcome === 'filed') {
+        if (
+          !Array.isArray(tasks) ||
+          tasks.length === 0 ||
+          tasks.length > MAX_TRIAGE_TASKS ||
+          !tasks.every((t) => typeof t === 'string' && TASK_ID.test(t))
+        ) {
+          res.status(400).json({ error: 'a filed report names 1–10 task ids like 2026-09-24-040' });
+          return;
+        }
+      } else if (tasks !== undefined) {
+        res.status(400).json({ error: 'only a filed report names tasks' });
+        return;
+      }
+      if (outcome === 'dismissed' && !cleanNote) {
+        res.status(400).json({ error: 'a dismissed report needs a note saying why' });
+        return;
+      }
+      triage = {
+        outcome,
+        ...(outcome === 'filed' ? { tasks: [...new Set(tasks as string[])] } : {}),
+        ...(cleanNote ? { note: cleanNote } : {}),
+        at: new Date().toISOString(),
+      };
+    }
+    if (!db.setFeedbackTriage(String(req.params.id), triage)) {
+      res.status(404).json({ error: 'unknown feedback id' });
+      return;
+    }
+    res.json({ ok: true, triage });
   });
 
   // ── instructor notes (notes/todos.md item 12) ───────────────────

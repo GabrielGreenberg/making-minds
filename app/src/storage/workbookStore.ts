@@ -10,6 +10,8 @@
 // lands the localStorage write.
 
 import type { AssignmentData, AssignmentState, ConfirmedBoxDef, QuestionCircuit } from '../types';
+import { deriveMintKey, DEV_MINT_SECRET } from '../provenance/ids';
+import { rebindLegacyBoxes, rebindLegacyLibrary } from '../boxPorts';
 
 export interface WorkbookStore {
   loadAssignmentState(id: string): Promise<AssignmentState | null>;
@@ -23,6 +25,15 @@ export interface WorkbookStore {
     state: AssignmentState,
     opts?: { keepalive?: boolean },
   ): Promise<void>;
+  /**
+   * Opening an assignment: the saved state (as `loadAssignmentState`) AND this
+   * person's mint key (hex) for it (task 034, provenance/ids.ts), in ONE
+   * fetch. The server derives the key from its secret and returns it with the
+   * workbook (the session names the person; `email` is ignored); local mode
+   * derives it from the dev secret, with no /api call. `mintKey` is null when
+   * there is none (a visitor; an older server).
+   */
+  loadForOpen(id: string, email: string | null): Promise<{ state: AssignmentState | null; mintKey: string | null }>;
 }
 
 /** Fresh, empty canvas state for one question. */
@@ -35,7 +46,11 @@ export function emptyQuestionCircuit(): QuestionCircuit {
  * Pure (no storage), so the drift handling is unit-testable: circuits are kept
  * only for question ids that still exist in the definition; new/unknown ids get
  * an empty circuit; a saved id no longer present is dropped; the saved index is
- * clamped into range.
+ * clamped into range. A box placed before 038, in a question or inside a
+ * library entry, is re-bound by the stated rule (boxPorts.ts
+ * rebindLegacyBoxes): opening AND submitting from Home both come through
+ * here, so what is submitted is what the live run ran. A load normalisation,
+ * not an edit; a circuit with nothing to re-bind is the saved object itself.
  */
 export function restoreQuestionCircuits(
   def: AssignmentData,
@@ -54,10 +69,15 @@ export function restoreQuestionCircuits(
   const currentQuestionIndex = saved
     ? Math.min(Math.max(saved.currentQuestionIndex, 0), lastIndex)
     : 0;
+  const boxLibrary = restoreBoxLibrary(saved, questionCircuits);
+  for (const [id, qc] of questionCircuits) {
+    const components = Array.isArray(qc.components) ? rebindLegacyBoxes(qc.components, boxLibrary) : qc.components;
+    if (components !== qc.components) questionCircuits.set(id, { ...qc, components });
+  }
   return {
     questionCircuits,
     currentQuestionIndex,
-    boxLibrary: restoreBoxLibrary(saved, questionCircuits),
+    boxLibrary: rebindLegacyLibrary(boxLibrary),
   };
 }
 
@@ -121,6 +141,13 @@ class LocalWorkbookStore implements WorkbookStore {
     } catch {
       // localStorage full or unavailable — silent fail (matches sandbox autosave).
     }
+  }
+
+  async loadForOpen(id: string, email: string | null): Promise<{ state: AssignmentState | null; mintKey: string | null }> {
+    return {
+      state: await this.loadAssignmentState(id),
+      mintKey: email ? deriveMintKey(DEV_MINT_SECRET, email, id) : null,
+    };
   }
 }
 

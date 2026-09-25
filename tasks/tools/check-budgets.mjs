@@ -13,6 +13,7 @@ const budgets = [
   ['tasks/README.md', 12_000],
   ['tasks/CATCHER.md', 14_000],
   ['tasks/WORK.md', 14_000],
+  ['tasks/LOOP.md', 14_000],
   ['tasks/WORKER.md', 14_000],
 ];
 let failed = 0;
