@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useStore, selectEffectiveMode, selectAllowedComponents, selectPlaceableBoxKinds } from '../store';
+import { useStore, selectEffectiveMode, selectAllowedComponents, selectPlaceableBoxKinds, selectMayHoldMemory } from '../store';
 import { isComponentTypeAllowed, disallowedComponentTypes } from '../engine/machineValidation';
 import { usePasteGuard } from '../usePasteGuard';
 import type { ComponentType } from '../types';
@@ -228,10 +228,14 @@ export function ComponentLibrary() {
   // the same rule (engine/machineValidation.ts owns the semantics).
   const allowedComponents = useStore(selectAllowedComponents);
   const placeableKinds = useStore(selectPlaceableBoxKinds);
+  // A combinatorial canvas holds no memory, so it never offers MEM (the
+  // mode's rule, not a per-question setting — store.ts selectMayHoldMemory).
+  const mayHoldMemory = useStore(selectMayHoldMemory);
 
   // TM shares the FSM editor palette (STATE nodes + transition wires).
   const allItems = effectiveMode === 'FSM' || effectiveMode === 'TM' ? FSM_LIBRARY_ITEMS : CC_LIBRARY_ITEMS;
-  const items = allItems.filter((item) => isComponentTypeAllowed(item.type, allowedComponents));
+  const items = allItems.filter((item) =>
+    (item.type !== 'MEM' || mayHoldMemory) && isComponentTypeAllowed(item.type, allowedComponents));
 
   // Group by section
   const sections = new Map<string, LibraryEntry[]>();

@@ -8,9 +8,9 @@ requires: browser
 area: app
 source: audit
 created: 2026-09-25T10:35:00-07:00
-status: ready
+status: in-progress
 after:
-branch:
+branch: task/045-no-memory-in-cc
 merged_into:
 ---
 
@@ -51,3 +51,17 @@ Gates plus the new pins. Browser: an HW1 CC question's palette has no Memory sec
 SC question's and the sandbox's still do.
 
 ## Progress log
+- 2026-09-25 — claimed; worked in the worktree `.claude/worktrees/hw1-memory` (the main checkout is on task/042). Next: one "may hold memory" rule from placeableBoxKinds, then palette, store, paste, Stage 1, pins.
+- 2026-09-25 — built. One rule, `types.ts modeHoldsMemory(mode)` = `placeableBoxKinds(mode)`
+  includes 'SC'; `store.ts selectMayHoldMemory` adds the sandbox Logic Circuit tab. Asked by
+  the palette (`ComponentLibrary` hides MEM), `addComponent` (refuses MEM), `paste` (refuses a
+  bare MEM as well as a memory-holding box; message says "combinatorial circuit"), the question
+  creator (no MEM checkbox/budget on a CC canvas), and Stage 1
+  (`machineValidation.validateModeMemory`, run first in `caseRun.questionComponentRules`; a
+  turbot answers for its brain's mode). `boxScopeCheck [memory]`: 19 pins (rule ≡ box rule mode
+  by mode; CC/turbot-CC/SC/turbot-SC/sandbox selector; placement; paste; grader refuses MEM in
+  CC, turbot-CC brain and CC perception, SC unaffected). The old "CC refuses to box a MEM" pin
+  now starts from a pre-045 workbook state (a MEM can no longer be placed there). No CC
+  reference fixture held a MEM. Gates: app tsc, tools tsc, `npm run check` (56/56 coverage),
+  build, server check — all green. Owed: a browser look at a CC palette (no Memory section) vs
+  SC and the sandbox — the worktree has no dev server; done against the merged result.

@@ -22,7 +22,9 @@
 // computes what it enclosed (engine, every CC/SC reference fixture boxed
 // across, the store's repro, run, paste, undo, save/load), and a box saved
 // before 038 is re-bound on load by the stated rule, a submitted snapshot
-// never.
+// never; and [memory] (task 045) — a combinatorial canvas holds no memory:
+// one rule (types.ts modeHoldsMemory = where a sequential box may go) for the
+// palette, addComponent, paste and the grader's Stage 1.
 import type { AssignmentState, CircuitComponent, SubmissionRecord } from '../src/types';
 
 const noop = () => {};
@@ -520,7 +522,16 @@ console.log('\n[sequential boxes: store]');
   await flush();
   check('placeBoxInstance refuses an SC box on a CC question', S().components.length === before);
   clean();
-  buildDelay();
+  // A MEM can no longer be placed on a CC canvas ([memory], task 045); a
+  // workbook saved before that rule may still hold one, and boxing it there
+  // stays refused.
+  {
+    const { comp, wire } = await import('./builder');
+    useStore.setState({
+      components: [comp('d-in', 'INPUT', 'IN1', 200, 180), comp('d-mem', 'MEM', 'M1', 320, 180), comp('d-out', 'OUTPUT', 'OUT1', 460, 190)],
+      wires: [wire('d-w1', 'd-in', 'out', 'd-mem', 'min'), wire('d-w2', 'd-mem', 'mout', 'd-out', 'in')],
+    });
+  }
   const ccRefusal = drawAndConfirm();
   check(`a CC question refuses to box a MEM, naming it (${ccRefusal.err})`,
     typeof ccRefusal.err === 'string' &&
@@ -1599,6 +1610,92 @@ console.log('\n[drawn-across boxes: legacy own IN/OUT]');
   const fullList = [fullPlaced];
   check('a box the label rule fully binds comes back as the same array, unbound',
     rebindLegacyBoxes(fullList, [fullEntry]) === fullList);
+}
+
+// ── [memory] a combinatorial canvas holds none (task 045) ────────────────
+// One rule — types.ts modeHoldsMemory, "a canvas may hold memory iff it may
+// place a sequential box" — asked by the palette, addComponent, paste, the
+// question creator and the grader's Stage 1. Before 045 a CC question's
+// palette offered MEM and the grader ran it as a constant 0.
+console.log('\n[memory: a combinatorial canvas holds none]');
+{
+  const { modeHoldsMemory, placeableBoxKinds } = await import('../src/types');
+  const { selectMayHoldMemory } = await import('../src/store');
+  const { gradeQuestion } = await import('../src/engine');
+  const { ccCorrect, scCorrect, turbotCorrect, perceptionEdgeCorrect } = await import('../src/devData/sampleData');
+  const { comp } = await import('./builder');
+
+  const modes = ['CC', 'SC', 'FSM', 'TM', 'turbot', 'open'] as const;
+  check('the rule: CC holds no memory, SC does',
+    !modeHoldsMemory('CC') && modeHoldsMemory('SC'));
+  check('...and it IS the sequential-box rule, mode by mode',
+    modes.every((m) => modeHoldsMemory(m) === placeableBoxKinds(m).includes('SC')));
+
+  // The store: palette selector, placement, paste.
+  check('opened the sample assignment', (await S().openAssignment(SAMPLE_ASSIGNMENT_ID)) === true);
+  S().switchQuestion(0); // Q1: CC
+  await flush();
+  clean();
+  check('a CC question may not hold memory (the palette hides MEM)', !selectMayHoldMemory(S()));
+  const undo0 = S().undoStack.length;
+  S().addComponent('MEM', 300, 300);
+  check('...addComponent(MEM) places nothing and leaves no undo entry',
+    !S().components.some((c) => c.type === 'MEM') && S().undoStack.length === undo0);
+  S().addComponent('AND', 300, 300);
+  check('...while a gate still places', S().components.some((c) => c.type === 'AND'));
+  S().switchQuestion(4); // Q5: turbot, CC brain
+  await flush();
+  check('a turbot with a CC brain may not hold memory', !selectMayHoldMemory(S()));
+  S().switchQuestion(5); // Q6: turbot, SC brain
+  await flush();
+  check('a turbot with an SC brain may', selectMayHoldMemory(S()));
+  S().switchQuestion(1); // Q2: SC
+  await flush();
+  check('an SC question may hold memory', selectMayHoldMemory(S()));
+  const scBefore = S().components.length;
+  S().addComponent('MEM', 640, 420);
+  const mem = S().components.slice(scBefore).find((c) => c.type === 'MEM');
+  check('...and addComponent(MEM) places one there', mem !== undefined);
+  useStore.setState({ selectedIds: [mem!.id] });
+  S().copySelected();
+  S().deleteSelected();
+  S().switchQuestion(0);
+  await flush();
+  const n0 = S().components.length;
+  const u0 = S().undoStack.length;
+  const msg = S().paste();
+  check(`pasting a bare MEM onto the CC question is refused, naming it (${msg})`,
+    typeof msg === 'string' && msg.includes(mem!.label) && msg.includes('combinatorial'));
+  check('...adding nothing and leaving no undo entry',
+    S().components.length === n0 && S().undoStack.length === u0 && !S().components.some((c) => c.type === 'MEM'));
+  clean();
+  S().closeAssignment();
+  await flush();
+  useStore.setState({ buildMode: 'CC' });
+  check("the sandbox's Logic Circuit tab (CC mode) keeps memory", selectMayHoldMemory(S()));
+
+  // The grader: Stage 1 refuses memory in every combinatorial machine.
+  const qs = buildSampleAssignment().questions;
+  const withMem = (c: ReturnType<typeof ccCorrect>) =>
+    ({ ...c, components: [...c.components, comp('stray-mem', 'MEM', 'M1', 900, 900)] });
+  const reasons = (r: ReturnType<typeof gradeQuestion>): string[] => [
+    ...(r.cases ?? []).map((c) => c.reason ?? ''),
+    ...(r.turbotCases ?? []).map((c) => c.reason ?? ''),
+    ...(r.perceptionCases ?? []).map((c) => c.reason ?? ''),
+  ];
+  const refused = (r: ReturnType<typeof gradeQuestion>) =>
+    r.status === 'graded' && r.total > 0 && r.passed === 0 && reasons(r).every((x) => x.includes('no memory'));
+  const passes = (r: ReturnType<typeof gradeQuestion>) => r.status === 'graded' && r.total > 0 && r.passed === r.total;
+  const qCC = qs[0], qSC = qs[1], qTurbotCC = qs[4], qPerceptionCC = qs[8];
+  check(`sample questions are what the pins assume (${qCC.buildMode}, ${qSC.buildMode}, ${qTurbotCC.buildMode}/${qTurbotCC.innerMode}, ${qPerceptionCC.buildMode}+perception)`,
+    qCC.buildMode === 'CC' && qSC.buildMode === 'SC' && qTurbotCC.buildMode === 'turbot' &&
+    qTurbotCC.innerMode === 'CC' && qPerceptionCC.buildMode === 'CC' && qPerceptionCC.perception !== undefined);
+  check('control: the CC answer passes without the MEM', passes(gradeQuestion(qCC, ccCorrect())));
+  check('a CC answer holding a MEM is refused at Stage 1, every case, with the reason',
+    refused(gradeQuestion(qCC, withMem(ccCorrect()))));
+  check('...likewise a turbot CC brain', refused(gradeQuestion(qTurbotCC, withMem(turbotCorrect()))));
+  check('...and a CC perception circuit', refused(gradeQuestion(qPerceptionCC, withMem(perceptionEdgeCorrect()))));
+  check('an SC answer with its MEMs still passes', passes(gradeQuestion(qSC, scCorrect())));
 }
 
 console.log(`\nboxScopeCheck: ${passed} passed, ${failed} failed`);
