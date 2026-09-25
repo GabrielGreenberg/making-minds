@@ -31,3 +31,4 @@
 2026-09-24-039 · chore · Type-check the harness tools — app/tools and server/tools are outside every tsconfig, so stale literals and wrong signatures pass silently · 2026-09-24T07:51:19-0700 · task/039-typecheck-harness-tools · c68bda3
 2026-09-21-018 · feature · Pull open feedback reports from the server into a private folder outside the repo, with the author's role and a server-side triage mark (stage 1 of the feedback pipeline) · 2026-09-24T21:27:52-0700 · task/018-feedback-pull · 0009c75
 2026-09-23-036 · feature · Identify students by UID, not only email — 37 of 87 class-list emails are not UCLA addresses · 2026-09-24T23:17:44-0700 · task/036-identity-by-uid · 9494934
+2026-09-25-041 · chore · Back up the pilot database daily and keep the copies for weeks, independent of releases · 2026-09-25T10:13:41-0700 · task/041-daily-backups · 58aac12
