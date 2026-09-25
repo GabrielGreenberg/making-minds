@@ -29,3 +29,4 @@
 2026-09-23-038 · bug · A box drawn across wires (no IN/OUT of its own) confirms but its placed copy outputs 0 — bind box ports to the wires the box cuts · 2026-09-24T06:18:26-0700 · task/038-box-across-wires-port-binding · c6e8a8a
 2026-09-21-016 · chore · Add the harness-tool portability grep gate (P-TOOLS-1) · 2026-09-24T07:09:13-0700 · task/016-harness-tool-portability-gate · f31776f
 2026-09-24-039 · chore · Type-check the harness tools — app/tools and server/tools are outside every tsconfig, so stale literals and wrong signatures pass silently · 2026-09-24T07:51:19-0700 · task/039-typecheck-harness-tools · c68bda3
+2026-09-21-018 · feature · Pull open feedback reports from the server into a private folder outside the repo, with the author's role and a server-side triage mark (stage 1 of the feedback pipeline) · 2026-09-24T21:27:52-0700 · task/018-feedback-pull · 0009c75
