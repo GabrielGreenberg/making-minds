@@ -109,8 +109,9 @@ sudo systemctl reload caddy
 curl -s https://api.<domain>/api/health    # → {"ok":true}
 ```
 
-Updates: `deploy/release.sh` (section 0). By hand, as the `makingminds` user:
-`git pull && npm install && sudo systemctl restart makingminds-api`.
+Updates: `deploy/release.sh` (section 0). By hand, as the `makingminds` user, in the
+repo: `git pull && (cd server && npm install) && sudo systemctl restart makingminds-api`
+— npm only ever in `server/` (run at the root, it writes a stray lockfile; task 060).
 
 **Backups** (task 041): the entire state is one SQLite file, copied two ways, each
 with its own folder and rotation so neither can prune the other's files. Both are

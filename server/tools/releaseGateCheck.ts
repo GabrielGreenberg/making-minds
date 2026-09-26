@@ -16,7 +16,9 @@
 //                listPilotAssignments() against a real password-mode server
 //                (published + due date — the fields the freeze reads)
 //   [release.sh] --unattended asks the gate and obeys its exit codes; the
-//                smoke test runs after every release
+//                smoke test runs after every release; the box discards npm's
+//                lockfile rewrites before it pulls (task 060), and the root has
+//                no tracked lockfile
 //
 // Exits non-zero on any failed assertion.
 
@@ -265,6 +267,13 @@ section('[release.sh]');
 {
   const sh = readFileSync(join(REPO, 'deploy', 'release.sh'), 'utf8');
   check('--unattended asks the gate, remembering its last note', sh.includes('deploy/release-gate.mjs" --json --note-state'));
+  const discard = sh.indexOf(`diff --name-only HEAD -- '*package-lock.json'`);
+  check(
+    "the box restores npm's lockfile rewrites before it pulls (drift never blocks a release)",
+    discard > 0 && sh.indexOf('checkout HEAD -- "$f"', discard) > discard && discard < sh.indexOf('pull --ff-only'),
+  );
+  const rootLock = execFileSync('git', ['-C', REPO, 'ls-files', '--', 'package-lock.json'], { encoding: 'utf8' }).trim();
+  check('no lockfile is tracked at the root (it has no package.json)', rootLock === '');
   check('… releases on 0, stops on hold (3) / wait (4), treats current (5) as done', /0\) ;;/.test(sh) && /5\) echo "nothing new to release"; exit 0 ;;/.test(sh) && /3\|4\) exit "\$gate_code" ;;/.test(sh));
   check('… and refuses other options beside it', sh.includes('--unattended releases everything or nothing'));
   check('--check prints the verdict and releases nothing', sh.includes('[ "$CHECK" = 1 ] && exec node "$ROOT/deploy/release-gate.mjs"'));
