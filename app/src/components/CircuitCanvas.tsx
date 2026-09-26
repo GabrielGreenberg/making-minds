@@ -1549,6 +1549,7 @@ function BoxView({
   onNotice?: (message: string) => void;
 }) {
   const removeConfirmedBox = useStore((s) => s.removeConfirmedBox);
+  const putAwayBox = useStore((s) => s.putAwayBox);
   const [hovered, setHovered] = useState(false);
   const C = canvasColors();
   // Box names are part of the graded circuit: the rename wears the provenance
@@ -1738,6 +1739,30 @@ function BoxView({
             pointerEvents="none"
           >
             ×
+          </text>
+        </g>
+      )}
+      {!isDraft && hovered && (
+        <g
+          style={{ cursor: 'pointer' }}
+          onPointerDown={(e) => {
+            e.stopPropagation();
+            const error = putAwayBox(box.id);
+            if (error) onNotice?.(error);
+          }}
+        >
+          <title>Put away: take this design off the canvas (the box stays in the library)</title>
+          <circle cx={box.x + box.width - 26} cy={box.y + 8} r={7} fill={C.surface} stroke={C.line2} strokeWidth={1} />
+          <text
+            x={box.x + box.width - 26}
+            y={box.y + 8}
+            textAnchor="middle"
+            dominantBaseline="central"
+            fontSize="10"
+            fill={C.dim}
+            pointerEvents="none"
+          >
+            ↓
           </text>
         </g>
       )}

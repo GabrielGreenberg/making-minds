@@ -968,6 +968,7 @@ interface AppState {
   // working (decision 7, task 054: a library action never destroys placed
   // work). Undoable, like every edit.
   removeConfirmedBox: (id: string) => void;
+  putAwayBox: (id: string) => string | null;
   // Rename a box everywhere it appears — the library entry, the drawn box on
   // the canvas, and the label of every placed instance (in this assignment,
   // across every question). Returns an error string, or null on success.
@@ -2761,6 +2762,29 @@ export const useStore = create<AppState>()((set, get) => ({
       boxes: state.boxes.filter((b) => b.id !== id),
       selectedTool: typeof state.selectedTool === 'object' && state.selectedTool?.box === id ? null : state.selectedTool,
     });
+  },
+  putAwayBox: (id) => {
+    const state = get();
+    if (isCurrentQuestionLocked(state)) return lockRefusal(state, 'put a box away');
+    const box = state.boxes.find((b) => b.id === id);
+    if (!box || !state.confirmedBoxLibrary.some((b) => b.id === id)) return 'Box not found.';
+    const inside = new Set(box.componentIds);
+    const wiredOut = state.wires.some((w) =>
+      inside.has(w.sourceComponentId) !== inside.has(w.targetComponentId)
+    );
+    if (wiredOut) {
+      return 'This box is wired into the rest of your circuit. Disconnect it first, ' +
+        'then use copies from the library instead.';
+    }
+    state.pushHistory();
+    set({
+      components: state.components.filter((c) => !inside.has(c.id)),
+      wires: state.wires.filter((w) => !inside.has(w.sourceComponentId)),
+      boxes: state.boxes.filter((b) => b.id !== id),
+      selectedIds: state.selectedIds.filter((sid) => !inside.has(sid)),
+    });
+    setTimeout(() => get().evaluateCircuit(), 0);
+    return null;
   },
   renameBox: (id, name) => {
     const state = get();

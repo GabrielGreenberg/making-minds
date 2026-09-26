@@ -153,9 +153,9 @@ intros, callouts, SVG figures cropped from the PDFs, all under `app/public/probl
 ## What's next
 
 The open work is the queue (`tasks/incoming/` ready, `tasks/blocked/` waiting on Gabriel);
-`/work` offers it. Headline on 2026-09-25: the editor redesign (053–057), the
-grading interface (031), the robot's setup (043), the pilot domain (008); UCLA SSO (006)
-deferred.
+`/work` offers it. Headline on 2026-09-26: the editor redesign (056 parked for Gabriel's
+look, 057), the grading interface (031), the robot's setup (043), the pilot domain (008);
+UCLA SSO (006) deferred.
 
 ---
 
