@@ -28,7 +28,7 @@ export function AccountPanel() {
   );
 }
 
-function ChangePasswordModal({ onClose }: { onClose: () => void }) {
+export function ChangePasswordModal({ onClose }: { onClose: () => void }) {
   const { capabilities, changePassword } = useAuth();
   const minLength = capabilities?.passwordMinLength ?? 8;
   const [current, setCurrent] = useState('');

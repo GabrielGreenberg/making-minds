@@ -1,7 +1,8 @@
 // The workspace for a fill-in-the-blank question — the open question's
-// writing panel narrowed to a list of labelled boxes. Same chrome as every
-// other question (nav bar, autosave, Submit); the answers live in the store's
-// fillAnswers and persist/travel exactly like a circuit.
+// answer area narrowed to a grid of labelled boxes, in the editor frame's
+// centre (EditorShell; the question itself is in the question panel). The
+// answers live in the store's fillAnswers and persist/travel exactly like a
+// circuit.
 //
 // Unlike an open question this one IS autograded (engine/fillIn.ts), so the
 // boxes are the whole answer: no prose, and into a digits-only blank no
@@ -13,7 +14,7 @@
 import { useStore, selectLockNotice } from '../store';
 import { usePasteGuard } from '../usePasteGuard';
 import { fillInBlanks } from '../engine/fillIn';
-import { ProblemBody, ProblemContext } from './ProblemSetDocument';
+import { AnswerFoot } from './OpenResponsePanel';
 
 export function FillInPanel() {
   const assignment = useStore((s) => s.assignment);
@@ -30,27 +31,19 @@ export function FillInPanel() {
   if (!assignment || !question || !spec) return null;
 
   const blanks = fillInBlanks(spec);
-  const filled = blanks.filter((_, i) => (answers[i] ?? '').trim() !== '').length;
 
   return (
-    <div className="open-response">
-      <div className="open-response-card">
-        <div className="open-response-head">
-          <h2 className="open-response-label">{question.label}</h2>
-          <span className="open-response-mode">fill in the blanks</span>
-        </div>
-        <div className="open-response-statement">
-          <ProblemContext assignment={assignment} questionId={question.id} />
-          <ProblemBody question={question} />
-        </div>
-        <div className="fill-in-grid">
+    <div className="wb-answer mm-surface">
+      <div className="wb-answer-inner">
+        <div className="eyebrow wb-answer-eyebrow">Your answer</div>
+        <div className="wb-fill-grid">
           {/* Keyed by position: answers are positional (fillAnswers[i] is
               blank i), and labels are unique only by authoring. */}
           {blanks.map((blank, i) => (
-            <label key={i} className="fill-in-row">
-              <span className="fill-in-label">{blank.label}</span>
+            <label key={i} className="wb-fill-field">
+              <span className="wb-fill-label">{blank.label}</span>
               <input
-                className="fill-in-input"
+                className="wb-fill-input"
                 value={answers[i] ?? ''}
                 inputMode={blank.digitsOnly ? 'numeric' : 'text'}
                 autoComplete="off"
@@ -67,16 +60,7 @@ export function FillInPanel() {
             </label>
           ))}
         </div>
-        <div className="open-response-foot">
-          <span>{filled} of {blanks.length} filled in</span>
-          {pasteNotice ? (
-            <span className="paste-notice" role="status">{pasteNotice}</span>
-          ) : (
-            <span>
-              {lockNotice ?? "Saved automatically — submit the assignment when you're done."}
-            </span>
-          )}
-        </div>
+        <AnswerFoot pasteNotice={pasteNotice} lockNotice={lockNotice} />
       </div>
     </div>
   );

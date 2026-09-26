@@ -300,24 +300,6 @@
 .feedback-sent { padding: 12px 0 4px; }
 .feedback-file { font-size: var(--mm-fs-small); color: var(--mm-ink-2); }
 
-/* MenuBar Submit (assignment active) */
-.menu-submit {
-  margin-left: auto;
-  color: var(--mm-ok);
-  font-weight: 600;
-}
-
-.menu-submit:hover {
-  background: var(--mm-ok-soft);
-}
-
-.menu-frozen {
-  margin-left: auto;
-  color: var(--mm-danger);
-  font-weight: 600;
-  cursor: default;
-}
-
 /* ─────────────────────────────────────────────────────────────────
    Instructor frontend
    ───────────────────────────────────────────────────────────────── */
@@ -788,7 +770,6 @@
   cursor: pointer;
 }
 .visitor-banner-close:hover { color: var(--mm-ink); }
-.session-chip--visitor { color: var(--mm-accent); border-color: var(--mm-accent); }
 .login-visitor {
   display: grid;
   gap: 12px;
@@ -820,16 +801,7 @@
 .login-switch--inline { display: inline; margin: 0; font-size: inherit; }
 .login-actions { display: flex; flex-wrap: wrap; gap: 10px; }
 
-/* Session controls — shown in the menu bar, home screen, and instructor header */
-.session-chip {
-  font-size: 13px;
-  color: var(--mm-ink-2);
-  padding: 4px 10px;
-  background: var(--mm-surface);
-  border: 1px solid var(--mm-line-2);
-  border-radius: 999px;
-  white-space: nowrap;
-}
+/* The Password button (auth/AccountPanel.tsx) beside a page's session controls. */
 .menu-link-button {
   border: 1px solid var(--mm-line-2);
   background: var(--mm-surface);
@@ -842,12 +814,3 @@
 }
 .menu-link-button:hover { color: var(--mm-ink); border-color: var(--mm-ink-3); }
 
-.menu-right {
-  margin-left: auto;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 0 8px;
-}
-/* When Submit is present it owns the auto-margin; keep a gap before the group. */
-.menu-submit + .menu-right { margin-left: 8px; }

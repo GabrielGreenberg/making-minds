@@ -138,7 +138,7 @@ _(textbook ch. 22, pp. 99–103; mockup `Mock_Ups-9.jpg`)_
   single action write-or-move), **external = square** (sense B/E/F, move ↑/↱/↰).
   TM-turbot's private tape shown read-only below the canvas.
 
-## Page surfaces (everything outside the editor)
+## Page surfaces (everything outside the canvas)
 
 _The course website, https://www.makingminds.org, is the design authority for every
 surface that is not the circuit editor: the login and server-health screens, the home
@@ -169,8 +169,8 @@ literal or an undefined token. Task: `tasks/done/2026-09-21-019-*`._
   "First time here?" link to setup and an access request only when setup finds the
   email off-roster.)
 - **Visitor** (task 027) — someone not signed in reaches only the sandbox (the editor):
-  its menu bar shows a magenta-outlined "Visitor" chip and **Sign in** where the name /
-  Feedback / Log out sit (no ⌂ Home), and under it one dismissible lavender
+  its top bar shows "Visitor" and **Sign in** where the name menu sits (the brand is not
+  a link — a visitor has no Home), and under it one dismissible lavender
   `.visitor-banner` line ("…as a visitor — PHIL 133 student? Sign in"; dismissed for the
   browser session). On page surfaces `SessionControls` shows Visitor · Sign in. Every
   sign-in card (local picker; remote password / dev / SSO) OPENS with "Just exploring?…"
@@ -213,6 +213,14 @@ literal or an undefined token. Task: `tasks/done/2026-09-21-019-*`._
 - **Home row** — title · meta (question count, due date) · submission status (which
   carries the grade line and the "View grades" link once released) · ONE action (Submit,
   or the past-due lock). Nothing else.
-- **The editor is untouched** — `index.css` keeps its own canvas tokens (there
-  `--accent` is the selection blue) and inherits only the font family from the page
-  tokens; `themeCheck` pins that.
+- **One visual language, the editor included** (task 052, retiring the old "the editor
+  is untouched" boundary) — the editor's frame speaks these tokens too:
+  `components/EditorShell.tsx` (a 48px white top bar — serif brand to Home, a breadcrumb
+  to the assignment's document, the save state, Submit, `SessionControls` folded under
+  "Name ▾" — over a 4px band), the left **question panel** (nav strip, the problem, the
+  grouped question list), resizable and collapsible columns, and the open / fill-in
+  answer area, all styled in `app/src/workbench.css` (literal-free, like `pages.css`).
+  The spec is `docs/buildout/designs/editor-workbench.md`. What is still inside
+  `index.css` — the canvas, palette and data-panel internals — moves onto the tokens in
+  tasks 053–055; until then `themeCheck` ratchets its colour literals (they may only go
+  down). The goal and output tables use Plex Sans with tabular digits, never Mono.

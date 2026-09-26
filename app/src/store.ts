@@ -660,6 +660,9 @@ interface AppState {
   // 'error' is remote-only: a seam save failed (server unreachable); the
   // crash buffer holds the state and a backoff retry is scheduled.
   autoSaveStatus: 'saved' | 'unsaved' | 'saving' | 'error';
+  /** When the open workbook's last save was confirmed (ms epoch) — the top
+   *  bar's "Saved N min ago". Null until the first save since it opened. */
+  lastSavedAt: number | null;
 
   // Workbook — the sandbox's tabs as one file (task 028: File ▸ New / Open… /
   // Save / Save as…, components/WorkbookFileMenu.tsx). Everything here reads
@@ -1511,6 +1514,7 @@ export function captureSandboxSession(): () => boolean {
 
 export const useStore = create<AppState>()((set, get) => ({
   autoSaveStatus: 'saved' as const,
+  lastSavedAt: null,
 
   // Workbook state
   workbookOpen: false,
@@ -2271,6 +2275,7 @@ export const useStore = create<AppState>()((set, get) => ({
       confirmedBoxLibrary: boxLibrary,
       buildMode: activeQ?.buildMode || 'CC',
       workbookOpen: true,
+      lastSavedAt: null,
     });
     get().resetAllSimState();
     return true;
@@ -2308,7 +2313,7 @@ export const useStore = create<AppState>()((set, get) => ({
     }
     // History is canvas-scoped: an undo after coming back must not restore
     // the canvas left here over whichever one is entered next.
-    set({ workbookOpen: false, undoStack: [], redoStack: [] });
+    set({ workbookOpen: false, lastSavedAt: null, undoStack: [], redoStack: [] });
   },
   enterSandbox: () => {
     const state = get();
@@ -4554,7 +4559,10 @@ export const useStore = create<AppState>()((set, get) => ({
     // gate on the first click there. So is the history: undo writes its
     // snapshot into the CURRENT canvas, so a stack carried across a swap
     // would restore the previous question (or sandbox tab) over this one.
-    set({ selectedTool: null, undoStack: [], redoStack: [] });
+    // The selection is canvas-scoped for the same reason: ids from the last
+    // canvas select nothing here, and a stale one would let Delete act on
+    // this canvas's namesake (task 052).
+    set({ selectedTool: null, selectedIds: [], undoStack: [], redoStack: [] });
   },
 
   resetForPrincipal: (email) => {
@@ -4838,7 +4846,7 @@ async function performAutoSave(keepalive = false): Promise<void> {
       }
       return;
     }
-    useStore.setState({ autoSaveStatus: 'saved' });
+    useStore.setState({ autoSaveStatus: 'saved', lastSavedAt: Date.now() });
     autoSaveBackoff = AUTO_SAVE_BACKOFF_INITIAL;
     if (backendMode === 'remote' && saved) {
       // Confirmed on the server — the crash buffer for this assignment is
@@ -4996,7 +5004,7 @@ function cancelPendingAutoSave() {
   autoSavePendingSince = null;
   autoSaveTrailing = false;
   autoSaveBackoff = AUTO_SAVE_BACKOFF_INITIAL;
-  useStore.setState({ autoSaveStatus: 'saved' });
+  useStore.setState({ autoSaveStatus: 'saved', lastSavedAt: null });
 }
 window.addEventListener('beforeunload', () => flushAutoSave({ journal: true, keepalive: true }));
 window.addEventListener('pagehide', () => flushAutoSave({ journal: true, keepalive: true }));

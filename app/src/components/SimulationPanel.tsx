@@ -8,7 +8,6 @@ export function SimulationToolbar() {
   const components = useStore((s) => s.components);
   const hasMem = hasMemory(components); // boxed MEMs count: a sequential box is SC
   const isSC = buildMode === 'SC' || hasMem;
-  const autoSaveStatus = useStore((s) => s.autoSaveStatus);
   const selectedIds = useStore((s) => s.selectedIds);
   const hasSelection = selectedIds.length > 0;
   const hasStateSelected = selectedIds.some((id) => components.find((c) => c.id === id)?.type === 'STATE');
@@ -123,21 +122,6 @@ export function SimulationToolbar() {
               Current state: {currentStateLabel ?? 'S₀'}
             </span>
           )}
-          <span
-            className="autosave-indicator"
-            style={{ marginLeft: 0, ...(autoSaveStatus === 'error' ? { color: '#c62828' } : {}) }}
-            title={
-              autoSaveStatus === 'saved' ? 'All changes saved'
-              : autoSaveStatus === 'saving' ? 'Saving...'
-              : autoSaveStatus === 'error' ? 'The server could not be reached — your work is kept in this browser and saving will retry automatically'
-              : 'Unsaved changes'
-            }
-          >
-            {autoSaveStatus === 'saved' ? '✓ Saved'
-              : autoSaveStatus === 'saving' ? 'Saving...'
-              : autoSaveStatus === 'error' ? '⚠ Not saved — retrying'
-              : '• Unsaved'}
-          </span>
         </div>
       </div>
     </>

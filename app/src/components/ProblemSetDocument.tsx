@@ -13,7 +13,7 @@
 // reads correctly on its own canvas too.
 
 import type { MouseEvent, ReactNode } from 'react';
-import type { AssignmentData, AssignmentQuestion, Callout, Figure, Placement } from '../types';
+import type { AssignmentData, AssignmentQuestion, Callout, CalloutKind, Figure, Placement } from '../types';
 import { questionModeLabel } from '../types';
 import {
   DEFAULT_CALLOUT_TITLE,
@@ -41,7 +41,7 @@ export interface ProblemStatus {
 
 const BASE_URL: string = import.meta.env.BASE_URL;
 
-function FigureView({ figure }: { figure: Figure }) {
+export function FigureView({ figure }: { figure: Figure }) {
   return (
     <figure className="ps-figure">
       <img
@@ -93,13 +93,28 @@ function arenaCellSize(width: number): number {
 /**
  * One problem's own content: run-in title, statement, hint, its callouts and
  * figures, and (for a turbot) its first arena. `showArena` is off in the
- * editor, whose right panel already draws the live arena.
+ * editor, whose right panel already draws the live arena. The editor's
+ * question panel (QuestionPanel.tsx) heads the problem with its own title,
+ * keeps caution notes always in view and puts the hints behind a link, so it
+ * passes `showTitle={false}`, `showHint={false}` and omits those kinds here.
  */
-export function ProblemBody({ question, showArena = true }: { question: AssignmentQuestion; showArena?: boolean }) {
-  const callouts = question.callouts ?? [];
+export function ProblemBody({
+  question,
+  showArena = true,
+  showTitle = true,
+  showHint = true,
+  omitKinds = [],
+}: {
+  question: AssignmentQuestion;
+  showArena?: boolean;
+  showTitle?: boolean;
+  showHint?: boolean;
+  omitKinds?: readonly CalloutKind[];
+}) {
+  const callouts = (question.callouts ?? []).filter((c) => !omitKinds.includes(c.kind));
   const figures = question.figures ?? [];
   const arena = showArena && question.buildMode === 'turbot' ? question.turbot_cases?.[0]?.arena : undefined;
-  const title = question.title?.trim();
+  const title = showTitle ? question.title?.trim() : undefined;
   // The PDFs' run-in idiom: "**Edge detector.** Design a machine …" — the
   // period only when text follows on the same line.
   const first = parseStatement(question.statement)[0];
@@ -113,7 +128,7 @@ export function ProblemBody({ question, showArena = true }: { question: Assignme
       <StatementBody text={question.statement} lead={lead} />
       {/* A problem has no margin of its own: its asides follow it as notes. */}
       <Attachments callouts={callouts} figures={figures} where="aside" note />
-      {question.hint && <div className="ps-hint"><StatementBody text={question.hint} /></div>}
+      {showHint && question.hint && <div className="ps-hint"><StatementBody text={question.hint} /></div>}
       {arena && (
         <div className="ps-arena">
           <ArenaCanvas arena={arena} cellSize={arenaCellSize(arena.width)} />

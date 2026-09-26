@@ -40,18 +40,7 @@ html, body, #root {
   width: 100vw;
 }
 
-/* ── Menu Bar ── */
-.menu-bar {
-  display: flex;
-  align-items: center;
-  height: 36px;
-  background: var(--menu-bg);
-  border-bottom: 1px solid var(--menu-border);
-  padding: 0 4px;
-  flex-shrink: 0;
-  z-index: 100;
-}
-
+/* ── The sandbox's File menu (WorkbookFileMenu, in the editor's top bar) ── */
 .menu-item {
   position: relative;
   padding: 6px 14px;
@@ -294,14 +283,6 @@ html, body, #root {
   padding: 0 8px;
   gap: 4px;
   flex-shrink: 0;
-}
-
-.autosave-indicator {
-  margin-left: auto;
-  font-size: 11px;
-  color: #999;
-  white-space: nowrap;
-  padding-right: 4px;
 }
 
 .toolbar-btn {
@@ -710,55 +691,20 @@ html, body, #root {
   color: #333;
 }
 
-/* ── Data Table Panel ── */
+/* ── Data Table Panel ──
+   The editor's right column (EditorShell's .wb-right) sets the width and draws
+   the divider; the panel just fills it. */
 .data-table-panel {
-  width: 260px;
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
   background: var(--panel-bg);
-  border-left: 1px solid var(--menu-border);
   display: flex;
   flex-direction: row;
-  flex-shrink: 0;
   overflow: visible;
   position: relative;
 }
 
-.panel-resize-handle {
-  cursor: col-resize;
-  position: absolute;
-  top: 0;
-  /* The panel is the containing block, so `left` is measured from its PADDING
-     box — 1px inside its border-left, which is the visible divider. Centering
-     the 9px strip on the divider's midline needs -4px - 1px. */
-  left: -5px;
-  bottom: 0;
-  width: 9px;
-  z-index: 20;
-}
-.panel-resize-handle::after {
-  content: '';
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  width: 6px;
-  height: 28px;
-  background: #e8e8e8;
-  border: 1px solid #d0d0d0;
-  border-radius: 4px;
-}
-.panel-resize-handle:hover,
-.panel-resize-handle:active {
-  background: rgba(42, 127, 255, 0.08);
-}
-.panel-resize-handle:hover::after,
-.panel-resize-handle:active::after {
-  background: var(--accent);
-}
-
-.data-table-panel > .table-header,
-.data-table-panel > .data-table-content {
-  /* Let the content fill remaining space after the handle */
-}
 .data-table-panel-inner {
   display: flex;
   flex-direction: column;
@@ -851,18 +797,6 @@ html, body, #root {
   letter-spacing: 0.4px;
   color: var(--text-secondary);
   margin-bottom: 4px;
-}
-
-/* Representation badge next to the "Question" label in the right panel */
-.question-rep-badge {
-  float: right;
-  font-weight: 500;
-  text-transform: none;
-  letter-spacing: 0;
-  color: #1565c0;
-  background: #e3f2fd;
-  border-radius: 8px;
-  padding: 1px 8px;
 }
 
 .data-table {
@@ -1375,130 +1309,6 @@ thead .sc-label-col {
   align-items: center;
 }
 
-/* ── Per-question navigation bar (assignment canvas) ── */
-.tab-bar.question-nav {
-  align-items: center;
-  gap: 10px;
-  padding: 0 8px;
-}
-
-.question-nav-back {
-  font-size: 12px;
-  color: #1565c0;
-  background: none;
-  border: none;
-  padding: 4px 6px;
-  cursor: pointer;
-  white-space: nowrap;
-  font-weight: 500;
-}
-
-.question-nav-back:hover {
-  text-decoration: underline;
-}
-
-.question-nav-label {
-  font-size: 12px;
-  font-weight: 600;
-  color: #333;
-  white-space: nowrap;
-}
-
-/* The open assignment's full name, right-aligned in the question nav bar so
-   the editor always says which homework you are in. */
-.question-nav-assignment {
-  margin-left: auto;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-size: 12px;
-  color: var(--text-secondary);
-}
-
-.question-nav-count {
-  font-weight: 400;
-  color: #999;
-}
-
-.question-nav-arrows {
-  display: flex;
-  gap: 4px;
-}
-
-.question-nav-btn {
-  font-size: 13px;
-  line-height: 1;
-  padding: 4px 10px;
-  border: 1px solid #ccc;
-  border-radius: 4px;
-  background: white;
-  cursor: pointer;
-  color: #333;
-}
-
-.question-nav-btn:hover:not(:disabled) {
-  border-color: #1565c0;
-  color: #1565c0;
-}
-
-.question-nav-btn:disabled {
-  color: #ccc;
-  cursor: default;
-}
-
-.question-nav-done-tag {
-  margin-left: 8px;
-  font-size: 11px;
-  font-weight: 600;
-  color: #8a6d1f;
-}
-
-.question-nav-done-toggle {
-  font-size: 12px;
-  padding: 4px 10px;
-  border: 1px solid #ccc;
-  border-radius: 4px;
-  background: white;
-  cursor: pointer;
-  color: #333;
-  white-space: nowrap;
-}
-
-.question-nav-done-toggle:hover {
-  border-color: #1565c0;
-  color: #1565c0;
-}
-
-.question-nav-done-toggle--done {
-  background: #fff8e1;
-  border-color: #e0c060;
-  color: #8a6d1f;
-}
-
-.question-nav-done-toggle--done:hover {
-  border-color: #c62828;
-  color: #c62828;
-}
-
-.question-nav-frozen-tag {
-  font-size: 12px;
-  font-weight: 600;
-  padding: 4px 10px;
-  border-radius: 4px;
-  background: #fff0f0;
-  color: #c62828;
-  white-space: nowrap;
-}
-
-/* Question statement shown at the top of the right data panel */
-.question-statement {
-  padding: 8px 10px;
-  font-size: 12px;
-  line-height: 1.5;
-  color: #444;
-}
-
 /* A graded case loaded into the run ("Run this input" on the grade sheet —
    GradedCaseBanner): what was recorded, what this run gives, whether they
    are the same run. */
@@ -1802,126 +1612,5 @@ thead .sc-label-col {
   font-family: 'SF Mono', 'Fira Code', monospace;
   color: #444;
   line-height: 1.6;
-  white-space: nowrap;
-}
-
-/* ── Open (free-text) question workspace ───────────────────────── */
-
-.open-response {
-  flex: 1;
-  overflow-y: auto;
-  background: var(--panel-bg);
-  display: flex;
-  justify-content: center;
-  padding: 32px 24px;
-}
-
-.open-response-card {
-  width: 100%;
-  max-width: 720px;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  background: #fff;
-  border: 1px solid #e0e0e0;
-  border-radius: 10px;
-  padding: 24px 28px;
-  align-self: flex-start;
-}
-
-.open-response-head {
-  display: flex;
-  align-items: baseline;
-  gap: 10px;
-}
-
-.open-response-label {
-  font-size: 18px;
-  font-weight: 600;
-}
-
-.open-response-mode {
-  font-size: 11px;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  color: var(--text-secondary);
-  background: #f0f0f0;
-  border-radius: 4px;
-  padding: 2px 7px;
-}
-
-.open-response-statement {
-  font-size: 14px;
-  line-height: 1.55;
-  color: var(--text);
-}
-
-.open-response-textarea {
-  font-family: inherit;
-  font-size: 14px;
-  line-height: 1.6;
-  color: var(--text);
-  min-height: 260px;
-  resize: vertical;
-  padding: 12px 14px;
-  border: 1px solid #ccc;
-  border-radius: 6px;
-  outline: none;
-}
-
-.open-response-textarea:focus {
-  border-color: var(--accent);
-  box-shadow: 0 0 0 2px rgba(42, 127, 255, 0.15);
-}
-
-/* Fill-in-the-blank answers: one labelled box per blank. */
-.fill-in-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
-  gap: 10px 16px;
-  margin: 18px 0 6px;
-}
-
-.fill-in-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.fill-in-label {
-  min-width: 2.2em;
-  text-align: right;
-  font-weight: 600;
-  color: var(--text);
-}
-
-.fill-in-input {
-  flex: 1;
-  min-width: 0;
-  padding: 6px 8px;
-  font-family: 'SF Mono', 'Fira Code', ui-monospace, monospace;
-  font-size: 14px;
-  border: 1px solid var(--menu-border);
-  border-radius: 5px;
-  background: #fff;
-  color: var(--text);
-}
-
-.fill-in-input:focus {
-  outline: none;
-  border-color: var(--accent);
-}
-
-.open-response-foot {
-  display: flex;
-  justify-content: space-between;
-  gap: 16px;
-  font-size: 12px;
-  color: var(--text-secondary);
-}
-
-/* The count keeps its line when a paste notice takes the right side. */
-.open-response-foot > :first-child {
   white-space: nowrap;
 }
