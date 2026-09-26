@@ -8,9 +8,9 @@ requires:
 area: deploy
 source: chat
 created: 2026-09-25T15:40:00-07:00
-status: in-progress
+status: done
 after:
-branch: task/060-box-lockfile-drift
+branch:
 merged_into:
 ---
 
@@ -59,3 +59,9 @@ and no "uncommitted edits" note, and the box's clone is clean afterwards
 ## Progress log
 - 2026-09-25 (`/work`) — Filed and claimed from the 029 release output at Gabriel's ask
   ("complete it here"); diagnosed with a read-only ssh diff of the box's clone.
+- 2026-09-25 (`/work`) — Landed. The box snippet was run against a scratch repo (a drifted
+  root and `server/` lockfile + an unrelated edit): both lockfiles restored with the message,
+  the edit kept. Gates by exit code: app `tsc` 0, build 0, `npm run check` 0, server
+  typecheck 0, server check 0. **Owed:** Gabriel's next hand release (the gate holds
+  `deploy/` changes) — expect "discarded npm's rewrite of package-lock.json", no
+  "uncommitted edits" note, and a clean clone on the box after.

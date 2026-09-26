@@ -111,6 +111,13 @@ sudo bash -c 'chmod 600 /srv/making-minds/data/backup-*.sqlite* 2>/dev/null || t
 sudo bash -c 'ls -t /srv/making-minds/data/backup-*.sqlite 2>/dev/null | tail -n +8 | xargs -r rm -f'
 echo "backup: $BK"
 before=$(sudo -u makingminds -H git -C "$REPO" rev-parse --short HEAD)
+# npm's output is never a hand edit: a lockfile npm rewrote in this clone (npm run
+# in the wrong folder, or the box's npm differing) is restored, so it can never block
+# the pull (task 060). Any other edit is kept and reported, below.
+for f in $(sudo -u makingminds -H git -C "$REPO" diff --name-only HEAD -- '*package-lock.json'); do
+  sudo -u makingminds -H git -C "$REPO" checkout HEAD -- "$f"
+  echo "discarded npm's rewrite of $f"
+done
 dirty=$(sudo -u makingminds -H git -C "$REPO" status --porcelain)
 [ -z "$dirty" ] || printf 'note: uncommitted edits on the box (kept; the pull fails if they collide):\n%s\n' "$dirty"
 sudo -u makingminds -H git -C "$REPO" pull --ff-only -q
