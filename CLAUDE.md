@@ -66,9 +66,9 @@ down; a "Password" control) → browse
 **problem-set document** (`AssignmentOverview` → `ProblemSetDocument`, task 020: preamble,
 sections with the instruction for their run of problems, continuously numbered problems with
 run-in titles, tables/one-liners in grids/columns, callout boxes, figures, a turbot's arena
-drawn live, a status mark per problem, an "Original PDF" link) → the question **editor** (task 052: a top bar with save state + Submit;
-a question panel beside the workspace; resizable, collapsible columns; 054: a floating
-parts palette, Boxes pop-out, pins; 055: the site's canvas look, Fit), in the right mode: **CC, SC, FSM, TM,
+drawn live, a status mark per problem, an "Original PDF" link) → the question **editor**, a workbench built to its design memo (052–057: a top bar with
+save state + Submit; a question panel; resizable, collapsible columns; a floating parts
+palette + Boxes pop-out; the site's canvas look, Fit), in the right mode: **CC, SC, FSM, TM,
 turbot** (TM: clickable tape strip below the canvas, machine table / run / history panels,
 tape alphabet tied to the question's `representation`; turbot: the
 `innerMode` brain's editor plus the arena "Map" (Step/Run/Pause/Reset) in the right panel;
@@ -153,9 +153,8 @@ intros, callouts, SVG figures cropped from the PDFs, all under `app/public/probl
 ## What's next
 
 The open work is the queue (`tasks/incoming/` ready, `tasks/blocked/` waiting on Gabriel);
-`/work` offers it. Headline on 2026-09-26: the editor redesign's last
-step (057), the grading interface (031), the robot's setup (043), the pilot domain (008);
-UCLA SSO (006) deferred.
+`/work` offers it. Headline on 2026-09-26: the grading interface (031), the robot's setup
+(043), the pilot domain (008); UCLA SSO (006) deferred.
 
 ---
 

@@ -58,6 +58,7 @@ import {
   boxMetaLine,
   boxRows,
   clampPalette,
+  clearOf,
   clientToCanvas,
   paletteHasBoxes,
   paletteLength,
@@ -344,6 +345,20 @@ console.log('\n[palette]');
       paletteOrientation(false, len, { w: 900, h: 300 }) === true);
     check('neither fitting, or an unknown canvas, keeps the choice',
       paletteOrientation(true, len, { w: 200, h: 200 }) === true && paletteOrientation(false, len, { w: 0, h: 0 }) === false);
+  }
+  {
+    // Task 057: the palette keeps clear of the canvas's action group (top right).
+    const group = { x0: 100, y0: 12, x1: 390, y1: 70 };
+    const pal = { w: 60, h: 372 };
+    check('clear of the action group: no overlap leaves the palette where it is',
+      JSON.stringify(clearOf({ x: 14, y: 14 }, pal, { x0: 300, y0: 12, x1: 640, y1: 70 }, { w: 660, h: 716 })) === '{"x":14,"y":14}');
+    check('…an overlap drops it below the group (8px clear)',
+      JSON.stringify(clearOf({ x: 120, y: 14 }, pal, group, { w: 400, h: 716 })) === '{"x":120,"y":78}');
+    check('…a canvas too short for that keeps the clamped spot',
+      JSON.stringify(clearOf({ x: 120, y: 14 }, pal, group, { w: 400, h: 420 })) === '{"x":120,"y":14}');
+    check('…and the palette measures the real group (.cv-actions) and applies it after the clamp',
+      /querySelector<HTMLElement>\('\.cv-actions'\)/.test(code('components/Palette.tsx')) &&
+        /clearOf\(clampPalette\(placement, size, canvas\), size, actions, canvas\)/.test(code('components/Palette.tsx')));
   }
   check('a canvas smaller than the palette pins it to the top-left margin',
     JSON.stringify(clampPalette({ x: 50, y: 50 }, size, { w: 40, h: 300 })) === '{"x":8,"y":8}');

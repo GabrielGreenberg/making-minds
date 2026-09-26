@@ -1,0 +1,2488 @@
+{
+  "hw1-cc": {
+    "checks": [
+      {
+        "sec": "Top bar",
+        "what": "height 48",
+        "sel": ".wb-topbar",
+        "prop": "H",
+        "want": 48,
+        "got": 48,
+        "ok": true
+      },
+      {
+        "sec": "Top bar",
+        "what": "background surface",
+        "sel": ".wb-topbar",
+        "prop": "background-color",
+        "want": "tok:--mm-surface",
+        "got": "rgb(255, 255, 255)",
+        "ok": true
+      },
+      {
+        "sec": "Top bar",
+        "what": "bottom border 1px line",
+        "sel": ".wb-topbar",
+        "prop": "border-bottom",
+        "want": "re:^1px solid",
+        "got": "1px solid rgb(229, 229, 229)",
+        "ok": true
+      },
+      {
+        "sec": "Top bar",
+        "what": "bottom border colour",
+        "sel": ".wb-topbar",
+        "prop": "border-bottom-color",
+        "want": "tok:--mm-line",
+        "got": "rgb(229, 229, 229)",
+        "ok": true
+      },
+      {
+        "sec": "Top bar",
+        "what": "padding 0 20px",
+        "sel": ".wb-topbar",
+        "prop": "padding",
+        "want": "0px 20px",
+        "got": "0px 20px",
+        "ok": true
+      },
+      {
+        "sec": "Top bar",
+        "what": "gap 18",
+        "sel": ".wb-topbar",
+        "prop": "column-gap",
+        "want": 18,
+        "got": "18px",
+        "ok": true
+      },
+      {
+        "sec": "Top bar",
+        "what": "items centred",
+        "sel": ".wb-topbar",
+        "prop": "align-items",
+        "want": "center",
+        "got": "center",
+        "ok": true
+      },
+      {
+        "sec": "Top bar",
+        "what": "brand serif",
+        "sel": ".wb-brand",
+        "prop": "font-family",
+        "want": "re:Plex Serif",
+        "got": "\"IBM Plex Serif\", Georgia, \"Times New Roman\", serif",
+        "ok": true
+      },
+      {
+        "sec": "Top bar",
+        "what": "brand 700",
+        "sel": ".wb-brand",
+        "prop": "font-weight",
+        "want": "700",
+        "got": "700",
+        "ok": true
+      },
+      {
+        "sec": "Top bar",
+        "what": "brand 17px",
+        "sel": ".wb-brand",
+        "prop": "font-size",
+        "want": 17,
+        "got": "17px",
+        "ok": true
+      },
+      {
+        "sec": "Top bar",
+        "what": "brand nowrap",
+        "sel": ".wb-brand",
+        "prop": "white-space",
+        "want": "nowrap",
+        "got": "nowrap",
+        "ok": true
+      },
+      {
+        "sec": "Top bar",
+        "what": "brand no shrink",
+        "sel": ".wb-brand",
+        "prop": "flex-shrink",
+        "want": "0",
+        "got": "0",
+        "ok": true
+      },
+      {
+        "sec": "Top bar",
+        "what": "PHIL 133 11px",
+        "sel": ".wb-course",
+        "prop": "font-size",
+        "want": 11,
+        "got": "11px",
+        "ok": true
+      },
+      {
+        "sec": "Top bar",
+        "what": "PHIL 133 600",
+        "sel": ".wb-course",
+        "prop": "font-weight",
+        "want": "600",
+        "got": "600",
+        "ok": true
+      },
+      {
+        "sec": "Top bar",
+        "what": "PHIL 133 .09em",
+        "sel": ".wb-course",
+        "prop": "letter-spacing",
+        "want": 0.99,
+        "got": "0.99px",
+        "ok": true
+      },
+      {
+        "sec": "Top bar",
+        "what": "PHIL 133 accent",
+        "sel": ".wb-course",
+        "prop": "color",
+        "want": "tok:--mm-accent",
+        "got": "rgb(194, 85, 185)",
+        "ok": true
+      },
+      {
+        "sec": "Top bar",
+        "what": "breadcrumb 13.5px",
+        "sel": ".wb-crumbs",
+        "prop": "font-size",
+        "want": 13.5,
+        "got": "13.5px",
+        "ok": true
+      },
+      {
+        "sec": "Top bar",
+        "what": "breadcrumb ink-3",
+        "sel": ".wb-crumbs",
+        "prop": "color",
+        "want": "tok:--mm-ink-3",
+        "got": "rgb(123, 123, 123)",
+        "ok": true
+      },
+      {
+        "sec": "Top bar",
+        "what": "breadcrumb ellipsis",
+        "sel": ".wb-crumbs",
+        "prop": "text-overflow",
+        "want": "ellipsis",
+        "got": "clip",
+        "ok": false
+      },
+      {
+        "sec": "Top bar",
+        "what": "crumb current ink",
+        "sel": ".wb-crumb-current",
+        "prop": "color",
+        "want": "tok:--mm-ink",
+        "got": "rgb(42, 42, 42)",
+        "ok": true
+      },
+      {
+        "sec": "Top bar",
+        "what": "crumb current 500",
+        "sel": ".wb-crumb-current",
+        "prop": "font-weight",
+        "want": "500",
+        "got": "500",
+        "ok": true
+      },
+      {
+        "sec": "Top bar",
+        "what": "separator line-2",
+        "sel": ".wb-crumb-sep",
+        "prop": "color",
+        "want": "tok:--mm-line-2",
+        "got": "rgb(213, 213, 213)",
+        "ok": true
+      },
+      {
+        "sec": "Top bar",
+        "what": "separator padding 0 4px",
+        "sel": ".wb-crumb-sep",
+        "prop": "padding",
+        "want": "0px 4px",
+        "got": "0px 4px",
+        "ok": true
+      },
+      {
+        "sec": "Top bar",
+        "what": "right pushed (margin-left auto)",
+        "sel": ".wb-topbar-right",
+        "prop": "margin-left",
+        "want": "re:^[1-9]",
+        "got": "309.656px",
+        "ok": true
+      },
+      {
+        "sec": "Top bar",
+        "what": "save 12.5px",
+        "sel": ".wb-save",
+        "prop": "font-size",
+        "want": 12.5,
+        "got": "12.5px",
+        "ok": true
+      },
+      {
+        "sec": "Top bar",
+        "what": "save ink-3",
+        "sel": ".wb-save",
+        "prop": "color",
+        "want": "tok:--mm-ink-3",
+        "got": "rgb(123, 123, 123)",
+        "ok": true
+      },
+      {
+        "sec": "Top bar",
+        "what": "Submit 13px",
+        "sel": ".wb-topbar .wb-primary",
+        "prop": "font-size",
+        "want": 13,
+        "got": "13px",
+        "ok": true
+      },
+      {
+        "sec": "Top bar",
+        "what": "Submit 600",
+        "sel": ".wb-topbar .wb-primary",
+        "prop": "font-weight",
+        "want": "600",
+        "got": "600",
+        "ok": true
+      },
+      {
+        "sec": "Top bar",
+        "what": "Submit padding 6px 12px",
+        "sel": ".wb-topbar .wb-primary",
+        "prop": "padding",
+        "want": "6px 12px",
+        "got": "6px 12px",
+        "ok": true
+      },
+      {
+        "sec": "Top bar",
+        "what": "session 13.5px",
+        "sel": ".wb-topbar .session > button",
+        "prop": "font-size",
+        "want": 13.5,
+        "got": "13.5px",
+        "ok": true
+      },
+      {
+        "sec": "Top bar",
+        "what": "session ink-2",
+        "sel": ".wb-topbar .session > button",
+        "prop": "color",
+        "want": "tok:--mm-ink-2",
+        "got": "rgb(74, 74, 74)",
+        "ok": true
+      },
+      {
+        "sec": "Top bar",
+        "what": "band 4px",
+        "sel": ".wb-band",
+        "prop": "H",
+        "want": 4,
+        "got": 4,
+        "ok": true
+      },
+      {
+        "sec": "Top bar",
+        "what": "band lav",
+        "sel": ".wb-band",
+        "prop": "background-color",
+        "want": "tok:--mm-lav",
+        "got": "rgb(226, 180, 255)",
+        "ok": true
+      },
+      {
+        "sec": "Question panel",
+        "what": "panel bg",
+        "sel": ".wb-left",
+        "prop": "background-color",
+        "want": "tok:--mm-bg",
+        "got": "rgb(251, 250, 253)",
+        "ok": true
+      },
+      {
+        "sec": "Question panel",
+        "what": "panel width 320",
+        "sel": ".wb-left",
+        "prop": "W",
+        "want": 320,
+        "got": 320,
+        "ok": true
+      },
+      {
+        "sec": "Question panel",
+        "what": "nav 34 tall",
+        "sel": ".qp-nav",
+        "prop": "H",
+        "want": 34,
+        "got": 34,
+        "ok": true
+      },
+      {
+        "sec": "Question panel",
+        "what": "nav bg surface-3",
+        "sel": ".qp-nav",
+        "prop": "background-color",
+        "want": "tok:--mm-surface-3",
+        "got": "rgb(247, 245, 250)",
+        "ok": true
+      },
+      {
+        "sec": "Question panel",
+        "what": "nav bottom border line",
+        "sel": ".qp-nav",
+        "prop": "border-bottom-color",
+        "want": "tok:--mm-line",
+        "got": "rgb(229, 229, 229)",
+        "ok": true
+      },
+      {
+        "sec": "Question panel",
+        "what": "nav padding 0 6 0 10",
+        "sel": ".qp-nav",
+        "prop": "padding",
+        "want": "0px 6px 0px 10px",
+        "got": "0px 6px 0px 10px",
+        "ok": true
+      },
+      {
+        "sec": "Question panel",
+        "what": "nav gap 2",
+        "sel": ".qp-nav",
+        "prop": "column-gap",
+        "want": 2,
+        "got": "2px",
+        "ok": true
+      },
+      {
+        "sec": "Question panel",
+        "what": "Prev/Next 26 tall",
+        "sel": ".qp-navbtn",
+        "prop": "H",
+        "want": 26,
+        "got": 26,
+        "ok": true
+      },
+      {
+        "sec": "Question panel",
+        "what": "Prev/Next padding 0 8px",
+        "sel": ".qp-navbtn",
+        "prop": "padding",
+        "want": "0px 8px",
+        "got": "0px 8px",
+        "ok": true
+      },
+      {
+        "sec": "Question panel",
+        "what": "Prev/Next 12.5px",
+        "sel": ".qp-navbtn",
+        "prop": "font-size",
+        "want": 12.5,
+        "got": "12.5px",
+        "ok": true
+      },
+      {
+        "sec": "Question panel",
+        "what": "Prev/Next 500",
+        "sel": ".qp-navbtn",
+        "prop": "font-weight",
+        "want": "500",
+        "got": "500",
+        "ok": true
+      },
+      {
+        "sec": "Question panel",
+        "what": "Prev disabled opacity .45",
+        "sel": ".qp-navbtn:disabled",
+        "prop": "opacity",
+        "want": "0.45",
+        "got": "0.45",
+        "ok": true
+      },
+      {
+        "sec": "Question panel",
+        "what": "Prev disabled ink-3",
+        "sel": ".qp-navbtn:disabled",
+        "prop": "color",
+        "want": "tok:--mm-ink-3",
+        "got": "rgb(123, 123, 123)",
+        "ok": true
+      },
+      {
+        "sec": "Question panel",
+        "what": "\"1 of 23\" 12px",
+        "sel": ".qp-pos",
+        "prop": "font-size",
+        "want": 12,
+        "got": "12px",
+        "ok": true
+      },
+      {
+        "sec": "Question panel",
+        "what": "\"1 of 23\" ink-3",
+        "sel": ".qp-pos",
+        "prop": "color",
+        "want": "tok:--mm-ink-3",
+        "got": "rgb(123, 123, 123)",
+        "ok": true
+      },
+      {
+        "sec": "Question panel",
+        "what": "\"1 of 23\" tabular",
+        "sel": ".qp-pos",
+        "prop": "font-variant-numeric",
+        "want": "tabular-nums",
+        "got": "tabular-nums",
+        "ok": true
+      },
+      {
+        "sec": "Question panel",
+        "what": "collapse 28 wide",
+        "sel": ".qp-collapse",
+        "prop": "W",
+        "want": 28,
+        "got": 28,
+        "ok": true
+      },
+      {
+        "sec": "Question panel",
+        "what": "collapse 26 tall",
+        "sel": ".qp-collapse",
+        "prop": "H",
+        "want": 26,
+        "got": 26,
+        "ok": true
+      },
+      {
+        "sec": "Question panel",
+        "what": "collapse ink-3",
+        "sel": ".qp-collapse",
+        "prop": "color",
+        "want": "tok:--mm-ink-3",
+        "got": "rgb(123, 123, 123)",
+        "ok": true
+      },
+      {
+        "sec": "Question panel",
+        "what": "current bg surface",
+        "sel": ".qp-current",
+        "prop": "background-color",
+        "want": "tok:--mm-surface",
+        "got": "rgb(255, 255, 255)",
+        "ok": true
+      },
+      {
+        "sec": "Question panel",
+        "what": "current padding 16 20 22",
+        "sel": ".qp-current",
+        "prop": "padding",
+        "want": "16px 20px 22px",
+        "got": "16px 20px 22px",
+        "ok": true
+      },
+      {
+        "sec": "Question panel",
+        "what": "current gap 12",
+        "sel": ".qp-current",
+        "prop": "row-gap",
+        "want": 12,
+        "got": "12px",
+        "ok": true
+      },
+      {
+        "sec": "Question panel",
+        "what": "current max-height 64%",
+        "sel": ".qp-current",
+        "prop": "max-height",
+        "want": "re:.",
+        "got": "64%",
+        "ok": true
+      },
+      {
+        "sec": "Question panel",
+        "what": "current own scroll",
+        "sel": ".qp-current",
+        "prop": "overflow-y",
+        "want": "auto",
+        "got": "auto",
+        "ok": true
+      },
+      {
+        "sec": "Question panel",
+        "what": "eyebrow 11px",
+        "sel": ".qp-eyebrow",
+        "prop": "font-size",
+        "want": 11,
+        "got": "11px",
+        "ok": true
+      },
+      {
+        "sec": "Question panel",
+        "what": "eyebrow 600",
+        "sel": ".qp-eyebrow",
+        "prop": "font-weight",
+        "want": "600",
+        "got": "600",
+        "ok": true
+      },
+      {
+        "sec": "Question panel",
+        "what": "eyebrow uppercase",
+        "sel": ".qp-eyebrow",
+        "prop": "text-transform",
+        "want": "uppercase",
+        "got": "uppercase",
+        "ok": true
+      },
+      {
+        "sec": "Question panel",
+        "what": "eyebrow .08em",
+        "sel": ".qp-eyebrow",
+        "prop": "letter-spacing",
+        "want": 0.88,
+        "got": "0.88px",
+        "ok": true
+      },
+      {
+        "sec": "Question panel",
+        "what": "eyebrow accent",
+        "sel": ".qp-eyebrow",
+        "prop": "color",
+        "want": "tok:--mm-accent",
+        "got": "rgb(194, 85, 185)",
+        "ok": true
+      },
+      {
+        "sec": "Question panel",
+        "what": "title serif",
+        "sel": ".qp-title",
+        "prop": "font-family",
+        "want": "re:Plex Serif",
+        "got": "\"IBM Plex Serif\", Georgia, \"Times New Roman\", serif",
+        "ok": true
+      },
+      {
+        "sec": "Question panel",
+        "what": "title 19px",
+        "sel": ".qp-title",
+        "prop": "font-size",
+        "want": 19,
+        "got": "19px",
+        "ok": true
+      },
+      {
+        "sec": "Question panel",
+        "what": "title 600",
+        "sel": ".qp-title",
+        "prop": "font-weight",
+        "want": "600",
+        "got": "600",
+        "ok": true
+      },
+      {
+        "sec": "Question panel",
+        "what": "title line-height 1.25",
+        "sel": ".qp-title",
+        "prop": "line-height",
+        "want": 23.75,
+        "got": "23.75px",
+        "ok": true
+      },
+      {
+        "sec": "Question panel",
+        "what": "title ink",
+        "sel": ".qp-title",
+        "prop": "color",
+        "want": "tok:--mm-ink",
+        "got": "rgb(42, 42, 42)",
+        "ok": true
+      },
+      {
+        "sec": "Question panel",
+        "what": "title balance",
+        "sel": ".qp-title",
+        "prop": "text-wrap",
+        "want": "re:balance",
+        "got": "balance",
+        "ok": true
+      },
+      {
+        "sec": "Question panel",
+        "what": "title margin-top -6",
+        "sel": ".qp-title",
+        "prop": "margin-top",
+        "want": -6,
+        "got": "-6px",
+        "ok": true
+      },
+      {
+        "sec": "Question panel",
+        "what": "statement 15px",
+        "sel": ".qp-statement",
+        "prop": "font-size",
+        "want": 15,
+        "got": "15px",
+        "ok": true
+      },
+      {
+        "sec": "Question panel",
+        "what": "statement 1.5",
+        "sel": ".qp-statement",
+        "prop": "line-height",
+        "want": 22.5,
+        "got": "22.5px",
+        "ok": true
+      },
+      {
+        "sec": "Question panel",
+        "what": "statement ink-2",
+        "sel": ".qp-statement",
+        "prop": "color",
+        "want": "tok:--mm-ink-2",
+        "got": "rgb(74, 74, 74)",
+        "ok": true
+      },
+      {
+        "sec": "Question panel",
+        "what": "statement bold ink",
+        "sel": ".qp-statement strong",
+        "prop": "color",
+        "want": "tok:--mm-ink",
+        "got": "rgb(42, 42, 42)",
+        "ok": true
+      },
+      {
+        "sec": "Question panel",
+        "what": "statement bold 600",
+        "sel": ".qp-statement strong",
+        "prop": "font-weight",
+        "want": "600",
+        "got": "600",
+        "ok": true
+      },
+      {
+        "sec": "Question panel",
+        "what": "goal cell 60 wide",
+        "sel": ".qp-statement .statement-io-table td",
+        "prop": "W",
+        "want": 60,
+        "got": 60,
+        "ok": true
+      },
+      {
+        "sec": "Question panel",
+        "what": "goal cell centred",
+        "sel": ".qp-statement .statement-io-table td",
+        "prop": "text-align",
+        "want": "center",
+        "got": "center",
+        "ok": true
+      },
+      {
+        "sec": "Question panel",
+        "what": "goal cell padding 8px 0",
+        "sel": ".qp-statement .statement-io-table td",
+        "prop": "padding",
+        "want": "8px 0px",
+        "got": "8px 0px",
+        "ok": true
+      },
+      {
+        "sec": "Question panel",
+        "what": "goal cell 14px",
+        "sel": ".qp-statement .statement-io-table td",
+        "prop": "font-size",
+        "want": 14,
+        "got": "14px",
+        "ok": true
+      },
+      {
+        "sec": "Question panel",
+        "what": "goal cell Plex Sans (decision 2)",
+        "sel": ".qp-statement .statement-io-table td",
+        "prop": "font-family",
+        "want": "re:^\"IBM Plex Sans\"",
+        "got": "\"IBM Plex Sans\", \"Helvetica Neue\", Arial, sans-serif",
+        "ok": true
+      },
+      {
+        "sec": "Question panel",
+        "what": "goal cell tabular",
+        "sel": ".qp-statement .statement-io-table td",
+        "prop": "font-variant-numeric",
+        "want": "tabular-nums",
+        "got": "tabular-nums",
+        "ok": true
+      },
+      {
+        "sec": "Question panel",
+        "what": "goal header 11px",
+        "sel": ".qp-statement .statement-io-table th",
+        "prop": "font-size",
+        "want": 11,
+        "got": "11px",
+        "ok": true
+      },
+      {
+        "sec": "Question panel",
+        "what": "goal header 600",
+        "sel": ".qp-statement .statement-io-table th",
+        "prop": "font-weight",
+        "want": "600",
+        "got": "600",
+        "ok": true
+      },
+      {
+        "sec": "Question panel",
+        "what": "goal header .08em",
+        "sel": ".qp-statement .statement-io-table th",
+        "prop": "letter-spacing",
+        "want": 0.88,
+        "got": "0.88px",
+        "ok": true
+      },
+      {
+        "sec": "Question panel",
+        "what": "goal header ink-3",
+        "sel": ".qp-statement .statement-io-table th",
+        "prop": "color",
+        "want": "tok:--mm-ink-3",
+        "got": "rgb(123, 123, 123)",
+        "ok": true
+      },
+      {
+        "sec": "Question panel",
+        "what": "goal header padding 6px 0",
+        "sel": ".qp-statement .statement-io-table th",
+        "prop": "padding",
+        "want": "6px 0px",
+        "got": "6px 0px",
+        "ok": true
+      },
+      {
+        "sec": "Question panel",
+        "what": "goal header rule line-2",
+        "sel": ".qp-statement .statement-io-table th",
+        "prop": "border-bottom-color",
+        "want": "tok:--mm-line-2",
+        "got": "rgb(213, 213, 213)",
+        "ok": true
+      },
+      {
+        "sec": "Question panel",
+        "what": "goal row rule line",
+        "sel": ".qp-statement .statement-io-table td",
+        "prop": "border-bottom-color",
+        "want": "tok:--mm-line",
+        "got": "rgb(229, 229, 229)",
+        "ok": true
+      },
+      {
+        "sec": "Question panel",
+        "what": "first output rule line-2",
+        "sel": ".qp-statement .statement-io-table .statement-io-out",
+        "prop": "border-left-color",
+        "want": "tok:--mm-line-2",
+        "got": "rgb(213, 213, 213)",
+        "ok": true
+      },
+      {
+        "sec": "Question panel",
+        "what": "hint link 13.5px",
+        "sel": ".qp-link",
+        "prop": "font-size",
+        "want": 13.5,
+        "got": "13.5px",
+        "ok": true
+      },
+      {
+        "sec": "Question panel",
+        "what": "hint link 500",
+        "sel": ".qp-link",
+        "prop": "font-weight",
+        "want": "500",
+        "got": "500",
+        "ok": true
+      },
+      {
+        "sec": "Question panel",
+        "what": "hint link colour",
+        "sel": ".qp-link",
+        "prop": "color",
+        "want": "tok:--mm-link",
+        "got": "rgb(19, 130, 214)",
+        "ok": true
+      },
+      {
+        "sec": "Question panel",
+        "what": "done label 13.5px",
+        "sel": ".qp-done-label",
+        "prop": "font-size",
+        "want": 13.5,
+        "got": "13.5px",
+        "ok": true
+      },
+      {
+        "sec": "Question panel",
+        "what": "done label ink-2",
+        "sel": ".qp-done-label",
+        "prop": "color",
+        "want": "tok:--mm-ink-2",
+        "got": "rgb(74, 74, 74)",
+        "ok": true
+      },
+      {
+        "sec": "Question panel",
+        "what": "done hit height ≥32",
+        "sel": ".qp-done-label",
+        "prop": "min-height",
+        "want": 32,
+        "got": "32px",
+        "ok": true
+      },
+      {
+        "sec": "Question panel",
+        "what": "done box 18",
+        "sel": ".qp-done-box",
+        "prop": "W",
+        "want": 18,
+        "got": 18,
+        "ok": true
+      },
+      {
+        "sec": "Question panel",
+        "what": "done box border edge-2",
+        "sel": ".qp-done-box",
+        "prop": "border-top-color",
+        "want": "tok:--mm-edge-2",
+        "got": "rgb(185, 178, 196)",
+        "ok": true
+      },
+      {
+        "sec": "Question panel",
+        "what": "list head 34",
+        "sel": ".qp-list-head",
+        "prop": "H",
+        "want": 34,
+        "got": 34,
+        "ok": true
+      },
+      {
+        "sec": "Question panel",
+        "what": "list head surface-2",
+        "sel": ".qp-list-head",
+        "prop": "background-color",
+        "want": "tok:--mm-surface-2",
+        "got": "rgb(241, 238, 245)",
+        "ok": true
+      },
+      {
+        "sec": "Question panel",
+        "what": "list head top border edge",
+        "sel": ".qp-list-head",
+        "prop": "border-top-color",
+        "want": "tok:--mm-edge",
+        "got": "rgb(207, 200, 216)",
+        "ok": true
+      },
+      {
+        "sec": "Question panel",
+        "what": "list head bottom border line",
+        "sel": ".qp-list-head",
+        "prop": "border-bottom-color",
+        "want": "tok:--mm-line",
+        "got": "rgb(229, 229, 229)",
+        "ok": true
+      },
+      {
+        "sec": "Question panel",
+        "what": "list head 11.5px",
+        "sel": ".qp-list-head",
+        "prop": "font-size",
+        "want": 11.5,
+        "got": "11.5px",
+        "ok": true
+      },
+      {
+        "sec": "Question panel",
+        "what": "list head 600",
+        "sel": ".qp-list-head",
+        "prop": "font-weight",
+        "want": "600",
+        "got": "600",
+        "ok": true
+      },
+      {
+        "sec": "Question panel",
+        "what": "list head uppercase",
+        "sel": ".qp-list-head",
+        "prop": "text-transform",
+        "want": "uppercase",
+        "got": "uppercase",
+        "ok": true
+      },
+      {
+        "sec": "Question panel",
+        "what": "list head .09em",
+        "sel": ".qp-list-head",
+        "prop": "letter-spacing",
+        "want": 1.035,
+        "got": "1.035px",
+        "ok": true
+      },
+      {
+        "sec": "Question panel",
+        "what": "list head ink",
+        "sel": ".qp-list-head",
+        "prop": "color",
+        "want": "tok:--mm-ink",
+        "got": "rgb(42, 42, 42)",
+        "ok": true
+      },
+      {
+        "sec": "Question panel",
+        "what": "list head padding 0 20px",
+        "sel": ".qp-list-head",
+        "prop": "padding",
+        "want": "0px 20px",
+        "got": "0px 20px",
+        "ok": true
+      },
+      {
+        "sec": "Question panel",
+        "what": "section label 10.5px",
+        "sel": ".qp-list-label",
+        "prop": "font-size",
+        "want": 10.5,
+        "got": "10.5px",
+        "ok": true
+      },
+      {
+        "sec": "Question panel",
+        "what": "section label 600",
+        "sel": ".qp-list-label",
+        "prop": "font-weight",
+        "want": "600",
+        "got": "600",
+        "ok": true
+      },
+      {
+        "sec": "Question panel",
+        "what": "section label .08em",
+        "sel": ".qp-list-label",
+        "prop": "letter-spacing",
+        "want": 0.84,
+        "got": "0.84px",
+        "ok": true
+      },
+      {
+        "sec": "Question panel",
+        "what": "section label ink-3",
+        "sel": ".qp-list-label",
+        "prop": "color",
+        "want": "tok:--mm-ink-3",
+        "got": "rgb(123, 123, 123)",
+        "ok": true
+      },
+      {
+        "sec": "Question panel",
+        "what": "section label padding 12 20 4",
+        "sel": ".qp-list-label",
+        "prop": "padding",
+        "want": "12px 20px 4px",
+        "got": "12px 20px 4px",
+        "ok": true
+      },
+      {
+        "sec": "Question panel",
+        "what": "row grid",
+        "sel": ".qp-row",
+        "prop": "grid-template-columns",
+        "want": "re:^30px",
+        "got": "30px 151.391px 24.6094px 50px",
+        "ok": true
+      },
+      {
+        "sec": "Question panel",
+        "what": "row gap 8",
+        "sel": ".qp-row",
+        "prop": "column-gap",
+        "want": 8,
+        "got": "8px",
+        "ok": true
+      },
+      {
+        "sec": "Question panel",
+        "what": "row min-height 36",
+        "sel": ".qp-row",
+        "prop": "min-height",
+        "want": 36,
+        "got": "36px",
+        "ok": true
+      },
+      {
+        "sec": "Question panel",
+        "what": "row padding 0 20px",
+        "sel": ".qp-row",
+        "prop": "padding",
+        "want": "0px 20px",
+        "got": "0px 20px",
+        "ok": true
+      },
+      {
+        "sec": "Question panel",
+        "what": "row 13.5px",
+        "sel": ".qp-row",
+        "prop": "font-size",
+        "want": 13.5,
+        "got": "13.5px",
+        "ok": true
+      },
+      {
+        "sec": "Question panel",
+        "what": "row number 12px",
+        "sel": ".qp-row-num",
+        "prop": "font-size",
+        "want": 12,
+        "got": "12px",
+        "ok": true
+      },
+      {
+        "sec": "Question panel",
+        "what": "row number mono",
+        "sel": ".qp-row-num",
+        "prop": "font-family",
+        "want": "re:Plex Mono",
+        "got": "\"IBM Plex Mono\", SFMono-Regular, Menlo, Consolas, monospace",
+        "ok": true
+      },
+      {
+        "sec": "Question panel",
+        "what": "row number ink-3",
+        "sel": ".qp-row-num",
+        "prop": "color",
+        "want": "tok:--mm-ink-3",
+        "got": "rgb(123, 123, 123)",
+        "ok": true
+      },
+      {
+        "sec": "Question panel",
+        "what": "current row lav-soft",
+        "sel": ".qp-row--current",
+        "prop": "background-color",
+        "want": "tok:--mm-lav-soft",
+        "got": "rgb(242, 230, 255)",
+        "ok": true
+      },
+      {
+        "sec": "Question panel",
+        "what": "current row 600",
+        "sel": ".qp-row--current",
+        "prop": "font-weight",
+        "want": "600",
+        "got": "600",
+        "ok": true
+      },
+      {
+        "sec": "Question panel",
+        "what": "mark done 11.5px",
+        "sel": ".qp-row-mark--done",
+        "prop": "font-size",
+        "want": 11.5,
+        "got": "11.5px",
+        "ok": true
+      },
+      {
+        "sec": "Question panel",
+        "what": "mark done 600",
+        "sel": ".qp-row-mark--done",
+        "prop": "font-weight",
+        "want": "600",
+        "got": "600",
+        "ok": true
+      },
+      {
+        "sec": "Question panel",
+        "what": "mark done accent",
+        "sel": ".qp-row-mark--done",
+        "prop": "color",
+        "want": "tok:--mm-accent",
+        "got": "rgb(194, 85, 185)",
+        "ok": true
+      },
+      {
+        "sec": "Question panel",
+        "what": "mark started 11.5px",
+        "sel": ".qp-row-mark--started",
+        "prop": "font-size",
+        "want": 11.5,
+        "got": "11.5px",
+        "ok": true
+      },
+      {
+        "sec": "Question panel",
+        "what": "mark started warn",
+        "sel": ".qp-row-mark--started",
+        "prop": "color",
+        "want": "tok:--mm-warn",
+        "got": "rgb(168, 112, 15)",
+        "ok": true
+      },
+      {
+        "sec": "Question panel",
+        "what": "CC tag mono 10.5",
+        "sel": ".qp-row .tag--accent",
+        "prop": "font-size",
+        "want": 10.5,
+        "got": "10.5px",
+        "ok": true
+      },
+      {
+        "sec": "Question panel",
+        "what": "CC tag 600",
+        "sel": ".qp-row .tag--accent",
+        "prop": "font-weight",
+        "want": "600",
+        "got": "600",
+        "ok": true
+      },
+      {
+        "sec": "Dividers",
+        "what": "hit area 9",
+        "sel": ".wb-divider",
+        "prop": "W",
+        "want": 9,
+        "got": 9,
+        "ok": true
+      },
+      {
+        "sec": "Dividers",
+        "what": "margin 0 -4px",
+        "sel": ".wb-divider",
+        "prop": "margin",
+        "want": "0px -4px",
+        "got": "0px -4px",
+        "ok": true
+      },
+      {
+        "sec": "Dividers",
+        "what": "col-resize",
+        "sel": ".wb-divider",
+        "prop": "cursor",
+        "want": "col-resize",
+        "got": "col-resize",
+        "ok": true
+      },
+      {
+        "sec": "Dividers",
+        "what": "touch-action none",
+        "sel": ".wb-divider",
+        "prop": "touch-action",
+        "want": "none",
+        "got": "none",
+        "ok": true
+      },
+      {
+        "sec": "Dividers",
+        "what": "grip 7 wide",
+        "sel": ".wb-divider-grip",
+        "prop": "W",
+        "want": 7,
+        "got": 7,
+        "ok": true
+      },
+      {
+        "sec": "Dividers",
+        "what": "grip 30 tall",
+        "sel": ".wb-divider-grip",
+        "prop": "H",
+        "want": 30,
+        "got": 30,
+        "ok": true
+      },
+      {
+        "sec": "Dividers",
+        "what": "grip surface",
+        "sel": ".wb-divider-grip",
+        "prop": "background-color",
+        "want": "tok:--mm-surface",
+        "got": "rgb(255, 255, 255)",
+        "ok": true
+      },
+      {
+        "sec": "Dividers",
+        "what": "grip border edge",
+        "sel": ".wb-divider-grip",
+        "prop": "border-top-color",
+        "want": "tok:--mm-edge",
+        "got": "rgb(207, 200, 216)",
+        "ok": true
+      },
+      {
+        "sec": "Canvas",
+        "what": "surface",
+        "sel": ".canvas-container",
+        "prop": "background-color",
+        "want": "tok:--mm-surface",
+        "got": "rgb(255, 255, 255)",
+        "ok": true
+      },
+      {
+        "sec": "Canvas",
+        "what": "dot grid",
+        "sel": ".canvas-container",
+        "prop": "background-image",
+        "want": "re:radial-gradient",
+        "got": "radial-gradient(circle, rgb(218, 212, 226) 1px, rgba(0, 0, 0, 0) 1.2px)",
+        "ok": true
+      },
+      {
+        "sec": "Canvas",
+        "what": "actions top 12",
+        "sel": ".cv-actions",
+        "prop": "top",
+        "want": 12,
+        "got": "12px",
+        "ok": true
+      },
+      {
+        "sec": "Canvas",
+        "what": "actions right 14",
+        "sel": ".cv-actions",
+        "prop": "right",
+        "want": 14,
+        "got": "14px",
+        "ok": true
+      },
+      {
+        "sec": "Canvas",
+        "what": "actions border line-2",
+        "sel": ".cv-group",
+        "prop": "border-top-color",
+        "want": "tok:--mm-line-2",
+        "got": "rgb(213, 213, 213)",
+        "ok": true
+      },
+      {
+        "sec": "Canvas",
+        "what": "action button 13px",
+        "sel": ".cv-group > button",
+        "prop": "font-size",
+        "want": 13,
+        "got": "13px",
+        "ok": true
+      },
+      {
+        "sec": "Canvas",
+        "what": "action button padding 6px 12px",
+        "sel": ".cv-group > button",
+        "prop": "padding",
+        "want": "6px 12px",
+        "got": "6px 12px",
+        "ok": true
+      },
+      {
+        "sec": "Canvas",
+        "what": "action divider line",
+        "sel": ".cv-group > button + button",
+        "prop": "border-left-color",
+        "want": "tok:--mm-line",
+        "got": "rgb(229, 229, 229)",
+        "ok": true
+      },
+      {
+        "sec": "Canvas",
+        "what": "zoom bottom 12",
+        "sel": ".cv-zoom",
+        "prop": "bottom",
+        "want": 12,
+        "got": "12px",
+        "ok": true
+      },
+      {
+        "sec": "Canvas",
+        "what": "zoom right 12",
+        "sel": ".cv-zoom",
+        "prop": "right",
+        "want": 12,
+        "got": "12px",
+        "ok": true
+      },
+      {
+        "sec": "Canvas",
+        "what": "zoom 12.5px",
+        "sel": ".cv-zoom > button",
+        "prop": "font-size",
+        "want": 12.5,
+        "got": "12.5px",
+        "ok": true
+      },
+      {
+        "sec": "Canvas",
+        "what": "zoom % mono",
+        "sel": ".cv-zoom-pct",
+        "prop": "font-family",
+        "want": "re:Plex Mono",
+        "got": "\"IBM Plex Mono\", SFMono-Regular, Menlo, Consolas, monospace",
+        "ok": true
+      },
+      {
+        "sec": "Canvas",
+        "what": "zoom % 11.5px",
+        "sel": ".cv-zoom-pct",
+        "prop": "font-size",
+        "want": 11.5,
+        "got": "11.5px",
+        "ok": true
+      },
+      {
+        "sec": "Canvas",
+        "what": "zoom % min-width 48",
+        "sel": ".cv-zoom-pct",
+        "prop": "min-width",
+        "want": 48,
+        "got": "48px",
+        "ok": true
+      },
+      {
+        "sec": "Canvas",
+        "what": "hint left 16",
+        "sel": ".cv-guide-hint",
+        "prop": "left",
+        "want": 16,
+        "got": "16px",
+        "ok": true
+      },
+      {
+        "sec": "Canvas",
+        "what": "hint bottom 14",
+        "sel": ".cv-guide-hint",
+        "prop": "bottom",
+        "want": 14,
+        "got": "14px",
+        "ok": true
+      },
+      {
+        "sec": "Canvas",
+        "what": "hint 12.5px",
+        "sel": ".cv-guide-hint",
+        "prop": "font-size",
+        "want": 12.5,
+        "got": "12.5px",
+        "ok": true
+      },
+      {
+        "sec": "Canvas",
+        "what": "hint ink-3",
+        "sel": ".cv-guide-hint",
+        "prop": "color",
+        "want": "tok:--mm-ink-3",
+        "got": "rgb(123, 123, 123)",
+        "ok": true
+      },
+      {
+        "sec": "Canvas",
+        "what": "hint ellipsis",
+        "sel": ".cv-guide-hint",
+        "prop": "text-overflow",
+        "want": "ellipsis",
+        "got": "ellipsis",
+        "ok": true
+      },
+      {
+        "sec": "Canvas",
+        "what": "hint pointer-events none",
+        "sel": ".cv-guide-hint",
+        "prop": "pointer-events",
+        "want": "none",
+        "got": "none",
+        "ok": true
+      },
+      {
+        "sec": "Palette",
+        "what": "at (14,14): left",
+        "sel": ".pal",
+        "prop": "left",
+        "want": 14,
+        "got": "14px",
+        "ok": true
+      },
+      {
+        "sec": "Palette",
+        "what": "at (14,14): top",
+        "sel": ".pal",
+        "prop": "top",
+        "want": 14,
+        "got": "14px",
+        "ok": true
+      },
+      {
+        "sec": "Palette",
+        "what": "surface",
+        "sel": ".pal",
+        "prop": "background-color",
+        "want": "tok:--mm-surface",
+        "got": "rgb(255, 255, 255)",
+        "ok": true
+      },
+      {
+        "sec": "Palette",
+        "what": "border line-2",
+        "sel": ".pal",
+        "prop": "border-top-color",
+        "want": "tok:--mm-line-2",
+        "got": "rgb(213, 213, 213)",
+        "ok": true
+      },
+      {
+        "sec": "Palette",
+        "what": "shadow 0 2px 8px .08",
+        "sel": ".pal",
+        "prop": "box-shadow",
+        "want": "re:0.08\\) 0px 2px 8px",
+        "got": "rgba(3, 13, 36, 0.08) 0px 2px 8px 0px",
+        "ok": true
+      },
+      {
+        "sec": "Palette",
+        "what": "grip 16",
+        "sel": ".pal-grip",
+        "prop": "H",
+        "want": 16,
+        "got": 16,
+        "ok": true
+      },
+      {
+        "sec": "Palette",
+        "what": "grip surface-3",
+        "sel": ".pal-grip",
+        "prop": "background-color",
+        "want": "tok:--mm-surface-3",
+        "got": "rgb(247, 245, 250)",
+        "ok": true
+      },
+      {
+        "sec": "Palette",
+        "what": "tile 58 wide",
+        "sel": ".pal-tile",
+        "prop": "W",
+        "want": 58,
+        "got": 58,
+        "ok": true
+      },
+      {
+        "sec": "Palette",
+        "what": "tile min-height 44",
+        "sel": ".pal-tile",
+        "prop": "min-height",
+        "want": 44,
+        "got": "44px",
+        "ok": true
+      },
+      {
+        "sec": "Palette",
+        "what": "tile padding 7 0 6",
+        "sel": ".pal-tile",
+        "prop": "padding",
+        "want": "7px 0px 6px",
+        "got": "7px 0px 6px",
+        "ok": true
+      },
+      {
+        "sec": "Palette",
+        "what": "tile gap 4",
+        "sel": ".pal-tile",
+        "prop": "row-gap",
+        "want": 4,
+        "got": "4px",
+        "ok": true
+      },
+      {
+        "sec": "Palette",
+        "what": "icon 36 wide",
+        "sel": ".pal-tile .pal-ico",
+        "prop": "W",
+        "want": 36,
+        "got": 36,
+        "ok": true
+      },
+      {
+        "sec": "Palette",
+        "what": "icon 26 tall",
+        "sel": ".pal-tile .pal-ico",
+        "prop": "H",
+        "want": 26,
+        "got": 26,
+        "ok": true
+      },
+      {
+        "sec": "Palette",
+        "what": "label 10.5px",
+        "sel": ".pal-tile-label",
+        "prop": "font-size",
+        "want": 10.5,
+        "got": "10.5px",
+        "ok": true
+      },
+      {
+        "sec": "Palette",
+        "what": "label 500",
+        "sel": ".pal-tile-label",
+        "prop": "font-weight",
+        "want": "500",
+        "got": "500",
+        "ok": true
+      },
+      {
+        "sec": "Palette",
+        "what": "label ink-2",
+        "sel": ".pal-tile-label",
+        "prop": "color",
+        "want": "tok:--mm-ink-2",
+        "got": "rgb(74, 74, 74)",
+        "ok": true
+      },
+      {
+        "sec": "Palette",
+        "what": "turn 24",
+        "sel": ".pal-turn",
+        "prop": "H",
+        "want": 24,
+        "got": 24,
+        "ok": true
+      },
+      {
+        "sec": "Palette",
+        "what": "icon stroke 1.6",
+        "sel": ".pal-tile .pal-ico",
+        "prop": "stroke-width",
+        "want": "1.6px",
+        "got": "1.6px",
+        "ok": true
+      },
+      {
+        "sec": "Output panel",
+        "what": "surface",
+        "sel": ".wb-right",
+        "prop": "background-color",
+        "want": "tok:--mm-surface",
+        "got": "rgb(255, 255, 255)",
+        "ok": true
+      },
+      {
+        "sec": "Output panel",
+        "what": "width 300",
+        "sel": ".wb-right",
+        "prop": "W",
+        "want": 300,
+        "got": 300,
+        "ok": true
+      },
+      {
+        "sec": "Output panel",
+        "what": "eyebrow 11.5px",
+        "sel": ".wb-right-head",
+        "prop": "font-size",
+        "want": 11.5,
+        "got": "15px",
+        "ok": false
+      },
+      {
+        "sec": "Output panel",
+        "what": "eyebrow 600",
+        "sel": ".wb-right-head",
+        "prop": "font-weight",
+        "want": "600",
+        "got": "400",
+        "ok": false
+      },
+      {
+        "sec": "Output panel",
+        "what": "eyebrow .09em",
+        "sel": ".wb-right-head",
+        "prop": "letter-spacing",
+        "want": 1.035,
+        "got": "normal",
+        "ok": false
+      },
+      {
+        "sec": "Output panel",
+        "what": "eyebrow ink-3",
+        "sel": ".wb-right-head",
+        "prop": "color",
+        "want": "tok:--mm-ink-3",
+        "got": "rgb(42, 42, 42)",
+        "ok": false
+      },
+      {
+        "sec": "Output panel",
+        "what": "collapse 32",
+        "sel": ".wb-right-head .wb-collapse",
+        "prop": "W",
+        "want": 32,
+        "got": 32,
+        "ok": true
+      },
+      {
+        "sec": "Output panel",
+        "what": "button 34 tall",
+        "sel": ".op-controls .op-btn",
+        "prop": "H",
+        "want": 34,
+        "got": 34,
+        "ok": true
+      },
+      {
+        "sec": "Output panel",
+        "what": "button padding 0 12px",
+        "sel": ".op-controls .op-btn",
+        "prop": "padding",
+        "want": "0px 12px",
+        "got": "0px 12px",
+        "ok": true
+      },
+      {
+        "sec": "Output panel",
+        "what": "button 13px",
+        "sel": ".op-controls .op-btn",
+        "prop": "font-size",
+        "want": 13,
+        "got": "13px",
+        "ok": true
+      },
+      {
+        "sec": "Output panel",
+        "what": "button 600",
+        "sel": ".op-controls .op-btn",
+        "prop": "font-weight",
+        "want": "600",
+        "got": "600",
+        "ok": true
+      },
+      {
+        "sec": "Output panel",
+        "what": "button border line-2",
+        "sel": ".op-controls .op-btn",
+        "prop": "border-top-color",
+        "want": "tok:--mm-line-2",
+        "got": "rgb(213, 213, 213)",
+        "ok": true
+      },
+      {
+        "sec": "Output panel",
+        "what": "▶ accent",
+        "sel": ".op-btn-icon",
+        "prop": "color",
+        "want": "tok:--mm-accent",
+        "got": "rgb(194, 85, 185)",
+        "ok": true
+      },
+      {
+        "sec": "Output panel",
+        "what": "table cell 14px",
+        "sel": ".op-table td",
+        "prop": "font-size",
+        "want": 14,
+        "got": "14px",
+        "ok": true
+      },
+      {
+        "sec": "Output panel",
+        "what": "table Plex Sans",
+        "sel": ".op-table td",
+        "prop": "font-family",
+        "want": "re:^\"IBM Plex Sans\"",
+        "got": "\"IBM Plex Sans\", \"Helvetica Neue\", Arial, sans-serif",
+        "ok": true
+      },
+      {
+        "sec": "Output panel",
+        "what": "a 1 is signal red",
+        "sel": ".op-table .op-1",
+        "prop": "color",
+        "want": "tok:--mm-signal-1",
+        "got": "rgb(229, 57, 53)",
+        "ok": true
+      },
+      {
+        "sec": "Output panel",
+        "what": "a 1 is 600",
+        "sel": ".op-table .op-1",
+        "prop": "font-weight",
+        "want": "600",
+        "got": "600",
+        "ok": true
+      },
+      {
+        "sec": "Output panel",
+        "what": "current row lav-soft",
+        "sel": ".op-row--current td",
+        "prop": "background-color",
+        "want": "tok:--mm-lav-soft",
+        "got": "rgb(242, 230, 255)",
+        "ok": true
+      },
+      {
+        "sec": "Output panel",
+        "what": "note 12.5px",
+        "sel": ".op-note",
+        "prop": "font-size",
+        "want": 12.5,
+        "got": "12.5px",
+        "ok": true
+      },
+      {
+        "sec": "Output panel",
+        "what": "note ink-3",
+        "sel": ".op-note",
+        "prop": "color",
+        "want": "tok:--mm-ink-3",
+        "got": "rgb(123, 123, 123)",
+        "ok": true
+      },
+      {
+        "sec": "Output panel",
+        "what": "note text",
+        "sel": ".op-note",
+        "prop": "text",
+        "want": "Click a row to set the inputs.",
+        "got": "Click a row to set the inputs.",
+        "ok": true
+      }
+    ],
+    "scan": {
+      "radius": [],
+      "shadow": [
+        "div.pal rgba(3, 13, 36, 0.08) 0px 2px 8px 0px"
+      ]
+    },
+    "overflow": {
+      "pageOverflowX": 0,
+      "brandLines": null,
+      "crumbsTruncate": {
+        "overflow": "clip/visible",
+        "clipped": false
+      },
+      "wbOverflowX": 0
+    }
+  },
+  "canvas-appearance": {
+    "svgFont": "\"IBM Plex Sans\"",
+    "svgWeight": "600",
+    "svgNums": "tabular-nums",
+    "textFonts": [
+      "\"IBM Plex Sans\"/600"
+    ],
+    "wireWidths": [
+      "2"
+    ],
+    "selection": {
+      "stroke": "#C255B9",
+      "fill": "#F2E6FF"
+    },
+    "portDotsR35": 8,
+    "label": {
+      "size": "11",
+      "fill": "#7B7B7B",
+      "spacing": "0.04em"
+    },
+    "value": {
+      "size": "17",
+      "fill": "#E53935"
+    },
+    "symbol": {
+      "stroke": "#2A2A2A",
+      "width": "2",
+      "cap": "round"
+    }
+  },
+  "boxes": {
+    "checks": [
+      {
+        "sec": "Boxes",
+        "what": "badge 16 min",
+        "sel": ".pal-badge",
+        "prop": "min-width",
+        "want": 16,
+        "got": "16px",
+        "ok": true
+      },
+      {
+        "sec": "Boxes",
+        "what": "badge accent",
+        "sel": ".pal-badge",
+        "prop": "background-color",
+        "want": "tok:--mm-accent",
+        "got": "rgb(194, 85, 185)",
+        "ok": true
+      },
+      {
+        "sec": "Boxes",
+        "what": "badge mono",
+        "sel": ".pal-badge",
+        "prop": "font-family",
+        "want": "re:Plex Mono",
+        "got": "\"IBM Plex Mono\", SFMono-Regular, Menlo, Consolas, monospace",
+        "ok": true
+      },
+      {
+        "sec": "Boxes",
+        "what": "badge 10px/600",
+        "sel": ".pal-badge",
+        "prop": "font-size",
+        "want": 10,
+        "got": "10px",
+        "ok": true
+      },
+      {
+        "sec": "Boxes",
+        "what": "pop-out 260 wide",
+        "sel": ".pal-pop",
+        "prop": "W",
+        "want": 260,
+        "got": 260,
+        "ok": true
+      },
+      {
+        "sec": "Boxes",
+        "what": "pop-out surface",
+        "sel": ".pal-pop",
+        "prop": "background-color",
+        "want": "tok:--mm-surface",
+        "got": "rgb(255, 255, 255)",
+        "ok": true
+      },
+      {
+        "sec": "Boxes",
+        "what": "pop-out border line-2",
+        "sel": ".pal-pop",
+        "prop": "border-top-color",
+        "want": "tok:--mm-line-2",
+        "got": "rgb(213, 213, 213)",
+        "ok": true
+      },
+      {
+        "sec": "Boxes",
+        "what": "pop-out shadow 0 10px 28px .16",
+        "sel": ".pal-pop",
+        "prop": "box-shadow",
+        "want": "re:0.16\\) 0px 10px 28px",
+        "got": "rgba(3, 13, 36, 0.16) 0px 10px 28px 0px",
+        "ok": true
+      },
+      {
+        "sec": "Boxes",
+        "what": "row grid 36px 1fr auto",
+        "sel": ".pal-row",
+        "prop": "grid-template-columns",
+        "want": "re:^36px",
+        "got": "36px 83.1875px 94.8125px",
+        "ok": true
+      },
+      {
+        "sec": "Boxes",
+        "what": "row padding 8px 12px",
+        "sel": ".pal-row",
+        "prop": "padding",
+        "want": "8px 12px",
+        "got": "8px 12px",
+        "ok": true
+      },
+      {
+        "sec": "Boxes",
+        "what": "name 13.5px",
+        "sel": ".pal-row-label",
+        "prop": "font-size",
+        "want": 13.5,
+        "got": "13.5px",
+        "ok": true
+      },
+      {
+        "sec": "Boxes",
+        "what": "name 600",
+        "sel": ".pal-row-label",
+        "prop": "font-weight",
+        "want": "600",
+        "got": "600",
+        "ok": true
+      },
+      {
+        "sec": "Boxes",
+        "what": "meta 11.5px",
+        "sel": ".pal-row-meta",
+        "prop": "font-size",
+        "want": 11.5,
+        "got": "11.5px",
+        "ok": true
+      },
+      {
+        "sec": "Boxes",
+        "what": "meta ink-3",
+        "sel": ".pal-row-meta",
+        "prop": "color",
+        "want": "tok:--mm-ink-3",
+        "got": "rgb(123, 123, 123)",
+        "ok": true
+      },
+      {
+        "sec": "Boxes",
+        "what": "pin 12px",
+        "sel": ".pal-pin",
+        "prop": "font-size",
+        "want": 12,
+        "got": "12px",
+        "ok": true
+      },
+      {
+        "sec": "Boxes",
+        "what": "pin padding 4px 8px",
+        "sel": ".pal-pin",
+        "prop": "padding",
+        "want": "4px 8px",
+        "got": "4px 8px",
+        "ok": true
+      },
+      {
+        "sec": "Boxes",
+        "what": "New box full width",
+        "sel": ".pal-newbox",
+        "prop": "W",
+        "want": 236,
+        "got": 234,
+        "ok": false
+      },
+      {
+        "sec": "Boxes",
+        "what": "New box 34 tall",
+        "sel": ".pal-newbox",
+        "prop": "H",
+        "want": 34,
+        "got": 34,
+        "ok": true
+      },
+      {
+        "sec": "Boxes",
+        "what": "New box border line-2",
+        "sel": ".pal-newbox",
+        "prop": "border-top-color",
+        "want": "tok:--mm-line-2",
+        "got": "rgb(213, 213, 213)",
+        "ok": true
+      },
+      {
+        "sec": "Boxes",
+        "what": "New box 13px",
+        "sel": ".pal-newbox",
+        "prop": "font-size",
+        "want": 13,
+        "got": "13px",
+        "ok": true
+      },
+      {
+        "sec": "Boxes",
+        "what": "New box 600",
+        "sel": ".pal-newbox",
+        "prop": "font-weight",
+        "want": "600",
+        "got": "600",
+        "ok": true
+      },
+      {
+        "sec": "Boxes",
+        "what": "note 12px",
+        "sel": ".pal-pop-note",
+        "prop": "font-size",
+        "want": 12,
+        "got": "12px",
+        "ok": true
+      },
+      {
+        "sec": "Boxes",
+        "what": "note ink-3",
+        "sel": ".pal-pop-note",
+        "prop": "color",
+        "want": "tok:--mm-ink-3",
+        "got": "rgb(123, 123, 123)",
+        "ok": true
+      },
+      {
+        "sec": "Boxes",
+        "what": "eyebrow text",
+        "sel": ".pal-pop-title",
+        "prop": "text",
+        "want": "re:your boxes",
+        "got": "Your boxes",
+        "ok": true
+      }
+    ],
+    "scan": {
+      "radius": [],
+      "shadow": [
+        "div.pal rgba(3, 13, 36, 0.08) 0px 2px 8px 0px",
+        "div.pal-pop rgba(3, 13, 36, 0.16) 0px 10px 28px 0px"
+      ]
+    },
+    "overflow": {
+      "pageOverflowX": 0,
+      "brandLines": null,
+      "crumbsTruncate": {
+        "overflow": "clip/visible",
+        "clipped": false
+      },
+      "wbOverflowX": 0
+    }
+  },
+  "open": {
+    "checks": [
+      {
+        "sec": "Answer area",
+        "what": "surface",
+        "sel": ".wb-answer",
+        "prop": "background-color",
+        "want": "tok:--mm-surface",
+        "got": "rgb(255, 255, 255)",
+        "ok": true
+      },
+      {
+        "sec": "Answer area",
+        "what": "padding 40px 48px",
+        "sel": ".wb-answer",
+        "prop": "padding",
+        "want": "40px 48px",
+        "got": "40px 48px",
+        "ok": true
+      },
+      {
+        "sec": "Answer area",
+        "what": "max-width 640",
+        "sel": ".wb-answer-inner",
+        "prop": "max-width",
+        "want": 640,
+        "got": "640px",
+        "ok": true
+      },
+      {
+        "sec": "Answer area",
+        "what": "eyebrow \"YOUR ANSWER\"",
+        "sel": ".wb-answer-eyebrow",
+        "prop": "text",
+        "want": "re:your answer",
+        "got": "Your answer",
+        "ok": true
+      },
+      {
+        "sec": "Answer area",
+        "what": "textarea min-height 260",
+        "sel": ".wb-answer-text",
+        "prop": "min-height",
+        "want": 260,
+        "got": "260px",
+        "ok": true
+      },
+      {
+        "sec": "Answer area",
+        "what": "textarea border line-2",
+        "sel": ".wb-answer-text",
+        "prop": "border-top-color",
+        "want": "tok:--mm-line-2",
+        "got": "rgb(213, 213, 213)",
+        "ok": true
+      },
+      {
+        "sec": "Answer area",
+        "what": "textarea padding 14px 16px",
+        "sel": ".wb-answer-text",
+        "prop": "padding",
+        "want": "14px 16px",
+        "got": "14px 16px",
+        "ok": true
+      },
+      {
+        "sec": "Answer area",
+        "what": "textarea 16px",
+        "sel": ".wb-answer-text",
+        "prop": "font-size",
+        "want": 16,
+        "got": "15px",
+        "ok": false
+      },
+      {
+        "sec": "Answer area",
+        "what": "textarea 1.6",
+        "sel": ".wb-answer-text",
+        "prop": "line-height",
+        "want": 25.6,
+        "got": "24px",
+        "ok": false
+      },
+      {
+        "sec": "Answer area",
+        "what": "textarea resize vertical",
+        "sel": ".wb-answer-text",
+        "prop": "resize",
+        "want": "vertical",
+        "got": "vertical",
+        "ok": true
+      },
+      {
+        "sec": "Answer area",
+        "what": "placeholder",
+        "sel": ".wb-answer-text",
+        "prop": "attr:placeholder",
+        "want": "Write your answer here.",
+        "got": "Write your answer here.",
+        "ok": true
+      },
+      {
+        "sec": "Answer area",
+        "what": "footer 12.5px",
+        "sel": ".wb-answer-foot",
+        "prop": "font-size",
+        "want": 12.5,
+        "got": "12.5px",
+        "ok": true
+      },
+      {
+        "sec": "Answer area",
+        "what": "footer ink-3",
+        "sel": ".wb-answer-foot",
+        "prop": "color",
+        "want": "tok:--mm-ink-3",
+        "got": "rgb(123, 123, 123)",
+        "ok": true
+      },
+      {
+        "sec": "Answer area",
+        "what": "footer text",
+        "sel": ".wb-answer-foot",
+        "prop": "text",
+        "want": "Saved as you type.",
+        "got": "Saved as you type.",
+        "ok": true
+      }
+    ],
+    "scan": {
+      "radius": [],
+      "shadow": []
+    },
+    "overflow": {
+      "pageOverflowX": 0,
+      "brandLines": null,
+      "crumbsTruncate": {
+        "overflow": "clip/visible",
+        "clipped": false
+      },
+      "wbOverflowX": 0
+    }
+  },
+  "fill-in": {
+    "checks": [
+      {
+        "sec": "Answer area",
+        "what": "grid auto-fill minmax(160px,1fr)",
+        "sel": ".wb-fill-grid",
+        "prop": "grid-template-columns",
+        "want": "re:px",
+        "got": "202.656px 202.672px 202.672px",
+        "ok": true
+      },
+      {
+        "sec": "Answer area",
+        "what": "grid gap 12px 16px",
+        "sel": ".wb-fill-grid",
+        "prop": "gap",
+        "want": "12px 16px",
+        "got": "12px 16px",
+        "ok": true
+      },
+      {
+        "sec": "Answer area",
+        "what": "label 13.5px",
+        "sel": ".wb-fill-label",
+        "prop": "font-size",
+        "want": 13.5,
+        "got": "13.5px",
+        "ok": true
+      },
+      {
+        "sec": "Answer area",
+        "what": "label ink-2",
+        "sel": ".wb-fill-label",
+        "prop": "color",
+        "want": "tok:--mm-ink-2",
+        "got": "rgb(74, 74, 74)",
+        "ok": true
+      },
+      {
+        "sec": "Answer area",
+        "what": "input 44 tall",
+        "sel": ".wb-fill-input",
+        "prop": "H",
+        "want": 44,
+        "got": 44,
+        "ok": true
+      },
+      {
+        "sec": "Answer area",
+        "what": "input mono",
+        "sel": ".wb-fill-input",
+        "prop": "font-family",
+        "want": "re:Plex Mono",
+        "got": "\"IBM Plex Sans\", \"Helvetica Neue\", Arial, sans-serif",
+        "ok": false
+      },
+      {
+        "sec": "Answer area",
+        "what": "input 16px",
+        "sel": ".wb-fill-input",
+        "prop": "font-size",
+        "want": 16,
+        "got": "15px",
+        "ok": false
+      },
+      {
+        "sec": "Answer area",
+        "what": "input border line-2",
+        "sel": ".wb-fill-input",
+        "prop": "border-top-color",
+        "want": "tok:--mm-line-2",
+        "got": "rgb(213, 213, 213)",
+        "ok": true
+      }
+    ],
+    "scan": {
+      "radius": [],
+      "shadow": []
+    },
+    "overflow": {
+      "pageOverflowX": 0,
+      "brandLines": null,
+      "crumbsTruncate": {
+        "overflow": "clip/visible",
+        "clipped": false
+      },
+      "wbOverflowX": 0
+    }
+  },
+  "collapsed": {
+    "checks": [
+      {
+        "sec": "Collapsed strips",
+        "what": "left strip 40",
+        "sel": ".wb-strip--left",
+        "prop": "W",
+        "want": 40,
+        "got": 40,
+        "ok": true
+      },
+      {
+        "sec": "Collapsed strips",
+        "what": "left strip surface",
+        "sel": ".wb-strip--left",
+        "prop": "background-color",
+        "want": "tok:--mm-surface",
+        "got": "rgb(255, 255, 255)",
+        "ok": true
+      },
+      {
+        "sec": "Collapsed strips",
+        "what": "left strip border line-2",
+        "sel": ".wb-strip--left",
+        "prop": "border-right-color",
+        "want": "tok:--mm-line-2",
+        "got": "rgb(213, 213, 213)",
+        "ok": true
+      },
+      {
+        "sec": "Collapsed strips",
+        "what": "» 30 wide",
+        "sel": ".wb-strip--left .wb-strip-toggle",
+        "prop": "W",
+        "want": 30,
+        "got": 30,
+        "ok": true
+      },
+      {
+        "sec": "Collapsed strips",
+        "what": "» accent",
+        "sel": ".wb-strip--left .wb-strip-toggle",
+        "prop": "color",
+        "want": "tok:--mm-accent",
+        "got": "rgb(194, 85, 185)",
+        "ok": true
+      },
+      {
+        "sec": "Collapsed strips",
+        "what": "title vertical",
+        "sel": ".wb-strip--left .wb-strip-title",
+        "prop": "writing-mode",
+        "want": "vertical-rl",
+        "got": "vertical-rl",
+        "ok": true
+      },
+      {
+        "sec": "Collapsed strips",
+        "what": "title serif",
+        "sel": ".wb-strip--left .wb-strip-title",
+        "prop": "font-family",
+        "want": "re:Plex Serif",
+        "got": "\"IBM Plex Serif\", Georgia, \"Times New Roman\", serif",
+        "ok": true
+      },
+      {
+        "sec": "Collapsed strips",
+        "what": "title 15px",
+        "sel": ".wb-strip--left .wb-strip-title",
+        "prop": "font-size",
+        "want": 15,
+        "got": "15px",
+        "ok": true
+      },
+      {
+        "sec": "Collapsed strips",
+        "what": "title 600",
+        "sel": ".wb-strip--left .wb-strip-title",
+        "prop": "font-weight",
+        "want": "600",
+        "got": "600",
+        "ok": true
+      },
+      {
+        "sec": "Collapsed strips",
+        "what": "right strip 40",
+        "sel": ".wb-strip--right",
+        "prop": "W",
+        "want": 40,
+        "got": 40,
+        "ok": true
+      },
+      {
+        "sec": "Collapsed strips",
+        "what": "right strip border line-2",
+        "sel": ".wb-strip--right",
+        "prop": "border-left-color",
+        "want": "tok:--mm-line-2",
+        "got": "rgb(213, 213, 213)",
+        "ok": true
+      },
+      {
+        "sec": "Collapsed strips",
+        "what": "OUTPUT vertical",
+        "sel": ".wb-strip--right .wb-strip-title",
+        "prop": "writing-mode",
+        "want": "vertical-rl",
+        "got": "vertical-rl",
+        "ok": true
+      },
+      {
+        "sec": "Collapsed strips",
+        "what": "OUTPUT 11.5px",
+        "sel": ".wb-strip--right .wb-strip-title",
+        "prop": "font-size",
+        "want": 11.5,
+        "got": "11.5px",
+        "ok": true
+      },
+      {
+        "sec": "Collapsed strips",
+        "what": "OUTPUT 600",
+        "sel": ".wb-strip--right .wb-strip-title",
+        "prop": "font-weight",
+        "want": "600",
+        "got": "600",
+        "ok": true
+      }
+    ],
+    "scan": {
+      "radius": [],
+      "shadow": [
+        "div.pal rgba(3, 13, 36, 0.08) 0px 2px 8px 0px"
+      ]
+    },
+    "overflow": {
+      "pageOverflowX": 0,
+      "brandLines": null,
+      "crumbsTruncate": {
+        "overflow": "clip/visible",
+        "clipped": false
+      },
+      "wbOverflowX": 0
+    }
+  },
+  "sandbox": {
+    "checks": [
+      {
+        "sec": "Sandbox",
+        "what": "no question panel",
+        "sel": ".qp",
+        "prop": "H",
+        "want": 0,
+        "got": "MISSING",
+        "ok": false
+      }
+    ],
+    "scan": {
+      "radius": [
+        "div.tab.active 4px 4px 0px 0px",
+        "button.tab-add-btn 4px 4px 0px 0px"
+      ],
+      "shadow": [
+        "div.pal rgba(3, 13, 36, 0.08) 0px 2px 8px 0px"
+      ]
+    },
+    "overflow": {
+      "pageOverflowX": 0,
+      "brandLines": null,
+      "crumbsTruncate": {
+        "overflow": "clip/visible",
+        "clipped": false
+      },
+      "wbOverflowX": 0
+    }
+  },
+  "at1024": {
+    "hw1-cc": {
+      "pageOverflowX": 0,
+      "brandLines": null,
+      "crumbsTruncate": {
+        "overflow": "clip/visible",
+        "clipped": false
+      },
+      "wbOverflowX": 0
+    },
+    "open": {
+      "pageOverflowX": 0,
+      "brandLines": null,
+      "crumbsTruncate": {
+        "overflow": "clip/visible",
+        "clipped": false
+      },
+      "wbOverflowX": 0
+    },
+    "fill-in": {
+      "pageOverflowX": 0,
+      "brandLines": null,
+      "crumbsTruncate": {
+        "overflow": "clip/visible",
+        "clipped": false
+      },
+      "wbOverflowX": 0
+    },
+    "sandbox": {
+      "pageOverflowX": 0,
+      "brandLines": null,
+      "crumbsTruncate": {
+        "overflow": "clip/visible",
+        "clipped": false
+      },
+      "wbOverflowX": 0
+    }
+  }
+}

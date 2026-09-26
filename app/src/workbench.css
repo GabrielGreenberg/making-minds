@@ -19,7 +19,7 @@
 .wb-right { flex-shrink: 0; min-height: 0; display: flex; flex-direction: column; background: var(--mm-surface); overflow: hidden; }
 .wb-right-head {
   display: flex; align-items: center; justify-content: space-between;
-  padding: 10px 12px 4px 22px; flex-shrink: 0; background: var(--mm-surface);
+  padding: 16px 22px 0; flex-shrink: 0; background: var(--mm-surface);
 }
 .wb-right-body { flex: 1; min-height: 0; display: flex; }
 .wb-right-head .wb-collapse {
@@ -250,7 +250,9 @@ a.wb-brand:hover { color: var(--mm-accent); text-decoration: none; }
 .wb-answer { flex: 1; min-height: 0; overflow: auto; padding: 40px 48px; background: var(--mm-surface); }
 .wb-answer-inner { max-width: 640px; }
 .wb-answer-eyebrow { margin-bottom: 10px; }
-.wb-answer-text {
+/* Two classes: theme.css's `.mm-surface textarea { font-size: inherit }` would
+   otherwise win (memo: 16px/1.6 here, mono 16px in a blank). */
+.wb-answer .wb-answer-text {
   display: block; width: 100%; min-height: 260px; resize: vertical; padding: 14px 16px;
   font-family: var(--mm-font-sans); font-size: 16px; line-height: 1.6; color: var(--mm-ink);
   background: var(--mm-surface); border: 1px solid var(--mm-line-2); border-radius: var(--mm-radius);
@@ -260,7 +262,7 @@ a.wb-brand:hover { color: var(--mm-accent); text-decoration: none; }
 .wb-fill-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 12px 16px; }
 .wb-fill-field { display: flex; flex-direction: column; gap: 6px; }
 .wb-fill-label { font-size: var(--mm-fs-small); color: var(--mm-ink-2); }
-.wb-fill-input {
+.wb-answer .wb-fill-input {
   height: 44px; padding: 0 12px; font-family: var(--mm-font-mono); font-size: 16px; color: var(--mm-ink);
   background: var(--mm-surface); border: 1px solid var(--mm-line-2); border-radius: var(--mm-radius);
 }
@@ -327,7 +329,7 @@ a.wb-brand:hover { color: var(--mm-accent); text-decoration: none; }
 .cv-hint { font-size: 11.5px; color: var(--mm-ink-3); }
 .cv-confirm {
   width: 240px; padding: 12px 14px; font-size: var(--mm-fs-small);
-  background: var(--mm-surface); border: 1px solid var(--mm-line-2); box-shadow: var(--mm-shadow);
+  background: var(--mm-surface); border: 1px solid var(--mm-line-2);
 }
 .cv-confirm p { margin: 0 0 10px; }
 .cv-confirm-actions { display: flex; justify-content: flex-end; gap: 8px; }
@@ -485,10 +487,9 @@ a.wb-brand:hover { color: var(--mm-accent); text-decoration: none; }
 }
 /* "The circuit is off screen" — the arrow that brings it back. */
 .cv-nav {
-  position: absolute; z-index: 50; width: 36px; height: 36px; border: 0; border-radius: 50%;
+  position: absolute; z-index: 50; width: 36px; height: 36px; border: 0;
   display: grid; place-items: center; cursor: pointer;
   background: var(--mm-accent); color: var(--mm-surface); font-size: 18px; font-weight: 700;
-  box-shadow: var(--mm-shadow-palette-drag);
 }
 /* A drawn box's Ready to Box · Cancel. */
 .ready-to-box-btn { gap: 4px; }
@@ -514,13 +515,12 @@ a.wb-brand:hover { color: var(--mm-accent); text-decoration: none; }
   max-width: min(560px, calc(100% - 32px)); padding: 6px 14px; text-align: center;
   font-family: var(--mm-font-sans); font-size: 12.5px; line-height: 1.4;
   background: var(--mm-surface); border: 1px solid var(--mm-accent); color: var(--mm-ink);
-  box-shadow: var(--mm-shadow-palette);
 }
 /* The box editor's bar (BoxEditorBar) — top centre while a box is open. */
 .box-editor-bar {
   position: absolute; top: 12px; left: 50%; transform: translateX(-50%); z-index: 48;
   max-width: calc(100% - 32px); padding: 10px 14px; font-family: var(--mm-font-sans);
-  background: var(--mm-surface); border: 2px solid var(--mm-accent); box-shadow: var(--mm-shadow-palette);
+  background: var(--mm-surface); border: 2px solid var(--mm-accent);
 }
 .box-editor-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .box-editor-title { font-size: 11.5px; font-weight: 600; letter-spacing: 0.09em; text-transform: uppercase; color: var(--mm-accent); }
