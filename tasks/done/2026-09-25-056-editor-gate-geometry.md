@@ -8,9 +8,9 @@ requires: browser
 area: app
 source: inbox
 created: 2026-09-25T16:15:00-07:00
-status: blocked
+status: done
 after: 2026-09-25-055
-branch: task/056-editor-gate-geometry
+branch:
 merged_into:
 ---
 
@@ -130,6 +130,11 @@ the fixture.
   "load this circuit into the canvas" mode and a before/after naming scheme.
 
 ### Resolved decisions
+Gabriel, 2026-09-26 (/work, answering the park): **"accept and release"** — the geometry as
+the screenshot pass shows it is approved; it releases now, without the real-workbook census
+(Questions 2): no load-time nudge pass is built; students drag apart any box that newly
+overlaps. The census recipe (## Verify) stays available if packed boxes turn up.
+
 Gabriel, 2026-09-25 (catch):
 - **5. NOT is 50×60, as designed.** It matches the AND/OR height, and the overlaps it causes
   are judged at the screenshot pass.
@@ -238,3 +243,11 @@ Gabriel, 2026-09-25 (catch):
   sandbox, before/after naming; waits for the dev server) made the pass.
 - **Owed:** Questions 2 (real workbooks, counts only); a browser eyeball of seeded HW1 work
   after release.
+
+### 2026-09-26 — released (/work)
+- Gabriel: "accept and release". `main` had moved (a collaborator's "put away a box design"
+  in `store.ts`/`CircuitCanvas.tsx`, a notes-preview CSS change, the park): merged into
+  the branch cleanly, every gate re-run green on the combined code, then landed through
+  PROFILE §5. The robot releases it within the hour (or `deploy/release.sh` by hand).
+- Owed after release: an eyeball of seeded HW1 work on the pilot (connections intact,
+  symbols upright); a real-workbook census if packed boxes are reported.
