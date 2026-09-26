@@ -86,6 +86,11 @@ export interface WireManualSegment {
   segmentIndex: number; // index into the computed path segments
   offset: number; // displacement from computed position
   axis: 'x' | 'y'; // which axis was shifted
+  /** Where the router ran the segment (its coordinate on `axis`) when it was
+   *  dragged: the offset applies only while the routed segment is still
+   *  there (wireSegments.ts — task 056). Absent on offsets saved before it,
+   *  which apply only to a draggable (middle) segment. */
+  base?: number;
 }
 
 export interface CircuitData {
@@ -887,8 +892,6 @@ export function getPortsForType(type: ComponentType): Port[] {
 
 // Component dimensions
 export const GRID_SIZE = 20;
-export const COMP_WIDTH = 75;
-export const COMP_HEIGHT = 70;
 export const PORT_RADIUS = 3.5;
 export const INPUT_OUTPUT_SIZE = 40;
 export const STATE_RADIUS = 30;

@@ -73,6 +73,7 @@ import {
 } from '../src/wireRouter';
 import { buildRouteInputs, checkCircuitLayout, checkFixtureLayout } from './layoutCheck';
 import { comp, wire, circuit } from './builder';
+import { applyManualSegments, isDraggableSegment } from '../src/wireSegments';
 import type { CircuitData, CircuitComponent } from '../src/types';
 
 /** Route a machine exactly as the canvas/oracle would and return the raw
@@ -103,9 +104,12 @@ console.log('GEOMETRY SMOKE — componentGeometry pins (rendered dimensions + po
 
   check('INPUT renders 40×40', eqDims(dims('INPUT'), 40, 40));
   check('OUTPUT renders 40×40', eqDims(dims('OUTPUT'), 40, 40));
-  check('NOT renders 55×50', eqDims(dims('NOT'), 55, 50));
-  check('AND/OR/XOR render 75×70',
-    eqDims(dims('AND'), 75, 70) && eqDims(dims('OR'), 75, 70) && eqDims(dims('XOR'), 75, 70));
+  // Task 056: one explicit per-type table (componentGeometry.ts PART_SIZE) —
+  // AND/OR 60×60 and NOT 50×60, ports on the 10px half-grid; XOR, HA, MEM and
+  // STATE keep their sizes (no shared default resizes them).
+  check('NOT renders 50×60', eqDims(dims('NOT'), 50, 60));
+  check('AND/OR render 60×60, XOR still 75×70',
+    eqDims(dims('AND'), 60, 60) && eqDims(dims('OR'), 60, 60) && eqDims(dims('XOR'), 75, 70));
   check('HA renders 75×80', eqDims(dims('HA'), 75, 80));
   check('MEM renders 50×50 (NOT the old phantom 75×70 router default)',
     eqDims(dims('MEM'), 50, 50));
@@ -115,21 +119,43 @@ console.log('GEOMETRY SMOKE — componentGeometry pins (rendered dimensions + po
   check('STATE renders 60×60 regardless of a stray boxedCircuitId',
     eqDims(dims('STATE'), 60, 60) && eqDims(dims('STATE', { boxedCircuitId: 'b1' }), 60, 60));
 
-  // Port math: two left ports on a 70-tall gate sit at h/3 and 2h/3.
+  // Port math: a 60-tall gate's two left ports at 20 and 40, its output at 30.
   const and = comp('a', 'AND', 'AND', 100, 100);
-  check('AND in1/in2 at left edge, spaced h/3',
-    nearPt(getPortPosition(and, 'in1'), 100, 100 + 70 / 3) &&
-    nearPt(getPortPosition(and, 'in2'), 100, 100 + 140 / 3));
-  check('AND out at right edge, centered',
-    nearPt(getPortPosition(and, 'out'), 175, 135));
+  check('AND in1/in2 at the left edge, (0,20) and (0,40)',
+    nearPt(getPortPosition(and, 'in1'), 100, 120) &&
+    nearPt(getPortPosition(and, 'in2'), 100, 140));
+  check('AND out at the right edge, (60,30)',
+    nearPt(getPortPosition(and, 'out'), 160, 130));
+  const not = comp('n', 'NOT', 'NOT', 100, 100);
+  check('NOT in (0,30), out (50,30)',
+    nearPt(getPortPosition(not, 'in'), 100, 130) && nearPt(getPortPosition(not, 'out'), 150, 130));
 
-  // OR/XOR left-port inset: the curved face pulls left ports inward.
+  // An OR's ports stay on its box edge (the canvas draws a 5.3 stub to the
+  // curve); XOR's double arc still insets its left ports.
   const or = comp('o', 'OR', 'OR', 100, 100);
   const xor = comp('x', 'XOR', 'XOR', 100, 100);
-  check('OR left ports inset by 7% of width (x = 105.25)',
-    near(getPortPositionLocal(or, 'in1').x, 100 + 75 * 0.07));
-  check('XOR left ports inset a further 6px (x = 111.25)',
+  check('OR left ports on the box edge, (0,20) and (0,40)',
+    nearPt(getPortPositionLocal(or, 'in1'), 100, 120) && nearPt(getPortPositionLocal(or, 'in2'), 100, 140));
+  check('XOR left ports inset 6px + 7% of width (x = 111.25)',
     near(getPortPositionLocal(xor, 'in1').x, 100 + 6 + 75 * 0.07));
+
+  // A placed box: 100 wide, max(nIn, nOut, 2)·20 + 20 tall, ports 20 apart
+  // and centred on each side.
+  const box = (nIn: number, nOut: number) => comp('b', 'BOXED', 'Box', 100, 100, {
+    ports: [
+      ...Array.from({ length: nIn }, (_, i) => ({ id: `in${i + 1}`, label: '', side: 'left' as const, index: i })),
+      ...Array.from({ length: nOut }, (_, i) => ({ id: `out${i + 1}`, label: '', side: 'right' as const, index: i })),
+    ],
+  });
+  const b21 = box(2, 1);
+  const b41 = box(4, 1);
+  check('a placed box: 100 × (max(nIn, nOut, 2)·20 + 20)',
+    eqDims(getComponentSize(b21), 100, 60) && eqDims(getComponentSize(b41), 100, 100) && eqDims(getComponentSize(box(1, 1)), 100, 60));
+  check('…its ports 20 apart, centred on each side',
+    nearPt(getPortPosition(b21, 'in1'), 100, 120) && nearPt(getPortPosition(b21, 'in2'), 100, 140) &&
+      nearPt(getPortPosition(b21, 'out1'), 200, 130) &&
+      nearPt(getPortPosition(b41, 'in1'), 100, 120) && nearPt(getPortPosition(b41, 'in4'), 100, 180) &&
+      nearPt(getPortPosition(b41, 'out1'), 200, 150));
 
   // MEM ports: mout on the left face, min on the RIGHT face at x+50 — the
   // 50×50 body is exactly why min's stub tip (x+62) cleared the phantom
@@ -145,6 +171,36 @@ console.log('GEOMETRY SMOKE — componentGeometry pins (rendered dimensions + po
 }
 
 // ─── 2. MEM.min reachability + fallback-counter tripwire ────────────────────
+
+console.log('\nONE SIZE TABLE — every consumer reads componentGeometry (task 056)');
+{
+  const store = readFileSync(join(HERE, '../src/store.ts'), 'utf8');
+  const at = store.indexOf('  confirmBox: (id) => {');
+  const confirm = at < 0 ? '' : store.slice(at, store.indexOf('\n  },\n', at));
+  check('confirmBox finds the parts inside a drawn box by the one size table (no size table of its own)',
+    /getComponentSize\(c\)/.test(confirm) && !/\? 40 : 80|\? 70 : 60/.test(confirm));
+  const geom = readFileSync(join(HERE, '../src/componentGeometry.ts'), 'utf8');
+  check('the size table is explicit per type (a Record over the types), no shared default',
+    /PART_SIZE: Record<Exclude<ComponentType, 'BOXED'>/.test(geom) && !/COMP_WIDTH|COMP_HEIGHT/.test(geom));
+}
+
+console.log('\nMANUAL SEGMENTS — an offset belongs to the route it was dragged on (task 056)');
+{
+  // A 7-point route: stubs at 0/1 and 4/5 (never draggable), middle runs 2 and 3.
+  const route = [{ x: 0, y: 0 }, { x: 12, y: 0 }, { x: 40, y: 0 }, { x: 40, y: 80 }, { x: 88, y: 80 }, { x: 100, y: 80 }];
+  check('the draggable range is the middle runs (never a stub or the run after it)',
+    [0, 1, 2, 3, 4].map((i) => isDraggableSegment(i, route.length)).join() === 'false,false,true,false,false');
+  const moved = applyManualSegments(route, [{ segmentIndex: 2, axis: 'x', offset: 10, base: 40 }]);
+  check('an offset whose routed segment is still there applies (and the wire stays connected)',
+    moved[2].x === 50 && moved[3].x === 50 && moved[1].x === 12 && moved[4].x === 88);
+  const rerouted = [{ x: 0, y: 0 }, { x: 12, y: 0 }, { x: 60, y: 0 }, { x: 60, y: 80 }, { x: 88, y: 80 }, { x: 100, y: 80 }];
+  check('an offset whose routed segment moved (a new geometry re-laid the wire) is stale: not applied',
+    JSON.stringify(applyManualSegments(rerouted, [{ segmentIndex: 2, axis: 'x', offset: 10, base: 40 }])) === JSON.stringify(rerouted));
+  check('an offset saved before `base` applies to a middle run…',
+    applyManualSegments(route, [{ segmentIndex: 2, axis: 'x', offset: 10 }])[2].x === 50);
+  check('…but never to a stub or the run after it (it would pull the wire off its port)',
+    JSON.stringify(applyManualSegments(route, [{ segmentIndex: 1, axis: 'y', offset: 10 }])) === JSON.stringify(route));
+}
 
 console.log('\nMEM ROUTING — A* reaches MEM.min in a clean field (no fallback)');
 {

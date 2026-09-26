@@ -7,6 +7,7 @@ import { Palette } from './Palette';
 import { usePaletteDrag } from './paletteDrag';
 import { clientToCanvas, placementOrigin, toolComponent } from '../palette';
 import { editorShortcut, isTextEntryTarget } from '../shortcuts';
+import { applyManualSegments } from '../wireSegments';
 import { canvasColors, canvasVar, signalColor } from '../canvasTheme';
 import { circuitBounds, fitView, freeArea, zoomAbout, ZOOM_STEP } from '../canvasView';
 import { CanvasGuide } from './CanvasGuide';
@@ -41,6 +42,7 @@ import {
 import {
   getComponentSize as getCompDimensions,
   getLabelAnchor,
+  OR_STUB,
   getPortPosition,
   getPortPositionLocal,
 } from '../componentGeometry';
@@ -109,36 +111,6 @@ function findWireTarget(
 }
 
 // ─── Wire routing (A* pathfinder — see wireRouter.ts) ────────────
-
-/** Apply manual segment overrides to a computed wire path, maintaining connectivity.
- *  When a segment is shifted, adjacent segments stretch to stay connected. */
-function applyManualSegments(
-  points: { x: number; y: number }[],
-  manualSegments?: import('../types').WireManualSegment[]
-): { x: number; y: number }[] {
-  if (!manualSegments || manualSegments.length === 0) return points;
-  const result = points.map((p) => ({ ...p }));
-  // Check orientation on the ORIGINAL points, not the mutated result,
-  // so prior adjustments don't break subsequent ones.
-  for (const seg of manualSegments) {
-    const i = seg.segmentIndex;
-    if (i < 0 || i >= points.length - 1) continue;
-    const origP1 = points[i];
-    const origP2 = points[i + 1];
-    const isHorizontal = Math.abs(origP1.y - origP2.y) < 1;
-    const isVertical = Math.abs(origP1.x - origP2.x) < 1;
-    if (isHorizontal && seg.axis === 'y') {
-      // Move horizontal segment up/down — shift both endpoints
-      result[i].y += seg.offset;
-      result[i + 1].y += seg.offset;
-    } else if (isVertical && seg.axis === 'x') {
-      // Move vertical segment left/right — shift both endpoints
-      result[i].x += seg.offset;
-      result[i + 1].x += seg.offset;
-    }
-  }
-  return result;
-}
 
 function pointsToPathD(points: { x: number; y: number }[]): string {
   if (points.length === 0) return '';
@@ -401,6 +373,29 @@ function CircuitComponentView({
   const cy = comp.y + h / 2;
   const counterRotateLabel = () =>
     rot !== 0 ? `rotate(${-rot}, ${cx}, ${cy})` : undefined;
+  // A gate's symbol (∧ ∨ ¬) as a stroked path (the memo's), centred on
+  // (sx, sy) and scaled by k. It turns with the gate's position but stays
+  // upright: counter-rotated about its own centre, not the body's.
+  const gateSymbol = (kind: 'and' | 'or' | 'not', sx: number, sy: number, k: number) => {
+    const d = kind === 'and'
+      ? `M${sx - 7 * k},${sy + 6 * k} L${sx},${sy - 7 * k} L${sx + 7 * k},${sy + 6 * k}`
+      : kind === 'or'
+        ? `M${sx - 7 * k},${sy - 6 * k} L${sx},${sy + 7 * k} L${sx + 7 * k},${sy - 6 * k}`
+        : `M${sx - 7 * k},${sy - 3 * k} H${sx + 6 * k} V${sy + 4 * k}`;
+    return (
+      <path
+        d={d}
+        fill="none"
+        stroke={C.ink}
+        strokeWidth={2}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        pointerEvents="none"
+        data-gate-symbol={kind}
+        transform={rot !== 0 ? `rotate(${-rot}, ${sx}, ${sy})` : undefined}
+      />
+    );
+  };
 
   const renderGateBody = () => {
     switch (comp.type) {
@@ -513,30 +508,19 @@ function CircuitComponentView({
           </g>
         );
 
+      // AND, OR and NOT: the memo's shapes (componentGeometry.ts PART_SIZE —
+      // 60×60, 60×60, 50×60), their symbols drawn as 2px strokes (gateSymbol).
       case 'AND':
         return (
           <g>
             <path
-              d={`M${comp.x},${comp.y} L${comp.x + w * 0.5},${comp.y} Q${comp.x + w},${comp.y} ${comp.x + w},${comp.y + h / 2} Q${comp.x + w},${comp.y + h} ${comp.x + w * 0.5},${comp.y + h} L${comp.x},${comp.y + h} Z`}
+              d={`M${comp.x},${comp.y} H${comp.x + w - h / 2} A${h / 2},${h / 2} 0 0 1 ${comp.x + w - h / 2},${comp.y + h} H${comp.x} Z`}
               fill={bodyFill}
               stroke={bodyStroke}
               strokeWidth={bodyStrokeW}
+              strokeLinejoin="round"
             />
-            <text
-              x={cx}
-              y={cy}
-              textAnchor="middle"
-              dominantBaseline="central"
-              fontSize="20"
-              fontWeight="700"
-              fill={C.ink}
-              stroke={C.ink}
-              strokeWidth={1}
-              paintOrder="stroke"
-              transform={counterRotateLabel()}
-            >
-              {'\u2227'}
-            </text>
+            {gateSymbol('and', comp.x + 28, comp.y + 30, 1)}
           </g>
         );
 
@@ -544,26 +528,20 @@ function CircuitComponentView({
         return (
           <g>
             <path
-              d={`M${comp.x},${comp.y} Q${comp.x + w * 0.3},${comp.y} ${comp.x + w * 0.5},${comp.y} Q${comp.x + w},${comp.y} ${comp.x + w},${comp.y + h / 2} Q${comp.x + w},${comp.y + h} ${comp.x + w * 0.5},${comp.y + h} Q${comp.x + w * 0.3},${comp.y + h} ${comp.x},${comp.y + h} Q${comp.x + w * 0.2},${comp.y + h / 2} ${comp.x},${comp.y} Z`}
+              d={`M${comp.x},${comp.y} H${comp.x + 24} Q${comp.x + 50},${comp.y + 3} ${comp.x + 60},${comp.y + 30} Q${comp.x + 50},${comp.y + 57} ${comp.x + 24},${comp.y + 60} H${comp.x} Q${comp.x + 12},${comp.y + 30} ${comp.x},${comp.y} Z`}
               fill={bodyFill}
               stroke={bodyStroke}
               strokeWidth={bodyStrokeW}
+              strokeLinejoin="round"
             />
-            <text
-              x={cx}
-              y={cy}
-              textAnchor="middle"
-              dominantBaseline="central"
-              fontSize="20"
-              fontWeight="700"
-              fill={C.ink}
-              stroke={C.ink}
-              strokeWidth={1}
-              paintOrder="stroke"
-              transform={counterRotateLabel()}
-            >
-              {'\u2228'}
-            </text>
+            {/* The inputs sit on the box's edge; a stub carries each to the curve. */}
+            <path
+              d={`M${comp.x},${comp.y + 20} H${comp.x + OR_STUB} M${comp.x},${comp.y + 40} H${comp.x + OR_STUB}`}
+              fill="none"
+              stroke={bodyStroke}
+              strokeWidth={1.5}
+            />
+            {gateSymbol('or', comp.x + 30, comp.y + 30, 1)}
           </g>
         );
 
@@ -571,23 +549,13 @@ function CircuitComponentView({
         return (
           <g>
             <polygon
-              points={`${comp.x},${comp.y} ${comp.x + w},${comp.y + h / 2} ${comp.x},${comp.y + h}`}
+              points={`${comp.x},${comp.y + 8} ${comp.x + 50},${comp.y + 30} ${comp.x},${comp.y + 52}`}
               fill={bodyFill}
               stroke={bodyStroke}
               strokeWidth={bodyStrokeW}
+              strokeLinejoin="round"
             />
-            <text
-              x={comp.x + w / 3}
-              y={cy}
-              textAnchor="middle"
-              dominantBaseline="central"
-              fontSize="18"
-              fontWeight="700"
-              fill={C.ink}
-              transform={counterRotateLabel()}
-            >
-              {'\u00AC'}
-            </text>
+            {gateSymbol('not', comp.x + 16, comp.y + 29, 0.85)}
           </g>
         );
 
@@ -2406,7 +2374,9 @@ export function CircuitCanvas() {
         const existingIdx = existingSegments.findIndex(
           (s) => s.segmentIndex === drag.segmentIndex
         );
-        const newSeg = { segmentIndex: drag.segmentIndex!, offset, axis };
+        // `base`: where the router ran this segment — the offset belongs to
+        // that route and goes stale if the route moves (wireSegments.ts).
+        const newSeg = { segmentIndex: drag.segmentIndex!, offset, axis, base: drag.segmentOrigValue };
         if (existingIdx >= 0) {
           existingSegments[existingIdx] = newSeg;
         } else {

@@ -72,6 +72,7 @@ import { parseWorkbookFile, serializeWorkbook, titleFromFileName, workbookKeyHas
 import { orderBoxPorts, rebindLegacyBoxes, rebindLegacyLibrary } from './boxPorts';
 import { placementOrigin, toolComponent, type ArmedTool } from './palette';
 import { clampZoom } from './canvasView';
+import { getComponentSize } from './componentGeometry';
 
 /**
  * TM tape notation (alphabet) for the current context. Inside an assignment
@@ -2809,10 +2810,10 @@ export const useStore = create<AppState>()((set, get) => ({
     const box = state.boxes.find((b) => b.id === id);
     if (!box) return 'Box not found.';
 
-    // Find components inside the box (use actual component dimensions)
+    // Find components inside the box: those whose centre it encloses, by the
+    // one size table (componentGeometry.ts — the canvas's own sizes).
     const insideComps = state.components.filter((c) => {
-      const w = (c.type === 'INPUT' || c.type === 'OUTPUT') ? 40 : 80;
-      const h = (c.type === 'INPUT' || c.type === 'OUTPUT') ? 40 : (c.type === 'HA' ? 70 : 60);
+      const { w, h } = getComponentSize(c);
       const cx = c.x + w / 2;
       const cy = c.y + h / 2;
       return cx >= box.x && cx <= box.x + box.width && cy >= box.y && cy <= box.y + box.height;
