@@ -8,9 +8,9 @@ requires: browser
 area: app
 source: inbox
 created: 2026-09-25T16:15:00-07:00
-status: ready
+status: in-progress
 after: 2026-09-25-055
-branch:
+branch: task/056-editor-gate-geometry
 merged_into:
 ---
 
