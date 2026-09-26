@@ -220,8 +220,10 @@ literal or an undefined token. Task: `tasks/done/2026-09-21-019-*`._
   to the assignment's document, the save state, Submit, `SessionControls` folded under
   "Name ▾" — over a 4px band), the left **question panel** (nav strip, the problem, the
   grouped question list), resizable and collapsible columns, and the open / fill-in
-  answer area, all styled in `app/src/workbench.css` (literal-free, like `pages.css`).
-  The spec is `docs/buildout/designs/editor-workbench.md`. What is still inside
-  `index.css` — the canvas, palette and data-panel internals — moves onto the tokens in
-  tasks 053–055; until then `themeCheck` ratchets its colour literals (they may only go
-  down). The goal and output tables use Plex Sans with tabular digits, never Mono.
+  answer area, and the canvas's floating parts **palette** (task 054: 58px icon tiles
+  stroked in the ink colour, a grip, a turn button, pinned boxes, the Boxes pop-out, a
+  55% ghost while a tile is dragged), all styled in `app/src/workbench.css`
+  (literal-free, like `pages.css`). The spec is `docs/buildout/designs/editor-workbench.md`.
+  What is still inside `index.css` — the canvas and data-panel internals — moves onto the
+  tokens in task 055; until then `themeCheck` ratchets its colour literals (they may only
+  go down). The goal and output tables use Plex Sans with tabular digits, never Mono.

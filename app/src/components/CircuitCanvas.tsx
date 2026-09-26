@@ -3,10 +3,13 @@ import { useStore, selectEffectiveMode, selectLiveFsmStateId, selectTransitionNo
 import { inputCharTokens, hasCombinationalLoop, memorySlots } from '../engine';
 import { usePasteGuard, useNotice } from '../usePasteGuard';
 import { CanvasActions } from './CanvasActions';
+import { Palette } from './Palette';
+import { usePaletteDrag } from './paletteDrag';
+import { clientToCanvas, placementOrigin, toolComponent } from '../palette';
+import { editorShortcut, isTextEntryTarget } from '../shortcuts';
 import type {
   CircuitComponent,
   Wire,
-  ComponentType,
   BoxDefinition,
 } from '../types';
 import {
@@ -1754,6 +1757,27 @@ function BoxView({
   );
 }
 
+// ─── Palette ghost ───────────────────────────────────────────────
+
+/** The part a palette tile would place, drawn at 55% under the pointer while
+ *  the tile is dragged over open canvas (Palette.tsx runs the drag; its tiny
+ *  store changes at pointer rate, so only this re-renders). */
+function PaletteGhost({ containerRef }: { containerRef: React.RefObject<HTMLDivElement | null> }) {
+  const drag = usePaletteDrag((s) => s.drag);
+  const library = useStore((s) => s.confirmedBoxLibrary);
+  const rect = drag?.overCanvas ? containerRef.current?.getBoundingClientRect() : undefined;
+  if (!drag || !rect) return null;
+  const comp = toolComponent(drag.tool, library);
+  if (!comp) return null;
+  const at = clientToCanvas({ x: drag.clientX, y: drag.clientY }, rect, useStore.getState());
+  const origin = placementOrigin(comp, at.x, at.y);
+  return (
+    <g className="cv-ghost" pointerEvents="none">
+      <CircuitComponentView comp={{ ...comp, x: origin.x, y: origin.y }} isSelected={false} />
+    </g>
+  );
+}
+
 // ─── Navigation Arrow ────────────────────────────────────────────
 
 function NavigationArrow({
@@ -1845,7 +1869,6 @@ export function CircuitCanvas() {
   const panY = useStore((s) => s.panY);
   const showGrid = useStore((s) => s.showGrid);
   const showWireValues = useStore((s) => s.showWireValues);
-  const addComponent = useStore((s) => s.addComponent);
   const selectedIds = useStore((s) => s.selectedIds);
   // For turbot questions the canvas edits the inner brain circuit, so
   // editor-behavior branches key off the effective (inner) mode.
@@ -1902,50 +1925,53 @@ export function CircuitCanvas() {
   }, [components, wires, effectiveMode, showUnboundBoxWarning]);
 
   // ─── Keyboard shortcuts ──────────────────────────────────────
+  // Which command a key press is lives in ONE pure table (shortcuts.ts, task
+  // 058: case-free, so Shift or Caps Lock never turns ⌘Z's "z" into a miss;
+  // Ctrl+Y redoes too); this handler only dispatches. Undo and redo are the
+  // store's, which carry the lock (law 3).
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
-      if (
-        document.activeElement?.tagName === 'INPUT' ||
-        document.activeElement?.tagName === 'TEXTAREA'
-      )
-        return;
-
-      if (e.key === 'Escape') {
-        useStore.getState().setSelectedTool(null);
-        // Cancel box drawing
-        const state = useStore.getState();
-        if (state.boxDrawing.phase !== 'idle') {
-          state.setBoxDrawingPhase('idle');
-          state.setDraftBox(null);
-        }
-      }
-      if (e.key === 'Delete' || e.key === 'Backspace') {
-        e.preventDefault();
-        useStore.getState().deleteSelected();
-      }
-      if (e.metaKey || e.ctrlKey) {
-        if (e.key === 'z' && !e.shiftKey) {
+      if (isTextEntryTarget(document.activeElement as HTMLElement | null)) return;
+      const command = editorShortcut(e);
+      if (!command) return;
+      const state = useStore.getState();
+      switch (command) {
+        case 'escape':
+          // Esc disarms the palette tool, closes the Boxes pop-out and
+          // cancels a box being drawn.
+          state.setSelectedTool(null);
+          if (state.boxesPopoutOpen) state.setBoxesPopoutOpen(false);
+          if (state.boxDrawing.phase !== 'idle') {
+            state.setBoxDrawingPhase('idle');
+            state.setDraftBox(null);
+          }
+          return;
+        case 'delete':
           e.preventDefault();
-          useStore.getState().undo();
-        }
-        if (e.key === 'z' && e.shiftKey) {
+          state.deleteSelected();
+          return;
+        case 'undo':
           e.preventDefault();
-          useStore.getState().redo();
-        }
-        if (e.key === 'c') {
+          state.undo();
+          return;
+        case 'redo':
           e.preventDefault();
-          useStore.getState().copySelected();
-        }
-        if (e.key === 'v') {
+          state.redo();
+          return;
+        case 'copy':
           e.preventDefault();
-          const refused = useStore.getState().paste();
+          state.copySelected();
+          return;
+        case 'paste': {
+          e.preventDefault();
+          const refused = state.paste();
           if (refused) showPasteNotice(refused);
+          return;
         }
-        if (e.key === 'a') {
+        case 'selectAll':
           e.preventDefault();
-          const s = useStore.getState();
-          s.setSelectedIds(s.components.map((c) => c.id));
-        }
+          state.setSelectedIds(state.components.map((c) => c.id));
+          return;
       }
     };
     window.addEventListener('keydown', handler);
@@ -1984,33 +2010,6 @@ export function CircuitCanvas() {
     });
     observer.observe(el);
     return () => observer.disconnect();
-  }, []);
-
-  // ─── Drag & drop from component library ────────────────────────
-  const handleDrop = useCallback(
-    (e: React.DragEvent) => {
-      e.preventDefault();
-      const type = e.dataTransfer.getData('componentType');
-      if (!type) return;
-      const pos = screenToCanvas(e.clientX, e.clientY);
-
-      // Handle box instance drops
-      if (type === 'BOXED_INSTANCE') {
-        const boxId = e.dataTransfer.getData('boxDefinitionId');
-        if (boxId) {
-          useStore.getState().placeBoxInstance(boxId, pos.x - 40, pos.y - 30);
-        }
-        return;
-      }
-
-      addComponent(type as ComponentType, pos.x - 40, pos.y - 30);
-    },
-    [screenToCanvas, addComponent]
-  );
-
-  const handleDragOver = useCallback((e: React.DragEvent) => {
-    e.preventDefault();
-    e.dataTransfer.dropEffect = 'copy';
   }, []);
 
   // ─── Find what's under the mouse ───────────────────────────────
@@ -3046,6 +3045,8 @@ export function CircuitCanvas() {
 
       // ─── Canvas background ──────────────────────────────────────
       e.preventDefault();
+      // A click on empty canvas closes the palette's Boxes pop-out.
+      if (state.boxesPopoutOpen) state.setBoxesPopoutOpen(false);
 
       // Click-to-place: NEW_BOX tool — start drawing
       if (state.selectedTool === 'NEW_BOX') {
@@ -3067,11 +3068,14 @@ export function CircuitCanvas() {
         return;
       }
 
-      // Click-to-place: component tool. The tool stays armed, so repeated
-      // background clicks drop copies in a row; a click that lands on an
-      // existing object disarms it instead (the branches above).
+      // Click-to-place: a part or a box, centred on the click — the store's
+      // one placement path (placeTool), the palette's drop uses it too. Shift
+      // keeps the tool armed for another copy; a plain click places one and
+      // disarms. A click that lands on an existing object disarms it instead
+      // (the branches above).
       if (state.selectedTool) {
-        addComponent(state.selectedTool as ComponentType, canvasPos.x - 40, canvasPos.y - 30);
+        state.placeTool(state.selectedTool, canvasPos.x, canvasPos.y);
+        if (!e.shiftKey) state.setSelectedTool(null);
         return;
       }
 
@@ -3596,8 +3600,6 @@ export function CircuitCanvas() {
     <div
       className="canvas-container"
       ref={containerRef}
-      onDrop={handleDrop}
-      onDragOver={handleDragOver}
     >
       {/* Ready to Box button */}
       {draftBox && boxDrawing.phase === 'adjusting' && (
@@ -3857,8 +3859,14 @@ export function CircuitCanvas() {
               isSelected={selectedIds.includes(comp.id)}
             />
           ))}
+
+          {/* A palette tile in flight: the part at 55%, centred on the pointer */}
+          <PaletteGhost containerRef={containerRef} />
         </g>
       </svg>
+
+      {/* The floating palette and its Boxes pop-out (task 054) */}
+      <Palette canvasW={containerSize.width} canvasH={containerSize.height} />
 
       {/* Navigation arrow */}
       {navArrow && (

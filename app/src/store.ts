@@ -70,6 +70,7 @@ import { INTEGRITY_NOTICE } from './provenance/notice';
 // The sandbox workbook file (task 028): parsing, the saved-content key.
 import { parseWorkbookFile, serializeWorkbook, titleFromFileName, workbookKeyHash } from './workbookFile';
 import { orderBoxPorts, rebindLegacyBoxes, rebindLegacyLibrary } from './boxPorts';
+import { placementOrigin, toolComponent, type ArmedTool } from './palette';
 
 /**
  * TM tape notation (alphabet) for the current context. Inside an assignment
@@ -176,9 +177,10 @@ export function selectLockNotice(s: Parameters<typeof lockReason>[0]): string | 
  * The open question's component restriction (`allowed_components`), or null
  * when unrestricted — sandbox (no assignment), or the field absent/empty
  * (absent/empty = all allowed; semantics in engine/machineValidation.ts).
- * The palette (ComponentLibrary) filters its entries through this via
- * `isComponentTypeAllowed`, so a disallowed gate can never be placed; the
- * grader's Stage-1 check is the enforcement backstop.
+ * The palette (Palette.tsx, via palette.ts) dims what it excludes — a
+ * disallowed tile does nothing, a box using one can't be armed or placed from
+ * it (decision 3, task 054); the grader's Stage-1 check and the paste seam
+ * are the enforcement.
  */
 export function selectAllowedComponents(s: {
   assignment: AssignmentData | null;
@@ -959,6 +961,10 @@ interface AppState {
   updateBox: (id: string, updates: Partial<BoxDefinition>) => void;
   removeBox: (id: string) => void;
   confirmBox: (id: string) => string | null; // returns error or null
+  // Remove a box from the LIBRARY (and its drawn outline on this canvas) —
+  // never a placed copy: each carries its own internalCircuit and keeps
+  // working (decision 7, task 054: a library action never destroys placed
+  // work). Undoable, like every edit.
   removeConfirmedBox: (id: string) => void;
   // Rename a box everywhere it appears — the library entry, the drawn box on
   // the canvas, and the label of every placed instance (in this assignment,
@@ -1070,9 +1076,21 @@ interface AppState {
   loadScGlobalSequence: (index: number) => void;
   recordScGlobalSequenceOutput: () => void;
 
-  // Selected tool (click-to-place mode)
-  selectedTool: ComponentType | 'NEW_BOX' | null;
-  setSelectedTool: (t: ComponentType | 'NEW_BOX' | null) => void;
+  // The armed palette tool (click-to-place): ONE tagged value — a part type,
+  // the NEW_BOX draw tool, or a library box (palette.ts ArmedTool). A gate
+  // tile, a box row and a pinned box tile all arm it; canvas-scoped (reset on
+  // every canvas swap).
+  selectedTool: ArmedTool | null;
+  setSelectedTool: (t: ArmedTool | null) => void;
+  // Place what a tool places, centred on canvas point (x, y) and snapped —
+  // the ONE placement path for a click on the canvas and a drop from the
+  // palette alike (addComponent / placeBoxInstance carry the lock). NEW_BOX
+  // places nothing (it is a draw tool).
+  placeTool: (tool: ArmedTool, x: number, y: number) => void;
+  // The palette's Boxes pop-out (task 054): UI only, canvas-scoped — a canvas
+  // swap closes it, as do ×, Esc and a click on empty canvas.
+  boxesPopoutOpen: boolean;
+  setBoxesPopoutOpen: (open: boolean) => void;
 
   // Box drawing mode state
   boxDrawing: {
@@ -2725,32 +2743,16 @@ export const useStore = create<AppState>()((set, get) => ({
     const state = get();
     if (isCurrentQuestionLocked(state)) return;
     state.pushHistory();
-
-    // Helper: strip all instances of this box from a circuit snapshot
-    const stripBox = (comps: CircuitComponent[], wires: Wire[]) => {
-      const removedIds = new Set(
-        comps.filter((c) => c.boxedCircuitId === id).map((c) => c.id)
-      );
-      return {
-        components: comps.filter((c) => !removedIds.has(c.id)),
-        wires: wires.filter(
-          (w) => !removedIds.has(w.sourceComponentId) && !removedIds.has(w.targetComponentId)
-        ),
-        removedIds,
-      };
-    };
-
-    // Sweep the live canvas only — the library is per-canvas, so a box's
-    // instances can't exist on any other question or tab.
-    const { components: newComponents, wires: newWires, removedIds } =
-      stripBox(state.components, state.wires);
-
+    // The library entry and its drawn outline on this canvas go; every
+    // placed copy — on this question, on every other question of the
+    // homework, in this sandbox tab — stays, and keeps working: it carries
+    // its own internalCircuit (decision 7, task 054). The library is per
+    // homework (per tab in the sandbox), so copies elsewhere are the rule,
+    // not the exception.
     set({
       confirmedBoxLibrary: state.confirmedBoxLibrary.filter((b) => b.id !== id),
-      components: newComponents,
-      wires: newWires,
       boxes: state.boxes.filter((b) => b.id !== id),
-      selectedIds: state.selectedIds.filter((sid) => !removedIds.has(sid)),
+      selectedTool: typeof state.selectedTool === 'object' && state.selectedTool?.box === id ? null : state.selectedTool,
     });
   },
   renameBox: (id, name) => {
@@ -2963,6 +2965,8 @@ export const useStore = create<AppState>()((set, get) => ({
           id,
           name: suggestedName,
           kind: sequential ? 'SC' : 'CC',
+          // Where it was boxed (the pop-out's "· Problem 1"); none in the sandbox.
+          ...(s.assignment ? { origin: s.assignment.questions[s.currentQuestionIndex]?.id } : {}),
           inputPortIds,
           outputPortIds,
           // A stamped copy starts at rest, whatever the canvas was holding.
@@ -4128,6 +4132,16 @@ export const useStore = create<AppState>()((set, get) => ({
   // Selected tool (click-to-place mode)
   selectedTool: null,
   setSelectedTool: (t) => set({ selectedTool: t }),
+  placeTool: (tool, x, y) => {
+    const state = get();
+    const comp = toolComponent(tool, state.confirmedBoxLibrary);
+    if (!comp) return;
+    const at = placementOrigin(comp, x, y);
+    if (typeof tool === 'object') state.placeBoxInstance(tool.box, at.x, at.y);
+    else state.addComponent(comp.type, at.x, at.y);
+  },
+  boxesPopoutOpen: false,
+  setBoxesPopoutOpen: (open) => set({ boxesPopoutOpen: open }),
 
   // Box drawing mode state
   boxDrawing: {
@@ -4818,7 +4832,7 @@ export const useStore = create<AppState>()((set, get) => ({
     // The selection is canvas-scoped for the same reason: ids from the last
     // canvas select nothing here, and a stale one would let Delete act on
     // this canvas's namesake (task 052).
-    set({ selectedTool: null, selectedIds: [], undoStack: [], redoStack: [] });
+    set({ selectedTool: null, boxesPopoutOpen: false, selectedIds: [], undoStack: [], redoStack: [] });
   },
 
   resetForPrincipal: (email) => {

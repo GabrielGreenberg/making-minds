@@ -11,7 +11,13 @@
 // Pins: confirm on Q1 → absent on Q2 → restored (with internals, placeable)
 // back on Q1; survives goHome/closeAssignment/openAssignment via the
 // workbook seam; sandbox tabs isolated from assignments and each other;
-// removeConfirmedBox strips the entry + placed instances and undo restores it;
+// [library delete] (task 054, decision 7) — removeConfirmedBox drops the
+// library entry and its drawn outline, never a placed copy: every copy, on
+// this question and on others, stays and computes exactly what it did, and
+// undo restores the entry; [placing] — placeTool, the one path for a click
+// and a palette drop, centres the part or box on the point, snapped, and a box
+// placed through it is the box placeBoxInstance places; [origin] — a box
+// confirmed in an assignment records its question, none in the sandbox;
 // [sequential boxes] — a box may hold memory and then behaves exactly as
 // unboxed (engine pins, every SC reference fixture graded boxed whole, and
 // the store: kind 'SC', where it places, runs, local step, undo, save/load,
@@ -96,6 +102,8 @@ await flush();
 console.log('[shared across the assignment]');
 const boxId = buildAndBoxAnd();
 check('confirm added a library entry on Q1', useStore.getState().confirmedBoxLibrary.some((b) => b.id === boxId));
+check('[origin] the entry records the question it was boxed on (the pop-out\'s "· Problem 1")',
+  useStore.getState().confirmedBoxLibrary.find((b) => b.id === boxId)?.origin === assignment.questions[0].id);
 
 // Q2 is the SC question: a CC box follows the student there (it is placeable
 // on an SC canvas — placeableBoxKinds('SC') includes 'CC').
@@ -125,11 +133,15 @@ useStore.getState().placeBoxInstance(boxId, 500, 400);
 await flush();
 check('instance placeable on Q1 too', useStore.getState().components.length === before + 1);
 
-// Removing a library entry sweeps the LIVE canvas only. Instances already
-// stamped into another question keep working: a placed BOXED component carries
-// its own internals, so it still simulates and grades — and silently deleting
-// work in a question the student isn't looking at would be worse.
+// [library delete] Removing a library entry never touches placed work
+// (decision 7): a placed BOXED component carries its own internals, so every
+// copy — on the question it is deleted from and on every other — stays and
+// computes exactly what it did. Only the entry and its drawn outline go.
+console.log('[library delete]');
 {
+  const { evaluateBoxedCircuit } = await import('../src/engine/cc');
+  const table = (c: CircuitComponent | undefined) =>
+    [[0, 0], [0, 1], [1, 0], [1, 1]].map((row) => evaluateBoxedCircuit(c, row).join('')).join(' ');
   useStore.getState().switchQuestion(1);
   await flush();
   const doomed = buildAndBoxAnd();
@@ -141,20 +153,39 @@ check('instance placeable on Q1 too', useStore.getState().components.length === 
   check('the new box is placeable on Q1 too', useStore.getState().components.length === q1Before + 1);
   useStore.getState().switchQuestion(1);
   await flush();
+  useStore.getState().placeBoxInstance(doomed, 800, 100);
+  await flush();
+  const hereCopy = () => useStore.getState().components.find((c) => c.boxedCircuitId === doomed && c.type === 'BOXED');
+  const hereBefore = table(hereCopy());
+  const originalsBefore = useStore.getState().components.filter((c) => c.type !== 'BOXED').length;
   useStore.getState().removeConfirmedBox(doomed);
   await flush();
   check('removeConfirmedBox drops the shared library entry',
     !useStore.getState().confirmedBoxLibrary.some((b) => b.id === doomed));
+  check('…and its drawn outline on this canvas', !useStore.getState().boxes.some((b) => b.id === doomed));
+  check('…but the copy placed on THIS question stays', hereCopy() !== undefined);
+  check('…computing exactly what it did (the AND table)', hereBefore === '0 0 0 1' && table(hereCopy()) === hereBefore);
+  check('…and the parts the box was drawn around stay too',
+    useStore.getState().components.filter((c) => c.type !== 'BOXED').length === originalsBefore);
+  useStore.getState().undo();
+  check('undo restores the entry', useStore.getState().confirmedBoxLibrary.some((b) => b.id === doomed));
+  useStore.getState().removeConfirmedBox(doomed);
   useStore.getState().switchQuestion(0);
   await flush();
-  check('an instance already stamped on another question survives, internals intact',
-    useStore.getState().components.some(
-      (c) => c.boxedCircuitId === doomed && (c.internalCircuit?.components ?? []).length > 0,
-    ));
+  const thereCopy = useStore.getState().components.find((c) => c.boxedCircuitId === doomed);
+  check('a copy already placed on another question survives, internals intact',
+    (thereCopy?.internalCircuit?.components ?? []).length > 0 && table(thereCopy) === '0 0 0 1');
   // Clean up so the persistence round-trip below starts from a known canvas.
   useStore.setState({
     components: useStore.getState().components.filter((c) => c.boxedCircuitId !== doomed),
   });
+  useStore.getState().switchQuestion(1);
+  await flush();
+  useStore.setState({
+    components: useStore.getState().components.filter((c) => c.boxedCircuitId !== doomed),
+  });
+  useStore.getState().switchQuestion(0);
+  await flush();
 }
 
 // ── persistence: autosave → close → reopen ──────────────────────
@@ -222,12 +253,51 @@ useStore.getState().switchTab(tab1);
 await flush();
 check('switching back to tab 1 restores its box', useStore.getState().confirmedBoxLibrary.some((b) => b.id === sbBox));
 
-// removeConfirmedBox removes entry + instances on this canvas
+check('[origin] a sandbox box records no question', useStore.getState().confirmedBoxLibrary.find((b) => b.id === sbBox)?.origin === undefined);
+
+// [placing] placeTool — the click's and the palette drop's one path — centres
+// what it places on the point, snapped; a box placed through it (a pinned
+// tile, a pop-out row, a drop) is the box placeBoxInstance places.
+console.log('[placing]');
+{
+  const { gradedMachineKey } = await import('../src/engine/caseRun');
+  const { getComponentSize } = await import('../src/componentGeometry');
+  const { GRID_SIZE } = await import('../src/types');
+  const snap = (v: number) => Math.round(v / GRID_SIZE) * GRID_SIZE;
+  const n0 = useStore.getState().components.length;
+  useStore.getState().placeTool('AND', 300, 500);
+  const and = useStore.getState().components[n0];
+  const size = and && getComponentSize(and);
+  check('placeTool(AND) places an AND centred on the point, snapped',
+    and?.type === 'AND' && and.x === snap(300 - size.w / 2) && and.y === snap(500 - size.h / 2));
+  useStore.getState().placeTool({ box: sbBox }, 700, 500);
+  const viaTool = useStore.getState().components[n0 + 1];
+  const bsize = viaTool && getComponentSize(viaTool);
+  useStore.getState().placeBoxInstance(sbBox, 700 - bsize.w / 2, 500 - bsize.h / 2);
+  const direct = useStore.getState().components[n0 + 2];
+  check('placeTool({box}) places that box, centred and snapped',
+    viaTool?.type === 'BOXED' && viaTool.boxedCircuitId === sbBox &&
+    viaTool.x === snap(700 - bsize.w / 2) && viaTool.y === snap(500 - bsize.h / 2));
+  check('…the same box placeBoxInstance places (same box id, same graded key)',
+    direct?.boxedCircuitId === sbBox && viaTool.x === direct.x && viaTool.y === direct.y &&
+    // (each placement mints its own id; set aside, the two are one machine)
+    gradedMachineKey({ components: [{ ...viaTool, id: 'b' }], wires: [] }) ===
+      gradedMachineKey({ components: [{ ...direct, id: 'b' }], wires: [] }));
+  useStore.getState().placeTool('NEW_BOX', 100, 100);
+  check('placeTool(NEW_BOX) places nothing (it is a draw tool)', useStore.getState().components.length === n0 + 3);
+  useStore.getState().placeTool({ box: 'no-such-box' }, 100, 100);
+  check('placeTool of a box the library lacks places nothing', useStore.getState().components.length === n0 + 3);
+  useStore.setState({ components: useStore.getState().components.slice(0, n0) });
+}
+
+// [library delete] in the sandbox: the entry goes, the placed copy stays.
 useStore.getState().placeBoxInstance(sbBox, 500, 300);
+useStore.getState().setSelectedTool({ box: sbBox });
 useStore.getState().removeConfirmedBox(sbBox);
 await flush();
 check('removeConfirmedBox clears entry', !useStore.getState().confirmedBoxLibrary.some((b) => b.id === sbBox));
-check('removeConfirmedBox strips placed instances', !useStore.getState().components.some((c) => c.boxedCircuitId === sbBox));
+check('removeConfirmedBox leaves the placed copy', useStore.getState().components.some((c) => c.boxedCircuitId === sbBox));
+check('…and disarms the deleted box if it was the armed tool', useStore.getState().selectedTool === null);
 useStore.getState().undo();
 check('undo restores the confirmed box', useStore.getState().confirmedBoxLibrary.some((b) => b.id === sbBox));
 

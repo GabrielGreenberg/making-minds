@@ -55,7 +55,7 @@ const OK: MachineValidation = { ok: true };
 // Enforced as part of Stage 1 in every grading branch (grader.ts: gradeQuestion
 // for CC/SC/FSM/TM, gradeTurbot for brains, gradePerception; mirrored by
 // coverageCheck's validateStage1), so a violating machine fails every case.
-// The student palette (ComponentLibrary) and the instructor authoring UI
+// The student palette (palette.ts / Palette.tsx) and the instructor authoring UI
 // (QuestionCreator) read the same helpers.
 
 /** Infrastructure types that are always allowed regardless of the restriction
