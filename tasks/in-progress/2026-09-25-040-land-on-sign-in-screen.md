@@ -8,9 +8,9 @@ requires: browser
 area: app
 source: feedback
 created: 2026-09-25T09:00:00-07:00
-status: ready
+status: in-progress
 after:
-branch:
+branch: task/040-land-on-sign-in-screen
 merged_into:
 ---
 
