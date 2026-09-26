@@ -197,6 +197,23 @@ export function paletteOrientation(preferHoriz: boolean, length: number, canvas:
   return preferHoriz ? fitsHoriz || !fitsVert : !fitsVert && fitsHoriz;
 }
 
+/** Keep the palette off another piece of the canvas's furniture — the action
+ *  group at the top right (Undo · Redo · Delete · …). Where they would
+ *  overlap, the palette drops below it; a canvas too short for that keeps
+ *  the clamped spot. Rects in canvas-container px. */
+export function clearOf(
+  pos: { x: number; y: number },
+  size: { w: number; h: number },
+  obstacle: { x0: number; y0: number; x1: number; y1: number } | null,
+  canvas: { w: number; h: number },
+): { x: number; y: number } {
+  if (!obstacle) return pos;
+  const overlaps = pos.x < obstacle.x1 && pos.x + size.w > obstacle.x0 && pos.y < obstacle.y1 && pos.y + size.h > obstacle.y0;
+  if (!overlaps) return pos;
+  const below = clampPalette({ x: pos.x, y: obstacle.y1 + PALETTE_MARGIN }, size, canvas);
+  return below.y >= obstacle.y1 ? below : pos;
+}
+
 /** Pins are kept per homework; in the sandbox, whose library is per tab, per tab. */
 export function pinsPrefKey(scope: { assignmentId: string } | { tabId: string }): string {
   return 'assignmentId' in scope ? `pinnedBoxes:${scope.assignmentId}` : `pinnedBoxes:tab:${scope.tabId}`;

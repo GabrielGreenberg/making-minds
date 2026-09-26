@@ -203,7 +203,7 @@ html, body, #root {
   background: #ddd;
   border: 1px solid var(--menu-border);
   border-bottom: none;
-  border-radius: 4px 4px 0 0;
+  border-radius: 0;
   display: flex;
   align-items: center;
   gap: 8px;
@@ -237,7 +237,7 @@ html, body, #root {
   width: 80px;
   font-size: 12px;
   border: 1px solid var(--accent);
-  border-radius: 2px;
+  border-radius: 0;
   padding: 0 4px;
   outline: none;
   font-family: inherit;
@@ -249,7 +249,7 @@ html, body, #root {
   line-height: 1;
   background: transparent;
   border: 1px solid transparent;
-  border-radius: 4px 4px 0 0;
+  border-radius: 0;
   cursor: pointer;
   color: #888;
   font-weight: 500;

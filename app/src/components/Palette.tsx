@@ -25,6 +25,7 @@ import {
   DRAG_THRESHOLD,
   boxRows,
   clampPalette,
+  clearOf,
   clientToCanvas,
   paletteHasBoxes,
   paletteLength,
@@ -284,14 +285,27 @@ export function Palette({ canvasW, canvasH }: { canvasW: number; canvasH: number
   const [dragging, setDragging] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   const [size, setSize] = useState({ w: 0, h: 0 });
+  // The canvas's action group (top right), which the palette keeps clear of.
+  const [actions, setActions] = useState<{ x0: number; y0: number; x1: number; y1: number } | null>(null);
   useLayoutEffect(() => {
     const el = ref.current;
     if (!el) return;
-    const measure = () => setSize((prev) =>
-      prev.w === el.offsetWidth && prev.h === el.offsetHeight ? prev : { w: el.offsetWidth, h: el.offsetHeight });
+    const group = el.parentElement?.querySelector<HTMLElement>('.cv-actions') ?? null;
+    const measure = () => {
+      setSize((prev) =>
+        prev.w === el.offsetWidth && prev.h === el.offsetHeight ? prev : { w: el.offsetWidth, h: el.offsetHeight });
+      if (group) {
+        const c = el.parentElement!.getBoundingClientRect();
+        const g = group.getBoundingClientRect();
+        const next = { x0: g.left - c.left, y0: g.top - c.top, x1: g.right - c.left, y1: g.bottom - c.top };
+        setActions((prev) => (prev && prev.x0 === next.x0 && prev.y1 === next.y1 && prev.x1 === next.x1 ? prev : next));
+      }
+    };
     measure();
     const observer = new ResizeObserver(measure);
     observer.observe(el);
+    if (group) observer.observe(group);
+    if (el.parentElement) observer.observe(el.parentElement);
     return () => observer.disconnect();
   }, []);
 
@@ -333,7 +347,7 @@ export function Palette({ canvasW, canvasH }: { canvasW: number; canvasH: number
   const horiz = paletteOrientation(placement.horiz, length, canvas);
   const canTurn = paletteOrientation(!horiz, length, canvas) === !horiz;
   const canvasKnown = canvasW > 0 && canvasH > 0 && size.w > 0;
-  const shown = canvasKnown ? clampPalette(placement, size, canvas) : placement;
+  const shown = canvasKnown ? clearOf(clampPalette(placement, size, canvas), size, actions, canvas) : placement;
 
   // Moving it: the grip drags it (clamped as it goes); the pref is written on release.
   const onGripDown = (e: ReactPointerEvent<HTMLDivElement>) => {

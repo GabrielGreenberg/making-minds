@@ -47,3 +47,4 @@
 2026-09-25-058 · bug · Make Ctrl/⌘+Shift+Z redo on every keyboard — the canvas compares the key's case, so Shift can turn "z" into "Z" and skip redo · 2026-09-25T21:45:31-0700 · task/054-editor-floating-palette · 687e604
 2026-09-25-055 · feature · Give the canvas the site's look — Plex Sans text, magenta selection, a dot grid, a hint line, an empty-canvas message and a Fit button (editor redesign 4 of 6) · 2026-09-26T09:56:41-0700 · task/055-editor-canvas-look · 33779c1
 2026-09-25-056 · feature · Regularize the gate shapes — AND/OR 60×60, NOT 50×60, boxes sized to their ports, symbols drawn as strokes — and park for Gabriel's look before merging (editor redesign 5 of 6) · 2026-09-26T12:56:57-0700 · task/056-editor-gate-geometry · 2a25fae
+2026-09-25-057 · chore · Measure the rebuilt editor against every value in the workbench memo and fix the drift (editor redesign 6 of 6) · 2026-09-26T15:31:32-0700 · task/057-editor-memo-pass · 7283a3f
