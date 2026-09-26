@@ -8,9 +8,9 @@ requires: browser
 area: app
 source: inbox
 created: 2026-09-25T16:15:00-07:00
-status: ready
+status: in-progress
 after:
-branch:
+branch: task/052-editor-workbench-shell
 merged_into:
 ---
 
