@@ -2,8 +2,7 @@ import { TabBar } from './components/TabBar';
 import { EditorShell } from './components/EditorShell';
 import { ComponentLibrary } from './components/ComponentLibrary';
 import { CircuitCanvas } from './components/CircuitCanvas';
-import { DataTable } from './components/DataTable';
-import { SimulationToolbar } from './components/SimulationPanel';
+import { OutputPanel } from './components/OutputPanel';
 import { SequentialTimeline } from './components/SequentialTimeline';
 import { TMTapePanel } from './components/TMTapePanel';
 import { TurbotTapePanel } from './components/TurbotTapePanel';
@@ -64,10 +63,9 @@ function App() {
   }
 
   return (
-    <EditorShell output={<DataTable />}>
+    <EditorShell output={<OutputPanel />}>
       {/* The sandbox's worksheet tabs, over its canvas (no question panel). */}
       {!assignment && <TabBar />}
-      <SimulationToolbar />
       <div className="main-area">
         <ComponentLibrary />
         <div className="canvas-and-timeline">

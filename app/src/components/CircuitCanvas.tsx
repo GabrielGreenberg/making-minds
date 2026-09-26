@@ -2,6 +2,7 @@ import { useRef, useState, useCallback, useEffect, useMemo } from 'react';
 import { useStore, selectEffectiveMode, selectLiveFsmStateId, selectTransitionNotationForSource, selectPasteScope, selectShowUnboundBoxWarning } from '../store';
 import { inputCharTokens, hasCombinationalLoop, memorySlots } from '../engine';
 import { usePasteGuard, useNotice } from '../usePasteGuard';
+import { CanvasActions } from './CanvasActions';
 import type {
   CircuitComponent,
   Wire,
@@ -3881,6 +3882,9 @@ export function CircuitCanvas() {
           ))}
         </div>
       )}
+
+      {/* Undo · Redo · Delete · Rotate · Clear — top-right corner */}
+      <CanvasActions />
 
       {/* Zoom control — bottom-right corner */}
       <div className="zoom-control">

@@ -267,3 +267,67 @@ a.wb-brand:hover { color: var(--mm-accent); text-decoration: none; }
 .wb-answer-foot { margin-top: 10px; font-size: var(--mm-fs-meta); color: var(--mm-ink-3); text-align: left; }
 .wb-answer-foot.paste-notice { color: var(--mm-link); font-weight: 500; }
 .wb-answer-foot--error { color: var(--mm-danger); }
+
+/* ── The output panel (task 053) ──────────────────────────────────────── */
+.wb-right .data-table-panel { background: var(--mm-surface); }
+.op { flex: 1; min-width: 0; min-height: 0; display: flex; flex-direction: column; }
+/* ONE control row for whatever the canvas runs (OutputPanel). */
+.op-controls {
+  flex-shrink: 0; display: flex; align-items: center; gap: 8px; padding: 8px 22px 0;
+  background: var(--mm-surface);
+}
+.op-controls .op-btn {
+  height: 34px; padding: 0 12px; display: inline-flex; align-items: center; gap: 6px;
+  font: inherit; font-size: 13px; font-weight: 600; color: var(--mm-ink);
+  background: var(--mm-surface); border: 1px solid var(--mm-line-2); border-radius: var(--mm-radius); cursor: pointer;
+}
+.op-controls .op-btn:hover:not(:disabled) { background: var(--mm-lav-soft); }
+.op-controls .op-btn:disabled { color: var(--mm-ink-3); opacity: 0.45; cursor: default; }
+.op-btn-icon { color: var(--mm-accent); font-size: 11px; }
+.op-status {
+  margin-left: auto; font-size: var(--mm-fs-meta); color: var(--mm-ink-3);
+  font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+
+/* A combinational circuit's live truth table (LiveTruthTable), styled like
+   the question panel's goal table: Plex Sans tabular, a 1 in the signal-1
+   red, the current row lavender. */
+.op-body { padding: 14px 22px 16px; font-size: 14px; }
+.op-table {
+  table-layout: fixed; border-collapse: collapse;
+  font-family: var(--mm-font-sans); font-variant-numeric: tabular-nums; font-size: 14px; color: var(--mm-ink);
+}
+.op-table th {
+  padding: 6px 0; text-align: center; border-bottom: 1px solid var(--mm-line-2);
+  font-size: 11px; font-weight: 600; letter-spacing: 0.08em; color: var(--mm-ink-3);
+}
+.op-table td { padding: 8px 0; text-align: center; border-bottom: 1px solid var(--mm-line); }
+.op-table .op-out { border-left: 1px solid var(--mm-line-2); }
+.op-table .op-1 { color: var(--mm-signal-1); font-weight: 600; }
+.op-row { cursor: pointer; }
+.op-row:hover td { background: var(--mm-surface-3); }
+.op-row--current td, .op-row--current:hover td { background: var(--mm-lav-soft); }
+.op-row:focus-visible { outline: 2px solid var(--mm-focus); outline-offset: -2px; }
+.op-note { margin: 10px 0 0; font-size: var(--mm-fs-meta); color: var(--mm-ink-3); }
+.op-empty { margin: 4px 0 0; font-size: var(--mm-fs-small); color: var(--mm-ink-3); max-width: 34ch; }
+
+/* ── The canvas's edit actions (CanvasActions, task 053) ─────────────── */
+.cv-actions {
+  position: absolute; top: 12px; right: 14px; z-index: 40;
+  display: flex; flex-direction: column; align-items: flex-end; gap: 4px; font-family: var(--mm-font-sans);
+}
+.cv-group { display: flex; background: var(--mm-surface); border: 1px solid var(--mm-line-2); }
+.cv-group > button {
+  padding: 6px 12px; border: 0; background: none; cursor: pointer; white-space: nowrap;
+  font: inherit; font-size: 13px; color: var(--mm-ink);
+}
+.cv-group > button + button { border-left: 1px solid var(--mm-line); }
+.cv-group > button:hover:not(:disabled) { background: var(--mm-lav-soft); }
+.cv-group > button:disabled { color: var(--mm-ink-3); opacity: 0.45; cursor: default; }
+.cv-hint { font-size: 11.5px; color: var(--mm-ink-3); }
+.cv-confirm {
+  width: 240px; padding: 12px 14px; font-size: var(--mm-fs-small);
+  background: var(--mm-surface); border: 1px solid var(--mm-line-2); box-shadow: var(--mm-shadow);
+}
+.cv-confirm p { margin: 0 0 10px; }
+.cv-confirm-actions { display: flex; justify-content: flex-end; gap: 8px; }

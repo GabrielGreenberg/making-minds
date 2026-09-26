@@ -321,9 +321,13 @@ laws (tasks/PROFILE.md §8); each flag says how it was settled rather than worke
   student work never enter the public repo.
 - **F11 (task 054).** "· Problem 1" in a box's meta line needs an optional origin on
   `ConfirmedBoxDef`.
-- **One control set (task 053).** "Exactly one Run/Step/Reset in every mode" applies to CC,
-  FSM, TM and turbot this pass; SC keeps its local stepper beside the header's global run
-  until the machine-types session.
+- **One control set (task 053).** The output panel's row renders one store descriptor
+  (`selectRunControls`) and dispatches through `runControl`; every run loop is the store's.
+  CC, FSM, TM and turbot have exactly that one Run/Step/Reset. SC's row plays its Global I/O
+  row, and its local stepper stays in the panel. SC perception has no header row: its frame
+  player keeps its own controls. Both wait for the machine-types session. The toolbar's other
+  tools (Undo, Redo, Delete, Rotate, Clear, a turbot TM's Swap state type) are the canvas's
+  top-right group; its "Current state" readout is the row's status (e.g. "t=3 · S₁").
 
 ## Assets
 
