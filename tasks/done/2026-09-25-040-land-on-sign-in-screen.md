@@ -8,9 +8,9 @@ requires: browser
 area: app
 source: feedback
 created: 2026-09-25T09:00:00-07:00
-status: in-progress
+status: done
 after:
-branch: task/040-land-on-sign-in-screen
+branch:
 merged_into:
 ---
 
@@ -67,3 +67,25 @@ root sees the sign-in screen with the form first; "Continue as visitor" reaches 
 release (a private window on `https://making-minds.pages.dev`).
 
 ## Progress log
+
+### 2026-09-25 — built, verified, landed (/work)
+- **One front door.** `routing.ts` loses `landingRoute`; `initRouting()` takes no options and
+  applies the URL as it is. `#/` is Home, which needs sign-in, so anyone signed out meets the
+  sign-in card whatever the browser remembers; `#/sandbox` still opens directly; held deep
+  links are unchanged.
+- **The trace retired.** `KNOWN_KEY` / `markSignedInBefore` / `hasAnyKey` (`accounts.ts`),
+  `AuthContextValue.hasSignInTrace` and both providers' versions are gone; nothing writes
+  `mm:auth:known` now, and a leftover one is ignored (checked in the browser).
+- **The card leads with signing in** (`LoginScreen.tsx` `LoginCard`): the pane first, then a
+  hairline and one quiet `--mm-ink-3` meta line, "Just exploring? *Continue as visitor* to
+  build…", in every pane (local picker; remote sign-in / setup / request / SSO).
+  `VISUAL_VOCAB.md` §Visitor updated.
+- **Pins.** `routingCheck` `[front door]` (`#/` and no hash need sign-in, `#/sandbox` public,
+  the boot keeps `#/` and holds Home with no sandbox behind it) plus a grep gate that the
+  retired names are gone from `src` (proven: a probe file fails it).
+- **Browser, both modes:** a fresh browser at the root shows the sign-in card, form first;
+  Continue as visitor → sandbox; `#/sandbox` direct → sandbox; `#/grades` signed out → sign-in,
+  then Grades after sign-in; sign in → Home; Log out → sign-in; no console errors. Remote was
+  run against a scratch server seeded with a generated test password.
+- **Gates green:** app tsc, tools typecheck, build, `npm run check`, server `npm run check`.
+- **Owed:** the pilot after release, in a private window on `https://making-minds.pages.dev`.
