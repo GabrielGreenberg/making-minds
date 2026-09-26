@@ -43,3 +43,5 @@
 2026-09-25-053 · feature · Give the editor one set of run controls in a right-hand Output panel, and retire the toolbar (editor redesign 2 of 6) · 2026-09-25T19:37:37-0700 · task/053-editor-output-panel · f09ccbf
 2026-09-25-060 · bug · Keep npm's lockfile rewrites on the pilot box from blocking a release — drop the stray root lockfile, discard npm drift before the pull · 2026-09-25T19:52:30-0700 · task/060-box-lockfile-drift · ae278e7
 2026-09-25-040 · feature · Land first-time visitors on the sign-in screen, not in the sandbox, and retire the sign-in trace that only served that rule · 2026-09-25T20:12:15-0700 · task/040-land-on-sign-in-screen · aa96d06
+2026-09-25-054 · feature · Replace the parts column with a floating, draggable palette and a Boxes pop-out where boxes can be pinned (editor redesign 3 of 6) · 2026-09-25T21:45:31-0700 · task/054-editor-floating-palette · 687e604
+2026-09-25-058 · bug · Make Ctrl/⌘+Shift+Z redo on every keyboard — the canvas compares the key's case, so Shift can turn "z" into "Z" and skip redo · 2026-09-25T21:45:31-0700 · task/054-editor-floating-palette · 687e604

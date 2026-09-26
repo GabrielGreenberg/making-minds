@@ -8,9 +8,9 @@ requires: browser
 area: app
 source: inbox
 created: 2026-09-25T16:15:00-07:00
-status: in-progress
+status: done
 after: 2026-09-25-053
-branch: task/054-editor-floating-palette
+branch:
 merged_into:
 ---
 
@@ -129,3 +129,59 @@ Gabriel, 2026-09-25 (catch):
   - Screenshot at 1280 and 1024 wide.
 
 ## Progress log
+
+### 2026-09-25 — built, verified, landed (/work, with 058)
+- **The palette** (`components/Palette.tsx`; pure decisions in `src/palette.ts`, pinned by
+  `workbenchCheck [palette]`): floats in the canvas at (14,14), grip-dragged and clamped 8px
+  inside, turned flat/upright; both in `uiPrefs['editor.palette']`. It runs whichever way
+  fits the canvas (`paletteOrientation`), and the turn button stands down when the other
+  way wouldn't fit. Found in the 1024px pass: a flat palette in the ~400px canvas clipped
+  its own turn button. Tiles are 58px with the memo's 36×26 stroked icons, grouped
+  I/O · Gates · Boxes. FSM/TM show State only (no Boxes group). MEM appears only where
+  `selectMayHoldMemory`. There is no visible machine label (the aria-label names it).
+- **One tool, one placement path.** `selectedTool: ArmedTool` (`palette.ts`: a part |
+  `'NEW_BOX'` | `{box}`) and the store's `placeTool(tool, x, y)` (centred, snapped) serve
+  both the canvas click and the palette drop. A plain click places one and disarms; Shift
+  keeps the tool armed; Esc disarms. The drag is pointer-driven: `components/paletteDrag.ts`
+  is a tiny store, so only the canvas's `PaletteGhost` re-renders, and it draws the real
+  part at 55%. The HTML drag-and-drop path (`handleDrop`, `dataTransfer`) is gone.
+- **Decision 3.** An excluded part is dimmed at 0.3 with "OR is not used in this
+  problem" and does nothing. A box whose insides use one is dimmed too ("This box uses
+  OR, …").
+- **Boxes pop-out.** A count badge; rows show "2 in · 1 out · Problem 1" (F11:
+  `ConfirmedBoxDef.origin`, stamped by `confirmBox` in an assignment; the workbook file
+  already accepted extra fields). A row can be renamed (paste-guarded), deleted, clicked
+  to arm, dragged to place, or dragged onto the palette to pin it (the border turns
+  accent while over it). The pin button reads "Add to toolbar" / "On toolbar" and
+  unpins too. Pins live in `uiPrefs['pinnedBoxes:<asgId>']` (`:tab:<id>` in the sandbox);
+  unresolved pins are skipped (F12). The New box button arms the existing draw tool. The
+  pop-out closes on ×, Esc, a click on empty canvas, and a canvas swap
+  (`boxesPopoutOpen` in the store, reset by `resetAllSimState`).
+- **Decision 7.** `removeConfirmedBox` drops only the library entry and its drawn outline
+  (it also disarms the box if it was armed). Every placed copy stays. The stale
+  "per-canvas" comment is gone. Pinned in `boxScopeCheck [library delete]`: the copy on
+  this question and the one on another keep the AND table, the enclosed parts stay, and
+  undo restores the entry. `[placing]`: placeTool is centred and snapped, and a box
+  placed through it equals placeBoxInstance's (same box id, same graded key). `[origin]`
+  is pinned there too.
+- **Styles** in `workbench.css` (literal-free): three shadow tokens were added to
+  `theme.css`, the old `.component-library`/`.library-*` rules were removed, and the
+  `themeCheck` ratchet went from 174 to 168. `Palette.tsx` is in the style gate's list,
+  and `pasteCheck` guards `Palette.tsx` in place of `ComponentLibrary.tsx`.
+- **Browser (local, 1280 and 1024):**
+  - Every part placed by click-arm and by real drag; the ghost at 55%, centred; Shift
+    placed several, Esc disarmed.
+  - The palette was dragged (clamped), turned, and reloaded (both persisted).
+  - HW1 P2: OR dimmed with its tooltip, inert to click and drag. An OR box made on P1
+    was dimmed there, with meta "· Problem 1".
+  - Pinning by button and by drag (accent border), unpinning, and placing from a row
+    and from a pinned tile all worked. Renaming updated the tile and every copy.
+    Deleting kept all 3 copies and dropped the pin and the badge.
+  - ×, Esc, a canvas click and a question change each closed the pop-out. New box drew.
+  - HW3 (SC) shows MEM; HW4 (FSM) shows State only, and a state places.
+  - No console errors.
+- **Gates green:** app tsc, tools typecheck, build, `npm run check`, server `npm run check`.
+- **Owed / for 055–057:** Fit and the hint line (055) are unbuilt. At 1024 the canvas
+  column is ~400px, so the 260px pop-out covers the canvas's action group while open
+  (it closes on ×, Esc or a canvas click). Existing circuits near the canvas's top-left
+  can sit under the palette until Fit lands.

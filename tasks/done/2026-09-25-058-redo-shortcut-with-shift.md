@@ -8,9 +8,9 @@ requires:
 area: app
 source: chat
 created: 2026-09-25T16:15:00-07:00
-status: in-progress
+status: done
 after:
-branch: task/054-editor-floating-palette
+branch:
 merged_into:
 ---
 
@@ -65,3 +65,21 @@ own.
   harness can't produce the browser's own key reporting.
 
 ## Progress log
+
+### 2026-09-25 — built, verified, landed (/work, with 054)
+- `app/src/shortcuts.ts` (pure): `editorShortcut(press)` → `undo | redo | copy | paste |
+  selectAll | delete | escape | null`. The letter is lower-cased; a non-Latin `key` falls
+  back to the physical `code` (`KeyZ`), while Latin layouts keep `key`, so AZERTY's Z is
+  still Z. Ctrl+Y is redo; ⌘Y is left to the browser (History on a Mac).
+  Ctrl+Shift+C/V/A and AltGr (Ctrl+Alt) are not shortcuts. `isTextEntryTarget` stands
+  every shortcut down in an INPUT, TEXTAREA, SELECT or contentEditable.
+- `CircuitCanvas`'s keydown handler now only dispatches the command. Undo and redo go
+  through the store's own (locked) `undo`/`redo`, and Esc also closes 054's Boxes pop-out.
+- Pinned in `workbenchCheck [shortcuts]`: a 21-row key table (the Windows "Z" report,
+  Caps Lock, Ctrl+Y, ⌘Y, Cyrillic, AZERTY, AltGr) plus the focus guard, and a source pin
+  that the canvas asks the table and has no case-sensitive `e.key === 'z'` left.
+- **Browser (this pane, macOS):** ⌘Z undid a box delete, ⌘⇧Z redid it, and Ctrl+Y redid.
+  ⌘A inside the rename field did not select the canvas.
+- **Gates green** with 054's.
+- **Owed:** a real keypress on Windows Chrome for Ctrl+Shift+Z (the harness and this
+  pane can't produce the OS's own key reporting).
