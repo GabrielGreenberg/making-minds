@@ -54,3 +54,19 @@ Items 2–3, recorded in the progress log.
   `~/making-minds-robot` and `~/making-minds-robot-catch` cloned, each with
   `user.name "Gabriel Greenberg (robot)"` / `user.email gabriel.greenberg@gmail.com` (the
   laptop's current commit email); `npm ci` done in the work clone's `app/` and `server/`.
+- 2026-09-25 22:35 — Steps 3–6 done. (3) Gabriel sent the private files as one zip; unzipped
+  into both clones, `chmod 600` (dirs 700), all gitignored — never opened, never in git or a
+  chat. (4) `.claude/launch.json` "Robot Dev Server": `npm run dev --prefix app -- --port 5190
+  --strictPort`, port 5190 — the explicit flags pin the port whatever the launcher exports;
+  served (302 → `/making-minds/`). Note: the browser pane reads `launch.json` from the
+  session's starting folder, so a session started elsewhere can't `preview_start` it; the work
+  routine starts in the clone. (5) catch: `feedback.mjs list --review` → 0 review reports (the
+  server has 029's review filter). work: `release.sh --check` → HOLD on 7908005, box runs
+  7a7ca33 (029 and 042 are in it, so 029 was released by hand) — held for sign-in (040 pending)
+  and quiet hours; ssh + pilot API answer. `npm run check` green in `server/` and `app/`.
+  (6) Routines created by Gabriel in the app: `mm-robot-work` (manual only) and
+  `mm-robot-catch` (`0 * * * *`), Opus 5.5, folders as the recipe, no worktree. Recipe gap: the
+  app created both with no permission mode (the other routines on this Mac are `auto`), so an
+  unattended run would stall on prompts; Gabriel set both to Auto. A manual-only routine
+  reads `enabled: false` in the task list — the first chain shows whether `run_scheduled_task`
+  still starts it.
