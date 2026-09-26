@@ -705,7 +705,7 @@ const stripComments = (src: string) => src.replace(/\/\*[\s\S]*?\*\/|(?<=^|\s)\/
 console.log('\n[menu wiring]');
 {
   const menu = stripComments(read('components/WorkbookFileMenu.tsx'));
-  const bar = stripComments(read('components/MenuBar.tsx'));
+  const bar = stripComments(read('components/EditorTopBar.tsx'));
   /** Every token present, each after the one before (a missing one fails —
    *  never indexOf's -1 comparing as "before"). */
   const inOrder = (src: string, ...tokens: string[]) => {
@@ -723,9 +723,15 @@ console.log('\n[menu wiring]');
     const j = i < 0 ? -1 : src.indexOf(to, i + from.length);
     return i < 0 || j < 0 ? '' : src.slice(i, j);
   };
-  check('MenuBar shows the File menu only outside an assignment', /\{!assignment && <WorkbookFileMenu \/>\}/.test(bar));
+  // The top bar's crumbs branch on the assignment: the File menu lives in the
+  // sandbox branch (after its "Sandbox" crumb), never in an assignment's.
+  const crumbs = between(bar, '<nav className="wb-crumbs"', '</nav>');
+  check('the editor top bar shows the File menu only outside an assignment',
+    inOrder(crumbs, '{assignment ? (', ') : (', 'Sandbox', '<WorkbookFileMenu />') &&
+      (crumbs.match(/<WorkbookFileMenu/g) ?? []).length === 1 &&
+      !between(crumbs, '{assignment ? (', ') : (').includes('WorkbookFileMenu'));
   check('…before the session controls (visitors and signed-in alike)',
-    inOrder(bar, '<WorkbookFileMenu', 'menu-right') && !/isVisitor[^\n]*WorkbookFileMenu|user[^\n]*&&[^\n]*WorkbookFileMenu/.test(bar));
+    inOrder(bar, '<WorkbookFileMenu', '<SessionControls') && !/isVisitor[^\n]*WorkbookFileMenu|user[^\n]*&&[^\n]*WorkbookFileMenu/.test(bar));
 
   // The File ▾ dropdown's own markup — not the unsaved-changes modal, whose
   // buttons say Open… and Save too.

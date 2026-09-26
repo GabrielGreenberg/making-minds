@@ -8,9 +8,9 @@ requires: browser
 area: app
 source: inbox
 created: 2026-09-25T16:15:00-07:00
-status: in-progress
+status: done
 after:
-branch: task/052-editor-workbench-shell
+branch:
 merged_into:
 ---
 
@@ -212,3 +212,57 @@ where they differ.
   - Screenshot at 1280 wide.
 
 ## Progress log
+
+### 2026-09-25 — built, verified, landing (/work)
+- **Built.** One frame for every question and the sandbox: `components/EditorShell.tsx`, with
+  `EditorTopBar.tsx`, `QuestionPanel.tsx` and the pure parts in `src/workbench.ts` (columns,
+  question list, save and submitted labels).
+  - **Top bar:** the brand goes to Home, the crumb to the overview, then the save state, the
+    submitted time and Submit. Sandbox: its File menu. Viewing a submission: "Back to my
+    work" in Submit's place. `SessionControls menu` folds the controls under "Name ▾", with
+    Dashboard for instructors.
+  - **Question panel:** the nav strip with the lock tags, then the problem. The goal table
+    comes from the statement only. Caution notes always show; hints and section notes sit
+    behind links. The done mark is still a lock. The list is grouped by `documentSections`
+    with done/started marks.
+  - **Columns:** both dividers drag (and take arrow keys), and both panels collapse to 40px.
+    Prefs are `editor.*` in `uiPrefs`, and the old `panelWidth` carries over.
+  - **Open / fill-in** moved into the frame (`AnswerFoot` never claims "saved" while a
+    remote save fails). DataTable lost its question text (it keeps `GradedCaseBanner`) and
+    its own width handle.
+  - **Removed:** MenuBar and TabBar's question branch; the toolbar's save indicator moved to
+    the top bar.
+  - **Store:** `lastSavedAt`; `resetAllSimState` clears `selectedIds` (F4).
+- **One visual language (F2).** `workbench.css` is literal-free, and the new tokens sit in
+  `theme.css :root`. themeCheck now scans `workbench.css` and the frame components. The
+  "index.css only --mm-font-sans" rule is replaced by a literal ratchet
+  (`INDEX_CSS_LITERAL_CEILING = 177`), which 053–055 lower to 0. `VISUAL_VOCAB` and the
+  `theme.css` header say so.
+- **Memo.** Its open questions became "Resolved decisions and filing notes". CLAUDE.md
+  STATUS was updated in place (39992 → 39992 bytes).
+- **Pins.**
+  - New `tools/workbenchCheck.ts` (in `npm run check`): columns, question list, labels, and
+    one-frame source pins, including no answer key in the frame (F1).
+  - `navResetCheck`: every swap clears the selection.
+  - `workbookFileCheck` and `provenanceCheck` now read `EditorTopBar`.
+- **Verified.**
+  - Gates by exit code: both tsc runs, the build, `npm run check`, and the server's
+    `npm run check`.
+  - Headless Chrome at 1280 and 1024, local mode: all of HW1; mark done (tag, lock, list);
+    "started" from live text; collapsing both panels and reloading; a divider drag
+    persists; submit ("Submitted …", "Submit again"); viewing submission 1 (tags, "Back to
+    my work", done mark hidden); SC-perception, FSM, TM and turbot-TM right panels
+    unchanged; sandbox tabs and File menu; visitor; the name menu.
+  - Remote mode (a dev-login server on a scratch DB): HW1 opens; a failed PUT shows "Not
+    saved — retrying".
+  - Screenshots: `tasks/attachments/2026-09-25-052-{1..5}.png`.
+- **Review fix.** The done mark is a `role="checkbox"` button, not an `<input>`. The canvas's
+  shortcuts stand down while an input has focus, so a checkbox left Delete and ⌘Z dead after
+  the click; this was proved in headless Chrome and is pinned in workbenchCheck.
+- **Next:** 053 (the output panel re-homes the toolbar's Rotate, Clear, Swap and "Current
+  state" readout, then deletes `SimulationToolbar`).
+
+### 2026-09-25 — landed (/work)
+All gates green by exit code: both tsc runs, the app build, `npm run check` (including the new
+workbenchCheck) and the server's `npm run check`. Merged to `main` with `--no-ff`. Next in the
+chain: 053.

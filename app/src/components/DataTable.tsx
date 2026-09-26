@@ -3,7 +3,6 @@ import { useStore, selectTmNotation, selectEffectiveMode, selectCodecWindow, sel
 import { tmNotation, memorySlots, hasMemory } from '../engine';
 import { outputDisplayString } from './outputDisplay';
 import { TurbotArenaPanel } from './TurbotArenaPanel';
-import { ProblemBody, ProblemContext } from './ProblemSetDocument';
 import { GradedCaseBanner } from './GradedCaseBanner';
 import { PerceptionFramePlayer } from './PerceptionFramePlayer';
 import { RunSpeedControl } from './RunSpeedControl';
@@ -15,30 +14,6 @@ function inputKey(bits: number[]): string {
   return bits.join(',');
 }
 
-/** The open assignment question, shown above the tables in every mode's
- *  panel: its section's instruction as context, then the problem itself
- *  (the document's own parts — components/ProblemSetDocument.tsx), then any
- *  graded case loaded into the run (GradedCaseBanner). Renders nothing in
- *  the sandbox. */
-function QuestionStatement() {
-  const assignment = useStore((s) => s.assignment);
-  const currentQuestionIndex = useStore((s) => s.currentQuestionIndex);
-  const question = assignment?.questions[currentQuestionIndex];
-  if (!assignment || !question) return null;
-  return (
-    <div className="table-section">
-      <div className="table-section-label">
-        <span>{question.label}</span>
-        <span className="question-rep-badge">{question.representation} representation</span>
-      </div>
-      <div className="question-statement">
-        <ProblemContext assignment={assignment} questionId={question.id} />
-        <ProblemBody question={question} showArena={false} />
-      </div>
-      <GradedCaseBanner />
-    </div>
-  );
-}
 
 export function DataTable() {
   const components = useStore((s) => s.components);
@@ -243,33 +218,6 @@ export function DataTable() {
   const isFSM = buildMode === 'FSM';
   const isTM = buildMode === 'TM';
 
-  // ── Resizable panel ──
-  const [panelWidth, _setPanelWidth] = useState(() => (typeof _prefs.current.panelWidth === 'number' ? _prefs.current.panelWidth as number : 260));
-  const dragRef = useRef<{ startX: number; startW: number } | null>(null);
-
-  const setPanelWidth = (v: number) => _setPanelWidth(v);
-  const onResizePointerDown = useCallback((e: React.PointerEvent) => {
-    e.preventDefault();
-    dragRef.current = { startX: e.clientX, startW: panelWidth };
-    const target = e.currentTarget as HTMLElement;
-    target.setPointerCapture(e.pointerId);
-
-    let lastWidth = panelWidth;
-    const onMove = (ev: PointerEvent) => {
-      if (!dragRef.current) return;
-      lastWidth = Math.max(0, Math.min(600, dragRef.current.startW + (dragRef.current.startX - ev.clientX)));
-      setPanelWidth(lastWidth);
-    };
-    const onUp = () => {
-      dragRef.current = null;
-      target.releasePointerCapture(e.pointerId);
-      window.removeEventListener('pointermove', onMove);
-      window.removeEventListener('pointerup', onUp);
-      saveUiPref('panelWidth', lastWidth);
-    };
-    window.addEventListener('pointermove', onMove);
-    window.addEventListener('pointerup', onUp);
-  }, [panelWidth]);
 
   const inputs = components
     .filter((c) => c.type === 'INPUT')
@@ -397,11 +345,10 @@ export function DataTable() {
     const isStateBrain = effectiveMode === 'FSM' || effectiveMode === 'TM';
 
     return (
-      <div className="data-table-panel" style={{ width: panelWidth }}>
-        <div className="panel-resize-handle" onPointerDown={onResizePointerDown} />
+      <div className="data-table-panel">
         <div className="data-table-panel-inner">
         <div className="data-table-content">
-          <QuestionStatement />
+          <GradedCaseBanner />
 
           {/* The arena ("Map") + run controls: below the question statement,
               above the machine/history tables (spec §9.1's Map panel). */}
@@ -553,11 +500,10 @@ export function DataTable() {
       fsmHistory.map((h) => ({ t: h.t, bits: String(h.output).split('').map(Number) })));
 
     return (
-      <div className="data-table-panel" style={{ width: panelWidth }}>
-        <div className="panel-resize-handle" onPointerDown={onResizePointerDown} />
+      <div className="data-table-panel">
         <div className="data-table-panel-inner">
         <div className="data-table-content">
-          <QuestionStatement />
+          <GradedCaseBanner />
           {/* State Table */}
           <div className="table-section">
             <div className="table-section-label">
@@ -761,11 +707,10 @@ export function DataTable() {
     }
 
     return (
-      <div className="data-table-panel" style={{ width: panelWidth }}>
-        <div className="panel-resize-handle" onPointerDown={onResizePointerDown} />
+      <div className="data-table-panel">
         <div className="data-table-panel-inner">
         <div className="data-table-content">
-          <QuestionStatement />
+          <GradedCaseBanner />
           {/* Machine Table */}
           <div className="table-section">
             <div className="table-section-label">
@@ -883,12 +828,11 @@ export function DataTable() {
 
   if (inputs.length === 0) {
     return (
-      <div className="data-table-panel" style={{ width: panelWidth }}>
-        <div className="panel-resize-handle" onPointerDown={onResizePointerDown} />
+      <div className="data-table-panel">
         <div className="data-table-panel-inner">
           <div className="table-header" />
           <div className="data-table-content">
-            <QuestionStatement />
+            <GradedCaseBanner />
             <div style={{ padding: 12, color: '#999', fontSize: 12 }}>
               Add inputs and outputs to see the I/O table.
             </div>
@@ -924,11 +868,10 @@ export function DataTable() {
   const nonCCHasRows = !isCC && !isSC && tableRows.length > 0;
 
   return (
-    <div className="data-table-panel" style={{ width: panelWidth }}>
-      <div className="panel-resize-handle" onPointerDown={onResizePointerDown} />
+    <div className="data-table-panel">
       <div className="data-table-panel-inner">
       <div className="data-table-content">
-        <QuestionStatement />
+        <GradedCaseBanner />
         {/* ── I/O Table (CC and SC) ────────────────────────────── */}
         <div className="table-section">
           <div className="table-section-label" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>

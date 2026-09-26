@@ -1,6 +1,6 @@
-# Handoff: the question editor as a workbench (HW1 / CC pass)
+# Design memo: the question editor as a workbench (HW1 / CC pass)
 
-Suggested home in the repo: `docs/buildout/designs/editor-workbench.md` (this file, as the design memo), with `inbox-note.md` dropped into `tasks/inbox/` for `/catch` to file as tasks.
+The handoff from the design sessions, filed 2026-09-25 as tasks 052 (shell) → 053 (output panel) → 054 (floating palette) → 055 (canvas look) → 056 (gate geometry, parked for Gabriel's yes) → 057 (a pass against this memo). The working prototype is `editor-workbench/Editor Prototype.dc.html`. **Where this memo and the settled decisions differ, the decisions win** — they are at the end, under "Resolved decisions and filing notes".
 
 ## Overview
 
@@ -70,18 +70,18 @@ Background `--mm-bg`. Three stacked parts.
 - **Section eyebrow:** the section heading, e.g. "I. COMBINATORIAL CIRCUITS", 11px/600 uppercase, letter-spacing `.08em`, `--mm-accent`.
 - **Title:** "Problem 1 · NAND" (title, or just "Problem 6a"), `--mm-font-serif` 19px/600, line-height 1.25, `--mm-ink`, `text-wrap:balance`, margin-top −6.
 - **Statement:** through `StatementBody` / `ProblemBody` at 15px/1.5 `--mm-ink-2`, bold `--mm-ink` 600, 10px paragraph gap. For CC questions whose statement is a profile, show the section intro ("Design **combinatorial circuits** with the following input-output profiles:") followed by the goal table.
-- **Goal table:** built from the profile or `test_cases`, headers IN1…INn | OUT (or OUT1…).
+- **Goal table:** built from the statement's profile — **never from `test_cases`** (flag F1) — headers IN1…INn | OUT (or OUT1…).
   - Cells: fixed 60px wide, centred, padding `8px 0`, 14px.
   - Headers: sans 11px/600, `.08em`, `--mm-ink-3`, padding `6px 0`.
   - Rules: 1px `--mm-line-2` under the header, 1px `--mm-line` between rows, and 1px `--mm-line-2` on the left of the first output column.
-  - The digits are Plex Mono today. Gabriel dislikes mono **on the canvas**; tables are unconfirmed. See Open questions.
+  - The digits are Plex Mono today. Gabriel dislikes mono **on the canvas**; the tables move to Plex Sans tabular too (decision 2).
 - **Figures:** `question.figures` at their authored width, max 100%.
 - **Caution callouts** (`kind:'caution'`) are **always visible**: a block on `--mm-warn-soft`, padding `10px 12px`, 14px/1.45, with a bold "Caution: " prefix in `--mm-warn`.
 - **Hints:** the question `hint` plus `kind:'hint'` question callouts sit behind a link "▸ Hint" / "▾ Hint", 13.5px/500 `--mm-link`. Expanded: a block on `#F7F5FA`, padding `10px 12px`, 14px, "Hint: " bold.
 - **Section notes:** the section's callouts sit behind a second link labelled by kind, e.g. "▸ Hint for this section" or "▸ Challenge problem (optional, not collected)". Same expanded style.
   - Both links are closed by default, and both reset closed on question change.
   - This replaces today's "▶ Note for this section".
-- **Done mark:** "I'm done with this question", 13.5px `--mm-ink-2`, with a 32px min hit height. The box is 18px square: border `#B9B2C4` when unchecked; when checked, fill and border `--mm-accent` with a white ✓ at 12px. See Open questions on locking.
+- **Done mark:** "I'm done with this question", 13.5px `--mm-ink-2`, with a 32px min hit height. The box is 18px square: border `#B9B2C4` when unchecked; when checked, fill and border `--mm-accent` with a white ✓ at 12px. It keeps the lock (decision 1).
 
 **3. Question list.**
 - **Header band:** 34px, `--mm-surface-2`, top border 1px `#CFC8D8` and bottom border 1px `--mm-line`. It is the visual divider from the current question. Text "HW1 · QUESTIONS" in 11.5px/600 uppercase, `.09em`, `--mm-ink`, padding `0 20px`.
@@ -136,7 +136,7 @@ Background `--mm-bg`. Three stacked parts.
 - **Tiles:**
   - 58 wide, min-height 44, padding `7px 0 6px`, gap 4. Icon 36×26 above a label at 10.5px/500 `--mm-ink-2`.
   - Hover `--mm-lav-soft`. Armed (click-to-place) `--mm-lav-soft`.
-  - A part disallowed by `allowed_components` gets opacity .3, tooltip "OR is not used in this problem", and no action. This follows `selectAllowedComponents`; decide dimming versus hiding (see Open questions).
+  - A part disallowed by `allowed_components` gets opacity .3, tooltip "OR is not used in this problem", and no action. This follows `selectAllowedComponents`: dimmed, not hidden (decision 3).
   - **Two ways to place:**
     - Drag a tile onto the canvas (a ghost preview at 55% opacity follows the pointer, and dropping places the part centred on the pointer and snapped).
     - Click a tile to arm it, then click the canvas. Shift keeps it armed, and Esc disarms.
@@ -174,7 +174,7 @@ Background `--mm-bg`. Three stacked parts.
 - **Header row:** "OUTPUT" as an eyebrow (11.5px/600 uppercase `.09em` `--mm-ink-3`), with a collapse button "»" (32×32) on the right. No other title: "Your circuit" and the explainer line were removed on purpose.
 - **Controls,** 8px below: Run · Step · Reset.
   - Each is 34px tall, padding `0 12px`, 13px/600, border 1px `--mm-line-2`, hover `--mm-lav-soft`. The ▶ is `--mm-accent`, and Run becomes "■ Stop" while running.
-  - For CC: Run walks the table rows (one every 700ms), Step advances to the next row, and Reset sets every input to 0.
+  - For CC: ~~Run walks the table rows (one every 700ms), Step advances to the next row~~ — **overridden (decision 6):** Step and Run keep today's signal-flow animation for the current row; the table is live. Reset sets every input to 0.
   - This is the **only** run-control set on screen. Delete the toolbar Reset and the second Reset under the table.
 - **The table,** 14px below: the circuit's live input/output table, styled like the goal table.
   - A value of 1 is `#E53935` at weight 600.
@@ -271,12 +271,59 @@ Background `--mm-bg`. Three stacked parts.
 - **Radius:** 0 everywhere, since the site is flat.
 - **Shadows:** the palette (8px), palette while dragging (28px), and the pop-out (28px) only.
 
-## Open questions for Gabriel (settle before filing)
+## Resolved decisions and filing notes
 
-1. **Does "done" still lock editing?** Today Mark done is a self-lock (`isCurrentQuestionLocked`, pinned by `navResetCheck`). The prototype treats done as a marker only, with no lock. Keep the lock, drop it, or make it an option?
-2. **Tables:** should the goal and output table digits move off Plex Mono to Plex Sans tabular, matching the canvas?
-3. **Disallowed parts:** dim them with a tooltip (as in the prototype), or hide them (as today)?
-4. **Sandbox:** should the left panel be absent (as proposed), or hold something such as a notes field?
+Gabriel answered the open questions on 2026-09-25 (the `/catch` that filed the tasks). The
+filing also checked this memo against CLAUDE.md's critical design rules and the load-bearing
+laws (tasks/PROFILE.md §8); each flag says how it was settled rather than worked around.
+
+### Resolved decisions
+1. **Done keeps its lock.** "I'm done with this question" still locks the question through
+   `isCurrentQuestionLocked` (pinned by `navResetCheck`); the checked mark says so, and
+   unchecking unlocks. (The prototype showed done as a bare marker.)
+2. **Table digits are Plex Sans with tabular numbers** — the goal table and the output
+   table, like the canvas. Mono stays only where this memo names it outside tables (the
+   list's number column, the fill-in inputs).
+3. **Disallowed parts are dimmed with a tooltip**, not hidden (task 054) — boxes whose
+   insides use an excluded part too.
+4. **The sandbox has no question panel**; its worksheet tabs stay a strip over the canvas.
+5. **NOT is 50×60, as designed** (task 056); the overlaps it causes in saved work are judged
+   at the screenshot pass.
+6. **CC keeps its signal-flow animation** (task 053): Step and Run animate propagation for
+   the current row, a row click or an INPUT toggle makes a row current, and the output table
+   is live (every row computed). This overrides "Run walks the table rows".
+7. **Deleting a box from the pop-out removes it from the library and the palette only**
+   (task 054); every placed copy stays — a library action never destroys placed work.
+8. **The gate-geometry task (056) is built, then parked unmerged** with a before/after
+   screenshot pass for Gabriel's yes; it never merges on its own.
+
+### Filing notes — where the memo met the laws
+- **F1. The goal table never comes from `test_cases`** (law 1: students never receive them
+  in remote mode). It comes from the statement's own profile, which `statementFormat.ts`
+  already lifts into a table; every HW1 circuit statement is one.
+- **F2. One visual language reversed a written, gated rule** (VISUAL_VOCAB "the editor is
+  untouched"; `themeCheck` allowed `index.css` only `--mm-font-sans`). Task 052 rewrote the
+  rule: the frame is styled in `workbench.css` (literal-free), and `themeCheck` ratchets
+  `index.css`'s colour literals down until 053–055 bring them to zero.
+- **F3. Locks unchanged** (law 3): the panel only displays the lock reasons.
+- **F4. The reset law** (law 6): a question change clears the selection in the store's
+  canvas-swap reset (`resetAllSimState`), never a component effect; Fit belongs to 055.
+- **F5. What the top bar keeps** beyond this memo: the sandbox File menu, the instructor's
+  way to the Dashboard (in the name menu), "Back to my work" while viewing a submission (in
+  Submit's place), and the frozen / viewing tags (in the nav strip).
+- **F6. The brand goes Home** (not the website, as on page surfaces): the editor has no
+  other Home link. A visitor's brand is not a link.
+- **F7. Prefs are per browser** (`uiPrefs.ts`, one key), not per student — fine for
+  cosmetic state; pinned boxes (054) likewise.
+- **F8–F10 (task 056).** `COMP_WIDTH/HEIGHT` also size XOR, HA and BOXED, so the geometry
+  goes into one explicit per-type table; the change reaches every CC and SC canvas, not only
+  HW1 (one reference HW3 circuit gains 19 overlaps at NOT 60 tall); screenshots of real
+  student work never enter the public repo.
+- **F11 (task 054).** "· Problem 1" in a box's meta line needs an optional origin on
+  `ConfirmedBoxDef`.
+- **One control set (task 053).** "Exactly one Run/Step/Reset in every mode" applies to CC,
+  FSM, TM and turbot this pass; SC keeps its local stepper beside the header's global run
+  until the machine-types session.
 
 ## Assets
 

@@ -2,10 +2,12 @@ import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import 'katex/dist/katex.min.css'
 // Stylesheet order: the page-surface tokens first (index.css reads the font
-// family from them), then the editor, then the page surfaces (theme.css).
+// family from them), then the editor, then the page surfaces (theme.css),
+// then the editor's frame (workbench.css), which restyles editor parts.
 import './theme.css'
 import './index.css'
 import './pages.css'
+import './workbench.css'
 import App from './App.tsx'
 import { AuthProvider, AuthGate } from './auth'
 import { ServerHealthProvider } from './auth/HealthGate.tsx'

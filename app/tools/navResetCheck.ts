@@ -142,6 +142,9 @@ function checkAllSimFresh(label: string) {
   // swap must disarm it — otherwise a gate armed on one question drops a
   // component on the first click in the next one.
   check(`${label}: palette tool disarmed`, s.selectedTool === null);
+  // So is the selection (task 052): ids from the last canvas select nothing
+  // here, and a stale one would let Delete act on this canvas's namesake.
+  check(`${label}: selection cleared`, s.selectedIds.length === 0);
   // Undo writes its snapshot into the CURRENT canvas, so history must not
   // survive a swap either.
   check(`${label}: undo/redo history empty`, s.undoStack.length === 0 && s.redoStack.length === 0);
@@ -176,6 +179,7 @@ function plantSimJunk() {
     turbotCaseIndex: 2,
     loadedCase: { kind: 'value', questionId: 1, caseIndex: 3, attempt: 1, gradedKey: null, input: [1, 2], recorded: { pass: false } },
     selectedTool: 'AND',
+    selectedIds: ['ghost-component', 'ghost-wire'],
     undoStack: [{ components: [], wires: [], boxes: [], confirmedBoxes: [] }],
     redoStack: [{ components: [], wires: [], boxes: [], confirmedBoxes: [] }],
   });
