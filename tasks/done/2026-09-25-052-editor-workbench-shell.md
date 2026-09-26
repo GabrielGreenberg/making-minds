@@ -8,9 +8,9 @@ requires: browser
 area: app
 source: inbox
 created: 2026-09-25T16:15:00-07:00
-status: in-progress
+status: done
 after:
-branch: task/052-editor-workbench-shell
+branch:
 merged_into:
 ---
 
@@ -261,3 +261,8 @@ where they differ.
   the click; this was proved in headless Chrome and is pinned in workbenchCheck.
 - **Next:** 053 (the output panel re-homes the toolbar's Rotate, Clear, Swap and "Current
   state" readout, then deletes `SimulationToolbar`).
+
+### 2026-09-25 — landed (/work)
+All gates green by exit code: both tsc runs, the app build, `npm run check` (including the new
+workbenchCheck) and the server's `npm run check`. Merged to `main` with `--no-ff`. Next in the
+chain: 053.
