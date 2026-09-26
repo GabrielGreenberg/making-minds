@@ -45,6 +45,7 @@ const PAGE_COMPONENTS = [
   'components/LiveTruthTable.tsx',
   'components/CanvasActions.tsx',
   'components/Palette.tsx',
+  'components/CanvasGuide.tsx',
   'components/PageShell.tsx',
   'components/SessionControls.tsx',
   'components/HomeScreen.tsx',
@@ -102,6 +103,27 @@ for (const [label, text] of [['theme.css', theme], ['pages.css', pages], ['workb
 }
 check(`every var(--mm-*) resolves to a defined token (${defined.size} defined)`, undefinedTokens.size === 0, [...undefinedTokens].join(', '));
 
+// ── 2b. The canvas (task 055) ──────────────────────────────────────────────
+// The canvas draws in SVG attributes, so its colours are theme ROLES
+// (canvasTheme.ts) read off the tokens — never a literal: no hex, no rgb/hsl,
+// no quoted colour name ('white', "black"), no monospace stack. Every role
+// names a token theme.css defines.
+{
+  const QUOTED_NAMED = /['"](?:white|black|red|blue|green|gr[ae]y|orange|purple|pink|yellow)['"]/g;
+  for (const rel of ['components/CircuitCanvas.tsx', 'canvasTheme.ts']) {
+    const text = read(rel);
+    const hits = [...literals(text), ...[...text.matchAll(QUOTED_NAMED)].map((m) => `${text.slice(0, m.index).split('\n').length}: ${m[0]}`)];
+    check(`${rel}: no colour literals (hex, rgb/hsl, quoted names)`, hits.length === 0, hits.slice(0, 8).join(' · '));
+  }
+  const canvas = read('components/CircuitCanvas.tsx');
+  check('CircuitCanvas.tsx: no monospace text (Plex Sans, tabular — decision 2)', !/monospace|SF Mono|Fira Code/.test(canvas));
+  const roles = [...read('canvasTheme.ts').matchAll(/^\s+[a-zA-Z0-9]+: '(--mm-[a-z0-9-]+)',/gm)].map((m) => m[1]);
+  const missing = roles.filter((t) => !defined.has(t));
+  check(`every canvas role names a defined token (${roles.length} roles)`, roles.length >= 15 && missing.length === 0, missing.join(', '));
+  for (const t of usedIn(canvas)) if (!defined.has(t)) undefinedTokens.add(`${t} (CircuitCanvas.tsx)`);
+  check('CircuitCanvas.tsx: every var(--mm-*) resolves', [...usedIn(canvas)].every((t) => defined.has(t)));
+}
+
 // ── 3. Wiring ──────────────────────────────────────────────────────────────
 const main = read('main.tsx');
 const order = ["import './theme.css'", "import './index.css'", "import './pages.css'", "import './workbench.css'"].map((s) => main.indexOf(s));
@@ -117,7 +139,7 @@ check('index.html title is the course, not "app"', /<title>Making Minds/.test(ht
 // are the canvas, palette and data-panel internals that tasks 053–055 move
 // onto the tokens. The ceiling only ever goes down: lower it as they go, and
 // a new literal fails here. At 0 this becomes pin 1's rule for index.css.
-const INDEX_CSS_LITERAL_CEILING = 168;
+const INDEX_CSS_LITERAL_CEILING = 133;
 const editorLiterals = literals(editor);
 check(
   `index.css: colour literals only go down (${editorLiterals.length} ≤ ${INDEX_CSS_LITERAL_CEILING})`,

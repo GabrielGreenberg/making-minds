@@ -30,6 +30,14 @@
 //                    centred; the retired parts column and its HTML drag gone,
 //                    the canvas's one placement path, the Shift rule, the
 //                    pop-out closing on empty canvas and Esc.
+//   [canvas]         (task 055) the one zoom range and a step about a point;
+//                    the circuit's bounds (an INPUT's tab included); the
+//                    area the palette leaves free; Fit (centred, 80–140%, a
+//                    wide circuit left-aligned, an empty canvas at 100%);
+//                    the hint line's states and the empty-canvas message;
+//                    the canvas's wiring: the zoom group with Fit, no
+//                    slider, the dot grid, the selected wire's halo, Fit on
+//                    every canvas swap through the store's counter.
 //   [shortcuts]      (task 058) the key → command table: case-free (Shift,
 //                    Caps Lock), Ctrl+Y redo (not ⌘Y), non-Latin layouts by
 //                    physical key; no shortcut while a text field, select or
@@ -67,6 +75,11 @@ import {
   toolKey,
 } from '../src/palette';
 import { editorShortcut, isTextEntryTarget, type KeyPress } from '../src/shortcuts';
+import {
+  EMPTY_CANVAS_MESSAGE, FIT_MAX, FIT_MIN, ZOOM_MAX, ZOOM_MIN,
+  canvasHint, circuitBounds, clampZoom, fitView, freeArea, zoomAbout, type HintState,
+} from '../src/canvasView';
+import { toolLabel } from '../src/palette';
 import { documentSections } from '../src/problemSet';
 import {
   COLLAPSED_STRIP,
@@ -367,6 +380,75 @@ console.log('\n[palette]');
     (canvasSrc.match(/setBoxesPopoutOpen\(false\)/g) ?? []).length >= 2);
   check('the palette holds no lock of its own (law 3) and its rename wears the paste guard (law 8)',
     !/isCurrentQuestionLocked|selectQuestionLocked/.test(paletteSrc) && /ref=\{pasteGuardRef\}/.test(paletteSrc));
+}
+
+console.log('\n[canvas]');
+{
+  check('one zoom range, 25%–300%, and everything clamps to it',
+    ZOOM_MIN === 0.25 && ZOOM_MAX === 3 && clampZoom(0.1) === 0.25 && clampZoom(9) === 3 && clampZoom(1.5) === 1.5 && clampZoom(NaN) === 1);
+  {
+    const v = zoomAbout({ zoom: 1, panX: 0, panY: 0 }, 2, 100, 100);
+    check('a zoom step keeps the canvas point under the anchor where it is',
+      v.zoom === 2 && v.panX === -100 && v.panY === -100 && zoomAbout({ zoom: 3, panX: 0, panY: 0 }, 2, 0, 0).zoom === 3);
+  }
+  const part = (type: CircuitComponent['type'], x: number, y: number): CircuitComponent =>
+    ({ id: `${type}${x}`, type, x, y, label: type, ports: getPortsForType(type), value: 0 });
+  {
+    const b = circuitBounds([part('INPUT', 100, 100), part('AND', 300, 100)]);
+    check('the circuit\'s bounds: every footprint (an INPUT\'s toggle tab too), padded for labels',
+      b !== null && b.x0 < 100 - 14 && b.x1 > 300 + getComponentSize(part('AND', 0, 0)).w && b.y0 < 100);
+    check('an empty canvas has no bounds', circuitBounds([]) === null);
+  }
+  const canvas = { w: 1000, h: 700 };
+  {
+    const standing = freeArea(canvas, { x: 14, y: 14, w: 60, h: 400, horiz: false });
+    check('a standing palette at the left: the area to its right', standing.x0 === 14 + 60 + 16 && standing.x1 === 1000 - 30);
+    const onRight = freeArea(canvas, { x: 900, y: 14, w: 60, h: 400, horiz: false });
+    check('…at the right: the area to its left', onRight.x0 === 16 && onRight.x1 === 900 - 16);
+    const flat = freeArea(canvas, { x: 14, y: 14, w: 450, h: 56, horiz: true });
+    check('a flat palette at the top: the area below it', flat.y0 === 14 + 56 + 16 && flat.y1 === 700 - 50);
+    check('no palette: the canvas less its corners', JSON.stringify(freeArea(canvas, null)) === '{"x0":16,"y0":48,"x1":970,"y1":650}');
+  }
+  {
+    const area = { x0: 100, y0: 50, x1: 900, y1: 650 };
+    const small = fitView({ x0: 0, y0: 0, x1: 200, y1: 100 }, area);
+    check('Fit centres a small circuit, zoomed no further than 140%',
+      small.zoom === FIT_MAX && small.panX === Math.round(100 + (800 - 200 * FIT_MAX) / 2) && small.panY === Math.round(50 + (600 - 100 * FIT_MAX) / 2));
+    const mid = fitView({ x0: 0, y0: 0, x1: 800, y1: 300 }, area);
+    check('…a circuit that fits at 100% fills the width', mid.zoom === 1 && mid.panX === 100);
+    const wide = fitView({ x0: 40, y0: 0, x1: 3040, y1: 200 }, area);
+    check('…never below 80%: a wider circuit left-aligns in the free area (and the student pans)',
+      FIT_MIN === 0.8 && wide.zoom === 0.8 && wide.panX === Math.round(100 - 40 * 0.8));
+    const empty = fitView(null, area);
+    check('…an empty canvas: 100%, its origin at the free area\'s corner', empty.zoom === 1 && empty.panX === 100 && empty.panY === 50);
+  }
+  {
+    const base: HintState = { tool: null, selectedParts: 0, selectedWires: 0, parts: 3, wires: 2, stateMachine: false, locked: false };
+    const hint = (over: Partial<HintState>) => canvasHint({ ...base, ...over });
+    check('hint: a tool armed', hint({ tool: 'AND' }) === 'Click the canvas to place AND. Shift-click to place several. Esc cancels.');
+    check('hint: a part selected', hint({ selectedParts: 1 }) === 'Drag to move. Delete removes it.');
+    check('hint: a wire selected', hint({ selectedWires: 1 }) === 'Delete removes this wire.');
+    check('hint: parts but no wires', hint({ wires: 0 }) === 'Drag from one dot to another to connect parts.');
+    check('hint: otherwise', hint({}) === 'Click an input to switch it between 0 and 1.');
+    check('hint: none on an empty canvas', hint({ parts: 0, wires: 0 }) === null);
+    check('hint: the New box tool, a state machine, a locked question say what applies there',
+      hint({ tool: 'NEW_BOX' })!.startsWith('Drag a rectangle') && hint({ stateMachine: true, wires: 0 })!.includes('state') &&
+        hint({ locked: true, selectedParts: 1 })!.startsWith('This question is locked'));
+    check('the empty canvas\'s message, as the memo words it',
+      EMPTY_CANVAS_MESSAGE === 'Drag parts from the toolbar onto the canvas, or click a part and then click here.');
+    check('the hint names a tool as its tile does', toolLabel('INPUT', []) === 'Input' && toolLabel('AND', []) === 'AND');
+  }
+  const canvasSrc = code('components/CircuitCanvas.tsx');
+  const store = code('store.ts');
+  check('the zoom group: − · % · + · Fit, and no slider',
+    /className="cv-zoom"/.test(canvasSrc) && /onClick=\{fitCanvas\}/.test(canvasSrc) && !/zoom-slider|type="range"/.test(canvasSrc));
+  check('the dot grid follows pan and zoom (the container\'s background, cell = GRID_SIZE × zoom)',
+    /radial-gradient\(circle, var\(--mm-canvas-dot\)/.test(canvasSrc) && /const cell = GRID_SIZE \* zoom/.test(canvasSrc) && !/grid-pattern/.test(canvasSrc));
+  check('a wire is 2px in its signal\'s colour; a selected one gets the lavender halo under it',
+    /stroke=\{C\.halo\}\s+strokeWidth=\{8\}/.test(canvasSrc) && /stroke=\{color\}\s+strokeWidth=\{2\}/.test(canvasSrc));
+  check('Fit runs on every canvas swap: the store\'s counter, bumped by resetAllSimState, answered by the canvas',
+    /canvasSwapSeq: s\.canvasSwapSeq \+ 1/.test(store) && /\[canvasSwapSeq, fitCanvas\]/.test(canvasSrc));
+  check('setZoom clamps to the one range', /setZoom: \(z\) => set\(\{ zoom: clampZoom\(z\) \}\)/.test(store));
 }
 
 console.log('\n[shortcuts]');

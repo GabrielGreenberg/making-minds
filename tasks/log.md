@@ -45,3 +45,4 @@
 2026-09-25-040 · feature · Land first-time visitors on the sign-in screen, not in the sandbox, and retire the sign-in trace that only served that rule · 2026-09-25T20:12:15-0700 · task/040-land-on-sign-in-screen · aa96d06
 2026-09-25-054 · feature · Replace the parts column with a floating, draggable palette and a Boxes pop-out where boxes can be pinned (editor redesign 3 of 6) · 2026-09-25T21:45:31-0700 · task/054-editor-floating-palette · 687e604
 2026-09-25-058 · bug · Make Ctrl/⌘+Shift+Z redo on every keyboard — the canvas compares the key's case, so Shift can turn "z" into "Z" and skip redo · 2026-09-25T21:45:31-0700 · task/054-editor-floating-palette · 687e604
+2026-09-25-055 · feature · Give the canvas the site's look — Plex Sans text, magenta selection, a dot grid, a hint line, an empty-canvas message and a Fit button (editor redesign 4 of 6) · 2026-09-26T09:56:41-0700 · task/055-editor-canvas-look · 33779c1

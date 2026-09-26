@@ -134,6 +134,14 @@ export function pinnedRows(pins: readonly string[], rows: readonly BoxRow[]): Bo
   return out;
 }
 
+/** A tool as the hint line names it: a part by its tile label ("AND",
+ *  "Input"), a box by its name, NEW_BOX as itself. */
+export function toolLabel(tool: ArmedTool, library: readonly ConfirmedBoxDef[]): string {
+  if (tool === 'NEW_BOX') return 'NEW_BOX';
+  if (typeof tool === 'object') return library.find((b) => b.id === tool.box)?.name ?? 'the box';
+  return [...CIRCUIT_PARTS, ...STATE_PARTS].find((p) => p.type === tool)?.label ?? tool;
+}
+
 /** Pin or unpin a box (a new list; pinning appends, never duplicates). */
 export function togglePin(pins: readonly string[], id: string, on: boolean): string[] {
   const rest = pins.filter((p) => p !== id);

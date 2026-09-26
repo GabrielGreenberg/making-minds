@@ -445,3 +445,74 @@ a.wb-brand:hover { color: var(--mm-accent); text-decoration: none; }
 .pal-pop-note { margin: 8px 0 0; font-size: 12px; color: var(--mm-ink-3); }
 /* The part a dragged tile would place (CircuitCanvas PaletteGhost). */
 .cv-ghost { opacity: 0.55; }
+
+/* ── The canvas's look (CircuitCanvas, CanvasGuide — task 055) ────────── */
+/* Every canvas text: Plex Sans 600, tabular digits (decision 2). The SVG's
+   colours are theme roles (canvasTheme.ts); the dot grid is the container's
+   background, sized by the zoom (CircuitCanvas gridStyle). */
+.canvas-container > svg {
+  font-family: var(--mm-font-sans); font-weight: 600; font-variant-numeric: tabular-nums;
+}
+/* Zoom — bottom-right, 12/12: − · % · + · Fit, one joined group. */
+.cv-zoom {
+  position: absolute; right: 12px; bottom: 12px; z-index: 40; display: flex;
+  background: var(--mm-surface); border: 1px solid var(--mm-line-2); font-family: var(--mm-font-sans);
+}
+.cv-zoom > button {
+  padding: 5px 11px; border: 0; background: none; cursor: pointer;
+  font: inherit; font-size: 12.5px; color: var(--mm-ink-2); line-height: 1.3;
+}
+.cv-zoom > button + button { border-left: 1px solid var(--mm-line); }
+.cv-zoom > button:hover { background: var(--mm-lav-soft); }
+.cv-zoom > .cv-zoom-pct {
+  min-width: 48px; padding: 5px 8px; text-align: center;
+  font-family: var(--mm-font-mono); font-size: 11.5px; color: var(--mm-ink-2);
+}
+/* The hint line — bottom-left, 16/14, clear of the zoom group; the pointer passes through. */
+.cv-guide-hint {
+  position: absolute; left: 16px; bottom: 14px; right: 200px; z-index: 30; margin: 0;
+  width: fit-content; max-width: calc(100% - 216px); padding: 3px 8px;
+  font-family: var(--mm-font-sans); font-size: 12.5px; color: var(--mm-ink-3);
+  background: var(--mm-hint-bg); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  pointer-events: none;
+}
+/* The empty canvas's message — centred. */
+.cv-guide-empty {
+  position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); z-index: 30; margin: 0;
+  width: max-content; max-width: min(340px, calc(100% - 32px)); text-align: center;
+  font-family: var(--mm-font-sans); font-size: 15px; line-height: 1.5; color: var(--mm-ink-3);
+  pointer-events: none;
+}
+/* "The circuit is off screen" — the arrow that brings it back. */
+.cv-nav {
+  position: absolute; z-index: 50; width: 36px; height: 36px; border: 0; border-radius: 50%;
+  display: grid; place-items: center; cursor: pointer;
+  background: var(--mm-accent); color: var(--mm-surface); font-size: 18px; font-weight: 700;
+  box-shadow: var(--mm-shadow-palette-drag);
+}
+/* A drawn box's Ready to Box · Cancel. */
+.ready-to-box-btn { gap: 4px; }
+.cv-btn {
+  padding: 4px 10px; font: inherit; font-family: var(--mm-font-sans); font-size: 12px; font-weight: 600; cursor: pointer;
+  background: var(--mm-surface); color: var(--mm-ink); border: 1px solid var(--mm-line-2);
+}
+.cv-btn:hover { background: var(--mm-lav-soft); }
+.cv-btn--primary { background: var(--mm-accent); color: var(--mm-surface); border-color: var(--mm-accent); }
+.cv-btn--primary:hover { background: var(--mm-accent-2); border-color: var(--mm-accent-2); }
+/* Warn, don't block: loops, merged links, unbound boxes — above the hint line. */
+.validation-warnings {
+  position: absolute; bottom: 48px; left: 50%; transform: translateX(-50%); z-index: 50;
+  display: flex; flex-direction: column; gap: 4px;
+}
+.validation-warning {
+  padding: 4px 14px; white-space: nowrap; font-family: var(--mm-font-sans); font-size: 12px;
+  background: var(--mm-warn-soft); border: 1px solid var(--mm-warn); color: var(--mm-warn);
+}
+/* A refused paste explains itself (provenance.ts refusalMessage) — top centre. */
+.canvas-notice {
+  position: absolute; top: 10px; left: 50%; transform: translateX(-50%); z-index: 50;
+  max-width: min(560px, calc(100% - 32px)); padding: 6px 14px; text-align: center;
+  font-family: var(--mm-font-sans); font-size: 12.5px; line-height: 1.4;
+  background: var(--mm-surface); border: 1px solid var(--mm-accent); color: var(--mm-ink);
+  box-shadow: var(--mm-shadow-palette);
+}

@@ -71,6 +71,7 @@ import { INTEGRITY_NOTICE } from './provenance/notice';
 import { parseWorkbookFile, serializeWorkbook, titleFromFileName, workbookKeyHash } from './workbookFile';
 import { orderBoxPorts, rebindLegacyBoxes, rebindLegacyLibrary } from './boxPorts';
 import { placementOrigin, toolComponent, type ArmedTool } from './palette';
+import { clampZoom } from './canvasView';
 
 /**
  * TM tape notation (alphabet) for the current context. Inside an assignment
@@ -1091,6 +1092,10 @@ interface AppState {
   // swap closes it, as do ×, Esc and a click on empty canvas.
   boxesPopoutOpen: boolean;
   setBoxesPopoutOpen: (open: boolean) => void;
+  // Bumped by every canvas swap (resetAllSimState): a new canvas is on show.
+  // The canvas answers it by fitting the view (task 055) — a view change,
+  // never part of the reset itself.
+  canvasSwapSeq: number;
 
   // Box drawing mode state
   boxDrawing: {
@@ -2112,7 +2117,8 @@ export const useStore = create<AppState>()((set, get) => ({
   showGrid: true,
   showWireValues: true,
   snapToAlign: true,
-  setZoom: (z) => set({ zoom: Math.max(0.25, Math.min(3, z)) }),
+  // The one zoom range (canvasView.ts ZOOM_MIN–ZOOM_MAX).
+  setZoom: (z) => set({ zoom: clampZoom(z) }),
   setPan: (x, y) => set({ panX: x, panY: y }),
   setShowGrid: (v) => set({ showGrid: v }),
   setShowWireValues: (v) => set({ showWireValues: v }),
@@ -4142,6 +4148,7 @@ export const useStore = create<AppState>()((set, get) => ({
   },
   boxesPopoutOpen: false,
   setBoxesPopoutOpen: (open) => set({ boxesPopoutOpen: open }),
+  canvasSwapSeq: 0,
 
   // Box drawing mode state
   boxDrawing: {
@@ -4832,7 +4839,10 @@ export const useStore = create<AppState>()((set, get) => ({
     // The selection is canvas-scoped for the same reason: ids from the last
     // canvas select nothing here, and a stale one would let Delete act on
     // this canvas's namesake (task 052).
-    set({ selectedTool: null, boxesPopoutOpen: false, selectedIds: [], undoStack: [], redoStack: [] });
+    set((s) => ({
+      selectedTool: null, boxesPopoutOpen: false, selectedIds: [], undoStack: [], redoStack: [],
+      canvasSwapSeq: s.canvasSwapSeq + 1,
+    }));
   },
 
   resetForPrincipal: (email) => {
