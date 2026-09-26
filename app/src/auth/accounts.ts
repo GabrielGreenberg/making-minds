@@ -36,29 +36,3 @@ export function readPersistedAccount(): Account | null {
     return null;
   }
 }
-
-/**
- * Durable "this browser has signed in before" marker, in BOTH modes. Set on
- * every successful sign-in or session restore and deliberately NOT cleared by
- * Log out: it is what tells a returning student (led to the sign-in screen)
- * from a newcomer (landed in the sandbox as a visitor) — routing.ts
- * `landingRoute`. It says nothing about who; it holds no identity.
- */
-export const KNOWN_KEY = 'mm:auth:known';
-
-export function markSignedInBefore(): void {
-  try {
-    localStorage.setItem(KNOWN_KEY, '1');
-  } catch {
-    // localStorage unavailable — this browser will just be greeted as new.
-  }
-}
-
-/** Whether localStorage holds any of the given keys (unavailable = none). */
-export function hasAnyKey(keys: string[]): boolean {
-  try {
-    return keys.some((k) => localStorage.getItem(k) != null);
-  } catch {
-    return false;
-  }
-}

@@ -770,22 +770,15 @@
   cursor: pointer;
 }
 .visitor-banner-close:hover { color: var(--mm-ink); }
+/* The sign-in card's closing line: the quieter way past it, into the sandbox. */
 .login-visitor {
-  display: grid;
-  gap: 12px;
-  margin: 0 0 22px;
-  padding-bottom: 22px;
-  border-bottom: 1px solid var(--mm-line);
+  margin: 22px 0 0;
+  padding-top: 18px;
+  border-top: 1px solid var(--mm-line);
+  font-size: var(--mm-fs-meta);
+  line-height: 1.5;
+  color: var(--mm-ink-3);
 }
-.login-visitor p { margin: 0; color: var(--mm-ink-2); }
-.mm-surface .login-visitor a.login-visitor-btn {
-  justify-self: stretch;
-  text-align: center;
-  background: var(--mm-accent-soft);
-  border-color: var(--mm-accent-soft);
-  color: var(--mm-accent);
-}
-.mm-surface .login-visitor a.login-visitor-btn:hover { border-color: var(--mm-accent); color: var(--mm-accent); }
 .login-switch {
   display: block;
   margin-top: 16px;
