@@ -71,18 +71,18 @@ const flush = () => new Promise((r) => setTimeout(r, 10));
 
 // Build a fully-wired INPUT×2 → AND → OUTPUT circuit on the live canvas,
 // draw a box around it, and confirm — returns the confirmed box's id.
-function buildAndBoxAnd(): string {
+function buildAndBoxAnd(dx = 0): string {
   const countBefore = useStore.getState().components.length;
-  useStore.getState().addComponent('INPUT', 200, 180);
-  useStore.getState().addComponent('INPUT', 200, 260);
-  useStore.getState().addComponent('AND', 320, 200);
-  useStore.getState().addComponent('OUTPUT', 460, 210);
+  useStore.getState().addComponent('INPUT', 200 + dx, 180);
+  useStore.getState().addComponent('INPUT', 200 + dx, 260);
+  useStore.getState().addComponent('AND', 320 + dx, 200);
+  useStore.getState().addComponent('OUTPUT', 460 + dx, 210);
   const [in1, in2, and, out] = useStore.getState().components.slice(countBefore);
   useStore.getState().addWire(in1.id, 'out', and.id, 'in1');
   useStore.getState().addWire(in2.id, 'out', and.id, 'in2');
   useStore.getState().addWire(and.id, 'out', out.id, 'in');
   const boxId = `box-${Math.random().toString(36).slice(2)}`;
-  useStore.getState().addBox({ id: boxId, name: '', x: 150, y: 120, width: 400, height: 220, componentIds: [], inputPortIds: [], outputPortIds: [] });
+  useStore.getState().addBox({ id: boxId, name: '', x: 150 + dx, y: 120, width: 400, height: 220, componentIds: [], inputPortIds: [], outputPortIds: [] });
   const err = useStore.getState().confirmBox(boxId);
   if (err) throw new Error(`confirmBox failed: ${err}`);
   return boxId;
@@ -133,6 +133,36 @@ useStore.getState().placeBoxInstance(boxId, 500, 400);
 await flush();
 check('instance placeable on Q1 too', useStore.getState().components.length === before + 1);
 
+console.log('[put away]');
+{
+  const inputs = () => useStore.getState().components.filter((c) => c.type === 'INPUT').length;
+  const inputsBefore = inputs();
+  const countBefore = useStore.getState().components.length;
+  const wiresBefore = useStore.getState().wires.length;
+  const designed = buildAndBoxAnd(2000);
+  check('a box design adds its INPUTs to the canvas', inputs() === inputsBefore + 2);
+  check('putAwayBox succeeds', useStore.getState().putAwayBox(designed) === null);
+  check('…taking the design\'s components and wires off the canvas',
+    useStore.getState().components.length === countBefore && useStore.getState().wires.length === wiresBefore);
+  check('…so its INPUTs no longer count as the question\'s', inputs() === inputsBefore);
+  check('…and its outline', !useStore.getState().boxes.some((b) => b.id === designed));
+  check('…while the library keeps the box', useStore.getState().confirmedBoxLibrary.some((b) => b.id === designed));
+  useStore.getState().placeBoxInstance(designed, 700, 500);
+  const placed = useStore.getState().components.find((c) => c.boxedCircuitId === designed);
+  check('…and it still places, internals intact', (placed?.internalCircuit?.components ?? []).length === 4);
+  useStore.getState().undo();
+  useStore.getState().undo();
+  check('undo brings the design back', inputs() === inputsBefore + 2 && useStore.getState().boxes.some((b) => b.id === designed));
+  const [and] = useStore.getState().components.filter((c) => c.type === 'AND').slice(-1);
+  useStore.getState().addComponent('OUTPUT', 2700, 700);
+  const outside = useStore.getState().components.slice(-1)[0];
+  useStore.getState().addWire(and.id, 'out', outside.id, 'in');
+  check('a box wired into the rest of the circuit is refused', useStore.getState().putAwayBox(designed) !== null);
+  useStore.getState().removeComponent(outside.id);
+  useStore.getState().putAwayBox(designed);
+  useStore.getState().removeConfirmedBox(designed);
+  check('the canvas is back where it started', useStore.getState().components.length === countBefore);
+}
 // [library delete] Removing a library entry never touches placed work
 // (decision 7): a placed BOXED component carries its own internals, so every
 // copy — on the question it is deleted from and on every other — stays and
