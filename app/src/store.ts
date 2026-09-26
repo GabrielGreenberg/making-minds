@@ -266,6 +266,95 @@ export function selectScRunWindow(s: {
   return frames > 0 ? frames : null;
 }
 
+/** A command for the output panel's one control row (runControl). */
+export type RunCommand = 'run' | 'step' | 'reset' | 'stop';
+
+/**
+ * What the output panel's one control row can do right now (task 053; design
+ * memo editor-workbench.md §Output panel) — or null when the canvas runs
+ * nothing from it: an SC perception question, whose frame player keeps its
+ * own controls until the machine-types design, and a canvas with no machine.
+ * `kind` says whose run it is: a combinational circuit's local step (the
+ * signal-flow animation of the current row), an SC circuit's Global I/O row,
+ * an FSM, a TM, a turbot. A mode is added HERE and in runControl, never as a
+ * button row of its own in a panel.
+ */
+export interface RunControls {
+  kind: 'cc' | 'sc' | 'fsm' | 'tm' | 'turbot';
+  running: boolean;
+  canRun: boolean;
+  canStep: boolean;
+  canReset: boolean;
+  /** A short readout beside the buttons ("t=3 · S₁", "HALTED", "4/7"), or null. */
+  status: string | null;
+}
+
+export function selectRunControls(s: AppState): RunControls | null {
+  const stateLabel = (id: string | null | undefined) =>
+    id ? s.components.find((c) => c.id === id)?.label ?? null : null;
+  const join = (...parts: (string | null)[]) => parts.filter(Boolean).join(' · ') || null;
+  if (s.buildMode === 'turbot') {
+    const editing = s.turbotEditingMap;
+    const stateBrain = s.turbotBrainState.stateId ?? null;
+    return {
+      kind: 'turbot',
+      running: s.turbotRunning,
+      canRun: !editing && !s.turbotHalted,
+      canStep: !editing && !s.turbotRunning && !s.turbotHalted,
+      canReset: !editing && !s.turbotRunning,
+      status: stateLabel(stateBrain),
+    };
+  }
+  if (s.buildMode === 'FSM') {
+    // Question runs go to the codec window, fed the codec's stream for the
+    // typed value (see fsmStep); sandbox runs stop at the typed length.
+    const end = selectCodecWindow(s) ?? s.fsmInputSequence.length;
+    const more = !s.fsmHalted && s.fsmTimeStep <= end;
+    return {
+      kind: 'fsm',
+      running: s.fsmRunning,
+      canRun: !s.fsmRunning && more,
+      canStep: !s.fsmRunning && more,
+      canReset: !s.fsmRunning,
+      status: join(s.fsmHalted ? 'HALTED' : s.fsmTimeStep > 1 ? `t=${s.fsmTimeStep - 1}` : null, stateLabel(s.fsmCurrentStateId)),
+    };
+  }
+  if (s.buildMode === 'TM') {
+    return {
+      kind: 'tm',
+      running: s.tmRunning,
+      canRun: !s.tmRunning && !s.tmHalted,
+      canStep: !s.tmRunning && !s.tmHalted,
+      canReset: !s.tmRunning,
+      status: join(s.tmHalted ? 'HALTED' : s.tmTimeStep > 1 ? `t=${s.tmTimeStep - 1}` : null, stateLabel(s.tmCurrentStateId)),
+    };
+  }
+  const hasInputs = inputCount(s.components) > 0;
+  if (s.buildMode === 'SC' || hasMemory(s.components)) {
+    if (selectPerceptionRetina(s) !== null) return null;
+    return {
+      kind: 'sc',
+      running: s.scRunning,
+      canRun: hasInputs && !s.scRunning,
+      canStep: hasInputs && !s.scRunning,
+      canReset: !s.scRunning,
+      status: s.scTimeStep > 1 ? `t=${s.scTimeStep - 1}` : null,
+    };
+  }
+  if (s.buildMode === 'CC') {
+    const n = s.localStepSorted.length;
+    return {
+      kind: 'cc',
+      running: s.localStepRunning,
+      canRun: hasInputs && !s.localStepRunning,
+      canStep: hasInputs && !s.localStepRunning,
+      canReset: hasInputs && !s.localStepRunning,
+      status: s.localStepActive && n > 0 ? `${Math.min(s.localStepIndex, n)}/${n}` : null,
+    };
+  }
+  return null;
+}
+
 /** Parse display-order digits as a numeral under `rep` — exactly how the A/V
  *  ARG column reads typed input (tally "011" = 2; binary "110" = 6). Returns
  *  null when the digits are not a valid codeword (tally with a 0 after a 1 —
@@ -934,6 +1023,14 @@ interface AppState {
   localStepOne: () => boolean;
   localStepReset: () => void;
   localStepClear: () => void;
+  // The local step's Run — the ONE loop that plays a row's propagation (task
+  // 053; it used to be an interval inside DataTable). Every selection, reset
+  // and clear stops it, so a canvas swap or a machine edit (both clear the
+  // local step) can never leave it stepping.
+  localStepRunning: boolean;
+  localStepRunId: number | null;
+  localStepRun: (intervalMs?: number) => void;
+  localStepPause: () => void;
 
   // Sequential circuit state
   scTimeStep: number; // current time step (starts at 1)
@@ -948,6 +1045,17 @@ interface AppState {
   scRun: (intervalMs?: number) => void;
   scPause: () => void; // pause continuous execution
   scReset: () => void; // reset to t=1, preserve circuit structure and input sequence
+  // The Global I/O row a run plays (task 053: store-held so the output
+  // panel's one control row can drive it). scGlobalReset — every canvas swap
+  // — forgets it.
+  scActiveGlobalIndex: number | null;
+  setScActiveGlobalIndex: (index: number | null) => void;
+  // Run / Step / Reset the active Global I/O row: load it if nothing is loaded
+  // (or the last run finished), then play exactly the grader's run length
+  // (selectScRunWindow) — the sandbox's typed length plus its drain.
+  scSequenceRun: (intervalMs?: number) => void;
+  scSequenceStep: () => void;
+  scSequenceReset: () => void;
   scGlobalReset: () => void; // reset to t=1, clear all inputs and memory
   setScInputBit: (inputIndex: number, timeStep: number, value: number) => void;
   // Load a perception film (frames, IN1-first bit-vectors, t1 first) as the
@@ -1035,6 +1143,14 @@ interface AppState {
   turbotRun: () => void;
   turbotPause: () => void;
   turbotReset: () => void; // back to the arena's start pose, brain re-initialized
+  // A sandbox turbot tab's Map is being edited ("Edit map"): its runs are
+  // off meanwhile. Canvas-scoped — every swap closes the editor.
+  turbotEditingMap: boolean;
+  setTurbotEditingMap: (editing: boolean) => void;
+  // The output panel's one control row (task 053): Run / Step / Reset / Stop
+  // for whatever the open canvas runs (selectRunControls says what is
+  // possible). It only dispatches to each mode's own actions.
+  runControl: (command: RunCommand, opts?: { intervalMs?: number }) => void;
   // Turbot TM: flip a STATE between internal (circle, tape ops) and external
   // (square, sense/move ops). Outgoing transition labels are reset to the new
   // kind's default since the grammars are disjoint.
@@ -3255,6 +3371,7 @@ export const useStore = create<AppState>()((set, get) => ({
 
   localStepSelect: (inBits, memBits) => {
     suppressAutoAddRow = false; // selecting a row to evaluate → re-enable auto-add
+    get().localStepPause(); // a new row starts un-run
     const state = get();
     const { components, wires } = state;
 
@@ -3607,7 +3724,24 @@ export const useStore = create<AppState>()((set, get) => ({
     get().localStepSelect(inBits, memBits);
   },
 
+  localStepRunning: false,
+  localStepRunId: null,
+  localStepRun: (intervalMs = 300) => {
+    const state = get();
+    if (state.localStepRunning || !state.localStepActive) return;
+    const id = window.setInterval(() => {
+      if (!get().localStepOne()) get().localStepPause();
+    }, intervalMs);
+    set({ localStepRunning: true, localStepRunId: id });
+  },
+  localStepPause: () => {
+    const id = get().localStepRunId;
+    if (id !== null) window.clearInterval(id);
+    if (id !== null || get().localStepRunning) set({ localStepRunning: false, localStepRunId: null });
+  },
+
   localStepClear: () => {
+    get().localStepPause();
     set({
       localStepActive: false,
       localStepSelectedKey: null,
@@ -3824,6 +3958,7 @@ export const useStore = create<AppState>()((set, get) => ({
       scRunIntervalId: null,
       tableRows: [],
       scGlobalSequences: [],
+      scActiveGlobalIndex: null,
       components: zeroMemState(state.components.map((c) => {
         if (c.type === 'INPUT') return { ...c, value: undefined, inputValues: [undefined as unknown as number] };
         return c;
@@ -3858,6 +3993,68 @@ export const useStore = create<AppState>()((set, get) => ({
     const width = selectPerceptionRetina(get()) ?? Math.max(0, ...frames.map((f) => f.length));
     set({ scInputSequence: framesToLanes(frames, width) });
     get().scReset();
+  },
+
+  scActiveGlobalIndex: null,
+  setScActiveGlobalIndex: (index) => set({ scActiveGlobalIndex: index }),
+
+  scSequenceRun: (intervalMs = 300) => {
+    ensureScSequenceLoaded();
+    const state = get();
+    if (state.scRunning || inputCount(state.components) === 0) return;
+    const maxLen = Math.max(...state.scInputSequence.map((s) => s.length), 0);
+    // Question runs execute exactly the grader's run length (the steps the
+    // grader reads — selectScRunWindow), feeding the codec's stream for the
+    // typed value (see scStep). Sandbox: L plus one 0-input flush step per
+    // MEM so delayed bits drain.
+    const win = selectScRunWindow(state);
+    const runEnd = win ?? maxLen + memorySlots(state.components).length;
+    const remaining = runEnd - (state.scTimeStep - 1);
+    // Nothing typed in the sandbox: one step on the INPUT toggles.
+    if (remaining <= 0 && maxLen === 0 && win === null) {
+      state.scStep();
+      return;
+    }
+    if (remaining <= 0) return;
+    // The run loop stops itself at the same end (scRun).
+    state.scRun(intervalMs);
+  },
+
+  scSequenceStep: () => {
+    ensureScSequenceLoaded();
+    const state = get();
+    if (state.scRunning) return;
+    const maxLen = Math.max(...state.scInputSequence.map((s) => s.length), 0);
+    // Question steps stop at the grader's run length; sandbox at L + per-MEM drain.
+    const win = selectScRunWindow(state);
+    const within = win !== null
+      ? state.scTimeStep <= win
+      : maxLen === 0 || state.scTimeStep <= maxLen + memorySlots(state.components).length;
+    if (within) state.scStep();
+  },
+
+  // If the loaded input is a Global I/O row, clear its output and load it
+  // again (t=1); otherwise the plain reset.
+  scSequenceReset: () => {
+    const state = get();
+    if (state.scRunning) return;
+    const numInputs = inputCount(state.components);
+    const maxLen = Math.max(...state.scInputSequence.map((s) => s.length), 0);
+    let currentInputStr = '';
+    for (let t = maxLen - 1; t >= 0; t--) {
+      for (let ii = 0; ii < numInputs; ii++) {
+        currentInputStr += String(state.scInputSequence[ii]?.[t] ?? 0);
+      }
+    }
+    const idx = state.scGlobalSequences.findIndex((s) => s.inputStr === currentInputStr);
+    if (idx >= 0) {
+      const seqs = [...state.scGlobalSequences];
+      seqs[idx] = { ...seqs[idx], outputStr: '' };
+      set({ scGlobalSequences: seqs });
+      state.loadScGlobalSequence(idx);
+    } else {
+      state.scReset();
+    }
   },
 
   setScGlobalSequenceInput: (index, value) => {
@@ -4365,6 +4562,63 @@ export const useStore = create<AppState>()((set, get) => ({
     set({ turbotRunning: false, turbotRunIntervalId: null, turbotHoldTicks: 0 });
   },
 
+  turbotEditingMap: false,
+  setTurbotEditingMap: (editing) => set({ turbotEditingMap: editing }),
+
+  runControl: (command, opts) => {
+    const c = selectRunControls(get());
+    if (!c) return;
+    const s = get();
+    if (command === 'stop') {
+      if (!c.running) return;
+      if (c.kind === 'cc') s.localStepPause();
+      else if (c.kind === 'sc') s.scPause();
+      else if (c.kind === 'fsm') s.fsmPause();
+      else if (c.kind === 'tm') s.tmPause();
+      else s.turbotPause();
+      return;
+    }
+    if (command === 'run' ? !c.canRun : command === 'step' ? !c.canStep : !c.canReset) return;
+    switch (c.kind) {
+      case 'cc': {
+        // Reset: every input to 0, the canvas un-run on that row. Run and
+        // Step play the current row's propagation (Gabriel, 2026-09-25: CC
+        // keeps its signal-flow animation) — from the top when nothing is
+        // selected or the last play finished.
+        const bits = inputCount(s.components) === 0 ? [] : sortByLabel(s.components, 'IN').map((i) => i.value ?? 0);
+        if (command === 'reset') {
+          s.localStepSelect(bits.map(() => 0));
+          return;
+        }
+        if (!s.localStepActive) s.localStepSelect(bits);
+        else if (s.localStepIndex >= s.localStepSorted.length) s.localStepReset();
+        if (command === 'step') get().localStepOne();
+        else get().localStepRun(opts?.intervalMs);
+        return;
+      }
+      case 'sc':
+        if (command === 'run') s.scSequenceRun(opts?.intervalMs);
+        else if (command === 'step') s.scSequenceStep();
+        else s.scSequenceReset();
+        return;
+      case 'fsm':
+        if (command === 'run') s.fsmRun();
+        else if (command === 'step') s.fsmStep();
+        else s.fsmReset();
+        return;
+      case 'tm':
+        if (command === 'run') s.tmRun();
+        else if (command === 'step') s.tmStep();
+        else s.tmReset();
+        return;
+      case 'turbot':
+        if (command === 'run') s.turbotRun();
+        else if (command === 'step') s.turbotStep();
+        else s.turbotReset();
+        return;
+    }
+  },
+
   turbotReset: () => {
     const state = get();
     if (state.turbotRunIntervalId !== null) {
@@ -4552,8 +4806,10 @@ export const useStore = create<AppState>()((set, get) => ({
     // A loaded graded case belongs to the canvas it was loaded on, and so
     // does the arena it picked — cleared BEFORE turbotReset, which re-seats
     // the turbot on the (now primary) arena's start.
-    set({ loadedCase: null, turbotCaseIndex: 0 });
+    set({ loadedCase: null, turbotCaseIndex: 0, turbotEditingMap: false });
     get().turbotReset();
+    // A local-step row (and its Run) belongs to the canvas it was picked on.
+    get().localStepClear();
     // The armed palette tool is canvas-scoped too: an AND armed on a CC
     // question must not survive into the next question's canvas and drop a
     // gate on the first click there. So is the history: undo writes its
@@ -5041,6 +5297,29 @@ function tmLive(s: AppState): boolean {
 }
 function turbotLive(s: AppState): boolean {
   return s.turbotRunning || s.turbotHistory.length > 0 || s.turbotHalted;
+}
+
+/** Load the SC Global I/O row a Run or Step should play, unless a loaded
+ *  input is still mid-run: the active row first, else the first row with
+ *  input (which then becomes active). A finished run loads again from t=1. */
+function ensureScSequenceLoaded(): void {
+  const state = useStore.getState();
+  const maxLen = Math.max(...state.scInputSequence.map((s) => s.length), 0);
+  // Question runs end at the grader's run length (selectScRunWindow);
+  // sandbox runs at L + one 0-drain step per MEM (boxed ones included).
+  const runEnd = selectScRunWindow(state) ?? maxLen + memorySlots(state.components).length;
+  if (maxLen > 0 && state.scTimeStep <= runEnd) return;
+  const active = state.scActiveGlobalIndex;
+  const candidates = active !== null ? [active] : [];
+  for (let i = 0; i < state.scGlobalSequences.length; i++) if (i !== active) candidates.push(i);
+  for (const idx of candidates) {
+    const seq = state.scGlobalSequences[idx];
+    if (seq && seq.inputStr.length > 0) {
+      useStore.setState({ scActiveGlobalIndex: idx });
+      state.loadScGlobalSequence(idx);
+      return;
+    }
+  }
 }
 
 function inputCount(components: CircuitComponent[]): number {

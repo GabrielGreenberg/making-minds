@@ -314,3 +314,43 @@ export function evaluateCCInputs(
   const outputs = sortByLabel(withInputs, 'OUT');
   return outputs.map((o) => portValues.get(`${o.id}:in`) ?? 0);
 }
+
+/** A combinational circuit's whole truth table, as the output panel shows it. */
+export interface CCTruthTable {
+  inputLabels: string[];
+  outputLabels: string[];
+  /** Per output (OUT-label order): does a wire reach it? An unwired output
+   *  has no value to show. */
+  wired: boolean[];
+  /** Every input combination, IN1 the most significant bit, 00…0 first. */
+  rows: { inputBits: number[]; outputBits: number[] }[];
+}
+
+/** The largest table shown: 2^8 rows. */
+export const TRUTH_TABLE_MAX_INPUTS = 8;
+
+/**
+ * Every row of a combinational circuit's truth table at once (task 053: the
+ * output panel's table is live — CC propagation is instantaneous, so no row
+ * waits to be "run"). Null when the circuit has no INPUT or no OUTPUT;
+ * 'too-many' past TRUTH_TABLE_MAX_INPUTS inputs. Each row is the headless
+ * grading primitive's evaluation (evaluateCCInputs), so the table reads
+ * exactly what the grader would.
+ */
+export function truthTableCC(components: CircuitComponent[], wires: Wire[]): CCTruthTable | 'too-many' | null {
+  const inputs = sortByLabel(components, 'IN');
+  const outputs = sortByLabel(components, 'OUT');
+  if (inputs.length === 0 || outputs.length === 0) return null;
+  if (inputs.length > TRUTH_TABLE_MAX_INPUTS) return 'too-many';
+  const n = inputs.length;
+  const rows = Array.from({ length: 1 << n }, (_, i) => {
+    const inputBits = Array.from({ length: n }, (_, k) => (i >> (n - 1 - k)) & 1);
+    return { inputBits, outputBits: evaluateCCInputs(components, wires, inputBits) };
+  });
+  return {
+    inputLabels: inputs.map((c) => c.label),
+    outputLabels: outputs.map((c) => c.label),
+    wired: outputs.map((o) => wires.some((w) => w.targetComponentId === o.id)),
+    rows,
+  };
+}

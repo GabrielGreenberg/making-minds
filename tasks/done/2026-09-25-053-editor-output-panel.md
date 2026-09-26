@@ -8,9 +8,9 @@ requires: browser
 area: app
 source: inbox
 created: 2026-09-25T16:15:00-07:00
-status: in-progress
+status: done
 after: 2026-09-25-052
-branch: task/053-editor-output-panel
+branch:
 merged_into:
 ---
 
@@ -130,3 +130,64 @@ Gabriel, 2026-09-25 (catch):
   - Screenshot at 1280 wide.
 
 ## Progress log
+
+### 2026-09-25 — built, verified (/work)
+- **One control row.** `components/OutputPanel.tsx` renders the store's one descriptor,
+  `selectRunControls` (kind, running, canRun/Step/Reset, a status readout such as
+  "t=3 · S₁"), and dispatches through `runControl('run'|'step'|'reset'|'stop')`. Run becomes
+  "■ Stop" while running. A new mode is added in the store, never as a panel's own button row.
+- **Every run loop is the store's.**
+  - The CC local step's Run moved out of DataTable's `setInterval` into
+    `localStepRun`/`localStepPause`. Every select, reset and clear pauses it, and
+    `resetAllSimState` now clears the local step.
+  - SC's Global I/O orchestration moved into the store: `scActiveGlobalIndex` plus
+    `scSequenceRun`/`Step`/`Reset` (from DataTable's `ensureSequenceLoaded` and the three
+    callbacks). `scGlobalReset` forgets the row.
+  - The turbot Map's "Edit map" is store-held (`turbotEditingMap`, cleared on every swap),
+    so the row stands down while editing.
+- **CC (decision 6).**
+  - Step and Run play the current row's signal flow. With no row picked they pick the
+    current inputs' row; a finished row replays from the top.
+  - Reset sets every input to 0 and leaves the canvas un-run on that row.
+  - The table is live: `LiveTruthTable` over the new pure `engine/cc.ts truthTableCC` (every
+    row is `evaluateCCInputs`, the grader's own evaluation). It uses the memo's style (Plex
+    Sans tabular, red 1s, lavender current row, equal columns up to 60px that shrink to
+    fit), with a row click or Enter to set the inputs and the memo's note and empty lines.
+- **Where each control went.**
+  - FSM, TM and turbot panels lost their button rows; the FSM "clear" and TM "clear tape"
+    stay.
+  - SC plays its Global row from the header; its local stepper stays (F8), and the pace
+    control stays in the panel.
+  - SC perception has no header row: the frame player keeps its controls.
+- **The toolbar retired.**
+  - `SimulationPanel.tsx` is deleted.
+  - `components/CanvasActions.tsx` is the canvas's top-right group: Undo · Redo · Delete ·
+    Rotate · Clear (with a confirm), plus Swap state type for a turbot TM. It has the
+    "(shift+click to ↻)" hint (task 024) and calls the store's own locked actions.
+  - The "Current state" readout is now the row's status.
+  - Dead CSS removed. The themeCheck ratchet went 177 → 174, and the new components are in
+    its scan.
+- **Docs.** The memo's "One control set" note was updated. CLAUDE.md rows were updated in
+  place (39992 → 39972 bytes).
+- **Pins.**
+  - navResetCheck `[run controls]` (CC step/run/stop/reset, the run ends itself, an edit or
+    a swap stops it; FSM/TM step and reset with a status; SC Global row step and reset,
+    forgotten on swap; the turbot step, and Map editing stands the row down).
+    `checkAllSimFresh` now also asserts no local-step row or run, no Global row, and a
+    closed Map editor. The rotate-hint pin moved to CanvasActions.
+  - workbenchCheck `[output panel]`: `truthTableCC` against HW1 P3's reference (AND/NAND),
+    unwired outputs, the empty and too-many cases; source pins — one row from the
+    descriptor, no panel Run/Step for CC/FSM/TM/turbot, no toolbar, the live table, and the
+    action group through the store.
+- **Verified** in headless Chrome at 1280, local mode:
+  - HW1 P3 with its reference circuit: the live table; a row click, 2× Step ("2/7"), a Run
+    to "7/7", then Reset (inputs 0, row 00 current); Rotate, Delete, Undo, and Clear's
+    confirm.
+  - HW3 P1 (SC): the header steps the Global row. HW4 P3 (FSM): "t=1 · S₁". HW5 P1 (TM):
+    Run → "HALTED · S₂". HW6 turbot TM: Swap in the group, the Map without buttons.
+  - HW3 P11 (SC perception): no header row.
+- **Screenshots:** `tasks/attachments/2026-09-25-053-{1..4}.png` (CC stepping, the Clear confirm, SC, turbot TM).
+- **Gates** (by exit code): both tsc runs, the build, `npm run check` and the server's `npm run check`.
+
+### 2026-09-25 — landed (/work)
+Merged to `main` with `--no-ff`. Next in the chain: 054 (the floating palette).

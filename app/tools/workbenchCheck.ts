@@ -15,12 +15,19 @@
 //                    EditorShell; the sandbox has no question panel; the
 //                    retired MenuBar is gone; the question text left the data
 //                    panel; nothing in the frame reads the answer key.
+//   [output panel]   (task 053) a circuit's live truth table (engine
+//                    truthTableCC) against a reference circuit; ONE control
+//                    row — the retired toolbar is gone, no panel builds a
+//                    Run/Step of its own for CC, FSM, TM or turbot, the row
+//                    renders the store's one descriptor; the canvas's action
+//                    group calls the store's (locked) actions.
 //
 // Run from app/: npx tsx tools/workbenchCheck.ts   (part of `npm run check`).
 
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import type { AssignmentData, QuestionCircuit } from '../src/types';
+import type { AssignmentData, CircuitData, QuestionCircuit } from '../src/types';
+import { truthTableCC, TRUTH_TABLE_MAX_INPUTS } from '../src/engine';
 import { documentSections } from '../src/problemSet';
 import {
   COLLAPSED_STRIP,
@@ -171,6 +178,50 @@ console.log('\n[one frame]');
     /role="checkbox"/.test(panel) && !/<input\b/.test(panel));
   check('navigation goes through navigate() with the viewed attempt carried along',
     /navigate\(\{ kind: 'assignment', id: assignment\.id, attempt, questionIndex: i \}, \{ replace: true \}\)/.test(panel));
+}
+
+console.log('\n[output panel]');
+{
+  const fixture = (name: string) =>
+    JSON.parse(readFileSync(join(import.meta.dirname, 'fixtures/reference', name), 'utf8')) as { correct: CircuitData };
+  // HW1 P3: OUT1 = IN1 AND IN2, OUT2 = its NOT.
+  const p3 = fixture('hw1-p3.json').correct;
+  const t = truthTableCC(p3.components, p3.wires);
+  check('the live table: every row at once, IN1 most significant, 00 first',
+    t !== null && t !== 'too-many' && t.rows.map((r) => r.inputBits.join('')).join(' ') === '00 01 10 11');
+  check('…each row the grader\'s evaluation (HW1 P3: AND and NAND)',
+    t !== null && t !== 'too-many' && t.rows.map((r) => r.outputBits.join('')).join(' ') === '01 01 01 10' &&
+      t.inputLabels.join() === 'IN1,IN2' && t.outputLabels.join() === 'OUT1,OUT2' && t.wired.every(Boolean));
+  {
+    const unwired = { ...p3, wires: p3.wires.filter((w) => w.targetComponentId !== p3.components.find((c) => c.label === 'OUT2')!.id) };
+    const u = truthTableCC(unwired.components, unwired.wires);
+    check('an output no wire reaches is marked unwired (the panel shows it blank)', u !== null && u !== 'too-many' && u.wired.join() === 'true,false');
+  }
+  check('no INPUT or no OUTPUT → no table',
+    truthTableCC(p3.components.filter((c) => c.type !== 'OUTPUT'), []) === null &&
+      truthTableCC(p3.components.filter((c) => c.type !== 'INPUT'), []) === null);
+  {
+    const many = Array.from({ length: TRUTH_TABLE_MAX_INPUTS + 1 }, (_, i) => ({ ...p3.components[0], id: `in${i}`, label: `IN${i + 1}` }));
+    check(`more than ${TRUTH_TABLE_MAX_INPUTS} inputs → 'too-many'`, truthTableCC([...many, p3.components.find((c) => c.type === 'OUTPUT')!], []) === 'too-many');
+  }
+
+  const app = code('App.tsx');
+  check('the retired simulation toolbar is gone', !existsSync(join(SRC, 'components/SimulationPanel.tsx')) && !/SimulationToolbar/.test(app));
+  check('the output panel is OutputPanel', /<EditorShell output=\{<OutputPanel \/>\}>/.test(app));
+  const out = code('components/OutputPanel.tsx');
+  check('ONE control row, rendered from the store\'s descriptor and dispatched through runControl',
+    /selectRunControls/.test(out) && /runControl\('run'/.test(out) && /runControl\('step'\)/.test(out) &&
+      /runControl\('reset'\)/.test(out) && /runControl\('stop'\)/.test(out) && !/setInterval|setTimeout/.test(out));
+  const table = code('components/DataTable.tsx');
+  const map = code('components/TurbotArenaPanel.tsx');
+  check('no panel builds a Run/Step of its own for CC, FSM, TM or turbot',
+    !/\b(fsmRun|fsmStep|tmRun|tmStep|scSequenceRun|scSequenceStep)\b/.test(table) && !/\b(turbotRun|turbotStep)\b/.test(map) &&
+      !/setInterval/.test(table));
+  check('the CC table is the live one', /<LiveTruthTable \/>/.test(table) && /truthTableCC/.test(code('components/LiveTruthTable.tsx')));
+  const actions = code('components/CanvasActions.tsx');
+  check('the canvas\'s action group: Undo · Redo · Delete · Rotate · Clear through the store\'s own actions',
+    ['undo()', 'redo()', 'deleteSelected()', 'rotateComponent(id)', 'clearWorkspace()', 'toggleStateKind(id)'].every((a) => actions.includes(a)) &&
+      !/isCurrentQuestionLocked/.test(actions));
 }
 
 console.log(failures === 0 ? '\nworkbenchCheck: all checks passed' : `\nworkbenchCheck: ${failures} FAILED`);
