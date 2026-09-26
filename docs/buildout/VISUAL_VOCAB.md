@@ -224,6 +224,12 @@ literal or an undefined token. Task: `tasks/done/2026-09-21-019-*`._
   stroked in the ink colour, a grip, a turn button, pinned boxes, the Boxes pop-out, a
   55% ghost while a tile is dragged), all styled in `app/src/workbench.css`
   (literal-free, like `pages.css`). The spec is `docs/buildout/designs/editor-workbench.md`.
-  What is still inside `index.css` — the canvas and data-panel internals — moves onto the
-  tokens in task 055; until then `themeCheck` ratchets its colour literals (they may only
-  go down). The goal and output tables use Plex Sans with tabular digits, never Mono.
+  The **canvas** (task 055) wears the tokens too: its SVG colours are roles in
+  `app/src/canvasTheme.ts` read off `theme.css` (no literal in `CircuitCanvas.tsx` —
+  `themeCheck`), its text Plex Sans 600 with tabular digits; selection is `--mm-accent` on
+  `--mm-lav-soft`, a selected wire keeps its signal colour over an 8px `--mm-lav` halo,
+  port dots wear their wire's signal, an input or output at 1 takes the
+  `--mm-signal-1-soft` wash; a `--mm-canvas-dot` grid; bottom-right the zoom group
+  (− · % · + · Fit), bottom-left the hint line, centred the empty-canvas message. What is
+  still inside `index.css` is the data panel's and sandbox's older internals; `themeCheck`
+  ratchets its colour literals (they may only go down). The goal and output tables use Plex Sans with tabular digits, never Mono.

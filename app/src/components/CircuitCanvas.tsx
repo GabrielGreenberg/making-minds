@@ -7,6 +7,9 @@ import { Palette } from './Palette';
 import { usePaletteDrag } from './paletteDrag';
 import { clientToCanvas, placementOrigin, toolComponent } from '../palette';
 import { editorShortcut, isTextEntryTarget } from '../shortcuts';
+import { canvasColors, canvasVar, signalColor } from '../canvasTheme';
+import { circuitBounds, fitView, freeArea, zoomAbout, ZOOM_STEP } from '../canvasView';
+import { CanvasGuide } from './CanvasGuide';
 import type {
   CircuitComponent,
   Wire,
@@ -374,11 +377,20 @@ interface DragInfo {
 function CircuitComponentView({
   comp,
   isSelected,
+  portValues,
 }: {
   comp: CircuitComponent;
   isSelected: boolean;
+  /** The signal on each port's wire (`compId:portId` → 0/1): a port dot
+   *  wears its wire's colour; a port no wire reaches, the ink. */
+  portValues?: ReadonlyMap<string, number>;
 }) {
   const { w, h } = getCompDimensions(comp);
+  // Every colour is a theme role (canvasTheme.ts); selection is magenta.
+  const C = canvasColors();
+  const bodyFill = isSelected ? C.selectFill : C.surface;
+  const bodyStroke = isSelected ? C.select : C.ink;
+  const bodyStrokeW = isSelected ? 2.5 : 1.5;
   // The live FSM control state for the green highlight — one selector fed by
   // whichever sim is active (FSM sim or a turbot arena run with an FSM
   // brain), never a direct read of one slice's field.
@@ -410,8 +422,8 @@ function CircuitComponentView({
               width={toggleW}
               height={toggleH}
               rx={3}
-              fill={isBlank ? '#ccc' : val ? '#e53935' : '#999'}
-              stroke={isSelected ? '#2a7fff' : '#555'}
+              fill={isBlank ? C.faint : val ? C.signal1 : C.dim}
+              stroke={isSelected ? C.select : C.ink2}
               strokeWidth={1}
               data-input-toggle={comp.id}
               style={{ cursor: 'pointer' }}
@@ -422,8 +434,8 @@ function CircuitComponentView({
               width={w}
               height={h}
               rx={3}
-              fill={isSelected ? '#e3f2fd' : 'white'}
-              stroke={isSelected ? '#2a7fff' : '#333'}
+              fill={isSelected ? C.selectFill : val === 1 ? C.signal1Soft : C.surface}
+              stroke={isSelected ? C.select : val === 1 ? C.signal1 : C.ink}
               strokeWidth={strokeW}
             />
             <text
@@ -431,9 +443,7 @@ function CircuitComponentView({
               y={toggleY + toggleH / 2 + 4}
               textAnchor="middle"
               fontSize="10"
-              fontFamily="monospace"
-              fontWeight="600"
-              fill="white"
+              fill={C.surface}
               pointerEvents="none"
               transform={counterRotateLabel()}
             >
@@ -441,23 +451,22 @@ function CircuitComponentView({
             </text>
             <text
               x={comp.x + w / 2}
-              y={comp.y - 4}
+              y={comp.y - 6}
               textAnchor="middle"
-              fontSize="10"
-              fill="#666"
-              fontWeight="500"
+              fontSize="11"
+              letterSpacing="0.04em"
+              fill={C.dim}
               transform={counterRotateLabel()}
             >
               {comp.label}
             </text>
             <text
               x={comp.x + w / 2}
-              y={comp.y + h / 2 + 5}
+              y={comp.y + h / 2 + 1}
               textAnchor="middle"
-              fontSize="14"
-              fontFamily="monospace"
-              fontWeight="600"
-              fill={val === 1 ? '#e53935' : '#333'}
+              dominantBaseline="central"
+              fontSize="17"
+              fill={signalColor(C, val)}
               transform={counterRotateLabel()}
             >
               {displayVal}
@@ -475,29 +484,28 @@ function CircuitComponentView({
               width={w}
               height={h}
               rx={3}
-              fill={isSelected ? '#e3f2fd' : 'white'}
-              stroke={isSelected ? '#2a7fff' : '#333'}
-              strokeWidth={isSelected ? 2.5 : 1.5}
+              fill={isSelected ? C.selectFill : comp.value === 1 ? C.signal1Soft : C.surface}
+              stroke={bodyStroke}
+              strokeWidth={bodyStrokeW}
             />
             <text
               x={comp.x + w / 2}
-              y={comp.y - 4}
+              y={comp.y - 6}
               textAnchor="middle"
-              fontSize="10"
-              fill="#666"
-              fontWeight="500"
+              fontSize="11"
+              letterSpacing="0.04em"
+              fill={C.dim}
               transform={counterRotateLabel()}
             >
               {comp.label}
             </text>
             <text
               x={comp.x + w / 2}
-              y={comp.y + h / 2 + 5}
+              y={comp.y + h / 2 + 1}
               textAnchor="middle"
-              fontSize="14"
-              fontFamily="monospace"
-              fontWeight="600"
-              fill={comp.value === 1 ? '#e53935' : '#333'}
+              dominantBaseline="central"
+              fontSize="17"
+              fill={signalColor(C, comp.value)}
               transform={counterRotateLabel()}
             >
               {comp.value != null ? comp.value : ''}
@@ -510,9 +518,9 @@ function CircuitComponentView({
           <g>
             <path
               d={`M${comp.x},${comp.y} L${comp.x + w * 0.5},${comp.y} Q${comp.x + w},${comp.y} ${comp.x + w},${comp.y + h / 2} Q${comp.x + w},${comp.y + h} ${comp.x + w * 0.5},${comp.y + h} L${comp.x},${comp.y + h} Z`}
-              fill={isSelected ? '#e3f2fd' : 'white'}
-              stroke={isSelected ? '#2a7fff' : '#333'}
-              strokeWidth={isSelected ? 2.5 : 1.5}
+              fill={bodyFill}
+              stroke={bodyStroke}
+              strokeWidth={bodyStrokeW}
             />
             <text
               x={cx}
@@ -521,8 +529,8 @@ function CircuitComponentView({
               dominantBaseline="central"
               fontSize="20"
               fontWeight="700"
-              fill="#333"
-              stroke="#333"
+              fill={C.ink}
+              stroke={C.ink}
               strokeWidth={1}
               paintOrder="stroke"
               transform={counterRotateLabel()}
@@ -537,9 +545,9 @@ function CircuitComponentView({
           <g>
             <path
               d={`M${comp.x},${comp.y} Q${comp.x + w * 0.3},${comp.y} ${comp.x + w * 0.5},${comp.y} Q${comp.x + w},${comp.y} ${comp.x + w},${comp.y + h / 2} Q${comp.x + w},${comp.y + h} ${comp.x + w * 0.5},${comp.y + h} Q${comp.x + w * 0.3},${comp.y + h} ${comp.x},${comp.y + h} Q${comp.x + w * 0.2},${comp.y + h / 2} ${comp.x},${comp.y} Z`}
-              fill={isSelected ? '#e3f2fd' : 'white'}
-              stroke={isSelected ? '#2a7fff' : '#333'}
-              strokeWidth={isSelected ? 2.5 : 1.5}
+              fill={bodyFill}
+              stroke={bodyStroke}
+              strokeWidth={bodyStrokeW}
             />
             <text
               x={cx}
@@ -548,8 +556,8 @@ function CircuitComponentView({
               dominantBaseline="central"
               fontSize="20"
               fontWeight="700"
-              fill="#333"
-              stroke="#333"
+              fill={C.ink}
+              stroke={C.ink}
               strokeWidth={1}
               paintOrder="stroke"
               transform={counterRotateLabel()}
@@ -564,9 +572,9 @@ function CircuitComponentView({
           <g>
             <polygon
               points={`${comp.x},${comp.y} ${comp.x + w},${comp.y + h / 2} ${comp.x},${comp.y + h}`}
-              fill={isSelected ? '#e3f2fd' : 'white'}
-              stroke={isSelected ? '#2a7fff' : '#333'}
-              strokeWidth={isSelected ? 2.5 : 1.5}
+              fill={bodyFill}
+              stroke={bodyStroke}
+              strokeWidth={bodyStrokeW}
             />
             <text
               x={comp.x + w / 3}
@@ -575,7 +583,7 @@ function CircuitComponentView({
               dominantBaseline="central"
               fontSize="18"
               fontWeight="700"
-              fill="#333"
+              fill={C.ink}
               transform={counterRotateLabel()}
             >
               {'\u00AC'}
@@ -588,14 +596,14 @@ function CircuitComponentView({
           <g>
             <path
               d={`M${comp.x + 6},${comp.y} Q${comp.x + w * 0.4},${comp.y} ${comp.x + w * 0.5},${comp.y} Q${comp.x + w},${comp.y} ${comp.x + w},${comp.y + h / 2} Q${comp.x + w},${comp.y + h} ${comp.x + w * 0.5},${comp.y + h} Q${comp.x + w * 0.4},${comp.y + h} ${comp.x + 6},${comp.y + h} Q${comp.x + w * 0.25},${comp.y + h / 2} ${comp.x + 6},${comp.y} Z`}
-              fill={isSelected ? '#e3f2fd' : 'white'}
-              stroke={isSelected ? '#2a7fff' : '#333'}
-              strokeWidth={isSelected ? 2.5 : 1.5}
+              fill={bodyFill}
+              stroke={bodyStroke}
+              strokeWidth={bodyStrokeW}
             />
             <path
               d={`M${comp.x},${comp.y} Q${comp.x + w * 0.18},${comp.y + h / 2} ${comp.x},${comp.y + h}`}
               fill="none"
-              stroke={isSelected ? '#2a7fff' : '#333'}
+              stroke={bodyStroke}
               strokeWidth={1.5}
             />
             <text
@@ -605,7 +613,7 @@ function CircuitComponentView({
               dominantBaseline="central"
               fontSize="18"
               fontWeight="700"
-              fill="#333"
+              fill={C.ink}
               transform={counterRotateLabel()}
             >
               {'\u2295'}
@@ -622,9 +630,9 @@ function CircuitComponentView({
               width={w}
               height={h}
               rx={4}
-              fill={isSelected ? '#e3f2fd' : 'white'}
-              stroke={isSelected ? '#2a7fff' : '#333'}
-              strokeWidth={isSelected ? 2.5 : 1.5}
+              fill={bodyFill}
+              stroke={bodyStroke}
+              strokeWidth={bodyStrokeW}
             />
             <text
               x={cx}
@@ -632,16 +640,15 @@ function CircuitComponentView({
               textAnchor="middle"
               dominantBaseline="central"
               fontSize="13"
-              fontWeight="600"
-              fill="#333"
+              fill={C.ink}
               transform={counterRotateLabel()}
             >
               HA
             </text>
-            <text x={comp.x + 6} y={comp.y + h / 3 + 4} fontSize="9" fill="#888" transform={counterRotateLabel()}>A</text>
-            <text x={comp.x + 6} y={comp.y + (2 * h) / 3 + 4} fontSize="9" fill="#888" transform={counterRotateLabel()}>B</text>
-            <text x={comp.x + w - 12} y={comp.y + h / 3 + 4} fontSize="9" fill="#888" transform={counterRotateLabel()}>S</text>
-            <text x={comp.x + w - 12} y={comp.y + (2 * h) / 3 + 4} fontSize="9" fill="#888" transform={counterRotateLabel()}>C</text>
+            <text x={comp.x + 6} y={comp.y + h / 3 + 4} fontSize="9" fill={C.dim} transform={counterRotateLabel()}>A</text>
+            <text x={comp.x + 6} y={comp.y + (2 * h) / 3 + 4} fontSize="9" fill={C.dim} transform={counterRotateLabel()}>B</text>
+            <text x={comp.x + w - 12} y={comp.y + h / 3 + 4} fontSize="9" fill={C.dim} transform={counterRotateLabel()}>S</text>
+            <text x={comp.x + w - 12} y={comp.y + (2 * h) / 3 + 4} fontSize="9" fill={C.dim} transform={counterRotateLabel()}>C</text>
           </g>
         );
 
@@ -652,7 +659,7 @@ function CircuitComponentView({
         const arrowInset = 12; // distance from block edge to arrow tip
         // Shift the whole arrow+value group when resolved so it stays visually centered
         const groupShift = !dir ? 0 : dir === 'left-to-right' ? 4 : -4;
-        const arrowColor = dir ? '#555' : '#bbb';
+        const arrowColor = dir ? C.ink2 : C.faint;
         // Determine arrow directions:
         // Undecided: both arrows point outward (← val →)
         // left-to-right: both point right (→ val →)
@@ -684,9 +691,9 @@ function CircuitComponentView({
               width={w}
               height={h}
               rx={8}
-              fill={isSelected ? '#e3f2fd' : '#f5f5f5'}
-              stroke={isSelected ? '#2a7fff' : '#333'}
-              strokeWidth={isSelected ? 2 : 1.5}
+              fill={isSelected ? C.selectFill : C.quiet}
+              stroke={bodyStroke}
+              strokeWidth={bodyStrokeW}
             />
             {/* Name label — bold, off the local top side. The anchor rotates
                 with the component (componentGeometry.getLabelAnchor), so a
@@ -703,8 +710,7 @@ function CircuitComponentView({
                   textAnchor={anchor.textAnchor}
                   dominantBaseline={anchor.dominantBaseline}
                   fontSize="12"
-                  fill="#333"
-                  fontWeight="700"
+                  fill={C.ink}
                   transform={counterRotateLabel()}
                 >
                   {comp.label}
@@ -724,12 +730,11 @@ function CircuitComponentView({
             {/* Stored value — centered, prominent */}
             <text
               x={cx}
-              y={cy + 5}
+              y={cy + 1}
               textAnchor="middle"
-              fontSize="14"
-              fontFamily="monospace"
-              fontWeight="700"
-              fill={storedVal === 1 ? '#e53935' : '#333'}
+              dominantBaseline="central"
+              fontSize="16"
+              fill={signalColor(C, storedVal)}
               transform={counterRotateLabel()}
             >
               {valDisplay}
@@ -757,18 +762,17 @@ function CircuitComponentView({
               width={w}
               height={h}
               rx={4}
-              fill={isSelected ? '#e3f2fd' : 'white'}
-              stroke={isSelected ? '#2a7fff' : '#333'}
-              strokeWidth={2}
+              fill={isSelected ? C.selectFill : C.quiet}
+              stroke={bodyStroke}
+              strokeWidth={bodyStrokeW}
             />
             <text
               x={cx}
               y={cy}
               textAnchor="middle"
               dominantBaseline="central"
-              fontSize="12"
-              fontWeight="600"
-              fill="#333"
+              fontSize="13"
+              fill={C.ink}
               transform={counterRotateLabel()}
             >
               {comp.label}
@@ -778,14 +782,14 @@ function CircuitComponentView({
 
       case 'STATE': {
         const isCurrentState = liveFsmStateId === comp.id;
-        const strokeColor = isCurrentState ? '#4caf50' : isSelected ? '#2a7fff' : '#333';
+        const strokeColor = isCurrentState ? C.live : isSelected ? C.select : C.ink;
 
         const ringR = STATE_RADIUS + 7;
         // Turbot-TM convention (textbook): external states draw as squares,
         // internal states as circles. stateKind is only ever set on turbot-TM
         // states, so plain FSM/TM machines are unaffected.
         const isExternal = comp.stateKind === 'external';
-        const stateFill = isCurrentState ? '#e8f5e9' : isSelected ? '#e3f2fd' : 'white';
+        const stateFill = isCurrentState ? C.liveSoft : isSelected ? C.selectFill : C.surface;
         return (
           <g>
             {/* Outer ring — wire-creation zone affordance */}
@@ -822,8 +826,7 @@ function CircuitComponentView({
               textAnchor="middle"
               dominantBaseline="central"
               fontSize="16"
-              fontWeight="700"
-              fill="#333"
+              fill={C.ink}
               pointerEvents="none"
             >
               {comp.label}
@@ -840,9 +843,9 @@ function CircuitComponentView({
             width={w}
             height={h}
             rx={4}
-            fill={isSelected ? '#e3f2fd' : 'white'}
-            stroke={isSelected ? '#2a7fff' : '#333'}
-            strokeWidth={1.5}
+            fill={bodyFill}
+            stroke={bodyStroke}
+            strokeWidth={bodyStrokeW}
           />
         );
     }
@@ -880,8 +883,8 @@ function CircuitComponentView({
               cx={x}
               cy={y}
               r={2.5}
-              fill="#888"
-              stroke="white"
+              fill={C.dim}
+              stroke={C.surface}
               strokeWidth={1}
               pointerEvents="none"
             />
@@ -910,9 +913,7 @@ function CircuitComponentView({
                 cx={pos.x}
                 cy={pos.y}
                 r={PORT_RADIUS}
-                fill="#bbb"
-                stroke="#000"
-                strokeWidth={1}
+                fill={signalColor(C, portValues?.get(`${comp.id}:${port.id}`))}
                 pointerEvents="none"
               />
             </g>
@@ -963,9 +964,11 @@ function WireView({
   usedFallback?: boolean;
   violation?: string;
 }) {
+  const C = canvasColors();
   const isBlankWire = wire.value === -1;
-  const color = isBlankWire ? '#333' : wire.value === 1 ? '#e53935' : '#333';
-  const strokeW = isSelected ? 3 : 2;
+  // A wire is 2px in its signal's colour, selected or not (black = 0, red =
+  // 1); a selected wire gets a lavender halo under it.
+  const color = signalColor(C, isBlankWire ? 0 : wire.value);
   const valStr = isBlankWire ? '' : String(wire.value);
 
   // Route-quality indicator (warn, don't block — wire-routing design memo):
@@ -994,7 +997,7 @@ function WireView({
         <path
           d={pathD}
           fill="none"
-          stroke="#f5a623"
+          stroke={C.warn}
           strokeWidth={6}
           strokeDasharray="4,6"
           strokeLinejoin="round"
@@ -1004,11 +1007,23 @@ function WireView({
           data-wire-violation={wire.id}
         />
       )}
+      {isSelected && (
+        <path
+          d={pathD}
+          fill="none"
+          stroke={C.halo}
+          strokeWidth={8}
+          strokeLinejoin="round"
+          strokeLinecap="round"
+          pointerEvents="none"
+          data-wire-halo={wire.id}
+        />
+      )}
       <path
         d={pathD}
         fill="none"
-        stroke={isSelected ? '#2a7fff' : color}
-        strokeWidth={strokeW}
+        stroke={color}
+        strokeWidth={2}
         strokeLinejoin="round"
         strokeLinecap="round"
         pointerEvents="none"
@@ -1062,8 +1077,8 @@ function WireView({
         // Determine annotation positions from actual wire stub direction.
         // pathPoints[0]=port, [1]=stub tip tells us the source direction;
         // pathPoints[len-1]=port, [len-2]=stub tip tells us the target direction.
-        const valFill = wire.value === 1 ? '#e53935' : '#888';
-        const fontProps = { fontSize: 10, fontFamily: "'SF Mono', 'Fira Code', monospace", fontWeight: 600, fill: valFill, pointerEvents: 'none' as const };
+        const valFill = wire.value === 1 ? C.signal1 : C.dim;
+        const fontProps = { fontSize: 10, fill: valFill, pointerEvents: 'none' as const };
 
         // Source annotation: placed just past the stub tip
         const srcDx = pathPoints.length >= 2 ? pathPoints[1].x - pathPoints[0].x : 1;
@@ -1166,7 +1181,8 @@ function FsmTransitionView({
   const parsedLabel = notation.parse(wire.transitionLabel);
   const displayLeft = parsedLabel?.input;
   const displayRight = parsedLabel ? parsedLabel.outputs.join(outputSep) : undefined;
-  const color = isSelected ? '#2a7fff' : '#333';
+  const C = canvasColors();
+  const color = isSelected ? C.select : C.ink;
 
   useEffect(() => {
     if (editing && editorRef.current) {
@@ -1352,7 +1368,7 @@ function FsmTransitionView({
           cx={controlPt.x}
           cy={controlPt.y}
           r={4}
-          fill={dragging ? '#2a7fff' : 'white'}
+          fill={dragging ? C.select : C.surface}
           stroke={color}
           strokeWidth={1.5}
           style={{ cursor: 'move' }}
@@ -1373,11 +1389,11 @@ function FsmTransitionView({
           return (
             <g>
               <rect x={x0} y={y0} width={W} height={H} rx={3}
-                fill="white" fillOpacity={0.92} stroke="#ddd" strokeWidth={0.5} pointerEvents="none" />
+                fill={C.surface} fillOpacity={0.92} stroke={C.line2} strokeWidth={0.5} pointerEvents="none" />
               <rect x={x0} y={y0} width={W} height={H} rx={3} fill="transparent" style={{ cursor: 'text' }}
                 onClick={(e) => { e.stopPropagation(); openEdit(0); }} />
               <text x={labelPos.x} y={labelPos.y} textAnchor="middle" dominantBaseline="central"
-                fontSize="12" fontFamily="'SF Mono','Fira Code',monospace" fontWeight="600"
+                fontSize="12"
                 fill={color} pointerEvents="none">{label}</text>
             </g>
           );
@@ -1395,7 +1411,7 @@ function FsmTransitionView({
           <g>
             {/* Background */}
             <rect x={x0} y={y0} width={W} height={H} rx={3}
-              fill="white" fillOpacity={0.92} stroke="#ddd" strokeWidth={0.5} pointerEvents="none" />
+              fill={C.surface} fillOpacity={0.92} stroke={C.line2} strokeWidth={0.5} pointerEvents="none" />
             {/* Left half (input) — click target */}
             <rect x={x0} y={y0} width={leftW} height={H} rx={3} fill="transparent" style={{ cursor: 'text' }}
               onClick={(e) => { e.stopPropagation(); openEdit(0); }} />
@@ -1404,14 +1420,14 @@ function FsmTransitionView({
               onClick={(e) => { e.stopPropagation(); openEdit(1); }} />
             {/* Input symbol */}
             <text x={x0 + leftW / 2} y={labelPos.y} textAnchor="middle" dominantBaseline="central"
-              fontSize="12" fontFamily="'SF Mono','Fira Code',monospace" fontWeight="600"
+              fontSize="12"
               fill={color} pointerEvents="none">{displayLeft}</text>
             {/* Separator */}
             <line x1={sepX} y1={y0 + 3} x2={sepX} y2={y0 + H - 3}
-              stroke="#ccc" strokeWidth={1} pointerEvents="none" />
+              stroke={C.line2} strokeWidth={1} pointerEvents="none" />
             {/* Output symbol(s) */}
             <text x={sepX + rightW / 2} y={labelPos.y} textAnchor="middle" dominantBaseline="central"
-              fontSize="12" fontFamily="'SF Mono','Fira Code',monospace" fontWeight="600"
+              fontSize="12"
               fill={color} pointerEvents="none">{displayRight}</text>
           </g>
         );
@@ -1434,9 +1450,9 @@ function FsmTransitionView({
               alignItems: 'stretch',
               width: '100%',
               height: '100%',
-              border: '1.5px solid #2a7fff',
+              border: `1.5px solid ${canvasVar('select')}`,
               borderRadius: 4,
-              background: 'white',
+              background: canvasVar('surface'),
               boxSizing: 'border-box',
               outline: 'none',
               overflow: 'hidden',
@@ -1480,11 +1496,12 @@ function FsmTransitionView({
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                background: activeField === 0 ? '#2a7fff' : 'transparent',
-                color: activeField === 0 ? 'white' : '#333',
-                fontFamily: "'SF Mono','Fira Code',monospace",
+                background: activeField === 0 ? canvasVar('select') : 'transparent',
+                color: activeField === 0 ? canvasVar('surface') : canvasVar('ink'),
+                fontFamily: 'var(--mm-font-sans)',
+                fontVariantNumeric: 'tabular-nums',
                 fontSize: 14,
-                fontWeight: 700,
+                fontWeight: 600,
                 cursor: 'default',
                 userSelect: 'none',
               }}
@@ -1496,7 +1513,7 @@ function FsmTransitionView({
             {/* Separator */}
             <div style={{
               width: 1, alignSelf: 'stretch', margin: '5px 1px',
-              background: '#ccc', flexShrink: 0,
+              background: canvasVar('line2'), flexShrink: 0,
             }} />
             {/* Output half — every output field's characters in sequence,
                 with the notation's separator between fields (a TM's
@@ -1515,11 +1532,12 @@ function FsmTransitionView({
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                background: activeField > 0 ? '#2a7fff' : 'transparent',
-                color: activeField > 0 ? 'white' : '#333',
-                fontFamily: "'SF Mono','Fira Code',monospace",
+                background: activeField > 0 ? canvasVar('select') : 'transparent',
+                color: activeField > 0 ? canvasVar('surface') : canvasVar('ink'),
+                fontFamily: 'var(--mm-font-sans)',
+                fontVariantNumeric: 'tabular-nums',
                 fontSize: 14,
-                fontWeight: 700,
+                fontWeight: 600,
                 cursor: 'default',
                 userSelect: 'none',
               }}
@@ -1564,6 +1582,7 @@ function BoxView({
 }) {
   const removeConfirmedBox = useStore((s) => s.removeConfirmedBox);
   const [hovered, setHovered] = useState(false);
+  const C = canvasColors();
   // Box names are part of the graded circuit: the rename wears the provenance
   // guard like every assignment answer field (law 8).
   const { ref: pasteGuardRef } = usePasteGuard(onNotice);
@@ -1597,8 +1616,9 @@ function BoxView({
         y={box.y}
         width={box.width}
         height={box.height}
-        fill={isDraft ? 'rgba(42, 127, 255, 0.05)' : 'rgba(42, 127, 255, 0.03)'}
-        stroke={isDraft ? '#2a7fff' : (isHighlighted ? '#2a7fff' : '#333')}
+        fill={isDraft ? C.selectFill : C.quiet}
+        fillOpacity={isDraft ? 0.35 : 0.5}
+        stroke={isDraft || isHighlighted ? C.select : C.ink}
         strokeWidth={isDraft ? 2 : 2}
         strokeDasharray={isDraft ? '6,3' : undefined}
         rx={4}
@@ -1628,10 +1648,10 @@ function BoxView({
             y1={pos.y}
             x2={pos.x}
             y2={pos.y}
-            stroke="#333"
+            stroke={C.ink}
             strokeWidth={2}
           />
-          <circle cx={pos.x - 8} cy={pos.y} r={3} fill="#555" />
+          <circle cx={pos.x - 8} cy={pos.y} r={3} fill={C.ink2} />
         </g>
       ))}
       {/* Output port indicators (right side) */}
@@ -1642,10 +1662,10 @@ function BoxView({
             y1={pos.y}
             x2={pos.x + 8}
             y2={pos.y}
-            stroke="#333"
+            stroke={C.ink}
             strokeWidth={2}
           />
-          <circle cx={pos.x + 8} cy={pos.y} r={3} fill="#555" />
+          <circle cx={pos.x + 8} cy={pos.y} r={3} fill={C.ink2} />
         </g>
       ))}
       {/* Editable label — double-click to rename confirmed boxes */}
@@ -1674,7 +1694,7 @@ function BoxView({
             }}
             onClick={(e) => e.stopPropagation()}
             onPointerDown={(e) => e.stopPropagation()}
-            style={{ width: '100%', fontSize: 11, fontWeight: 600, border: '1px solid #2a7fff', borderRadius: 2, padding: '0 4px', outline: 'none', fontFamily: 'inherit' }}
+            style={{ width: '100%', fontSize: 11, fontWeight: 600, border: `1px solid ${canvasVar('select')}`, borderRadius: 2, padding: '0 4px', outline: 'none', fontFamily: 'var(--mm-font-sans)' }}
           />
         </foreignObject>
       ) : (
@@ -1696,7 +1716,7 @@ function BoxView({
             y={box.y - 4}
             fontSize="11"
             fontWeight="600"
-            fill={isDraft ? '#2a7fff' : '#333'}
+            fill={isDraft ? C.select : C.ink}
             style={{ cursor: isDraft ? 'default' : 'pointer' }}
             pointerEvents={isDraft ? 'none' : 'auto'}
             data-box-name={isDraft ? undefined : box.id}
@@ -1718,8 +1738,8 @@ function BoxView({
                 y={hy - 5}
                 width={10}
                 height={10}
-                fill="white"
-                stroke="#2a7fff"
+                fill={C.surface}
+                stroke={C.select}
                 strokeWidth={1.5}
                 rx={2}
                 data-box-resize={box.id}
@@ -1739,14 +1759,14 @@ function BoxView({
             removeConfirmedBox(box.id);
           }}
         >
-          <circle cx={box.x + box.width - 8} cy={box.y + 8} r={7} fill="white" stroke="#ccc" strokeWidth={1} />
+          <circle cx={box.x + box.width - 8} cy={box.y + 8} r={7} fill={C.surface} stroke={C.line2} strokeWidth={1} />
           <text
             x={box.x + box.width - 8}
             y={box.y + 8}
             textAnchor="middle"
             dominantBaseline="central"
             fontSize="10"
-            fill="#888"
+            fill={C.dim}
             pointerEvents="none"
           >
             ×
@@ -1794,23 +1814,8 @@ function NavigationArrow({
     down: '\u2193',
   };
 
-  const posStyle: React.CSSProperties = {
-    position: 'absolute',
-    zIndex: 50,
-    background: 'rgba(42, 127, 255, 0.9)',
-    color: 'white',
-    border: 'none',
-    borderRadius: '50%',
-    width: 36,
-    height: 36,
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    cursor: 'pointer',
-    fontSize: 18,
-    fontWeight: 'bold',
-    boxShadow: '0 2px 8px rgba(0,0,0,0.2)',
-  };
+  // The look is workbench.css .cv-nav; only the edge it sits on is inline.
+  const posStyle: React.CSSProperties = {};
 
   if (direction === 'left') Object.assign(posStyle, { left: 8, top: '50%', transform: 'translateY(-50%)' });
   if (direction === 'right') Object.assign(posStyle, { right: 8, top: '50%', transform: 'translateY(-50%)' });
@@ -1818,7 +1823,7 @@ function NavigationArrow({
   if (direction === 'down') Object.assign(posStyle, { bottom: 8, left: '50%', transform: 'translateX(-50%)' });
 
   return (
-    <button style={posStyle} onClick={onClick} title="Navigate to circuit">
+    <button type="button" className="cv-nav" style={posStyle} onClick={onClick} title="Show the circuit">
       {arrows[direction]}
     </button>
   );
@@ -1867,6 +1872,7 @@ export function CircuitCanvas() {
   const zoom = useStore((s) => s.zoom);
   const panX = useStore((s) => s.panX);
   const panY = useStore((s) => s.panY);
+  const C = canvasColors();
   const showGrid = useStore((s) => s.showGrid);
   const showWireValues = useStore((s) => s.showWireValues);
   const selectedIds = useStore((s) => s.selectedIds);
@@ -3182,29 +3188,78 @@ export function CircuitCanvas() {
   }, [components]);
 
   // ─── Grid ──────────────────────────────────────────────────────
-  const gridPattern = useMemo(() => {
-    if (!showGrid) return null;
-    return (
-      <>
-        <defs>
-          <pattern
-            id="grid-pattern"
-            width={GRID_SIZE}
-            height={GRID_SIZE}
-            patternUnits="userSpaceOnUse"
-          >
-            <path
-              d={`M ${GRID_SIZE} 0 L 0 0 0 ${GRID_SIZE}`}
-              fill="none"
-              stroke="#ddd"
-              strokeWidth={0.5}
-            />
-          </pattern>
-        </defs>
-        <rect x={-4000} y={-4000} width={8000} height={8000} fill="url(#grid-pattern)" />
-      </>
-    );
-  }, [showGrid]);
+  // A dot on every grid point (GRID_SIZE — where parts snap), drawn as the
+  // container's background so it runs to every edge and follows pan and
+  // zoom: one dot per cell, the cell GRID_SIZE × zoom, shifted half a cell
+  // so the dots sit on the grid points, not between them.
+  const gridStyle = useMemo<React.CSSProperties | undefined>(() => {
+    if (!showGrid) return undefined;
+    const cell = GRID_SIZE * zoom;
+    return {
+      backgroundImage: 'radial-gradient(circle, var(--mm-canvas-dot) 1px, transparent 1.2px)',
+      backgroundSize: `${cell}px ${cell}px`,
+      backgroundPosition: `${panX - cell / 2}px ${panY - cell / 2}px`,
+    };
+  }, [showGrid, zoom, panX, panY]);
+
+  // ─── Port colours ──────────────────────────────────────────────
+  // Each port dot wears the colour of the signal on its wire.
+  const portValues = useMemo(() => {
+    const m = new Map<string, number>();
+    for (const w of wires) {
+      if (w.value === -1) continue;
+      m.set(`${w.sourceComponentId}:${w.sourcePortId}`, w.value);
+      m.set(`${w.targetComponentId}:${w.targetPortId}`, w.value);
+    }
+    return m;
+  }, [wires]);
+
+  // ─── Fit ───────────────────────────────────────────────────────
+  // Centre the circuit in the part of the canvas the palette leaves free,
+  // never below 80% (canvasView.ts fitView). A view change only: zoom and
+  // pan, never the circuit, its runs or its history (law 6).
+  const fitCanvas = useCallback(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    const rect = el.getBoundingClientRect();
+    if (rect.width === 0 || rect.height === 0) return;
+    const pal = el.querySelector<HTMLElement>('.pal');
+    const pr = pal?.getBoundingClientRect();
+    const palette = pal && pr && pr.width > 0
+      ? { x: pr.left - rect.left, y: pr.top - rect.top, w: pr.width, h: pr.height, horiz: pal.classList.contains('pal--horiz') }
+      : null;
+    const state = useStore.getState();
+    const view = fitView(circuitBounds(state.components, state.boxes), freeArea({ w: rect.width, h: rect.height }, palette));
+    state.setZoom(view.zoom);
+    state.setPan(view.panX, view.panY);
+  }, []);
+
+  // Every canvas swap — a question or tab change, an opened assignment, a
+  // submission put on show — fits the new canvas: the canvas's response to
+  // the store's swap counter (resetAllSimState bumps it), never a separate
+  // reset of its own. Two frames: the palette measures and settles first.
+  const canvasSwapSeq = useStore((s) => s.canvasSwapSeq);
+  useEffect(() => {
+    let second = 0;
+    const first = requestAnimationFrame(() => {
+      second = requestAnimationFrame(() => fitCanvas());
+    });
+    return () => {
+      cancelAnimationFrame(first);
+      cancelAnimationFrame(second);
+    };
+  }, [canvasSwapSeq, fitCanvas]);
+
+  /** − and +: a zoom step about the canvas's centre. */
+  const zoomStep = useCallback((factor: number) => {
+    const el = containerRef.current;
+    const state = useStore.getState();
+    const w = el?.clientWidth ?? 0;
+    const h = el?.clientHeight ?? 0;
+    const view = zoomAbout(state, factor, w / 2, h / 2);
+    state.setZoom(view.zoom);
+    state.setPan(view.panX, view.panY);
+  }, []);
 
   // ─── Wire data ref (for event handlers that need current wire paths) ──
   const wireDataRef = useRef<Map<string, { pathD: string; points: { x: number; y: number }[]; basePoints: { x: number; y: number }[]; crossings: { x: number; y: number }[]; from: { x: number; y: number }; to: { x: number; y: number }; isFsmTransition?: boolean; labelPos?: { x: number; y: number }; usedFallback?: boolean; violation?: string }>>(new Map());
@@ -3559,10 +3614,10 @@ export function CircuitCanvas() {
         cx={p.x}
         cy={p.y}
         r={SPLIT_DOT_RADIUS}
-        fill="#333"
+        fill={C.ink}
       />
     ));
-  }, [wires, wireData]);
+  }, [wires, wireData, C]);
 
   // ─── Box highlighting (inputs/outputs crossing boundary) ───────
   const draftBox = boxDrawing.draftBox;
@@ -3600,6 +3655,7 @@ export function CircuitCanvas() {
     <div
       className="canvas-container"
       ref={containerRef}
+      style={gridStyle}
     >
       {/* Ready to Box button */}
       {draftBox && boxDrawing.phase === 'adjusting' && (
@@ -3613,8 +3669,8 @@ export function CircuitCanvas() {
           }}
         >
           <button
-            className="toolbar-btn"
-            style={{ background: '#2a7fff', color: 'white', borderColor: '#2a7fff', fontSize: 11, padding: '4px 10px' }}
+            type="button"
+            className="cv-btn cv-btn--primary"
             onClick={() => {
               const error = useStore.getState().confirmBox(draftBox.id);
               if (error) {
@@ -3627,8 +3683,8 @@ export function CircuitCanvas() {
             Ready to Box
           </button>
           <button
-            className="toolbar-btn"
-            style={{ fontSize: 11, padding: '4px 8px', marginLeft: 4 }}
+            type="button"
+            className="cv-btn"
             onClick={() => {
               useStore.getState().removeBox(draftBox.id);
               useStore.getState().setBoxDrawingPhase('idle');
@@ -3678,7 +3734,6 @@ export function CircuitCanvas() {
         }}
       >
         <g transform={`translate(${panX}, ${panY}) scale(${zoom})`}>
-          {gridPattern}
 
           {/* Confirmed boxes */}
           {boxes.filter((b) => b.name && b.id !== draftBox?.id).map((box) => (
@@ -3709,8 +3764,9 @@ export function CircuitCanvas() {
               y={drawBoxPreview.y}
               width={drawBoxPreview.w}
               height={drawBoxPreview.h}
-              fill="rgba(42, 127, 255, 0.05)"
-              stroke="#2a7fff"
+              fill={C.selectFill}
+              fillOpacity={0.35}
+              stroke={C.select}
               strokeWidth={2}
               strokeDasharray="6,3"
               rx={4}
@@ -3770,7 +3826,7 @@ export function CircuitCanvas() {
                   cy={pos.y}
                   r={6}
                   fill="none"
-                  stroke="#ff9800"
+                  stroke={C.warn}
                   strokeWidth={2}
                   pointerEvents="none"
                 />
@@ -3785,9 +3841,9 @@ export function CircuitCanvas() {
               y1={wirePreview.fromY}
               x2={wirePreview.toX}
               y2={wirePreview.toY}
-              stroke="#2a7fff"
-              strokeWidth={1.5}
-              strokeDasharray="6,3"
+              stroke={C.select}
+              strokeWidth={2}
+              strokeDasharray="5,4"
               pointerEvents="none"
             />
           )}
@@ -3799,8 +3855,9 @@ export function CircuitCanvas() {
               y={boxSelect.y1}
               width={boxSelect.x2 - boxSelect.x1}
               height={boxSelect.y2 - boxSelect.y1}
-              fill="rgba(42, 127, 255, 0.1)"
-              stroke="#2a7fff"
+              fill={C.selectFill}
+              fillOpacity={0.5}
+              stroke={C.select}
               strokeWidth={1}
               strokeDasharray="4,4"
               pointerEvents="none"
@@ -3816,7 +3873,7 @@ export function CircuitCanvas() {
                 y1={guide.start}
                 x2={guide.pos}
                 y2={guide.end}
-                stroke="#4db8ff"
+                stroke={C.guide}
                 strokeWidth={1}
                 strokeDasharray="4,2"
                 pointerEvents="none"
@@ -3828,7 +3885,7 @@ export function CircuitCanvas() {
                 y1={guide.pos}
                 x2={guide.end}
                 y2={guide.pos}
-                stroke="#4db8ff"
+                stroke={C.guide}
                 strokeWidth={1}
                 strokeDasharray="4,2"
                 pointerEvents="none"
@@ -3843,7 +3900,7 @@ export function CircuitCanvas() {
               y1={wireSegmentViolation.y1}
               x2={wireSegmentViolation.x2}
               y2={wireSegmentViolation.y2}
-              stroke="#e53935"
+              stroke={C.danger}
               strokeWidth={4}
               strokeDasharray="6,3"
               opacity={0.7}
@@ -3857,6 +3914,7 @@ export function CircuitCanvas() {
               key={comp.id}
               comp={comp}
               isSelected={selectedIds.includes(comp.id)}
+              portValues={portValues}
             />
           ))}
 
@@ -3894,39 +3952,17 @@ export function CircuitCanvas() {
       {/* Undo · Redo · Delete · Rotate · Clear — top-right corner */}
       <CanvasActions />
 
-      {/* Zoom control — bottom-right corner */}
-      <div className="zoom-control">
-        <button
-          className="zoom-btn"
-          onClick={() => useStore.getState().setZoom(zoom - 0.1)}
-          title="Zoom out"
-        >
-          −
-        </button>
-        <input
-          type="range"
-          className="zoom-slider"
-          min={0.2}
-          max={3}
-          step={0.05}
-          value={zoom}
-          onChange={(e) => useStore.getState().setZoom(parseFloat(e.target.value))}
-          title={`${Math.round(zoom * 100)}%`}
-        />
-        <button
-          className="zoom-btn"
-          onClick={() => useStore.getState().setZoom(zoom + 0.1)}
-          title="Zoom in"
-        >
-          +
-        </button>
-        <button
-          className="zoom-pct"
-          onClick={() => useStore.getState().setZoom(1)}
-          title="Reset to 100%"
-        >
+      {/* The hint line (bottom-left) and the empty canvas's message */}
+      <CanvasGuide />
+
+      {/* Zoom — bottom-right: − · % · + · Fit */}
+      <div className="cv-zoom" role="group" aria-label="Zoom">
+        <button type="button" onClick={() => zoomStep(1 / ZOOM_STEP)} title="Zoom out" aria-label="Zoom out">−</button>
+        <button type="button" className="cv-zoom-pct" onClick={() => zoomStep(1 / zoom)} title="Back to 100%">
           {Math.round(zoom * 100)}%
         </button>
+        <button type="button" onClick={() => zoomStep(ZOOM_STEP)} title="Zoom in" aria-label="Zoom in">+</button>
+        <button type="button" onClick={fitCanvas} title="Show the whole circuit">Fit</button>
       </div>
     </div>
   );

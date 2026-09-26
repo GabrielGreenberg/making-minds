@@ -2115,6 +2115,40 @@ console.log('[canvas gestures]');
     /\.cv-hint\s*\{[^}]*color:\s*var\(--mm-ink-3\)/.test(css));
 }
 
+// Task 055: the view is not the canvas. Every canvas swap bumps the store's
+// canvasSwapSeq (the canvas answers it with Fit); zooming and panning — what
+// Fit writes — never touch the circuit, its history or its runs (law 6).
+console.log('[view: Fit is a view change, never a reset]');
+{
+  await useStore.getState().openAssignment(SAMPLE_ASSIGNMENT_ID);
+  useStore.getState().switchQuestion(0);
+  if (useStore.getState().questionCircuits.get(useStore.getState().assignment!.questions[0].id)?.done) {
+    useStore.getState().toggleCurrentQuestionDone();
+  }
+  const seq0 = useStore.getState().canvasSwapSeq;
+  useStore.getState().switchQuestion(1);
+  check('a question change bumps canvasSwapSeq (the canvas fits the new one)', useStore.getState().canvasSwapSeq === seq0 + 1);
+  useStore.getState().switchQuestion(0);
+  useStore.getState().addComponent('AND', 80, 80);
+  const undoBefore = useStore.getState().undoStack.length;
+  const redoBefore = useStore.getState().redoStack.length;
+  const comps = useStore.getState().components;
+  const wiresBefore = useStore.getState().wires;
+  const seq1 = useStore.getState().canvasSwapSeq;
+  useStore.getState().setZoom(0.8);
+  useStore.getState().setPan(123, -45);
+  const st = useStore.getState();
+  check('zoom and pan leave the circuit, its undo/redo and the swap counter alone',
+    st.components === comps && st.wires === wiresBefore && st.undoStack.length === undoBefore &&
+      st.redoStack.length === redoBefore && st.canvasSwapSeq === seq1 && st.zoom === 0.8 && st.panX === 123 && st.panY === -45);
+  useStore.getState().setZoom(0.1);
+  const lo = useStore.getState().zoom;
+  useStore.getState().setZoom(40);
+  check('setZoom clamps to the one range (25%–300%)', lo === 0.25 && useStore.getState().zoom === 3);
+  useStore.getState().setZoom(1);
+  useStore.getState().undo();
+}
+
 await flushTimers();
 console.log(`\nnavResetCheck: ${passed} passed, ${failed} failed`);
 process.exit(failed > 0 ? 1 : 0);
