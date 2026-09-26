@@ -167,6 +167,8 @@ console.log('\n[one frame]');
   const panel = code('components/QuestionPanel.tsx');
   check('the done mark goes through the store\'s toggle (the lock stays the store\'s, law 3)',
     /toggleCurrentQuestionDone/.test(panel) && !/isCurrentQuestionLocked/.test(panel));
+  check('the done mark is a checkbox-role button, not an <input> (the canvas\'s shortcuts stand down while an input has focus)',
+    /role="checkbox"/.test(panel) && !/<input\b/.test(panel));
   check('navigation goes through navigate() with the viewed attempt carried along',
     /navigate\(\{ kind: 'assignment', id: assignment\.id, attempt, questionIndex: i \}, \{ replace: true \}\)/.test(panel));
 }

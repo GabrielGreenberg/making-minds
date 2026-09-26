@@ -256,5 +256,8 @@ where they differ.
   - Remote mode (a dev-login server on a scratch DB): HW1 opens; a failed PUT shows "Not
     saved — retrying".
   - Screenshots: `tasks/attachments/2026-09-25-052-{1..5}.png`.
+- **Review fix.** The done mark is a `role="checkbox"` button, not an `<input>`. The canvas's
+  shortcuts stand down while an input has focus, so a checkbox left Delete and ⌘Z dead after
+  the click; this was proved in headless Chrome and is pinned in workbenchCheck.
 - **Next:** 053 (the output panel re-homes the toolbar's Rotate, Clear, Swap and "Current
   state" readout, then deletes `SimulationToolbar`).

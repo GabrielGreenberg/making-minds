@@ -174,13 +174,15 @@ function DoneMark({ questionId }: { questionId: number }) {
   const done = useStore((s) => s.questionCircuits.get(questionId)?.done ?? false);
   const toggle = useStore((s) => s.toggleCurrentQuestionDone);
   if (showing) return null;
+  // A button with checkbox semantics, not an <input>: the canvas's keyboard
+  // shortcuts stand down while an input has focus, so a checkbox would leave
+  // Delete and ⌘Z dead after the click.
   return (
     <div className="qp-done">
-      <label className="qp-done-label">
-        <input type="checkbox" className="qp-done-input" checked={done} onChange={() => toggle()} />
-        <span className="qp-done-box" aria-hidden>{done ? '✓' : ''}</span>
+      <button type="button" role="checkbox" aria-checked={done} className="qp-done-label" onClick={() => toggle()}>
+        <span className={done ? 'qp-done-box qp-done-box--on' : 'qp-done-box'} aria-hidden>{done ? '✓' : ''}</span>
         I'm done with this question
-      </label>
+      </button>
       {done && <div className="qp-done-note">🔒 Locked against edits — uncheck to keep working.</div>}
     </div>
   );

@@ -201,17 +201,17 @@ a.wb-brand:hover { color: var(--mm-accent); text-decoration: none; }
 .qp-disclosure-body { margin-top: 8px; display: flex; flex-direction: column; gap: 8px; }
 
 /* The done mark: the student's own, and still a lock (store.ts). */
-.qp-done-label {
-  display: inline-flex; align-items: center; gap: 10px; min-height: 32px; cursor: pointer;
-  font-size: var(--mm-fs-small); color: var(--mm-ink-2);
+.qp .qp-done-label {
+  display: inline-flex; align-items: center; gap: 10px; min-height: 32px; padding: 0; cursor: pointer;
+  border: 0; background: none; font: inherit; font-size: var(--mm-fs-small); color: var(--mm-ink-2); text-align: left;
 }
-.qp-done-input { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
+.qp .qp-done-label:focus-visible { outline: none; }
 .qp-done-box {
   width: 18px; height: 18px; flex-shrink: 0; display: grid; place-items: center;
   border: 1px solid var(--mm-edge-2); background: var(--mm-surface); color: var(--mm-surface); font-size: 12px; line-height: 1;
 }
-.qp-done-input:checked + .qp-done-box { background: var(--mm-accent); border-color: var(--mm-accent); }
-.qp-done-input:focus-visible + .qp-done-box { outline: 2px solid var(--mm-focus); outline-offset: 1px; }
+.qp-done-box--on { background: var(--mm-accent); border-color: var(--mm-accent); }
+.qp-done-label:focus-visible .qp-done-box { outline: 2px solid var(--mm-focus); outline-offset: 1px; }
 .qp-done-note { margin: 2px 0 0 28px; font-size: var(--mm-fs-meta); color: var(--mm-ink-3); }
 
 /* The homework's questions, grouped by section. */
