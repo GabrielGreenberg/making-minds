@@ -177,6 +177,23 @@ console.log('\n[edited]');
     homeworkContentHash(d.getAssignment('hw3')!) === homeworkContentHash(byId.get('hw3')!.assignment));
 }
 
+console.log('\n[due date]');
+{
+  const d = freshDb();
+  syncHomeworks(d, { lineage: noLineage });
+  check('an inserted copy carries the repo due date', d.getAssignment('hw1')!.dueDate === byId.get('hw1')!.assignment.dueDate);
+  const { dueDate: _dropped, ...undated } = d.getAssignment('hw1')!;
+  d.saveAssignment({ ...undated, order: 2 });
+  d.saveAssignment({ ...d.getAssignment('hw2')!, dueDate: '2026-10-20T06:59:00.000Z' });
+  const steps = syncHomeworks(d, { lineage: noLineage });
+  const s1 = steps.find((s) => s.id === 'hw1')!;
+  check('an undated current copy gets the repo due date, keeping its order',
+    s1.action === 'refresh' && s1.matched === 'due date' &&
+      d.getAssignment('hw1')!.dueDate === byId.get('hw1')!.assignment.dueDate && d.getAssignment('hw1')!.order === 2);
+  check('a due date set on the deployment is kept',
+    steps.find((s) => s.id === 'hw2')!.action === 'unchanged' && d.getAssignment('hw2')!.dueDate === '2026-10-20T06:59:00.000Z');
+}
+
 // ── git lineage ───────────────────────────────────────────────────
 console.log('\n[git lineage]');
 {

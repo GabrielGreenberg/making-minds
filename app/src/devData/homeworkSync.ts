@@ -17,7 +17,8 @@
 //
 // "Content" is the assignment minus the fields the deployment owns: the
 // dashboard's `order` and the instructor's `dueDate`. They are ignored when
-// comparing and carried over by a refresh. Publish and release flags are not
+// comparing and carried over by a refresh; a copy that has no due date takes
+// the repo's. Publish and release flags are not
 // in the JSON at all (they are store-level flags), so no sync can touch them.
 
 import type { AssignmentData } from '../types';
@@ -104,7 +105,12 @@ export function planHomeworkSync(
     const copy = current(a.id);
     if (!copy) return { ...base, action: 'insert', next: { ...a } };
     const currentHash = homeworkContentHash(copy);
-    if (currentHash === repoHash) return { ...base, action: 'unchanged', currentHash };
+    if (currentHash === repoHash) {
+      if (copy.dueDate === undefined && a.dueDate !== undefined) {
+        return { ...base, action: 'refresh', currentHash, matched: 'due date', next: withInstructorOwned(a, copy) };
+      }
+      return { ...base, action: 'unchanged', currentHash };
+    }
     const matched = known(a.id, currentHash) ?? (force.has(a.id) ? 'forced' : undefined);
     if (matched) return { ...base, action: 'refresh', currentHash, matched, next: withInstructorOwned(a, copy) };
     return { ...base, action: 'edited', currentHash };
@@ -118,7 +124,9 @@ export function describeSyncStep(step: SyncStep, planned = false): string {
   switch (step.action) {
     case 'insert': return `${step.id}: ${will('added', 'would be added')} (unpublished)`;
     case 'unchanged': return `${step.id}: already current`;
-    case 'refresh': return `${step.id}: ${will('refreshed', 'would be refreshed')} from the repo (${step.matched === 'forced' ? 'forced' : `the copy was the ${step.matched} version`})`;
+    case 'refresh':
+      if (step.matched === 'due date') return `${step.id}: ${will('due date set', 'due date would be set')} from the repo`;
+      return `${step.id}: ${will('refreshed', 'would be refreshed')} from the repo (${step.matched === 'forced' ? 'forced' : `the copy was the ${step.matched} version`})`;
     case 'edited': return `${step.id}: left as is — edited here since it was loaded`;
   }
 }
