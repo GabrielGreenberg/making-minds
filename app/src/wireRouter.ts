@@ -226,6 +226,15 @@ function getStubEndpoint(port: Point, dir: Dir): Point {
  *  violation, much worse than a bumped crossing but not overlap-grade. */
 const UNDRAWABLE_CROSSING_FACTOR = 10;
 
+/** How many rip-up-and-reroute rounds the validation pass may take. The
+ *  rip-up converges, but not always in 2: a wire hugging a column of target
+ *  gates runs on the column's margin line, ELEMENT_MARGIN = CROSSING_BUMP_RADIUS
+ *  from the ports, where every approach it crosses is bump-undrawable, and
+ *  moving it can push a neighbour into the same corridor for a round
+ *  (task 056's geometry needed 4 on hw2-p11 and hw3-p9; 3 is mid-swap). Every
+ *  reference fixture is bump-clean at 4 — bumpCheck pins it. */
+const VALIDATION_ROUNDS = 4;
+
 /** Count perpendicular crossings between a segment and existing segments,
  *  weighted: a crossing in the bump-undrawable band of an EXISTING
  *  horizontal segment (whose extent is known) counts
@@ -1160,12 +1169,13 @@ export function routeAllWires(
 
   // ─── Validation pass (§7.1): check all wires for hard constraint violations ───
   // Re-route any wire whose path violates H1 (overlap), H2 (element crossing),
-  // H3 (shared bend), or H4 (bump-undrawable crossing). Cap at 2 rounds to
-  // bound computation time. H4 conflicts accumulate per wire across rounds
-  // and feed back into the re-route as overlap-priced avoid points
-  // (rip-up-and-reroute memory — see aStarSearch).
+  // H3 (shared bend), or H4 (bump-undrawable crossing). Capped at
+  // VALIDATION_ROUNDS to bound computation time; a clean round ends it early,
+  // so the cap costs only a circuit that still has a violation. H4 conflicts
+  // accumulate per wire across rounds and feed back into the re-route as
+  // overlap-priced avoid points (rip-up-and-reroute memory — see aStarSearch).
   const avoidByWire = new Map<string, Point[]>();
-  for (let round = 0; round < 2; round++) {
+  for (let round = 0; round < VALIDATION_ROUNDS; round++) {
     let anyRerouted = false;
     for (const item of indexedInputs) {
       const result = results[item.index];

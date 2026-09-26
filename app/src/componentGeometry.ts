@@ -21,10 +21,8 @@
  * every rendered-size or port-math change HERE.
  */
 
-import type { CircuitComponent } from './types';
+import type { CircuitComponent, ComponentType } from './types';
 import {
-  COMP_WIDTH,
-  COMP_HEIGHT,
   INPUT_OUTPUT_SIZE,
   STATE_RADIUS,
   STATE_SIZE,
@@ -43,24 +41,50 @@ export const INPUT_TOGGLE_H = 20;
 /** The strokeW/2 seam between tab and body at rest (unselected stroke 1.5). */
 const INPUT_TOGGLE_SEAM = 0.75;
 
+// ─── The size table ───────────────────────────────────────────────────
+// Every part's body (w × h, unrotated canvas px), by type — the ONE table
+// (task 056; the design memo's gate geometry). A Record, so every type is
+// named once and none falls to a silent default. AND and OR are 60×60 and
+// NOT 50×60, with their ports on the 10px half-grid (in 20/40, out 30);
+// XOR, HA, MEM and STATE keep their sizes until the machine-types session.
+// A placed box has no fixed size: it is sized to its ports (boxSize).
+export const PART_SIZE: Record<Exclude<ComponentType, 'BOXED'>, { w: number; h: number }> = {
+  INPUT: { w: INPUT_OUTPUT_SIZE, h: INPUT_OUTPUT_SIZE },
+  OUTPUT: { w: INPUT_OUTPUT_SIZE, h: INPUT_OUTPUT_SIZE },
+  AND: { w: 60, h: 60 },
+  OR: { w: 60, h: 60 },
+  NOT: { w: 50, h: 60 },
+  XOR: { w: 75, h: 70 },
+  HA: { w: 75, h: 80 },
+  MEM: { w: 50, h: 50 },
+  STATE: { w: STATE_SIZE, h: STATE_SIZE },
+};
+
+/** A placed box's ports are this far apart, centred on each side. */
+export const BOX_PORT_PITCH = 20;
+/** A placed box is this wide… */
+export const BOX_WIDTH = 100;
+/** …and tall enough for its busier side: max(nIn, nOut, 2) · 20 + 20. */
+export function boxSize(nIn: number, nOut: number): { w: number; h: number } {
+  return { w: BOX_WIDTH, h: Math.max(nIn, nOut, 2) * BOX_PORT_PITCH + BOX_PORT_PITCH };
+}
+
+/** Where an OR's curved back face meets its input rows: the stubs drawn
+ *  from the ports (on the body's left edge) to the curve are this long. */
+export const OR_STUB = 5.3;
+
 /** Rendered bounding-box size for a component (unrotated, in canvas px). */
 export function getComponentSize(comp: CircuitComponent): { w: number; h: number } {
-  if (comp.type === 'INPUT' || comp.type === 'OUTPUT') {
-    return { w: INPUT_OUTPUT_SIZE, h: INPUT_OUTPUT_SIZE };
+  if (comp.type === 'BOXED') {
+    let nIn = 0;
+    let nOut = 0;
+    for (const p of comp.ports) {
+      if (p.side === 'left') nIn++;
+      else nOut++;
+    }
+    return boxSize(nIn, nOut);
   }
-  if (comp.type === 'NOT') {
-    return { w: 55, h: 50 };
-  }
-  if (comp.type === 'HA') {
-    return { w: COMP_WIDTH, h: COMP_HEIGHT + 10 };
-  }
-  if (comp.type === 'MEM') {
-    return { w: 50, h: 50 };
-  }
-  if (comp.type === 'STATE') {
-    return { w: STATE_SIZE, h: STATE_SIZE };
-  }
-  return { w: COMP_WIDTH, h: COMP_HEIGHT };
+  return PART_SIZE[comp.type];
 }
 
 /** Unrotated port position (absolute canvas coords). */
@@ -86,16 +110,20 @@ export function getPortPositionLocal(
 
   const { w, h } = getComponentSize(comp);
   const portsOnSide = comp.ports.filter((p) => p.side === port.side);
-  const spacing = h / (portsOnSide.length + 1);
 
   let localX = port.side === 'left' ? 0 : w;
-  const localY = spacing * (port.index + 1);
+  // A placed box: its ports 20 apart, centred on each side (a side with fewer
+  // ports sits in the middle of the taller one). Every other part: the side
+  // divided evenly, which on a 60-tall gate gives 20/40 and 30.
+  const localY = comp.type === 'BOXED'
+    ? h / 2 + (port.index - (portsOnSide.length - 1) / 2) * BOX_PORT_PITCH
+    : (h / (portsOnSide.length + 1)) * (port.index + 1);
 
-  // OR/XOR gates have a curved left face — inset the left ports so they sit
-  // on the drawn curve, not the bounding box edge (XOR's double arc adds 6px).
-  if (port.side === 'left' && (comp.type === 'OR' || comp.type === 'XOR')) {
-    const xorOffset = comp.type === 'XOR' ? 6 : 0;
-    localX = xorOffset + w * 0.07;
+  // XOR's double-arc back face: its left ports sit on the drawn curve, inset
+  // from the box edge. (An OR's ports stay on the edge; the canvas draws a
+  // stub from each to its curve — OR_STUB.)
+  if (port.side === 'left' && comp.type === 'XOR') {
+    localX = 6 + w * 0.07;
   }
 
   return { x: comp.x + localX, y: comp.y + localY };
