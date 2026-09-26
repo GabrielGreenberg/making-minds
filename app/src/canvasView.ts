@@ -152,3 +152,4 @@ export function canvasHint(s: HintState): string | null {
 
 /** The empty canvas's centred message (memo §Canvas). */
 export const EMPTY_CANVAS_MESSAGE = 'Drag parts from the toolbar onto the canvas, or click a part and then click here.';
+export const EMPTY_BOX_MESSAGE = 'Build the box: an IN node for each input, an OUT node for each output, and the parts between them.';

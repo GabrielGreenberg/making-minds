@@ -44,6 +44,7 @@ import {
   type PalettePlacement,
 } from '../palette';
 import { problemNumber } from '../problemSet';
+import { containsCopyOf } from '../boxEditing';
 import { loadUiPrefs, saveUiPref } from '../uiPrefs';
 import { usePasteGuard } from '../usePasteGuard';
 import { usePaletteDrag } from './paletteDrag';
@@ -267,7 +268,11 @@ export function Palette({ canvasW, canvasH }: { canvasW: number; canvasH: number
   const allowed = useStore(selectAllowedComponents);
   const placeableKinds = useStore(selectPlaceableBoxKinds);
   const mayHoldMemory = useStore(selectMayHoldMemory);
-  const library = useStore((s) => s.confirmedBoxLibrary);
+  const fullLibrary = useStore((s) => s.confirmedBoxLibrary);
+  const editingBoxId = useStore((s) => s.boxEditor?.boxId ?? null);
+  const library = editingBoxId
+    ? fullLibrary.filter((b) => b.id !== editingBoxId && !containsCopyOf(b.internalComponents, editingBoxId))
+    : fullLibrary;
   const armedTool = useStore((s) => s.selectedTool);
   const popoutOpen = useStore((s) => s.boxesPopoutOpen);
   const assignment = useStore((s) => s.assignment);
@@ -467,6 +472,12 @@ export function Palette({ canvasW, canvasH }: { canvasW: number; canvasH: number
 
 // ── The Boxes pop-out ───────────────────────────────────────────────────────
 
+function openEditor(boxId: string | null) {
+  const err = useStore.getState().openBoxEditor(boxId);
+  if (err) alert(err);
+  else useStore.getState().setBoxesPopoutOpen(false);
+}
+
 function BoxesPopout({ rows, style, armedTool, onPin, setPinned }: {
   rows: BoxRow[];
   style: React.CSSProperties;
@@ -494,14 +505,13 @@ function BoxesPopout({ rows, style, armedTool, onPin, setPinned }: {
       <div className="pal-pop-foot">
         <button
           type="button"
-          className={`pal-newbox${armedTool === 'NEW_BOX' ? ' pal-newbox--armed' : ''}`}
-          aria-pressed={armedTool === 'NEW_BOX'}
-          title="Draw a rectangle around the parts to box"
-          onClick={() => armToggle('NEW_BOX')}
+          className="pal-newbox"
+          title="Build a new box in the box editor"
+          onClick={() => openEditor(null)}
         >
           New box
         </button>
-        <p className="pal-pop-note">Drag a box onto the toolbar to keep it there.</p>
+        <p className="pal-pop-note">Or select parts on the canvas and press Box. Drag a box onto the toolbar to keep it there.</p>
       </div>
     </div>
   );
@@ -572,6 +582,9 @@ function BoxRowView({ row, armed, onPin, setPinned }: {
           <span className="pal-row-name">
             <span className="pal-row-label">{box.name}</span>
             <span className="pal-row-tools" onPointerDown={stop}>
+              <button type="button" title="Edit what this box does (every copy changes)" aria-label={`Edit ${box.name}`} onClick={(e) => { stop(e); openEditor(box.id); }}>
+                Edit
+              </button>
               <button type="button" title="Rename box" aria-label={`Rename ${box.name}`} onClick={(e) => { stop(e); setEditing(true); }}>
                 ✎
               </button>

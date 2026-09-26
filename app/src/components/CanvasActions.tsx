@@ -6,7 +6,7 @@
 // (law 3); the disabled look only mirrors it.
 
 import { useState } from 'react';
-import { useStore, selectEffectiveMode, selectQuestionLocked } from '../store';
+import { useStore, selectEffectiveMode, selectQuestionLocked, selectPlaceableBoxKinds } from '../store';
 
 export function CanvasActions() {
   const canUndo = useStore((s) => s.undoStack.length > 0);
@@ -17,6 +17,12 @@ export function CanvasActions() {
   const buildMode = useStore((s) => s.buildMode);
   const effectiveMode = useStore(selectEffectiveMode);
   const [confirmClear, setConfirmClear] = useState(false);
+  const canBox = useStore((s) => selectPlaceableBoxKinds(s).length > 0);
+  const editingBox = useStore((s) => s.boxEditor !== null);
+  const hasBoxable = selectedIds.some((id) => {
+    const t = components.find((c) => c.id === id)?.type;
+    return t !== undefined && t !== 'INPUT' && t !== 'OUTPUT' && t !== 'STATE';
+  });
 
   const hasSelection = selectedIds.length > 0;
   const hasStateSelected = selectedIds.some((id) => components.find((c) => c.id === id)?.type === 'STATE');
@@ -48,6 +54,19 @@ export function CanvasActions() {
         >
           ↻ Rotate
         </button>
+        {canBox && !editingBox && (
+          <button
+            type="button"
+            disabled={locked || !hasBoxable}
+            onClick={act(() => {
+              const err = s().boxSelection();
+              if (err) alert(err);
+            })}
+            title="Turn the selected parts into a box (inputs and outputs stay on the canvas)"
+          >
+            ▣ Box
+          </button>
+        )}
         {isTurbotTM && (
           <button
             type="button"

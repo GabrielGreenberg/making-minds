@@ -516,3 +516,19 @@ a.wb-brand:hover { color: var(--mm-accent); text-decoration: none; }
   background: var(--mm-surface); border: 1px solid var(--mm-accent); color: var(--mm-ink);
   box-shadow: var(--mm-shadow-palette);
 }
+/* The box editor's bar (BoxEditorBar) — top centre while a box is open. */
+.box-editor-bar {
+  position: absolute; top: 12px; left: 50%; transform: translateX(-50%); z-index: 48;
+  max-width: calc(100% - 32px); padding: 10px 14px; font-family: var(--mm-font-sans);
+  background: var(--mm-surface); border: 2px solid var(--mm-accent); box-shadow: var(--mm-shadow-palette);
+}
+.box-editor-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.box-editor-title { font-size: 11.5px; font-weight: 600; letter-spacing: 0.09em; text-transform: uppercase; color: var(--mm-accent); }
+.box-editor-name {
+  width: 160px; padding: 4px 8px; font: inherit; font-size: 13.5px; font-weight: 600;
+  border: 1px solid var(--mm-line-2); background: var(--mm-surface); color: var(--mm-ink);
+}
+.box-editor-name:focus { outline: none; border-color: var(--mm-accent); }
+.box-editor-ports { font-size: 12px; color: var(--mm-ink-3); }
+.box-editor-note { margin: 6px 0 0; font-size: 12px; color: var(--mm-ink-3); }
+.box-editor-error { margin: 6px 0 0; font-size: 12.5px; color: var(--mm-danger); }

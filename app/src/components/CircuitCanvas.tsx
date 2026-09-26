@@ -25,6 +25,7 @@ import {
 } from '../types';
 import { mintId } from '../provenance/ids';
 import { unboundBoxes } from '../boxPorts';
+import { BoxEditorBar } from './BoxEditorBar';
 import {
   routeAllWires,
   validateSegmentPosition,
@@ -3720,6 +3721,13 @@ export function CircuitCanvas() {
             e.stopPropagation();
             setEditingBoxId(boxNameEl.getAttribute('data-box-name')!);
           }
+          const compEl = target.closest<SVGElement>('[data-comp-id]');
+          const comp = compEl ? useStore.getState().components.find((c) => c.id === compEl.getAttribute('data-comp-id')) : undefined;
+          if (!boxNameEl && comp?.type === 'BOXED' && comp.boxedCircuitId) {
+            e.stopPropagation();
+            const err = useStore.getState().openBoxEditor(comp.boxedCircuitId);
+            if (err) alert(err);
+          }
         }}
         style={{
           cursor,
@@ -3943,6 +3951,8 @@ export function CircuitCanvas() {
           ))}
         </div>
       )}
+
+      <BoxEditorBar />
 
       {/* Undo · Redo · Delete · Rotate · Clear — top-right corner */}
       <CanvasActions />

@@ -4,7 +4,7 @@
 // still works (law 3: the store's actions carry it).
 
 import { useStore, selectEffectiveMode, selectQuestionLocked } from '../store';
-import { canvasHint, EMPTY_CANVAS_MESSAGE } from '../canvasView';
+import { canvasHint, EMPTY_BOX_MESSAGE, EMPTY_CANVAS_MESSAGE } from '../canvasView';
 import { toolLabel } from '../palette';
 
 export function CanvasGuide() {
@@ -15,9 +15,10 @@ export function CanvasGuide() {
   const library = useStore((s) => s.confirmedBoxLibrary);
   const effectiveMode = useStore(selectEffectiveMode);
   const locked = useStore(selectQuestionLocked);
+  const editingBox = useStore((s) => s.boxEditor !== null);
 
   if (components.length === 0) {
-    return locked ? null : <p className="cv-guide-empty">{EMPTY_CANVAS_MESSAGE}</p>;
+    return locked ? null : <p className="cv-guide-empty">{editingBox ? EMPTY_BOX_MESSAGE : EMPTY_CANVAS_MESSAGE}</p>;
   }
   const selected = new Set(selectedIds);
   const hint = canvasHint({

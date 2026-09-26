@@ -70,6 +70,7 @@ import { INTEGRITY_NOTICE } from './provenance/notice';
 // The sandbox workbook file (task 028): parsing, the saved-content key.
 import { parseWorkbookFile, serializeWorkbook, titleFromFileName, workbookKeyHash } from './workbookFile';
 import { orderBoxPorts, rebindLegacyBoxes, rebindLegacyLibrary } from './boxPorts';
+import { boxCircuitProblem, boxEntryFromCanvas, boxEntryFromInstance, containsCopyOf, editableBoxCircuit, extractSelection, replaceCopies, replaceCopiesInLibrary } from './boxEditing';
 import { placementOrigin, toolComponent, type ArmedTool } from './palette';
 import { clampZoom } from './canvasView';
 import { getComponentSize } from './componentGeometry';
@@ -211,7 +212,9 @@ export function selectPasteScope(s: { assignment: AssignmentData | null }): Past
 export function selectCodecLayout(s: {
   assignment: AssignmentData | null;
   currentQuestionIndex: number;
+  boxEditor?: unknown;
 }): CodecLayout | null {
+  if (s.boxEditor) return null;
   const q = s.assignment?.questions[s.currentQuestionIndex];
   if (!q || (q.buildMode !== 'SC' && q.buildMode !== 'FSM')) return null;
   return questionLayout(q);
@@ -243,7 +246,9 @@ export function selectCodecWindow(s: {
 export function selectPerceptionRetina(s: {
   assignment: AssignmentData | null;
   currentQuestionIndex: number;
+  boxEditor?: unknown;
 }): number | null {
+  if (s.boxEditor) return null;
   const q = s.assignment?.questions[s.currentQuestionIndex];
   if (!q || q.buildMode !== 'SC' || questionTask(q) !== 'perception') return null;
   return q.perception?.width ?? null;
@@ -974,6 +979,11 @@ interface AppState {
   // across every question). Returns an error string, or null on success.
   renameBox: (id: string, name: string) => string | null;
   placeBoxInstance: (boxId: string, x: number, y: number) => void; // place a copy of a box as a BOXED component
+  boxEditor: BoxEditorSession | null;
+  openBoxEditor: (boxId: string | null) => string | null;
+  saveBoxEditor: (name?: string) => string | null;
+  cancelBoxEditor: () => void;
+  boxSelection: () => string | null;
 
   // The confirmed-box library behind the palette's "Boxes" section. Its SCOPE
   // depends on where you are:
@@ -1527,10 +1537,11 @@ function foldLiveQuestion(
   questionId: number,
   overrides: Partial<QuestionCircuit> = {},
 ): QuestionCircuit {
+  const live = liveCanvas(s);
   return {
-    components: s.components,
-    wires: s.wires,
-    boxes: s.boxes,
+    components: live.components,
+    wires: live.wires,
+    boxes: live.boxes,
     responseText: s.openResponse,
     fillAnswers: s.fillAnswers,
     done: s.questionCircuits.get(questionId)?.done,
@@ -1584,10 +1595,11 @@ function freshSandboxTab(
 function sandboxTabCircuits(s: AppState): Map<string, TabCircuitData> {
   const sheets = new Map(s.tabCircuits);
   if (s.assignment === null) {
+    const live = liveCanvas(s);
     sheets.set(s.activeTabId, {
-      components: s.components,
-      wires: s.wires,
-      boxes: s.boxes,
+      components: live.components,
+      wires: live.wires,
+      boxes: live.boxes,
       confirmedBoxes: s.confirmedBoxLibrary,
     });
   }
@@ -1653,6 +1665,29 @@ export function captureSandboxSession(): () => boolean {
   };
 }
 
+export interface BoxEditorSession {
+  boxId: string;
+  isNew: boolean;
+  name: string;
+  stash: {
+    components: CircuitComponent[];
+    wires: Wire[];
+    boxes: BoxDefinition[];
+    undoStack: HistoryEntry[];
+    redoStack: HistoryEntry[];
+    buildMode: BuildMode;
+  };
+}
+
+function liveCanvas(s: AppState): { components: CircuitComponent[]; wires: Wire[]; boxes: BoxDefinition[] } {
+  return s.boxEditor ? s.boxEditor.stash : s;
+}
+
+function closeBoxEditorForSwap(get: () => AppState): void {
+  if (!get().boxEditor) return;
+  if (get().saveBoxEditor() !== null) get().cancelBoxEditor();
+}
+
 export const useStore = create<AppState>()((set, get) => ({
   autoSaveStatus: 'saved' as const,
   lastSavedAt: null,
@@ -1685,6 +1720,7 @@ export const useStore = create<AppState>()((set, get) => ({
   },
 
   closeWorkbook: () => {
+    closeBoxEditorForSwap(get);
     set({
       workbookOpen: false,
       workbookTitle: 'Untitled Workbook',
@@ -1708,6 +1744,7 @@ export const useStore = create<AppState>()((set, get) => ({
   },
 
   newWorkbook: (mode = 'CC', innerMode, title = 'Circuit 1') => {
+    closeBoxEditorForSwap(get);
     // An open assignment is left the way Home leaves it — its live canvas
     // folded and saved — before the live fields become the sandbox's.
     if (get().assignment) get().goHome();
@@ -1767,6 +1804,7 @@ export const useStore = create<AppState>()((set, get) => ({
     // Parse (and validate) first: a bad file changes nothing.
     const parsed = parseWorkbookFile(json);
     if (!parsed.ok) return parsed;
+    closeBoxEditorForSwap(get);
     const wb = parsed.workbook;
     // A file never writes into an assignment: one that is open is left the
     // way Home leaves it (folded and saved), and the file opens as the
@@ -2316,6 +2354,7 @@ export const useStore = create<AppState>()((set, get) => ({
   },
   questionTrace: null,
   loadAssignment: (assignment) => {
+    closeBoxEditorForSwap(get);
     const questionCircuits = new Map<number, QuestionCircuit>();
     for (const q of assignment.questions) {
       questionCircuits.set(q.id, emptyQuestionCircuit());
@@ -2337,6 +2376,7 @@ export const useStore = create<AppState>()((set, get) => ({
     get().resetAllSimState();
   },
   openAssignment: async (id) => {
+    closeBoxEditorForSwap(get);
     // Flush any pending debounced save for the canvas we're leaving so its
     // last edit is persisted before another workbook takes over the live state.
     flushAutoSave();
@@ -2423,6 +2463,7 @@ export const useStore = create<AppState>()((set, get) => ({
     return true;
   },
   goHome: () => {
+    closeBoxEditorForSwap(get);
     // Leaving the editor: a submission lookup still in flight applies nothing.
     viewSubmissionSeq++;
     const state = get();
@@ -2458,6 +2499,7 @@ export const useStore = create<AppState>()((set, get) => ({
     set({ workbookOpen: false, lastSavedAt: null, undoStack: [], redoStack: [] });
   },
   enterSandbox: () => {
+    closeBoxEditorForSwap(get);
     const state = get();
     if (state.tabs.length === 0) {
       get().newWorkbook();
@@ -2486,6 +2528,7 @@ export const useStore = create<AppState>()((set, get) => ({
     get().resetAllSimState();
   },
   switchQuestion: (index) => {
+    closeBoxEditorForSwap(get);
     const state = get();
     const a = state.assignment;
     if (!a) return;
@@ -2536,6 +2579,7 @@ export const useStore = create<AppState>()((set, get) => ({
     get().resetAllSimState();
   },
   toggleCurrentQuestionDone: () => {
+    closeBoxEditorForSwap(get);
     const state = get();
     const q = state.assignment?.questions[state.currentQuestionIndex];
     if (!q) return;
@@ -2552,6 +2596,7 @@ export const useStore = create<AppState>()((set, get) => ({
     set({ questionCircuits: qc });
   },
   closeAssignment: () => {
+    closeBoxEditorForSwap(get);
     set({
       assignment: null,
       viewingSubmission: null,
@@ -2570,6 +2615,7 @@ export const useStore = create<AppState>()((set, get) => ({
   },
   viewingSubmission: null,
   viewSubmission: async (attempt) => {
+    closeBoxEditorForSwap(get);
     // This call supersedes any lookup still in flight (viewSubmissionSeq).
     const viewSeq = ++viewSubmissionSeq;
     const who = currentPrincipal;
@@ -2655,6 +2701,7 @@ export const useStore = create<AppState>()((set, get) => ({
     );
   },
   exportSubmission: (student) => {
+    closeBoxEditorForSwap(get);
     const state = get();
     const assignment = state.assignment;
     if (!assignment) return null;
@@ -2665,6 +2712,7 @@ export const useStore = create<AppState>()((set, get) => ({
     return JSON.stringify({ notice: INTEGRITY_NOTICE, ...submission }, null, 2);
   },
   submitAssignment: async (id, student) => {
+    closeBoxEditorForSwap(get);
     const epoch = principalEpoch;
     const def = await getAssignment(id);
     if (!def) return null;
@@ -3087,6 +3135,146 @@ export const useStore = create<AppState>()((set, get) => ({
     setTimeout(() => get().evaluateCircuit(), 0);
   },
 
+  boxEditor: null,
+  openBoxEditor: (boxId) => {
+    const state = get();
+    if (state.boxEditor) return 'Save or cancel the box you are editing first.';
+    if (isCurrentQuestionLocked(state)) return lockRefusal(state, 'edit a box');
+    if (selectPlaceableBoxKinds(state).length === 0) return 'Boxes are not available on this canvas.';
+    const scope = selectPasteScope(state);
+    const mint = () => mintId(scope);
+    let id: string;
+    let name: string;
+    let isNew: boolean;
+    let circuit: { components: CircuitComponent[]; wires: Wire[] };
+    if (boxId === null) {
+      id = mint();
+      name = nextBoxName('Box', takenBoxNames(state.confirmedBoxLibrary, state.boxes));
+      isNew = true;
+      circuit = { components: [], wires: [] };
+    } else {
+      const inLibrary = state.confirmedBoxLibrary.find((b) => b.id === boxId);
+      const placed = state.components.find((c) => c.type === 'BOXED' && c.boxedCircuitId === boxId);
+      const entry = inLibrary ?? (placed ? boxEntryFromInstance(placed) : null);
+      if (!entry) return 'Box not found.';
+      id = entry.id;
+      name = entry.name;
+      isNew = !inLibrary;
+      circuit = editableBoxCircuit(entry, mint);
+    }
+    set({
+      boxEditor: {
+        boxId: id,
+        isNew,
+        name,
+        stash: {
+          components: state.components,
+          wires: state.wires,
+          boxes: state.boxes,
+          undoStack: state.undoStack,
+          redoStack: state.redoStack,
+          buildMode: state.buildMode,
+        },
+      },
+      buildMode: selectEffectiveMode(state),
+      components: circuit.components,
+      wires: circuit.wires,
+      boxes: [],
+    });
+    get().resetAllSimState();
+    setTimeout(() => get().evaluateCircuit(), 0);
+    return null;
+  },
+  saveBoxEditor: (requestedName) => {
+    const state = get();
+    const ed = state.boxEditor;
+    if (!ed) return null;
+    if (isCurrentQuestionLocked(state)) return lockRefusal(state, 'edit a box');
+    const name = (requestedName ?? ed.name).trim();
+    if (!name) return 'A box needs a name.';
+    if (takenBoxNames(state.confirmedBoxLibrary, ed.stash.boxes, ed.boxId).has(name))
+      return `A box named "${name}" already exists.`;
+    if (containsCopyOf(state.components, ed.boxId)) return 'A box cannot contain a copy of itself.';
+    const problem = boxCircuitProblem(state.components, state.wires);
+    if (problem) return problem;
+    if (hasMemory(state.components) && !selectPlaceableBoxKinds(state).includes('SC'))
+      return 'Memory cannot go inside a box here: this canvas takes combinational boxes only.';
+
+    const prev = state.confirmedBoxLibrary.find((b) => b.id === ed.boxId);
+    const q = state.assignment?.questions[state.currentQuestionIndex];
+    const entry = boxEntryFromCanvas(ed.boxId, name, state.components, state.wires, prev ? prev.origin : q?.id);
+    const library = prev
+      ? replaceCopiesInLibrary(state.confirmedBoxLibrary, entry)
+      : [...replaceCopiesInLibrary(state.confirmedBoxLibrary, entry), entry];
+    const live = replaceCopies(ed.stash.components, ed.stash.wires, entry);
+    let questionCircuits = state.questionCircuits;
+    if (state.assignment) {
+      questionCircuits = new Map(state.questionCircuits);
+      for (const [qid, qc] of questionCircuits) {
+        if (qid === q?.id || qc.done) continue;
+        const next = replaceCopies(qc.components, qc.wires, entry);
+        if (next.components !== qc.components) questionCircuits.set(qid, { ...qc, ...next });
+      }
+    }
+    const before: HistoryEntry = {
+      components: JSON.parse(JSON.stringify(ed.stash.components)),
+      wires: JSON.parse(JSON.stringify(ed.stash.wires)),
+      boxes: JSON.parse(JSON.stringify(ed.stash.boxes)),
+      confirmedBoxes: JSON.parse(JSON.stringify(state.confirmedBoxLibrary)),
+    };
+    set({
+      boxEditor: null,
+      buildMode: ed.stash.buildMode,
+      components: live.components,
+      wires: live.wires,
+      boxes: ed.stash.boxes,
+      confirmedBoxLibrary: library,
+      questionCircuits,
+    });
+    get().resetAllSimState();
+    set({ undoStack: [...ed.stash.undoStack.slice(-49), before], redoStack: [] });
+    setTimeout(() => get().evaluateCircuit(), 0);
+    return null;
+  },
+  cancelBoxEditor: () => {
+    const ed = get().boxEditor;
+    if (!ed) return;
+    set({
+      boxEditor: null,
+      buildMode: ed.stash.buildMode,
+      components: ed.stash.components,
+      wires: ed.stash.wires,
+      boxes: ed.stash.boxes,
+    });
+    get().resetAllSimState();
+    set({ undoStack: ed.stash.undoStack, redoStack: ed.stash.redoStack });
+    setTimeout(() => get().evaluateCircuit(), 0);
+  },
+  boxSelection: () => {
+    const state = get();
+    if (isCurrentQuestionLocked(state)) return lockRefusal(state, 'box parts');
+    if (state.boxEditor) return 'Save or cancel the box you are editing first.';
+    if (selectPlaceableBoxKinds(state).length === 0) return 'Boxing is not available for this kind of machine.';
+    const scope = selectPasteScope(state);
+    const result = extractSelection(state.components, state.wires, state.selectedIds, {
+      id: mintId(scope),
+      name: nextBoxName('Box', takenBoxNames(state.confirmedBoxLibrary, state.boxes)),
+      origin: state.assignment?.questions[state.currentQuestionIndex]?.id,
+      mint: () => mintId(scope),
+    });
+    if ('error' in result) return result.error;
+    if (!selectPlaceableBoxKinds(state).includes(result.entry.kind === 'SC' ? 'SC' : 'CC'))
+      return 'Memory cannot go inside a box here: this canvas takes combinational boxes only. Box the gates around it and leave the memory on the canvas.';
+    state.pushHistory(1);
+    set({
+      components: result.components,
+      wires: result.wires,
+      confirmedBoxLibrary: [...state.confirmedBoxLibrary, result.entry],
+      selectedIds: [result.instance.id],
+    });
+    return get().openBoxEditor(result.entry.id);
+  },
+
   // Delete
   clearWorkspace: () => {
     const state = get();
@@ -3224,6 +3412,7 @@ export const useStore = create<AppState>()((set, get) => ({
   tabCircuits: new Map(),
 
   addTab: (title, buildMode, activeTask, innerMode) => {
+    closeBoxEditorForSwap(get);
     const state = get();
     // A turbot tab carries its brain kind and its own arena (freshSandboxTab).
     const tab = freshSandboxTab(mintId({ kind: 'sandbox' }), title, buildMode, innerMode, activeTask || 'arithmetic');
@@ -3250,6 +3439,7 @@ export const useStore = create<AppState>()((set, get) => ({
   },
 
   switchTab: (id) => {
+    closeBoxEditorForSwap(get);
     const state = get();
     if (id === state.activeTabId) return;
     const updatedTabCircuits = new Map(state.tabCircuits);
@@ -3275,6 +3465,7 @@ export const useStore = create<AppState>()((set, get) => ({
   },
 
   removeTab: (id) => {
+    closeBoxEditorForSwap(get);
     const state = get();
     if (state.tabs.length <= 1) return;
     const newTabs = state.tabs.filter((t) => t.id !== id);
@@ -4872,6 +5063,7 @@ export const useStore = create<AppState>()((set, get) => ({
 
   resetForPrincipal: (email) => {
     if (principalReported && email === currentPrincipal) return;
+    closeBoxEditorForSwap(get);
     // The leaving principal's pending edits land under ITS keys (the sandbox
     // key and, remotely, the crash journal read currentPrincipal and the
     // session cache — both still the leaving person's here).
