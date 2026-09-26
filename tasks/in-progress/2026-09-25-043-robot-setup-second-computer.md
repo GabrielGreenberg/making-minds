@@ -8,7 +8,7 @@ requires: human
 area: pipeline
 source: chat
 created: 2026-09-25T10:00:00-07:00
-status: ready
+status: in-progress
 after: 2026-09-22-029
 branch:
 merged_into:
@@ -47,3 +47,10 @@ land from this laptop, and this part needs the other machine and Gabriel's hands
 Items 2–3, recorded in the progress log.
 
 ## Progress log
+- 2026-09-25 — Claimed on the robot (Gabriel's Mac Studio, Mac14,14, macOS 26.6.2), in a
+  session with Gabriel. No code branch: this task's commits are `tasks/` files only, on `main`,
+  pushed at once. Step 1 (tools): Node 22.23.2, git 2.50.1, `gh` 2.88.1 signed in as
+  GabrielGreenberg over HTTPS with `gh auth setup-git` already in place. Step 2 (clones):
+  `~/making-minds-robot` and `~/making-minds-robot-catch` cloned, each with
+  `user.name "Gabriel Greenberg (robot)"` / `user.email gabriel.greenberg@gmail.com` (the
+  laptop's current commit email); `npm ci` done in the work clone's `app/` and `server/`.
