@@ -8,9 +8,9 @@ requires: browser
 area: app
 source: inbox
 created: 2026-09-25T16:15:00-07:00
-status: ready
+status: in-progress
 after: 2026-09-25-052
-branch:
+branch: task/053-editor-output-panel
 merged_into:
 ---
 
