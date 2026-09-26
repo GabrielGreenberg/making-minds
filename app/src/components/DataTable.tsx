@@ -1,10 +1,10 @@
-import { useMemo, useState, useCallback, useRef, useEffect } from 'react';
-import { useStore, selectTmNotation, selectEffectiveMode, selectCodecWindow, selectScRunWindow, selectPerceptionRetina, selectFsmNotation } from '../store';
+import { useMemo, useState, useRef, useEffect } from 'react';
+import { useStore, selectTmNotation, selectEffectiveMode, selectPerceptionRetina, selectFsmNotation } from '../store';
 import { tmNotation, memorySlots, hasMemory } from '../engine';
 import { outputDisplayString } from './outputDisplay';
 import { TurbotArenaPanel } from './TurbotArenaPanel';
-import { ProblemBody, ProblemContext } from './ProblemSetDocument';
 import { GradedCaseBanner } from './GradedCaseBanner';
+import { LiveTruthTable } from './LiveTruthTable';
 import { PerceptionFramePlayer } from './PerceptionFramePlayer';
 import { RunSpeedControl } from './RunSpeedControl';
 import type { TMSymbol } from '../types';
@@ -15,30 +15,6 @@ function inputKey(bits: number[]): string {
   return bits.join(',');
 }
 
-/** The open assignment question, shown above the tables in every mode's
- *  panel: its section's instruction as context, then the problem itself
- *  (the document's own parts — components/ProblemSetDocument.tsx), then any
- *  graded case loaded into the run (GradedCaseBanner). Renders nothing in
- *  the sandbox. */
-function QuestionStatement() {
-  const assignment = useStore((s) => s.assignment);
-  const currentQuestionIndex = useStore((s) => s.currentQuestionIndex);
-  const question = assignment?.questions[currentQuestionIndex];
-  if (!assignment || !question) return null;
-  return (
-    <div className="table-section">
-      <div className="table-section-label">
-        <span>{question.label}</span>
-        <span className="question-rep-badge">{question.representation} representation</span>
-      </div>
-      <div className="question-statement">
-        <ProblemContext assignment={assignment} questionId={question.id} />
-        <ProblemBody question={question} showArena={false} />
-      </div>
-      <GradedCaseBanner />
-    </div>
-  );
-}
 
 export function DataTable() {
   const components = useStore((s) => s.components);
@@ -47,10 +23,6 @@ export function DataTable() {
   const buildMode = useStore((s) => s.buildMode);
   // TM alphabet is tied to the question's representation (sandbox: repSystem).
   const tmRep = useStore(selectTmNotation);
-  // Codec run window for the open SC/FSM question (null in the sandbox):
-  // question runs execute exactly the steps the grader reads, so UI verdicts
-  // match grades.
-  const codecWindow = useStore(selectCodecWindow);
   // An SC perception question's retina width (null otherwise): its frame
   // player takes the Global I/O rows' place.
   const retina = useStore(selectPerceptionRetina);
@@ -62,6 +34,10 @@ export function DataTable() {
   const loadScGlobalSequence = useStore((s) => s.loadScGlobalSequence);
   const scReset = useStore((s) => s.scReset);
   const scGlobalReset = useStore((s) => s.scGlobalReset);
+  // Which Global I/O row a run plays — store-held, so the output panel's one
+  // control row (OutputPanel) drives it (task 053).
+  const activeGlobalIndex = useStore((s) => s.scActiveGlobalIndex);
+  const setActiveGlobalIndex = useStore((s) => s.setScActiveGlobalIndex);
 
   // Local I/O stepping
   const localStepActive = useStore((s) => s.localStepActive);
@@ -71,11 +47,11 @@ export function DataTable() {
   const localStepSelect = useStore((s) => s.localStepSelect);
   const localStepOne = useStore((s) => s.localStepOne);
   const localStepReset = useStore((s) => s.localStepReset);
-
-  // Sequence playback runs in the store (scRun), so every reset stops it —
-  // a canvas swap, Reset, and an edit mid-run (the store's edit law).
+  const localStepRun = useStore((s) => s.localStepRun);
+  // Every run loop lives in the store (scRun, localStepRun), so every reset
+  // stops it — a canvas swap, Reset, and an edit mid-run (the store's edit law).
   const isRunning = useStore((s) => s.scRunning);
-  const [localIsRunning, setLocalIsRunning] = useState(false);
+  const localIsRunning = useStore((s) => s.localStepRunning);
   const [autoFocusIndex, setAutoFocusIndex] = useState<number | null>(null);
 
   // Collapsible section state (persisted)
@@ -87,9 +63,6 @@ export function DataTable() {
 
   // Run speed: multiplier (1 = 300ms per step, 2 = 150ms, 0.5 = 600ms, etc.)
   const [runSpeed, setRunSpeed] = useState(() => (typeof _prefs.current.runSpeed === 'number' ? _prefs.current.runSpeed as number : 1));
-
-  // Which global I/O row is currently selected
-  const [activeGlobalIndex, setActiveGlobalIndex] = useState<number | null>(null);
 
   // Flash animation: increment counter each step to trigger CSS animation re-run
   const [flashCounter, setFlashCounter] = useState(0);
@@ -104,113 +77,11 @@ export function DataTable() {
     prevHistLenRef.current = scHistory.length;
   }, [scHistory.length]);
 
-  // Run through the currently loaded global sequence with animation
-  // Ensure a global sequence is loaded into scInputSequence before running/stepping.
-  // If activeGlobalIndex is set, use that; otherwise find the first sequence with input.
-  const ensureSequenceLoaded = useCallback(() => {
-    const state = useStore.getState();
-    const maxLen = Math.max(...state.scInputSequence.map((s) => s.length), 0);
-    const drain = memorySlots(state.components).length;
-    // Question runs end at the grader's run length (selectScRunWindow);
-    // sandbox runs at L + one 0-drain step per MEM (boxed ones included).
-    const runEnd = selectScRunWindow(state) ?? maxLen + drain;
-    if (maxLen > 0 && state.scTimeStep <= runEnd) return; // already loaded and in progress
-
-    // Try active index first, then fall back to first sequence with input
-    const candidates = activeGlobalIndex !== null ? [activeGlobalIndex] : [];
-    for (let i = 0; i < state.scGlobalSequences.length; i++) {
-      if (i !== activeGlobalIndex) candidates.push(i);
-    }
-    for (const idx of candidates) {
-      const seq = state.scGlobalSequences[idx];
-      if (seq && seq.inputStr.length > 0) {
-        setActiveGlobalIndex(idx);
-        loadScGlobalSequence(idx);
-        return;
-      }
-    }
-  }, [activeGlobalIndex, loadScGlobalSequence]);
-
-  const runLoadedSequence = useCallback(() => {
-    ensureSequenceLoaded();
-    // Re-read state after potential load
-    setTimeout(() => {
-      const state = useStore.getState();
-      const numInputs = state.components.filter((c) => c.type === 'INPUT').length;
-      if (numInputs === 0) return;
-      const maxLen = Math.max(...state.scInputSequence.map((s) => s.length), 0);
-      // Question runs execute exactly the grader's run length (the steps the
-      // grader reads — selectScRunWindow), feeding the codec's stream for the
-      // typed value (see scStep). Sandbox: L plus one 0-input flush step per
-      // MEM so delayed bits drain.
-      const drain = memorySlots(state.components).length;
-      const win = selectScRunWindow(state);
-      const runEnd = win ?? maxLen + drain;
-      const remaining = runEnd - (state.scTimeStep - 1);
-      // If no sequence loaded (sandbox), just do a single step
-      if (remaining <= 0 && maxLen === 0 && win === null) {
-        state.scStep();
-        return;
-      }
-      if (remaining <= 0) return;
-      // The store's run loop stops itself at the same end (scRun).
-      state.scRun(Math.round(300 / runSpeed));
-    }, 0);
-  }, [runSpeed, ensureSequenceLoaded]);
-
-  // Step once: if a sequence is loaded, advance within it; otherwise just step with current inputs
-  const stepLoadedSequence = useCallback(() => {
-    ensureSequenceLoaded();
-    setTimeout(() => {
-      const state = useStore.getState();
-      const maxLen = Math.max(...state.scInputSequence.map((s) => s.length), 0);
-      const drain = memorySlots(state.components).length;
-      // Question steps stop at the grader's run length; sandbox at L +
-      // per-MEM drain.
-      const win = selectScRunWindow(state);
-      if (win !== null ? state.scTimeStep <= win : (maxLen === 0 || state.scTimeStep <= maxLen + drain)) {
-        state.scStep();
-      }
-    }, 0);
-  }, [ensureSequenceLoaded]);
-
-  // Reset: if a global sequence is active, clear its output and re-load; otherwise just scReset
-  const resetLoadedSequence = useCallback(() => {
-    const state = useStore.getState();
-    const seqs = state.scGlobalSequences;
-    const numInputs = state.components.filter((c) => c.type === 'INPUT').length;
-    const maxLen = Math.max(...state.scInputSequence.map((s) => s.length), 0);
-    let currentInputStr = '';
-    for (let t = maxLen - 1; t >= 0; t--) {
-      for (let ii = 0; ii < numInputs; ii++) {
-        currentInputStr += String(state.scInputSequence[ii]?.[t] ?? 0);
-      }
-    }
-    const idx = seqs.findIndex((s) => s.inputStr === currentInputStr);
-    if (idx >= 0) {
-      // Clear the stored output
-      const newSeqs = [...seqs];
-      newSeqs[idx] = { ...newSeqs[idx], outputStr: '' };
-      useStore.setState({ scGlobalSequences: newSeqs });
-      // Re-load to reset circuit state
-      loadScGlobalSequence(idx);
-    } else {
-      // No active global sequence — just reset
-      state.scReset();
-    }
-  }, [loadScGlobalSequence]);
-
   // FSM state
   const fsmCurrentStateId = useStore((s) => s.fsmCurrentStateId);
   const fsmInputSequence = useStore((s) => s.fsmInputSequence);
-  const fsmTimeStep = useStore((s) => s.fsmTimeStep);
   const fsmHistory = useStore((s) => s.fsmHistory);
-  const fsmHalted = useStore((s) => s.fsmHalted);
-  const fsmRunning = useStore((s) => s.fsmRunning);
   const setFsmInputSequence = useStore((s) => s.setFsmInputSequence);
-  const fsmStep = useStore((s) => s.fsmStep);
-  const fsmRun = useStore((s) => s.fsmRun);
-  const fsmReset = useStore((s) => s.fsmReset);
   const fsmGlobalReset = useStore((s) => s.fsmGlobalReset);
   // The FSM label notation for this editing surface (engine/notation.ts):
   // sized to the open question's input/output group counts; 1-bit in the
@@ -219,13 +90,7 @@ export function DataTable() {
 
   // TM state
   const tmCurrentStateId = useStore((s) => s.tmCurrentStateId);
-  const tmTimeStep = useStore((s) => s.tmTimeStep);
   const tmHistory = useStore((s) => s.tmHistory);
-  const tmHalted = useStore((s) => s.tmHalted);
-  const tmRunning = useStore((s) => s.tmRunning);
-  const tmStep = useStore((s) => s.tmStep);
-  const tmRun = useStore((s) => s.tmRun);
-  const tmReset = useStore((s) => s.tmReset);
   const tmGlobalReset = useStore((s) => s.tmGlobalReset);
 
   // Turbot state — the arena + run controls live in TurbotArenaPanel; this
@@ -243,33 +108,6 @@ export function DataTable() {
   const isFSM = buildMode === 'FSM';
   const isTM = buildMode === 'TM';
 
-  // ── Resizable panel ──
-  const [panelWidth, _setPanelWidth] = useState(() => (typeof _prefs.current.panelWidth === 'number' ? _prefs.current.panelWidth as number : 260));
-  const dragRef = useRef<{ startX: number; startW: number } | null>(null);
-
-  const setPanelWidth = (v: number) => _setPanelWidth(v);
-  const onResizePointerDown = useCallback((e: React.PointerEvent) => {
-    e.preventDefault();
-    dragRef.current = { startX: e.clientX, startW: panelWidth };
-    const target = e.currentTarget as HTMLElement;
-    target.setPointerCapture(e.pointerId);
-
-    let lastWidth = panelWidth;
-    const onMove = (ev: PointerEvent) => {
-      if (!dragRef.current) return;
-      lastWidth = Math.max(0, Math.min(600, dragRef.current.startW + (dragRef.current.startX - ev.clientX)));
-      setPanelWidth(lastWidth);
-    };
-    const onUp = () => {
-      dragRef.current = null;
-      target.releasePointerCapture(e.pointerId);
-      window.removeEventListener('pointermove', onMove);
-      window.removeEventListener('pointerup', onUp);
-      saveUiPref('panelWidth', lastWidth);
-    };
-    window.addEventListener('pointermove', onMove);
-    window.addEventListener('pointerup', onUp);
-  }, [panelWidth]);
 
   const inputs = components
     .filter((c) => c.type === 'INPUT')
@@ -334,26 +172,6 @@ export function DataTable() {
     return map;
   }, [tableRows]);
 
-  // CC mode: generate all 2^n input combinations
-  const ccInputRows = useMemo(() => {
-    if (!isCC) return null;
-    if (inputs.length === 0 || outputs.length === 0) return null;
-    if (inputs.length > 8) return 'too-many';
-
-    const n = inputs.length;
-    const totalRows = 1 << n;
-    const rows: number[][] = [];
-
-    for (let i = 0; i < totalRows; i++) {
-      const inputBits: number[] = [];
-      for (let bit = n - 1; bit >= 0; bit--) {
-        inputBits.push((i >> bit) & 1);
-      }
-      rows.push(inputBits);
-    }
-    return rows;
-  }, [inputs.length, outputs.length, isCC]);
-
   // SC mode: generate all 2^(inputs+mems) combinations
   const scInputRows = useMemo(() => {
     if (!isSC) return null;
@@ -397,11 +215,10 @@ export function DataTable() {
     const isStateBrain = effectiveMode === 'FSM' || effectiveMode === 'TM';
 
     return (
-      <div className="data-table-panel" style={{ width: panelWidth }}>
-        <div className="panel-resize-handle" onPointerDown={onResizePointerDown} />
+      <div className="data-table-panel">
         <div className="data-table-panel-inner">
         <div className="data-table-content">
-          <QuestionStatement />
+          <GradedCaseBanner />
 
           {/* The arena ("Map") + run controls: below the question statement,
               above the machine/history tables (spec §9.1's Map panel). */}
@@ -553,11 +370,10 @@ export function DataTable() {
       fsmHistory.map((h) => ({ t: h.t, bits: String(h.output).split('').map(Number) })));
 
     return (
-      <div className="data-table-panel" style={{ width: panelWidth }}>
-        <div className="panel-resize-handle" onPointerDown={onResizePointerDown} />
+      <div className="data-table-panel">
         <div className="data-table-panel-inner">
         <div className="data-table-content">
-          <QuestionStatement />
+          <GradedCaseBanner />
           {/* State Table */}
           <div className="table-section">
             <div className="table-section-label">
@@ -654,31 +470,8 @@ export function DataTable() {
                 </tr>
               </tbody>
             </table>
-            {/* Controls */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '5px 0 3px', paddingLeft: 4 }}>
-              {/* Question runs go to the codec window, fed the codec's stream
-                  for the typed value (see fsmStep); sandbox runs feed the raw
-                  digits and stop at the typed length. */}
-              <button className="action-btn" onClick={() => { if (!fsmRunning) fsmRun(); }} disabled={fsmRunning || fsmHalted || fsmTimeStep > (codecWindow ?? fsmInputSequence.length)}>
-                Run
-              </button>
-              <button className="action-btn" onClick={() => { if (!fsmRunning) fsmStep(); }} disabled={fsmRunning || fsmHalted || fsmTimeStep > (codecWindow ?? fsmInputSequence.length)}>
-                Step
-              </button>
-              <button className="action-btn" onClick={fsmReset} disabled={fsmRunning}>
-                Reset
-              </button>
-              {fsmHalted && (
-                <span style={{ fontSize: 10, color: '#e53935', fontWeight: 600, marginLeft: 'auto', paddingRight: 6 }}>
-                  HALTED
-                </span>
-              )}
-              {!fsmHalted && fsmTimeStep > 1 && (
-                <span style={{ marginLeft: 'auto', fontSize: 10, color: '#888', fontFamily: 'monospace', paddingRight: 6 }}>
-                  t={fsmTimeStep - 1}
-                </span>
-              )}
-            </div>
+            {/* Run / Step / Reset (and HALTED / t=) are the output panel's
+                one control row (OutputPanel, task 053). */}
           </div>
 
           {/* History */}
@@ -761,11 +554,10 @@ export function DataTable() {
     }
 
     return (
-      <div className="data-table-panel" style={{ width: panelWidth }}>
-        <div className="panel-resize-handle" onPointerDown={onResizePointerDown} />
+      <div className="data-table-panel">
         <div className="data-table-panel-inner">
         <div className="data-table-content">
-          <QuestionStatement />
+          <GradedCaseBanner />
           {/* Machine Table */}
           <div className="table-section">
             <div className="table-section-label">
@@ -806,10 +598,11 @@ export function DataTable() {
             )}
           </div>
 
-          {/* Controls */}
+          {/* The tape's input. Run / Step / Reset (and HALTED / t=) are the
+              output panel's one control row (OutputPanel, task 053). */}
           <div className="table-section">
             <div className="table-section-label" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <span>Run</span>
+              <span>Tape</span>
               <button
                 className="toggle-btn"
                 onClick={tmGlobalReset}
@@ -819,29 +612,8 @@ export function DataTable() {
                 clear tape
               </button>
             </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '5px 0 3px', paddingLeft: 4 }}>
-              <button className="action-btn" onClick={() => { if (!tmRunning) tmRun(); }} disabled={tmRunning || tmHalted}>
-                Run
-              </button>
-              <button className="action-btn" onClick={() => { if (!tmRunning) tmStep(); }} disabled={tmRunning || tmHalted}>
-                Step
-              </button>
-              <button className="action-btn" onClick={tmReset} disabled={tmRunning}>
-                Reset
-              </button>
-              {tmHalted && (
-                <span style={{ fontSize: 10, color: '#e53935', fontWeight: 600, marginLeft: 'auto', paddingRight: 6 }}>
-                  HALTED
-                </span>
-              )}
-              {!tmHalted && tmTimeStep > 1 && (
-                <span style={{ marginLeft: 'auto', fontSize: 10, color: '#888', fontFamily: 'monospace', paddingRight: 6 }}>
-                  t={tmTimeStep - 1}
-                </span>
-              )}
-            </div>
             <div style={{ padding: '2px 4px 6px', fontSize: 10, color: '#999' }}>
-              Set the input on the tape below the canvas, then Run or Step. Halting ends the computation.
+              Set the input on the tape below the canvas, then Run or Step above. Halting ends the computation.
             </div>
           </div>
 
@@ -881,14 +653,26 @@ export function DataTable() {
     );
   }
 
+  // ── A combinational circuit: its live truth table (task 053) ──────
+  if (isCC && !isSC) {
+    return (
+      <div className="data-table-panel">
+        <div className="data-table-panel-inner">
+          <div className="data-table-content">
+            <LiveTruthTable />
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   if (inputs.length === 0) {
     return (
-      <div className="data-table-panel" style={{ width: panelWidth }}>
-        <div className="panel-resize-handle" onPointerDown={onResizePointerDown} />
+      <div className="data-table-panel">
         <div className="data-table-panel-inner">
           <div className="table-header" />
           <div className="data-table-content">
-            <QuestionStatement />
+            <GradedCaseBanner />
             <div style={{ padding: 12, color: '#999', fontSize: 12 }}>
               Add inputs and outputs to see the I/O table.
             </div>
@@ -903,44 +687,23 @@ export function DataTable() {
     );
   }
 
-  /** Red activity dot for the active row, empty for inactive */
-  const playBtn = (inBits: number[], isActive: boolean) => (
-    <td
-      className="row-play-btn"
-      style={{
-        width: 18, padding: '2px 0',
-        cursor: isActive ? 'default' : 'pointer',
-        border: 'none', background: 'transparent',
-        textAlign: 'center', verticalAlign: 'middle',
-      }}
-      onClick={() => { if (!isActive) localStepSelect(inBits); }}
-      title={isActive ? 'Selected row' : 'Select this row'}
-    >
-      {isActive && <span style={{ display: 'inline-block', width: 7, height: 7, borderRadius: '50%', background: '#e53935' }} />}
-    </td>
-  );
-
-  // For non-CC modes, use tableRows directly
-  const nonCCHasRows = !isCC && !isSC && tableRows.length > 0;
-
   return (
-    <div className="data-table-panel" style={{ width: panelWidth }}>
-      <div className="panel-resize-handle" onPointerDown={onResizePointerDown} />
+    <div className="data-table-panel">
       <div className="data-table-panel-inner">
       <div className="data-table-content">
-        <QuestionStatement />
-        {/* ── I/O Table (CC and SC) ────────────────────────────── */}
+        <GradedCaseBanner />
+        {/* ── Local I/O Table (SC) ─────────────────────────────── */}
         <div className="table-section">
           <div className="table-section-label" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 4, cursor: 'pointer' }} onClick={() => setLocalOpen(!localOpen)}>
               <span className="pod-toggle">{localOpen ? '▼' : '▶'}</span>
-              <span>{isSC ? 'Local Input / Output' : 'Input / Output'}</span>
+              <span>Local Input / Output</span>
             </div>
             <button
               className="toggle-btn"
               onClick={() => {
                 clearTableRows();
-                if (isSC) scReset();
+                scReset();
                 if (localStepActive) useStore.getState().localStepClear();
                 // Reset all inputs and wire values
                 const state = useStore.getState();
@@ -959,11 +722,11 @@ export function DataTable() {
             </button>
           </div>
 
-          {!localOpen ? null : isSC && scInputRows === 'too-many' ? (
+          {!localOpen ? null : scInputRows === 'too-many' ? (
             <div style={{ padding: 12, color: '#999', fontSize: 12 }}>
               Too many inputs + memories (max 8) to show full table.
             </div>
-          ) : isSC && scInputRows ? (
+          ) : scInputRows ? (
             /* SC: full truth table over inputs + memories */
             <table className="data-table">
               <colgroup>
@@ -1022,102 +785,18 @@ export function DataTable() {
                 })}
               </tbody>
             </table>
-          ) : isCC && ccInputRows === 'too-many' ? (
-            <div style={{ padding: 12, color: '#999', fontSize: 12 }}>
-              Too many inputs (max 8) to show full truth table.
-            </div>
-          ) : isCC && ccInputRows ? (
-            /* CC: full truth table */
-            <table className="data-table">
-              <colgroup>
-                <col style={{ width: 18 }} />
-              </colgroup>
-              <thead>
-                <tr>
-                  <th style={{ border: 'none', background: 'transparent' }} />
-                  {inputs.map((inp) => <th key={inp.id}>{inp.label}</th>)}
-                  {outputs.map((out) => <th key={out.id}>{out.label}</th>)}
-                </tr>
-              </thead>
-              <tbody>
-                {(ccInputRows as number[][]).map((inBits, i) => {
-                  const key = inputKey(inBits);
-                  const outBits = evaluatedRows.get(key);
-                  const isActive = key === currentInputKey;
-                  return (
-                    <tr key={i} className={isActive ? 'row-active' : ''} style={{ cursor: isActive ? 'default' : 'pointer' }} onClick={() => { if (!isActive) localStepSelect(inBits); }}>
-                      {playBtn(inBits, isActive)}
-                      {inBits.map((b, j) => (
-                        <td key={`i${j}`} className={b === 1 ? 'val-1' : ''}>
-                          <span className="mono-value">{b}</span>
-                        </td>
-                      ))}
-                      {outputs.map((_, j) => (
-                        <td key={`o${j}`} className={outBits && outBits[j] === 1 && outputConnected[j] ? 'val-1' : ''}>
-                          <span className="mono-value">{outBits != null && outputConnected[j] ? outBits[j] : ''}</span>
-                        </td>
-                      ))}
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          ) : nonCCHasRows ? (
-            <table className="data-table">
-              <colgroup>
-                <col style={{ width: 18 }} />
-              </colgroup>
-              <thead>
-                <tr>
-                  <th style={{ border: 'none', background: 'transparent' }} />
-                  {inputs.map((inp) => <th key={inp.id}>{inp.label}</th>)}
-                  {outputs.map((out) => <th key={out.id}>{out.label}</th>)}
-                </tr>
-              </thead>
-              <tbody>
-                {tableRows.map((row, i) => {
-                  const key = inputKey(row.inputBits);
-                  const isActive = key === currentInputKey;
-                  return (
-                    <tr key={i} className={isActive ? 'row-active' : ''} style={{ cursor: isActive ? 'default' : 'pointer' }} onClick={() => { if (!isActive) localStepSelect(row.inputBits); }}>
-                      {playBtn(row.inputBits, isActive)}
-                      {row.inputBits.map((b, j) => (
-                        <td key={`i${j}`} className={b === 1 ? 'val-1' : ''}>
-                          <span className="mono-value">{b}</span>
-                        </td>
-                      ))}
-                      {row.outputBits.map((b, j) => (
-                        <td key={`o${j}`} className={b === 1 ? 'val-1' : ''}>
-                          <span className="mono-value">{b}</span>
-                        </td>
-                      ))}
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          ) : !isCC && !isSC ? (
-            <div style={{ padding: 12, color: '#999', fontSize: 12 }}>
-              Set input values on the canvas, then click Run to add a row.
-            </div>
           ) : null}
 
-          {/* Local Run/Step/Reset controls */}
-          {localOpen && (isCC || isSC) && inputs.length > 0 && (
+          {/* SC's local stepper — a second, legitimate run set beside the
+              header's Global I/O run until the machine-types design (task
+              053 F8). A combinational circuit's Run/Step/Reset are the output
+              panel's one control row. Its Run is the store's loop. */}
+          {localOpen && isSC && inputs.length > 0 && (
             <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '5px 0 3px', paddingLeft: 18 }}>
               <button
                 className="action-btn"
                 onClick={() => {
-                  if (localIsRunning) return;
-                  if (!localStepActive) return;
-                  setLocalIsRunning(true);
-                  const interval = setInterval(() => {
-                    const more = useStore.getState().localStepOne();
-                    if (!more) {
-                      clearInterval(interval);
-                      setLocalIsRunning(false);
-                    }
-                  }, Math.round(300 / runSpeed));
+                  if (!localIsRunning && localStepActive) localStepRun(Math.round(300 / runSpeed));
                 }}
                 disabled={localIsRunning || !localStepActive}
               >
@@ -1331,28 +1010,9 @@ export function DataTable() {
                 </tr>
               </tbody>
             </table>
+            {/* Run / Step / Reset for the selected row are the output panel's
+                one control row (OutputPanel, task 053); its pace is set here. */}
             <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '5px 0 3px', paddingLeft: 18 }}>
-              <button
-                className="action-btn"
-                onClick={() => { if (!isRunning) runLoadedSequence(); }}
-                disabled={isRunning}
-              >
-                Run
-              </button>
-              <button
-                className="action-btn"
-                onClick={() => { if (!isRunning) stepLoadedSequence(); }}
-                disabled={isRunning}
-              >
-                Step
-              </button>
-              <button
-                className="action-btn"
-                onClick={() => { if (!isRunning) resetLoadedSequence(); }}
-                disabled={isRunning}
-              >
-                Reset
-              </button>
               <RunSpeedControl speed={runSpeed} onChange={setRunSpeed} />
             </div>
           </>}

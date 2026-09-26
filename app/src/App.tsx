@@ -1,9 +1,7 @@
 import { TabBar } from './components/TabBar';
-import { MenuBar } from './components/MenuBar';
-import { ComponentLibrary } from './components/ComponentLibrary';
+import { EditorShell } from './components/EditorShell';
 import { CircuitCanvas } from './components/CircuitCanvas';
-import { DataTable } from './components/DataTable';
-import { SimulationToolbar } from './components/SimulationPanel';
+import { OutputPanel } from './components/OutputPanel';
 import { SequentialTimeline } from './components/SequentialTimeline';
 import { TMTapePanel } from './components/TMTapePanel';
 import { TurbotTapePanel } from './components/TurbotTapePanel';
@@ -13,14 +11,13 @@ import { HomeScreen } from './components/HomeScreen';
 import { AssignmentOverview } from './components/AssignmentOverview';
 import { InstructorApp } from './instructor/InstructorApp';
 import { useInstructorRoute } from './instructor/useInstructorRoute';
-import { VisitorBanner } from './components/VisitorBanner';
 import { useStore, selectEffectiveMode } from './store';
 import { useAuth } from './auth';
 import { questionTask } from './types';
 import { useEffect } from 'react';
 
 function App() {
-  const { user, isVisitor } = useAuth();
+  const { user } = useAuth();
   const instructorRoute = useInstructorRoute();
   const workbookOpen = useStore((s) => s.workbookOpen);
   const buildMode = useStore((s) => s.buildMode);
@@ -54,42 +51,34 @@ function App() {
   // canvas (below) is entered by picking a question (#/a/:id/q/:i).
   if (assignment && assignmentView === 'overview') return <AssignmentOverview />;
 
-  // Open questions: same chrome (menu + question nav), but the workspace is a
-  // writing panel — no palette, canvas, or data tables. A fill-in question
-  // (types.ts questionTask) narrows that panel to a list of labelled boxes,
-  // which IS autograded.
+  // Every question and the sandbox render inside ONE frame (EditorShell: the
+  // top bar, the question panel, the workspace, the output panel). An open
+  // question's workspace is a writing area and it has no output panel; a
+  // fill-in question (types.ts questionTask) narrows the writing area to a
+  // grid of labelled boxes, which IS autograded.
   if (buildMode === 'open') {
     const q = assignment?.questions[currentQuestionIndex];
-    return (
-      <div className="app">
-        <MenuBar />
-        <TabBar />
-        {q && questionTask(q) === 'fill-in' ? <FillInPanel /> : <OpenResponsePanel />}
-      </div>
-    );
+    return <EditorShell>{q && questionTask(q) === 'fill-in' ? <FillInPanel /> : <OpenResponsePanel />}</EditorShell>;
   }
 
   return (
-    <div className="app">
-      <MenuBar />
-      {isVisitor && <VisitorBanner />}
-      <TabBar />
-      <SimulationToolbar />
+    <EditorShell output={<OutputPanel />}>
+      {/* The sandbox's worksheet tabs, over its canvas (no question panel). */}
+      {!assignment && <TabBar />}
       <div className="main-area">
-        <ComponentLibrary />
+        {/* The parts are a floating palette inside the canvas (task 054). */}
         <div className="canvas-and-timeline">
-          {/* Turbot questions: the arena ("Map") lives in the right data
-              panel (DataTable's turbot branch), not here — the canvas column
-              is the inner machine's normal editor. A TM-brained turbot shows
-              its internal tape (read-only: turbots start on a blank tape). */}
+          {/* Turbot questions: the arena ("Map") lives in the output panel
+              (DataTable's turbot branch), not here — the canvas column is the
+              inner machine's normal editor. A TM-brained turbot shows its
+              internal tape (read-only: turbots start on a blank tape). */}
           <CircuitCanvas />
           {buildMode !== 'FSM' && buildMode !== 'TM' && buildMode !== 'turbot' && <SequentialTimeline />}
           {buildMode === 'TM' && <TMTapePanel />}
           {buildMode === 'turbot' && effectiveMode === 'TM' && <TurbotTapePanel />}
         </div>
-        <DataTable />
       </div>
-    </div>
+    </EditorShell>
   );
 }
 

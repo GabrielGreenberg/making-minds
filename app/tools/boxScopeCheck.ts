@@ -11,7 +11,13 @@
 // Pins: confirm on Q1 → absent on Q2 → restored (with internals, placeable)
 // back on Q1; survives goHome/closeAssignment/openAssignment via the
 // workbook seam; sandbox tabs isolated from assignments and each other;
-// removeConfirmedBox strips the entry + placed instances and undo restores it;
+// [library delete] (task 054, decision 7) — removeConfirmedBox drops the
+// library entry and its drawn outline, never a placed copy: every copy, on
+// this question and on others, stays and computes exactly what it did, and
+// undo restores the entry; [placing] — placeTool, the one path for a click
+// and a palette drop, centres the part or box on the point, snapped, and a box
+// placed through it is the box placeBoxInstance places; [origin] — a box
+// confirmed in an assignment records its question, none in the sandbox;
 // [sequential boxes] — a box may hold memory and then behaves exactly as
 // unboxed (engine pins, every SC reference fixture graded boxed whole, and
 // the store: kind 'SC', where it places, runs, local step, undo, save/load,
@@ -22,7 +28,9 @@
 // computes what it enclosed (engine, every CC/SC reference fixture boxed
 // across, the store's repro, run, paste, undo, save/load), and a box saved
 // before 038 is re-bound on load by the stated rule, a submitted snapshot
-// never.
+// never; and [memory] (task 045) — a combinatorial canvas holds no memory:
+// one rule (types.ts modeHoldsMemory = where a sequential box may go) for the
+// palette, addComponent, paste and the grader's Stage 1.
 import type { AssignmentState, CircuitComponent, SubmissionRecord } from '../src/types';
 
 const noop = () => {};
@@ -94,6 +102,8 @@ await flush();
 console.log('[shared across the assignment]');
 const boxId = buildAndBoxAnd();
 check('confirm added a library entry on Q1', useStore.getState().confirmedBoxLibrary.some((b) => b.id === boxId));
+check('[origin] the entry records the question it was boxed on (the pop-out\'s "· Problem 1")',
+  useStore.getState().confirmedBoxLibrary.find((b) => b.id === boxId)?.origin === assignment.questions[0].id);
 
 // Q2 is the SC question: a CC box follows the student there (it is placeable
 // on an SC canvas — placeableBoxKinds('SC') includes 'CC').
@@ -123,11 +133,15 @@ useStore.getState().placeBoxInstance(boxId, 500, 400);
 await flush();
 check('instance placeable on Q1 too', useStore.getState().components.length === before + 1);
 
-// Removing a library entry sweeps the LIVE canvas only. Instances already
-// stamped into another question keep working: a placed BOXED component carries
-// its own internals, so it still simulates and grades — and silently deleting
-// work in a question the student isn't looking at would be worse.
+// [library delete] Removing a library entry never touches placed work
+// (decision 7): a placed BOXED component carries its own internals, so every
+// copy — on the question it is deleted from and on every other — stays and
+// computes exactly what it did. Only the entry and its drawn outline go.
+console.log('[library delete]');
 {
+  const { evaluateBoxedCircuit } = await import('../src/engine/cc');
+  const table = (c: CircuitComponent | undefined) =>
+    [[0, 0], [0, 1], [1, 0], [1, 1]].map((row) => evaluateBoxedCircuit(c, row).join('')).join(' ');
   useStore.getState().switchQuestion(1);
   await flush();
   const doomed = buildAndBoxAnd();
@@ -139,20 +153,39 @@ check('instance placeable on Q1 too', useStore.getState().components.length === 
   check('the new box is placeable on Q1 too', useStore.getState().components.length === q1Before + 1);
   useStore.getState().switchQuestion(1);
   await flush();
+  useStore.getState().placeBoxInstance(doomed, 800, 100);
+  await flush();
+  const hereCopy = () => useStore.getState().components.find((c) => c.boxedCircuitId === doomed && c.type === 'BOXED');
+  const hereBefore = table(hereCopy());
+  const originalsBefore = useStore.getState().components.filter((c) => c.type !== 'BOXED').length;
   useStore.getState().removeConfirmedBox(doomed);
   await flush();
   check('removeConfirmedBox drops the shared library entry',
     !useStore.getState().confirmedBoxLibrary.some((b) => b.id === doomed));
+  check('…and its drawn outline on this canvas', !useStore.getState().boxes.some((b) => b.id === doomed));
+  check('…but the copy placed on THIS question stays', hereCopy() !== undefined);
+  check('…computing exactly what it did (the AND table)', hereBefore === '0 0 0 1' && table(hereCopy()) === hereBefore);
+  check('…and the parts the box was drawn around stay too',
+    useStore.getState().components.filter((c) => c.type !== 'BOXED').length === originalsBefore);
+  useStore.getState().undo();
+  check('undo restores the entry', useStore.getState().confirmedBoxLibrary.some((b) => b.id === doomed));
+  useStore.getState().removeConfirmedBox(doomed);
   useStore.getState().switchQuestion(0);
   await flush();
-  check('an instance already stamped on another question survives, internals intact',
-    useStore.getState().components.some(
-      (c) => c.boxedCircuitId === doomed && (c.internalCircuit?.components ?? []).length > 0,
-    ));
+  const thereCopy = useStore.getState().components.find((c) => c.boxedCircuitId === doomed);
+  check('a copy already placed on another question survives, internals intact',
+    (thereCopy?.internalCircuit?.components ?? []).length > 0 && table(thereCopy) === '0 0 0 1');
   // Clean up so the persistence round-trip below starts from a known canvas.
   useStore.setState({
     components: useStore.getState().components.filter((c) => c.boxedCircuitId !== doomed),
   });
+  useStore.getState().switchQuestion(1);
+  await flush();
+  useStore.setState({
+    components: useStore.getState().components.filter((c) => c.boxedCircuitId !== doomed),
+  });
+  useStore.getState().switchQuestion(0);
+  await flush();
 }
 
 // ── persistence: autosave → close → reopen ──────────────────────
@@ -220,12 +253,51 @@ useStore.getState().switchTab(tab1);
 await flush();
 check('switching back to tab 1 restores its box', useStore.getState().confirmedBoxLibrary.some((b) => b.id === sbBox));
 
-// removeConfirmedBox removes entry + instances on this canvas
+check('[origin] a sandbox box records no question', useStore.getState().confirmedBoxLibrary.find((b) => b.id === sbBox)?.origin === undefined);
+
+// [placing] placeTool — the click's and the palette drop's one path — centres
+// what it places on the point, snapped; a box placed through it (a pinned
+// tile, a pop-out row, a drop) is the box placeBoxInstance places.
+console.log('[placing]');
+{
+  const { gradedMachineKey } = await import('../src/engine/caseRun');
+  const { getComponentSize } = await import('../src/componentGeometry');
+  const { GRID_SIZE } = await import('../src/types');
+  const snap = (v: number) => Math.round(v / GRID_SIZE) * GRID_SIZE;
+  const n0 = useStore.getState().components.length;
+  useStore.getState().placeTool('AND', 300, 500);
+  const and = useStore.getState().components[n0];
+  const size = and && getComponentSize(and);
+  check('placeTool(AND) places an AND centred on the point, snapped',
+    and?.type === 'AND' && and.x === snap(300 - size.w / 2) && and.y === snap(500 - size.h / 2));
+  useStore.getState().placeTool({ box: sbBox }, 700, 500);
+  const viaTool = useStore.getState().components[n0 + 1];
+  const bsize = viaTool && getComponentSize(viaTool);
+  useStore.getState().placeBoxInstance(sbBox, 700 - bsize.w / 2, 500 - bsize.h / 2);
+  const direct = useStore.getState().components[n0 + 2];
+  check('placeTool({box}) places that box, centred and snapped',
+    viaTool?.type === 'BOXED' && viaTool.boxedCircuitId === sbBox &&
+    viaTool.x === snap(700 - bsize.w / 2) && viaTool.y === snap(500 - bsize.h / 2));
+  check('…the same box placeBoxInstance places (same box id, same graded key)',
+    direct?.boxedCircuitId === sbBox && viaTool.x === direct.x && viaTool.y === direct.y &&
+    // (each placement mints its own id; set aside, the two are one machine)
+    gradedMachineKey({ components: [{ ...viaTool, id: 'b' }], wires: [] }) ===
+      gradedMachineKey({ components: [{ ...direct, id: 'b' }], wires: [] }));
+  useStore.getState().placeTool('NEW_BOX', 100, 100);
+  check('placeTool(NEW_BOX) places nothing (it is a draw tool)', useStore.getState().components.length === n0 + 3);
+  useStore.getState().placeTool({ box: 'no-such-box' }, 100, 100);
+  check('placeTool of a box the library lacks places nothing', useStore.getState().components.length === n0 + 3);
+  useStore.setState({ components: useStore.getState().components.slice(0, n0) });
+}
+
+// [library delete] in the sandbox: the entry goes, the placed copy stays.
 useStore.getState().placeBoxInstance(sbBox, 500, 300);
+useStore.getState().setSelectedTool({ box: sbBox });
 useStore.getState().removeConfirmedBox(sbBox);
 await flush();
 check('removeConfirmedBox clears entry', !useStore.getState().confirmedBoxLibrary.some((b) => b.id === sbBox));
-check('removeConfirmedBox strips placed instances', !useStore.getState().components.some((c) => c.boxedCircuitId === sbBox));
+check('removeConfirmedBox leaves the placed copy', useStore.getState().components.some((c) => c.boxedCircuitId === sbBox));
+check('…and disarms the deleted box if it was the armed tool', useStore.getState().selectedTool === null);
 useStore.getState().undo();
 check('undo restores the confirmed box', useStore.getState().confirmedBoxLibrary.some((b) => b.id === sbBox));
 
@@ -520,7 +592,16 @@ console.log('\n[sequential boxes: store]');
   await flush();
   check('placeBoxInstance refuses an SC box on a CC question', S().components.length === before);
   clean();
-  buildDelay();
+  // A MEM can no longer be placed on a CC canvas ([memory], task 045); a
+  // workbook saved before that rule may still hold one, and boxing it there
+  // stays refused.
+  {
+    const { comp, wire } = await import('./builder');
+    useStore.setState({
+      components: [comp('d-in', 'INPUT', 'IN1', 200, 180), comp('d-mem', 'MEM', 'M1', 320, 180), comp('d-out', 'OUTPUT', 'OUT1', 460, 190)],
+      wires: [wire('d-w1', 'd-in', 'out', 'd-mem', 'min'), wire('d-w2', 'd-mem', 'mout', 'd-out', 'in')],
+    });
+  }
   const ccRefusal = drawAndConfirm();
   check(`a CC question refuses to box a MEM, naming it (${ccRefusal.err})`,
     typeof ccRefusal.err === 'string' &&
@@ -1599,6 +1680,92 @@ console.log('\n[drawn-across boxes: legacy own IN/OUT]');
   const fullList = [fullPlaced];
   check('a box the label rule fully binds comes back as the same array, unbound',
     rebindLegacyBoxes(fullList, [fullEntry]) === fullList);
+}
+
+// ── [memory] a combinatorial canvas holds none (task 045) ────────────────
+// One rule — types.ts modeHoldsMemory, "a canvas may hold memory iff it may
+// place a sequential box" — asked by the palette, addComponent, paste, the
+// question creator and the grader's Stage 1. Before 045 a CC question's
+// palette offered MEM and the grader ran it as a constant 0.
+console.log('\n[memory: a combinatorial canvas holds none]');
+{
+  const { modeHoldsMemory, placeableBoxKinds } = await import('../src/types');
+  const { selectMayHoldMemory } = await import('../src/store');
+  const { gradeQuestion } = await import('../src/engine');
+  const { ccCorrect, scCorrect, turbotCorrect, perceptionEdgeCorrect } = await import('../src/devData/sampleData');
+  const { comp } = await import('./builder');
+
+  const modes = ['CC', 'SC', 'FSM', 'TM', 'turbot', 'open'] as const;
+  check('the rule: CC holds no memory, SC does',
+    !modeHoldsMemory('CC') && modeHoldsMemory('SC'));
+  check('...and it IS the sequential-box rule, mode by mode',
+    modes.every((m) => modeHoldsMemory(m) === placeableBoxKinds(m).includes('SC')));
+
+  // The store: palette selector, placement, paste.
+  check('opened the sample assignment', (await S().openAssignment(SAMPLE_ASSIGNMENT_ID)) === true);
+  S().switchQuestion(0); // Q1: CC
+  await flush();
+  clean();
+  check('a CC question may not hold memory (the palette hides MEM)', !selectMayHoldMemory(S()));
+  const undo0 = S().undoStack.length;
+  S().addComponent('MEM', 300, 300);
+  check('...addComponent(MEM) places nothing and leaves no undo entry',
+    !S().components.some((c) => c.type === 'MEM') && S().undoStack.length === undo0);
+  S().addComponent('AND', 300, 300);
+  check('...while a gate still places', S().components.some((c) => c.type === 'AND'));
+  S().switchQuestion(4); // Q5: turbot, CC brain
+  await flush();
+  check('a turbot with a CC brain may not hold memory', !selectMayHoldMemory(S()));
+  S().switchQuestion(5); // Q6: turbot, SC brain
+  await flush();
+  check('a turbot with an SC brain may', selectMayHoldMemory(S()));
+  S().switchQuestion(1); // Q2: SC
+  await flush();
+  check('an SC question may hold memory', selectMayHoldMemory(S()));
+  const scBefore = S().components.length;
+  S().addComponent('MEM', 640, 420);
+  const mem = S().components.slice(scBefore).find((c) => c.type === 'MEM');
+  check('...and addComponent(MEM) places one there', mem !== undefined);
+  useStore.setState({ selectedIds: [mem!.id] });
+  S().copySelected();
+  S().deleteSelected();
+  S().switchQuestion(0);
+  await flush();
+  const n0 = S().components.length;
+  const u0 = S().undoStack.length;
+  const msg = S().paste();
+  check(`pasting a bare MEM onto the CC question is refused, naming it (${msg})`,
+    typeof msg === 'string' && msg.includes(mem!.label) && msg.includes('combinatorial'));
+  check('...adding nothing and leaving no undo entry',
+    S().components.length === n0 && S().undoStack.length === u0 && !S().components.some((c) => c.type === 'MEM'));
+  clean();
+  S().closeAssignment();
+  await flush();
+  useStore.setState({ buildMode: 'CC' });
+  check("the sandbox's Logic Circuit tab (CC mode) keeps memory", selectMayHoldMemory(S()));
+
+  // The grader: Stage 1 refuses memory in every combinatorial machine.
+  const qs = buildSampleAssignment().questions;
+  const withMem = (c: ReturnType<typeof ccCorrect>) =>
+    ({ ...c, components: [...c.components, comp('stray-mem', 'MEM', 'M1', 900, 900)] });
+  const reasons = (r: ReturnType<typeof gradeQuestion>): string[] => [
+    ...(r.cases ?? []).map((c) => c.reason ?? ''),
+    ...(r.turbotCases ?? []).map((c) => c.reason ?? ''),
+    ...(r.perceptionCases ?? []).map((c) => c.reason ?? ''),
+  ];
+  const refused = (r: ReturnType<typeof gradeQuestion>) =>
+    r.status === 'graded' && r.total > 0 && r.passed === 0 && reasons(r).every((x) => x.includes('no memory'));
+  const passes = (r: ReturnType<typeof gradeQuestion>) => r.status === 'graded' && r.total > 0 && r.passed === r.total;
+  const qCC = qs[0], qSC = qs[1], qTurbotCC = qs[4], qPerceptionCC = qs[8];
+  check(`sample questions are what the pins assume (${qCC.buildMode}, ${qSC.buildMode}, ${qTurbotCC.buildMode}/${qTurbotCC.innerMode}, ${qPerceptionCC.buildMode}+perception)`,
+    qCC.buildMode === 'CC' && qSC.buildMode === 'SC' && qTurbotCC.buildMode === 'turbot' &&
+    qTurbotCC.innerMode === 'CC' && qPerceptionCC.buildMode === 'CC' && qPerceptionCC.perception !== undefined);
+  check('control: the CC answer passes without the MEM', passes(gradeQuestion(qCC, ccCorrect())));
+  check('a CC answer holding a MEM is refused at Stage 1, every case, with the reason',
+    refused(gradeQuestion(qCC, withMem(ccCorrect()))));
+  check('...likewise a turbot CC brain', refused(gradeQuestion(qTurbotCC, withMem(turbotCorrect()))));
+  check('...and a CC perception circuit', refused(gradeQuestion(qPerceptionCC, withMem(perceptionEdgeCorrect()))));
+  check('an SC answer with its MEMs still passes', passes(gradeQuestion(qSC, scCorrect())));
 }
 
 console.log(`\nboxScopeCheck: ${passed} passed, ${failed} failed`);

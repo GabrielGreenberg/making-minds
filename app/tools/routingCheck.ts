@@ -1,5 +1,5 @@
-// Headless checks for route-level access and the visitor landing rule
-// (src/routing.ts — task 027, visitor mode).
+// Headless checks for route-level access and the one front door
+// (src/routing.ts — task 027, visitor mode; task 040, the front door).
 //
 //   cd app && npx tsx tools/routingCheck.ts
 //
@@ -13,17 +13,24 @@
 // read-only, task 003) parses and round-trips, a malformed attempt is dropped
 // (the rest kept), and applying it shows the attempt (store viewSubmission)
 // BEFORE the question opens; an unknown attempt repairs the URL to the live
-// route; a superseded apply does nothing. [landing] — a browser with no trace of a
-// previous sign-in opening `#/` lands in the sandbox; one with a trace, or
-// any deep link, is left alone. [held routes] — with nobody signed in, a
-// route that needs sign-in is never applied to the store (no unauthenticated
-// openAssignment), a public one is; signing in applies the held route (the
-// deep-link-survives-sign-in guarantee). [boot] — initRouting applies the
-// landing rule by replacing the URL, then opens the sandbox. [principal
+// route; a superseded apply does nothing. [front door] — the bare site (`#/`,
+// or no hash) is Home, which needs sign-in, so anyone not signed in meets the
+// sign-in screen whatever the browser's history; `#/sandbox` is open to a
+// visitor; the retired "signed in before" trace (`mm:auth:known`, the
+// sandbox landing redirect) is gone from src (grep gate). [held routes] — with
+// nobody signed in, a route that needs sign-in is never applied to the store
+// (no unauthenticated openAssignment), a public one is; signing in applies
+// the held route (the deep-link-survives-sign-in guarantee). [boot] —
+// initRouting on `#/` with nobody signed in keeps the URL and holds Home (no
+// redirect, no sandbox opened behind the sign-in screen). [principal
 // change] — every change of who is signed in re-applies the URL onto the
 // store the auth provider has just reset (store.resetForPrincipal): the
 // sandbox is re-entered (never a blank page), a signed-in route is held on
 // sign-out and applied on the next sign-in.
+
+import { readdirSync, readFileSync, statSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+import { dirname, join, relative } from 'node:path';
 
 // The store and routing touch window / document / localStorage / location /
 // history, so install minimal shims BEFORE dynamically importing them.
@@ -51,7 +58,7 @@ const setUrl = (_s: unknown, _t: string, url: string) => {
 };
 g.history = { pushState: setUrl, replaceState: setUrl };
 
-const { routeAccess, landingRoute, initRouting, setRoutingPrincipal, parseHash, routeToHash, navigate } = await import('../src/routing');
+const { routeAccess, initRouting, setRoutingPrincipal, parseHash, routeToHash, navigate } = await import('../src/routing');
 const { useStore } = await import('../src/store');
 type Route = import('../src/routing').Route;
 
@@ -130,13 +137,30 @@ console.log('[submission route]');
   check('the submission route needs sign-in', routeAccess(parseHash('#/a/hw1/submission/2')) === 'signed-in');
 }
 
-console.log('[landing]');
-check('no trace + #/ → the sandbox', landingRoute(parseHash('#/'), false)?.kind === 'sandbox');
-check('no trace + empty hash → the sandbox', landingRoute(parseHash(''), false)?.kind === 'sandbox');
-check('a trace + #/ → left alone (restore or sign in)', landingRoute(parseHash('#/'), true) === null);
-check('no trace + a deep link #/a/hw1 → left alone', landingRoute(parseHash('#/a/hw1'), false) === null);
-check('no trace + #/grades → left alone', landingRoute(parseHash('#/grades'), false) === null);
-check('no trace + #/instructor → left alone', landingRoute(parseHash('#/instructor'), false) === null);
+console.log('[front door]');
+check('#/ is Home, which needs sign-in (the sign-in screen for anyone not signed in)',
+  parseHash('#/').kind === 'home' && routeAccess(parseHash('#/')) === 'signed-in');
+check('no hash at all is Home too', parseHash('').kind === 'home' && routeAccess(parseHash('')) === 'signed-in');
+check('#/sandbox is open to a visitor', routeAccess(parseHash('#/sandbox')) === 'public');
+{
+  // The retired trace: nothing in src reads or writes it any more.
+  const SRC = join(dirname(fileURLToPath(import.meta.url)), '../src');
+  const RETIRED = /mm:auth:known|KNOWN_KEY|markSignedInBefore|hasSignInTrace|landingRoute/;
+  const hits: string[] = [];
+  const walk = (dir: string) => {
+    for (const name of readdirSync(dir)) {
+      const p = join(dir, name);
+      if (statSync(p).isDirectory()) walk(p);
+      else if (/\.(ts|tsx)$/.test(name)) {
+        readFileSync(p, 'utf8').split('\n').forEach((line, i) => {
+          if (RETIRED.test(line)) hits.push(`${relative(SRC, p)}:${i + 1}`);
+        });
+      }
+    }
+  };
+  walk(SRC);
+  check(`the "signed in before" trace is gone from src${hits.length ? ` (${hits.join(', ')})` : ''}`, hits.length === 0);
+}
 
 console.log('[held routes]');
 // Spy on the store actions routing drives, so nothing real opens.
@@ -158,10 +182,11 @@ setRoutingPrincipal(null);
 
 // [boot] first: initRouting runs once per page load.
 loc.hash = '#/';
-initRouting({ hasSignInTrace: false });
-check('boot, no trace, #/ → the URL is replaced with #/sandbox', loc.hash === '#/sandbox');
-check('boot, no trace, #/ → the sandbox is open', useStore.getState().workbookOpen === true && useStore.getState().assignment === null);
-check('boot → Home was never applied', homes === 0);
+initRouting();
+check('boot, nobody signed in, #/ → the URL is kept (no redirect)', loc.hash === '#/');
+check('boot, nobody signed in, #/ → Home is held (goHome not called)', homes === 0);
+check('boot, nobody signed in, #/ → no sandbox opened behind the sign-in screen',
+  useStore.getState().workbookOpen === false && useStore.getState().assignment === null);
 
 navigate({ kind: 'assignment', id: 'hw1', questionIndex: 1 });
 check('visitor → #/a/hw1/q/1: the URL is kept (for after sign-in)', loc.hash === '#/a/hw1/q/1');

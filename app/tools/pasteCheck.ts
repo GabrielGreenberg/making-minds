@@ -422,7 +422,7 @@ console.log('\n[grep gate]');
     'FeedbackPanel.tsx': { fields: 1, reason: 'platform/homework reports to the instructor; not work' },
   };
   // The files whose answer fields wear the guard today (each keeps at least one).
-  const GUARDED = ['OpenResponsePanel.tsx', 'FillInPanel.tsx', 'ComponentLibrary.tsx', 'CircuitCanvas.tsx'];
+  const GUARDED = ['OpenResponsePanel.tsx', 'FillInPanel.tsx', 'Palette.tsx', 'CircuitCanvas.tsx'];
   const NON_TEXT = /\btype=["'](range|checkbox|radio|file|color|button|submit|hidden)["']/;
   const GUARD_REF = /\bref=\{pasteGuardRef\}/;
   const BARE_READONLY = /\breadOnly\b(?!\s*=)/;

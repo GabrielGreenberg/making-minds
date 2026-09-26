@@ -10,9 +10,11 @@ export {
   evaluateBoxedCircuit,
   evaluateCC,
   evaluateCCInputs,
+  truthTableCC,
+  TRUTH_TABLE_MAX_INPUTS,
   sortByLabel,
 } from './cc';
-export type { CCEvalResult } from './cc';
+export type { CCEvalResult, CCTruthTable } from './cc';
 export {
   scNetlist,
   evaluateSCStep,
@@ -98,6 +100,7 @@ export {
 export type { Axis, CodecLayout, EncodedInput, RawOutput } from './codec';
 export {
   validateMachine,
+  validateModeMemory,
   validateAllowedComponents,
   disallowedComponentTypes,
   isComponentTypeAllowed,

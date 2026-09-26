@@ -421,6 +421,17 @@ export function placeableBoxKinds(mode: BuildMode): ReadonlyArray<'CC' | 'SC'> {
   }
 }
 
+/** May a canvas of this mode hold memory — a MEM, or a box with one inside?
+ *  Exactly where a sequential box may be placed: one rule, not two. A CC
+ *  question (a CC turbot brain, CC perception) is a combinatorial circuit and
+ *  holds none; SC holds both. The palette, the store's placement and paste,
+ *  the question creator and the grader's Stage 1 all ask this (the sandbox's
+ *  Logic Circuit tab, CC mode that may turn SC, is store.ts
+ *  selectMayHoldMemory's one exception). */
+export function modeHoldsMemory(mode: BuildMode): boolean {
+  return placeableBoxKinds(mode).includes('SC');
+}
+
 export interface AssignmentData {
   id: string;                  // stable slug (e.g. "hw1"); keys the registry/persistence
   title: string;
@@ -659,8 +670,11 @@ export type FeedbackStatus = 'open' | 'resolved';
  *  or joined, the listed tasks; `personal` — it is about the student, not
  *  the platform or a homework, so it is left for the instructor and never
  *  filed; `dismissed` — noise, a duplicate or already done (`note` says
- *  which). Independent of `status`: resolving stays the instructor's act. */
-export type FeedbackTriageOutcome = 'filed' | 'personal' | 'dismissed';
+ *  which); `review` — a student's feature request, bigger change or unclear
+ *  report, waiting for the instructor's call in `/catch` (task 029), which
+ *  re-marks it `filed` or `dismissed`. Independent of `status`: resolving
+ *  stays the instructor's act. */
+export type FeedbackTriageOutcome = 'filed' | 'personal' | 'dismissed' | 'review';
 
 export interface FeedbackTriage {
   outcome: FeedbackTriageOutcome;
@@ -809,6 +823,10 @@ export interface ConfirmedBoxDef {
   outputPortIds: string[];
   internalComponents: CircuitComponent[];
   internalWires: Wire[];
+  /** The question it was boxed on (its id), for the pop-out's "· Problem 1"
+   *  (task 054). Stamped by confirmBox inside an assignment; absent in the
+   *  sandbox and on boxes made before it existed (no suffix shown). */
+  origin?: number;
 }
 
 export interface BoxDefinition {

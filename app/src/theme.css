@@ -5,9 +5,11 @@
    and server-health screens, the home catalog, an assignment's question list,
    the grade sheet, the feedback and account modals, the instructor shell — is
    styled through the tokens and primitives in this file, so those surfaces
-   read as one site with the course website. The circuit editor keeps its own
-   un-prefixed tokens in index.css (there `--accent` is the canvas selection
-   blue), which is why page tokens are namespaced `--mm-*`.
+   read as one site with the course website. So is the editor's frame
+   (workbench.css: its top bar, question panel and answer area — task 052), on
+   the way to ONE visual language: the canvas internals still keep index.css's
+   older un-prefixed tokens until tasks 053–055 move them over, which is why
+   page tokens are namespaced `--mm-*`.
 
    Design authority: the website's stylesheet — `assets/site.css` in the
    making-minds-website repo (github.com/GabrielGreenberg/making-minds-website),
@@ -62,6 +64,21 @@
   --mm-shadow: 0 14px 44px rgba(3, 13, 36, 0.18); /* app-only  modal card */
   --mm-shadow-edge: -6px 0 6px -6px rgba(3, 13, 36, 0.15); /* app-only  sticky column edge */
   --mm-focus: var(--mm-accent);
+
+  /* ── The editor workbench (app-only; design memo editor-workbench.md §Tokens) ── */
+  --mm-surface-3: #F7F5FA;       /* app-only  quiet fill: nav strip, grip, hint box, box fill */
+  --mm-edge: #CFC8D8;            /* app-only  panel edge, grip border */
+  --mm-edge-2: #B9B2C4;          /* app-only  grip stroke, an unchecked box */
+  --mm-canvas-dot: #DAD4E2;      /* app-only  the canvas's dot grid */
+  --mm-signal-0: var(--mm-ink);  /* app-only  a 0 on a wire or in a table */
+  --mm-signal-1: #E53935;        /* app-only  a 1 on a wire or in a table (red = 1) */
+  --mm-signal-1-soft: var(--mm-hw-soft); /* app-only  an input or output holding 1: its body's wash */
+  --mm-hint-bg: rgba(255, 255, 255, 0.85); /* app-only  the canvas's hint line, over the dots */
+  --mm-divider-hover: rgba(194, 85, 185, 0.12); /* app-only  a column divider under the pointer (--mm-accent at 12%) */
+  --mm-shadow-palette: 0 2px 8px rgba(3, 13, 36, 0.08);       /* app-only  the canvas's floating palette */
+  --mm-shadow-palette-drag: 0 10px 28px rgba(3, 13, 36, 0.22); /* app-only  …while it is dragged */
+  --mm-shadow-popout: 0 10px 28px rgba(3, 13, 36, 0.16);      /* app-only  the palette's Boxes pop-out */
+  --mm-editor-band: 4px;         /* the editor's band: the site's 14px, thinned to save height */
 
   /* ── Type (site.css body · h1–h3 · .eyebrow · .tag · .topbar nav · td.date · .sub) ── */
   --mm-font-sans: "IBM Plex Sans", "Helvetica Neue", Arial, sans-serif;

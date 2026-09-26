@@ -1,12 +1,11 @@
 import { useStore, selectLockNotice } from '../store';
 import { usePasteGuard } from '../usePasteGuard';
-import { ProblemBody, ProblemContext } from './ProblemSetDocument';
 
 /**
  * The workspace for an open (free-text) question — the text-panel analogue of
- * the circuit canvas. Same chrome as every other question (nav bar, autosave,
- * Submit), but the "canvas" is one writing area bound to the store's
- * openResponse, which persists/travels exactly like a circuit.
+ * the circuit canvas, in the editor frame's centre (EditorShell; the question
+ * itself is in the question panel beside it). One writing area bound to the
+ * store's openResponse, which persists/travels exactly like a circuit.
  *
  * The writing area wears the provenance guard (usePasteGuard; law 8): the
  * student may copy, cut and paste their OWN assignment text, but text from
@@ -26,39 +25,39 @@ export function OpenResponsePanel() {
 
   if (!assignment || !question) return null;
 
-  const words = response.trim() === '' ? 0 : response.trim().split(/\s+/).length;
-
   return (
-    <div className="open-response">
-      <div className="open-response-card">
-        <div className="open-response-head">
-          <h2 className="open-response-label">{question.label}</h2>
-          <span className="open-response-mode">open question</span>
-        </div>
-        <div className="open-response-statement">
-          <ProblemContext assignment={assignment} questionId={question.id} />
-          <ProblemBody question={question} />
-        </div>
+    <div className="wb-answer mm-surface">
+      <div className="wb-answer-inner">
+        <div className="eyebrow wb-answer-eyebrow">Your answer</div>
         <textarea
-          className="open-response-textarea"
+          className="wb-answer-text"
           value={response}
           onChange={(e) => setOpenResponse(e.target.value)}
           ref={pasteGuardRef}
-          placeholder="Type your answer here…"
+          placeholder="Write your answer here."
+          aria-label={`Your answer to ${question.label}`}
           spellCheck
           readOnly={locked}
         />
-        <div className="open-response-foot">
-          <span>{words} word{words === 1 ? '' : 's'}</span>
-          {pasteNotice ? (
-            <span className="paste-notice" role="status">{pasteNotice}</span>
-          ) : (
-            <span>
-              {lockNotice ?? "Saved automatically — submit the assignment when you're done."}
-            </span>
-          )}
-        </div>
+        <AnswerFoot pasteNotice={pasteNotice} lockNotice={lockNotice} />
       </div>
     </div>
   );
+}
+
+/** The answer area's one line: a refused paste, else why the question is
+ *  read-only, else how saving is going — "Saved as you type." unless a
+ *  remote save is failing, when it never claims to be saved. */
+export function AnswerFoot({ pasteNotice, lockNotice }: { pasteNotice: string | null; lockNotice: string | null }) {
+  const saveFailing = useStore((s) => s.autoSaveStatus === 'error');
+  if (pasteNotice) return <div className="wb-answer-foot paste-notice" role="status">{pasteNotice}</div>;
+  if (lockNotice) return <div className="wb-answer-foot">{lockNotice}</div>;
+  if (saveFailing) {
+    return (
+      <div className="wb-answer-foot wb-answer-foot--error">
+        Not saved yet — your answer is kept in this browser, and saving retries on its own.
+      </div>
+    );
+  }
+  return <div className="wb-answer-foot">Saved as you type.</div>;
 }

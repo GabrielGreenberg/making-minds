@@ -229,8 +229,8 @@ console.log('\n[fill-in blanks]');
   check('HW1 P11 carries a fill-in spec and a same-length answer key',
     !!q.fill_in && q.fill_in.labels.length === 11 &&
     q.fill_in_answers?.length === 11);
-  check('the boxes are labelled 0 through 10',
-    q.fill_in!.labels.join(',') === '0,1,2,3,4,5,6,7,8,9,10');
+  check('the boxes are labelled zero through ten, in words (task 046)',
+    q.fill_in!.labels.join(',') === 'zero,one,two,three,four,five,six,seven,eight,nine,ten');
 
   const correct = Array.from({ length: 11 }, (_, n) => n.toString(2));
   const graded = gradeQuestion(q, undefined, undefined, correct);
@@ -246,7 +246,7 @@ console.log('\n[fill-in blanks]');
   const oneWrong = gradeQuestion(q, undefined, undefined, correct.map((a, i) => (i === 4 ? '1000' : a)));
   check('one wrong numeral scores 10/11 and names the blank',
     oneWrong.passed === 10 &&
-    (oneWrong.fillCases ?? []).filter((c) => !c.pass).map((c) => c.label).join('') === '4');
+    (oneWrong.fillCases ?? []).filter((c) => !c.pass).map((c) => c.label).join('') === 'four');
 
   const blank = gradeQuestion(q, undefined, undefined, []);
   check('no answers at all fails every blank (never "pending")',
@@ -284,18 +284,22 @@ console.log('\n[fill-in authoring]');
   // (1) A no-op creator edit reproduces the hand-written question exactly —
   // canonicalJson is the homework sync's own comparison, so P11 stays pristine.
   const p11Drafts = blankDraftsOf(p11);
+  const WORDS = ['zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten'];
   check('HW1 P11 loads as 11 drafts, each with its answer and the digits-only flag',
     p11Drafts.length === 11 && p11Drafts.every((d, i) =>
-      d.label === String(i) && d.answer === p11.fill_in_answers![i] && d.digitsOnly));
+      d.label === WORDS[i] && d.answer === p11.fill_in_answers![i] && d.digitsOnly));
   check('drafts → fields round-trips HW1 P11 byte-for-byte (canonicalJson)',
     canonicalJson(fillInFields(p11Drafts)) ===
       canonicalJson({ fill_in: p11.fill_in, fill_in_answers: p11.fill_in_answers }));
   check('...and keeps P11 in its `numericOnly: true` form',
     fillInFields(p11Drafts).fill_in.numericOnly === true);
-  const added = newBlankDraft(p11Drafts);
-  check('a new blank after 0–10 is labelled "11" and inherits digits-only',
+  const numbered = p11Drafts.map((d, i) => ({ ...d, label: String(i) }));
+  const added = newBlankDraft(numbered);
+  check('a new blank after blanks labelled 0–10 is labelled "11" and inherits digits-only',
     added.label === '11' && added.digitsOnly && added.answer === '' &&
-      !p11Drafts.some((d) => d.key === added.key));
+      !numbered.some((d) => d.key === added.key));
+  check('...and after P11\'s word labels takes the first unused number, "1"',
+    newBlankDraft(p11Drafts).label === '1');
   check('a question without a spec (new, or free response) has no drafts',
     blankDraftsOf(undefined).length === 0 &&
       blankDraftsOf(hw1.questions.find((x) => x.id === 10)).length === 0);
@@ -336,16 +340,16 @@ console.log('\n[fill-in authoring]');
   // confirms at save) exactly when a saved blank loses its slot.
   const labelsOf = (ls: string[]) => ls.join('|');
   const edited = p11Drafts.map((d, i) =>
-    i === 4 ? { ...d, label: 'four', answer: '0100', digitsOnly: false } : d);
+    i === 4 ? { ...d, label: 'the number four', answer: '0100', digitsOnly: false } : d);
   check('relabelling a saved blank, or changing its answer or flag, misplaces nothing',
     misplacedBlanks(p11Drafts, edited).length === 0);
   check('appending blanks misplaces nothing',
     misplacedBlanks(p11Drafts, [...p11Drafts, newBlankDraft(p11Drafts)]).length === 0);
-  check('removing blank "3" misplaces the answers to "3" and every blank after it',
+  check('removing blank "three" misplaces the answers to "three" and every blank after it',
     labelsOf(misplacedBlanks(p11Drafts, p11Drafts.filter((_, i) => i !== 3))) ===
-      '3|4|5|6|7|8|9|10');
+      'three|four|five|six|seven|eight|nine|ten');
   check('swapping two blanks misplaces exactly those two',
-    labelsOf(misplacedBlanks(p11Drafts, moveItem(p11Drafts, 0, 1))) === '0|1');
+    labelsOf(misplacedBlanks(p11Drafts, moveItem(p11Drafts, 0, 1))) === 'zero|one');
   check('inserting a new blank first misplaces every saved one',
     misplacedBlanks(p11Drafts, [newBlankDraft(p11Drafts), ...p11Drafts]).length === 11);
   check('saving no blanks (the question stops being fill-in) misplaces every saved one',

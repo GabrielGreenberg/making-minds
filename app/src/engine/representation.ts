@@ -12,16 +12,18 @@
 
 import type { RepSystem } from '../types';
 
-/** Valid tally: consecutive 1's from the left, then 0's. Returns count or null. */
+/** Valid tally: 0's, then consecutive 1's to the right end — `0…01…1`, the
+ *  textbook's "Tally Syntax" (pp. 26–27: `0011` is two; `1000` is no numeral)
+ *  and spec §Tally. Returns the count of 1's, or null when a 0 follows a 1. */
 export function bitsToTally(bits: number[]): number | null {
-  let seenZero = false;
+  let seenOne = false;
   let count = 0;
   for (const b of bits) {
     if (b === 1) {
-      if (seenZero) return null; // 1 after a 0 → invalid
+      seenOne = true;
       count++;
-    } else {
-      seenZero = true;
+    } else if (seenOne) {
+      return null; // 0 after a 1 → invalid
     }
   }
   return count;
@@ -55,12 +57,14 @@ export function interpretBits(bits: number[], rep: RepSystem): string {
  * Encode a non-negative integer as exactly `width` bits under `rep`.
  * - binary: MSB first, masked to the least-significant `width` bits — this
  *   truncation is the **implicit modulus** the reference-function DSL relies on.
- * - tally: `n` ones followed by zeros, clamped into 0..width.
+ * - tally: zeros, then `n` ones at the right end (`0…01…1`), clamped into
+ *   0..width. On the space axis the ones sit on the last wires; on the time
+ *   axis (LSB at t1) they arrive first, at t1..tn.
  */
 export function valueToBits(n: number, width: number, rep: RepSystem): number[] {
   if (rep === 'tally') {
     const ones = Math.max(0, Math.min(width, n));
-    return Array.from({ length: width }, (_, i) => (i < ones ? 1 : 0));
+    return Array.from({ length: width }, (_, i) => (i >= width - ones ? 1 : 0));
   }
   // binary, MSB first; mask to the least-significant `width` bits.
   return Array.from({ length: width }, (_, i) => (n >> (width - 1 - i)) & 1);
@@ -68,7 +72,7 @@ export function valueToBits(n: number, width: number, rep: RepSystem): number[] 
 
 /**
  * Is `bits` a legal codeword under `rep`? Binary accepts everything; tally
- * requires consecutive 1's then 0's (so `101` is rejected, not decoded). This is
+ * requires 0's then consecutive 1's (so `101` and `110` are rejected, not decoded). This is
  * the codec's rep-level acceptance check — run BEFORE `bitsToValue`.
  */
 export function isValidCodeword(bits: number[], rep: RepSystem): boolean {

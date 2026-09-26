@@ -1,7 +1,7 @@
 import { createContext, useContext, useState, useCallback, useEffect } from 'react';
 import type { ReactNode } from 'react';
 import type { AuthUser, AuthContextValue, AuthCapabilities, AuthAttemptResult } from './types';
-import { SESSION_KEY, KNOWN_KEY, findAccount, readPersistedAccount, markSignedInBefore, hasAnyKey } from './accounts';
+import { SESSION_KEY, findAccount, readPersistedAccount } from './accounts';
 import { setSessionUser, getSessionUser } from './session';
 import { backendMode } from '../storage/backend';
 import { migrateLocalData } from '../storage/migrateLocal';
@@ -31,9 +31,7 @@ import * as api from '../api/client';
 //
 // Neither mode requires a user: with nobody signed in and nothing resolving,
 // the principal is the VISITOR (`isVisitor`), who may use the public routes
-// (routing.ts `routeAccess`). Every successful sign-in or restore also sets
-// the durable "signed in before" marker (accounts.ts KNOWN_KEY) that the boot
-// landing rule reads.
+// (routing.ts `routeAccess`).
 //
 // Identity and role are never the client's decision in remote mode — they are
 // whatever the server's AuthProvider returns (server/src/auth.ts), which is
@@ -64,7 +62,6 @@ const AuthContext = createContext<AuthContextValue>({
   user: null,
   loading: false,
   isVisitor: true,
-  hasSignInTrace: () => false,
   capabilities: LOCAL_CAPABILITIES,
   login: async () => UNSUPPORTED,
   register: async () => UNSUPPORTED,
@@ -115,13 +112,10 @@ function writePrincipalHint(email: string | null): void {
   }
 }
 
-const localHasSignInTrace = () => hasAnyKey([SESSION_KEY, KNOWN_KEY]);
-
 function LocalAuthProvider({ children }: { children: ReactNode }) {
   // Seed from the persisted session so a reload stays logged in.
   const [user, setUserState] = useState<AuthUser | null>(() => {
     const u = accountToUser(readPersistedAccount());
-    if (u) markSignedInBefore();
     reportPrincipal(u?.email ?? null);
     return u;
   });
@@ -139,7 +133,6 @@ function LocalAuthProvider({ children }: { children: ReactNode }) {
     } catch {
       // localStorage unavailable — the session just won't persist across reloads.
     }
-    markSignedInBefore();
     changeUser(accountToUser(account));
     return { ok: true, error: null };
   }, [changeUser]);
@@ -161,7 +154,6 @@ function LocalAuthProvider({ children }: { children: ReactNode }) {
         user,
         loading: false,
         isVisitor: user == null,
-        hasSignInTrace: localHasSignInTrace,
         capabilities: LOCAL_CAPABILITIES,
         login,
         register: unsupported,
@@ -202,8 +194,6 @@ function describeError(e: unknown, fallback: string): string {
   return fallback;
 }
 
-const remoteHasSignInTrace = () => api.getToken() != null || hasAnyKey([KNOWN_KEY]);
-
 function RemoteAuthProvider({ children }: { children: ReactNode }) {
   // Session restore and the capabilities fetch wait for the health probe: a
   // visitor's sandbox renders without the server, but nothing here may read
@@ -228,10 +218,7 @@ function RemoteAuthProvider({ children }: { children: ReactNode }) {
     reportPrincipal(u?.email ?? null);
     setSessionUser(u);
     setUserState(u);
-    if (u) {
-      markSignedInBefore();
-      writePrincipalHint(u.email);
-    }
+    if (u) writePrincipalHint(u.email);
   }, []);
 
   // Ask the server what its sign-in system offers. The login screen waits for
@@ -383,7 +370,6 @@ function RemoteAuthProvider({ children }: { children: ReactNode }) {
         user,
         loading,
         isVisitor: user == null && !loading,
-        hasSignInTrace: remoteHasSignInTrace,
         capabilities,
         login,
         register,

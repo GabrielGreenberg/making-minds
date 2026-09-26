@@ -51,12 +51,6 @@ export interface AuthContextValue {
    */
   isVisitor: boolean;
   /**
-   * Whether this browser shows any trace of a previous sign-in (a session
-   * record, a token, or the durable marker). Read once at boot for the
-   * landing rule (routing.ts `landingRoute`).
-   */
-  hasSignInTrace(): boolean;
-  /**
    * What this server's sign-in system supports. Null while it is still being
    * fetched (remote mode, first paint).
    */

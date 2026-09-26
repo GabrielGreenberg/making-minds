@@ -45,7 +45,7 @@ import {
   validateTurbotTM,
   validateTurbotFSM,
 } from './turbot';
-import { validateMachine, validateAllowedComponents, validateComponentLimits } from './machineValidation';
+import { validateMachine, validateModeMemory, validateAllowedComponents, validateComponentLimits } from './machineValidation';
 import {
   axisForMode,
   encodeInput,
@@ -117,13 +117,21 @@ export function gradingCircuit(circuit: CircuitData): CircuitData {
   return components === circuit.components ? circuit : { ...circuit, components };
 }
 
-/** The two question-wide component rules, checked together at the head of
- *  Stage 1 in every grading branch: which types are allowed, and how many of
- *  each. Both are absent by default and both recurse into BOXED internals. */
+/** The question-wide component rules, checked together at the head of Stage 1
+ *  in every grading branch: the mode's own (a combinatorial circuit holds no
+ *  memory — types.ts modeHoldsMemory; a turbot answers for its brain's mode),
+ *  then the question's: which types are allowed, and how many of each. The
+ *  question's two are absent by default; all three recurse into BOXED
+ *  internals. */
 export function questionComponentRules(
   question: AssignmentQuestion,
   circuit: CircuitData,
 ): { ok: boolean; reason?: string } {
+  const mode = question.buildMode === 'turbot' ? question.innerMode : question.buildMode;
+  if (mode) {
+    const memory = validateModeMemory(circuit, mode);
+    if (!memory.ok) return memory;
+  }
   const allowed = validateAllowedComponents(circuit, question.allowed_components);
   if (!allowed.ok) return allowed;
   return validateComponentLimits(circuit, question.component_limits);

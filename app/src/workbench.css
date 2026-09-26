@@ -1,0 +1,518 @@
+/* ═══════════════════════════════════════════════════════════════════════
+   workbench.css — the editor's frame (task 052)
+
+   The top bar, the question panel, the column dividers and collapse strips,
+   and the open / fill-in answer area: components/EditorShell.tsx,
+   EditorTopBar.tsx, QuestionPanel.tsx, OpenResponsePanel.tsx, FillInPanel.tsx.
+   The spec is docs/buildout/designs/editor-workbench.md (every size here is
+   its value); the look is the course website's, so this file speaks only in
+   theme.css's --mm-* tokens — themeCheck pins it literal-free, like pages.css.
+   Loaded last (main.tsx), so it may restyle an editor part it wraps.
+   ═══════════════════════════════════════════════════════════════════════ */
+
+/* ── The frame ─────────────────────────────────────────────────────────── */
+.wb { background: var(--mm-bg); }
+.wb-band { height: var(--mm-editor-band); background: var(--mm-lav); flex-shrink: 0; }
+.wb-body { flex: 1; min-height: 0; display: flex; }
+.wb-left { flex-shrink: 0; min-height: 0; display: flex; flex-direction: column; background: var(--mm-bg); overflow: hidden; }
+.wb-center { flex: 1; min-width: 0; min-height: 0; display: flex; flex-direction: column; }
+.wb-right { flex-shrink: 0; min-height: 0; display: flex; flex-direction: column; background: var(--mm-surface); overflow: hidden; }
+.wb-right-head {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 10px 12px 4px 22px; flex-shrink: 0; background: var(--mm-surface);
+}
+.wb-right-body { flex: 1; min-height: 0; display: flex; }
+.wb-right-head .wb-collapse {
+  width: 32px; height: 32px; border: 0; background: none; cursor: pointer;
+  color: var(--mm-ink-3); font-size: 16px; line-height: 1;
+}
+.wb-right-head .wb-collapse:hover { color: var(--mm-accent); background: var(--mm-lav-soft); }
+
+/* A column divider: a 9px hit area that nets 1px of layout, the visible rule
+   in its middle, a grip at half height. */
+.wb-divider {
+  position: relative; flex: 0 0 9px; margin: 0 -4px; z-index: 5;
+  cursor: col-resize; touch-action: none; background: transparent;
+}
+.wb-divider::before {
+  content: ''; position: absolute; top: 0; bottom: 0; left: 4px; width: 1px; background: var(--mm-line-2);
+}
+.wb-divider:hover, .wb-divider:active { background: var(--mm-divider-hover); }
+.wb-divider:focus-visible { outline: 2px solid var(--mm-focus); outline-offset: -2px; }
+.wb-divider-grip {
+  position: absolute; top: 50%; left: 1px; width: 7px; height: 30px; transform: translateY(-50%);
+  background: var(--mm-surface); border: 1px solid var(--mm-edge);
+}
+.wb-divider-grip::after {
+  content: ''; position: absolute; left: 2px; top: 7px; width: 1px; height: 14px; background: var(--mm-edge-2);
+}
+
+/* A collapsed side panel: a 40px strip that opens it again. */
+.wb-strip {
+  flex: 0 0 40px; min-height: 0; display: flex; flex-direction: column; align-items: center; gap: 10px;
+  padding: 6px 0 0; border: 0; background: var(--mm-surface); color: var(--mm-ink); cursor: pointer; overflow: hidden;
+}
+.wb-strip--left { border-right: 1px solid var(--mm-line-2); }
+.wb-strip--right { border-left: 1px solid var(--mm-line-2); }
+.wb-strip-toggle { width: 30px; height: 30px; display: grid; place-items: center; color: var(--mm-accent); font-size: 16px; }
+.wb-strip:hover .wb-strip-toggle { background: var(--mm-lav-soft); }
+.wb-strip-title {
+  writing-mode: vertical-rl; font-family: var(--mm-font-serif); font-size: 15px; font-weight: 600;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-height: calc(100% - 60px);
+}
+.wb-strip-title--eyebrow {
+  font-family: var(--mm-font-sans); font-size: var(--mm-fs-eyebrow); letter-spacing: var(--mm-tracking-eyebrow);
+  text-transform: uppercase; color: var(--mm-ink-3);
+}
+
+/* ── The top bar ───────────────────────────────────────────────────────── */
+.wb-topbar {
+  position: relative; z-index: 100; flex-shrink: 0;
+  height: 48px; padding: 0 20px; display: flex; align-items: center; gap: 18px;
+  background: var(--mm-surface); border-bottom: 1px solid var(--mm-line);
+}
+.wb-brand {
+  display: inline-flex; align-items: baseline; gap: 10px; flex-shrink: 0; white-space: nowrap;
+  font-family: var(--mm-font-serif); font-weight: 700; font-size: 17px; color: var(--mm-ink); text-decoration: none;
+}
+a.wb-brand:hover { color: var(--mm-accent); text-decoration: none; }
+.wb-course {
+  font-family: var(--mm-font-sans); font-size: 11px; font-weight: 600; letter-spacing: 0.09em; color: var(--mm-accent);
+}
+.wb-crumbs {
+  display: flex; align-items: center; min-width: 0; flex: 0 1 auto;
+  font-size: var(--mm-fs-small); color: var(--mm-ink-3); white-space: nowrap;
+}
+.wb-crumbs > a { color: inherit; text-decoration: none; flex-shrink: 0; }
+.wb-crumbs > a:hover { color: var(--mm-accent); }
+.wb-crumb-sep { color: var(--mm-line-2); padding: 0 4px; flex-shrink: 0; }
+.wb-crumbs > .wb-crumb-current {
+  color: var(--mm-ink); font-weight: 500; min-width: 0; flex-shrink: 1; overflow: hidden; text-overflow: ellipsis;
+}
+.wb-crumbs > a.wb-crumb-current:hover { color: var(--mm-accent); }
+/* The sandbox's File menu sits after its crumb. */
+.wb-crumbs .menu-item { font-size: var(--mm-fs-small); color: var(--mm-ink-2); margin-left: 8px; }
+.wb-topbar-right { margin-left: auto; display: flex; align-items: center; gap: 14px; flex-shrink: 0; }
+.wb-save { font-size: var(--mm-fs-meta); color: var(--mm-ink-3); white-space: nowrap; }
+.wb-save--error { color: var(--mm-danger); font-weight: 600; }
+.wb-submitted, .wb-lock { font-size: var(--mm-fs-meta); color: var(--mm-ink-2); white-space: nowrap; }
+.wb-topbar .wb-primary { font-size: 13px; font-weight: 600; padding: 6px 12px; }
+
+/* The session controls, as the top bar shows them. */
+.wb-topbar .session { display: flex; align-items: center; gap: 14px; font-size: var(--mm-fs-small); color: var(--mm-ink-2); white-space: nowrap; }
+.wb-topbar .session > .who { color: var(--mm-ink-3); }
+.wb-topbar .session > button, .session-who {
+  border: 0; background: none; padding: 0; font: inherit; color: var(--mm-ink-2); cursor: pointer;
+}
+.wb-topbar .session > button:hover, .session-who:hover, .session-who[aria-expanded="true"] { color: var(--mm-accent); }
+.session--menu { position: relative; }
+.session-caret { margin-left: 4px; font-size: 11px; }
+.session-menu {
+  position: absolute; right: 0; top: calc(100% + 10px); min-width: 170px; z-index: 200;
+  display: flex; flex-direction: column; padding: 4px 0;
+  background: var(--mm-surface); border: 1px solid var(--mm-line-2);
+}
+.session-menu > button {
+  border: 0; background: none; font: inherit; font-size: var(--mm-fs-small); color: var(--mm-ink);
+  text-align: left; padding: 8px 16px; cursor: pointer;
+}
+.session-menu > button:hover, .session-menu > button:focus-visible { background: var(--mm-lav-soft); outline: none; }
+
+/* ── The question panel ────────────────────────────────────────────────── */
+.qp { display: flex; flex-direction: column; height: 100%; min-height: 0; }
+
+.qp-nav {
+  height: 34px; flex-shrink: 0; display: flex; align-items: center; gap: 2px; padding: 0 6px 0 10px;
+  background: var(--mm-surface-3); border-bottom: 1px solid var(--mm-line);
+}
+/* Buttons inside .mm-surface inherit its 15px (theme.css), so the panel's own
+   sizes are set one level deeper. */
+.qp .qp-navbtn {
+  height: 26px; padding: 0 8px; border: 0; background: none; cursor: pointer;
+  font: inherit; font-size: var(--mm-fs-meta); font-weight: 500; color: var(--mm-ink); white-space: nowrap;
+}
+.qp .qp-navbtn:hover:not(:disabled) { background: var(--mm-lav-soft); }
+.qp .qp-navbtn:disabled { color: var(--mm-ink-3); opacity: 0.45; cursor: default; }
+.qp-pos {
+  margin-left: auto; display: flex; align-items: center; gap: 6px; min-width: 0;
+  font-size: 12px; color: var(--mm-ink-3); font-variant-numeric: tabular-nums; white-space: nowrap;
+}
+.qp-tag {
+  font-size: 11px; font-weight: 600; color: var(--mm-ink-2); padding: 1px 6px;
+  background: var(--mm-surface); border: 1px solid var(--mm-line-2); overflow: hidden; text-overflow: ellipsis;
+}
+.qp .qp-collapse {
+  width: 28px; height: 26px; flex-shrink: 0; border: 0; background: none; cursor: pointer;
+  color: var(--mm-ink-3); font-size: 15px; line-height: 1;
+}
+.qp .qp-collapse:hover { color: var(--mm-accent); background: var(--mm-lav-soft); }
+
+/* The current question: it takes what it needs, up to 64% of the panel, and
+   scrolls on its own; the question list below has the rest. */
+.qp-current {
+  flex-shrink: 0; max-height: 64%; overflow-y: auto;
+  display: flex; flex-direction: column; gap: 12px; padding: 16px 20px 22px; background: var(--mm-surface);
+}
+.qp-eyebrow { font-size: 11px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--mm-accent); }
+.mm-surface .qp-title {
+  margin: -6px 0 0; font-family: var(--mm-font-serif); font-size: 19px; font-weight: 600; line-height: 1.25;
+  color: var(--mm-ink); text-wrap: balance;
+}
+.qp-meta { margin-top: -8px; font-size: var(--mm-fs-meta); color: var(--mm-ink-3); }
+.qp-statement { font-size: 15px; line-height: 1.5; color: var(--mm-ink-2); }
+.qp-statement strong, .qp-statement b { color: var(--mm-ink); font-weight: 600; }
+.qp-statement .statement-para + .statement-para,
+.qp-statement .statement-list + .statement-para,
+.qp-statement .statement-para + .statement-list { margin-top: 10px; }
+.qp-intro + .ps-body { margin-top: 10px; }
+.qp-statement .ps-figure { margin: 12px 0 0; }
+.qp .ps-figure img { max-width: 100%; height: auto; }
+
+/* The goal table: the problem's input-output profile (statementFormat.ts
+   lifts it out of the statement — never built from the answer key). Plex Sans
+   with tabular digits (Gabriel, 2026-09-25), fixed 60px columns. */
+.qp-statement .statement-io-wrap { margin: 12px 0 0; }
+.qp-statement .statement-io-table {
+  font-family: var(--mm-font-sans); font-variant-numeric: tabular-nums; font-size: 14px; border-collapse: collapse;
+}
+.qp-statement .statement-io-table th,
+.qp-statement .statement-io-table td {
+  width: 60px; padding: 8px 0; text-align: center; border: 0; border-bottom: 1px solid var(--mm-line); color: var(--mm-ink);
+}
+.qp-statement .statement-io-table th {
+  padding: 6px 0; background: none; border-bottom-color: var(--mm-line-2);
+  font-size: 11px; font-weight: 600; letter-spacing: 0.08em; color: var(--mm-ink-3);
+}
+.qp-statement .statement-io-table .statement-io-out { border-left: 1px solid var(--mm-line-2); }
+
+/* Caution notes stay in view; hints and a section's notes open from a link. */
+.qp-caution, .qp-note { padding: 10px 12px; font-size: 14px; line-height: 1.45; color: var(--mm-ink-2); }
+.qp-caution { background: var(--mm-warn-soft); }
+.qp-note { background: var(--mm-surface-3); }
+.qp-note-lead { color: var(--mm-ink); }
+.qp-caution .qp-note-lead { color: var(--mm-warn); }
+.qp-caution .statement-para + .statement-para, .qp-note .statement-para + .statement-para { margin-top: 8px; }
+.qp .qp-link {
+  border: 0; background: none; padding: 0; cursor: pointer; text-align: left;
+  font: inherit; font-size: var(--mm-fs-small); font-weight: 500; color: var(--mm-link);
+}
+.qp-link:hover { text-decoration: underline; }
+.qp-link-caret { display: inline-block; width: 0.8em; }
+.qp-disclosure-body { margin-top: 8px; display: flex; flex-direction: column; gap: 8px; }
+
+/* The done mark: the student's own, and still a lock (store.ts). */
+.qp .qp-done-label {
+  display: inline-flex; align-items: center; gap: 10px; min-height: 32px; padding: 0; cursor: pointer;
+  border: 0; background: none; font: inherit; font-size: var(--mm-fs-small); color: var(--mm-ink-2); text-align: left;
+}
+.qp .qp-done-label:focus-visible { outline: none; }
+.qp-done-box {
+  width: 18px; height: 18px; flex-shrink: 0; display: grid; place-items: center;
+  border: 1px solid var(--mm-edge-2); background: var(--mm-surface); color: var(--mm-surface); font-size: 12px; line-height: 1;
+}
+.qp-done-box--on { background: var(--mm-accent); border-color: var(--mm-accent); }
+.qp-done-label:focus-visible .qp-done-box { outline: 2px solid var(--mm-focus); outline-offset: 1px; }
+.qp-done-note { margin: 2px 0 0 28px; font-size: var(--mm-fs-meta); color: var(--mm-ink-3); }
+
+/* The homework's questions, grouped by section. */
+.qp-list-head {
+  height: 34px; flex-shrink: 0; display: flex; align-items: center; padding: 0 20px;
+  background: var(--mm-surface-2); border-top: 1px solid var(--mm-edge); border-bottom: 1px solid var(--mm-line);
+  font-size: var(--mm-fs-eyebrow); font-weight: 600; letter-spacing: var(--mm-tracking-eyebrow); text-transform: uppercase; color: var(--mm-ink);
+}
+.qp-list { flex: 1; min-height: 0; overflow-y: auto; padding-bottom: 12px; }
+.qp-list-label {
+  padding: 12px 20px 4px; font-size: 10.5px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--mm-ink-3);
+}
+.qp .qp-row {
+  display: grid; grid-template-columns: 30px minmax(0, 1fr) auto 50px; gap: 8px; align-items: center;
+  width: 100%; min-height: 36px; padding: 0 20px; border: 0; background: none; cursor: pointer; text-align: left;
+  font: inherit; font-size: var(--mm-fs-small); color: var(--mm-ink);
+}
+.qp .qp-row:hover, .qp .qp-row--current { background: var(--mm-lav-soft); }
+.qp .qp-row--current { font-weight: 600; }
+.qp-row-num { font-family: var(--mm-font-mono); font-size: 12px; font-weight: 400; color: var(--mm-ink-3); }
+.qp-row-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.qp-row-name--dim { color: var(--mm-ink-3); }
+.qp-row--current .qp-row-name--dim { color: var(--mm-ink); }
+.qp-row-tag {
+  padding: 1px 6px; white-space: nowrap;
+  font-size: 10.5px; font-weight: 500; letter-spacing: 0; text-transform: none; color: var(--mm-ink-2); background: var(--mm-surface-2);
+}
+.qp-row-tag.qp-row-tag--machine {
+  font-family: var(--mm-font-mono); font-weight: 600; color: var(--mm-accent); background: var(--mm-accent-soft);
+}
+.qp-row-mark { font-size: var(--mm-fs-eyebrow); font-weight: 400; }
+.qp-row-mark--done { color: var(--mm-accent); font-weight: 600; }
+.qp-row-mark--started { color: var(--mm-warn); }
+
+/* ── The answer area (open and fill-in questions) ─────────────────────── */
+.wb-answer { flex: 1; min-height: 0; overflow: auto; padding: 40px 48px; background: var(--mm-surface); }
+.wb-answer-inner { max-width: 640px; }
+.wb-answer-eyebrow { margin-bottom: 10px; }
+.wb-answer-text {
+  display: block; width: 100%; min-height: 260px; resize: vertical; padding: 14px 16px;
+  font-family: var(--mm-font-sans); font-size: 16px; line-height: 1.6; color: var(--mm-ink);
+  background: var(--mm-surface); border: 1px solid var(--mm-line-2); border-radius: var(--mm-radius);
+}
+.wb-answer-text:focus, .wb-fill-input:focus { outline: none; border-color: var(--mm-accent); }
+.wb-answer-text[readonly], .wb-fill-input[readonly] { background: var(--mm-surface-3); color: var(--mm-ink-2); }
+.wb-fill-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 12px 16px; }
+.wb-fill-field { display: flex; flex-direction: column; gap: 6px; }
+.wb-fill-label { font-size: var(--mm-fs-small); color: var(--mm-ink-2); }
+.wb-fill-input {
+  height: 44px; padding: 0 12px; font-family: var(--mm-font-mono); font-size: 16px; color: var(--mm-ink);
+  background: var(--mm-surface); border: 1px solid var(--mm-line-2); border-radius: var(--mm-radius);
+}
+.wb-answer-foot { margin-top: 10px; font-size: var(--mm-fs-meta); color: var(--mm-ink-3); text-align: left; }
+.wb-answer-foot.paste-notice { color: var(--mm-link); font-weight: 500; }
+.wb-answer-foot--error { color: var(--mm-danger); }
+
+/* ── The output panel (task 053) ──────────────────────────────────────── */
+.wb-right .data-table-panel { background: var(--mm-surface); }
+.op { flex: 1; min-width: 0; min-height: 0; display: flex; flex-direction: column; }
+/* ONE control row for whatever the canvas runs (OutputPanel). */
+.op-controls {
+  flex-shrink: 0; display: flex; align-items: center; gap: 8px; padding: 8px 22px 0;
+  background: var(--mm-surface);
+}
+.op-controls .op-btn {
+  height: 34px; padding: 0 12px; display: inline-flex; align-items: center; gap: 6px;
+  font: inherit; font-size: 13px; font-weight: 600; color: var(--mm-ink);
+  background: var(--mm-surface); border: 1px solid var(--mm-line-2); border-radius: var(--mm-radius); cursor: pointer;
+}
+.op-controls .op-btn:hover:not(:disabled) { background: var(--mm-lav-soft); }
+.op-controls .op-btn:disabled { color: var(--mm-ink-3); opacity: 0.45; cursor: default; }
+.op-btn-icon { color: var(--mm-accent); font-size: 11px; }
+.op-status {
+  margin-left: auto; font-size: var(--mm-fs-meta); color: var(--mm-ink-3);
+  font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+
+/* A combinational circuit's live truth table (LiveTruthTable), styled like
+   the question panel's goal table: Plex Sans tabular, a 1 in the signal-1
+   red, the current row lavender. */
+.op-body { padding: 14px 22px 16px; font-size: 14px; }
+.op-table {
+  table-layout: fixed; border-collapse: collapse;
+  font-family: var(--mm-font-sans); font-variant-numeric: tabular-nums; font-size: 14px; color: var(--mm-ink);
+}
+.op-table th {
+  padding: 6px 0; text-align: center; border-bottom: 1px solid var(--mm-line-2);
+  font-size: 11px; font-weight: 600; letter-spacing: 0.08em; color: var(--mm-ink-3);
+}
+.op-table td { padding: 8px 0; text-align: center; border-bottom: 1px solid var(--mm-line); }
+.op-table .op-out { border-left: 1px solid var(--mm-line-2); }
+.op-table .op-1 { color: var(--mm-signal-1); font-weight: 600; }
+.op-row { cursor: pointer; }
+.op-row:hover td { background: var(--mm-surface-3); }
+.op-row--current td, .op-row--current:hover td { background: var(--mm-lav-soft); }
+.op-row:focus-visible { outline: 2px solid var(--mm-focus); outline-offset: -2px; }
+.op-note { margin: 10px 0 0; font-size: var(--mm-fs-meta); color: var(--mm-ink-3); }
+.op-empty { margin: 4px 0 0; font-size: var(--mm-fs-small); color: var(--mm-ink-3); max-width: 34ch; }
+
+/* ── The canvas's edit actions (CanvasActions, task 053) ─────────────── */
+.cv-actions {
+  position: absolute; top: 12px; right: 14px; z-index: 40;
+  display: flex; flex-direction: column; align-items: flex-end; gap: 4px; font-family: var(--mm-font-sans);
+}
+.cv-group { display: flex; background: var(--mm-surface); border: 1px solid var(--mm-line-2); }
+.cv-group > button {
+  padding: 6px 12px; border: 0; background: none; cursor: pointer; white-space: nowrap;
+  font: inherit; font-size: 13px; color: var(--mm-ink);
+}
+.cv-group > button + button { border-left: 1px solid var(--mm-line); }
+.cv-group > button:hover:not(:disabled) { background: var(--mm-lav-soft); }
+.cv-group > button:disabled { color: var(--mm-ink-3); opacity: 0.45; cursor: default; }
+.cv-hint { font-size: 11.5px; color: var(--mm-ink-3); }
+.cv-confirm {
+  width: 240px; padding: 12px 14px; font-size: var(--mm-fs-small);
+  background: var(--mm-surface); border: 1px solid var(--mm-line-2); box-shadow: var(--mm-shadow);
+}
+.cv-confirm p { margin: 0 0 10px; }
+.cv-confirm-actions { display: flex; justify-content: flex-end; gap: 8px; }
+
+/* ── The floating palette and its Boxes pop-out (Palette.tsx, task 054) ─ */
+.pal {
+  position: absolute; z-index: 45; display: flex; flex-direction: column;
+  background: var(--mm-surface); border: 1px solid var(--mm-line-2); box-shadow: var(--mm-shadow-palette);
+  font-family: var(--mm-font-sans); user-select: none; touch-action: none;
+}
+.pal--horiz { flex-direction: row; }
+.pal--dragging { box-shadow: var(--mm-shadow-palette-drag); }
+.pal--pin-target { border-color: var(--mm-accent); }
+.pal-grip {
+  height: 16px; display: grid; place-items: center; flex-shrink: 0;
+  background: var(--mm-surface-3); cursor: grab;
+}
+.pal--dragging .pal-grip { cursor: grabbing; }
+.pal--horiz .pal-grip { height: auto; width: 16px; }
+/* (.pal-scoped: the canvas's own `.canvas-container svg` rule sizes every svg in it to 100%.) */
+.pal .pal-grip-ico { width: 12px; height: 12px; fill: var(--mm-ink-3); }
+.pal-groupwrap { display: flex; flex-direction: column; }
+.pal--horiz .pal-groupwrap { flex-direction: row; }
+.pal-group { display: flex; flex-direction: column; }
+.pal--horiz .pal-group { flex-direction: row; }
+.pal-div { height: 1px; background: var(--mm-line); flex-shrink: 0; }
+.pal--horiz .pal-div { height: auto; width: 1px; }
+.pal-tile {
+  position: relative; width: 58px; min-height: 44px; padding: 7px 0 6px;
+  display: flex; flex-direction: column; align-items: center; gap: 4px;
+  border: 0; background: none; font: inherit; color: var(--mm-ink); cursor: pointer;
+}
+.pal-tile:hover, .pal-tile--armed { background: var(--mm-lav-soft); }
+.pal-tile:focus-visible { outline: 2px solid var(--mm-focus); outline-offset: -2px; }
+.pal-tile--off { opacity: 0.3; cursor: not-allowed; }
+.pal-tile--off:hover { background: none; }
+.pal-tile-label {
+  max-width: 54px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  font-size: 10.5px; font-weight: 500; line-height: 1.1; color: var(--mm-ink-2);
+}
+.pal-badge {
+  position: absolute; top: 3px; right: 5px; min-width: 16px; height: 16px; padding: 0 4px;
+  display: grid; place-items: center; box-sizing: border-box;
+  background: var(--mm-accent); color: var(--mm-surface);
+  font-family: var(--mm-font-mono); font-size: 10px; font-weight: 600; line-height: 1;
+}
+.pal-turn {
+  height: 24px; display: grid; place-items: center; flex-shrink: 0;
+  border: 0; background: none; color: var(--mm-ink-3); cursor: pointer;
+}
+.pal--horiz .pal-turn { height: auto; width: 24px; }
+.pal-turn:hover:not(:disabled) { background: var(--mm-lav-soft); color: var(--mm-ink); }
+.pal-turn:disabled { opacity: 0.35; cursor: default; }
+/* The tile icons: 36×26, stroke 1.6 in the ink colour, round caps and joins. */
+.pal .pal-ico, .pal-pop .pal-ico {
+  width: 36px; height: 26px; flex-shrink: 0; overflow: visible;
+  fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round;
+}
+.pal-ico .pal-ico-dot { fill: currentColor; stroke: none; }
+.pal-ico .pal-ico-fill { fill: var(--mm-surface-3); }
+.pal-ico text { fill: currentColor; stroke: none; font-family: var(--mm-font-sans); font-size: 10px; font-weight: 600; }
+.pal .pal-turn-ico { width: 14px; height: 14px; }
+
+.pal-pop {
+  position: absolute; z-index: 46; width: 260px; display: flex; flex-direction: column;
+  background: var(--mm-surface); border: 1px solid var(--mm-line-2); box-shadow: var(--mm-shadow-popout);
+  font-family: var(--mm-font-sans); color: var(--mm-ink);
+}
+.pal-pop-head { display: flex; align-items: center; justify-content: space-between; padding: 10px 8px 6px 12px; }
+.pal-pop-title { font-size: 11px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--mm-accent); }
+.pal-pop-close { border: 0; background: none; padding: 0 4px; font-size: 17px; line-height: 1; color: var(--mm-ink-3); cursor: pointer; }
+.pal-pop-close:hover { color: var(--mm-ink); }
+.pal-pop-list { flex: 1; min-height: 0; overflow-y: auto; }
+.pal-pop-empty { margin: 0; padding: 4px 12px 12px; font-size: 12.5px; line-height: 1.45; color: var(--mm-ink-3); }
+.pal-row {
+  display: grid; grid-template-columns: 36px 1fr auto; gap: 10px; align-items: center;
+  padding: 8px 12px; cursor: grab; user-select: none; touch-action: none;
+}
+.pal-row:hover, .pal-row--armed { background: var(--mm-lav-soft); }
+.pal-row:focus-visible { outline: 2px solid var(--mm-focus); outline-offset: -2px; }
+.pal-row--off { cursor: not-allowed; }
+.pal-row--off .pal-row-icon, .pal-row--off .pal-row-label, .pal-row--off .pal-row-meta { opacity: 0.3; }
+.pal-row--off:hover { background: none; }
+.pal-row-icon { display: grid; place-items: center; color: var(--mm-ink); }
+.pal-row-text { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.pal-row-name { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.pal-row-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13.5px; font-weight: 600; }
+.pal-row-tools { display: flex; gap: 2px; opacity: 0; }
+.pal-row:hover .pal-row-tools, .pal-row:focus-within .pal-row-tools { opacity: 1; }
+.pal-row-tools > button {
+  border: 0; background: none; padding: 0 3px; font-size: 11px; line-height: 1.4;
+  color: var(--mm-ink-3); cursor: pointer;
+}
+.pal-row-tools > button:hover { color: var(--mm-accent); }
+/* Wraps rather than clip: beside the pin button the column is ~85px, and "· Problem 12" is the point. */
+.pal-row-meta { font-size: 11.5px; line-height: 1.35; color: var(--mm-ink-3); }
+.pal-row-rename { display: flex; flex-direction: column; gap: 4px; cursor: auto; }
+.pal-row-rename input {
+  width: 100%; box-sizing: border-box; padding: 3px 6px; font: inherit; font-size: 13px;
+  border: 1px solid var(--mm-accent); background: var(--mm-surface); color: var(--mm-ink); outline: none;
+}
+.pal-row-notice { font-size: 11.5px; line-height: 1.4; color: var(--mm-link); }
+.pal-pin {
+  padding: 4px 8px; font: inherit; font-size: 12px; white-space: nowrap; cursor: pointer;
+  background: var(--mm-surface); border: 1px solid var(--mm-line-2); color: var(--mm-ink-2);
+}
+.pal-pin:hover { border-color: var(--mm-accent); }
+.pal-pin--on { color: var(--mm-accent); border-color: var(--mm-lav-line); }
+.pal-pop-foot { padding: 10px 12px 12px; border-top: 1px solid var(--mm-line); }
+.pal-newbox {
+  width: 100%; height: 34px; font: inherit; font-size: 13px; font-weight: 600; cursor: pointer;
+  background: var(--mm-surface); border: 1px solid var(--mm-line-2); color: var(--mm-ink);
+}
+.pal-newbox:hover, .pal-newbox--armed { background: var(--mm-lav-soft); }
+.pal-pop-note { margin: 8px 0 0; font-size: 12px; color: var(--mm-ink-3); }
+/* The part a dragged tile would place (CircuitCanvas PaletteGhost). */
+.cv-ghost { opacity: 0.55; }
+
+/* ── The canvas's look (CircuitCanvas, CanvasGuide — task 055) ────────── */
+/* Every canvas text: Plex Sans 600, tabular digits (decision 2). The SVG's
+   colours are theme roles (canvasTheme.ts); the dot grid is the container's
+   background, sized by the zoom (CircuitCanvas gridStyle). */
+.canvas-container > svg {
+  font-family: var(--mm-font-sans); font-weight: 600; font-variant-numeric: tabular-nums;
+}
+/* Zoom — bottom-right, 12/12: − · % · + · Fit, one joined group. */
+.cv-zoom {
+  position: absolute; right: 12px; bottom: 12px; z-index: 40; display: flex;
+  background: var(--mm-surface); border: 1px solid var(--mm-line-2); font-family: var(--mm-font-sans);
+}
+.cv-zoom > button {
+  padding: 5px 11px; border: 0; background: none; cursor: pointer;
+  font: inherit; font-size: 12.5px; color: var(--mm-ink-2); line-height: 1.3;
+}
+.cv-zoom > button + button { border-left: 1px solid var(--mm-line); }
+.cv-zoom > button:hover { background: var(--mm-lav-soft); }
+.cv-zoom > .cv-zoom-pct {
+  min-width: 48px; padding: 5px 8px; text-align: center;
+  font-family: var(--mm-font-mono); font-size: 11.5px; color: var(--mm-ink-2);
+}
+/* The hint line — bottom-left, 16/14, clear of the zoom group; the pointer passes through. */
+.cv-guide-hint {
+  position: absolute; left: 16px; bottom: 14px; right: 200px; z-index: 30; margin: 0;
+  width: fit-content; max-width: calc(100% - 216px); padding: 3px 8px;
+  font-family: var(--mm-font-sans); font-size: 12.5px; color: var(--mm-ink-3);
+  background: var(--mm-hint-bg); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  pointer-events: none;
+}
+/* The empty canvas's message — centred. */
+.cv-guide-empty {
+  position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); z-index: 30; margin: 0;
+  width: max-content; max-width: min(340px, calc(100% - 32px)); text-align: center;
+  font-family: var(--mm-font-sans); font-size: 15px; line-height: 1.5; color: var(--mm-ink-3);
+  pointer-events: none;
+}
+/* "The circuit is off screen" — the arrow that brings it back. */
+.cv-nav {
+  position: absolute; z-index: 50; width: 36px; height: 36px; border: 0; border-radius: 50%;
+  display: grid; place-items: center; cursor: pointer;
+  background: var(--mm-accent); color: var(--mm-surface); font-size: 18px; font-weight: 700;
+  box-shadow: var(--mm-shadow-palette-drag);
+}
+/* A drawn box's Ready to Box · Cancel. */
+.ready-to-box-btn { gap: 4px; }
+.cv-btn {
+  padding: 4px 10px; font: inherit; font-family: var(--mm-font-sans); font-size: 12px; font-weight: 600; cursor: pointer;
+  background: var(--mm-surface); color: var(--mm-ink); border: 1px solid var(--mm-line-2);
+}
+.cv-btn:hover { background: var(--mm-lav-soft); }
+.cv-btn--primary { background: var(--mm-accent); color: var(--mm-surface); border-color: var(--mm-accent); }
+.cv-btn--primary:hover { background: var(--mm-accent-2); border-color: var(--mm-accent-2); }
+/* Warn, don't block: loops, merged links, unbound boxes — above the hint line. */
+.validation-warnings {
+  position: absolute; bottom: 48px; left: 50%; transform: translateX(-50%); z-index: 50;
+  display: flex; flex-direction: column; gap: 4px;
+}
+.validation-warning {
+  padding: 4px 14px; white-space: nowrap; font-family: var(--mm-font-sans); font-size: 12px;
+  background: var(--mm-warn-soft); border: 1px solid var(--mm-warn); color: var(--mm-warn);
+}
+/* A refused paste explains itself (provenance.ts refusalMessage) — top centre. */
+.canvas-notice {
+  position: absolute; top: 10px; left: 50%; transform: translateX(-50%); z-index: 50;
+  max-width: min(560px, calc(100% - 32px)); padding: 6px 14px; text-align: center;
+  font-family: var(--mm-font-sans); font-size: 12.5px; line-height: 1.4;
+  background: var(--mm-surface); border: 1px solid var(--mm-accent); color: var(--mm-ink);
+  box-shadow: var(--mm-shadow-palette);
+}

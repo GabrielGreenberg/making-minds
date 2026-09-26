@@ -33,3 +33,16 @@
 2026-09-23-036 · feature · Identify students by UID, not only email — 37 of 87 class-list emails are not UCLA addresses · 2026-09-24T23:17:44-0700 · task/036-identity-by-uid · 9494934
 2026-09-25-041 · chore · Back up the pilot database daily and keep the copies for weeks, independent of releases · 2026-09-25T10:13:41-0700 · task/041-daily-backups · 58aac12
 2026-09-25-042 · feature · Release guardrails for unattended releases — a hold list, quiet hours, a deadline freeze, and a one-line note per release · 2026-09-25T10:45:51-0700 · task/042-release-gate · 0b91b2a
+2026-09-25-044 · bug · Write tally numerals with their 1s on the right, as the textbook and the spec do, on every axis · 2026-09-25T11:02:12-0700 · task/044-tally-ones-on-the-right · c026cdb
+2026-09-25-045 · bug · A combinatorial-circuit canvas never offers or accepts a memory (MEM) block · 2026-09-25T11:04:44-0700 · task/045-no-memory-in-cc · fc60a4c
+2026-09-25-046 · feature · Make HW1 release-ready — a box per part, autograded parts, typable symbols, a prominent schematic, an unclipped overview · 2026-09-25T11:16:30-0700 · task/046-hw1-release-ready · 279acc6
+2026-09-25-050 · chore · Stop linking HW1's PDF from the app — the app's HW1 now differs from the printed one · 2026-09-25T11:30:23-0700 · task/050-unlink-hw1-pdf · b4681fa
+2026-09-25-051 · chore · Bring HW1 in the textbook deck (MM.key) up to date with the app's HW1 — handed to the MM class session · 2026-09-25T11:32:58-0700 · (none) · (memo only)
+2026-09-22-029 · feature · The robot pipeline — an hourly auto-catch that chains into a one-task work run, in the robot's own clones, releasing through the guardrails · 2026-09-25T15:08:04-0700 · task/029-robot-pipeline · 5c1386f
+2026-09-25-052 · feature · Rebuild the question editor's frame as a workbench — a top bar, a question panel on the left, resizable and collapsible columns (editor redesign 1 of 6) · 2026-09-25T17:52:05-0700 · task/052-editor-workbench-shell · 93365f9
+2026-09-25-053 · feature · Give the editor one set of run controls in a right-hand Output panel, and retire the toolbar (editor redesign 2 of 6) · 2026-09-25T19:37:37-0700 · task/053-editor-output-panel · f09ccbf
+2026-09-25-060 · bug · Keep npm's lockfile rewrites on the pilot box from blocking a release — drop the stray root lockfile, discard npm drift before the pull · 2026-09-25T19:52:30-0700 · task/060-box-lockfile-drift · ae278e7
+2026-09-25-040 · feature · Land first-time visitors on the sign-in screen, not in the sandbox, and retire the sign-in trace that only served that rule · 2026-09-25T20:12:15-0700 · task/040-land-on-sign-in-screen · aa96d06
+2026-09-25-054 · feature · Replace the parts column with a floating, draggable palette and a Boxes pop-out where boxes can be pinned (editor redesign 3 of 6) · 2026-09-25T21:45:31-0700 · task/054-editor-floating-palette · 687e604
+2026-09-25-058 · bug · Make Ctrl/⌘+Shift+Z redo on every keyboard — the canvas compares the key's case, so Shift can turn "z" into "Z" and skip redo · 2026-09-25T21:45:31-0700 · task/054-editor-floating-palette · 687e604
+2026-09-25-055 · feature · Give the canvas the site's look — Plex Sans text, magenta selection, a dot grid, a hint line, an empty-canvas message and a Fit button (editor redesign 4 of 6) · 2026-09-26T09:56:41-0700 · task/055-editor-canvas-look · 33779c1

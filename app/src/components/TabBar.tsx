@@ -1,7 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { useStore, selectAssignmentFrozen } from '../store';
-import { navigate } from '../routing';
+import { useStore } from '../store';
 import type { BuildMode } from '../types';
 import { MachineMenu } from './MachineMenu';
 
@@ -146,99 +145,10 @@ function AddTabButton() {
   );
 }
 
+/** The sandbox's worksheet tabs — a strip over its canvas (an assignment's
+ *  questions are navigated from the question panel, QuestionPanel.tsx). */
 export function TabBar() {
-  const {
-    tabs,
-    activeTabId,
-    switchTab,
-    removeTab,
-    assignment,
-    currentQuestionIndex,
-    questionCircuits,
-    toggleCurrentQuestionDone,
-    viewingSubmission,
-  } = useStore();
-  const frozen = useStore(selectAssignmentFrozen);
-
-  if (assignment) {
-    // Per-question navigation: back to the assignment's question list, or to
-    // the previous/next question — one dedicated canvas per question. While a
-    // submission is on show, every link stays on that attempt (task 003).
-    const q = assignment.questions[currentQuestionIndex];
-    const count = assignment.questions.length;
-    const done = q ? (questionCircuits.get(q.id)?.done ?? false) : false;
-    const attempt = viewingSubmission?.attempt;
-    const go = (i: number) =>
-      navigate({ kind: 'assignment', id: assignment.id, attempt, questionIndex: i }, { replace: true });
-    return (
-      <div className="tab-bar question-nav">
-        <button
-          className="question-nav-back"
-          onClick={() => navigate({ kind: 'assignment', id: assignment.id, attempt })}
-          title="Back to the question list"
-        >
-          ‹ Questions
-        </button>
-        <span className="question-nav-arrows">
-          <button
-            className="question-nav-btn"
-            disabled={currentQuestionIndex === 0}
-            onClick={() => go(currentQuestionIndex - 1)}
-            title="Previous question"
-          >
-            ←
-          </button>
-          <button
-            className="question-nav-btn"
-            disabled={currentQuestionIndex >= count - 1}
-            onClick={() => go(currentQuestionIndex + 1)}
-            title="Next question"
-          >
-            →
-          </button>
-        </span>
-        <span className="question-nav-label">
-          {q?.label ?? '?'}
-          <span className="question-nav-count"> · {currentQuestionIndex + 1} of {count}</span>
-          {!frozen && !viewingSubmission && done && (
-            <span className="question-nav-done-tag" title="Locked — mark not done to edit">🔒 done</span>
-          )}
-        </span>
-        {frozen ? (
-          <span className="question-nav-frozen-tag" title="This assignment closed after its due date — showing your submitted answer, read-only.">
-            🔒 submission (past due)
-          </span>
-        ) : viewingSubmission ? (
-          <>
-            <span
-              className="question-nav-frozen-tag"
-              title={`Your answer as submitted in attempt ${viewingSubmission.attempt}, read-only — Run and Step still work.`}
-            >
-              Submission {viewingSubmission.attempt} · read-only
-            </span>
-            <button
-              className="question-nav-done-toggle"
-              onClick={() => navigate({ kind: 'assignment', id: assignment.id, questionIndex: currentQuestionIndex })}
-              title="Leave the submission and go back to your live work on this question"
-            >
-              Back to my work
-            </button>
-          </>
-        ) : (
-          <button
-            className={`question-nav-done-toggle${done ? ' question-nav-done-toggle--done' : ''}`}
-            onClick={() => toggleCurrentQuestionDone()}
-            title={done ? 'Unlock this question for editing' : 'Mark this question done and lock it'}
-          >
-            {done ? '✓ Done — click to unlock' : 'Mark done'}
-          </button>
-        )}
-        <span className="question-nav-assignment" title={assignment.title}>
-          {assignment.title}
-        </span>
-      </div>
-    );
-  }
+  const { tabs, activeTabId, switchTab, removeTab } = useStore();
 
   return (
     <div className="tab-bar">

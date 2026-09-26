@@ -239,11 +239,16 @@ console.log('\n[corpus: the seeded HW1-HW7 documents]');
     markup++;
     try { parseStatement(text); statementProse(text); } catch (e) { invalid.push(`${where}: ${(e as Error).message}`); }
   };
+  // A homework whose app version departs from its printed PDF does not link
+  // it: the link would invite confusion (Gabriel, 2026-09-25 — HW1 after
+  // task 046's lettered parts and marks; task 050).
+  const UNLINKED_PDF = new Set(['hw1']);
   for (const f of readdirSync(dir).filter((n) => n.endsWith('.json')).sort()) {
     const hw = JSON.parse(readFileSync(join(dir, f), 'utf8')) as AssignmentData;
     const name = f.replace('.json', '');
     for (const m of validateDocument(hw)) invalid.push(`${name}: ${m}`);
-    if (!hw.sections?.length || !hw.sourcePdf) emptyDoc.push(name);
+    if (!hw.sections?.length || (!hw.sourcePdf && !UNLINKED_PDF.has(name))) emptyDoc.push(name);
+    if (hw.sourcePdf && UNLINKED_PDF.has(name)) emptyDoc.push(`${name} links the PDF it must not`);
     if (hw.sourcePdf && !existsSync(join(publicDir, hw.sourcePdf))) missingPdf.push(`${name}: ${hw.sourcePdf}`);
     for (const { where, figure } of collectFigures(hw)) {
       if (!/^data:/.test(figure.src) && !existsSync(join(publicDir, figure.src))) missingFigures.push(`${name} ${where}: ${figure.src}`);
@@ -265,17 +270,19 @@ console.log('\n[corpus: the seeded HW1-HW7 documents]');
   }
   check(`swept ${statements} HW1-HW7 statements and ${markup} pieces of markup`, statements > 0 && markup > statements);
   check(`every document is valid${invalid.length ? ' — ' + invalid.join('; ') : ''}`, invalid.length === 0);
-  check(`every HW carries sections and its source PDF${emptyDoc.length ? ' — ' + emptyDoc.join(', ') : ''}`, emptyDoc.length === 0);
+  check(`every HW carries sections and its source PDF (HW1 deliberately unlinked)${emptyDoc.length ? ' — ' + emptyDoc.join(', ') : ''}`, emptyDoc.length === 0);
   check(`every source PDF exists under public/${missingPdf.length ? ' — ' + missingPdf.join(', ') : ''}`, missingPdf.length === 0);
   check(`every figure file exists under public/${missingFigures.length ? ' — ' + missingFigures.join(', ') : ''}`, missingFigures.length === 0);
   // The five HW1 truth-table problems are exactly the ones that tabulate;
   // anything else joining them is a false positive of the profile regex.
   check(`exactly the five HW1 truth tables tabulate (${tabulated.join(', ')})`,
     tabulated.join('|') === 'hw1 Problem 1|hw1 Problem 2|hw1 Problem 3|hw1 Problem 4|hw1 Problem 5');
-  // Only the four genuinely multi-part HW1 questions split into parts — no
-  // "p(1, 2)", "j( )" or "(1)" reference is mistaken for a marker anywhere.
-  check(`exactly the four multi-part HW1 questions split (${parted.join(', ')})`,
-    parted.join('|') === 'hw1 Problem 6|hw1 Problem 9|hw1 Problem 10|hw1 Problem 13');
+  // No statement splits into parts: HW1's multi-part problems are lettered
+  // questions now ("Problem 6a", task 046), and no "p(1, 2)", "j(⋅)" or "(1)"
+  // reference is mistaken for a marker anywhere. (The part grammar itself is
+  // pinned in [multi-part questions] above.)
+  check(`no HW statement splits into parts (${parted.join(', ') || 'none'})`,
+    parted.length === 0);
 }
 
 console.log(`\nstatementFormatCheck: ${passed} passed, ${failed} failed`);

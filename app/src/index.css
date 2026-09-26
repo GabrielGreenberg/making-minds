@@ -1,21 +1,12 @@
 :root {
-  --menu-bg: #f5f5f5;
   --menu-border: #ccc;
   --panel-bg: #fafafa;
-  --canvas-bg: #ffffff;
-  --grid-color: #e8e8e8;
   --accent: #2a7fff;
   --accent-hover: #1a6fef;
   --danger: #e53935;
-  --wire-0: #333;
   --wire-1: #e53935;
   --text: #222;
   --text-secondary: #666;
-  --selected-border: #2a7fff;
-  --port-fill: #555;
-  --port-hover: #2a7fff;
-  --component-bg: #fff;
-  --component-border: #333;
 }
 
 * {
@@ -40,18 +31,7 @@ html, body, #root {
   width: 100vw;
 }
 
-/* ── Menu Bar ── */
-.menu-bar {
-  display: flex;
-  align-items: center;
-  height: 36px;
-  background: var(--menu-bg);
-  border-bottom: 1px solid var(--menu-border);
-  padding: 0 4px;
-  flex-shrink: 0;
-  z-index: 100;
-}
-
+/* ── The sandbox's File menu (WorkbookFileMenu, in the editor's top bar) ── */
 .menu-item {
   position: relative;
   padding: 6px 14px;
@@ -284,87 +264,6 @@ html, body, #root {
   color: #333;
 }
 
-/* ── Simulation Toolbar ── */
-.simulation-toolbar {
-  display: flex;
-  align-items: center;
-  height: 36px;
-  background: #f0f0f0;
-  border-bottom: 1px solid var(--menu-border);
-  padding: 0 8px;
-  gap: 4px;
-  flex-shrink: 0;
-}
-
-.autosave-indicator {
-  margin-left: auto;
-  font-size: 11px;
-  color: #999;
-  white-space: nowrap;
-  padding-right: 4px;
-}
-
-.toolbar-btn {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  padding: 4px 12px;
-  font-size: 12px;
-  font-weight: 500;
-  border: 1px solid var(--menu-border);
-  background: white;
-  cursor: pointer;
-  border-radius: 4px;
-  user-select: none;
-  transition: background 0.1s;
-  font-family: inherit;
-}
-
-.toolbar-btn:disabled {
-  opacity: 0.35;
-  cursor: default;
-  pointer-events: none;
-}
-
-.toolbar-btn:hover {
-  background: #e0e0e0;
-}
-
-.toolbar-btn:active {
-  background: #d0d0d0;
-}
-
-.toolbar-btn-active {
-  background: var(--accent);
-  color: white;
-  border-color: var(--accent);
-}
-
-.toolbar-btn-active:hover {
-  background: var(--accent-hover);
-}
-
-.toolbar-btn-danger {
-  color: var(--danger);
-}
-
-.toolbar-btn-danger:hover {
-  background: #fde8e8;
-}
-
-.toolbar-icon {
-  font-size: 10px;
-}
-
-/* A muted gesture hint beside a toolbar button, e.g. "(shift+click to ↻)". */
-.toolbar-hint {
-  font-size: 11px;
-  font-weight: 400;
-  color: var(--text-secondary);
-  white-space: nowrap;
-  user-select: none;
-}
-
 .toolbar-menu-label {
   font-size: 12px;
   font-weight: 500;
@@ -414,13 +313,6 @@ html, body, #root {
   text-align: center;
   font-size: 12px;
   color: var(--accent);
-}
-
-.toolbar-separator {
-  width: 1px;
-  height: 20px;
-  background: var(--menu-border);
-  margin: 0 4px;
 }
 
 /* ── Main Layout ── */
@@ -474,124 +366,12 @@ html, body, #root {
   background: #f0f0f0;
 }
 
-/* ── Component Library ── */
-.component-library {
-  width: 64px;
-  background: var(--panel-bg);
-  border-right: 1px solid var(--menu-border);
-  display: flex;
-  flex-direction: column;
-  padding: 4px;
-  gap: 0;
-  overflow-y: auto;
-  flex-shrink: 0;
-}
-
-.library-machine-label {
-  font-size: 11px;
-  font-weight: 600;
-  color: #444;
-  text-align: left;
-  padding: 5px 4px 4px;
-  border-bottom: 1px solid #d0d0d0;
-  margin-bottom: 2px;
-  line-height: 1.3;
-}
-
-.library-section-title {
-  font-size: 9px;
-  font-weight: 600;
-  text-transform: uppercase;
-  color: #8b2020;
-  letter-spacing: 0.5px;
-  margin-top: 4px;
-  padding-bottom: 2px;
-  border-bottom: 1px solid #e0e0e0;
-}
-
-.library-item {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 1px;
-  padding: 3px 2px;
-  border: 1px solid transparent;
-  border-radius: 6px;
-  cursor: grab;
-  user-select: none;
-  transition: border-color 0.15s, background 0.15s;
-}
-
-.library-item:hover {
-  border-color: var(--accent);
-  background: #e8f0fe;
-}
-
-.library-item:active {
-  cursor: grabbing;
-}
-
-.library-item-selected {
-  border-color: var(--accent);
-  background: #d0e2ff;
-  box-shadow: 0 0 0 2px var(--accent);
-}
-
-.library-item svg {
-  width: 48px;
-  height: 32px;
-}
-
-.library-item-label {
-  font-size: 9px;
-  font-weight: 500;
-  color: var(--text-secondary);
-  line-height: 1;
-}
-
-.library-box-actions {
-  display: flex;
-  gap: 2px;
-}
-
-.library-box-rename-btn {
-  font-size: 8px;
-  line-height: 1;
-  padding: 1px 3px;
-  border: 1px solid transparent;
-  border-radius: 3px;
-  background: none;
-  color: var(--text-secondary);
-  cursor: pointer;
-  opacity: 0.45;
-}
-
-.library-item:hover .library-box-rename-btn {
-  opacity: 1;
-}
-
-.library-box-rename-btn:hover {
-  border-color: var(--accent);
-  color: var(--accent);
-}
-
-.library-box-rename input {
-  width: 100%;
-  font-size: 10px;
-  font-family: inherit;
-  padding: 2px 4px;
-  border: 1px solid var(--accent);
-  border-radius: 3px;
-  outline: none;
-}
-
 /* ── Canvas ── */
 .canvas-container {
   flex: 1;
   position: relative;
   overflow: hidden;
-  background: var(--canvas-bg);
+  background-color: var(--mm-surface);
 }
 
 .canvas-container svg {
@@ -622,143 +402,20 @@ html, body, #root {
   -webkit-user-select: none;
 }
 
-/* ── Zoom Control ── */
-.zoom-control {
-  position: absolute;
-  bottom: 12px;
-  right: 12px;
-  display: flex;
-  align-items: center;
-  gap: 2px;
-  background: rgba(255, 255, 255, 0.92);
-  border: 1px solid #ccc;
-  border-radius: 6px;
-  padding: 3px 6px;
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.12);
-  z-index: 20;
-  user-select: none;
-}
-
-.zoom-btn {
-  width: 26px;
-  height: 26px;
-  border: none;
-  background: transparent;
-  font-size: 16px;
-  font-weight: 600;
-  color: #444;
-  cursor: pointer;
-  border-radius: 4px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 0;
-  line-height: 1;
-}
-.zoom-btn:hover {
-  background: #e8e8e8;
-}
-.zoom-btn:active {
-  background: #d4d4d4;
-}
-
-.zoom-slider {
-  width: 80px;
-  height: 4px;
-  -webkit-appearance: none;
-  appearance: none;
-  background: #ccc;
-  border-radius: 2px;
-  outline: none;
-  cursor: pointer;
-}
-.zoom-slider::-webkit-slider-thumb {
-  -webkit-appearance: none;
-  appearance: none;
-  width: 14px;
-  height: 14px;
-  border-radius: 50%;
-  background: #555;
-  cursor: pointer;
-  border: 2px solid #fff;
-  box-shadow: 0 0 2px rgba(0, 0, 0, 0.3);
-}
-.zoom-slider::-moz-range-thumb {
-  width: 14px;
-  height: 14px;
-  border-radius: 50%;
-  background: #555;
-  cursor: pointer;
-  border: 2px solid #fff;
-  box-shadow: 0 0 2px rgba(0, 0, 0, 0.3);
-}
-
-.zoom-pct {
-  border: none;
-  background: transparent;
-  font-size: 11px;
-  font-weight: 600;
-  color: #666;
-  cursor: pointer;
-  padding: 2px 4px;
-  border-radius: 3px;
-  min-width: 38px;
-  text-align: center;
-}
-.zoom-pct:hover {
-  background: #e8e8e8;
-  color: #333;
-}
-
-/* ── Data Table Panel ── */
+/* ── Data Table Panel ──
+   The editor's right column (EditorShell's .wb-right) sets the width and draws
+   the divider; the panel just fills it. */
 .data-table-panel {
-  width: 260px;
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
   background: var(--panel-bg);
-  border-left: 1px solid var(--menu-border);
   display: flex;
   flex-direction: row;
-  flex-shrink: 0;
   overflow: visible;
   position: relative;
 }
 
-.panel-resize-handle {
-  cursor: col-resize;
-  position: absolute;
-  top: 0;
-  /* The panel is the containing block, so `left` is measured from its PADDING
-     box — 1px inside its border-left, which is the visible divider. Centering
-     the 9px strip on the divider's midline needs -4px - 1px. */
-  left: -5px;
-  bottom: 0;
-  width: 9px;
-  z-index: 20;
-}
-.panel-resize-handle::after {
-  content: '';
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  width: 6px;
-  height: 28px;
-  background: #e8e8e8;
-  border: 1px solid #d0d0d0;
-  border-radius: 4px;
-}
-.panel-resize-handle:hover,
-.panel-resize-handle:active {
-  background: rgba(42, 127, 255, 0.08);
-}
-.panel-resize-handle:hover::after,
-.panel-resize-handle:active::after {
-  background: var(--accent);
-}
-
-.data-table-panel > .table-header,
-.data-table-panel > .data-table-content {
-  /* Let the content fill remaining space after the handle */
-}
 .data-table-panel-inner {
   display: flex;
   flex-direction: column;
@@ -851,18 +508,6 @@ html, body, #root {
   letter-spacing: 0.4px;
   color: var(--text-secondary);
   margin-bottom: 4px;
-}
-
-/* Representation badge next to the "Question" label in the right panel */
-.question-rep-badge {
-  float: right;
-  font-weight: 500;
-  text-transform: none;
-  letter-spacing: 0;
-  color: #1565c0;
-  background: #e3f2fd;
-  border-radius: 8px;
-  padding: 1px 8px;
 }
 
 .data-table {
@@ -1261,242 +906,11 @@ thead .sc-label-col {
   font-style: italic;
 }
 
-/* ── Validation warnings ── */
-.validation-warnings {
-  position: absolute;
-  bottom: 8px;
-  left: 50%;
-  transform: translateX(-50%);
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  z-index: 50;
-}
-
-.validation-warning {
-  background: #fff3e0;
-  border: 1px solid #ffb74d;
-  color: #e65100;
-  padding: 4px 14px;
-  border-radius: 4px;
-  font-size: 11px;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-  white-space: nowrap;
-}
-
-/* ── Paste notices (provenance.ts refusalMessage) ── */
-/* On the canvas: top centre, clear of the validation warnings below. */
-.canvas-notice,
-.library-paste-notice {
-  background: #e8f1ff;
-  border: 1px solid var(--accent);
-  color: var(--text);
-  border-radius: 4px;
-  line-height: 1.4;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-}
-
-.canvas-notice {
-  position: absolute;
-  top: 10px;
-  left: 50%;
-  transform: translateX(-50%);
-  max-width: min(560px, calc(100% - 32px));
-  padding: 6px 14px;
-  font-size: 12px;
-  text-align: center;
-  z-index: 50;
-}
-
-/* Beside the palette's box rename. The 64px palette scrolls, so it would clip
-   anything wider: the notice is a fixed box at its static position, nudged
-   out over the canvas. */
-.library-paste-notice {
-  position: fixed;
-  align-self: flex-start;
-  margin-left: 58px;
-  width: 240px;
-  padding: 6px 10px;
-  font-size: 11px;
-  cursor: default;
-  z-index: 60;
-}
-
-/* In an answer field's footer (open response, fill-in). */
-.paste-notice {
-  color: var(--accent-hover);
-  font-weight: 500;
-  text-align: right;
-}
-
-/* ── Machine Type Selector ── */
-.machine-type-selector {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  padding-bottom: 6px;
-  margin-bottom: 2px;
-}
-
-.machine-type-dropdown {
-  width: 100%;
-  padding: 3px 4px;
-  font-size: 10px;
-  font-family: inherit;
-  border: 1px solid var(--menu-border);
-  border-radius: 3px;
-  background: white;
-  cursor: pointer;
-}
-
-.turbo-toggle {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  font-size: 10px;
-  cursor: pointer;
-  user-select: none;
-}
-
-.turbo-toggle input[type="checkbox"] {
-  margin: 0;
-  cursor: pointer;
-}
-
-.turbo-label {
-  font-weight: 500;
-  color: var(--text-secondary);
-}
-
 /* ── Problem Set Header ── */
 /* ── Ready to Box button container ── */
 .ready-to-box-btn {
   display: flex;
   align-items: center;
-}
-
-/* ── Per-question navigation bar (assignment canvas) ── */
-.tab-bar.question-nav {
-  align-items: center;
-  gap: 10px;
-  padding: 0 8px;
-}
-
-.question-nav-back {
-  font-size: 12px;
-  color: #1565c0;
-  background: none;
-  border: none;
-  padding: 4px 6px;
-  cursor: pointer;
-  white-space: nowrap;
-  font-weight: 500;
-}
-
-.question-nav-back:hover {
-  text-decoration: underline;
-}
-
-.question-nav-label {
-  font-size: 12px;
-  font-weight: 600;
-  color: #333;
-  white-space: nowrap;
-}
-
-/* The open assignment's full name, right-aligned in the question nav bar so
-   the editor always says which homework you are in. */
-.question-nav-assignment {
-  margin-left: auto;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-size: 12px;
-  color: var(--text-secondary);
-}
-
-.question-nav-count {
-  font-weight: 400;
-  color: #999;
-}
-
-.question-nav-arrows {
-  display: flex;
-  gap: 4px;
-}
-
-.question-nav-btn {
-  font-size: 13px;
-  line-height: 1;
-  padding: 4px 10px;
-  border: 1px solid #ccc;
-  border-radius: 4px;
-  background: white;
-  cursor: pointer;
-  color: #333;
-}
-
-.question-nav-btn:hover:not(:disabled) {
-  border-color: #1565c0;
-  color: #1565c0;
-}
-
-.question-nav-btn:disabled {
-  color: #ccc;
-  cursor: default;
-}
-
-.question-nav-done-tag {
-  margin-left: 8px;
-  font-size: 11px;
-  font-weight: 600;
-  color: #8a6d1f;
-}
-
-.question-nav-done-toggle {
-  font-size: 12px;
-  padding: 4px 10px;
-  border: 1px solid #ccc;
-  border-radius: 4px;
-  background: white;
-  cursor: pointer;
-  color: #333;
-  white-space: nowrap;
-}
-
-.question-nav-done-toggle:hover {
-  border-color: #1565c0;
-  color: #1565c0;
-}
-
-.question-nav-done-toggle--done {
-  background: #fff8e1;
-  border-color: #e0c060;
-  color: #8a6d1f;
-}
-
-.question-nav-done-toggle--done:hover {
-  border-color: #c62828;
-  color: #c62828;
-}
-
-.question-nav-frozen-tag {
-  font-size: 12px;
-  font-weight: 600;
-  padding: 4px 10px;
-  border-radius: 4px;
-  background: #fff0f0;
-  color: #c62828;
-  white-space: nowrap;
-}
-
-/* Question statement shown at the top of the right data panel */
-.question-statement {
-  padding: 8px 10px;
-  font-size: 12px;
-  line-height: 1.5;
-  color: #444;
 }
 
 /* A graded case loaded into the run ("Run this input" on the grade sheet —
@@ -1802,126 +1216,5 @@ thead .sc-label-col {
   font-family: 'SF Mono', 'Fira Code', monospace;
   color: #444;
   line-height: 1.6;
-  white-space: nowrap;
-}
-
-/* ── Open (free-text) question workspace ───────────────────────── */
-
-.open-response {
-  flex: 1;
-  overflow-y: auto;
-  background: var(--panel-bg);
-  display: flex;
-  justify-content: center;
-  padding: 32px 24px;
-}
-
-.open-response-card {
-  width: 100%;
-  max-width: 720px;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  background: #fff;
-  border: 1px solid #e0e0e0;
-  border-radius: 10px;
-  padding: 24px 28px;
-  align-self: flex-start;
-}
-
-.open-response-head {
-  display: flex;
-  align-items: baseline;
-  gap: 10px;
-}
-
-.open-response-label {
-  font-size: 18px;
-  font-weight: 600;
-}
-
-.open-response-mode {
-  font-size: 11px;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  color: var(--text-secondary);
-  background: #f0f0f0;
-  border-radius: 4px;
-  padding: 2px 7px;
-}
-
-.open-response-statement {
-  font-size: 14px;
-  line-height: 1.55;
-  color: var(--text);
-}
-
-.open-response-textarea {
-  font-family: inherit;
-  font-size: 14px;
-  line-height: 1.6;
-  color: var(--text);
-  min-height: 260px;
-  resize: vertical;
-  padding: 12px 14px;
-  border: 1px solid #ccc;
-  border-radius: 6px;
-  outline: none;
-}
-
-.open-response-textarea:focus {
-  border-color: var(--accent);
-  box-shadow: 0 0 0 2px rgba(42, 127, 255, 0.15);
-}
-
-/* Fill-in-the-blank answers: one labelled box per blank. */
-.fill-in-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
-  gap: 10px 16px;
-  margin: 18px 0 6px;
-}
-
-.fill-in-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.fill-in-label {
-  min-width: 2.2em;
-  text-align: right;
-  font-weight: 600;
-  color: var(--text);
-}
-
-.fill-in-input {
-  flex: 1;
-  min-width: 0;
-  padding: 6px 8px;
-  font-family: 'SF Mono', 'Fira Code', ui-monospace, monospace;
-  font-size: 14px;
-  border: 1px solid var(--menu-border);
-  border-radius: 5px;
-  background: #fff;
-  color: var(--text);
-}
-
-.fill-in-input:focus {
-  outline: none;
-  border-color: var(--accent);
-}
-
-.open-response-foot {
-  display: flex;
-  justify-content: space-between;
-  gap: 16px;
-  font-size: 12px;
-  color: var(--text-secondary);
-}
-
-/* The count keeps its line when a paste notice takes the right side. */
-.open-response-foot > :first-child {
   white-space: nowrap;
 }

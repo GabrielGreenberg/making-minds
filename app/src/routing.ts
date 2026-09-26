@@ -140,6 +140,11 @@ let applySeq = 0;
 // which needs no identity and no server — while everything that reads the
 // storage seams needs a signed-in user, and the instructor area the
 // instructor role. A new public surface is one line here.
+//
+// One front door: the bare site (`#/`) is Home, which needs sign-in, so
+// anyone not signed in who opens it meets the sign-in screen — whatever the
+// browser's history — and that screen offers the sandbox as its second
+// choice. Only an explicit `#/sandbox` (the website's link) skips it.
 
 export type RouteAccess = 'public' | 'signed-in' | 'instructor';
 
@@ -161,20 +166,6 @@ export function routeAccess(route: Route): RouteAccess {
     case 'instructor-notes':
       return 'instructor';
   }
-}
-
-/**
- * The boot landing rule. Pure. A browser with no trace of any previous
- * sign-in that opens the bare site (`#/`) is a newcomer — most of them want
- * to try the machines, not sign in — so it lands in the sandbox as a visitor.
- * A browser that HAS signed in before stays where it asked to go (Home
- * restores the session, or shows the sign-in screen if it no longer
- * restores); any explicit deep link is honoured for everyone. Returns the
- * route to replace the initial URL with, or null to leave it alone.
- */
-export function landingRoute(route: Route, hasSignInTrace: boolean): Route | null {
-  if (route.kind === 'home' && !hasSignInTrace) return { kind: 'sandbox' };
-  return null;
 }
 
 // Who is signed in, as far as applying routes is concerned (set by AuthGate
@@ -316,17 +307,13 @@ export const ROUTE_EVENT = 'mm:route';
 let routingStarted = false;
 
 /**
- * Wire up Back/Forward, apply the boot landing rule, and apply the initial
- * URL. Idempotent; called by AuthGate once, at boot.
+ * Wire up Back/Forward and apply the initial URL, as it is — there is no
+ * landing redirect (one front door, above). Idempotent; called by AuthGate
+ * once, at boot.
  */
-export function initRouting(opts: { hasSignInTrace: boolean }): void {
+export function initRouting(): void {
   if (routingStarted) return;
   routingStarted = true;
   window.addEventListener('popstate', () => applyRoute(parseHash(location.hash)));
-  const landed = landingRoute(parseHash(location.hash), opts.hasSignInTrace);
-  if (landed) {
-    navigate(landed, { replace: true });
-    return;
-  }
   applyRoute(parseHash(location.hash));
 }

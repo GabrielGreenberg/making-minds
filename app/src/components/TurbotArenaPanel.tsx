@@ -120,12 +120,8 @@ export function TurbotArenaPanel() {
   const turbotState = useStore((s) => s.turbotState);
   const turbotHistory = useStore((s) => s.turbotHistory);
   const turbotRunning = useStore((s) => s.turbotRunning);
-  const turbotHalted = useStore((s) => s.turbotHalted);
   const turbotStopReason = useStore((s) => s.turbotStopReason);
-  const turbotStep = useStore((s) => s.turbotStep);
-  const turbotRun = useStore((s) => s.turbotRun);
   const turbotPause = useStore((s) => s.turbotPause);
-  const turbotReset = useStore((s) => s.turbotReset);
   // The goal-reached cue (the store owns the moment and the Run's hold; the
   // Map only pulses the circle while it is the latest step's event).
   const goalHit = useStore(selectTurbotGoalHit);
@@ -142,7 +138,10 @@ export function TurbotArenaPanel() {
   // a question's arena is part of the assignment and stays read-only.
   const isSandbox = useStore((s) => s.assignment === null);
   const setTabArena = useStore((s) => s.setTabArena);
-  const [editingMap, setEditingMap] = useState(false);
+  // Store-held (canvas-scoped): the output panel's run controls stand down
+  // while the map is being edited.
+  const editingMap = useStore((s) => s.turbotEditingMap);
+  const setEditingMap = useStore((s) => s.setTurbotEditingMap);
   const [mapTool, setMapTool] = useState<MapTool>('block');
   // The event live when "Edit map" opened: Done must not replay its pulse.
   // By identity — t restarts after a reset, so a later hit may repeat it.
@@ -295,7 +294,7 @@ export function TurbotArenaPanel() {
             onClick={() => {
               if (!editingMap && turbotRunning) turbotPause();
               if (!editingMap) setSuppressedEvent(turbotLastEvent);
-              setEditingMap((e) => !e);
+              setEditingMap(!editingMap);
             }}
             title={editingMap ? 'Back to running the turbot' : 'Paint blocks/goals and place the start'}
           >
@@ -358,19 +357,8 @@ export function TurbotArenaPanel() {
             </>
           ) : (
             <>
-              <div className="turbot-arena-controls">
-                <button className="action-btn" onClick={turbotStep} disabled={turbotRunning || turbotHalted}>
-                  Step
-                </button>
-                {turbotRunning ? (
-                  <button className="action-btn" onClick={turbotPause}>Pause</button>
-                ) : (
-                  <button className="action-btn" onClick={turbotRun} disabled={turbotHalted}>Run</button>
-                )}
-                <button className="action-btn" onClick={turbotReset} disabled={turbotRunning}>
-                  Reset
-                </button>
-              </div>
+              {/* Step / Run / Reset are the output panel's one control row
+                  (OutputPanel, task 053); the Map keeps its readout. */}
               <div className="turbot-arena-status">
                 <span>cycle {cycle}</span>
                 <span>sensor: {sensor}</span>

@@ -17,13 +17,24 @@ and `server/` (Express 5 + `node:sqlite`; it imports `app/src/engine/*` directly
 long-lived branch, `main`**, not protected; every landing is a **merge commit, never a
 squash**. CI (`.github/workflows/deploy.yml`) runs on every push to `main`: server
 typecheck + check, the context-budget guard, the harness-tool portability gate, app build →
-GitHub Pages. The pilot deploy (Cloudflare Pages + Lightsail) is manual — `deploy/README.md`.
-**Routines never push or deploy.** Interactive sessions push only when Gabriel says so, and
-after any push confirm `gh run list --limit 1` is green before reporting done.
+GitHub Pages. The pilot (Cloudflare Pages + Lightsail) is released by `deploy/release.sh`
+(`deploy/README.md`): by Gabriel's hand, or hourly by the robot through task 042's gate.
+**Land = push, on every machine** (Gabriel, 2026-09-25): a claim is pushed at once and a
+land is pushed at once, so `main` never holds unpushed work. **Pushing to GitHub `main` is
+shipping** — the robot releases it within the hour unless the gate holds it. After any push
+confirm `gh run list --limit 1` is green before reporting done.
 
-## 3. The main checkout is live and shared
+## 3. Two machines, one queue — and a live, shared checkout
 
-Gabriel edits it, and parallel Claude sessions may be working in it at the same time. So:
+Gabriel's laptop and the **robot** (his always-on Mac: its own clones, `START.md` §"The
+robot") both work the queue, and git on GitHub is the only thing they share. So every role
+**fetches before it looks at the queue** (`git -C <repo> fetch origin`, then
+`merge --ff-only origin/main` on `main`) and **pushes its queue commits at once** (claims,
+filings, parks): a pushed claim is the lock; a rejected push means someone else moved —
+fetch, re-check, retry. The robot pushes to `main` every hour.
+
+Gabriel's checkout is live: he edits it, and parallel Claude sessions may be working in it
+at the same time. So:
 verify `HEAD` and `git status --porcelain` before and between writes; use `git -C <repo> …`,
 never `cd && git`; **explicit `git add <paths>`, never `git add -A`**; never remove a branch
 or worktree you didn't create; never sweep untracked files; treat foreign modified files as
@@ -36,31 +47,26 @@ the wrong tree).
 - `/work` (interactive): `task/NNN-slug`, cut from `main` **in the main checkout**, so the
   dev server, the browser preview and Gabriel are all right there. One task branch at a
   time in the main checkout.
-- `/worker` (unattended): `fix/NNN-slug` in an **isolated worktree**, so half-done work never
-  touches the live checkout:
-  ```
-  git -C <repo> worktree add <repo>/.claude/worktrees/NNN-slug -b fix/NNN-slug main
-  ln -s <repo>/app/node_modules    <repo>/.claude/worktrees/NNN-slug/app/node_modules
-  ln -s <repo>/server/node_modules <repo>/.claude/worktrees/NNN-slug/server/node_modules
-  ```
-  `.claude/` is gitignored (no status noise) and `~/.claude/settings.json` excludes
-  `**/.claude/worktrees/**` from CLAUDE.md loading (so the worktree's copy is never loaded a
-  second time). A dev server generally can't run inside a symlinked worktree; durable proof
-  there is types + tests; a visual check is owed against `main` after the merge.
+- The robot's work routine (`ROBOT-WORK.md`): `robot/NNN-slug` in **its own clone**
+  (`~/making-minds-robot`), with its own dev server; an unfinished branch is pushed so the
+  next run resumes it. Each role touches only its own prefix.
+- A worktree, when a session wants isolation inside Gabriel's checkout:
+  `git -C <repo> worktree add <repo>/.claude/worktrees/NNN-slug -b <branch> main`, then
+  symlink `app/node_modules` and `server/node_modules` into it. `.claude/` is gitignored and
+  `~/.claude/settings.json` keeps its `CLAUDE.md` from loading twice; a dev server generally
+  can't run there, so a visual check is owed against `main` after the merge.
 
 ## 5. Landing (the one procedure; README.md §Lifecycle explains the why)
 
 1. On the branch, all gates green (§6). Then in the task file: `status: done`, clear
    `branch:`, final `## Progress log` entry; `git mv` it `in-progress/` → `done/`; append the
    `tasks/log.md` line; `git add` those paths; commit `tasks: land NNN — <title>`.
-2. The main checkout must be **on `main` and clean**. If it isn't (Gabriel mid-edit):
-   `/work` — tell Gabriel and wait; `/worker` — set `status: awaiting-merge`, leave the
-   branch, retry next run.
-3. `git -C <repo> merge --no-ff fix/NNN-slug -m "Merge fix/NNN-slug: <title>"` (or the
-   `task/` branch). Must be conflict-free; a real conflict is a human call — abort the
-   merge and escalate.
-4. `git -C <repo> worktree remove <path>` (worker), `git -C <repo> branch -d <branch>`.
-5. Never push (routines) / push only when told (interactive).
+2. The checkout must be **on `main` and clean** (Gabriel mid-edit → tell him and wait), and
+   `main` current: `git -C <repo> fetch origin`, `merge --ff-only origin/main`.
+3. `git -C <repo> merge --no-ff <branch> -m "Merge <branch>: <title>"`. Must be
+   conflict-free; a real conflict is a human call — abort the merge and escalate.
+4. **Push `main` at once** (§2), then confirm CI. Rejected → fetch, merge `origin/main`,
+   push. Then `git -C <repo> branch -d <branch>` (and the remote branch, if it was pushed).
 
 ## 6. Gates (verify tooling)
 
@@ -82,10 +88,12 @@ Deps missing → `npm ci` in that package (never commit lockfile churn).
 
 - **Visual/layout** — only a browser eyeball proves it. Interactive sessions verify with
   the browser tools against the dev server (`.claude/launch.json` → "Vite Dev Server",
-  port 5173; "Vite Remote Mode" pairs with a local server on 8199). Routines can't start a
-  dev server or answer permission prompts: a task needing this carries `requires: browser`.
+  port 5173; "Vite Remote Mode" pairs with a local server on 8199). The robot's work
+  routine checks in its own clone ("Robot Dev Server") and parks when it can't; a task
+  needing an eyeball carries `requires: browser`.
 - **The Lightsail box / Cloudflare Pages** — needs ssh keys / tokens in gitignored
-  `secrets/`, `ssh/`: `requires: ssh`, human-run.
+  `secrets/`, `ssh/`: a task doing box work by hand carries `requires: ssh` (human-run; the
+  robot only releases, through the gate).
 - **Real UCLA SSO** — no test IdP exists yet.
 State each such gap in the task's `## Verify` as owed, with the recipe.
 
@@ -131,9 +139,10 @@ grow, it starts sessions half-full and makes unattended runs thrash and die. Rul
   the task file's `## Progress log` + one `log.md` line. `docs/HISTORY.md` is frozen.
 - Role prompts and this file have budgets too (same script). Ledgers written by routines
   get a size rule and a script that enforces it.
-- Unattended prompts never use ultracode / multi-agent workflows. The worker fans out
-  read-only with at most ~3 `Explore` agents (they skip the instruction load), asking for
-  short structured answers, never file dumps.
+- Unattended runs never use ultracode. The robot's catch routine uses no Workflows; its work
+  routine runs exactly one `mm-task` Workflow per run (≤ 8 agents — it keeps the run's own
+  context to conclusions). Both fan out read-only with at most ~3 `Explore` agents (they
+  skip the instruction load), asking for short structured answers, never file dumps.
 - Read in slices (`sed -n`, Read with offset/limit, grep first). Never `cat` `docs/HISTORY.md`,
   `tasks/log.md`, or a whole check tool.
 - Checkpoint and exit before a long session compacts; a fresh session resumes from the
@@ -156,5 +165,6 @@ before a targeted edit.
 
 Clickable links for every file written; a compact running list of tasks touched, refreshed
 as it changes; end every catcher/work response with **"Done."**; commit messages end with
-`Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>`; plain language first, code
-vocabulary second.
+the `Co-Authored-By:` line naming the model that ran (the harness supplies it); plain
+language first, code vocabulary second. An unattended robot run has no reader for the
+running list, the links or "Done.": it keeps the co-author line and the plain language.

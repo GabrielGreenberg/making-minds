@@ -54,6 +54,12 @@
 // one interval (Step never), Pause drops the hold, Reset and an edit clear
 // both; the Map's pulse is pinned in the source (≤ 600 ms, reduced-motion
 // off, the live Map only, no timer).
+// [run controls] (task 053): the output panel's ONE control row — one
+// descriptor per mode (selectRunControls) and one dispatcher (runControl);
+// a combinational circuit's Step/Run play its row's signal flow in the
+// store's own loop and Reset zeroes the inputs; an SC circuit's play its
+// Global I/O row (store-held); an edit or a canvas swap stops every loop;
+// editing a turbot's map stands the controls down.
 
 // The store registers window/document listeners at import time (and must NOT
 // read the sandbox then — [no load at import]), so install minimal shims
@@ -91,8 +97,9 @@ backing.set(VISITOR_KEY, JSON.stringify({
   tabCircuits: { 'import-tab': { components: [{ id: 'import-sentinel', type: 'AND', x: 0, y: 0 }], wires: [], boxes: [] } },
 }));
 
-const { useStore, selectTurbotArena, selectAssignmentFrozen, selectQuestionLocked, showsSubmission, selectTurbotGoalHit, TURBOT_GOAL_HOLD_TICKS } =
+const { useStore, selectTurbotArena, selectAssignmentFrozen, selectQuestionLocked, showsSubmission, selectTurbotGoalHit, TURBOT_GOAL_HOLD_TICKS, selectRunControls } =
   await import('../src/store');
+const { sortByLabel } = await import('../src/engine');
 const { buildSampleAssignment, ccCorrect, scCorrect, fsmCorrect, tmCorrect, turbotCorrect, turbotFsmCorrect, turbotTmCorrect, SAMPLE_ASSIGNMENT_ID } =
   await import('../src/devData/sampleData');
 const { localAssignmentStore } = await import('../src/storage/AssignmentStore');
@@ -142,9 +149,16 @@ function checkAllSimFresh(label: string) {
   // swap must disarm it — otherwise a gate armed on one question drops a
   // component on the first click in the next one.
   check(`${label}: palette tool disarmed`, s.selectedTool === null);
+  // So is the selection (task 052): ids from the last canvas select nothing
+  // here, and a stale one would let Delete act on this canvas's namesake.
+  check(`${label}: selection cleared`, s.selectedIds.length === 0);
   // Undo writes its snapshot into the CURRENT canvas, so history must not
   // survive a swap either.
   check(`${label}: undo/redo history empty`, s.undoStack.length === 0 && s.redoStack.length === 0);
+  // The output panel's run state (task 053): the local-step row and its Run,
+  // the Global I/O row a Run plays, the Map editor — all canvas-scoped.
+  check(`${label}: no local-step row, no local run`, !s.localStepActive && !s.localStepRunning && s.localStepRunId === null);
+  check(`${label}: no Global I/O row picked, Map editor closed`, s.scActiveGlobalIndex === null && !s.turbotEditingMap);
 }
 
 // Junk that only navigation (not the actions used to build real runs above)
@@ -176,6 +190,12 @@ function plantSimJunk() {
     turbotCaseIndex: 2,
     loadedCase: { kind: 'value', questionId: 1, caseIndex: 3, attempt: 1, gradedKey: null, input: [1, 2], recorded: { pass: false } },
     selectedTool: 'AND',
+    selectedIds: ['ghost-component', 'ghost-wire'],
+    localStepActive: true,
+    localStepSelectedKey: '1,0',
+    localStepRunning: true,
+    scActiveGlobalIndex: 2,
+    turbotEditingMap: true,
     undoStack: [{ components: [], wires: [], boxes: [], confirmedBoxes: [] }],
     redoStack: [{ components: [], wires: [], boxes: [], confirmedBoxes: [] }],
   });
@@ -1370,6 +1390,95 @@ function liveSandboxIds(): string[] {
   return [...sheets.values()].flatMap((c) => c.components.map((x) => x.id));
 }
 
+// ═════ The output panel's one control row (task 053) ═════════════
+
+console.log('[run controls]');
+{
+  await useStore.getState().openAssignment(SAMPLE_ASSIGNMENT_ID);
+  const st = () => useStore.getState();
+  const rc = () => selectRunControls(st());
+  const open = (i: number, machine: { components: unknown; wires: unknown }) => {
+    st().switchQuestion(i);
+    const q = st().assignment!.questions[i];
+    if (st().questionCircuits.get(q.id)?.done) st().toggleCurrentQuestionDone();
+    useStore.setState(JSON.parse(JSON.stringify({ components: machine.components, wires: machine.wires })));
+  };
+
+  // A combinational circuit: its local step (the signal-flow animation).
+  open(0, ccCorrect());
+  check('CC: the row is the local step, idle and ready',
+    rc()?.kind === 'cc' && rc()!.canRun && rc()!.canStep && rc()!.canReset && !rc()!.running);
+  st().runControl('step');
+  check('CC Step with no row picked picks the current inputs\' row and plays one step',
+    st().localStepActive && st().localStepIndex === 1 && rc()!.status === `1/${st().localStepSorted.length}`);
+  st().runControl('run', { intervalMs: 5 });
+  check('CC Run plays in the store\'s one loop', st().localStepRunning && st().localStepRunId !== null && rc()!.running && !rc()!.canRun);
+  st().runControl('stop');
+  check('Stop pauses it', !st().localStepRunning && st().localStepRunId === null);
+  st().runControl('run', { intervalMs: 5 });
+  st().addComponent('NOT', 600, 600);
+  check('a machine edit mid-run stops the CC run and drops the row (the edit law)',
+    !st().localStepRunning && !st().localStepActive);
+  st().runControl('reset');
+  {
+    const ins = sortByLabel(st().components, 'IN');
+    check('CC Reset: every input 0, the canvas un-run on that row',
+      ins.length > 0 && ins.every((c) => c.value === 0) && st().localStepActive && st().localStepIndex === 0 &&
+        st().localStepSelectedKey === ins.map(() => 0).join(','));
+  }
+  st().runControl('run', { intervalMs: 5 });
+  for (let i = 0; i < 200 && st().localStepRunning; i++) await flushTimers();
+  check('a Run plays to the end of the row and stops itself',
+    !st().localStepRunning && st().localStepIndex >= st().localStepSorted.length);
+  st().runControl('step');
+  check('…and Step after the end plays the row again from the top', st().localStepIndex === 1);
+  st().runControl('run', { intervalMs: 50 });
+  st().switchQuestion(2);
+  check('a canvas swap stops the CC run and forgets the row', !st().localStepRunning && !st().localStepActive);
+
+  // An FSM.
+  open(2, fsmCorrect());
+  st().setFsmInputSequence([1, 0, 1]);
+  check('FSM: the row is the FSM\'s run', rc()?.kind === 'fsm' && rc()!.canStep);
+  st().runControl('step');
+  check('FSM Step steps, and the readout says t and the state',
+    st().fsmTimeStep === 2 && st().fsmHistory.length === 1 && /^t=1 · \S+/.test(rc()!.status ?? ''));
+  st().runControl('reset');
+  check('FSM Reset: back to t=1', st().fsmTimeStep === 1 && st().fsmHistory.length === 0);
+
+  // A TM.
+  open(3, tmCorrect());
+  check('TM: the row is the TM\'s run', rc()?.kind === 'tm' && rc()!.canStep);
+  st().runControl('step');
+  check('TM Step steps', st().tmTimeStep === 2 || st().tmHalted);
+  st().runControl('reset');
+  check('TM Reset: back to t=1', st().tmTimeStep === 1 && !st().tmHalted);
+
+  // An SC circuit: the Global I/O row (the grader's run).
+  open(1, scCorrect());
+  st().setScGlobalSequenceInput(0, '0110');
+  check('SC: the row plays the Global I/O row', rc()?.kind === 'sc' && rc()!.canStep);
+  st().runControl('step');
+  check('SC Step loads the first typed Global row and steps it', st().scActiveGlobalIndex === 0 && st().scTimeStep === 2);
+  st().runControl('reset');
+  check('SC Reset: back to t=1 on the same row', st().scTimeStep === 1 && st().scInputSequence.length > 0 && st().scActiveGlobalIndex === 0);
+  st().switchQuestion(0);
+  check('a canvas swap forgets the Global row', st().scActiveGlobalIndex === null);
+
+  // A turbot.
+  open(4, turbotCorrect());
+  check('turbot: the row is the turbot\'s run', rc()?.kind === 'turbot' && rc()!.canRun && rc()!.canStep);
+  st().runControl('step');
+  check('turbot Step steps', st().turbotHistory.length === 1);
+  st().setTurbotEditingMap(true);
+  check('editing the Map stands the run controls down', !rc()!.canRun && !rc()!.canStep && !rc()!.canReset);
+  st().runControl('step');
+  check('…and a Step then does nothing', st().turbotHistory.length === 1);
+  st().switchQuestion(0);
+  check('a canvas swap closes the Map editor', !st().turbotEditingMap);
+  st().goHome();
+}
+
 console.log('[principal change]');
 {
   const A = 'a@x.test';
@@ -1998,11 +2107,46 @@ console.log('[canvas gestures]');
   const wireAt = handler.indexOf("if (hit.type === 'wire' ", portAt);
   check('the port branch routes modifier-clicks the same way (port circles cover small parts)',
     portAt >= 0 && wireAt > portAt && handler.slice(portAt, wireAt).includes('modifierClick('));
-  const panel = read('../src/components/SimulationPanel.tsx');
-  const css = read('../src/index.css');
+  // The Rotate button lives in the canvas's action group since task 053.
+  const actions = read('../src/components/CanvasActions.tsx');
+  const css = read('../src/workbench.css');
   check('the Rotate button carries the muted "(shift+click to ↻)" hint',
-    /<span className="toolbar-hint">\(shift\+click to ↻\)<\/span>/.test(panel) &&
-    /\.toolbar-hint\s*\{[^}]*color:\s*var\(--text-secondary\)/.test(css));
+    /↻ Rotate/.test(actions) && /<span className="cv-hint">\(shift\+click to ↻\)<\/span>/.test(actions) &&
+    /\.cv-hint\s*\{[^}]*color:\s*var\(--mm-ink-3\)/.test(css));
+}
+
+// Task 055: the view is not the canvas. Every canvas swap bumps the store's
+// canvasSwapSeq (the canvas answers it with Fit); zooming and panning — what
+// Fit writes — never touch the circuit, its history or its runs (law 6).
+console.log('[view: Fit is a view change, never a reset]');
+{
+  await useStore.getState().openAssignment(SAMPLE_ASSIGNMENT_ID);
+  useStore.getState().switchQuestion(0);
+  if (useStore.getState().questionCircuits.get(useStore.getState().assignment!.questions[0].id)?.done) {
+    useStore.getState().toggleCurrentQuestionDone();
+  }
+  const seq0 = useStore.getState().canvasSwapSeq;
+  useStore.getState().switchQuestion(1);
+  check('a question change bumps canvasSwapSeq (the canvas fits the new one)', useStore.getState().canvasSwapSeq === seq0 + 1);
+  useStore.getState().switchQuestion(0);
+  useStore.getState().addComponent('AND', 80, 80);
+  const undoBefore = useStore.getState().undoStack.length;
+  const redoBefore = useStore.getState().redoStack.length;
+  const comps = useStore.getState().components;
+  const wiresBefore = useStore.getState().wires;
+  const seq1 = useStore.getState().canvasSwapSeq;
+  useStore.getState().setZoom(0.8);
+  useStore.getState().setPan(123, -45);
+  const st = useStore.getState();
+  check('zoom and pan leave the circuit, its undo/redo and the swap counter alone',
+    st.components === comps && st.wires === wiresBefore && st.undoStack.length === undoBefore &&
+      st.redoStack.length === redoBefore && st.canvasSwapSeq === seq1 && st.zoom === 0.8 && st.panX === 123 && st.panY === -45);
+  useStore.getState().setZoom(0.1);
+  const lo = useStore.getState().zoom;
+  useStore.getState().setZoom(40);
+  check('setZoom clamps to the one range (25%–300%)', lo === 0.25 && useStore.getState().zoom === 3);
+  useStore.getState().setZoom(1);
+  useStore.getState().undo();
 }
 
 await flushTimers();

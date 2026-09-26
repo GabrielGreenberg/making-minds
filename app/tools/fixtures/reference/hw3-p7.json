@@ -101,7 +101,7 @@
         "id": "hw3-p7-in1",
         "type": "INPUT",
         "x": 80,
-        "y": 420,
+        "y": 105,
         "label": "IN1",
         "ports": [
           {
@@ -113,10 +113,31 @@
         ]
       },
       {
+        "id": "hw3-p7-not-in",
+        "type": "NOT",
+        "x": 200,
+        "y": 100,
+        "label": "",
+        "ports": [
+          {
+            "id": "in",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
         "id": "hw3-p7-m1",
         "type": "MEM",
-        "x": 1480,
-        "y": 60,
+        "x": 340,
+        "y": 100,
         "label": "M1",
         "ports": [
           {
@@ -132,14 +153,14 @@
             "index": 0
           }
         ],
-        "memDirection": "right-to-left",
+        "memDirection": "left-to-right",
         "storedValue": 0
       },
       {
         "id": "hw3-p7-m2",
         "type": "MEM",
-        "x": 1320,
-        "y": 60,
+        "x": 480,
+        "y": 100,
         "label": "M2",
         "ports": [
           {
@@ -155,14 +176,14 @@
             "index": 0
           }
         ],
-        "memDirection": "right-to-left",
+        "memDirection": "left-to-right",
         "storedValue": 0
       },
       {
         "id": "hw3-p7-m3",
         "type": "MEM",
-        "x": 1160,
-        "y": 60,
+        "x": 620,
+        "y": 100,
         "label": "M3",
         "ports": [
           {
@@ -178,129 +199,14 @@
             "index": 0
           }
         ],
-        "memDirection": "right-to-left",
+        "memDirection": "left-to-right",
         "storedValue": 0
       },
       {
-        "id": "hw3-p7-m4",
-        "type": "MEM",
-        "x": 1000,
-        "y": 60,
-        "label": "M4",
-        "ports": [
-          {
-            "id": "mout",
-            "label": "M_OUT",
-            "side": "left",
-            "index": 0
-          },
-          {
-            "id": "min",
-            "label": "M_IN",
-            "side": "right",
-            "index": 0
-          }
-        ],
-        "memDirection": "right-to-left",
-        "storedValue": 0
-      },
-      {
-        "id": "hw3-p7-m5",
-        "type": "MEM",
-        "x": 840,
-        "y": 60,
-        "label": "M5",
-        "ports": [
-          {
-            "id": "mout",
-            "label": "M_OUT",
-            "side": "left",
-            "index": 0
-          },
-          {
-            "id": "min",
-            "label": "M_IN",
-            "side": "right",
-            "index": 0
-          }
-        ],
-        "memDirection": "right-to-left",
-        "storedValue": 0
-      },
-      {
-        "id": "hw3-p7-m6",
-        "type": "MEM",
-        "x": 680,
-        "y": 60,
-        "label": "M6",
-        "ports": [
-          {
-            "id": "mout",
-            "label": "M_OUT",
-            "side": "left",
-            "index": 0
-          },
-          {
-            "id": "min",
-            "label": "M_IN",
-            "side": "right",
-            "index": 0
-          }
-        ],
-        "memDirection": "right-to-left",
-        "storedValue": 0
-      },
-      {
-        "id": "hw3-p7-m7",
-        "type": "MEM",
-        "x": 520,
-        "y": 60,
-        "label": "M7",
-        "ports": [
-          {
-            "id": "mout",
-            "label": "M_OUT",
-            "side": "left",
-            "index": 0
-          },
-          {
-            "id": "min",
-            "label": "M_IN",
-            "side": "right",
-            "index": 0
-          }
-        ],
-        "memDirection": "right-to-left",
-        "storedValue": 0
-      },
-      {
-        "id": "hw3-p7-m8",
-        "type": "MEM",
-        "x": 360,
-        "y": 60,
-        "label": "M8",
-        "ports": [
-          {
-            "id": "mout",
-            "label": "M_OUT",
-            "side": "left",
-            "index": 0
-          },
-          {
-            "id": "min",
-            "label": "M_IN",
-            "side": "right",
-            "index": 0
-          }
-        ],
-        "memDirection": "right-to-left",
-        "storedValue": 0
-      },
-      {
-        "id": "hw3-p7-not-first",
+        "id": "hw3-p7-not-out",
         "type": "NOT",
-        "x": 1560,
-        "y": 220,
+        "x": 760,
+        "y": 100,
         "label": "",
         "ports": [
           {
@@ -318,64 +224,10 @@
         ]
       },
       {
-        "id": "hw3-p7-or-const1",
-        "type": "OR",
-        "x": 1700,
-        "y": 160,
-        "label": "",
-        "ports": [
-          {
-            "id": "in1",
-            "label": "",
-            "side": "left",
-            "index": 0
-          },
-          {
-            "id": "in2",
-            "label": "",
-            "side": "left",
-            "index": 1
-          },
-          {
-            "id": "out",
-            "label": "",
-            "side": "right",
-            "index": 0
-          }
-        ]
-      },
-      {
-        "id": "hw3-p7-or-out",
-        "type": "OR",
-        "x": 400,
-        "y": 420,
-        "label": "",
-        "ports": [
-          {
-            "id": "in1",
-            "label": "",
-            "side": "left",
-            "index": 0
-          },
-          {
-            "id": "in2",
-            "label": "",
-            "side": "left",
-            "index": 1
-          },
-          {
-            "id": "out",
-            "label": "",
-            "side": "right",
-            "index": 0
-          }
-        ]
-      },
-      {
         "id": "hw3-p7-out1",
         "type": "OUTPUT",
-        "x": 640,
-        "y": 420,
+        "x": 900,
+        "y": 105,
         "label": "OUT1",
         "ports": [
           {
@@ -389,112 +241,48 @@
     ],
     "wires": [
       {
-        "id": "hw3-p7-wt1",
-        "sourceComponentId": "hw3-p7-m1",
-        "sourcePortId": "mout",
-        "targetComponentId": "hw3-p7-not-first",
+        "id": "hw3-p7-w1",
+        "sourceComponentId": "hw3-p7-in1",
+        "sourcePortId": "out",
+        "targetComponentId": "hw3-p7-not-in",
         "targetPortId": "in",
         "value": 0
       },
       {
-        "id": "hw3-p7-wt2",
-        "sourceComponentId": "hw3-p7-not-first",
-        "sourcePortId": "out",
-        "targetComponentId": "hw3-p7-or-const1",
-        "targetPortId": "in1",
-        "value": 0
-      },
-      {
-        "id": "hw3-p7-wt3",
-        "sourceComponentId": "hw3-p7-m1",
-        "sourcePortId": "mout",
-        "targetComponentId": "hw3-p7-or-const1",
-        "targetPortId": "in2",
-        "value": 0
-      },
-      {
-        "id": "hw3-p7-wt4",
-        "sourceComponentId": "hw3-p7-or-const1",
+        "id": "hw3-p7-w2",
+        "sourceComponentId": "hw3-p7-not-in",
         "sourcePortId": "out",
         "targetComponentId": "hw3-p7-m1",
-        "targetPortId": "min",
+        "targetPortId": "mout",
         "value": 0
       },
       {
-        "id": "hw3-p7-wc1",
+        "id": "hw3-p7-w3",
         "sourceComponentId": "hw3-p7-m1",
-        "sourcePortId": "mout",
+        "sourcePortId": "min",
         "targetComponentId": "hw3-p7-m2",
-        "targetPortId": "min",
+        "targetPortId": "mout",
         "value": 0
       },
       {
-        "id": "hw3-p7-wc2",
+        "id": "hw3-p7-w4",
         "sourceComponentId": "hw3-p7-m2",
-        "sourcePortId": "mout",
+        "sourcePortId": "min",
         "targetComponentId": "hw3-p7-m3",
-        "targetPortId": "min",
+        "targetPortId": "mout",
         "value": 0
       },
       {
-        "id": "hw3-p7-wc3",
+        "id": "hw3-p7-w5",
         "sourceComponentId": "hw3-p7-m3",
-        "sourcePortId": "mout",
-        "targetComponentId": "hw3-p7-m4",
-        "targetPortId": "min",
+        "sourcePortId": "min",
+        "targetComponentId": "hw3-p7-not-out",
+        "targetPortId": "in",
         "value": 0
       },
       {
-        "id": "hw3-p7-wc4",
-        "sourceComponentId": "hw3-p7-m4",
-        "sourcePortId": "mout",
-        "targetComponentId": "hw3-p7-m5",
-        "targetPortId": "min",
-        "value": 0
-      },
-      {
-        "id": "hw3-p7-wc5",
-        "sourceComponentId": "hw3-p7-m5",
-        "sourcePortId": "mout",
-        "targetComponentId": "hw3-p7-m6",
-        "targetPortId": "min",
-        "value": 0
-      },
-      {
-        "id": "hw3-p7-wc6",
-        "sourceComponentId": "hw3-p7-m6",
-        "sourcePortId": "mout",
-        "targetComponentId": "hw3-p7-m7",
-        "targetPortId": "min",
-        "value": 0
-      },
-      {
-        "id": "hw3-p7-wc7",
-        "sourceComponentId": "hw3-p7-m7",
-        "sourcePortId": "mout",
-        "targetComponentId": "hw3-p7-m8",
-        "targetPortId": "min",
-        "value": 0
-      },
-      {
-        "id": "hw3-p7-wo1",
-        "sourceComponentId": "hw3-p7-in1",
-        "sourcePortId": "out",
-        "targetComponentId": "hw3-p7-or-out",
-        "targetPortId": "in1",
-        "value": 0
-      },
-      {
-        "id": "hw3-p7-wo2",
-        "sourceComponentId": "hw3-p7-m8",
-        "sourcePortId": "mout",
-        "targetComponentId": "hw3-p7-or-out",
-        "targetPortId": "in2",
-        "value": 0
-      },
-      {
-        "id": "hw3-p7-wo3",
-        "sourceComponentId": "hw3-p7-or-out",
+        "id": "hw3-p7-w6",
+        "sourceComponentId": "hw3-p7-not-out",
         "sourcePortId": "out",
         "targetComponentId": "hw3-p7-out1",
         "targetPortId": "in",
@@ -508,7 +296,7 @@
         "id": "hw3-p7-b-in1",
         "type": "INPUT",
         "x": 80,
-        "y": 420,
+        "y": 105,
         "label": "IN1",
         "ports": [
           {
@@ -520,10 +308,31 @@
         ]
       },
       {
+        "id": "hw3-p7-b-not-in",
+        "type": "NOT",
+        "x": 200,
+        "y": 100,
+        "label": "",
+        "ports": [
+          {
+            "id": "in",
+            "label": "",
+            "side": "left",
+            "index": 0
+          },
+          {
+            "id": "out",
+            "label": "",
+            "side": "right",
+            "index": 0
+          }
+        ]
+      },
+      {
         "id": "hw3-p7-b-m1",
         "type": "MEM",
-        "x": 1480,
-        "y": 60,
+        "x": 340,
+        "y": 100,
         "label": "M1",
         "ports": [
           {
@@ -539,14 +348,14 @@
             "index": 0
           }
         ],
-        "memDirection": "right-to-left",
+        "memDirection": "left-to-right",
         "storedValue": 0
       },
       {
         "id": "hw3-p7-b-m2",
         "type": "MEM",
-        "x": 1320,
-        "y": 60,
+        "x": 480,
+        "y": 100,
         "label": "M2",
         "ports": [
           {
@@ -562,175 +371,14 @@
             "index": 0
           }
         ],
-        "memDirection": "right-to-left",
+        "memDirection": "left-to-right",
         "storedValue": 0
       },
       {
-        "id": "hw3-p7-b-m3",
-        "type": "MEM",
-        "x": 1160,
-        "y": 60,
-        "label": "M3",
-        "ports": [
-          {
-            "id": "mout",
-            "label": "M_OUT",
-            "side": "left",
-            "index": 0
-          },
-          {
-            "id": "min",
-            "label": "M_IN",
-            "side": "right",
-            "index": 0
-          }
-        ],
-        "memDirection": "right-to-left",
-        "storedValue": 0
-      },
-      {
-        "id": "hw3-p7-b-m4",
-        "type": "MEM",
-        "x": 1000,
-        "y": 60,
-        "label": "M4",
-        "ports": [
-          {
-            "id": "mout",
-            "label": "M_OUT",
-            "side": "left",
-            "index": 0
-          },
-          {
-            "id": "min",
-            "label": "M_IN",
-            "side": "right",
-            "index": 0
-          }
-        ],
-        "memDirection": "right-to-left",
-        "storedValue": 0
-      },
-      {
-        "id": "hw3-p7-b-m5",
-        "type": "MEM",
-        "x": 840,
-        "y": 60,
-        "label": "M5",
-        "ports": [
-          {
-            "id": "mout",
-            "label": "M_OUT",
-            "side": "left",
-            "index": 0
-          },
-          {
-            "id": "min",
-            "label": "M_IN",
-            "side": "right",
-            "index": 0
-          }
-        ],
-        "memDirection": "right-to-left",
-        "storedValue": 0
-      },
-      {
-        "id": "hw3-p7-b-m6",
-        "type": "MEM",
-        "x": 680,
-        "y": 60,
-        "label": "M6",
-        "ports": [
-          {
-            "id": "mout",
-            "label": "M_OUT",
-            "side": "left",
-            "index": 0
-          },
-          {
-            "id": "min",
-            "label": "M_IN",
-            "side": "right",
-            "index": 0
-          }
-        ],
-        "memDirection": "right-to-left",
-        "storedValue": 0
-      },
-      {
-        "id": "hw3-p7-b-m7",
-        "type": "MEM",
-        "x": 520,
-        "y": 60,
-        "label": "M7",
-        "ports": [
-          {
-            "id": "mout",
-            "label": "M_OUT",
-            "side": "left",
-            "index": 0
-          },
-          {
-            "id": "min",
-            "label": "M_IN",
-            "side": "right",
-            "index": 0
-          }
-        ],
-        "memDirection": "right-to-left",
-        "storedValue": 0
-      },
-      {
-        "id": "hw3-p7-b-m8",
-        "type": "MEM",
-        "x": 360,
-        "y": 60,
-        "label": "M8",
-        "ports": [
-          {
-            "id": "mout",
-            "label": "M_OUT",
-            "side": "left",
-            "index": 0
-          },
-          {
-            "id": "min",
-            "label": "M_IN",
-            "side": "right",
-            "index": 0
-          }
-        ],
-        "memDirection": "right-to-left",
-        "storedValue": 0
-      },
-      {
-        "id": "hw3-p7-b-m9",
-        "type": "MEM",
-        "x": 200,
-        "y": 60,
-        "label": "M9",
-        "ports": [
-          {
-            "id": "mout",
-            "label": "M_OUT",
-            "side": "left",
-            "index": 0
-          },
-          {
-            "id": "min",
-            "label": "M_IN",
-            "side": "right",
-            "index": 0
-          }
-        ],
-        "memDirection": "right-to-left",
-        "storedValue": 0
-      },
-      {
-        "id": "hw3-p7-b-not-first",
+        "id": "hw3-p7-b-not-out",
         "type": "NOT",
-        "x": 1560,
-        "y": 220,
+        "x": 620,
+        "y": 100,
         "label": "",
         "ports": [
           {
@@ -748,64 +396,10 @@
         ]
       },
       {
-        "id": "hw3-p7-b-or-const1",
-        "type": "OR",
-        "x": 1700,
-        "y": 160,
-        "label": "",
-        "ports": [
-          {
-            "id": "in1",
-            "label": "",
-            "side": "left",
-            "index": 0
-          },
-          {
-            "id": "in2",
-            "label": "",
-            "side": "left",
-            "index": 1
-          },
-          {
-            "id": "out",
-            "label": "",
-            "side": "right",
-            "index": 0
-          }
-        ]
-      },
-      {
-        "id": "hw3-p7-b-or-out",
-        "type": "OR",
-        "x": 400,
-        "y": 420,
-        "label": "",
-        "ports": [
-          {
-            "id": "in1",
-            "label": "",
-            "side": "left",
-            "index": 0
-          },
-          {
-            "id": "in2",
-            "label": "",
-            "side": "left",
-            "index": 1
-          },
-          {
-            "id": "out",
-            "label": "",
-            "side": "right",
-            "index": 0
-          }
-        ]
-      },
-      {
         "id": "hw3-p7-b-out1",
         "type": "OUTPUT",
-        "x": 640,
-        "y": 420,
+        "x": 760,
+        "y": 105,
         "label": "OUT1",
         "ports": [
           {
@@ -819,120 +413,40 @@
     ],
     "wires": [
       {
-        "id": "hw3-p7-b-wt1",
-        "sourceComponentId": "hw3-p7-b-m1",
-        "sourcePortId": "mout",
-        "targetComponentId": "hw3-p7-b-not-first",
+        "id": "hw3-p7-b-w1",
+        "sourceComponentId": "hw3-p7-b-in1",
+        "sourcePortId": "out",
+        "targetComponentId": "hw3-p7-b-not-in",
         "targetPortId": "in",
         "value": 0
       },
       {
-        "id": "hw3-p7-b-wt2",
-        "sourceComponentId": "hw3-p7-b-not-first",
-        "sourcePortId": "out",
-        "targetComponentId": "hw3-p7-b-or-const1",
-        "targetPortId": "in1",
-        "value": 0
-      },
-      {
-        "id": "hw3-p7-b-wt3",
-        "sourceComponentId": "hw3-p7-b-m1",
-        "sourcePortId": "mout",
-        "targetComponentId": "hw3-p7-b-or-const1",
-        "targetPortId": "in2",
-        "value": 0
-      },
-      {
-        "id": "hw3-p7-b-wt4",
-        "sourceComponentId": "hw3-p7-b-or-const1",
+        "id": "hw3-p7-b-w2",
+        "sourceComponentId": "hw3-p7-b-not-in",
         "sourcePortId": "out",
         "targetComponentId": "hw3-p7-b-m1",
-        "targetPortId": "min",
+        "targetPortId": "mout",
         "value": 0
       },
       {
-        "id": "hw3-p7-b-wc1",
+        "id": "hw3-p7-b-w3",
         "sourceComponentId": "hw3-p7-b-m1",
-        "sourcePortId": "mout",
+        "sourcePortId": "min",
         "targetComponentId": "hw3-p7-b-m2",
-        "targetPortId": "min",
+        "targetPortId": "mout",
         "value": 0
       },
       {
-        "id": "hw3-p7-b-wc2",
+        "id": "hw3-p7-b-w4",
         "sourceComponentId": "hw3-p7-b-m2",
-        "sourcePortId": "mout",
-        "targetComponentId": "hw3-p7-b-m3",
-        "targetPortId": "min",
+        "sourcePortId": "min",
+        "targetComponentId": "hw3-p7-b-not-out",
+        "targetPortId": "in",
         "value": 0
       },
       {
-        "id": "hw3-p7-b-wc3",
-        "sourceComponentId": "hw3-p7-b-m3",
-        "sourcePortId": "mout",
-        "targetComponentId": "hw3-p7-b-m4",
-        "targetPortId": "min",
-        "value": 0
-      },
-      {
-        "id": "hw3-p7-b-wc4",
-        "sourceComponentId": "hw3-p7-b-m4",
-        "sourcePortId": "mout",
-        "targetComponentId": "hw3-p7-b-m5",
-        "targetPortId": "min",
-        "value": 0
-      },
-      {
-        "id": "hw3-p7-b-wc5",
-        "sourceComponentId": "hw3-p7-b-m5",
-        "sourcePortId": "mout",
-        "targetComponentId": "hw3-p7-b-m6",
-        "targetPortId": "min",
-        "value": 0
-      },
-      {
-        "id": "hw3-p7-b-wc6",
-        "sourceComponentId": "hw3-p7-b-m6",
-        "sourcePortId": "mout",
-        "targetComponentId": "hw3-p7-b-m7",
-        "targetPortId": "min",
-        "value": 0
-      },
-      {
-        "id": "hw3-p7-b-wc7",
-        "sourceComponentId": "hw3-p7-b-m7",
-        "sourcePortId": "mout",
-        "targetComponentId": "hw3-p7-b-m8",
-        "targetPortId": "min",
-        "value": 0
-      },
-      {
-        "id": "hw3-p7-b-wc8",
-        "sourceComponentId": "hw3-p7-b-m8",
-        "sourcePortId": "mout",
-        "targetComponentId": "hw3-p7-b-m9",
-        "targetPortId": "min",
-        "value": 0
-      },
-      {
-        "id": "hw3-p7-b-wo1",
-        "sourceComponentId": "hw3-p7-b-in1",
-        "sourcePortId": "out",
-        "targetComponentId": "hw3-p7-b-or-out",
-        "targetPortId": "in1",
-        "value": 0
-      },
-      {
-        "id": "hw3-p7-b-wo2",
-        "sourceComponentId": "hw3-p7-b-m9",
-        "sourcePortId": "mout",
-        "targetComponentId": "hw3-p7-b-or-out",
-        "targetPortId": "in2",
-        "value": 0
-      },
-      {
-        "id": "hw3-p7-b-wo3",
-        "sourceComponentId": "hw3-p7-b-or-out",
+        "id": "hw3-p7-b-w5",
+        "sourceComponentId": "hw3-p7-b-not-out",
         "sourcePortId": "out",
         "targetComponentId": "hw3-p7-b-out1",
         "targetPortId": "in",

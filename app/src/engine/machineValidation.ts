@@ -18,6 +18,8 @@
 //        parse) — see engine/tmValidate.ts.
 
 import type { CircuitData, CircuitComponent, ComponentType, BuildMode, RepSystem } from '../types';
+import { modeHoldsMemory } from '../types';
+import { hasMemory } from './netlist';
 import type { CodecLayout } from './codec';
 import { sortStateComponents } from './fsm';
 import { fsmNotation, validateTransitionTable } from './notation';
@@ -53,7 +55,7 @@ const OK: MachineValidation = { ok: true };
 // Enforced as part of Stage 1 in every grading branch (grader.ts: gradeQuestion
 // for CC/SC/FSM/TM, gradeTurbot for brains, gradePerception; mirrored by
 // coverageCheck's validateStage1), so a violating machine fails every case.
-// The student palette (ComponentLibrary) and the instructor authoring UI
+// The student palette (palette.ts / Palette.tsx) and the instructor authoring UI
 // (QuestionCreator) read the same helpers.
 
 /** Infrastructure types that are always allowed regardless of the restriction
@@ -100,6 +102,18 @@ export function disallowedComponentTypes(
   };
   walk(components);
   return offenders;
+}
+
+/** Stage-1 check for the question's MODE: a combinatorial circuit (CC — a
+ *  CC question, a CC turbot brain, CC perception) holds no memory, not even
+ *  inside a box (types.ts modeHoldsMemory). The grader would otherwise run a
+ *  MEM as a constant 0, and NOT(MEM) would pass as a constant 1. */
+export function validateModeMemory(circuit: CircuitData, mode: BuildMode): MachineValidation {
+  if (modeHoldsMemory(mode) || !hasMemory(circuit.components)) return OK;
+  return {
+    ok: false,
+    reason: 'a combinatorial circuit holds no memory: remove its MEM blocks (and any box holding one)',
+  };
 }
 
 /** Stage-1 check for the restriction (see semantics above). Runs before the

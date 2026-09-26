@@ -677,7 +677,7 @@ console.log('\n[notices]');
     SUBMIT_INTEGRITY_SENTENCE === 'The platform checks that submitted work was created in your own editor.' &&
     submitConfirmMessage('HW1', { saved: true }).includes('saved work'));
   const src = (p: string) => readFileSync(new URL(p, import.meta.url), 'utf8');
-  for (const f of ['AssignmentOverview', 'MenuBar', 'HomeScreen']) {
+  for (const f of ['AssignmentOverview', 'EditorTopBar', 'HomeScreen']) {
     const text = src(`../src/components/${f}.tsx`);
     check(`${f}: its Submit asks through submitConfirmMessage (one wording)`,
       text.includes('confirm(submitConfirmMessage(') && !text.includes('This records a snapshot'));

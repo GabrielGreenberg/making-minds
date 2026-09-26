@@ -1967,7 +1967,25 @@
           "components": [],
           "wires": []
         },
-        "responseText": "m takes three arguments x, y, and z; when you apply it to them, it returns the value 3 + (x • y • z). Equivalently, m maps any triple of integers to 3 plus their product. It is a 3-place function."
+        "responseText": "m takes three arguments x, y, and z; when you apply it to them, it returns the value 3 + (x • y • z)."
+      },
+      {
+        "questionId": 18,
+        "circuit": {
+          "components": [],
+          "wires": []
+        },
+        "responseText": "m maps any three integers x, y, z to 3 plus their product."
+      },
+      {
+        "questionId": 19,
+        "circuit": {
+          "components": [],
+          "wires": []
+        },
+        "fillAnswers": [
+          "3"
+        ]
       },
       {
         "questionId": 7,
@@ -1991,7 +2009,25 @@
           "components": [],
           "wires": []
         },
-        "responseText": "j(x, y) = x • y when 0 ≤ x ≤ 2 and 0 ≤ y ≤ 2, undefined otherwise. Table over the nine defined pairs (x rows 0/1/2, y columns 0/1/2): 0 0 0 / 0 1 2 / 0 2 4."
+        "responseText": "j(x, y) = x • y when 0 ≤ x ≤ 2 and 0 ≤ y ≤ 2, undefined otherwise."
+      },
+      {
+        "questionId": 20,
+        "circuit": {
+          "components": [],
+          "wires": []
+        },
+        "fillAnswers": [
+          "0",
+          "0",
+          "0",
+          "0",
+          "1",
+          "2",
+          "0",
+          "2",
+          "4"
+        ]
       },
       {
         "questionId": 10,
@@ -1999,7 +2035,23 @@
           "components": [],
           "wires": []
         },
-        "responseText": "(a) f(x) = 1 − x. (b) Identity: f(x) = x, and f(x) = 1 − (1 − x). (c) Constant one: f(x) = 1, and f(x) = x + (1 − x)."
+        "responseText": "f(x) = 1 − x."
+      },
+      {
+        "questionId": 21,
+        "circuit": {
+          "components": [],
+          "wires": []
+        },
+        "responseText": "f(x) = x, and f(x) = 1 − (1 − x)."
+      },
+      {
+        "questionId": 22,
+        "circuit": {
+          "components": [],
+          "wires": []
+        },
+        "responseText": "f(x) = 1, and f(x) = x + (1 − x)."
       },
       {
         "questionId": 11,
@@ -2027,7 +2079,7 @@
           "components": [],
           "wires": []
         },
-        "responseText": "Symbols: △ = zero, □ = one, ○ = two, ● = three, ☆ = four, ★ = five. Thirty-two = 5 • 6 + 2, so it is written ★○."
+        "responseText": "Symbols: ! = zero, ? = one, & = two, % = three, $ = four, ~ = five. Thirty-two = 5 • 6 + 2, so it is written ~&."
       },
       {
         "questionId": 13,
@@ -2035,7 +2087,19 @@
           "components": [],
           "wires": []
         },
-        "responseText": "(a) 1111 + 1 = 10000 (each column overflows, the carry ripples left). (b) 1011 + 11001 = 100100, adding column by column with carries."
+        "fillAnswers": [
+          "10000"
+        ]
+      },
+      {
+        "questionId": 23,
+        "circuit": {
+          "components": [],
+          "wires": []
+        },
+        "fillAnswers": [
+          "100100"
+        ]
       },
       {
         "questionId": 14,
@@ -2043,7 +2107,10 @@
           "components": [],
           "wires": []
         },
-        "responseText": "f(○) = 0 and f(●) = 1."
+        "fillAnswers": [
+          "0",
+          "1"
+        ]
       },
       {
         "questionId": 15,
@@ -2051,7 +2118,7 @@
           "components": [],
           "wires": []
         },
-        "responseText": "For any series of three dots x, y, z: g(x, y, z) = 4 • f(x) + 2 • f(y) + f(z)."
+        "responseText": "For any series of three marks x, y, z: g(x, y, z) = 4 • f(x) + 2 • f(y) + f(z)."
       },
       {
         "questionId": 16,
@@ -2061,7 +2128,7 @@
               "id": "hw1-p16-in1",
               "type": "INPUT",
               "x": 80,
-              "y": 180,
+              "y": 100,
               "label": "IN1",
               "ports": [
                 {
@@ -2076,7 +2143,7 @@
               "id": "hw1-p16-not",
               "type": "NOT",
               "x": 260,
-              "y": 260,
+              "y": 262,
               "label": "",
               "ports": [
                 {
@@ -2097,7 +2164,7 @@
               "id": "hw1-p16-or",
               "type": "OR",
               "x": 420,
-              "y": 100,
+              "y": 240,
               "label": "",
               "ports": [
                 {
@@ -2139,7 +2206,7 @@
               "id": "hw1-p16-out2",
               "type": "OUTPUT",
               "x": 580,
-              "y": 260,
+              "y": 255,
               "label": "OUT2",
               "ports": [
                 {
@@ -2156,8 +2223,8 @@
               "id": "hw1-p16-w1",
               "sourceComponentId": "hw1-p16-in1",
               "sourcePortId": "out",
-              "targetComponentId": "hw1-p16-or",
-              "targetPortId": "in1",
+              "targetComponentId": "hw1-p16-out1",
+              "targetPortId": "in",
               "value": 0
             },
             {
@@ -2170,6 +2237,14 @@
             },
             {
               "id": "hw1-p16-w3",
+              "sourceComponentId": "hw1-p16-in1",
+              "sourcePortId": "out",
+              "targetComponentId": "hw1-p16-or",
+              "targetPortId": "in1",
+              "value": 0
+            },
+            {
+              "id": "hw1-p16-w4",
               "sourceComponentId": "hw1-p16-not",
               "sourcePortId": "out",
               "targetComponentId": "hw1-p16-or",
@@ -2177,16 +2252,8 @@
               "value": 0
             },
             {
-              "id": "hw1-p16-w4",
-              "sourceComponentId": "hw1-p16-or",
-              "sourcePortId": "out",
-              "targetComponentId": "hw1-p16-out1",
-              "targetPortId": "in",
-              "value": 0
-            },
-            {
               "id": "hw1-p16-w5",
-              "sourceComponentId": "hw1-p16-in1",
+              "sourceComponentId": "hw1-p16-or",
               "sourcePortId": "out",
               "targetComponentId": "hw1-p16-out2",
               "targetPortId": "in",
@@ -3025,6 +3092,24 @@
         "responseText": "I ran out of time here, but my guess is yes — it seems like it should be possible."
       },
       {
+        "questionId": 18,
+        "circuit": {
+          "components": [],
+          "wires": []
+        },
+        "responseText": "I ran out of time here, but my guess is yes — it seems like it should be possible."
+      },
+      {
+        "questionId": 19,
+        "circuit": {
+          "components": [],
+          "wires": []
+        },
+        "fillAnswers": [
+          "3"
+        ]
+      },
+      {
         "questionId": 7,
         "circuit": {
           "components": [],
@@ -3049,7 +3134,41 @@
         "responseText": "I ran out of time here, but my guess is yes — it seems like it should be possible."
       },
       {
+        "questionId": 20,
+        "circuit": {
+          "components": [],
+          "wires": []
+        },
+        "fillAnswers": [
+          "0",
+          "0",
+          "0",
+          "0",
+          "1",
+          "2",
+          "0",
+          "2",
+          ""
+        ]
+      },
+      {
         "questionId": 10,
+        "circuit": {
+          "components": [],
+          "wires": []
+        },
+        "responseText": "I ran out of time here, but my guess is yes — it seems like it should be possible."
+      },
+      {
+        "questionId": 21,
+        "circuit": {
+          "components": [],
+          "wires": []
+        },
+        "responseText": "I ran out of time here, but my guess is yes — it seems like it should be possible."
+      },
+      {
+        "questionId": 22,
         "circuit": {
           "components": [],
           "wires": []
@@ -3090,7 +3209,19 @@
           "components": [],
           "wires": []
         },
-        "responseText": "I ran out of time here, but my guess is yes — it seems like it should be possible."
+        "fillAnswers": [
+          "1110"
+        ]
+      },
+      {
+        "questionId": 23,
+        "circuit": {
+          "components": [],
+          "wires": []
+        },
+        "fillAnswers": [
+          ""
+        ]
       },
       {
         "questionId": 14,
@@ -3098,7 +3229,10 @@
           "components": [],
           "wires": []
         },
-        "responseText": "I ran out of time here, but my guess is yes — it seems like it should be possible."
+        "fillAnswers": [
+          "1",
+          "0"
+        ]
       },
       {
         "questionId": 15,
@@ -3116,7 +3250,7 @@
               "id": "hw1-p16-in1",
               "type": "INPUT",
               "x": 80,
-              "y": 100,
+              "y": 180,
               "label": "IN1",
               "ports": [
                 {
@@ -3149,9 +3283,36 @@
               ]
             },
             {
+              "id": "hw1-p16-or",
+              "type": "OR",
+              "x": 420,
+              "y": 100,
+              "label": "",
+              "ports": [
+                {
+                  "id": "in1",
+                  "label": "",
+                  "side": "left",
+                  "index": 0
+                },
+                {
+                  "id": "in2",
+                  "label": "",
+                  "side": "left",
+                  "index": 1
+                },
+                {
+                  "id": "out",
+                  "label": "",
+                  "side": "right",
+                  "index": 0
+                }
+              ]
+            },
+            {
               "id": "hw1-p16-out1",
               "type": "OUTPUT",
-              "x": 420,
+              "x": 580,
               "y": 100,
               "label": "OUT1",
               "ports": [
@@ -3166,7 +3327,7 @@
             {
               "id": "hw1-p16-out2",
               "type": "OUTPUT",
-              "x": 420,
+              "x": 580,
               "y": 260,
               "label": "OUT2",
               "ports": [
@@ -3184,8 +3345,8 @@
               "id": "hw1-p16-w1",
               "sourceComponentId": "hw1-p16-in1",
               "sourcePortId": "out",
-              "targetComponentId": "hw1-p16-out1",
-              "targetPortId": "in",
+              "targetComponentId": "hw1-p16-or",
+              "targetPortId": "in1",
               "value": 0
             },
             {
@@ -3199,6 +3360,22 @@
             {
               "id": "hw1-p16-w3",
               "sourceComponentId": "hw1-p16-not",
+              "sourcePortId": "out",
+              "targetComponentId": "hw1-p16-or",
+              "targetPortId": "in2",
+              "value": 0
+            },
+            {
+              "id": "hw1-p16-w4",
+              "sourceComponentId": "hw1-p16-or",
+              "sourcePortId": "out",
+              "targetComponentId": "hw1-p16-out1",
+              "targetPortId": "in",
+              "value": 0
+            },
+            {
+              "id": "hw1-p16-w5",
+              "sourceComponentId": "hw1-p16-in1",
               "sourcePortId": "out",
               "targetComponentId": "hw1-p16-out2",
               "targetPortId": "in",

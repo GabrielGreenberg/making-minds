@@ -108,16 +108,28 @@
 .ps-section-aside { display: flex; flex-direction: column; gap: 12px; padding-top: 4px; }
 
 /* Runs of problems: stacked, two columns (the PDFs' numbered lists), or a
-   grid of truth tables / arenas several per row. */
+   grid of truth tables / arenas several per row. A grid cell is as wide as
+   its widest unbreakable content (a table, an arena) and never under 205px;
+   its text wraps to that width. Fixed 205px tracks clipped HW1 P3/P5's
+   four-column tables behind an invisible scrollbar (task 046). */
 .ps-run + .ps-run, .ps-attachments + .ps-run, .ps-run + .ps-attachments { margin-top: 10px; }
 .ps-run--columns { columns: 2; column-gap: 36px; }
 .ps-run--columns .ps-problem { break-inside: avoid; }
 .ps-run--grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(205px, 1fr));
+  display: flex;
+  flex-wrap: wrap;
   gap: 8px 20px;
-  align-items: start;
+  align-items: flex-start;
 }
+/* The cell's body column sizes to its content here: a `1fr` track, or a body
+   with `min-width: 0`, counts as zero in a min-content size. */
+.ps-run--grid > .ps-problem {
+  width: min-content;
+  min-width: 205px;
+  max-width: 100%;
+  grid-template-columns: 2.2em auto;
+}
+.ps-run--grid .ps-problem-main { min-width: auto; }
 /* A grid cell has no room for the mode tag; the section says what these are. */
 .ps-run--grid .ps-mode { display: none; }
 
@@ -184,7 +196,7 @@
 @media (max-width: 720px) {
   .ps-section-body--aside { grid-template-columns: minmax(0, 1fr); }
   .ps-run--columns { columns: 1; }
-  .ps-run--grid { grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); }
+  .ps-run--grid > .ps-problem { min-width: 200px; }
 }
 
 /* ── Rendered statement markup (components/StatementBody.tsx) ─────────
@@ -287,24 +299,6 @@
 /* ── Feedback (the student form; the instructor queue is further down) ── */
 .feedback-sent { padding: 12px 0 4px; }
 .feedback-file { font-size: var(--mm-fs-small); color: var(--mm-ink-2); }
-
-/* MenuBar Submit (assignment active) */
-.menu-submit {
-  margin-left: auto;
-  color: var(--mm-ok);
-  font-weight: 600;
-}
-
-.menu-submit:hover {
-  background: var(--mm-ok-soft);
-}
-
-.menu-frozen {
-  margin-left: auto;
-  color: var(--mm-danger);
-  font-weight: 600;
-  cursor: default;
-}
 
 /* ─────────────────────────────────────────────────────────────────
    Instructor frontend
@@ -789,23 +783,15 @@
   cursor: pointer;
 }
 .visitor-banner-close:hover { color: var(--mm-ink); }
-.session-chip--visitor { color: var(--mm-accent); border-color: var(--mm-accent); }
+/* The sign-in card's closing line: the quieter way past it, into the sandbox. */
 .login-visitor {
-  display: grid;
-  gap: 12px;
-  margin: 0 0 22px;
-  padding-bottom: 22px;
-  border-bottom: 1px solid var(--mm-line);
+  margin: 22px 0 0;
+  padding-top: 18px;
+  border-top: 1px solid var(--mm-line);
+  font-size: var(--mm-fs-meta);
+  line-height: 1.5;
+  color: var(--mm-ink-3);
 }
-.login-visitor p { margin: 0; color: var(--mm-ink-2); }
-.mm-surface .login-visitor a.login-visitor-btn {
-  justify-self: stretch;
-  text-align: center;
-  background: var(--mm-accent-soft);
-  border-color: var(--mm-accent-soft);
-  color: var(--mm-accent);
-}
-.mm-surface .login-visitor a.login-visitor-btn:hover { border-color: var(--mm-accent); color: var(--mm-accent); }
 .login-switch {
   display: block;
   margin-top: 16px;
@@ -821,16 +807,7 @@
 .login-switch--inline { display: inline; margin: 0; font-size: inherit; }
 .login-actions { display: flex; flex-wrap: wrap; gap: 10px; }
 
-/* Session controls — shown in the menu bar, home screen, and instructor header */
-.session-chip {
-  font-size: 13px;
-  color: var(--mm-ink-2);
-  padding: 4px 10px;
-  background: var(--mm-surface);
-  border: 1px solid var(--mm-line-2);
-  border-radius: 999px;
-  white-space: nowrap;
-}
+/* The Password button (auth/AccountPanel.tsx) beside a page's session controls. */
 .menu-link-button {
   border: 1px solid var(--mm-line-2);
   background: var(--mm-surface);
@@ -843,12 +820,3 @@
 }
 .menu-link-button:hover { color: var(--mm-ink); border-color: var(--mm-ink-3); }
 
-.menu-right {
-  margin-left: auto;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 0 8px;
-}
-/* When Submit is present it owns the auto-margin; keep a gap before the group. */
-.menu-submit + .menu-right { margin-left: 8px; }
