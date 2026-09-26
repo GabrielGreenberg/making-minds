@@ -35,22 +35,21 @@ export function LoginScreen() {
 
 /**
  * The card variant of the page shell: the brand topbar and one centred card.
- * Every sign-in pane (the local picker; remote password / SSO / dev) OPENS
- * with the way past it: continue as a visitor, into the sandbox — first, its
- * button in the site's soft magenta, because most people arriving from the website just
- * want to try the machines.
+ * This card is the site's one front door (routing.ts), so every pane (the
+ * local picker; remote password / setup / request / SSO / dev) LEADS with
+ * signing in, and closes, below a hairline, with the quieter way past it:
+ * continue as a visitor, into the sandbox. (People who came for the machines
+ * alone have the website's own sandbox link, which skips this card.)
  */
 function LoginCard({ children }: { children: ReactNode }) {
   return (
     <PageShell variant="card">
       <div className="mm-card mm-card--narrow">
-        <div className="login-visitor">
-          <p>Just exploring? Build circuits, state machines and Turing machines. No account needed.</p>
-          <a className="mm-btn login-visitor-btn" {...hashLink({ kind: 'sandbox' })}>
-            Continue as visitor
-          </a>
-        </div>
         {children}
+        <p className="login-visitor">
+          Just exploring? <a {...hashLink({ kind: 'sandbox' })}>Continue as visitor</a> to build
+          circuits, state machines and Turing machines. No account needed.
+        </p>
       </div>
     </PageShell>
   );

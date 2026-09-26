@@ -19,8 +19,9 @@ import { useRoute } from '../useRoute';
  *                if nobody is signed in, then the app.
  *
  * Routing starts HERE, at boot, for everyone: `initRouting` applies the
- * landing rule (a browser with no trace of a previous sign-in, opening `#/`,
- * lands in the sandbox as a visitor) and the initial URL. A route that needs
+ * initial URL as it is — the bare site is Home, so anyone not signed in who
+ * opens it gets the sign-in screen, which offers the sandbox as its second
+ * choice (one front door, routing.ts). A route that needs
  * sign-in is held — never applied to the store unauthenticated. Every
  * principal change (`setRoutingPrincipal`) re-applies the URL onto the store
  * the auth provider has just reset for the new person: a deep link like
@@ -28,7 +29,7 @@ import { useRoute } from '../useRoute';
  * #/sandbox shows the arriving person's own sandbox.
  */
 export function AuthGate({ children }: { children: ReactNode }) {
-  const { user, loading, hasSignInTrace } = useAuth();
+  const { user, loading } = useAuth();
   const route = useRoute();
 
   // Declared first so it runs first: routing must know who is signed in
@@ -38,8 +39,8 @@ export function AuthGate({ children }: { children: ReactNode }) {
   }, [user]);
 
   useEffect(() => {
-    initRouting({ hasSignInTrace: hasSignInTrace() });
-  }, [hasSignInTrace]);
+    initRouting();
+  }, []);
 
   if (routeAccess(route) === 'public') return <>{children}</>;
 

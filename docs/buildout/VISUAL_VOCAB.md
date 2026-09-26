@@ -172,11 +172,12 @@ literal or an undefined token. Task: `tasks/done/2026-09-21-019-*`._
   its top bar shows "Visitor" and **Sign in** where the name menu sits (the brand is not
   a link — a visitor has no Home), and under it one dismissible lavender
   `.visitor-banner` line ("…as a visitor — PHIL 133 student? Sign in"; dismissed for the
-  browser session). On page surfaces `SessionControls` shows Visitor · Sign in. Every
-  sign-in card (local picker; remote password / dev / SSO) OPENS with "Just exploring?…"
-  on white and a full-width **Continue as visitor** button in soft magenta
-  (`--mm-accent-soft` field, `--mm-accent` text), then a hairline, then Sign in; the
-  server-health card offers "Open the sandbox" beside Retry.
+  browser session). On page surfaces `SessionControls` shows Visitor · Sign in. The
+  sign-in card is the one front door (the bare site opens it for anyone not signed in,
+  task 040): every pane (local picker; remote password / setup / request / dev / SSO)
+  LEADS with signing in, then a hairline and one quiet meta-size `--mm-ink-3` line, "Just
+  exploring? *Continue as visitor* to build…", its link the only way into the sandbox
+  from there; the server-health card offers "Open the sandbox" beside Retry.
 - **Up next** — the site's `.next`/`.nx` box (`.mm-next`/`.mm-nx`): a lavender field with
   a chip on the left (NEXT DUE) and date-in-`--mm-date` + title + a detail line on the
   right, above the student's catalog; shown only when a homework has a future due date.
