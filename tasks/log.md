@@ -40,3 +40,4 @@
 2026-09-25-051 · chore · Bring HW1 in the textbook deck (MM.key) up to date with the app's HW1 — handed to the MM class session · 2026-09-25T11:32:58-0700 · (none) · (memo only)
 2026-09-22-029 · feature · The robot pipeline — an hourly auto-catch that chains into a one-task work run, in the robot's own clones, releasing through the guardrails · 2026-09-25T15:08:04-0700 · task/029-robot-pipeline · 5c1386f
 2026-09-25-052 · feature · Rebuild the question editor's frame as a workbench — a top bar, a question panel on the left, resizable and collapsible columns (editor redesign 1 of 6) · 2026-09-25T17:52:05-0700 · task/052-editor-workbench-shell · 93365f9
+2026-09-25-053 · feature · Give the editor one set of run controls in a right-hand Output panel, and retire the toolbar (editor redesign 2 of 6) · 2026-09-25T19:37:37-0700 · task/053-editor-output-panel · f09ccbf

@@ -8,9 +8,9 @@ requires: browser
 area: app
 source: inbox
 created: 2026-09-25T16:15:00-07:00
-status: in-progress
+status: done
 after: 2026-09-25-052
-branch: task/053-editor-output-panel
+branch:
 merged_into:
 ---
 
@@ -188,3 +188,6 @@ Gabriel, 2026-09-25 (catch):
   - HW3 P11 (SC perception): no header row.
 - **Screenshots:** `tasks/attachments/2026-09-25-053-{1..4}.png` (CC stepping, the Clear confirm, SC, turbot TM).
 - **Gates** (by exit code): both tsc runs, the build, `npm run check` and the server's `npm run check`.
+
+### 2026-09-25 — landed (/work)
+Merged to `main` with `--no-ff`. Next in the chain: 054 (the floating palette).
