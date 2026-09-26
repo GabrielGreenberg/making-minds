@@ -44,6 +44,7 @@ const PAGE_COMPONENTS = [
   'components/OutputPanel.tsx',
   'components/LiveTruthTable.tsx',
   'components/CanvasActions.tsx',
+  'components/Palette.tsx',
   'components/PageShell.tsx',
   'components/SessionControls.tsx',
   'components/HomeScreen.tsx',
@@ -116,7 +117,7 @@ check('index.html title is the course, not "app"', /<title>Making Minds/.test(ht
 // are the canvas, palette and data-panel internals that tasks 053–055 move
 // onto the tokens. The ceiling only ever goes down: lower it as they go, and
 // a new literal fails here. At 0 this becomes pin 1's rule for index.css.
-const INDEX_CSS_LITERAL_CEILING = 174;
+const INDEX_CSS_LITERAL_CEILING = 168;
 const editorLiterals = literals(editor);
 check(
   `index.css: colour literals only go down (${editorLiterals.length} ≤ ${INDEX_CSS_LITERAL_CEILING})`,

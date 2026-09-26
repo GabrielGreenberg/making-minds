@@ -1,6 +1,5 @@
 import { TabBar } from './components/TabBar';
 import { EditorShell } from './components/EditorShell';
-import { ComponentLibrary } from './components/ComponentLibrary';
 import { CircuitCanvas } from './components/CircuitCanvas';
 import { OutputPanel } from './components/OutputPanel';
 import { SequentialTimeline } from './components/SequentialTimeline';
@@ -67,7 +66,7 @@ function App() {
       {/* The sandbox's worksheet tabs, over its canvas (no question panel). */}
       {!assignment && <TabBar />}
       <div className="main-area">
-        <ComponentLibrary />
+        {/* The parts are a floating palette inside the canvas (task 054). */}
         <div className="canvas-and-timeline">
           {/* Turbot questions: the arena ("Map") lives in the output panel
               (DataTable's turbot branch), not here — the canvas column is the

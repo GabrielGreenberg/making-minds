@@ -593,7 +593,7 @@ function runTripwires(): void {
       (smuggled.cases[0]?.reason ?? '').includes('OR'),
   );
 
-  // The palette filter's pure predicate (ComponentLibrary reads this).
+  // The palette's pure predicate (palette.ts partRefusal reads this).
   selfCheck(
     'allowed_components: palette predicate — OR hidden, NOT/INPUT/OUTPUT shown, no field = all shown',
     !isComponentTypeAllowed('OR', hw1p2.question.allowed_components) &&

@@ -21,6 +21,20 @@
 //                    Run/Step of its own for CC, FSM, TM or turbot, the row
 //                    renders the store's one descriptor; the canvas's action
 //                    group calls the store's (locked) actions.
+//   [palette]        (task 054) the parts each canvas offers, dimmed (never
+//                    hidden) when a question excludes them, boxes likewise;
+//                    the box rows, their meta line and pins (unresolved pins
+//                    skipped); the position clamp and prefs; the way it
+//                    runs (the student's choice, unless only the other way
+//                    fits the canvas); placement
+//                    centred; the retired parts column and its HTML drag gone,
+//                    the canvas's one placement path, the Shift rule, the
+//                    pop-out closing on empty canvas and Esc.
+//   [shortcuts]      (task 058) the key → command table: case-free (Shift,
+//                    Caps Lock), Ctrl+Y redo (not ⌘Y), non-Latin layouts by
+//                    physical key; no shortcut while a text field, select or
+//                    contentEditable has focus; the canvas dispatches the
+//                    table's commands to the store's (locked) undo/redo.
 //
 // Run from app/: npx tsx tools/workbenchCheck.ts   (part of `npm run check`).
 
@@ -28,6 +42,31 @@ import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { AssignmentData, CircuitData, QuestionCircuit } from '../src/types';
 import { truthTableCC, TRUTH_TABLE_MAX_INPUTS } from '../src/engine';
+import type { ConfirmedBoxDef, CircuitComponent } from '../src/types';
+import { getPortsForType } from '../src/types';
+import { getComponentSize } from '../src/componentGeometry';
+import {
+  PALETTE_DEFAULT,
+  boxMetaLine,
+  boxRows,
+  clampPalette,
+  clientToCanvas,
+  paletteHasBoxes,
+  paletteLength,
+  paletteOrientation,
+  paletteParts,
+  palettePlacementFromPrefs,
+  partRefusal,
+  pinnedRows,
+  pinsFromPrefs,
+  pinsPrefKey,
+  placementOrigin,
+  sameTool,
+  togglePin,
+  toolComponent,
+  toolKey,
+} from '../src/palette';
+import { editorShortcut, isTextEntryTarget, type KeyPress } from '../src/shortcuts';
 import { documentSections } from '../src/problemSet';
 import {
   COLLAPSED_STRIP,
@@ -222,6 +261,151 @@ console.log('\n[output panel]');
   check('the canvas\'s action group: Undo · Redo · Delete · Rotate · Clear through the store\'s own actions',
     ['undo()', 'redo()', 'deleteSelected()', 'rotateComponent(id)', 'clearWorkspace()', 'toggleStateKind(id)'].every((a) => actions.includes(a)) &&
       !/isCurrentQuestionLocked/.test(actions));
+}
+
+console.log('\n[palette]');
+{
+  const types = (mode: string, mem: boolean) => paletteParts(mode, mem).map((p) => p.type).join(' ');
+  check('a CC canvas offers Input · Output · AND · OR · NOT (no MEM: it holds no memory)',
+    types('CC', false) === 'INPUT OUTPUT AND OR NOT');
+  check('a canvas that may hold memory adds MEM', types('SC', true) === 'INPUT OUTPUT AND OR NOT MEM');
+  check('FSM and TM offer STATE only', types('FSM', false) === 'STATE' && types('TM', false) === 'STATE');
+  check('boxing (New box, the Boxes group) on circuit canvases only',
+    paletteHasBoxes('CC') && paletteHasBoxes('SC') && !paletteHasBoxes('FSM') && !paletteHasBoxes('TM'));
+  const or = paletteParts('CC', false).find((p) => p.type === 'OR')!;
+  const input = paletteParts('CC', false).find((p) => p.type === 'INPUT')!;
+  check('decision 3: an excluded part is dimmed with "OR is not used in this problem"',
+    partRefusal(or, ['AND', 'NOT']) === 'OR is not used in this problem');
+  check('…INPUT/OUTPUT are always allowed; no restriction dims nothing',
+    partRefusal(input, ['AND']) === null && partRefusal(or, null) === null);
+
+  const part = (type: CircuitComponent['type'], id: string): CircuitComponent =>
+    ({ id, type, x: 0, y: 0, label: type, ports: getPortsForType(type), value: 0 });
+  const box = (id: string, name: string, inner: CircuitComponent['type'][], extra: Partial<ConfirmedBoxDef> = {}): ConfirmedBoxDef => ({
+    id, name, inputPortIds: ['a:out', 'b:out'], outputPortIds: ['c:in'],
+    internalComponents: inner.map((t, i) => part(t, `${id}-${i}`)), internalWires: [], ...extra,
+  });
+  const lib = [
+    box('b1', 'Box 1', ['AND'], { kind: 'CC', origin: 7 }),
+    box('b2', 'OR box', ['OR']),
+    box('b3', 'Delay', ['MEM'], { kind: 'SC' }),
+    box('b4', 'Old FSM', ['STATE'], { kind: 'FSM' }),
+  ];
+  const problemOf = (origin: number | undefined) => (origin === 7 ? '1' : null);
+  const onCC = boxRows(lib, ['CC'], ['AND', 'NOT'], ['b2'], problemOf);
+  check('rows: the kinds this canvas may place, in library order (an SC box not on CC; a retired FSM box never)',
+    onCC.map((r) => r.box.id).join() === 'b1,b2' && boxRows(lib, ['CC', 'SC'], null, [], problemOf).map((r) => r.box.id).join() === 'b1,b2,b3');
+  check('F11: the meta line "2 in · 1 out · Problem 1" when the origin is known, no suffix when not',
+    onCC[0].meta === '2 in · 1 out · Problem 1' && onCC[1].meta === '2 in · 1 out' && boxMetaLine(3, 2, null) === '3 in · 2 out');
+  check('decision 3: a box using an excluded part is dimmed (not hidden), saying which',
+    onCC[0].refusal === null && onCC[1].refusal === 'This box uses OR, which is not used in this problem');
+  check('rows know whether they are pinned', !onCC[0].pinned && onCC[1].pinned);
+  check('pinned tiles in pin order; a pin that resolves to nothing is skipped silently (F12)',
+    pinnedRows(['gone', 'b2', 'b1', 'b2'], onCC).map((r) => r.box.id).join() === 'b2,b1');
+  check('pinning appends once; unpinning removes',
+    togglePin(['b1'], 'b2', true).join() === 'b1,b2' && togglePin(['b1', 'b2'], 'b1', true).join() === 'b2,b1' &&
+      togglePin(['b1', 'b2'], 'b1', false).join() === 'b2');
+  check('pins are kept per homework, per tab in the sandbox',
+    pinsPrefKey({ assignmentId: 'hw1' }) === 'pinnedBoxes:hw1' && pinsPrefKey({ tabId: 't2' }) === 'pinnedBoxes:tab:t2' &&
+      pinsFromPrefs({ 'pinnedBoxes:hw1': ['b1', 3, 'b2'] }, 'pinnedBoxes:hw1').join() === 'b1,b2' && pinsFromPrefs({}, 'x').length === 0);
+
+  check('the palette starts at (14,14), vertical; a stored placement is read back, junk falls back',
+    palettePlacementFromPrefs({}) === PALETTE_DEFAULT && PALETTE_DEFAULT.x === 14 && PALETTE_DEFAULT.y === 14 && !PALETTE_DEFAULT.horiz &&
+      JSON.stringify(palettePlacementFromPrefs({ 'editor.palette': { x: 300, y: 40, horiz: true } })) === '{"x":300,"y":40,"horiz":true}' &&
+      JSON.stringify(palettePlacementFromPrefs({ 'editor.palette': { x: 'left', horiz: 1 } })) === '{"x":14,"y":14,"horiz":false}');
+  const canvas = { w: 800, h: 600 };
+  const size = { w: 60, h: 400 };
+  check('it stays 8px inside the canvas',
+    JSON.stringify(clampPalette({ x: -50, y: -5 }, size, canvas)) === '{"x":8,"y":8}' &&
+      JSON.stringify(clampPalette({ x: 900, y: 500 }, size, canvas)) === '{"x":732,"y":192}' &&
+      JSON.stringify(clampPalette({ x: 100, y: 100 }, size, canvas)) === '{"x":100,"y":100}');
+  {
+    // 7 tiles, 3 hairlines: the CC palette with its Boxes tile.
+    const len = paletteLength(7, 3);
+    check('the palette\'s run: grip 16 + turn 24 + border 2 + hairlines + 58 per tile', len === 16 + 24 + 2 + 3 + 7 * 58);
+    check('it runs the way the student chose when that fits',
+      paletteOrientation(true, len, { w: 900, h: 700 }) === true && paletteOrientation(false, len, { w: 900, h: 700 }) === false);
+    check('a flat palette that would clip in a narrow canvas stands up instead (never loses its turn button)',
+      paletteOrientation(true, len, { w: 300, h: 700 }) === false);
+    check('…and a standing one that would clip in a short canvas lies flat',
+      paletteOrientation(false, len, { w: 900, h: 300 }) === true);
+    check('neither fitting, or an unknown canvas, keeps the choice',
+      paletteOrientation(true, len, { w: 200, h: 200 }) === true && paletteOrientation(false, len, { w: 0, h: 0 }) === false);
+  }
+  check('a canvas smaller than the palette pins it to the top-left margin',
+    JSON.stringify(clampPalette({ x: 50, y: 50 }, size, { w: 40, h: 300 })) === '{"x":8,"y":8}');
+
+  check('the armed tool is one tagged value: a part, NEW_BOX, or a box',
+    toolKey('AND') === 'AND' && toolKey('NEW_BOX') === 'NEW_BOX' && toolKey({ box: 'b1' }) === 'box:b1' &&
+      sameTool({ box: 'b1' }, { box: 'b1' }) && !sameTool({ box: 'b1' }, { box: 'b2' }) && !sameTool('AND', null) && sameTool(null, null));
+  const and = toolComponent('AND', lib)!;
+  const at = placementOrigin(and, 300, 200);
+  const { w, h } = getComponentSize(and);
+  check('a part lands centred on the pointer', at.x === 300 - w / 2 && at.y === 200 - h / 2);
+  const b1 = toolComponent({ box: 'b1' }, lib);
+  check('a box tool draws the box as it lands: BOXED, its name, its port counts',
+    b1?.type === 'BOXED' && b1.label === 'Box 1' && b1.boxedCircuitId === 'b1' &&
+      b1.ports.filter((p) => p.side === 'left').length === 2 && b1.ports.filter((p) => p.side === 'right').length === 1);
+  check('NEW_BOX and a vanished box place nothing', toolComponent('NEW_BOX', lib) === null && toolComponent({ box: 'gone' }, lib) === null);
+  check('screen → canvas through the pan and zoom',
+    JSON.stringify(clientToCanvas({ x: 250, y: 150 }, { left: 50, top: 50 }, { panX: 100, panY: 0, zoom: 2 })) === '{"x":50,"y":50}');
+
+  const app = code('App.tsx');
+  const canvasSrc = code('components/CircuitCanvas.tsx');
+  const paletteSrc = code('components/Palette.tsx');
+  check('the parts column is gone (no ComponentLibrary), the palette floats in the canvas',
+    !existsSync(join(SRC, 'components/ComponentLibrary.tsx')) && !/ComponentLibrary/.test(app) &&
+      /<Palette canvasW=\{containerSize\.width\} canvasH=\{containerSize\.height\} \/>/.test(canvasSrc));
+  check('no HTML drag-and-drop left: the palette\'s pointer drag and the canvas\'s ghost replace it',
+    !/onDrop=|dataTransfer|draggable/.test(canvasSrc + paletteSrc) && /<PaletteGhost /.test(canvasSrc));
+  check('ONE placement path: the canvas click and the palette drop both call the store\'s placeTool',
+    /state\.placeTool\(state\.selectedTool, canvasPos\.x, canvasPos\.y\)/.test(canvasSrc) && /s\.placeTool\(tool, at\.x, at\.y\)/.test(paletteSrc) &&
+      !/addComponent\(|placeBoxInstance\(/.test(canvasSrc + paletteSrc));
+  check('Shift keeps the tool armed; a plain click places one and disarms',
+    /if \(!e\.shiftKey\) state\.setSelectedTool\(null\);/.test(canvasSrc));
+  check('a click on empty canvas and Esc close the Boxes pop-out',
+    (canvasSrc.match(/setBoxesPopoutOpen\(false\)/g) ?? []).length >= 2);
+  check('the palette holds no lock of its own (law 3) and its rename wears the paste guard (law 8)',
+    !/isCurrentQuestionLocked|selectQuestionLocked/.test(paletteSrc) && /ref=\{pasteGuardRef\}/.test(paletteSrc));
+}
+
+console.log('\n[shortcuts]');
+{
+  const k = (key: string, mods: Partial<KeyPress> = {}): KeyPress =>
+    ({ key, shiftKey: false, ctrlKey: false, metaKey: false, altKey: false, ...mods });
+  const table: [string, KeyPress, string | null][] = [
+    ['⌘Z', k('z', { metaKey: true }), 'undo'],
+    ['Ctrl+Z', k('z', { ctrlKey: true }), 'undo'],
+    ['⌘⇧Z reported lower-case (Chrome, macOS)', k('z', { metaKey: true, shiftKey: true }), 'redo'],
+    ['Ctrl+Shift+Z reported "Z" (Windows, Linux)', k('Z', { ctrlKey: true, shiftKey: true }), 'redo'],
+    ['⌘⇧Z reported "Z" (macOS, some browsers)', k('Z', { metaKey: true, shiftKey: true }), 'redo'],
+    ['Ctrl+Z under Caps Lock ("Z", no Shift)', k('Z', { ctrlKey: true }), 'undo'],
+    ['Ctrl+Y (Windows redo)', k('y', { ctrlKey: true }), 'redo'],
+    ['Ctrl+Y under Caps Lock', k('Y', { ctrlKey: true }), 'redo'],
+    ['⌘Y is the browser\'s History, not redo', k('y', { metaKey: true }), null],
+    ['⌘C / Ctrl+C under Caps Lock', k('C', { ctrlKey: true }), 'copy'],
+    ['⌘V', k('v', { metaKey: true }), 'paste'],
+    ['Ctrl+A under Caps Lock', k('A', { ctrlKey: true }), 'selectAll'],
+    ['Ctrl+Shift+C stays the browser\'s', k('C', { ctrlKey: true, shiftKey: true }), null],
+    ['a Cyrillic layout: Ctrl+"я" on the Z key', k('я', { ctrlKey: true, code: 'KeyZ' }), 'undo'],
+    ['…and with Shift', k('Я', { ctrlKey: true, shiftKey: true, code: 'KeyZ' }), 'redo'],
+    ['AZERTY: the Z key reports "z" (physical KeyW) — the letter wins', k('z', { ctrlKey: true, code: 'KeyW' }), 'undo'],
+    ['AltGr (Ctrl+Alt) is typing, not a shortcut', k('z', { ctrlKey: true, altKey: true }), null],
+    ['a plain "z" is typing', k('z'), null],
+    ['Delete', k('Delete'), 'delete'],
+    ['Backspace', k('Backspace'), 'delete'],
+    ['Escape', k('Escape'), 'escape'],
+  ];
+  for (const [name, press, want] of table) check(`${name} → ${want ?? 'nothing'}`, editorShortcut(press) === want, `got ${editorShortcut(press)}`);
+  check('no shortcut while a text field, textarea, select or contentEditable has focus',
+    isTextEntryTarget({ tagName: 'INPUT' }) && isTextEntryTarget({ tagName: 'textarea' }) && isTextEntryTarget({ tagName: 'SELECT' }) &&
+      isTextEntryTarget({ tagName: 'DIV', isContentEditable: true }) && !isTextEntryTarget({ tagName: 'BUTTON' }) &&
+      !isTextEntryTarget({ tagName: 'BODY', isContentEditable: false }) && !isTextEntryTarget(null));
+  const canvasSrc = code('components/CircuitCanvas.tsx');
+  check('the canvas asks the table and dispatches — undo/redo through the store\'s own (locked) actions',
+    /const command = editorShortcut\(e\)/.test(canvasSrc) && /isTextEntryTarget\(document\.activeElement/.test(canvasSrc) &&
+      /case 'undo':[\s\S]*?state\.undo\(\)/.test(canvasSrc) && /case 'redo':[\s\S]*?state\.redo\(\)/.test(canvasSrc) &&
+      !/e\.key === 'z'|e\.key === 'c'|e\.key === 'v'|e\.key === 'a'/.test(canvasSrc));
 }
 
 console.log(failures === 0 ? '\nworkbenchCheck: all checks passed' : `\nworkbenchCheck: ${failures} FAILED`);

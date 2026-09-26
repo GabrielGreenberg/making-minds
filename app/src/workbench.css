@@ -331,3 +331,117 @@ a.wb-brand:hover { color: var(--mm-accent); text-decoration: none; }
 }
 .cv-confirm p { margin: 0 0 10px; }
 .cv-confirm-actions { display: flex; justify-content: flex-end; gap: 8px; }
+
+/* ── The floating palette and its Boxes pop-out (Palette.tsx, task 054) ─ */
+.pal {
+  position: absolute; z-index: 45; display: flex; flex-direction: column;
+  background: var(--mm-surface); border: 1px solid var(--mm-line-2); box-shadow: var(--mm-shadow-palette);
+  font-family: var(--mm-font-sans); user-select: none; touch-action: none;
+}
+.pal--horiz { flex-direction: row; }
+.pal--dragging { box-shadow: var(--mm-shadow-palette-drag); }
+.pal--pin-target { border-color: var(--mm-accent); }
+.pal-grip {
+  height: 16px; display: grid; place-items: center; flex-shrink: 0;
+  background: var(--mm-surface-3); cursor: grab;
+}
+.pal--dragging .pal-grip { cursor: grabbing; }
+.pal--horiz .pal-grip { height: auto; width: 16px; }
+/* (.pal-scoped: the canvas's own `.canvas-container svg` rule sizes every svg in it to 100%.) */
+.pal .pal-grip-ico { width: 12px; height: 12px; fill: var(--mm-ink-3); }
+.pal-groupwrap { display: flex; flex-direction: column; }
+.pal--horiz .pal-groupwrap { flex-direction: row; }
+.pal-group { display: flex; flex-direction: column; }
+.pal--horiz .pal-group { flex-direction: row; }
+.pal-div { height: 1px; background: var(--mm-line); flex-shrink: 0; }
+.pal--horiz .pal-div { height: auto; width: 1px; }
+.pal-tile {
+  position: relative; width: 58px; min-height: 44px; padding: 7px 0 6px;
+  display: flex; flex-direction: column; align-items: center; gap: 4px;
+  border: 0; background: none; font: inherit; color: var(--mm-ink); cursor: pointer;
+}
+.pal-tile:hover, .pal-tile--armed { background: var(--mm-lav-soft); }
+.pal-tile:focus-visible { outline: 2px solid var(--mm-focus); outline-offset: -2px; }
+.pal-tile--off { opacity: 0.3; cursor: not-allowed; }
+.pal-tile--off:hover { background: none; }
+.pal-tile-label {
+  max-width: 54px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  font-size: 10.5px; font-weight: 500; line-height: 1.1; color: var(--mm-ink-2);
+}
+.pal-badge {
+  position: absolute; top: 3px; right: 5px; min-width: 16px; height: 16px; padding: 0 4px;
+  display: grid; place-items: center; box-sizing: border-box;
+  background: var(--mm-accent); color: var(--mm-surface);
+  font-family: var(--mm-font-mono); font-size: 10px; font-weight: 600; line-height: 1;
+}
+.pal-turn {
+  height: 24px; display: grid; place-items: center; flex-shrink: 0;
+  border: 0; background: none; color: var(--mm-ink-3); cursor: pointer;
+}
+.pal--horiz .pal-turn { height: auto; width: 24px; }
+.pal-turn:hover:not(:disabled) { background: var(--mm-lav-soft); color: var(--mm-ink); }
+.pal-turn:disabled { opacity: 0.35; cursor: default; }
+/* The tile icons: 36×26, stroke 1.6 in the ink colour, round caps and joins. */
+.pal .pal-ico, .pal-pop .pal-ico {
+  width: 36px; height: 26px; flex-shrink: 0; overflow: visible;
+  fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round;
+}
+.pal-ico .pal-ico-dot { fill: currentColor; stroke: none; }
+.pal-ico .pal-ico-fill { fill: var(--mm-surface-3); }
+.pal-ico text { fill: currentColor; stroke: none; font-family: var(--mm-font-sans); font-size: 10px; font-weight: 600; }
+.pal .pal-turn-ico { width: 14px; height: 14px; }
+
+.pal-pop {
+  position: absolute; z-index: 46; width: 260px; display: flex; flex-direction: column;
+  background: var(--mm-surface); border: 1px solid var(--mm-line-2); box-shadow: var(--mm-shadow-popout);
+  font-family: var(--mm-font-sans); color: var(--mm-ink);
+}
+.pal-pop-head { display: flex; align-items: center; justify-content: space-between; padding: 10px 8px 6px 12px; }
+.pal-pop-title { font-size: 11px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--mm-accent); }
+.pal-pop-close { border: 0; background: none; padding: 0 4px; font-size: 17px; line-height: 1; color: var(--mm-ink-3); cursor: pointer; }
+.pal-pop-close:hover { color: var(--mm-ink); }
+.pal-pop-list { flex: 1; min-height: 0; overflow-y: auto; }
+.pal-pop-empty { margin: 0; padding: 4px 12px 12px; font-size: 12.5px; line-height: 1.45; color: var(--mm-ink-3); }
+.pal-row {
+  display: grid; grid-template-columns: 36px 1fr auto; gap: 10px; align-items: center;
+  padding: 8px 12px; cursor: grab; user-select: none; touch-action: none;
+}
+.pal-row:hover, .pal-row--armed { background: var(--mm-lav-soft); }
+.pal-row:focus-visible { outline: 2px solid var(--mm-focus); outline-offset: -2px; }
+.pal-row--off { cursor: not-allowed; }
+.pal-row--off .pal-row-icon, .pal-row--off .pal-row-label, .pal-row--off .pal-row-meta { opacity: 0.3; }
+.pal-row--off:hover { background: none; }
+.pal-row-icon { display: grid; place-items: center; color: var(--mm-ink); }
+.pal-row-text { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.pal-row-name { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.pal-row-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13.5px; font-weight: 600; }
+.pal-row-tools { display: flex; gap: 2px; opacity: 0; }
+.pal-row:hover .pal-row-tools, .pal-row:focus-within .pal-row-tools { opacity: 1; }
+.pal-row-tools > button {
+  border: 0; background: none; padding: 0 3px; font-size: 11px; line-height: 1.4;
+  color: var(--mm-ink-3); cursor: pointer;
+}
+.pal-row-tools > button:hover { color: var(--mm-accent); }
+/* Wraps rather than clip: beside the pin button the column is ~85px, and "· Problem 12" is the point. */
+.pal-row-meta { font-size: 11.5px; line-height: 1.35; color: var(--mm-ink-3); }
+.pal-row-rename { display: flex; flex-direction: column; gap: 4px; cursor: auto; }
+.pal-row-rename input {
+  width: 100%; box-sizing: border-box; padding: 3px 6px; font: inherit; font-size: 13px;
+  border: 1px solid var(--mm-accent); background: var(--mm-surface); color: var(--mm-ink); outline: none;
+}
+.pal-row-notice { font-size: 11.5px; line-height: 1.4; color: var(--mm-link); }
+.pal-pin {
+  padding: 4px 8px; font: inherit; font-size: 12px; white-space: nowrap; cursor: pointer;
+  background: var(--mm-surface); border: 1px solid var(--mm-line-2); color: var(--mm-ink-2);
+}
+.pal-pin:hover { border-color: var(--mm-accent); }
+.pal-pin--on { color: var(--mm-accent); border-color: var(--mm-lav-line); }
+.pal-pop-foot { padding: 10px 12px 12px; border-top: 1px solid var(--mm-line); }
+.pal-newbox {
+  width: 100%; height: 34px; font: inherit; font-size: 13px; font-weight: 600; cursor: pointer;
+  background: var(--mm-surface); border: 1px solid var(--mm-line-2); color: var(--mm-ink);
+}
+.pal-newbox:hover, .pal-newbox--armed { background: var(--mm-lav-soft); }
+.pal-pop-note { margin: 8px 0 0; font-size: 12px; color: var(--mm-ink-3); }
+/* The part a dragged tile would place (CircuitCanvas PaletteGhost). */
+.cv-ghost { opacity: 0.55; }

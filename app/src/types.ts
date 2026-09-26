@@ -823,6 +823,10 @@ export interface ConfirmedBoxDef {
   outputPortIds: string[];
   internalComponents: CircuitComponent[];
   internalWires: Wire[];
+  /** The question it was boxed on (its id), for the pop-out's "· Problem 1"
+   *  (task 054). Stamped by confirmBox inside an assignment; absent in the
+   *  sandbox and on boxes made before it existed (no suffix shown). */
+  origin?: number;
 }
 
 export interface BoxDefinition {
