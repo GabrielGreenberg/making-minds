@@ -8,9 +8,9 @@ requires:
 area: app
 source: chat
 created: 2026-09-25T16:15:00-07:00
-status: ready
+status: in-progress
 after:
-branch:
+branch: task/054-editor-floating-palette
 merged_into:
 ---
 

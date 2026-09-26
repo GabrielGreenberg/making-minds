@@ -8,9 +8,9 @@ requires: browser
 area: app
 source: inbox
 created: 2026-09-25T16:15:00-07:00
-status: ready
+status: in-progress
 after: 2026-09-25-053
-branch:
+branch: task/054-editor-floating-palette
 merged_into:
 ---
 
