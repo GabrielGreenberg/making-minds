@@ -65,3 +65,6 @@ and no "uncommitted edits" note, and the box's clone is clean afterwards
   typecheck 0, server check 0. **Owed:** Gabriel's next hand release (the gate holds
   `deploy/` changes) — expect "discarded npm's rewrite of package-lock.json", no
   "uncommitted edits" note, and a clean clone on the box after.
+- 2026-09-25 — Verified on the pilot: Gabriel's hand release printed "discarded npm's rewrite of
+  package-lock.json" and no "uncommitted edits" note; afterwards the box's clone is clean
+  (`status --porcelain` empty), runs `7a7ca33`, and has no root lockfile. Nothing owed.
