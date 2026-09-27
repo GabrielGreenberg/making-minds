@@ -1741,8 +1741,10 @@ console.log('[own submissions]');
     readFileSync(new URL(f, srcRoot), 'utf8').includes('listAllSubmissions'));
   check('listAllSubmissions appears only in api/client.ts and storage/ (the remote seam)',
     rawCallers.length > 0 && rawCallers.every((f) => f.startsWith('storage/')), rawCallers.join(', '));
-  check('…and the gradebook and the dashboard read through it',
-    callers.includes('instructor/GradebookView.tsx') && callers.includes('instructor/InstructorDashboard.tsx'));
+  // The instructor views read the GradingStore's summaries (task 065), which
+  // read listAll themselves (storage/) — no view reads every attempt.
+  check('…and no instructor view calls it (they read the GradingStore summaries)',
+    callers.some((f) => f.startsWith('storage/')) && !callers.some((f) => f.startsWith('instructor/')), callers.join(', '));
 }
 
 // ═════ Each question's editing record rides every canvas swap ═══

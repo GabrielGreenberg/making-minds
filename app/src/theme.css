@@ -385,3 +385,15 @@ select.mm-input { width: auto; }
 .mm-nx-date { font-weight: 400; color: var(--mm-date); margin-right: 6px; }
 .mm-nx-detail { color: var(--mm-ink-2); font-size: 13px; margin-top: 2px; }
 @media (max-width: 720px) { .mm-nx { grid-template-columns: 1fr; gap: 4px; } }
+
+/* ═════════════════ Progress (the Grading tab's bar, task 065) ═════════════════
+   How far along a count is — submitted of the roster, hand grades of those
+   owed: a flat bar (accent; --ok once it is full) under "x / y  n%", and an
+   optional quiet sub-line. */
+.gr-bar { height: 6px; background: var(--mm-surface-2); position: relative; min-width: 80px; }
+.gr-bar > i { position: absolute; left: 0; top: 0; bottom: 0; background: var(--mm-accent); }
+.gr-bar--ok > i { background: var(--mm-ok); }
+.gr-prog { display: grid; gap: 5px; min-width: 130px; }
+.gr-prog-line { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; font-size: var(--mm-fs-small); white-space: nowrap; }
+.gr-prog-line b { font-weight: 600; font-variant-numeric: tabular-nums; }
+.gr-prog-sub { font-size: var(--mm-fs-meta); color: var(--mm-ink-3); white-space: nowrap; }

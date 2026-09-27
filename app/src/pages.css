@@ -373,12 +373,8 @@
 
 /* Fields */
 
-/* Gradebook: per-student rows and expanded submission history */
-.instructor-expand-caret { color: var(--mm-ink-2); font-size: 10px; margin-right: 2px; }
-.instructor-latest-tag { color: var(--mm-ink-2); font-size: 11px; }
+/* A student's submission (StudentSubmissionView): a late attempt's stamp */
 .instructor-late { color: var(--mm-danger); font-size: 11px; font-weight: 600; }
-.instructor-attempt-table { margin: 6px 0; }
-.instructor-attempt-table th { font-size: 11px; }
 
 /* Question list */
 .instructor-question-list { list-style: none; border-top: 1px solid var(--mm-line-2); }
@@ -437,36 +433,17 @@
 .instructor-probe-arrow { color: var(--mm-ink-2); font-size: 16px; }
 .instructor-probe-out { font-size: 13px; }
 
-/* Gradebook */
-.instructor-stats { display: flex; gap: 24px; flex-wrap: wrap; margin-bottom: 20px; padding: 14px 16px; background: var(--mm-surface-2); border-radius: var(--mm-radius); }
-.instructor-stat { display: flex; flex-direction: column; }
-.instructor-stat-value { font-size: 20px; font-weight: 700; }
-.instructor-stat-label { font-size: 12px; color: var(--mm-ink-2); }
-.instructor-submission-row { cursor: pointer; }
+/* Wide instructor tables (the dashboard, the roster) scroll sideways. */
+.instructor-table-scroll { overflow-x: auto; }
+
+/* A student's submission: the counting attempt's group line */
 .instructor-group { margin: 0 0 10px; font-size: var(--mm-fs-small); }
 .instructor-group .mm-label { margin-right: 6px; }
-.instructor-submission-row:hover { background: var(--mm-surface-2); }
-
-/* Submissions pane: the per-question columns can run wide, so the pane
-   scrolls horizontally while the Score column stays pinned on the right. */
-.instructor-table-scroll { overflow-x: auto; }
-.instructor-table--score-sticky { width: max-content; min-width: 100%; }
-.instructor-table--score-sticky thead th:last-child,
-.instructor-table--score-sticky tbody tr.instructor-submission-row td:last-child {
-  position: sticky;
-  right: 0;
-  z-index: 1;
-  background: var(--mm-surface);
-  box-shadow: var(--mm-shadow-edge);
-}
-.instructor-table--score-sticky tbody tr.instructor-submission-row:hover td:last-child {
-  background: var(--mm-surface-2);
-}
 .instructor-pass { color: var(--mm-ok); font-weight: 700; }
 .instructor-fail { color: var(--mm-danger); font-weight: 700; }
-.instructor-pending, .instructor-half { color: var(--mm-warn); font-weight: 700; }
+.instructor-half { color: var(--mm-warn); font-weight: 700; }
 
-/* An open question's free-text answer in the gradebook drill-down */
+/* An open question's free-text answer on a student's submission */
 .instructor-open-response {
   margin: 6px 0 0;
   padding: 8px 12px;
@@ -503,6 +480,87 @@
 .instructor-detail-table { border-collapse: collapse; margin-top: 6px; font-size: 12px; }
 .instructor-detail-table th, .instructor-detail-table td { border: 1px solid var(--mm-line); padding: 3px 10px; text-align: center; }
 
+
+/* ── Instructor: the Grading tab (task 065; memo grading-interface.md §6.1–
+   §6.2, mockups 1–3). The progress bar is shared vocabulary (theme.css). ── */
+.gr-table td, .gr-table th { vertical-align: middle; }
+.gr-table th.num { text-align: right; }
+.gr-table a.mm-row-title { text-decoration: none; }
+.gr-table a.mm-row-title:hover { color: var(--mm-accent); }
+.gr-dimrow td { color: var(--mm-ink-3); }
+.gr-dimrow .mm-row-title { color: var(--mm-ink-3); }
+.gr-tag-gap { margin-left: 8px; }
+.gr-footnote { margin-top: 8px; }
+.gr-prov { color: var(--mm-ink-3); font-weight: 400; }
+.gr-flag { color: var(--mm-danger); margin-left: 2px; font-size: 0.85em; cursor: help; }
+.gr-subline { font-size: var(--mm-fs-small); color: var(--mm-ink-2); margin: 0 0 12px; }
+.gr-subline .mm-label { margin-right: 6px; }
+.gr-state { color: var(--mm-ink-2); }
+.gr-attempt { padding: 8px 0; border-bottom: 1px solid var(--mm-line); }
+/* The Overview: four tiles, the stale banner, the per-problem shares */
+.gr-tiles { display: grid; grid-template-columns: repeat(4, 1fr); border: 1px solid var(--mm-line); background: var(--mm-surface); margin: 0 0 22px; }
+.gr-tile { padding: 14px 18px 16px; border-left: 1px solid var(--mm-line); display: grid; gap: 7px; align-content: start; }
+.gr-tile:first-child { border-left: 0; }
+.gr-tile-value { font-size: 24px; font-weight: 600; font-variant-numeric: tabular-nums; line-height: 1.1; }
+.gr-tile-value small { font-size: 14px; color: var(--mm-ink-3); font-weight: 500; }
+.gr-tile-sub { font-size: var(--mm-fs-meta); color: var(--mm-ink-3); }
+.gr-banner { display: flex; align-items: center; gap: 14px; padding: 10px 14px; margin: 0 0 18px; background: var(--mm-date-soft); border: 1px solid var(--mm-line-2); font-size: var(--mm-fs-small); }
+.gr-banner .gr-ico { font-weight: 700; color: var(--mm-date); }
+.gr-banner .mm-btn { margin-left: auto; }
+.gr-views { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px 16px; margin: 0 0 18px; }
+.gr-views-meta { font-size: 13px; }
+.gr-dist { display: flex; height: 8px; width: 120px; background: var(--mm-surface-2); }
+.gr-dist > i { display: block; height: 100%; }
+.gr-dist .d1 { background: var(--mm-ok); }
+.gr-dist .dh { background: var(--mm-warn); }
+.gr-dist .d0 { background: var(--mm-danger); }
+.gr-dist .dp { background: var(--mm-lav); }
+/* The Matrix: filter chips, then students × problems with the name and the
+   grade pinned while the problems scroll between them */
+.gr-filters { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 0 0 12px; }
+.gr-filter { border: 1px solid var(--mm-line-2); background: var(--mm-surface); padding: 3px 10px; font: inherit; font-size: var(--mm-fs-meta); color: var(--mm-ink-2); cursor: pointer; }
+.gr-filter:hover { color: var(--mm-accent); }
+.gr-filter b { font-variant-numeric: tabular-nums; margin-left: 5px; color: var(--mm-ink); font-weight: 600; }
+.gr-filter--on { border-color: var(--mm-accent); color: var(--mm-accent); background: var(--mm-accent-soft); }
+.gr-filter--on b { color: var(--mm-accent); }
+.gr-filters .mm-input { width: 200px; padding: 4px 8px; font-size: var(--mm-fs-meta); }
+.gr-filters select.mm-input { width: auto; }
+.gr-spacer { flex: 1; }
+.gr-matrix { font-size: var(--mm-fs-small); width: max-content; min-width: 100%; }
+.gr-matrix th, .gr-matrix td { padding: 6px 8px; white-space: nowrap; }
+.gr-matrix th.q, .gr-matrix td.q { padding: 5px 2px; text-align: center; width: 30px; }
+.gr-matrix th.q { font-family: var(--mm-font-mono); letter-spacing: 0; text-transform: none; font-size: 11px; }
+.gr-matrix th.q.hand { color: var(--mm-accent); }
+.gr-matrix td.name { font-weight: 500; }
+.gr-matrix td.name a { color: var(--mm-ink); text-decoration: none; }
+.gr-matrix td.name .dim { font-weight: 400; font-size: var(--mm-fs-meta); margin-left: 6px; }
+.gr-matrix th.num, .gr-matrix td.num { text-align: right; font-variant-numeric: tabular-nums; }
+.gr-matrix td.grade { font-weight: 600; }
+.gr-matrix th:first-child, .gr-matrix td:first-child { position: sticky; left: 0; z-index: 1; background: var(--mm-surface); box-shadow: var(--mm-shadow-edge); }
+.gr-matrix th:last-child, .gr-matrix td:last-child { position: sticky; right: 0; z-index: 1; background: var(--mm-surface); box-shadow: var(--mm-shadow-edge); }
+.gr-matrix .gr-row { cursor: pointer; }
+.gr-matrix .gr-row:hover td { background: var(--mm-surface-3); }
+.gr-matrix .gr-row:hover td.name a { color: var(--mm-accent); }
+.gr-matrix .gr-dimrow td.name a { color: var(--mm-ink-3); }
+.gr-matrix .gr-divider td, .gr-more td { color: var(--mm-ink-3); font-size: var(--mm-fs-meta); text-align: center; }
+.gr-matrix .gr-divider td { position: static; box-shadow: none; text-align: left; background: var(--mm-surface-2); border-top: 1px solid var(--mm-line-2); }
+.gr-cell { display: inline-block; position: relative; width: 24px; height: 22px; line-height: 22px; font-family: var(--mm-font-mono); font-size: 12px; font-weight: 600; text-align: center; }
+.gr-cell--1 { background: var(--mm-ok-soft); color: var(--mm-ok); }
+.gr-cell--h { background: var(--mm-warn-soft); color: var(--mm-warn); }
+.gr-cell--0 { background: var(--mm-danger-soft); color: var(--mm-danger); }
+.gr-cell--p { background: var(--mm-lav-soft); color: var(--mm-accent); }
+.gr-cell--c { background: var(--mm-date-soft); color: var(--mm-date); }
+.gr-cell--m { color: var(--mm-ink-3); font-weight: 400; }
+.gr-cell--human { box-shadow: inset 0 -2px 0 currentColor; }
+.gr-cell--flag::after { content: "\2691"; position: absolute; top: -7px; right: -5px; font-size: 10px; line-height: 1; color: var(--mm-danger); }
+.gr-legend { display: flex; flex-wrap: wrap; gap: 6px 18px; font-size: var(--mm-fs-meta); color: var(--mm-ink-3); margin: 10px 0 0; align-items: center; }
+.gr-legend .gr-cell { margin-right: 5px; transform: scale(0.85); }
+@media (max-width: 720px) {
+  .gr-tiles { grid-template-columns: repeat(2, 1fr); }
+  .gr-tile:nth-child(3) { border-left: 0; }
+  .gr-tile:nth-child(n + 3) { border-top: 1px solid var(--mm-line); }
+  .gr-filters .mm-input { width: 100%; }
+}
 
 /* ── Instructor: document editing (DocumentEditors.tsx; sections and the
    preview in AssignmentEditor.tsx) ── */

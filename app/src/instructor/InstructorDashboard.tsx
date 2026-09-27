@@ -1,6 +1,6 @@
 import { listAssignments, getAssignment, createAssignment } from '../assignments';
 import type { AssignmentSummary } from '../assignments';
-import { assignmentStore, submissionStore, backendMode } from '../storage/backend';
+import { assignmentStore, gradingStore, backendMode } from '../storage/backend';
 import { navigate } from '../routing';
 import { seedSampleData } from '../devData/seed';
 import { seedHomeworks } from '../devData/homeworks';
@@ -9,24 +9,28 @@ import { useAsyncValue } from '../useAsyncValue';
 import { useDragReorder } from './dragReorder';
 
 /**
- * Instructor dashboard: lists every assignment with question and submission
- * counts, and the per-assignment actions. Every assignment is a row in the
+ * Instructor dashboard: lists every assignment with its question count and
+ * how many roster students have submitted (the Grading tab's own count, one
+ * GradingStore.course() read), and the per-assignment actions. Every assignment is a row in the
  * AssignmentStore, so every row is editable, publishable and deletable.
  */
 export function InstructorDashboard() {
-  // The list and per-row submission counts come from the async seams; after a
-  // mutation (create/delete/seed), reload() re-fetches.
+  // The list and per-row submitted counts come from the async seams; after a
+  // mutation (create/delete/seed), reload() re-fetches. `submitted` is roster
+  // students with a submission (not attempts); `submitters` adds anyone else
+  // who submitted — a store refuses to delete an assignment with either.
   const {
     value: rows,
     loading,
     error,
     reload,
   } = useAsyncValue(async () => {
-    const summaries = await listAssignments();
-    const submissionLists = await Promise.all(
-      summaries.map((a) => submissionStore.listAll(a.id)),
-    );
-    return summaries.map((a, i) => ({ ...a, submissionCount: submissionLists[i].length }));
+    const [summaries, course] = await Promise.all([listAssignments(), gradingStore.course()]);
+    const progress = new Map(course.assignments.map((a) => [a.id, a.progress]));
+    return summaries.map((a) => {
+      const p = progress.get(a.id);
+      return { ...a, submitted: p?.submitted ?? 0, submitters: (p?.submitted ?? 0) + (p?.offRosterSubmitted ?? 0) };
+    });
   }, []);
   const assignments = rows ?? [];
 
@@ -81,7 +85,7 @@ export function InstructorDashboard() {
     reload();
     window.alert(
       `Loaded the sample CC/SC/FSM assignment and ${submissionCount} autograded submissions. ` +
-        'Open its Submissions to see the grades.',
+        'Open its Grading to see the grades.',
     );
   };
 
@@ -136,7 +140,7 @@ export function InstructorDashboard() {
               <th className="instructor-table-order-head" aria-label="Reorder"></th>
               <th>Title</th>
               <th>Questions</th>
-              <th>Submissions</th>
+              <th title="Roster students who have submitted">Submitted</th>
               <th className="instructor-table-actions-head">Actions</th>
             </tr>
           </thead>
@@ -167,7 +171,7 @@ export function InstructorDashboard() {
                     )}
                   </td>
                   <td>{a.questionCount}</td>
-                  <td>{a.submissionCount}</td>
+                  <td>{a.submitted}</td>
                   <td className="instructor-table-actions">
                     <button
                       className="mm-btn"
@@ -188,14 +192,14 @@ export function InstructorDashboard() {
                     </button>
                     <button
                       className="mm-btn"
-                      onClick={() => navigate({ kind: 'instructor-submissions', id: a.id })}
+                      onClick={() => navigate({ kind: 'instructor-grading-assignment', id: a.id, view: 'overview' })}
                     >
-                      Submissions
+                      Grading
                     </button>
                     <button
                       className="mm-btn mm-btn--danger"
-                      disabled={a.submissionCount > 0}
-                      title={a.submissionCount > 0 ? 'Students have submitted this — hide it instead' : undefined}
+                      disabled={a.submitters > 0}
+                      title={a.submitters > 0 ? 'Students have submitted this — hide it instead' : undefined}
                       onClick={() => void handleDelete(a.id, a.title)}
                     >
                       Delete
