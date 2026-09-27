@@ -57,7 +57,7 @@ import { buildSubmission } from '../src/storage/submissionStore';
 import { legacyGradesByStudent, planGradeWrite, studentGrade, type GradeWrite } from '../src/storage/gradeWrites';
 import { checkGroup, MAX_GROUP_OTHERS } from '../src/submissionGroup';
 import { emptyQuestionCircuit } from '../src/storage/workbookStore';
-import { gradeSubmissions } from '../src/instructor/Gradebook';
+import { buildAssignmentSummary } from '../src/storage/gradingSummary';
 import { problemVerdict } from '../src/gradeDisplay';
 import { fillInBlanks } from '../src/engine/fillIn';
 import {
@@ -186,8 +186,8 @@ console.log('\n[boxed-across answers]');
 
 // Human grades (task 063): the ONE write planner both GradingStores run
 // (storage/gradeWrites.ts). A grade is stored apart from the result, anchored
-// to the latest attempt's answer, versioned, logged; the gradebook then counts
-// the problem like any other.
+// to the latest attempt's answer, versioned, logged; the grading summary then
+// counts the problem like any other.
 console.log('\n[human grades]');
 const openQ = assignment.questions.find((q) => q.buildMode === 'open')!;
 const machineQ = assignment.questions.find((q) => q.buildMode !== 'open')!;
@@ -236,14 +236,23 @@ const records: SubmissionRecord[] = [
     migrated[0].grader === null && migrated[0].note === 'ok');
 
   if (g1) {
-    const [before] = gradeSubmissions(assignment, records);
-    const [after] = gradeSubmissions(assignment, [{ ...records[0], grades: [g1] }]);
-    const qg = after.grades.find((g) => g.questionId === openQ.id);
-    check('gradebook counts the graded problem', qg?.pending === false && qg?.passed === true && qg?.points === 1 && qg?.source === 'human');
+    // What the grading views read (task 065): the one summary builder's row.
+    const rowOf = (grades: HumanGrade[]) => buildAssignmentSummary({
+      assignment,
+      roster: [{ key: 's@x', name: 'S', sortName: 'S', uid: '', section: null, hasAccount: true }],
+      latest: [{ ...records[0], studentKey: 's@x', grades }],
+      identify: (key) => ({ key, name: key, sortName: key, uid: '', section: null, hasAccount: true }),
+      released: false,
+      now: Date.now(),
+    }).rows[0];
+    const before = rowOf([]);
+    const after = rowOf([g1]);
+    const cell = after.problems[assignment.questions.findIndex((q) => q.id === openQ.id)];
+    check('the grading summary counts the graded problem: source "human", 1 point', cell?.source === 'human' && cell.points === 1);
     check('the grade now includes it: provisional before, 100 after',
-      before.score.provisional && before.score.final! < 100 && !after.score.provisional && after.score.final === 100);
-    check("the student's sheet (scoreRecord, a student-safe copy) and the gradebook agree",
-      scoreRecord(assignment.questions, { ...records[0], grades: [studentGrade(g1)] }, Date.now()).final === after.score.final &&
+      before.grade.provisional && before.grade.final! < 100 && !after.grade.provisional && after.grade.final === 100);
+    check("the student's sheet (scoreRecord, a student-safe copy) and the grading summary agree",
+      scoreRecord(assignment.questions, { ...records[0], grades: [studentGrade(g1)] }, Date.now()).final === after.grade.final &&
       !('grader' in studentGrade(g1)) && !('version' in studentGrade(g1)));
   }
 }

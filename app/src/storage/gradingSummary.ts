@@ -18,7 +18,7 @@
 //
 // Pure: no storage, no clock (the caller passes `now`) — the server imports it.
 
-import type { AssignmentData, GradeEvent, Points, SubmissionRecord } from '../types';
+import type { AssignmentData, GradeEvent, IntegrityFlagCode, Points, SubmissionRecord } from '../types';
 import { scoreRecord, scoreSubmission, type ProblemSource, type Score, type ScoreInput } from '../engine/score';
 import { homeworkContentHash } from '../devData/homeworkSync';
 import { sortAssignments } from '../assignmentOrder';
@@ -49,7 +49,9 @@ export interface GradingAttemptMeta {
   attempt: number;
   submittedAt: string;
   /** `late` against the effective due date; `units`/`deduction` stay null
-   *  until the course calendar prices lateness (task 068). */
+   *  until the course calendar prices lateness (task 068) and whenever the
+   *  attempt is on time. `deduction` is net of any waiver — what the grade
+   *  actually lost. */
   late: { late: boolean; units: number | null; deduction: number | null };
   /** Graded against an older version of the assignment (its content hash
    *  differs; a result with no hash predates the stamp and counts as stale). */
@@ -61,6 +63,11 @@ export interface GradingAttemptMeta {
 export interface GradingProblem {
   points: Points | null;
   source: ProblemSource;
+  /** The integrity flag codes on this problem of the counting attempt (task
+   *  034 — things to look at, never a verdict); absent when none. Codes only:
+   *  a flag's detail can name a classmate's email, which the summary never
+   *  carries — the attempt itself holds the details. */
+  flags?: IntegrityFlagCode[];
 }
 
 export interface GradingRow {
@@ -88,6 +95,10 @@ export interface GradingProgress {
   /** Of the roster's problems needing a person (open, or ungradable): how many
    *  carry a hand grade (`x`) out of how many (`y`). A changed answer is in y, not x. */
   handGraded: { x: number; y: number };
+  /** The grade over the roster's SUBMITTED rows (a missing student is in
+   *  `missing`, not a zero here): mean and median of the final grade (null
+   *  with no submission), and how many of those grades are provisional. */
+  grades: { mean: number | null; median: number | null; provisional: number };
   released: boolean;
 }
 
@@ -96,6 +107,8 @@ export interface AssignmentGradingSummary {
   assignmentId: string;
   title: string;
   dueDate?: string;
+  /** false = not counted toward the course grade (HW7); absent = counts. */
+  countsTowardGrade?: boolean;
   questionIds: number[];
   released: boolean;
   rows: GradingRow[];
@@ -108,6 +121,8 @@ export interface CourseAssignmentRow {
   title: string;
   order?: number;
   dueDate?: string;
+  /** As the summary's: false = not counted (dimmed, listed last). */
+  countsTowardGrade?: boolean;
   visible: boolean;
   released: boolean;
   progress: GradingProgress;
@@ -161,8 +176,29 @@ export function dueFor(assignment: AssignmentData, _student: GradingIdentity): S
   return assignment.dueDate ? { at: assignment.dueDate } : undefined;
 }
 
+const round1 = (x: number) => Math.round(x * 10) / 10;
+
 const byName = (a: GradingIdentity, b: GradingIdentity) =>
   a.sortName.localeCompare(b.sortName, undefined, { sensitivity: 'base' }) || (a.key < b.key ? -1 : a.key > b.key ? 1 : 0);
+
+/** The row's late marker: on time → no units or deduction (the score's
+ *  `late` exists whenever a policy does, on-time attempts included); late →
+ *  the priced units and the deduction net of any waiver. */
+function lateMeta(
+  record: SubmissionRecord,
+  due: { at: string } | undefined,
+  scored: { late: boolean; units: number; deduction: number; waived: number } | null,
+): GradingAttemptMeta['late'] {
+  const late = due !== undefined && Date.parse(record.submittedAt) > Date.parse(due.at);
+  if (!late || !scored?.late) return { late, units: null, deduction: null };
+  return { late, units: scored.units, deduction: Math.max(0, scored.deduction - scored.waived) };
+}
+
+/** The integrity flag codes on one problem of a record (task 034). */
+function integrityFlags(record: SubmissionRecord, questionId: number): IntegrityFlagCode[] {
+  const qi = record.integrity?.questions.find((x) => x.questionId === questionId);
+  return qi ? [...new Set(qi.flags.map((f) => f.code))] : [];
+}
 
 /** A row, and what it adds to the hand-grading count: problems the
  *  autograde left to a person (open, or nothing to grade against) — `y` — of
@@ -189,14 +225,13 @@ function scoredRow(
       latest: {
         attempt: record.attempt,
         submittedAt: record.submittedAt,
-        late: {
-          late: due !== undefined && Date.parse(record.submittedAt) > Date.parse(due.at),
-          units: s.late?.units ?? null,
-          deduction: s.late?.deduction ?? null,
-        },
+        late: lateMeta(record, due, s.late),
         stale: record.result !== undefined && record.assignmentHash !== hash,
       },
-      problems: s.problems.map((p) => ({ points: p.points, source: p.source })),
+      problems: s.problems.map((p) => {
+        const flags = integrityFlags(record, p.questionId);
+        return { points: p.points, source: p.source, ...(flags.length ? { flags } : {}) };
+      }),
       grade: { raw: s.raw, final: s.final, provisional: s.provisional, missing: s.missing },
     },
     hand: { x: toPerson.filter((p) => p.source === 'human').length, y: toPerson.length },
@@ -240,21 +275,32 @@ export function buildAssignmentSummary(input: {
     missing: 0,
     autograded: { current: 0, stale: 0 },
     handGraded: { x: 0, y: 0 },
+    grades: { mean: null, median: null, provisional: 0 },
     released: input.released,
   };
+  const finals: number[] = [];
   for (const { row: r, hand } of rosterRows) {
     if (r.grade.missing) progress.missing++;
     if (!r.latest) continue;
     progress.submitted++;
+    if (r.grade.final !== null) finals.push(r.grade.final);
+    if (r.grade.provisional) progress.grades.provisional++;
     if (r.latest.late.late) progress.late++;
     if (byKey.get(r.student.key)?.result) progress.autograded[r.latest.stale ? 'stale' : 'current']++;
     progress.handGraded.x += hand.x;
     progress.handGraded.y += hand.y;
   }
+  if (finals.length) {
+    const sorted = [...finals].sort((a, b) => a - b);
+    const mid = sorted.length >> 1;
+    progress.grades.mean = round1(finals.reduce((n, f) => n + f, 0) / finals.length);
+    progress.grades.median = round1(sorted.length % 2 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2);
+  }
   return {
     assignmentId: assignment.id,
     title: assignment.title,
     ...(assignment.dueDate ? { dueDate: assignment.dueDate } : {}),
+    ...(assignment.countsTowardGrade !== undefined ? { countsTowardGrade: assignment.countsTowardGrade } : {}),
     questionIds: assignment.questions.map((q) => q.id),
     released: input.released,
     rows: [...rosterRows.map((r) => r.row), ...offRows],
@@ -274,6 +320,7 @@ export function buildCourseGrading(input: {
       title: summary.title,
       ...(order !== undefined ? { order } : {}),
       ...(summary.dueDate ? { dueDate: summary.dueDate } : {}),
+      ...(summary.countsTowardGrade !== undefined ? { countsTowardGrade: summary.countsTowardGrade } : {}),
       visible,
       released: summary.released,
       progress: summary.progress,

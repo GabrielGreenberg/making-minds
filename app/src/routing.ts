@@ -26,10 +26,26 @@ export type Route =
   | { kind: 'instructor' }
   | { kind: 'instructor-new-assignment' }
   | { kind: 'instructor-edit'; id: string }
-  | { kind: 'instructor-submissions'; id: string }
+  // The Grading tab (task 065; memo grading-interface.md §6): the course
+  // list, one assignment's Overview · Matrix · Queue (`questionId`: the queue
+  // for one problem), one student's submission on an assignment, and one
+  // student across assignments. `student` is always GradingIdentity.key —
+  // opaque (remote: the account's public_id), never an email or a UID.
+  | { kind: 'instructor-grading' }
+  | { kind: 'instructor-grading-assignment'; id: string; view: GradingView; questionId?: number }
+  | { kind: 'instructor-grading-student'; id: string; student: string }
+  | { kind: 'instructor-student'; student: string }
   | { kind: 'instructor-roster' }
   | { kind: 'instructor-feedback' }
   | { kind: 'instructor-notes' };
+
+/** An assignment's grading views (the segmented control; the URL keeps it). */
+export type GradingView = 'overview' | 'matrix' | 'queue';
+
+/** A hash's path segments, still URI-encoded. */
+function hashParts(hash: string): string[] {
+  return hash.replace(/^#/, '').replace(/^\/+/, '').split('/').filter(Boolean);
+}
 
 /** A non-negative integer URL segment, or undefined. */
 function indexSegment(part: string | undefined): number | undefined {
@@ -46,7 +62,7 @@ function attemptSegment(part: string | undefined): number | undefined {
 
 /** Parse a location hash (e.g. "#/a/hw1/q/2") into a Route. Pure. */
 export function parseHash(hash: string): Route {
-  const parts = hash.replace(/^#/, '').replace(/^\/+/, '').split('/').filter(Boolean);
+  const parts = hashParts(hash);
   if (parts.length === 0) return { kind: 'home' };
   if (parts[0] === 'sandbox') return { kind: 'sandbox' };
   // #/grades | #/grades/:id — Home's Grades tab, optionally with one sheet open
@@ -55,7 +71,29 @@ export function parseHash(hash: string): Route {
   }
   if (parts[0] === 'instructor') {
     // #/instructor/roster
-    // #/instructor/assignments/new | .../:id/edit | .../:id/submissions
+    // #/instructor/assignments/new | .../:id/edit
+    // #/instructor/grading[/:asg[/matrix | /queue[/:qid] | /student/:sid]]
+    // #/instructor/students/:sid
+    if (parts[1] === 'grading') {
+      if (!parts[2]) return { kind: 'instructor-grading' };
+      const id = decodeURIComponent(parts[2]);
+      if (parts[3] === 'matrix') return { kind: 'instructor-grading-assignment', id, view: 'matrix' };
+      if (parts[3] === 'queue') {
+        // A malformed problem id is dropped; the queue is kept.
+        const questionId = indexSegment(parts[4]);
+        return questionId !== undefined
+          ? { kind: 'instructor-grading-assignment', id, view: 'queue', questionId }
+          : { kind: 'instructor-grading-assignment', id, view: 'queue' };
+      }
+      if (parts[3] === 'student' && parts[4]) {
+        return { kind: 'instructor-grading-student', id, student: decodeURIComponent(parts[4]) };
+      }
+      // No view, or one we don't know: the Overview.
+      return { kind: 'instructor-grading-assignment', id, view: 'overview' };
+    }
+    if (parts[1] === 'students') {
+      return parts[2] ? { kind: 'instructor-student', student: decodeURIComponent(parts[2]) } : { kind: 'instructor-grading' };
+    }
     if (parts[1] === 'roster') return { kind: 'instructor-roster' };
     if (parts[1] === 'feedback') return { kind: 'instructor-feedback' };
     if (parts[1] === 'notes') return { kind: 'instructor-notes' };
@@ -64,7 +102,9 @@ export function parseHash(hash: string): Route {
       if (parts[2]) {
         const id = decodeURIComponent(parts[2]);
         if (parts[3] === 'edit') return { kind: 'instructor-edit', id };
-        if (parts[3] === 'submissions') return { kind: 'instructor-submissions', id };
+        // The retired gradebook's URL: its assignment's grading Overview
+        // (initRouting rewrites the URL — canonicalHash).
+        if (parts[3] === 'submissions') return { kind: 'instructor-grading-assignment', id, view: 'overview' };
       }
     }
     return { kind: 'instructor' };
@@ -122,9 +162,31 @@ export function routeToHash(route: Route): string {
       return '#/instructor/assignments/new';
     case 'instructor-edit':
       return `#/instructor/assignments/${encodeURIComponent(route.id)}/edit`;
-    case 'instructor-submissions':
-      return `#/instructor/assignments/${encodeURIComponent(route.id)}/submissions`;
+    case 'instructor-grading':
+      return '#/instructor/grading';
+    case 'instructor-grading-assignment': {
+      const base = `#/instructor/grading/${encodeURIComponent(route.id)}`;
+      if (route.view === 'matrix') return `${base}/matrix`;
+      if (route.view === 'queue') return route.questionId != null ? `${base}/queue/${route.questionId}` : `${base}/queue`;
+      return base;
+    }
+    case 'instructor-grading-student':
+      return `#/instructor/grading/${encodeURIComponent(route.id)}/student/${encodeURIComponent(route.student)}`;
+    case 'instructor-student':
+      return `#/instructor/students/${encodeURIComponent(route.student)}`;
   }
+}
+
+/**
+ * The hash a location should show. A retired URL — the old gradebook's
+ * `#/instructor/assignments/:id/submissions` — becomes its route's own hash
+ * (`#/instructor/grading/:id`); every other hash is left exactly as typed
+ * (rewriting all of them would mangle a deep link mid-edit). Pure.
+ */
+export function canonicalHash(hash: string): string {
+  const parts = hashParts(hash);
+  const legacy = parts[0] === 'instructor' && parts[1] === 'assignments' && !!parts[2] && parts[2] !== 'new' && parts[3] === 'submissions';
+  return legacy ? routeToHash(parseHash(hash)) : hash;
 }
 
 // Monotonic token bumped per applyRoute call: the assignment branch resolves
@@ -160,7 +222,10 @@ export function routeAccess(route: Route): RouteAccess {
     case 'instructor':
     case 'instructor-new-assignment':
     case 'instructor-edit':
-    case 'instructor-submissions':
+    case 'instructor-grading':
+    case 'instructor-grading-assignment':
+    case 'instructor-grading-student':
+    case 'instructor-student':
     case 'instructor-roster':
     case 'instructor-feedback':
     case 'instructor-notes':
@@ -214,7 +279,10 @@ function applyRoute(route: Route): void {
     case 'instructor':
     case 'instructor-new-assignment':
     case 'instructor-edit':
-    case 'instructor-submissions':
+    case 'instructor-grading':
+    case 'instructor-grading-assignment':
+    case 'instructor-grading-student':
+    case 'instructor-student':
     case 'instructor-roster':
     case 'instructor-feedback':
     case 'instructor-notes':
@@ -314,6 +382,14 @@ let routingStarted = false;
 export function initRouting(): void {
   if (routingStarted) return;
   routingStarted = true;
-  window.addEventListener('popstate', () => applyRoute(parseHash(location.hash)));
-  applyRoute(parseHash(location.hash));
+  window.addEventListener('popstate', applyLocation);
+  applyLocation();
+}
+
+/** Apply the current URL — first rewriting a retired one in place
+ *  (canonicalHash), so the address bar and Back show where you are. */
+function applyLocation(): void {
+  const hash = canonicalHash(location.hash);
+  if (hash !== location.hash) history.replaceState(null, '', `${location.pathname}${location.search}${hash}`);
+  applyRoute(parseHash(hash));
 }

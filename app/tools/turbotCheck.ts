@@ -29,8 +29,7 @@ import {
   type TurbotRunResult,
 } from '../src/engine/turbot';
 import { gradeSubmission } from '../src/engine/grader';
-import { autoPoints } from '../src/engine/score';
-import { gradeSubmissions } from '../src/instructor/Gradebook';
+import { autoPoints, scoreRecord } from '../src/engine/score';
 
 let failures = 0;
 function check(label: string, cond: boolean) {
@@ -825,24 +824,24 @@ const lazyFamily = gradeFamily([3, 5, 7], lazyBrain());
 check('stop-immediately brain fails every goal-ful return-to-start arena (0/3)',
   lazyFamily.questions[0].passed === 0 && lazyFamily.questions[0].total === 3);
 
-// Gradebook logic consumes the SAME per-arena counts: the question grade is
+// The score consumes the SAME per-arena counts: the question grade is
 // all-or-nothing and every failing arena is counted (not just index 0).
-const gradebookGrades = gradeSubmissions(madMaxAssignment([3, 5, 7]), [{
-  assignmentId: 'madmax-family',
-  attempt: 1,
+const familyAssignment = madMaxAssignment([3, 5, 7]);
+const familySubmission = {
+  assignmentTitle: 'Mad Max family',
+  student: 'family@example.com',
   submittedAt: '2026-07-07T00:00:00Z',
-  submission: {
-    assignmentTitle: 'Mad Max family',
-    student: 'family@example.com',
-    submittedAt: '2026-07-07T00:00:00Z',
-    answers: [{ questionId: 1, circuit: hardcodedOutAndBack(2) }],
-  },
-}]);
-check('gradebook: hardcoded brain earns 0 on the family (question not passed) — 40 on the 40 + 60·P scale',
-  gradebookGrades[0].grades[0].passed === false && gradebookGrades[0].grades[0].points === 0 &&
-  gradebookGrades[0].score.earned === 0 && gradebookGrades[0].score.final === 40);
-check('gradebook: both failing arenas are counted (failedCount 2 of 3)',
-  gradebookGrades[0].grades[0].failedCount === 2);
+  answers: [{ questionId: 1, circuit: hardcodedOutAndBack(2) }],
+};
+const familyResult = gradeSubmission(familyAssignment, familySubmission);
+const familyScore = scoreRecord(familyAssignment.questions, {
+  assignmentId: 'madmax-family', attempt: 1, submittedAt: familySubmission.submittedAt, submission: familySubmission, result: familyResult,
+}, Date.now());
+check('score: hardcoded brain earns 0 on the family (question not passed) — 40 on the 40 + 60·P scale',
+  familyScore.problems[0].points === 0 && familyScore.problems[0].source === 'auto' &&
+  familyScore.earned === 0 && familyScore.final === 40);
+check('result: both failing arenas are counted (2 of 3 fail)',
+  familyResult.questions[0].total - familyResult.questions[0].passed === 2);
 
 // ── failure reasons: every failing arena explains itself (P5.3) ──────
 // A clean halt that just doesn't satisfy its criterion (no step limit, no

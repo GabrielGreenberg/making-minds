@@ -454,6 +454,11 @@ export interface AssignmentData {
    *  sorts last, then by title, so an assignment that has never been moved
    *  keeps a stable place. Set by the dashboard's ↑/↓ buttons. */
   order?: number;
+  /** Whether this assignment counts toward the course grade (the six problem
+   *  sets do; HW7, the final project, does not). Absent = counts. The Grading
+   *  tab dims a `false` row and lists it after the counting ones; task 068
+   *  makes it instructor-owned and syncs HW7's `false`. */
+  countsTowardGrade?: boolean;
   questions: AssignmentQuestion[];
   /** Statement markup shown under the title, before the first section
    *  (HW1's "Note: I have put key words in bold …"). */

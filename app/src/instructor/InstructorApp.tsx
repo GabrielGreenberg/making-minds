@@ -6,7 +6,10 @@ import { InstructorGate } from './InstructorGate';
 import { InstructorLayout } from './InstructorLayout';
 import { InstructorDashboard } from './InstructorDashboard';
 import { AssignmentEditor } from './AssignmentEditor';
-import { GradebookView } from './GradebookView';
+import { GradingTab } from './GradingTab';
+import { GradingAssignment } from './GradingAssignment';
+import { StudentSubmissionView } from './StudentSubmissionView';
+import { StudentGradingView } from './StudentGradingView';
 import { RosterView } from './RosterView';
 import { FeedbackQueueView } from './FeedbackQueueView';
 import { NotesView } from './NotesView';
@@ -32,8 +35,14 @@ function InstructorView({ route }: { route: InstructorRoute }) {
       return <InstructorDashboard />;
     case 'instructor-edit':
       return <AssignmentEditor id={route.id} />;
-    case 'instructor-submissions':
-      return <GradebookView id={route.id} />;
+    case 'instructor-grading':
+      return <GradingTab />;
+    case 'instructor-grading-assignment':
+      return <GradingAssignment route={route} />;
+    case 'instructor-grading-student':
+      return <StudentSubmissionView route={route} />;
+    case 'instructor-student':
+      return <StudentGradingView route={route} />;
     case 'instructor-roster':
       return <RosterView />;
     case 'instructor-feedback':

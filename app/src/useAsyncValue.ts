@@ -1,8 +1,7 @@
 // One shared fetch-on-mount hook for the async storage seams.
 //
-// The five views that used to read the stores synchronously at render time
-// (HomeScreen, InstructorDashboard, AssignmentEditor, GradebookView, and the
-// gradebook's review flow) all fetch through this instead. `reload()` re-runs
+// Every view that reads the async seams — HomeScreen, InstructorDashboard,
+// AssignmentEditor, the Grading tab's views (task 065) — fetches through this. `reload()` re-runs
 // the fetcher — it replaces the ad-hoc force-rerender ceremony those views
 // used to carry. Stale resolves are dropped (a re-run or dep change bumps the
 // sequence token), and the previous value is kept while a reload is in flight

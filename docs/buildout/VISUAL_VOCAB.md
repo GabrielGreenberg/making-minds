@@ -164,8 +164,8 @@ literal or an undefined token. Task: `tasks/done/2026-09-21-019-*`._
   **card** variant: one centred `.mm-card`. A section's own navigation lives INSIDE the
   column as `.mm-tabs` (an optional eyebrow, then tabs; current tab underlined): the
   student Home's Assignments · Grades on the catalog, the Grades page and an
-  assignment's overview; the Dashboard's Assignments · Roster & accounts · Feedback ·
-  Notes on every instructor page. (The remote sign-in has no tabs: one form, with a quiet
+  assignment's overview; the Dashboard's Assignments · Grading · Roster & accounts ·
+  Feedback · Notes on every instructor page. (The remote sign-in has no tabs: one form, with a quiet
   "First time here?" link to setup and an access request only when setup finds the
   email off-roster.)
 - **Visitor** (task 027) — someone not signed in reaches only the sandbox (the editor):
@@ -183,6 +183,17 @@ literal or an undefined token. Task: `tasks/done/2026-09-21-019-*`._
   right, above the student's catalog; shown only when a homework has a future due date.
 - **Grades** — a hairline table (assignment · submitted · result); a released row opens
   in place into its question-by-question sheet (a bordered white block), never a modal.
+- **Grading** (task 065; mockups `docs/buildout/designs/grading-interface/mockups.html`)
+  — three idioms, tokens only. The **progress bar** (`.gr-bar`, in `theme.css` as shared
+  vocabulary): a flat 6px bar, magenta while counting, `--mm-ok` once full, under
+  "x / y  n%" with an optional grey sub-line (`.gr-prog`). The **matrix cell**
+  (`.gr-cell`): a 24×22 mono square on a soft field — `--1` green 1, `--h` amber ½,
+  `--0` red 0, `--p` lavender ✎ awaiting a hand grade, `--c` date-brown ↻ changed since
+  graded, `--m` a grey — for not submitted; a human grade underlines it in its own colour
+  (`--human`), a flag adds a red ⚑ corner (`--flag`); name and grade columns stay pinned
+  while the problems scroll. The **filter chip** (`.gr-filter`): a square hairline chip
+  with its count in bold, the chosen one magenta on the accent field (`--on`). A row that
+  does not count (HW7) is dimmed (`.gr-dimrow`); a provisional grade carries a grey `*`.
 - **Type** — IBM Plex, loaded from Google Fonts with system fallbacks: **Sans**
   15px/1.5 for text, **Serif** for h1 (34px/600) and h2 (19px/600, magenta), **Mono**
   for tags and emails. Section labels are `.eyebrow` (11.5px uppercase, tracked, grey).

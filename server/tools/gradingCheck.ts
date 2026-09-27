@@ -266,8 +266,14 @@ console.log('[migration]');
   const expected = scoreRecord(asg2.questions, johnLatest, Date.now(), { at: asg2.dueDate! })
     .problems.map((p) => ({ points: p.points, source: p.source }));
   check('latest attempt only: the row is attempt 2, scored from attempt 2',
-    johnRow.latest?.attempt === 2 && JSON.stringify(johnRow.problems) === JSON.stringify(expected) &&
+    johnRow.latest?.attempt === 2 &&
+      JSON.stringify(johnRow.problems.map((p) => ({ points: p.points, source: p.source }))) === JSON.stringify(expected) &&
       johnRow.problems.some((p) => p.points !== 1));
+  check("a problem's integrity flags ride on it as codes (the attempt's own, never its details)",
+    johnRow.problems.every((p, i) => {
+      const codes = [...new Set(johnLatest.integrity?.questions.find((q) => q.questionId === asg2.questions[i].id)?.flags.map((f) => f.code) ?? [])];
+      return JSON.stringify(p.flags ?? []) === JSON.stringify(codes);
+    }));
   check('a submission past the due date is late (units and deduction wait for the calendar, task 068)',
     johnRow.latest?.late.late === true && johnRow.latest.late.units === null && johnRow.latest.late.deduction === null &&
       s1.progress.late === 1);
@@ -333,6 +339,22 @@ console.log('[migration]');
       course.counts.accounts === 0 &&
       course.counts.pendingHandGrading === s4.progress.handGraded.y - s4.progress.handGraded.x,
     JSON.stringify(course.counts));
+
+  console.log('[mean]');
+  {
+    // The grade over the roster's SUBMITTED rows only: an off-roster
+    // submitter never moves it, a missing student is not a zero in it.
+    const finals = s4.rows.filter((r) => !r.student.offRoster && r.latest).map((r) => r.grade.final!);
+    const sorted = [...finals].sort((a, b) => a - b);
+    const mid = sorted.length >> 1;
+    const median = sorted.length % 2 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
+    const mean = finals.reduce((n, f) => n + f, 0) / finals.length;
+    const prov = s4.rows.filter((r) => !r.student.offRoster && r.latest && r.grade.provisional).length;
+    check('progress.grades: mean and median of the submitted roster rows\' final, the provisional count',
+      finals.length === 2 && s4.progress.grades.mean === Math.round(mean * 10) / 10 &&
+        s4.progress.grades.median === Math.round(median * 10) / 10 && s4.progress.grades.provisional === prov && prov >= 1,
+      JSON.stringify([finals, s4.progress.grades]));
+  }
 
   console.log('[student]');
   const one = await call<StudentGrading>('GET', `/students/${johnKey}`, { token: i2Tok });
@@ -417,6 +439,17 @@ console.log('[migration]');
     const a = JSON.stringify(norm(localSummary));
     const b = JSON.stringify(norm(remoteSummary));
     check('LocalGradingStore.summary ≡ the server\'s /summary on the same records', a === b, `\n local  ${a.slice(0, 400)}\n remote ${b.slice(0, 400)}`);
+  }
+  console.log('[counts toward grade]');
+  {
+    // Absent → absent (counts); false rides the summary and the /grading row.
+    check('countsTowardGrade absent on a counting assignment', !('countsTowardGrade' in (await getSummary())) &&
+      !('countsTowardGrade' in (await call<CourseGrading>('GET', '/grading', { token: i2Tok })).json.assignments[0]));
+    db2.saveAssignment({ ...asg2, id: 'not-counted', title: 'Not counted', countsTowardGrade: false });
+    const nc = (await call<AssignmentGradingSummary>('GET', '/assignments/not-counted/summary', { token: i2Tok })).json;
+    const ncRow = (await call<CourseGrading>('GET', '/grading', { token: i2Tok })).json.assignments.find((a) => a.id === 'not-counted');
+    check('countsTowardGrade: false carried to the summary and the /grading row',
+      nc.countsTowardGrade === false && ncRow?.countsTowardGrade === false, JSON.stringify(ncRow));
   }
   server2.close();
   db2.close();

@@ -13,7 +13,12 @@
 // read-only, task 003) parses and round-trips, a malformed attempt is dropped
 // (the rest kept), and applying it shows the attempt (store viewSubmission)
 // BEFORE the question opens; an unknown attempt repairs the URL to the live
-// route; a superseded apply does nothing. [front door] — the bare site (`#/`,
+// route; a superseded apply does nothing. [grading routes] — the Grading
+// tab's routes (task 065) round-trip with the student key URI-encoded whole,
+// a malformed queue problem is dropped (the queue kept), an unknown view is
+// the Overview, and the retired gradebook URL
+// (`#/instructor/assignments/:id/submissions`) parses to its Overview and is
+// rewritten by canonicalHash, which leaves every other hash alone. [front door] — the bare site (`#/`,
 // or no hash) is Home, which needs sign-in, so anyone not signed in meets the
 // sign-in screen whatever the browser's history; `#/sandbox` is open to a
 // visitor; the retired "signed in before" trace (`mm:auth:known`, the
@@ -58,7 +63,7 @@ const setUrl = (_s: unknown, _t: string, url: string) => {
 };
 g.history = { pushState: setUrl, replaceState: setUrl };
 
-const { routeAccess, initRouting, setRoutingPrincipal, parseHash, routeToHash, navigate } = await import('../src/routing');
+const { routeAccess, initRouting, setRoutingPrincipal, parseHash, routeToHash, navigate, canonicalHash } = await import('../src/routing');
 const { useStore } = await import('../src/store');
 type Route = import('../src/routing').Route;
 
@@ -83,7 +88,13 @@ const ALL: Route[] = [
   { kind: 'instructor' },
   { kind: 'instructor-new-assignment' },
   { kind: 'instructor-edit', id: 'hw1' },
-  { kind: 'instructor-submissions', id: 'hw1' },
+  { kind: 'instructor-grading' },
+  { kind: 'instructor-grading-assignment', id: 'hw1', view: 'overview' },
+  { kind: 'instructor-grading-assignment', id: 'hw1', view: 'matrix' },
+  { kind: 'instructor-grading-assignment', id: 'hw1', view: 'queue' },
+  { kind: 'instructor-grading-assignment', id: 'hw1', view: 'queue', questionId: 7 },
+  { kind: 'instructor-grading-student', id: 'hw1', student: 'k1' },
+  { kind: 'instructor-student', student: 'k1' },
   { kind: 'instructor-roster' },
   { kind: 'instructor-feedback' },
   { kind: 'instructor-notes' },
@@ -135,6 +146,48 @@ console.log('[submission route]');
   const plain = parseHash('#/a/hw1/q/2');
   check('a plain question route has no attempt', plain.kind === 'assignment' && plain.attempt === undefined);
   check('the submission route needs sign-in', routeAccess(parseHash('#/a/hw1/submission/2')) === 'signed-in');
+}
+
+console.log('[grading routes]');
+{
+  // Every hash round-trips; a student segment is an opaque key, URI-encoded
+  // whole (a local key is an email, so '@' — and a '/' must not split it).
+  const key = 's01@example.com/x';
+  const enc = encodeURIComponent(key);
+  const cases: [string, Route][] = [
+    ['#/instructor/grading', { kind: 'instructor-grading' }],
+    ['#/instructor/grading/hw1', { kind: 'instructor-grading-assignment', id: 'hw1', view: 'overview' }],
+    ['#/instructor/grading/hw1/matrix', { kind: 'instructor-grading-assignment', id: 'hw1', view: 'matrix' }],
+    ['#/instructor/grading/hw1/queue', { kind: 'instructor-grading-assignment', id: 'hw1', view: 'queue' }],
+    ['#/instructor/grading/hw1/queue/7', { kind: 'instructor-grading-assignment', id: 'hw1', view: 'queue', questionId: 7 }],
+    ['#/instructor/grading/hw1/student/k1', { kind: 'instructor-grading-student', id: 'hw1', student: 'k1' }],
+    [`#/instructor/grading/hw1/student/${enc}`, { kind: 'instructor-grading-student', id: 'hw1', student: key }],
+    ['#/instructor/students/k1', { kind: 'instructor-student', student: 'k1' }],
+    [`#/instructor/students/${enc}`, { kind: 'instructor-student', student: key }],
+  ];
+  for (const [hash, want] of cases) {
+    const r = parseHash(hash);
+    check(`'${hash}' parses, and round-trips`, JSON.stringify(r) === JSON.stringify(want) && routeToHash(r) === hash);
+  }
+  check("the encoded key keeps its '@' and '/' out of the path",
+    !routeToHash({ kind: 'instructor-student', student: key }).slice('#/instructor/students/'.length).match(/[@/]/));
+  for (const bad of ['x', '-1', '1.5']) {
+    const b = parseHash(`#/instructor/grading/hw1/queue/${bad}`);
+    check(`'/queue/${bad}' drops the problem but keeps the queue`,
+      b.kind === 'instructor-grading-assignment' && b.view === 'queue' && b.questionId === undefined);
+  }
+  for (const odd of ['#/instructor/grading/hw1/nonsense', '#/instructor/grading/hw1/student']) {
+    const o = parseHash(odd);
+    check(`'${odd}' → the Overview`, o.kind === 'instructor-grading-assignment' && o.view === 'overview');
+  }
+  const legacy = '#/instructor/assignments/hw1/submissions';
+  const lr = parseHash(legacy);
+  check("the old gradebook URL parses to the assignment's grading Overview",
+    lr.kind === 'instructor-grading-assignment' && lr.id === 'hw1' && lr.view === 'overview');
+  check('…and canonicalHash rewrites it to #/instructor/grading/hw1', canonicalHash(legacy) === '#/instructor/grading/hw1');
+  check('canonicalHash leaves every canonical hash unchanged',
+    [...cases.map(([h]) => h), '#/', '#/a/hw1/q/2', '#/instructor/assignments/hw1/edit', '#/instructor/assignments/new', '#/instructor/grading/hw1/nonsense']
+      .every((h) => canonicalHash(h) === h));
 }
 
 console.log('[front door]');

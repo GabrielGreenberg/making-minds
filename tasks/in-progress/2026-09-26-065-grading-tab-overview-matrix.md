@@ -54,3 +54,54 @@ Gates; browser against local mode with HW1–HW7 loaded and the sample submissio
 screen matches its mockup; screenshots into the progress log.
 
 ## Progress log
+- 2026-09-27 (robot, implement): Built the Grading tab over the 064 summaries — no view computes a grade.
+  - Routes: `instructor-grading`, `instructor-grading-assignment` (overview/matrix/queue[/:qid]),
+    `instructor-grading-student`, `instructor-student` (student key URI-encoded whole); the old
+    `#/instructor/assignments/:id/submissions` parses to the Overview and `canonicalHash` rewrites it
+    on load/popstate. `instructor-submissions` retired; Dashboard tabs Assignments · Grading · …
+  - Data: `AssignmentData.countsTowardGrade?` (absent = counts; HW7's `false` + instructor-owned is
+    068's), carried to the summary and the `/api/grading` row; `GradingProgress.grades {mean, median,
+    provisional}` over submitted roster rows, in the shared builder.
+  - Views: `GradingTab`, `GradingAssignment` (+ `GradingOverview`, `GradingMatrix`, `GradingParts`),
+    pure `gradingViews.ts`; interim `StudentSubmissionView` (the old gradebook detail, read through
+    `gradingStore.attempt`; grade controls on hand-graded problems and existing grades) and
+    `StudentGradingView`; queue view is a placeholder for 066. `GradebookView.tsx` and `Gradebook.ts`
+    deleted; the dashboard reads `course()` (column = roster students submitted).
+  - Not built here (owned elsewhere): the Export CSV file (071 — the Overview carries a disabled
+    "Export CSV" button until then), Re-grade… (069), Needs attention / the Flagged chip / row
+    flags (070).
+  - Review fixes: the summary's `GradingProblem` carries `flags` (the counting attempt's integrity
+    flag codes — never the details, which can name a classmate's email; the tooltip words them) so the matrix keeps the old gradebook's per-problem ⚑ before 070;
+    `GradingAttemptMeta.late.deduction` is null when on time and net of any waiver (latent until
+    068's policy), and the Late column tests `late.late` — no red "−0". Pinned in gradingViewCheck.
+  - CSS: `.gr-bar`/`.gr-prog` in theme.css, the rest in pages.css, tokens only; dead gradebook rules
+    removed. VISUAL_VOCAB §Page surfaces names the idioms.
+  - Pins: new `gradingViewCheck` (cells, filters, problem stats, tiles, grades, release warning, sort,
+    grep gate, retirement); routingCheck `[grading routes]`; gradingCheck `[mean]`, `[counts toward
+    grade]`; navResetCheck, pipelineCheck, turbotCheck repointed. Both tscs, build, app + server
+    `npm run check` green.
+  - Browser (headless Chrome over a scratch Vite, local mode, HW1–HW7 + sample data, two sample
+    attempts re-keyed to the toy roster): `tasks/attachments/2026-09-26-065-{1-grading-tab,2-overview,
+    3-matrix,7-student-submission}.png`. The legacy URL landed on `#/instructor/grading/hw1`. Local
+    dev-seed submitters are off-roster by design (064), so today's local data shows them below the
+    matrix divider.
+
+### 2026-09-27 — implemented (work loop)
+- Built: the instructor Dashboard's new **Grading** tab — a course-wide assignment table, each
+  assignment's Overview (tiles, stale banner, per-problem table, Release + a disabled Export CSV
+  until 071) and Matrix (cells 1/½/0/✎/↻/— with human-grade underline and per-problem ⚑, chips,
+  section select, search, sticky name/grade, Late + Grade columns; a row opens the student's
+  submission). Every view renders the 064 summaries; none computes a grade. `GradebookView` retired.
+- Pins: `gradingViewCheck` (new), routingCheck `[grading routes]` (incl. the legacy
+  `/submissions` redirect), server gradingCheck `[mean]`, `[counts toward grade]`, row flags ≡
+  attempt integrity codes, no-email; navResetCheck / pipelineCheck / turbotCheck repointed.
+- Gates: app-tsc=0 app-build=0 app-check=0 server-tsc=0 server-check=0.
+- Review fixed: (1) Export CSV action (disabled, 071); (2) Late column never "−0" (deduction null
+  on time, net of waiver); (3) per-problem ⚑ via `GradingProblem.flags` codes only. Skipped: none.
+  Nits left: CLAUDE.md trimmed unrelated facts to stay under budget.
+- Owed: loop-session browser check in local mode (tab row, Grading tab vs mockup 1, Overview vs 2
+  incl. release/hide round trip, Matrix vs 3 incl. filters/sticky/row click/grade write, legacy URL
+  replace, /queue + students interim views, 375px no page scroll) with screenshots
+  `tasks/attachments/2026-09-26-065-*.png`; remote mode optional (summary routes, public_id sids,
+  no `/submissions/all`). Gabriel after release: pilot `#/instructor/grading` renders.
+- **Next step:** loop session: visual check if owed, then land per PROFILE §5.
