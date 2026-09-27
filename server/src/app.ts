@@ -65,9 +65,10 @@
 
 import express from 'express';
 import type { Request, Response, NextFunction } from 'express';
-import type { AssignmentData, AssignmentState, FeedbackTriage, FeedbackTriageOutcome, SubmissionData } from '../../app/src/types';
+import type { AssignmentData, AssignmentState, FeedbackTriage, FeedbackTriageOutcome, SubmissionData, SubmissionRecord } from '../../app/src/types';
 import { gradeSubmission } from '../../app/src/engine/grader';
-import { applyManualReview } from '../../app/src/storage/manualReview';
+import { planGradeWrite, type GradeWrite } from '../../app/src/storage/gradeWrites';
+import { homeworkContentHash } from '../../app/src/devData/homeworkSync';
 import { deriveMintKey } from '../../app/src/provenance/ids';
 import { assessIntegrity, saveSummary } from '../../app/src/provenance/integrity';
 import type { ServerConfig } from './config';
@@ -518,6 +519,12 @@ export function createApp(config: ServerConfig, db: Db) {
   });
 
   app.delete('/api/assignments/:id', auth, requireInstructor, (req, res) => {
+    // An assignment with submissions is never removed (task 063; memo §6.6):
+    // its attempts and grades would be orphaned. Hide it instead.
+    if (db.hasSubmissions(String(req.params.id))) {
+      res.status(409).json({ error: 'students have submitted this assignment — hide it instead of deleting it' });
+      return;
+    }
     db.removeAssignment(String(req.params.id));
     res.json({ ok: true });
   });
@@ -638,7 +645,9 @@ export function createApp(config: ServerConfig, db: Db) {
       legacy: db.legacyFor(email, assignment.id),
       history: db.listWorkbookSaves(email, assignment.id).map((h) => h.summary),
     });
-    const record = db.addSubmission(assignment.id, email, submission, result, integrity);
+    // Stamped with the version it was graded against (task 063): an edit or a
+    // homework sync afterwards makes this result stale, and says so.
+    const record = db.addSubmission(assignment.id, email, submission, result, integrity, homeworkContentHash(assignment));
     // The grade is computed and stored NOW, but students don't see it until
     // the instructor releases grades — and even then, scores only.
     res.status(201).json({
@@ -653,69 +662,96 @@ export function createApp(config: ServerConfig, db: Db) {
   // Student view is a student-side read, so it sees only the instructor's
   // own attempts. Everyone's is the gradebook's route below.
   app.get('/api/assignments/:id/submissions', auth, (req, res) => {
-    const own = db.listSubmissions(String(req.params.id), req.user!.email);
+    const id = String(req.params.id);
+    const own = db.listSubmissions(id, req.user!.email);
+    const grades = db.listGrades(id).get(req.user!.email) ?? [];
     if (req.user!.role === 'instructor') {
-      res.json({ records: own });
+      res.json({ records: own.map((r) => (grades.length ? { ...r, grades } : r)) });
       return;
     }
-    const released = db.getGradesReleased(String(req.params.id));
+    const released = db.getGradesReleased(id);
     // The full assignment fills older results' case separations (sanitize.ts).
-    const assignment = db.getAssignment(String(req.params.id)) ?? undefined;
-    res.json({ records: own.map((r) => studentRecord(r, released, assignment)) });
+    const assignment = db.getAssignment(id) ?? undefined;
+    res.json({ records: own.map((r) => studentRecord(r, released, assignment, grades)) });
   });
 
+  // Everyone's attempts (the gradebook): each with its student's human grades
+  // in full and the opaque key the grade routes name them by (task 063).
   app.get('/api/assignments/:id/submissions/all', auth, requireInstructor, (req, res) => {
-    res.json({ records: db.listSubmissions(String(req.params.id)) });
+    const id = String(req.params.id);
+    const grades = db.listGrades(id);
+    const keys = new Map<string, string | null>();
+    const keyOf = (email: string) => {
+      if (!keys.has(email)) keys.set(email, db.publicIdOf(email));
+      return keys.get(email) ?? undefined;
+    };
+    res.json({
+      records: db.listSubmissions(id).map((r): SubmissionRecord => {
+        const email = (r.submission.student ?? '').toLowerCase();
+        const mine = grades.get(email) ?? [];
+        const studentKey = keyOf(email);
+        return { ...r, ...(studentKey ? { studentKey } : {}), ...(mine.length ? { grades: mine } : {}) };
+      }),
+    });
   });
 
-  // ── manual review (instructor) ─────────────────────────────────
-  // Record (or overwrite) the instructor's verdict on a pending open question
-  // of one stored attempt, via the SAME pure `applyManualReview` the local
-  // SubmissionStore uses (app/src/storage/manualReview.ts) — the server is the
-  // other implementation of one contract, not a mirror. `student` rides in the
-  // body because attempt numbers count per (assignment, student). The server
-  // stamps `reviewedAt` (its word, like submission timestamps); the verdict
-  // lands on the stored record's `result` and reaches students only through
-  // the release gate + `studentRecord` sanitization like any other grade.
-  app.post('/api/assignments/:id/submissions/:attempt/review', auth, requireInstructor, (req, res) => {
+  // ── human grades (instructor; task 063) ─────────────────────────
+  // One grade — a hand grade, or an override of the autograde (note
+  // required) — on a student's LATEST attempt, planned by the SAME pure
+  // planGradeWrite the local GradingStore uses (app/src/storage/gradeWrites.ts):
+  // the server is the other implementation of one contract. The student is
+  // named by their opaque key (users.public_id), never an email. A stale
+  // `version` is a 409 carrying the current grade; every write is logged.
+  const gradeRoute = (req: Request, res: Response, write: GradeWrite) => {
     const assignmentId = String(req.params.id);
-    if (!db.getAssignment(assignmentId)) {
-      res.status(404).json({ error: 'unknown assignment' });
+    const assignment = db.getAssignment(assignmentId);
+    const email = db.emailOfPublicId(String(req.params.sid));
+    const question = assignment?.questions.find((q) => q.id === Number(req.params.qid));
+    if (!assignment || !email || !question) {
+      res.status(404).json({ error: 'no such assignment, student or question' });
       return;
     }
-    const attempt = Number(req.params.attempt);
-    const body = (req.body ?? {}) as {
-      student?: unknown;
-      questionId?: unknown;
-      pass?: unknown;
-      note?: unknown;
-    };
-    if (
-      !Number.isInteger(attempt) ||
-      attempt < 1 ||
-      typeof body.student !== 'string' ||
-      body.student.length === 0 ||
-      typeof body.questionId !== 'number' ||
-      typeof body.pass !== 'boolean' ||
-      (body.note !== undefined && typeof body.note !== 'string')
-    ) {
-      res.status(400).json({ error: 'body must be {student, questionId, pass, note?}' });
-      return;
-    }
-    const email = body.student.toLowerCase();
-    const records = db.listSubmissions(assignmentId, email);
-    const updated = applyManualReview(records, attempt, body.questionId, {
-      pass: body.pass,
-      note: body.note?.trim() || undefined,
-      reviewedAt: new Date().toISOString(),
+    const own = db.listSubmissions(assignmentId, email);
+    const plan = planGradeWrite({
+      question,
+      latest: own.length ? own[own.length - 1] : null,
+      student: email,
+      existing: db.getGrade(assignmentId, email, question.id),
+      write,
+      actor: req.user!.email,
+      now: new Date().toISOString(),
     });
-    if (!updated) {
-      res.status(404).json({ error: 'no pending open question for that attempt' });
+    if (!plan.ok) {
+      if (plan.conflict) res.status(409).json({ error: 'someone else changed this grade meanwhile', current: plan.current });
+      else res.status(400).json({ error: plan.error });
       return;
     }
-    const record = updated.find((r) => r.attempt === attempt)!;
-    db.updateSubmissionResult(assignmentId, email, attempt, record.result!);
-    res.status(201).json({ record });
+    if (plan.grade) db.putGrade(assignmentId, email, plan.grade);
+    else db.deleteGrade(assignmentId, email, question.id);
+    db.addGradeEvent(assignmentId, plan.event);
+    res.json({ grade: plan.grade });
+  };
+  const versionOf = (v: unknown): number | null | undefined =>
+    v === null ? null : typeof v === 'number' && Number.isInteger(v) && v >= 0 ? v : undefined;
+
+  app.put('/api/assignments/:id/grades/:sid/:qid', auth, requireInstructor, (req, res) => {
+    const body = (req.body ?? {}) as { points?: unknown; note?: unknown; version?: unknown };
+    const version = versionOf(body.version);
+    if (version === undefined || (body.note !== undefined && typeof body.note !== 'string')) {
+      res.status(400).json({ error: 'body must be {points, note?, version} (version: the one read, or null)' });
+      return;
+    }
+    // planGradeWrite refuses points outside {0, ½, 1} (engine/score.ts gradeWriteProblem).
+    gradeRoute(req, res, { points: body.points as 0 | 0.5 | 1, note: body.note as string | undefined, version });
+  });
+
+  app.delete('/api/assignments/:id/grades/:sid/:qid', auth, requireInstructor, (req, res) => {
+    const version = versionOf((req.body ?? {}).version);
+    if (typeof version !== 'number') {
+      res.status(400).json({ error: 'body must be {version}' });
+      return;
+    }
+    gradeRoute(req, res, { clear: true, version });
   });
 
   // ── feedback (notes/todos.md item 9) ────────────────────────────

@@ -51,6 +51,8 @@ import type {
   FeedbackTriage,
   InstructorNote,
   PlatformFeedback,
+  GradeEvent,
+  HumanGrade,
   SubmissionData,
   SubmissionIntegrity,
   SubmissionRecord,
@@ -59,6 +61,7 @@ import type {
 import type { Role } from '../../app/src/auth/accounts';
 import { normalizeEmail, normalizeUid } from './roster';
 import { idsOfWorkbook } from '../../app/src/provenance/ids';
+import { legacyGradesByStudent } from '../../app/src/storage/gradeWrites';
 import { saveSummary, type LegacyContent, type SaveSummary } from '../../app/src/provenance/integrity';
 
 export interface UserRow {
@@ -213,6 +216,27 @@ export class Db {
         key   TEXT PRIMARY KEY,
         value TEXT NOT NULL
       );
+      -- Human grades (task 063): a person's 0 / ½ / 1 on one problem of one
+      -- student's work, apart from the autograde output so no re-grade can
+      -- wipe it; anchored by answer_key to the answer it judged (a JSON
+      -- HumanGrade in \`grade\`, keyed here for lookup). version = the
+      -- optimistic-concurrency counter a write must name.
+      CREATE TABLE IF NOT EXISTS grades (
+        assignment_id TEXT NOT NULL,
+        email         TEXT NOT NULL,
+        question_id   INTEGER NOT NULL,
+        grade         TEXT NOT NULL,
+        version       INTEGER NOT NULL,
+        PRIMARY KEY (assignment_id, email, question_id)
+      );
+      -- Every change to a grade, append-only: nothing in this module updates or
+      -- deletes a row (P3 event logging; memo grading-interface.md §9).
+      CREATE TABLE IF NOT EXISTS grade_events (
+        id            INTEGER PRIMARY KEY AUTOINCREMENT,
+        assignment_id TEXT NOT NULL,
+        event         TEXT NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS idx_grade_events ON grade_events (assignment_id, id);
       CREATE TABLE IF NOT EXISTS workbook_saves (
         id            INTEGER PRIMARY KEY AUTOINCREMENT,
         email         TEXT NOT NULL,
@@ -250,6 +274,9 @@ export class Db {
       // The provenance check computed on receipt (task 034) — JSON, beside
       // `result`, never part of it.
       'ALTER TABLE submissions ADD COLUMN integrity TEXT;',
+      // The content hash of the assignment a result was graded against (task
+      // 063) — how a stale result is told apart; NULL = graded before it.
+      'ALTER TABLE submissions ADD COLUMN assignment_hash TEXT;',
       // What the task pipeline made of a report (task 018) — JSON
       // FeedbackTriage, NULL until processed.
       'ALTER TABLE feedback ADD COLUMN triage TEXT;',
@@ -319,7 +346,42 @@ export class Db {
     const setKey = this.db.prepare('UPDATE users SET public_id = ? WHERE email = ?');
     for (const r of unkeyed) setKey.run(Db.newPublicId(), r.email);
     this.db.exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_users_public_id ON users (public_id);');
+    this.migrateLegacyReviews();
     if (firstWatermarkBoot) this.snapshotLegacyContent();
+  }
+
+  /** Once per database (task 063): the ✓/✗ reviews once stored inside each
+   *  student's LATEST attempt's result become rows of `grades`, each logged
+   *  as a `migrate` event. Guarded by a server_meta flag, in one
+   *  transaction, so it runs exactly once. */
+  private migrateLegacyReviews(): void {
+    const done = this.db.prepare("SELECT 1 FROM server_meta WHERE key = 'grades_migrated'").get();
+    if (done) return;
+    this.db.exec('BEGIN');
+    try {
+      const now = new Date().toISOString();
+      const ids = this.db.prepare('SELECT DISTINCT assignment_id AS id FROM submissions').all() as unknown as { id: string }[];
+      for (const { id } of ids) {
+        const assignment = this.getAssignment(id);
+        if (!assignment) continue;
+        const byStudent = legacyGradesByStudent(
+          assignment.questions,
+          this.listSubmissions(id),
+          (r) => (r.submission.student ?? '').toLowerCase(),
+        );
+        for (const [email, grades] of byStudent) {
+          for (const g of grades) {
+            this.putGrade(id, email, g);
+            this.addGradeEvent(id, { at: now, actor: 'migration', student: email, questionId: g.questionId, kind: 'migrate', before: null, after: g });
+          }
+        }
+      }
+      this.db.prepare("INSERT INTO server_meta (key, value) VALUES ('grades_migrated', ?)").run(now);
+      this.db.exec('COMMIT');
+    } catch (err) {
+      this.db.exec('ROLLBACK');
+      throw err;
+    }
   }
 
   /** 72 random bits, URL-safe — see the public_id migration above. */
@@ -439,6 +501,70 @@ export class Db {
          ORDER BY COALESCE(sort_name, name) COLLATE NOCASE, email`,
       )
       .all() as unknown as { key: string; name: string; email: string }[];
+  }
+
+  /** The account an opaque key names (see listStudentKeys), or null. */
+  emailOfPublicId(key: string): string | null {
+    const row = this.db.prepare('SELECT email FROM users WHERE public_id = ?').get(key) as unknown as
+      | { email: string }
+      | undefined;
+    return row?.email ?? null;
+  }
+
+  // ── human grades (task 063) ──────────────────────────────────────
+
+  /** One assignment's human grades — for one student, or by student for all. */
+  listGrades(assignmentId: string): Map<string, HumanGrade[]> {
+    const rows = this.db
+      .prepare('SELECT email, grade FROM grades WHERE assignment_id = ? ORDER BY email, question_id')
+      .all(assignmentId) as unknown as { email: string; grade: string }[];
+    const out = new Map<string, HumanGrade[]>();
+    for (const r of rows) out.set(r.email, [...(out.get(r.email) ?? []), JSON.parse(r.grade) as HumanGrade]);
+    return out;
+  }
+
+  getGrade(assignmentId: string, email: string, questionId: number): HumanGrade | null {
+    const row = this.db
+      .prepare('SELECT grade FROM grades WHERE assignment_id = ? AND email = ? AND question_id = ?')
+      .get(assignmentId, email, questionId) as unknown as { grade: string } | undefined;
+    return row ? (JSON.parse(row.grade) as HumanGrade) : null;
+  }
+
+  /** Create or replace one grade (its version rides inside, as planned). */
+  putGrade(assignmentId: string, email: string, grade: HumanGrade): void {
+    this.db
+      .prepare(
+        `INSERT INTO grades (assignment_id, email, question_id, grade, version) VALUES (?, ?, ?, ?, ?)
+         ON CONFLICT(assignment_id, email, question_id) DO UPDATE SET grade = excluded.grade, version = excluded.version`,
+      )
+      .run(assignmentId, email, grade.questionId, JSON.stringify(grade), grade.version ?? 1);
+  }
+
+  deleteGrade(assignmentId: string, email: string, questionId: number): void {
+    this.db
+      .prepare('DELETE FROM grades WHERE assignment_id = ? AND email = ? AND question_id = ?')
+      .run(assignmentId, email, questionId);
+  }
+
+  /** Append one change to the log — the only write the log ever takes. */
+  addGradeEvent(assignmentId: string, event: GradeEvent): void {
+    this.db
+      .prepare('INSERT INTO grade_events (assignment_id, event) VALUES (?, ?)')
+      .run(assignmentId, JSON.stringify(event));
+  }
+
+  /** The change log for one assignment, oldest first. */
+  listGradeEvents(assignmentId: string): GradeEvent[] {
+    return (
+      this.db
+        .prepare('SELECT event FROM grade_events WHERE assignment_id = ? ORDER BY id')
+        .all(assignmentId) as unknown as { event: string }[]
+    ).map((r) => JSON.parse(r.event) as GradeEvent);
+  }
+
+  /** Does any attempt exist for this assignment? (Removing one would orphan them.) */
+  hasSubmissions(assignmentId: string): boolean {
+    return this.db.prepare('SELECT 1 FROM submissions WHERE assignment_id = ? LIMIT 1').get(assignmentId) !== undefined;
   }
 
   /** An account's opaque key (see listStudentKeys), or null for no such account. */
@@ -1054,6 +1180,7 @@ export class Db {
     submission: SubmissionData,
     result: SubmissionResult | undefined,
     integrity?: SubmissionIntegrity,
+    assignmentHash?: string,
   ): SubmissionRecord {
     const prev = this.db
       .prepare(
@@ -1063,8 +1190,8 @@ export class Db {
     const attempt = prev.n + 1;
     this.db
       .prepare(
-        `INSERT INTO submissions (assignment_id, email, attempt, submitted_at, submission, result, integrity)
-         VALUES (?, ?, ?, ?, ?, ?, ?)`,
+        `INSERT INTO submissions (assignment_id, email, attempt, submitted_at, submission, result, integrity, assignment_hash)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
       )
       .run(
         assignmentId,
@@ -1074,6 +1201,7 @@ export class Db {
         JSON.stringify(submission),
         result ? JSON.stringify(result) : null,
         integrity ? JSON.stringify(integrity) : null,
+        assignmentHash ?? null,
       );
     return {
       assignmentId,
@@ -1082,6 +1210,7 @@ export class Db {
       submission,
       result,
       ...(integrity ? { integrity } : {}),
+      ...(assignmentHash ? { assignmentHash } : {}),
     };
   }
 
@@ -1091,13 +1220,13 @@ export class Db {
       email
         ? this.db
             .prepare(
-              `SELECT attempt, submitted_at, submission, result, integrity FROM submissions
+              `SELECT attempt, submitted_at, submission, result, integrity, assignment_hash FROM submissions
                WHERE assignment_id = ? AND email = ? ORDER BY email, attempt`,
             )
             .all(assignmentId, email)
         : this.db
             .prepare(
-              `SELECT attempt, submitted_at, submission, result, integrity FROM submissions
+              `SELECT attempt, submitted_at, submission, result, integrity, assignment_hash FROM submissions
                WHERE assignment_id = ? ORDER BY email, attempt`,
             )
             .all(assignmentId)
@@ -1107,6 +1236,7 @@ export class Db {
       submission: string;
       result: string | null;
       integrity: string | null;
+      assignment_hash: string | null;
     }[];
     return rows.map((r) => ({
       assignmentId,
@@ -1115,15 +1245,15 @@ export class Db {
       submission: JSON.parse(r.submission) as SubmissionData,
       result: r.result ? (JSON.parse(r.result) as SubmissionResult) : undefined,
       ...(r.integrity ? { integrity: JSON.parse(r.integrity) as SubmissionIntegrity } : {}),
+      ...(r.assignment_hash ? { assignmentHash: r.assignment_hash } : {}),
     }));
   }
 
   /**
-   * Overwrite the stored grade of one attempt — the manual-review write path.
-   * The submission snapshot is immutable; `result` is the grade side of the
-   * record, which the server owns and may amend (a review annotates the
-   * stored SubmissionResult via the pure applyManualReview). `integrity`
-   * is a column of its own and untouched here.
+   * Overwrite the stored autograde of one attempt (a re-grade's write path,
+   * task 2026-09-26-069). The submission snapshot is immutable; `result` is
+   * the machine's side of the record, which the server owns. Human grades live
+   * in `grades` and are never touched here; nor is `integrity`.
    */
   updateSubmissionResult(
     assignmentId: string,

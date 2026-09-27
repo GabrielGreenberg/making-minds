@@ -67,7 +67,12 @@ export function InstructorDashboard() {
 
   const handleDelete = async (id: string, title: string) => {
     if (!window.confirm(`Delete "${title}"? This cannot be undone.`)) return;
-    await assignmentStore.remove(id);
+    try {
+      await assignmentStore.remove(id);
+    } catch (err) {
+      // An assignment with submissions is refused by the store (both modes).
+      alert(`"${title}" was not deleted: ${err instanceof Error ? err.message : 'the server refused'}.`);
+    }
     reload();
   };
 
@@ -189,6 +194,8 @@ export function InstructorDashboard() {
                     </button>
                     <button
                       className="mm-btn mm-btn--danger"
+                      disabled={a.submissionCount > 0}
+                      title={a.submissionCount > 0 ? 'Students have submitted this — hide it instead' : undefined}
                       onClick={() => void handleDelete(a.id, a.title)}
                     >
                       Delete

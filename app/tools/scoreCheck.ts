@@ -16,7 +16,7 @@ import {
   answerKey,
   autoPoints,
   formatGrade,
-  gradesFromReviews,
+  gradesFromLegacyReviews,
   halfCreditProblem,
   lateDeduction,
   questionCaseCount,
@@ -80,7 +80,7 @@ const latest = (submission: SubmissionData, result = gradeSubmission(asg, submis
 
   const reviewed = { ...correctResult, questions: correctResult.questions.map((r) =>
     r.questionId === OPEN ? { ...r, manual: { pass: true, note: 'Nice.', reviewedAt: '2026-10-19T10:00:00Z' } } : r) };
-  const hand = gradesFromReviews(asg.questions, correct, reviewed);
+  const hand = gradesFromLegacyReviews(asg.questions, correct, reviewed);
   check("today's ✓ review reads as a 1-point human grade on this attempt's answer",
     hand.length === 1 && hand[0].points === 1 && hand[0].answerKey === answerKey(Q(OPEN), correct.answers.find((a) => a.questionId === OPEN)));
   const full = scoreSubmission({ questions: asg.questions, latest: latest(correct, reviewed), grades: hand, now: NOW });

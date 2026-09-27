@@ -30,6 +30,8 @@ import type {
   AssignmentData,
   AssignmentState,
   Classmate,
+  HumanGrade,
+  Points,
   FeedbackCategory,
   FeedbackScreenshot,
   FeedbackStatus,
@@ -42,6 +44,7 @@ import type { AssignmentSummary } from '../assignments';
 import type { WorkbookStore } from './workbookStore';
 import type { AssignmentStore } from './AssignmentStore';
 import type { SubmissionStore } from './submissionStore';
+import type { GradingStore, GradeWriteOutcome } from './gradingStore';
 import type { FeedbackStore } from './feedbackStore';
 import type { Role } from '../auth/accounts';
 import type { NotesStore } from './NotesStore';
@@ -61,7 +64,8 @@ import {
   getClassmates,
   listSubmissions as apiListSubmissions,
   listAllSubmissions as apiListAllSubmissions,
-  reviewSubmission,
+  putGrade,
+  deleteGrade,
   submitFeedback,
   listFeedback,
   setFeedbackStatus,
@@ -173,16 +177,40 @@ class RemoteSubmissionStore implements SubmissionStore {
   listAll(id: string): Promise<SubmissionRecord[]> {
     return apiListAllSubmissions(id);
   }
+}
 
-  recordManualReview(
-    id: string,
-    student: string,
-    attempt: number,
+class RemoteGradingStore implements GradingStore {
+  // The server plans every write (storage/gradeWrites.ts) and stamps the
+  // grader and time; a 409 carries the grade someone else wrote meanwhile, a
+  // 400 the refusal's reason.
+  private async outcome(write: () => Promise<HumanGrade | null>): Promise<GradeWriteOutcome> {
+    try {
+      return { ok: true, grade: await write() };
+    } catch (err) {
+      if (err instanceof ApiError && err.status === 409) {
+        return { ok: false, conflict: true, current: (err.body.current as HumanGrade | null | undefined) ?? null };
+      }
+      if (err instanceof ApiError && (err.status === 400 || err.status === 404)) {
+        return { ok: false, conflict: false, error: err.message };
+      }
+      throw err;
+    }
+  }
+
+  setGrade(
+    assignmentId: string,
+    studentKey: string,
     questionId: number,
-    review: { pass: boolean; note?: string },
-  ): Promise<SubmissionRecord | null> {
-    // 404 = no pending open question for that attempt — the seam's null.
-    return or404(reviewSubmission(id, student, attempt, questionId, review), null);
+    write: { points: Points; note?: string; version: number | null },
+  ): Promise<GradeWriteOutcome> {
+    return this.outcome(() => putGrade(assignmentId, studentKey, questionId, write));
+  }
+
+  clearGrade(assignmentId: string, studentKey: string, questionId: number, version: number): Promise<GradeWriteOutcome> {
+    return this.outcome(async () => {
+      await deleteGrade(assignmentId, studentKey, questionId, version);
+      return null;
+    });
   }
 }
 
@@ -230,5 +258,6 @@ class RemoteNotesStore implements NotesStore {
 export const remoteWorkbookStore: WorkbookStore = new RemoteWorkbookStore();
 export const remoteAssignmentStore: AssignmentStore = new RemoteAssignmentStore();
 export const remoteSubmissionStore: SubmissionStore = new RemoteSubmissionStore();
+export const remoteGradingStore: GradingStore = new RemoteGradingStore();
 export const remoteFeedbackStore: FeedbackStore = new RemoteFeedbackStore();
 export const remoteNotesStore: NotesStore = new RemoteNotesStore();

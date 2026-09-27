@@ -20,6 +20,8 @@
 
 import type {
   AssignmentQuestion,
+  HumanGrade,
+  Points,
   QuestionResult,
   SubmissionData,
   SubmissionRecord,
@@ -28,20 +30,8 @@ import type {
 import { questionTask } from '../types';
 import { gradedMachineKey } from './caseRun';
 
-export type Points = 0 | 0.5 | 1;
-
-/** A person's judgment of one problem of one student's work: a hand grade on
- *  an open problem, or an override of an autograde. `answerKey` names the
- *  answer it judged (see `answerKey`), so it applies only while the counting
- *  attempt still holds that answer. */
-export interface HumanGrade {
-  questionId: number;
-  points: Points;
-  note?: string;
-  answerKey: string;
-  grader?: string | null;
-  gradedAt: string;
-}
+// The grade record itself is a domain type (types.ts, task 063).
+export type { HumanGrade, Points } from '../types';
 
 /** Where a problem's points came from. `pending`: awaiting a human (an open
  *  problem, or one the autograder couldn't grade). `changed`: a human graded
@@ -244,12 +234,12 @@ export function scoreSubmission(input: ScoreInput): Score {
 }
 
 /**
- * Today's hand grades, read from where they live until task 063 gives them a
- * table: the `manual` review an instructor recorded on a pending question of
- * THIS attempt (✓ = 1, ✗ = 0). Anchored to this attempt's own answers, so they
- * apply to it — and to nothing else.
+ * The legacy ✓/✗ reviews an instructor recorded INSIDE an attempt's result
+ * (`QuestionResult.manual`, before task 063), as human grades anchored to that
+ * attempt's own answers — the one-time migration into stored grades (server
+ * db.ts, the local GradingStore) reads them through here, and nothing else.
  */
-export function gradesFromReviews(
+export function gradesFromLegacyReviews(
   questions: readonly AssignmentQuestion[],
   submission: SubmissionData,
   result: SubmissionResult | undefined,
@@ -263,17 +253,37 @@ export function gradesFromReviews(
     return [{
       questionId: q.id,
       points: (r.manual.pass ? 1 : 0) as Points,
-      note: r.manual.note,
+      ...(r.manual.note ? { note: r.manual.note } : {}),
       answerKey: answerKey(q, answers.get(q.id)),
       gradedAt: r.manual.reviewedAt,
+      grader: null,
     }];
   });
 }
 
 /**
+ * What is wrong with a grade someone is about to write, or null: points are
+ * 0, ½ or 1, and overriding an autograde (a problem the machine graded)
+ * needs a note saying why — the student sees it on release (memo §4.2).
+ * Both GradingStores ask this before writing.
+ */
+export function gradeWriteProblem(
+  write: { points: unknown; note?: unknown },
+  autograde: Points | null,
+): string | null {
+  if (write.points !== 0 && write.points !== 0.5 && write.points !== 1) return 'points must be 0, ½ or 1';
+  if (write.note !== undefined && typeof write.note !== 'string') return 'the note must be text';
+  if (autograde !== null && !(typeof write.note === 'string' && write.note.trim())) {
+    return 'overriding the autograde needs a note saying why';
+  }
+  return null;
+}
+
+/**
  * A stored attempt's score, as the counting attempt: its own result and the
- * hand grades recorded on it (gradesFromReviews, until task 063). The one
- * call every surface makes for "this submission's grade".
+ * human grades delivered with it (`record.grades`, task 063 — each applies
+ * only while it judges this attempt's answer). The one call every surface
+ * makes for "this submission's grade".
  */
 export function scoreRecord(
   questions: readonly AssignmentQuestion[],
@@ -284,7 +294,7 @@ export function scoreRecord(
   return scoreSubmission({
     questions,
     latest: { submission: record.submission, submittedAt: record.submittedAt, result: record.result },
-    grades: gradesFromReviews(questions, record.submission, record.result),
+    grades: record.grades,
     due,
     now,
   });

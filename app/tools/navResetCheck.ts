@@ -103,7 +103,7 @@ const { sortByLabel } = await import('../src/engine');
 const { buildSampleAssignment, ccCorrect, scCorrect, fsmCorrect, tmCorrect, turbotCorrect, turbotFsmCorrect, turbotTmCorrect, SAMPLE_ASSIGNMENT_ID } =
   await import('../src/devData/sampleData');
 const { localAssignmentStore } = await import('../src/storage/AssignmentStore');
-const { backendMode, workbookStore, submissionStore } = await import('../src/storage/backend');
+const { backendMode, workbookStore, submissionStore, gradingStore } = await import('../src/storage/backend');
 // The clipboard lives in the provenance seam, not in store state (task 033).
 const { peekClipboard, stampText, currentProvenance } = await import('../src/provenance');
 // …and the mint keys in the minting seam (task 034).
@@ -1648,19 +1648,26 @@ console.log('[own submissions]');
     check("listAll (the gradebook's read) holds everyone's five attempts",
       (await submissionStore.listAll(OWN_ID)).length === 5);
 
-    // A manual review lands on the named student's attempt only.
+    // A human grade (task 063) lands on the named student's work only, and
+    // comes back WITH that student's records — student-safe in their own
+    // copy, in full (grader, version, studentKey) in the gradebook's.
     const openQ = b1.result?.questions.find((q) => q.status === 'pending')?.questionId;
-    check('the sample has a pending open question to review', openQ != null);
-    const reviewed = await submissionStore.recordManualReview(OWN_ID, B, 1, openQ!, { pass: true, note: 'ok' });
-    check("recordManualReview(B, attempt 1) returns B's attempt 1, reviewed",
-      reviewed?.submission.student === B && reviewed.attempt === 1 &&
-        reviewed.result?.questions.find((q) => q.questionId === openQ)?.manual?.pass === true);
-    const a1After = (await submissionStore.listOwn(OWN_ID, A))[0];
+    check('the sample has a pending open question to grade', openQ != null);
+    const wrote = await gradingStore.setGrade(OWN_ID, B.toLowerCase(), openQ!, { points: 1, note: 'ok', version: null });
+    check('setGrade(B) writes version 1', wrote.ok && wrote.grade?.version === 1 && wrote.grade.points === 1);
     const b1After = await submissionStore.getLatestOwn(OWN_ID, B);
-    check("…stored on B's record, and A's attempt 1 is still unreviewed",
-      b1After?.result?.questions.find((q) => q.questionId === openQ)?.manual?.pass === true &&
-        a1After.result?.questions.find((q) => q.questionId === openQ)?.manual === undefined &&
-        (await submissionStore.listAll(OWN_ID)).length === 5);
+    const a1After = (await submissionStore.listOwn(OWN_ID, A))[0];
+    check("…B's own copy carries it, student-safe (no grader, no version); A's carries none",
+      b1After?.grades?.length === 1 && b1After.grades[0].points === 1 && b1After.grades[0].grader === undefined &&
+        b1After.grades[0].version === undefined && a1After.grades === undefined);
+    const allAfter = await submissionStore.listAll(OWN_ID);
+    const bInAll = allAfter.find((r) => r.submission.student === B);
+    check("…the gradebook's copy carries it in full, with the studentKey that addresses B",
+      allAfter.length === 5 && bInAll?.studentKey === B.toLowerCase() && bInAll.grades?.[0].version === 1 &&
+        typeof bInAll.grades?.[0].grader === 'string');
+    const stale = await gradingStore.setGrade(OWN_ID, B.toLowerCase(), openQ!, { points: 0, version: null });
+    check('a write that read no grade, now that there is one, is a conflict carrying it',
+      !stale.ok && stale.conflict && stale.current?.version === 1);
 
     // Store level: the hydrated map, the open, viewSubmission.
     useStore.getState().resetForPrincipal(A);

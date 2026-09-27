@@ -16,7 +16,7 @@
 //   - the full round-trip: instructor creates an assignment → student's copy
 //     is answer-stripped → workbook save/load → submit (answers only;
 //     identity + timestamp are the server's word; no grade shown) →
-//     instructor reads server grades → manual review through the seam →
+//     instructor reads server grades → a human grade through the GradingStore seam →
 //     release/unrelease gates what the student's records carry
 //   - own reads for every role (task 037): an instructor's own-read (the
 //     Student view) holds only the instructor's attempts, whatever email is
@@ -68,6 +68,7 @@ const {
   remoteWorkbookStore,
   remoteAssignmentStore,
   remoteSubmissionStore,
+  remoteGradingStore,
   remoteFeedbackStore,
   remoteNotesStore,
 } = await import('../src/storage/remoteStores');
@@ -297,7 +298,7 @@ const rec2 = await remoteSubmissionStore.submit(SAMPLE_ASSIGNMENT_ID, buildIncor
 check('second submit is attempt 2', rec2.attempt === 2);
 check('getLatestOwn() returns the newest attempt', (await remoteSubmissionStore.getLatestOwn(SAMPLE_ASSIGNMENT_ID, student.email))?.attempt === 2);
 
-// ── instructor: server grades + manual review through the seam ───
+// ── instructor: server grades + a human grade through the seam ───
 api.setToken(iTok);
 const graded = await remoteSubmissionStore.listAll(SAMPLE_ASSIGNMENT_ID);
 const g1 = graded.find((r) => r.attempt === 1)?.result;
@@ -309,32 +310,34 @@ check(
 );
 
 const openQ = createdBack!.assignment.questions.find((q) => q.buildMode === 'open')!;
-const reviewed = await remoteSubmissionStore.recordManualReview(
-  SAMPLE_ASSIGNMENT_ID,
-  student.email,
-  1,
-  openQ.id,
-  { pass: true, note: 'clear justification' },
+// A human grade through the GradingStore seam (task 063): the student is
+// named by the opaque key the gradebook's records carry, never an email.
+const sKey = graded.find((r) => r.attempt === 2)?.studentKey ?? '';
+check('instructor records carry the opaque studentKey, not an email', sKey.length > 0 && !sKey.includes('@'));
+const wrote = await remoteGradingStore.setGrade(SAMPLE_ASSIGNMENT_ID, sKey, openQ.id, { points: 1, note: 'clear justification', version: null });
+check('setGrade writes version 1, stamped with the grader (the server\'s word)',
+  wrote.ok && wrote.grade?.version === 1 && wrote.grade.points === 1 && wrote.grade.grader === instructor.email.toLowerCase() &&
+    wrote.grade.attempt === 2);
+const refusedOverride = await remoteGradingStore.setGrade(
+  SAMPLE_ASSIGNMENT_ID, sKey, createdBack!.assignment.questions[0].id, { points: 0.5, version: null },
 );
-const verdict = reviewed?.result?.questions.find((q) => q.questionId === openQ.id)?.manual;
-check(
-  'recordManualReview lands the verdict on the returned record',
-  verdict?.pass === true && verdict.note === 'clear justification',
-);
-const notPending = await remoteSubmissionStore.recordManualReview(
-  SAMPLE_ASSIGNMENT_ID,
-  student.email,
-  1,
-  createdBack!.assignment.questions[0].id, // autograded, never pending
-  { pass: true },
-);
-check('review of a non-pending question resolves null (404 → seam null)', notPending === null);
+check("an override with no note: the server's 400 is the seam's refusal, with the reason",
+  !refusedOverride.ok && !refusedOverride.conflict && /note/.test(refusedOverride.error));
+const conflict = await remoteGradingStore.setGrade(SAMPLE_ASSIGNMENT_ID, sKey, openQ.id, { points: 0, version: null });
+check("a stale version: the 409 is the seam's conflict, carrying the current grade",
+  !conflict.ok && conflict.conflict && conflict.current?.version === 1);
+check('the gradebook read carries the grade in full',
+  (await remoteSubmissionStore.listAll(SAMPLE_ASSIGNMENT_ID)).some((r) => r.grades?.[0]?.version === 1));
 
 // ── release gates what the student's records carry ───────────────
 await remoteAssignmentStore.setGradesReleased(SAMPLE_ASSIGNMENT_ID, true);
 api.setToken(sTok);
 const releasedLatest = await remoteSubmissionStore.getLatestOwn(SAMPLE_ASSIGNMENT_ID, student.email);
 check('after release, student getLatestOwn() carries scores', releasedLatest?.result != null);
+check('…and the human grade, student-safe: points and note, no grader or version',
+  releasedLatest?.grades?.length === 1 && releasedLatest.grades[0].points === 1 &&
+    releasedLatest.grades[0].note === 'clear justification' && releasedLatest.grades[0].grader === undefined &&
+    releasedLatest.grades[0].version === undefined);
 // notes/todos.md item 4: per-case detail is now safe-widened (which input,
 // pass/fail) — server/tools/parityCheck.ts pins the widening itself; here
 // just confirm the answer key stays hidden through the seam too.

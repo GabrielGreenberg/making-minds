@@ -25,13 +25,13 @@
 //      unsanitized view) — and compare the grade payloads deeply.
 //   4. Pin the student-facing sanitization boundary on the same records
 //      (perception-aware — extends, not duplicates, serverCheck: see below).
-//   5. Pin manual-review parity: the review endpoint's stored record must
-//      deeply equal the pure `applyManualReview` applied in-process to the
-//      same records (reviewedAt is server-stamped, so the server's stamp is
-//      injected into the in-process side — the submittedAt pattern) — and the
-//      released student view carries the verdict but still no per-case detail.
+//   5. Pin grade parity (task 063): the grade route's stored grade must
+//      deeply equal the pure `planGradeWrite` run in-process on the same
+//      latest record (gradedAt and grader are the server's, so they are
+//      injected — the submittedAt pattern) — the result untouched — and the
+//      released student view carries the grade but still no per-case detail.
 //   6. Provenance never grades (task 034): the integrity summary sits beside
-//      `result` (so the answers echo and the grade stay byte-equal), a review
+//      `result` (so the answers echo and the grade stay byte-equal), a grade
 //      leaves it untouched, and answers carrying signed editing records grade
 //      exactly as the same answers without them.
 //   7. A TM case's block separations (task 002, "Run this input") reach the
@@ -90,7 +90,7 @@ import { TOY_ACCOUNTS } from '../../app/src/auth/accounts';
 import { gradeSubmission, gradeQuestion } from '../../app/src/engine/grader';
 import { scoreRecord } from '../../app/src/engine/score';
 import { studentRecord } from '../src/sanitize';
-import { applyManualReview } from '../../app/src/storage/manualReview';
+import { planGradeWrite } from '../../app/src/storage/gradeWrites';
 import { buildSampleAssignment } from '../../app/src/devData/sampleData';
 import { nextTrace } from '../../app/src/provenance/trace';
 import { prepareKey } from '../../app/src/provenance/ids';
@@ -99,6 +99,7 @@ import { rebindLegacyBoxes } from '../../app/src/boxPorts';
 import type {
   AssignmentData,
   AssignmentQuestion,
+  HumanGrade,
   CircuitData,
   SubmissionData,
   SubmissionRecord,
@@ -536,58 +537,63 @@ check(
     (sFillIn.fillCases ?? []).every((c) => c.label.length > 0 && c.expected === '' && c.got === ''),
 );
 
-// ── Manual-review parity: review endpoint ≡ pure applyManualReview ──────────
-// The endpoint (POST .../submissions/:attempt/review) claims to be the same
-// pure function the local SubmissionStore runs — one contract, two homes.
-// Prove it: review attempt 1's open question (id 7) over HTTP, apply
-// applyManualReview in-process to the SAME pre-review instructor records with
-// the server's reviewedAt stamp injected (the one server-owned field), and
-// deep-compare the full stored record.
+// ── Grade parity: the grade route ≡ the pure planGradeWrite (task 063) ──────
+// The route (PUT .../grades/:sid/:qid) claims to be the same pure planner the
+// local GradingStore runs — one contract, two homes. Prove it: grade the open
+// question (id 7) over HTTP, plan the same write in-process against the SAME
+// latest record with the server's two own fields (gradedAt, grader) injected,
+// and deep-compare the stored grade.
 const REVIEW_NOTE = 'Strong answer; cites the component-count asymmetry.';
-const reviewRes = await api<{ record: SubmissionRecord }>(
-  'POST',
-  `/assignments/${ASSIGNMENT_ID}/submissions/1/review`,
-  { token: iTok, body: { student: studentEmail, questionId: 7, pass: true, note: REVIEW_NOTE } },
+const sKey = all.json.records.find((r) => r.attempt === 2)?.studentKey ?? '';
+const gradeRes = await api<{ grade: HumanGrade }>(
+  'PUT',
+  `/assignments/${ASSIGNMENT_ID}/grades/${sKey}/7`,
+  { token: iTok, body: { points: 1, note: REVIEW_NOTE, version: null } },
 );
-check('review endpoint records the verdict (201)', reviewRes.status === 201);
-
-const serverStamp =
-  reviewRes.json.record?.result?.questions.find((q) => q.questionId === 7)?.manual?.reviewedAt ?? '';
-check("reviewedAt is the server's word (valid ISO date)", !Number.isNaN(Date.parse(serverStamp)));
-
-const inProcess = applyManualReview(canon(all.json.records), 1, 7, {
-  pass: true,
-  note: REVIEW_NOTE,
-  reviewedAt: serverStamp,
+check('grade route records the grade (200)', gradeRes.status === 200 && gradeRes.json.grade?.version === 1);
+const serverStamp = gradeRes.json.grade?.gradedAt ?? '';
+check("gradedAt is the server's word (valid ISO date)", !Number.isNaN(Date.parse(serverStamp)));
+const gradedQuestion = assignment.questions.find((q) => q.id === 7)!;
+const inProcess = planGradeWrite({
+  question: gradedQuestion,
+  latest: all.json.records.filter((r) => r.submission.student === studentEmail).sort((a, b) => a.attempt - b.attempt).at(-1)!,
+  student: studentEmail,
+  existing: null,
+  write: { points: 1, note: REVIEW_NOTE, version: null },
+  actor: gradeRes.json.grade?.grader ?? '',
+  now: serverStamp,
 });
 const afterReview = await api<{ records: SubmissionRecord[] }>(
   'GET',
   `/assignments/${ASSIGNMENT_ID}/submissions/all`,
   { token: iTok },
 );
-const dReview = diffPaths(
-  canon(inProcess?.find((r) => r.attempt === 1)),
-  canon(afterReview.json.records.find((r) => r.attempt === 1)),
-);
-check('PARITY: server-applied review ≡ in-process applyManualReview', dReview.length === 0, dReview.join(' | '));
+const storedGrade = afterReview.json.records.find((r) => r.attempt === 2)?.grades?.find((g) => g.questionId === 7);
+const dReview = diffPaths(canon(inProcess.ok ? inProcess.grade : null), canon(storedGrade));
+check('PARITY: server-planned grade ≡ in-process planGradeWrite', dReview.length === 0 && !!storedGrade, dReview.join(' | '));
+check('…and the result it judges is untouched (grades live apart from the autograde)',
+  diffPaths(canon(all.json.records.find((r) => r.attempt === 2)?.result), canon(afterReview.json.records.find((r) => r.attempt === 2)?.result)).length === 0);
 
-// The verdict is the open question's grade: post-release the student sees it
-// (pass + note survive studentRecord's roll-up) — but the reviewed record
-// still leaks no answer key (the safe-field widening applies here too).
+// The grade is the open question's: post-release the student sees it (points +
+// note, never grader or version) and it counts in their score — but the
+// record still leaks no answer key.
 const sAfterReview = await api<{ records: SubmissionRecord[] }>(
   'GET',
   `/assignments/${ASSIGNMENT_ID}/submissions`,
   { token: sTok },
 );
-const sOpen = sAfterReview.json.records
-  .find((r) => r.attempt === 1)
-  ?.result?.questions.find((q) => q.questionId === 7);
+const sLatest = sAfterReview.json.records.find((r) => r.attempt === 2);
+const sGrade = sLatest?.grades?.find((g) => g.questionId === 7);
 check(
-  'post-release student sees the open-question verdict',
-  sOpen?.manual?.pass === true && sOpen.manual.note === REVIEW_NOTE,
+  'post-release student sees the grade, student-safe',
+  sGrade?.points === 1 && sGrade.note === REVIEW_NOTE && sGrade.grader === undefined && sGrade.version === undefined,
 );
+check("…and it counts in the student's score exactly as in the instructor's",
+  !!sLatest && JSON.stringify(scoreRecord(assignment.questions, sLatest, 0)) ===
+    JSON.stringify(scoreRecord(assignment.questions, afterReview.json.records.find((r) => r.attempt === 2)!, 0)) &&
+    scoreRecord(assignment.questions, sLatest, 0).problems.find((p) => p.questionId === 7)?.source === 'human');
 const reviewLeaks = sAfterReview.json.records.flatMap((r) => findLeaks(r.result, new Set(['expected', 'got'])));
-check('reviewed student records still leak no answer keys', reviewLeaks.length === 0, reviewLeaks.join(', '));
+check('graded student records still leak no answer keys', reviewLeaks.length === 0, reviewLeaks.join(', '));
 
 // ── Provenance never grades (task 034) ──────────────────────────────────────
 const preIntegrity = all.json.records.find((r) => r.attempt === 1)?.integrity;
@@ -595,7 +601,7 @@ const postIntegrity = afterReview.json.records.find((r) => r.attempt === 1)?.int
 check('the stored record carries an integrity summary beside its result',
   preIntegrity != null && preIntegrity.questions.length === correctAnswers.length);
 const dIntegrity = diffPaths(canon(preIntegrity), canon(postIntegrity));
-check('manual review preserves record.integrity', postIntegrity != null && dIntegrity.length === 0, dIntegrity.join(' | '));
+check('a grade preserves record.integrity', postIntegrity != null && dIntegrity.length === 0, dIntegrity.join(' | '));
 check('students never receive it', sAfterReview.json.records.every((r) => !('integrity' in r)));
 
 // The same correct answers, each carrying a signed editing record, graded

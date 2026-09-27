@@ -7,7 +7,8 @@
 //
 //   RemoteWorkbookStore   → getWorkbook / getWorkbookFull / putWorkbook
 //   RemoteAssignmentStore → listAssignments / getAssignment / putAssignment / deleteAssignment
-//   RemoteSubmissionStore → submitAssignment / listSubmissions / listAllSubmissions / reviewSubmission / getClassmates
+//   RemoteSubmissionStore → submitAssignment / listSubmissions / listAllSubmissions / getClassmates
+//   RemoteGradingStore    → putGrade / deleteGrade
 //   remote auth           → login / logout / me
 //
 // Configuration: VITE_API_BASE (e.g. "https://api.phil133.example.edu") set at
@@ -23,6 +24,8 @@ import type {
   AssignmentData,
   AssignmentState,
   Classmate,
+  HumanGrade,
+  Points,
   FeedbackCategory,
   FeedbackScreenshot,
   FeedbackStatus,
@@ -172,11 +175,15 @@ export function setToken(token: string | null): void {
 /** Thrown for any non-2xx response; `status` 401 means the session is gone. */
 export class ApiError extends Error {
   status: number;
+  /** The response's JSON body, for a refusal that carries more than a
+   *  message (a 409's current grade). */
+  body: Record<string, unknown>;
 
-  constructor(status: number, message: string) {
+  constructor(status: number, message: string, body: Record<string, unknown> = {}) {
     super(message);
     this.name = 'ApiError';
     this.status = status;
+    this.body = body;
   }
 }
 
@@ -212,7 +219,7 @@ async function request<T>(
   const json = (await res.json().catch(() => ({}))) as Record<string, unknown>;
   if (!res.ok) {
     if (res.status === 401) onUnauthorized?.();
-    throw new ApiError(res.status, typeof json.error === 'string' ? json.error : res.statusText);
+    throw new ApiError(res.status, typeof json.error === 'string' ? json.error : res.statusText, json);
   }
   return json as T;
 }
@@ -510,26 +517,38 @@ export async function listAllSubmissions(assignmentId: string): Promise<Submissi
 }
 
 /**
- * Instructor only: record (or overwrite) a manual verdict on a pending open
- * question of one stored attempt. `student` identifies whose attempt — server
- * attempt numbers count per (assignment, student), so the attempt alone is
- * ambiguous. The server stamps `reviewedAt` and applies the same pure
- * `applyManualReview` the local store uses; returns the updated (full,
- * instructor-view) record.
+ * Instructor only: write one human grade (task 063) — a hand grade, or an
+ * override of an autograde (note required) — on the student's latest
+ * attempt. `version` is the grade's version as read (null = none); a stale
+ * one is a 409 whose body carries the `current` grade. `studentKey` is the
+ * student's opaque key (`SubmissionRecord.studentKey`), never an email.
  */
-export async function reviewSubmission(
+export async function putGrade(
   assignmentId: string,
-  student: string,
-  attempt: number,
+  studentKey: string,
   questionId: number,
-  review: { pass: boolean; note?: string },
-): Promise<SubmissionRecord> {
-  const { record } = await request<{ record: SubmissionRecord }>(
-    'POST',
-    `/assignments/${encodeURIComponent(assignmentId)}/submissions/${attempt}/review`,
-    { student, questionId, pass: review.pass, note: review.note },
+  write: { points: Points; note?: string; version: number | null },
+): Promise<HumanGrade> {
+  const { grade } = await request<{ grade: HumanGrade }>(
+    'PUT',
+    `/assignments/${encodeURIComponent(assignmentId)}/grades/${encodeURIComponent(studentKey)}/${questionId}`,
+    write,
   );
-  return record;
+  return grade;
+}
+
+/** Instructor only: clear one human grade (the autograde, or pending, again). */
+export async function deleteGrade(
+  assignmentId: string,
+  studentKey: string,
+  questionId: number,
+  version: number,
+): Promise<void> {
+  await request(
+    'DELETE',
+    `/assignments/${encodeURIComponent(assignmentId)}/grades/${encodeURIComponent(studentKey)}/${questionId}`,
+    { version },
+  );
 }
 
 // ── feedback ─────────────────────────────────────────────────────

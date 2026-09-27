@@ -33,10 +33,14 @@
 import type { AssignmentData } from '../types';
 import type { AssignmentSummary } from '../assignments';
 
+export const ASSIGNMENT_HAS_SUBMISSIONS = 'students have submitted this assignment — hide it instead of deleting it';
+
 export interface AssignmentStore {
   list(): Promise<AssignmentSummary[]>;
   get(id: string): Promise<{ assignment: AssignmentData; gradesReleased: boolean } | null>;
   save(assignment: AssignmentData): Promise<void>; // create or update
+  /** Rejects (ASSIGNMENT_HAS_SUBMISSIONS) once any student has submitted it —
+   *  hide it instead; its attempts and grades must not be orphaned. */
   remove(id: string): Promise<void>;
   /**
    * The release flag for one assignment id. Answered for ANY id, known or not,
@@ -138,6 +142,15 @@ class LocalAssignmentStore implements AssignmentStore {
   }
 
   async remove(id: string): Promise<void> {
+    // The server's rule (task 063): an assignment students have submitted is
+    // never removed — its attempts and grades would be orphaned.
+    let submitted = false;
+    try {
+      submitted = JSON.parse(localStorage.getItem('mm:sub:' + id) ?? '[]').length > 0;
+    } catch {
+      // unreadable — treat as none
+    }
+    if (submitted) throw new Error(ASSIGNMENT_HAS_SUBMISSIONS);
     try {
       localStorage.removeItem(KEY_PREFIX + id);
       // Release is policy about THIS assignment; a future assignment reusing
