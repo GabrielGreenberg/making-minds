@@ -8,7 +8,7 @@ requires: browser
 area: app
 source: chat
 created: 2026-09-26T21:34:00-07:00
-status: in-progress
+status: blocked
 after: 2026-09-26-067
 branch: robot/068-late-penalty-calendar-extensions
 merged_into:
@@ -58,3 +58,10 @@ Gates; browser: a toy late submission shows the deduction; an extension moves th
 date on the student's Home; a waiver reduces it.
 
 ## Progress log
+
+## Questions
+1. The code is done and every gate is green on `robot/068-late-penalty-calendar-extensions`.
+   An unattended run can't start the dev server, so the browser check this task requires
+   (the owed-checks recipe in the Progress log) wasn't done. Recommendation: run that check
+   in an attended `/work` session (or approve the robot's dev server), then land. Or reply
+   "land it, eyeball owed" and I'll land it with the check noted as owed.
