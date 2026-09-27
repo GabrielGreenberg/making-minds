@@ -1,5 +1,5 @@
 # Grading Interface: One Grade Model, Then the Surfaces on Top
-_Status: proposed — awaiting Gabriel's approval · 2026-09-26 · Task: 2026-09-23-031 ·
+_Status: accepted (Gabriel, 2026-09-26) · Task: 2026-09-23-031 · Build: tasks 2026-09-26-061…071 ·
 Decisions: all answered by Gabriel 2026-09-26 (§3) · Mockups: `grading-interface/mockups.html`,
 screenshots `tasks/attachments/2026-09-23-031-*.png`_
 
@@ -189,7 +189,7 @@ machine did. A re-grade that changes the autograde under an override flags it
 ### 4.5 Not submitted
 There is no grade before the due date. After the effective due date (§4.7) with no submission,
 the problem set is **Missing**. The export writes 0, since the policy's average of A1–A6 treats
-a missing set that way. _(Proposed default; confirm at approval.)_
+a missing set that way. _(Default confirmed at approval.)_
 
 ### 4.6 Late penalty (decisions 5, 5b)
 - **When a submission is late**: `submittedAt` is after the student's effective due date. The
@@ -198,7 +198,7 @@ a missing set that way. _(Proposed default; confirm at approval.)_
   after the due date and before `submittedAt`.
   - Class meetings are the calendar's lecture and in-class exam dates, at their 12:30–13:45 slot.
     Holidays simply have no meeting. The finals-week exam slot is not a meeting.
-  - _(Proposed: "passes" = the meeting has ended; confirm.)_
+  - A meeting "passes" when it has ended (confirmed at approval).
 - **Per-day assignments**: an assignment can carry `latePolicy: 'per-day'` (HW6, due on the
   last day of instruction). It deducts 5 once late plus 5 per full 24 hours after.
 - After instruction ends, per-meeting deductions stop growing. The "> 2 weeks late" flag (§8)
@@ -463,7 +463,7 @@ tokens only. The data is fictional. Screenshots:
 `tasks/attachments/2026-09-23-031-{1-grading-tab,2-overview,3-matrix,4-queue,5-submission,6-student,7-regrade}.png`.
 Open a single screen with `mockups.html#only=<id>`.
 
-## 12. Build order (filed as tasks after approval)
+## 12. Build order (filed as tasks 2026-09-26-061 … 071, in this order)
 HW1 is due **Oct 4**, and the policy returns work "about a week after". So slices 1–6 should
 land by about Oct 9. Slice 2 must precede HW1 submissions, or HW1's groups go unrecorded.
 1. **Grade model**: `engine/score.ts` (`scoreSubmission`, `answerKey`, `lateDeduction`),
