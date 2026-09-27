@@ -104,3 +104,9 @@ date on the student's Home; a waiver reduces it.
   `npm run homeworks -- status` on the box; set HW6/HW7 owned fields by hand if 'edited';
   rerun `npm run calendar -- import` whenever the website's course.json changes.
 - **NEXT STEP:** loop session: visual check if owed, then land per PROFILE §5.
+
+### 2026-09-27 (robot) — parked for the browser check
+- The task `requires: browser`, but an unattended run can't start the dev server
+  (preview_start refuses in scheduled runs), so the owed eyeball above couldn't be done.
+  Code and gates are complete on `robot/068-late-penalty-calendar-extensions` (9e3e09c).
+- **NEXT STEP:** do the owed browser checks (entry above), then land per PROFILE §5.
