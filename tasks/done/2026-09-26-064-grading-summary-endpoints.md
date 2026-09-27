@@ -8,9 +8,9 @@ requires:
 area: server
 source: chat
 created: 2026-09-26T21:34:00-07:00
-status: in-progress
+status: done
 after: 2026-09-26-063
-branch: robot/064-grading-summary-endpoints
+branch:
 merged_into:
 ---
 
@@ -106,3 +106,9 @@ Gates incl. `gradingCheck`; a timing/size note for 80 × 23 in the progress log.
   against a Remote Mode server. Nothing is owed to the pilot beyond the next release,
   because the endpoints are read-only and need no migration.
 - **Next step:** loop session: visual check if owed (none), then land per PROFILE §5.
+
+### 2026-09-27 — landed (robot)
+- Fixed the review nit: `EmailAliasSource` got its doc comment back (`server/src/db.ts`). No
+  change came in from `origin/main`, so the workflow's gates stand (server typecheck re-run: 0).
+  No browser check owed (no UI in this slice). Still owed and not claimed: timing of
+  `/api/grading` over all 7 HWs × 80 students on real data.
