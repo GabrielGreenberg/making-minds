@@ -8,9 +8,9 @@ requires: browser
 area: app
 source: chat
 created: 2026-09-26T21:34:00-07:00
-status: in-progress
+status: done
 after: 
-branch: task/062-group-members-on-submit
+branch:
 merged_into:
 ---
 
@@ -77,3 +77,5 @@ gradebook detail; remote mode against the local server (Vite Remote Mode).
   Jane → "Group listed: Jane Roe"; reopening pre-selects Jane; the instructor's gradebook
   shows "Group Jane Roe"; no console errors. Remote mode verified by remoteStoreCheck against
   the real server (no browser pass). CLAUDE.md Part 1 Submit line updated (39,999 B).
+- 2026-09-26 — Gates green (app tsc, build, app check, server check). Landed. Next in the
+  grading build: 2026-09-26-061 (the grade model).
