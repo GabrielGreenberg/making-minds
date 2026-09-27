@@ -8,7 +8,8 @@
 //   RemoteWorkbookStore   → getWorkbook / getWorkbookFull / putWorkbook
 //   RemoteAssignmentStore → listAssignments / getAssignment / putAssignment / deleteAssignment
 //   RemoteSubmissionStore → submitAssignment / listSubmissions / listAllSubmissions / getClassmates
-//   RemoteGradingStore    → putGrade / deleteGrade
+//   RemoteGradingStore    → putGrade / deleteGrade / getGradingSummary / getCourseGrading /
+//                           getStudentGrading / getGradingAttempt
 //   remote auth           → login / logout / me
 //
 // Configuration: VITE_API_BASE (e.g. "https://api.phil133.example.edu") set at
@@ -34,6 +35,12 @@ import type {
   SubmissionData,
   SubmissionRecord,
 } from '../types';
+import type {
+  AssignmentGradingSummary,
+  AttemptDetail,
+  CourseGrading,
+  StudentGrading,
+} from '../storage/gradingSummary';
 
 export interface ApiUser {
   email: string;
@@ -548,6 +555,31 @@ export async function deleteGrade(
     'DELETE',
     `/assignments/${encodeURIComponent(assignmentId)}/grades/${encodeURIComponent(studentKey)}/${questionId}`,
     { version },
+  );
+}
+
+/** Instructor only: one assignment's grading summary (task 064) — a row per
+ *  roster student and per other submitter, no circuits. */
+export function getGradingSummary(assignmentId: string): Promise<AssignmentGradingSummary> {
+  return request<AssignmentGradingSummary>('GET', `/assignments/${encodeURIComponent(assignmentId)}/summary`);
+}
+
+/** Instructor only: every assignment's grading progress + course-wide counts. */
+export function getCourseGrading(): Promise<CourseGrading> {
+  return request<CourseGrading>('GET', '/grading');
+}
+
+/** Instructor only: one student (by opaque key) across assignments. */
+export function getStudentGrading(studentKey: string): Promise<StudentGrading> {
+  return request<StudentGrading>('GET', `/students/${encodeURIComponent(studentKey)}`);
+}
+
+/** Instructor only: one attempt in full (circuits, expected/got, integrity,
+ *  grades, that student's grade log). */
+export function getGradingAttempt(assignmentId: string, studentKey: string, attempt: number): Promise<AttemptDetail> {
+  return request<AttemptDetail>(
+    'GET',
+    `/assignments/${encodeURIComponent(assignmentId)}/submissions/${encodeURIComponent(studentKey)}/${encodeURIComponent(String(attempt))}`,
   );
 }
 

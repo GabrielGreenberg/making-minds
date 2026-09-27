@@ -94,6 +94,29 @@ export interface RosterRow extends UserRow {
 }
 
 /** Where an extra sign-in address came from. */
+/** An account as the grading summaries see it (listGradingUsers). */
+export interface GradingUserRow {
+  email: string;
+  publicId: string | null;
+  name: string;
+  sortName: string;
+  uid: string;
+  section: string | null;
+  role: Role;
+  hasAccount: boolean;
+}
+
+/** A submissions row as selected (Db.SUBMISSION_COLUMNS). */
+interface SubmissionRow {
+  email: string;
+  attempt: number;
+  submitted_at: string;
+  submission: string;
+  result: string | null;
+  integrity: string | null;
+  assignment_hash: string | null;
+}
+
 export type EmailAliasSource = 'roster' | 'signup' | 'sso' | 'request';
 
 /** addEmailAlias's answer: stored now, already this account's, or someone else's. */
@@ -509,6 +532,42 @@ export class Db {
       | { email: string }
       | undefined;
     return row?.email ?? null;
+  }
+
+  /**
+   * Every account as the grading summaries name it (task 064): the opaque
+   * key, name, sort key, UID, section and whether it has a credential —
+   * students by last name, then instructors. `email` is for the SERVER's own
+   * join to submissions; no grading route sends it.
+   */
+  listGradingUsers(): GradingUserRow[] {
+    return (
+      this.db
+        .prepare(
+          `SELECT email, public_id, name, COALESCE(sort_name, name) AS sort_name, uid, section, role,
+                  password_hash IS NOT NULL AS has_account
+           FROM users ORDER BY role DESC, COALESCE(sort_name, name) COLLATE NOCASE, email`,
+        )
+        .all() as unknown as {
+        email: string;
+        public_id: string | null;
+        name: string;
+        sort_name: string;
+        uid: string | null;
+        section: string | null;
+        role: Role;
+        has_account: number;
+      }[]
+    ).map((r) => ({
+      email: r.email,
+      publicId: r.public_id,
+      name: r.name,
+      sortName: r.sort_name,
+      uid: r.uid ?? '',
+      section: r.section,
+      role: r.role,
+      hasAccount: !!r.has_account,
+    }));
   }
 
   // ── human grades (task 063) ──────────────────────────────────────
@@ -1214,31 +1273,11 @@ export class Db {
     };
   }
 
-  /** All attempts for one assignment; optionally scoped to one student. */
-  listSubmissions(assignmentId: string, email?: string): SubmissionRecord[] {
-    const rows = (
-      email
-        ? this.db
-            .prepare(
-              `SELECT attempt, submitted_at, submission, result, integrity, assignment_hash FROM submissions
-               WHERE assignment_id = ? AND email = ? ORDER BY email, attempt`,
-            )
-            .all(assignmentId, email)
-        : this.db
-            .prepare(
-              `SELECT attempt, submitted_at, submission, result, integrity, assignment_hash FROM submissions
-               WHERE assignment_id = ? ORDER BY email, attempt`,
-            )
-            .all(assignmentId)
-    ) as unknown as {
-      attempt: number;
-      submitted_at: string;
-      submission: string;
-      result: string | null;
-      integrity: string | null;
-      assignment_hash: string | null;
-    }[];
-    return rows.map((r) => ({
+  private static readonly SUBMISSION_COLUMNS =
+    's.email, s.attempt, s.submitted_at, s.submission, s.result, s.integrity, s.assignment_hash';
+
+  private static toRecord(assignmentId: string, r: SubmissionRow): SubmissionRecord {
+    return {
       assignmentId,
       attempt: r.attempt,
       submittedAt: r.submitted_at,
@@ -1246,7 +1285,63 @@ export class Db {
       result: r.result ? (JSON.parse(r.result) as SubmissionResult) : undefined,
       ...(r.integrity ? { integrity: JSON.parse(r.integrity) as SubmissionIntegrity } : {}),
       ...(r.assignment_hash ? { assignmentHash: r.assignment_hash } : {}),
-    }));
+    };
+  }
+
+  /** All attempts for one assignment; optionally scoped to one student. */
+  listSubmissions(assignmentId: string, email?: string): SubmissionRecord[] {
+    const rows = (
+      email
+        ? this.db
+            .prepare(
+              `SELECT ${Db.SUBMISSION_COLUMNS} FROM submissions s
+               WHERE s.assignment_id = ? AND s.email = ? ORDER BY s.email, s.attempt`,
+            )
+            .all(assignmentId, email)
+        : this.db
+            .prepare(
+              `SELECT ${Db.SUBMISSION_COLUMNS} FROM submissions s
+               WHERE s.assignment_id = ? ORDER BY s.email, s.attempt`,
+            )
+            .all(assignmentId)
+    ) as unknown as SubmissionRow[];
+    return rows.map((r) => Db.toRecord(assignmentId, r));
+  }
+
+  /**
+   * Each student's LATEST attempt only (the counting one; task 064's grading
+   * summaries), keyed by the account email the attempt was filed under —
+   * older attempts are never read or parsed. Optionally one student's.
+   */
+  listLatestSubmissions(assignmentId: string, email?: string): { email: string; record: SubmissionRecord }[] {
+    const rows = this.db
+      .prepare(
+        `SELECT ${Db.SUBMISSION_COLUMNS} FROM submissions s
+         JOIN (SELECT email, MAX(attempt) AS attempt FROM submissions
+               WHERE assignment_id = ?${email ? ' AND email = ?' : ''} GROUP BY email) l
+           ON s.email = l.email AND s.attempt = l.attempt
+         WHERE s.assignment_id = ? ORDER BY s.email`,
+      )
+      .all(...(email ? [assignmentId, email, assignmentId] : [assignmentId, assignmentId])) as unknown as SubmissionRow[];
+    return rows.map((r) => ({ email: r.email, record: Db.toRecord(assignmentId, r) }));
+  }
+
+  /** One attempt, or null. */
+  getSubmission(assignmentId: string, email: string, attempt: number): SubmissionRecord | null {
+    const row = this.db
+      .prepare(
+        `SELECT ${Db.SUBMISSION_COLUMNS} FROM submissions s
+         WHERE s.assignment_id = ? AND s.email = ? AND s.attempt = ?`,
+      )
+      .get(assignmentId, email, attempt) as unknown as SubmissionRow | undefined;
+    return row ? Db.toRecord(assignmentId, row) : null;
+  }
+
+  /** Every address any attempt was filed under (a removed account's too). */
+  listSubmitterEmails(): string[] {
+    return (
+      this.db.prepare('SELECT DISTINCT email FROM submissions ORDER BY email').all() as unknown as { email: string }[]
+    ).map((r) => r.email);
   }
 
   /**

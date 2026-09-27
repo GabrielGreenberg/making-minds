@@ -39,9 +39,12 @@ task 2026-09-26-064 (memo `docs/buildout/designs/grading-interface.md` §7.2) �
   `pages.css`; `themeCheck` green).
 - **Class section** (remote mode): accounts created vs roster size; students active in the
   last 24 h / 7 days; a table per assignment: started (has a workbook), saved in the last 7 days,
-  submitted (by the due date / late), plus per-question pass rate on latest attempts. Local
-  mode shows the same from local stores, or a clear "remote only" note. Pick one and
-  record the choice in the progress log.
+  submitted (by the due date / late), plus per-question pass rate on latest attempts.
+  **Submitted / late / missing and the per-question pass rate come from the shared summary**
+  (`GradingStore.summary(id)` → `GET /api/assignments/:id/summary`, task 064: `progress` and
+  each row's per-problem `{points, source}`, aligned with `questionIds`; roster-only counts,
+  off-roster submitters apart) — never a second definition of "submitted". Local mode reuses
+  `LocalGradingStore.summary` for that part.
 - **Traffic section**: visits and page views per day for the last 30 days (a small chart),
   top referrers / countries / devices. When the server has no Cloudflare credentials it
   shows "Cloudflare traffic not configured", not an error. In local mode it shows "not available in local mode".
@@ -60,8 +63,10 @@ task 2026-09-26-064 (memo `docs/buildout/designs/grading-interface.md` §7.2) �
   `getTraffic(days)`. Remote impl = `api/client.ts` calls. Local impl = activity computed
   from the local stores (cheap, since they're already in the browser), traffic → `null`
   ("not available"). The server side splits in two:
-  - `server/src/analytics.ts` — pure aggregation SQL/functions over `users`, `workbooks`,
-    `submissions`, `assignments` (latest attempt per student, as the gradebook does).
+  - `server/src/analytics.ts` — only what the grading summary lacks: started / saved (from
+    `workbooks`), active 24 h / 7 d, accounts vs roster. Submitted, late, missing and pass
+    rates are read from `server/src/gradingSummary.ts assignmentSummary` (the one builder,
+    `app/src/storage/gradingSummary.ts`), not re-queried.
   - `server/src/cloudflare.ts` — a small GraphQL client (`POST
     https://api.cloudflare.com/client/v4/graphql`, Bearer token) querying the Web Analytics
     (RUM) dataset (`rumPageloadEventsAdaptiveGroups`, filtered by `siteTag`, grouped by

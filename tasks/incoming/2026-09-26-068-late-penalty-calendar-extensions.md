@@ -36,6 +36,11 @@ request (memo §4.6–§4.7, §7.4, §7.7). Today lateness is a tag only (`dueDa
   Home, overview, freezing (`dueDates.ts:70 isFrozen`) follow; shown "Due Oct 8 (extended)".
 - `scoreSubmission` gets the real calendar: deductions appear in the matrix, the submission
   page and (after release) the student's sheet ("late by 2 class meetings: −15; 5 waived").
+- Hand-off from 064: `app/src/storage/gradingSummary.ts dueFor` (the ONE hook both grading
+  adapters call) returns the extension-aware due date AND the `late` policy, so the
+  summaries' `latest.late.units` / `.deduction` (null since 064) carry the real values;
+  flip `server/tools/gradingCheck.ts`'s "units and deduction wait for the calendar" pin to
+  the calendar's numbers.
 - The submit dialog, past the effective due date, states the cost and that an earlier
   on-time submission will no longer count.
 - Pinned: `dueDateCheck` + `scoreCheck` over the committed calendar (HW1–HW6 real dates), the
