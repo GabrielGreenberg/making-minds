@@ -8,9 +8,9 @@ requires:
 area: docs
 source: chat
 created: 2026-09-26T21:48:03-0700
-status: ready
+status: in-progress
 after:
-branch:
+branch: task/072-claude-md-headroom
 merged_into:
 ---
 
