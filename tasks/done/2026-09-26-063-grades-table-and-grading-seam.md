@@ -8,9 +8,9 @@ requires: browser
 area: server
 source: chat
 created: 2026-09-26T21:34:00-07:00
-status: in-progress
+status: done
 after: 2026-09-26-061
-branch: task/063-grades-table-and-grading-seam
+branch:
 merged_into:
 ---
 
@@ -92,3 +92,6 @@ changed.
   Browser (local, after a dev-server restart — it had cached a stale score.ts): graded John's
   HW1 P6a ½ with a note → stored v1 + logged, detail "graded ½", row 40 → 41.3*. Owed: on
   the pilot, the one-time migration runs on the next release's boot (toy data only).
+- 2026-09-26 — Gates green (app tsc, build, app check, server check incl. gradingCheck).
+  Landed. Next in the grading build: 2026-09-26-064 (summary endpoints — through the
+  GradingStore seam; records already carry grades + studentKey).

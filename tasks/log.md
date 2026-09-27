@@ -52,3 +52,4 @@
 2026-09-26-062 · feature · Let a student name up to two group members at submit, in one Submit dialog shared by every submit site · 2026-09-26T22:06:03-0700 · task/062-group-members-on-submit · 956967b
 2026-09-26-072 · chore · Win back CLAUDE.md headroom — 39,999 → 37,049 bytes by tightening wording; no path, seam, law or gate dropped · 2026-09-26T22:08:52-0700 · task/072-claude-md-headroom · 0dba25d
 2026-09-26-061 · feature · Define the grade once — engine/score.ts (1 point per problem, the ½ rule, 40 + 60·P, late math) — and retire the three score rules · 2026-09-26T22:22:55-0700 · task/061-grade-model-score · 7cc5f48
+2026-09-26-063 · feature · Store human grades apart from the autograde — grades table, append-only change log, the GradingStore seam, legacy reviews migrated · 2026-09-26T22:37:56-0700 · task/063-grades-table-and-grading-seam · ee3512f
