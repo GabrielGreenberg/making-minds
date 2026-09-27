@@ -150,6 +150,9 @@ export function GradingQueue({
 
 // ── By problem ───────────────────────────────────────────────────────────
 
+/** ByProblem's "every response is done" state. */
+const CAUGHT_UP = 'caught-up' as const;
+
 /** The feed for one problem, re-read every POLL_MS, with local patches
  *  (a save, a 409's current grade) laid over it until the next read. */
 function useFeed(assignmentId: string, questionId: number) {
@@ -182,18 +185,20 @@ function ByProblem({
   const question = assignment.questions.find((q) => q.id === questionId)!;
   const { feed, items, setItems } = useFeed(assignment.id, questionId);
   // The current response, by student key (stable across re-reads); null =
-  // not chosen yet; '' = all caught up.
-  const [cur, setCur] = useState<string | null>(null);
+  // not chosen yet; CAUGHT_UP = none left. Never a sentinel string: a key
+  // may be anything, even '' (a local dev seed's anonymous submitter).
+  const [cur, setCur] = useState<{ key: string } | typeof CAUGHT_UP | null>(null);
   useEffect(() => {
     if (!items || cur !== null) return;
     const i = nextToGrade(items, -1, Date.now());
-    setCur(i === null ? '' : items[i].student.key);
+    setCur(i === null ? CAUGHT_UP : { key: items[i].student.key });
   }, [items, cur]);
 
   if (!items) {
     return <p className="mm-empty">{feed.loading ? 'Loading responses…' : feed.value === null ? 'No such problem.' : 'Couldn’t load the responses.'}</p>;
   }
-  const index = cur ? items.findIndex((r) => r.student.key === cur) : -1;
+  const curKey = cur !== null && cur !== CAUGHT_UP ? cur.key : null;
+  const index = curKey !== null ? items.findIndex((r) => r.student.key === curKey) : -1;
   const item = index >= 0 ? items[index] : null;
   const counts = queueCounts(items);
 
@@ -204,7 +209,7 @@ function ByProblem({
     if (advance) {
       const from = next.findIndex((r) => r.student.key === key);
       const i = nextToGrade(next, from, Date.now());
-      setCur(i === null ? '' : next[i].student.key);
+      setCur(i === null ? CAUGHT_UP : { key: next[i].student.key });
     }
     if (patch) {
       feed.reload();
@@ -213,7 +218,7 @@ function ByProblem({
   };
   const go = (dir: 1 | -1) => {
     const i = step(items, index, dir, Date.now());
-    if (i !== null) setCur(items[i].student.key);
+    if (i !== null) setCur({ key: items[i].student.key });
   };
 
   return (
@@ -226,7 +231,7 @@ function ByProblem({
         ) : !item ? (
           <div className="mm-empty gr-caughtup">
             <b>All caught up.</b> Every response is graded or open in another grader’s queue.{' '}
-            <button type="button" className="mm-btn mm-btn--small" onClick={() => setCur(items[0].student.key)}>
+            <button type="button" className="mm-btn mm-btn--small" onClick={() => setCur({ key: items[0].student.key })}>
               Review from the top
             </button>
           </div>
@@ -244,10 +249,10 @@ function ByProblem({
           {items.map((r, i) => {
             const now = Date.now();
             const state = queueState(r, now);
-            const current = r.student.key === cur;
+            const current = r.student.key === curKey;
             return (
               <li key={r.student.key} className={current ? 'cur' : ''}>
-                <button type="button" className="gr-sidebtn" onMouseDown={keepFocus} onClick={() => setCur(r.student.key)}>
+                <button type="button" className="gr-sidebtn" onMouseDown={keepFocus} onClick={() => setCur({ key: r.student.key })}>
                   {responseLabel(i, r.student, hideNames)}
                 </button>
                 {current ? (
