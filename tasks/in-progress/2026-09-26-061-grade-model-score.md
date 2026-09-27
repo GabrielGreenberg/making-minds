@@ -8,9 +8,9 @@ requires: browser
 area: app
 source: chat
 created: 2026-09-26T21:34:00-07:00
-status: ready
+status: in-progress
 after: 
-branch:
+branch: task/061-grade-model-score
 merged_into:
 ---
 
