@@ -8,9 +8,9 @@ requires: browser
 area: app
 source: chat
 created: 2026-09-26T21:34:00-07:00
-status: in-progress
+status: done
 after: 2026-09-26-065
-branch: robot/066-hand-grading-queue
+branch:
 merged_into:
 ---
 
@@ -107,3 +107,20 @@ points alone; 390 px wide: one column, no horizontal scroll.
   two instructors: claim shown + skipped, 409 → theirs stands, Save mine works, claim lapses;
   resubmit → ↻ with one-click Keep). Fake names only, scratchpad files, never git.
 - **NEXT STEP:** loop session: visual check if owed, then land per PROFILE §5.
+
+### 2026-09-27 (robot, land)
+- The browser pane can't start a dev server in an unattended run. For the visual check I used
+  headless Chrome (CDP, the shootProblemSets recipe) over a scratch Vite in local mode, with the
+  sample assignment's 5 submitters on P14.
+- Found and fixed (27b708b): ByProblem used '' to mean "all caught up", but the sample's anonymous
+  submitter has the key ''. So the queue opened on "All caught up" with 0 of 5 graded. The
+  current response is now `{key}` | CAUGHT_UP | null. After the fix: the card renders; 1 + Enter
+  saves and moves on ("1 of 5 graded", the side list shows 1, the next response is "grading");
+  J moves to the next response; at 375px nothing scrolls sideways (widest element 375).
+- Gates re-run after the fix, all exit 0: app tsc, build, check, typecheck:tools; server tsc,
+  check.
+- Owed, not claimed: every local-mode submitter reads "Not on the roster" (the sample's emails
+  aren't toy accounts; this predates 066, from 064's localIdentity), so the name/Hide-names
+  labels were only checked in code and pins. Also owed: the remote-mode checks above (ten fake
+  students by keyboard alone, two instructors' claim + 409, the ↻ Keep suggestion), and By
+  student in the browser.
