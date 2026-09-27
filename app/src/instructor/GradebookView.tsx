@@ -367,6 +367,20 @@ function AttemptRow({
   );
 }
 
+/** The classmates a submission lists as its group (task 062), by name — the
+ *  instructor's class list maps the opaque keys back. A key no longer on the
+ *  roster shows as such rather than vanishing. Reciprocity is judged by the
+ *  grading build's flags (task 2026-09-26-070), not here. */
+function GroupLine({ keys }: { keys: string[] }) {
+  const { value: classmates } = useAsyncValue(() => submissionStore.listClassmates(), []);
+  const names = keys.map((k) => classmates?.find((c) => c.key === k)?.name ?? (classmates ? 'someone no longer on the roster' : '…'));
+  return (
+    <p className="instructor-group">
+      <span className="mm-label">Group</span> {names.join(', ')}
+    </p>
+  );
+}
+
 function SubmissionDetail({
   record,
   assignment,
@@ -382,6 +396,7 @@ function SubmissionDetail({
 
   return (
     <div className="instructor-detail">
+      {record.submission.group?.length ? <GroupLine keys={record.submission.group} /> : null}
       {result.questions.map((qr) => {
         const q = assignment.questions.find((x) => x.id === qr.questionId);
         // Open question: nothing was autograded — show the student's response

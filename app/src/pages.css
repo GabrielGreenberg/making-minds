@@ -298,6 +298,18 @@
 
 /* ── Feedback (the student form; the instructor queue is further down) ── */
 .feedback-sent { padding: 12px 0 4px; }
+
+/* ── The Submit dialog (components/SubmitDialog.tsx, task 062) ── */
+.mm-modal .submit-para { margin: 0 0 10px; }
+.mm-modal-head + .submit-para { margin-top: 12px; }
+.submit-group { border: 0; border-top: 1px solid var(--mm-line); margin: 16px 0 0; padding: 14px 0 0; min-width: 0; }
+.submit-group > legend { padding: 0; float: left; width: 100%; margin-bottom: 4px; }
+.submit-group-note { clear: both; margin: 0 0 10px; }
+.submit-group-selects { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.submit-group-selects select.mm-input { width: 100%; }
+.mm-modal .submit-error { margin: 12px 0 0; }
+.mm-modal .submit-actions { margin-top: 18px; }
+.mm-modal .submit-group-done { margin-top: 8px; }
 .feedback-file { font-size: var(--mm-fs-small); color: var(--mm-ink-2); }
 
 /* ─────────────────────────────────────────────────────────────────
@@ -431,6 +443,8 @@
 .instructor-stat-value { font-size: 20px; font-weight: 700; }
 .instructor-stat-label { font-size: 12px; color: var(--mm-ink-2); }
 .instructor-submission-row { cursor: pointer; }
+.instructor-group { margin: 0 0 10px; font-size: var(--mm-fs-small); }
+.instructor-group .mm-label { margin-right: 6px; }
 .instructor-submission-row:hover { background: var(--mm-surface-2); }
 
 /* Submissions pane: the per-question columns can run wide, so the pane

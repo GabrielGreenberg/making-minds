@@ -2149,6 +2149,45 @@ console.log('[view: Fit is a view change, never a reset]');
   useStore.getState().undo();
 }
 
+// ═════ The submit dialog's group listing, through the local seam (task 062) ═══
+console.log('\n[submit group]');
+{
+  const { SESSION_KEY } = await import('../src/auth/accounts');
+  const { SubmitRefused } = await import('../src/submissionGroup');
+  const GROUP_ID = `${SAMPLE_ASSIGNMENT_ID}-group`;
+  await localAssignmentStore.save({ ...buildSampleAssignment(), id: GROUP_ID, dueDate: new Date(Date.now() + 86_400_000).toISOString() });
+  await localAssignmentStore.setVisible(GROUP_ID, true);
+  const JOHN = 'john.doe@example.com';
+  backing.set(SESSION_KEY, 'student-john');
+  useStore.getState().resetForPrincipal(JOHN);
+  const mates = await submissionStore.listClassmates();
+  check("a student's class list is the other students — names and keys only, self and instructors left out",
+    JSON.stringify(mates) === JSON.stringify([{ key: 'student-jane', name: 'Jane Roe' }]));
+  backing.set(SESSION_KEY, 'instructor-ada');
+  const all = await submissionStore.listClassmates();
+  check("an instructor's is every student (the gradebook maps group keys by it)",
+    all.map((c) => c.key).join() === 'student-john,student-jane');
+  backing.set(SESSION_KEY, 'student-john');
+  const withGroup = await useStore.getState().submitAssignment(GROUP_ID, JOHN, { group: ['student-jane'] });
+  check('a listed classmate is recorded on the submission', JSON.stringify(withGroup?.submission.group) === '["student-jane"]');
+  const alone = await useStore.getState().submitAssignment(GROUP_ID, JOHN, { group: [] });
+  check('no group listed → no group field at all', alone != null && !('group' in alone.submission));
+  const refused = async (group: string[]) => {
+    const before = (await submissionStore.listOwn(GROUP_ID, JOHN)).length;
+    let err: unknown = null;
+    try { await useStore.getState().submitAssignment(GROUP_ID, JOHN, { group }); } catch (e) { err = e; }
+    const after = (await submissionStore.listOwn(GROUP_ID, JOHN)).length;
+    return err instanceof SubmitRefused && after === before;
+  };
+  check('listing yourself is refused, and nothing is recorded', await refused(['student-john']));
+  check('listing an instructor is refused', await refused(['instructor-ada']));
+  check('listing someone off the roster is refused', await refused(['student-nobody']));
+  check('listing the same classmate twice is refused', await refused(['student-jane', 'student-jane']));
+  check('the badge map shows the latest recorded attempt, not a refused one',
+    useStore.getState().submissions[GROUP_ID]?.attempt === alone?.attempt);
+  backing.delete(SESSION_KEY);
+}
+
 await flushTimers();
 console.log(`\nnavResetCheck: ${passed} passed, ${failed} failed`);
 process.exit(failed > 0 ? 1 : 0);

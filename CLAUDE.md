@@ -77,8 +77,8 @@ TM brains also show their internal tape read-only; SC perception: a retina frame
 boxes, autograded). Debounced autosave through `WorkbookStore` (remote: PUT with an `'error'`
 indicator + backoff retry, keepalive unload flush, and a per-email crash-buffer journal
 replayed on the next open — a hard tab kill loses nothing). Leave and resume. **Submit** a
-timestamped snapshot (remote submit is online-only: a failure alerts and records nothing —
-the server stamps time). Once grades are released: the **Grades** tab's sheet (verdict per
+timestamped snapshot in one `SubmitDialog` (≤ 2 group members; online-only: a failure
+records nothing — server stamps time). Once grades are released: the **Grades** tab's sheet (verdict per
 question, the instructor's note, "▸ failed inputs" with safe fields only — which case failed
 and why, never the answer key — a link into the question, and **Run this input**: the
 grader's run of that case, recorded vs live verdict); Home and the overview re-fetch on every visit. **Viewing a

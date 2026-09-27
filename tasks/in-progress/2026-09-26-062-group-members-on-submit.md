@@ -53,3 +53,27 @@ Gates; browser: submit HW1 as a toy student with one member, see it in the instr
 gradebook detail; remote mode against the local server (Vite Remote Mode).
 
 ## Progress log
+- 2026-09-26 (work session, Opus 5.5) — Built. **One Submit dialog**: all three submit sites
+  (Home row, the assignment's document page, the editor's top bar) had their own
+  `confirm()`/`alert()` copies; they now open `components/SubmitDialog.tsx` (the
+  `submitConfirmMessage` text, the group picker, inline refusal/network errors, a "Submitted —
+  attempt N" done state that replaced Home's alert). **The rule**: `app/src/submissionGroup.ts`
+  `checkGroup` (≤ 2 others, distinct, roster students, not self; refused whole with a reason)
+  + `SubmitRefused`, used by BOTH stores — the server's 400 becomes `SubmitRefused` in
+  `RemoteSubmissionStore`. **Data**: `SubmissionData.group?: string[]` of opaque keys (never
+  emails — a student's own record comes back to them); `Classmate {key, name}`; seam method
+  `SubmissionStore.listClassmates()` (student: the other students; instructor: all students).
+  **Server**: `users.public_id` (random, set at insert, backfilled, unique index — also what
+  task 063 reuses), `db.listStudentKeys`/`publicIdOf`, `GET /api/classmates` (names + keys
+  only), the submit route checks the group. **Local mode**: a second toy student, Jane Roe
+  (`accounts.ts`, after John so "the first student" stays John); key = the toy account id.
+  **Gradebook**: `SubmissionDetail` shows "Group: <names>". **Pins**: `pipelineCheck [group
+  listing]` (the rule, buildSubmission, grader ignores it), `navResetCheck [submit group]`
+  (local seam: classmates per role, recorded, refusals record nothing, badge map),
+  `serverCheck` (classmates auth + shape, 400s with reasons, nothing recorded, gradebook feed,
+  public_id stable across update + restart), `remoteStoreCheck` (seam end to end,
+  SubmitRefused), `provenanceCheck` rewritten (every site opens `<SubmitDialog`, which shows
+  `submitConfirmMessage(title, { saved })`). Browser (local mode): John submits HW1 listing
+  Jane → "Group listed: Jane Roe"; reopening pre-selects Jane; the instructor's gradebook
+  shows "Group Jane Roe"; no console errors. Remote mode verified by remoteStoreCheck against
+  the real server (no browser pass). CLAUDE.md Part 1 Submit line updated (39,999 B).

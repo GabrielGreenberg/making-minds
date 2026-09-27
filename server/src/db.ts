@@ -303,7 +303,28 @@ export class Db {
     } catch {
       // already present
     }
+    // An opaque, stable per-account key (task 062): what one student may see
+    // of another — the group picker's `Classmate.key` — and, in the grading
+    // build (memo grading-interface.md §9), what routes and API paths name a
+    // student by, never an email or UID. Random, set at insert, backfilled
+    // once for rows that predate it; never changed afterwards.
+    try {
+      this.db.exec('ALTER TABLE users ADD COLUMN public_id TEXT;');
+    } catch {
+      // already present
+    }
+    const unkeyed = this.db.prepare('SELECT email FROM users WHERE public_id IS NULL').all() as unknown as {
+      email: string;
+    }[];
+    const setKey = this.db.prepare('UPDATE users SET public_id = ? WHERE email = ?');
+    for (const r of unkeyed) setKey.run(Db.newPublicId(), r.email);
+    this.db.exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_users_public_id ON users (public_id);');
     if (firstWatermarkBoot) this.snapshotLegacyContent();
+  }
+
+  /** 72 random bits, URL-safe — see the public_id migration above. */
+  private static newPublicId(): string {
+    return randomBytes(9).toString('base64url');
   }
 
   /** Record every existing workbook's ids and per-question sizes as legacy:
@@ -381,7 +402,7 @@ export class Db {
     const studentId = (user.studentId ?? '').trim();
     this.db
       .prepare(
-        `INSERT INTO users (email, name, role, student_id, uid, section, sort_name) VALUES (?, ?, ?, ?, ?, ?, ?)
+        `INSERT INTO users (email, name, role, student_id, uid, section, sort_name, public_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
          ON CONFLICT(email) DO UPDATE SET
            name = excluded.name,
            role = excluded.role,
@@ -401,7 +422,31 @@ export class Db {
         (verifiedId && normalizeUid(studentId)) || null,
         user.section ?? null,
         user.sortName ?? null,
+        Db.newPublicId(), // an insert's only; a conflict keeps the row's own
       );
+  }
+
+  /**
+   * The roster's students as another person may see them (task 062): the
+   * opaque `public_id` and the name — nothing else — by last name. `email`
+   * rides along for the SERVER's own use (leaving the caller out, checking a
+   * group); the classmates route never sends it.
+   */
+  listStudentKeys(): { key: string; name: string; email: string }[] {
+    return this.db
+      .prepare(
+        `SELECT public_id AS key, name, email FROM users WHERE role = 'student'
+         ORDER BY COALESCE(sort_name, name) COLLATE NOCASE, email`,
+      )
+      .all() as unknown as { key: string; name: string; email: string }[];
+  }
+
+  /** An account's opaque key (see listStudentKeys), or null for no such account. */
+  publicIdOf(email: string): string | null {
+    const row = this.db.prepare('SELECT public_id FROM users WHERE email = ?').get(email) as unknown as
+      | { public_id: string | null }
+      | undefined;
+    return row?.public_id ?? null;
   }
 
   private static readonly USER_COLUMNS = 'email, name, role, student_id, uid, password_hash';

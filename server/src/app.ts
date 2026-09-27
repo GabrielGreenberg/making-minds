@@ -86,6 +86,7 @@ import { isEmail, normalizeEmail, normalizeUid } from './roster';
 import { matchAccount, placeRosterEntry } from './identity';
 import { importRosterCsv } from './rosterImport';
 import { stripAnswers, studentRecord } from './sanitize';
+import { checkGroup } from '../../app/src/submissionGroup';
 
 export function createApp(config: ServerConfig, db: Db) {
   const app = express();
@@ -578,6 +579,20 @@ export function createApp(config: ServerConfig, db: Db) {
   });
 
   // ── submissions (submit + gradebook) ───────────────────────────
+  // The class list as one student may see another (task 062: the submit
+  // dialog's group picker): names and opaque keys only — never an email, a
+  // UID or a section — the caller left out. Any signed-in person; an
+  // instructor gets every student (the gradebook resolves group keys by it).
+  app.get('/api/classmates', auth, (req, res) => {
+    const self = req.user!.email;
+    res.json({
+      classmates: db
+        .listStudentKeys()
+        .filter((c) => c.email !== self)
+        .map(({ key, name }) => ({ key, name })),
+    });
+  });
+
   app.post('/api/assignments/:id/submissions', auth, (req, res) => {
     const assignment = db.getAssignment(String(req.params.id));
     if (!assignment) {
@@ -589,12 +604,26 @@ export function createApp(config: ServerConfig, db: Db) {
       res.status(400).json({ error: 'malformed submission (answers required)' });
       return;
     }
+    // The group listing (task 062): up to two roster students by their opaque
+    // keys, never the submitter — the one rule, submissionGroup.ts. A bad
+    // listing refuses the whole submission (400, nothing recorded) with a
+    // reason the dialog shows.
+    const group = checkGroup(
+      body.group,
+      new Set(db.listStudentKeys().map((c) => c.key)),
+      db.publicIdOf(req.user!.email),
+    );
+    if (!group.ok) {
+      res.status(400).json({ error: group.error });
+      return;
+    }
     // Identity and timestamp are the server's word, not the client's.
     const submission: SubmissionData = {
       assignmentTitle: assignment.title,
       student: req.user!.email,
       submittedAt: new Date().toISOString(),
       answers: body.answers,
+      ...(group.group.length ? { group: group.group } : {}),
     };
     const result = gradeSubmission(assignment, submission);
     // Provenance (task 034): whose ids and editing records these are, tested

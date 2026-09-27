@@ -17,6 +17,9 @@ export interface Account {
 
 export const TOY_ACCOUNTS: Account[] = [
   { id: 'student-john', email: 'john.doe@example.com', name: 'John Doe', role: 'student' },
+  // A classmate, so local mode has a group to list at submit (task 062).
+  // After John: tools take the FIRST student as "the" student.
+  { id: 'student-jane', email: 'jane.roe@example.com', name: 'Jane Roe', role: 'student' },
   { id: 'instructor-ada', email: 'ada.instructor@example.com', name: 'Prof. Ada', role: 'instructor' },
 ];
 

@@ -13,6 +13,7 @@
 
 import type {
   AssignmentData,
+  Classmate,
   QuestionCircuit,
   SubmissionData,
   SubmissionRecord,
@@ -23,7 +24,8 @@ import { gradeSubmission } from '../engine/grader';
 import { applyManualReview } from './manualReview';
 import { assessIntegrity } from '../provenance/integrity';
 import { deriveMintKey, DEV_MINT_SECRET } from '../provenance/ids';
-import { TOY_ACCOUNTS } from '../auth/accounts';
+import { TOY_ACCOUNTS, readPersistedAccount } from '../auth/accounts';
+import { checkGroup, SubmitRefused } from '../submissionGroup';
 
 // The pure review helper lives in storage/manualReview.ts (a types-only leaf)
 // so the server's review endpoint can import it without pulling this
@@ -41,9 +43,9 @@ export { applyManualReview } from './manualReview';
 export function buildSubmission(
   def: AssignmentData,
   questionCircuits: Map<number, QuestionCircuit>,
-  opts: { student?: string; submittedAt: string },
+  opts: { student?: string; submittedAt: string; group?: string[] },
 ): SubmissionData {
-  return {
+  const submission: SubmissionData = {
     assignmentTitle: def.title,
     student: opts.student?.trim() || undefined,
     submittedAt: opts.submittedAt,
@@ -64,6 +66,9 @@ export function buildSubmission(
       return answer;
     }),
   };
+  // The classmates listed at submit (task 062); absent when none.
+  if (opts.group?.length) submission.group = [...opts.group];
+  return submission;
 }
 
 // Promise-returning (a remote backend is intrinsically async); the local
@@ -82,8 +87,18 @@ export function buildSubmission(
 // instructor gradebook's, and nothing student-facing may call it
 // (navResetCheck grep-gates where it appears).
 export interface SubmissionStore {
-  /** Append a new attempt and return the recorded (immutable) record. */
+  /** Append a new attempt and return the recorded (immutable) record. A
+   *  `submission.group` that fails `checkGroup` rejects with `SubmitRefused`
+   *  (submissionGroup.ts) and nothing is recorded. */
   submit(id: string, submission: SubmissionData): Promise<SubmissionRecord>;
+  /**
+   * The roster's students as the principal may see them — names and opaque
+   * keys only, never an email or UID — for the submit dialog's group picker
+   * (task 062). A student's list leaves themself out; an instructor's is the
+   * whole roster, which is also how the gradebook turns a submission's
+   * `group` keys back into names. Sorted by last name.
+   */
+  listClassmates(): Promise<Classmate[]>;
   /** The principal's own attempts, oldest first. */
   listOwn(id: string, email: string | null): Promise<SubmissionRecord[]>;
   /** The principal's own latest attempt, or null if they never submitted. */
@@ -146,6 +161,13 @@ class LocalSubmissionStore implements SubmissionStore {
     return this.read(id);
   }
 
+  async listClassmates(): Promise<Classmate[]> {
+    // Locally the toy accounts are the roster and an account's id is its key.
+    const self = readPersistedAccount();
+    return TOY_ACCOUNTS.filter((a) => a.role === 'student' && (self?.role !== 'student' || a.id !== self.id))
+      .map((a) => ({ key: a.id, name: a.name }));
+  }
+
   /**
    * Drop all stored submissions for an assignment (e.g. reseeding dev data).
    * Deliberately OFF the `SubmissionStore` seam — dev/local-mode only.
@@ -159,6 +181,19 @@ class LocalSubmissionStore implements SubmissionStore {
   }
 
   async submit(id: string, submission: SubmissionData): Promise<SubmissionRecord> {
+    // The group listing gets the server's check (submissionGroup.ts), against
+    // the toy roster: a refused listing records nothing.
+    const selfAccount = TOY_ACCOUNTS.find(
+      (a) => a.email.toLowerCase() === (submission.student ?? '').trim().toLowerCase(),
+    );
+    const group = checkGroup(
+      submission.group,
+      new Set(TOY_ACCOUNTS.filter((a) => a.role === 'student').map((a) => a.id)),
+      selfAccount?.id ?? null,
+    );
+    if (!group.ok) throw new SubmitRefused(group.error);
+    const { group: _listed, ...rest } = submission;
+    submission = group.group.length ? { ...rest, group: group.group } : rest;
     const all = this.read(id);
     // Autograde on receipt: the "server" holds the test vectors, so it can grade
     // the moment the submission lands and persist the result on the record.

@@ -2,7 +2,7 @@ import { useStore } from '../store';
 import { listAssignments } from '../assignments';
 import type { AssignmentSummary } from '../assignments';
 import { navigate } from '../routing';
-import { getCurrentUserEmail, useAuth } from '../auth';
+import { useAuth } from '../auth';
 import { summarizeResult } from '../engine/grader';
 import {
   dueStatus,
@@ -17,8 +17,8 @@ import { useAsyncValue } from '../useAsyncValue';
 import { useRoute } from '../useRoute';
 import { GradesView } from './GradesView';
 import { StudentLayout } from './StudentLayout';
-import { submitConfirmMessage } from '../provenance/notice';
-import { useEffect } from 'react';
+import { SubmitDialog } from './SubmitDialog';
+import { useEffect, useState } from 'react';
 
 /**
  * The student Home — what App renders whenever no workbook is open. Two tabs,
@@ -49,9 +49,11 @@ function nextDue(assignments: AssignmentSummary[], now: number): { a: Assignment
  */
 function AssignmentsTab() {
   const submissions = useStore((s) => s.submissions);
-  const submitAssignment = useStore((s) => s.submitAssignment);
   const hydrateSubmissions = useStore((s) => s.hydrateSubmissions);
   const { user } = useAuth();
+  // The row whose Submit dialog is open (components/SubmitDialog.tsx) — it
+  // records the SAVED work, since the assignment isn't open here.
+  const [submitting, setSubmitting] = useState<{ id: string; title: string } | null>(null);
 
   // Re-fetch on every visit to this screen (not just once at app boot) so a
   // grade or feedback note the instructor recorded after the student's last
@@ -74,31 +76,6 @@ function AssignmentsTab() {
   const now = Date.now();
   const next = nextDue(assignments.filter((a) => a.visible), now);
   const nextSub = next ? submissions[next.a.id] : undefined;
-
-  const handleSubmit = async (id: string, title: string) => {
-    const ok = confirm(submitConfirmMessage(title, { saved: true }));
-    if (!ok) return;
-    let rec;
-    try {
-      rec = await submitAssignment(id, getCurrentUserEmail());
-    } catch {
-      // Online-only submit: a failure records nothing and asks for a visible
-      // retry — never a silent (late) queue. The work itself is autosaved.
-      alert(
-        'Submission failed — the server could not be reached, and nothing was recorded.\n\n' +
-        'Your work is still saved. Please try Submit again in a moment.'
-      );
-      return;
-    }
-    if (!rec) return;
-    // The submission is autograded on receipt, but the grade is NEVER shown at
-    // submit time — students see grades only after the instructor releases
-    // them for the assignment (the release flag on the AssignmentStore seam).
-    alert(
-      `Submitted "${title}" (attempt ${rec.attempt}).\n` +
-        'Your work has been recorded. Grades will appear under Grades once your instructor releases them.',
-    );
-  };
 
   return (
     <StudentLayout current="assignments">
@@ -189,7 +166,7 @@ function AssignmentsTab() {
                   🔒 Past due
                 </span>
               ) : (
-                <button className="mm-btn" onClick={() => void handleSubmit(a.id, a.title)}>
+                <button className="mm-btn" onClick={() => setSubmitting({ id: a.id, title: a.title })}>
                   Submit
                 </button>
               )}
@@ -206,6 +183,14 @@ function AssignmentsTab() {
           </p>
         )}
       </div>
+      {submitting && (
+        <SubmitDialog
+          assignmentId={submitting.id}
+          title={submitting.title}
+          saved
+          onClose={() => setSubmitting(null)}
+        />
+      )}
     </StudentLayout>
   );
 }

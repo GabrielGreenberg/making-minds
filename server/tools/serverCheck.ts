@@ -893,6 +893,67 @@ check('saving again overwrites the single row (not a second one)',
       sOwn.json.records.every((r) => r.submission.student === student.email.toLowerCase()));
 }
 
+// ── group members at submit (task 062) ────────────────────────────
+{
+  type Mate = { key: string; name: string };
+  const jane = TOY_ACCOUNTS.find((a) => a.role === 'student' && a.email !== student.email)!;
+  check('classmates needs a session', (await api('GET', '/classmates')).status === 401);
+  const mates = await api<{ classmates: Mate[] }>('GET', '/classmates', { token: sTok });
+  const names = (list: Mate[]) => list.map((c) => c.name);
+  check("a student's class list: the other students (self and instructors left out), names + opaque keys only",
+    mates.status === 200 && names(mates.json.classmates).includes(jane.name) &&
+    !names(mates.json.classmates).includes(student.name) && !names(mates.json.classmates).includes(instructor.name) &&
+    mates.json.classmates.every((c) => Object.keys(c).sort().join() === 'key,name' && !c.key.includes('@')));
+  const janeKey = mates.json.classmates.find((c) => c.name === jane.name)?.key ?? '';
+  const iMates = await api<{ classmates: Mate[] }>('GET', '/classmates', { token: iTok });
+  check("an instructor's: every student, no instructor",
+    names(iMates.json.classmates).includes(student.name) && names(iMates.json.classmates).includes(jane.name) &&
+    !names(iMates.json.classmates).includes(instructor.name));
+  const johnKey = iMates.json.classmates.find((c) => c.name === student.name)?.key ?? '';
+  const url = `/assignments/${SAMPLE_ASSIGNMENT_ID}/submissions`;
+  const own = async () => (await api<{ records: SubmissionRecord[] }>('GET', url, { token: sTok })).json.records.length;
+  const withGroup = await api<{ record: SubmissionRecord }>('POST', url, {
+    token: sTok, body: { answers: correct.answers, group: [janeKey] },
+  });
+  check('a listed classmate is stored — as the opaque key, which is all the student gets back',
+    withGroup.status === 201 && JSON.stringify(withGroup.json.record.submission.group) === JSON.stringify([janeKey]));
+  const before = await own();
+  const refusedWith = async (group: unknown, why: RegExp) => {
+    const r = await api<{ error: string }>('POST', url, { token: sTok, body: { answers: correct.answers, group } });
+    return r.status === 400 && why.test(r.json.error);
+  };
+  check('listing yourself → 400 with the reason', await refusedWith([johnKey], /yourself/));
+  check('listing an instructor → 400', await refusedWith([db.publicIdOf(instructor.email.toLowerCase())], /roster/));
+  check('more than two → 400', await refusedWith([janeKey, 'x', 'y'], /at most 2/));
+  check('a duplicate → 400', await refusedWith([janeKey, janeKey], /twice/));
+  check('a non-list → 400', await refusedWith(janeKey, /list/));
+  check('…and none of the refused ones was recorded', (await own()) === before);
+  const plain = await api<{ record: SubmissionRecord }>('POST', url, { token: sTok, body: { answers: correct.answers } });
+  check('no group → no group field', plain.status === 201 && !('group' in plain.json.record.submission));
+  const all = await api<{ records: SubmissionRecord[] }>('GET', `${url}/all`, { token: iTok });
+  check('the gradebook feed carries the listing',
+    all.json.records.some((r) => JSON.stringify(r.submission.group) === JSON.stringify([janeKey])));
+  // The key is stable: a restart (a new Db over the same file) keeps it.
+  const { mkdtempSync, rmSync } = await import('node:fs');
+  const { tmpdir } = await import('node:os');
+  const { join } = await import('node:path');
+  const dir = mkdtempSync(join(tmpdir(), 'mm-pubid-'));
+  const file = join(dir, 'k.sqlite');
+  const d1 = new Db(file);
+  d1.upsertUser({ email: 'kay@example.com', name: 'Kay', role: 'student' });
+  d1.upsertUser({ email: 'lee@example.com', name: 'Lee', role: 'student' });
+  const k1 = d1.publicIdOf('kay@example.com');
+  d1.upsertUser({ email: 'kay@example.com', name: 'Kay Renamed', role: 'student' });
+  const k2 = d1.publicIdOf('kay@example.com');
+  d1.close();
+  const d2 = new Db(file);
+  const k3 = d2.publicIdOf('kay@example.com');
+  check('public_id: set at insert, unique, kept by an update and by a restart',
+    !!k1 && k1 === k2 && k2 === k3 && k1 !== d2.publicIdOf('lee@example.com'));
+  d2.close();
+  rmSync(dir, { recursive: true, force: true });
+}
+
 // ── logout ───────────────────────────────────────────────────────
 await api('POST', '/auth/logout', { token: sTok });
 const afterLogout = await api('GET', '/auth/me', { token: sTok });
