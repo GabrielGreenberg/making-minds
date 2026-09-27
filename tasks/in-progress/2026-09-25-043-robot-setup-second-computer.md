@@ -70,3 +70,24 @@ Items 2–3, recorded in the progress log.
   unattended run would stall on prompts; Gabriel set both to Auto. A manual-only routine
   reads `enabled: false` in the task list — the first chain shows whether `run_scheduled_task`
   still starts it.
+- 2026-09-27 — Step 7, the watched runs. **Catch** ("Run now", twice: 09-25 22:45 and today
+  10:29): sync, pull (nothing pending), inbox (empty) all fine, but its chain step failed —
+  `run_scheduled_task` → "This tool is unavailable in unattended sessions (scheduled-task runs
+  and remote-dispatched trees)": the app forbids a routine starting a routine, so 029's
+  catch → work chain can't exist. (A manual-only routine reading `enabled: false` was a red
+  herring.) **Work** ("Run now", 10:34–11:03): Workflow runs in a routine and the run waits
+  for its background completion (plan → implement → gates → review, ~28 min); the browser
+  pane's tools are present (unused: 064 needs none); claimed, landed and pushed 064
+  (`be18016`, CI green), branch deleted, clone left clean on `main`; the gate held (hold list:
+  sign-in, grader, schema, sanitize — pending 057, 031, 062, 072, 061, 063, 064). Starting
+  context 72.6k (the deferred-tool list is a large share); no compactions, no API errors.
+  **Push notification**: not delivered — at the Mac, "not sent, this terminal is active";
+  away, "Mobile push not sent (Remote Control inactive)". **Recipe fixed** (this commit):
+  work gets its own clock (`30 * * * *`, after catch at :00) and a run lock in
+  `ROBOT-WORK.md` §1 (a run that outlasts the hour must not share the clone with the next);
+  catch's chain step retired; `START.md` adds Auto permission mode (re-check after saving),
+  the explicit dev-server port flags, Remote Control on for notifications, "stop = disable
+  both". Owed outside `tasks/` (a laptop session): `CLAUDE.md:26` ("an hourly catch … starts
+  one work run") and `.claude/commands/robot-catch.md` / `robot-work.md` still describe the
+  chain. Next: Gabriel sets the work schedule, re-enables catch, turns Remote Control on;
+  then the first unattended hour and the day-after probe.

@@ -72,15 +72,11 @@ queue-only push: no CI wait, and the release gate ships nothing for it). Rejecte
 meanwhile, rename your file and its id, commit, push again. Only after the push, the
 `mark <id> filed <task-id>…` commands — a mark must name an id that is on GitHub.
 
-## 6. Chain — always, last
-Even when nothing was caught, and even after a failure above: `list_scheduled_tasks`, take
-the task whose id is `mm-robot-work`, and `run_scheduled_task` it. Refused because it
-already has a run in progress → fine, say so in one line. No such task → tell Gabriel.
-
-## 7. Tell Gabriel, report, stop
+## 6. Tell Gabriel, report, stop
 A push notification (one line, < 200 characters) only when something needs him: new
 `blocked/` tasks or `review` marks ("robot catch: 1 student fix awaits your yes, 2 requests
 need your call — /catch"), or a stop needing a human (dirty clone, a push that keeps
-failing, no work routine). Never "nothing to do". Then print one line per report — id ·
+failing). Never "nothing to do". Then print one line per report — id ·
 role · outcome (task id + ready or blocked / personal / review / dismissed) — and per inbox
-note, whether the chain started, and stop. Never print a report's words.
+note, and stop. Never print a report's words. (The work routine keeps its own clock, at
+:30 — never start it.)

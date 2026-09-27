@@ -1,4 +1,4 @@
-# ROBOT-WORK — the robot's work routine (started by the catch routine, or "Run now")
+# ROBOT-WORK — the robot's work routine (hourly at :30, or "Run now")
 
 You are one unattended run on the robot: Gabriel's always-on Mac, in the work clone
 `~/making-minds-robot` (`<repo>` below; setup: `START.md` §"The robot"). Nobody is watching
@@ -6,7 +6,8 @@ and nobody can answer. Do §1 first; then read `tasks/PROFILE.md` and `tasks/LOO
 (selection), §3 (the task workflow) and §4 (parking) — after the sync, so you read today's
 rules (re-read this file too if the sync changed it). This file overrides them where it
 differs. Work **exactly one task**, then release, then stop. Parking beats doing the wrong
-thing. "Stop" below means end the run there, skipping the release step, unless it names §4.6.
+thing. "Stop" below means end the run there, skipping the release step, unless it names §4.6 —
+and every stop but "another run is live" (§1) ends with `rmdir <repo>/.claude/robot-work.lock`.
 
 ## 0. Rules of this run
 - This clone only. Never read `~/making-minds-private/` (raw feedback): you work from the
@@ -19,6 +20,11 @@ thing. "Stop" below means end the run there, skipping the release step, unless i
 - One `mm-task` Workflow per run (≤ 8 agents) is your only multi-agent use (PROFILE §9).
 
 ## 1. Sync and check
+**The run lock, first**: a run can outlast the hour, and two in one clone would switch
+branches under each other. `mkdir <repo>/.claude/robot-work.lock` (gitignored). It exists →
+`find <repo>/.claude/robot-work.lock -maxdepth 0 -mmin -240`: prints it = another run is
+live — stop at once, silently (no notification, no release, its lock left alone); prints
+nothing = a run died holding it (> 4 h) — `rmdir` + `mkdir` it, say so in the report, go on.
 `git -C <repo> status --porcelain` must be empty (dirty = a run crashed mid-edit: tell
 Gabriel, stop). `git -C <repo> fetch origin --prune`; `git -C <repo> checkout main`;
 `git -C <repo> merge --ff-only origin/main`. If that fails because `main` is only *ahead*
@@ -94,4 +100,5 @@ A push notification — one line, cut to 200 characters — only for: the releas
 line; a park ("robot parked NNN: <first question>"); a stop that needs him (dirty or
 diverged clone, no Workflow tool, a failed release). Never routine progress or "nothing to
 do". Then print: task id + title, outcome (landed / unfinished / parked / nothing
-eligible), gates, the release verdict, owed checks. Leave the clone on `main`, clean. Stop.
+eligible), gates, the release verdict, owed checks. Leave the clone on `main`, clean;
+release the lock. Stop.

@@ -19,10 +19,12 @@ missing backups, a failed CI) — then it tells you once and you release by hand
 ## The robot
 
 Two scheduled routines in the Claude app on Gabriel's always-on Mac, each in its own clone:
-**catch** (hourly; `ROBOT-CATCH.md`) and **work** (no schedule; started by catch's last step
-or "Run now"; `ROBOT-WORK.md`). Two clones because a work run can outlast the hour: the
-next catch must never switch branches under it. Set it up once, with a Claude session on
-that Mac told "set up the robot using `tasks/START.md`" (task 043), Gabriel at hand:
+**catch** (hourly at :00; `ROBOT-CATCH.md`) and **work** (hourly at :30, after what catch
+filed; `ROBOT-WORK.md`). Each keeps its own clock: the app blocks `run_scheduled_task` in
+unattended runs, so a routine can't start another (043). Two clones because a work run can
+outlast the hour: the next catch must never switch branches under it; the next work run
+finds the first's lock and stops (`ROBOT-WORK.md` §1). Set it up once, with a Claude
+session on that Mac told "set up the robot using `tasks/START.md`" (task 043), Gabriel at hand:
 
 1. **Tools**: the Claude desktop app signed in as Gabriel; Node ≥ 22.5; git; `gh`.
    `gh auth login` (HTTPS) and `gh auth setup-git`, so both clones push as Gabriel.
@@ -35,33 +37,38 @@ that Mac told "set up the robot using `tasks/START.md`" (task 043), Gabriel at h
    `ssh/LightsailDefaultKey-us-west-2.pem` (`chmod 600`); into the catch clone
    `secrets/feedback.env` only. All gitignored.
 4. **The work clone's dev server**: create its gitignored `.claude/launch.json` with one
-   configuration, `"name": "Robot Dev Server"`, `npm run dev --prefix app`, port 5190.
+   configuration, `"name": "Robot Dev Server"`, `npm run dev --prefix app -- --port 5190
+   --strictPort`, port 5190.
 5. **Check the pieces by hand**, in a session in each clone: `node tasks/tools/feedback.mjs
    list --review` (catch: the credentials work); `deploy/release.sh --check` (work: ssh and
    the pilot API answer); `npm run check` in `app/` and `server/` (work: the gates run here).
-6. **The two routines** (the app's Scheduled tasks; model **Opus 5.5**; the permission mode
-   that runs without prompts):
-   - `mm-robot-work` — **no schedule**; working folder `~/making-minds-robot`; prompt:
+6. **The two routines** (the app's Scheduled tasks; model **Opus 5.5**; worktree off;
+   permission mode **Auto** — re-check it after saving: the app can leave it unset, and an
+   unset routine stalls on its first prompt):
+   - `mm-robot-work` — hourly, `30 * * * *`; working folder `~/making-minds-robot`; prompt:
      `Read tasks/PROFILE.md, then tasks/ROBOT-WORK.md, both in full, and follow
      ROBOT-WORK.md exactly: one task, then the release step, then stop.`
    - `mm-robot-catch` — hourly, `0 * * * *`; working folder `~/making-minds-robot-catch`;
      prompt: `Read tasks/PROFILE.md, then tasks/ROBOT-CATCH.md, both in full, and follow
-     ROBOT-CATCH.md exactly. Its last step always starts the mm-robot-work routine.`
-     The id `mm-robot-work` matters: the catch routine looks it up by that name.
+     ROBOT-CATCH.md exactly.`
 7. **Approvals**: "Run now" each routine once while watching and "always allow" every tool
-   it asks for (Bash, Read, Edit, Write, Glob, Grep, Workflow, the scheduled-tasks tools,
-   push notifications, the browser tools). Confirm, and write into 043's log: the Workflow
+   it asks for (Bash, Read, Edit, Write, Glob, Grep, Workflow, push notifications, the
+   browser tools). Confirm, and write into 043's log: the Workflow
    tool runs in a routine and the run waits for it; the browser pane works; a push
-   notification reaches the phone. Whatever doesn't, fix this recipe (and the prompts).
+   notification reaches the phone (the app withholds one while you're at the Mac: test it
+   away). Whatever doesn't, fix this recipe (and the prompts).
 8. **Always on**: the Claude app opens at login and stays open (routines run only while it
-   is); its keep-awake setting on; the Mac never sleeps (System Settings → Energy).
+   is); its keep-awake setting on; the Mac never sleeps (System Settings → Energy); Remote
+   Control on by default (Code settings) — without it a routine's push notification never
+   leaves the Mac ("Mobile push not sent (Remote Control inactive)", 043).
 9. **After a day**, the transcript probe, in `~/.claude/projects/*making-minds-robot*/*.jsonl`:
    the first assistant message's `usage` (input + cache_read + cache_creation) is the
    starting context — well under 100k; no `"subtype":"compact_boundary"` records (no
    compactions); no `isApiErrorMessage` records (limit errors). And no double claims or
    stuck rejected pushes between the laptop and the robot.
 
-**Stopping it**: disable `mm-robot-catch` in the app — the work routine then never starts.
+**Stopping it**: disable both routines in the app (catch alone stops filing; work alone
+stops landing).
 A run in flight finishes its task first. **Holding releases** without stopping it: the
 gate's rules in `deploy/release-gate.mjs` (hold list, hours, deadline freeze).
 
