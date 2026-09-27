@@ -8,9 +8,9 @@ requires:
 area: app
 source: audit
 created: 2026-09-25T10:35:00-07:00
-status: ready
+status: in-progress
 after: 2026-09-25-044
-branch:
+branch: robot/047-fsm-partial-transition-tables
 merged_into:
 ---
 
@@ -39,4 +39,41 @@ output 0?). Confirm with the textbook's own halting note (p. 100).
 ## Verify
 Gates; a pin grading the book's machine as drawn.
 
+- 2026-09-27 (robot, implement): app tsc + typecheck:tools + build + `npm run check` green;
+  server typecheck + `npm run check` green (parityCheck unchanged). notationCheck
+  `[partial tables — 047]` grades the p. 101 machine as drawn 9/9 on HW4 P3; caseRunCheck
+  replays a halting machine (store run HALTED, output so far ≡ recorded got).
+- **Owed (browser):** in an FSM question, a state missing an arrow shows the dashed amber halo
+  (tooltip on hover names the input) and the state table's HALT row reads amber; adding the
+  arrow clears both; nothing blocks Run/Submit.
+
 ## Progress log
+- 2026-09-27 (robot, implement): FSM Stage 1 now `'at-most-one'` (a missing arrow is allowed;
+  two arrows for one input stay an error); `caseRun.ts` no longer rejects a halted FSM run —
+  the steps taken are decoded, unreached steps read 0 by the codec. New pure
+  `notation.ts uncoveredInputs` → `store.ts selectFsmUncoveredInputs` (memoized) → a dashed
+  `C.warn` halo + tooltip on the state in `CircuitCanvas`, amber HALT rows in the state
+  table. The hw4-p3 reference fixture is now the book machine exactly (S₁ 1:1 dropped).
+  Scope note / possible follow-up: turbot FSM brains keep totality (`validateTurbotFSM`
+  'total') — an arena brain that halts has no "output so far" to grade; unchanged here.
+
+### 2026-09-27 — implemented (work loop)
+- **Built:** an FSM may now leave out arrows, as the textbook's do. A run reaching a state
+  with no arrow for the current input halts; the grader decodes the output so far (unreached
+  steps read 0), so a case fails only on a wrong output. Two arrows for one input stay a
+  Stage-1 error. The editor warns, never blocks: a dashed amber halo + tooltip on the state,
+  amber –/HALT rows in the state table. Turbot FSM brains keep totality (no warning shown
+  there — review fix).
+- **Pins:** notationCheck `[partial tables — 047]` (p. 101 book machine 9/9 on HW4 P3; a
+  machine halting in S₁ passes; S₁-less echo fails on output; two arrows stay Stage-1); the
+  arity block's missing-symbol case now graded not rejected; caseRunCheck replays a halting
+  machine (store HALTED ≡ recorded got) + missing-arrow warning pins (hw4-p3 warns S₀: [0];
+  turbot FSM brain with a gap warns nothing). hw4-p3 reference fixture = the book machine.
+- **Gates:** app-tsc 0, app-build 0, app-check 0, server-tsc 0, server-check 0.
+- **Review:** findings 1+2 fixed (`selectFsmUncoveredInputs` → empty in turbot mode); none
+  skipped. Nit left: `notation.ts uncoveredInputs` doc says the 'total' check shares it; it
+  doesn't.
+- **Owed (browser):** HW4 P3 in local mode — amber marker + tooltip on S₁, –/HALT row, Run 111
+  → 4; delete S₁ 0:0 → HALTED with output so far; Submit → 9/9; dark/light glance; sandbox FSM
+  tab warns likewise.
+- **Next step:** loop session: visual check if owed, then land per PROFILE §5.

@@ -270,12 +270,15 @@ export function runValidatedValueCase(
   } else {
     // FSM — feed the FULL encoded row per step as one input symbol: symbol
     // char i = input wire i (cc_spec declaration order = codec wire order).
-    // Stage 1 validated totality over this notation's whole alphabet, so a
-    // valid FSM cannot halt mid-run; guard anyway.
+    // A state with no arrow for the symbol read HALTS the run (textbook: "a
+    // machine halts in a given state, given an input, if there are no arrows
+    // leaving that state for that input"; Stage 1 allows it, task 047). The
+    // halt is not a rejection: `steps` holds only the steps taken, and the
+    // codec reads every unreached step as output 0 (timeOutputBits), so the
+    // output so far is decoded and the case fails only if it is wrong.
     const notation = fsmNotation(layout.inputWidths.length, layout.outputWidths.length);
     const symbols = enc.steps.map((s) => s.join(''));
     const r = evaluateFSMSymbolSequence(machine.components, machine.wires, symbols, notation);
-    if (r.halted) return { reason: 'machine halted before consuming the input' };
     raw = { axis: 'time', steps: r.outputs.map((sym) => sym.split('').map(Number)) };
   }
 

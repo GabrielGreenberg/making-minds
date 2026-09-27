@@ -70,6 +70,7 @@ export {
   turbotExternalNotation,
   inputCharTokens,
   validateTransitionTable,
+  uncoveredInputs,
 } from './notation';
 export type {
   TransitionNotation,

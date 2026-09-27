@@ -1,5 +1,5 @@
 import { useRef, useState, useCallback, useEffect, useMemo } from 'react';
-import { useStore, selectEffectiveMode, selectLiveFsmStateId, selectTransitionNotationForSource, selectPasteScope, selectShowUnboundBoxWarning } from '../store';
+import { useStore, selectEffectiveMode, selectLiveFsmStateId, selectFsmUncoveredInputs, selectTransitionNotationForSource, selectPasteScope, selectShowUnboundBoxWarning } from '../store';
 import { inputCharTokens, hasCombinationalLoop, memorySlots } from '../engine';
 import { usePasteGuard, useNotice } from '../usePasteGuard';
 import { CanvasActions } from './CanvasActions';
@@ -368,6 +368,11 @@ function CircuitComponentView({
   // whichever sim is active (FSM sim or a turbot arena run with an FSM
   // brain), never a direct read of one slice's field.
   const liveFsmStateId = useStore(selectLiveFsmStateId);
+  // The input symbols this state has no arrow for (plain FSM only — never a
+  // turbot brain, whose gaps the grader rejects; a stable array or undefined,
+  // the selector is memoized). Warn, don't block.
+  const uncoveredSymbols = useStore((s) =>
+    comp.type === 'STATE' ? selectFsmUncoveredInputs(s).get(comp.id) : undefined);
 
   const rot = comp.rotation ?? 0;
   const cx = comp.x + w / 2;
@@ -759,8 +764,23 @@ function CircuitComponentView({
         // states, so plain FSM/TM machines are unaffected.
         const isExternal = comp.stateKind === 'external';
         const stateFill = isCurrentState ? C.liveSoft : isSelected ? C.selectFill : C.surface;
+        // A missing arrow is allowed — the run halts there (textbook) — so it
+        // warns, never blocks: a faint dashed amber halo, like a wire's
+        // routing violation, with the halting rule in its tooltip.
+        const missingTitle = uncoveredSymbols && uncoveredSymbols.length > 0
+          ? `No arrow for input ${uncoveredSymbols.join(', ')} — the machine halts here if it reads ${uncoveredSymbols.length === 1 ? 'it' : 'one'}`
+          : null;
         return (
           <g>
+            {missingTitle && <title>{missingTitle}</title>}
+            {missingTitle && (
+              <circle
+                cx={cx} cy={cy} r={ringR + 5}
+                fill="none" stroke={C.warn} strokeWidth={4} strokeDasharray="4,6"
+                opacity={0.55} pointerEvents="none"
+                data-state-missing-arrow={comp.id}
+              />
+            )}
             {/* Outer ring — wire-creation zone affordance */}
             {isExternal ? (
               <rect

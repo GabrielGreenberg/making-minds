@@ -38,7 +38,7 @@ export interface ParsedTransition { input: string; outputs: string[] } // '10' �
 export interface OutputField { name: string; tokens: string[]; width: number }
 export interface TransitionNotation {
   id: 'fsm' | 'tm-dual' | 'turbot-fsm' | 'turbot-internal' | 'turbot-external';
-  inputAlphabet: string[];      // FULL enumeration — drives totality validation AND editor tokens
+  inputAlphabet: string[];      // FULL enumeration — drives table validation, missing-arrow warnings AND editor tokens
   inputWidth: number;
   outputFields: OutputField[];  // FSM: 1; TM dual: [write, move] (mirrors editor's rightSubField)
   defaultLabel: string;
@@ -72,7 +72,8 @@ is the single answer to "is this turbot-FSM label legal" for grader AND store, w
 2. **Engine flip:** `fsm.ts` gains `evaluateFSMSymbolStep/Sequence` (match on
    `parse(label).input === inputSymbol`); legacy `evaluateFSMSingleStep/Sequence` become
    `fsmNotation(1,1)` wrappers, signatures unchanged. `machineValidation.ts` FSM branch →
-   `validateTransitionTable(..., 'total')` over 2^kIn symbols; delete `fsmInputBit`; explicit cap
+   `validateTransitionTable(..., 'total')` over 2^kIn symbols (task 047 relaxed it to
+   `'at-most-one'`: a missing arrow halts the run, as in the textbook); delete `fsmInputBit`; explicit cap
    `kIn > 3 → { ok:false }` (nothing silently degrades). `grader.ts:138-143` feeds
    `enc.steps.map(s => s.join(''))`. **Footgun dies twice** (grader feed + Stage-1 arity totality).
 3. **Store/UI flip:** store FSM question-run feed joins the full row (kills the store.ts:3088
