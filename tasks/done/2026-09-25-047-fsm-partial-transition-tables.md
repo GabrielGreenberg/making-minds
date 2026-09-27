@@ -8,9 +8,9 @@ requires:
 area: app
 source: audit
 created: 2026-09-25T10:35:00-07:00
-status: in-progress
+status: done
 after: 2026-09-25-044
-branch: robot/047-fsm-partial-transition-tables
+branch:
 merged_into:
 ---
 
@@ -77,3 +77,9 @@ Gates; a pin grading the book's machine as drawn.
   → 4; delete S₁ 0:0 → HALTED with output so far; Submit → 9/9; dark/light glance; sandbox FSM
   tab warns likewise.
 - **Next step:** loop session: visual check if owed, then land per PROFILE §5.
+
+### 2026-09-27 — landed (robot)
+- The doc-comment nit fixed (`uncoveredInputs` — the editor's warning reads it). Merged
+  `origin/main` (nothing new); the workflow's gates stand.
+- **Owed, not claimed (browser):** the recipe above — HW4 P3 amber marker/tooltip, –/HALT
+  rows, Run 111 → 4, halting run, Submit 9/9, dark/light, sandbox FSM tab.
