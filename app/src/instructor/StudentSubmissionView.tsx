@@ -6,11 +6,12 @@ import { gradingStore, submissionStore } from '../storage/backend';
 import type { AttemptDetail, GradeWriteOutcome, GradingRow } from '../storage/gradingStore';
 import type { Route } from '../routing';
 import { hashLink } from '../components/PageShell';
-import { formatDateTime, formatDuration, lateBy } from '../dueDates';
+import { formatDateTime, formatDueDate, formatDuration, lateBy, lateLabel } from '../dueDates';
 import { useAsyncValue } from '../useAsyncValue';
 import { halfCreditProblem, pointsLabel, type ProblemScore, type Score } from '../engine/score';
 import { GradeValue } from './GradingParts';
 import { adjacentStudents, OFF_ROSTER_LABEL } from './gradingViews';
+import { LateAdjustControls } from './LateAdjustControls';
 
 /**
  * One student's submission on an assignment — the matrix row's page (task
@@ -82,19 +83,50 @@ export function StudentSubmissionView({ route }: { route: Extract<Route, { kind:
       </div>
 
       {!row.latest || !detail ? (
-        <p className="mm-empty">{row.grade.missing ? 'Missing — nothing submitted by the due date.' : 'Nothing submitted yet.'}</p>
+        <>
+          <p className="gr-subline">
+            <span className="mm-label">Due</span>
+            {row.extendedTo ? `${formatDueDate(row.extendedTo)} (extended)` : assignment.dueDate ? formatDueDate(assignment.dueDate) : 'no due date'}
+            <LateAdjustControls
+              assignmentId={id}
+              studentKey={student}
+              assignmentDue={assignment.dueDate}
+              extendedTo={row.extendedTo}
+              canWaive={false}
+              onChanged={reload}
+            />
+          </p>
+          <p className="mm-empty">{row.grade.missing ? 'Missing — nothing submitted by the due date.' : 'Nothing submitted yet.'}</p>
+        </>
       ) : (
         <>
           <div className="gr-header">
             <p className="gr-subline">
               <span className="mm-label">Counting attempt</span> #{detail.record.attempt}, {formatDateTime(detail.record.submittedAt)}
-              <LateLine assignment={assignment} submittedAt={detail.record.submittedAt} late={detail.score.late} />
+              <LateLine assignment={assignment} due={detail.due} submittedAt={detail.record.submittedAt} late={detail.score.late} />
               {' · '}grade <b><GradeValue value={detail.score.final} provisional={detail.score.provisional} /></b> / 100
               {row.latest.stale && <span className="mm-warn"> · graded against an older version</span>}
               {' · '}
               <a className="mm-link" {...hashLink(viewerRoute(id, student, detail.record.attempt, 0))}>
                 Open in viewer →
               </a>
+            </p>
+            <p className="gr-subline">
+              <span className="mm-label">Due</span>
+              {detail.extension
+                ? `${formatDueDate(detail.extension.dueDate)} (extended from ${assignment.dueDate ? formatDueDate(assignment.dueDate) : 'no due date'})`
+                : assignment.dueDate
+                  ? formatDueDate(assignment.dueDate)
+                  : 'no due date'}
+              {detail.waiver && ` · ${detail.waiver.points} late point${detail.waiver.points === 1 ? '' : 's'} waived${detail.waiver.note ? ` — ${detail.waiver.note}` : ''}`}
+              <LateAdjustControls
+                assignmentId={id}
+                studentKey={student}
+                assignmentDue={assignment.dueDate}
+                extendedTo={detail.extension?.dueDate}
+                waiver={detail.waiver}
+                onChanged={reload}
+              />
             </p>
             {detail.record.attempt > 1 && (
               <p className="gr-subline">
@@ -149,31 +181,25 @@ function StudentLink({ id, row, label }: { id: string; row: GradingRow | null; l
   );
 }
 
-/** "· late by …" next to a submission time — the score's priced late units
- *  and deduction (net of a waiver) once the course calendar prices lateness
- *  (task 068); until then the plain lateness, never a silent −5. Nothing when
- *  on time / no due date. */
+/** "· late by 2 class meetings: −15; 5 waived" next to a submission time —
+ *  the score's price against the student's EFFECTIVE due date (`due`: their
+ *  extension, else the assignment's; task 068). Without a course calendar
+ *  the plain lateness, never a silent −5. Nothing when on time / no due date. */
 function LateLine({
   assignment,
+  due,
   submittedAt,
   late,
 }: {
   assignment: AssignmentData;
+  due: string | undefined;
   submittedAt: string;
   late: Score['late'];
 }) {
-  if (!assignment.dueDate) return null;
-  const ms = lateBy(assignment.dueDate, submittedAt);
+  if (!due) return null;
+  const ms = lateBy(due, submittedAt);
   if (ms === 0) return null;
-  if (late?.late) {
-    const net = late.deduction - late.waived;
-    return (
-      <span className="instructor-late">
-        {' '}· late by {late.units} unit{late.units === 1 ? '' : 's'}: −{net}
-        {late.waived > 0 && ` (${late.waived} waived)`}
-      </span>
-    );
-  }
+  if (late?.late) return <span className="instructor-late"> · {lateLabel(late, assignment.latePolicy)}</span>;
   return <span className="instructor-late"> · late by {formatDuration(ms)}</span>;
 }
 
@@ -197,7 +223,7 @@ function EarlierAttemptBody({ assignment, studentKey, attempt }: { assignment: A
     <>
       <p className="gr-subline">
         {formatDateTime(detail.record.submittedAt)}
-        <LateLine assignment={assignment} submittedAt={detail.record.submittedAt} late={detail.score.late} />
+        <LateLine assignment={assignment} due={detail.due} submittedAt={detail.record.submittedAt} late={detail.score.late} />
         {' · '}would grade <GradeValue value={detail.score.final} provisional={detail.score.provisional} />
         {' · '}
         <a className="mm-link" {...hashLink(viewerRoute(assignment.id, studentKey, attempt, 0))}>

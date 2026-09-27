@@ -25,6 +25,9 @@ import { questionModeLabel } from '../types';
 import { getAssignment } from '../assignments';
 import { problemVerdict, describeCaseInput } from '../gradeDisplay';
 import { formatGrade, scoreRecord } from '../engine/score';
+import { dueInput } from '../lateContext';
+import { COURSE_CALENDAR } from '../courseCalendar';
+import { lateLabel } from '../dueDates';
 import { recordedCaseSeparations } from '../engine/caseRun';
 import { useAsyncValue } from '../useAsyncValue';
 import { navigate } from '../routing';
@@ -119,7 +122,11 @@ export function GradeSheet({ assignmentId, record }: { assignmentId: string; rec
 
   const byId = new Map((record.result?.questions ?? []).map((q) => [q.questionId, q]));
   const questions = assignment?.questions ?? [];
-  const score = assignment && record.result ? scoreRecord(questions, record, Date.now()) : null;
+  // The served copy's due date is the student's effective one (task 068).
+  const score =
+    assignment && record.result
+      ? scoreRecord(questions, record, Date.now(), dueInput(assignment, { waived: record.lateWaived }, COURSE_CALENDAR))
+      : null;
   const problem = (id: number) => score?.problems.find((p) => p.questionId === id);
   const pending = score ? score.problems.filter((p) => p.points === null).length : 0;
 
@@ -189,6 +196,7 @@ export function GradeSheet({ assignmentId, record }: { assignmentId: string; rec
           <>
             <b>Grade {formatGrade(score.final)} / 100</b> — {formatGrade(score.earned)} of {score.available}{' '}
             point{score.available === 1 ? '' : 's'}, scaled as 40 + 60 × {formatGrade(score.earned)}/{score.available}.
+            {score.late?.late && ` Before the late deduction ${formatGrade(score.raw ?? 0)}; ${lateLabel(score.late, assignment?.latePolicy)}.`}
             {pending > 0 && ` ${pending} problem${pending === 1 ? '' : 's'} still awaiting review — the grade may rise.`}{' '}
           </>
         )}

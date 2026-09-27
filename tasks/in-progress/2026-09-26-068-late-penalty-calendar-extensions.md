@@ -58,3 +58,49 @@ Gates; browser: a toy late submission shows the deduction; an extension moves th
 date on the student's Home; a waiver reduces it.
 
 ## Progress log
+- 2026-09-27 (robot, implement): the calendar is course data with one source —
+  `engine/calendar.ts` (`importCourseCalendar`, DST-correct `toCourseCalendar`), CLI
+  `npm run calendar -- import|show`, the committed `devData/courseCalendar.json` (20 meetings:
+  19 lessons + the 10-29 midterm; no 11-11 / 11-26 / 12-09), bundled as `COURSE_CALENDAR`,
+  synced into `course_settings.calendar` by `homeworks.ts syncCalendar` (homeworks CLI `sync`
+  / `status` dry run, `seed --homeworks`). `lateContext.ts`: `dueInput` (extension ?? date;
+  policy + waiver only with a calendar — no calendar, no deduction) and `studentCopy` (served
+  date + `dueExtended`, students only). `gradingSummary.ts dueFor(…, LateContext)` threads
+  through all four builders (rows gain `extendedTo` / `waived`; attempt detail `due`,
+  `extension`, `waiver`). Owned fields: `countsTowardGrade` / `latePolicy` (HW6 per-day, HW7
+  false; content hashes of hw1–hw7 unchanged), filled only on an unchanged copy. Tables
+  `extensions` / `late_waivers` (+ PUT routes, `planExtensionWrite` / `planWaiverWrite`,
+  logged as `extension` / `waiver` events with no questionId); local mirror
+  `storage/lateLocal.ts`. UI: editor late policy + counts checkbox, `LateAdjustControls` on the
+  submission page and the interim student page, `(extended)` on Home / overview, the sheet's
+  late line, the submit dialog's warning. Pins: dueDateCheck, scoreCheck [real calendar],
+  pipelineCheck [local extensions/waivers], gradingCheck (line-286 pin flipped; [extensions &
+  waivers]), homeworkSyncCheck [owned fields] [calendar], remoteStoreCheck. Gates green.
+  Owed (browser): a toy late submission shows the deduction; an extension moves the due date
+  on the student's Home; a waiver reduces it.
+
+### 2026-09-27 — implemented (work loop)
+- **Built:** late work now costs what the syllabus says. The course calendar (lecture
+  meetings) is imported from the website into `devData/courseCalendar.json`, bundled locally
+  and synced to the server on release; `scoreSubmission` counts class meetings past the
+  (extension-aware) due date. Instructors can grant a per-student **Extension…** or **Waive…**
+  points on the submission page and the interim student page; students see "Due … (extended)",
+  freezing follows the extended date, the submit dialog warns of the cost, and released sheets
+  show "late by N class meetings: −X; Y waived". HW6 is `per-day`, HW7 doesn't count; both
+  owned fields are editable in the assignment editor.
+- **Pins:** dueDateCheck [calendar import] (fixture, unknown-zone rejection), scoreCheck
+  [real calendar] (HW1/HW2/HW4 dates, Sunday 23:59 LA incl. post-DST, deduction pins),
+  pipelineCheck [local extensions/waivers], gradingCheck (units/deduction pin flipped;
+  [extensions & waivers], incl. removeAssignment clearing them), homeworkSyncCheck [owned
+  fields] [calendar], remoteStoreCheck.
+- **Gates:** app-tsc 0, app-build 0, app-check 0, server-tsc 0, server-check 0.
+- **Review fixed:** sync fills an edited copy's unset owned fields (still 'edited', logged
+  "set from the repo"); scoreCheck covers HW2/HW4 + DST; server removeAssignment deletes
+  extensions/waivers; calendar import rejects unknown IANA zones. Skipped: none. Nit left:
+  CLAUDE.md Dev/sample row still lists only `order`/`dueDate` as hash-excluded.
+- **Owed:** browser checks (local: late submit deduction in dialog/matrix/page, extension
+  moves Home due date + unfreezes, waiver nets, HW7 dimmed, HW6 'per day'; remote: served copy
+  carries extended date, instructor editor keeps the original). To Gabriel after release:
+  `npm run homeworks -- status` on the box; set HW6/HW7 owned fields by hand if 'edited';
+  rerun `npm run calendar -- import` whenever the website's course.json changes.
+- **NEXT STEP:** loop session: visual check if owed, then land per PROFILE §5.

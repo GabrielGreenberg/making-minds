@@ -37,6 +37,13 @@
 //                  sizes), snapshotted ONCE, on the
 //                  boot that creates the table; the integrity check reads it
 //                  as "legacy", not unbound
+//   course_settings — course-level data as JSON by key; today `calendar`,
+//                  the class meetings the late policy counts, written by the
+//                  release's homework sync from the repo (task 068)
+//   extensions / late_waivers — one student's own due date / late points
+//                  waived on one assignment (task 068); every change logged
+//                  in grade_events. An extension has no reason column, by
+//                  design (memo grading-interface.md §9)
 //   (submissions.integrity — the provenance check computed on receipt,
 //                  instructor-only; see app.ts and sanitize.ts)
 
@@ -53,6 +60,8 @@ import type {
   PlatformFeedback,
   GradeEvent,
   HumanGrade,
+  LateExtension,
+  LateWaiver,
   SubmissionData,
   SubmissionIntegrity,
   SubmissionRecord,
@@ -63,6 +72,8 @@ import { normalizeEmail, normalizeUid } from './roster';
 import { idsOfWorkbook } from '../../app/src/provenance/ids';
 import { legacyGradesByStudent } from '../../app/src/storage/gradeWrites';
 import { saveSummary, type LegacyContent, type SaveSummary } from '../../app/src/provenance/integrity';
+import { isCourseCalendarFile, toCourseCalendar } from '../../app/src/engine/calendar';
+import type { CourseCalendar } from '../../app/src/engine/score';
 
 export interface UserRow {
   /** The account's key: the email it was first rostered under. */
@@ -269,6 +280,32 @@ export class Db {
       );
       CREATE INDEX IF NOT EXISTS idx_workbook_saves
         ON workbook_saves (email, assignment_id, id);
+      -- Course-level settings (task 068): JSON by key — \`calendar\`, synced
+      -- from the repo by every release (server/src/homeworks.ts syncCalendar).
+      CREATE TABLE IF NOT EXISTS course_settings (
+        key   TEXT PRIMARY KEY,
+        value TEXT NOT NULL
+      );
+      -- A student's own due date on an assignment (their effective one). No
+      -- reason column, by design: accommodation details stay off the platform.
+      CREATE TABLE IF NOT EXISTS extensions (
+        assignment_id TEXT NOT NULL,
+        email         TEXT NOT NULL,
+        due_date      TEXT NOT NULL,
+        set_by        TEXT NOT NULL,
+        set_at        TEXT NOT NULL,
+        PRIMARY KEY (assignment_id, email)
+      );
+      -- Late points waived for a student on an assignment (never below 0).
+      CREATE TABLE IF NOT EXISTS late_waivers (
+        assignment_id TEXT NOT NULL,
+        email         TEXT NOT NULL,
+        points        INTEGER NOT NULL,
+        note          TEXT,
+        waived_by     TEXT NOT NULL,
+        waived_at     TEXT NOT NULL,
+        PRIMARY KEY (assignment_id, email)
+      );
       CREATE TABLE IF NOT EXISTS legacy_content (
         email         TEXT NOT NULL,
         assignment_id TEXT NOT NULL,
@@ -619,6 +656,84 @@ export class Db {
         .prepare('SELECT event FROM grade_events WHERE assignment_id = ? ORDER BY id')
         .all(assignmentId) as unknown as { event: string }[]
     ).map((r) => JSON.parse(r.event) as GradeEvent);
+  }
+
+  // ── late policy (task 068) ───────────────────────────────────────
+
+  getCourseSetting(key: string): unknown {
+    const row = this.db.prepare('SELECT value FROM course_settings WHERE key = ?').get(key) as unknown as { value: string } | undefined;
+    if (!row) return undefined;
+    try {
+      return JSON.parse(row.value) as unknown;
+    } catch {
+      return undefined;
+    }
+  }
+
+  setCourseSetting(key: string, value: unknown): void {
+    this.db
+      .prepare('INSERT INTO course_settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value')
+      .run(key, JSON.stringify(value));
+  }
+
+  /** The class meetings the late policy counts; undefined until a sync has
+   *  written a calendar (then no deduction is computed, never a silent −5). */
+  courseCalendar(): CourseCalendar | undefined {
+    const file = this.getCourseSetting('calendar');
+    return isCourseCalendarFile(file) ? toCourseCalendar(file) : undefined;
+  }
+
+  /** One assignment's extensions, by account email. */
+  listExtensions(assignmentId: string): Map<string, LateExtension> {
+    const rows = this.db
+      .prepare('SELECT email, due_date, set_by, set_at FROM extensions WHERE assignment_id = ?')
+      .all(assignmentId) as unknown as { email: string; due_date: string; set_by: string; set_at: string }[];
+    return new Map(rows.map((r) => [r.email, { dueDate: r.due_date, setBy: r.set_by, setAt: r.set_at }]));
+  }
+
+  getExtension(assignmentId: string, email: string): LateExtension | null {
+    return this.listExtensions(assignmentId).get(email) ?? null;
+  }
+
+  /** Set (value) or remove (null) one extension. */
+  putExtension(assignmentId: string, email: string, value: LateExtension | null): void {
+    if (!value) {
+      this.db.prepare('DELETE FROM extensions WHERE assignment_id = ? AND email = ?').run(assignmentId, email);
+      return;
+    }
+    this.db
+      .prepare(
+        `INSERT INTO extensions (assignment_id, email, due_date, set_by, set_at) VALUES (?, ?, ?, ?, ?)
+         ON CONFLICT(assignment_id, email) DO UPDATE SET due_date = excluded.due_date, set_by = excluded.set_by, set_at = excluded.set_at`,
+      )
+      .run(assignmentId, email, value.dueDate, value.setBy, value.setAt);
+  }
+
+  /** One assignment's late waivers, by account email. */
+  listWaivers(assignmentId: string): Map<string, LateWaiver> {
+    const rows = this.db
+      .prepare('SELECT email, points, note, waived_by, waived_at FROM late_waivers WHERE assignment_id = ?')
+      .all(assignmentId) as unknown as { email: string; points: number; note: string | null; waived_by: string; waived_at: string }[];
+    return new Map(rows.map((r) => [r.email, { points: r.points, ...(r.note ? { note: r.note } : {}), by: r.waived_by, at: r.waived_at }]));
+  }
+
+  getWaiver(assignmentId: string, email: string): LateWaiver | null {
+    return this.listWaivers(assignmentId).get(email) ?? null;
+  }
+
+  /** Set (value) or remove (null) one waiver. */
+  putWaiver(assignmentId: string, email: string, value: LateWaiver | null): void {
+    if (!value) {
+      this.db.prepare('DELETE FROM late_waivers WHERE assignment_id = ? AND email = ?').run(assignmentId, email);
+      return;
+    }
+    this.db
+      .prepare(
+        `INSERT INTO late_waivers (assignment_id, email, points, note, waived_by, waived_at) VALUES (?, ?, ?, ?, ?, ?)
+         ON CONFLICT(assignment_id, email) DO UPDATE SET points = excluded.points, note = excluded.note,
+           waived_by = excluded.waived_by, waived_at = excluded.waived_at`,
+      )
+      .run(assignmentId, email, value.points, value.note ?? null, value.by, value.at);
   }
 
   /** Does any attempt exist for this assignment? (Removing one would orphan them.) */
@@ -1112,8 +1227,20 @@ export class Db {
       .run(id, hash, new Date().toISOString());
   }
 
+  /** Remove an assignment and its per-student late adjustments (extensions,
+   *  waivers) — as local mode does — so a copy re-added under the same id
+   *  (e.g. by the homework sync) never inherits a stale extension. */
   removeAssignment(id: string): void {
-    this.db.prepare('DELETE FROM assignments WHERE id = ?').run(id);
+    this.db.exec('BEGIN');
+    try {
+      this.db.prepare('DELETE FROM extensions WHERE assignment_id = ?').run(id);
+      this.db.prepare('DELETE FROM late_waivers WHERE assignment_id = ?').run(id);
+      this.db.prepare('DELETE FROM assignments WHERE id = ?').run(id);
+      this.db.exec('COMMIT');
+    } catch (e) {
+      this.db.exec('ROLLBACK');
+      throw e;
+    }
   }
 
   // Grade release is a per-assignment flag OUTSIDE the AssignmentData JSON —

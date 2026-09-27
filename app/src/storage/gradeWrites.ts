@@ -12,6 +12,8 @@ import type {
   AssignmentQuestion,
   GradeEvent,
   HumanGrade,
+  LateExtension,
+  LateWaiver,
   Points,
   SubmissionRecord,
 } from '../types';
@@ -123,5 +125,77 @@ export function studentGrade(g: HumanGrade): HumanGrade {
     ...(g.note ? { note: g.note } : {}),
     answerKey: g.answerKey,
     gradedAt: g.gradedAt,
+  };
+}
+
+// ── Extensions and waivers (task 068; memo §4.6–§4.7) ──────────────────
+// Assignment-level, per student: set or clear, each logged as one event
+// with no questionId. Both backends persist the plan and nothing else.
+
+export type LateWritePlan<T> =
+  | { ok: true; value: T | null; event: GradeEvent }
+  | { ok: false; error: string };
+
+/** A due date as an extension takes it: a parseable instant, stored as ISO. */
+function isoInstant(x: unknown): string | null {
+  if (typeof x !== 'string' || !x.trim()) return null;
+  const ms = Date.parse(x);
+  return Number.isFinite(ms) ? new Date(ms).toISOString() : null;
+}
+
+/** Set (`dueDate`) or clear (null) one student's extension. No reason field,
+ *  by design (memo §9: accommodation details stay out of the platform). */
+export function planExtensionWrite(input: {
+  existing: LateExtension | null;
+  dueDate: unknown;
+  student: string;
+  actor: string;
+  now: string;
+}): LateWritePlan<LateExtension> {
+  const { existing } = input;
+  let value: LateExtension | null = null;
+  if (input.dueDate !== null) {
+    const at = isoInstant(input.dueDate);
+    if (!at) return { ok: false, error: 'the extension must be a date and time (or null to clear it)' };
+    value = { dueDate: at, setBy: input.actor, setAt: input.now };
+  } else if (!existing) {
+    return { ok: false, error: 'this student has no extension to clear' };
+  }
+  return {
+    ok: true,
+    value,
+    event: { at: input.now, actor: input.actor, student: input.student, kind: 'extension', before: existing, after: value },
+  };
+}
+
+/** Largest waiver: the whole of any deduction the grade could carry. */
+export const MAX_WAIVER = 100;
+
+/** Set ({points, note?}) or clear (null) one student's late waiver: a whole
+ *  number of points, 1…100 (the score caps it at the actual deduction). */
+export function planWaiverWrite(input: {
+  existing: LateWaiver | null;
+  write: { points: unknown; note?: unknown } | null;
+  student: string;
+  actor: string;
+  now: string;
+}): LateWritePlan<LateWaiver> {
+  const { existing, write } = input;
+  let value: LateWaiver | null = null;
+  if (write) {
+    const { points, note } = write;
+    if (typeof points !== 'number' || !Number.isInteger(points) || points < 1 || points > MAX_WAIVER) {
+      return { ok: false, error: `a waiver is a whole number of points, 1 to ${MAX_WAIVER}` };
+    }
+    if (note !== undefined && typeof note !== 'string') return { ok: false, error: 'the note must be text' };
+    const text = (note as string | undefined)?.trim();
+    value = { points, ...(text ? { note: text } : {}), by: input.actor, at: input.now };
+  } else if (!existing) {
+    return { ok: false, error: 'this student has no waiver to clear' };
+  }
+  return {
+    ok: true,
+    value,
+    event: { at: input.now, actor: input.actor, student: input.student, kind: 'waiver', before: existing, after: value },
   };
 }

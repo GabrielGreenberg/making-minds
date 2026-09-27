@@ -1,8 +1,10 @@
 // The one Submit dialog (task 062). Every place a student submits — a Home
 // row, the assignment's document page, the editor's top bar — opens this,
 // so what a student is told before submitting (the snapshot, "only your most
-// recent submission is graded", the integrity sentence: provenance/notice.ts)
-// and how a failure is reported can't drift between them. It also carries
+// recent submission is graded", the integrity sentence: provenance/notice.ts;
+// past the student's effective due date, what submitting now costs:
+// dueDates.ts submitLateWarning, task 068) and how a failure is reported
+// can't drift between them. It also carries
 // the optional group listing: up to two classmates from the roster, names
 // only (memo docs/buildout/designs/grading-interface.md §6.7).
 //
@@ -17,7 +19,9 @@ import { submissionStore } from '../storage/backend';
 import { useAsyncValue } from '../useAsyncValue';
 import { submitConfirmMessage } from '../provenance/notice';
 import { MAX_GROUP_OTHERS, SubmitRefused } from '../submissionGroup';
-import type { Classmate, SubmissionRecord } from '../types';
+import { submitLateWarning } from '../dueDates';
+import { COURSE_CALENDAR } from '../courseCalendar';
+import type { AssignmentData, Classmate, SubmissionRecord } from '../types';
 
 type Phase =
   | { kind: 'confirm'; error?: string }
@@ -25,19 +29,32 @@ type Phase =
   | { kind: 'done'; record: SubmissionRecord };
 
 export function SubmitDialog({
-  assignmentId,
-  title,
+  assignment,
   saved = false,
   onClose,
 }: {
-  assignmentId: string;
-  title: string;
+  /** The assignment as served to this student — its `dueDate` is their
+   *  effective one (an extension, task 068). */
+  assignment: Pick<AssignmentData, 'id' | 'title' | 'dueDate' | 'latePolicy'>;
   /** Submitting from outside the editor records the SAVED work (a Home row). */
   saved?: boolean;
   onClose: () => void;
 }) {
+  const { id: assignmentId, title } = assignment;
   const submitAssignment = useStore((s) => s.submitAssignment);
   const lastGroup = useStore((s) => s.submissions[assignmentId]?.submission.group);
+  const lastSubmittedAt = useStore((s) => s.submissions[assignmentId]?.submittedAt ?? null);
+  // Past the effective due date: what submitting now costs, and whether it
+  // unseats an on-time attempt (only the latest counts). Read once, on open.
+  const [lateWarning] = useState(() =>
+    submitLateWarning({
+      now: Date.now(),
+      dueDate: assignment.dueDate,
+      policy: assignment.latePolicy,
+      calendar: COURSE_CALENDAR,
+      previousSubmittedAt: lastSubmittedAt,
+    }),
+  );
   const classmates = useAsyncValue(() => submissionStore.listClassmates(), []);
   const [members, setMembers] = useState<string[]>(() => Array(MAX_GROUP_OTHERS).fill(''));
   const [phase, setPhase] = useState<Phase>({ kind: 'confirm' });
@@ -123,6 +140,7 @@ export function SubmitDialog({
             {submitConfirmMessage(title, { saved }).split('\n\n').map((para, i) => (
               <p key={i} className="mm-note submit-para">{para}</p>
             ))}
+            {lateWarning && <p className="mm-warn submit-para">{lateWarning}</p>}
             <GroupPicker
               classmates={roster}
               loading={classmates.loading}

@@ -24,7 +24,11 @@
 // students refused, a second instructor sees the first's claim by name and
 // cannot take it, a release clears it; [queue 409] two graders read the same
 // version, the second write is refused with the first's grade, nothing logged
-// for it.
+// for it. And the late policy (task 068): [summary] a synced calendar prices
+// lateness (units, −5 − 5·units); [extensions & waivers] the two PUT routes —
+// 400 / 404 / 403, an extension moves the row on time and the STUDENT's
+// served copy (never the instructor's), a waiver nets the deduction, both
+// logged without a questionId, a released record carries `lateWaived` only.
 
 import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -48,6 +52,7 @@ import type {
   StudentGrading,
 } from '../../app/src/storage/gradingSummary';
 import { assignmentSummary } from '../src/gradingSummary';
+import { syncCalendar } from '../src/homeworks';
 
 let failures = 0;
 function check(label: string, ok: boolean, detail?: string) {
@@ -134,8 +139,9 @@ const events = db.listGradeEvents(SAMPLE_ASSIGNMENT_ID);
 check('every change is logged, in order: grade, grade, override, clear',
   events.map((e) => e.kind).join() === 'grade,grade,override,clear' &&
   events.every((e) => e.actor === instructor.email.toLowerCase() && e.student === email));
-check('…each with what it was before and after', events[1].before?.version === 1 && events[1].after?.version === 2 &&
-  events[3].after === null && events[3].before?.points === 0.5);
+const graded = (x: GradeEvent['before']) => x as HumanGrade | null;
+check('…each with what it was before and after', graded(events[1].before)?.version === 1 && graded(events[1].after)?.version === 2 &&
+  events[3].after === null && graded(events[3].before)?.points === 0.5);
 check('refused and conflicting writes are not logged', events.length === 4);
 const dbSource = readFileSync(new URL('../src/db.ts', import.meta.url), 'utf8');
 check('the log is append-only: db.ts never updates or deletes a grade_events row',
@@ -258,6 +264,11 @@ console.log('[migration]');
   db2.removeUser(LEAVER);
   await submit(i2Tok, buildCorrectSubmission(instructor.email).answers);
 
+  // A fixture calendar (task 068), UTC: two meetings that ended between
+  // asg2's due date (2026-01-01) and now, and one far ahead.
+  const meeting = (date: string) => ({ date, start: '12:30', end: '13:45', kind: 'lesson' as const });
+  db2.setCourseSetting('calendar', { timezone: 'UTC', meetings: [meeting('2026-01-06'), meeting('2026-01-08'), meeting('2099-01-06')] });
+
   console.log('[summary]');
   const getSummary = async () => (await call<AssignmentGradingSummary>('GET', `${u2}/summary`, { token: i2Tok })).json;
   const s1 = await getSummary();
@@ -283,9 +294,9 @@ console.log('[migration]');
       const codes = [...new Set(johnLatest.integrity?.questions.find((q) => q.questionId === asg2.questions[i].id)?.flags.map((f) => f.code) ?? [])];
       return JSON.stringify(p.flags ?? []) === JSON.stringify(codes);
     }));
-  check('a submission past the due date is late (units and deduction wait for the calendar, task 068)',
-    johnRow.latest?.late.late === true && johnRow.latest.late.units === null && johnRow.latest.late.deduction === null &&
-      s1.progress.late === 1);
+  check('a submission past the due date is late, priced by the synced calendar: 2 meetings ended since → −15 (task 068)',
+    johnRow.latest?.late.late === true && johnRow.latest.late.units === 2 && johnRow.latest.late.deduction === 15 &&
+      s1.progress.late === 1, JSON.stringify(johnRow.latest?.late));
   check('a submitter removed from the roster is flagged, under an opaque derived key',
     !!leaverRow && leaverRow.latest?.attempt === 1 && !leaverRow.student.key.includes('@') && leaverRow.student.key.startsWith('x') &&
       leaverRow.student.key !== db2.publicIdOf(LEAVER));
@@ -406,6 +417,9 @@ console.log('[migration]');
 
   console.log('[local ≡ remote]');
   {
+    // Local mode prices lateness with the bundled calendar; give the server
+    // the same one, the way a release does (homeworks.ts syncCalendar).
+    syncCalendar(db2);
     // The local GradingStore over the same records: localStorage shimmed
     // BEFORE the app's storage modules load (the harness resolves to local).
     const mem = new Map<string, string>();
@@ -559,6 +573,99 @@ console.log('[migration]');
     const ncRow = (await call<CourseGrading>('GET', '/grading', { token: i2Tok })).json.assignments.find((a) => a.id === 'not-counted');
     check('countsTowardGrade: false carried to the summary and the /grading row',
       nc.countsTowardGrade === false && ncRow?.countsTowardGrade === false, JSON.stringify(ncRow));
+    const bad = async (body: unknown) => (await call('PUT', u2, { token: i2Tok, body })).status;
+    check('PUT /assignments/:id refuses a latePolicy or countsTowardGrade outside their values',
+      (await bad({ ...asg2, latePolicy: 'weekly' })) === 400 && (await bad({ ...asg2, countsTowardGrade: 'no' })) === 400 &&
+        (await bad({ ...asg2, latePolicy: 'per-day', countsTowardGrade: true })) === 200);
+    await bad({ ...asg2, dueExtended: true });
+    check('…and never stores the served-only dueExtended', db2.getAssignment(asg2.id)?.dueExtended === undefined);
+    db2.saveAssignment(asg2);
+  }
+
+  console.log('[extensions & waivers]');
+  {
+    // The server holds the committed calendar here ([local ≡ remote] synced it).
+    const extPath = (sid: string) => `${u2}/students/${sid}/extension`;
+    const waivePath = (sid: string) => `${u2}/students/${sid}/waiver`;
+    const rowOf = async () => (await getSummary()).rows.find((r) => r.student.key === johnKey)!;
+    const before = await rowOf();
+    const gross = before.latest!.late.deduction!;
+    check('before: John is late, priced by the calendar', before.latest?.late.late === true && gross >= 5 && gross % 5 === 0, JSON.stringify(before.latest));
+    const statuses = await Promise.all([
+      call('PUT', extPath(johnKey), { token: i2Tok, body: {} }),
+      call('PUT', extPath(johnKey), { token: i2Tok, body: { dueDate: 'not a date' } }),
+      call('PUT', extPath(johnKey), { token: i2Tok, body: { dueDate: 5 } }),
+      call('PUT', waivePath(johnKey), { token: i2Tok, body: {} }),
+      call('PUT', waivePath(johnKey), { token: i2Tok, body: { points: 0 } }),
+      call('PUT', waivePath(johnKey), { token: i2Tok, body: { points: 2.5 } }),
+      call('PUT', waivePath(johnKey), { token: i2Tok, body: { points: 5, note: 7 } }),
+    ].map(async (p) => (await p).status));
+    check('bad bodies → 400', statuses.every((st) => st === 400), JSON.stringify(statuses));
+    check('an unknown student or assignment → 404',
+      (await call('PUT', extPath('nobody'), { token: i2Tok, body: { dueDate: '2099-01-01T00:00:00Z' } })).status === 404 &&
+        (await call('PUT', `/assignments/nope/students/${johnKey}/waiver`, { token: i2Tok, body: { points: 5 } })).status === 404);
+    check('students are refused (403)',
+      (await call('PUT', extPath(johnKey), { token: jTok, body: { dueDate: '2099-01-01T00:00:00Z' } })).status === 403 &&
+        (await call('PUT', waivePath(johnKey), { token: jTok, body: { points: 5 } })).status === 403);
+
+    const ext = await call<{ extension: { dueDate: string } }>('PUT', extPath(johnKey), { token: i2Tok, body: { dueDate: '2099-01-01T08:00:00Z' } });
+    const after = await rowOf();
+    check('an extension: stored as ISO, and the row is on time against it (no units, no deduction)',
+      ext.status === 200 && ext.json.extension.dueDate === '2099-01-01T08:00:00.000Z' && after.extendedTo === '2099-01-01T08:00:00.000Z' &&
+        after.latest?.late.late === false && after.latest.late.units === null && after.latest.late.deduction === null,
+      JSON.stringify([ext.status, ext.json, after.latest]));
+    db2.setVisible(asg2.id, true);
+    const studentList = (await call<{ assignments: { id: string; dueDate?: string; dueExtended?: true }[] }>('GET', '/assignments', { token: jTok })).json.assignments.find((a) => a.id === asg2.id);
+    const studentOne = (await call<{ assignment: AssignmentData }>('GET', u2, { token: jTok })).json.assignment;
+    const instList = (await call<{ assignments: { id: string; dueDate?: string; dueExtended?: true }[] }>('GET', '/assignments', { token: i2Tok })).json.assignments.find((a) => a.id === asg2.id);
+    const instOne = (await call<{ assignment: AssignmentData }>('GET', u2, { token: i2Tok })).json.assignment;
+    check("the student's list row and copy carry their extended due date, marked dueExtended",
+      studentList?.dueDate === '2099-01-01T08:00:00.000Z' && studentList.dueExtended === true &&
+        studentOne.dueDate === '2099-01-01T08:00:00.000Z' && studentOne.dueExtended === true, JSON.stringify(studentList));
+    check("…and still no answers (the overlay adds a date, nothing else)", studentOne.questions.every((q) => (q.test_cases ?? []).length === 0));
+    check("the instructor's copy is the stored one: the original due date, no dueExtended",
+      instList !== undefined && instList.dueDate === asg2.dueDate && !('dueExtended' in instList) && instOne.dueDate === asg2.dueDate && !('dueExtended' in instOne));
+    const cleared = await call('PUT', extPath(johnKey), { token: i2Tok, body: { dueDate: null } });
+    const again = await call('PUT', extPath(johnKey), { token: i2Tok, body: { dueDate: null } });
+    check('clearing an extension restores the assignment date; clearing nothing is a 400',
+      cleared.status === 200 && (await rowOf()).latest?.late.deduction === gross && !('extendedTo' in (await rowOf())) && again.status === 400);
+
+    const w = await call<{ waiver: { points: number; note?: string } }>('PUT', waivePath(johnKey), { token: i2Tok, body: { points: 5, note: ' asked in office hours ' } });
+    const waived = await rowOf();
+    check('a waiver nets the deduction (never below 0), and the row names its points',
+      w.status === 200 && w.json.waiver.points === 5 && w.json.waiver.note === 'asked in office hours' &&
+        waived.latest?.late.deduction === gross - 5 && waived.waived === 5, JSON.stringify(waived.latest));
+    const detail = (await call<AttemptDetail>('GET', `${u2}/submissions/${johnKey}/${waived.latest!.attempt}`, { token: i2Tok })).json;
+    check('the attempt detail carries the effective due date and the waiver in full',
+      detail.due === asg2.dueDate && detail.waiver?.points === 5 && detail.waiver.note === 'asked in office hours' &&
+        detail.score.late?.waived === 5 && detail.extension === undefined);
+    const lateEvents = db2.listGradeEvents(asg2.id).filter((e) => e.kind === 'extension' || e.kind === 'waiver');
+    check('every set and clear is logged: extension, extension, waiver — no questionId, the instructor as actor',
+      lateEvents.map((e) => e.kind).join() === 'extension,extension,waiver' &&
+        lateEvents.every((e) => e.questionId === undefined && e.student === johnEmail && e.actor === instructor.email.toLowerCase()) &&
+        lateEvents[1].after === null, JSON.stringify(lateEvents.map((e) => e.kind)));
+
+    type Rec = SubmissionRecord & { lateWaived?: number };
+    const own = async () => (await call<{ records: Rec[] }>('GET', `${u2}/submissions`, { token: jTok })).json.records;
+    check('before release the student sees no waiver', (await own()).every((r) => r.lateWaived === undefined));
+    db2.setGradesReleased(asg2.id, true);
+    const released = await own();
+    check('after release their records carry lateWaived — the points only, never the note or who gave it',
+      released.length > 0 && released.every((r) => r.lateWaived === 5) && !/office hours/.test(JSON.stringify(released)));
+    db2.setGradesReleased(asg2.id, false);
+    db2.setVisible(asg2.id, false);
+
+    // Removing an assignment takes its extensions and waivers with it (as
+    // local mode does): a copy re-added under the same id starts clean.
+    const gone = { ...asg2, id: 'gone-068' };
+    db2.saveAssignment(gone);
+    db2.putExtension(gone.id, johnEmail, { dueDate: '2099-01-01T08:00:00.000Z', setBy: 'x', setAt: '2026-09-27T00:00:00.000Z' });
+    db2.putWaiver(gone.id, johnEmail, { points: 5, by: 'x', at: '2026-09-27T00:00:00.000Z' });
+    db2.removeAssignment(gone.id);
+    db2.saveAssignment(gone);
+    check('removing an assignment drops its extensions and waivers; a re-added copy has none',
+      db2.getExtension(gone.id, johnEmail) === null && db2.getWaiver(gone.id, johnEmail) === null && db2.listExtensions(gone.id).size === 0);
+    db2.removeAssignment(gone.id);
   }
   server2.close();
   db2.close();

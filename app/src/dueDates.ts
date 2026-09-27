@@ -19,6 +19,8 @@
 // freeze — so they can keep editing and submit late exactly as before; the
 // moment they do, THAT submission is what freezes their view from then on.
 
+import { lateDeduction, type CourseCalendar, type LatePolicy } from './engine/score';
+
 /** "Due soon" horizon: less than this long until the deadline turns the badge amber. */
 export const DUE_SOON_MS = 3 * 24 * 60 * 60 * 1000; // 3 days
 
@@ -81,6 +83,17 @@ export function formatDueDate(iso: string): string {
   );
 }
 
+/** ISO timestamp → the local wall-clock "YYYY-MM-DDTHH:MM" a datetime-local
+ *  input wants (the assignment editor's due date, the extension dialog). */
+export function toLocalInputValue(iso: string): string {
+  const d = new Date(iso);
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return (
+    `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}` +
+    `T${pad(d.getHours())}:${pad(d.getMinutes())}`
+  );
+}
+
 /** A submitted-at stamp in the catalog's short form, e.g. "Sep 20, 4:12 PM". */
 export function formatDateTime(iso: string): string {
   return formatDueDate(iso);
@@ -94,4 +107,43 @@ export function formatDueDay(iso: string): string {
     ', ' +
     d.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })
   );
+}
+
+/** A late deduction in words (task 068) — "late by 2 class meetings: −15; 5
+ *  waived", "late by 3 days: −20", or "late: −5" when no meeting (or full
+ *  day) has passed yet. The deduction shown is the policy's; a waiver is
+ *  named beside it. */
+export function lateLabel(
+  late: { units: number; deduction: number; waived?: number },
+  policy: LatePolicy = 'per-meeting',
+): string {
+  const unit = policy === 'per-day' ? 'day' : 'class meeting';
+  const by = late.units > 0 ? ` by ${late.units} ${unit}${late.units === 1 ? '' : 's'}` : '';
+  return `late${by}: −${late.deduction}${late.waived ? `; ${late.waived} waived` : ''}`;
+}
+
+/**
+ * What the submit dialog says past the student's effective due date (task
+ * 068): the cost of submitting now, and — when their latest attempt was on
+ * time — that it will stop counting (only the latest attempt is graded).
+ * null when submitting now is on time or there is no due date.
+ */
+export function submitLateWarning(input: {
+  now: number;
+  dueDate: string | undefined;
+  policy?: LatePolicy;
+  calendar?: CourseCalendar;
+  previousSubmittedAt?: string | null;
+}): string | null {
+  const { dueDate } = input;
+  if (!dueDate) return null;
+  const policy = input.policy ?? 'per-meeting';
+  const late = lateDeduction(new Date(input.now).toISOString(), dueDate, policy, input.calendar);
+  if (!late.late) return null;
+  const earlier =
+    input.previousSubmittedAt && Date.parse(input.previousSubmittedAt) <= Date.parse(dueDate)
+      ? ' Your earlier on-time submission will no longer count.'
+      : '';
+  const priced = input.calendar || policy === 'per-day' ? lateLabel(late, policy) : 'late';
+  return `Submitting now is ${priced}.${earlier}`;
 }

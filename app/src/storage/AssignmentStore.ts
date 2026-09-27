@@ -29,9 +29,18 @@
 // publishes it — absent means hidden, on both backends, for every assignment
 // including the seeded ones. Students see an empty catalog until
 // something is released, which is the point.
+//
+// A STUDENT'S EXTENSION (task 068) is served the same way on both backends:
+// a student's copy carries their effective due date as `dueDate` (marked
+// `dueExtended`), so Home, the overview and the freeze follow it with no
+// client logic (lateContext.ts studentCopy). Never an instructor's copy —
+// the editor saves that one back.
 
 import type { AssignmentData } from '../types';
 import type { AssignmentSummary } from '../assignments';
+import { readPersistedAccount } from '../auth/accounts';
+import { studentCopy } from '../lateContext';
+import { readExtensions } from './lateLocal';
 
 export const ASSIGNMENT_HAS_SUBMISSIONS = 'students have submitted this assignment — hide it instead of deleting it';
 
@@ -113,24 +122,35 @@ class LocalAssignmentStore implements AssignmentStore {
     }
   }
 
+  /** The signed-in toy account's own copy: a student's carries their
+   *  extension (the server's GET rule); anyone else's is the stored one. */
+  private served<T extends Pick<AssignmentData, 'dueDate'>>(id: string, a: T): T & { dueExtended?: true } {
+    const account = readPersistedAccount();
+    if (account?.role !== 'student') return a;
+    return studentCopy(a, readExtensions(id)[account.email.toLowerCase()]);
+  }
+
   async list(): Promise<AssignmentSummary[]> {
     return this.ids()
       .map((id) => this.read(id))
       .filter((a): a is AssignmentData => a != null)
-      .map((a) => ({
-        id: a.id,
-        title: a.title,
-        questionCount: a.questions.length,
-        gradesReleased: this.readReleased(a.id),
-        visible: this.readVisible(a.id),
-        dueDate: a.dueDate,
-        order: a.order,
-      }));
+      .map((a) =>
+        this.served(a.id, {
+          id: a.id,
+          title: a.title,
+          questionCount: a.questions.length,
+          gradesReleased: this.readReleased(a.id),
+          visible: this.readVisible(a.id),
+          dueDate: a.dueDate,
+          order: a.order,
+          ...(a.latePolicy ? { latePolicy: a.latePolicy } : {}),
+        }),
+      );
   }
 
   async get(id: string): Promise<{ assignment: AssignmentData; gradesReleased: boolean } | null> {
     const assignment = this.read(id);
-    return assignment ? { assignment, gradesReleased: this.readReleased(id) } : null;
+    return assignment ? { assignment: this.served(id, assignment), gradesReleased: this.readReleased(id) } : null;
   }
 
   async save(assignment: AssignmentData): Promise<void> {
