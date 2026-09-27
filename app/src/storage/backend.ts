@@ -43,6 +43,6 @@ export const submissionStore: SubmissionStore = remote
   : localSubmissionStore;
 export const gradingStore: GradingStore = remote
   ? remoteGradingStore
-  : new LocalGradingStore(localSubmissionStore);
+  : new LocalGradingStore(localSubmissionStore, localAssignmentStore);
 export const feedbackStore: FeedbackStore = remote ? remoteFeedbackStore : localFeedbackStore;
 export const notesStore: NotesStore = remote ? remoteNotesStore : localNotesStore;

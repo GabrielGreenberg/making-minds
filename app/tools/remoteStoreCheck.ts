@@ -326,6 +326,14 @@ check("an override with no note: the server's 400 is the seam's refusal, with th
 const conflict = await remoteGradingStore.setGrade(SAMPLE_ASSIGNMENT_ID, sKey, openQ.id, { points: 0, version: null });
 check("a stale version: the 409 is the seam's conflict, carrying the current grade",
   !conflict.ok && conflict.conflict && conflict.current?.version === 1);
+// The grading summary through the seam (task 064): the server's builder, one
+// row per roster student, the hand grade in its cell.
+const summary = await remoteGradingStore.summary(SAMPLE_ASSIGNMENT_ID);
+const sRow = summary?.rows.find((r) => r.student.key === sKey);
+check('remoteGradingStore.summary: the roster-joined rows, the hand grade in place, an unknown id → null',
+  !!summary && summary.progress.roster === TOY_ACCOUNTS.filter((a) => a.role === 'student').length &&
+    sRow?.latest?.attempt === 2 && sRow.problems[summary.questionIds.indexOf(openQ.id)]?.source === 'human' &&
+    (await remoteGradingStore.summary('no-such-assignment')) === null);
 check('the gradebook read carries the grade in full',
   (await remoteSubmissionStore.listAll(SAMPLE_ASSIGNMENT_ID)).some((r) => r.grades?.[0]?.version === 1));
 

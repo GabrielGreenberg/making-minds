@@ -10,10 +10,38 @@
 // decision. Local: the local SubmissionStore persists (it owns the records a
 // grade is anchored to). Remote: the server's grade routes. Both run the ONE
 // planner, storage/gradeWrites.ts.
+//
+// And where grading is READ in bulk (task 064): the summaries every grading
+// view and the Activity tab share — one roster join, one score — built by
+// the ONE pure builder, storage/gradingSummary.ts. Local: over the local
+// SubmissionStore's records and the toy roster. Remote: the server's summary
+// routes, which run the same builder over the Db.
 
-import type { HumanGrade, Points } from '../types';
-import { readPersistedAccount } from '../auth/accounts';
+import type { AssignmentData, HumanGrade, Points, SubmissionRecord } from '../types';
+import { readPersistedAccount, TOY_ACCOUNTS } from '../auth/accounts';
 import type { localSubmissionStore } from './submissionStore';
+import type { AssignmentStore } from './AssignmentStore';
+import {
+  buildAssignmentSummary,
+  buildAttemptDetail,
+  buildCourseGrading,
+  buildStudentGrading,
+  type AssignmentGradingSummary,
+  type AttemptDetail,
+  type CourseGrading,
+  type GradingIdentity,
+  type StudentGrading,
+} from './gradingSummary';
+
+export type {
+  AssignmentGradingSummary,
+  AttemptDetail,
+  CourseGrading,
+  GradingIdentity,
+  GradingProgress,
+  GradingRow,
+  StudentGrading,
+} from './gradingSummary';
 
 /** How a write came out. A conflict carries the grade someone else wrote
  *  since it was read (null = they cleared it); a refusal carries a reason. */
@@ -37,13 +65,56 @@ export interface GradingStore {
   ): Promise<GradeWriteOutcome>;
   /** Clear one grade — the problem is the autograde's (or pending) again. */
   clearGrade(assignmentId: string, studentKey: string, questionId: number, version: number): Promise<GradeWriteOutcome>;
+  /** One assignment's shared summary: a row per roster student (submitted or
+   *  not) and per other submitter (flagged), latest attempt only, no
+   *  circuits. null = no such assignment. Instructor-only. */
+  summary(assignmentId: string): Promise<AssignmentGradingSummary | null>;
+  /** Every assignment's progress + course-wide counts (the Grading tab). */
+  course(): Promise<CourseGrading>;
+  /** One student (by `GradingIdentity.key`) across assignments; null = unknown key. */
+  student(studentKey: string): Promise<StudentGrading | null>;
+  /** One attempt in full, on demand; null = no such assignment, student or attempt. */
+  attempt(assignmentId: string, studentKey: string, attempt: number): Promise<AttemptDetail | null>;
+}
+
+/** The toy roster: its students, keyed as local records are (the email). */
+function localRoster(): GradingIdentity[] {
+  return TOY_ACCOUNTS.filter((a) => a.role === 'student').map((a) => localIdentity(a.email));
+}
+
+/** Who a local key (an email) is: a toy student, a toy instructor (flagged),
+ *  or nobody on the toy roster (a dev seed's made-up student, flagged). */
+function localIdentity(key: string): GradingIdentity {
+  const account = TOY_ACCOUNTS.find((a) => a.email.toLowerCase() === key);
+  const name = account?.name ?? 'Not on the roster';
+  return {
+    key,
+    name,
+    sortName: name,
+    uid: '',
+    section: null,
+    hasAccount: true,
+    ...(account?.role === 'student' ? {} : { offRoster: account ? ('instructor' as const) : ('not-rostered' as const) }),
+  };
+}
+
+/** Each student's latest attempt (records carry `studentKey` from listAll). */
+function latestPerStudent(all: readonly SubmissionRecord[]): SubmissionRecord[] {
+  const byKey = new Map<string, SubmissionRecord>();
+  for (const r of all) {
+    const prev = byKey.get(r.studentKey ?? '');
+    if (!prev || r.attempt > prev.attempt) byKey.set(r.studentKey ?? '', r);
+  }
+  return [...byKey.values()];
 }
 
 export class LocalGradingStore implements GradingStore {
   private readonly subs: typeof localSubmissionStore;
+  private readonly assignments: AssignmentStore;
 
-  constructor(subs: typeof localSubmissionStore) {
+  constructor(subs: typeof localSubmissionStore, assignments: AssignmentStore) {
     this.subs = subs;
+    this.assignments = assignments;
   }
 
   /** Locally the grader is the signed-in toy account. */
@@ -64,5 +135,66 @@ export class LocalGradingStore implements GradingStore {
   async clearGrade(assignmentId: string, studentKey: string, questionId: number, version: number): Promise<GradeWriteOutcome> {
     const plan = await this.subs.applyGradeWrite(assignmentId, studentKey, questionId, { clear: true, version }, this.actor());
     return plan.ok ? { ok: true, grade: null } : plan;
+  }
+
+  private async summaryOf(assignment: AssignmentData, released: boolean, now: number): Promise<AssignmentGradingSummary> {
+    return buildAssignmentSummary({
+      assignment,
+      roster: localRoster(),
+      latest: latestPerStudent(await this.subs.listAll(assignment.id)),
+      identify: localIdentity,
+      released,
+      now,
+    });
+  }
+
+  async summary(assignmentId: string): Promise<AssignmentGradingSummary | null> {
+    const got = await this.assignments.get(assignmentId);
+    return got ? this.summaryOf(got.assignment, got.gradesReleased, Date.now()) : null;
+  }
+
+  async course(): Promise<CourseGrading> {
+    const now = Date.now();
+    const rows = await this.assignments.list();
+    const assignments = [];
+    for (const row of rows) {
+      const got = await this.assignments.get(row.id);
+      if (!got) continue;
+      assignments.push({
+        summary: await this.summaryOf(got.assignment, got.gradesReleased, now),
+        ...(got.assignment.order !== undefined ? { order: got.assignment.order } : {}),
+        visible: row.visible,
+      });
+    }
+    return buildCourseGrading({ roster: localRoster(), assignments });
+  }
+
+  async student(studentKey: string): Promise<StudentGrading | null> {
+    const now = Date.now();
+    const assignments: { assignment: AssignmentData; released: boolean; latest: SubmissionRecord | null }[] = [];
+    let seen = TOY_ACCOUNTS.some((a) => a.email.toLowerCase() === studentKey);
+    for (const row of await this.assignments.list()) {
+      const got = await this.assignments.get(row.id);
+      if (!got) continue;
+      const mine = (await this.subs.listAll(row.id)).filter((r) => r.studentKey === studentKey);
+      if (mine.length) seen = true;
+      assignments.push({ assignment: got.assignment, released: got.gradesReleased, latest: latestPerStudent(mine)[0] ?? null });
+    }
+    return seen ? buildStudentGrading({ student: localIdentity(studentKey), assignments, now }) : null;
+  }
+
+  async attempt(assignmentId: string, studentKey: string, attempt: number): Promise<AttemptDetail | null> {
+    const got = await this.assignments.get(assignmentId);
+    const record = got
+      ? (await this.subs.listAll(assignmentId)).find((r) => r.studentKey === studentKey && r.attempt === attempt)
+      : undefined;
+    if (!got || !record) return null;
+    return buildAttemptDetail({
+      assignment: got.assignment,
+      student: localIdentity(studentKey),
+      record,
+      events: this.subs.gradeLog(assignmentId).filter((e) => e.student === studentKey),
+      now: Date.now(),
+    });
   }
 }

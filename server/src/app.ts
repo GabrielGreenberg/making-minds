@@ -39,6 +39,20 @@
 //   GET    /api/assignments/:id/submissions/all
 //                                              instructor: every student's attempts,
 //                                              full detail (the gradebook feed)
+//   GET    /api/assignments/:id/summary       instructor: the shared grading summary (task
+//                                              064) — a row per roster student ∪ flagged
+//                                              other submitters: latest-attempt meta,
+//                                              points per problem, grade; progress. No circuits
+//   GET    /api/assignments/:id/submissions/:sid/:attempt
+//                                              instructor: one attempt in full (circuits,
+//                                              expected/got, integrity, grades, the log)
+//   GET    /api/grading                        instructor: every assignment's progress +
+//                                              course-wide counts
+//   GET    /api/students/:sid                  instructor: one student across assignments
+//   PUT    /api/assignments/:id/grades/:sid/:qid
+//   DELETE /api/assignments/:id/grades/:sid/:qid
+//                                              instructor: write / clear one human grade
+//                                              (task 063; :sid = the opaque key)
 //   POST   /api/assignments/:id/submissions/:attempt/review
 //                                              instructor: manual verdict on a pending
 //                                              open question — {student, questionId,
@@ -87,6 +101,7 @@ import { isEmail, normalizeEmail, normalizeUid } from './roster';
 import { matchAccount, placeRosterEntry } from './identity';
 import { importRosterCsv } from './rosterImport';
 import { stripAnswers, studentRecord } from './sanitize';
+import { assignmentSummary, attemptDetail, courseGrading, studentEmailOf, studentGrading } from './gradingSummary';
 import { checkGroup } from '../../app/src/submissionGroup';
 
 export function createApp(config: ServerConfig, db: Db) {
@@ -695,17 +710,57 @@ export function createApp(config: ServerConfig, db: Db) {
     });
   });
 
+  // ── grading summaries (instructor; task 064) ────────────────────
+  // What the grading views read instead of every attempt in full: one pure
+  // builder (app/src/storage/gradingSummary.ts) over the roster and each
+  // student's latest attempt (server/src/gradingSummary.ts gathers them).
+  // Students are named by opaque keys, never an email or UID.
+  app.get('/api/grading', auth, requireInstructor, (_req, res) => {
+    res.json(courseGrading(db, mintSecret, Date.now()));
+  });
+
+  app.get('/api/assignments/:id/summary', auth, requireInstructor, (req, res) => {
+    const summary = assignmentSummary(db, mintSecret, String(req.params.id), Date.now());
+    if (!summary) {
+      res.status(404).json({ error: 'unknown assignment' });
+      return;
+    }
+    res.json(summary);
+  });
+
+  app.get('/api/students/:sid', auth, requireInstructor, (req, res) => {
+    const student = studentGrading(db, mintSecret, String(req.params.sid), Date.now());
+    if (!student) {
+      res.status(404).json({ error: 'no such student' });
+      return;
+    }
+    res.json(student);
+  });
+
+  app.get('/api/assignments/:id/submissions/:sid/:attempt', auth, requireInstructor, (req, res) => {
+    const detail = attemptDetail(
+      db, mintSecret, String(req.params.id), String(req.params.sid), Number(req.params.attempt), Date.now(),
+    );
+    if (!detail) {
+      res.status(404).json({ error: 'no such assignment, student or attempt' });
+      return;
+    }
+    res.json(detail);
+  });
+
   // ── human grades (instructor; task 063) ─────────────────────────
   // One grade — a hand grade, or an override of the autograde (note
   // required) — on a student's LATEST attempt, planned by the SAME pure
   // planGradeWrite the local GradingStore uses (app/src/storage/gradeWrites.ts):
   // the server is the other implementation of one contract. The student is
-  // named by their opaque key (users.public_id), never an email. A stale
+  // named by their opaque key (users.public_id, or a removed submitter's
+  // derived key — gradingSummary.ts studentEmailOf), never an email. A stale
   // `version` is a 409 carrying the current grade; every write is logged.
   const gradeRoute = (req: Request, res: Response, write: GradeWrite) => {
     const assignmentId = String(req.params.id);
     const assignment = db.getAssignment(assignmentId);
-    const email = db.emailOfPublicId(String(req.params.sid));
+    // Any key a summary row carries, a removed submitter's derived one too.
+    const email = studentEmailOf(db, mintSecret, String(req.params.sid));
     const question = assignment?.questions.find((q) => q.id === Number(req.params.qid));
     if (!assignment || !email || !question) {
       res.status(404).json({ error: 'no such assignment, student or question' });

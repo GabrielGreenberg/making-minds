@@ -10,6 +10,7 @@
 
 import type { AssignmentData } from '../types';
 import { assignmentStore } from '../storage/backend';
+import { sortAssignments } from '../assignmentOrder';
 
 export interface AssignmentSummary {
   id: string;
@@ -25,18 +26,8 @@ export interface AssignmentSummary {
   order?: number;
 }
 
-/** The order the catalog and the dashboard both list assignments in: the
- *  instructor's chosen positions first, in ascending order, then everything
- *  that has never been moved, alphabetically. Pure, so both backends and the
- *  headless checks agree. */
-export function sortAssignments<T extends { title: string; order?: number }>(rows: T[]): T[] {
-  return rows.slice().sort((a, b) => {
-    const ao = a.order ?? Number.POSITIVE_INFINITY;
-    const bo = b.order ?? Number.POSITIVE_INFINITY;
-    if (ao !== bo) return ao - bo;
-    return a.title.localeCompare(b.title);
-  });
-}
+// The ordering rule lives in a pure module the server imports too (task 064).
+export { sortAssignments };
 
 /** Lightweight list for a catalog/home/dashboard screen — no question
  *  details — in the instructor's chosen order (see sortAssignments). */

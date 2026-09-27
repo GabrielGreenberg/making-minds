@@ -44,7 +44,14 @@ import type { AssignmentSummary } from '../assignments';
 import type { WorkbookStore } from './workbookStore';
 import type { AssignmentStore } from './AssignmentStore';
 import type { SubmissionStore } from './submissionStore';
-import type { GradingStore, GradeWriteOutcome } from './gradingStore';
+import type {
+  AssignmentGradingSummary,
+  AttemptDetail,
+  CourseGrading,
+  GradingStore,
+  GradeWriteOutcome,
+  StudentGrading,
+} from './gradingStore';
 import type { FeedbackStore } from './feedbackStore';
 import type { Role } from '../auth/accounts';
 import type { NotesStore } from './NotesStore';
@@ -66,6 +73,10 @@ import {
   listAllSubmissions as apiListAllSubmissions,
   putGrade,
   deleteGrade,
+  getGradingSummary,
+  getCourseGrading,
+  getStudentGrading,
+  getGradingAttempt,
   submitFeedback,
   listFeedback,
   setFeedbackStatus,
@@ -211,6 +222,33 @@ class RemoteGradingStore implements GradingStore {
       await deleteGrade(assignmentId, studentKey, questionId, version);
       return null;
     });
+  }
+
+  // The summaries are the server's (the same builder over the Db, task 064);
+  // a 404 is the seam's null.
+  private async orNull<T>(read: () => Promise<T>): Promise<T | null> {
+    try {
+      return await read();
+    } catch (err) {
+      if (err instanceof ApiError && err.status === 404) return null;
+      throw err;
+    }
+  }
+
+  summary(assignmentId: string): Promise<AssignmentGradingSummary | null> {
+    return this.orNull(() => getGradingSummary(assignmentId));
+  }
+
+  course(): Promise<CourseGrading> {
+    return getCourseGrading();
+  }
+
+  student(studentKey: string): Promise<StudentGrading | null> {
+    return this.orNull(() => getStudentGrading(studentKey));
+  }
+
+  attempt(assignmentId: string, studentKey: string, attempt: number): Promise<AttemptDetail | null> {
+    return this.orNull(() => getGradingAttempt(assignmentId, studentKey, attempt));
   }
 }
 
