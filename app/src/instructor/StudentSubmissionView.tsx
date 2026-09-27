@@ -1,21 +1,27 @@
-import { useState } from 'react';
-import type { AssignmentData, HumanGrade, Points, SubmissionRecord } from '../types';
+import { useState, type ReactNode } from 'react';
+import type { AssignmentData, AssignmentQuestion, HumanGrade, Points, QuestionResult, SubmissionRecord } from '../types';
+import { questionTask } from '../types';
 import { getAssignment } from '../assignments';
 import { gradingStore, submissionStore } from '../storage/backend';
-import type { AttemptDetail, GradeWriteOutcome } from '../storage/gradingStore';
+import type { AttemptDetail, GradeWriteOutcome, GradingRow } from '../storage/gradingStore';
 import type { Route } from '../routing';
 import { hashLink } from '../components/PageShell';
 import { formatDateTime, formatDuration, lateBy } from '../dueDates';
 import { useAsyncValue } from '../useAsyncValue';
-import { pointsLabel, type ProblemScore } from '../engine/score';
+import { halfCreditProblem, pointsLabel, type ProblemScore, type Score } from '../engine/score';
 import { GradeValue } from './GradingParts';
+import { adjacentStudents, OFF_ROSTER_LABEL } from './gradingViews';
 
 /**
  * One student's submission on an assignment — the matrix row's page (task
- * 065, interim: task 067 builds the memo's §6.3 page here). The gradebook's
- * old per-student detail, moved: the counting attempt in full (per-case
- * failed inputs, open answers, integrity, group) with the 0 / ½ / 1 grade
- * controls, and the earlier attempts read-only on demand. Everything is read
+ * 067; memo grading-interface.md §6.3). The header: who (name, UID, section,
+ * account), the counting attempt (submitted, late, grade), the group, the
+ * integrity summary and the previous / next student in matrix order. Then
+ * every problem: the autograde in full (expected/got — instructor-only — and
+ * every case on demand), the ½ rule's count, **Run this input** / **Open in
+ * viewer** (the student's machine in the read-only editor, store
+ * openSubmissionOf), and the 0 · ½ · 1 points control on every problem of the
+ * counting attempt. Earlier attempts read-only on demand. Everything is read
  * through the GradingStore (the summary's row, then `attempt()` for one
  * attempt in full, scored by the shared builder) — no grade is computed here,
  * and a record with no autograde says so rather than grading on the fly.
@@ -49,15 +55,26 @@ export function StudentSubmissionView({ route }: { route: Extract<Route, { kind:
     );
   }
 
-  const { name, uid, section } = row.student;
+  const { name, uid, section, hasAccount, offRoster } = row.student;
+  const { prev, next } = adjacentStudents(summary, student);
+  const flagged = detail?.record.integrity?.questions.filter((q) => q.flags.length > 0).length;
   return (
     <div className="student-submission">
       <div className="mm-head">
-        {back}
+        <div className="gr-pager">
+          {back}
+          <span className="gr-pager-links">
+            <StudentLink id={id} row={prev} label="← Previous" />
+            <StudentLink id={id} row={next} label="Next →" />
+          </span>
+        </div>
         <h1>{name}</h1>
         <p className="mm-lede">
-          {[uid && `UID ${uid}`, section && `section ${section}`].filter(Boolean).join(' · ')}
-          {(uid || section) && ' · '}
+          {[uid && `UID ${uid}`, section && `section ${section}`, hasAccount ? 'account set up' : 'no account yet']
+            .filter(Boolean)
+            .join(' · ')}
+          {offRoster && <span className="tag gr-tag-gap">{OFF_ROSTER_LABEL[offRoster] ?? 'not on the roster'}</span>}
+          {' · '}
           <a className="mm-link" {...hashLink({ kind: 'instructor-student', student })}>
             All assignments →
           </a>
@@ -68,13 +85,37 @@ export function StudentSubmissionView({ route }: { route: Extract<Route, { kind:
         <p className="mm-empty">{row.grade.missing ? 'Missing — nothing submitted by the due date.' : 'Nothing submitted yet.'}</p>
       ) : (
         <>
-          <p className="gr-subline">
-            <span className="mm-label">Counting attempt</span> #{detail.record.attempt}, {formatDateTime(detail.record.submittedAt)}
-            <LateTag assignment={assignment} submittedAt={detail.record.submittedAt} />
-            {' · '}grade <b><GradeValue value={detail.score.final} provisional={detail.score.provisional} /></b> / 100
-            {row.latest.stale && <span className="mm-warn"> · graded against an older version</span>}
-          </p>
-          <SubmissionDetail detail={detail} isLatest assignment={assignment} onReviewed={reload} />
+          <div className="gr-header">
+            <p className="gr-subline">
+              <span className="mm-label">Counting attempt</span> #{detail.record.attempt}, {formatDateTime(detail.record.submittedAt)}
+              <LateLine assignment={assignment} submittedAt={detail.record.submittedAt} late={detail.score.late} />
+              {' · '}grade <b><GradeValue value={detail.score.final} provisional={detail.score.provisional} /></b> / 100
+              {row.latest.stale && <span className="mm-warn"> · graded against an older version</span>}
+              {' · '}
+              <a className="mm-link" {...hashLink(viewerRoute(id, student, detail.record.attempt, 0))}>
+                Open in viewer →
+              </a>
+            </p>
+            {detail.record.attempt > 1 && (
+              <p className="gr-subline">
+                <span className="mm-label">Older attempts</span> {detail.record.attempt - 1}, read-only below — only the latest counts.
+              </p>
+            )}
+            {detail.record.submission.group?.length ? <GroupLine keys={detail.record.submission.group} /> : null}
+            {flagged !== undefined && (
+              <p className="gr-subline">
+                <span className="mm-label">Integrity</span>{' '}
+                {flagged === 0 ? (
+                  'nothing to look at'
+                ) : (
+                  <button className="mm-link" onClick={() => document.getElementById('gr-integrity')?.scrollIntoView({ behavior: 'smooth' })}>
+                    {flagged} problem{flagged === 1 ? '' : 's'} to look at ↓
+                  </button>
+                )}
+              </p>
+            )}
+          </div>
+          <SubmissionDetail detail={detail} isLatest assignment={assignment} studentKey={student} onReviewed={reload} />
           {detail.record.attempt > 1 && (
             <section className="mm-section">
               <h2>Earlier attempts</h2>
@@ -90,11 +131,49 @@ export function StudentSubmissionView({ route }: { route: Extract<Route, { kind:
   );
 }
 
-/** "· late by …" next to a submission time, or nothing when on time / no due date. */
-function LateTag({ assignment, submittedAt }: { assignment: AssignmentData; submittedAt: string }) {
+/** The viewer route (task 067): `student`'s attempt in the read-only editor,
+ *  at a question, optionally with one graded case loaded. */
+function viewerRoute(id: string, student: string, attempt: number, questionIndex: number, caseIndex?: number): Route {
+  return caseIndex !== undefined
+    ? { kind: 'assignment', id, student, attempt, questionIndex, caseIndex }
+    : { kind: 'assignment', id, student, attempt, questionIndex };
+}
+
+/** Previous / next student in the matrix's order, or a dimmed label at an end. */
+function StudentLink({ id, row, label }: { id: string; row: GradingRow | null; label: string }) {
+  if (!row) return <span className="gr-pager-end">{label}</span>;
+  return (
+    <a className="mm-link" {...hashLink({ kind: 'instructor-grading-student', id, student: row.student.key })} title={row.student.name}>
+      {label}
+    </a>
+  );
+}
+
+/** "· late by …" next to a submission time — the score's priced late units
+ *  and deduction (net of a waiver) once the course calendar prices lateness
+ *  (task 068); until then the plain lateness, never a silent −5. Nothing when
+ *  on time / no due date. */
+function LateLine({
+  assignment,
+  submittedAt,
+  late,
+}: {
+  assignment: AssignmentData;
+  submittedAt: string;
+  late: Score['late'];
+}) {
   if (!assignment.dueDate) return null;
   const ms = lateBy(assignment.dueDate, submittedAt);
   if (ms === 0) return null;
+  if (late?.late) {
+    const net = late.deduction - late.waived;
+    return (
+      <span className="instructor-late">
+        {' '}· late by {late.units} unit{late.units === 1 ? '' : 's'}: −{net}
+        {late.waived > 0 && ` (${late.waived} waived)`}
+      </span>
+    );
+  }
   return <span className="instructor-late"> · late by {formatDuration(ms)}</span>;
 }
 
@@ -118,10 +197,14 @@ function EarlierAttemptBody({ assignment, studentKey, attempt }: { assignment: A
     <>
       <p className="gr-subline">
         {formatDateTime(detail.record.submittedAt)}
-        <LateTag assignment={assignment} submittedAt={detail.record.submittedAt} />
+        <LateLine assignment={assignment} submittedAt={detail.record.submittedAt} late={detail.score.late} />
         {' · '}would grade <GradeValue value={detail.score.final} provisional={detail.score.provisional} />
+        {' · '}
+        <a className="mm-link" {...hashLink(viewerRoute(assignment.id, studentKey, attempt, 0))}>
+          Open in viewer →
+        </a>
       </p>
-      <SubmissionDetail detail={detail} isLatest={false} assignment={assignment} onReviewed={() => {}} />
+      <SubmissionDetail detail={detail} isLatest={false} assignment={assignment} studentKey={studentKey} onReviewed={() => {}} />
     </>
   );
 }
@@ -162,12 +245,15 @@ function SubmissionDetail({
   detail,
   isLatest,
   assignment,
+  studentKey,
   onReviewed,
 }: {
   detail: AttemptDetail;
   /** Only the counting (latest) attempt takes grades — they judge its answers. */
   isLatest: boolean;
   assignment: AssignmentData;
+  /** Whose attempt: the viewer route's key (the page's route). */
+  studentKey: string;
   onReviewed: () => void;
 }) {
   const { record, score } = detail;
@@ -175,27 +261,28 @@ function SubmissionDetail({
   if (!result) {
     return (
       <div className="instructor-detail">
-        {record.submission.group?.length ? <GroupLine keys={record.submission.group} /> : null}
         <p className="mm-note">Not autograded — this attempt predates grading on receipt.</p>
       </div>
     );
   }
+  const indexOf = (questionId: number) => Math.max(0, assignment.questions.findIndex((x) => x.id === questionId));
+  const viewer = (questionId: number, caseIndex?: number) =>
+    viewerRoute(assignment.id, studentKey, record.attempt, indexOf(questionId), caseIndex);
 
   return (
     <div className="instructor-detail">
-      {record.submission.group?.length ? <GroupLine keys={record.submission.group} /> : null}
       {result.questions.map((qr) => {
         const q = assignment.questions.find((x) => x.id === qr.questionId);
         const label = q?.label ?? `Q${qr.questionId}`;
         const problem = score.problems.find((x) => x.questionId === qr.questionId);
         // Grades judge the counting attempt's answer, so only the latest takes
         // them; a record with no studentKey (a legacy anonymous dev record)
-        // stays display-only. The controls sit on what a person must grade
-        // (nothing to autograde) and on any grade already given; overriding
-        // an autograde from scratch is task 067's page (a note required —
-        // the one planner, storage/gradeWrites.ts).
+        // stays display-only. Every problem takes one (memo §6.3): a hand
+        // grade where nothing was autograded, an override elsewhere — whose
+        // required note is the one planner's rule (storage/gradeWrites.ts
+        // planGradeWrite); the controls only show its refusal.
         const existing = record.grades?.find((g) => g.questionId === qr.questionId);
-        const controls = isLatest && record.studentKey !== undefined && problem && (problem.autoPoints === null || existing) && (
+        const controls = isLatest && record.studentKey !== undefined && problem && (
           <GradeControls
             record={record}
             questionId={qr.questionId}
@@ -204,9 +291,24 @@ function SubmissionDetail({
             onReviewed={onReviewed}
           />
         );
+        // "Run this input" replays one graded case in the viewer — only for
+        // the case banks the replay understands (store loadCaseInput: value
+        // cases, turbot arenas).
+        const replayable = q ? ['function', 'turbot'].includes(questionTask(q)) : false;
+        const runLink = (caseIndex: number) =>
+          replayable && (
+            <a className="mm-link" {...hashLink(viewer(qr.questionId, caseIndex))}>
+              Run this input →
+            </a>
+          );
         const head = (what: string) => (
           <>
             <strong>{label}</strong>: {what} — <span className="gr-state">{problemState(problem)}</span>
+            {' · '}
+            <a className="mm-link" {...hashLink(viewer(qr.questionId))}>
+              Open in viewer →
+            </a>
+            {q && <HalfRuleLine question={q} qr={qr} problem={problem} />}
           </>
         );
         // Open question: nothing was autograded — show the student's response
@@ -250,6 +352,7 @@ function SubmissionDetail({
                       <th>steps</th>
                       <th>final position</th>
                       <th>why it failed</th>
+                      <th />
                     </tr>
                   </thead>
                   <tbody>
@@ -261,6 +364,7 @@ function SubmissionDetail({
                           ({c.finalPosition.x}, {c.finalPosition.y}) {c.finalPosition.facing}
                         </td>
                         <td className="instructor-bits instructor-fail">{c.reason ?? 'criterion not met'}</td>
+                        <td>{runLink(c.arenaIndex - 1)}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -333,29 +437,17 @@ function SubmissionDetail({
             </div>
           );
         }
-        const failed = qr.cases.filter((c) => !c.pass);
+        const cases = qr.cases.map((c, caseIndex) => ({ ...c, caseIndex }));
+        const failed = cases.filter((c) => !c.pass);
         return (
           <div className="instructor-detail-q" key={qr.questionId}>
             {head(`${qr.passed}/${qr.total} passed`)}
-            {failed.length > 0 && (
-              <table className="instructor-detail-table">
-                <thead>
-                  <tr>
-                    <th>input</th>
-                    <th>expected</th>
-                    <th>got</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {failed.map((c, ci) => (
-                    <tr key={ci}>
-                      <td className="instructor-bits">{c.input.join(', ')}</td>
-                      <td className="instructor-bits">{c.expected.join(', ')}</td>
-                      <td className="instructor-bits instructor-fail">{c.reason ?? c.got.join(', ')}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+            {failed.length > 0 && <CaseTable cases={failed} runLink={runLink} />}
+            {cases.length > 0 && (
+              <details className="gr-cases">
+                <summary>All {cases.length} case{cases.length === 1 ? '' : 's'}</summary>
+                <CaseTable cases={cases} runLink={runLink} showPass />
+              </details>
             )}
             {controls}
           </div>
@@ -363,6 +455,60 @@ function SubmissionDetail({
       })}
       <IntegrityNotes record={record} assignment={assignment} />
     </div>
+  );
+}
+
+/** Value cases, as graded: input, expected, got (instructor-only), and a
+ *  replay of each in the viewer. */
+function CaseTable({
+  cases,
+  runLink,
+  showPass,
+}: {
+  cases: (QuestionResult['cases'][number] & { caseIndex: number })[];
+  runLink: (caseIndex: number) => ReactNode;
+  showPass?: boolean;
+}) {
+  return (
+    <table className="instructor-detail-table">
+      <thead>
+        <tr>
+          {showPass && <th>#</th>}
+          <th>input</th>
+          <th>expected</th>
+          <th>got</th>
+          {showPass && <th>verdict</th>}
+          <th />
+        </tr>
+      </thead>
+      <tbody>
+        {cases.map((c) => (
+          <tr key={c.caseIndex}>
+            {showPass && <td className="instructor-bits">{c.caseIndex + 1}</td>}
+            <td className="instructor-bits">{c.input.join(', ')}</td>
+            <td className="instructor-bits">{c.expected.join(', ')}</td>
+            <td className={c.pass ? 'instructor-bits' : 'instructor-bits instructor-fail'}>{c.reason ?? c.got.join(', ')}</td>
+            {showPass && <td className={c.pass ? 'instructor-pass' : 'instructor-fail'}>{c.pass ? '✓' : '✗'}</td>}
+            <td>{runLink(c.caseIndex)}</td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  );
+}
+
+/** The ½ rule's count for one problem (when the question has one): ≥ K of
+ *  its N cases, and whether this attempt met it — read off the score's
+ *  autograde (engine/score.ts autoPoints), never recounted here. */
+function HalfRuleLine({ question, qr, problem }: { question: AssignmentQuestion; qr: QuestionResult; problem: ProblemScore | undefined }) {
+  const k = question.half_credit_at;
+  if (k === undefined || halfCreditProblem(question) !== null) return null;
+  const met = problem?.autoPoints != null && problem.autoPoints > 0;
+  return (
+    <p className="gr-half">
+      ½ rule: at least {k} of {qr.total} case{qr.total === 1 ? '' : 's'} — passed {qr.passed},{' '}
+      <span className={met ? 'instructor-pass' : 'instructor-fail'}>{met ? 'met' : 'not met'}</span>
+    </p>
   );
 }
 
@@ -375,7 +521,7 @@ function IntegrityNotes({ record, assignment }: { record: SubmissionRecord; assi
   if (!integrity) return null;
   const flagged = integrity.questions.filter((q) => q.flags.length > 0);
   return (
-    <div className="instructor-detail-q instructor-review">
+    <div className="instructor-detail-q instructor-review" id="gr-integrity">
       <strong>Integrity — to look at, not a verdict</strong>
       {flagged.length === 0 ? (
         <p className="mm-note">Nothing to look at.</p>
@@ -445,7 +591,11 @@ function GradeControls({
         <input
           className="instructor-review-note"
           type="text"
-          placeholder={override ? 'Why override the autograde? (required; the student sees it on release)' : 'Feedback note (optional; the student sees it on release)'}
+          placeholder={
+            override
+              ? 'Why override the autograde? (required; the student sees it on release — no medical or accommodation details)'
+              : 'Feedback note (optional; the student sees it on release — no medical or accommodation details)'
+          }
           value={note}
           onChange={(e) => setNote(e.target.value)}
         />

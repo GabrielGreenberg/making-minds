@@ -12,7 +12,8 @@
 // Pins: [cells] cellOf for every state; [filters] each chip's predicate and
 // its count (the roster only); [problems] problemStats; [tiles] the
 // Overview's counts; [grades] progress.grades over submitted roster rows;
-// [release] the warning; [sort] counting assignments first; [claims] the
+// [release] the warning; [adjacent students] the submission page's
+// Previous / Next in matrix order (task 067); [sort] counting assignments first; [claims] the
 // hand-grading queue's soft claims (task 066; storage/gradingClaims.ts — TTL,
 // renewal, never stolen, one per grader); [queue] the queue's pure logic
 // (src/instructor/gradingQueueViews.ts — states, Save & next's skips, J/K,
@@ -46,6 +47,7 @@ import {
   submitterKeys,
 } from '../src/instructor/gradingQueueViews';
 import {
+  adjacentStudents,
   cellOf,
   filterCounts,
   filterTest,
@@ -229,6 +231,26 @@ check('the release warning names pending hand grades, changed answers and stale 
     warn.includes('1 submission graded against an older version'), warn);
 const done = buildAssignmentSummary({ assignment: asg, roster, latest: [latest[0]], identify: (k) => who(k, 'x'), released: false, now: NOW });
 check('…and nothing once nothing is open', releaseWarning(done) === null);
+
+console.log('[adjacent students]');
+{
+  // The submission page's Previous / Next (task 067): the matrix's unfiltered
+  // order — the roster by sort name, then the off-roster submitters.
+  const { roster: rr, offRoster: off } = splitRows(summary);
+  const order = [...rr, ...off].map((r) => r.student.key);
+  const sorted = rr.map((r) => r.student.sortName);
+  check('the roster rows are in sort-name order, off-roster after them',
+    JSON.stringify(sorted) === JSON.stringify([...sorted].sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }))) &&
+      off.length > 0 && order.length === summary.rows.length);
+  const walk = order.map((k) => adjacentStudents(summary, k));
+  check('each student\'s prev/next are its neighbours in that order',
+    walk.every((a, i) => (a.prev?.student.key ?? null) === (order[i - 1] ?? null) && (a.next?.student.key ?? null) === (order[i + 1] ?? null)));
+  check('no previous at the first, no next at the last', walk[0].prev === null && walk[walk.length - 1].next === null);
+  check('the last roster student leads to the first off-roster submitter',
+    adjacentStudents(summary, rr[rr.length - 1].student.key).next?.student.key === off[0].student.key);
+  const unknown = adjacentStudents(summary, 'nobody');
+  check('an unknown key → both null', unknown.prev === null && unknown.next === null);
+}
 
 console.log('[sort]');
 const course = (id: string, countsTowardGrade?: boolean): CourseAssignmentRow =>

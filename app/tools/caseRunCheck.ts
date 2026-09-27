@@ -47,6 +47,11 @@
 //     viewSubmission, task 003) and a later one is the latest, a case replays
 //     the attempt ON SHOW — its recorded verdict, its machine (so the banner
 //     reads "Same as when graded"); without the view, the latest (task 002).
+//   [fetched record]  another student's attempt on show (viewSubmission's
+//     record form, task 067 — the instructor's viewer) replays unchanged:
+//     the FETCHED attempt's verdict, machine and the grader's stimulus, with
+//     the viewer's own different latest attempt in the badge map ignored;
+//     a turbot arena likewise.
 //   [dismiss]  ✕ (clearLoadedCase) puts the Map back on the primary arena,
 //     the turbot at its start, runs at its budget.
 //   [step budgets]  question TM/turbot runs stop at the grader's budgets
@@ -636,6 +641,64 @@ console.log('\n[viewed attempt: a case replays the attempt on show]');
   await useStore.getState().viewSubmission(null);
   await useStore.getState().loadCaseInput(q.id, k);
   check("on the live work the case is the latest attempt's (2)", useStore.getState().loadedCase?.attempt === 2);
+  useStore.getState().closeAssignment();
+}
+
+// ── [fetched record] ────────────────────────────────────────────────────────
+console.log("\n[fetched record: another student's attempt replays unchanged]");
+{
+  // An instructor views a student's attempt (store viewSubmission's record
+  // form — what openSubmissionOf hands it from the grading seam) while their
+  // OWN latest submission on the same assignment is a different attempt: a
+  // case replays the FETCHED attempt — its verdict, its machine, the
+  // grader's stimulus — and never the viewer's own.
+  const fx = loadFixture('hw2-p1');
+  const q = fx.question;
+  const full: AssignmentData = { id: 'case-run-fetched', title: 'case run check', questions: [q] };
+  const theirs = gradedRecord(full, q, fx.broken!, 1);
+  const graded = theirs.result!.questions[0];
+  const own = gradedRecord(full, q, fx.correct, 3);
+  const k = failingIndices(graded, 1)[0];
+  useStore.getState().loadAssignment(full);
+  useStore.setState({ submissions: { [full.id]: own } });
+  check('viewSubmission({record, owner}) resolves true',
+    (await useStore.getState().viewSubmission({ record: theirs, owner: { key: 'student-x', name: 'Student X' } })) === true);
+  check("…the canvas holds the student's machine",
+    gradedMachineKey({ components: useStore.getState().components, wires: useStore.getState().wires }) === gradedMachineKey(fx.broken!));
+  await pinValueLoad('hw2-p1 (fetched record)', q, graded, k);
+  {
+    const s = useStore.getState();
+    const lc = s.loadedCase;
+    check("the case is the FETCHED attempt's (1), its recorded verdict, its machine",
+      lc?.attempt === 1 && lc.kind === 'value' && lc.recorded.pass === graded.cases[k].pass &&
+        lc.recorded.reason === graded.cases[k].reason && lc.gradedKey === gradedMachineKey(fx.broken!));
+    // The banner in the viewer passes no latest attempt (the viewer's own
+    // submissions say nothing about the student's).
+    const v = gradedCaseView(q, lc!, { components: s.components, wires: s.wires }, undefined);
+    check('…so the banner reads "Same as when graded."', v.note === 'same' && v.noteText === 'Same as when graded.');
+  }
+
+  // A turbot: the fetched record's arena, pose and steps.
+  const tb = loadFixture('hw3-p14');
+  const tq = tb.question;
+  const tfull: AssignmentData = { id: 'case-run-fetched-turbot', title: 'case run check', questions: [tq] };
+  const trec = gradedRecord(tfull, tq, tb.correct, 2);
+  const tk = tq.turbot_cases!.length - 1;
+  useStore.getState().loadAssignment(tfull);
+  useStore.setState({ submissions: {} });
+  await useStore.getState().viewSubmission({ record: trec, owner: { key: 'student-y', name: 'Student Y' } });
+  await useStore.getState().loadCaseInput(tq.id, tk);
+  {
+    const s = useStore.getState();
+    const lc = s.loadedCase;
+    const recorded = trec.result!.questions[0].turbotCases![tk];
+    check(`turbot: arena ${tk} of the fetched attempt (2) loads, its recorded result`,
+      lc?.kind === 'turbot' && lc.attempt === 2 && lc.caseIndex === tk && same(lc.recorded, recorded));
+    check('…the Map on that arena, the run at its end: the recorded pose and steps',
+      s.turbotCaseIndex === tk && same(selectTurbotArena(s), tq.turbot_cases![tk].arena) &&
+        s.turbotHistory.length === recorded.stepsTaken &&
+        s.turbotState.x === recorded.finalPosition.x && s.turbotState.y === recorded.finalPosition.y);
+  }
   useStore.getState().closeAssignment();
 }
 

@@ -30,6 +30,16 @@
 // any due date is a canvas swap both ways, refuses every edit but runs, and
 // never lands in the live workbook (no fold, no save, a submit records the
 // live work); [frozen assignment] is the same view, forced on by the freeze.
+// [viewing another's attempt] (task 067): an instructor's view of a
+// student's attempt (openSubmissionOf, a fetched record) is the same
+// read-only view, but NEVER the viewer's workbook — the stored workbook stays
+// byte-identical through the view, Home, a submit and a principal change; no
+// mint key registers; frozen ignores the viewer's own past-due submission;
+// the lock names the student; two students' attempt 1 are different
+// attempts; a stale open applies nothing; leaving resets; and the same-id
+// resume never resurrects the view's empty map; the viewer's sandbox is
+// saved on the way in and put back on the way out, never stored empty (a
+// grep pin keeps the record branch off the viewer's own seams).
 // [own submissions] (task 037): every student-side submission read — the
 // seam's Own pair, the hydrated map, the frozen view, viewSubmission — sees
 // only the principal's own attempts (an instructor's Student view too),
@@ -97,7 +107,7 @@ backing.set(VISITOR_KEY, JSON.stringify({
   tabCircuits: { 'import-tab': { components: [{ id: 'import-sentinel', type: 'AND', x: 0, y: 0 }], wires: [], boxes: [] } },
 }));
 
-const { useStore, selectTurbotArena, selectAssignmentFrozen, selectQuestionLocked, showsSubmission, selectTurbotGoalHit, TURBOT_GOAL_HOLD_TICKS, selectRunControls } =
+const { useStore, selectTurbotArena, selectAssignmentFrozen, selectQuestionLocked, selectLockNotice, showsSubmission, selectTurbotGoalHit, TURBOT_GOAL_HOLD_TICKS, selectRunControls } =
   await import('../src/store');
 const { sortByLabel } = await import('../src/engine');
 const { buildSampleAssignment, ccCorrect, scCorrect, fsmCorrect, tmCorrect, turbotCorrect, turbotFsmCorrect, turbotTmCorrect, SAMPLE_ASSIGNMENT_ID } =
@@ -694,6 +704,244 @@ console.log('[viewing a submission]');
   useStore.getState().closeAssignment();
   check('closeAssignment clears the view', useStore.getState().viewingSubmission === null);
   // The sandbox sections below run as the visitor.
+  useStore.getState().resetForPrincipal(null);
+}
+
+// ── viewing ANOTHER person's attempt (task 067): an instructor opens a
+// student's submitted attempt read-only from the grading seam — never the
+// viewer's own workbook ──
+console.log("[viewing another's attempt]");
+{
+  const FOREIGN_ID = `${SAMPLE_ASSIGNMENT_ID}-foreign`;
+  const INSTR = 'ada.instructor@example.com';
+  const STUDENT = 'john.doe@example.com'; // John Doe on the toy roster
+  const OTHER = 'jane.roe@example.com'; // Jane Roe
+  const { buildCorrectSubmission } = await import('../src/devData/sampleData');
+  const pastDate = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+  const futureDate = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+  const asg = { ...buildSampleAssignment(), id: FOREIGN_ID, title: 'Foreign Sample', dueDate: futureDate };
+  const q1 = asg.questions[0]; // CC
+  const SC_INDEX = 1; // Q2 (SC)
+  await localAssignmentStore.save(asg);
+  await localAssignmentStore.setVisible(FOREIGN_ID, true);
+
+  // Two students' attempt 1: John's Q1 is the correct CC circuit, Jane's Q1
+  // is empty — the same attempt number, different machines.
+  const johnSub = { ...buildCorrectSubmission(STUDENT), assignmentId: FOREIGN_ID, submittedAt: new Date().toISOString() };
+  const janeBase = buildCorrectSubmission(OTHER);
+  const janeSub = {
+    ...janeBase,
+    assignmentId: FOREIGN_ID,
+    submittedAt: new Date().toISOString(),
+    answers: janeBase.answers.map((a) => (a.questionId === q1.id ? { ...a, circuit: { components: [], wires: [] } } : a)),
+  };
+  const johnRec = await submissionStore.submit(FOREIGN_ID, johnSub);
+  const janeRec = await submissionStore.submit(FOREIGN_ID, janeSub);
+  const johnQ1 = johnSub.answers.find((a) => a.questionId === q1.id)!.circuit!.components.length;
+  check("both students' attempts are attempt 1, with different Q1 machines",
+    johnRec.attempt === 1 && janeRec.attempt === 1 && johnQ1 > 0);
+
+  // The instructor's OWN work W on the same assignment: submitted (2 parts),
+  // then diverged (3 parts), saved by Home; then the deadline passes, so the
+  // instructor's own attempt would freeze their own open.
+  useStore.getState().resetForPrincipal(INSTR);
+  await useStore.getState().openAssignment(FOREIGN_ID);
+  useStore.getState().switchQuestion(0);
+  useStore.getState().addComponent('NOT', 100, 100);
+  useStore.getState().addComponent('NOT', 100, 200);
+  const ownRec = await useStore.getState().submitAssignment(FOREIGN_ID, INSTR);
+  useStore.getState().addComponent('NOT', 100, 300);
+  useStore.getState().goHome();
+  await localAssignmentStore.save({ ...asg, dueDate: pastDate });
+  const WB_KEY = `mm:asg:${FOREIGN_ID}`;
+  const W = backing.get(WB_KEY);
+  check("the instructor's own workbook W is stored (Q1: 3 parts)",
+    W !== undefined && (await workbookStore.loadAssignmentState(FOREIGN_ID))?.questionCircuits[q1.id]?.components.length === 3);
+  const wUnchanged = (label: string) => check(`${label}: the instructor's stored workbook is byte-identical`, backing.get(WB_KEY) === W);
+
+  // A fresh session: no mint keys, the instructor's own (past-due) attempt
+  // in the badge map.
+  useStore.getState().resetForPrincipal(null);
+  useStore.getState().resetForPrincipal(INSTR);
+  await useStore.getState().hydrateSubmissions();
+  check("the badge map holds the instructor's OWN past-due attempt",
+    useStore.getState().submissions[FOREIGN_ID]?.submission.student === INSTR);
+
+  // (a) Open John's attempt 1: a canvas swap onto HIS machine.
+  plantSimJunk();
+  check('openSubmissionOf resolves true', (await useStore.getState().openSubmissionOf(FOREIGN_ID, STUDENT, 1)) === true);
+  {
+    const s = useStore.getState();
+    check("the canvas is John's submitted Q1, on show as John's",
+      s.components.length === johnQ1 && s.viewingOwner?.key === STUDENT && s.viewingOwner.name === 'John Doe' &&
+        s.viewingSubmission?.submission.student === STUDENT && s.viewingSubmission.attempt === 1);
+    check('…open in the editor, on the question', s.workbookOpen && s.assignmentView === 'question' && s.assignment?.id === FOREIGN_ID);
+    check("…over an EMPTY map (the viewer's workbook was never loaded)",
+      [...s.questionCircuits.values()].every((qc) => qc.components.length === 0));
+    check("frozen ignores the viewer's own past-due submission", !selectAssignmentFrozen(s));
+    check('the lock notice names the student', selectLockNotice(s) === "Showing John Doe's submission — read-only.");
+  }
+  checkAllSimFresh("opening another's attempt");
+  check('no mint key registered for the assignment (law 8)', mintKeyFor(FOREIGN_ID) === null);
+
+  // (b) Edits refused through the one lock, in the student's name; copying
+  // their parts reaches no clipboard.
+  useStore.getState().addComponent('AND', 300, 300);
+  check('addComponent is refused', useStore.getState().components.length === johnQ1);
+  check('a refusal names the student',
+    useStore.getState().renameBox('nope', 'X') === "This question shows John Doe's submission, read-only — you can't rename a box here.");
+  {
+    const clipBefore = peekClipboard().canvas;
+    useStore.setState({ selectedIds: [useStore.getState().components[0].id] });
+    useStore.getState().copySelected();
+    check("copySelected is a no-op (a student's ids never reach the viewer's clipboard)", peekClipboard().canvas === clipBefore);
+    useStore.setState({ selectedIds: [] });
+  }
+
+  // (c) Simulation runs on the student's machine.
+  useStore.getState().switchQuestion(SC_INDEX);
+  check("switching question: John's submitted SC circuit",
+    useStore.getState().components.length === 3 && useStore.getState().viewingOwner?.key === STUDENT);
+  useStore.getState().setScGlobalSequenceInput(0, '0110');
+  useStore.getState().loadScGlobalSequence(0);
+  for (let i = 0; i < 3; i++) useStore.getState().scStep();
+  check('an SC run steps on the viewed attempt', useStore.getState().scHistory.length === 3);
+  {
+    const input = useStore.getState().components.find((c) => c.type === 'INPUT');
+    if (input) useStore.getState().setInputValue(input.id, 1);
+  }
+  await flushTimers();
+  wUnchanged('after running and toggling inputs');
+  useStore.getState().switchQuestion(0);
+
+  // (d) The same attempt number of ANOTHER student is a different attempt.
+  {
+    const jane = await gradingStore.attempt(FOREIGN_ID, OTHER, 1);
+    check("Jane's attempt 1 comes from the grading seam", jane?.record.submission.student === OTHER);
+    check('viewSubmission(record) of her attempt 1 resolves true',
+      (await useStore.getState().viewSubmission({ record: jane!.record, owner: { key: OTHER, name: jane!.student.name } })) === true);
+    const s = useStore.getState();
+    check("…and swaps the canvas to Jane's (empty) Q1, as Jane's",
+      s.components.length === 0 && s.viewingOwner?.key === OTHER && s.viewingSubmission?.submission.student === OTHER);
+    check('switching to Jane via openSubmissionOf too',
+      (await useStore.getState().openSubmissionOf(FOREIGN_ID, OTHER, 1)) === true && useStore.getState().components.length === 0);
+    check('an unknown attempt resolves false', (await useStore.getState().openSubmissionOf(FOREIGN_ID, OTHER, 9)) === false);
+  }
+
+  // (e) Nothing of the viewer's is written: Home, a submit, a principal change.
+  await useStore.getState().openSubmissionOf(FOREIGN_ID, STUDENT, 1);
+  useStore.getState().goHome();
+  {
+    const s = useStore.getState();
+    check('Home from the view closes it (leaving resets)',
+      s.assignment === null && s.viewingOwner === null && s.viewingSubmission === null && !s.workbookOpen);
+  }
+  checkAllSimFresh("Home from another's attempt");
+  wUnchanged('after Home');
+  await useStore.getState().openSubmissionOf(FOREIGN_ID, STUDENT, 1);
+  const submitted = await useStore.getState().submitAssignment(FOREIGN_ID, INSTR);
+  check("a submit while viewing records the viewer's OWN work W (3 parts), not the student's or an empty map",
+    submitted?.submission.student === INSTR &&
+      submitted.submission.answers.find((a) => a.questionId === q1.id)?.circuit?.components.length === 3);
+  check('…and the view stays on John', useStore.getState().viewingOwner?.key === STUDENT);
+  wUnchanged('after a submit while viewing');
+  useStore.getState().resetForPrincipal(null); // a sign-out (or 401) while viewing
+  wUnchanged('after a principal change while viewing');
+  check('the principal change clears the view', useStore.getState().viewingOwner === null && useStore.getState().assignment === null);
+  useStore.getState().resetForPrincipal(INSTR);
+
+  // (f) A stale open overtaken by the viewer's own open applies nothing.
+  {
+    const stale = useStore.getState().openSubmissionOf(FOREIGN_ID, STUDENT, 1);
+    const own = useStore.getState().openAssignment(FOREIGN_ID);
+    check('the overtaken openSubmissionOf resolves true', (await stale) === true);
+    check('the own open resolves true', (await own) === true);
+    const s = useStore.getState();
+    check("…and the canvas is the viewer's own (no owner, W's Q1 in the map)",
+      s.viewingOwner === null && s.questionCircuits.get(q1.id)?.components.length === 3);
+    useStore.getState().goHome();
+  }
+
+  // (g) Leaving for another route resets; the same-id resume never
+  // resurrects the view's empty map.
+  await useStore.getState().openSubmissionOf(FOREIGN_ID, STUDENT, 1);
+  plantSimJunk();
+  useStore.getState().leaveForeignView(); // routing: any other route
+  {
+    const s = useStore.getState();
+    check('leaving clears the view and the assignment', s.assignment === null && s.viewingOwner === null && !s.workbookOpen);
+  }
+  checkAllSimFresh("leaving another's attempt");
+  await useStore.getState().openSubmissionOf(FOREIGN_ID, STUDENT, 1);
+  check('openAssignment(same id) from the view resolves true', (await useStore.getState().openAssignment(FOREIGN_ID)) === true);
+  {
+    const s = useStore.getState();
+    check("…and loads the viewer's own W, never the view's empty map",
+      s.viewingOwner === null && s.questionCircuits.get(q1.id)?.components.length === 3);
+  }
+  useStore.getState().goHome();
+  {
+    const stored = await workbookStore.loadAssignmentState(FOREIGN_ID);
+    check("…whose save still holds W's Q1 (3 parts)", stored?.questionCircuits[q1.id]?.components.length === 3);
+  }
+  check("the instructor's own earlier attempt is untouched", ownRec?.submission.student === INSTR);
+  useStore.getState().closeAssignment();
+
+  // (h) The viewer's SANDBOX survives the view: entered straight from the
+  // sandbox (its live canvas folded and saved on the way in) and via Home;
+  // leaving puts the sandbox tab back, never an empty canvas the sandbox
+  // autosave would store over it.
+  {
+    const SB_KEY = `making-minds-autosave:${INSTR}`;
+    const sbParts = () => {
+      const raw = backing.get(SB_KEY);
+      if (!raw) return -1;
+      const d = JSON.parse(raw);
+      return (d.tabCircuits?.[d.activeTabId]?.components ?? []).length;
+    };
+    const st = () => useStore.getState();
+    st().enterSandbox();
+    const before = st().components.length;
+    st().addComponent('AND', 100, 100);
+    st().addComponent('OR', 100, 200);
+    const sandboxIds = liveSandboxIds();
+    // Straight from the sandbox, no Home (Sandbox → Dashboard → Grading → Open in viewer).
+    await st().openSubmissionOf(FOREIGN_ID, STUDENT, 1);
+    check('opening a view from the sandbox saves its pending edit first', sbParts() === before + 2);
+    check("…and folds the live sandbox canvas into its tab",
+      st().tabCircuits.get(st().activeTabId)?.components.length === before + 2);
+    st().leaveForeignView();
+    check('leaving the view puts the sandbox tab back in the live fields',
+      st().assignment === null && st().components.length === before + 2 &&
+        JSON.stringify(liveSandboxIds()) === JSON.stringify(sandboxIds));
+    // Via Home, then a view, then leave; the leaving save (principal change)
+    // stores whatever the live sandbox now is.
+    st().goHome();
+    await st().openSubmissionOf(FOREIGN_ID, STUDENT, 1);
+    st().goHome(); // Home from the view = leaveForeignView
+    check('…and via Home too', st().components.length === before + 2);
+    st().resetForPrincipal(null);
+    check("the viewer's stored sandbox still holds both parts", sbParts() === before + 2);
+    st().resetForPrincipal(INSTR);
+    st().enterSandbox();
+    check('…and re-entering the sandbox shows them', st().components.length === before + 2);
+    st().goHome();
+  }
+
+  // Grep pin: the record branch of viewSubmission and openSubmissionOf never
+  // read the viewer's own seams (listOwn / loadForOpen / getLatestOwn).
+  {
+    const { readFileSync } = await import('node:fs');
+    // Code only: the comments name the seams they stay off.
+    const src = readFileSync(new URL('../src/store.ts', import.meta.url), 'utf8').replace(/\/\/.*$/gm, '');
+    const open = src.slice(src.indexOf('  openSubmissionOf: async'), src.indexOf('\n  },\n', src.indexOf('  openSubmissionOf: async')));
+    const view = src.slice(src.indexOf('  viewSubmission: async'), src.indexOf('  leaveForeignView: () => {'));
+    const recordBranch = view.slice(view.indexOf("if (arg != null && typeof arg === 'object') {"), view.indexOf('} else if (attempt == null)'));
+    check('openSubmissionOf reads no own seam (loadForOpen, getLatestOwn, listOwn, setMintKey)',
+      open.length > 0 && !/loadForOpen|getLatestOwn|listOwn|setMintKey/.test(open));
+    check("viewSubmission's record branch reads no own seam",
+      recordBranch.length > 0 && !/listOwn|loadForOpen/.test(recordBranch));
+  }
   useStore.getState().resetForPrincipal(null);
 }
 

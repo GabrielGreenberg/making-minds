@@ -12,6 +12,7 @@
 // there is no feedback loop and we never listen to `hashchange`.
 
 import { useStore } from './store';
+import { instructorRole } from './auth/instructorRole';
 
 export type Route =
   | { kind: 'home' }
@@ -21,8 +22,11 @@ export type Route =
   // workbook (task 003, store viewSubmission) — absent = the live workbook
   // (or, frozen, the latest submission). caseIndex: a graded case to load
   // into the question's run ("Run this input" on the grade sheet) — only
-  // meaningful with a questionIndex.
-  | { kind: 'assignment'; id: string; attempt?: number; questionIndex?: number; caseIndex?: number }
+  // meaningful with a questionIndex. student: ANOTHER person's attempt on
+  // show (task 067 — an instructor viewing a student's, store
+  // openSubmissionOf; `attempt` is then required), keyed like the Grading
+  // tab's routes; absent = the principal's own.
+  | { kind: 'assignment'; id: string; attempt?: number; questionIndex?: number; caseIndex?: number; student?: string }
   | { kind: 'instructor' }
   | { kind: 'instructor-new-assignment' }
   | { kind: 'instructor-edit'; id: string }
@@ -73,7 +77,7 @@ export function parseHash(hash: string): Route {
   if (parts[0] === 'instructor') {
     // #/instructor/roster
     // #/instructor/assignments/new | .../:id/edit
-    // #/instructor/grading[/:asg[/matrix | /queue[/:qid | /student/:sid] | /student/:sid]]
+    // #/instructor/grading[/:asg[/matrix | /queue[/:qid | /student/:sid] | /student/:sid[/submission/:n[/q/:i[/case/:k]]]]]
     // #/instructor/students/:sid
     if (parts[1] === 'grading') {
       if (!parts[2]) return { kind: 'instructor-grading' };
@@ -91,7 +95,16 @@ export function parseHash(hash: string): Route {
           : { kind: 'instructor-grading-assignment', id, view: 'queue' };
       }
       if (parts[3] === 'student' && parts[4]) {
-        return { kind: 'instructor-grading-student', id, student: decodeURIComponent(parts[4]) };
+        const student = decodeURIComponent(parts[4]);
+        // The viewer (task 067): that student's attempt n in the read-only
+        // editor. A malformed or missing attempt is their submission page.
+        if (parts[5] === 'submission') {
+          const attempt = attemptSegment(parts[6]);
+          if (attempt !== undefined) {
+            return withQuestion({ kind: 'assignment', id, student, attempt }, parts.slice(7));
+          }
+        }
+        return { kind: 'instructor-grading-student', id, student };
       }
       // No view, or one we don't know: the Overview.
       return { kind: 'instructor-grading-assignment', id, view: 'overview' };
@@ -124,17 +137,18 @@ export function parseHash(hash: string): Route {
       attempt = attemptSegment(rest[1]);
       rest = rest.slice(2);
     }
-    const route: Route = attempt !== undefined ? { kind: 'assignment', id, attempt } : { kind: 'assignment', id };
-    const qi = rest[0] === 'q' ? indexSegment(rest[1]) : undefined;
-    if (qi !== undefined) {
-      const k = rest[2] === 'case' ? indexSegment(rest[3]) : undefined;
-      return k !== undefined
-        ? { ...route, questionIndex: qi, caseIndex: k }
-        : { ...route, questionIndex: qi };
-    }
-    return route;
+    return withQuestion(attempt !== undefined ? { kind: 'assignment', id, attempt } : { kind: 'assignment', id }, rest);
   }
   return { kind: 'home' };
+}
+
+/** An assignment route's `[/q/:i[/case/:k]]` tail — a malformed question or
+ *  case segment is dropped, the rest kept. */
+function withQuestion(route: Extract<Route, { kind: 'assignment' }>, rest: string[]): Route {
+  const qi = rest[0] === 'q' ? indexSegment(rest[1]) : undefined;
+  if (qi === undefined) return route;
+  const k = rest[2] === 'case' ? indexSegment(rest[3]) : undefined;
+  return k !== undefined ? { ...route, questionIndex: qi, caseIndex: k } : { ...route, questionIndex: qi };
 }
 
 /** Serialize a Route to a location hash. Pure. Inverse of parseHash. */
@@ -148,8 +162,9 @@ export function routeToHash(route: Route): string {
       return route.id ? `#/grades/${encodeURIComponent(route.id)}` : '#/grades';
     case 'assignment': {
       const base =
-        `#/a/${encodeURIComponent(route.id)}` +
-        (route.attempt != null ? `/submission/${route.attempt}` : '');
+        route.student != null
+          ? `#/instructor/grading/${encodeURIComponent(route.id)}/student/${encodeURIComponent(route.student)}/submission/${route.attempt ?? 1}`
+          : `#/a/${encodeURIComponent(route.id)}` + (route.attempt != null ? `/submission/${route.attempt}` : '');
       if (route.questionIndex == null) return base;
       return route.caseIndex != null
         ? `${base}/q/${route.questionIndex}/case/${route.caseIndex}`
@@ -223,9 +238,11 @@ export function routeAccess(route: Route): RouteAccess {
   switch (route.kind) {
     case 'sandbox':
       return 'public';
+    case 'assignment':
+      // Another person's attempt is the instructor's to see (task 067).
+      return route.student != null ? 'instructor' : 'signed-in';
     case 'home':
     case 'grades':
-    case 'assignment':
       return 'signed-in';
     case 'instructor':
     case 'instructor-new-assignment':
@@ -283,6 +300,10 @@ function applyRoute(route: Route): void {
     return;
   }
   const store = useStore.getState();
+  // Leaving another person's attempt (task 067) for any other route: the
+  // view closes — nothing in it is this person's to keep in memory, and the
+  // editor must not come back to it (leaving resets).
+  if (store.viewingOwner && !(route.kind === 'assignment' && route.student != null)) store.leaveForeignView();
   switch (route.kind) {
     case 'instructor':
     case 'instructor-new-assignment':
@@ -313,6 +334,10 @@ function applyRoute(route: Route): void {
       return;
     case 'assignment': {
       const seq = applySeq;
+      if (route.student != null) {
+        applyForeignView(route, route.student, seq);
+        return;
+      }
       void store.openAssignment(route.id).then(async (ok) => {
         // A newer navigation was applied while the open was in flight — it
         // owns the UI now; applying this route's view state would clobber it.
@@ -355,6 +380,57 @@ function applyRoute(route: Route): void {
       return;
     }
   }
+}
+
+/**
+ * The route of the editor as it stands — the open assignment, the attempt on
+ * show and whose it is — at `questionIndex` (absent = the document). Every
+ * in-editor navigation (the question arrows, the case banner's close, the
+ * crumb) builds on it, so another person's attempt stays theirs. Pure.
+ */
+export function editorRoute(
+  s: {
+    assignment: { id: string } | null;
+    viewingSubmission: { attempt: number } | null;
+    viewingOwner: { key: string } | null;
+  },
+  questionIndex?: number,
+): Route | null {
+  if (!s.assignment) return null;
+  const attempt = s.viewingSubmission?.attempt;
+  const route: Route = s.viewingOwner
+    ? { kind: 'assignment', id: s.assignment.id, student: s.viewingOwner.key, attempt }
+    : { kind: 'assignment', id: s.assignment.id, attempt };
+  return questionIndex != null ? { ...route, questionIndex } : route;
+}
+
+/** The viewer route (task 067): `student`'s attempt in the read-only editor.
+ *  Only an instructor opens it (anyone else is sent Home); an unknown
+ *  assignment or attempt repairs the URL to the student's submission page. */
+function applyForeignView(route: Extract<Route, { kind: 'assignment' }>, student: string, seq: number): void {
+  if (!instructorRole.isInstructor()) {
+    navigate({ kind: 'home' }, { replace: true });
+    return;
+  }
+  const { viewingOwner, viewingSubmission, assignment, openSubmissionOf } = useStore.getState();
+  // Already on show (a question arrow, a case, the banner's close): no
+  // reload — the canvas and a run stay; only the question/case apply.
+  const shown =
+    viewingOwner?.key === student && viewingSubmission?.attempt === route.attempt && assignment?.id === route.id;
+  const opened = shown ? Promise.resolve(true) : openSubmissionOf(route.id, student, route.attempt ?? 1);
+  void opened.then((ok) => {
+    if (seq !== applySeq) return;
+    if (!ok) {
+      navigate({ kind: 'instructor-grading-student', id: route.id, student }, { replace: true });
+      return;
+    }
+    const { assignment: a, currentQuestionIndex, switchQuestion } = useStore.getState();
+    const qi = route.questionIndex ?? 0;
+    if (a && qi < a.questions.length && qi !== currentQuestionIndex) switchQuestion(qi);
+    useStore.setState({ assignmentView: 'question' });
+    const q = a?.questions[qi];
+    if (route.caseIndex != null && q) void useStore.getState().loadCaseInput(q.id, route.caseIndex);
+  });
 }
 
 /**

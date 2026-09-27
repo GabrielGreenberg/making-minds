@@ -18,7 +18,14 @@
 // a malformed queue problem is dropped (the queue kept), an unknown view is
 // the Overview, and the retired gradebook URL
 // (`#/instructor/assignments/:id/submissions`) parses to its Overview and is
-// rewritten by canonicalHash, which leaves every other hash alone. [front door] — the bare site (`#/`,
+// rewritten by canonicalHash, which leaves every other hash alone. [viewer
+// route] — another student's attempt in the read-only editor (task 067,
+// `#/instructor/grading/:asg/student/:sid/submission/:n[/q/:i[/case/:k]]`)
+// round-trips, needs the instructor role, falls back to the student's page on
+// a malformed attempt, leaves the own `#/a/:id/submission/:n` unchanged; and
+// editorRoute keeps the owner on every in-editor navigation; [viewer apply]
+// only an instructor's apply opens it (openSubmissionOf), and any other
+// route leaves it. [front door] — the bare site (`#/`,
 // or no hash) is Home, which needs sign-in, so anyone not signed in meets the
 // sign-in screen whatever the browser's history; `#/sandbox` is open to a
 // visitor; the retired "signed in before" trace (`mm:auth:known`, the
@@ -63,7 +70,7 @@ const setUrl = (_s: unknown, _t: string, url: string) => {
 };
 g.history = { pushState: setUrl, replaceState: setUrl };
 
-const { routeAccess, initRouting, setRoutingPrincipal, parseHash, routeToHash, navigate, canonicalHash } = await import('../src/routing');
+const { routeAccess, initRouting, setRoutingPrincipal, parseHash, routeToHash, navigate, canonicalHash, editorRoute } = await import('../src/routing');
 const { useStore } = await import('../src/store');
 type Route = import('../src/routing').Route;
 
@@ -197,6 +204,42 @@ console.log('[grading routes]');
       .every((h) => canonicalHash(h) === h));
 }
 
+console.log('[viewer route]');
+{
+  // Another student's attempt in the read-only editor (task 067): the
+  // student's page with `/submission/:n[/q/:i[/case/:k]]`, an `assignment`
+  // route carrying the student's key — instructor-only.
+  const key = 's01@example.com/x';
+  const enc = encodeURIComponent(key);
+  const base = `#/instructor/grading/hw1/student/${enc}/submission/2`;
+  const cases: [string, Route][] = [
+    [base, { kind: 'assignment', id: 'hw1', student: key, attempt: 2 }],
+    [`${base}/q/3`, { kind: 'assignment', id: 'hw1', student: key, attempt: 2, questionIndex: 3 }],
+    [`${base}/q/3/case/1`, { kind: 'assignment', id: 'hw1', student: key, attempt: 2, questionIndex: 3, caseIndex: 1 }],
+  ];
+  for (const [hash, want] of cases) {
+    const r = parseHash(hash);
+    check(`'${hash}' parses, and round-trips`, JSON.stringify(r) === JSON.stringify(want) && routeToHash(r) === hash);
+    check('…and needs the instructor role', routeAccess(r) === 'instructor');
+  }
+  for (const bad of ['', '/0', '/x', '/1.5']) {
+    const b = parseHash(`#/instructor/grading/hw1/student/k1/submission${bad}`);
+    check(`'/submission${bad}' falls back to the student's submission page`,
+      b.kind === 'instructor-grading-student' && b.id === 'hw1' && b.student === 'k1');
+  }
+  const own = parseHash('#/a/hw1/submission/2/q/3');
+  check("the principal's own submission route is unchanged (no student, signed-in)",
+    own.kind === 'assignment' && own.student === undefined && routeAccess(own) === 'signed-in' &&
+      routeToHash(own) === '#/a/hw1/submission/2/q/3');
+  check('canonicalHash leaves the viewer hash alone', canonicalHash(`${base}/q/3/case/1`) === `${base}/q/3/case/1`);
+  // editorRoute: every in-editor navigation keeps whose attempt is on show.
+  check('editorRoute keeps the owner and the attempt',
+    routeToHash(editorRoute({ assignment: { id: 'hw1' }, viewingSubmission: { attempt: 2 }, viewingOwner: { key } }, 4)!) ===
+      `${base}/q/4`);
+  check("editorRoute on the principal's own work is the plain route",
+    routeToHash(editorRoute({ assignment: { id: 'hw1' }, viewingSubmission: null, viewingOwner: null }, 4)!) === '#/a/hw1/q/4');
+}
+
 console.log('[front door]');
 check('#/ is Home, which needs sign-in (the sign-in screen for anyone not signed in)',
   parseHash('#/').kind === 'home' && routeAccess(parseHash('#/')) === 'signed-in');
@@ -315,7 +358,8 @@ console.log('[submission route: applied]');
   useStore.setState({
     assignment: { id: 'hws', title: 'submission route', questions } as unknown as import('../src/types').AssignmentData,
     currentQuestionIndex: 0,
-    viewSubmission: (attempt: number | null) => {
+    viewSubmission: (target: number | null | object) => {
+      const attempt = typeof target === 'object' && target !== null ? -1 : target;
       calls.push(`view:${attempt}`);
       if (attempt === 7) return new Promise<boolean>((r) => { slow.release = r; });
       return Promise.resolve(attempt !== 9);
@@ -386,6 +430,39 @@ check('the next sign-in applies it for the new person: openAssignment(hw2)',
 // knows nobody. me() confirming them must not re-enter the sandbox over the
 // live canvas; me() refusing them resets the store for the visitor while
 // routing hears no change at all — the store keeps the sandbox open itself.
+console.log('[viewer apply]');
+{
+  // Applying the viewer route: only an instructor opens another's attempt
+  // (store openSubmissionOf); anyone else is sent Home. Any other route
+  // leaves the view (leaveForeignView).
+  const views: string[] = [];
+  let leaves = 0;
+  const spyViewer = () =>
+    useStore.setState({
+      openSubmissionOf: async (id: string, student: string, attempt: number) => {
+        views.push(`${id}|${student}|${attempt}`);
+        return true;
+      },
+      leaveForeignView: () => {
+        leaves++;
+      },
+    });
+  changePrincipal('stu@x.test');
+  spyViewer();
+  navigate({ kind: 'assignment', id: 'hw1', student: 'k1', attempt: 2, questionIndex: 0 });
+  check('a student applying the viewer route is sent Home, nothing opened', views.length === 0 && loc.hash === '#/');
+  backing.set('mm:auth:current', 'instructor-ada');
+  navigate({ kind: 'assignment', id: 'hw1', student: 'k1', attempt: 2, questionIndex: 0 });
+  await new Promise((r) => setTimeout(r, 10));
+  check('an instructor applying it opens that attempt of that student',
+    views.join() === 'hw1|k1|2' && loc.hash === '#/instructor/grading/hw1/student/k1/submission/2/q/0');
+  useStore.setState({ viewingOwner: { key: 'k1', name: 'K' } });
+  navigate({ kind: 'instructor-grading-student', id: 'hw1', student: 'k1' });
+  check('another route leaves the view', leaves === 1);
+  useStore.setState({ viewingOwner: null });
+  backing.delete('mm:auth:current');
+}
+
 console.log('[token boot]');
 changePrincipal(null);
 navigate({ kind: 'sandbox' });

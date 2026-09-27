@@ -48,7 +48,7 @@ import { emptyQuestionCircuit, restoreQuestionCircuits } from './storage/workboo
 import { buildSubmission } from './storage/submissionStore';
 // Store INSTANCES come from the backend seam (local vs. remote is decided
 // there, nowhere else); the modules above supply only pure helpers + types.
-import { workbookStore, submissionStore, assignmentStore, backendMode } from './storage/backend';
+import { workbookStore, submissionStore, assignmentStore, gradingStore, backendMode } from './storage/backend';
 import { writeJournal, clearJournal, clearJournalIfHolds, reconcileJournal } from './storage/journal';
 import { isFrozen } from './dueDates';
 import { getSessionUser } from './auth/session';
@@ -93,6 +93,26 @@ export function selectTmNotation(s: {
   return notationForRepresentation(q ? q.representation : s.repSystem);
 }
 
+/** Whose submitted attempt is on show when it is not the principal's own
+ *  (task 067: an instructor viewing a student's) — the grading summaries'
+ *  opaque student key and the name the lock notices use. */
+export interface SubmissionOwner {
+  key: string;
+  name: string;
+}
+
+/**
+ * Does the open assignment's canvas belong to the principal's own workbook —
+ * an assignment is open and it is not another person's attempt on show
+ * (viewingOwner)? The one guard every path that folds, saves, journals or
+ * resumes the open workbook asks: a viewed student's attempt opens with an
+ * EMPTY map (openSubmissionOf never loads the viewer's workbook), which saved
+ * or resumed would overwrite the viewer's own work.
+ */
+export function ownsOpenWorkbook(s: { assignment: AssignmentData | null; viewingOwner: SubmissionOwner | null }): boolean {
+  return s.assignment != null && s.viewingOwner == null;
+}
+
 /**
  * Is the open assignment frozen (notes/todos.md item 3)? True once its due
  * date has passed AND the student already has a submission on file — see
@@ -100,10 +120,17 @@ export function selectTmNotation(s: {
  * is never frozen. `now` defaults to the real clock; tests pass a fixed one.
  */
 export function selectAssignmentFrozen(
-  s: { assignment: AssignmentData | null; submissions: Record<string, SubmissionRecord> },
+  s: {
+    assignment: AssignmentData | null;
+    submissions: Record<string, SubmissionRecord>;
+    viewingOwner?: SubmissionOwner | null;
+  },
   now: number = Date.now(),
 ): boolean {
-  if (!s.assignment) return false;
+  // Another person's attempt on show (task 067): the viewer's OWN
+  // submissions say nothing about it — it is read-only as a viewed
+  // submission, never "frozen".
+  if (!s.assignment || s.viewingOwner) return false;
   return isFrozen(s.assignment.dueDate, now, s.submissions[s.assignment.id] != null);
 }
 
@@ -119,6 +146,7 @@ export function showsSubmission(s: {
   assignment: AssignmentData | null;
   submissions: Record<string, SubmissionRecord>;
   viewingSubmission: SubmissionRecord | null;
+  viewingOwner?: SubmissionOwner | null;
 }): boolean {
   if (!s.assignment) return false;
   return s.viewingSubmission != null || selectAssignmentFrozen(s);
@@ -136,6 +164,7 @@ function lockReason(s: {
   questionCircuits: Map<number, QuestionCircuit>;
   submissions: Record<string, SubmissionRecord>;
   viewingSubmission: SubmissionRecord | null;
+  viewingOwner?: SubmissionOwner | null;
 }): 'submission' | 'done' | null {
   const q = s.assignment?.questions[s.currentQuestionIndex];
   if (!q) return null;
@@ -156,6 +185,7 @@ export function selectQuestionLocked(s: {
   questionCircuits: Map<number, QuestionCircuit>;
   submissions: Record<string, SubmissionRecord>;
   viewingSubmission: SubmissionRecord | null;
+  viewingOwner?: SubmissionOwner | null;
 }): boolean {
   return lockReason(s) !== null;
 }
@@ -171,7 +201,9 @@ export function selectShowUnboundBoxWarning(s: Parameters<typeof selectQuestionL
 /** The answer panels' line for a locked question (null when unlocked). */
 export function selectLockNotice(s: Parameters<typeof lockReason>[0]): string | null {
   const reason = lockReason(s);
-  if (reason === 'submission') return 'Showing your submission — read-only.';
+  if (reason === 'submission') {
+    return s.viewingOwner ? `Showing ${s.viewingOwner.name}'s submission — read-only.` : 'Showing your submission — read-only.';
+  }
   if (reason === 'done') return 'Marked done — unlock this question to keep editing.';
   return null;
 }
@@ -933,7 +965,35 @@ interface AppState {
   // changing nothing, for an attempt that doesn't exist; a seam lookup
   // overtaken by any newer viewSubmission, open, Home or principal change —
   // a navigation on the SAME assignment included — applies nothing (true).
-  viewSubmission: (attempt: number | null) => Promise<boolean>;
+  //
+  // The record form (task 067) shows an attempt already fetched — another
+  // person's, from the grading seam — as `owner`'s: no seam lookup, and
+  // "already on show" compares the owner too (two students' attempt 1 are
+  // different attempts).
+  viewSubmission: (
+    target: number | null | { record: SubmissionRecord; owner: SubmissionOwner },
+  ) => Promise<boolean>;
+  // Whose attempt is on show when it is NOT the principal's own (task 067:
+  // an instructor viewing a student's), else null. Non-null only with
+  // viewingSubmission non-null: every clear of viewingSubmission clears it.
+  // While set, the open assignment's map is EMPTY — the viewer's own
+  // workbook was never loaded — so nothing folds, saves, journals or resumes
+  // it (ownsOpenWorkbook), frozen is never read off the viewer's own
+  // submissions, and the lock notices name the owner.
+  viewingOwner: SubmissionOwner | null;
+  // Open `studentKey`'s attempt `attempt` of assignment `assignmentId`
+  // read-only in the editor (the viewer route
+  // `#/instructor/grading/:asg/student/:sid/submission/:n`), from the
+  // grading seam's attempt detail. Leaves the principal's own open workbook
+  // the way Home does; never opens, folds or saves it, and registers no mint
+  // key. Resolves false (changing nothing) when the assignment or attempt
+  // doesn't exist; overtaken by any newer open, view, Home or principal
+  // change, it applies nothing (true).
+  openSubmissionOf: (assignmentId: string, studentKey: string, attempt: number) => Promise<boolean>;
+  // Close another person's attempt on show (viewingOwner) — the assignment,
+  // the canvas, the run and the editor with it; nothing saved, nothing kept
+  // (leaving resets). A no-op on the principal's own work.
+  leaveForeignView: () => void;
   closeAssignment: () => void;
   // Navigation between the catalog (Home) and the editor.
   goHome: () => void;          // hide the editor, return to the catalog (preserves in-memory work)
@@ -1754,6 +1814,7 @@ export const useStore = create<AppState>()((set, get) => ({
     set({
       assignment: null,
       viewingSubmission: null,
+      viewingOwner: null,
       workbookOpen: true,
       workbookTitle: 'Untitled Workbook',
       workbookFileHandle: null,
@@ -1846,6 +1907,7 @@ export const useStore = create<AppState>()((set, get) => ({
     set({
       assignment: null,
       viewingSubmission: null,
+      viewingOwner: null,
       workbookOpen: true,
       workbookTitle: titleFromFileName(fileName) || wb.metadata.title || 'Untitled Workbook',
       workbookFileHandle: handle ?? null,
@@ -2373,6 +2435,7 @@ export const useStore = create<AppState>()((set, get) => ({
       fillAnswers: [],
       questionTrace: null,
       viewingSubmission: null,
+      viewingOwner: null,
       buildMode: assignment.questions[0]?.buildMode || 'CC',
     });
     get().resetAllSimState();
@@ -2384,8 +2447,11 @@ export const useStore = create<AppState>()((set, get) => ({
     flushAutoSave();
     // A newer navigation: a submission lookup still in flight applies nothing.
     viewSubmissionSeq++;
-    // Same assignment already in memory → resume without wiping in-progress work.
-    if (get().assignment?.id === id) {
+    // Same assignment already in memory → resume without wiping in-progress
+    // work — only when it IS the principal's own work: another person's
+    // attempt on show (viewingOwner) sits over an empty map, which resumed
+    // (and autosaved) would overwrite this person's workbook.
+    if (get().assignment?.id === id && ownsOpenWorkbook(get())) {
       set({ workbookOpen: true });
       return true;
     }
@@ -2469,6 +2535,12 @@ export const useStore = create<AppState>()((set, get) => ({
     // Leaving the editor: a submission lookup still in flight applies nothing.
     viewSubmissionSeq++;
     const state = get();
+    // Another person's attempt on show (task 067): nothing here is this
+    // person's — no fold, no save; the view is simply closed (leaving resets).
+    if (state.viewingOwner) {
+      get().leaveForeignView();
+      return;
+    }
     // Sync the live canvas into its container so nothing in memory is lost —
     // never a submission on show (viewingSubmission): the live work is
     // already in the map, and folding the SUBMITTED canvas there would
@@ -2519,6 +2591,7 @@ export const useStore = create<AppState>()((set, get) => ({
     set({
       assignment: null,
       viewingSubmission: null,
+      viewingOwner: null,
       workbookOpen: true,
       components: saved.components,
       wires: saved.wires,
@@ -2602,6 +2675,7 @@ export const useStore = create<AppState>()((set, get) => ({
     set({
       assignment: null,
       viewingSubmission: null,
+      viewingOwner: null,
       currentQuestionIndex: 0,
       questionCircuits: new Map(),
       components: [],
@@ -2616,25 +2690,34 @@ export const useStore = create<AppState>()((set, get) => ({
     });
   },
   viewingSubmission: null,
-  viewSubmission: async (attempt) => {
+  viewingOwner: null,
+  viewSubmission: async (arg) => {
     closeBoxEditorForSwap(get);
     // This call supersedes any lookup still in flight (viewSubmissionSeq).
     const viewSeq = ++viewSubmissionSeq;
     const who = currentPrincipal;
     const a = get().assignment;
+    const attempt = arg == null || typeof arg === 'number' ? arg : arg.record.attempt;
     if (!a) return attempt == null;
+    // Whose attempt the target is: null = the principal's own.
+    const owner = arg != null && typeof arg === 'object' ? arg.owner : null;
     // The record to show; null = the live workbook — except while frozen,
     // which stays locked to the latest submission.
     let target: SubmissionRecord | null;
-    if (attempt == null) {
+    if (arg != null && typeof arg === 'object') {
+      // A fetched record (task 067): shown as it came — never looked up in
+      // this person's own submissions.
+      target = arg.record;
+    } else if (attempt == null) {
       const s = get();
       target = selectAssignmentFrozen(s) ? s.submissions[a.id] ?? null : null;
     } else {
       const s = get();
       // The fresher copy first: `submissions` is re-read on every visit (a
       // grade release adds the result a graded-case replay reads); the view
-      // is whatever was fetched when it began.
-      target = [s.submissions[a.id], s.viewingSubmission].find((r) => r?.attempt === attempt) ?? null;
+      // is whatever was fetched when it began — never another person's.
+      target =
+        [s.submissions[a.id], s.viewingOwner ? null : s.viewingSubmission].find((r) => r?.attempt === attempt) ?? null;
       if (!target) {
         // Own attempts only: attempt numbers count per student, and another
         // person's attempt k is never "yours" (task 037).
@@ -2649,19 +2732,28 @@ export const useStore = create<AppState>()((set, get) => ({
 
     const s = get();
     const shown = s.viewingSubmission;
-    if ((shown?.attempt ?? null) === (target?.attempt ?? null)) {
+    // An attempt is (whose, which): two students' attempt 1 are different.
+    if (
+      (s.viewingOwner?.key ?? null) === (owner?.key ?? null) &&
+      (shown?.attempt ?? null) === (target?.attempt ?? null)
+    ) {
       // Already on show: no canvas swap — a re-applied route, or the arrows,
       // must not wipe a run. Only a fresher copy of the record is taken.
-      if (target && target !== shown) set({ viewingSubmission: target });
+      if (target && target !== shown) set({ viewingSubmission: target, viewingOwner: owner });
       return true;
     }
+    // Leaving another person's attempt for this person's own: their map was
+    // never loaded under it (openSubmissionOf) — the view can't hand back.
+    if (s.viewingOwner && !owner) return false;
     const q = a.questions[s.currentQuestionIndex];
     let questionCircuits = s.questionCircuits;
-    if (!shown) {
+    if (!shown && !owner) {
       // Leaving the live workbook: its pending save goes out NOW (the
       // snapshot is taken synchronously, before the swap — the autosave
       // refuses while a submission is on show), and the live canvas lands in
-      // the map, which the view never writes to.
+      // the map, which the view never writes to. Never for another person's
+      // attempt: openSubmissionOf already left this person's workbook, and
+      // what is in memory now (an empty map) is nobody's to fold or save.
       flushAutoSave();
       if (q) {
         questionCircuits = new Map(questionCircuits);
@@ -2673,8 +2765,67 @@ export const useStore = create<AppState>()((set, get) => ({
       : target
         ? submittedQuestionCircuit(target, q.id)
         : questionCircuits.get(q.id) ?? emptyQuestionCircuit();
-    set({ viewingSubmission: target, questionCircuits, ...loadQuestionFields(canvas) });
+    set({ viewingSubmission: target, viewingOwner: target ? owner : null, questionCircuits, ...loadQuestionFields(canvas) });
     get().resetAllSimState();
+    return true;
+  },
+  leaveForeignView: () => {
+    if (!get().viewingOwner) return;
+    closeBoxEditorForSwap(get);
+    // A lookup or open still in flight for the view applies nothing.
+    viewSubmissionSeq++;
+    openAssignmentSeq++;
+    get().closeAssignment();
+    // With no assignment in memory the live fields ARE the sandbox's active
+    // tab (sandboxTabCircuits folds them into it, the autosave writes it):
+    // put that tab back, never closeAssignment's empty canvas — which the
+    // sandbox autosave would store over the viewer's saved tab.
+    // openSubmissionOf folded it into tabCircuits on the way in.
+    const s = get();
+    const saved = s.tabCircuits.get(s.activeTabId);
+    const tab = s.tabs.find((t) => t.id === s.activeTabId);
+    set({
+      components: saved?.components ?? [],
+      wires: saved?.wires ?? [],
+      boxes: saved?.boxes ?? [],
+      confirmedBoxLibrary: saved?.confirmedBoxes ?? [],
+      buildMode: tab?.buildMode || 'CC',
+    });
+    get().resetAllSimState();
+    set({ workbookOpen: false, lastSavedAt: null, loadedCase: null, undoStack: [], redoStack: [] });
+  },
+  openSubmissionOf: async (assignmentId, studentKey, attempt) => {
+    closeBoxEditorForSwap(get);
+    // Leave what the live fields hold the way Home does: this person's own
+    // open workbook (its live canvas folded and saved), or the sandbox (the
+    // live canvas folded into its tab, and its pending save flushed NOW,
+    // while no assignment is in memory — once one loads, the debounced save
+    // would go to the assignment path and the sandbox's would be lost);
+    // another person's view is simply closed.
+    const fromSandbox = get().assignment === null;
+    get().goHome();
+    if (fromSandbox) flushAutoSave();
+    // A newer navigation: an open or a submission lookup still in flight
+    // applies nothing; so does this one if it is overtaken.
+    const seq = ++openAssignmentSeq;
+    viewSubmissionSeq++;
+    const viewSeq = viewSubmissionSeq;
+    // The assignment (the instructor's copy: its banks are what a graded
+    // case replays against) and the attempt in full, from the grading seam —
+    // NEVER this person's workbook (loadForOpen), own submissions or mint key.
+    const [def, detail] = await Promise.all([
+      getAssignment(assignmentId),
+      gradingStore.attempt(assignmentId, studentKey, attempt),
+    ]);
+    if (seq !== openAssignmentSeq || viewSeq !== viewSubmissionSeq) return true;
+    if (!def || !detail) return false;
+    get().loadAssignment(def);
+    const shown = await get().viewSubmission({
+      record: detail.record,
+      owner: { key: detail.student.key, name: detail.student.name },
+    });
+    if (!shown || get().assignment?.id !== assignmentId) return shown;
+    set({ workbookOpen: true, assignmentView: 'question', lastSavedAt: null });
     return true;
   },
 
@@ -2721,8 +2872,10 @@ export const useStore = create<AppState>()((set, get) => ({
     const state = get();
     // Build from live state if this assignment is open; otherwise from the
     // persisted state — so you can submit straight from a Home card.
+    // Another person's attempt on show counts as not open: the map under it
+    // is empty, never this person's work (ownsOpenWorkbook).
     const circuits =
-      state.assignment?.id === id
+      state.assignment?.id === id && ownsOpenWorkbook(state)
         ? syncedQuestionCircuits(state)
         : restoreQuestionCircuits(def, await workbookStore.loadAssignmentState(id))
             .questionCircuits;
@@ -3336,6 +3489,9 @@ export const useStore = create<AppState>()((set, get) => ({
   // the sandbox), by whom and from which kind of canvas.
   copySelected: () => {
     const state = get();
+    // Another person's attempt on show (task 067): their parts, ids and all,
+    // never reach this person's clipboard (law 8).
+    if (state.viewingOwner) return;
     const selectedComps = state.components.filter((c) =>
       state.selectedIds.includes(c.id)
     );
@@ -5201,7 +5357,7 @@ function isCurrentQuestionLocked(state: AppState): boolean {
  *  lock's own words. */
 function lockRefusal(state: AppState, what: string): string {
   return lockReason(state) === 'submission'
-    ? `This question shows your submission, read-only — you can't ${what} here.`
+    ? `This question shows ${state.viewingOwner ? `${state.viewingOwner.name}'s` : 'your'} submission, read-only — you can't ${what} here.`
     : `This question is marked done — unlock it to ${what}.`;
 }
 
@@ -5279,7 +5435,9 @@ async function saveAssignmentState(
 ): Promise<{ id: string; state: AssignmentState } | null> {
   const s = useStore.getState();
   const a = s.assignment;
-  if (!a) return null;
+  // Another person's attempt on show: there is no workbook of this
+  // person's in memory to save (ownsOpenWorkbook).
+  if (!a || !ownsOpenWorkbook(s)) return null;
   const state = snapshotAssignmentState(s);
   await workbookStore.saveAssignmentState(a.id, state, { keepalive });
   return { id: a.id, state };
@@ -5294,7 +5452,7 @@ async function saveAssignmentState(
 function writeOpenAssignmentJournal(): void {
   if (backendMode !== 'remote') return;
   const s = useStore.getState();
-  if (!s.assignment || s.autoSaveStatus === 'saved') return;
+  if (!s.assignment || !ownsOpenWorkbook(s) || s.autoSaveStatus === 'saved') return;
   const email = getSessionUser()?.email;
   if (!email) return;
   writeJournal(email, s.assignment.id, snapshotAssignmentState(s));
@@ -5476,6 +5634,9 @@ function saveForLeavingPrincipal(): void {
   const unsaved = autoSaveTimer != null || autoSaveTrailing || s.autoSaveStatus !== 'saved';
   if (!unsaved) return;
   const a = s.assignment;
+  // Another person's attempt on show: nothing in memory is the leaving
+  // person's (their workbook was never loaded), and no sandbox either.
+  if (a && !ownsOpenWorkbook(s)) return;
   if (!a) {
     try {
       localStorage.setItem(sandboxKey(currentPrincipal), JSON.stringify(getAutoSaveData()));

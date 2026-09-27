@@ -229,8 +229,10 @@ console.log('\n[one frame]');
     /toggleCurrentQuestionDone/.test(panel) && !/isCurrentQuestionLocked/.test(panel));
   check('the done mark is a checkbox-role button, not an <input> (the canvas\'s shortcuts stand down while an input has focus)',
     /role="checkbox"/.test(panel) && !/<input\b/.test(panel));
-  check('navigation goes through navigate() with the viewed attempt carried along',
-    /navigate\(\{ kind: 'assignment', id: assignment\.id, attempt, questionIndex: i \}, \{ replace: true \}\)/.test(panel));
+  // The route comes from routing's editorRoute (the attempt on show and,
+  // task 067, whose it is), pinned in routingCheck [viewer route].
+  check('navigation goes through navigate() with the viewed attempt (and its owner) carried along',
+    /editorRoute\(useStore\.getState\(\), i\)/.test(panel) && /navigate\(route, \{ replace: true \}\)/.test(panel));
 }
 
 console.log('\n[output panel]');
