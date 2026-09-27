@@ -93,7 +93,6 @@ export interface RosterRow extends UserRow {
   aliases: string[];
 }
 
-/** Where an extra sign-in address came from. */
 /** An account as the grading summaries see it (listGradingUsers). */
 export interface GradingUserRow {
   email: string;
@@ -117,6 +116,7 @@ interface SubmissionRow {
   assignment_hash: string | null;
 }
 
+/** Where an extra sign-in address came from. */
 export type EmailAliasSource = 'roster' | 'signup' | 'sso' | 'request';
 
 /** addEmailAlias's answer: stored now, already this account's, or someone else's. */
