@@ -9,7 +9,8 @@
 //   RemoteAssignmentStore → listAssignments / getAssignment / putAssignment / deleteAssignment
 //   RemoteSubmissionStore → submitAssignment / listSubmissions / listAllSubmissions / getClassmates
 //   RemoteGradingStore    → putGrade / deleteGrade / getGradingSummary / getCourseGrading /
-//                           getStudentGrading / getGradingAttempt
+//                           getStudentGrading / getGradingAttempt /
+//                           getQuestionResponses / postGradingClaim
 //   remote auth           → login / logout / me
 //
 // Configuration: VITE_API_BASE (e.g. "https://api.phil133.example.edu") set at
@@ -39,8 +40,10 @@ import type {
   AssignmentGradingSummary,
   AttemptDetail,
   CourseGrading,
+  QuestionResponses,
   StudentGrading,
 } from '../storage/gradingSummary';
+import type { ClaimOutcome } from '../storage/gradingClaims';
 
 export interface ApiUser {
   email: string;
@@ -581,6 +584,26 @@ export function getGradingAttempt(assignmentId: string, studentKey: string, atte
     'GET',
     `/assignments/${encodeURIComponent(assignmentId)}/submissions/${encodeURIComponent(studentKey)}/${encodeURIComponent(String(attempt))}`,
   );
+}
+
+/** Instructor only: the hand-grading queue's feed (task 066) — one problem
+ *  across every submitter's latest attempt, with grades and live claims. */
+export function getQuestionResponses(assignmentId: string, questionId: number): Promise<QuestionResponses> {
+  return request<QuestionResponses>(
+    'GET',
+    `/assignments/${encodeURIComponent(assignmentId)}/questions/${encodeURIComponent(String(questionId))}/responses`,
+  );
+}
+
+/** Instructor only: claim (renew) or release a soft claim on one response.
+ *  The student is named by their opaque key in the body, never in a path. */
+export function postGradingClaim(input: {
+  assignmentId: string;
+  studentKey: string;
+  questionId: number;
+  release?: boolean;
+}): Promise<ClaimOutcome> {
+  return request<ClaimOutcome>('POST', '/grading/claims', input);
 }
 
 // ── feedback ─────────────────────────────────────────────────────

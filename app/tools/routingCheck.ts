@@ -14,7 +14,7 @@
 // (the rest kept), and applying it shows the attempt (store viewSubmission)
 // BEFORE the question opens; an unknown attempt repairs the URL to the live
 // route; a superseded apply does nothing. [grading routes] — the Grading
-// tab's routes (task 065) round-trip with the student key URI-encoded whole,
+// tab's routes (task 065; the queue by student, 066) round-trip with the student key URI-encoded whole,
 // a malformed queue problem is dropped (the queue kept), an unknown view is
 // the Overview, and the retired gradebook URL
 // (`#/instructor/assignments/:id/submissions`) parses to its Overview and is
@@ -93,6 +93,7 @@ const ALL: Route[] = [
   { kind: 'instructor-grading-assignment', id: 'hw1', view: 'matrix' },
   { kind: 'instructor-grading-assignment', id: 'hw1', view: 'queue' },
   { kind: 'instructor-grading-assignment', id: 'hw1', view: 'queue', questionId: 7 },
+  { kind: 'instructor-grading-assignment', id: 'hw1', view: 'queue', student: 'k1' },
   { kind: 'instructor-grading-student', id: 'hw1', student: 'k1' },
   { kind: 'instructor-student', student: 'k1' },
   { kind: 'instructor-roster' },
@@ -160,6 +161,9 @@ console.log('[grading routes]');
     ['#/instructor/grading/hw1/matrix', { kind: 'instructor-grading-assignment', id: 'hw1', view: 'matrix' }],
     ['#/instructor/grading/hw1/queue', { kind: 'instructor-grading-assignment', id: 'hw1', view: 'queue' }],
     ['#/instructor/grading/hw1/queue/7', { kind: 'instructor-grading-assignment', id: 'hw1', view: 'queue', questionId: 7 }],
+    // The queue by student (task 066): the student key, URI-encoded whole.
+    ['#/instructor/grading/hw1/queue/student/abc', { kind: 'instructor-grading-assignment', id: 'hw1', view: 'queue', student: 'abc' }],
+    [`#/instructor/grading/hw1/queue/student/${enc}`, { kind: 'instructor-grading-assignment', id: 'hw1', view: 'queue', student: key }],
     ['#/instructor/grading/hw1/student/k1', { kind: 'instructor-grading-student', id: 'hw1', student: 'k1' }],
     [`#/instructor/grading/hw1/student/${enc}`, { kind: 'instructor-grading-student', id: 'hw1', student: key }],
     ['#/instructor/students/k1', { kind: 'instructor-student', student: 'k1' }],
@@ -176,6 +180,9 @@ console.log('[grading routes]');
     check(`'/queue/${bad}' drops the problem but keeps the queue`,
       b.kind === 'instructor-grading-assignment' && b.view === 'queue' && b.questionId === undefined);
   }
+  const bare = parseHash('#/instructor/grading/hw1/queue/student');
+  check("'/queue/student' with no key is the queue (no problem, no student)",
+    bare.kind === 'instructor-grading-assignment' && bare.view === 'queue' && bare.questionId === undefined && bare.student === undefined);
   for (const odd of ['#/instructor/grading/hw1/nonsense', '#/instructor/grading/hw1/student']) {
     const o = parseHash(odd);
     check(`'${odd}' → the Overview`, o.kind === 'instructor-grading-assignment' && o.view === 'overview');

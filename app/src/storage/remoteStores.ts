@@ -47,9 +47,11 @@ import type { SubmissionStore } from './submissionStore';
 import type {
   AssignmentGradingSummary,
   AttemptDetail,
+  ClaimOutcome,
   CourseGrading,
   GradingStore,
   GradeWriteOutcome,
+  QuestionResponses,
   StudentGrading,
 } from './gradingStore';
 import type { FeedbackStore } from './feedbackStore';
@@ -77,6 +79,8 @@ import {
   getCourseGrading,
   getStudentGrading,
   getGradingAttempt,
+  getQuestionResponses,
+  postGradingClaim,
   submitFeedback,
   listFeedback,
   setFeedbackStatus,
@@ -249,6 +253,14 @@ class RemoteGradingStore implements GradingStore {
 
   attempt(assignmentId: string, studentKey: string, attempt: number): Promise<AttemptDetail | null> {
     return this.orNull(() => getGradingAttempt(assignmentId, studentKey, attempt));
+  }
+
+  responses(assignmentId: string, questionId: number): Promise<QuestionResponses | null> {
+    return this.orNull(() => getQuestionResponses(assignmentId, questionId));
+  }
+
+  claim(assignmentId: string, studentKey: string, questionId: number, opts?: { release?: boolean }): Promise<ClaimOutcome | null> {
+    return this.orNull(() => postGradingClaim({ assignmentId, studentKey, questionId, ...(opts?.release ? { release: true } : {}) }));
   }
 }
 

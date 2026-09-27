@@ -26,7 +26,7 @@ happen (memo §6.4, mockup 4, `tasks/attachments/2026-09-23-031-4-queue.png`).
   `POST /api/grading/claims` (in memory, 5-minute TTL renewed while active).
 - `#/instructor/grading/:asg/queue/:qid`: **By problem** — statement (collapsible), one
   response, 0 / ½ / 1 (keys `0`, `h`, `1`), note (optional on a hand grade; placeholder "No
-  medical or accommodation details"), **Save & next** (↵), J/K previous/next; it skips graded
+  medical or accommodation details"), **Save & next** (↵), J/K next/previous (vim/Gmail: J = next); it skips graded
   and claimed responses; the side list shows states (to grade, changed, graded, claimed by …).
   **By student** walks one student's pending problems.
 - **Hide names** toggle (per-person ui pref in localStorage) shows "Response 39".
@@ -45,4 +45,65 @@ happen (memo §6.4, mockup 4, `tasks/attachments/2026-09-23-031-4-queue.png`).
 Gates; browser: grade ten toy responses by keyboard alone; two tabs as two instructors
 see the claim and the 409.
 
+Done 2026-09-27 (Implement stage, headless Chrome over the Vite dev server, local mode,
+HW1 seeded): `/queue` lands on Problem 6a; `h ↵ 1 ↵ 0 ↵` graded all three local responses
+by keyboard (counts 0 → 3 of 3, then "All caught up"); Hide names switch → "Response N";
+By student walks one submitter's 9 waiting problems; typing `1`/`h` in the note leaves the
+points alone; 390 px wide: one column, no horizontal scroll.
+
+**Owed (remote mode — local mode has one instructor and three HW1 submitters):**
+1. `cd server && MM_AUTH_MODE=dev npm run dev` (port 8199) and the "Vite Remote Mode"
+   launch config; import ten fake students (`npm run roster`), submit HW1 as each (dev
+   login), add a second instructor (made-up name).
+2. Tab A as instructor 1 → `#/instructor/grading/hw1/queue/<open qid>`: grade ten
+   responses with `0`/`h`/`1` + ↵ alone.
+3. Tab B (a private window) as instructor 2 on the same problem: the response open in
+   tab A shows "claimed by <name>" in the side list and Save & next skips it.
+4. Both tabs open the same ungraded response (click it in the side list); save in A, then
+   in B → B shows "Graded … by … meanwhile — theirs stands" with Keep theirs / Save mine.
+5. Resubmit one graded student with a different answer → the queue shows "↻ was ½" and
+   the card's "Keep ½" saves it in one click.
+
 ## Progress log
+- 2026-09-27 (robot, Implement): built on `robot/066-hand-grading-queue`. Pure
+  `storage/gradingClaims.ts` (ClaimBook, TTL 5 min, never stolen, one per grader) and
+  `gradingSummary.ts buildQuestionResponses` (the feed; answer keys only as a sha256
+  fingerprint, a machine by attempt reference); `GradingStore.responses/claim` (local:
+  in-page ClaimBook; remote: `getQuestionResponses`/`postGradingClaim`); server routes
+  `GET …/questions/:qid/responses`, `POST /api/grading/claims`; route
+  `/queue/student/:sid`; `instructor/gradingQueueViews.ts` (pure) + `GradingQueue.tsx`;
+  Overview "Grade →"; pages.css queue block. Pins: gradingViewCheck [claims] [queue]
+  [feed] (grep gate widened), server gradingCheck [queue feed] [claims] [queue 409],
+  routingCheck. Decisions: the queue lists every submitter (roster first, off-roster
+  tagged) ordered by opaque key so "Response N" is stable and name-blind; one live claim
+  per grader; a live claim is only shown, never taken; claims renew every 60 s only after
+  activity in the last 5 min; By student reuses the queue card until 067 builds the §6.3
+  page; J = next, K = previous (vim/Gmail), the hint says so. The pure module is
+  `gradingQueueViews.ts`, not `gradingQueue.ts` — that name collides with
+  `GradingQueue.tsx` on macOS's case-insensitive filesystem.
+- 2026-09-27 (robot, review fixes): Save & next now writes the version the card MOUNTED
+  with (pinned in a ref; the 30 s poll and a 409 patch no longer rebase it) — only "Save
+  mine over it" or a successful save rebases; while a conflict shows, ↵ = Keep theirs &
+  next. Mouse clicks on the side list, Hide names, statement toggle and Previous keep focus
+  off the button so ↵ still saves. The side list says "claimed by <name>". The Done-when's
+  J/K clause amended to record the J = next decision.
+
+### 2026-09-27 — implemented (work loop)
+- **Built:** the hand-grading queue. One open response at a time under its (collapsible)
+  statement, 0 / ½ / 1 by key (`0` `h` `1`), optional note, ↵ = Save & next (skips graded
+  and others' claimed responses), J/K next/previous; side list with states; By student walks
+  one student's pending problems; Hide names ("Response N", per-person ui pref); a changed
+  answer offers its old grade as one click; a 409 shows the other grader's grade ("theirs
+  stands", Keep theirs / Save mine over it). Server: `GET …/questions/:qid/responses`,
+  `POST /api/grading/claims` (in-memory ClaimBook, 5-min TTL). Overview "Grade →" opens it.
+- **Pins:** gradingViewCheck [claims] [queue] [feed]; server gradingCheck [queue feed]
+  (no answer key / test cases in the feed) [claims] [queue 409]; routingCheck (queue routes).
+- **Gates:** app-tsc=0 app-build=0 app-check=0 server-tsc=0 server-check=0.
+- **Review:** 4 fixed (claimed-by text; J/K recorded as J = next; keepFocus so ↵ still
+  saves after a mouse click; version pinned at mount so polls/409 never rebase silently),
+  0 skipped.
+- **Owed (loop session):** browser checks in local mode (queue page, keys, Hide names,
+  By student, 1080px + phone width) and remote mode (ten fake students by keyboard alone;
+  two instructors: claim shown + skipped, 409 → theirs stands, Save mine works, claim lapses;
+  resubmit → ↻ with one-click Keep). Fake names only, scratchpad files, never git.
+- **NEXT STEP:** loop session: visual check if owed, then land per PROFILE §5.

@@ -17,13 +17,16 @@ import {
   buildAssignmentSummary,
   buildAttemptDetail,
   buildCourseGrading,
+  buildQuestionResponses,
   buildStudentGrading,
   type AssignmentGradingSummary,
   type AttemptDetail,
   type CourseGrading,
   type GradingIdentity,
+  type QuestionResponses,
   type StudentGrading,
 } from '../../app/src/storage/gradingSummary';
+import type { ClaimBook } from '../../app/src/storage/gradingClaims';
 
 function derivedKey(secret: string, email: string): string {
   return 'x' + createHash('sha256').update(`${secret}\0grading\0${email}`).digest('base64url').slice(0, 12);
@@ -160,6 +163,34 @@ export function attemptDetail(db: Db, secret: string, id: string, key: string, a
     student,
     record: { ...record, studentKey: student.key, ...(grades.length ? { grades } : {}) },
     events: db.listGradeEvents(id).filter((e) => e.student === email),
+    now,
+  });
+}
+
+/** GET /api/assignments/:id/questions/:qid/responses — the hand-grading
+ *  queue's feed (task 066), with the live claims as `viewer` (the grader's
+ *  email; never sent) sees them; null = no such assignment or question. */
+export function questionResponses(
+  db: Db,
+  secret: string,
+  id: string,
+  questionId: number,
+  claims: ClaimBook,
+  viewer: string,
+  now: number,
+): QuestionResponses | null {
+  const assignment = db.getAssignment(id);
+  if (!assignment) return null;
+  const dir = new Directory(db, secret);
+  const { latest, identities } = latestRecords(db, dir, id);
+  return buildQuestionResponses({
+    assignment,
+    questionId,
+    roster: dir.roster,
+    latest,
+    identify: (key) => identities.get(key)!,
+    claims: claims.active(id, questionId, now, viewer),
+    released: db.getGradesReleased(id),
     now,
   });
 }

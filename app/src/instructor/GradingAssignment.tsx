@@ -10,6 +10,7 @@ import { isHandQuestion, plural, releaseWarning, sectionsOf } from './gradingVie
 import { ReleaseTag } from './GradingParts';
 import { GradingOverview } from './GradingOverview';
 import { GradingMatrix } from './GradingMatrix';
+import { GradingQueue } from './GradingQueue';
 
 const VIEWS: { view: GradingView; label: string }[] = [
   { view: 'overview', label: 'Overview' },
@@ -22,7 +23,8 @@ const VIEWS: { view: GradingView; label: string }[] = [
  * mockups 2–3): a header with the Release action, and a segmented control
  * over Overview · Matrix · Queue (the URL keeps the view). Reads the 064
  * summary — one row per roster student, then the other submitters — and the
- * assignment for its labels; no view computes a grade.
+ * assignment for its labels; no view computes a grade. The Queue (task 066)
+ * reads its own feed too, and reloads the summary after each grade.
  */
 export function GradingAssignment({ route }: { route: Extract<Route, { kind: 'instructor-grading-assignment' }> }) {
   const { id, view } = route;
@@ -113,15 +115,7 @@ export function GradingAssignment({ route }: { route: Extract<Route, { kind: 'in
 
       {view === 'overview' && <GradingOverview summary={summary} assignment={assignment} />}
       {view === 'matrix' && <GradingMatrix summary={summary} assignment={assignment} />}
-      {view === 'queue' && (
-        <p className="mm-empty">
-          The by-problem hand-grading queue arrives with the next grading slice. Until then, open a student from the{' '}
-          <a className="mm-link" {...hashLink({ kind: 'instructor-grading-assignment', id, view: 'matrix' })}>
-            Matrix
-          </a>{' '}
-          to grade their answers.
-        </p>
-      )}
+      {view === 'queue' && <GradingQueue summary={summary} assignment={assignment} route={route} onChanged={reload} />}
     </div>
   );
 }

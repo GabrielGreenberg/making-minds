@@ -16,6 +16,12 @@
 // the ONE pure builder, storage/gradingSummary.ts. Local: over the local
 // SubmissionStore's records and the toy roster. Remote: the server's summary
 // routes, which run the same builder over the Db.
+//
+// And the hand-grading queue (task 066): one problem across every
+// submitter (`responses`, the same pure builder) and the soft claims on it
+// (`claim`; storage/gradingClaims.ts — advisory, a write never checks one).
+// Local: a ClaimBook in this page's memory, the signed-in toy account the
+// grader. Remote: the server's, one per process.
 
 import type { AssignmentData, HumanGrade, Points, SubmissionRecord } from '../types';
 import { readPersistedAccount, TOY_ACCOUNTS } from '../auth/accounts';
@@ -25,13 +31,16 @@ import {
   buildAssignmentSummary,
   buildAttemptDetail,
   buildCourseGrading,
+  buildQuestionResponses,
   buildStudentGrading,
   type AssignmentGradingSummary,
   type AttemptDetail,
   type CourseGrading,
   type GradingIdentity,
+  type QuestionResponses,
   type StudentGrading,
 } from './gradingSummary';
+import { ClaimBook, type ClaimOutcome } from './gradingClaims';
 
 export type {
   AssignmentGradingSummary,
@@ -40,8 +49,13 @@ export type {
   GradingIdentity,
   GradingProgress,
   GradingRow,
+  QueueAnswer,
+  QueueResponse,
+  QuestionResponses,
   StudentGrading,
 } from './gradingSummary';
+export type { ClaimOutcome, ClaimView } from './gradingClaims';
+export { CLAIM_TTL_MS } from './gradingClaims';
 
 /** How a write came out. A conflict carries the grade someone else wrote
  *  since it was read (null = they cleared it); a refusal carries a reason. */
@@ -75,6 +89,15 @@ export interface GradingStore {
   student(studentKey: string): Promise<StudentGrading | null>;
   /** One attempt in full, on demand; null = no such assignment, student or attempt. */
   attempt(assignmentId: string, studentKey: string, attempt: number): Promise<AttemptDetail | null>;
+  /** The hand-grading queue's feed: one problem across every submitter's
+   *  latest attempt, with each response's grade and live claim. null = no
+   *  such assignment or question. Instructor-only. */
+  responses(assignmentId: string, questionId: number): Promise<QuestionResponses | null>;
+  /** Claim (or renew) one response for the signed-in grader, or with
+   *  `release` let go of it (the outcome is then `{held: false}`, `by` null
+   *  unless someone else holds it). Another grader's live claim is never taken — the
+   *  outcome names them. null = no such assignment, question or student. */
+  claim(assignmentId: string, studentKey: string, questionId: number, opts?: { release?: boolean }): Promise<ClaimOutcome | null>;
 }
 
 /** The toy roster: its students, keyed as local records are (the email). */
@@ -111,6 +134,8 @@ function latestPerStudent(all: readonly SubmissionRecord[]): SubmissionRecord[] 
 export class LocalGradingStore implements GradingStore {
   private readonly subs: typeof localSubmissionStore;
   private readonly assignments: AssignmentStore;
+  /** This page's claims (local mode has one grader per browser tab). */
+  private readonly claims = new ClaimBook();
 
   constructor(subs: typeof localSubmissionStore, assignments: AssignmentStore) {
     this.subs = subs;
@@ -196,5 +221,37 @@ export class LocalGradingStore implements GradingStore {
       events: this.subs.gradeLog(assignmentId).filter((e) => e.student === studentKey),
       now: Date.now(),
     });
+  }
+
+  async responses(assignmentId: string, questionId: number): Promise<QuestionResponses | null> {
+    const got = await this.assignments.get(assignmentId);
+    if (!got) return null;
+    const now = Date.now();
+    return buildQuestionResponses({
+      assignment: got.assignment,
+      questionId,
+      roster: localRoster(),
+      latest: latestPerStudent(await this.subs.listAll(assignmentId)),
+      identify: localIdentity,
+      claims: this.claims.active(assignmentId, questionId, now, this.actor()),
+      released: got.gradesReleased,
+      now,
+    });
+  }
+
+  async claim(assignmentId: string, studentKey: string, questionId: number, opts?: { release?: boolean }): Promise<ClaimOutcome | null> {
+    const got = await this.assignments.get(assignmentId);
+    const known = got?.assignment.questions.some((q) => q.id === questionId) &&
+      (await this.subs.listAll(assignmentId)).some((r) => r.studentKey === studentKey);
+    if (!known) return null;
+    const target = { assignmentId, studentKey, questionId };
+    const now = Date.now();
+    if (opts?.release) {
+      this.claims.release(target, this.actor());
+      const left = this.claims.active(assignmentId, questionId, now).get(studentKey);
+      return { held: false, by: left?.by ?? null, until: left?.until ?? null };
+    }
+    const account = readPersistedAccount();
+    return this.claims.claim(target, { actor: this.actor(), name: account?.name ?? 'Someone' }, now);
   }
 }

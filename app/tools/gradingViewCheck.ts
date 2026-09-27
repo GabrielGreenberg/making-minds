@@ -12,15 +12,39 @@
 // Pins: [cells] cellOf for every state; [filters] each chip's predicate and
 // its count (the roster only); [problems] problemStats; [tiles] the
 // Overview's counts; [grades] progress.grades over submitted roster rows;
-// [release] the warning; [sort] counting assignments first; [no view grades]
-// the grep gate (no view imports the grader or a scorer) and the retired
-// gradebook's files are gone.
+// [release] the warning; [sort] counting assignments first; [claims] the
+// hand-grading queue's soft claims (task 066; storage/gradingClaims.ts — TTL,
+// renewal, never stolen, one per grader); [queue] the queue's pure logic
+// (src/instructor/gradingQueueViews.ts — states, Save & next's skips, J/K,
+// the counts line, hidden names); [feed] buildQuestionResponses over the same
+// fixture (who is in it and in what order, answers by kind, the suggestion,
+// no answer key or circuit); [no view grades] the grep gate (no view imports
+// the grader or a scorer) and the retired gradebook's files are gone.
 
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import type { AssignmentData, AssignmentQuestion, HumanGrade, Points, QuestionResult, SubmissionData, SubmissionRecord } from '../src/types';
 import { answerKey } from '../src/engine/score';
 import { homeworkContentHash } from '../src/devData/homeworkSync';
-import { buildAssignmentSummary, type CourseAssignmentRow, type GradingIdentity } from '../src/storage/gradingSummary';
+import {
+  buildAssignmentSummary,
+  buildQuestionResponses,
+  type CourseAssignmentRow,
+  type GradingIdentity,
+  type QueueResponse,
+} from '../src/storage/gradingSummary';
+import { ClaimBook, CLAIM_TTL_MS, type ClaimView } from '../src/storage/gradingClaims';
+import {
+  hideNamesPrefKey,
+  nextToGrade,
+  queueCounts,
+  queueProblemIds,
+  queueState,
+  responseLabel,
+  stateText,
+  step,
+  studentsWithWork,
+  submitterKeys,
+} from '../src/instructor/gradingQueueViews';
 import {
   cellOf,
   filterCounts,
@@ -213,13 +237,151 @@ const sorted = sortGradingRows([course('hw7', false), course('hw1'), course('hw2
 check('counting assignments first, in order; countsTowardGrade: false after', sorted.map((r) => r.id).join() === 'hw1,hw2,hw7,x');
 check('a not-counted row is dimmed; absent counts', !isCounted(course('hw7', false)) && isCounted(course('hw1')) && isCounted(course('hw2', true)));
 
+console.log('[claims]');
+{
+  const book = new ClaimBook();
+  const T = (studentKey: string) => ({ assignmentId: 'toy', studentKey, questionId: O.id });
+  const A = { actor: 'a@example.edu', name: 'Grader A' };
+  const B = { actor: 'b@example.edu', name: 'Grader B' };
+  const t0 = 1_000_000;
+  const c1 = book.claim(T('ka'), A, t0);
+  check('a claim at t lives until t + 5 minutes', CLAIM_TTL_MS === 300_000 && c1.held && Date.parse(c1.until) === t0 + CLAIM_TTL_MS);
+  check('…live one ms before `until`, gone AT it',
+    book.active('toy', O.id, t0 + CLAIM_TTL_MS - 1).has('ka') && !book.active('toy', O.id, t0 + CLAIM_TTL_MS).has('ka'));
+  check('active() prunes what has lapsed', book.size === 0);
+  book.claim(T('ka'), A, t0);
+  const renewed = book.claim(T('ka'), A, t0 + 200_000);
+  check('the same grader claiming again renews it', renewed.held && Date.parse(renewed.until) === t0 + 200_000 + CLAIM_TTL_MS &&
+    book.active('toy', O.id, t0 + CLAIM_TTL_MS + 1).has('ka'));
+  const stolen = book.claim(T('ka'), B, t0 + 250_000);
+  check("another grader's live claim is not taken — the answer names who holds it",
+    !stolen.held && stolen.by === 'Grader A' && book.active('toy', O.id, t0 + 250_000).get('ka')?.by === 'Grader A');
+  const after = book.claim(T('ka'), B, t0 + 200_000 + CLAIM_TTL_MS);
+  check('…but an expired one is', after.held && book.active('toy', O.id, t0 + 200_000 + CLAIM_TTL_MS).get('ka')?.by === 'Grader B');
+  const t1 = t0 + 10_000_000;
+  book.claim(T('kb'), A, t1);
+  book.claim(T('kc'), A, t1 + 1);
+  const live = book.active('toy', O.id, t1 + 2);
+  check('one live claim per grader: claiming B drops A', !live.has('kb') && live.get('kc')?.by === 'Grader A');
+  book.release(T('kc'), B.actor);
+  check('a release by someone who does not hold it is a no-op', book.active('toy', O.id, t1 + 3).has('kc'));
+  book.release(T('kc'), A.actor);
+  check('…by the holder, it goes', !book.active('toy', O.id, t1 + 4).has('kc'));
+  book.claim(T('kd'), A, t1 + 5);
+  const views = book.active('toy', O.id, t1 + 6, A.actor);
+  check("the viewer's own claim is `mine`; another's is not",
+    views.get('kd')?.mine === true && book.active('toy', O.id, t1 + 6, B.actor).get('kd')?.mine === false &&
+      book.active('toy', M.id, t1 + 6).size === 0);
+}
+
+console.log('[queue]');
+{
+  const NOW_Q = 5_000_000;
+  const live = (by: string, mine: boolean): ClaimView => ({ by, mine, until: new Date(NOW_Q + 60_000).toISOString() });
+  const lapsed: ClaimView = { by: 'Grader B', mine: false, until: new Date(NOW_Q).toISOString() };
+  type Item = Pick<QueueResponse, 'source' | 'points' | 'claim' | 'suggestion'>;
+  const it = (source: QueueResponse['source'], points: QueueResponse['points'], claim: ClaimView | null = null, suggestion?: HumanGrade): Item =>
+    ({ source, points, claim, ...(suggestion ? { suggestion } : {}) });
+  const half: HumanGrade = { questionId: O.id, points: 0.5, answerKey: 'x', gradedAt: ON_TIME, version: 2 };
+  check('queueState: pending → to-grade; changed → changed; a hand grade or an autograde → graded',
+    queueState(it('pending', null), NOW_Q) === 'to-grade' && queueState(it('changed', null), NOW_Q) === 'changed' &&
+      queueState(it('human', 1), NOW_Q) === 'graded' && queueState(it('auto', 0), NOW_Q) === 'graded' &&
+      queueState(it('auto-half', 0.5), NOW_Q) === 'graded');
+  check("…another grader's live claim → claimed (whatever the work); the viewer's own on work left → mine; a lapsed claim is nothing",
+    queueState(it('pending', null, live('Grader B', false)), NOW_Q) === 'claimed' &&
+      queueState(it('human', 1, live('Grader B', false)), NOW_Q) === 'claimed' &&
+      queueState(it('pending', null, live('Me', true)), NOW_Q) === 'mine' &&
+      queueState(it('human', 1, live('Me', true)), NOW_Q) === 'graded' &&
+      queueState(it('pending', null, lapsed), NOW_Q) === 'to-grade');
+  const items: Item[] = [
+    it('human', 1), //                               0 graded
+    it('pending', null, live('Grader B', false)), // 1 claimed by B
+    it('pending', null), //                          2 to grade
+    it('changed', null, null, half), //              3 changed
+    it('auto', 1), //                                4 graded
+    it('pending', null, live('Me', true)), //        5 mine
+  ];
+  check('Save & next skips graded and claimed-by-others: from the top → 2, from 2 → 3, from 3 → 5 (own claim not a skip)',
+    nextToGrade(items, -1, NOW_Q) === 2 && nextToGrade(items, 2, NOW_Q) === 3 && nextToGrade(items, 3, NOW_Q) === 5);
+  check('…it wraps once: from 5 → 2', nextToGrade(items, 5, NOW_Q) === 2);
+  const doneItems: Item[] = [it('human', 1), it('pending', null, live('Grader B', false)), it('auto', 0)];
+  check('…null (All caught up) when only graded and claimed-by-others remain; empty → null',
+    nextToGrade(doneItems, -1, NOW_Q) === null && nextToGrade(doneItems, 0, NOW_Q) === null && nextToGrade([], -1, NOW_Q) === null);
+  check('…a lapsed claim is not a skip', nextToGrade([it('human', 1), it('pending', null, lapsed)], 0, NOW_Q) === 1);
+  check('J/K: adjacent, skipping only claimed-by-others (graded ones are visited), no wrap',
+    step(items, 0, 1, NOW_Q) === 2 && step(items, 2, -1, NOW_Q) === 0 && step(items, 3, 1, NOW_Q) === 4 &&
+      step(items, 5, 1, NOW_Q) === null && step(items, 0, -1, NOW_Q) === null);
+  check('the counts line: by the work, not the claims',
+    queueCounts(items).text === '2 of 6 graded · 1 changed · 3 to go', queueCounts(items).text);
+  check('the side list: ½ · claimed by name · ↻ was ½ · ✎',
+    stateText(it('human', 0.5), NOW_Q) === '½' && stateText(items[1], NOW_Q) === 'claimed by Grader B' && stateText(items[3], NOW_Q) === '↻ was ½' &&
+      stateText(items[2], NOW_Q) === '✎');
+  const s = { name: 'Student B' };
+  check('hidden names: "Response N" by the feed position; shown: the name',
+    responseLabel(38, s, true) === 'Response 39' && responseLabel(38, s, false) === 'Student B');
+  check('the Hide names pref is per person', hideNamesPrefKey('Ada@Example.edu') === 'gradingHideNames:ada@example.edu' &&
+    hideNamesPrefKey('a@x.edu') !== hideNamesPrefKey('b@x.edu'));
+  check('the problem picker: hand problems, and any other with a response waiting on a person',
+    queueProblemIds(summary, asg).join() === String(O.id));
+  const order = submitterKeys(summary);
+  check('by student: submitters in the stable key order (roster, then the rest); the ones with work waiting',
+    order.join() === 'ka,kb,kc,kd,kf,kx' && studentsWithWork(summary).map((r) => r.student.key).join() === 'kb,kc,kd,kx');
+}
+
+console.log('[feed]');
+{
+  // A fill-in question joins the toy set; one submitter's grade is claimed.
+  const F: AssignmentQuestion = {
+    id: 3, label: 'Problem 3', statement: 'Fill in.', buildMode: 'open', representation: 'binary',
+    fill_in: { labels: ['a', 'b'] }, fill_in_answers: ['1', '10'],
+  } as AssignmentQuestion;
+  const asgF: AssignmentData = { ...asg, questions: [M, O, F] };
+  const withFill = latest.map((r) => ({
+    ...r,
+    submission: { ...r.submission, answers: [...r.submission.answers, { questionId: F.id, circuit: EMPTY, fillAnswers: ['1', '11'] }] },
+    result: { ...r.result!, questions: [...r.result!.questions, { questionId: F.id, status: 'graded', passed: 1, total: 2, cases: [], fillCases: [{ expected: '10', got: '11', pass: false }] } as unknown as QuestionResult] },
+  }));
+  const claims = new Map<string, ClaimView>([['kb', { by: 'Grader B', mine: false, until: new Date(NOW + 60_000).toISOString() }]]);
+  const feedOf = (qid: number) => buildQuestionResponses({
+    assignment: asgF, questionId: qid, roster, latest: withFill,
+    identify: (key) => ({ ...who(key, 'Someone else'), offRoster: 'not-rostered' }), claims, released: false, now: NOW,
+  })!;
+  const open = feedOf(O.id);
+  check('every submitter: roster first, by key; then the off-roster one, flagged; a non-submitter absent',
+    open.responses.map((r) => r.student.key).join() === 'ka,kb,kc,kd,kf,kx' && open.responses[5].student.offRoster === 'not-rostered' &&
+      !open.responses.some((r) => r.student.key === 'ke'));
+  check('an open answer is its text', open.responses[1].answer.kind === 'text' &&
+    (open.responses[1].answer as { text: string }).text === 'maybe');
+  const kd = open.responses[3];
+  check('a changed answer: source changed, the stored grade (with its version) AND the suggestion',
+    kd.source === 'changed' && kd.points === null && kd.grade?.version === 1 && kd.suggestion?.points === 1);
+  check('the points as the one score says: a hand grade, and pending', open.responses[0].source === 'human' && open.responses[0].points === 1 &&
+    open.responses[1].source === 'pending' && open.responses[1].points === null);
+  check("another grader's claim shows by name, not mine", open.responses[1].claim?.by === 'Grader B' && open.responses[1].claim.mine === false &&
+    open.responses[0].claim === null);
+  const fill = feedOf(F.id).responses[0];
+  check('a fill-in answer is its blanks', fill.answer.kind === 'fill' && (fill.answer as { blanks: string[] }).blanks.join() === '1,11');
+  const machine = feedOf(M.id).responses[0];
+  check('a machine answer is a reference to the attempt, never the circuit',
+    JSON.stringify(machine.answer) === JSON.stringify({ kind: 'machine', attempt: 1 }));
+  const text = JSON.stringify([open, feedOf(F.id), feedOf(M.id)]);
+  const leaks = ['test_cases', 'perception_cases', 'fill_in_answers', 'expected', '"got"', 'components', 'wires', 'integrity', 'circuit', '@']
+    .filter((k) => text.includes(k));
+  check('the feed carries no answer key, case, circuit, integrity or email', leaks.length === 0, leaks.join());
+  check('answer keys ride only as fingerprints (16 hex)', [open.responses[0].answerKey, open.responses[0].grade!.answerKey]
+    .every((k) => /^[0-9a-f]{16}$/.test(k)));
+  check('an unknown question → null', buildQuestionResponses({
+    assignment: asgF, questionId: 99, roster, latest: withFill, identify: (k) => who(k, 'x'), claims, released: false, now: NOW,
+  }) === null);
+}
+
 console.log('[no view grades]');
 {
   const dir = new URL('../src/instructor/', import.meta.url);
-  const views = readdirSync(dir).filter((f) => /^Grading.*\.tsx$|^Student(Submission|Grading)View\.tsx$|^gradingViews\.ts$/.test(f));
+  const views = readdirSync(dir).filter((f) => /^Grading.*\.tsx$|^Student(Submission|Grading)View\.tsx$|^gradingViews\.ts$|^gradingQueueViews\.ts$/.test(f));
   const offenders = views.filter((f) => /engine\/grader|\bscoreRecord\b|\bscoreSubmission\b/.test(readFileSync(new URL(f, dir), 'utf8')));
   check(`the grading views read the summaries; none imports the grader or a scorer (${views.length} files)`,
-    views.length >= 5 && offenders.length === 0, offenders.join(', '));
+    views.length >= 7 && offenders.length === 0, offenders.join(', '));
   check('the retired gradebook is gone (GradebookView.tsx, Gradebook.ts)',
     !existsSync(new URL('GradebookView.tsx', dir)) && !existsSync(new URL('Gradebook.ts', dir)));
 }

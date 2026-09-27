@@ -17,6 +17,14 @@
 // only, stale results by content hash, no circuits / answers / emails in a
 // summary, one attempt in full on demand, students refused; the local
 // GradingStore ≡ the server on the same fixture; the 80 × 23 payload's size.
+// And the hand-grading queue (task 066): [queue feed] the responses route —
+// instructor-only, 404 on an unknown assignment or problem, one response per
+// latest attempt, no answer key, case, circuit or student email in it, local
+// ≡ server; [claims] the soft claims — a bad body 400, an unknown key 404,
+// students refused, a second instructor sees the first's claim by name and
+// cannot take it, a release clears it; [queue 409] two graders read the same
+// version, the second write is refused with the first's grade, nothing logged
+// for it.
 
 import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -30,12 +38,13 @@ import { buildSampleAssignment, buildCorrectSubmission, buildIncorrectSubmission
 import { gradeSubmission } from '../../app/src/engine/grader';
 import { scoreRecord } from '../../app/src/engine/score';
 import { homeworkContentHash } from '../../app/src/devData/homeworkSync';
-import type { AssignmentData, HumanGrade, SubmissionData, SubmissionRecord } from '../../app/src/types';
+import type { AssignmentData, GradeEvent, HumanGrade, SubmissionData, SubmissionRecord } from '../../app/src/types';
 import type {
   AssignmentGradingSummary,
   AttemptDetail,
   CourseGrading,
   GradingRow,
+  QuestionResponses,
   StudentGrading,
 } from '../../app/src/storage/gradingSummary';
 import { assignmentSummary } from '../src/gradingSummary';
@@ -440,6 +449,106 @@ console.log('[migration]');
     const b = JSON.stringify(norm(remoteSummary));
     check('LocalGradingStore.summary ≡ the server\'s /summary on the same records', a === b, `\n local  ${a.slice(0, 400)}\n remote ${b.slice(0, 400)}`);
   }
+  console.log('[queue feed]');
+  {
+    const feedPath = (qid: number | string, a = asg2.id) => `/assignments/${a}/questions/${qid}/responses`;
+    const st = [(await call('GET', feedPath(OPEN), { token: jTok })).status, (await call('GET', feedPath(OPEN))).status];
+    check('students get 403 on the feed; no session 401', st[0] === 403 && st[1] === 401, JSON.stringify(st));
+    check('an unknown assignment or problem → 404',
+      (await call('GET', feedPath(OPEN, 'nope'), { token: i2Tok })).status === 404 &&
+        (await call('GET', feedPath(9999), { token: i2Tok })).status === 404 &&
+        (await call('GET', feedPath('abc'), { token: i2Tok })).status === 404);
+    const got = await call<QuestionResponses>('GET', feedPath(OPEN), { token: i2Tok });
+    const f = got.json;
+    const latestOf = (e: string) => db2.listSubmissions(asg2.id, e).at(-1)!;
+    const byName = (n: string) => f.responses.find((r) => r.student.name === n)!;
+    check('one response per submitter: roster first, then the others, flagged',
+      got.status === 200 && f.questionId === OPEN && f.responses.length === 4 &&
+        f.responses.slice(0, 2).every((r) => !r.student.offRoster) && f.responses.slice(2).every((r) => !!r.student.offRoster),
+      f.responses.map((r) => r.student.name).join('|'));
+    const jr = byName(john.name);
+    check('…each its latest attempt, the answer as text', jr.attempt === latestOf(johnEmail).attempt && jr.answer.kind === 'text' &&
+      (jr.answer as { text: string }).text === 'Something else entirely.');
+    check('a changed answer carries the stored grade (version) and the suggestion',
+      jr.source === 'changed' && jr.points === null && jr.grade?.version === 1 && jr.suggestion?.points === 1);
+    const mf = (await call<QuestionResponses>('GET', feedPath(MACHINE), { token: i2Tok })).json;
+    check('a machine problem: the answer by reference only', mf.responses.every((r) => r.answer.kind === 'machine' && Object.keys(r.answer).join() === 'kind,attempt'));
+    const students = [johnEmail, jane.email.toLowerCase(), LEAVER];
+    const leak = (text: string) =>
+      // As JSON keys: a student's prose may say "components" or "wires".
+      [...['test_cases', 'perception_cases', 'fill_in_answers', 'expected', 'got', 'components', 'wires', 'integrity', 'circuit', 'cases'].map((k) => `"${k}"`), ...students]
+        .filter((k) => text.includes(k));
+    const leaks = [...leak(got.text), ...leak((await call('GET', feedPath(MACHINE), { token: i2Tok })).text)];
+    check('no answer key, case, circuit, integrity or student email in the feed', leaks.length === 0, leaks.join());
+
+    const local = (await import(new URL('../../app/src/storage/backend.ts', import.meta.url).href)) as {
+      gradingStore: { responses(id: string, qid: number): Promise<QuestionResponses | null> };
+    };
+    // Keys differ by design (public_id vs email) and so does their order;
+    // claims are per process. Compare by name.
+    const norm = (q: QuestionResponses) => JSON.stringify(q.responses
+      .filter((r) => r.student.offRoster !== 'removed')
+      .map((r) => ({ ...r, student: { name: r.student.name, offRoster: r.student.offRoster }, claim: null }))
+      .sort((a, b) => a.student.name.localeCompare(b.student.name)));
+    const lf = (await local.gradingStore.responses(asg2.id, OPEN))!;
+    check("the local GradingStore's feed ≡ the server's on the same records", norm(lf) === norm(f), `\n local  ${norm(lf).slice(0, 300)}\n remote ${norm(f).slice(0, 300)}`);
+  }
+
+  console.log('[claims]');
+  // A second instructor (a made-up one — PROFILE §8.9).
+  const TWO = { email: 'grader.two@example.com', name: 'Grader Two' };
+  db2.upsertUser({ ...TWO, role: 'instructor' });
+  const twoTok = await signIn(TWO.email);
+  const feedOf = async (tok: string, qid = OPEN) =>
+    (await call<QuestionResponses>('GET', `/assignments/${asg2.id}/questions/${qid}/responses`, { token: tok })).json;
+  const janeKey = (await feedOf(i2Tok)).responses.find((r) => r.student.name === jane.name)!.student.key;
+  {
+    const claim = (tok: string | undefined, body: unknown) => call<{ held: boolean; by?: string | null; until?: string | null }>('POST', '/grading/claims', { token: tok, body });
+    const target = { assignmentId: asg2.id, studentKey: johnKey, questionId: OPEN };
+    check('a bad body → 400', (await claim(i2Tok, {})).status === 400 && (await claim(i2Tok, { ...target, questionId: String(OPEN) })).status === 400 &&
+      (await claim(i2Tok, { ...target, release: 'yes' })).status === 400);
+    check('an unknown student key, problem or assignment → 404; an email is not a key',
+      (await claim(i2Tok, { ...target, studentKey: 'no-such-key' })).status === 404 &&
+        (await claim(i2Tok, { ...target, studentKey: johnEmail })).status === 404 &&
+        (await claim(i2Tok, { ...target, questionId: 9999 })).status === 404 &&
+        (await claim(i2Tok, { ...target, assignmentId: 'nope' })).status === 404);
+    check('students get 403; no session 401', (await claim(jTok, target)).status === 403 && (await claim(undefined, target)).status === 401);
+    const a = await claim(i2Tok, target);
+    check('instructor A claims → held, for 5 minutes', a.status === 200 && a.json.held === true &&
+      Math.abs(Date.parse(a.json.until!) - Date.now() - 300_000) < 5_000);
+    const seenByB = (await feedOf(twoTok)).responses.find((r) => r.student.key === johnKey)!.claim;
+    const seenByA = (await feedOf(i2Tok)).responses.find((r) => r.student.key === johnKey)!.claim;
+    check("B's feed shows A's claim by name, not B's; A's shows it as A's own",
+      seenByB?.by === instructor.name && seenByB.mine === false && seenByA?.by === instructor.name && seenByA.mine === true);
+    check('…on that problem only', (await feedOf(twoTok, MACHINE)).responses.every((r) => r.claim === null));
+    const b = await claim(twoTok, target);
+    check("B cannot take A's live claim — the answer names A", b.status === 200 && b.json.held === false && b.json.by === instructor.name);
+    const r = await claim(i2Tok, { ...target, release: true });
+    check("A's release clears it", r.status === 200 && r.json.held === false && r.json.by === null &&
+      (await feedOf(twoTok)).responses.find((x) => x.student.key === johnKey)!.claim === null);
+  }
+
+  console.log('[queue 409]');
+  {
+    const readA = (await feedOf(i2Tok)).responses.find((r) => r.student.key === janeKey)!;
+    const readB = (await feedOf(twoTok)).responses.find((r) => r.student.key === janeKey)!;
+    check('both graders read the same (no) grade', readA.grade === null && readB.grade === null && readA.source === 'pending');
+    const logged = db2.listGradeEvents(asg2.id).length;
+    const gradePath = `/assignments/${asg2.id}/grades/${janeKey}/${OPEN}`;
+    const wa = await call<{ grade: HumanGrade }>('PUT', gradePath, { token: i2Tok, body: { points: 0.5, note: 'half', version: readA.grade?.version ?? null } });
+    const wb = await call<{ current: HumanGrade | null }>('PUT', gradePath, { token: twoTok, body: { points: 1, version: readB.grade?.version ?? null } });
+    check("A saves → 200; B's save on the stale read → 409 carrying A's grade",
+      wa.status === 200 && wb.status === 409 && wb.json.current?.points === 0.5 && wb.json.current.grader === instructor.email.toLowerCase(),
+      JSON.stringify([wa.status, wb.status, wb.json]));
+    const after = (await feedOf(twoTok)).responses.find((r) => r.student.key === janeKey)!;
+    check("the feed afterwards shows A's grade", after.source === 'human' && after.points === 0.5 && after.grade?.version === 1);
+    const events: GradeEvent[] = db2.listGradeEvents(asg2.id);
+    check('only the accepted write is logged', events.length === logged + 1 && events.at(-1)!.actor === instructor.email.toLowerCase());
+    const wb2 = await call<{ grade: HumanGrade }>('PUT', gradePath, { token: twoTok, body: { points: 1, version: wb.json.current!.version } });
+    check('…and B may then save over it by naming the version it was shown', wb2.status === 200 && wb2.json.grade.version === 2 &&
+      wb2.json.grade.grader === TWO.email);
+  }
+
   console.log('[counts toward grade]');
   {
     // Absent → absent (counts); false rides the summary and the /grading row.

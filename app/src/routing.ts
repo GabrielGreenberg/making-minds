@@ -28,11 +28,12 @@ export type Route =
   | { kind: 'instructor-edit'; id: string }
   // The Grading tab (task 065; memo grading-interface.md §6): the course
   // list, one assignment's Overview · Matrix · Queue (`questionId`: the queue
-  // for one problem), one student's submission on an assignment, and one
-  // student across assignments. `student` is always GradingIdentity.key —
+  // for one problem, by problem; `student`: the queue by student, task 066),
+  // one student's submission on an assignment, and one student across
+  // assignments. `student` is always GradingIdentity.key —
   // opaque (remote: the account's public_id), never an email or a UID.
   | { kind: 'instructor-grading' }
-  | { kind: 'instructor-grading-assignment'; id: string; view: GradingView; questionId?: number }
+  | { kind: 'instructor-grading-assignment'; id: string; view: GradingView; questionId?: number; student?: string }
   | { kind: 'instructor-grading-student'; id: string; student: string }
   | { kind: 'instructor-student'; student: string }
   | { kind: 'instructor-roster' }
@@ -72,13 +73,17 @@ export function parseHash(hash: string): Route {
   if (parts[0] === 'instructor') {
     // #/instructor/roster
     // #/instructor/assignments/new | .../:id/edit
-    // #/instructor/grading[/:asg[/matrix | /queue[/:qid] | /student/:sid]]
+    // #/instructor/grading[/:asg[/matrix | /queue[/:qid | /student/:sid] | /student/:sid]]
     // #/instructor/students/:sid
     if (parts[1] === 'grading') {
       if (!parts[2]) return { kind: 'instructor-grading' };
       const id = decodeURIComponent(parts[2]);
       if (parts[3] === 'matrix') return { kind: 'instructor-grading-assignment', id, view: 'matrix' };
       if (parts[3] === 'queue') {
+        // By student (task 066): one student's pending problems.
+        if (parts[4] === 'student' && parts[5]) {
+          return { kind: 'instructor-grading-assignment', id, view: 'queue', student: decodeURIComponent(parts[5]) };
+        }
         // A malformed problem id is dropped; the queue is kept.
         const questionId = indexSegment(parts[4]);
         return questionId !== undefined
@@ -167,7 +172,10 @@ export function routeToHash(route: Route): string {
     case 'instructor-grading-assignment': {
       const base = `#/instructor/grading/${encodeURIComponent(route.id)}`;
       if (route.view === 'matrix') return `${base}/matrix`;
-      if (route.view === 'queue') return route.questionId != null ? `${base}/queue/${route.questionId}` : `${base}/queue`;
+      if (route.view === 'queue') {
+        if (route.student != null) return `${base}/queue/student/${encodeURIComponent(route.student)}`;
+        return route.questionId != null ? `${base}/queue/${route.questionId}` : `${base}/queue`;
+      }
       return base;
     }
     case 'instructor-grading-student':
