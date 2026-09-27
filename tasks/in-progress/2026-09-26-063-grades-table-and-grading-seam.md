@@ -63,3 +63,32 @@ gradebook, resubmit unchanged as the student → the grade holds; change the ans
 changed.
 
 ## Progress log
+- 2026-09-26 (work session, Opus 5.5) — Built. **Types**: `HumanGrade`/`Points`/`GradeEvent` in
+  types.ts; `SubmissionRecord.grades` (delivered WITH the records — full to instructors,
+  student-safe after release), `.studentKey` (instructor copies: `public_id` / local email),
+  `.assignmentHash` (stamped at submit, both stores). **The planner**:
+  `storage/gradeWrites.ts` `planGradeWrite` (version check → conflict carrying the current
+  grade, incl. "someone already cleared it"; 0/½/1 and override-needs-a-note via
+  `engine/score.ts gradeWriteProblem`; anchored to the LATEST answer; one log event per write)
+  + `legacyGradesByStudent` (latest attempt's ✓/✗ only) + `studentGrade`. **Seam**:
+  `storage/gradingStore.ts` `GradingStore` (setGrade/clearGrade → ok | conflict | refusal),
+  `LocalGradingStore` (persists through the local SubmissionStore: `mm:grades:<id>`,
+  append-only `mm:grade-log:<id>`, lazy one-time legacy migration), `RemoteGradingStore`
+  (409/400 → the seam's outcomes; `ApiError.body` now carries the JSON). **Server**: tables
+  `grades` + append-only `grade_events`, `submissions.assignment_hash`, one-time migration
+  (server_meta `grades_migrated`, one transaction), `PUT`/`DELETE
+  /api/assignments/:id/grades/:sid/:qid` (public_id; an email is a 404), `submissions/all`
+  attaches grades + studentKey, own submissions attach released student-safe grades,
+  `sanitize.ts` strips `manual`, `DELETE /api/assignments/:id` → 409 once submitted (local
+  store too; the dashboard's Delete is disabled with a tooltip). **Retired**: the review
+  route, `recordManualReview` (seam + both stores + client), `app/src/storage/manualReview.ts`,
+  score.ts's review adapter (scoreRecord reads `record.grades`). **Gradebook**: 0 / ½ / 1 +
+  note + Clear through the seam, latest attempt only; "graded ½ / changed since graded (was
+  …) / needs a grade". **Pins**: new `server/tools/gradingCheck.ts` (in server `npm run
+  check`), serverCheck + parityCheck (grade route ≡ in-process planner; result untouched;
+  student sees the grade student-safe and it scores the same), remoteStoreCheck (seam end to
+  end: key not email, version, refusal, conflict, release), navResetCheck (local seam),
+  pipelineCheck `[human grades]` (the planner, migration latest-only, student-safe copy).
+  Browser (local, after a dev-server restart — it had cached a stale score.ts): graded John's
+  HW1 P6a ½ with a note → stored v1 + logged, detail "graded ½", row 40 → 41.3*. Owed: on
+  the pilot, the one-time migration runs on the next release's boot (toy data only).

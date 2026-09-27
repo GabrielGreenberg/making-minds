@@ -616,11 +616,10 @@ export interface CaseResult {
 }
 
 /**
- * An instructor's manual verdict on a `pending` (open) question. Recorded
- * after submission via `SubmissionStore.recordManualReview` and stored on the
- * QuestionResult (the result stays `pending` — the review annotates it rather
- * than replacing it, so it can be re-reviewed and is distinguishable from an
- * autograde). A future LLM-grading pass could write the same shape.
+ * LEGACY (retired by task 063): an instructor's ✓/✗ verdict on a `pending`
+ * (open) question, once stored INSIDE the attempt's result. Still read — only
+ * by the one-time migration into `HumanGrade`s (server db.ts, the local
+ * GradingStore) — and never written.
  */
 export interface ManualReview {
   pass: boolean;
@@ -680,6 +679,58 @@ export interface SubmissionRecord {
   /** Provenance check computed at receipt (task 034) — instructor-only,
    *  stripped from every student copy, never part of the score. */
   integrity?: SubmissionIntegrity;
+  /** The human grades on this student's work for the assignment (task 063),
+   *  delivered WITH the record by the SubmissionStore: every one to an
+   *  instructor; to the student only once grades are released, and then
+   *  without grader or version. engine/score.ts applies each only while its
+   *  `answerKey` matches this attempt's answer. */
+  grades?: HumanGrade[];
+  /** Instructor copies only: the student's opaque key, which names them in
+   *  the grading API's paths (remote: `users.public_id`; local: the email). */
+  studentKey?: string;
+  /** The content hash of the assignment this result was graded against
+   *  (devData/homeworkSync.ts homeworkContentHash), stamped at submit — how a
+   *  stale result is told apart (the re-grade, task 2026-09-26-069). */
+  assignmentHash?: string;
+}
+
+/** One change to a human grade, as the append-only log keeps it (task 063;
+ *  memo grading-interface.md §7.1) — who, when, what before and after.
+ *  `migrate` = a legacy review carried into the grades table. Instructor-only. */
+export interface GradeEvent {
+  at: string;
+  actor: string;
+  student: string;
+  questionId: number;
+  kind: 'grade' | 'override' | 'clear' | 'migrate';
+  before: HumanGrade | null;
+  after: HumanGrade | null;
+}
+
+/** A problem's points: every problem is worth 1 (memo grading-interface.md §4.1). */
+export type Points = 0 | 0.5 | 1;
+
+/**
+ * A person's judgment of one problem of one student's work (task 063): a hand
+ * grade on an open problem, or an override of an autograde (note required).
+ * Stored apart from the autograde output — keyed (assignment, student,
+ * question) — so a re-grade can never wipe it, and anchored by `answerKey`
+ * (engine/score.ts) to the answer it judged, so a resubmission with a
+ * different answer turns it into a suggestion rather than a grade.
+ */
+export interface HumanGrade {
+  questionId: number;
+  points: Points;
+  note?: string;
+  answerKey: string;
+  gradedAt: string;
+  /** Who graded — instructor copies only (null = migrated from a review). */
+  grader?: string | null;
+  /** The attempt it was given on — instructor copies only. */
+  attempt?: number;
+  /** Optimistic-concurrency counter: a write names the version it read, and
+   *  a stale one is refused (409). Instructor copies only. */
+  version?: number;
 }
 
 // ── Platform feedback (notes/todos.md item 9) ──────────────────────────────

@@ -1,14 +1,15 @@
 import { useState } from 'react';
-import type { AssignmentData, ManualReview, SubmissionRecord } from '../types';
+import type { AssignmentData, HumanGrade, Points, SubmissionRecord } from '../types';
 import { questionTask } from '../types';
 import { getAssignment } from '../assignments';
-import { assignmentStore, submissionStore } from '../storage/backend';
+import { assignmentStore, gradingStore, submissionStore } from '../storage/backend';
+import type { GradeWriteOutcome } from '../storage/gradingStore';
 import { gradeSubmission } from '../engine/grader';
 import { navigate } from '../routing';
 import { gradeSubmissions, computeStats, type SubmissionGrade } from './Gradebook';
 import { formatDuration, lateBy } from '../dueDates';
 import { useAsyncValue } from '../useAsyncValue';
-import { formatGrade, type Score } from '../engine/score';
+import { formatGrade, pointsLabel, type Score } from '../engine/score';
 
 function formatTime(iso: string): string {
   const d = new Date(iso);
@@ -249,11 +250,11 @@ function QuestionMarks({
               // response and record a grade.
               <span className="instructor-pending" title="Open question — review the response below">✎</span>
             ) : qg?.passed ? (
-              <span className="instructor-pass" title={qg.manual ? 'manually graded correct' : undefined}>✓</span>
+              <span className="instructor-pass" title={qg.source === 'human' ? 'graded by hand' : undefined}>✓</span>
             ) : qg?.points === 0.5 ? (
               <span className="instructor-half" title={qg.source === 'human' ? 'graded ½ by hand' : 'half credit — the ½ rule'}>½</span>
             ) : (
-              <span className="instructor-fail" title={qg?.manual ? 'manually graded incorrect' : undefined}>✗</span>
+              <span className="instructor-fail" title={qg?.source === 'human' ? 'graded by hand' : undefined}>✗</span>
             )}
             {flags.length > 0 && (
               <span
@@ -374,7 +375,7 @@ function AttemptRow({
       {showDetail && (
         <tr className="instructor-submission-detail">
           <td colSpan={colSpan}>
-            <SubmissionDetail record={grade.record} assignment={assignment} onReviewed={onReviewed} />
+            <SubmissionDetail grade={grade} isLatest={isLatest} assignment={assignment} onReviewed={onReviewed} />
           </td>
         </tr>
       )}
@@ -397,14 +398,18 @@ function GroupLine({ keys }: { keys: string[] }) {
 }
 
 function SubmissionDetail({
-  record,
+  grade,
+  isLatest,
   assignment,
   onReviewed,
 }: {
-  record: SubmissionRecord;
+  grade: SubmissionGrade;
+  /** Only the counting (latest) attempt takes grades — they judge its answers. */
+  isLatest: boolean;
   assignment: AssignmentData;
   onReviewed: () => void;
 }) {
+  const record = grade.record;
   // Prefer the grade stored at submission time (it carries full per-case
   // detail); re-grade only for legacy records that predate autograde-on-submit.
   const result = record.result ?? gradeSubmission(assignment, record.submission);
@@ -424,11 +429,7 @@ function SubmissionDetail({
           return (
             <div className="instructor-detail-q" key={qr.questionId}>
               <strong>{q?.label ?? `Q${qr.questionId}`}</strong>: open question —{' '}
-              {qr.manual
-                ? qr.manual.pass
-                  ? 'marked correct'
-                  : 'marked incorrect'
-                : 'needs manual review'}
+              {problemState(grade, qr.questionId)}
               {response?.trim() ? (
                 <blockquote className="instructor-open-response">{response}</blockquote>
               ) : (
@@ -436,14 +437,14 @@ function SubmissionDetail({
                   (no answer submitted)
                 </p>
               )}
-              {/* Grading controls need a stored result to attach the verdict
-                  to; legacy records that predate autograde-on-submit have
-                  none, so they stay display-only. */}
-              {record.result && (
-                <ManualReviewControls
+              {/* Grades judge the counting attempt's answer, so only the latest
+                  takes them; a record with no studentKey (a legacy anonymous
+                  dev record) stays display-only. */}
+              {isLatest && record.studentKey !== undefined && (
+                <GradeControls
                   record={record}
                   questionId={qr.questionId}
-                  manual={qr.manual}
+                  existing={record.grades?.find((g) => g.questionId === qr.questionId)}
                   onReviewed={onReviewed}
                 />
               )}
@@ -629,62 +630,80 @@ function IntegrityNotes({ record, assignment }: { record: SubmissionRecord; assi
   );
 }
 
-/** Grade a pending open question: mark it correct/incorrect with an optional
- *  note. Writes through `SubmissionStore.recordManualReview` (the verdict
- *  lands on the stored record's result) and re-grading overwrites it. */
-function ManualReviewControls({
+/** How a pending-kind problem stands, in words (engine/score.ts's source). */
+function problemState(grade: SubmissionGrade, questionId: number): string {
+  const p = grade.score.problems.find((x) => x.questionId === questionId);
+  if (!p) return 'not in the assignment any more';
+  if (p.source === 'human' && p.points !== null) return `graded ${pointsLabel(p.points)}`;
+  if (p.source === 'changed') return `changed since graded (was ${p.suggestion ? pointsLabel(p.suggestion.points) : '—'})`;
+  return 'needs a grade';
+}
+
+/** Grade one problem 0 / ½ / 1 with an optional note, through the
+ *  GradingStore seam (task 063): stored apart from the autograde, anchored to
+ *  this attempt's answer, every change logged. The version read travels with
+ *  the write — if someone else graded meanwhile, the write is refused and the
+ *  view reloads to show theirs. */
+function GradeControls({
   record,
   questionId,
-  manual,
+  existing,
   onReviewed,
 }: {
   record: SubmissionRecord;
   questionId: number;
-  manual: ManualReview | undefined;
+  existing: HumanGrade | undefined;
   onReviewed: () => void;
 }) {
-  const [note, setNote] = useState(manual?.note ?? '');
+  const [note, setNote] = useState(existing?.note ?? '');
+  const [message, setMessage] = useState<string | null>(null);
 
-  const save = async (pass: boolean) => {
-    // The student email disambiguates WHOSE attempt: attempt numbers count
-    // per student in both stores ('' = a legacy anonymous local record).
-    await submissionStore.recordManualReview(
-      record.assignmentId,
-      record.submission.student ?? '',
-      record.attempt,
-      questionId,
-      { pass, note },
-    );
+  const done = (o: GradeWriteOutcome) => {
+    if (o.ok) setMessage(null);
+    else if (o.conflict) setMessage('Someone else changed this grade meanwhile — showing theirs.');
+    else setMessage(o.error);
     onReviewed();
   };
+  const save = async (points: Points) =>
+    done(await gradingStore.setGrade(record.assignmentId, record.studentKey!, questionId, {
+      points, note, version: existing?.version ?? null,
+    }));
+  const clear = async () =>
+    done(await gradingStore.clearGrade(record.assignmentId, record.studentKey!, questionId, existing!.version ?? 0));
 
   return (
     <div className="instructor-review">
-      {manual && (
+      {existing && (
         <p className="instructor-review-verdict">
-          {manual.pass ? (
-            <span className="instructor-pass">✓ correct</span>
-          ) : (
-            <span className="instructor-fail">✗ incorrect</span>
-          )}{' '}
-          <span className="instructor-review-when">reviewed {formatTime(manual.reviewedAt)}</span>
+          <span className={existing.points === 1 ? 'instructor-pass' : existing.points === 0 ? 'instructor-fail' : 'instructor-half'}>
+            {pointsLabel(existing.points)} point{existing.points === 0 ? 's' : ''}
+          </span>{' '}
+          <span className="instructor-review-when">
+            {existing.grader ? `by ${existing.grader}` : 'carried over from a ✓/✗ review'}, {formatTime(existing.gradedAt)}
+            {existing.attempt !== undefined && existing.attempt !== record.attempt && ` (on attempt ${existing.attempt})`}
+          </span>
         </p>
       )}
       <div className="instructor-review-controls">
         <input
           className="instructor-review-note"
           type="text"
-          placeholder="Feedback note (optional)"
+          placeholder="Feedback note (optional; the student sees it on release)"
           value={note}
           onChange={(e) => setNote(e.target.value)}
         />
-        <button className="mm-btn instructor-review-btn" onClick={() => void save(true)}>
-          ✓ Correct
-        </button>
-        <button className="mm-btn instructor-review-btn" onClick={() => void save(false)}>
-          ✗ Incorrect
-        </button>
+        {([0, 0.5, 1] as const).map((p) => (
+          <button key={p} className="mm-btn instructor-review-btn" onClick={() => void save(p)}>
+            {pointsLabel(p)}
+          </button>
+        ))}
+        {existing && (
+          <button className="mm-btn mm-btn--quiet instructor-review-btn" onClick={() => void clear()}>
+            Clear
+          </button>
+        )}
       </div>
+      {message && <p className="mm-error">{message}</p>}
     </div>
   );
 }

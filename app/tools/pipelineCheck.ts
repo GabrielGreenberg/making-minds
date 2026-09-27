@@ -39,7 +39,7 @@
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import type { AssignmentData, AssignmentQuestion, QuestionResult, SubmissionRecord } from '../src/types';
+import type { AssignmentData, AssignmentQuestion, HumanGrade, QuestionResult, SubmissionRecord } from '../src/types';
 import { QUESTION_TASKS, questionModeLabel, questionTask } from '../src/types';
 import {
   buildSampleAssignment,
@@ -52,8 +52,9 @@ import {
 } from '../src/devData/sampleData';
 import { boxAcross, boxWhole } from './builder';
 import { gradeQuestion, gradeSubmission } from '../src/engine/grader';
-import { autoPoints, scoreRecord, type ProblemScore } from '../src/engine/score';
-import { applyManualReview, buildSubmission } from '../src/storage/submissionStore';
+import { answerKey, autoPoints, scoreRecord, type ProblemScore } from '../src/engine/score';
+import { buildSubmission } from '../src/storage/submissionStore';
+import { legacyGradesByStudent, planGradeWrite, studentGrade, type GradeWrite } from '../src/storage/gradeWrites';
 import { checkGroup, MAX_GROUP_OTHERS } from '../src/submissionGroup';
 import { emptyQuestionCircuit } from '../src/storage/workbookStore';
 import { gradeSubmissions } from '../src/instructor/Gradebook';
@@ -183,13 +184,13 @@ console.log('\n[boxed-across answers]');
   }
 }
 
-// Manual review of the pending open question (the instructor grading seam):
-// the verdict lands on the stored record's result and the gradebook then
-// counts the question like any other.
-console.log('\n[manual review]');
+// Human grades (task 063): the ONE write planner both GradingStores run
+// (storage/gradeWrites.ts). A grade is stored apart from the result, anchored
+// to the latest attempt's answer, versioned, logged; the gradebook then counts
+// the problem like any other.
+console.log('\n[human grades]');
 const openQ = assignment.questions.find((q) => q.buildMode === 'open')!;
 const machineQ = assignment.questions.find((q) => q.buildMode !== 'open')!;
-const review = { pass: true, note: 'well argued', reviewedAt: '2026-07-07T00:00:00.000Z' };
 const records: SubmissionRecord[] = [
   {
     assignmentId: 'sample',
@@ -199,28 +200,52 @@ const records: SubmissionRecord[] = [
     result: correct,
   },
 ];
-const reviewed = applyManualReview(records, 1, openQ.id, review);
-const reviewedQ = reviewed?.[0].result?.questions.find((q) => q.questionId === openQ.id);
-check('review lands on the pending question', reviewedQ?.manual?.pass === true);
-check('reviewed result stays pending (annotated, not replaced)', reviewedQ?.status === 'pending');
-check('original records are not mutated',
-  records[0].result!.questions.find((q) => q.questionId === openQ.id)!.manual === undefined);
-check('review of a non-pending question is rejected',
-  applyManualReview(records, 1, machineQ.id, review) === null);
-check('review of a missing attempt is rejected',
-  applyManualReview(records, 2, openQ.id, review) === null);
-if (reviewed) {
-  const [before] = gradeSubmissions(assignment, records);
-  const [after] = gradeSubmissions(assignment, reviewed);
-  const qg = after.grades.find((g) => g.questionId === openQ.id);
-  check('gradebook counts the reviewed question as passed',
-    qg?.pending === false && qg?.passed === true && qg?.points === 1 && qg?.source === 'human');
-  check('the grade now includes the reviewed open question: provisional before, 100 after',
-    before.score.provisional && before.score.final! < 100 && !after.score.provisional && after.score.final === 100 &&
-    after.grades.filter((g) => !g.pending).length ===
-      before.grades.filter((g) => !g.pending).length + 1);
-  check('the student\'s sheet (scoreRecord) and the gradebook agree on the grade',
-    scoreRecord(assignment.questions, reviewed[0], Date.now()).final === after.score.final);
+{
+  const plan = (question: typeof openQ, write: GradeWrite, existing: HumanGrade | null = null) =>
+    planGradeWrite({ question, latest: records[0], student: 's@x', existing, write, actor: 'prof@x', now: '2026-07-08T00:00:00.000Z' });
+  const first = plan(openQ, { points: 1, note: ' well argued ', version: null });
+  check('a first grade on an open problem: version 1, anchored to the answer, stamped, logged as "grade"',
+    first.ok && first.grade?.version === 1 && first.grade.points === 1 && first.grade.note === 'well argued' &&
+    first.grade.answerKey === answerKey(openQ, records[0].submission.answers.find((a) => a.questionId === openQ.id)) &&
+    first.grade.grader === 'prof@x' && first.grade.attempt === 1 &&
+    first.event.kind === 'grade' && first.event.before === null);
+  const g1 = first.ok ? first.grade! : null;
+  check('a write that read no grade, where there is one, is a conflict carrying it',
+    (() => { const r = plan(openQ, { points: 0, version: null }, g1); return !r.ok && r.conflict && r.current === g1; })());
+  check('a write naming the current version replaces it: version 2, before/after logged',
+    (() => { const r = plan(openQ, { points: 0.5, version: 1 }, g1); return r.ok && r.grade?.version === 2 && r.event.before === g1; })());
+  check('points outside 0 / ½ / 1 are refused',
+    (() => { const r = plan(openQ, { points: 0.7 as never, version: null }); return !r.ok && !r.conflict; })());
+  check('overriding an autograded problem needs a note; with one it is an "override"',
+    (() => { const r = plan(machineQ, { points: 0.5, version: null }); return !r.ok && !r.conflict && /note/.test(r.error); })() &&
+    (() => { const r = plan(machineQ, { points: 0.5, note: 'one wire off', version: null }); return r.ok && r.event.kind === 'override'; })());
+  check('clearing names the version too, and is logged; clearing what someone already cleared is a conflict carrying nothing',
+    (() => { const r = plan(openQ, { clear: true, version: 1 }, g1); return r.ok && r.grade === null && r.event.kind === 'clear'; })() &&
+    (() => { const r = plan(openQ, { clear: true, version: 1 }); return !r.ok && r.conflict && r.current === null; })());
+  check('no submission, no grade', (() => {
+    const r = planGradeWrite({ question: openQ, latest: null, student: 's@x', existing: null, write: { points: 1, version: null }, actor: 'p', now: 'n' });
+    return !r.ok && !r.conflict;
+  })());
+  const legacy: SubmissionRecord[] = [
+    { ...records[0], result: { ...correct, questions: correct.questions.map((q) => q.questionId === openQ.id ? { ...q, manual: { pass: false, reviewedAt: '2026-07-01T00:00:00.000Z' } } : q) } },
+    { ...records[0], attempt: 2, result: { ...correct, questions: correct.questions.map((q) => q.questionId === openQ.id ? { ...q, manual: { pass: true, note: 'ok', reviewedAt: '2026-07-02T00:00:00.000Z' } } : q) } },
+  ];
+  const migrated = legacyGradesByStudent(assignment.questions, legacy, () => 's@x').get('s@x') ?? [];
+  check("the legacy migration carries the LATEST attempt's review only (✓ = 1), version 1, grader null",
+    migrated.length === 1 && migrated[0].points === 1 && migrated[0].attempt === 2 && migrated[0].version === 1 &&
+    migrated[0].grader === null && migrated[0].note === 'ok');
+
+  if (g1) {
+    const [before] = gradeSubmissions(assignment, records);
+    const [after] = gradeSubmissions(assignment, [{ ...records[0], grades: [g1] }]);
+    const qg = after.grades.find((g) => g.questionId === openQ.id);
+    check('gradebook counts the graded problem', qg?.pending === false && qg?.passed === true && qg?.points === 1 && qg?.source === 'human');
+    check('the grade now includes it: provisional before, 100 after',
+      before.score.provisional && before.score.final! < 100 && !after.score.provisional && after.score.final === 100);
+    check("the student's sheet (scoreRecord, a student-safe copy) and the gradebook agree",
+      scoreRecord(assignment.questions, { ...records[0], grades: [studentGrade(g1)] }, Date.now()).final === after.score.final &&
+      !('grader' in studentGrade(g1)) && !('version' in studentGrade(g1)));
+  }
 }
 
 // ── Fill-in-the-blank questions (HW1 P11) ──────────────────────────

@@ -6,7 +6,7 @@
 // only rolls them up into the shapes the gradebook UI needs. Reads from the SubmissionStore today; a server query drops
 // in at the call site (GradebookView) without changing these helpers.
 
-import type { AssignmentData, ManualReview, SubmissionRecord } from '../types';
+import type { AssignmentData, SubmissionRecord } from '../types';
 import { gradeSubmission } from '../engine/grader';
 import { scoreRecord, type Points, type ProblemSource, type Score } from '../engine/score';
 
@@ -18,7 +18,6 @@ export interface QuestionGrade {
   passed: boolean; // full credit (points === 1)
   failedCount: number; // test vectors that didn't match (a ✗ review counts 1)
   pending: boolean; // awaiting a person — earns nothing yet, the grade is provisional
-  manual?: ManualReview; // open question: the instructor's recorded verdict
 }
 
 export interface SubmissionGrade {
@@ -51,7 +50,6 @@ export function gradeSubmissions(
         passed: p.points === 1,
         failedCount: !r ? 0 : r.status === 'pending' ? (p.points === 0 ? 1 : 0) : r.total - r.passed,
         pending: p.points === null,
-        manual: r?.manual,
       };
     });
     return { record, grades, score };

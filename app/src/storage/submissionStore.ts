@@ -14,6 +14,8 @@
 import type {
   AssignmentData,
   Classmate,
+  GradeEvent,
+  HumanGrade,
   QuestionCircuit,
   SubmissionData,
   SubmissionRecord,
@@ -21,17 +23,13 @@ import type {
 import { questionTask } from '../types';
 import { emptyQuestionCircuit } from './workbookStore';
 import { gradeSubmission } from '../engine/grader';
-import { applyManualReview } from './manualReview';
 import { assessIntegrity } from '../provenance/integrity';
 import { deriveMintKey, DEV_MINT_SECRET } from '../provenance/ids';
 import { TOY_ACCOUNTS, readPersistedAccount } from '../auth/accounts';
 import { checkGroup, SubmitRefused } from '../submissionGroup';
+import { homeworkContentHash } from '../devData/homeworkSync';
+import { legacyGradesByStudent, planGradeWrite, studentGrade, type GradeWrite, type GradeWritePlan } from './gradeWrites';
 
-// The pure review helper lives in storage/manualReview.ts (a types-only leaf)
-// so the server's review endpoint can import it without pulling this
-// localStorage-backed module into its graph; re-exported here so app-side
-// consumers keep one import path.
-export { applyManualReview } from './manualReview';
 
 /**
  * Build a submission snapshot from an assignment definition and the student's
@@ -99,31 +97,26 @@ export interface SubmissionStore {
    * `group` keys back into names. Sorted by last name.
    */
   listClassmates(): Promise<Classmate[]>;
-  /** The principal's own attempts, oldest first. */
+  /** The principal's own attempts, oldest first — each carrying the human
+   *  grades on their work (`grades`, student-safe: no grader or version). */
   listOwn(id: string, email: string | null): Promise<SubmissionRecord[]>;
   /** The principal's own latest attempt, or null if they never submitted. */
   getLatestOwn(id: string, email: string | null): Promise<SubmissionRecord | null>;
-  /** Every student's attempts, full detail — the instructor gradebook's feed. */
+  /** Every student's attempts, full detail — the instructor gradebook's feed:
+   *  each with its student's human grades in full and the `studentKey` the
+   *  GradingStore addresses them by. */
   listAll(id: string): Promise<SubmissionRecord[]>;
-  /**
-   * Record (or overwrite) the instructor's verdict on a pending open question
-   * of one stored attempt. Returns the updated record, or null if the attempt
-   * has no pending question with that id. An instructor/server capability —
-   * nothing student-facing calls this.
-   *
-   * `student` identifies WHOSE attempt: attempt numbers count per
-   * (assignment, student) in both stores, so the attempt alone is ambiguous.
-   */
-  recordManualReview(
-    id: string,
-    student: string,
-    attempt: number,
-    questionId: number,
-    review: { pass: boolean; note?: string },
-  ): Promise<SubmissionRecord | null>;
 }
 
 const KEY_PREFIX = 'mm:sub:';
+const GRADES_PREFIX = 'mm:grades:';
+const GRADE_LOG_PREFIX = 'mm:grade-log:';
+
+/** A record's student as the local grades are keyed — the email, lowercased
+ *  (a dev-seed attempt with no student is ''). */
+function studentOf(r: SubmissionRecord): string {
+  return (r.submission.student ?? '').trim().toLowerCase();
+}
 
 /**
  * Is this record's student the principal? Trimmed and case-insensitive (the
@@ -149,7 +142,10 @@ class LocalSubmissionStore implements SubmissionStore {
   }
 
   async listOwn(id: string, email: string | null): Promise<SubmissionRecord[]> {
-    return this.read(id).filter((r) => sameStudent(r.submission.student, email));
+    const own = this.read(id).filter((r) => sameStudent(r.submission.student, email));
+    if (own.length === 0) return own;
+    const grades = ((await this.grades(id))[studentOf(own[0])] ?? []).map(studentGrade);
+    return own.map((r) => ({ ...r, ...(grades.length ? { grades } : {}) }));
   }
 
   async getLatestOwn(id: string, email: string | null): Promise<SubmissionRecord | null> {
@@ -158,7 +154,97 @@ class LocalSubmissionStore implements SubmissionStore {
   }
 
   async listAll(id: string): Promise<SubmissionRecord[]> {
-    return this.read(id);
+    const all = this.read(id);
+    if (all.length === 0) return all;
+    const grades = await this.grades(id);
+    return all.map((r) => {
+      const who = studentOf(r);
+      const mine = grades[who] ?? [];
+      return { ...r, studentKey: who, ...(mine.length ? { grades: mine } : {}) };
+    });
+  }
+
+  // ── Human grades (task 063): the local half of the GradingStore seam ──
+  // `mm:grades:<id>` holds each student's grades ({ email: HumanGrade[] });
+  // `mm:grade-log:<id>` the append-only change log. The first read of an
+  // assignment carries its legacy ✓/✗ reviews over (gradeWrites.ts), once.
+
+  private async grades(id: string): Promise<Record<string, HumanGrade[]>> {
+    try {
+      const raw = localStorage.getItem(GRADES_PREFIX + id);
+      if (raw) return JSON.parse(raw) as Record<string, HumanGrade[]>;
+    } catch {
+      return {};
+    }
+    const { getAssignment } = await import('../assignments');
+    const def = await getAssignment(id);
+    const migrated = def ? legacyGradesByStudent(def.questions, this.read(id), studentOf) : new Map<string, HumanGrade[]>();
+    const table = Object.fromEntries(migrated) as Record<string, HumanGrade[]>;
+    const now = new Date().toISOString();
+    this.appendLog(id, [...migrated].flatMap(([student, gs]) => gs.map((g): GradeEvent =>
+      ({ at: now, actor: 'migration', student, questionId: g.questionId, kind: 'migrate', before: null, after: g }))));
+    this.writeGrades(id, table);
+    return table;
+  }
+
+  private writeGrades(id: string, table: Record<string, HumanGrade[]>): void {
+    try {
+      localStorage.setItem(GRADES_PREFIX + id, JSON.stringify(table));
+    } catch {
+      // localStorage full or unavailable — silent fail (matches submit).
+    }
+  }
+
+  private appendLog(id: string, events: GradeEvent[]): void {
+    if (events.length === 0) return;
+    try {
+      const raw = localStorage.getItem(GRADE_LOG_PREFIX + id);
+      const log = raw ? (JSON.parse(raw) as GradeEvent[]) : [];
+      localStorage.setItem(GRADE_LOG_PREFIX + id, JSON.stringify([...log, ...events]));
+    } catch {
+      // ignore
+    }
+  }
+
+  /** The change log, oldest first (dev / checks; the server's is the table). */
+  gradeLog(id: string): GradeEvent[] {
+    try {
+      return JSON.parse(localStorage.getItem(GRADE_LOG_PREFIX + id) ?? '[]') as GradeEvent[];
+    } catch {
+      return [];
+    }
+  }
+
+  /** Apply one grade write (gradeWrites.ts plans it; this persists the plan).
+   *  `student` is the studentKey — locally, the email. */
+  async applyGradeWrite(
+    id: string,
+    student: string,
+    questionId: number,
+    write: GradeWrite,
+    actor: string,
+  ): Promise<GradeWritePlan> {
+    const { getAssignment } = await import('../assignments');
+    const question = (await getAssignment(id))?.questions.find((q) => q.id === questionId);
+    if (!question) return { ok: false, conflict: false, error: 'no such question' };
+    const table = await this.grades(id);
+    const mine = table[student] ?? [];
+    const own = this.read(id).filter((r) => studentOf(r) === student);
+    const plan = planGradeWrite({
+      question,
+      latest: own.length ? own.reduce((a, b) => (b.attempt > a.attempt ? b : a)) : null,
+      student,
+      existing: mine.find((g) => g.questionId === questionId) ?? null,
+      write,
+      actor,
+      now: new Date().toISOString(),
+    });
+    if (!plan.ok) return plan;
+    const rest = mine.filter((g) => g.questionId !== questionId);
+    table[student] = plan.grade ? [...rest, plan.grade] : rest;
+    this.writeGrades(id, table);
+    this.appendLog(id, [plan.event]);
+    return plan;
   }
 
   async listClassmates(): Promise<Classmate[]> {
@@ -175,6 +261,8 @@ class LocalSubmissionStore implements SubmissionStore {
   async clearSubmissions(id: string): Promise<void> {
     try {
       localStorage.removeItem(KEY_PREFIX + id);
+      localStorage.removeItem(GRADES_PREFIX + id);
+      localStorage.removeItem(GRADE_LOG_PREFIX + id);
     } catch {
       // ignore
     }
@@ -229,6 +317,8 @@ class LocalSubmissionStore implements SubmissionStore {
       submission,
       result,
       integrity,
+      // What the result was graded against (task 063) — a later edit makes it stale.
+      ...(def ? { assignmentHash: homeworkContentHash(def) } : {}),
     };
     try {
       localStorage.setItem(KEY_PREFIX + id, JSON.stringify([...all, record]));
@@ -236,43 +326,6 @@ class LocalSubmissionStore implements SubmissionStore {
       // localStorage full or unavailable — silent fail (matches autosave).
     }
     return record;
-  }
-
-  async recordManualReview(
-    id: string,
-    student: string,
-    attempt: number,
-    questionId: number,
-    review: { pass: boolean; note?: string },
-  ): Promise<SubmissionRecord | null> {
-    // Attempt numbers are per student, so review within that student's
-    // records and write them back into their own positions (applyManualReview
-    // maps, so the subset keeps its length and order).
-    const all = this.read(id);
-    const positions = all
-      .map((r, i) => (sameStudent(r.submission.student, student) ? i : -1))
-      .filter((i) => i >= 0);
-    const updated = applyManualReview(
-      positions.map((i) => all[i]),
-      attempt,
-      questionId,
-      {
-        pass: review.pass,
-        note: review.note?.trim() || undefined,
-        reviewedAt: new Date().toISOString(),
-      },
-    );
-    if (!updated) return null;
-    const merged = [...all];
-    positions.forEach((pos, k) => {
-      merged[pos] = updated[k];
-    });
-    try {
-      localStorage.setItem(KEY_PREFIX + id, JSON.stringify(merged));
-    } catch {
-      // localStorage full or unavailable — silent fail (matches submit).
-    }
-    return updated.find((r) => r.attempt === attempt) ?? null;
   }
 }
 

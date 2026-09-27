@@ -32,11 +32,13 @@ import type {
   AssignmentQuestion,
   CaseResult,
   FillInCaseResult,
+  HumanGrade,
   PerceptionCaseResult,
   QuestionResult,
   SubmissionRecord,
   SubmissionResult,
 } from '../../app/src/types';
+import { studentGrade } from '../../app/src/storage/gradeWrites';
 
 /** Assignment as served to a student: no answer bank. */
 export function stripAnswers(assignment: AssignmentData): AssignmentData {
@@ -82,8 +84,11 @@ function stripFillInCaseResult(c: FillInCaseResult): FillInCaseResult {
 }
 
 function stripQuestionResult(qr: QuestionResult, question: AssignmentQuestion | undefined): QuestionResult {
+  // A legacy ✓/✗ review (`manual`, before task 063) never reaches a student
+  // from here: grades travel as `record.grades`, student-safe (studentRecord).
+  const { manual: _legacyReview, ...kept } = qr;
   return {
-    ...qr,
+    ...kept,
     cases: qr.cases.map((c, k) => stripCaseResult(c, k, question)),
     turbotCases: qr.turbotCases, // no answer key in this shape — passes through whole
     perceptionCases: qr.perceptionCases?.map(stripPerceptionCaseResult),
@@ -106,7 +111,8 @@ export function stripResultDetail(result: SubmissionResult, assignment?: Assignm
 /**
  * A student's own submission record. Grades are withheld entirely until the
  * instructor releases them for the assignment ("release grades"); once
- * released, the student sees scores but never the per-case detail. The
+ * released, the student sees scores and their human grades (`grades`, points
+ * + note only) but never the per-case answer key. The
  * integrity check (task 034) is instructor-only, released or not: it never
  * reaches a student. Pass the full `assignment` so a result graded before
  * cases recorded their TM block separations gets them (stripResultDetail).
@@ -115,10 +121,15 @@ export function studentRecord(
   record: SubmissionRecord,
   gradesReleased: boolean,
   assignment?: AssignmentData,
+  grades: readonly HumanGrade[] = [],
 ): SubmissionRecord {
-  const { integrity: _instructorOnly, ...rest } = record;
+  const { integrity: _instructorOnly, grades: _unsafe, studentKey: _key, ...rest } = record;
+  const released = gradesReleased && record.result;
   return {
     ...rest,
-    result: gradesReleased && record.result ? stripResultDetail(record.result, assignment) : undefined,
+    result: released ? stripResultDetail(record.result!, assignment) : undefined,
+    // The human grades on this student's work (task 063): once released, and
+    // then only points, note and what they judged — never grader or version.
+    ...(released && grades.length ? { grades: grades.map(studentGrade) } : {}),
   };
 }
