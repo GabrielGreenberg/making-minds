@@ -677,10 +677,18 @@ console.log('\n[notices]');
     SUBMIT_INTEGRITY_SENTENCE === 'The platform checks that submitted work was created in your own editor.' &&
     submitConfirmMessage('HW1', { saved: true }).includes('saved work'));
   const src = (p: string) => readFileSync(new URL(p, import.meta.url), 'utf8');
+  // Every Submit opens the ONE dialog (task 062), and the dialog tells the
+  // student what submitConfirmMessage says — one wording, no private copies.
   for (const f of ['AssignmentOverview', 'EditorTopBar', 'HomeScreen']) {
     const text = src(`../src/components/${f}.tsx`);
-    check(`${f}: its Submit asks through submitConfirmMessage (one wording)`,
-      text.includes('confirm(submitConfirmMessage(') && !text.includes('This records a snapshot'));
+    check(`${f}: its Submit opens the SubmitDialog (one wording)`,
+      text.includes('<SubmitDialog') && !text.includes('submitConfirmMessage') && !text.includes('confirm(') &&
+      !text.includes('This records a snapshot'));
+  }
+  {
+    const dialog = src('../src/components/SubmitDialog.tsx');
+    check('SubmitDialog shows submitConfirmMessage, with the saved-work variant passed through',
+      dialog.includes('submitConfirmMessage(title, { saved })') && !dialog.includes('This records a snapshot'));
   }
   check('main.tsx prints the banner in production builds only',
     /if \(import\.meta\.env\.PROD\) printIntegrityBanner\(\)/.test(src('../src/main.tsx')));

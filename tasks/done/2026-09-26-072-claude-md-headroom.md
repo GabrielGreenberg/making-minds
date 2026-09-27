@@ -66,3 +66,11 @@ paths) empty; all gates in PROFILE §6 by exit code. No visual surface.
   bare) and four slash-phrases whose facts live in the Problem-set, turbot and API client
   rows. Headings are unchanged. Gates: check-budgets, app tsc, app build, server typecheck,
   server check and app check all exit 0.
+- 2026-09-26 (land) — `main` moved while I worked: 062 landed and put `CLAUDE.md` at 39,999
+  bytes. The first `--no-ff` merge into `main` conflicted (`tasks/log.md` appends; 062's
+  in-place Submit sentence inside my rewrapped Student side paragraph), so I aborted it, merged
+  `origin/main` into this branch and resolved it there. I took my paragraph with 062's Submit
+  sentence verbatim (`SubmitDialog`, ≤ 2 group members) and kept both log lines in landing
+  order. Result: `CLAUDE.md` **39,999 → 37,049 bytes** (2,951 bytes of headroom). The token
+  diff against the new `main` shows the same five known exceptions. The gates were re-run on
+  the merged tree before the final merge.

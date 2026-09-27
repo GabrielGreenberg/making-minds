@@ -1,15 +1,14 @@
 import { useStore, selectAssignmentFrozen } from '../store';
 import { navigate } from '../routing';
-import { getCurrentUserEmail } from '../auth';
 import { StudentLayout } from './StudentLayout';
 import { ProblemSetDocument, type ProblemStatus } from './ProblemSetDocument';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useAsyncValue } from '../useAsyncValue';
 import { assignmentStore } from '../storage/backend';
 import { figureUrl } from '../problemSet';
 import { questionVerdict } from '../gradeDisplay';
 import { formatDueDate, formatDateTime } from '../dueDates';
-import { submitConfirmMessage } from '../provenance/notice';
+import { SubmitDialog } from './SubmitDialog';
 import type { AssignmentQuestion } from '../types';
 
 /**
@@ -24,7 +23,8 @@ import type { AssignmentQuestion } from '../types';
 export function AssignmentOverview() {
   const assignment = useStore((s) => s.assignment);
   const submissions = useStore((s) => s.submissions);
-  const submitAssignment = useStore((s) => s.submitAssignment);
+  // Submit opens the one Submit dialog (components/SubmitDialog.tsx).
+  const [submitting, setSubmitting] = useState(false);
   const hydrateSubmissions = useStore((s) => s.hydrateSubmissions);
   const questionCircuits = useStore((s) => s.questionCircuits);
   const frozen = useStore(selectAssignmentFrozen);
@@ -54,19 +54,6 @@ export function AssignmentOverview() {
     done: questionCircuits.get(q.id)?.done,
     verdict: results ? questionVerdict(results.get(q.id)) : undefined,
   });
-
-  const handleSubmit = () => {
-    const ok = confirm(submitConfirmMessage(assignment.title));
-    if (!ok) return;
-    // Online-only submit: a failure records nothing and asks for a visible
-    // retry — never a silent (late) queue. See MenuBar's handler.
-    void submitAssignment(assignment.id, getCurrentUserEmail()).catch(() => {
-      alert(
-        'Submission failed — the server could not be reached, and nothing was recorded.\n\n' +
-        'Your work is still saved. Please try Submit again in a moment.'
-      );
-    });
-  };
 
   return (
     <StudentLayout current="assignments">
@@ -133,13 +120,16 @@ export function AssignmentOverview() {
               </button>
             </span>
           ) : (
-            <button className="mm-btn mm-btn--primary" onClick={handleSubmit}>
+            <button className="mm-btn mm-btn--primary" onClick={() => setSubmitting(true)}>
               Submit assignment
             </button>
           )}
         </span>
       </div>
 
+      {submitting && (
+        <SubmitDialog assignmentId={assignment.id} title={assignment.title} onClose={() => setSubmitting(false)} />
+      )}
     </StudentLayout>
   );
 }

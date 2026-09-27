@@ -589,6 +589,32 @@ try {
 }
 check('a student cannot read the notes through the seam', notesForbidden);
 
+// ── the submit dialog's group listing, through the seam (task 062) ─
+{
+  const { SubmitRefused } = await import('../src/submissionGroup');
+  api.setToken(sTok);
+  const mates = await remoteSubmissionStore.listClassmates();
+  const jane = TOY_ACCOUNTS.find((a) => a.role === 'student' && a.email !== student.email)!;
+  check("listClassmates(): the other students, names + opaque keys only",
+    mates.some((c) => c.name === jane.name) && !mates.some((c) => c.name === student.name) &&
+    mates.every((c) => Object.keys(c).sort().join() === 'key,name' && !c.key.includes('@')));
+  const janeKey = mates.find((c) => c.name === jane.name)!.key;
+  const withGroup = await remoteSubmissionStore.submit(SAMPLE_ASSIGNMENT_ID, {
+    ...buildCorrectSubmission(student.email), group: [janeKey],
+  });
+  check('submit() sends the listed group, and the server records it', JSON.stringify(withGroup.submission.group) === JSON.stringify([janeKey]));
+  const before = (await remoteSubmissionStore.listOwn(SAMPLE_ASSIGNMENT_ID, null)).length;
+  let refusal: unknown = null;
+  try {
+    await remoteSubmissionStore.submit(SAMPLE_ASSIGNMENT_ID, { ...buildCorrectSubmission(student.email), group: [janeKey, janeKey] });
+  } catch (e) {
+    refusal = e;
+  }
+  check("the server's 400 is the seam's SubmitRefused, with the server's reason",
+    refusal instanceof SubmitRefused && /twice/.test(refusal.message));
+  check('…and nothing was recorded', (await remoteSubmissionStore.listOwn(SAMPLE_ASSIGNMENT_ID, null)).length === before);
+}
+
 // ── the account system through api/client.ts ─────────────────────
 // A SECOND real server, this one in the launch auth mode (password + roster),
 // driven through the browser client the login screen actually calls. The

@@ -66,11 +66,11 @@ clickable tape strip + machine table / run / history panels, alphabet from the q
 **open** (free text), **fill-in** (labelled boxes, autograded). Debounced autosave through
 `WorkbookStore` (remote: PUT, an `'error'` indicator + backoff retry, keepalive unload
 flush, the per-email crash journal — a hard tab kill loses nothing); leave and resume.
-**Submit** a timestamped snapshot (remote: online-only; a failure alerts and records
-nothing; the server stamps time). Released grades: the **Grades** sheet (verdict per
-question, the instructor's note, "▸ failed inputs" in safe fields — which case failed and
-why — a link into the question, and **Run this input**: the grader's run of that case,
-recorded vs live verdict); Home and the overview re-fetch every visit. **Viewing a
+**Submit** a timestamped snapshot in one `SubmitDialog` (≤ 2 group members; online-only: a
+failure records nothing — server stamps time). Released grades: the **Grades** sheet
+(verdict per question, the instructor's note, "▸ failed inputs" in safe fields — which case
+failed and why — a link into the question, and **Run this input**: the grader's run of that
+case, recorded vs live verdict); Home and the overview re-fetch every visit. **Viewing a
 submission**: the sheet opens a graded attempt read-only at any due date (the `attempt`
 route: Run/Step work, edits refused, "Back to my work"). **Freezing** (`isFrozen`, Due dates
 row) forces the latest attempt, no way back. **Mark done**: the question panel's self-lock

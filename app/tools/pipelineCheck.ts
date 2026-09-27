@@ -53,6 +53,7 @@ import {
 import { boxAcross, boxWhole } from './builder';
 import { gradeQuestion, gradeSubmission, summarizeResult } from '../src/engine/grader';
 import { applyManualReview, buildSubmission } from '../src/storage/submissionStore';
+import { checkGroup, MAX_GROUP_OTHERS } from '../src/submissionGroup';
 import { emptyQuestionCircuit } from '../src/storage/workbookStore';
 import { gradeSubmissions } from '../src/instructor/Gradebook';
 import { questionVerdict } from '../src/gradeDisplay';
@@ -682,6 +683,29 @@ console.log('\n[student grade sheet]');
   check('a reviewed open question carries the instructor verdict',
     verdict(q({ status: 'pending', manual: { pass: true, reviewedAt: NOW_ISO } })).tone === 'pass' &&
     verdict(q({ status: 'pending', manual: { pass: false, reviewedAt: NOW_ISO } })).tone === 'fail');
+}
+
+// ─── The group listing at submit (task 062): the one rule, submissionGroup.ts ───
+console.log('\n[group listing]');
+{
+  const roster = new Set(['k-ann', 'k-bo', 'k-cy', 'k-self']);
+  const ok = (raw: unknown) => { const r = checkGroup(raw, roster, 'k-self'); return r.ok ? r.group : null; };
+  check('absent, null or empty is "no group"', JSON.stringify([ok(undefined), ok(null), ok([])]) === '[[],[],[]]');
+  check('one or two roster students are accepted, in order', JSON.stringify(ok(['k-bo', 'k-ann'])) === '["k-bo","k-ann"]');
+  check(`more than ${MAX_GROUP_OTHERS} is refused (groups are at most 3, the submitter included)`,
+    MAX_GROUP_OTHERS === 2 && ok(['k-ann', 'k-bo', 'k-cy']) === null);
+  check('self, a duplicate, a non-roster key, a non-string and a non-list are each refused',
+    [['k-self'], ['k-ann', 'k-ann'], ['k-zed'], [7], 'k-ann'].every((raw) => ok(raw) === null));
+  const refusal = checkGroup(['k-self'], roster, 'k-self');
+  check('a refusal carries a reason a student can act on', !refusal.ok && /yourself/.test(refusal.error));
+  const def = buildSampleAssignment();
+  const empty = new Map<number, ReturnType<typeof emptyQuestionCircuit>>();
+  check('buildSubmission carries a listed group, and omits the field when none is listed',
+    JSON.stringify(buildSubmission(def, empty, { submittedAt: NOW_ISO, group: ['k-ann'] }).group) === '["k-ann"]' &&
+    !('group' in buildSubmission(def, empty, { submittedAt: NOW_ISO, group: [] })));
+  check('the grader never reads the group: a listed group grades identically',
+    JSON.stringify(gradeSubmission(def, buildSubmission(def, empty, { submittedAt: NOW_ISO, group: ['k-ann'] }))) ===
+    JSON.stringify(gradeSubmission(def, buildSubmission(def, empty, { submittedAt: NOW_ISO }))));
 }
 
 console.log(`\n${failures === 0 ? 'PIPELINE OK' : `PIPELINE FAILED (${failures} checks)`}`);
