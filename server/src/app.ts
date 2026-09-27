@@ -53,6 +53,15 @@
 //   DELETE /api/assignments/:id/grades/:sid/:qid
 //                                              instructor: write / clear one human grade
 //                                              (task 063; :sid = the opaque key)
+//   GET    /api/assignments/:id/questions/:qid/responses
+//                                              instructor: the hand-grading queue's feed
+//                                              (task 066) — one problem across every
+//                                              submitter's latest attempt: the answer
+//                                              (text / blanks; a machine by reference),
+//                                              grade, answer fingerprint, live claim
+//   POST   /api/grading/claims                 instructor: a soft claim on one response —
+//                                              {assignmentId, studentKey, questionId,
+//                                              release?}; in memory, 5-minute TTL; advisory
 //   POST   /api/assignments/:id/submissions/:attempt/review
 //                                              instructor: manual verdict on a pending
 //                                              open question — {student, questionId,
@@ -101,7 +110,15 @@ import { isEmail, normalizeEmail, normalizeUid } from './roster';
 import { matchAccount, placeRosterEntry } from './identity';
 import { importRosterCsv } from './rosterImport';
 import { stripAnswers, studentRecord } from './sanitize';
-import { assignmentSummary, attemptDetail, courseGrading, studentEmailOf, studentGrading } from './gradingSummary';
+import {
+  assignmentSummary,
+  attemptDetail,
+  courseGrading,
+  questionResponses,
+  studentEmailOf,
+  studentGrading,
+} from './gradingSummary';
+import { ClaimBook } from '../../app/src/storage/gradingClaims';
 import { checkGroup } from '../../app/src/submissionGroup';
 
 export function createApp(config: ServerConfig, db: Db) {
@@ -746,6 +763,58 @@ export function createApp(config: ServerConfig, db: Db) {
       return;
     }
     res.json(detail);
+  });
+
+  // ── the hand-grading queue (instructor; task 066) ───────────────
+  // The feed is the same pure builder the local GradingStore runs
+  // (app/src/storage/gradingSummary.ts buildQuestionResponses). Claims are
+  // soft and live only in this process (app/src/storage/gradingClaims.ts):
+  // keyed by the student's opaque key, held by the grader's email, shown to
+  // others by the grader's name. A grade write never checks one — the
+  // grade's version does that job (a 409 below).
+  const claims = new ClaimBook();
+  const questionOf = (assignmentId: string, qid: unknown) => {
+    const n = Number(qid);
+    const assignment = db.getAssignment(assignmentId);
+    return Number.isInteger(n) ? (assignment?.questions.find((q) => q.id === n) ?? null) : null;
+  };
+
+  app.get('/api/assignments/:id/questions/:qid/responses', auth, requireInstructor, (req, res) => {
+    const id = String(req.params.id);
+    const question = questionOf(id, req.params.qid);
+    const feed = question ? questionResponses(db, mintSecret, id, question.id, claims, req.user!.email, Date.now()) : null;
+    if (!feed) {
+      res.status(404).json({ error: 'no such assignment or question' });
+      return;
+    }
+    res.json(feed);
+  });
+
+  app.post('/api/grading/claims', auth, requireInstructor, (req, res) => {
+    const body = (req.body ?? {}) as { assignmentId?: unknown; studentKey?: unknown; questionId?: unknown; release?: unknown };
+    if (
+      typeof body.assignmentId !== 'string' || typeof body.studentKey !== 'string' || typeof body.questionId !== 'number' ||
+      (body.release !== undefined && typeof body.release !== 'boolean')
+    ) {
+      res.status(400).json({ error: 'body must be {assignmentId, studentKey, questionId, release?}' });
+      return;
+    }
+    const question = questionOf(body.assignmentId, body.questionId);
+    // Any key a summary or feed hands out (one resolver); the claim is keyed
+    // by that opaque key, never the address it names.
+    if (!question || !studentEmailOf(db, mintSecret, body.studentKey)) {
+      res.status(404).json({ error: 'no such assignment, question or student' });
+      return;
+    }
+    const target = { assignmentId: body.assignmentId, studentKey: body.studentKey, questionId: question.id };
+    const now = Date.now();
+    if (body.release) {
+      claims.release(target, req.user!.email);
+      const left = claims.active(target.assignmentId, target.questionId, now).get(target.studentKey);
+      res.json({ held: false, by: left?.by ?? null, until: left?.until ?? null });
+      return;
+    }
+    res.json(claims.claim(target, { actor: req.user!.email, name: req.user!.name }, now));
   });
 
   // ── human grades (instructor; task 063) ─────────────────────────

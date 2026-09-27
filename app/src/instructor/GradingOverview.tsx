@@ -8,8 +8,9 @@ import { Bar, GradeValue } from './GradingParts';
 /**
  * An assignment's Overview (task 065; memo §6.2, mockup 2): four progress
  * tiles, the stale banner, and the per-problem table — counts and shares of
- * the 064 summary (gradingViews.ts), never a grade of its own. (Re-grade…
- * arrives with task 069, the Export CSV file with 071, the queue's "Grade →" with 066.)
+ * the 064 summary (gradingViews.ts), never a grade of its own; a hand
+ * problem's "Grade →" opens its queue (task 066). (Re-grade… arrives with
+ * task 069, the Export CSV file with 071.)
  */
 export function GradingOverview({ summary, assignment }: { summary: AssignmentGradingSummary; assignment: AssignmentData }) {
   const t = overviewTiles(summary, assignment);
@@ -115,6 +116,15 @@ export function GradingOverview({ summary, assignment }: { summary: AssignmentGr
                       : p.overrides > 0
                         ? plural(p.overrides, 'override')
                         : ''}
+                    {p.hand && (
+                      <>
+                        {' '}
+                        <a className="mm-link gr-grade-link"
+                          {...hashLink({ kind: 'instructor-grading-assignment', id: summary.assignmentId, view: 'queue', questionId: p.questionId })}>
+                          Grade →
+                        </a>
+                      </>
+                    )}
                   </td>
                 </tr>
               );

@@ -15,13 +15,21 @@
 //   · No circuits, answers, cases, notes or emails: a row is identity (an
 //     opaque key), attempt meta, points per problem and the grade. One
 //     attempt in full is `buildAttemptDetail`, on demand.
+//   · The hand-grading queue's feed (task 066, `buildQuestionResponses`): one
+//     problem across every submitter — the answer itself (text or blanks; a
+//     machine only by reference), its points and grade, and who is grading
+//     it. No cases, circuits or integrity, and answer keys only as a
+//     fingerprint.
 //
 // Pure: no storage, no clock (the caller passes `now`) — the server imports it.
 
-import type { AssignmentData, GradeEvent, IntegrityFlagCode, Points, SubmissionRecord } from '../types';
-import { scoreRecord, scoreSubmission, type ProblemSource, type Score, type ScoreInput } from '../engine/score';
+import type { AssignmentData, GradeEvent, HumanGrade, IntegrityFlagCode, Points, SubmissionRecord } from '../types';
+import { questionTask } from '../types';
+import { answerKey, scoreRecord, scoreSubmission, type ProblemSource, type Score, type ScoreInput } from '../engine/score';
 import { homeworkContentHash } from '../devData/homeworkSync';
 import { sortAssignments } from '../assignmentOrder';
+import { sha256, toHex, utf8 } from '../provenance/sha256';
+import type { ClaimView } from './gradingClaims';
 
 /** Why a row is not a roster student's: `removed` — their account left the
  *  roster after they submitted; `instructor` — an instructor's own attempt;
@@ -391,4 +399,115 @@ export function buildAttemptDetail(input: {
     events: [...input.events],
     score: scoreRecord(assignment.questions, record, input.now, dueFor(assignment, student)),
   };
+}
+
+// ── The hand-grading queue's feed (task 066) ─────────────────────────────
+
+/** A response's answer as the queue shows it: an open answer's text, a
+ *  fill-in's blanks (in the spec's order), or a machine by reference — the
+ *  attempt to open in full, never its circuit. */
+export type QueueAnswer =
+  | { kind: 'text'; text: string }
+  | { kind: 'fill'; blanks: string[] }
+  | { kind: 'machine'; attempt: number };
+
+/** One submitter's latest answer to one problem, with where its points
+ *  stand. `grade` is the STORED grade row whatever it judged (so a write can
+ *  name its `version`) — for a `changed` response it is not the current
+ *  points; `suggestion` then offers it. Every `answerKey` here is a
+ *  fingerprint (`answerFingerprint`), not the key itself: a machine's key
+ *  spells out its parts and wiring. */
+export interface QueueResponse {
+  student: GradingIdentity;
+  attempt: number;
+  submittedAt: string;
+  answer: QueueAnswer;
+  answerKey: string;
+  source: ProblemSource;
+  points: Points | null;
+  autoPoints: Points | null;
+  grade: HumanGrade | null;
+  suggestion?: HumanGrade;
+  /** Who is grading it right now (a soft claim, gradingClaims.ts); null = nobody. */
+  claim: ClaimView | null;
+}
+
+/** GET /api/assignments/:id/questions/:qid/responses — the queue feed. */
+export interface QuestionResponses {
+  assignmentId: string;
+  questionId: number;
+  released: boolean;
+  /** Roster submitters, then every other submitter (flagged `offRoster`),
+   *  each group in the order of its opaque key — a stable order that never
+   *  follows the names, so "Response N" leaks nothing and never renumbers. */
+  responses: QueueResponse[];
+}
+
+/** An answer key's short, one-way fingerprint: equal answers, equal
+ *  fingerprints — without carrying a machine's structure to the client. */
+export function answerFingerprint(key: string): string {
+  return toHex(sha256(utf8(key))).slice(0, 16);
+}
+
+const fingerprinted = (g: HumanGrade): HumanGrade => ({ ...g, answerKey: answerFingerprint(g.answerKey) });
+
+const byKey = (a: GradingIdentity, b: GradingIdentity) => (a.key < b.key ? -1 : a.key > b.key ? 1 : 0);
+
+/**
+ * One problem across every submitter's latest attempt (the queue, memo
+ * §6.4). `latest` and `identify` are as `buildAssignmentSummary`'s; `claims`
+ * maps a student key to the live claim on this problem, as the viewer sees
+ * it. null = no such question.
+ */
+export function buildQuestionResponses(input: {
+  assignment: AssignmentData;
+  questionId: number;
+  roster: readonly GradingIdentity[];
+  latest: readonly SubmissionRecord[];
+  identify: (key: string) => GradingIdentity;
+  claims: ReadonlyMap<string, ClaimView>;
+  released: boolean;
+  now: number;
+}): QuestionResponses | null {
+  const { assignment, questionId, now } = input;
+  const index = assignment.questions.findIndex((q) => q.id === questionId);
+  if (index < 0) return null;
+  const question = assignment.questions[index];
+  const task = questionTask(question);
+  const latestByKey = new Map<string, SubmissionRecord>();
+  for (const r of input.latest) {
+    const key = r.studentKey ?? '';
+    const prev = latestByKey.get(key);
+    if (!prev || r.attempt > prev.attempt) latestByKey.set(key, r);
+  }
+  const rostered = new Map(input.roster.map((s) => [s.key, s]));
+  const submitters = [...latestByKey.keys()].map((k) => rostered.get(k) ?? input.identify(k));
+  const ordered = [...submitters.filter((s) => rostered.has(s.key)).sort(byKey), ...submitters.filter((s) => !rostered.has(s.key)).sort(byKey)];
+
+  const responses = ordered.map((student): QueueResponse => {
+    const record = latestByKey.get(student.key)!;
+    const given = record.submission.answers.find((a) => a.questionId === questionId);
+    const problem = scoreRecord(assignment.questions, record, now, dueFor(assignment, student)).problems[index];
+    const stored = record.grades?.find((g) => g.questionId === questionId) ?? null;
+    const answer: QueueAnswer =
+      task === 'open'
+        ? { kind: 'text', text: given?.responseText ?? '' }
+        : task === 'fill-in'
+          ? { kind: 'fill', blanks: [...(given?.fillAnswers ?? [])] }
+          : { kind: 'machine', attempt: record.attempt };
+    return {
+      student,
+      attempt: record.attempt,
+      submittedAt: record.submittedAt,
+      answer,
+      answerKey: answerFingerprint(answerKey(question, given)),
+      source: problem.source,
+      points: problem.points,
+      autoPoints: problem.autoPoints,
+      grade: stored ? fingerprinted(stored) : null,
+      ...(problem.source === 'changed' && problem.suggestion ? { suggestion: fingerprinted(problem.suggestion) } : {}),
+      claim: input.claims.get(student.key) ?? null,
+    };
+  });
+  return { assignmentId: assignment.id, questionId, released: input.released, responses };
 }
