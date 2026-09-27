@@ -54,3 +54,4 @@
 2026-09-26-061 · feature · Define the grade once — engine/score.ts (1 point per problem, the ½ rule, 40 + 60·P, late math) — and retire the three score rules · 2026-09-26T22:22:55-0700 · task/061-grade-model-score · 7cc5f48
 2026-09-26-063 · feature · Store human grades apart from the autograde — grades table, append-only change log, the GradingStore seam, legacy reviews migrated · 2026-09-26T22:37:56-0700 · task/063-grades-table-and-grading-seam · ee3512f
 2026-09-26-064 · feature · Serve slim, roster-joined grading summaries — per assignment, course-wide, per student — and one attempt on demand · 2026-09-27T11:01:56-0700 · robot/064-grading-summary-endpoints · 91094b9
+2026-09-26-065 · feature · Add the Grading tab — assignment list with progress, and each assignment's Overview and Matrix — and retire the old gradebook page into it · 2026-09-27T12:20:58-0700 · robot/065-grading-tab-overview-matrix · 3d577ba

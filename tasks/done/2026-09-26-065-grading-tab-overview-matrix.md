@@ -8,9 +8,9 @@ requires: browser
 area: app
 source: chat
 created: 2026-09-26T21:34:00-07:00
-status: in-progress
+status: done
 after: 2026-09-26-064
-branch: robot/065-grading-tab-overview-matrix
+branch:
 merged_into:
 ---
 
@@ -105,3 +105,16 @@ screen matches its mockup; screenshots into the progress log.
   `tasks/attachments/2026-09-26-065-*.png`; remote mode optional (summary routes, public_id sids,
   no `/submissions/all`). Gabriel after release: pilot `#/instructor/grading` renders.
 - **Next step:** loop session: visual check if owed, then land per PROFILE §5.
+
+### 2026-09-27 — landed (robot)
+- Visual check: the pane can't start a dev server in an unattended run, so the eyeball was the
+  workflow's headless-Chrome shots of the real build (local mode, HW1–HW7 + samples) against
+  mockups 1–3: tab row, Grading table (bars, current/stale, hand bar, mean*, Hidden tags),
+  Overview (tiles, per-problem shares, Release) and Matrix (cells, underline, chips, search,
+  off-roster divider, legend) all match. The Needs-attention box is absent as intended (070).
+- Owed, not claimed: the shots predate the review fixes, so the Matrix's Late column and the
+  Overview's disabled "Export CSV" button are code- and pin-verified only; also owed the
+  release/hide round trip, sticky columns on horizontal scroll, the row → student route with a
+  grade write, and 375px (recipe: the workflow's owedChecks above; re-shoot
+  `tasks/attachments/2026-09-26-065-*.png`). Gabriel after release: pilot `#/instructor/grading`.
+- Gates at land: app tsc/build/check, server tsc/check — all 0 (no new commits on main since).
