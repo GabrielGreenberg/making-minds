@@ -6,7 +6,8 @@ import { useEffect, useState } from 'react';
 import { useAsyncValue } from '../useAsyncValue';
 import { assignmentStore } from '../storage/backend';
 import { figureUrl } from '../problemSet';
-import { questionVerdict } from '../gradeDisplay';
+import { problemVerdict } from '../gradeDisplay';
+import { scoreRecord } from '../engine/score';
 import { formatDueDate, formatDateTime } from '../dueDates';
 import { SubmitDialog } from './SubmitDialog';
 import type { AssignmentQuestion } from '../types';
@@ -47,12 +48,12 @@ export function AssignmentOverview() {
   const sub = submissions[assignment.id];
   const total = assignment.questions.length;
   const done = assignment.questions.filter((q) => questionCircuits.get(q.id)?.done).length;
-  const results = released && sub?.result
-    ? new Map(sub.result.questions.map((r) => [r.questionId, r]))
-    : null;
+  // Once released: each problem's points, from the one grade definition.
+  const score = released && sub?.result ? scoreRecord(assignment.questions, sub, Date.now()) : null;
+  const results = new Map((sub?.result?.questions ?? []).map((r) => [r.questionId, r]));
   const status = (q: AssignmentQuestion): ProblemStatus => ({
     done: questionCircuits.get(q.id)?.done,
-    verdict: results ? questionVerdict(results.get(q.id)) : undefined,
+    verdict: score ? problemVerdict(score.problems.find((p) => p.questionId === q.id), results.get(q.id)) : undefined,
   });
 
   return (

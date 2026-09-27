@@ -279,6 +279,12 @@ export interface AssignmentQuestion {
    *  (engine/tm.ts `tapeCellsUsed`). Applies to TM questions and to turbot
    *  questions whose brain is a TM (its private tape). Absent = unbudgeted. */
   maxTapeCells?: number;
+  /** Automatic half credit (task 061; memo grading-interface.md §4.3): the
+   *  problem earns ½ when at least this many of its N cases pass (value
+   *  cases, turbot arenas, perception films or fill-in blanks alike), with
+   *  1 ≤ K < N. A machine refused at Stage 1 never earns it. Absent = the
+   *  autograde is 0 or 1. Not an answer key: students' copies keep it. */
+  half_credit_at?: number;
   cc_spec?: CCSpec;            // authoring spec; source of group widths + generates test_cases at save
   test_cases?: TestCase[];     // value-based grading cases (one bank, all modes — see TestCase)
   // Turbot-only fields (buildMode === 'turbot'). A turbot question's "circuit"

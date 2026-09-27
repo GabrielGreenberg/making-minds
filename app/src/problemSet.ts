@@ -19,6 +19,7 @@ import type {
 } from './types';
 import { CALLOUT_KINDS } from './types';
 import { parseStatement, statementProse } from './statementFormat';
+import { halfCreditProblem } from './engine/score';
 
 /** A problem as the document shows it: the question, its index in the flat
  *  list (the canvas route), its printed number and its layout shape. */
@@ -185,7 +186,8 @@ const PLACEMENTS = ['before', 'aside', 'after'];
 /** The document invariants, as human-readable problems (empty = valid):
  *  sections list existing ids once each and between them cover every
  *  question; callouts have a known kind and a body; figures have a source and
- *  alt text; layouts and placements are known values. */
+ *  alt text; layouts and placements are known values; a question's ½ rule is
+ *  sound (engine/score.ts halfCreditProblem). */
 export function validateDocument(assignment: AssignmentData): string[] {
   const problems: string[] = [];
   const ids = new Set(assignment.questions.map((q) => q.id));
@@ -229,6 +231,8 @@ export function validateDocument(assignment: AssignmentData): string[] {
   for (const q of assignment.questions) {
     checkCallouts(q.label, q.callouts);
     checkFigures(q.label, q.figures);
+    const half = halfCreditProblem(q);
+    if (half) problems.push(`${q.label}: ${half}`);
   }
   return problems;
 }

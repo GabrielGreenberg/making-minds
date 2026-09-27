@@ -118,7 +118,20 @@ export {
   gradedMachineKey,
 } from './caseRun';
 export type { StageOne, ValueCaseRun, CaseStimulus } from './caseRun';
-export { gradeQuestion, gradeSubmission, summarizeResult } from './grader';
+export { gradeQuestion, gradeSubmission } from './grader';
+export {
+  scoreSubmission,
+  scoreRecord,
+  autoPoints,
+  answerKey,
+  lateDeduction,
+  gradesFromReviews,
+  questionCaseCount,
+  halfCreditProblem,
+  formatGrade,
+  pointsLabel,
+} from './score';
+export type { Score, ProblemScore, HumanGrade, Points, ProblemSource, CourseCalendar, ClassMeeting, LatePolicy } from './score';
 export type { CaseResult, QuestionResult, SubmissionResult } from './grader';
 export {
   senseAhead,

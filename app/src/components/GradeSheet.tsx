@@ -1,6 +1,8 @@
-// A student's grade sheet for one assignment: one row per question, with what
-// the autograder (or the instructor's review) made of it. Rendered inline on
-// the Grades page (GradesView) under the assignment's row.
+// A student's grade sheet for one assignment: one row per question, with its
+// points and what the autograder (or the instructor's review) made of it, and
+// the assignment's grade out of 100 — all from engine/score.ts, the one grade
+// definition. Rendered inline on the Grades page (GradesView) under the
+// assignment's row.
 //
 // Shown only once the instructor has RELEASED grades — before that a student
 // sees nothing, not even on submit (the release flag on the AssignmentStore
@@ -21,7 +23,8 @@ import { useState } from 'react';
 import type { AssignmentQuestion, QuestionResult, SubmissionRecord } from '../types';
 import { questionModeLabel } from '../types';
 import { getAssignment } from '../assignments';
-import { questionVerdict, describeCaseInput } from '../gradeDisplay';
+import { problemVerdict, describeCaseInput } from '../gradeDisplay';
+import { formatGrade, scoreRecord } from '../engine/score';
 import { recordedCaseSeparations } from '../engine/caseRun';
 import { useAsyncValue } from '../useAsyncValue';
 import { navigate } from '../routing';
@@ -116,11 +119,9 @@ export function GradeSheet({ assignmentId, record }: { assignmentId: string; rec
 
   const byId = new Map((record.result?.questions ?? []).map((q) => [q.questionId, q]));
   const questions = assignment?.questions ?? [];
-  const counted = questions.filter((q) => {
-    const v = questionVerdict(byId.get(q.id));
-    return v.tone === 'pass' || v.tone === 'fail';
-  });
-  const correct = counted.filter((q) => questionVerdict(byId.get(q.id)).tone === 'pass').length;
+  const score = assignment && record.result ? scoreRecord(questions, record, Date.now()) : null;
+  const problem = (id: number) => score?.problems.find((p) => p.questionId === id);
+  const pending = score ? score.problems.filter((p) => p.points === null).length : 0;
 
   const goToQuestion = (i: number) => navigate({ kind: 'assignment', id: assignmentId, questionIndex: i });
   // The graded attempt, read-only (one question, or the whole problem set).
@@ -144,8 +145,8 @@ export function GradeSheet({ assignmentId, record }: { assignmentId: string; rec
         <tbody>
           {questions.map((q, i) => {
             const qr = byId.get(q.id);
-            const v = questionVerdict(qr);
-            const note = qr?.manual?.note?.trim();
+            const v = problemVerdict(problem(q.id), qr);
+            const note = problem(q.id)?.note?.trim();
             const failed = hasFailedCases(qr);
             return (
               <tr key={q.id}>
@@ -184,9 +185,13 @@ export function GradeSheet({ assignmentId, record }: { assignmentId: string; rec
         </tbody>
       </table>
       <p className="grades-foot">
-        {correct} of {counted.length} graded question{counted.length === 1 ? '' : 's'} correct.
-        {counted.length < questions.length &&
-          ` ${questions.length - counted.length} not counted yet.`}{' '}
+        {score && score.final !== null && (
+          <>
+            <b>Grade {formatGrade(score.final)} / 100</b> — {formatGrade(score.earned)} of {score.available}{' '}
+            point{score.available === 1 ? '' : 's'}, scaled as 40 + 60 × {formatGrade(score.earned)}/{score.available}.
+            {pending > 0 && ` ${pending} problem${pending === 1 ? '' : 's'} still awaiting review — the grade may rise.`}{' '}
+          </>
+        )}
         <button className="mm-link" onClick={() => openSubmission()} title="Every answer as submitted in this attempt, read-only">
           Open submission {record.attempt} →
         </button>

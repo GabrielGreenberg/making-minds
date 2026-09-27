@@ -8,9 +8,9 @@ requires: browser
 area: app
 source: chat
 created: 2026-09-26T21:34:00-07:00
-status: in-progress
+status: done
 after: 
-branch: task/061-grade-model-score
+branch:
 merged_into:
 ---
 
@@ -67,3 +67,35 @@ released, partly reviewed submission shows the same number in the Grades row and
 the creator's ½ field validates live.
 
 ## Progress log
+- 2026-09-26 (work session, Opus 5.5) — Built. `app/src/engine/score.ts` (pure, exported by
+  the engine barrel): `scoreSubmission` (memo §4.8 — precedence human-on-the-same-answer >
+  autograde > pending; 40 + 60·P rounded to 0.1; floor 0; Missing; provisional), `autoPoints`
+  (1 / ½ by `half_credit_at` / 0; null = a person decides: open, skipped, or no cases),
+  `answerKey` (machine = `gradedMachineKey`, text whitespace-normalised, blanks trimmed),
+  `lateDeduction` (a meeting passes when it ENDS; per-day; takes the calendar — `ClassMeeting`
+  = ISO instants, so the engine needs no time-zone math; callers pass no `late` until task 068),
+  `gradesFromReviews` (today's `manual` reviews as human grades until 063), `scoreRecord` (the
+  one call surfaces make), `questionCaseCount`, `halfCreditProblem`, `formatGrade`,
+  `pointsLabel`. **Refinement**: a `skipped` result is pending (a person decides), not 0 — a
+  submission always answers every question, so a skip means the question had no bank/spec;
+  memo §4.2 updated. **The three old rules are gone**: `summarizeResult` deleted from
+  grader.ts (the "No partial credit" note now points at score.ts); `Gradebook.ts`
+  `gradeSubmissions` returns `score: Score` + per-problem `points`/`source` (over the
+  assignment as it is NOW); `GradeSheet`'s tally → a points column (`problemVerdict`, tone
+  `half`) and "Grade X / 100 — e of n points, scaled as 40 + 60 × e/n"; Home and the Grades
+  tab show `RecordGrade` ("82.5 / 100 (provisional)"); `questionVerdict` → `problemVerdict`;
+  the overview's margin marks gain ½; the gradebook shows ½ marks, a Grade column out of 100
+  (`*` provisional) and "mean grade / 100". **Authoring**: `AssignmentQuestion.half_credit_at`,
+  a "Half credit" field in `QuestionCreator` (live "½ if at least K of N arenas/blanks/cases
+  pass"; every save goes through `saveQuestion`, which refuses an unsound rule against the
+  bank the question will carry), `validateDocument` reports it. **Pins**: new
+  `app/tools/scoreCheck.ts` (in `npm run check`), `pipelineCheck`/`turbotCheck` moved onto the
+  score, `parityCheck` (server-stored ≡ in-process score per attempt; the student's sanitized
+  copy scores as the instructor's). Browser (local): gradebook grades + mean; John's released
+  HW1 sheet, row and margin marks; the creator's field and its refusal at 2 of 2. Visual
+  owed: a ½ mark on screen (no homework carries a ½ rule yet; pinned headless).
+- 2026-09-26 — Gates green (app tsc, build, app check incl. the new scoreCheck, server check
+  incl. parity). Merged main (072's CLAUDE.md) into the branch; CLAUDE.md updated in place
+  (37,503 B). Landed. Next in the grading build: 2026-09-26-063 (grades table, change log,
+  GradingStore seam — reuse 062's `users.public_id`; drop score.ts's `gradesFromReviews`
+  adapter once grades are stored).

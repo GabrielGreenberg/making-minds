@@ -16,11 +16,12 @@
 // criteria — gradeTurbot) and perception questions (raw bit-level frames in,
 // one classification bit out per step — gradePerception, engine/perception.ts).
 //
-// Scoring is all-or-nothing at the question level: a question passes iff the
-// machine is valid AND every case passes. A case passes iff its output is
-// accepted and decodes to f(x). No partial credit — a rejected output and a wrong
-// value fail identically. A Stage-1-invalid machine fails every case (0/total),
-// never `skipped`. The answer key in each case (expected/got) is recorded for
+// The grader judges CASES: a case passes iff its output is accepted and
+// decodes to f(x) — a rejected output and a wrong value fail identically. A
+// Stage-1-invalid machine fails every case (0/total), never `skipped`. Points —
+// 1 when every case passes, ½ by a question's `half_credit_at` rule, a human's
+// grade over either — are NOT decided here: engine/score.ts is the one grade
+// definition (task 061). The answer key in each case (expected/got) is recorded for
 // the INSTRUCTOR only (server/src/sanitize.ts).
 //
 // Everything up to "decode" — Stage 1, the grading circuit, running one case —
@@ -299,25 +300,3 @@ export function gradeSubmission(assignment: AssignmentData, submission: Submissi
   };
 }
 
-/**
- * Roll a SubmissionResult up into headline counts for display. "Questions passed"
- * counts a question as passed only when it was graded and every one of its cases
- * matched; skipped questions are excluded from the question total so they don't
- * penalise the student. "Cases" are the finer-grained per-case tallies already on
- * the result.
- */
-export function summarizeResult(result: SubmissionResult): {
-  questionsPassed: number;
-  questionsTotal: number;
-  vectorsPassed: number;
-  vectorsTotal: number;
-} {
-  const graded = result.questions.filter((q) => q.status === 'graded');
-  const questionsPassed = graded.filter((q) => q.total > 0 && q.passed === q.total).length;
-  return {
-    questionsPassed,
-    questionsTotal: graded.length,
-    vectorsPassed: result.passed,
-    vectorsTotal: result.total,
-  };
-}

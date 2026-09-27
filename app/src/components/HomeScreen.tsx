@@ -3,7 +3,6 @@ import { listAssignments } from '../assignments';
 import type { AssignmentSummary } from '../assignments';
 import { navigate } from '../routing';
 import { useAuth } from '../auth';
-import { summarizeResult } from '../engine/grader';
 import {
   dueStatus,
   formatDateTime,
@@ -18,6 +17,7 @@ import { useRoute } from '../useRoute';
 import { GradesView } from './GradesView';
 import { StudentLayout } from './StudentLayout';
 import { SubmitDialog } from './SubmitDialog';
+import { RecordGrade } from './RecordGrade';
 import { useEffect, useState } from 'react';
 
 /**
@@ -113,7 +113,7 @@ function AssignmentsTab() {
           const frozen = isFrozen(a.dueDate, now, sub != null);
           const late = a.dueDate && sub ? lateBy(a.dueDate, sub.submittedAt) : 0;
           const status = a.dueDate ? dueStatus(a.dueDate, now) : null;
-          const summary = a.gradesReleased && sub?.result ? summarizeResult(sub.result) : null;
+          const released = a.gradesReleased && sub?.result != null;
           return (
             <div key={a.id} className="home-row">
               <button
@@ -141,16 +141,13 @@ function AssignmentsTab() {
                         <span className="home-late"> · late by {formatDuration(late)}</span>
                       )}
                     </span>
-                    {summary && (
+                    {released && sub && (
                       <button
                         className="mm-link"
                         onClick={() => navigate({ kind: 'grades', id: a.id })}
                         title="See your result for each question"
                       >
-                        {summary.questionsTotal > 0
-                          ? `${summary.questionsPassed} of ${summary.questionsTotal} correct · `
-                          : ''}
-                        View grades
+                        <RecordGrade assignmentId={a.id} record={sub} /> · View grades
                       </button>
                     )}
                   </>

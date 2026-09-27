@@ -40,6 +40,7 @@ import {
   type AuthoredOutputGroup,
 } from '../engine/testVectorGen';
 import { FormulaError } from '../engine/formulaEval';
+import { halfCreditProblem, questionCaseCount } from '../engine/score';
 import { StatementBody } from '../components/StatementBody';
 import {
   countCombos,
@@ -170,6 +171,12 @@ export function QuestionCreator({ assignment, existingQuestion, onSave, onCancel
   // TM-brained turbots only.
   const [maxTapeCells, setMaxTapeCells] = useState<string>(
     () => (existingQuestion?.maxTapeCells !== undefined ? String(existingQuestion.maxTapeCells) : ''),
+  );
+
+  // The automatic ½ rule (task 061): "½ when at least K of the N cases pass".
+  // Held as text so it can be cleared back to "no half credit".
+  const [halfCreditAt, setHalfCreditAt] = useState<string>(
+    () => (existingQuestion?.half_credit_at !== undefined ? String(existingQuestion.half_credit_at) : ''),
   );
 
   // Component restriction (`allowed_components`). Off = unrestricted (the
@@ -321,6 +328,37 @@ export function QuestionCreator({ assignment, existingQuestion, onSave, onCancel
     return Number.isInteger(n) && n > 0 ? { maxTapeCells: n } : {};
   })();
 
+  // Half credit needs cases to count: every autograded kind (a machine, a
+  // turbot's arenas, a perception bank, fill-in blanks) — not free text.
+  const canHalfCredit = !(isOpen && !isFillIn);
+  const halfCreditField: Pick<AssignmentQuestion, 'half_credit_at'> = (() => {
+    if (!canHalfCredit) return {};
+    const raw = halfCreditAt.trim();
+    return raw === '' ? {} : { half_credit_at: Number(raw) };
+  })();
+  // N as far as it is known before save: the drafts for turbot arenas and
+  // fill-in blanks; an edited question's own bank otherwise (a generated bank
+  // is rebuilt at save, where the rule is checked against it).
+  const knownCaseCount: number | null = isTurbot
+    ? caseDrafts.length
+    : isFillIn
+      ? blankDrafts.length
+      : existingQuestion && existingQuestion.buildMode === mode
+        ? questionCaseCount(existingQuestion)
+        : null;
+
+  // Every save goes through here: the ½ rule is judged against the bank the
+  // question will actually carry (engine/score.ts halfCreditProblem).
+  const saveQuestion = (q: AssignmentQuestion) => {
+    const next: AssignmentQuestion = { ...q, ...halfCreditField };
+    const problem = halfCreditProblem(next);
+    if (problem) {
+      setSaveError(`Half credit: ${problem}.`);
+      return;
+    }
+    onSave(next);
+  };
+
   // A budget is meaningful on any canvas that has components to count.
   const canLimitComponents = mode !== 'open';
   const componentLimitsField: Pick<AssignmentQuestion, 'component_limits'> = (() => {
@@ -429,7 +467,7 @@ export function QuestionCreator({ assignment, existingQuestion, onSave, onCancel
     // The representation field is meaningless for them; store the default so
     // the type stays uniform.
     if (mode === 'open') {
-      onSave({
+      saveQuestion({
         id: newId,
         label: label.trim(),
         ...(title.trim() ? { title: title.trim() } : {}),
@@ -449,7 +487,7 @@ export function QuestionCreator({ assignment, existingQuestion, onSave, onCancel
     // internal tape alphabet (binary {0,1,*}, unary {0,1}) for the editor,
     // the arena driver loop, and grading.
     if (mode === 'turbot') {
-      onSave({
+      saveQuestion({
         id: newId,
         label: label.trim(),
         ...(title.trim() ? { title: title.trim() } : {}),
@@ -478,7 +516,7 @@ export function QuestionCreator({ assignment, existingQuestion, onSave, onCancel
         setSaveError(e instanceof Error ? e.message : 'Could not generate perception cases.');
         return;
       }
-      onSave({
+      saveQuestion({
         id: newId,
         label: label.trim(),
         ...(title.trim() ? { title: title.trim() } : {}),
@@ -510,7 +548,7 @@ export function QuestionCreator({ assignment, existingQuestion, onSave, onCancel
       return;
     }
 
-    onSave({
+    saveQuestion({
       id: newId,
       label: label.trim(),
       ...(title.trim() ? { title: title.trim() } : {}),
@@ -641,6 +679,26 @@ export function QuestionCreator({ assignment, existingQuestion, onSave, onCancel
             />
             <span className="instructor-count">
               blank = unbudgeted; counts the span of cells the head occupies
+            </span>
+          </label>
+        )}
+        {canHalfCredit && (
+          <label className="mm-inline-field">
+            Half credit
+            <input
+              className="mm-input mm-input--num"
+              type="number"
+              min={1}
+              placeholder="—"
+              aria-label="Half credit: the fewest passing cases that earn ½"
+              value={halfCreditAt}
+              onChange={(e) => setHalfCreditAt(e.target.value)}
+            />
+            <span className="instructor-count">
+              {halfCreditAt.trim() === ''
+                ? 'blank = 0 or 1 only; a number K gives ½ when at least K cases pass'
+                : `½ if at least ${halfCreditAt.trim()} of ${knownCaseCount ?? 'N'} ${isTurbot ? 'arenas' : isFillIn ? 'blanks' : 'cases'} pass` +
+                  (knownCaseCount === null ? ' (N is set when the bank is built at save)' : '')}
             </span>
           </label>
         )}

@@ -151,8 +151,11 @@ an open question has been reviewed. The grader itself is pass/fail: "No partial 
    **changed since graded**.
 2. **Autograde**: 1 if every case passes. ½ if the question's `half_credit_at` rule is met.
    Otherwise 0.
-3. **Pending**: an open question with no valid human grade. It counts as **0 earned**, with the
-   grade marked **provisional** (never over-reporting), and releasing warns while any remain.
+3. **Pending**: no valid human grade and nothing the autograder could grade: an open question,
+   or one the grader skipped (the question had no bank or spec; a submission always carries an
+   answer for every question, so a skip is never the student's blank). It counts as **0
+   earned**, with the grade marked **provisional** (never over-reporting), and releasing warns
+   while any remain. _(Refined while building task 061.)_
 
 The autograde value is always shown beside a human grade, so an override never hides what the
 machine did. A re-grade that changes the autograde under an override flags it

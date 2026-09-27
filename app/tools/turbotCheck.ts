@@ -28,7 +28,8 @@ import {
   TURBOT_FORWARD,
   type TurbotRunResult,
 } from '../src/engine/turbot';
-import { gradeSubmission, summarizeResult } from '../src/engine/grader';
+import { gradeSubmission } from '../src/engine/grader';
+import { autoPoints } from '../src/engine/score';
 import { gradeSubmissions } from '../src/instructor/Gradebook';
 
 let failures = 0;
@@ -763,12 +764,17 @@ function gradeFamily(blockXs: number[], circuit: { components: CircuitComponent[
   });
 }
 
+/** The family question's points for a graded result (engine/score.ts), with
+ *  an optional ½ rule. */
+const familyPoints = (sizes: number[], r: ReturnType<typeof gradeFamily>, halfAt?: number) =>
+  autoPoints({ ...madMaxAssignment(sizes).questions[0], half_credit_at: halfAt }, r.questions[0]);
+
 // (i) The hardcoded brain PASSES the 1-arena family — a single layout
 // cannot tell a layout-solver from a navigator.
 const hard2Solo = gradeFamily([3], hardcodedOutAndBack(2));
 check('hardcoded out-2-back-2 brain passes the 1-arena family (1/1)',
   hard2Solo.questions[0].passed === 1 && hard2Solo.questions[0].total === 1 &&
-  summarizeResult(hard2Solo).questionsPassed === 1);
+  familyPoints([3], hard2Solo) === 1);
 
 // (ii) The SAME brain FAILS the 3-arena family: it never reaches the
 // sensing spot at distance 4 or 6.
@@ -776,7 +782,7 @@ const hard2Family = gradeFamily([3, 5, 7], hardcodedOutAndBack(2));
 check('the same hardcoded brain fails the 3-arena family (1/3)',
   hard2Family.questions[0].passed === 1 && hard2Family.questions[0].total === 3);
 check('a partially-passing family does not pass the question',
-  summarizeResult(hard2Family).questionsPassed === 0);
+  familyPoints([3, 5, 7], hard2Family) === 0);
 
 // (iii) Per-arena results identify the failing arenas with full detail.
 const hard2Cases = hard2Family.questions[0].turbotCases ?? [];
@@ -802,13 +808,15 @@ check('distance-4 hardcoded brain passes exactly 2 of 3 arenas',
   hard4Family.questions[0].passed === 2 && hard4Family.questions[0].total === 3 &&
   hard4Family.questions[0].turbotCases?.[2]?.pass === false);
 check('2/3 arenas is not a pass (all arenas required)',
-  summarizeResult(hard4Family).questionsPassed === 0);
+  familyPoints([3, 5, 7], hard4Family) === 0);
+check('…unless the question sets a ½ rule at 2 of 3: then it earns ½ (engine/score.ts)',
+  familyPoints([3, 5, 7], hard4Family, 2) === 0.5 && familyPoints([3, 5, 7], hard2Family, 2) === 0);
 
 // The sensor-reactive navigator the family is asking for passes everywhere.
 const madMaxFamily = gradeFamily([3, 5, 7], madMaxBrain());
 check('sensor-reactive Mad Max brain passes all 3 arenas',
   madMaxFamily.questions[0].passed === 3 && madMaxFamily.questions[0].total === 3 &&
-  summarizeResult(madMaxFamily).questionsPassed === 1);
+  familyPoints([3, 5, 7], madMaxFamily) === 1);
 
 // Criterion teeth: with a goal in the arena, return-to-start requires the
 // trace to VISIT it — the never-moving brain no longer passes vacuously.
@@ -830,8 +838,9 @@ const gradebookGrades = gradeSubmissions(madMaxAssignment([3, 5, 7]), [{
     answers: [{ questionId: 1, circuit: hardcodedOutAndBack(2) }],
   },
 }]);
-check('gradebook: hardcoded brain scores 0 on the family (question not passed)',
-  gradebookGrades[0].grades[0].passed === false && gradebookGrades[0].score === 0);
+check('gradebook: hardcoded brain earns 0 on the family (question not passed) — 40 on the 40 + 60·P scale',
+  gradebookGrades[0].grades[0].passed === false && gradebookGrades[0].grades[0].points === 0 &&
+  gradebookGrades[0].score.earned === 0 && gradebookGrades[0].score.final === 40);
 check('gradebook: both failing arenas are counted (failedCount 2 of 3)',
   gradebookGrades[0].grades[0].failedCount === 2);
 

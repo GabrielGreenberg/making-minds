@@ -88,6 +88,7 @@ import { Db } from '../src/db';
 import type { ServerConfig } from '../src/config';
 import { TOY_ACCOUNTS } from '../../app/src/auth/accounts';
 import { gradeSubmission, gradeQuestion } from '../../app/src/engine/grader';
+import { scoreRecord } from '../../app/src/engine/score';
 import { studentRecord } from '../src/sanitize';
 import { applyManualReview } from '../../app/src/storage/manualReview';
 import { buildSampleAssignment } from '../../app/src/devData/sampleData';
@@ -402,6 +403,15 @@ if (rec1 && rec2) {
   check('PARITY: attempt 1 grade payload ≡ direct gradeSubmission', d1.length === 0, d1.join(' | '));
   const d2 = diffPaths(canon(directBroken), canon(rec2.result));
   check('PARITY: attempt 2 grade payload ≡ direct gradeSubmission', d2.length === 0, d2.join(' | '));
+  // …and so the ONE grade definition (engine/score.ts, task 061) reads the
+  // same grade from either: server-stored ≡ in-process, per problem.
+  const NOW = Date.now();
+  for (const [name, direct, rec] of [['attempt 1', directCorrect, rec1], ['attempt 2', directBroken, rec2]] as const) {
+    const mine = scoreRecord(assignment.questions, { ...rec, result: direct }, NOW);
+    const theirs = scoreRecord(assignment.questions, rec, NOW);
+    const ds = diffPaths(canon(mine), canon(theirs));
+    check(`PARITY: ${name} score (engine/score.ts) ≡ from the stored result`, ds.length === 0 && theirs.final !== null, ds.join(' | '));
+  }
 
   // The server must store the answers verbatim (no circuit preprocessing).
   const a1 = diffPaths(canon(correctAnswers), canon(rec1.submission.answers));
@@ -471,6 +481,13 @@ const postRelease = await api<{ records: SubmissionRecord[] }>(
   'GET',
   `/assignments/${ASSIGNMENT_ID}/submissions`,
   { token: sTok },
+);
+check(
+  'post-release: the student\'s sanitized copy scores exactly as the instructor\'s (engine/score.ts)',
+  postRelease.json.records.every((r) => {
+    const full = all.json.records.find((f) => f.attempt === r.attempt);
+    return !!full && JSON.stringify(scoreRecord(assignment.questions, r, 0)) === JSON.stringify(scoreRecord(assignment.questions, full, 0));
+  }),
 );
 check(
   'post-release student sees the same scores the instructor does',
