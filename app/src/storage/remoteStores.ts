@@ -29,6 +29,7 @@
 import type {
   AssignmentData,
   AssignmentState,
+  Classmate,
   FeedbackCategory,
   FeedbackScreenshot,
   FeedbackStatus,
@@ -44,6 +45,7 @@ import type { SubmissionStore } from './submissionStore';
 import type { FeedbackStore } from './feedbackStore';
 import type { Role } from '../auth/accounts';
 import type { NotesStore } from './NotesStore';
+import { SubmitRefused } from '../submissionGroup';
 import {
   ApiError,
   getWorkbook,
@@ -56,6 +58,7 @@ import {
   setGradesReleased as apiSetGradesReleased,
   setVisible as apiSetVisible,
   submitAssignment as apiSubmitAssignment,
+  getClassmates,
   listSubmissions as apiListSubmissions,
   listAllSubmissions as apiListAllSubmissions,
   reviewSubmission,
@@ -138,9 +141,20 @@ class RemoteAssignmentStore implements AssignmentStore {
 }
 
 class RemoteSubmissionStore implements SubmissionStore {
-  submit(id: string, submission: SubmissionData): Promise<SubmissionRecord> {
-    // Answers only — identity + timestamp are the server's word (see header).
-    return apiSubmitAssignment(id, submission.answers);
+  async submit(id: string, submission: SubmissionData): Promise<SubmissionRecord> {
+    // Answers and the listed group only — identity + timestamp are the
+    // server's word (see header); so is whether the group is valid: its 400
+    // is the seam's SubmitRefused, with the server's reason.
+    try {
+      return await apiSubmitAssignment(id, submission.answers, submission.group);
+    } catch (err) {
+      if (err instanceof ApiError && err.status === 400) throw new SubmitRefused(err.message);
+      throw err;
+    }
+  }
+
+  listClassmates(): Promise<Classmate[]> {
+    return getClassmates();
   }
 
   listOwn(id: string, _email: string | null): Promise<SubmissionRecord[]> {

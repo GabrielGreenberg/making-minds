@@ -956,7 +956,9 @@ interface AppState {
   hydrateSubmissions: () => Promise<void>;
   // Record an immutable snapshot for an assignment. Works whether the assignment
   // is open (live state) or not (persisted state). Resolves null if id is unknown.
-  submitAssignment: (id: string, student?: string) => Promise<SubmissionRecord | null>;
+  // `group`: the classmates listed in the submit dialog (task 062) — the seam
+  // refuses (rejects) a listing that fails submissionGroup.ts checkGroup.
+  submitAssignment: (id: string, student?: string, opts?: { group?: string[] }) => Promise<SubmissionRecord | null>;
   // exportWorkbook and importWorkbook are in the Workbook section above
 
   // Rotation
@@ -2711,7 +2713,7 @@ export const useStore = create<AppState>()((set, get) => ({
     });
     return JSON.stringify({ notice: INTEGRITY_NOTICE, ...submission }, null, 2);
   },
-  submitAssignment: async (id, student) => {
+  submitAssignment: async (id, student, opts) => {
     closeBoxEditorForSwap(get);
     const epoch = principalEpoch;
     const def = await getAssignment(id);
@@ -2727,6 +2729,7 @@ export const useStore = create<AppState>()((set, get) => ({
     const submission = buildSubmission(def, circuits, {
       student,
       submittedAt: new Date().toISOString(),
+      group: opts?.group,
     });
     const record = await submissionStore.submit(id, submission);
     // Recorded either way; only the SAME principal's badge map shows it.

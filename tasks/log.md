@@ -49,3 +49,4 @@
 2026-09-25-056 · feature · Regularize the gate shapes — AND/OR 60×60, NOT 50×60, boxes sized to their ports, symbols drawn as strokes — and park for Gabriel's look before merging (editor redesign 5 of 6) · 2026-09-26T12:56:57-0700 · task/056-editor-gate-geometry · 2a25fae
 2026-09-25-057 · chore · Measure the rebuilt editor against every value in the workbench memo and fix the drift (editor redesign 6 of 6) · 2026-09-26T15:31:32-0700 · task/057-editor-memo-pass · 7283a3f
 2026-09-23-031 · research · Design the instructor grading interface — memo, mockups and 19 decisions approved by Gabriel; the build filed as 061–071 · 2026-09-26T21:36:59-0700 · task/031-grading-interface-design · 826a235
+2026-09-26-062 · feature · Let a student name up to two group members at submit, in one Submit dialog shared by every submit site · 2026-09-26T22:06:03-0700 · task/062-group-members-on-submit · 956967b

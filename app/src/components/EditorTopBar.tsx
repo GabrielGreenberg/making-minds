@@ -6,12 +6,12 @@
 
 import { useEffect, useState } from 'react';
 import { useStore, selectAssignmentFrozen, showsSubmission } from '../store';
-import { getCurrentUserEmail, useAuth } from '../auth';
+import { useAuth } from '../auth';
 import { navigate } from '../routing';
 import { hashLink } from './PageShell';
 import { SessionControls } from './SessionControls';
 import { WorkbookFileMenu } from './WorkbookFileMenu';
-import { submitConfirmMessage } from '../provenance/notice';
+import { SubmitDialog } from './SubmitDialog';
 import { saveLabel, submittedLabel } from '../workbench';
 
 /** The clock, re-read every `ms` — for labels that age ("Saved 3 min ago"). */
@@ -29,7 +29,6 @@ export function EditorTopBar() {
   const assignment = useStore((s) => s.assignment);
   const currentQuestionIndex = useStore((s) => s.currentQuestionIndex);
   const submission = useStore((s) => (s.assignment ? s.submissions[s.assignment.id] : undefined));
-  const submitAssignment = useStore((s) => s.submitAssignment);
   const viewingSubmission = useStore((s) => s.viewingSubmission);
   const frozen = useStore(selectAssignmentFrozen);
   const showingSubmission = useStore(showsSubmission);
@@ -37,19 +36,8 @@ export function EditorTopBar() {
   const lastSavedAt = useStore((s) => s.lastSavedAt);
   const now = useNow(30_000);
 
-  const handleSubmit = () => {
-    if (!assignment) return;
-    if (!confirm(submitConfirmMessage(assignment.title))) return;
-    // Submit is online-only, never queued: a failure records NOTHING and asks
-    // for a visible retry (the server stamps the submission time, so nothing
-    // can be silently late near a deadline). The work itself is autosaved.
-    void submitAssignment(assignment.id, getCurrentUserEmail()).catch(() => {
-      alert(
-        'Submission failed — the server could not be reached, and nothing was recorded.\n\n' +
-        'Your work is still saved. Please try Submit again in a moment.'
-      );
-    });
-  };
+  // Submit opens the one Submit dialog (components/SubmitDialog.tsx).
+  const [submitting, setSubmitting] = useState(false);
 
   // A submission on show saves nothing, so there is no save state to report.
   const save = showingSubmission ? null : saveLabel(status, lastSavedAt, now);
@@ -123,9 +111,12 @@ export function EditorTopBar() {
         {assignment && !showingSubmission && (
           <>
             {submission && <span className="wb-submitted">{submittedLabel(submission.submittedAt, now)}</span>}
-            <button type="button" className="mm-btn mm-btn--primary wb-primary" onClick={handleSubmit}>
+            <button type="button" className="mm-btn mm-btn--primary wb-primary" onClick={() => setSubmitting(true)}>
               {submission ? 'Submit again' : 'Submit assignment'}
             </button>
+            {submitting && (
+              <SubmitDialog assignmentId={assignment.id} title={assignment.title} onClose={() => setSubmitting(false)} />
+            )}
           </>
         )}
         <SessionControls menu />

@@ -483,6 +483,19 @@ export interface SubmissionData {
      *  workbook; checked at submit, never graded. */
     provenance?: QuestionProvenance;
   }[];
+  /** The classmates the student worked with (task 062): up to two roster
+   *  students, as opaque `Classmate.key`s — never emails or UIDs, since a
+   *  student's own record comes back to them. Absent = no group listed.
+   *  Validated by `submissionGroup.ts checkGroup` on receipt; never graded. */
+  group?: string[];
+}
+
+/** A roster student as another student may see them: a name and an opaque,
+ *  stable key (remote: `users.public_id`; local: the toy account's id) —
+ *  what the submit dialog's group picker offers (task 062). */
+export interface Classmate {
+  key: string;
+  name: string;
 }
 
 // ─── Provenance and integrity (task 034) ─────────────────────────

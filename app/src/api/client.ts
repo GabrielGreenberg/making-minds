@@ -7,7 +7,7 @@
 //
 //   RemoteWorkbookStore   → getWorkbook / getWorkbookFull / putWorkbook
 //   RemoteAssignmentStore → listAssignments / getAssignment / putAssignment / deleteAssignment
-//   RemoteSubmissionStore → submitAssignment / listSubmissions / listAllSubmissions / reviewSubmission
+//   RemoteSubmissionStore → submitAssignment / listSubmissions / listAllSubmissions / reviewSubmission / getClassmates
 //   remote auth           → login / logout / me
 //
 // Configuration: VITE_API_BASE (e.g. "https://api.phil133.example.edu") set at
@@ -22,6 +22,7 @@
 import type {
   AssignmentData,
   AssignmentState,
+  Classmate,
   FeedbackCategory,
   FeedbackScreenshot,
   FeedbackStatus,
@@ -463,19 +464,28 @@ export async function putWorkbook(
 // ── submissions ──────────────────────────────────────────────────
 
 /**
- * Submit answers; the server stamps identity + timestamp, grades, and returns
- * the record (per-case detail already stripped for students).
+ * Submit answers (+ the listed group, task 062); the server stamps identity +
+ * timestamp, checks the group, grades, and returns the record (per-case
+ * detail already stripped for students). A refused group is a 400.
  */
 export async function submitAssignment(
   assignmentId: string,
   answers: SubmissionData['answers'],
+  group?: string[],
 ): Promise<SubmissionRecord> {
   const { record } = await request<{ record: SubmissionRecord }>(
     'POST',
     `/assignments/${encodeURIComponent(assignmentId)}/submissions`,
-    { answers },
+    group?.length ? { answers, group } : { answers },
   );
   return record;
+}
+
+/** The roster's students as the caller may see them — names + opaque keys,
+ *  the caller left out (task 062: the submit dialog's group picker). */
+export async function getClassmates(): Promise<Classmate[]> {
+  const { classmates } = await request<{ classmates: Classmate[] }>('GET', '/classmates');
+  return classmates;
 }
 
 /**

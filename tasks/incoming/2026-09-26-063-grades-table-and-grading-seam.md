@@ -26,7 +26,8 @@ change, and routes it through a new seam (memo §7.1–§7.3, §7.6).
 - Server tables (`db.ts` migrations): `grades` (PK assignment, student, question; points ∈
   {0, 0.5, 1}, note, grader, graded_at, attempt, answer_key, version), `grade_events`
   (append-only: id, at, actor, assignment_id, student, question_id?, kind, before, after — no
-  update or delete path), `users.public_id` (random, stable, backfilled), `submissions`
+  update or delete path), `users.public_id` (ALREADY BUILT by 2026-09-26-062 — random,
+  stable, backfilled, `db.publicIdOf`/`listStudentKeys`; reuse it), `submissions`
   gains `assignment_hash` stamped at submit (`homeworkContentHash`,
   `devData/homeworkSync.ts:56`).
 - `PUT /api/assignments/:id/grades/:sid/:qid` `{points, note, version}` → 409 with the current
