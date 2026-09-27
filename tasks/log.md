@@ -56,3 +56,4 @@
 2026-09-26-064 · feature · Serve slim, roster-joined grading summaries — per assignment, course-wide, per student — and one attempt on demand · 2026-09-27T11:01:56-0700 · robot/064-grading-summary-endpoints · 91094b9
 2026-09-26-065 · feature · Add the Grading tab — assignment list with progress, and each assignment's Overview and Matrix — and retire the old gradebook page into it · 2026-09-27T12:20:58-0700 · robot/065-grading-tab-overview-matrix · 3d577ba
 2026-09-26-066 · feature · Build the hand-grading queue — one problem across students, 0 / ½ / 1 keys, hide names, soft claims, changed-since-graded suggestions · 2026-09-27T13:18:14-0700 · robot/066-hand-grading-queue · 70c120d
+2026-09-26-067 · feature · Show one student's submission to an instructor — full autograde detail, overrides, and the submitted machine in the read-only viewer · 2026-09-27T14:19:08-0700 · robot/067-instructor-submission-page-and-viewer · 93a01e7

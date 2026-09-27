@@ -8,9 +8,9 @@ requires: browser
 area: app
 source: chat
 created: 2026-09-26T21:34:00-07:00
-status: in-progress
+status: done
 after: 2026-09-26-065
-branch: robot/067-instructor-submission-page-and-viewer
+branch:
 merged_into:
 ---
 
@@ -98,4 +98,4 @@ override ½ with a note, see it in the matrix.
   none. Nit left: a stray OFF_ROSTER_LABEL doc comment in GradingMatrix.tsx:21.
 - **Owed:** browser eyeballs not yet seen — the instructor's own copy intact after a view
   (navResetCheck pins it), remote mode (server attempt route; a student's 403 on the viewer URL).
-- **NEXT STEP:** loop session: visual check if owed, then land per PROFILE §5.
+- **Landed** (robot, 2026-09-27): the robot run could not start the browser pane unattended; the headless-Chrome Verify above stands. Still owed: remote-mode eyeball and the own-copy-intact eyeball (recipes above).
