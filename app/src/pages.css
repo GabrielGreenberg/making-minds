@@ -151,7 +151,7 @@
 .ps-mark { font-size: 0.8em; font-weight: 700; line-height: 1; }
 .ps-mark--done, .ps-mark--pass { color: var(--mm-ok); }
 .ps-mark--fail { color: var(--mm-danger); }
-.ps-mark--pending { color: var(--mm-warn); }
+.ps-mark--pending, .ps-mark--half { color: var(--mm-warn); }
 .ps-mode { float: right; margin: 2px 0 4px 10px; opacity: 0.85; }
 .ps-title { color: var(--mm-ink); }
 .ps-hint { margin-top: 0.4em; font-style: italic; color: var(--mm-exam); }
@@ -271,7 +271,7 @@
 .grades-verdict { white-space: nowrap; font-weight: 600; }
 .grades-verdict--pass { color: var(--mm-ok); }
 .grades-verdict--fail { color: var(--mm-danger); }
-.grades-verdict--pending { color: var(--mm-warn); }
+.grades-verdict--pending, .grades-verdict--half { color: var(--mm-warn); }
 .grades-verdict--none { color: var(--mm-ink-3); font-weight: 400; }
 
 /* ── Login (card variant of the shell) ─────────────────────────────── */
@@ -464,7 +464,7 @@
 }
 .instructor-pass { color: var(--mm-ok); font-weight: 700; }
 .instructor-fail { color: var(--mm-danger); font-weight: 700; }
-.instructor-pending { color: var(--mm-warn); font-weight: 700; }
+.instructor-pending, .instructor-half { color: var(--mm-warn); font-weight: 700; }
 
 /* An open question's free-text answer in the gradebook drill-down */
 .instructor-open-response {

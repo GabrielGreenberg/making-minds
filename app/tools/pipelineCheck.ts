@@ -51,12 +51,13 @@ import {
   turbotIncorrect,
 } from '../src/devData/sampleData';
 import { boxAcross, boxWhole } from './builder';
-import { gradeQuestion, gradeSubmission, summarizeResult } from '../src/engine/grader';
+import { gradeQuestion, gradeSubmission } from '../src/engine/grader';
+import { autoPoints, scoreRecord, type ProblemScore } from '../src/engine/score';
 import { applyManualReview, buildSubmission } from '../src/storage/submissionStore';
 import { checkGroup, MAX_GROUP_OTHERS } from '../src/submissionGroup';
 import { emptyQuestionCircuit } from '../src/storage/workbookStore';
 import { gradeSubmissions } from '../src/instructor/Gradebook';
-import { questionVerdict } from '../src/gradeDisplay';
+import { problemVerdict } from '../src/gradeDisplay';
 import { fillInBlanks } from '../src/engine/fillIn';
 import {
   blankDraftsOf,
@@ -122,8 +123,11 @@ for (const q of correct.questions) {
     check(`${def?.label} all vectors pass`, q.status === 'graded' && q.total > 0 && q.passed === q.total);
   }
 }
-const cs = summarizeResult(correct);
-check('correct: 13/13 autograded questions', cs.questionsPassed === 13 && cs.questionsTotal === 13);
+const fullPoints = (r: typeof correct) =>
+  assignment.questions.filter((q) => autoPoints(q, r.questions.find((x) => x.questionId === q.id)) === 1).length;
+const autograded = (r: typeof correct) =>
+  assignment.questions.filter((q) => autoPoints(q, r.questions.find((x) => x.questionId === q.id)) !== null).length;
+check('correct: 13/13 autograded questions earn their point', fullPoints(correct) === 13 && autograded(correct) === 13);
 
 console.log('\n[incorrect submission]');
 const wrong = gradeSubmission(assignment, buildIncorrectSubmission());
@@ -137,8 +141,7 @@ for (const q of wrong.questions) {
     check(`${def?.label} fails at least one vector`, q.status === 'graded' && q.passed < q.total);
   }
 }
-const ws = summarizeResult(wrong);
-check('incorrect: 0/13 autograded questions', ws.questionsPassed === 0 && ws.questionsTotal === 13);
+check('incorrect: 0/13 autograded questions earn a point', fullPoints(wrong) === 0 && autograded(wrong) === 13);
 
 // A sequential sub-circuit boxed (task 004): the SC answer with its whole
 // circuit — MEM included — inside one placed box grades exactly as unboxed,
@@ -211,11 +214,13 @@ if (reviewed) {
   const [after] = gradeSubmissions(assignment, reviewed);
   const qg = after.grades.find((g) => g.questionId === openQ.id);
   check('gradebook counts the reviewed question as passed',
-    qg?.pending === false && qg?.passed === true);
-  check('score now includes the reviewed open question',
-    before.score === 1 && after.score === 1 &&
+    qg?.pending === false && qg?.passed === true && qg?.points === 1 && qg?.source === 'human');
+  check('the grade now includes the reviewed open question: provisional before, 100 after',
+    before.score.provisional && before.score.final! < 100 && !after.score.provisional && after.score.final === 100 &&
     after.grades.filter((g) => !g.pending).length ===
       before.grades.filter((g) => !g.pending).length + 1);
+  check('the student\'s sheet (scoreRecord) and the gradebook agree on the grade',
+    scoreRecord(assignment.questions, reviewed[0], Date.now()).final === after.score.final);
 }
 
 // ── Fill-in-the-blank questions (HW1 P11) ──────────────────────────
@@ -634,7 +639,9 @@ console.log('\n[turbot arena authoring]');
     halfQ.passed === 1 && halfQ.total === 2 &&
       halfQ.turbotCases?.[0].pass === true && halfQ.turbotCases?.[1].pass === false);
   check('...and the question fails as a whole (every arena must pass)',
-    summarizeResult(half).questionsPassed === 0 && summarizeResult(half).questionsTotal === 1);
+    autoPoints(halfDef.questions[0], halfQ) === 0);
+  check('...unless it sets a ½ rule at 1 of 2 arenas (engine/score.ts)',
+    autoPoints({ ...halfDef.questions[0], half_credit_at: 1 }, halfQ) === 0.5);
   const wrong = gradeAgainst(authored, turbotIncorrect()).questions[0];
   check('a brain that never leaves the start fails both arenas (0/2)',
     wrong.passed === 0 && wrong.total === 2 && wrong.turbotCases?.length === 2);
@@ -656,33 +663,33 @@ console.log('\n[turbot arena authoring]');
       creator.includes('saved={savedArenas}'));
 }
 
-// ── The student's own grade sheet (gradeDisplay.questionVerdict) ────
-// What a student is told about each question. The load-bearing cases are the
-// ones that must NOT read as a failure: a question with no result at all, one
-// that was never attempted, and an open question still awaiting review.
+// ── The student's own grade sheet (gradeDisplay.problemVerdict) ────
+// What a student is told about each problem: its points (engine/score.ts)
+// and how they came about. The load-bearing cases are the ones that must NOT
+// read as a failure: no result at all, and a problem still awaiting review.
 console.log('\n[student grade sheet]');
 {
-  const verdict = (r: Parameters<typeof questionVerdict>[0]) => questionVerdict(r);
   const q = (over: Partial<QuestionResult>): QuestionResult =>
     ({ questionId: 1, status: 'graded', passed: 0, total: 0, cases: [], ...over });
+  const p = (over: Partial<ProblemScore>): ProblemScore =>
+    ({ questionId: 1, points: null, source: 'pending', autoPoints: null, ...over });
 
-  check('no result at all is not a failure', verdict(undefined).tone === 'none');
-  check('a skipped question is "Not attempted"',
-    verdict(q({ status: 'skipped' })).tone === 'none' &&
-    verdict(q({ status: 'skipped' })).text === 'Not attempted');
-  check('a 0/0 result is not a failure either',
-    verdict(q({ passed: 0, total: 0 })).tone === 'none');
-  check('all cases passed reads as correct, with the count',
-    verdict(q({ passed: 4, total: 4 })).tone === 'pass' &&
-    verdict(q({ passed: 4, total: 4 })).text === 'Correct — 4/4');
-  check('some cases failed shows the score, not "correct"',
-    verdict(q({ passed: 3, total: 4 })).tone === 'fail' &&
-    verdict(q({ passed: 3, total: 4 })).text === '3/4');
-  check('an unreviewed open question is pending, not failed',
-    verdict(q({ status: 'pending' })).tone === 'pending');
-  check('a reviewed open question carries the instructor verdict',
-    verdict(q({ status: 'pending', manual: { pass: true, reviewedAt: NOW_ISO } })).tone === 'pass' &&
-    verdict(q({ status: 'pending', manual: { pass: false, reviewedAt: NOW_ISO } })).tone === 'fail');
+  check('no result at all is not a failure', problemVerdict(undefined, undefined).tone === 'none');
+  check('awaiting review is pending, not failed',
+    problemVerdict(p({}), q({ status: 'pending' })).tone === 'pending' &&
+    problemVerdict(p({}), q({ status: 'pending' })).text === 'Awaiting review');
+  check('full credit reads with its points and the count',
+    problemVerdict(p({ points: 1, source: 'auto', autoPoints: 1 }), q({ passed: 4, total: 4 })).tone === 'pass' &&
+    problemVerdict(p({ points: 1, source: 'auto', autoPoints: 1 }), q({ passed: 4, total: 4 })).text === '1 point — 4/4');
+  check('half credit by the rule reads as ½',
+    problemVerdict(p({ points: 0.5, source: 'auto-half', autoPoints: 0.5 }), q({ passed: 1, total: 2 })).tone === 'half' &&
+    problemVerdict(p({ points: 0.5, source: 'auto-half', autoPoints: 0.5 }), q({ passed: 1, total: 2 })).text === '½ point — 1/2');
+  check('some cases failed shows 0 points and the count',
+    problemVerdict(p({ points: 0, source: 'auto', autoPoints: 0 }), q({ passed: 3, total: 4 })).tone === 'fail' &&
+    problemVerdict(p({ points: 0, source: 'auto', autoPoints: 0 }), q({ passed: 3, total: 4 })).text === '0 points — 3/4');
+  check('a reviewed problem says so',
+    problemVerdict(p({ points: 1, source: 'human' }), q({ status: 'pending' })).text === '1 point (reviewed)' &&
+    problemVerdict(p({ points: 0, source: 'human' }), q({ status: 'pending' })).tone === 'fail');
 }
 
 // ─── The group listing at submit (task 062): the one rule, submissionGroup.ts ───

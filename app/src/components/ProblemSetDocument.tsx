@@ -31,12 +31,13 @@ import { hashLink } from './PageShell';
 import { InlineMarkup, StatementBody } from './StatementBody';
 import { parseStatement } from '../statementFormat';
 import { ArenaCanvas } from './ArenaCanvas';
+import type { Verdict } from '../gradeDisplay';
 
 /** What the margin shows beside a problem: the student's own "done" tick and,
  *  once grades are released, the verdict. */
 export interface ProblemStatus {
   done?: boolean;
-  verdict?: { text: string; tone: 'pass' | 'fail' | 'pending' | 'none' };
+  verdict?: Verdict;
 }
 
 const BASE_URL: string = import.meta.env.BASE_URL;
@@ -176,7 +177,7 @@ function StatusMarks({ status }: { status: ProblemStatus | undefined }) {
     <>
       {v && v.tone !== 'none' ? (
         <span className={`ps-mark ps-mark--${v.tone}`} title={v.text}>
-          {v.tone === 'pass' ? '✓' : v.tone === 'fail' ? '✗' : '…'}
+          {v.tone === 'pass' ? '✓' : v.tone === 'half' ? '½' : v.tone === 'fail' ? '✗' : '…'}
         </span>
       ) : status.done ? (
         <span className="ps-mark ps-mark--done" title="Marked done">✓</span>

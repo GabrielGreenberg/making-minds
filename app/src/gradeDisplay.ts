@@ -1,29 +1,30 @@
 // Student-facing grade display policy (pure — no React, so a headless check
-// can pin it). The instructor's Gradebook has its own richer mapping; this one
-// answers the only question a student's grade sheet asks of a result: did this
-// question come out right, and if not, how much of it did.
+// can pin it). The points come from engine/score.ts, the one grade
+// definition; this module only words them for a student's grade sheet and
+// the problem-set margin.
 
 import type { AssignmentQuestion, CaseResult, CircuitData, QuestionResult, TurbotCaseResult } from './types';
+import { pointsLabel, type ProblemScore } from './engine/score';
 import type { LoadedCase } from './store';
 import { runValueCase, runTurbotCase, gradedMachineKey } from './engine/caseRun';
 
-/** One question's verdict, in the student's terms. */
-export function questionVerdict(r: QuestionResult | undefined): {
+export type VerdictTone = 'pass' | 'half' | 'fail' | 'pending' | 'none';
+export interface Verdict {
   text: string;
-  tone: 'pass' | 'fail' | 'pending' | 'none';
-} {
-  if (!r) return { text: 'Not graded', tone: 'none' };
-  if (r.status === 'pending') {
-    if (!r.manual) return { text: 'Awaiting review', tone: 'pending' };
-    return r.manual.pass
-      ? { text: 'Correct (reviewed)', tone: 'pass' }
-      : { text: 'Incorrect (reviewed)', tone: 'fail' };
-  }
-  if (r.status === 'skipped') return { text: 'Not attempted', tone: 'none' };
-  if (r.total === 0) return { text: 'Not graded', tone: 'none' };
-  return r.passed === r.total
-    ? { text: `Correct — ${r.passed}/${r.total}`, tone: 'pass' }
-    : { text: `${r.passed}/${r.total}`, tone: 'fail' };
+  tone: VerdictTone;
+}
+
+/** One problem's verdict in the student's terms: its points (engine/score.ts
+ *  — the one grade definition) and how they came about — the case count for
+ *  an autograde, "(reviewed)" for a person's grade. Pending until a person
+ *  decides. */
+export function problemVerdict(p: ProblemScore | undefined, r: QuestionResult | undefined): Verdict {
+  if (!p) return { text: 'Not graded', tone: 'none' };
+  if (p.points === null) return { text: 'Awaiting review', tone: 'pending' };
+  const tone: VerdictTone = p.points === 1 ? 'pass' : p.points === 0.5 ? 'half' : 'fail';
+  const pts = `${pointsLabel(p.points)} point${p.points === 0 ? 's' : ''}`; // 1 point, ½ point, 0 points
+  if (p.source === 'human') return { text: `${pts} (reviewed)`, tone };
+  return { text: r && r.total > 0 ? `${pts} — ${r.passed}/${r.total}` : pts, tone };
 }
 
 /** One value case's input as the question names it — `x = 3, y = 5` (the

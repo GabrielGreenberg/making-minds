@@ -8,6 +8,7 @@ import { navigate } from '../routing';
 import { gradeSubmissions, computeStats, type SubmissionGrade } from './Gradebook';
 import { formatDuration, lateBy } from '../dueDates';
 import { useAsyncValue } from '../useAsyncValue';
+import { formatGrade, type Score } from '../engine/score';
 
 function formatTime(iso: string): string {
   const d = new Date(iso);
@@ -15,6 +16,18 @@ function formatTime(iso: string): string {
     d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) +
     ', ' +
     d.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })
+  );
+}
+
+/** An attempt's grade out of 100 (engine/score.ts), marked while any problem
+ *  still awaits a person. */
+function GradeCell({ score }: { score: Score }) {
+  if (score.final === null) return <>—</>;
+  return (
+    <span title={score.provisional ? 'Provisional — some problems still await review' : undefined}>
+      {formatGrade(score.final)}
+      {score.provisional ? '*' : ''}
+    </span>
   );
 }
 
@@ -141,8 +154,8 @@ export function GradebookView({ id }: { id: string }) {
           <span className="instructor-stat-label">submissions</span>
         </div>
         <div className="instructor-stat">
-          <span className="instructor-stat-value">{pct(stats.meanScore)}</span>
-          <span className="instructor-stat-label">mean score</span>
+          <span className="instructor-stat-value">{formatGrade(Math.round(stats.meanScore * 10) / 10)}</span>
+          <span className="instructor-stat-label">mean grade / 100</span>
         </div>
         {assignment.questions.map((q) => {
           if (questionTask(q) === 'open') {
@@ -186,7 +199,7 @@ export function GradebookView({ id }: { id: string }) {
                 {assignment.questions.map((q) => (
                   <th key={q.id}>{q.label}</th>
                 ))}
-                <th>Score</th>
+                <th>Grade</th>
               </tr>
             </thead>
             <tbody>
@@ -237,6 +250,8 @@ function QuestionMarks({
               <span className="instructor-pending" title="Open question — review the response below">✎</span>
             ) : qg?.passed ? (
               <span className="instructor-pass" title={qg.manual ? 'manually graded correct' : undefined}>✓</span>
+            ) : qg?.points === 0.5 ? (
+              <span className="instructor-half" title={qg.source === 'human' ? 'graded ½ by hand' : 'half credit — the ½ rule'}>½</span>
             ) : (
               <span className="instructor-fail" title={qg?.manual ? 'manually graded incorrect' : undefined}>✗</span>
             )}
@@ -285,7 +300,7 @@ function StudentRow({
         </td>
         <td>{all.length}</td>
         <QuestionMarks grade={latest} assignment={assignment} />
-        <td>{pct(latest.score)}</td>
+        <td><GradeCell score={latest.score} /></td>
       </tr>
       {expanded && (
         <tr className="instructor-submission-detail">
@@ -299,7 +314,7 @@ function StudentRow({
                     {assignment.questions.map((q) => (
                       <th key={q.id}>{q.label}</th>
                     ))}
-                    <th>Score</th>
+                    <th>Grade</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -354,7 +369,7 @@ function AttemptRow({
           <LateTag assignment={assignment} submittedAt={grade.record.submittedAt} />
         </td>
         <QuestionMarks grade={grade} assignment={assignment} />
-        <td>{pct(grade.score)}</td>
+        <td><GradeCell score={grade.score} /></td>
       </tr>
       {showDetail && (
         <tr className="instructor-submission-detail">

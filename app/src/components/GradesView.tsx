@@ -3,7 +3,7 @@ import { useStore } from '../store';
 import { listAssignments } from '../assignments';
 import { navigate } from '../routing';
 import { useAuth } from '../auth';
-import { summarizeResult } from '../engine/grader';
+import { RecordGrade } from './RecordGrade';
 import { formatDateTime } from '../dueDates';
 import { useAsyncValue } from '../useAsyncValue';
 import { GradeSheet } from './GradeSheet';
@@ -12,7 +12,7 @@ import { StudentLayout } from './StudentLayout';
 /**
  * The Grades tab of the student Home: one row per published assignment with
  * when it was submitted and the result once the instructor has released
- * grades ("N of M correct"; "Not released yet"; "Not submitted"). A released
+ * grades (the grade out of 100; "Not released yet"; "Not submitted"). A released
  * row opens into its question-by-question sheet; the open row is the route's
  * id (#/grades/:id), so a grade sheet is linkable and Back closes it.
  */
@@ -70,7 +70,6 @@ export function GradesView({ openId }: { openId?: string }) {
             {assignments.map((a) => {
               const sub = submissions[a.id];
               const released = a.gradesReleased && sub?.result != null;
-              const summary = released && sub?.result ? summarizeResult(sub.result) : null;
               const open = released && openId === a.id;
               return (
                 <Fragment key={a.id}>
@@ -91,9 +90,9 @@ export function GradesView({ openId }: { openId?: string }) {
                     <td>
                       {!sub ? (
                         <span className="dim">Not submitted</span>
-                      ) : summary ? (
-                        <span className="mm-ok grades-score">
-                          {summary.questionsPassed} of {summary.questionsTotal} correct
+                      ) : released ? (
+                        <span className="grades-score">
+                          <RecordGrade assignmentId={a.id} record={sub} />
                         </span>
                       ) : (
                         <span className="dim">Not released yet</span>
