@@ -9,7 +9,7 @@ area: server
 source: chat
 created: 2026-09-22T19:30:00-07:00
 status: ready
-after:
+after: 2026-09-26-064
 branch:
 merged_into:
 ---
@@ -30,6 +30,8 @@ Note (catch 2026-09-23): task 2026-09-23-031 (grading interface design) needs th
 roster ↔ submissions join and per-assignment summary (submitted / late / pass rate). If this
 lands first, build that query as ONE reusable summary endpoint the grading surfaces can
 consume; if 031's design lands first, reuse its endpoint here.
+031's design landed first (2026-09-26): consume `GET /api/assignments/:id/summary`, built by
+task 2026-09-26-064 (memo `docs/buildout/designs/grading-interface.md` §7.2) — hence `after:`.
 
 ## Done when
 - The Dashboard has an **Activity** tab (`#/instructor/activity`) beside Assignments ·

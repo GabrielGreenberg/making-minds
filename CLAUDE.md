@@ -10,7 +10,7 @@ by `tasks/tools/check-budgets.mjs` (runs in CI and in app `npm run check`).
 > story lives in its task file's `## Progress log` and one line in `tasks/log.md`, never
 > here; the pre-pipeline changelog (2026-07 → 2026-09-21) is frozen in `docs/HISTORY.md`.
 
-_Last updated: 2026-09-25_
+_Last updated: 2026-09-26_
 
 ## How work flows — the task pipeline (`tasks/`)
 
@@ -153,8 +153,9 @@ intros, callouts, SVG figures cropped from the PDFs, all under `app/public/probl
 ## What's next
 
 The open work is the queue (`tasks/incoming/` ready, `tasks/blocked/` waiting on Gabriel);
-`/work` offers it. Headline on 2026-09-26: the grading interface (031), the robot's setup
-(043), the pilot domain (008); UCLA SSO (006) deferred.
+`/work` offers it. Headline on 2026-09-26: **building the grading interface** (memo
+`docs/buildout/designs/grading-interface.md`; slices 061–071, 061–068 before HW1 returns);
+the robot (043), the pilot domain (008); SSO (006) deferred.
 
 ---
 

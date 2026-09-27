@@ -8,9 +8,9 @@ requires: human
 area: app
 source: chat
 created: 2026-09-23T10:00:00-07:00
-status: in-progress
+status: done
 after:
-branch: task/031-grading-interface-design
+branch:
 merged_into:
 ---
 
@@ -217,3 +217,45 @@ existing. The memo's current-behaviour claims are spot-checked against the cited
 mockups are screenshot-attached.
 
 ## Progress log
+- 2026-09-26 (work session, Opus 5.5) — Claimed. Audit re-verified against HEAD e3218ee (three
+  Explore passes; cites refreshed for the memo — notable drift: the gradebook feed is now
+  `GET …/submissions/all`, task 037; the score has THREE rules, `Gradebook.ts:26-61`,
+  `summarizeResult` `engine/grader.ts:309-321`, `GradeSheet.tsx:119-123`; task 003's viewer is
+  `store.ts viewSubmission`/`submittedQuestionCircuit`, own-attempts only). Grading policy read
+  from the website (`policies.html`, `data/course.json`). **Gabriel answered every decision**
+  (AskUserQuestion, 19 in all): Where = a Grading tab · Points = 1 per problem, ½ on any human
+  grade · machine ½ = an AUTOMATIC per-problem rule (author-set) · Override = any problem, note
+  required · Counting attempt = latest ONLY (no per-student pick) · Late = computed per policy,
+  shown, waivable · Calendar = a repo copy of the website's course.json, synced on release ·
+  Extensions = per-student due date, no reason · Counts = HW1–HW6, HW7 not graded (a
+  counts-toward-grade flag) · Groups = roster-picked members + reciprocity flag · TAs = FULL
+  instructors (no grader role; every change still logged with who) · Anonymous = hide-names
+  toggle · Release = per assignment · Export = plain CSV, one row per student · Course grade =
+  problem sets only · Flags = the five, tunable · Private notes = yes, student page ·
+  Resubmit after hand grade = carry if the answer is unchanged, else "changed since graded" ·
+  Two graders = soft claim · Regrade requests = out of scope. Next: write the memo
+  `docs/buildout/designs/grading-interface.md`, then the static mockups + screenshots.
+- 2026-09-26 — Memo written: `docs/buildout/designs/grading-interface.md` (current behaviour
+  re-cited, the 19 decisions as a table, the grade model, re-grade, surfaces + routes, data
+  layer + the `GradingStore` seam, flags, P3, deferred, 11 build slices). Mockups:
+  `docs/buildout/designs/grading-interface/mockups.html` (the app's own theme.css + pages.css;
+  proposed `gr-*` idioms in tokens only; fictional data), seven screenshots in
+  `tasks/attachments/2026-09-23-031-*.png`. Three proposed defaults still to confirm at
+  approval (memo §4.5, §4.6, §4.2): Missing exports as 0; a class meeting "passes" when it
+  ends; a pending problem counts 0 earned with the grade marked provisional. **Next:** Gabriel
+  reviews memo + screenshots → on approval record it here, set the memo's status to accepted,
+  file slices 1–11 (memo §12) as ordered tasks in `tasks/incoming/`, update CLAUDE.md "What's
+  next", land.
+- 2026-09-26 — **Approved by Gabriel** ("approved, defaults fine — file the slices and land
+  it"), including the three proposed defaults (Missing exports as 0; a class meeting passes
+  when it ends; a pending problem counts 0 earned with the grade provisional). Memo status →
+  accepted. Build filed in order as 2026-09-26-061 (grade model + scoreSubmission + ½ rule) ·
+  062 (group members at submit — urgent, before HW1 submissions) · 063 (grades table, change
+  log, GradingStore seam, review migration) · 064 (summary endpoints, shared with 030) · 065
+  (Grading tab + Overview + Matrix) · 066 (hand-grading queue) · 067 (instructor submission
+  page + viewer) · 068 (late penalty, calendar, extensions, waivers) · 069 (re-grade dry run)
+  · 070 (flags, student page, private notes) · 071 (export CSV). 030 now `after: 064`
+  (consumes its `/summary`); 014 now `after: 066` (a suggestion inside the queue). CLAUDE.md
+  "What's next" names the build (39,988 / 40,000 bytes — nearly full). Gates green on the
+  branch (app tsc, tools typecheck, build, app check, server check). Landed. Next: `/work`
+  on 062 (urgent) or 061.

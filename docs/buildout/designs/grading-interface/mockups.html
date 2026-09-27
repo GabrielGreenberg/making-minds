@@ -1,0 +1,430 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=1280">
+<title>Grading interface mockups</title>
+<!-- Task 2026-09-23-031 · design memo ../grading-interface.md §6, §11.
+     Drawn with the app's own stylesheets; gr-* rules below are PROPOSED idioms (tokens only).
+     All people and data are fictional. Generated; edit the memo, not this file, for decisions. -->
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;1,400&family=IBM+Plex+Serif:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="../../../../app/src/theme.css">
+<link rel="stylesheet" href="../../../../app/src/pages.css">
+<style>
+/* ── The mock frame (not part of the proposal) ── */
+html, body { margin: 0; background: var(--mm-surface-2); }
+.mock-index { font-family: var(--mm-font-sans); font-size: 14px; color: var(--mm-ink); padding: 28px 40px 8px; max-width: 1200px; margin: 0 auto; }
+.mock-index h1 { font-family: var(--mm-font-serif); font-size: 26px; margin: 0 0 6px; }
+.mock-index p { margin: 4px 0; color: var(--mm-ink-2); max-width: 90ch; }
+.mock-index ol { margin: 10px 0 0; padding-left: 20px; columns: 2; }
+.mock { width: 1280px; margin: 24px auto 48px; background: var(--mm-bg); box-shadow: var(--mm-shadow); position: relative; }
+.mock-cap { font-family: var(--mm-font-mono); font-size: 12px; padding: 8px 14px; background: var(--mm-navy); color: var(--mm-surface); }
+.mock .mm-shell { height: auto; overflow: visible; position: relative; }
+body.only { background: var(--mm-bg); }
+body.only .mock-index, body.only .mock-cap, body.only .mock { display: none; }
+body.only .mock.on { display: block; margin: 0; box-shadow: none; }
+
+/* ═════════ Proposed idioms (gr-*): --mm-* tokens only, no literals ═════════ */
+.gr-bar { height: 6px; background: var(--mm-surface-2); position: relative; min-width: 80px; }
+.gr-bar > i { position: absolute; left: 0; top: 0; bottom: 0; background: var(--mm-accent); }
+.gr-bar--ok > i { background: var(--mm-ok); }
+.gr-prog { display: grid; gap: 5px; min-width: 130px; }
+.gr-prog-line { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; font-size: var(--mm-fs-small); white-space: nowrap; }
+.gr-prog-line b { font-weight: 600; font-variant-numeric: tabular-nums; }
+.gr-prog-sub { font-size: var(--mm-fs-meta); color: var(--mm-ink-3); white-space: nowrap; }
+.gr-tiles { display: grid; grid-template-columns: repeat(4, 1fr); border: 1px solid var(--mm-line); background: var(--mm-surface); margin: 0 0 22px; }
+.gr-tile { padding: 14px 18px 16px; border-left: 1px solid var(--mm-line); display: grid; gap: 7px; align-content: start; }
+.gr-tile:first-child { border-left: 0; }
+.gr-tile-value { font-size: 24px; font-weight: 600; font-variant-numeric: tabular-nums; line-height: 1.1; }
+.gr-tile-value small { font-size: 14px; color: var(--mm-ink-3); font-weight: 500; }
+.gr-tile-sub { font-size: var(--mm-fs-meta); color: var(--mm-ink-3); }
+.gr-attn { background: var(--mm-lav-soft); border: 1px solid var(--mm-lav-line); padding: 14px 18px; margin: 0 0 26px; display: grid; grid-template-columns: auto 1fr auto; gap: 6px 24px; align-items: baseline; }
+.gr-attn h2 { margin: 0; font-size: 17px; }
+.gr-attn ul { margin: 0; padding: 0; list-style: none; display: flex; flex-wrap: wrap; gap: 4px 18px; font-size: var(--mm-fs-small); }
+.gr-banner { display: flex; align-items: center; gap: 14px; padding: 10px 14px; margin: 0 0 18px; background: var(--mm-date-soft); border: 1px solid var(--mm-line-2); font-size: var(--mm-fs-small); }
+.gr-banner .gr-ico { font-weight: 700; color: var(--mm-date); }
+.gr-banner .mm-btn { margin-left: auto; }
+.gr-views { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin: 0 0 18px; }
+.gr-dist { display: flex; height: 8px; width: 120px; background: var(--mm-surface-2); }
+.gr-dist > i { display: block; height: 100%; }
+.gr-dist .d1 { background: var(--mm-ok); } .gr-dist .dh { background: var(--mm-warn); } .gr-dist .d0 { background: var(--mm-danger); } .gr-dist .dp { background: var(--mm-lav); }
+.gr-table td, .gr-table th { vertical-align: middle; }
+.gr-dimrow td { color: var(--mm-ink-3); }
+
+/* Filters */
+.gr-filters { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 0 0 12px; }
+.gr-filter { border: 1px solid var(--mm-line-2); background: var(--mm-surface); padding: 3px 10px; font: inherit; font-size: var(--mm-fs-meta); color: var(--mm-ink-2); }
+.gr-filter b { font-variant-numeric: tabular-nums; margin-left: 5px; color: var(--mm-ink); font-weight: 600; }
+.gr-filter--on { border-color: var(--mm-accent); color: var(--mm-accent); background: var(--mm-accent-soft); }
+.gr-filter--on b { color: var(--mm-accent); }
+.gr-filters .mm-input { width: 200px; padding: 4px 8px; font-size: var(--mm-fs-meta); }
+.gr-filters select.mm-input { width: auto; }
+.gr-spacer { flex: 1; }
+
+/* Matrix */
+.gr-matrix { font-size: var(--mm-fs-small); }
+.gr-matrix th, .gr-matrix td { padding: 6px 8px; white-space: nowrap; }
+.gr-matrix th.q, .gr-matrix td.q { padding: 5px 2px; text-align: center; width: 30px; }
+.gr-matrix th.q { font-family: var(--mm-font-mono); letter-spacing: 0; text-transform: none; font-size: 11px; }
+.gr-matrix th.q.hand { color: var(--mm-accent); }
+.gr-matrix td.name { font-weight: 500; }
+.gr-matrix td.name .dim { font-weight: 400; font-size: var(--mm-fs-meta); margin-left: 6px; }
+.gr-matrix td.num, .gr-matrix th.num { text-align: right; font-variant-numeric: tabular-nums; }
+.gr-matrix td.grade { font-weight: 600; }
+.gr-matrix tr:hover td { background: var(--mm-surface-3); }
+.gr-cell { display: inline-block; position: relative; width: 24px; height: 22px; line-height: 22px; font-family: var(--mm-font-mono); font-size: 12px; font-weight: 600; text-align: center; }
+.gr-cell--1 { background: var(--mm-ok-soft); color: var(--mm-ok); }
+.gr-cell--h { background: var(--mm-warn-soft); color: var(--mm-warn); }
+.gr-cell--0 { background: var(--mm-danger-soft); color: var(--mm-danger); }
+.gr-cell--p { background: var(--mm-lav-soft); color: var(--mm-accent); }
+.gr-cell--c { background: var(--mm-date-soft); color: var(--mm-date); }
+.gr-cell--m { color: var(--mm-ink-3); font-weight: 400; }
+.gr-cell--human { box-shadow: inset 0 -2px 0 currentColor; }
+.gr-cell--flag::after { content: "\2691"; position: absolute; top: -7px; right: -5px; font-size: 10px; line-height: 1; color: var(--mm-danger); }
+.gr-prov { color: var(--mm-ink-3); font-weight: 400; }
+.gr-legend { display: flex; flex-wrap: wrap; gap: 6px 18px; font-size: var(--mm-fs-meta); color: var(--mm-ink-3); margin: 10px 0 0; align-items: center; }
+.gr-legend .gr-cell { margin-right: 5px; transform: scale(0.85); }
+.gr-more td { color: var(--mm-ink-3); font-size: var(--mm-fs-meta); text-align: center; }
+
+/* Queue */
+.gr-queue { display: grid; grid-template-columns: minmax(0, 1fr) 250px; gap: 30px; align-items: start; }
+.gr-qhead { display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap; margin: 0 0 12px; }
+.gr-qhead h2 { margin: 0; color: var(--mm-ink); font-size: 20px; }
+.gr-prompt { background: var(--mm-surface); border: 1px solid var(--mm-line); padding: 12px 16px; font-size: 14px; color: var(--mm-ink-2); margin: 0 0 16px; }
+.gr-prompt .eyebrow { display: block; margin-bottom: 4px; }
+.gr-resp-meta { display: flex; align-items: baseline; gap: 12px; font-size: var(--mm-fs-small); color: var(--mm-ink-3); margin: 0 0 6px; }
+.gr-resp-meta b { color: var(--mm-ink); font-size: 15px; }
+.gr-answer { background: var(--mm-surface); border: 1px solid var(--mm-line-2); border-left: 3px solid var(--mm-accent); padding: 16px 20px; font-size: 15px; line-height: 1.6; margin: 0 0 18px; }
+.gr-answer p { margin: 0 0 8px; } .gr-answer p:last-child { margin: 0; }
+.gr-gradebar { display: grid; grid-template-columns: auto 1fr; gap: 14px 22px; align-items: start; }
+.gr-keys { display: flex; gap: 8px; }
+.gr-key { width: 62px; height: 54px; border: 1px solid var(--mm-line-2); background: var(--mm-surface); font: inherit; font-size: 21px; font-weight: 600; color: var(--mm-ink); position: relative; }
+.gr-key kbd { position: absolute; bottom: 3px; right: 5px; font-family: var(--mm-font-mono); font-size: 10px; color: var(--mm-ink-3); font-weight: 500; }
+.gr-key--on { background: var(--mm-accent); border-color: var(--mm-accent); color: var(--mm-surface); }
+.gr-key--on kbd { color: var(--mm-surface); }
+.gr-key--sugg { border: 1px dashed var(--mm-date); color: var(--mm-date); }
+.gr-note textarea { min-height: 54px; }
+.gr-qfoot { grid-column: 1 / -1; display: flex; align-items: center; gap: 12px; font-size: var(--mm-fs-meta); color: var(--mm-ink-3); }
+.gr-qfoot .mm-btn--primary { margin-left: auto; }
+.gr-side h3 { margin: 0 0 6px; font-family: var(--mm-font-sans); font-size: var(--mm-fs-eyebrow); letter-spacing: var(--mm-tracking-eyebrow); text-transform: uppercase; color: var(--mm-ink-3); }
+.gr-sidelist { list-style: none; margin: 0 0 16px; padding: 0; border-top: 1px solid var(--mm-line-2); font-size: var(--mm-fs-small); }
+.gr-sidelist li { display: flex; justify-content: space-between; gap: 8px; padding: 5px 2px; border-bottom: 1px solid var(--mm-line); }
+.gr-sidelist li.cur { background: var(--mm-accent-soft); color: var(--mm-accent); font-weight: 600; padding-inline: 6px; }
+.gr-sidelist .st { font-family: var(--mm-font-mono); font-size: 12px; }
+.gr-claim { color: var(--mm-warn); font-size: var(--mm-fs-meta); }
+.gr-switch { display: inline-flex; align-items: center; gap: 8px; font-size: var(--mm-fs-small); color: var(--mm-ink-2); }
+.gr-switch i { width: 30px; height: 16px; background: var(--mm-accent); position: relative; display: inline-block; }
+.gr-switch i::after { content: ""; position: absolute; right: 2px; top: 2px; width: 12px; height: 12px; background: var(--mm-surface); }
+.gr-switch--off i { background: var(--mm-line-2); } .gr-switch--off i::after { right: auto; left: 2px; }
+
+/* Student submission */
+.gr-facts { display: grid; grid-template-columns: repeat(3, 1fr); border: 1px solid var(--mm-line); background: var(--mm-surface); margin: 0 0 22px; }
+.gr-facts > div { padding: 12px 16px 14px; border-left: 1px solid var(--mm-line); display: grid; gap: 4px; align-content: start; font-size: var(--mm-fs-small); }
+.gr-facts > div:first-child { border-left: 0; }
+.gr-facts .mm-label { margin-bottom: 2px; }
+.gr-facts .big { font-size: 20px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.gr-facts .mm-actions { justify-content: flex-start; margin-top: 4px; }
+.gr-problems { border-top: 1px solid var(--mm-line-2); }
+.gr-problem { display: grid; grid-template-columns: minmax(0, 1fr) 260px; gap: 10px 28px; padding: 16px 0 18px; border-bottom: 1px solid var(--mm-line); }
+.gr-problem h3 { margin: 0 0 4px; font-size: 16px; }
+.gr-problem h3 .tag { margin-left: 8px; font-family: var(--mm-font-mono); }
+.gr-auto { font-size: var(--mm-fs-small); color: var(--mm-ink-2); margin: 0 0 8px; }
+.gr-auto b { color: var(--mm-ink); }
+.gr-case { font-size: var(--mm-fs-meta); }
+.gr-case td, .gr-case th { padding: 5px 10px; }
+.gr-pts { display: grid; gap: 8px; align-content: start; justify-items: start; }
+.gr-pts .mm-segmented-btn { min-width: 42px; font-size: 14px; font-weight: 600; }
+.gr-pts .src { font-size: var(--mm-fs-meta); color: var(--mm-ink-3); }
+.gr-pts .mm-input { font-size: var(--mm-fs-meta); }
+.gr-collapsed { padding: 12px 0; border-bottom: 1px solid var(--mm-line); font-size: var(--mm-fs-small); color: var(--mm-ink-2); display: flex; gap: 12px; align-items: baseline; }
+.gr-pager { display: flex; gap: 8px; align-items: center; font-size: var(--mm-fs-small); color: var(--mm-ink-3); }
+
+/* Student page */
+.gr-two { display: grid; grid-template-columns: minmax(0, 1fr) 330px; gap: 34px; align-items: start; }
+.gr-flags { display: flex; flex-wrap: wrap; gap: 6px; margin: 10px 0 0; }
+.gr-notes { list-style: none; padding: 0; margin: 0 0 12px; border-top: 1px solid var(--mm-line-2); }
+.gr-notes li { padding: 10px 0; border-bottom: 1px solid var(--mm-line); font-size: 14px; }
+.gr-notes .when { display: block; font-size: var(--mm-fs-meta); color: var(--mm-ink-3); margin-bottom: 2px; }
+.gr-log { list-style: none; padding: 0; margin: 0; font-size: var(--mm-fs-meta); color: var(--mm-ink-2); }
+.gr-log li { padding: 5px 0; border-bottom: 1px solid var(--mm-line); }
+.gr-log .mono { color: var(--mm-ink-3); margin-right: 6px; }
+
+/* Modal inside a mock (the real one is fixed to the viewport) */
+.mock .gr-scrim { position: absolute; inset: 0; background: var(--mm-scrim); display: flex; justify-content: center; align-items: flex-start; padding-top: 150px; }
+.gr-diff td { font-size: var(--mm-fs-small); padding: 7px 10px; }
+.gr-arrow { color: var(--mm-ink-3); margin: 0 4px; }
+</style></head>
+<body>
+<div class="mock-index"><h1>Grading interface — mockups</h1>
+<p>Task 031 · design memo <a href="../grading-interface.md">grading-interface.md</a>. The app's real <code>theme.css</code> and <code>pages.css</code>; the <code>gr-*</code> rules are proposed new idioms, drawn in <code>--mm-*</code> tokens only. Fictional data: HW2 as of Wed Oct 21, 80 on the roster.</p>
+<ol><li><a href="#only=1-grading-tab">1 · Grading tab — #/instructor/grading</a></li><li><a href="#only=2-overview">2 · Assignment Overview — #/instructor/grading/:asg</a></li><li><a href="#only=3-matrix">3 · Assignment Matrix — #/instructor/grading/:asg/matrix</a></li><li><a href="#only=4-queue">4 · Hand-grading queue, by problem, names hidden — #/instructor/grading/:asg/queue/:qid</a></li><li><a href="#only=5-submission">5 · Student submission — #/instructor/grading/:asg/student/:sid</a></li><li><a href="#only=6-student">6 · Student page — #/instructor/students/:sid</a></li><li><a href="#only=7-regrade">7 · Re-grade dry run (over the Overview)</a></li></ol></div>
+<section class="mock" id="1-grading-tab"><div class="mock-cap">1 · Grading tab — #/instructor/grading</div><div class="mm-shell mm-surface">
+<header class="topbar"><div class="page">
+  <a class="brand" href="#">Making Minds<span class="course">Phil 133</span></a>
+  <nav aria-label="App"><a href="#" data-text="Student view">Student view</a><a href="#" data-text="Dashboard" aria-current="page">Dashboard</a></nav>
+  <a class="navbox" href="#">Sandbox</a>
+  <div class="session"><span class="who">Gabriel Greenberg · Instructor</span><button type="button">Password</button><button type="button">Log out</button></div>
+</div></header>
+<div class="band"></div>
+<main class="page">
+<nav class="mm-tabs" aria-label="Dashboard sections"><span class="eyebrow">Dashboard</span><a class="mm-tab" data-text="Assignments" href="#">Assignments</a><a class="mm-tab mm-tab--active" data-text="Grading" href="#">Grading</a><a class="mm-tab" data-text="Roster & accounts" href="#">Roster &amp; accounts</a><a class="mm-tab" data-text="Feedback" href="#">Feedback</a><a class="mm-tab" data-text="Notes" href="#">Notes</a></nav>
+
+<div class="mm-head mm-head--row"><div><h1>Grading</h1>
+<p class="mm-lede">Every assignment's grading status. HW1–HW6 are the six problem sets (55%); grades are 40 + 60·P, less late deductions.</p></div>
+<div class="mm-actions"><button class="mm-btn mm-btn--quiet" type="button">Settings</button><button class="mm-btn" type="button">Export CSV</button></div></div>
+<div class="gr-attn"><h2>Needs attention</h2>
+<ul><li><b>6</b> haven't submitted HW2</li><li><b>1</b> below 70 on two sets in a row</li><li><b>1</b> group mismatch</li><li><b>2</b> integrity prompts</li><li><b>1</b> no account yet</li></ul>
+<a href="#flags" class="mm-link">See all 11 →</a></div>
+<div class="mm-tablewrap"><table class="mm-table gr-table">
+<thead><tr><th>Assignment</th><th>Due</th><th>Submitted</th><th>Autograde</th><th>Hand grading</th><th class="num">Mean</th><th>Grades</th></tr></thead>
+<tbody><tr class=""><td><a href="#" class="mm-row-title">HW1. Basics: Circuits, Functions, and Representations</a></td><td class="date">Sun Oct 4</td><td><div class="gr-prog"><div class="gr-prog-line"><b>78 / 80</b><span class="dim">98%</span></div><div class="gr-bar gr-bar--ok"><i style="width:98%"></i></div><div class="gr-prog-sub">6 late · 2 missing</div></div></td><td><span class="mm-ok">✓ current</span></td><td><div class="gr-prog"><div class="gr-prog-line"><b>780 / 780</b><span class="dim">100%</span></div><div class="gr-bar gr-bar--ok"><i style="width:100%"></i></div><div class="gr-prog-sub">10 paragraph problems</div></div></td><td class="num">86.2</td><td><span class="tag tag--ok">Released Oct 12</span></td></tr><tr class=""><td><a href="#" class="mm-row-title">HW2. Computing with CCs</a></td><td class="date">Sun Oct 18</td><td><div class="gr-prog"><div class="gr-prog-line"><b>74 / 80</b><span class="dim">92%</span></div><div class="gr-bar"><i style="width:92%"></i></div><div class="gr-prog-sub">8 late · 6 missing</div></div></td><td><span class="mm-warn">↻ 9 stale</span></td><td><div class="gr-prog"><div class="gr-prog-line"><b>108 / 296</b><span class="dim">36%</span></div><div class="gr-bar"><i style="width:36%"></i></div><div class="gr-prog-sub">4 paragraph problems</div></div></td><td class="num">81.6<span class="gr-prov">*</span></td><td><span class="tag">Hidden</span></td></tr><tr class=""><td><a href="#" class="mm-row-title">HW3. Computing with SCs</a></td><td class="date">Sun Oct 25 · in 4 days</td><td><div class="gr-prog"><div class="gr-prog-line"><b>12 / 80</b><span class="dim">15%</span></div><div class="gr-bar"><i style="width:15%"></i></div><div class="gr-prog-sub">open — due in 4 days</div></div></td><td><span class="mm-ok">✓ current</span></td><td><div class="gr-prog"><div class="gr-prog-line"><b>0 / 36</b><span class="dim">0%</span></div><div class="gr-bar"><i style="width:0%"></i></div><div class="gr-prog-sub">3 paragraph problems</div></div></td><td class="num">—</td><td><span class="tag">Hidden</span></td></tr><tr class=""><td><a href="#" class="mm-row-title">HW4. Computing with FSMs</a></td><td class="date">Sun Nov 8</td><td><span class="dim">not open yet</span></td><td></td><td></td><td class="num"></td><td><span class="tag">Hidden</span></td></tr><tr class=""><td><a href="#" class="mm-row-title">HW5. Computing with TMs</a></td><td class="date">Sun Nov 22</td><td><span class="dim">not open yet</span></td><td></td><td></td><td class="num"></td><td><span class="tag">Hidden</span></td></tr><tr class=""><td><a href="#" class="mm-row-title">HW6. Navigation with Turbots</a></td><td class="date">Fri Dec 4 · late per day</td><td><span class="dim">not open yet</span></td><td></td><td></td><td class="num"></td><td><span class="tag">Hidden</span></td></tr><tr class="gr-dimrow"><td><a href="#" class="mm-row-title">HW7. Final Project</a></td><td class="date">—</td><td><span class="tag">Not counted</span></td><td></td><td></td><td class="num"></td><td></td></tr></tbody></table></div>
+<p class="mm-note" style="margin-top:8px"><span class="gr-prov">*</span> provisional — hand grading still pending.</p>
+<section class="mm-section" id="flags"><h2>Flagged students</h2>
+<div class="mm-tablewrap"><table class="mm-table"><thead><tr><th>Student</th><th>Flag</th><th>Where</th></tr></thead><tbody><tr><td><a href="#">Church, Alonzo</a></td><td><span class="tag tag--danger">Not submitted</span></td><td class="dim">HW2</td></tr><tr><td><a href="#">McCulloch, Warren</a></td><td><span class="tag tag--danger">Below 70 twice</span></td><td class="dim">HW1 64.8 · HW2 52.4*</td></tr><tr><td><a href="#">Hopper, Grace</a></td><td><span class="tag tag--warn">Group mismatch</span></td><td class="dim">HW2 — lists Turing, Alan; not listed back</td></tr><tr><td><a href="#">Gödel, Kurt</a></td><td><span class="tag tag--exam">Integrity prompt</span></td><td class="dim">HW2 P7 — ids from another student</td></tr><tr><td><a href="#">Hilbert, David</a></td><td><span class="tag tag--warn">No account</span></td><td class="dim">on the roster since Sep 24</td></tr>
+<tr class="gr-more"><td colspan="3">6 more — 5 not submitted HW2, 1 integrity prompt</td></tr></tbody></table></div>
+<p class="mm-note" style="margin-top:8px">Flags are prompts to look, never verdicts. Thresholds (below 70, two in a row, 14 days late, no account after 7 days) are in Settings.</p></section>
+</main>
+<footer class="page"><span>Phil 133 · Making Minds · UCLA Department of Philosophy</span><a href="#">makingminds.org</a></footer>
+</div></section>
+<section class="mock" id="2-overview"><div class="mock-cap">2 · Assignment Overview — #/instructor/grading/:asg</div><div class="mm-shell mm-surface">
+<header class="topbar"><div class="page">
+  <a class="brand" href="#">Making Minds<span class="course">Phil 133</span></a>
+  <nav aria-label="App"><a href="#" data-text="Student view">Student view</a><a href="#" data-text="Dashboard" aria-current="page">Dashboard</a></nav>
+  <a class="navbox" href="#">Sandbox</a>
+  <div class="session"><span class="who">Gabriel Greenberg · Instructor</span><button type="button">Password</button><button type="button">Log out</button></div>
+</div></header>
+<div class="band"></div>
+<main class="page">
+<nav class="mm-tabs" aria-label="Dashboard sections"><span class="eyebrow">Dashboard</span><a class="mm-tab" data-text="Assignments" href="#">Assignments</a><a class="mm-tab mm-tab--active" data-text="Grading" href="#">Grading</a><a class="mm-tab" data-text="Roster & accounts" href="#">Roster &amp; accounts</a><a class="mm-tab" data-text="Feedback" href="#">Feedback</a><a class="mm-tab" data-text="Notes" href="#">Notes</a></nav>
+
+<div class="mm-head mm-head--row"><div><a class="eyebrow" href="#">← Grading</a>
+<h1>HW2. Computing with CCs</h1>
+<p class="mm-lede">Due Sun Oct 18, 11:59 pm · 17 problems (13 autograded, 4 paragraph) · latest submission counts · <span class="tag">Grades hidden</span></p></div>
+<div class="mm-actions"><button class="mm-btn" type="button">Re-grade…</button><button class="mm-btn" type="button">Export CSV</button><button class="mm-btn mm-btn--primary" type="button">Release grades…</button></div></div>
+<div class="gr-views"><div class="mm-segmented"><button type="button" class="mm-segmented-btn mm-segmented-btn--active">Overview</button><button type="button" class="mm-segmented-btn">Matrix</button><button type="button" class="mm-segmented-btn">Queue</button></div><span class="dim" style="font-size:13px">80 on the roster · sections 1A, 1B</span></div>
+<div class="gr-tiles">
+ <div class="gr-tile"><span class="mm-label">Submitted</span><div class="gr-tile-value">74 <small>/ 80</small></div><div class="gr-bar"><i style="width:92%"></i></div><div class="gr-tile-sub">66 on time · 8 late · 6 missing · 1 extension</div></div>
+ <div class="gr-tile"><span class="mm-label">Autograded</span><div class="gr-tile-value">74 <small>/ 74</small></div><div class="gr-bar gr-bar--ok"><i style="width:100%"></i></div><div class="gr-tile-sub"><span class="mm-warn">9 against an older version</span></div></div>
+ <div class="gr-tile"><span class="mm-label">Hand-graded</span><div class="gr-tile-value">108 <small>/ 296</small></div><div class="gr-bar"><i style="width:36%"></i></div><div class="gr-tile-sub">1 changed since graded · 2 overrides</div></div>
+ <div class="gr-tile"><span class="mm-label">Grade</span><div class="gr-tile-value">81.6<span class="gr-prov">*</span> <small>mean</small></div><div class="gr-tile-sub">median 84.1 · 188 problems pending · not released</div></div>
+</div>
+<div class="gr-banner"><span class="gr-ico">↻</span><span><b>9 submissions were graded against an older version of HW2</b> — Problem 7's test bank changed on Oct 19. Hand grades are never touched by a re-grade.</span><button class="mm-btn mm-btn--small" type="button">Re-grade…</button></div>
+<div class="mm-tablewrap"><table class="mm-table gr-table">
+<thead><tr><th>Problem</th><th>Kind</th><th class="num">Mean</th><th>1 · ½ · 0 · pending</th><th>Hand</th><th></th></tr></thead>
+<tbody><tr><td class="mono">P1</td><td>Circuit</td><td class="num">0.97</td><td><div class="gr-dist"><i class="d1" style="width:96%"></i><i class="dh" style="width:0%"></i><i class="d0" style="width:4%"></i><i class="dp" style="width:0%"></i></div></td><td class="dim"></td><td><a href="#" class="mm-link">Cases →</a></td></tr><tr><td class="mono">P2</td><td>Circuit</td><td class="num">0.93</td><td><div class="gr-dist"><i class="d1" style="width:93%"></i><i class="dh" style="width:0%"></i><i class="d0" style="width:7%"></i><i class="dp" style="width:0%"></i></div></td><td class="dim"></td><td><a href="#" class="mm-link">Cases →</a></td></tr><tr><td class="mono">P3</td><td>Circuit</td><td class="num">0.91</td><td><div class="gr-dist"><i class="d1" style="width:91%"></i><i class="dh" style="width:0%"></i><i class="d0" style="width:9%"></i><i class="dp" style="width:0%"></i></div></td><td class="dim"></td><td><a href="#" class="mm-link">Cases →</a></td></tr><tr><td class="mono">P4</td><td>Circuit</td><td class="num">0.95</td><td><div class="gr-dist"><i class="d1" style="width:95%"></i><i class="dh" style="width:0%"></i><i class="d0" style="width:5%"></i><i class="dp" style="width:0%"></i></div></td><td class="dim"></td><td><a href="#" class="mm-link">Cases →</a></td></tr><tr><td class="mono">P5</td><td>Circuit</td><td class="num">0.90</td><td><div class="gr-dist"><i class="d1" style="width:88%"></i><i class="dh" style="width:3%"></i><i class="d0" style="width:9%"></i><i class="dp" style="width:0%"></i></div></td><td class="dim">1 override</td><td><a href="#" class="mm-link">Cases →</a></td></tr><tr><td class="mono">P6</td><td>Circuit</td><td class="num">0.86</td><td><div class="gr-dist"><i class="d1" style="width:86%"></i><i class="dh" style="width:0%"></i><i class="d0" style="width:14%"></i><i class="dp" style="width:0%"></i></div></td><td class="dim"></td><td><a href="#" class="mm-link">Cases →</a></td></tr><tr><td class="mono">P7</td><td>Circuit</td><td class="num">0.78</td><td><div class="gr-dist"><i class="d1" style="width:78%"></i><i class="dh" style="width:0%"></i><i class="d0" style="width:22%"></i><i class="dp" style="width:0%"></i></div></td><td class="dim">↻ 9 stale</td><td><a href="#" class="mm-link">Cases →</a></td></tr><tr><td class="mono">P8</td><td>Paragraph</td><td class="num">0.81</td><td><div class="gr-dist"><i class="d1" style="width:72%"></i><i class="dh" style="width:12%"></i><i class="d0" style="width:11%"></i><i class="dp" style="width:5%"></i></div></td><td class="dim">70 / 74</td><td><a href="#" class="mm-link">Grade →</a></td></tr><tr><td class="mono">P9</td><td>Paragraph</td><td class="num">0.46</td><td><div class="gr-dist"><i class="d1" style="width:38%"></i><i class="dh" style="width:9%"></i><i class="d0" style="width:4%"></i><i class="dp" style="width:49%"></i></div></td><td class="dim">38 / 74</td><td><a href="#" class="mm-link">Grade →</a></td></tr><tr><td class="mono">P10</td><td>Perception</td><td class="num">0.95</td><td><div class="gr-dist"><i class="d1" style="width:95%"></i><i class="dh" style="width:0%"></i><i class="d0" style="width:5%"></i><i class="dp" style="width:0%"></i></div></td><td class="dim"></td><td><a href="#" class="mm-link">Cases →</a></td></tr><tr><td class="mono">P11</td><td>Perception</td><td class="num">0.84</td><td><div class="gr-dist"><i class="d1" style="width:84%"></i><i class="dh" style="width:0%"></i><i class="d0" style="width:16%"></i><i class="dp" style="width:0%"></i></div></td><td class="dim"></td><td><a href="#" class="mm-link">Cases →</a></td></tr><tr><td class="mono">P12</td><td>Perception</td><td class="num">0.80</td><td><div class="gr-dist"><i class="d1" style="width:80%"></i><i class="dh" style="width:0%"></i><i class="d0" style="width:20%"></i><i class="dp" style="width:0%"></i></div></td><td class="dim"></td><td><a href="#" class="mm-link">Cases →</a></td></tr><tr><td class="mono">P13</td><td>Turbot · ½ at 1 of 2 arenas</td><td class="num">0.89</td><td><div class="gr-dist"><i class="d1" style="width:82%"></i><i class="dh" style="width:14%"></i><i class="d0" style="width:4%"></i><i class="dp" style="width:0%"></i></div></td><td class="dim"></td><td><a href="#" class="mm-link">Cases →</a></td></tr><tr><td class="mono">P14</td><td>Turbot · ½ at 1 of 2</td><td class="num">0.92</td><td><div class="gr-dist"><i class="d1" style="width:88%"></i><i class="dh" style="width:8%"></i><i class="d0" style="width:4%"></i><i class="dp" style="width:0%"></i></div></td><td class="dim"></td><td><a href="#" class="mm-link">Cases →</a></td></tr><tr><td class="mono">P15</td><td>Turbot · ½ at 1 of 2</td><td class="num">0.83</td><td><div class="gr-dist"><i class="d1" style="width:74%"></i><i class="dh" style="width:18%"></i><i class="d0" style="width:8%"></i><i class="dp" style="width:0%"></i></div></td><td class="dim"></td><td><a href="#" class="mm-link">Cases →</a></td></tr><tr><td class="mono">P16</td><td>Paragraph</td><td class="num">—</td><td><div class="gr-dist"><i class="d1" style="width:0%"></i><i class="dh" style="width:0%"></i><i class="d0" style="width:0%"></i><i class="dp" style="width:100%"></i></div></td><td class="dim">0 / 74</td><td><a href="#" class="mm-link">Grade →</a></td></tr><tr><td class="mono">P17</td><td>Paragraph</td><td class="num">—</td><td><div class="gr-dist"><i class="d1" style="width:0%"></i><i class="dh" style="width:0%"></i><i class="d0" style="width:0%"></i><i class="dp" style="width:100%"></i></div></td><td class="dim">0 / 74</td><td><a href="#" class="mm-link">Grade →</a></td></tr></tbody></table></div>
+</main>
+<footer class="page"><span>Phil 133 · Making Minds · UCLA Department of Philosophy</span><a href="#">makingminds.org</a></footer>
+</div></section>
+<section class="mock" id="3-matrix"><div class="mock-cap">3 · Assignment Matrix — #/instructor/grading/:asg/matrix</div><div class="mm-shell mm-surface">
+<header class="topbar"><div class="page">
+  <a class="brand" href="#">Making Minds<span class="course">Phil 133</span></a>
+  <nav aria-label="App"><a href="#" data-text="Student view">Student view</a><a href="#" data-text="Dashboard" aria-current="page">Dashboard</a></nav>
+  <a class="navbox" href="#">Sandbox</a>
+  <div class="session"><span class="who">Gabriel Greenberg · Instructor</span><button type="button">Password</button><button type="button">Log out</button></div>
+</div></header>
+<div class="band"></div>
+<main class="page">
+<nav class="mm-tabs" aria-label="Dashboard sections"><span class="eyebrow">Dashboard</span><a class="mm-tab" data-text="Assignments" href="#">Assignments</a><a class="mm-tab mm-tab--active" data-text="Grading" href="#">Grading</a><a class="mm-tab" data-text="Roster & accounts" href="#">Roster &amp; accounts</a><a class="mm-tab" data-text="Feedback" href="#">Feedback</a><a class="mm-tab" data-text="Notes" href="#">Notes</a></nav>
+
+<div class="mm-head mm-head--row"><div><a class="eyebrow" href="#">← Grading</a>
+<h1>HW2. Computing with CCs</h1>
+<p class="mm-lede">Due Sun Oct 18, 11:59 pm · 17 problems (13 autograded, 4 paragraph) · latest submission counts · <span class="tag">Grades hidden</span></p></div>
+<div class="mm-actions"><button class="mm-btn" type="button">Re-grade…</button><button class="mm-btn" type="button">Export CSV</button><button class="mm-btn mm-btn--primary" type="button">Release grades…</button></div></div>
+<div class="gr-views"><div class="mm-segmented"><button type="button" class="mm-segmented-btn">Overview</button><button type="button" class="mm-segmented-btn mm-segmented-btn--active">Matrix</button><button type="button" class="mm-segmented-btn">Queue</button></div><span class="dim" style="font-size:13px">80 on the roster · sections 1A, 1B</span></div>
+<div class="gr-filters">
+ <button class="gr-filter gr-filter--on" type="button">All<b>80</b></button>
+ <button class="gr-filter" type="button">Needs grading<b>74</b></button>
+ <button class="gr-filter" type="button">Changed<b>1</b></button>
+ <button class="gr-filter" type="button">Late<b>8</b></button>
+ <button class="gr-filter" type="button">Missing<b>6</b></button>
+ <button class="gr-filter" type="button">Flagged<b>9</b></button>
+ <button class="gr-filter" type="button">Below 70<b>5</b></button>
+ <span class="gr-spacer"></span>
+ <select class="mm-input"><option>All sections</option></select>
+ <input class="mm-input" placeholder="Search name or UID" />
+</div>
+<div class="mm-tablewrap"><table class="mm-table gr-matrix">
+<thead><tr><th>Student</th><th>Submitted</th><th class="q">1</th><th class="q">2</th><th class="q">3</th><th class="q">4</th><th class="q">5</th><th class="q">6</th><th class="q">7</th><th class="q hand">8</th><th class="q hand">9</th><th class="q">10</th><th class="q">11</th><th class="q">12</th><th class="q">13</th><th class="q">14</th><th class="q">15</th><th class="q hand">16</th><th class="q hand">17</th><th class="num">Late</th><th class="num">Grade</th></tr></thead>
+<tbody><tr><td class="name">Babbage, Charles<span class="dim">1A</span></td><td class="date">Oct 18, 9:40 pm</td><td class="q"><span class="gr-cell gr-cell--1">1</span></td><td class="q"><span class="gr-cell gr-cell--1">1</span></td><td class="q"><span class="gr-cell gr-cell--1">1</span></td><td class="q"><span class="gr-cell gr-cell--1">1</span></td><td class="q"><span class="gr-cell gr-cell--1">1</span></td><td class="q"><span class="gr-cell gr-cell--1">1</span></td><td class="q"><span class="gr-cell gr-cell--1">1</span></td><td class="q"><span class="gr-cell gr-cell--1 gr-cell--human">1</span></td><td class="q"><span class="gr-cell gr-cell--1 gr-cell--human">1</span></td><td class="q"><span class="gr-cell gr-cell--1">1</span></td><td class="q"><span class="gr-cell gr-cell--1">1</span></td><td class="q"><span class="gr-cell gr-cell--1">1</span></td><td class="q"><span class="gr-cell gr-cell--h">½</span></td><td class="q"><span class="gr-cell gr-cell--1">1</span></td><td class="q"><span class="gr-cell gr-cell--1">1</span></td><td class="q"><span class="gr-cell gr-cell--p">✎</span></td><td class="q"><span class="gr-cell gr-cell--p">✎</span></td><td class="num mm-danger"></td><td class="num grade">91.2<span class="gr-prov">*</span></td></tr><tr><td class="name">Boole, George<span class="dim">1B</span></td><td class="date">Oct 19, 9:12 am <span class="tag tag--danger">late</span></td><td class="q"><span class="gr-cell gr-cell--1">1</span></td><td class="q"><span class="gr-cell gr-cell--1">1</span></td><td class="q"><span class="gr-cell gr-cell--1">1</span></td><td class="q"><span class="gr-cell gr-cell--1">1</span></td><td class="q"><span class="gr-cell gr-cell--1">1</span></td><td class="q"><span class="gr-cell gr-cell--0">0</span></td><td class="q"><span class="gr-cell gr-cell--1">1</span></td><td class="q"><span class="gr-cell gr-cell--1 gr-cell--human">1</span></td><td class="q"><span class="gr-cell gr-cell--h gr-cell--human">½</span></td><td class="q"><span class="gr-cell gr-cell--1">1</span></td><td class="q"><span class="gr-cell gr-cell--1">1</span></td><td class="q"><span class="gr-cell gr-cell--1">1</span></td><td class="q"><span class="gr-cell gr-cell--1">1</span></td><td class="q"><span class="gr-cell gr-cell--1">1</span></td><td class="q"><span class="gr-cell gr-cell--1">1</span></td><td class="q"><span class="gr-cell gr-cell--p">✎</span></td><td class="q"><span class="gr-cell gr-cell--p">✎</span></td><td class="num mm-danger">−5</td><td class="num grade">82.6<span class="gr-prov">*</span></td></tr><tr><td class="name">Church, Alonzo <span class="mm-danger" title="flagged">⚑</span><span class="dim">1A</span></td><td><span class="tag tag--danger">Missing</span></td><td class="q"><span class="gr-cell gr-cell--m">—</span></td><td class="q"><span class="gr-cell gr-cell--m">—</span></td><td class="q"><span class="gr-cell gr-cell--m">—</span></td><td class="q"><span class="gr-cell gr-cell--m">—</span></td><td class="q"><span class="gr-cell gr-cell--m">—</span></td><td class="q"><span class="gr-cell gr-cell--m">—</span></td><td class="q"><span class="gr-cell gr-cell--m">—</span></td><td class="q"><span class="gr-cell gr-cell--m">—</span></td><td class="q"><span class="gr-cell gr-cell--m">—</span></td><td class="q"><span class="gr-cell gr-cell--m">—</span></td><td class="q"><span class="gr-cell gr-cell--m">—</span></td><td class="q"><span class="gr-cell gr-cell--m">—</span></td><td class="q"><span class="gr-cell gr-cell--m">—</span></td><td class="q"><span class="gr-cell gr-cell--m">—</span></td><td class="q"><span class="gr-cell gr-cell--m">—</span></td><td class="q"><span class="gr-cell gr-cell--m">—</span></td><td class="q"><span class="gr-cell gr-cell--m">—</span></td><td class="num mm-danger"></td><td class="num grade">—</td></tr><tr><td class="name">Descartes, René<span class="dim">1B</span></td><td class="date">Oct 18, 11:58 pm</td><td class="q"><span class="gr-cell gr-cell--1">1</span></td><td class="q"><span class="gr-cell gr-cell--1">1</span></td><td class="q"><span class="gr-cell gr-cell--0">0</span></td><td class="q"><span class="gr-cell gr-cell--1">1</span></td><td class="q"><span class="gr-cell gr-cell--1">1</span></td><td class="q"><span class="gr-cell gr-cell--1">1</span></td><td class="q"><span class="gr-cell gr-cell--1">1</span></td><td class="q"><span class="gr-cell gr-cell--0 gr-cell--human">0</span></td><td class="q"><span class="gr-cell gr-cell--p">✎</span></td><td class="q"><span class="gr-cell gr-cell--1">1</span></td><td class="q"><span class="gr-cell gr-cell--1">1</span></td><td class="q"><span class="gr-cell gr-cell--0">0</span></td><td class="q"><span class="gr-cell gr-cell--1">1</span></td><td class="q"><span class="gr-cell gr-cell--h">½</span></td><td class="q"><span class="gr-cell gr-cell--1">1</span></td><td class="q"><span class="gr-cell gr-cell--p">✎</span></td><td class="q"><span class="gr-cell gr-cell--p">✎</span></td><td class="num mm-danger"></td><td class="num grade">77.1<span class="gr-prov">*</span></td></tr><tr><td class="name">Frege, Gottlob<span class="dim">1A</span></td><td class="date">Oct 18, 6:03 pm</td><td class="q"><span class="gr-cell gr-cell--1">1</span></td><td class="q"><span class="gr-cell gr-cell--1">1</span></td><td class="q"><span class="gr-cell gr-cell--1">1</span></td><td class="q"><span class="gr-cell gr-cell--1">1</span></td><td class="q"><span class="gr-cell gr-cell--1">1</span></td><td class="q"><span class="gr-cell gr-cell--1">1</span></td><td class="q"><span class="gr-cell gr-cell--1">1</span></td><td class="q"><span class="gr-cell gr-cell--1 gr-cell--human">1</span></td><td class="q"><span class="gr-cell gr-cell--c">↻</span></td><td class="q"><span class="gr-cell gr-cell--1">1</span></td><td class="q"><span class="gr-cell gr-cell--1">1</span></td><td class="q"><span class="gr-cell gr-cell--1">1</span></td><td class="q"><span class="gr-cell gr-cell--1">1</span></td><td class="q"><span class="gr-cell gr-cell--1">1</span></td><td class="q"><span class="gr-cell gr-cell--1">1</span></td><td class="q"><span class="gr-cell gr-cell--p">✎</span></td><td class="q"><span class="gr-cell gr-cell--p">✎</span></td><td class="num mm-danger"></td><td class="num grade">89.4<span class="gr-prov">*</span></td></tr><tr><td class="name">Gödel, Kurt<span class="dim">1B</span></td><td class="date">Oct 17, 2:20 pm</td><td class="q"><span class="gr-cell gr-cell--1">1</span></td><td class="q"><span class="gr-cell gr-cell--1">1</span></td><td class="q"><span class="gr-cell gr-cell--1">1</span></td><td class="q"><span class="gr-cell gr-cell--1">1</span></td><td class="q"><span class="gr-cell gr-cell--1">1</span></td><td class="q"><span class="gr-cell gr-cell--1">1</span></td><td class="q"><span class="gr-cell gr-cell--1 gr-cell--flag">1</span></td><td class="q"><span class="gr-cell gr-cell--1 gr-cell--human">1</span></td><td class="q"><span class="gr-cell gr-cell--1 gr-cell--human">1</span></td><td class="q"><span class="gr-cell gr-cell--1">1</span></td><td class="q"><span class="gr-cell gr-cell--1">1</span></td><td class="q"><span class="gr-cell gr-cell--1">1</span></td><td class="q"><span class="gr-cell gr-cell--1">1</span></td><td class="q"><span class="gr-cell gr-cell--1">1</span></td><td class="q"><span class="gr-cell gr-cell--1">1</span></td><td class="q"><span class="gr-cell gr-cell--p">✎</span></td><td class="q"><span class="gr-cell gr-cell--p">✎</span></td><td class="num mm-danger"></td><td class="num grade">92.9<span class="gr-prov">*</span></td></tr><tr><td class="name">Hopper, Grace <span class="mm-danger" title="flagged">⚑</span><span class="dim">1A</span></td><td class="date">Oct 20, 3:02 pm <span class="tag tag--danger">late ·1 mtg</span></td><td class="q"><span class="gr-cell gr-cell--1">1</span></td><td class="q"><span class="gr-cell gr-cell--1">1</span></td><td class="q"><span class="gr-cell gr-cell--1">1</span></td><td class="q"><span class="gr-cell gr-cell--1">1</span></td><td class="q"><span class="gr-cell gr-cell--1">1</span></td><td class="q"><span class="gr-cell gr-cell--1">1</span></td><td class="q"><span class="gr-cell gr-cell--1">1</span></td><td class="q"><span class="gr-cell gr-cell--1 gr-cell--human">1</span></td><td class="q"><span class="gr-cell gr-cell--p">✎</span></td><td class="q"><span class="gr-cell gr-cell--1">1</span></td><td class="q"><span class="gr-cell gr-cell--1">1</span></td><td class="q"><span class="gr-cell gr-cell--1">1</span></td><td class="q"><span class="gr-cell gr-cell--1">1</span></td><td class="q"><span class="gr-cell gr-cell--1">1</span></td><td class="q"><span class="gr-cell gr-cell--h">½</span></td><td class="q"><span class="gr-cell gr-cell--p">✎</span></td><td class="q"><span class="gr-cell gr-cell--p">✎</span></td><td class="num mm-danger">−10</td><td class="num grade">77.6<span class="gr-prov">*</span></td></tr><tr><td class="name">Kleene, Stephen<span class="dim">1B</span></td><td class="date">Oct 21, 10:00 am <span class="tag tag--date">ext.</span></td><td class="q"><span class="gr-cell gr-cell--1">1</span></td><td class="q"><span class="gr-cell gr-cell--1">1</span></td><td class="q"><span class="gr-cell gr-cell--1">1</span></td><td class="q"><span class="gr-cell gr-cell--1">1</span></td><td class="q"><span class="gr-cell gr-cell--1">1</span></td><td class="q"><span class="gr-cell gr-cell--1">1</span></td><td class="q"><span class="gr-cell gr-cell--1">1</span></td><td class="q"><span class="gr-cell gr-cell--h gr-cell--human">½</span></td><td class="q"><span class="gr-cell gr-cell--p">✎</span></td><td class="q"><span class="gr-cell gr-cell--1">1</span></td><td class="q"><span class="gr-cell gr-cell--1">1</span></td><td class="q"><span class="gr-cell gr-cell--1">1</span></td><td class="q"><span class="gr-cell gr-cell--1">1</span></td><td class="q"><span class="gr-cell gr-cell--1">1</span></td><td class="q"><span class="gr-cell gr-cell--1">1</span></td><td class="q"><span class="gr-cell gr-cell--p">✎</span></td><td class="q"><span class="gr-cell gr-cell--p">✎</span></td><td class="num mm-danger"></td><td class="num grade">87.6<span class="gr-prov">*</span></td></tr><tr><td class="name">Lovelace, Ada<span class="dim">1A</span></td><td class="date">Oct 16, 8:15 pm</td><td class="q"><span class="gr-cell gr-cell--1">1</span></td><td class="q"><span class="gr-cell gr-cell--1">1</span></td><td class="q"><span class="gr-cell gr-cell--1">1</span></td><td class="q"><span class="gr-cell gr-cell--1">1</span></td><td class="q"><span class="gr-cell gr-cell--1">1</span></td><td class="q"><span class="gr-cell gr-cell--1">1</span></td><td class="q"><span class="gr-cell gr-cell--1">1</span></td><td class="q"><span class="gr-cell gr-cell--1 gr-cell--human">1</span></td><td class="q"><span class="gr-cell gr-cell--1 gr-cell--human">1</span></td><td class="q"><span class="gr-cell gr-cell--1">1</span></td><td class="q"><span class="gr-cell gr-cell--1">1</span></td><td class="q"><span class="gr-cell gr-cell--1">1</span></td><td class="q"><span class="gr-cell gr-cell--1">1</span></td><td class="q"><span class="gr-cell gr-cell--1">1</span></td><td class="q"><span class="gr-cell gr-cell--1">1</span></td><td class="q"><span class="gr-cell gr-cell--p">✎</span></td><td class="q"><span class="gr-cell gr-cell--p">✎</span></td><td class="num mm-danger"></td><td class="num grade">92.9<span class="gr-prov">*</span></td></tr><tr><td class="name">McCulloch, Warren <span class="mm-danger" title="flagged">⚑</span><span class="dim">1B</span></td><td class="date">Oct 18, 11:41 pm</td><td class="q"><span class="gr-cell gr-cell--1">1</span></td><td class="q"><span class="gr-cell gr-cell--0">0</span></td><td class="q"><span class="gr-cell gr-cell--0">0</span></td><td class="q"><span class="gr-cell gr-cell--0">0</span></td><td class="q"><span class="gr-cell gr-cell--1">1</span></td><td class="q"><span class="gr-cell gr-cell--0">0</span></td><td class="q"><span class="gr-cell gr-cell--0">0</span></td><td class="q"><span class="gr-cell gr-cell--0 gr-cell--human">0</span></td><td class="q"><span class="gr-cell gr-cell--p">✎</span></td><td class="q"><span class="gr-cell gr-cell--1">1</span></td><td class="q"><span class="gr-cell gr-cell--0">0</span></td><td class="q"><span class="gr-cell gr-cell--0">0</span></td><td class="q"><span class="gr-cell gr-cell--0">0</span></td><td class="q"><span class="gr-cell gr-cell--h">½</span></td><td class="q"><span class="gr-cell gr-cell--0">0</span></td><td class="q"><span class="gr-cell gr-cell--p">✎</span></td><td class="q"><span class="gr-cell gr-cell--p">✎</span></td><td class="num mm-danger"></td><td class="num grade">52.4<span class="gr-prov">*</span></td></tr><tr><td class="name">Noether, Emmy<span class="dim">1A</span></td><td class="date">Oct 18, 4:47 pm</td><td class="q"><span class="gr-cell gr-cell--1">1</span></td><td class="q"><span class="gr-cell gr-cell--1">1</span></td><td class="q"><span class="gr-cell gr-cell--1">1</span></td><td class="q"><span class="gr-cell gr-cell--1">1</span></td><td class="q"><span class="gr-cell gr-cell--1">1</span></td><td class="q"><span class="gr-cell gr-cell--1">1</span></td><td class="q"><span class="gr-cell gr-cell--1">1</span></td><td class="q"><span class="gr-cell gr-cell--1 gr-cell--human">1</span></td><td class="q"><span class="gr-cell gr-cell--1 gr-cell--human">1</span></td><td class="q"><span class="gr-cell gr-cell--1">1</span></td><td class="q"><span class="gr-cell gr-cell--1">1</span></td><td class="q"><span class="gr-cell gr-cell--1">1</span></td><td class="q"><span class="gr-cell gr-cell--1">1</span></td><td class="q"><span class="gr-cell gr-cell--1">1</span></td><td class="q"><span class="gr-cell gr-cell--1">1</span></td><td class="q"><span class="gr-cell gr-cell--p">✎</span></td><td class="q"><span class="gr-cell gr-cell--p">✎</span></td><td class="num mm-danger"></td><td class="num grade">92.9<span class="gr-prov">*</span></td></tr><tr><td class="name">Pitts, Walter<span class="dim">1B</span></td><td class="date">Oct 18, 10:30 pm</td><td class="q"><span class="gr-cell gr-cell--1">1</span></td><td class="q"><span class="gr-cell gr-cell--1">1</span></td><td class="q"><span class="gr-cell gr-cell--1">1</span></td><td class="q"><span class="gr-cell gr-cell--1">1</span></td><td class="q"><span class="gr-cell gr-cell--h gr-cell--human">½</span></td><td class="q"><span class="gr-cell gr-cell--1">1</span></td><td class="q"><span class="gr-cell gr-cell--1">1</span></td><td class="q"><span class="gr-cell gr-cell--1 gr-cell--human">1</span></td><td class="q"><span class="gr-cell gr-cell--p">✎</span></td><td class="q"><span class="gr-cell gr-cell--1">1</span></td><td class="q"><span class="gr-cell gr-cell--1">1</span></td><td class="q"><span class="gr-cell gr-cell--1">1</span></td><td class="q"><span class="gr-cell gr-cell--1">1</span></td><td class="q"><span class="gr-cell gr-cell--1">1</span></td><td class="q"><span class="gr-cell gr-cell--1">1</span></td><td class="q"><span class="gr-cell gr-cell--p">✎</span></td><td class="q"><span class="gr-cell gr-cell--p">✎</span></td><td class="num mm-danger"></td><td class="num grade">87.6<span class="gr-prov">*</span></td></tr><tr><td class="name">Post, Emil<span class="dim">1A</span></td><td class="date">Oct 21, 2:10 pm <span class="tag tag--danger">late ·1 mtg</span></td><td class="q"><span class="gr-cell gr-cell--1">1</span></td><td class="q"><span class="gr-cell gr-cell--1">1</span></td><td class="q"><span class="gr-cell gr-cell--1">1</span></td><td class="q"><span class="gr-cell gr-cell--1">1</span></td><td class="q"><span class="gr-cell gr-cell--1">1</span></td><td class="q"><span class="gr-cell gr-cell--1">1</span></td><td class="q"><span class="gr-cell gr-cell--1">1</span></td><td class="q"><span class="gr-cell gr-cell--p">✎</span></td><td class="q"><span class="gr-cell gr-cell--p">✎</span></td><td class="q"><span class="gr-cell gr-cell--1">1</span></td><td class="q"><span class="gr-cell gr-cell--0">0</span></td><td class="q"><span class="gr-cell gr-cell--1">1</span></td><td class="q"><span class="gr-cell gr-cell--1">1</span></td><td class="q"><span class="gr-cell gr-cell--1">1</span></td><td class="q"><span class="gr-cell gr-cell--1">1</span></td><td class="q"><span class="gr-cell gr-cell--p">✎</span></td><td class="q"><span class="gr-cell gr-cell--p">✎</span></td><td class="num mm-danger">−10</td><td class="num grade">72.4<span class="gr-prov">*</span></td></tr><tr><td class="name">Shannon, Claude<span class="dim">1B</span></td><td class="date">Oct 18, 7:55 pm</td><td class="q"><span class="gr-cell gr-cell--1">1</span></td><td class="q"><span class="gr-cell gr-cell--1">1</span></td><td class="q"><span class="gr-cell gr-cell--1">1</span></td><td class="q"><span class="gr-cell gr-cell--1">1</span></td><td class="q"><span class="gr-cell gr-cell--1">1</span></td><td class="q"><span class="gr-cell gr-cell--1">1</span></td><td class="q"><span class="gr-cell gr-cell--1">1</span></td><td class="q"><span class="gr-cell gr-cell--1 gr-cell--human">1</span></td><td class="q"><span class="gr-cell gr-cell--1 gr-cell--human">1</span></td><td class="q"><span class="gr-cell gr-cell--1">1</span></td><td class="q"><span class="gr-cell gr-cell--1">1</span></td><td class="q"><span class="gr-cell gr-cell--1">1</span></td><td class="q"><span class="gr-cell gr-cell--1">1</span></td><td class="q"><span class="gr-cell gr-cell--1">1</span></td><td class="q"><span class="gr-cell gr-cell--1">1</span></td><td class="q"><span class="gr-cell gr-cell--p">✎</span></td><td class="q"><span class="gr-cell gr-cell--p">✎</span></td><td class="num mm-danger"></td><td class="num grade">92.9<span class="gr-prov">*</span></td></tr><tr><td class="name">Turing, Alan <span class="mm-danger" title="flagged">⚑</span><span class="dim">1A</span></td><td class="date">Oct 18, 8:09 pm</td><td class="q"><span class="gr-cell gr-cell--1">1</span></td><td class="q"><span class="gr-cell gr-cell--1">1</span></td><td class="q"><span class="gr-cell gr-cell--1">1</span></td><td class="q"><span class="gr-cell gr-cell--1">1</span></td><td class="q"><span class="gr-cell gr-cell--1">1</span></td><td class="q"><span class="gr-cell gr-cell--1">1</span></td><td class="q"><span class="gr-cell gr-cell--1">1</span></td><td class="q"><span class="gr-cell gr-cell--1 gr-cell--human">1</span></td><td class="q"><span class="gr-cell gr-cell--1 gr-cell--human">1</span></td><td class="q"><span class="gr-cell gr-cell--1">1</span></td><td class="q"><span class="gr-cell gr-cell--1">1</span></td><td class="q"><span class="gr-cell gr-cell--1">1</span></td><td class="q"><span class="gr-cell gr-cell--1">1</span></td><td class="q"><span class="gr-cell gr-cell--1">1</span></td><td class="q"><span class="gr-cell gr-cell--1">1</span></td><td class="q"><span class="gr-cell gr-cell--p">✎</span></td><td class="q"><span class="gr-cell gr-cell--p">✎</span></td><td class="num mm-danger"></td><td class="num grade">92.9<span class="gr-prov">*</span></td></tr><tr class="gr-more"><td colspan="21">65 more rows · sorted by last name — click a column head to sort, a row to open the submission</td></tr></tbody></table></div>
+<div class="gr-legend">
+ <span><span class="gr-cell gr-cell--1">1</span>autograde pass</span><span><span class="gr-cell gr-cell--h">½</span>half credit</span><span><span class="gr-cell gr-cell--0">0</span>no credit</span>
+ <span><span class="gr-cell gr-cell--1 gr-cell--human">1</span>underline = a human grade or override</span><span><span class="gr-cell gr-cell--p">✎</span>awaiting a hand grade</span>
+ <span><span class="gr-cell gr-cell--c">↻</span>changed since graded</span><span><span class="gr-cell gr-cell--1 gr-cell--flag">1</span>integrity or group prompt</span><span><span class="gr-cell gr-cell--m">—</span>not submitted</span>
+ <span><span class="gr-prov">*</span> provisional</span><span>Magenta problem numbers are hand-graded.</span>
+</div>
+</main>
+<footer class="page"><span>Phil 133 · Making Minds · UCLA Department of Philosophy</span><a href="#">makingminds.org</a></footer>
+</div></section>
+<section class="mock" id="4-queue"><div class="mock-cap">4 · Hand-grading queue, by problem, names hidden — #/instructor/grading/:asg/queue/:qid</div><div class="mm-shell mm-surface">
+<header class="topbar"><div class="page">
+  <a class="brand" href="#">Making Minds<span class="course">Phil 133</span></a>
+  <nav aria-label="App"><a href="#" data-text="Student view">Student view</a><a href="#" data-text="Dashboard" aria-current="page">Dashboard</a></nav>
+  <a class="navbox" href="#">Sandbox</a>
+  <div class="session"><span class="who">Gabriel Greenberg · Instructor</span><button type="button">Password</button><button type="button">Log out</button></div>
+</div></header>
+<div class="band"></div>
+<main class="page">
+<nav class="mm-tabs" aria-label="Dashboard sections"><span class="eyebrow">Dashboard</span><a class="mm-tab" data-text="Assignments" href="#">Assignments</a><a class="mm-tab mm-tab--active" data-text="Grading" href="#">Grading</a><a class="mm-tab" data-text="Roster & accounts" href="#">Roster &amp; accounts</a><a class="mm-tab" data-text="Feedback" href="#">Feedback</a><a class="mm-tab" data-text="Notes" href="#">Notes</a></nav>
+
+<div class="mm-head mm-head--row"><div><a class="eyebrow" href="#">← Grading</a>
+<h1>HW2. Computing with CCs</h1>
+<p class="mm-lede">Due Sun Oct 18, 11:59 pm · 17 problems (13 autograded, 4 paragraph) · latest submission counts · <span class="tag">Grades hidden</span></p></div>
+<div class="mm-actions"><button class="mm-btn" type="button">Re-grade…</button><button class="mm-btn" type="button">Export CSV</button><button class="mm-btn mm-btn--primary" type="button">Release grades…</button></div></div>
+<div class="gr-views"><div class="mm-segmented"><button type="button" class="mm-segmented-btn">Overview</button><button type="button" class="mm-segmented-btn">Matrix</button><button type="button" class="mm-segmented-btn mm-segmented-btn--active">Queue</button></div><span class="dim" style="font-size:13px">80 on the roster · sections 1A, 1B</span></div>
+<div class="gr-queue"><div>
+ <div class="gr-qhead"><div class="mm-segmented"><button class="mm-segmented-btn mm-segmented-btn--active" type="button">By problem</button><button class="mm-segmented-btn" type="button">By student</button></div>
+  <select class="mm-input" style="width:auto;font-size:13px;padding:4px 8px"><option>Problem 9 — paragraph</option></select>
+  <span class="dim" style="font-size:13px">38 of 74 graded · 1 changed · 35 to go</span>
+  <span class="gr-spacer" style="flex:1"></span><span class="gr-switch"><i></i>Hide names</span></div>
+ <div class="gr-prompt"><span class="eyebrow">Problem 9 ▾</span>Could you design a CC that computes +1 B (i.e. unbounded)? Why or why not? Short paragraph.</div>
+ <div class="gr-resp-meta"><b>Response 39</b><span>of 74</span><span>·</span><span>submitted Oct 18, 10:14 pm</span><span>·</span><span>142 words</span></div>
+ <div class="gr-answer"><p>No. A combinatorial circuit has a fixed number of input wires, and it has to be built before it ever sees an input. So any CC can only read numerals up to some fixed length n.</p><p>+1 B has to work for binary numerals of every length. Whatever CC you build, there will be a numeral with more digits than it has input wires, and it can't compute the successor of that one. You can build a CC for +1 [0–n] B for each n (Problem 8), but no single CC does them all — that would need something like memory, which is what SCs add.</p></div>
+ <div class="gr-gradebar">
+  <div><span class="mm-label">Points</span><div class="gr-keys" style="margin-top:4px"><button class="gr-key" type="button">0<kbd>0</kbd></button><button class="gr-key" type="button">½<kbd>H</kbd></button><button class="gr-key gr-key--on" type="button">1<kbd>1</kbd></button></div></div>
+  <label class="mm-field gr-note"><span>Note to the student (optional on a hand grade)</span><textarea class="mm-input" placeholder="No medical or accommodation details">Right, and a nice link to SCs.</textarea></label>
+  <div class="gr-qfoot"><span><kbd class="mono">J</kbd>/<kbd class="mono">K</kbd> previous / next · <kbd class="mono">↵</kbd> save &amp; next · skips responses claimed by others</span>
+   <button class="mm-btn" type="button">← Previous</button><button class="mm-btn mm-btn--primary" type="button">Save &amp; next →</button></div>
+ </div>
+</div>
+<aside class="gr-side"><h3>Responses</h3><ul class="gr-sidelist"><li class=""><span>Response 35</span><span><span class="st mm-ok">1</span></span></li><li class=""><span>Response 36</span><span><span class="st mm-warn">½</span></span></li><li class=""><span>Response 37</span><span><span class="st mm-ok">1</span></span></li><li class=""><span>Response 38</span><span><span class="st mm-danger">0</span></span></li><li class="cur"><span>Response 39</span><span>grading</span></li><li class=""><span>Response 40</span><span><span class="gr-claim">P. Talma</span></span></li><li class=""><span>Response 41</span><span><span class="st" style="color:var(--mm-date)">↻ was ½</span></span></li><li class=""><span>Response 42</span><span><span class="st dim">✎</span></span></li><li class=""><span>Response 43</span><span><span class="st dim">✎</span></span></li><li class=""><span>Response 44</span><span><span class="st dim">✎</span></span></li></ul>
+ <h3>Being graded</h3><p class="mm-note" style="font-size:12.5px">Response 40 — P. Talma, 2 min ago. Claims lapse after 5 minutes idle; nothing is locked.</p>
+ <h3 style="margin-top:14px">Changed since graded</h3><p class="mm-note" style="font-size:12.5px">Response 41 was resubmitted with a different answer. Its old grade (½) is offered as a suggestion.</p>
+</aside></div>
+</main>
+<footer class="page"><span>Phil 133 · Making Minds · UCLA Department of Philosophy</span><a href="#">makingminds.org</a></footer>
+</div></section>
+<section class="mock" id="5-submission"><div class="mock-cap">5 · Student submission — #/instructor/grading/:asg/student/:sid</div><div class="mm-shell mm-surface">
+<header class="topbar"><div class="page">
+  <a class="brand" href="#">Making Minds<span class="course">Phil 133</span></a>
+  <nav aria-label="App"><a href="#" data-text="Student view">Student view</a><a href="#" data-text="Dashboard" aria-current="page">Dashboard</a></nav>
+  <a class="navbox" href="#">Sandbox</a>
+  <div class="session"><span class="who">Gabriel Greenberg · Instructor</span><button type="button">Password</button><button type="button">Log out</button></div>
+</div></header>
+<div class="band"></div>
+<main class="page">
+<nav class="mm-tabs" aria-label="Dashboard sections"><span class="eyebrow">Dashboard</span><a class="mm-tab" data-text="Assignments" href="#">Assignments</a><a class="mm-tab mm-tab--active" data-text="Grading" href="#">Grading</a><a class="mm-tab" data-text="Roster & accounts" href="#">Roster &amp; accounts</a><a class="mm-tab" data-text="Feedback" href="#">Feedback</a><a class="mm-tab" data-text="Notes" href="#">Notes</a></nav>
+
+<div class="mm-head mm-head--row"><div><a class="eyebrow" href="#">← HW2 · Matrix</a>
+<h1>Hopper, Grace <span class="dim" style="font-size:18px;font-family:var(--mm-font-sans);font-weight:400">UID 000000168 · section 1A · account ✓</span></h1>
+<p class="mm-lede">HW2. Computing with CCs — attempt <b>2 of 2</b> counts (the latest). <a href="#">View attempt 1</a> (Oct 17, on time).</p></div>
+<div class="gr-pager"><button class="mm-btn mm-btn--small" type="button">← Gödel, Kurt</button><button class="mm-btn mm-btn--small" type="button">Kleene, Stephen →</button></div></div>
+<div class="gr-facts">
+ <div><span class="mm-label">Grade</span><span class="big">77.6<span class="gr-prov">*</span> <span class="dim" style="font-size:14px;font-weight:400">/ 100</span></span>
+  <span class="dim">87.6 = 40 + 60 × 13.5 / 17 · −10 late · 3 problems pending</span></div>
+ <div><span class="mm-label">Submitted</span><span>Tue Oct 20, 3:02 pm <span class="tag tag--danger">late</span></span>
+  <span class="dim">Due Sun Oct 18, 11:59 pm · 1 class meeting has passed (Tue Oct 20) → −5 −5 = <b class="mm-danger">−10</b></span>
+  <div class="mm-actions"><button class="mm-btn mm-btn--small" type="button">Extension…</button><button class="mm-btn mm-btn--small" type="button">Waive…</button></div></div>
+ <div><span class="mm-label">Group &amp; integrity</span><span>Lists <a href="#">Turing, Alan</a> <span class="tag tag--warn">not listed back</span></span>
+  <span class="dim">Turing, Alan submitted Oct 18 listing no group.</span><span class="mm-ok">No integrity prompts on this attempt.</span></div>
+</div>
+<div class="gr-problems">
+ <div class="gr-collapsed"><span>▸</span><span><b>Problems 1–6, 10–14</b> — autograde 1 each, all cases pass</span><a href="#" class="mm-link">show</a></div>
+ <div class="gr-problem"><div>
+  <h3>Problem 15 · Zig-zag <span class="tag">turbot · CC brain</span></h3>
+  <p class="gr-auto"><b>Autograde ½</b> — 1 of 2 arenas pass; the rule gives ½ at ≥ 1 of 2.</p>
+  <div class="mm-tablewrap"><table class="mm-table gr-case"><thead><tr><th>Arena</th><th>Criterion</th><th>Result</th><th></th></tr></thead><tbody>
+   <tr><td>1 · 8×8</td><td>reach goal and stop</td><td class="mm-ok">pass · 41 steps</td><td></td></tr>
+   <tr><td>2 · 10×6</td><td>reach goal and stop</td><td class="mm-danger">fail — stopped at (4, 2) after 57 steps; goal (8, 5) not reached</td><td><a href="#" class="mm-link">Run this input</a></td></tr>
+  </tbody></table></div>
+  <p style="margin:10px 0 0"><a href="#" class="mm-link">Open the submitted machine in the viewer ↗</a> <span class="dim" style="font-size:13px">read-only · Run / Step work</span></p>
+ </div><div class="gr-pts"><span class="mm-label">Points</span><div class="mm-segmented"><button type="button" class="mm-segmented-btn">0</button><button type="button" class="mm-segmented-btn mm-segmented-btn--active">½</button><button type="button" class="mm-segmented-btn">1</button></div><span class="src">From the autograde. Choose another value to override — a note is then required.</span></div></div>
+ <div class="gr-problem"><div>
+  <h3>Problem 9 <span class="tag">paragraph</span></h3>
+  <div class="gr-answer" style="margin:6px 0 0;font-size:14px">No. The circuit would need infinitely many wires, because the input can be as long as you like and a CC can only have finitely many inputs. You would have to keep adding parts forever.</div>
+ </div><div class="gr-pts"><span class="mm-label">Points</span><div class="mm-segmented"><button type="button" class="mm-segmented-btn">0</button><button type="button" class="mm-segmented-btn">½</button><button type="button" class="mm-segmented-btn">1</button></div>
+  <textarea class="mm-input" rows="2" placeholder="Note (optional on a hand grade)"></textarea><span class="src">Awaiting a hand grade · <a href="#" class="mm-link">grade in the queue</a></span></div></div>
+ <div class="gr-problem"><div>
+  <h3>Problem 7 <span class="tag">circuit · 256 cases</span></h3>
+  <p class="gr-auto"><b>Autograde 1</b> — 256 of 256 cases pass (graded against the current version).</p>
+ </div><div class="gr-pts"><span class="mm-label">Points</span><div class="mm-segmented"><button type="button" class="mm-segmented-btn">0</button><button type="button" class="mm-segmented-btn">½</button><button type="button" class="mm-segmented-btn mm-segmented-btn--active">1</button></div><span class="src">From the autograde.</span></div></div>
+ <div class="gr-collapsed"><span>▸</span><span><b>Problems 8, 16, 17</b> — 8 hand-graded 1 by G. Greenberg (Oct 20) · 16, 17 awaiting</span><a href="#" class="mm-link">show</a></div>
+</div>
+</main>
+<footer class="page"><span>Phil 133 · Making Minds · UCLA Department of Philosophy</span><a href="#">makingminds.org</a></footer>
+</div></section>
+<section class="mock" id="6-student"><div class="mock-cap">6 · Student page — #/instructor/students/:sid</div><div class="mm-shell mm-surface">
+<header class="topbar"><div class="page">
+  <a class="brand" href="#">Making Minds<span class="course">Phil 133</span></a>
+  <nav aria-label="App"><a href="#" data-text="Student view">Student view</a><a href="#" data-text="Dashboard" aria-current="page">Dashboard</a></nav>
+  <a class="navbox" href="#">Sandbox</a>
+  <div class="session"><span class="who">Gabriel Greenberg · Instructor</span><button type="button">Password</button><button type="button">Log out</button></div>
+</div></header>
+<div class="band"></div>
+<main class="page">
+<nav class="mm-tabs" aria-label="Dashboard sections"><span class="eyebrow">Dashboard</span><a class="mm-tab" data-text="Assignments" href="#">Assignments</a><a class="mm-tab mm-tab--active" data-text="Grading" href="#">Grading</a><a class="mm-tab" data-text="Roster & accounts" href="#">Roster &amp; accounts</a><a class="mm-tab" data-text="Feedback" href="#">Feedback</a><a class="mm-tab" data-text="Notes" href="#">Notes</a></nav>
+
+<div class="mm-head mm-head--row"><div><a class="eyebrow" href="#">← Roster &amp; accounts</a>
+<h1>McCulloch, Warren</h1>
+<p class="mm-lede">UID 000000192 · section 1B · account since Sep 25 · last submission Oct 18</p>
+<div class="gr-flags"><span class="tag tag--danger">⚑ Below 70 on two sets in a row</span><span class="tag">HW1 64.8 → HW2 52.4*</span></div></div>
+<div class="mm-actions"><button class="mm-btn" type="button">Email</button></div></div>
+<div class="gr-two"><div>
+ <h2>Problem sets</h2>
+ <div class="mm-tablewrap"><table class="mm-table gr-table"><thead><tr><th>Assignment</th><th>Submitted</th><th></th><th class="num">Grade</th><th></th></tr></thead>
+ <tbody><tr><td><a href="#">HW1. Basics: Circuits, Functions, and Representations</a></td><td class="date">Oct 4, 10:52 pm</td><td></td><td class="num"><b>64.8</b></td><td><span class="tag tag--ok">Released</span></td></tr><tr><td><a href="#">HW2. Computing with CCs</a></td><td class="date">Oct 18, 11:41 pm</td><td></td><td class="num"><b>52.4<span class="gr-prov">*</span></b></td><td><span class="tag">Hidden</span></td></tr><tr><td><a href="#">HW3. Computing with SCs</a></td><td class="date"><span class="dim">not yet — due Sun Oct 25</span></td><td></td><td class="num"><b>—</b></td><td></td></tr><tr><td><a href="#">HW4. Computing with FSMs</a></td><td class="date"><span class="dim">not open yet</span></td><td></td><td class="num"><b>—</b></td><td></td></tr><tr><td><a href="#">HW5. Computing with TMs</a></td><td class="date"><span class="dim">not open yet</span></td><td></td><td class="num"><b>—</b></td><td></td></tr><tr><td><a href="#">HW6. Navigation with Turbots</a></td><td class="date"><span class="dim">not open yet</span></td><td></td><td class="num"><b>—</b></td><td></td></tr><tr class="gr-dimrow"><td>HW7. Final Project</td><td colspan="4">not counted</td></tr></tbody></table></div>
+ <p class="mm-note" style="margin-top:8px">Average so far (2 of 6 sets): <b>58.6</b><span class="gr-prov">*</span> · problem sets are 55% of the course grade; exams and participation are kept outside the app.</p>
+ <section class="mm-section"><h2>Grade history</h2><ul class="gr-log">
+  <li><span class="mono">Oct 21 10:02</span>G. Greenberg · HW2 P8 hand grade <b>0</b> — "Argues from wire count, but concludes yes."</li>
+  <li><span class="mono">Oct 16 11:05</span>G. Greenberg · HW1 P5 override <b>½</b> — "Right idea; one wire lands on the wrong input."</li>
+  <li><span class="mono">Oct 12 09:00</span>G. Greenberg · HW1 grades released</li>
+  <li><span class="mono">Oct 11 14:22</span>P. Talma · HW1 P12 hand grade <b>½</b> — "Symbols fine; thirty-two is off by one."</li>
+ </ul></section>
+</div><aside>
+ <h2>Private notes</h2><p class="mm-note" style="margin:-4px 0 10px">Instructors only — never shown to the student. No medical or accommodation details.</p>
+ <ul class="gr-notes">
+  <li><span class="when">Oct 20 · P. Talma</span>Emailed to check in after HW1. Replied; plans to come to section 1B.</li>
+  <li><span class="when">Oct 14 · G. Greenberg</span>Came to office hours. Mixing up composing functions with wiring circuits; worked through Problem 8 of HW1 together.</li>
+ </ul>
+ <label class="mm-field"><span>Add a note</span><textarea class="mm-input" rows="3" placeholder="What happened, what's next"></textarea></label>
+ <div class="mm-actions" style="margin-top:8px"><button class="mm-btn mm-btn--primary" type="button">Add note</button></div>
+ <section class="mm-section" style="margin-top:22px"><h2>Extensions</h2><p class="mm-note">None. <a href="#" class="mm-link">Set one…</a> — a date only; no reason is stored.</p></section>
+</aside></div>
+</main>
+<footer class="page"><span>Phil 133 · Making Minds · UCLA Department of Philosophy</span><a href="#">makingminds.org</a></footer>
+</div></section>
+<section class="mock" id="7-regrade"><div class="mock-cap">7 · Re-grade dry run (over the Overview)</div><div class="mm-shell mm-surface">
+<header class="topbar"><div class="page">
+  <a class="brand" href="#">Making Minds<span class="course">Phil 133</span></a>
+  <nav aria-label="App"><a href="#" data-text="Student view">Student view</a><a href="#" data-text="Dashboard" aria-current="page">Dashboard</a></nav>
+  <a class="navbox" href="#">Sandbox</a>
+  <div class="session"><span class="who">Gabriel Greenberg · Instructor</span><button type="button">Password</button><button type="button">Log out</button></div>
+</div></header>
+<div class="band"></div>
+<main class="page">
+<nav class="mm-tabs" aria-label="Dashboard sections"><span class="eyebrow">Dashboard</span><a class="mm-tab" data-text="Assignments" href="#">Assignments</a><a class="mm-tab mm-tab--active" data-text="Grading" href="#">Grading</a><a class="mm-tab" data-text="Roster & accounts" href="#">Roster &amp; accounts</a><a class="mm-tab" data-text="Feedback" href="#">Feedback</a><a class="mm-tab" data-text="Notes" href="#">Notes</a></nav>
+
+<div class="mm-head mm-head--row"><div><a class="eyebrow" href="#">← Grading</a>
+<h1>HW2. Computing with CCs</h1>
+<p class="mm-lede">Due Sun Oct 18, 11:59 pm · 17 problems (13 autograded, 4 paragraph) · latest submission counts · <span class="tag">Grades hidden</span></p></div>
+<div class="mm-actions"><button class="mm-btn" type="button">Re-grade…</button><button class="mm-btn" type="button">Export CSV</button><button class="mm-btn mm-btn--primary" type="button">Release grades…</button></div></div>
+<div class="gr-views"><div class="mm-segmented"><button type="button" class="mm-segmented-btn mm-segmented-btn--active">Overview</button><button type="button" class="mm-segmented-btn">Matrix</button><button type="button" class="mm-segmented-btn">Queue</button></div><span class="dim" style="font-size:13px">80 on the roster · sections 1A, 1B</span></div>
+<div class="gr-tiles">
+ <div class="gr-tile"><span class="mm-label">Submitted</span><div class="gr-tile-value">74 <small>/ 80</small></div><div class="gr-bar"><i style="width:92%"></i></div><div class="gr-tile-sub">66 on time · 8 late · 6 missing · 1 extension</div></div>
+ <div class="gr-tile"><span class="mm-label">Autograded</span><div class="gr-tile-value">74 <small>/ 74</small></div><div class="gr-bar gr-bar--ok"><i style="width:100%"></i></div><div class="gr-tile-sub"><span class="mm-warn">9 against an older version</span></div></div>
+ <div class="gr-tile"><span class="mm-label">Hand-graded</span><div class="gr-tile-value">108 <small>/ 296</small></div><div class="gr-bar"><i style="width:36%"></i></div><div class="gr-tile-sub">1 changed since graded · 2 overrides</div></div>
+ <div class="gr-tile"><span class="mm-label">Grade</span><div class="gr-tile-value">81.6<span class="gr-prov">*</span> <small>mean</small></div><div class="gr-tile-sub">median 84.1 · 188 problems pending · not released</div></div>
+</div>
+<div class="gr-banner"><span class="gr-ico">↻</span><span><b>9 submissions were graded against an older version of HW2</b> — Problem 7's test bank changed on Oct 19. Hand grades are never touched by a re-grade.</span><button class="mm-btn mm-btn--small" type="button">Re-grade…</button></div>
+<div class="mm-tablewrap"><table class="mm-table gr-table">
+<thead><tr><th>Problem</th><th>Kind</th><th class="num">Mean</th><th>1 · ½ · 0 · pending</th><th>Hand</th><th></th></tr></thead>
+<tbody><tr><td class="mono">P1</td><td>Circuit</td><td class="num">0.97</td><td><div class="gr-dist"><i class="d1" style="width:96%"></i><i class="dh" style="width:0%"></i><i class="d0" style="width:4%"></i><i class="dp" style="width:0%"></i></div></td><td class="dim"></td><td><a href="#" class="mm-link">Cases →</a></td></tr><tr><td class="mono">P2</td><td>Circuit</td><td class="num">0.93</td><td><div class="gr-dist"><i class="d1" style="width:93%"></i><i class="dh" style="width:0%"></i><i class="d0" style="width:7%"></i><i class="dp" style="width:0%"></i></div></td><td class="dim"></td><td><a href="#" class="mm-link">Cases →</a></td></tr><tr><td class="mono">P3</td><td>Circuit</td><td class="num">0.91</td><td><div class="gr-dist"><i class="d1" style="width:91%"></i><i class="dh" style="width:0%"></i><i class="d0" style="width:9%"></i><i class="dp" style="width:0%"></i></div></td><td class="dim"></td><td><a href="#" class="mm-link">Cases →</a></td></tr><tr><td class="mono">P4</td><td>Circuit</td><td class="num">0.95</td><td><div class="gr-dist"><i class="d1" style="width:95%"></i><i class="dh" style="width:0%"></i><i class="d0" style="width:5%"></i><i class="dp" style="width:0%"></i></div></td><td class="dim"></td><td><a href="#" class="mm-link">Cases →</a></td></tr><tr><td class="mono">P5</td><td>Circuit</td><td class="num">0.90</td><td><div class="gr-dist"><i class="d1" style="width:88%"></i><i class="dh" style="width:3%"></i><i class="d0" style="width:9%"></i><i class="dp" style="width:0%"></i></div></td><td class="dim">1 override</td><td><a href="#" class="mm-link">Cases →</a></td></tr><tr><td class="mono">P6</td><td>Circuit</td><td class="num">0.86</td><td><div class="gr-dist"><i class="d1" style="width:86%"></i><i class="dh" style="width:0%"></i><i class="d0" style="width:14%"></i><i class="dp" style="width:0%"></i></div></td><td class="dim"></td><td><a href="#" class="mm-link">Cases →</a></td></tr><tr><td class="mono">P7</td><td>Circuit</td><td class="num">0.78</td><td><div class="gr-dist"><i class="d1" style="width:78%"></i><i class="dh" style="width:0%"></i><i class="d0" style="width:22%"></i><i class="dp" style="width:0%"></i></div></td><td class="dim">↻ 9 stale</td><td><a href="#" class="mm-link">Cases →</a></td></tr><tr><td class="mono">P8</td><td>Paragraph</td><td class="num">0.81</td><td><div class="gr-dist"><i class="d1" style="width:72%"></i><i class="dh" style="width:12%"></i><i class="d0" style="width:11%"></i><i class="dp" style="width:5%"></i></div></td><td class="dim">70 / 74</td><td><a href="#" class="mm-link">Grade →</a></td></tr><tr><td class="mono">P9</td><td>Paragraph</td><td class="num">0.46</td><td><div class="gr-dist"><i class="d1" style="width:38%"></i><i class="dh" style="width:9%"></i><i class="d0" style="width:4%"></i><i class="dp" style="width:49%"></i></div></td><td class="dim">38 / 74</td><td><a href="#" class="mm-link">Grade →</a></td></tr><tr><td class="mono">P10</td><td>Perception</td><td class="num">0.95</td><td><div class="gr-dist"><i class="d1" style="width:95%"></i><i class="dh" style="width:0%"></i><i class="d0" style="width:5%"></i><i class="dp" style="width:0%"></i></div></td><td class="dim"></td><td><a href="#" class="mm-link">Cases →</a></td></tr><tr><td class="mono">P11</td><td>Perception</td><td class="num">0.84</td><td><div class="gr-dist"><i class="d1" style="width:84%"></i><i class="dh" style="width:0%"></i><i class="d0" style="width:16%"></i><i class="dp" style="width:0%"></i></div></td><td class="dim"></td><td><a href="#" class="mm-link">Cases →</a></td></tr><tr><td class="mono">P12</td><td>Perception</td><td class="num">0.80</td><td><div class="gr-dist"><i class="d1" style="width:80%"></i><i class="dh" style="width:0%"></i><i class="d0" style="width:20%"></i><i class="dp" style="width:0%"></i></div></td><td class="dim"></td><td><a href="#" class="mm-link">Cases →</a></td></tr><tr><td class="mono">P13</td><td>Turbot · ½ at 1 of 2 arenas</td><td class="num">0.89</td><td><div class="gr-dist"><i class="d1" style="width:82%"></i><i class="dh" style="width:14%"></i><i class="d0" style="width:4%"></i><i class="dp" style="width:0%"></i></div></td><td class="dim"></td><td><a href="#" class="mm-link">Cases →</a></td></tr><tr><td class="mono">P14</td><td>Turbot · ½ at 1 of 2</td><td class="num">0.92</td><td><div class="gr-dist"><i class="d1" style="width:88%"></i><i class="dh" style="width:8%"></i><i class="d0" style="width:4%"></i><i class="dp" style="width:0%"></i></div></td><td class="dim"></td><td><a href="#" class="mm-link">Cases →</a></td></tr><tr><td class="mono">P15</td><td>Turbot · ½ at 1 of 2</td><td class="num">0.83</td><td><div class="gr-dist"><i class="d1" style="width:74%"></i><i class="dh" style="width:18%"></i><i class="d0" style="width:8%"></i><i class="dp" style="width:0%"></i></div></td><td class="dim"></td><td><a href="#" class="mm-link">Cases →</a></td></tr><tr><td class="mono">P16</td><td>Paragraph</td><td class="num">—</td><td><div class="gr-dist"><i class="d1" style="width:0%"></i><i class="dh" style="width:0%"></i><i class="d0" style="width:0%"></i><i class="dp" style="width:100%"></i></div></td><td class="dim">0 / 74</td><td><a href="#" class="mm-link">Grade →</a></td></tr><tr><td class="mono">P17</td><td>Paragraph</td><td class="num">—</td><td><div class="gr-dist"><i class="d1" style="width:0%"></i><i class="dh" style="width:0%"></i><i class="d0" style="width:0%"></i><i class="dp" style="width:100%"></i></div></td><td class="dim">0 / 74</td><td><a href="#" class="mm-link">Grade →</a></td></tr></tbody></table></div>
+<div class="gr-scrim"><div class="mm-modal" style="width:680px">
+<div class="mm-modal-head"><h2>Re-grade HW2 — dry run</h2><button class="mm-btn mm-btn--quiet" type="button">✕</button></div>
+<p class="mm-modal-sub">Re-ran the 74 latest submissions against the current HW2 (edited Oct 19: Problem 7's test bank). Nothing is saved until you commit.</p>
+<div class="mm-tablewrap"><table class="mm-table gr-diff">
+<thead><tr><th>Student</th><th>Problem</th><th>Autograde</th><th>Grade</th></tr></thead><tbody>
+<tr><td>Descartes, René</td><td class="mono">P7</td><td>1 <span class="gr-arrow">→</span> <b class="mm-danger">0</b></td><td>77.1 → 73.5<span class="gr-prov">*</span></td></tr>
+<tr><td>McCulloch, Warren</td><td class="mono">P7</td><td>0 <span class="gr-arrow">→</span> <b class="mm-ok">1</b></td><td>52.4 → 55.9<span class="gr-prov">*</span></td></tr>
+<tr><td>Pitts, Walter</td><td class="mono">P5</td><td>0 <span class="gr-arrow">→</span> <b class="mm-ok">1</b></td><td><span class="tag tag--warn">under your override (½)</span> — override stays; flagged for a look</td></tr>
+</tbody></table></div>
+<p class="mm-note" style="margin-top:12px"><b>3 results would change</b> · 71 unchanged · 108 hand grades and 2 overrides untouched. A database snapshot is taken before the commit; every change is logged.</p>
+<div class="mm-actions" style="margin-top:16px"><button class="mm-btn" type="button">Cancel</button><button class="mm-btn mm-btn--primary" type="button">Commit re-grade</button></div>
+</div></div>
+</main>
+<footer class="page"><span>Phil 133 · Making Minds · UCLA Department of Philosophy</span><a href="#">makingminds.org</a></footer>
+</div></section>
+
+<script>
+  var m = location.hash.match(/^#only=(.+)$/);
+  if (m) { document.body.classList.add('only'); var s = document.getElementById(m[1]); if (s) s.classList.add('on'); }
+  window.addEventListener('hashchange', function () { location.reload(); });
+</script>
+</body></html>
