@@ -217,3 +217,21 @@ existing. The memo's current-behaviour claims are spot-checked against the cited
 mockups are screenshot-attached.
 
 ## Progress log
+- 2026-09-26 (work session, Opus 5.5) — Claimed. Audit re-verified against HEAD e3218ee (three
+  Explore passes; cites refreshed for the memo — notable drift: the gradebook feed is now
+  `GET …/submissions/all`, task 037; the score has THREE rules, `Gradebook.ts:26-61`,
+  `summarizeResult` `engine/grader.ts:309-321`, `GradeSheet.tsx:119-123`; task 003's viewer is
+  `store.ts viewSubmission`/`submittedQuestionCircuit`, own-attempts only). Grading policy read
+  from the website (`policies.html`, `data/course.json`). **Gabriel answered every decision**
+  (AskUserQuestion, 19 in all): Where = a Grading tab · Points = 1 per problem, ½ on any human
+  grade · machine ½ = an AUTOMATIC per-problem rule (author-set) · Override = any problem, note
+  required · Counting attempt = latest ONLY (no per-student pick) · Late = computed per policy,
+  shown, waivable · Calendar = a repo copy of the website's course.json, synced on release ·
+  Extensions = per-student due date, no reason · Counts = HW1–HW6, HW7 not graded (a
+  counts-toward-grade flag) · Groups = roster-picked members + reciprocity flag · TAs = FULL
+  instructors (no grader role; every change still logged with who) · Anonymous = hide-names
+  toggle · Release = per assignment · Export = plain CSV, one row per student · Course grade =
+  problem sets only · Flags = the five, tunable · Private notes = yes, student page ·
+  Resubmit after hand grade = carry if the answer is unchanged, else "changed since graded" ·
+  Two graders = soft claim · Regrade requests = out of scope. Next: write the memo
+  `docs/buildout/designs/grading-interface.md`, then the static mockups + screenshots.
