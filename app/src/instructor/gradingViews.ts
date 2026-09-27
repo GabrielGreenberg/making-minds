@@ -15,6 +15,7 @@ import type {
   CourseAssignmentRow,
   GradingProblem,
   GradingRow,
+  OffRoster,
 } from '../storage/gradingSummary';
 
 /** A problem graded by hand: an open (prose) question. Everything else — a
@@ -81,6 +82,30 @@ export function splitRows(summary: AssignmentGradingSummary): { roster: GradingR
     roster: summary.rows.filter((r) => !r.student.offRoster),
     offRoster: summary.rows.filter((r) => !!r.student.offRoster),
   };
+}
+
+/** An off-roster submitter's tag (null = no tag in the matrix: a plain
+ *  non-rostered account is flagged by its section of the table alone). */
+export const OFF_ROSTER_LABEL: Record<OffRoster, string | null> = {
+  removed: 'removed from the roster',
+  instructor: 'instructor',
+  'not-rostered': null,
+};
+
+/** The students before and after `key` in the matrix's order — the roster
+ *  (as the builder sorted it), then the off-roster submitters — for the
+ *  submission page's Previous / Next (task 067). Unfiltered: the matrix's
+ *  filter and search are its own view state, not in the URL, so this is the
+ *  one order both pages agree on. Both null for a key not in the summary. */
+export function adjacentStudents(
+  summary: AssignmentGradingSummary,
+  key: string,
+): { prev: GradingRow | null; next: GradingRow | null } {
+  const { roster, offRoster } = splitRows(summary);
+  const order = [...roster, ...offRoster];
+  const i = order.findIndex((r) => r.student.key === key);
+  if (i < 0) return { prev: null, next: null };
+  return { prev: order[i - 1] ?? null, next: order[i + 1] ?? null };
 }
 
 export type MatrixFilter = 'all' | 'needs-grading' | 'changed' | 'late' | 'missing' | 'below-70';

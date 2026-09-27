@@ -11,12 +11,23 @@ import { HomeScreen } from './components/HomeScreen';
 import { AssignmentOverview } from './components/AssignmentOverview';
 import { InstructorApp } from './instructor/InstructorApp';
 import { useInstructorRoute } from './instructor/useInstructorRoute';
+import { InstructorGate } from './instructor/InstructorGate';
+import { useRoute } from './useRoute';
 import { useStore, selectEffectiveMode } from './store';
 import { useAuth } from './auth';
 import { questionTask } from './types';
 import { useEffect } from 'react';
 
 function App() {
+  const route = useRoute();
+  // Another person's attempt in the editor (task 067) is the instructor's
+  // alone: the editor renders behind the same gate as the instructor area.
+  const foreign = route.kind === 'assignment' && route.student != null;
+  const editor = <AppEditor />;
+  return foreign ? <InstructorGate>{editor}</InstructorGate> : editor;
+}
+
+function AppEditor() {
   const { user } = useAuth();
   const instructorRoute = useInstructorRoute();
   const workbookOpen = useStore((s) => s.workbookOpen);

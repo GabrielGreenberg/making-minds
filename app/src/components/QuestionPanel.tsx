@@ -14,7 +14,7 @@ import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import type { AssignmentData, AssignmentQuestion, Callout, QuestionCircuit } from '../types';
 import { questionTask } from '../types';
 import { useStore, selectAssignmentFrozen, showsSubmission } from '../store';
-import { navigate } from '../routing';
+import { editorRoute, navigate } from '../routing';
 import { DEFAULT_CALLOUT_TITLE, sectionOf } from '../problemSet';
 import { parseStatement } from '../statementFormat';
 import { assignmentShortName, questionHeading, questionList, sectionNotesLabel } from '../workbench';
@@ -23,11 +23,10 @@ import { StatementBody } from './StatementBody';
 
 /** Go to question `i` of the open assignment, staying on a viewed attempt. */
 function useGoToQuestion(): (i: number) => void {
-  const assignment = useStore((s) => s.assignment);
-  const attempt = useStore((s) => s.viewingSubmission?.attempt);
   return (i: number) => {
-    if (!assignment) return;
-    navigate({ kind: 'assignment', id: assignment.id, attempt, questionIndex: i }, { replace: true });
+    // Whose attempt is on show rides along (routing editorRoute).
+    const route = editorRoute(useStore.getState(), i);
+    if (route) navigate(route, { replace: true });
   };
 }
 

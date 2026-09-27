@@ -947,3 +947,13 @@
 }
 .menu-link-button:hover { color: var(--mm-ink); border-color: var(--mm-ink-3); }
 
+
+/* One student's submission (task 067; memo grading-interface.md §6.3). */
+.gr-pager { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+.gr-pager-links { display: flex; gap: 16px; font-size: var(--mm-fs-small); }
+.gr-pager-end { color: var(--mm-ink-3); }
+.gr-header { margin: 0 0 18px; padding: 0 0 6px; border-bottom: 1px solid var(--mm-line); }
+.gr-header .gr-subline { margin-bottom: 6px; }
+.gr-half { margin: 4px 0 0; font-size: var(--mm-fs-small); color: var(--mm-ink-2); }
+.gr-cases { margin: 8px 0; font-size: var(--mm-fs-small); }
+.gr-cases summary { cursor: pointer; color: var(--mm-ink-2); }

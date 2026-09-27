@@ -5,7 +5,7 @@
 // menu here and its worksheet tabs above the canvas.
 
 import { useEffect, useState } from 'react';
-import { useStore, selectAssignmentFrozen, showsSubmission } from '../store';
+import { useStore, selectAssignmentFrozen, showsSubmission, type SubmissionOwner } from '../store';
 import { useAuth } from '../auth';
 import { navigate } from '../routing';
 import { hashLink } from './PageShell';
@@ -24,12 +24,36 @@ function useNow(ms: number): number {
   return now;
 }
 
+/** The crumbs over another person's attempt (task 067): back to the
+ *  Grading tab, the assignment's matrix and the student's submission page —
+ *  never to the viewer's own work. */
+function ForeignCrumbs({ id, title, owner }: { id: string; title: string; owner: SubmissionOwner }) {
+  return (
+    <>
+      <a {...hashLink({ kind: 'instructor-grading' })}>Grading</a>
+      <span className="wb-crumb-sep" aria-hidden>/</span>
+      <a {...hashLink({ kind: 'instructor-grading-assignment', id, view: 'matrix' })}>{title}</a>
+      <span className="wb-crumb-sep" aria-hidden>/</span>
+      <a
+        className="wb-crumb-current"
+        {...hashLink({ kind: 'instructor-grading-student', id, student: owner.key })}
+        title={`${owner.name}'s submission — every problem`}
+      >
+        {owner.name}
+      </a>
+    </>
+  );
+}
+
 export function EditorTopBar() {
   const { user } = useAuth();
   const assignment = useStore((s) => s.assignment);
   const currentQuestionIndex = useStore((s) => s.currentQuestionIndex);
   const submission = useStore((s) => (s.assignment ? s.submissions[s.assignment.id] : undefined));
   const viewingSubmission = useStore((s) => s.viewingSubmission);
+  // Another person's attempt on show (task 067): the crumbs lead back to
+  // their submission page, never to this person's own work.
+  const owner = useStore((s) => s.viewingOwner);
   const frozen = useStore(selectAssignmentFrozen);
   const showingSubmission = useStore(showsSubmission);
   const status = useStore((s) => s.autoSaveStatus);
@@ -56,17 +80,21 @@ export function EditorTopBar() {
 
       <nav className="wb-crumbs" aria-label="Where you are">
         {assignment ? (
-          <>
-            <a {...hashLink({ kind: 'home' })}>Assignments</a>
-            <span className="wb-crumb-sep" aria-hidden>/</span>
-            <a
-              className="wb-crumb-current"
-              {...hashLink({ kind: 'assignment', id: assignment.id, attempt: viewingSubmission?.attempt })}
-              title={`${assignment.title} — the whole problem set`}
-            >
-              {assignment.title}
-            </a>
-          </>
+          owner ? (
+            <ForeignCrumbs id={assignment.id} title={assignment.title} owner={owner} />
+          ) : (
+            <>
+              <a {...hashLink({ kind: 'home' })}>Assignments</a>
+              <span className="wb-crumb-sep" aria-hidden>/</span>
+              <a
+                className="wb-crumb-current"
+                {...hashLink({ kind: 'assignment', id: assignment.id, attempt: viewingSubmission?.attempt })}
+                title={`${assignment.title} — the whole problem set`}
+              >
+                {assignment.title}
+              </a>
+            </>
+          )
         ) : (
           <>
             <span className="wb-crumb-current">Sandbox</span>
@@ -93,7 +121,22 @@ export function EditorTopBar() {
             🔒 Past due — viewing your submission
           </span>
         )}
-        {assignment && !frozen && viewingSubmission && (
+        {assignment && owner && viewingSubmission && (
+          <>
+            <span className="wb-lock" title={`${owner.name}'s answers as submitted in this attempt — Run and Step still work, edits are off.`}>
+              Viewing {owner.name}'s attempt {viewingSubmission.attempt} — read-only
+            </span>
+            <button
+              type="button"
+              className="mm-btn mm-btn--primary wb-primary"
+              onClick={() => navigate({ kind: 'instructor-grading-student', id: assignment.id, student: owner.key })}
+              title={`Leave the viewer and go back to ${owner.name}'s submission page`}
+            >
+              Back to {owner.name}'s submission
+            </button>
+          </>
+        )}
+        {assignment && !owner && !frozen && viewingSubmission && (
           <>
             <span className="wb-lock" title="Your answers as submitted in this attempt — Run and Step still work, edits are off.">
               Viewing submission {viewingSubmission.attempt} — read-only

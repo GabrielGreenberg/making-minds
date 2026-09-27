@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import type { AssignmentData } from '../types';
 import type { AssignmentGradingSummary, GradingRow } from '../storage/gradingStore';
-import type { OffRoster } from '../storage/gradingSummary';
 import { navigate } from '../routing';
 import { hashLink } from '../components/PageShell';
 import { formatDateTime } from '../dueDates';
@@ -11,6 +10,7 @@ import {
   filterTest,
   matchesSearch,
   MATRIX_FILTERS,
+  OFF_ROSTER_LABEL,
   problemStats,
   sectionsOf,
   splitRows,
@@ -20,11 +20,6 @@ import { GradeValue } from './GradingParts';
 
 /** Why an off-roster row is there (below the "not on the roster" divider,
  *  so that case needs no tag of its own). */
-const OFF_ROSTER_LABEL: Record<OffRoster, string | null> = {
-  removed: 'removed from the roster',
-  instructor: 'instructor',
-  'not-rostered': null,
-};
 
 /**
  * An assignment's Matrix (task 065; memo §6.2, mockup 3): roster students ×

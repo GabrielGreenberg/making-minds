@@ -17,16 +17,19 @@
 import { useMemo } from 'react';
 import { useStore } from '../store';
 import { gradedCaseView } from '../gradeDisplay';
-import { navigate } from '../routing';
+import { editorRoute, navigate } from '../routing';
 
 export function GradedCaseBanner() {
   const loadedCase = useStore((s) => s.loadedCase);
   const assignment = useStore((s) => s.assignment);
   const currentQuestionIndex = useStore((s) => s.currentQuestionIndex);
-  const viewedAttempt = useStore((s) => s.viewingSubmission?.attempt);
   const components = useStore((s) => s.components);
   const wires = useStore((s) => s.wires);
-  const latestAttempt = useStore((s) => (s.assignment ? s.submissions[s.assignment.id]?.attempt : undefined));
+  // The principal's own latest attempt — none while another person's is on
+  // show (task 067): the viewer's own submissions say nothing about it.
+  const latestAttempt = useStore((s) =>
+    s.assignment && !s.viewingOwner ? s.submissions[s.assignment.id]?.attempt : undefined,
+  );
   const loadCaseInput = useStore((s) => s.loadCaseInput);
   const clearLoadedCase = useStore((s) => s.clearLoadedCase);
 
@@ -49,7 +52,8 @@ export function GradedCaseBanner() {
     clearLoadedCase();
     // Drop the case from the URL, so a reload does not load it again — and
     // only the case: a submission on show stays on show.
-    navigate({ kind: 'assignment', id: assignment.id, attempt: viewedAttempt, questionIndex: currentQuestionIndex }, { replace: true });
+    const route = editorRoute(useStore.getState(), currentQuestionIndex);
+    if (route) navigate(route, { replace: true });
   };
 
   return (
