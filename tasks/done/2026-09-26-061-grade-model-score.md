@@ -8,9 +8,9 @@ requires: browser
 area: app
 source: chat
 created: 2026-09-26T21:34:00-07:00
-status: in-progress
+status: done
 after: 
-branch: task/061-grade-model-score
+branch:
 merged_into:
 ---
 
@@ -94,3 +94,8 @@ the creator's ½ field validates live.
   copy scores as the instructor's). Browser (local): gradebook grades + mean; John's released
   HW1 sheet, row and margin marks; the creator's field and its refusal at 2 of 2. Visual
   owed: a ½ mark on screen (no homework carries a ½ rule yet; pinned headless).
+- 2026-09-26 — Gates green (app tsc, build, app check incl. the new scoreCheck, server check
+  incl. parity). Merged main (072's CLAUDE.md) into the branch; CLAUDE.md updated in place
+  (37,503 B). Landed. Next in the grading build: 2026-09-26-063 (grades table, change log,
+  GradingStore seam — reuse 062's `users.public_id`; drop score.ts's `gradesFromReviews`
+  adapter once grades are stored).
