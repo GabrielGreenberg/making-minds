@@ -8,9 +8,9 @@ requires: human
 area: app
 source: chat
 created: 2026-09-23T10:00:00-07:00
-status: in-progress
+status: done
 after:
-branch: task/031-grading-interface-design
+branch:
 merged_into:
 ---
 
@@ -246,3 +246,16 @@ mockups are screenshot-attached.
   reviews memo + screenshots → on approval record it here, set the memo's status to accepted,
   file slices 1–11 (memo §12) as ordered tasks in `tasks/incoming/`, update CLAUDE.md "What's
   next", land.
+- 2026-09-26 — **Approved by Gabriel** ("approved, defaults fine — file the slices and land
+  it"), including the three proposed defaults (Missing exports as 0; a class meeting passes
+  when it ends; a pending problem counts 0 earned with the grade provisional). Memo status →
+  accepted. Build filed in order as 2026-09-26-061 (grade model + scoreSubmission + ½ rule) ·
+  062 (group members at submit — urgent, before HW1 submissions) · 063 (grades table, change
+  log, GradingStore seam, review migration) · 064 (summary endpoints, shared with 030) · 065
+  (Grading tab + Overview + Matrix) · 066 (hand-grading queue) · 067 (instructor submission
+  page + viewer) · 068 (late penalty, calendar, extensions, waivers) · 069 (re-grade dry run)
+  · 070 (flags, student page, private notes) · 071 (export CSV). 030 now `after: 064`
+  (consumes its `/summary`); 014 now `after: 066` (a suggestion inside the queue). CLAUDE.md
+  "What's next" names the build (39,988 / 40,000 bytes — nearly full). Gates green on the
+  branch (app tsc, tools typecheck, build, app check, server check). Landed. Next: `/work`
+  on 062 (urgent) or 061.
