@@ -326,7 +326,7 @@ function describeParseFailure(
  * state, given an input, if there are no arrows leaving that state for that
  * input"). Unparseable labels cover nothing (they are errors on their own).
  * Only states with at least one uncovered symbol appear in the map. Pure:
- * the editor's missing-arrow warning and the 'total' check share it.
+ * the editor's missing-arrow warning reads it.
  */
 export function uncoveredInputs(
   states: CircuitComponent[],
