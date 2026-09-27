@@ -235,3 +235,14 @@ mockups are screenshot-attached.
   Resubmit after hand grade = carry if the answer is unchanged, else "changed since graded" ·
   Two graders = soft claim · Regrade requests = out of scope. Next: write the memo
   `docs/buildout/designs/grading-interface.md`, then the static mockups + screenshots.
+- 2026-09-26 — Memo written: `docs/buildout/designs/grading-interface.md` (current behaviour
+  re-cited, the 19 decisions as a table, the grade model, re-grade, surfaces + routes, data
+  layer + the `GradingStore` seam, flags, P3, deferred, 11 build slices). Mockups:
+  `docs/buildout/designs/grading-interface/mockups.html` (the app's own theme.css + pages.css;
+  proposed `gr-*` idioms in tokens only; fictional data), seven screenshots in
+  `tasks/attachments/2026-09-23-031-*.png`. Three proposed defaults still to confirm at
+  approval (memo §4.5, §4.6, §4.2): Missing exports as 0; a class meeting "passes" when it
+  ends; a pending problem counts 0 earned with the grade marked provisional. **Next:** Gabriel
+  reviews memo + screenshots → on approval record it here, set the memo's status to accepted,
+  file slices 1–11 (memo §12) as ordered tasks in `tasks/incoming/`, update CLAUDE.md "What's
+  next", land.
