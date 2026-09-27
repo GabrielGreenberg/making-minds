@@ -8,9 +8,9 @@ requires:
 area: docs
 source: chat
 created: 2026-09-26T21:48:03-0700
-status: in-progress
+status: done
 after:
-branch: task/072-claude-md-headroom
+branch:
 merged_into:
 ---
 
@@ -46,3 +46,23 @@ so the next task that touches it fails the gate. Gabriel (chat, 2026-09-26): fre
 paths) empty; all gates in PROFILE §6 by exit code. No visual surface.
 
 ## Progress log
+- 2026-09-26 (`/work`, Opus 5.5, worktree `.claude/worktrees/heuristic-cartwright-01774b`) —
+  Filed and claimed at Gabriel's ask; `CLAUDE.md` 39,988 → **37,026 bytes** (−2,962; 2,974
+  bytes of headroom). Done-when 1 aimed at ~36,500: not reached. The rest is identifier lists,
+  laws and gate descriptions, and more cuts there would drop named facts. That is the low end
+  of Gabriel's "roughly 3–4 KB".
+  What changed: Part 1 stops restating Part 2. The SSO no-rebuild point is in the Identity
+  seam. The PDF structure is in Deployment. Editor parts are in the Student UI row, freezing
+  in the Due dates row, and the homework-sync outcomes are stated once (Deployment). The paste
+  policy moved into the provenance rule, and the halt-position / tape-cell semantics live in
+  Homework JSON only. The task-number asides (003, 007, 020, 026–028, 033, 034, 040, 041,
+  052–057) are gone. Build phases is one line, and the DSL, Critical rules and the longest Key
+  files cells are tightened.
+  Fixed an error: Part 1 said `maxTapeCells`/`requireStandardHaltPosition` are checked at
+  Stage 1, but they are per-case at run/accept (`caseRun.ts` `tapeOverrun`, `tmCodec.ts`
+  accept). It now points to Homework JSON, which was already right.
+  Proof: a token diff of old vs new (every backticked span, path, bold phrase and heading;
+  882 tokens) drops none, except `isCurrentQuestionLocked(state)` (the identifier survives
+  bare) and four slash-phrases whose facts live in the Problem-set, turbot and API client
+  rows. Headings are unchanged. Gates: check-budgets, app tsc, app build, server typecheck,
+  server check and app check all exit 0.
