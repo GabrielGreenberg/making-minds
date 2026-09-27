@@ -331,8 +331,10 @@ export function DataTable() {
 
     // Build the state table from transitions (wires between STATE components),
     // one row per (state, input symbol) of the question's notation — the same
-    // alphabet the grader validates totality over (a k=2 question enumerates
-    // 00/01/10/11). Labels are read through the notation, never dissected.
+    // alphabet the grader feeds (a k=2 question enumerates 00/01/10/11).
+    // Labels are read through the notation, never dissected. A symbol with no
+    // arrow is a HALT row, warned (never blocked): the run halts there, as in
+    // the textbook, and the grader decodes the output so far (task 047).
     const stateTableRows: { state: string; input: string; output: string; nextState: string }[] = [];
     for (const state of states) {
       for (const inputSymbol of fsmDataNotation.inputAlphabet) {
@@ -398,11 +400,15 @@ export function DataTable() {
                     const isCurrentRow = fsmCurrentStateId !== null &&
                       row.state === components.find((c) => c.id === fsmCurrentStateId)?.label;
                     return (
-                      <tr key={i} className={isCurrentRow ? 'row-active' : ''}>
+                      <tr
+                        key={i}
+                        className={[isCurrentRow ? 'row-active' : '', row.nextState === 'HALT' ? 'data-table-row--halt' : ''].filter(Boolean).join(' ')}
+                        title={row.nextState === 'HALT' ? `No arrow for input ${row.input} — the machine halts in ${row.state} if it reads ${row.input}` : undefined}
+                      >
                         <td><span className="mono-value">{row.state}</span></td>
                         <td className={row.input === '1' ? 'val-1' : ''}><span className="mono-value">{row.input}</span></td>
                         <td className={row.output === '1' ? 'val-1' : ''}><span className="mono-value">{row.output}</span></td>
-                        <td><span className="mono-value" style={row.nextState === 'HALT' ? { color: '#999', fontStyle: 'italic' } : undefined}>{row.nextState}</span></td>
+                        <td><span className="mono-value">{row.nextState}</span></td>
                       </tr>
                     );
                   })}

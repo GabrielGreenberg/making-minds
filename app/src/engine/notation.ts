@@ -321,6 +321,42 @@ function describeParseFailure(
 }
 
 /**
+ * The alphabet symbols each state has NO parseable transition for — where a
+ * run halts if it reads that symbol (textbook: "a machine halts in a given
+ * state, given an input, if there are no arrows leaving that state for that
+ * input"). Unparseable labels cover nothing (they are errors on their own).
+ * Only states with at least one uncovered symbol appear in the map. Pure:
+ * the editor's missing-arrow warning reads it.
+ */
+export function uncoveredInputs(
+  states: CircuitComponent[],
+  wires: Wire[],
+  notationFor: (source: CircuitComponent) => TransitionNotation,
+): Map<string, string[]> {
+  const byId = new Map(states.map((s) => [s.id, s]));
+  const covered = new Map<string, Set<string>>();
+  for (const w of wires) {
+    const source = byId.get(w.sourceComponentId);
+    if (!source) continue;
+    const parsed = notationFor(source).parse(w.transitionLabel);
+    if (!parsed) continue;
+    let set = covered.get(source.id);
+    if (!set) {
+      set = new Set<string>();
+      covered.set(source.id, set);
+    }
+    set.add(parsed.input);
+  }
+  const out = new Map<string, string[]>();
+  for (const s of states) {
+    const have = covered.get(s.id);
+    const missing = notationFor(s).inputAlphabet.filter((sym) => !have?.has(sym));
+    if (missing.length > 0) out.set(s.id, missing);
+  }
+  return out;
+}
+
+/**
  * Validate a transition table against per-source-state notations (turbot-TM
  * state kinds fit the same shape later). Errors:
  *   - unparseable labels (arity-aware messages for FSM-family grammars);

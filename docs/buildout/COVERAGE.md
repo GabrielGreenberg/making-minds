@@ -97,7 +97,7 @@ _Note: HW3 #10 (x·y B) is an impossibility argument (not SC-computable) — exc
 
 | id | problem | category | auth | build | grades | appr | status | notes |
 |----|---------|----------|:----:|:-----:|:------:|:----:|:------:|-------|
-| hw4-p3  | +1 T | arithmetic | ✅ | ✅ | ✅ | ✅ | ✅ | `reference/hw4-p3.json`; the textbook's p. 101 machine (S₀ 1:1 loop, 0:1 → S₁, S₁ 0:0 loop) + an unused S₁ 1:1 edge for totality (task 047 would drop it); broken = echo, fails 9/9 |
+| hw4-p3  | +1 T | arithmetic | ✅ | ✅ | ✅ | ✅ | ✅ | `reference/hw4-p3.json`; the textbook's p. 101 machine exactly as drawn (S₀ 1:1 loop, 0:1 → S₁, S₁ 0:0 loop; no S₁ arrow on 1 — a missing arrow halts, task 047); broken = echo, fails 9/9 |
 | hw4-p4  | +2 T | arithmetic | ✅ | ✅ | ✅ | ✅ | ✅ | `reference/hw4-p4.json`; three-state analogue — echo the 1s, emit two extra 1s, then 0s (task 044); broken = the +1 T machine, fails 9/9 |
 | hw4-p5  | +1 B | arithmetic | ✅ | ✅ | ✅ | ✅ | ✅ | `reference/hw4-p5.json`; 2-state carry FSM; broken = carry-dropper (62.5%) |
 | hw4-p6  | +2 B | arithmetic | ✅ | ✅ | ✅ | ✅ | ✅ | `reference/hw4-p6.json`; 3-state shifted carry |

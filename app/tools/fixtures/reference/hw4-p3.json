@@ -167,15 +167,6 @@
         "targetPortId": "left",
         "value": 0,
         "transitionLabel": "0:0"
-      },
-      {
-        "id": "hw4-p3-w-s1-1",
-        "sourceComponentId": "hw4-p3-s1",
-        "sourcePortId": "right",
-        "targetComponentId": "hw4-p3-s1",
-        "targetPortId": "left",
-        "value": 0,
-        "transitionLabel": "1:1"
       }
     ]
   },

@@ -40,7 +40,7 @@ import {
   GRID_SIZE,
   toSubscript,
 } from './types';
-import { topologicalSort, evaluateGate, evaluateCC, scNetlist, evaluateSCStep, boxMemoryOutputs, stepBoxedMemory, memorySlots, withMemState, zeroMemState, hasMemory, isSequentialBox, hasCombinationalLoop, sortStateComponents, evaluateFSMSymbolStep, evaluateTMSingleStep, evaluateTMSequence, DEFAULT_TM_MAX_STEPS, notationForRepresentation, encodeTM, stepCountFor, encodeInput, valueToBits, bitsToValue, bitsToTally, bitsToBinary, sortByLabel, fsmNotation, turbotFsmNotation, tmNotation, turbotInternalNotation, turbotExternalNotation, questionLayout, caseStimulus, recordedCaseSeparations, gradedMachineKey, gradingCircuit, parsePortKey, type CodecLayout, type TransitionNotation } from './engine';
+import { topologicalSort, evaluateGate, evaluateCC, scNetlist, evaluateSCStep, boxMemoryOutputs, stepBoxedMemory, memorySlots, withMemState, zeroMemState, hasMemory, isSequentialBox, hasCombinationalLoop, sortStateComponents, evaluateFSMSymbolStep, evaluateTMSingleStep, evaluateTMSequence, DEFAULT_TM_MAX_STEPS, notationForRepresentation, encodeTM, stepCountFor, encodeInput, valueToBits, bitsToValue, bitsToTally, bitsToBinary, sortByLabel, fsmNotation, turbotFsmNotation, uncoveredInputs, tmNotation, turbotInternalNotation, turbotExternalNotation, questionLayout, caseStimulus, recordedCaseSeparations, gradedMachineKey, gradingCircuit, parsePortKey, type CodecLayout, type TransitionNotation } from './engine';
 import { senseAheadSymbol, applyMotorCommand, initialBrainState, runBrainStep, stateKindOf, isGoalCell, type BrainState } from './engine/turbot';
 import { framesToLanes } from './engine/perception';
 import { getAssignment, listAssignments } from './assignments';
@@ -713,6 +713,45 @@ export function selectFsmNotation(s: {
     return fsmNotation(q.cc_spec.inputs.length, q.cc_spec.outputs.length);
   }
   return fsmNotation(1, 1);
+}
+
+const NO_UNCOVERED: ReadonlyMap<string, string[]> = new Map();
+let uncoveredMemo: {
+  components: CircuitComponent[];
+  wires: Wire[];
+  notation: TransitionNotation;
+  result: ReadonlyMap<string, string[]>;
+} | null = null;
+
+/**
+ * The FSM editor's missing-arrow warning (task 047): per STATE id, the input
+ * symbols it has no arrow for — where a run halts if it reads one (the
+ * textbook's halting rule; the grader decodes the output so far). Warn,
+ * don't block: nothing gates on this. Plain FSM surfaces only: empty
+ * elsewhere, INCLUDING a turbot's FSM brain — turbot brains keep totality
+ * (`validateTurbotFSM`, walker mode 'total'), so a gap there is a Stage-1
+ * error the grader rejects, never a harmless halt; this warning must not
+ * describe it as one. Memoized on (components, wires, notation) identity,
+ * so the Map and its arrays are stable — selector-safe.
+ */
+export function selectFsmUncoveredInputs(s: {
+  buildMode: BuildMode;
+  assignment: AssignmentData | null;
+  currentQuestionIndex: number;
+  tabs?: SandboxTab[];
+  activeTabId?: string;
+  components: CircuitComponent[];
+  wires: Wire[];
+}): ReadonlyMap<string, string[]> {
+  if (s.buildMode === 'turbot' || selectEffectiveMode(s) !== 'FSM') return NO_UNCOVERED;
+  const notation = selectFsmNotation(s);
+  const m = uncoveredMemo;
+  if (m && m.components === s.components && m.wires === s.wires && m.notation === notation) {
+    return m.result;
+  }
+  const result = uncoveredInputs(sortStateComponents(s.components), s.wires, () => notation);
+  uncoveredMemo = { components: s.components, wires: s.wires, notation, result };
+  return result;
 }
 
 /**

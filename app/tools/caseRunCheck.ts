@@ -235,7 +235,7 @@ if (typeof (globalThis as { localStorage?: unknown }).localStorage === 'undefine
 }
 
 // Import AFTER the shims (static imports would hoist above them).
-const { useStore, selectTurbotArena, selectQuestionStepBudget, UI_RUN_STEP_CAP } = await import('../src/store');
+const { useStore, selectTurbotArena, selectQuestionStepBudget, selectFsmUncoveredInputs, UI_RUN_STEP_CAP } = await import('../src/store');
 
 async function waitUntil(pred: () => boolean, timeoutMs = 30000): Promise<boolean> {
   const start = Date.now();
@@ -323,8 +323,13 @@ async function pinValueLoad(tag: string, q: AssignmentQuestion, full: QuestionRe
       tc.reason === 'malformed output' ? !outputAccepted(raw, layout) : same(decodeOutput(raw, layout), tc.got));
   } else if (q.buildMode === 'FSM') {
     const hist = s.fsmHistory.slice().sort((a, b) => a.t - b.t);
-    check(`${label}: FSM fed the codec's symbols`,
-      stim.axis === 'time' && same(hist.map((h) => String(h.input)), stim.steps.map((r) => r.join(''))));
+    // A missing arrow halts the run early (task 047): the store fed a PREFIX
+    // of the codec's symbols and stopped, HALTED — exactly the grader's run.
+    const fed = stim.axis === 'time' ? stim.steps.map((r) => r.join('')) : [];
+    check(`${label}: FSM fed the codec's symbols${s.fsmHalted ? ' up to the halt' : ''}`,
+      stim.axis === 'time' && (s.fsmHalted
+        ? hist.length < fed.length && same(hist.map((h) => String(h.input)), fed.slice(0, hist.length))
+        : same(hist.map((h) => String(h.input)), fed)));
     const raw = { axis: 'time' as const, steps: hist.map((h) => String(h.output).split('').map(Number)) };
     check(`${label}: FSM outputs decode to the recorded result`,
       tc.reason === 'malformed output'
@@ -413,6 +418,35 @@ const TURBOT_ROWS: [string, CircuitData | null][] = [
   ['hw4-p14', null], // FSM brain
   ['hw6-p2', wandererBrain], // TM brain that never stops: 'exceeded max steps'
 ];
+// A partial FSM table (task 047): S₀ 1:1 alone halts on the tally's first
+// 0 — the store run halts where the grader's does, and the output so far
+// (unreached steps 0) decodes to the recorded got; no case has a reason.
+{
+  const fx = loadFixture('hw4-p3');
+  const halter = circuit([comp('s0', 'STATE', 'S₀', 100, 100)], [transition('t1', 's0', 's0', '1:1')]);
+  const full = openGraded(fx.question, halter);
+  check('hw4-p3 (halts early): graded on output, no case reason',
+    full.cases.every((c) => c.reason === undefined) && full.passed === 0);
+  for (const k of [0, 3, 8]) {
+    openGraded(fx.question, halter);
+    await pinValueLoad('hw4-p3 (halts early)', fx.question, full, k);
+    check(`hw4-p3 (halts early) case ${k}: the store run HALTED`, useStore.getState().fsmHalted);
+  }
+}
+// The editor's missing-arrow warning speaks only where the gap is a halt:
+// a plain FSM question warns (S₀ lacks input 0), a turbot's FSM brain never
+// does — turbot brains keep totality, so its gap is the grader's Stage-1
+// error, not a harmless halt (task 047 review).
+{
+  const fx = loadFixture('hw4-p3');
+  openGraded(fx.question, circuit([comp('s0', 'STATE', 'S₀', 100, 100)], [transition('t1', 's0', 's0', '1:1')]));
+  check('missing-arrow warning: a plain FSM question warns (S₀: [0])',
+    JSON.stringify(selectFsmUncoveredInputs(useStore.getState()).get('s0')) === '["0"]');
+  const tb = loadFixture('hw4-p14');
+  openGraded(tb.question, { ...tb.correct, wires: tb.correct.wires.slice(1) });
+  check('missing-arrow warning: a turbot FSM brain with a gap shows none',
+    selectFsmUncoveredInputs(useStore.getState()).size === 0);
+}
 for (const [id, alt] of TURBOT_ROWS) {
   const fx = loadFixture(id);
   const machine = alt ?? fx.correct;
