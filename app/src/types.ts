@@ -777,6 +777,41 @@ export interface RegradeEvent {
 /** An entry of an assignment's append-only grading log. */
 export type GradeEvent = GradeChangeEvent | RegradeEvent;
 
+/** The log's id for course-wide entries (private notes): no assignment has
+ *  it, so no assignment's log ever lists one. */
+export const COURSE_LOG_ID = '';
+
+/**
+ * A private note, as the append-only grading log records it (memo
+ * grading-interface.md §9: every private note is logged there). Filed under
+ * COURSE_LOG_ID; names the note by id and leaves its text in the notes log.
+ */
+export interface NoteEvent {
+  at: string;
+  actor: string;
+  student: string;
+  kind: 'note';
+  before: null;
+  after: { noteId: number };
+}
+
+/**
+ * One private note on a student (task 2026-09-26-070; memo
+ * grading-interface.md §6.5, decision 15): dated, append-only — no edit or
+ * delete path anywhere — and instructors only; nothing student-facing reads
+ * them. Never medical or accommodation details (P4, memo §9). Each row
+ * carries who (`author`, the account key) and when (`at`); every one is also
+ * logged in the grading log as a `NoteEvent` (memo §9).
+ */
+export interface StudentNote {
+  id: number;
+  body: string;
+  author: string;
+  /** The author's display name, as the student page shows it. */
+  authorName?: string;
+  at: string;
+}
+
 /** A problem's points: every problem is worth 1 (memo grading-interface.md §4.1). */
 export type Points = 0 | 0.5 | 1;
 

@@ -7,6 +7,7 @@ import { formatDateTime } from '../dueDates';
 import {
   cellOf,
   filterCounts,
+  flagChipText,
   filterTest,
   matchesSearch,
   MATRIX_FILTERS,
@@ -27,8 +28,9 @@ import { GradeValue } from './GradingParts';
  * cellOf), with filter chips, a section select and a search. Filter state is
  * the view's own, never the URL's. Off-roster submitters sit below a divider,
  * dimmed, and never count. A row opens that student's submission. ⚑ marks a problem
- * with integrity flags (the summary's `flags`); the Flagged chip and the
- * row-level flags arrive with task 070.
+ * with integrity flags (the summary's `flags`); a ⚑ after a name carries that
+ * row's flags on THIS assignment (task 070 — prompts, never verdicts) and
+ * opens the student's page, as the small ↗ beside every roster name does.
  */
 export function GradingMatrix({ summary, assignment }: { summary: AssignmentGradingSummary; assignment: AssignmentData }) {
   const [filter, setFilter] = useState<MatrixFilter>('all');
@@ -45,8 +47,18 @@ export function GradingMatrix({ summary, assignment }: { summary: AssignmentGrad
   const offShown = offRoster.filter(shown);
   const cols = problems.length + 4;
 
+  const names = new Map(summary.rows.map((x) => [x.student.key, x.student.name]));
+  const flagTip = (r: GradingRow) =>
+    (r.flags ?? [])
+      .map((f) => {
+        const others = (f.others ?? []).map((k) => names.get(k)).filter(Boolean);
+        return `${flagChipText(f)}: ${f.detail}${others.length ? ` — ${others.join(', ')}` : ''}`;
+      })
+      .join('\n');
+
   const row = (r: GradingRow, off: boolean) => {
     const open = { kind: 'instructor-grading-student', id: summary.assignmentId, student: r.student.key } as const;
+    const page = { kind: 'instructor-student', student: r.student.key } as const;
     const late = r.latest?.late;
     return (
       <tr key={r.student.key} className={`gr-row${off ? ' gr-dimrow' : ''}`} onClick={() => navigate(open)}>
@@ -54,6 +66,27 @@ export function GradingMatrix({ summary, assignment }: { summary: AssignmentGrad
           <a {...hashLink(open)} onClick={(e) => { e.stopPropagation(); hashLink(open).onClick(e); }}>
             {r.student.sortName}
           </a>
+          {r.flags?.length ? (
+            <a
+              className="gr-flag gr-rowflag"
+              title={`Flags — to look at, not verdicts:\n${flagTip(r)}`}
+              {...hashLink(page)}
+              onClick={(e) => { e.stopPropagation(); hashLink(page).onClick(e); }}
+            >
+              ⚑
+            </a>
+          ) : null}
+          {!off && (
+            <a
+              className="gr-pagelink"
+              title="The student's page"
+              aria-label={`${r.student.name}: student page`}
+              {...hashLink(page)}
+              onClick={(e) => { e.stopPropagation(); hashLink(page).onClick(e); }}
+            >
+              ↗
+            </a>
+          )}
           {r.student.section && <span className="dim">{r.student.section}</span>}
           {r.student.offRoster && OFF_ROSTER_LABEL[r.student.offRoster] && (
             <span className="tag gr-tag-gap">{OFF_ROSTER_LABEL[r.student.offRoster]}</span>
@@ -176,7 +209,7 @@ export function GradingMatrix({ summary, assignment }: { summary: AssignmentGrad
         <span><span className="gr-cell gr-cell--c">↻</span>changed since graded</span>
         <span><span className="gr-cell gr-cell--m">—</span>not submitted</span>
         <span><span className="gr-prov">*</span> provisional</span>
-        <span><span className="gr-flag">⚑</span>integrity flags — to look at, not a verdict</span>
+        <span><span className="gr-flag">⚑</span>on a problem: integrity flags; after a name: that student's flags here — to look at, not a verdict</span>
         <span>Accent problem numbers are graded by hand.</span>
       </div>
     </>

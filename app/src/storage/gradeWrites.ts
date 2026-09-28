@@ -199,3 +199,18 @@ export function planWaiverWrite(input: {
     event: { at: input.now, actor: input.actor, student: input.student, kind: 'waiver', before: existing, after: value },
   };
 }
+
+// ── Private notes on a student (task 2026-09-26-070; memo §6.5) ─────────
+// Append-only: a note is only ever added — the notes' own table (or local
+// list) is their log, so no grade_events entry duplicates one.
+
+/** Longest note: a few paragraphs, never a document. */
+export const MAX_STUDENT_NOTE = 4000;
+
+/** Check one note's text: non-empty once trimmed, at most MAX_STUDENT_NOTE. */
+export function checkStudentNote(body: unknown): { ok: true; body: string } | { ok: false; error: string } {
+  if (typeof body !== 'string' || !body.trim()) return { ok: false, error: 'a note needs some text' };
+  const text = body.trim();
+  if (text.length > MAX_STUDENT_NOTE) return { ok: false, error: `a note is at most ${MAX_STUDENT_NOTE} characters` };
+  return { ok: true, body: text };
+}

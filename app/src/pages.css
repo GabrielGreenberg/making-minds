@@ -605,8 +605,39 @@
 .gr-switch i::after { content: ""; position: absolute; right: 2px; top: 2px; width: 12px; height: 12px; background: var(--mm-surface); }
 .gr-switch--off i { background: var(--mm-line-2); }
 .gr-switch--off i::after { right: auto; left: 2px; }
+/* flags (070): the Grading tab's Needs-attention box, flagged list and
+   Settings panel; the matrix's row ⚑; the student page (mockups 1 and 6) */
+.gr-attention { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 18px; padding: 12px 18px; margin: 0 0 22px; background: var(--mm-lav-soft); border: 1px solid var(--mm-lav-line); font-size: var(--mm-fs-small); }
+.gr-attention-title { font-family: var(--mm-font-serif); font-size: 17px; color: var(--mm-accent); margin-right: 6px; }
+.gr-attention-all { margin-left: auto; }
+.gr-flagged { margin-top: 34px; }
+.gr-flagchips { display: flex; flex-wrap: wrap; gap: 6px; }
+.gr-flagchip { cursor: help; white-space: nowrap; }
+.mm-head .gr-flagchips { margin-top: 10px; }
+.gr-rowflag { text-decoration: none; margin-left: 4px; }
+.gr-pagelink { margin-left: 4px; font-size: var(--mm-fs-meta); color: var(--mm-ink-3); text-decoration: none; }
+.gr-matrix td.name a.gr-pagelink { color: var(--mm-ink-3); }
+.gr-matrix td.name a.gr-pagelink:hover, .gr-pagelink:hover { color: var(--mm-accent); }
+.gr-matrix td.name a.gr-rowflag { color: var(--mm-danger); }
+.gr-settings { background: var(--mm-surface); border: 1px solid var(--mm-line); padding: 16px 20px; margin: 0 0 22px; }
+.gr-settings-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 12px 24px; margin: 0 0 14px; }
+.gr-settings-input { display: flex; align-items: center; gap: 8px; }
+.gr-settings-actions { display: flex; align-items: center; gap: 12px; }
+.sg-columns { display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 34px; align-items: start; }
+.sg-section { margin-top: 28px; }
+.sg-history { list-style: none; margin: 0; padding: 0; border-top: 1px solid var(--mm-line); font-size: var(--mm-fs-small); }
+.sg-history li { display: flex; flex-wrap: wrap; gap: 4px 12px; padding: 6px 0; border-bottom: 1px solid var(--mm-line); }
+.sg-history .date { font-family: var(--mm-font-mono); font-size: var(--mm-fs-meta); color: var(--mm-ink-3); }
+.sg-notelist { list-style: none; margin: 12px 0 0; padding: 0; border-top: 1px solid var(--mm-line-2); }
+.sg-notelist li { padding: 10px 0; border-bottom: 1px solid var(--mm-line); }
+.sg-note-meta { font-size: var(--mm-fs-meta); color: var(--mm-ink-3); margin-bottom: 3px; }
+.sg-note-body { font-size: var(--mm-fs-small); white-space: pre-line; overflow-wrap: anywhere; }
+.sg-note-add { margin-top: 16px; }
+.sg-note-add textarea { width: 100%; max-width: none; }
+.sg-note-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; align-items: center; gap: 8px 12px; margin-top: 8px; }
 @media (max-width: 760px) {
   .gr-queue { grid-template-columns: minmax(0, 1fr); gap: 18px; }
+  .sg-columns { grid-template-columns: minmax(0, 1fr); gap: 22px; }
   .gr-gradebar { grid-template-columns: minmax(0, 1fr); }
   .gr-sidelist { max-height: 40vh; }
 }

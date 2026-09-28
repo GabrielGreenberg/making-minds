@@ -15,6 +15,10 @@
 //   · No circuits, answers, cases, notes or emails: a row is identity (an
 //     opaque key), attempt meta, points per problem and the grade. One
 //     attempt in full is `buildAttemptDetail`, on demand.
+//   · Flags (task 2026-09-26-070, storage/gradingFlags.ts): with thresholds
+//     the builder asks `assignmentFlags` for every roster row's prompts (the
+//     open answers' fingerprints it compares are computed here and never
+//     shipped); `buildCourseGrading` adds the course-wide ones.
 //   · The hand-grading queue's feed (task 066, `buildQuestionResponses`): one
 //     problem across every submitter — the answer itself (text or blanks; a
 //     machine only by reference), its points and grade, and who is grading
@@ -25,15 +29,18 @@
 
 import type {
   AssignmentData,
+  GradeChangeEvent,
   GradeEvent,
   HumanGrade,
   IntegrityFlagCode,
   LateExtension,
   LateWaiver,
   Points,
+  StudentNote,
   SubmissionRecord,
 } from '../types';
 import { questionTask } from '../types';
+import { assignmentFlags, courseFlags, type FlaggedStudent, type FlagThresholds, type StudentFlag } from './gradingFlags';
 import {
   answerKey,
   scoreRecord,
@@ -104,6 +111,12 @@ export interface GradingRow {
   /** Late points waived for them on it (the points only; the note and who
    *  gave it are the attempt detail's). */
   waived?: number;
+  /** The classmates their counting attempt lists as its group (task 062),
+   *  by `GradingIdentity.key`; absent when none. */
+  group?: string[];
+  /** This assignment's flags on them (task 070; roster rows only, and only
+   *  from a builder given thresholds); absent when none. */
+  flags?: StudentFlag[];
   /** null = never submitted. */
   latest: GradingAttemptMeta | null;
   /** Empty when never submitted. */
@@ -174,19 +187,51 @@ export interface CourseGrading {
     /** Stale autogrades across assignments. */
     staleResults: number;
   };
+  /** The roster students with flags (task 070), over published assignments. */
+  flagged: FlaggedStudent[];
+  /** The thresholds they were raised under (the Settings panel's values). */
+  thresholds: FlagThresholds;
 }
 
-/** GET /api/students/:sid — one student across assignments. */
+/** A grade-log entry on the student page: which assignment, and the event
+ *  without its `student` (the page is theirs; no address rides along). */
+export interface StudentHistoryEntry {
+  assignmentId: string;
+  title: string;
+  event: Omit<GradeChangeEvent, 'student'> | Omit<Extract<GradeEvent, { kind: 'regrade' }>, 'student'>;
+}
+
+/** The mean of the counted sets so far (task 070; the 071 export reuses it). */
+export interface CountedAverage {
+  /** null = no counted set is due yet. */
+  value: number | null;
+  sets: number;
+  /** Some grade in it is still provisional. */
+  provisional: boolean;
+}
+
+/** GET /api/students/:sid — one student across assignments (task 070: the
+ *  memo's §6.5 student page). Instructor-only; nothing student-facing reads
+ *  the notes. */
 export interface StudentGrading {
   student: GradingIdentity;
   assignments: {
     assignmentId: string;
     title: string;
     dueDate?: string;
+    /** As the summary's: false = not counted. */
+    countsTowardGrade?: boolean;
     released: boolean;
     questionIds: number[];
     row: GradingRow;
   }[];
+  /** Their active flags, as the Grading tab's list holds them. */
+  flags: StudentFlag[];
+  average: CountedAverage;
+  /** The private notes log, newest first. */
+  notes: StudentNote[];
+  /** Grade changes, extensions, waivers and re-grades, newest first. */
+  history: StudentHistoryEntry[];
 }
 
 /** GET /api/assignments/:id/submissions/:sid/:attempt — one attempt in full:
@@ -261,12 +306,15 @@ function scoredRow(
   record: SubmissionRecord | undefined,
   now: number,
   late: LateContext | undefined,
+  groupKey: (raw: string) => string | null,
 ): { row: GradingRow; hand: { x: number; y: number } } {
   const due = dueFor(assignment, student, late);
   const mine = late?.byStudent.get(student.key);
+  const group = (record?.submission.group ?? []).map(groupKey).filter((k): k is string => !!k);
   const adjusted = {
     ...(mine?.extension ? { extendedTo: mine.extension.dueDate } : {}),
     ...(mine?.waiver ? { waived: mine.waiver.points } : {}),
+    ...(group.length ? { group } : {}),
   };
   if (!record) {
     const s = scoreSubmission({ questions: assignment.questions, latest: null, due, now });
@@ -295,10 +343,20 @@ function scoredRow(
   };
 }
 
+/** An open answer as identical-text compares it: trimmed, whitespace
+ *  collapsed, lower-cased, fingerprinted — null below `minChars`. */
+function openTextFingerprint(text: string | undefined, minChars: number): string | null {
+  const norm = (text ?? '').trim().replace(/\s+/g, ' ').toLowerCase();
+  return norm.length >= minChars ? answerFingerprint(norm) : null;
+}
+
 /**
  * One assignment's summary. `latest` holds each submitter's counting attempt,
  * carrying `studentKey` and its human grades (`grades`); a key not on the
- * roster is named by `identify` (which sets `offRoster`).
+ * roster is named by `identify` (which sets `offRoster`). With `thresholds`,
+ * every roster row carries its flags (gradingFlags.ts); `groupKey` turns a
+ * submission's group listing (`Classmate.key`s) into identity keys — omitted
+ * where they already agree (the server's public_id), null = nobody known.
  */
 export function buildAssignmentSummary(input: {
   assignment: AssignmentData;
@@ -308,6 +366,8 @@ export function buildAssignmentSummary(input: {
   released: boolean;
   now: number;
   late?: LateContext;
+  thresholds?: FlagThresholds;
+  groupKey?: (raw: string) => string | null;
 }): AssignmentGradingSummary {
   const { assignment, now } = input;
   const hash = homeworkContentHash(assignment);
@@ -318,12 +378,38 @@ export function buildAssignmentSummary(input: {
     if (!prev || r.attempt > prev.attempt) byKey.set(key, r);
   }
   const rostered = new Set(input.roster.map((s) => s.key));
-  const rosterRows = [...input.roster].sort(byName).map((s) => scoredRow(assignment, hash, s, byKey.get(s.key), now, input.late));
+  const groupKey = input.groupKey ?? ((raw: string) => raw);
+  const rosterRows = [...input.roster].sort(byName).map((s) => scoredRow(assignment, hash, s, byKey.get(s.key), now, input.late, groupKey));
   const offRows = [...byKey.keys()]
     .filter((k) => !rostered.has(k))
     .map((k) => input.identify(k))
     .sort(byName)
-    .map((s) => scoredRow(assignment, hash, s, byKey.get(s.key), now, input.late).row);
+    .map((s) => scoredRow(assignment, hash, s, byKey.get(s.key), now, input.late, groupKey).row);
+  if (input.thresholds) {
+    const openIds = assignment.questions.filter((q) => questionTask(q) === 'open').map((q) => q.id);
+    const openText = new Map<string, Map<number, string>>();
+    for (const s of input.roster) {
+      const record = byKey.get(s.key);
+      const mine = new Map<number, string>();
+      for (const qid of openIds) {
+        const fp = openTextFingerprint(record?.submission.answers.find((a) => a.questionId === qid)?.responseText, input.thresholds.identicalTextMinChars);
+        if (fp) mine.set(qid, fp);
+      }
+      if (mine.size) openText.set(s.key, mine);
+    }
+    const flags = assignmentFlags({
+      assignmentId: assignment.id,
+      dueDate: assignment.dueDate,
+      rows: rosterRows.map((r) => r.row),
+      openText,
+      thresholds: input.thresholds,
+      now,
+    });
+    for (const { row } of rosterRows) {
+      const mine = flags.get(row.student.key);
+      if (mine?.length) row.flags = mine;
+    }
+  }
 
   const progress: GradingProgress = {
     roster: rosterRows.length,
@@ -367,10 +453,14 @@ export function buildAssignmentSummary(input: {
 }
 
 /** The Grading tab: every assignment (in the catalog's order) with its
- *  progress, and the course-wide counts. */
+ *  progress, the course-wide counts, and the flagged roster students (the
+ *  summaries built with the same `thresholds`; `calendar` dates "no account"). */
 export function buildCourseGrading(input: {
   roster: readonly GradingIdentity[];
   assignments: readonly { summary: AssignmentGradingSummary; order?: number; visible: boolean }[];
+  thresholds: FlagThresholds;
+  calendar?: CourseCalendar;
+  now: number;
 }): CourseGrading {
   const rows = sortAssignments(
     input.assignments.map(({ summary, order, visible }): CourseAssignmentRow => ({
@@ -398,40 +488,109 @@ export function buildCourseGrading(input: {
       pendingHandGrading: rows.reduce((n, a) => n + a.progress.handGraded.y - a.progress.handGraded.x, 0),
       staleResults: rows.reduce((n, a) => n + a.progress.autograded.stale, 0),
     },
+    flagged: courseFlags({
+      roster: input.roster,
+      summaries: input.assignments,
+      thresholds: input.thresholds,
+      ...(input.calendar ? { calendar: input.calendar } : {}),
+      now: input.now,
+    }),
+    thresholds: input.thresholds,
   };
 }
 
-/** One student across assignments (in the catalog's order): the same row
- *  the assignment's summary holds for them. */
+/**
+ * The mean final grade over the counted sets whose effective due date has
+ * passed (a missing one counts as its 0; one not yet due is left out, even
+ * if submitted). The caller passes only published sets. The student page's line and the export's column (071).
+ */
+export function countedAverage(
+  rows: readonly { countsTowardGrade?: boolean; dueDate?: string; row: GradingRow }[],
+  now: number,
+): CountedAverage {
+  const finals: number[] = [];
+  let provisional = false;
+  for (const { countsTowardGrade, dueDate, row } of rows) {
+    const at = row.extendedTo ?? dueDate;
+    if (countsTowardGrade === false || !at || !(Date.parse(at) < now) || row.grade.final === null) continue;
+    finals.push(row.grade.final);
+    if (row.grade.provisional) provisional = true;
+  }
+  return {
+    value: finals.length ? round1(finals.reduce((n, f) => n + f, 0) / finals.length) : null,
+    sets: finals.length,
+    provisional,
+  };
+}
+
+/**
+ * One student across assignments (in the catalog's order). Each row is the
+ * one the assignment's FULL summary holds for them (`summary`, when the
+ * adapter built it — so the row's flags see the whole class), else a
+ * one-student build (never given thresholds: with no classmates a group or
+ * identical-text rule would misfire). `flags` are courseFlags' for them (the
+ * adapter's, over the full summaries); `events` each assignment's log already
+ * filtered to them; `notes` their private notes log.
+ */
 export function buildStudentGrading(input: {
   student: GradingIdentity;
-  assignments: readonly { assignment: AssignmentData; released: boolean; latest: SubmissionRecord | null; late?: LateContext }[];
+  assignments: readonly {
+    assignment: AssignmentData;
+    released: boolean;
+    /** false = hidden from students: listed, but left out of the average
+     *  (as every flag leaves it out). Absent = shown. */
+    visible?: boolean;
+    latest: SubmissionRecord | null;
+    late?: LateContext;
+    summary?: AssignmentGradingSummary;
+    events?: readonly GradeEvent[];
+  }[];
+  flags?: readonly StudentFlag[];
+  notes?: readonly StudentNote[];
   now: number;
 }): StudentGrading {
   const { student } = input;
+  const ordered = sortAssignments(input.assignments.map((a) => ({ ...a, title: a.assignment.title, order: a.assignment.order })));
+  const assignments = ordered.map(({ assignment, released, latest, late, summary: full }) => {
+    const row =
+      full?.rows.find((r) => r.student.key === student.key) ??
+      buildAssignmentSummary({
+        assignment,
+        roster: [student],
+        latest: latest ? [{ ...latest, studentKey: student.key }] : [],
+        identify: () => student,
+        released,
+        now: input.now,
+        late,
+      }).rows[0];
+    return {
+      assignmentId: assignment.id,
+      title: assignment.title,
+      ...(assignment.dueDate ? { dueDate: assignment.dueDate } : {}),
+      ...(assignment.countsTowardGrade !== undefined ? { countsTowardGrade: assignment.countsTowardGrade } : {}),
+      released,
+      questionIds: assignment.questions.map((q) => q.id),
+      row,
+    };
+  });
+  const history: StudentHistoryEntry[] = ordered.flatMap(({ assignment, events }) =>
+    (events ?? []).map((e) => {
+      const { student: _who, ...event } = e;
+      return { assignmentId: assignment.id, title: assignment.title, event };
+    }),
+  );
+  history.sort((a, b) => (a.event.at < b.event.at ? 1 : a.event.at > b.event.at ? -1 : 0));
   return {
     student,
-    assignments: sortAssignments(input.assignments.map((a) => ({ ...a, title: a.assignment.title, order: a.assignment.order }))).map(
-      ({ assignment, released, latest, late }) => {
-        const summary = buildAssignmentSummary({
-          assignment,
-          roster: [student],
-          latest: latest ? [{ ...latest, studentKey: student.key }] : [],
-          identify: () => student,
-          released,
-          now: input.now,
-          late,
-        });
-        return {
-          assignmentId: assignment.id,
-          title: assignment.title,
-          ...(assignment.dueDate ? { dueDate: assignment.dueDate } : {}),
-          released,
-          questionIds: summary.questionIds,
-          row: summary.rows[0],
-        };
-      },
+    assignments,
+    flags: [...(input.flags ?? [])],
+    // A hidden set is work students were never shown: it never counts.
+    average: countedAverage(
+      assignments.filter((_, i) => ordered[i]!.visible !== false),
+      input.now,
     ),
+    notes: [...(input.notes ?? [])].sort((a, b) => (a.at < b.at ? 1 : a.at > b.at ? -1 : b.id - a.id)),
+    history,
   };
 }
 

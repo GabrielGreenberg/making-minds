@@ -37,9 +37,15 @@
 //                  sizes), snapshotted ONCE, on the
 //                  boot that creates the table; the integrity check reads it
 //                  as "legacy", not unbound
-//   course_settings — course-level data as JSON by key; today `calendar`,
-//                  the class meetings the late policy counts, written by the
-//                  release's homework sync from the repo (task 068)
+//   course_settings — course-level data as JSON by key: `calendar`, the
+//                  class meetings the late policy counts, written by the
+//                  release's homework sync from the repo (task 068); and
+//                  `flagThresholds`, the flag rules' thresholds (task 070)
+//   student_notes — instructors' private notes on a student (task 070):
+//                  dated, append-only — this module adds and lists, never
+//                  updates or deletes — and no student route reads them.
+//                  Each is also logged in grade_events (a `note` event under
+//                  the course-wide id, COURSE_LOG_ID; memo §9)
 //   extensions / late_waivers — one student's own due date / late points
 //                  waived on one assignment (task 068); every change logged
 //                  in grade_events. An extension has no reason column, by
@@ -59,14 +65,17 @@ import type {
   InstructorNote,
   PlatformFeedback,
   GradeEvent,
+  NoteEvent,
   HumanGrade,
   LateExtension,
   LateWaiver,
+  StudentNote,
   SubmissionData,
   SubmissionIntegrity,
   SubmissionRecord,
   SubmissionResult,
 } from '../../app/src/types';
+import { COURSE_LOG_ID } from '../../app/src/types';
 import type { Role } from '../../app/src/auth/accounts';
 import { normalizeEmail, normalizeUid } from './roster';
 import { idsOfWorkbook } from '../../app/src/provenance/ids';
@@ -96,6 +105,8 @@ export interface UserRow {
 /** A roster row plus its account state — the instructor's roster view.
  *  Instructor-only: `section` never reaches a student (getUser omits it). */
 export interface RosterRow extends UserRow {
+  /** A student's opaque key (`public_id`) — the student page's path (task 070). */
+  key?: string;
   studentId: string;
   section: string | null;
   registered: boolean;
@@ -306,6 +317,15 @@ export class Db {
         waived_at     TEXT NOT NULL,
         PRIMARY KEY (assignment_id, email)
       );
+      -- Private notes on a student (task 070): append-only, instructors only.
+      CREATE TABLE IF NOT EXISTS student_notes (
+        id     INTEGER PRIMARY KEY AUTOINCREMENT,
+        email  TEXT NOT NULL,
+        body   TEXT NOT NULL,
+        author TEXT NOT NULL,
+        at     TEXT NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS idx_student_notes ON student_notes (email, id);
       CREATE TABLE IF NOT EXISTS legacy_content (
         email         TEXT NOT NULL,
         assignment_id TEXT NOT NULL,
@@ -642,8 +662,9 @@ export class Db {
       .run(assignmentId, email, questionId);
   }
 
-  /** Append one change to the log — the only write the log ever takes. */
-  addGradeEvent(assignmentId: string, event: GradeEvent): void {
+  /** Append one change to the log — the only write the log ever takes. A
+   *  `note` goes under COURSE_LOG_ID, which is no assignment's id. */
+  addGradeEvent(assignmentId: string, event: GradeEvent | NoteEvent): void {
     this.db
       .prepare('INSERT INTO grade_events (assignment_id, event) VALUES (?, ?)')
       .run(assignmentId, JSON.stringify(event));
@@ -919,10 +940,11 @@ export class Db {
   listUsers(): RosterRow[] {
     const rows = this.db
       .prepare(
-        `SELECT email, name, role, student_id, uid, section, password_hash, registered_at
+        `SELECT email, name, role, student_id, uid, section, password_hash, registered_at, public_id
          FROM users ORDER BY role DESC, COALESCE(sort_name, name) COLLATE NOCASE`,
       )
       .all() as unknown as {
+      public_id: string | null;
       email: string;
       name: string;
       role: Role;
@@ -938,6 +960,7 @@ export class Db {
       .all() as unknown as { email: string; user_email: string }[];
     for (const a of aliasRows) aliases.set(a.user_email, [...(aliases.get(a.user_email) ?? []), a.email]);
     return rows.map((r) => ({
+      ...(r.role === 'student' && r.public_id ? { key: r.public_id } : {}),
       email: r.email,
       name: r.name,
       role: r.role,
@@ -1163,6 +1186,35 @@ export class Db {
       .prepare('UPDATE feedback SET triage = ? WHERE id = ?')
       .run(triage ? JSON.stringify(triage) : null, id);
     return result.changes > 0;
+  }
+
+  // ── private notes on a student (task 070) ──────────────────────
+  // Append-only: add and list, nothing else — no update or delete path.
+
+  addStudentNote(email: string, body: string, author: string): StudentNote {
+    const at = new Date().toISOString();
+    this.db.exec('BEGIN');
+    try {
+      const result = this.db
+        .prepare('INSERT INTO student_notes (email, body, author, at) VALUES (?, ?, ?, ?)')
+        .run(email, body, author, at);
+      const id = Number(result.lastInsertRowid);
+      // Every private note is logged (memo §9), course-wide: no assignment's.
+      const event: NoteEvent = { at, actor: author, student: email, kind: 'note', before: null, after: { noteId: id } };
+      this.addGradeEvent(COURSE_LOG_ID, event);
+      this.db.exec('COMMIT');
+      return { id, body, author, at };
+    } catch (e) {
+      this.db.exec('ROLLBACK');
+      throw e;
+    }
+  }
+
+  /** One student's notes, oldest first. */
+  listStudentNotes(email: string): StudentNote[] {
+    return this.db
+      .prepare('SELECT id, body, author, at FROM student_notes WHERE email = ? ORDER BY id')
+      .all(email) as unknown as StudentNote[];
   }
 
   // ── instructor notes ───────────────────────────────────────────

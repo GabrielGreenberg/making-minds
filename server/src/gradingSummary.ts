@@ -9,10 +9,14 @@
 // server's secret and their address ('x' + 12 url-safe characters — a
 // public_id is 12, so the two never collide), stable and opaque, so no email
 // ever reaches a path or a row.
+//
+// Flags (task 070): every summary is built under the course's thresholds
+// (course_settings.flagThresholds, normalized), so its rows carry their
+// flags; the student page adds course-wide ones, their notes and log.
 
 import { createHash } from 'node:crypto';
 import type { Db, GradingUserRow } from './db';
-import type { LateExtension, LateWaiver, SubmissionRecord } from '../../app/src/types';
+import type { GradeEvent, LateExtension, LateWaiver, StudentNote, SubmissionRecord } from '../../app/src/types';
 import {
   buildAssignmentSummary,
   buildAttemptDetail,
@@ -29,6 +33,12 @@ import {
 } from '../../app/src/storage/gradingSummary';
 import type { ClaimBook } from '../../app/src/storage/gradingClaims';
 import { planRegrade, type RegradePlan, type RegradeWrite } from '../../app/src/storage/regrade';
+import { courseFlags, normalizeThresholds, type FlagThresholds } from '../../app/src/storage/gradingFlags';
+
+/** The course's flag thresholds: what an instructor stored, defaults filled. */
+export function flagThresholds(db: Db): FlagThresholds {
+  return normalizeThresholds(db.getCourseSetting('flagThresholds'));
+}
 
 function derivedKey(secret: string, email: string): string {
   return 'x' + createHash('sha256').update(`${secret}\0grading\0${email}`).digest('base64url').slice(0, 12);
@@ -59,6 +69,11 @@ class Directory {
       hasAccount: u.hasAccount,
       ...(u.role === 'instructor' ? { offRoster: 'instructor' as const } : {}),
     };
+  }
+
+  /** An account's display name (a note's author); undefined for none. */
+  nameOf(email: string): string | undefined {
+    return this.byEmail.get(email)?.name;
   }
 
   /** The identity an attempt filed under this address belongs to. */
@@ -111,10 +126,11 @@ function lateContext(db: Db, dir: Directory, assignmentId: string): LateContext 
   return { ...(calendar ? { calendar } : {}), byStudent };
 }
 
-function summaryWith(db: Db, dir: Directory, id: string, now: number): AssignmentGradingSummary | null {
+function summaryWith(db: Db, dir: Directory, id: string, now: number, thresholds: FlagThresholds): AssignmentGradingSummary | null {
   const assignment = db.getAssignment(id);
   if (!assignment) return null;
   const { latest, identities } = latestRecords(db, dir, id);
+  // Group listings are public_ids — the identity keys already (no groupKey).
   return buildAssignmentSummary({
     assignment,
     roster: dir.roster,
@@ -123,6 +139,7 @@ function summaryWith(db: Db, dir: Directory, id: string, now: number): Assignmen
     released: db.getGradesReleased(id),
     now,
     late: lateContext(db, dir, id),
+    thresholds,
   });
 }
 
@@ -136,21 +153,31 @@ export function studentEmailOf(db: Db, secret: string, key: string): string | nu
 
 /** GET /api/assignments/:id/summary; null = no such assignment. */
 export function assignmentSummary(db: Db, secret: string, id: string, now: number): AssignmentGradingSummary | null {
-  return summaryWith(db, new Directory(db, secret), id, now);
+  return summaryWith(db, new Directory(db, secret), id, now, flagThresholds(db));
 }
 
 /** GET /api/grading. */
 export function courseGrading(db: Db, secret: string, now: number): CourseGrading {
   const dir = new Directory(db, secret);
-  const visible = db.listVisible();
+  const thresholds = flagThresholds(db);
+  const calendar = db.courseCalendar();
   return buildCourseGrading({
     roster: dir.roster,
-    assignments: db.listAssignments().map((a) => ({
-      summary: summaryWith(db, dir, a.id, now)!,
-      ...(a.order !== undefined ? { order: a.order } : {}),
-      visible: visible.get(a.id) ?? false,
-    })),
+    assignments: allSummaries(db, dir, now, thresholds),
+    thresholds,
+    ...(calendar ? { calendar } : {}),
+    now,
   });
+}
+
+/** Every assignment's full summary, with its place and visibility. */
+function allSummaries(db: Db, dir: Directory, now: number, thresholds: FlagThresholds) {
+  const visible = db.listVisible();
+  return db.listAssignments().map((a) => ({
+    summary: summaryWith(db, dir, a.id, now, thresholds)!,
+    ...(a.order !== undefined ? { order: a.order } : {}),
+    visible: visible.get(a.id) ?? false,
+  }));
 }
 
 /** GET /api/students/:sid; null = no student by that key. */
@@ -160,19 +187,47 @@ export function studentGrading(db: Db, secret: string, key: string, now: number)
   if (!email) return null;
   const student = dir.identityOf(email);
   const released = db.listGradesReleased();
+  const thresholds = flagThresholds(db);
+  const calendar = db.courseCalendar();
+  // The full summaries once: the rows (and their flags) see the whole class.
+  const summaries = allSummaries(db, dir, now, thresholds);
+  const byId = new Map(summaries.map((s) => [s.summary.assignmentId, s.summary]));
+  const visible = db.listVisible();
+  const flagged = courseFlags({ roster: dir.roster, summaries, thresholds, ...(calendar ? { calendar } : {}), now });
+  const notes: StudentNote[] = db.listStudentNotes(email).map((n) => {
+    const authorName = dir.nameOf(n.author);
+    return { ...n, ...(authorName ? { authorName } : {}) };
+  });
   return buildStudentGrading({
     student,
     assignments: db.listAssignments().map((assignment) => {
       const { latest } = latestRecords(db, dir, assignment.id, email);
+      const events: GradeEvent[] = db.listGradeEvents(assignment.id).filter((e) => e.student === email);
       return {
         assignment,
         released: released.get(assignment.id) ?? false,
+        visible: visible.get(assignment.id) ?? false,
         latest: latest[0] ?? null,
         late: lateContext(db, dir, assignment.id),
+        summary: byId.get(assignment.id),
+        events,
       };
     }),
+    flags: flagged.find((f) => f.student.key === student.key)?.flags ?? [],
+    notes,
     now,
   });
+}
+
+/** POST /api/students/:sid/notes — append one note under the author's
+ *  address; null = no student by that key. */
+export function addStudentNote(db: Db, secret: string, key: string, body: string, author: string): StudentNote | null {
+  const dir = new Directory(db, secret);
+  const email = dir.emailOf(key);
+  if (!email) return null;
+  const note = db.addStudentNote(email, body, author);
+  const authorName = dir.nameOf(author);
+  return { ...note, ...(authorName ? { authorName } : {}) };
 }
 
 /** GET /api/assignments/:id/submissions/:sid/:attempt; null = no such
