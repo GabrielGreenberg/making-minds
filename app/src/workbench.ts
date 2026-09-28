@@ -138,7 +138,7 @@ export function assignmentShortName(title: string): string | null {
 }
 
 /** The link that opens a section's notes, named by what is behind it: the
- *  one callout's own title ("Challenge problem (optional, not collected)"),
+ *  one callout's own title ("Challenge problem (optional)"),
  *  else its kind ("Hint for this section"); a lone figure is a figure;
  *  several things are counted. Null when the section has none. */
 export function sectionNotesLabel(section: Pick<ResolvedSection, 'callouts' | 'figures'>): string | null {

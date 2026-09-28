@@ -50,7 +50,7 @@
         {
           "kind": "challenge",
           "body": "Define a function which maps strings of 1’s and 0’s of *arbitrary length* to their numerical values. This is the general problem of semantics for binary.",
-          "title": "Challenge problem (optional, not collected)"
+          "title": "Challenge problem (optional)"
         }
       ]
     },
@@ -447,14 +447,14 @@
     {
       "id": 6,
       "label": "Problem 6a",
-      "statement": "Consider the function *m*(⋅) defined by the following **equation**: for any integers *x*, *y*, and *z*: *m*(*x*, *y*, *z*) = 3 + (*x* • *y* • *z*)\n\nDescribe the function with an English sentence using each of the terms “argument”, “value”, “apply”, and “return” correctly.",
+      "statement": "Consider the function *m*(⋅) defined by the following **equation**: for any integers *x*, *y*, and *z*: *m*(*x*, *y*, *z*) = 3 + (*x* • *y* • *z*)\n\nDefine the function in English, with no mathematical symbolism, using the terms “function”, “argument”, “value”, “apply”, and “return” correctly.",
       "buildMode": "open",
       "representation": "binary"
     },
     {
       "id": 18,
       "label": "Problem 6b",
-      "statement": "Describe the function *m*(⋅) from 6a with another English sentence, using the phrase “maps ... to”.",
+      "statement": "Describe the function *m*(⋅) from 6a with another English sentence using the phrase “maps ... to”.",
       "buildMode": "open",
       "representation": "binary"
     },
@@ -484,7 +484,7 @@
     {
       "id": 8,
       "label": "Problem 8",
-      "statement": "This is a problem about **function composition**. Let *s*(⋅) be the **successor function**. Let *a*(⋅) be the **addition function**. Suppose that *p*(⋅) is a 2-place function composed of successor functions and addition functions. Given only that *p*(1, 2) = 5, provide two possible definitions of *p*(⋅).\n\nYour two definitions should define *different* functions: functions that agree on the arguments (1, 2) but disagree on some other arguments.",
+      "statement": "This is a problem about **function composition**. Let *s*(⋅) be the 1-place **successor function**. Let *a*(⋅) be the 2-place **addition function**. Suppose that *p*(⋅) is a 2-place function composed of successor functions and addition functions. Given that *p*(1, 2) = 5, provide two possible definitions of *p*(⋅). Your two definitions should define different functions: functions that agree on the arguments (1, 2) but disagree on some other arguments.",
       "buildMode": "open",
       "representation": "binary"
     },
@@ -530,21 +530,21 @@
     {
       "id": 10,
       "label": "Problem 10a",
-      "statement": "The **Boolean numbers** are 0 and 1, where 0 and 1 are considered to be the “opposites” of one another. A **Boolean function** is a function which has only Boolean numbers as arguments and values.\n\nUsing one equation, define a Boolean function which maps any Boolean number to its opposite.",
+      "statement": "The **Boolean numbers** are 0 and 1. A **Boolean function** is a function which has only Boolean numbers as arguments and values.\n\nUsing an equation, define a 1-place Boolean function which maps 1’s to 0’s, and 0’s to 1’s.",
       "buildMode": "open",
       "representation": "binary"
     },
     {
       "id": 21,
       "label": "Problem 10b",
-      "statement": "Provide two different definitions of the Boolean function which maps any Boolean number to itself. This is called the **identity function**.\n\nThe two definitions should be written differently but define the same function. A table counts as a definition.",
+      "statement": "Using an equation, define a 1-place Boolean function which maps any Boolean number to itself. This is called the **identity function**.",
       "buildMode": "open",
       "representation": "binary"
     },
     {
       "id": 22,
       "label": "Problem 10c",
-      "statement": "Provide two different definitions of the Boolean function which maps any Boolean number to the number one. This is called a **constant function**.\n\nAs in 10b, the two definitions should be written differently but define the same function.",
+      "statement": "Using an equation, define a 1-place Boolean function which maps any Boolean number to the number one. This is called a **constant function**.",
       "buildMode": "open",
       "representation": "binary"
     },
@@ -627,7 +627,7 @@
     {
       "id": 14,
       "label": "Problem 14",
-      "statement": "Define a function *f* which maps the symbol “@” to the number zero and the symbol “#” to the number one, by giving its table: the value of *f* for each symbol.",
+      "statement": "Define a function *f* which maps the symbol “@” to the number zero and the symbol “#” to the number one. Use a table or an equation.\n\nIn the boxes, give the value of *f* for each symbol.",
       "buildMode": "open",
       "representation": "binary",
       "fill_in": {
@@ -645,7 +645,7 @@
     {
       "id": 15,
       "label": "Problem 15",
-      "statement": "Suppose we use the symbols in Problem 14 to form a base-2 counting system. Let’s call these symbols “marks”: a mark is either @ or #. Using an equation, define a 3-place function *g* which takes any three marks in a row and maps them onto the numerical value of that string of marks in that base-2 system. You will have to use the function in Problem 14 as part of the definition.\n\nSo, for example, your function should predict that *g*(@, @, #) = one, *g*(@, #, @) = two, and so on…\n\nYour answer should take the form: “for any series of three marks *x*, *y*, *z*: *g*(*x*, *y*, *z*) = …”",
+      "statement": "Suppose we use the symbols in Problem 14 to form a base-2 counting system. Let’s call these symbols “marks”. A mark is either @ or #. Using an equation, define a 3-place function *g* which takes any three marks in a row and maps them onto the numerical value of that string of marks in that base-2 system. You will have to use the function in Problem 14 as part of the definition.\n\nSo, for example, your function should predict that *g*(@, @, #) = one, *g*(@, #, @) = two, and so on…\n\nYour answer should take the form: “for any series of three marks *x*, *y*, *z*: *g*(*x*, *y*, *z*) = …”",
       "callouts": [
         {
           "kind": "hint",
@@ -658,7 +658,7 @@
     {
       "id": 16,
       "label": "Problem 16",
-      "statement": "Let *tal*(⋅) be a function which maps strings of tally 1’s and 0’s to their numerical values. For example, *tal*(0)=zero, *tal*(1)=one, *tal*(00)=zero, *tal*(01)=one, *tal*(11)=two, and so on.\n\nConsider a machine *M* which, on any one occasion, takes as input a single atomic symbol *I*, and produces two atomic symbols as output, *O*₁ and *O*₂, such that, in any context, *successor*(*tal*(*I*)) = *tal*(*O*₁*O*₂). Design a combinatorial circuit for machine *M*, with the schematic form shown below. On the canvas, *I* is IN1, *O*₁ is OUT1 and *O*₂ is OUT2.",
+      "statement": "Let *tal*(⋅) be a function which maps strings of tally 1’s and 0’s to their numerical values. For example, *tal*(0)=zero, *tal*(1)=one, *tal*(00)=zero, *tal*(01)=one, *tal*(11)=two, and so on.\n\nConsider a machine *M* which takes as input a single atomic symbol *I*, and produces two-place symbol *O*₁*O*₂ as output (in the form of two atomic symbols *O*₁ and *O*₂), such that, for any input, *successor*(*tal*(*I*)) = *tal*(*O*₁*O*₂). For example, 1 → *M* → 11. Design a combinatorial circuit for machine *M*, with the schematic form below. On the canvas, *I* is IN1, *O*₁ is OUT1 and *O*₂ is OUT2.",
       "buildMode": "CC",
       "representation": "tally",
       "cc_spec": {
@@ -706,7 +706,7 @@
     {
       "id": 17,
       "label": "Problem 17",
-      "statement": "Let *bin*(⋅) be a function which maps strings of binary 1’s and 0’s to their numerical values. For example, *bin*(0)=zero, *bin*(1)=one, *bin*(00)=zero, *bin*(01)=one, *bin*(10)=two, *bin*(11)=three, and so on.\n\nConsider a machine *N* which, on any one occasion, takes as input a single atomic symbol *I*, and produces two atomic symbols as output, *O*₁ and *O*₂, such that, in any context, *successor*(*bin*(*I*)) = *bin*(*O*₁*O*₂). Design a combinatorial circuit for machine *N*, with the same schematic form. On the canvas, *I* is IN1, *O*₁ is OUT1 and *O*₂ is OUT2.",
+      "statement": "Let *bin*(⋅) be a function which maps strings of binary 1’s and 0’s to their numerical values. For example, *bin*(0)=zero, *bin*(1)=one, *bin*(00)=zero, *bin*(01)=one, *bin*(10)=two, *bin*(11)=three, and so on.\n\nConsider a machine *N* which takes as input a single atomic symbol *I*, and produces two-place symbol *O*₁*O*₂ as output (in the form of two atomic symbols *O*₁ and *O*₂), such that, for any input, *successor*(*bin*(*I*)) = *bin*(*O*₁*O*₂). For example, 1 → *N* → 10. Design a combinatorial circuit for machine *N*, with the schematic form below. On the canvas, *I* is IN1, *O*₁ is OUT1 and *O*₂ is OUT2.",
       "buildMode": "CC",
       "representation": "binary",
       "cc_spec": {
