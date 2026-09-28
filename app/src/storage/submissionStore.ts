@@ -41,6 +41,7 @@ import {
   type LateWritePlan,
 } from './gradeWrites';
 import { EXTENSIONS_PREFIX, WAIVERS_PREFIX, readExtensions, readWaivers, writeLateRow } from './lateLocal';
+import type { RegradeWrite } from './regrade';
 
 
 /**
@@ -123,6 +124,7 @@ export interface SubmissionStore {
 const KEY_PREFIX = 'mm:sub:';
 const GRADES_PREFIX = 'mm:grades:';
 const GRADE_LOG_PREFIX = 'mm:grade-log:';
+const REGRADE_SNAPSHOT_PREFIX = 'mm:regrade-snapshot:';
 
 /** The local release flag (AssignmentStore's `mm:release:<id>`), read here
  *  without importing the assignment store. */
@@ -272,6 +274,28 @@ class LocalSubmissionStore implements SubmissionStore {
     return plan;
   }
 
+  /**
+   * A committed re-grade's writes (task 069; storage/regrade.ts plans them):
+   * first the snapshot — the assignment's records as they were, copied to
+   * `mm:regrade-snapshot:<id>` (the latest re-grade's; the server keeps
+   * files) — then each written attempt's `result` and `assignmentHash`
+   * replaced in place (the submission, its time and integrity never), and
+   * the `regrade` events appended to the log. Human grades are not touched.
+   * Returns the snapshot's key. Off the seam: LocalGradingStore's.
+   */
+  rewriteResults(id: string, writes: readonly RegradeWrite[], assignmentHash: string, events: GradeEvent[]): string {
+    const raw = localStorage.getItem(KEY_PREFIX + id) ?? '[]';
+    localStorage.setItem(REGRADE_SNAPSHOT_PREFIX + id, raw);
+    const byAttempt = new Map(writes.map((w) => [`${w.studentKey}\0${w.attempt}`, w]));
+    const next = this.read(id).map((r) => {
+      const w = byAttempt.get(`${studentOf(r)}\0${r.attempt}`);
+      return w ? { ...r, result: w.result, assignmentHash } : r;
+    });
+    localStorage.setItem(KEY_PREFIX + id, JSON.stringify(next));
+    this.appendLog(id, events);
+    return REGRADE_SNAPSHOT_PREFIX + id;
+  }
+
   // ── Extensions and waivers (task 068): storage/lateLocal.ts keeps them;
   // gradeWrites.ts plans each write; every one lands in the grade log.
 
@@ -315,6 +339,7 @@ class LocalSubmissionStore implements SubmissionStore {
       localStorage.removeItem(KEY_PREFIX + id);
       localStorage.removeItem(GRADES_PREFIX + id);
       localStorage.removeItem(GRADE_LOG_PREFIX + id);
+      localStorage.removeItem(REGRADE_SNAPSHOT_PREFIX + id);
       localStorage.removeItem(EXTENSIONS_PREFIX + id);
       localStorage.removeItem(WAIVERS_PREFIX + id);
     } catch {

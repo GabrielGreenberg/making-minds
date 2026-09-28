@@ -113,7 +113,7 @@ Updates: `deploy/release.sh` (section 0). By hand, as the `makingminds` user, in
 repo: `git pull && (cd server && npm install) && sudo systemctl restart makingminds-api`
 — npm only ever in `server/` (run at the root, it writes a stray lockfile; task 060).
 
-**Backups** (task 041): the entire state is one SQLite file, copied two ways, each
+**Backups** (task 041): the entire state is one SQLite file, copied three ways, each
 with its own folder and rotation so neither can prune the other's files. Both are
 consistent online copies (`VACUUM INTO` through `node:sqlite`; the box has no
 `sqlite3` CLI) and owner-only, since they hold password hashes.
@@ -122,6 +122,7 @@ consistent online copies (`VACUUM INTO` through `node:sqlite`; the box has no
 | --- | --- | --- | --- |
 | Daily | `/srv/making-minds/backups/daily/daily-YYYY-MM-DD.sqlite` | 35 days | `makingminds-backup.timer`, 03:30 Pacific (`deploy/backup-daily.sh`; integrity-checked before it counts) |
 | Pre-release | `/srv/making-minds/data/backup-YYYY-MM-DD-HHMMSS.sqlite` | the last 7 | `deploy/release.sh`, before each pull |
+| Pre-re-grade | `/srv/making-minds/backups/regrade/regrade-<assignment>-YYYYMMDD-HHMMSS-mmmZ.sqlite` (UTC; `MM_SNAPSHOT_DIR` overrides) | the last 20 | the API server itself, before a committed re-grade rewrites any result (task 069; `server/src/snapshot.ts`) |
 
 The daily job is installed and refreshed by `deploy/backup-install.sh`, which
 every release runs (so the box always carries the repo's version, and a new box

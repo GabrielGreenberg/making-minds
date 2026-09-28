@@ -55,6 +55,7 @@ import type {
   GradeWriteOutcome,
   LateWriteOutcome,
   QuestionResponses,
+  RegradeOutcome,
   StudentGrading,
 } from './gradingStore';
 import type { FeedbackStore } from './feedbackStore';
@@ -84,6 +85,7 @@ import {
   getGradingAttempt,
   getQuestionResponses,
   postGradingClaim,
+  postRegrade,
   putExtension,
   putWaiver,
   submitFeedback,
@@ -266,6 +268,21 @@ class RemoteGradingStore implements GradingStore {
 
   claim(assignmentId: string, studentKey: string, questionId: number, opts?: { release?: boolean }): Promise<ClaimOutcome | null> {
     return this.orNull(() => postGradingClaim({ assignmentId, studentKey, questionId, ...(opts?.release ? { release: true } : {}) }));
+  }
+
+  // The server plans, snapshots and writes (task 069); a 409 — the version
+  // changed since the dry run — carries the fresh plan.
+  regrade(assignmentId: string, opts: { dryRun: boolean; expectHash?: string }): Promise<RegradeOutcome | null> {
+    return this.orNull(async () => {
+      try {
+        return await postRegrade(assignmentId, opts);
+      } catch (err) {
+        if (err instanceof ApiError && err.status === 409 && err.body.plan) {
+          return { plan: err.body.plan as RegradeOutcome['plan'], committed: false, conflict: true };
+        }
+        throw err;
+      }
+    });
   }
 
   // Extensions and waivers (task 068): the server plans (gradeWrites.ts)

@@ -715,7 +715,7 @@ export interface SubmissionRecord {
 /** One change to a human grade, as the append-only log keeps it (task 063;
  *  memo grading-interface.md §7.1) — who, when, what before and after.
  *  `migrate` = a legacy review carried into the grades table. Instructor-only. */
-export interface GradeEvent {
+export interface GradeChangeEvent {
   at: string;
   actor: string;
   student: string;
@@ -754,6 +754,28 @@ export interface LateWaiver {
   by: string;
   at: string;
 }
+
+/** One problem whose points a committed re-grade changed (task 069; memo
+ *  §5): the attempt re-graded, the versions it went from and to, and the
+ *  autograde and points before and after. `underOverride` = a human
+ *  override stands over it (the override stays; the change is flagged). */
+export interface RegradeEvent {
+  at: string;
+  actor: string;
+  student: string;
+  questionId: number;
+  kind: 'regrade';
+  attempt: number;
+  /** null = the result predated the version stamp. */
+  fromHash: string | null;
+  toHash: string;
+  before: { auto: Points | null; points: Points | null };
+  after: { auto: Points | null; points: Points | null };
+  underOverride: boolean;
+}
+
+/** An entry of an assignment's append-only grading log. */
+export type GradeEvent = GradeChangeEvent | RegradeEvent;
 
 /** A problem's points: every problem is worth 1 (memo grading-interface.md §4.1). */
 export type Points = 0 | 0.5 | 1;

@@ -19,8 +19,11 @@
 // (src/instructor/gradingQueueViews.ts — states, Save & next's skips, J/K,
 // the counts line, hidden names); [feed] buildQuestionResponses over the same
 // fixture (who is in it and in what order, answers by kind, the suggestion,
-// no answer key or circuit); [no view grades] the grep gate (no view imports
-// the grader or a scorer) and the retired gradebook's files are gone.
+// no answer key or circuit); [regrade dialog] the re-grade's rows and
+// summary line (task 069 — an autograde's move, the grade's, the override
+// that stays); [no view grades] the grep gate (no view — the re-grade dialog
+// too — imports the grader or a scorer) and the retired gradebook's files
+// are gone.
 
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import type { AssignmentData, AssignmentQuestion, HumanGrade, Points, QuestionResult, SubmissionData, SubmissionRecord } from '../src/types';
@@ -34,6 +37,7 @@ import {
   type QueueResponse,
 } from '../src/storage/gradingSummary';
 import { ClaimBook, CLAIM_TTL_MS, type ClaimView } from '../src/storage/gradingClaims';
+import type { RegradeChange, RegradePlan } from '../src/storage/regrade';
 import {
   hideNamesPrefKey,
   nextToGrade,
@@ -56,6 +60,8 @@ import {
   MATRIX_FILTERS,
   overviewTiles,
   problemStats,
+  regradeRow,
+  regradeSummary,
   releaseWarning,
   sectionsOf,
   sortGradingRows,
@@ -397,13 +403,42 @@ console.log('[feed]');
   }) === null);
 }
 
+console.log('[regrade dialog]');
+{
+  const who = { key: 'k1', name: 'Descartes, René', sortName: 'Descartes' };
+  const change = (over: Partial<RegradeChange>): RegradeChange => ({
+    student: who, questionId: 7, number: '7', attempt: 2,
+    before: { auto: 1, points: 1 }, after: { auto: 0, points: 0 },
+    gradeBefore: 77.1, gradeAfter: 73.5, underOverride: false, ...over,
+  });
+  const down = regradeRow(change({}));
+  check('an autograde that falls: "1 → 0", the grade "77.1 → 73.5", marked down',
+    down.student === 'Descartes, René' && down.problem === 'P7' && down.autograde === '1 → 0' && down.up === false &&
+      down.grade === '77.1 → 73.5' && down.override === null, JSON.stringify(down));
+  const up = regradeRow(change({ before: { auto: 0, points: 0 }, after: { auto: 0.5, points: 0.5 }, gradeBefore: 40, gradeAfter: 55 }));
+  check('…one that rises to ½: "0 → ½", "40 → 55", marked up', up.autograde === '0 → ½' && up.up === true && up.grade === '40 → 55');
+  const over = regradeRow(change({ number: '5', before: { auto: 0, points: 0.5 }, after: { auto: 1, points: 0.5 }, underOverride: true, gradeBefore: 60, gradeAfter: 60 }));
+  check('under an override: the override that stays (½), no grade move', over.override === '½' && over.grade === '' && over.autograde === '0 → 1',
+    JSON.stringify(over));
+  const plan: RegradePlan = {
+    assignmentId: 'hw2', assignmentHash: 'h', latest: 74, stale: 9, changed: [change({}), change({}), change({ underOverride: true })],
+    unchanged: 71, humanGrades: { hand: 108, overrides: 2 },
+  };
+  const line = regradeSummary(plan);
+  check('the summary line: "3 results would change · 71 unchanged · 108 hand grades and 2 overrides untouched."',
+    line.changes === '3 results would change' && line.rest === '71 unchanged · 108 hand grades and 2 overrides untouched.',
+    JSON.stringify(line));
+  check('…singular when one', regradeSummary({ ...plan, changed: [change({})], humanGrades: { hand: 1, overrides: 1 } }).rest ===
+    '71 unchanged · 1 hand grade and 1 override untouched.');
+}
+
 console.log('[no view grades]');
 {
   const dir = new URL('../src/instructor/', import.meta.url);
-  const views = readdirSync(dir).filter((f) => /^Grading.*\.tsx$|^Student(Submission|Grading)View\.tsx$|^gradingViews\.ts$|^gradingQueueViews\.ts$/.test(f));
+  const views = readdirSync(dir).filter((f) => /^Grading.*\.tsx$|^Student(Submission|Grading)View\.tsx$|^RegradeDialog\.tsx$|^gradingViews\.ts$|^gradingQueueViews\.ts$/.test(f));
   const offenders = views.filter((f) => /engine\/grader|\bscoreRecord\b|\bscoreSubmission\b/.test(readFileSync(new URL(f, dir), 'utf8')));
   check(`the grading views read the summaries; none imports the grader or a scorer (${views.length} files)`,
-    views.length >= 7 && offenders.length === 0, offenders.join(', '));
+    views.length >= 8 && views.includes('RegradeDialog.tsx') && offenders.length === 0, offenders.join(', '));
   check('the retired gradebook is gone (GradebookView.tsx, Gradebook.ts)',
     !existsSync(new URL('GradebookView.tsx', dir)) && !existsSync(new URL('Gradebook.ts', dir)));
 }

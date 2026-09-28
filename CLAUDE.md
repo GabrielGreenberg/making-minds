@@ -58,8 +58,7 @@ health retry screen while the server is down; a "Password" control) → **publis
 assignments (hidden until an instructor publishes) → the assignment as a **problem-set
 document** (`AssignmentOverview` → `ProblemSetDocument`: live turbot arenas, a status mark
 per problem, an "Original PDF" link) → the question **editor**, a workbench built to its
-memo (top bar with save state + Submit; resizable, collapsible columns; floating parts
-palette; the site's canvas look) in the right mode: **CC, SC, FSM, TM, turbot** (TM:
+memo (top bar, resizable columns, floating parts palette) in the right mode: **CC, SC, FSM, TM, turbot** (TM:
 clickable tape strip + machine table / run / history panels, alphabet from the question's
 `representation`; turbot: the `innerMode` brain's editor + the arena "Map"
 (Step/Run/Pause/Reset), a TM brain's tape read-only; SC perception: a retina frame player),
@@ -112,26 +111,28 @@ preamble, source PDF, late policy, counts-toward-grade, sections with intro / la
 callouts / figures, live preview); **question creator** (all six modes on one form; per-problem
 callouts, figures; formula DSL → test banks; turbot: inner machine, encoding, arenas ≤
 30×30, each with criterion + max-steps; perception: rule + retina size; component
-restrictions and limits; TM halt-position toggle; fill-in blanks); **Grading** (task 065; views read the 064 summaries, none grades): the course
-list (submitted, autograde, hand grading, mean, released; `countsTowardGrade: false`
-dimmed); per assignment Overview (tiles, per-problem shares, Release warns while pending) ·
+restrictions/limits; TM halt toggle; fill-in blanks); **Grading** (065; views read the 064 summaries, none grades): the course
+list (submitted, autograde, hand grading, mean, released; not-counted
+dimmed); per assignment Overview (tiles, per-problem shares, Release warns while pending; the stale
+banner's **Re-grade…**: dry run, Commit, 069) ·
 Matrix (1 / ½ / 0 / ✎ / ↻ / — cells, filter chips) · Queue (066: one problem across
 students, or one student's pending problems; keys 0 / h / 1, ↵ Save & next skipping graded and
 claimed responses; soft 5-minute claims; a 409 shows the other grade; changed answers offer
-the old grade; Hide names); a row opens the student's **submission page** (067: every problem's
+the old grade; Hide names); a row opens the student's **submission page** (067: each problem's
 full autograde, ½ count, grade control; prev/next; **Extension…** / **Waive…**, also per row on
 the student page) and **Open in viewer**, their machine read-only.
 
 **Server** (`server/`: Express 5 + `node:sqlite`, zero native deps, WAL; files and gates:
 the Server row): auth providers behind `MM_AUTH_MODE` (`password` default — roster-gated
-registration, scrypt, login throttle; `dev` passwordless; `sso` — capabilities reported,
+registration, scrypt, login throttle; `dev` passwordless; `sso` —
 `authenticate` a TODO), **identity by UID** (emails are aliases), roster import (UI + CLI),
-the **homework sync** (`npm run homeworks -- sync | status`; Deployment below), assignment
+the **homework sync** (`npm run homeworks -- sync | status`), assignment
 CRUD, workbooks (+ mint key, per-save size history), submit-with-grading + integrity, human
-grades, `extensions` / `late_waivers` + `course_settings.calendar`, the **grading summaries** (task 064: `/api/assignments/:id/summary` — roster-joined,
+grades, `extensions` / `late_waivers` + `course_settings.calendar`, the **grading summaries** (064: `/api/assignments/:id/summary` — roster-joined,
 latest attempt, no circuits — `/api/grading`, `/api/students/:sid`, one attempt in full; the
-queue feed `…/questions/:qid/responses` + in-memory `/api/grading/claims`, task 066),
-grade release, feedback (+ role, triage mark), notes, `/api/health`.
+queue feed `…/questions/:qid/responses` + in-memory `/api/grading/claims`, 066),
+grade release, the **re-grade** (069: `POST …/regrade {dryRun}`; commit = snapshot, stale
+latest results rewritten, `regrade` events; grades untouched), feedback (+ role, triage mark), notes, `/api/health`.
 
 **Deployment — pilot live.** Cloudflare Pages `https://making-minds.pages.dev` → Lightsail
 API at the placeholder `https://100-22-69-95.sslip.io` (Caddy TLS). Not yet fit for
@@ -144,8 +145,8 @@ every release syncs it into the pilot DB** (`deploy/release.sh` → `npm run hom
 sync`: missing homeworks added unpublished, unedited copies refreshed, instructor-edited
 ones left alone and listed); local mode's "Load HW1–HW7" runs the same planner.
 
-**Reference-fixture coverage:** 56/56 at-tier — 46 exact (correct passes, broken fails) + 10
-interface (a plausible attempt grades end-to-end) — `app/tools/coverageCheck.ts`.
+**Reference-fixture coverage:** 56/56 at-tier — 46 exact + 10 interface —
+`app/tools/coverageCheck.ts`.
 
 ## What's next
 
@@ -208,7 +209,7 @@ wrappers.
 | Routing | `app/src/routing.ts`, `useRoute.ts` | `Route` union (incl. `grades`, Home's Grades tab; `attempt` = `#/a/:id/submission/:n`, `caseIndex` = `…/q/:i/case/:k`; `student` = the viewer (`…/grading/:asg/student/:sid/submission/:n`; `editorRoute`); the Grading tab's `instructor-grading*`, `instructor-student`), `parseHash`/`routeToHash`, `canonicalHash` (the old gradebook URL → Grading), `navigate()`; `useRoute()`: the hash as React state (Home's tabs, `useInstructorRoute`). |
 | Wire layout | `app/src/componentGeometry.ts`, `wireRouter.ts`, `wireSegments.ts` | `componentGeometry`: the one geometry — per-type sizes (`PART_SIZE`, `boxSize`), ports (`getPortPosition`), footprint `getComponentBounds`, `getLabelAnchor` — for canvas, router, oracle, `confirmBox`. `wireRouter`: the A* orthogonal router (phase-0 L-path for doomed wires; `usedFallback`/`violation` flags; `findDivergencePoints`). `wireSegments`: a stale segment drag is dropped. |
 | Storage | `app/src/storage/workbookStore.ts`, `AssignmentStore.ts`, `submissionStore.ts`, `gradingStore.ts`, `feedbackStore.ts`, `NotesStore.ts` | The six Promise-returning seam interfaces + Local impls. Grade release lives on `AssignmentStore` (`remove` refuses an assignment with submissions); records carry their student's human `grades` (task 063); `gradingStore.ts` WRITES them, READS the grading summaries (task 064) and the queue feed + soft claims (`responses`/`claim`; pure `gradingClaims.ts` ClaimBook, task 066). |
-| Storage | `app/src/storage/backend.ts`, `remoteStores.ts`, `gradeWrites.ts`, `gradingSummary.ts`, `journal.ts`, `migrateLocal.ts` | `backend.ts`: the mode switch (seams, above). `remoteStores.ts`: Remote impls as direct `api/client.ts` calls (404 → seam-null; GRADER-FREE, grep-gated). `gradeWrites.ts`: the pure `planGradeWrite` (version → 409, override needs a note, anchored to the latest answer, one log event) + the legacy-review migration, used by the local store AND the server. `gradingSummary.ts`: the ONE pure summary builder (roster ∪ flagged off-roster submitters, latest attempt, `scoreRecord` per problem, stale by content hash; `dueFor(…, LateContext)` → `dueInput`), local store + `server/src/gradingSummary.ts` adapt it. `journal.ts`: per-email crash buffer `mm:journal:<email>:<asgId>`, replayed by the next `openAssignment`. `migrateLocal.ts`: first-remote-login fill-empty upload of local data (guard `mm:migrated:<email>`; server never overwritten; submissions/release/reviews not migrated). |
+| Storage | `app/src/storage/backend.ts`, `remoteStores.ts`, `gradeWrites.ts`, `gradingSummary.ts`, `regrade.ts`, `journal.ts`, `migrateLocal.ts` | `backend.ts`: the mode switch (seams, above). `remoteStores.ts`: Remote impls as direct `api/client.ts` calls (404 → seam-null; GRADER-FREE, grep-gated). `gradeWrites.ts`: the pure `planGradeWrite` (version → 409, override needs a note, anchored to the latest answer, one log event) + legacy-review migration, local store AND server. `gradingSummary.ts`: the ONE pure summary builder (roster ∪ flagged off-roster submitters, latest attempt, `scoreRecord` per problem, stale by content hash; `dueFor(…, LateContext)` → `dueInput`), local store + `server/src/gradingSummary.ts` adapt it, as they do `regrade.ts` (`planRegrade`). `journal.ts`: the crash buffer `mm:journal:<email>:<asgId>`, replayed on `openAssignment`. `migrateLocal.ts`: first-remote-login fill-empty upload (guard `mm:migrated:<email>`; server never overwritten; submissions/release/reviews stay). |
 | Auth | `app/src/auth/` | `AuthGate.tsx` (per-route gate; `initRouting()` fires here), `HealthGate.tsx` (health provider + retry screen), `LoginScreen.tsx` (toy picker locally; remotely the panes Part 1 describes, from the server's `AuthCapabilities`), `AccountPanel.tsx` (change password), `authProvider.tsx` (one provider per mode), `types.ts`, `session.ts`, `accounts.ts`, `instructorRole.ts`. |
 | Page surfaces | `app/src/theme.css`, `pages.css`, `workbench.css`, `components/PageShell.tsx`, `SessionControls.tsx` | ONE visual language, the makingminds.org look. `theme.css`: the site's palette/type/spacing as `--mm-*` tokens (each names its `site.css` original; colour literals ONLY in its `:root`) + the shared vocabulary (shell, tags, rows, tables, buttons, fields, segmented controls, modals). `pages.css`: per-surface rules. `PageShell`: topbar (brand → website; `appNav` by role; Sandbox link; session controls) · band · ONE `.page` column (1080px, every route) · footer; `card` variant for login/health; `.mm-tabs`: a section's own tabs in the column (the Dashboard's). `workbench.css`: the editor frame; `index.css`'s canvas literals ratchet to zero. Rules: `docs/buildout/VISUAL_VOCAB.md` §Page surfaces; gate: `themeCheck`. |
 | Workbook file | `app/src/workbookFile.ts`, `fileHandle.ts`, `components/WorkbookFileMenu.tsx` | The sandbox as a file: pure `parseWorkbookFile` (validate, legacy) + `workbookKeyHash` (unsaved baseline); pickers, else download (not a save) / file input. |
@@ -340,7 +341,7 @@ CC → SC (a box may hold MEM, SC canvases only) → FSM → Turbots → TMs (tw
   upload; smoke test; needs main == origin/main and the gitignored `secrets/` + `ssh/` key —
   `deploy/README.md` §0); the robot runs it `--unattended` via `deploy/release-gate.mjs`.
 - **Deploy knobs live in `deploy/README.md`** (Pages build vars, the Lightsail unit's env;
-  backups daily, kept 35 days).
+  backups daily, kept 35 days; pre-re-grade snapshots, the last 20).
 - **CI is strict TypeScript** (`noUnusedLocals`, `noUnusedParameters`): before committing
   run `npx tsc -p tsconfig.app.json --noEmit` and `npm run typecheck:tools` in `app/` (both
   gate the deploy); after any push check `gh run list --limit 1`.

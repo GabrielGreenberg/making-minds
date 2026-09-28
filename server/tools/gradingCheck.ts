@@ -24,13 +24,25 @@
 // students refused, a second instructor sees the first's claim by name and
 // cannot take it, a release clears it; [queue 409] two graders read the same
 // version, the second write is refused with the first's grade, nothing logged
-// for it. And the late policy (task 068): [summary] a synced calendar prices
+// for it. And the re-grade (task 069): [regrade] POST .../regrade — students
+// refused, unknown id 404, a body without a boolean dryRun 400; a dry run
+// writes nothing (every table byte-identical, no snapshot) and lists exactly
+// the problems whose points or autograde change — an override's flagged, a
+// current submission absent — with no email, case or circuit in it; a commit
+// naming an outdated version is a 409 writing nothing; a commit takes one
+// snapshot (a real SQLite copy holding the old result), rewrites only the
+// stale LATEST attempts (older attempts, current ones and every grade
+// byte-identical), logs one `regrade` event per change, leaves nothing stale;
+// a second commit is a no-op; the local GradingStore's dry run ≡ the
+// server's, and its commit keeps the grades and snapshots the records.
+// And the late policy (task 068): [summary] a synced calendar prices
 // lateness (units, −5 − 5·units); [extensions & waivers] the two PUT routes —
 // 400 / 404 / 403, an extension moves the row on time and the STUDENT's
 // served copy (never the instructor's), a waiver nets the deduction, both
 // logged without a questionId, a released record carries `lateWaived` only.
 
-import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { mkdtempSync, readdirSync, readFileSync, rmSync, statSync } from 'node:fs';
+import { DatabaseSync } from 'node:sqlite';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { gzipSync } from 'node:zlib';
@@ -42,7 +54,7 @@ import { buildSampleAssignment, buildCorrectSubmission, buildIncorrectSubmission
 import { gradeSubmission } from '../../app/src/engine/grader';
 import { scoreRecord } from '../../app/src/engine/score';
 import { homeworkContentHash } from '../../app/src/devData/homeworkSync';
-import type { AssignmentData, GradeEvent, HumanGrade, SubmissionData, SubmissionRecord } from '../../app/src/types';
+import type { AssignmentData, GradeChangeEvent, GradeEvent, HumanGrade, RegradeEvent, SubmissionData, SubmissionRecord } from '../../app/src/types';
 import type {
   AssignmentGradingSummary,
   AttemptDetail,
@@ -52,6 +64,7 @@ import type {
   StudentGrading,
 } from '../../app/src/storage/gradingSummary';
 import { assignmentSummary } from '../src/gradingSummary';
+import type { RegradeOutcome, RegradePlan } from '../../app/src/storage/regrade';
 import { syncCalendar } from '../src/homeworks';
 
 let failures = 0;
@@ -135,7 +148,7 @@ check('a clear naming the version → the autograde again', cleared.status === 2
 
 // ── the log ─────────────────────────────────────────────────────────────
 console.log('[log]');
-const events = db.listGradeEvents(SAMPLE_ASSIGNMENT_ID);
+const events = db.listGradeEvents(SAMPLE_ASSIGNMENT_ID).filter((e): e is GradeChangeEvent => e.kind !== 'regrade');
 check('every change is logged, in order: grade, grade, override, clear',
   events.map((e) => e.kind).join() === 'grade,grade,override,clear' &&
   events.every((e) => e.actor === instructor.email.toLowerCase() && e.student === email));
@@ -669,6 +682,192 @@ console.log('[migration]');
   }
   server2.close();
   db2.close();
+}
+
+console.log('[regrade]');
+{
+  // A file database (a second connection reads its tables raw) and its own
+  // snapshot folder.
+  const tmp = mkdtempSync(join(tmpdir(), 'mm-regrade-check-'));
+  const snapDir = join(tmp, 'snapshots');
+  const cfg: ServerConfig = { ...config, dbPath: join(tmp, 'rg.sqlite'), snapshotDir: snapDir };
+  const db4 = new Db(cfg.dbPath);
+  for (const a of TOY_ACCOUNTS) db4.upsertUser({ email: a.email.toLowerCase(), name: a.name, role: a.role });
+  const v1: AssignmentData = { ...buildSampleAssignment(), id: 'regrade-hw', title: 'Regrade HW' };
+  db4.saveAssignment(v1);
+  const server4 = createApp(cfg, db4).listen(0);
+  await new Promise<void>((r) => server4.on('listening', r));
+  const addr4 = server4.address();
+  const base4 = `http://127.0.0.1:${typeof addr4 === 'object' && addr4 ? addr4.port : 0}/api`;
+  const call = async <T>(method: string, p: string, opts: { token?: string; body?: unknown } = {}) => {
+    const res = await fetch(base4 + p, {
+      method,
+      headers: { 'Content-Type': 'application/json', ...(opts.token ? { Authorization: `Bearer ${opts.token}` } : {}) },
+      body: opts.body === undefined ? undefined : JSON.stringify(opts.body),
+    });
+    const text = await res.text();
+    let json = {} as T;
+    try {
+      json = JSON.parse(text) as T;
+    } catch {
+      // not JSON
+    }
+    return { status: res.status, json, text };
+  };
+  const signIn = async (e: string) => (await call<{ token: string }>('POST', '/auth/login', { body: { email: e } })).json.token;
+  const [john, jane] = TOY_ACCOUNTS.filter((a) => a.role === 'student');
+  const johnEmail = john.email.toLowerCase();
+  const jTok = await signIn(john.email);
+  const janeTok = await signIn(jane.email);
+  const iTok4 = await signIn(instructor.email);
+  const u4 = `/assignments/${v1.id}`;
+  const submit = (tok: string, who: string) => call('POST', `${u4}/submissions`, { token: tok, body: { answers: buildCorrectSubmission(who).answers } });
+  // John: two attempts against v1 (the older must never be re-graded), an
+  // override on the CC problem, a hand grade on the open one.
+  await submit(jTok, john.email);
+  await submit(jTok, john.email);
+  const johnKey = db4.publicIdOf(johnEmail)!;
+  const CC = v1.questions.find((q) => q.buildMode === 'CC')!.id;
+  const SC = v1.questions.find((q) => q.buildMode === 'SC')!.id;
+  const OPEN4 = v1.questions.find((q) => q.buildMode === 'open')!.id;
+  const ov = await call('PUT', `${u4}/grades/${johnKey}/${CC}`, { token: iTok4, body: { points: 0.5, note: 'a judgment call', version: null } });
+  const hg = await call('PUT', `${u4}/grades/${johnKey}/${OPEN4}`, { token: iTok4, body: { points: 1, version: null } });
+  check('fixture: an override and a hand grade on the latest attempt', ov.status === 200 && hg.status === 200, `${ov.text} ${hg.text}`);
+  // v2: the CC bank becomes OR (John's AND now fails it, under the override)
+  // and the SC bank shifts by one (John's delay now fails it outright).
+  const v2: AssignmentData = {
+    ...v1,
+    questions: v1.questions.map((q) =>
+      q.id === CC
+        ? { ...q, test_cases: q.test_cases!.map((t) => ({ ...t, outputs: [t.inputs[0] | t.inputs[1]] })) }
+        : q.id === SC
+          ? { ...q, test_cases: q.test_cases!.map((t) => ({ ...t, outputs: t.outputs.map((o) => o + 1) })) }
+          : q,
+    ),
+  };
+  db4.saveAssignment(v2);
+  const v2Hash = homeworkContentHash(v2);
+  // Jane submits after the edit: current, never re-graded.
+  await submit(janeTok, jane.email);
+
+  const raw = new DatabaseSync(cfg.dbPath);
+  const dump = (table: string) => JSON.stringify(raw.prepare(`SELECT * FROM ${table} ORDER BY rowid`).all());
+  const tables = () => ({ submissions: dump('submissions'), grades: dump('grades'), grade_events: dump('grade_events') });
+  const snapshots = () => {
+    try {
+      return readdirSync(snapDir);
+    } catch {
+      return [];
+    }
+  };
+  const row = (email: string, attempt: number) =>
+    JSON.stringify(raw.prepare('SELECT * FROM submissions WHERE assignment_id = ? AND email = ? AND attempt = ?').get(v1.id, email, attempt));
+  const regrade = (body: unknown, token = iTok4, id = v1.id) =>
+    call<RegradeOutcome & { error?: string }>('POST', `/assignments/${id}/regrade`, { token, body });
+
+  check('a student cannot re-grade (403)', (await regrade({ dryRun: true }, jTok)).status === 403);
+  check('an unknown assignment → 404', (await regrade({ dryRun: true }, iTok4, 'no-such')).status === 404);
+  check('a body without a boolean dryRun → 400',
+    (await regrade({})).status === 400 && (await regrade({ dryRun: 'yes' })).status === 400 &&
+      (await regrade({ dryRun: false, expectHash: 7 })).status === 400);
+
+  const before = tables();
+  const dry = await regrade({ dryRun: true });
+  const plan = dry.json.plan;
+  check('a dry run writes nothing: submissions, grades and the log byte-identical, no snapshot',
+    dry.status === 200 && dry.json.committed === false && JSON.stringify(tables()) === JSON.stringify(before) && snapshots().length === 0);
+  check('…it covers every latest attempt; only John\'s is stale (Jane submitted after the edit)',
+    plan.latest === 2 && plan.stale === 1 && plan.assignmentHash === v2Hash, JSON.stringify({ latest: plan.latest, stale: plan.stale }));
+  const shape = plan.changed.map((c) => `${c.student.name}:${c.questionId}:${c.before.auto}/${c.before.points}→${c.after.auto}/${c.after.points}:${c.underOverride}`);
+  check('…and lists exactly the changed problems: CC under the override (½ stays), SC 1 → 0',
+    shape.join() === [`${john.name}:${CC}:1/0.5→0/0.5:true`, `${john.name}:${SC}:1/1→0/0:false`].join(), shape.join());
+  check('…with the grade before and after, the counts and the human grades untouched',
+    plan.changed.every((c) => c.gradeBefore !== null && c.gradeAfter !== null && c.gradeAfter < c.gradeBefore! && c.attempt === 2) &&
+      plan.unchanged === 1 && plan.humanGrades.hand === 1 && plan.humanGrades.overrides === 1, JSON.stringify(plan.humanGrades));
+  check('…naming students by opaque key and name only: no email, case or circuit in the response',
+    !dry.text.includes('@') && !/"(test_cases|expected|got|circuit|cases|writes|result)"/.test(dry.text) &&
+      plan.changed.every((c) => c.student.key === johnKey));
+
+  const mismatch = await regrade({ dryRun: false, expectHash: 'an-older-version' });
+  check('a commit naming a version that is no longer current → 409 with the fresh plan, nothing written',
+    mismatch.status === 409 && (mismatch.json as { plan?: RegradePlan }).plan?.assignmentHash === v2Hash &&
+      JSON.stringify(tables()) === JSON.stringify(before) && snapshots().length === 0);
+
+  // The local GradingStore over the same records (the harness's localStorage
+  // shim from [local ≡ remote] is still installed).
+  const local = (await import(new URL('../../app/src/storage/backend.ts', import.meta.url).href)) as {
+    assignmentStore: { save(a: AssignmentData): Promise<void> };
+    gradingStore: { regrade(id: string, o: { dryRun: boolean; expectHash?: string }): Promise<RegradeOutcome | null> };
+  };
+  await local.assignmentStore.save(v2);
+  localStorage.setItem(`mm:sub:${v1.id}`, JSON.stringify(db4.listSubmissions(v1.id)));
+  localStorage.setItem(`mm:grades:${v1.id}`, JSON.stringify(Object.fromEntries(db4.listGrades(v1.id))));
+  const localDry = (await local.gradingStore.regrade(v1.id, { dryRun: true }))!;
+  const normPlan = (p: RegradePlan) => ({ ...p, changed: p.changed.map((c) => ({ ...c, student: { name: c.student.name, sortName: c.student.sortName } })) });
+  const la = JSON.stringify(normPlan(localDry.plan));
+  const ra = JSON.stringify(normPlan(plan));
+  check("LocalGradingStore.regrade's dry run ≡ the server's on the same records", la === ra, `\n local  ${la.slice(0, 300)}\n remote ${ra.slice(0, 300)}`);
+
+  const olderJohn = row(johnEmail, 1);
+  const janeRow = row(jane.email.toLowerCase(), 1);
+  const staleJohn = row(johnEmail, 2);
+  const commit = await regrade({ dryRun: false, expectHash: plan.assignmentHash });
+  const after = tables();
+  const snaps = snapshots();
+  check('commit: done, naming the one snapshot it took (owner-only)',
+    commit.status === 200 && commit.json.committed === true && snaps.length === 1 && commit.json.snapshot === snaps[0] &&
+      /^regrade-regrade-hw-\d{8}-\d{6}-\d{3}Z\.sqlite$/.test(snaps[0]) && (statSync(join(snapDir, snaps[0])).mode & 0o777) === 0o600,
+    `${commit.status} ${commit.text.slice(0, 200)} ${snaps.join()}`);
+  const snapDb = new DatabaseSync(join(snapDir, snaps[0] ?? 'missing'), { readOnly: true });
+  check('…a real SQLite copy taken BEFORE the write: John\'s latest there has the old result and version',
+    JSON.stringify(snapDb.prepare('SELECT * FROM submissions WHERE assignment_id = ? AND email = ? AND attempt = 2').get(v1.id, johnEmail)) === staleJohn);
+  snapDb.close();
+  const johnLatest = db4.getSubmission(v1.id, johnEmail, 2)!;
+  check("John's latest now carries the current version and exactly the grader's result against it",
+    johnLatest.assignmentHash === v2Hash &&
+      JSON.stringify(johnLatest.result) === JSON.stringify(gradeSubmission(v2, johnLatest.submission)));
+  check("…and only it changed: John's older attempt and Jane's current one byte-identical",
+    row(johnEmail, 1) === olderJohn && row(jane.email.toLowerCase(), 1) === janeRow && row(johnEmail, 2) !== staleJohn);
+  check('the grades table is byte-identical: a re-grade never touches a human grade', after.grades === before.grades);
+  const logged = db4.listGradeEvents(v1.id).filter((e): e is RegradeEvent => e.kind === 'regrade');
+  check('one "regrade" event per changed problem, by the instructor, before → after, the override flagged',
+    logged.length === plan.changed.length &&
+      logged.every((e, i) => e.actor === instructor.email.toLowerCase() && e.student === johnEmail && e.attempt === 2 &&
+        e.questionId === plan.changed[i].questionId && e.toHash === v2Hash && e.fromHash !== null && e.fromHash !== v2Hash &&
+        e.underOverride === plan.changed[i].underOverride && JSON.stringify(e.after) === JSON.stringify(plan.changed[i].after)),
+    JSON.stringify(logged));
+  const s4 = (await call<AssignmentGradingSummary>('GET', `${u4}/summary`, { token: iTok4 })).json;
+  check('afterwards nothing is stale', s4.progress.autograded.stale === 0 && s4.rows.every((r) => !r.latest?.stale));
+  const again = await regrade({ dryRun: false });
+  check('a second commit is a no-op: nothing stale, no snapshot, nothing logged',
+    again.status === 200 && again.json.committed === false && again.json.plan.stale === 0 && snapshots().length === 1 &&
+      JSON.stringify(tables()) === JSON.stringify(after));
+  const src = readFileSync(new URL('../src/db.ts', import.meta.url), 'utf8');
+  check('the re-grade write path touches only result and assignment_hash',
+    /UPDATE submissions SET result = \?, assignment_hash = \? WHERE/.test(src) && !/UPDATE\s+grades\b/i.test(src.split('updateSubmissionResult(')[1] ?? ''));
+
+  console.log('[regrade local]');
+  {
+    const gradesBefore = localStorage.getItem(`mm:grades:${v1.id}`);
+    const subsBefore = localStorage.getItem(`mm:sub:${v1.id}`);
+    const out = (await local.gradingStore.regrade(v1.id, { dryRun: false, expectHash: localDry.plan.assignmentHash }))!;
+    const recs = JSON.parse(localStorage.getItem(`mm:sub:${v1.id}`) ?? '[]') as SubmissionRecord[];
+    const localLog = JSON.parse(localStorage.getItem(`mm:grade-log:${v1.id}`) ?? '[]') as GradeEvent[];
+    check('local commit: snapshot = the records as they were; grades untouched',
+      out.committed && out.snapshot === `mm:regrade-snapshot:${v1.id}` && localStorage.getItem(out.snapshot) === subsBefore &&
+        localStorage.getItem(`mm:grades:${v1.id}`) === gradesBefore);
+    check('…the stale latest re-graded, the older attempt and the current one untouched, one event per change',
+      JSON.stringify(recs.map((r) => r.assignmentHash)) === JSON.stringify(db4.listSubmissions(v1.id).map((r) => r.assignmentHash)) &&
+        JSON.stringify(recs.find((r) => r.attempt === 2)?.result) === JSON.stringify(johnLatest.result) &&
+        JSON.stringify(recs[0]) === JSON.stringify((JSON.parse(subsBefore!) as SubmissionRecord[])[0]) &&
+        localLog.filter((e) => e.kind === 'regrade').length === plan.changed.length);
+    const noop = (await local.gradingStore.regrade(v1.id, { dryRun: false }))!;
+    check('…and a second local commit is a no-op', !noop.committed && noop.plan.stale === 0);
+  }
+  raw.close();
+  server4.close();
+  db4.close();
+  rmSync(tmp, { recursive: true, force: true });
 }
 
 console.log('[size]');

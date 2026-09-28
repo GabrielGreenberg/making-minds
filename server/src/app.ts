@@ -26,6 +26,11 @@
 //                                              to students (list + fetch)
 //   PUT    /api/assignments/:id/grades-release instructor: {released: boolean} —
 //                                              students see no grades at all until released
+//   POST   /api/assignments/:id/regrade        instructor: {dryRun: boolean, expectHash?} —
+//                                              re-grade every stale latest attempt against the
+//                                              current version (task 069): the dry run's diff,
+//                                              or commit (snapshot, rewrite, log; 409 on a
+//                                              changed version). Human grades never touched
 //   GET    /api/workbooks/:assignmentId        the caller's saved canvas state + their
 //                                              mint key for it (task 034)
 //   PUT    /api/workbooks/:assignmentId        autosave target (also appends to the
@@ -116,8 +121,11 @@ import {
   courseGrading,
   questionResponses,
   studentEmailOf,
+  regradeInputs,
   studentGrading,
 } from './gradingSummary';
+import { regradeEvents } from '../../app/src/storage/regrade';
+import { snapshotDirFor, takeRegradeSnapshot } from './snapshot';
 import { ClaimBook } from '../../app/src/storage/gradingClaims';
 import { checkGroup } from '../../app/src/submissionGroup';
 import { studentCopy } from '../../app/src/lateContext';
@@ -617,6 +625,57 @@ export function createApp(config: ServerConfig, db: Db) {
     }
     db.setGradesReleased(id, released);
     res.json({ ok: true, gradesReleased: released });
+  });
+
+  // ── re-grade (instructor; task 069, memo grading-interface.md §5) ──
+  // The plan is the ONE pure planner's (app/src/storage/regrade.ts) over each
+  // student's latest attempt; the commit recomputes it — a client's plan is
+  // never trusted — and, when anything is stale, snapshots the database, then
+  // in one transaction rewrites `result` + `assignment_hash` on those latest
+  // attempts and logs one `regrade` event per changed (student, problem).
+  // The `grades` table is never written. The handler is synchronous
+  // (node:sqlite is), so no submission can land between plan and write.
+  const snapshotDir = snapshotDirFor(config.dbPath, config.snapshotDir);
+  app.post('/api/assignments/:id/regrade', auth, requireInstructor, (req, res) => {
+    const id = String(req.params.id);
+    const body = (req.body ?? {}) as { dryRun?: unknown; expectHash?: unknown };
+    if (typeof body.dryRun !== 'boolean' || (body.expectHash !== undefined && typeof body.expectHash !== 'string')) {
+      res.status(400).json({ error: 'body must be {dryRun: boolean, expectHash?: string}' });
+      return;
+    }
+    const now = new Date();
+    const inputs = regradeInputs(db, mintSecret, id, now.getTime());
+    if (!inputs) {
+      res.status(404).json({ error: 'unknown assignment' });
+      return;
+    }
+    const { plan, writes, emailOf } = inputs;
+    if (body.dryRun) {
+      res.json({ plan, committed: false });
+      return;
+    }
+    if (body.expectHash !== undefined && body.expectHash !== plan.assignmentHash) {
+      res.status(409).json({ error: 'the assignment changed since the dry run', plan });
+      return;
+    }
+    if (writes.length === 0) {
+      res.json({ plan, committed: false });
+      return;
+    }
+    let snapshot: string;
+    try {
+      snapshot = takeRegradeSnapshot(db, snapshotDir, id, now);
+    } catch (err) {
+      console.error('regrade snapshot failed:', err);
+      res.status(500).json({ error: 'snapshot failed; nothing re-graded' });
+      return;
+    }
+    const events = regradeEvents(plan, writes, { actor: req.user!.email, at: now.toISOString(), emailOf });
+    db.transaction(() => {
+      for (const w of writes) db.updateSubmissionResult(id, emailOf(w.studentKey), w.attempt, w.result, plan.assignmentHash);
+      for (const e of events) db.addGradeEvent(id, e);
+    });
+    res.json({ plan, committed: true, snapshot });
   });
 
   // ── workbooks (per-student autosave) ───────────────────────────

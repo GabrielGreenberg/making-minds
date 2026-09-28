@@ -333,6 +333,16 @@ check("an override with no note: the server's 400 is the seam's refusal, with th
 const conflict = await remoteGradingStore.setGrade(SAMPLE_ASSIGNMENT_ID, sKey, openQ.id, { points: 0, version: null });
 check("a stale version: the 409 is the seam's conflict, carrying the current grade",
   !conflict.ok && conflict.conflict && conflict.current?.version === 1);
+// The re-grade through the seam (task 069): the server's plan; a commit
+// naming an outdated version is the seam's conflict (the 409's fresh plan);
+// an unknown assignment the seam's null.
+const rgDry = await remoteGradingStore.regrade(SAMPLE_ASSIGNMENT_ID, { dryRun: true });
+const rgConflict = await remoteGradingStore.regrade(SAMPLE_ASSIGNMENT_ID, { dryRun: false, expectHash: 'an-older-version' });
+check('regrade: the dry run is the server\'s plan; an outdated expectHash is the seam\'s conflict; unknown → null',
+  !!rgDry && !rgDry.committed && rgDry.plan.stale === 0 && rgDry.plan.latest >= 1 &&
+    !!rgConflict && rgConflict.conflict === true && !rgConflict.committed && rgConflict.plan.assignmentHash === rgDry.plan.assignmentHash &&
+    (await remoteGradingStore.regrade('no-such-assignment', { dryRun: true })) === null,
+  JSON.stringify({ rgDry, rgConflict }).slice(0, 300));
 // The grading summary through the seam (task 064): the server's builder, one
 // row per roster student, the hand grade in its cell.
 const summary = await remoteGradingStore.summary(SAMPLE_ASSIGNMENT_ID);

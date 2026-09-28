@@ -10,7 +10,7 @@
 
 import type {
   AssignmentQuestion,
-  GradeEvent,
+  GradeChangeEvent,
   HumanGrade,
   LateExtension,
   LateWaiver,
@@ -26,7 +26,7 @@ export type GradeWrite =
   | { clear: true; version: number };
 
 export type GradeWritePlan =
-  | { ok: true; grade: HumanGrade | null; event: GradeEvent }
+  | { ok: true; grade: HumanGrade | null; event: GradeChangeEvent }
   | { ok: false; conflict: true; current: HumanGrade | null }
   | { ok: false; conflict: false; error: string };
 
@@ -133,7 +133,7 @@ export function studentGrade(g: HumanGrade): HumanGrade {
 // with no questionId. Both backends persist the plan and nothing else.
 
 export type LateWritePlan<T> =
-  | { ok: true; value: T | null; event: GradeEvent }
+  | { ok: true; value: T | null; event: GradeChangeEvent }
   | { ok: false; error: string };
 
 /** A due date as an extension takes it: a parseable instant, stored as ISO. */

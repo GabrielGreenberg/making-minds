@@ -960,3 +960,12 @@
 .gr-half { margin: 4px 0 0; font-size: var(--mm-fs-small); color: var(--mm-ink-2); }
 .gr-cases { margin: 8px 0; font-size: var(--mm-fs-small); }
 .gr-cases summary { cursor: pointer; color: var(--mm-ink-2); }
+
+/* The re-grade dialog (task 069; mockup 7). */
+.gr-regrade { width: min(760px, 100%); }
+.gr-regrade .gr-up { color: var(--mm-ok); }
+.gr-regrade .gr-down { color: var(--mm-danger); }
+.gr-regrade-notice { margin: 0 0 12px; }
+.gr-regrade-summary { margin: 14px 0 0; }
+.gr-regrade-error { margin: 12px 0 0; }
+.gr-regrade-actions { margin-top: 18px; }
