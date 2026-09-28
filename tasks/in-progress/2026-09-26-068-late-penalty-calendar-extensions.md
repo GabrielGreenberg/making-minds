@@ -8,7 +8,7 @@ requires: browser
 area: app
 source: chat
 created: 2026-09-26T21:34:00-07:00
-status: ready
+status: in-progress
 after: 2026-09-26-067
 branch: robot/068-late-penalty-calendar-extensions
 merged_into:
