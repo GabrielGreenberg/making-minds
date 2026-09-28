@@ -8,9 +8,9 @@ requires: browser
 area: app
 source: chat
 created: 2026-09-25T16:15:00-07:00
-status: in-progress
+status: done
 after: 2026-09-21-013
-branch: robot/059-perception-example-films
+branch:
 merged_into:
 ---
 
@@ -91,3 +91,18 @@ Showing one film's answer reveals nothing the statement doesn't. Flag it in `/wo
   runs, expected row hides on edit, works on locked questions; network payload shows
   `perception_cases: []`; post-grading "Run this input" lists both films).
 - **Next step:** loop session: visual check if owed, then land per PROFILE §5.
+
+### 2026-09-27 — landed (robot)
+- **Headless browser check (local mode), passed:** a seeded SC motion question (sample Q13)
+  with two authored films, film 1 flagged, saved through `perceptionFields`; signed in as
+  the toy student John in headless Chrome over CDP. Exactly one "Example 1 · 4 frames"
+  button; no expected row before loading; one click loads 4 frames, the button shows
+  pressed, and the `expected` row reads `1 1 0 0` (t1 on the right); Run completes with the
+  OUT row alongside it; toggling a bit drops the expected row, and clicking the example
+  again restores it; no crash screen.
+- **Owed, not claimed (Gabriel's eyeball):** the authoring side in the question creator
+  (tick the flag, save, reopen: it persists); remote mode (Vite Remote Mode + server on
+  8199: the student's `GET /api/assignments/:id` has `perception_cases: []` and one
+  `perception_examples` entry — already pinned headlessly by remoteStoreCheck/parityCheck);
+  a done-marked or frozen question still loads and runs an example; after grading,
+  "Run this input" lists both films.

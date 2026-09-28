@@ -64,3 +64,4 @@
 2026-09-26-070 · feature · Flag students who need attention, and give each student an instructor page with private notes and grade history · 2026-09-27T20:39:30-0700 · robot/070-flags-student-page-notes · 40c68fc
 2026-09-26-071 · feature · Export problem-set grades as a CSV — one row per student, HW1–HW6 out of 100 and their average · 2026-09-27T21:07:58-0700 · robot/071-grades-export-csv · 46d4464
 2026-09-21-013 · feature · Instructor-authored SC perception films and motion rules by direction (up / down / either) and scene (single / any number) · 2026-09-27T22:11:41-0700 · robot/013-perception-custom-sequences · facbd45
+2026-09-25-059 · feature · Let an instructor mark an authored perception film "show to students as an example", delivered without exposing the grading bank · 2026-09-27T23:03:49-0700 · robot/059-perception-example-films · fe46f59
