@@ -8,9 +8,9 @@ requires: browser
 area: app
 source: feedback
 created: 2026-09-28T10:00:00-07:00
-status: in-progress
+status: done
 after:
-branch: robot/075-earned-cc-truth-table
+branch:
 merged_into:
 ---
 
