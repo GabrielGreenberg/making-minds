@@ -19,6 +19,7 @@ import { localSubmissionStore, type SubmissionStore } from './submissionStore';
 import { LocalGradingStore, type GradingStore } from './gradingStore';
 import { localFeedbackStore, type FeedbackStore } from './feedbackStore';
 import { localNotesStore, type NotesStore } from './NotesStore';
+import { localRobotStatusStore, type RobotStatusStore } from './robotStatusStore';
 import {
   remoteWorkbookStore,
   remoteAssignmentStore,
@@ -26,6 +27,7 @@ import {
   remoteGradingStore,
   remoteFeedbackStore,
   remoteNotesStore,
+  remoteRobotStatusStore,
 } from './remoteStores';
 
 export const backendMode: 'local' | 'remote' = import.meta.env?.VITE_API_BASE
@@ -46,3 +48,4 @@ export const gradingStore: GradingStore = remote
   : new LocalGradingStore(localSubmissionStore, localAssignmentStore);
 export const feedbackStore: FeedbackStore = remote ? remoteFeedbackStore : localFeedbackStore;
 export const notesStore: NotesStore = remote ? remoteNotesStore : localNotesStore;
+export const robotStatusStore: RobotStatusStore = remote ? remoteRobotStatusStore : localRobotStatusStore;

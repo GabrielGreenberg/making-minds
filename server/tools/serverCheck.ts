@@ -17,10 +17,19 @@
 //     deduplicated save history, a transplant attributed to its owner, sandbox
 //     ids unbound, integrity never on a student's copy, legacy content read as
 //     legacy
+//   [robot-status] (task 083): the robot's state is instructor-only; against
+//     a temp origin, the server's clone of it and a mirror (no network) it
+//     reports what runs, the gate's hold in its own words, the landed task
+//     (a docs-only task merged beside it is no row), unreadable backups as a
+//     wait saying so, the blocked question (a deferred one omitted), queue
+//     activity and review marks as id + category; the cache and ?refresh=1;
+//     broken sources answer 200 with unknown sections; a malformed mirror
+//     inside another repository never touches that repository
 //
 // Exits non-zero on the first failed assertion.
 
-import { mkdtempSync, rmSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
+import { chmodSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
@@ -36,6 +45,7 @@ import {
   SAMPLE_ASSIGNMENT_ID,
 } from '../../app/src/devData/sampleData';
 import type { AssignmentData, CircuitData, SubmissionRecord } from '../../app/src/types';
+import type { RobotStatus } from '../../app/src/storage/robotStatus';
 import { deriveMintKey, DEV_MINT_SECRET, mintWithKey, prepareKey } from '../../app/src/provenance/ids';
 
 let failures = 0;
@@ -925,6 +935,199 @@ check('saving again overwrites the single row (not a second one)',
     !!k1 && k1 === k2 && k2 === k3 && k1 !== d2.publicIdOf('lee@example.com'));
   d2.close();
   rmSync(dir, { recursive: true, force: true });
+}
+
+// ── [robot-status] the robot's state (task 083) ─────────────────
+{
+  const denied = await api('GET', '/robot/status', { token: sTok });
+  check('[robot-status] a student gets 403', denied.status === 403);
+  const anonymous = await api('GET', '/robot/status');
+  check('[robot-status] no token gets 401', anonymous.status === 401);
+
+  // origin.git (GitHub's stand-in) ← work; the server's clone of it is at
+  // "first" (what the pilot runs); then main moves on: a schema change and a
+  // docs-only task, each landed on its branch and merged as /work and the
+  // robot land them, and two parked tasks (one deferred) under a robot claim.
+  const tmp = mkdtempSync(join(tmpdir(), 'mm-robot-'));
+  const gitEnv = { ...process.env, GIT_AUTHOR_NAME: 't', GIT_AUTHOR_EMAIL: 't@t', GIT_COMMITTER_NAME: 't', GIT_COMMITTER_EMAIL: 't@t' };
+  const git = (...args: string[]) => execFileSync('git', args, { encoding: 'utf8', env: gitEnv, stdio: ['ignore', 'pipe', 'pipe'] }).trim();
+  const origin = join(tmp, 'origin.git');
+  const work = join(tmp, 'work');
+  const clone = join(tmp, 'clone');
+  git('init', '-q', '--bare', origin);
+  mkdirSync(work);
+  git('-C', work, 'init', '-q');
+  git('-C', work, 'symbolic-ref', 'HEAD', 'refs/heads/main');
+  writeFileSync(join(work, 'README.md'), 'x\n');
+  git('-C', work, 'add', '.');
+  git('-C', work, 'commit', '-q', '-m', 'first');
+  git('-C', work, 'push', '-q', origin, 'HEAD:refs/heads/main');
+  git('clone', '-q', '-b', 'main', origin, clone);
+  const released = git('-C', clone, 'rev-parse', 'HEAD');
+  const landOnBranch = (branch: string, file: string, id: string, title: string) => {
+    git('-C', work, 'checkout', '-q', '-b', branch);
+    mkdirSync(join(work, file, '..'), { recursive: true });
+    writeFileSync(join(work, file), 'y\n');
+    git('-C', work, 'add', '.');
+    git('-C', work, 'commit', '-q', '-m', `${id.slice(-3)}: the change`);
+    git('-C', work, 'commit', '-q', '--allow-empty', '-m', `tasks: land ${id} — ${title}`);
+    git('-C', work, 'checkout', '-q', 'main');
+    git('-C', work, 'merge', '-q', '--no-ff', '-m', `Merge ${branch}: ${title}`, branch);
+  };
+  landOnBranch('robot/099-schema', 'server/src/db.ts', '2026-09-28-099', 'A test task');
+  landOnBranch('task/103-docs', 'docs/notes.md', '2026-09-28-103', 'A docs-only task');
+  mkdirSync(join(work, 'tasks', 'blocked'), { recursive: true });
+  writeFileSync(
+    join(work, 'tasks', 'blocked', '2026-09-28-100-a.md'),
+    '---\nid: 2026-09-28-100\ntitle: A student report\nstatus: blocked\n---\n\n## Description\nx\n\n## Questions\n1. Work this student-reported fix? (yes / no)\n',
+  );
+  writeFileSync(
+    join(work, 'tasks', 'blocked', '2026-09-28-101-b.md'),
+    '---\nid: 2026-09-28-101\ntitle: Later\nstatus: deferred\n---\n\n## Questions\n1. Not yet?\n',
+  );
+  git('-C', work, 'add', '.');
+  git('-C', work, 'commit', '-q', '-m', 'tasks: claim 099 (robot)');
+  git('-C', work, 'push', '-q', origin, 'HEAD:refs/heads/main');
+  const mainHead = git('-C', work, 'rev-parse', 'HEAD');
+
+  const listen = async (a: ReturnType<typeof createApp>) => {
+    const srv = a.listen(0);
+    await new Promise<void>((resolve) => srv.on('listening', resolve));
+    const addr = srv.address();
+    return { srv, url: `http://127.0.0.1:${typeof addr === 'object' && addr ? addr.port : 0}/api` };
+  };
+  const robot = async (url: string, path = '/robot/status') => {
+    const res = await fetch(url + path, { headers: { Authorization: `Bearer ${iTok}` } });
+    return { status: res.status, status_: (await res.json()) as RobotStatus };
+  };
+  // The same database (so the same sessions), a server of its own over the temp repos.
+  const { srv, url } = await listen(
+    createApp({ ...config, repoDir: clone, repoMirror: join(tmp, 'mirror.git'), backupDir: join(tmp, 'backups') }, db),
+  );
+  // A systemctl that cannot answer (as when the service user may not ask):
+  // the first gathering reads the backups through it.
+  const bin = join(tmp, 'bin');
+  mkdirSync(bin);
+  writeFileSync(join(bin, 'systemctl'), '#!/bin/sh\necho "Failed to connect to bus: No such file or directory" >&2\nexit 1\n');
+  chmodSync(join(bin, 'systemctl'), 0o755);
+  const realPath = process.env.PATH;
+  process.env.PATH = `${bin}:${realPath ?? ''}`;
+  let first: Awaited<ReturnType<typeof robot>>;
+  try {
+    first = await robot(url);
+  } finally {
+    process.env.PATH = realPath;
+  }
+  const s = first.status_;
+  check('[robot-status] an instructor gets 200', first.status === 200 && s.available === true);
+  if (s.available) {
+    check('[robot-status] live: what the server\'s clone runs', s.live.ok && s.live.sha === released && s.live.subject === 'first', JSON.stringify(s.live));
+    check('[robot-status] release: GitHub main, held for the schema in the gate\'s words',
+      s.release.ok && s.release.head === mainHead && s.release.verdict === 'hold' &&
+        s.release.line.startsWith('held: ') && s.release.line.includes('the database schema and its migrations'),
+      JSON.stringify(s.release));
+    check('[robot-status] release: the landed task waits; the docs-only task merged beside it does not',
+      s.release.ok && s.release.rows.length === 1 && s.release.rows[0].id === '2026-09-28-099' && s.release.rows[0].title === 'A test task',
+      JSON.stringify(s.release.ok ? s.release.rows : s.release));
+    check('[robot-status] release: backups systemctl cannot answer for are a wait that says they are unknown, and why',
+      s.release.ok && s.release.reasons.some((r) => r.verdict === 'wait' &&
+        r.detail === 'the daily backups are unknown: systemctl gave no answer about makingminds-backup.timer (Failed to connect to bus: No such file or directory)'),
+      JSON.stringify(s.release.ok ? s.release.reasons : s.release));
+    check('[robot-status] release: a non-GitHub origin is the gate\'s own "cannot read CI" wait (no network)',
+      s.release.ok && s.release.reasons.some((r) => r.verdict === 'wait' && /cannot read CI/.test(r.detail)));
+    check('[robot-status] answers: the student fix waits, tagged; the deferred task is omitted',
+      s.answers.ok && s.answers.tasks.length === 1 && s.answers.tasks[0].id === '2026-09-28-100' && s.answers.tasks[0].studentFix,
+      JSON.stringify(s.answers));
+    check('[robot-status] activity: the claim, tagged robot, newest first',
+      s.activity.ok && s.activity.events[0]?.kind === 'claim' && s.activity.events[0].robot &&
+        s.activity.events.some((e) => e.kind === 'land' && !e.robot),
+      JSON.stringify(s.activity));
+    check('[robot-status] review: nothing marked yet', s.review.ok && s.review.items.length === 0);
+  }
+
+  // The cache: main moves on; a plain ask within 10 minutes keeps the old
+  // answer, ?refresh=1 looks again.
+  git('-C', work, 'commit', '-q', '--allow-empty', '-m', 'tasks: file 102 — Another task (robot catch)');
+  git('-C', work, 'push', '-q', origin, 'HEAD:refs/heads/main');
+  const newerHead = git('-C', work, 'rev-parse', 'HEAD');
+  const cached = (await robot(url)).status_;
+  check('[robot-status] a plain second ask within 10 minutes answers from the cache',
+    cached.available && s.available && cached.asOf === s.asOf && cached.release.ok && cached.release.head === mainHead);
+  const fresh = (await robot(url, '/robot/status?refresh=1')).status_;
+  check('[robot-status] ?refresh=1 looks again',
+    fresh.available && fresh.release.ok && fresh.release.head === newerHead &&
+      fresh.activity.ok && fresh.activity.events[0]?.kind === 'file' && fresh.activity.events[0].robot);
+
+  // A report marked review: its id and category, never its words or author.
+  const filed = await api<{ feedback: { id: string } }>('POST', '/feedback', {
+    token: sTok,
+    body: { category: 'homework content', message: 'robot-panel-secret-words', screenshots: [] },
+  });
+  const marked = await api('PUT', `/feedback/${filed.json.feedback.id}/triage`, { token: iTok, body: { outcome: 'review' } });
+  const withReview = await robot(url);
+  const items = withReview.status_.available && withReview.status_.review.ok ? withReview.status_.review.items : [];
+  check('[robot-status] review: a marked report appears as {id, category} only',
+    filed.status === 201 && marked.status === 200 &&
+      items.some((i) => i.id === filed.json.feedback.id && i.category === 'homework content') &&
+      items.every((i) => JSON.stringify(Object.keys(i).sort()) === '["category","id"]'),
+    JSON.stringify(items));
+  const wire = JSON.stringify(withReview.status_);
+  check('[robot-status] …and no report text or author reaches the wire',
+    !wire.includes('robot-panel-secret-words') && !wire.includes(student.email.toLowerCase()));
+  srv.close();
+
+  // Broken sources: a mirror path that is a file; a clone that is no repo.
+  writeFileSync(join(tmp, 'mirror-file'), 'not a folder\n');
+  const badMirror = await listen(createApp({ ...config, repoDir: clone, repoMirror: join(tmp, 'mirror-file'), backupDir: join(tmp, 'backups') }, db));
+  const m = await robot(badMirror.url);
+  check('[robot-status] a mirror that cannot be made: 200, never 500', m.status === 200 && m.status_.available === true);
+  if (m.status_.available) {
+    const st = m.status_;
+    check('[robot-status] …what runs still answers; release, answers and activity are unknown, naming the mirror',
+      st.live.ok && [st.release, st.answers, st.activity].every((x) => !x.ok && /mirror/.test(x.unknown)),
+      JSON.stringify(st));
+  }
+  badMirror.srv.close();
+  const notRepo = join(tmp, 'not-a-repo');
+  mkdirSync(notRepo);
+  const broken = await listen(createApp({ ...config, repoDir: notRepo, repoMirror: join(tmp, 'mirror-file'), backupDir: join(tmp, 'backups') }, db));
+  const b = await robot(broken.url);
+  check('[robot-status] a clone that is no repository: 200, never 500', b.status === 200 && b.status_.available === true);
+  if (b.status_.available) {
+    const st = b.status_;
+    check('[robot-status] …live, release, answers and activity are unknown, each saying why',
+      [st.live, st.release, st.answers, st.activity].every((x) => !x.ok && x.unknown.length > 0),
+      JSON.stringify(st));
+    check('[robot-status] …while the review list, the database\'s, still answers', st.review.ok);
+  }
+  broken.srv.close();
+
+  // A malformed mirror (HEAD and nothing else) inside another repository —
+  // the dev default sits inside the live checkout: the forced fetch must
+  // never land in that repository and move its main, nor may its main be
+  // reported as GitHub's.
+  const outer = join(tmp, 'outer');
+  mkdirSync(outer);
+  git('-C', outer, 'init', '-q');
+  git('-C', outer, 'symbolic-ref', 'HEAD', 'refs/heads/main');
+  git('-C', outer, 'commit', '-q', '--allow-empty', '-m', 'outer-first');
+  git('-C', outer, 'checkout', '-q', '-b', 'feature');
+  const outerMain = git('-C', outer, 'rev-parse', 'refs/heads/main');
+  const nested = join(outer, 'server', 'repo-mirror.git');
+  mkdirSync(nested, { recursive: true });
+  writeFileSync(join(nested, 'HEAD'), 'ref: refs/heads/main\n');
+  const inRepo = await listen(createApp({ ...config, repoDir: clone, repoMirror: nested, backupDir: join(tmp, 'backups') }, db));
+  const n = await robot(inRepo.url);
+  check('[robot-status] a malformed mirror inside a repository: 200, and that repository\'s main never moves',
+    n.status === 200 && git('-C', outer, 'rev-parse', 'refs/heads/main') === outerMain);
+  if (n.status_.available) {
+    const st = n.status_;
+    check('[robot-status] …GitHub main is unknown, never the outer repository\'s main',
+      !st.release.ok && !JSON.stringify(st).includes(outerMain) && !st.answers.ok && !st.activity.ok,
+      JSON.stringify(st.release));
+  }
+  inRepo.srv.close();
+  rmSync(tmp, { recursive: true, force: true });
 }
 
 // ── logout ───────────────────────────────────────────────────────

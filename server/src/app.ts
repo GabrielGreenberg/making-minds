@@ -93,6 +93,11 @@
 //                                              tasks?, note?} | {clear: true}
 //   GET    /api/instructor-notes               instructor: the one shared markdown note
 //   PUT    /api/instructor-notes               instructor: {content: string} → saves it
+//   GET    /api/robot/status                   instructor: the robot's state (task 083) — what
+//                                              the pilot runs, the release gate's verdict on
+//                                              GitHub main, blocked questions, review marks
+//                                              (id + category), queue activity; cached 10
+//                                              minutes, ?refresh=1 looks again; never a 500
 //   GET    /api/health                         unauthenticated liveness probe
 //
 // Grading happens HERE, with the same pure engine the browser uses
@@ -144,6 +149,11 @@ import { snapshotDirFor, takeRegradeSnapshot } from './snapshot';
 import { ClaimBook } from '../../app/src/storage/gradingClaims';
 import { checkGroup } from '../../app/src/submissionGroup';
 import { studentCopy } from '../../app/src/lateContext';
+import { gateFactsFor, robotStatusUnknown, robotStatusView, type GateFactsLike } from '../../app/src/storage/robotStatus';
+import { backupDirFor, createRobotStatusSource, mirrorDirFor, repoDirFor } from './robotStatus';
+// The release gate's decision itself (pure; importing it runs nothing), so
+// the Dashboard's reason can never drift from what the robot's gate says.
+import { decide } from '../../deploy/release-gate.mjs';
 
 export function createApp(config: ServerConfig, db: Db) {
   const app = express();
@@ -1281,6 +1291,56 @@ export function createApp(config: ServerConfig, db: Db) {
     }
     const note = db.saveInstructorNote(content, req.user!.name);
     res.json({ note });
+  });
+
+  // ── the robot's state (task 083) ────────────────────────────────
+  // Instructor-only, like the Feedback tab. The git and CI facts are cached
+  // per app (src/robotStatus.ts); the assignments, the feedback queue, the
+  // gate's verdict and the view are this request's. The only input is
+  // `?refresh=1`, and it reaches no child process. Every failure is a section
+  // that says "unknown: <why>" — this route answers 200.
+  const robotSource = createRobotStatusSource({
+    repoDir: repoDirFor(config.repoDir),
+    mirrorDir: mirrorDirFor(config.dbPath, config.repoMirror),
+    backupDir: backupDirFor(config.dbPath, config.backupDir),
+  });
+
+  app.get('/api/robot/status', auth, requireInstructor, async (req, res) => {
+    const now = new Date();
+    try {
+      const facts = await robotSource.get(req.query.refresh === '1');
+      // The assignments as the gate's pilot probe shapes them (release-gate.mjs
+      // listPilotAssignments): published? due when?
+      let assignments: GateFactsLike['assignments'] = null;
+      try {
+        const visible = db.listVisible();
+        assignments = db.listAssignments().map((a) => ({
+          id: a.id,
+          title: a.title,
+          visible: visible.get(a.id) ?? false,
+          ...(a.dueDate ? { dueDate: a.dueDate } : {}),
+        }));
+      } catch {
+        // the gate waits on "cannot read due dates"
+      }
+      const gateFacts = gateFactsFor(facts, assignments, now);
+      let gate = null;
+      try {
+        gate = gateFacts ? decide(gateFacts) : null;
+      } catch (e) {
+        console.error(e);
+      }
+      let feedback = null;
+      try {
+        feedback = db.listFeedback({ status: 'open' });
+      } catch {
+        // review: unknown
+      }
+      res.json(robotStatusView(facts, gate, feedback));
+    } catch (e) {
+      console.error(e);
+      res.json(robotStatusUnknown("the robot's state could not be read", now));
+    }
   });
 
   // ── errors ─────────────────────────────────────────────────────

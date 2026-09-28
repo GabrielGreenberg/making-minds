@@ -180,3 +180,57 @@ push notification that doesn't reach him.
   acceptable. The mirror appears under `/srv/making-minds/data/`.
 
 ## Progress log
+
+### 2026-09-28 — implemented (work loop)
+**Built (deepFix).** The Dashboard now has a **Robot** tab (`#/instructor/robot`, after
+Notes). It shows four sections: Live (the sha and subject, the newest landed task, the release
+time plus "3 h ago"), Waiting for release (the verdict in the gate's own words, then a row per
+landed task that ships), Waiting for your answer (non-deferred `tasks/blocked/` files, each
+with its first question on one line and a "student fix" tag where it applies, plus review
+marks shown as id and category only, linking to Feedback) and Recent queue activity (the last
+15 events, each robot event tagged). The page has an "as of" line and Refresh; a failed
+refresh keeps the last answer and shows a one-line error. When a release is held or a
+question or report waits, a one-line strip sits over the tab row on every Dashboard tab. The
+server's `GET /api/robot/status` (instructor-only) reads its own clone, a fetch-only bare
+mirror of GitHub main beside the database (`--git-dir`, never the release clone), the daily
+backups, `systemctl` and GitHub's public CI API. It caches for 10 minutes, and `?refresh=1`
+looks again. It calls the gate's own `decide()` and `quietOnly` (no hold list is copied), runs
+only fixed-argument async `execFile` calls with timeouts, and answers 200 with an "unknown:
+<why>" for any section it can't read. The one pure builder is
+`app/src/storage/robotStatus.ts` (`robotStatusView`, `robotStripLine`, `completeGate`). It
+is reached through the new `RobotStatusStore` seam. The Local store answers "Not available
+in local mode" and makes no fetch.
+**Pins.** New `app/tools/robotStatusCheck.ts` (in `npm run check`): [hold] [quiet] [wait]
+[release] [box] [pending] [backup] [quiet-task] [blocked] (it also checks that every real
+blocked file's question fits on one line) [activity] [review] [unknown] [strip] [ago] [local]
+(zero fetches) [pure]. `serverCheck` [robot-status]: student 403, no token 401, instructor 200
+against a temp repo with a local bare remote (a schema hold, a docs-only land not counted,
+unreadable backups as a wait, non-GitHub CI as a wait, student fix and deferred, robot tag),
+the cache vs `?refresh=1`, review as {id, category} only, a broken mirror or clone giving 200
+with unknown sections, and a malformed mirror inside an outer repo leaving that repo's main
+unmoved. `remoteStoreCheck`: the Remote impl round-trips, `get(true)` works, a student gets
+403, and the grader grep gate stays green. `routingCheck` [robot route]: the route round-trips
+and is instructor-only; Notes · Robot are in the tab row; the four sections, the student-fix
+tag, the review link, the Unknown line, local "Not available" and the failed-refresh line all
+render.
+**Gates** (exit codes): app-tsc=0 app-build=0 app-check=0 server-tsc=0 server-check=0.
+**Review findings fixed (4).** (1) A failed comparison of what runs with main now shows the
+real reason, not the gate's "not in this clone's history". (2) Backups the server can't read
+now make it wait ("the daily backups are unknown: <why>"), never "Clear to release". (3) A
+docs- or queue-only landed task is no row, judged per land from its merge's diff with
+`quietOnly`. (4) Every mirror command runs with `--git-dir`, so a malformed mirror can't
+move an outer repo's main. Skipped: none. Nit left: trimming CLAUDE.md to its 40 KB budget
+dropped a few still-true facts (the "Next: robot (043), pilot domain (008)" line; "Home and
+the overview re-fetch every visit"; routerCheck's hw3-p4 pin).
+**Owed, not claimed.** (a) The headless remote-mode eyeball (ROBOT-WORK §3): a server on
+:8199 plus Vite remote mode on :5191, a token in localStorage, then shots of
+`#/instructor/robot` at 1280 and 375 px (the four sections, the as-of line, Refresh moving
+asOf, the tags, no horizontal overflow) and of `#/instructor/feedback` for the strip. Also:
+the server killed, where a Refresh keeps the last answer with a one-line error; and local mode
+(:5190), which shows "Not available in local mode" with no /api traffic. (b) On the box after
+the first release (Gabriel): Live's sha matches what `node deploy/release-gate.mjs` reports,
+and so does the verdict line; `/srv/making-minds/data/repo-mirror.git` exists and is owned by
+makingminds; `sudo -u makingminds systemctl is-active makingminds-backup.timer` answers (else
+backup reads "unknown", which is acceptable); the box reaches api.github.com.
+**Next step:** loop session: do the headless remote-mode visual check owed in (a), then land
+per PROFILE §5.

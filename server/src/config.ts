@@ -40,6 +40,17 @@ export interface ServerConfig {
    * next to the daily backups.
    */
   snapshotDir?: string;
+  /**
+   * The robot's state on the Dashboard (task 083; src/robotStatus.ts). The
+   * server's own clone — what the pilot runs (MM_REPO_DIR; unset: the repo
+   * this code runs from); a fetch-only mirror of GitHub main (MM_REPO_MIRROR;
+   * unset: `repo-mirror.git` beside the database, none for ':memory:'); the
+   * daily backups the release gate reads (MM_BACKUP_DIR; unset:
+   * `backups/daily` beside the database's directory, like snapshotDir).
+   */
+  repoDir?: string;
+  repoMirror?: string;
+  backupDir?: string;
 }
 
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): ServerConfig {
@@ -57,5 +68,8 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): ServerConfig {
     sessionTtlSeconds: Number(env.MM_SESSION_TTL_SECONDS) || 30 * 24 * 60 * 60,
     mintSecret: env.MM_MINT_SECRET || undefined,
     snapshotDir: env.MM_SNAPSHOT_DIR || undefined,
+    repoDir: env.MM_REPO_DIR || undefined,
+    repoMirror: env.MM_REPO_MIRROR || undefined,
+    backupDir: env.MM_BACKUP_DIR || undefined,
   };
 }

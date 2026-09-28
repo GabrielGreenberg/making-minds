@@ -1000,3 +1000,21 @@
 .gr-regrade-summary { margin: 14px 0 0; }
 .gr-regrade-error { margin: 12px 0 0; }
 .gr-regrade-actions { margin-top: 18px; }
+
+/* ── Instructor: the robot's state (task 083; instructor/RobotView.tsx) and
+   the strip over the Dashboard's tabs (instructor/InstructorLayout.tsx) ── */
+.robot-strip { margin: 0 0 14px; }
+.robot-strip a { font-weight: 600; }
+.robot-label { flex: 0 0 170px; color: var(--mm-ink-3); font-size: var(--mm-fs-small); }
+.robot-id { flex: 0 0 auto; font-size: var(--mm-fs-small); color: var(--mm-ink-2); }
+.robot-verdict { margin: 0 0 8px; font-weight: 600; color: var(--mm-ink); }
+.robot-reasons { margin: 0 0 12px; padding-left: 18px; font-size: var(--mm-fs-small); color: var(--mm-ink-2); }
+.robot-reasons li { margin: 2px 0; }
+.robot-subhead { margin: 22px 0 6px; }
+.robot-unknown, .robot-stale, .robot-error { margin: 0 0 12px; }
+.robot-event { overflow-wrap: anywhere; }
+.robot-link { text-decoration: none; }
+.robot-kind { min-width: 44px; text-align: center; }
+@media (max-width: 720px) {
+  .robot-label { flex-basis: 100%; }
+}
