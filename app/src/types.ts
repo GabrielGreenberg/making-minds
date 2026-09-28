@@ -892,6 +892,11 @@ export interface FeedbackScreenshot {
   filename?: string;
 }
 
+/** Where a report was filed from, if anywhere: the assignment (and question)
+ *  the reporter had open, derived from the route (routing.ts
+ *  feedbackContextFor) — absent off an assignment's pages. */
+export type FeedbackContext = { assignmentId?: string; questionId?: number };
+
 export interface PlatformFeedback {
   id: string;
   student: string; // email — feedback is tied to identity so an instructor can follow up
@@ -904,9 +909,9 @@ export interface PlatformFeedback {
   screenshots: FeedbackScreenshot[];
   createdAt: string; // ISO; the server's word remotely, the client's word locally
   status: FeedbackStatus;
-  /** Where the student was when they filed it, if anywhere — helps triage
-   *  "homework content" reports. Auto-filled from the current route. */
-  context?: { assignmentId?: string; questionId?: number };
+  /** Where the reporter was when they filed it, if anywhere — helps triage
+   *  "homework content" reports. Derived from the current route. */
+  context?: FeedbackContext;
   /** Absent = the task pipeline has not processed it yet. */
   triage?: FeedbackTriage;
 }

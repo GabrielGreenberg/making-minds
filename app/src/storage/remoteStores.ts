@@ -35,6 +35,7 @@ import type {
   LateWaiver,
   Points,
   FeedbackCategory,
+  FeedbackContext,
   FeedbackScreenshot,
   FeedbackStatus,
   InstructorNote,
@@ -338,7 +339,7 @@ class RemoteFeedbackStore implements FeedbackStore {
     category: FeedbackCategory;
     message: string;
     screenshots: FeedbackScreenshot[];
-    context?: { assignmentId?: string; questionId?: number };
+    context?: FeedbackContext;
   }): Promise<PlatformFeedback> {
     // `student` and `authorRole` are the server's word (the session
     // identifies who is posting, and in what role), same discipline as

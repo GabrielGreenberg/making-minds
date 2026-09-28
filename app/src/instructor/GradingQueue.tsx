@@ -18,6 +18,7 @@ import {
   pendingProblems,
   pointsText,
   queueCounts,
+  queueKeyAction,
   queueProblemIds,
   queueState,
   responseLabel,
@@ -27,6 +28,7 @@ import {
   submitterKeys,
   wordCount,
 } from './gradingQueueViews';
+import type { QueueKeyTarget } from './gradingQueueViews';
 
 /** How often the open queue re-reads the feed (others' grades and claims). */
 const POLL_MS = 30_000;
@@ -506,10 +508,21 @@ const KEYS: { points: Points; key: string; text: string }[] = [
   { points: 1, key: '1', text: '1' },
 ];
 
-/** Where keystrokes belong to a field, not the queue. */
-function inField(t: EventTarget | null): t is HTMLElement {
-  if (!(t instanceof HTMLElement)) return false;
-  return t.tagName === 'INPUT' || t.tagName === 'SELECT' || t.tagName === 'TEXTAREA' || t.isContentEditable;
+/** Where a keystroke landed, for queueKeyAction: the card's own note, any
+ *  other field (a textarea included — the topbar's Feedback form sits over
+ *  the queue, task 076), a button or link, or the page. */
+function keyTarget(t: EventTarget | null, note: HTMLTextAreaElement | null): QueueKeyTarget {
+  if (!(t instanceof HTMLElement)) return 'page';
+  if (note !== null && t === note) return 'note';
+  if (t.tagName === 'INPUT' || t.tagName === 'SELECT' || t.tagName === 'TEXTAREA' || t.isContentEditable) return 'field';
+  if (t.tagName === 'BUTTON' || t.tagName === 'A') return 'control';
+  return 'page';
+}
+
+/** A modal is up over the page (the shared `.mm-modal-backdrop`): it owns
+ *  the keyboard, not the queue behind it. */
+function modalOpen(): boolean {
+  return document.querySelector('.mm-modal-backdrop') !== null;
 }
 
 /** A mouse click must not leave focus on a button: Enter would re-click it
@@ -638,26 +651,29 @@ function ResponseCard({
   }, [busy, sel, note, conflict, write, onResult]);
 
   // The keys: 0 / h / 1 choose; Enter saves & moves on (Shift+Enter is a
-  // newline in the note); J / K next / previous. Typing in a field is left
-  // alone — except Enter in the note.
+  // newline in the note); J / K next / previous — what each keystroke means
+  // is queueKeyAction's (typing in a field is left alone except Enter in THIS
+  // card's note; a modal over the queue owns the keyboard).
+  const noteRef = useRef<HTMLTextAreaElement>(null);
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.metaKey || e.ctrlKey || e.altKey || e.defaultPrevented) return;
-      const t = e.target;
-      if (e.key === 'Enter' && !e.shiftKey) {
-        if (inField(t) && t.tagName !== 'TEXTAREA') return;
-        if (t instanceof HTMLElement && (t.tagName === 'BUTTON' || t.tagName === 'A')) return;
+      if (e.defaultPrevented) return;
+      const action = queueKeyAction(
+        { key: e.key, shift: e.shiftKey, modifier: e.metaKey || e.ctrlKey || e.altKey },
+        keyTarget(e.target, noteRef.current),
+        modalOpen(),
+      );
+      if (action === null) return;
+      if (action === 'save-next') {
         e.preventDefault();
         saveNext();
         return;
       }
-      if (inField(t)) return;
-      const k = e.key.toLowerCase();
-      if (k === '0') setSel(0);
-      else if (k === 'h') setSel(0.5);
-      else if (k === '1') setSel(1);
-      else if (k === 'j' && hasNext) onStep(1);
-      else if (k === 'k' && hasPrev) onStep(-1);
+      if (action === 'choose-0') setSel(0);
+      else if (action === 'choose-half') setSel(0.5);
+      else if (action === 'choose-1') setSel(1);
+      else if (action === 'next' && hasNext) onStep(1);
+      else if (action === 'prev' && hasPrev) onStep(-1);
       else return;
       e.preventDefault();
       setMessage(null);
@@ -739,7 +755,7 @@ function ResponseCard({
         </div>
         <label className="mm-field gr-note">
           <span>Note to the student ({item.autoPoints === null ? 'optional on a hand grade' : 'required to override the autograde'})</span>
-          <textarea className="mm-input" rows={2} placeholder="No medical or accommodation details" value={note}
+          <textarea ref={noteRef} className="mm-input" rows={2} placeholder="No medical or accommodation details" value={note}
             onChange={(e) => setNote(e.target.value)} />
         </label>
         <div className="gr-qfoot">

@@ -1,12 +1,16 @@
 import { useState } from 'react';
-import type { FeedbackCategory, FeedbackScreenshot } from '../types';
+import type { FeedbackCategory, FeedbackContext, FeedbackScreenshot } from '../types';
 import { feedbackStore } from '../storage/backend';
+import { feedbackFromSession } from '../storage/feedbackStore';
 import { useAuth } from '../auth';
-import { useStore } from '../store';
 
 const MAX_SCREENSHOTS = 2;
 const MAX_SIDE = 1600; // downscale so a typical screenshot lands well under 1MB
 const JPEG_QUALITY = 0.7;
+
+/** Fired on `window` when a report is filed, so a view listing reports (the
+ *  Dashboard's Feedback queue) reloads whichever entry point filed it. */
+export const FEEDBACK_FILED_EVENT = 'mm:feedback-filed';
 
 /** Downscale + re-encode a picked image file into a small JPEG data URL, so a
  *  full-resolution screenshot doesn't blow the request body or (in local
@@ -34,10 +38,15 @@ function fileToScreenshot(file: File): Promise<FeedbackScreenshot> {
   });
 }
 
-export function FeedbackPanel({ onClose }: { onClose: () => void }) {
+/**
+ * The report form, the same for every role and every entry point. `context`
+ * is where the reporter is, from the caller (the route —
+ * routing.ts feedbackContextFor); absent = none (Home, the Dashboard). The
+ * author and their role are the session's.
+ */
+export function FeedbackPanel({ onClose, context }: { onClose: () => void; context?: FeedbackContext }) {
   const { user } = useAuth();
-  const assignment = useStore((s) => s.assignment);
-  const currentQuestionIndex = useStore((s) => s.currentQuestionIndex);
+  const instructor = user?.role === 'instructor';
   const [category, setCategory] = useState<FeedbackCategory>('platform design');
   const [message, setMessage] = useState('');
   const [screenshots, setScreenshots] = useState<FeedbackScreenshot[]>([]);
@@ -69,20 +78,9 @@ export function FeedbackPanel({ onClose }: { onClose: () => void }) {
     setBusy(true);
     setError(null);
     try {
-      await feedbackStore.submit({
-        student: user.email,
-        authorRole: user.role,
-        category,
-        message: message.trim(),
-        screenshots,
-        context: assignment
-          ? {
-              assignmentId: assignment.id,
-              questionId: assignment.questions[currentQuestionIndex]?.id,
-            }
-          : undefined,
-      });
+      await feedbackStore.submit(feedbackFromSession(user, { category, message, screenshots }, context));
       setSent(true);
+      window.dispatchEvent(new Event(FEEDBACK_FILED_EVENT));
     } catch {
       setError('Could not send feedback — the server may be unreachable. Try again in a moment.');
     } finally {
@@ -97,13 +95,22 @@ export function FeedbackPanel({ onClose }: { onClose: () => void }) {
           <h2>Feedback</h2>
           <button className="mm-btn mm-btn--small" onClick={onClose}>Close</button>
         </div>
-        <p className="mm-modal-sub">
-          Something broken, confusing, or wrong in a homework? Tell the instructors.
-          This form is for the platform and the homeworks only: for anything personal
-          (an extension, an absence, a grade), email your instructor instead.
-        </p>
+        {instructor ? (
+          <p className="mm-modal-sub">
+            A problem or an idea about the platform or a homework? File it here — it
+            joins the Feedback queue with the instructor tag.
+          </p>
+        ) : (
+          <p className="mm-modal-sub">
+            Something broken, confusing, or wrong in a homework? Tell the instructors.
+            This form is for the platform and the homeworks only: for anything personal
+            (an extension, an absence, a grade), email your instructor instead.
+          </p>
+        )}
         {sent ? (
-          <p className="feedback-sent">Thanks — an instructor will take a look.</p>
+          <p className="feedback-sent">
+            {instructor ? 'Filed — it’s in the Feedback queue.' : 'Thanks — an instructor will take a look.'}
+          </p>
         ) : (
           <div className="mm-form">
             <label className="mm-field">

@@ -109,6 +109,46 @@ export function pointsText(p: 0 | 0.5 | 1): string {
   return p === 0.5 ? '½' : String(p);
 }
 
+// ── The keys ─────────────────────────────────────────────────────────────
+
+/** What a keystroke asks of the queue card. */
+export type QueueKeyAction = 'save-next' | 'choose-0' | 'choose-half' | 'choose-1' | 'next' | 'prev';
+
+/** Where a keystroke landed: `note` — this card's own note field; `field` —
+ *  any other field (an input, a select, contenteditable, a textarea that is
+ *  not the note); `control` — a button or link; `page` — anywhere else. */
+export type QueueKeyTarget = 'note' | 'field' | 'control' | 'page';
+
+/**
+ * The queue's keys (0 / h / 1 choose; Enter saves & moves on, Shift+Enter a
+ * newline in the note; J / K next / previous), or null when the keystroke is
+ * not the queue's. Typing in a field is left alone — the one exception is
+ * Enter in the card's OWN note, never in any other textarea. Enter on a
+ * button or link clicks it. A modal open over the queue (the topbar's
+ * Feedback form, on every Dashboard page since task 076, or any other) owns
+ * the keyboard outright: nothing is the queue's while one is up.
+ */
+export function queueKeyAction(
+  key: { key: string; shift: boolean; modifier: boolean },
+  target: QueueKeyTarget,
+  modalOpen: boolean,
+): QueueKeyAction | null {
+  if (key.modifier || modalOpen) return null;
+  if (key.key === 'Enter') {
+    if (key.shift) return null;
+    return target === 'note' || target === 'page' ? 'save-next' : null;
+  }
+  if (target === 'note' || target === 'field') return null;
+  switch (key.key.toLowerCase()) {
+    case '0': return 'choose-0';
+    case 'h': return 'choose-half';
+    case '1': return 'choose-1';
+    case 'j': return 'next';
+    case 'k': return 'prev';
+    default: return null;
+  }
+}
+
 /** Words in an answer (the card's meta line). */
 export function wordCount(text: string): number {
   const t = text.trim();

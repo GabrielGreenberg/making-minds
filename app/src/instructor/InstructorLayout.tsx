@@ -27,13 +27,15 @@ const SECTIONS: { label: string; route: ShellNavItem['route']; kinds: Instructor
 /**
  * The shell shared by all instructor views: the site's page shell with the
  * instructor's nav (Student view · Dashboard, the latter current), the
- * signed-in identity and Log out — and, inside the column, the Dashboard's
- * tab row. The chrome is the same one the student pages use, so nothing
- * moves on the crossing. Only instructor accounts get here (InstructorGate).
+ * signed-in identity, Feedback (the same report form students use, filed with
+ * the instructor tag — task 076) and Log out — and, inside the column, the
+ * Dashboard's tab row. The chrome is the same one the student pages use, so
+ * nothing moves on the crossing. Only instructor accounts get here
+ * (InstructorGate).
  */
 export function InstructorLayout({ route, children }: { route: InstructorRoute; children: ReactNode }) {
   return (
-    <PageShell nav={appNav('dashboard', 'instructor')} session={<SessionControls feedback={false} />}>
+    <PageShell nav={appNav('dashboard', 'instructor')} session={<SessionControls />}>
       <nav className="mm-tabs" aria-label="Dashboard sections">
         <span className="eyebrow">Dashboard</span>
         {SECTIONS.map((s) => {

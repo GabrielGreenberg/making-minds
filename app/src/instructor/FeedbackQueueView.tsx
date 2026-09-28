@@ -1,7 +1,8 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { FeedbackStatus, FeedbackTriage, PlatformFeedback } from '../types';
 import { feedbackStore } from '../storage/backend';
 import { useAsyncValue } from '../useAsyncValue';
+import { FEEDBACK_FILED_EVENT, FeedbackPanel } from '../components/FeedbackPanel';
 
 function formatTime(iso: string): string {
   const d = new Date(iso);
@@ -35,7 +36,10 @@ function TriageMark({ triage }: { triage: FeedbackTriage }) {
  * The instructor's feedback queue (notes/todos.md item 9): every report filed
  * on the platform or a homework, newest first, filterable by open/resolved,
  * with a status toggle; an instructor's own reports carry a tag, and a report
- * the task pipeline has processed shows what it became (task 018). Works in
+ * the task pipeline has processed shows what it became (task 018). "New
+ * report" files one from here (task 076) — the same form as the topbar's
+ * Feedback, with no assignment context; the list reloads whenever a report is
+ * filed, from either entry point (FEEDBACK_FILED_EVENT). Works in
  * both backends — the `feedbackStore` seam is local-storage-backed in local
  * mode, server-backed remotely — unlike the roster, which is a remote-only
  * concept.
@@ -44,6 +48,12 @@ export function FeedbackQueueView() {
   const { value: feedback, loading, error, reload } = useAsyncValue(() => feedbackStore.list(), []);
   const [filter, setFilter] = useState<'open' | 'resolved' | 'all'>('open');
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [filing, setFiling] = useState(false);
+
+  useEffect(() => {
+    window.addEventListener(FEEDBACK_FILED_EVENT, reload);
+    return () => window.removeEventListener(FEEDBACK_FILED_EVENT, reload);
+  }, [reload]);
 
   const rows = (feedback ?? []).filter((f) => filter === 'all' || f.status === filter);
   const openCount = (feedback ?? []).filter((f) => f.status === 'open').length;
@@ -73,8 +83,12 @@ export function FeedbackQueueView() {
             <option value="resolved">Resolved</option>
             <option value="all">All</option>
           </select>
+          <button className="mm-btn" onClick={() => setFiling(true)}>
+            New report
+          </button>
         </div>
       </div>
+      {filing && <FeedbackPanel onClose={() => setFiling(false)} />}
 
       {loading && !feedback && <p className="mm-empty">Loading…</p>}
       {error && <p className="mm-empty">Couldn’t load feedback.</p>}

@@ -64,3 +64,54 @@ as the toy instructor, Dashboard → Feedback → New report → it appears in t
 instructor, context none.
 
 ## Progress log
+- 2026-09-28 (robot, implement): deep fix. Checked the store: NOT cleared on leaving the
+  editor (`goHome` keeps `assignment` on purpose; instructor routes never touch the store),
+  so the context now comes from the route — pure `routing.ts feedbackContextFor(route,
+  assignment)` (an assignment route whose assignment is the one open → its id, + the
+  question's id when in range; else none), read by `SessionControls`' internal
+  `RouteFeedbackPanel`; `FeedbackPanel` takes `context` as a prop and reads no store.
+  `feedback` prop removed from `SessionControls` (the Dashboard shell now offers Feedback on
+  every tab); the Feedback tab gains "New report" (no context) and reloads on
+  `FEEDBACK_FILED_EVENT`, which the panel fires on every filing. Implementer's choice: the
+  form's copy is role-aware — an instructor reads "joins the Feedback queue with the
+  instructor tag" / "Filed — it's in the Feedback queue." (the student copy, "email your
+  instructor instead", read wrong for them); the student copy is unchanged. Kept the one
+  "Feedback" label (no "Report…" rename). Pins: routingCheck `[feedback context]` (pure
+  cases, local seam, source pins); remoteStoreCheck (instructor files through the real
+  server: role stamped, no context). Eyeball owed (Verify recipe).
+- 2026-09-28 (robot, fix): review findings. (major) The Feedback modal put a textarea over
+  the Grading Queue, whose window keydown took Enter in ANY textarea as Save & next: the
+  queue's keys are now the pure `gradingQueueViews.ts queueKeyAction(key, target,
+  modalOpen)` — Enter saves only from the card's own note (by ref) or the page, and any
+  `.mm-modal-backdrop` up owns the keyboard (gradingViewCheck `[queue]` key pins + a
+  source pin). (minor) Filing goes through the pure `feedbackStore.ts
+  feedbackFromSession(user, form, context)` (author + role from the session), pinned
+  with the account LocalAuthProvider restores; the Dashboard-shell pin is now a real
+  `react-dom/server` render through LocalAuthProvider (routingCheck `[dashboard shell]`:
+  Feedback on every tab, New report on the Feedback tab), replacing the prop-regex pins.
+
+### 2026-09-28 — implemented (work loop)
+- **Built:** the instructor can file a Feedback report from every Dashboard tab — the
+  shell's topbar now carries the same Feedback button as every other page
+  (`InstructorLayout.tsx:38`, `feedback` prop gone from `SessionControls`), and the
+  Feedback tab has "New report" beside its filter (`FeedbackQueueView.tsx:86-91`), reloading
+  on `FEEDBACK_FILED_EVENT` from either entry point. A report's context comes from the
+  route (`routing.ts:420 feedbackContextFor`), never the editor store's leftover
+  assignment; author + role from the session (`feedbackStore.ts feedbackFromSession`).
+  Form copy is role-aware for instructors. Grading Queue keys now `queueKeyAction` (a modal
+  owns the keyboard; Enter saves only from the card's note or the page).
+- **Pins:** routingCheck `[feedback context]` (pure cases, local seam filing as instructor
+  and student, source pins) + `[dashboard shell]` (real `react-dom/server` render through
+  LocalAuthProvider: Feedback on six Dashboard routes, New report on the Feedback tab;
+  mutation-tested); remoteStoreCheck (instructor files through the real server: role
+  stamped, no context, listed tagged instructor); gradingViewCheck `[queue]` key pins.
+- **Gates (exit codes):** app-tsc 0, app-build 0, app-check 0, server-tsc 0, server-check 0
+  (tsc, typecheck:tools, routingCheck re-run at checkpoint: 0).
+- **Review:** fixed 1 major (queue Enter behind the modal) + 2 minor (tautological filing
+  pin, regex shell pin); skipped none. Nits left: CLAUDE.md Notes line lost "only" in a
+  budget trim (39995/40000 B); viewer route without `/q/:i` files the assignment only.
+- **Owed:** headless-Chrome eyeball, local mode (Verify recipe: topbar Feedback on
+  Dashboard tabs; Feedback tab → New report → card tagged instructor, no context; editor
+  context kept from `#/a/<id>/q/1`; 375px head row wraps). For Gabriel after release: file
+  one report from the pilot Dashboard, confirm it lands tagged instructor.
+- **Next step:** loop session: visual check if owed, then land per PROFILE §5.

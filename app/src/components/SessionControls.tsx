@@ -1,7 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
 import { useAuth } from '../auth';
 import { AccountPanel, ChangePasswordModal } from '../auth/AccountPanel';
-import { navigate } from '../routing';
+import { feedbackContextFor, navigate } from '../routing';
+import { useRoute } from '../useRoute';
+import { useStore } from '../store';
 import { FeedbackPanel } from './FeedbackPanel';
 
 /**
@@ -18,9 +20,10 @@ export function signOut(logout: () => void): void {
 }
 
 /**
- * The identity and its actions — the page shell's topbar and the editor's
- * top bar both render this. Signed in: the name, Feedback (opens the report
- * modal), Password (only when the server manages passwords — AccountPanel
+ * The identity and its actions — the page shell's topbar (every page, the
+ * Dashboard's included) and the editor's top bar all render this. Signed in:
+ * the name, Feedback (opens the report modal — on every signed-in surface,
+ * task 076), Password (only when the server manages passwords — AccountPanel
  * decides), Log out. A visitor: a "Visitor" tag and Sign in. One component so
  * every surface offers the same controls in the same order.
  *
@@ -28,7 +31,7 @@ export function signOut(logout: () => void): void {
  * where width is scarce — design memo editor-workbench.md §Top bar), with
  * the instructor's way back to the Dashboard first.
  */
-export function SessionControls({ feedback = true, menu = false }: { feedback?: boolean; menu?: boolean }) {
+export function SessionControls({ menu = false }: { menu?: boolean }) {
   const { user, isVisitor, logout } = useAuth();
   const [showFeedback, setShowFeedback] = useState(false);
 
@@ -44,7 +47,7 @@ export function SessionControls({ feedback = true, menu = false }: { feedback?: 
   }
   if (!user) return null;
 
-  if (menu) return <SessionMenu feedback={feedback} />;
+  if (menu) return <SessionMenu />;
 
   return (
     <div className="session">
@@ -52,23 +55,32 @@ export function SessionControls({ feedback = true, menu = false }: { feedback?: 
         {user.name}
         {user.role === 'instructor' ? ' · Instructor' : ''}
       </span>
-      {feedback && (
-        <button type="button" onClick={() => setShowFeedback(true)}>
-          Feedback
-        </button>
-      )}
+      <button type="button" onClick={() => setShowFeedback(true)}>
+        Feedback
+      </button>
       <AccountPanel />
       <button type="button" onClick={() => signOut(logout)}>
         Log out
       </button>
-      {showFeedback && <FeedbackPanel onClose={() => setShowFeedback(false)} />}
+      {showFeedback && <RouteFeedbackPanel onClose={() => setShowFeedback(false)} />}
     </div>
   );
 }
 
+/** The report form, its context read from where the reporter IS (the route,
+ *  checked against the assignment actually open — routing.ts
+ *  feedbackContextFor), never from what the editor store last held. Its own
+ *  component so the hooks run only while the modal is open, off
+ *  SessionControls' early returns. */
+function RouteFeedbackPanel({ onClose }: { onClose: () => void }) {
+  const route = useRoute();
+  const assignment = useStore((s) => s.assignment);
+  return <FeedbackPanel context={feedbackContextFor(route, assignment)} onClose={onClose} />;
+}
+
 /** The signed-in controls as a "Name ▾" menu. The modals live outside the
  *  menu, so choosing an item can close it without closing what it opened. */
-function SessionMenu({ feedback }: { feedback: boolean }) {
+function SessionMenu() {
   const { user, capabilities, logout } = useAuth();
   const [open, setOpen] = useState(false);
   const [modal, setModal] = useState<'feedback' | 'password' | null>(null);
@@ -116,11 +128,9 @@ function SessionMenu({ feedback }: { feedback: boolean }) {
               Dashboard
             </button>
           )}
-          {feedback && (
-            <button type="button" role="menuitem" onClick={pick(() => setModal('feedback'))}>
-              Feedback
-            </button>
-          )}
+          <button type="button" role="menuitem" onClick={pick(() => setModal('feedback'))}>
+            Feedback
+          </button>
           {capabilities?.usesPassword && (
             <button type="button" role="menuitem" onClick={pick(() => setModal('password'))}>
               Password
@@ -131,7 +141,7 @@ function SessionMenu({ feedback }: { feedback: boolean }) {
           </button>
         </div>
       )}
-      {modal === 'feedback' && <FeedbackPanel onClose={() => setModal(null)} />}
+      {modal === 'feedback' && <RouteFeedbackPanel onClose={() => setModal(null)} />}
       {modal === 'password' && <ChangePasswordModal onClose={() => setModal(null)} />}
     </div>
   );
