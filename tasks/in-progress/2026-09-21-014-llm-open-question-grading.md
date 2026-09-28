@@ -8,9 +8,9 @@ requires:
 area: server
 source: claude-md
 created: 2026-09-21T15:30:00-07:00
-status: ready
+status: in-progress
 after: 2026-09-26-066
-branch:
+branch: robot/014-llm-open-question-grading
 merged_into:
 ---
 
