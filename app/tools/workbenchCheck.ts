@@ -183,7 +183,7 @@ console.log('\n[question list]');
     assignmentShortName(hw1.title) === 'HW1' && assignmentShortName('HW12a. Later') === 'HW12a' && assignmentShortName('Practice set') === null);
   check('section notes are named by what is behind them',
     sectionNotesLabel(doc[0]) === 'Hint for this section' &&
-      sectionNotesLabel(doc[2]) === 'Challenge problem (optional, not collected)' &&
+      sectionNotesLabel(doc[2]) === 'Challenge problem (optional)' &&
       sectionNotesLabel(doc[1]) === null &&
       sectionNotesLabel({ callouts: [], figures: [{ src: 'x.svg', alt: 'x' }] }) === 'Figure for this section' &&
       sectionNotesLabel({ callouts: [doc[0].callouts[0]], figures: [{ src: 'x.svg', alt: 'x' }] }) === 'Notes for this section (2)');
