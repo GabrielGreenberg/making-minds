@@ -2,7 +2,7 @@
 id: 2026-09-28-079
 type: feature
 title: Answer "define it with a table" problems in a blank argument–value table, autograded as a function (HW1 P14, P9b)
-priority: normal
+priority: high
 size: large
 requires:
 area: app
@@ -102,3 +102,5 @@ Nothing can show a table, or grade an answer whose arguments the student supplie
   authoring.
 
 ## Progress log
+- 2026-09-28 — Raised to `high` (Gabriel's 043 session): 048, the interleaved worksheet he asked
+  for, now builds on this task's table and waits on it.

@@ -4,12 +4,12 @@ type: feature
 title: Multi-part questions — one problem, parts of different kinds (line, paragraph, blanks, table), one Mark done
 priority: high
 size: large
-requires: browser, human
+requires: browser
 area: app
 source: audit
 created: 2026-09-25T10:35:00-07:00
 status: ready
-after: 2026-09-25-046
+after: 2026-09-28-079
 branch:
 merged_into:
 ---
@@ -50,7 +50,8 @@ A question may carry `parts: [{label, kind, prompt, …}]`, where each kind is o
 It renders as one problem with its parts, one Mark done, one stem. Each part is graded by its
 kind (blanks by script; a line, paragraph or table pending review, or by an LLM), and the
 result keeps per-part verdicts. HW1's lettered questions are folded back into parts. Design
-memo first (`docs/buildout/designs/`); Gabriel approves.
+memo in `docs/buildout/designs/`, written as part of this task — no separate approval
+(Gabriel, 2026-09-28: see Resolved decisions).
 
 ## Design
 ### Catch notes (2026-09-26)
@@ -96,9 +97,7 @@ memo first (`docs/buildout/designs/`); Gabriel approves.
   HW6 3.
 - **Risk, folding HW1 back:** if students already have HW1 work on the pilot, merging the
   lettered questions back into parts changes question ids mid-assignment. Existing answers
-  must migrate by id. Timing is Gabriel's call (asked 2026-09-26). Recommended: build the
-  feature now, use it for HW2 onwards, and fold HW1 back only after HW1 is due (2026-10-04),
-  with that migration.
+  must migrate by id. Decided 2026-09-28: fold HW1 back now (Resolved decisions).
 - **Tables come from 079 (robot catch, 2026-09-28).** Task 079 builds a blank
   argument–value table as a fill-in shape, autograded as a function, for HW1 P14 and P9b.
   That retires P9b's fixed blanks noted above. This task's "table" part kind should reuse
@@ -109,6 +108,18 @@ Touches the answer model (`types.ts` `QuestionCircuit` responseText / fillAnswer
 panels (`OpenResponsePanel` / `FillInPanel`), the problem-set document, the grader, the
 gradebook and GradeSheet, the provenance seam (every new field wears `usePasteGuard`),
 sanitize (answer keys per part) and the homework sync. Route through the seams.
+
+### Resolved decisions (Gabriel, 2026-09-28)
+- **Build it without a design approval first.** Write the memo as part of the task and go
+  on; Gabriel reviews the result with the browser check before his hand release (it is held
+  anyway: sanitize, homework content, the schema). The robot works it (`human` dropped).
+- **Stitch HW1 back together now**, not after HW1 is due: HW1's lettered questions (6a–13b)
+  fold back into one problem each, with parts. "It just changes the appearance, not the
+  actual grading." So students' existing HW1 work on the pilot must carry over — answers,
+  attempts and grades migrate by id to the regrouped problems; nobody loses work and no
+  grade changes.
+- **After 079** (the answer tables): the table part kind reuses 079's renderer, answer shape
+  and grader, so 079 lands first; it is raised to `high` so 048 doesn't wait behind it.
 
 ## Verify
 Gates; pins per part kind; browser.
