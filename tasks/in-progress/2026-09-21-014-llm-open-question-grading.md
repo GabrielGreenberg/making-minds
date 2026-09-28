@@ -52,6 +52,47 @@ Implementation seam is `applyManualReview` + a `source: 'llm'` marker on the rev
 - **Also check** UCLA's rules on sending student work (P3 data) to an outside AI service.
 
 ## Verify
-n/a (research).
+n/a (research) — docs only; gates: check-budgets.
+
+## Findings
+- Design memo: `docs/buildout/designs/llm-grading.md` (proposed); `grading-interface.md` §10 now points to it.
+- Corrected seam: `ManualReview`/`applyManualReview` were retired by 063 (types.ts `LEGACY`); the live seam is
+  `HumanGrade` + `GradingStore` + `planGradeWrite`, and the design fits that, not a `source: 'llm'` marker.
+- Recommendation: option B — a separate `grade_suggestions` record (never in score.ts precedence, stale on
+  `answerKey`) that a person accepts through `planGradeWrite` (queue chip, `a` key, Accept all); server-only
+  `SuggestionProvider` (anthropic | bedrock | fake | off, default off); local mode uses the fake, no network.
+- Anonymity: per-run shuffled ids (never `public_id`), roster/email/UID redaction, delimited answers, strict
+  JSON output, human confirm as the injection backstop; instructor-only `rubric` stripped in `sanitize.ts`.
+- Cost: about $0.2–0.35 per problem-run, $5–9 per term for all 24 open questions on `claude-opus-5`.
+- P3 (unverified): UCLA DTS lists Bedrock/Claude as approved but NOT for P3/FERPA data — UCLA approval is a
+  release gate. Decisions owed to Gabriel (memo §9): suggestion vs final, Policies wording, disclosure, UCLA.
+- **OPEN at landing — owed to the lander / next /catch:** the Done-when clause "Then a follow-up feature
+  task" is drafted, not filed (`llm-grading.md` §11); the robot's work routine may not mint ids
+  (tasks/README.md, id rule). File it into blocked/ with its Questions, or it is lost.
+- Review fixes (memo): Accept picks name `{batchId, answerKey, version}` and the server refuses a stale
+  suggestion (pure `planSuggestionAccept`), since `planGradeWrite` re-anchors to the latest answer; a run is
+  logged in its own `suggestion_runs` row (no `'suggest'` `GradeChangeEvent`, which needs a student), and a
+  replaced suggestion is not kept.
 
 ## Progress log
+- 2026-09-27 (robot): Wrote `docs/buildout/designs/llm-grading.md` (options, decision B, data model, seam,
+  where it runs, gradebook display, anonymity/rubric/injection, cost, P3 + release-gating decisions, blast
+  radius, draft follow-up task); pointed grading-interface.md §10 at it. No code. Next step: land this task;
+  then /catch files the follow-up feature task from the memo's §11 into blocked/.
+
+### 2026-09-27 — implemented (work loop)
+- Built: the design memo `docs/buildout/designs/llm-grading.md` — an LLM gives *suggestions* a person
+  accepts (option B), kept apart from human grades, server-only provider (default off), anonymous batched
+  requests per problem, cost/latency, gradebook display, P3/FERPA gate, blast radius, draft follow-up task
+  (§11). `grading-interface.md` §10 points to it. No code.
+- Pins: none added (docs only); the memo's §10 names the follow-up's pins (gradingViewCheck stale-accept
+  cases, remoteStoreCheck against the real server).
+- Gates: app-tsc=0 app-build=0 app-check=0 server-tsc=0 server-check=0.
+- Review: fixed 3 (stale-accept refusal via pure `planSuggestionAccept`; `suggestion_runs` table instead of
+  a `'suggest'` event, replaced suggestions not kept; OPEN-at-landing note for the unfiled follow-up).
+  Skipped 0. Nits left: §8 HW2–7 cost floor ($0.19 not $0.35); accept should add `fromBatch` beside the
+  existing grade/override kind rather than replace it.
+- Remains (owed): next /catch files the follow-up task from memo §11 into blocked/ (`next-id.mjs`);
+  Gabriel confirms UCLA P3 approval (memo §9) and whether HW1 rubric drafts move into hw1.json. No visual
+  check (no UI).
+- NEXT STEP: loop session: no visual check owed; land per PROFILE §5, then /catch files the follow-up.
