@@ -53,11 +53,13 @@ export function stripAnswers(assignment: AssignmentData): AssignmentData {
       } = q;
       // Perception questions keep their `perception` spec (retina width + rule
       // — that's the statement) but lose the generated case bank (the key);
-      // fill-in questions keep their `fill_in` labels (they ARE the prompts)
-      // and lose the answers. `perception_examples` passes through BY DESIGN
-      // (task 059): the films the instructor flagged "Example for students",
-      // derived into their own field at save — safe by construction, so this
-      // stripper stays wholesale and never reads a flag.
+      // fill-in questions keep their `fill_in` labels or table headers and
+      // sizes (they ARE the prompts — nothing key-bearing enters `fill_in`)
+      // and lose the answers (a table's key rows too, row-major).
+      // `perception_examples` passes through BY DESIGN (task 059): the films
+      // the instructor flagged "Example for students", derived into their own
+      // field at save — safe by construction, so this stripper stays
+      // wholesale and never reads a flag.
       return { ...rest, test_cases: [], perception_cases: [], fill_in_answers: [] };
     }),
   };

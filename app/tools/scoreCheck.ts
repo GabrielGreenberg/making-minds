@@ -252,6 +252,25 @@ console.log('[authoring the ½ rule]');
   check('validateDocument reports a bad rule by the problem\'s label',
     validateDocument(doc).some((p) => p.startsWith(`${Q(1).label}: `) && /½ rule/.test(p)) &&
     validateDocument(asg).every((p) => !/½ rule/.test(p)));
+
+  // A fill-in table (task 079): N is its KEY rows — the cases it is graded
+  // on — never its 27 cells, its 3 columns or the rows students see.
+  const hw1 = JSON.parse(readFileSync(new URL('../src/devData/homeworks/hw1.json', import.meta.url), 'utf8')) as AssignmentData;
+  const p9b = hw1.questions.find((q) => q.id === 20)!;
+  const p14 = hw1.questions.find((q) => q.id === 14)!;
+  const tallerP14 = { ...p14, fill_in: { ...p14.fill_in!, table: { ...p14.fill_in!.table!, rows: 5 } } };
+  check('a fill-in table\'s N is its key rows: 9 for HW1 P9b, 2 for P14 (even shown 5 rows)',
+    questionCaseCount(p9b) === 9 && questionCaseCount(p14) === 2 && questionCaseCount(tallerP14) === 2);
+  check('...so ½ at 9 of 9 is refused and 8 is sound',
+    /fewer than all/.test(halfCreditProblem(withHalf(p9b, 9)) ?? '') && halfCreditProblem(withHalf(p9b, 8)) === null);
+  const j = (x: number, y: number) => [String(x), String(y), String(x * y)];
+  const eightRight = [...[0, 1, 2].flatMap((x) => [0, 1, 2].map((y) => j(x, y))).slice(0, 8).flat(), '', '', ''];
+  const graded = gradeSubmission(hw1, { assignmentTitle: hw1.title, submittedAt: '2026-10-01T00:00:00Z',
+    answers: [{ questionId: 20, circuit: { components: [], wires: [] }, fillAnswers: eightRight }] })
+    .questions.find((r) => r.questionId === 20)!;
+  check('P9b graded 8/9 with half_credit_at 5 → autoPoints ½',
+    graded.passed === 8 && graded.total === 9 && autoPoints(withHalf(p9b, 5), graded) === 0.5,
+    JSON.stringify({ p: graded.passed, t: graded.total }));
 }
 
 // ─── [display] ────────────────────────────────────────────────────────────

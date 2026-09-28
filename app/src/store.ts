@@ -983,7 +983,8 @@ interface AppState {
   openResponse: string;
   setOpenResponse: (text: string) => void;
   // The live typed blanks for the current FILL-IN question, in the spec's
-  // order. Synced into questionCircuits.fillAnswers alongside openResponse.
+  // order (a table's cells row-major; engine/fillIn.ts). Synced into
+  // questionCircuits.fillAnswers alongside openResponse.
   fillAnswers: string[];
   setFillAnswer: (index: number, value: string) => void;
   // The live signed editing record of the current question (task 034,

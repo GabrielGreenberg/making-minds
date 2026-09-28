@@ -11,13 +11,19 @@ import type {
 } from '../types';
 import { QUESTION_TASKS, questionTask, modeHoldsMemory } from '../types';
 import { FillInBlanksEditor } from './FillInBlanksEditor';
+import { FillInTableEditor } from './FillInTableEditor';
 import {
   blankDraftsOf,
   fillInFields,
   fillInProblems,
+  fillInTableFields,
+  fillInTableProblems,
   misplacedAnswersWarning,
   misplacedBlanks,
+  misplacedTableWarning,
   newBlankDraft,
+  newTableDraft,
+  tableDraftOf,
 } from './fillInAuthoring';
 import { PerceptionEditor } from './PerceptionEditor';
 import { draftFromQuestion, draftProblems, perceptionFields } from './perceptionAuthoring';
@@ -122,7 +128,7 @@ const TASK_LABELS: Record<QuestionTask, string> = {
   perception: 'Perception',
   turbot: 'Turbot',
   open: 'Free response',
-  'fill-in': 'Fill-in blanks',
+  'fill-in': 'Fill-in',
 };
 
 // Representation systems the codec grades against (the display-only 'plus' is not
@@ -218,20 +224,26 @@ export function QuestionCreator({ assignment, existingQuestion, onSave, onCancel
 
   // What the question asks for (types.ts questionTask) — a choice among the
   // tasks its mode offers: Function/Perception on CC and SC, Free response/
-  // Fill-in blanks on Open. Held as picked and coerced to the mode below, so
+  // Fill-in on Open. Held as picked and coerced to the mode below, so
   // flipping the mode away and back keeps the choice.
   const [task, setTask] = useState<QuestionTask>(
     existingQuestion ? questionTask(existingQuestion) : 'function',
   );
 
   // ── Fill-in fields (open questions with task === 'fill-in') ────
-  // One row per blank — label, digits-only flag and answer together
-  // (./fillInAuthoring.ts); saved as `fill_in` + the stripped `fill_in_answers`.
-  // `savedBlanks` are the rows the question opened with: students' answers
-  // are stored by position, so the ones that no longer keep their slot are
+  // Two shapes (engine/fillIn.ts fillInShape), both drafted in
+  // ./fillInAuthoring.ts and saved as `fill_in` + the stripped
+  // `fill_in_answers`: labelled blanks, one row per blank — label, digits-only
+  // flag and answer together — or an argument–value table (task 079). Each
+  // keeps its own draft, so flipping the shape and back loses nothing.
+  // `savedBlanks` / `savedTable` are what the question opened with: students'
+  // answers are stored by position, so an edit that would misplace them is
   // warned about in the editor and confirmed at save.
   const [savedBlanks] = useState(() => blankDraftsOf(existingQuestion));
   const [blankDrafts, setBlankDrafts] = useState(savedBlanks);
+  const [savedTable] = useState(() => tableDraftOf(existingQuestion));
+  const [tableDraft, setTableDraft] = useState(() => savedTable ?? newTableDraft());
+  const [fillShape, setFillShape] = useState<'blanks' | 'table'>(savedTable ? 'table' : 'blanks');
 
   // ── Perception fields (CC/SC questions with task === 'perception') ──
   // Perception questions grade raw bit frames against a rule, not a formula
@@ -269,9 +281,14 @@ export function QuestionCreator({ assignment, existingQuestion, onSave, onCancel
   const effTask: QuestionTask = taskChoices.includes(task) ? task : taskChoices[0];
   const isPerception = effTask === 'perception';
   const isFillIn = effTask === 'fill-in';
-  const fillInErrors = isFillIn ? fillInProblems(blankDrafts) : [];
-  // Saving anything but these blanks (another task, another mode) drops them.
-  const misplacedAnswers = misplacedBlanks(savedBlanks, isFillIn ? blankDrafts : []);
+  const isFillTable = isFillIn && fillShape === 'table';
+  const fillInErrors = isFillIn
+    ? isFillTable ? fillInTableProblems(tableDraft) : fillInProblems(blankDrafts)
+    : [];
+  // Saving anything but these blanks (a table, another task, another mode)
+  // drops them; likewise the table.
+  const misplacedAnswers = misplacedBlanks(savedBlanks, isFillIn && !isFillTable ? blankDrafts : []);
+  const misplacedTable = misplacedTableWarning(savedTable, isFillTable ? tableDraft : null);
 
   // The restriction applies to gate-vocabulary canvases: CC/SC questions
   // (function or perception) and turbot questions whose brain is CC/SC.
@@ -305,13 +322,14 @@ export function QuestionCreator({ assignment, existingQuestion, onSave, onCancel
     const raw = halfCreditAt.trim();
     return raw === '' ? {} : { half_credit_at: Number(raw) };
   })();
-  // N as far as it is known before save: the drafts for turbot arenas and
-  // fill-in blanks; an edited question's own bank otherwise (a generated bank
-  // is rebuilt at save, where the rule is checked against it).
+  // N as far as it is known before save: the drafts for turbot arenas,
+  // fill-in blanks and a table's key rows; an edited question's own bank
+  // otherwise (a generated bank is rebuilt at save, where the rule is checked
+  // against it).
   const knownCaseCount: number | null = isTurbot
     ? caseDrafts.length
     : isFillIn
-      ? blankDrafts.length
+      ? isFillTable ? tableDraft.keyRows.length : blankDrafts.length
       : existingQuestion && existingQuestion.buildMode === mode
         ? questionCaseCount(existingQuestion)
         : null;
@@ -397,6 +415,7 @@ export function QuestionCreator({ assignment, existingQuestion, onSave, onCancel
     // What this save would misplace in work already stored by position.
     const misplacing = [
       ...(misplacedAnswers.length > 0 ? [misplacedAnswersWarning(misplacedAnswers)] : []),
+      ...(misplacedTable ? [misplacedTable] : []),
       ...(misplacedRuns.length > 0 ? [misplacedArenasWarning(misplacedRuns)] : []),
     ];
     if (misplacing.length > 0 && !window.confirm(`${misplacing.join('\n\n')}\n\nSave anyway?`)) {
@@ -423,7 +442,7 @@ export function QuestionCreator({ assignment, existingQuestion, onSave, onCancel
         statement: statement.trim(),
         buildMode: 'open',
         representation: 'binary',
-        ...(isFillIn ? fillInFields(blankDrafts) : {}),
+        ...(isFillIn ? (isFillTable ? fillInTableFields(tableDraft) : fillInFields(blankDrafts)) : {}),
       });
       return;
     }
@@ -642,7 +661,7 @@ export function QuestionCreator({ assignment, existingQuestion, onSave, onCancel
             <span className="instructor-count">
               {halfCreditAt.trim() === ''
                 ? 'blank = 0 or 1 only; a number K gives ½ when at least K cases pass'
-                : `½ if at least ${halfCreditAt.trim()} of ${knownCaseCount ?? 'N'} ${isTurbot ? 'arenas' : isFillIn ? 'blanks' : 'cases'} pass` +
+                : `½ if at least ${halfCreditAt.trim()} of ${knownCaseCount ?? 'N'} ${isTurbot ? 'arenas' : isFillTable ? 'rows' : isFillIn ? 'blanks' : 'cases'} pass` +
                   (knownCaseCount === null ? ' (N is set when the bank is built at save)' : '')}
             </span>
           </label>
@@ -655,14 +674,56 @@ export function QuestionCreator({ assignment, existingQuestion, onSave, onCancel
         )}
         {isFillIn && (
           <>
-            <p className="mm-note mm-hint">
-              The student types an answer into each labelled blank, and it is autograded by
-              string comparison — surrounding spaces and leading zeros are ignored
-              (&#8220;0011&#8221; matches &#8220;11&#8221;). A digits-only blank refuses every
-              other character. Answers match blanks by position: once students have started,
-              relabel blanks in place and add new ones at the end.
-            </p>
-            <FillInBlanksEditor drafts={blankDrafts} saved={savedBlanks} onChange={setBlankDrafts} />
+            <div className="mm-section-head">
+              <h3>Answer shape</h3>
+              <div className="mm-segmented">
+                {(['blanks', 'table'] as const).map((shape) => (
+                  <button
+                    key={shape}
+                    className={'mm-segmented-btn' + (fillShape === shape ? ' mm-segmented-btn--active' : '')}
+                    onClick={() => {
+                      setFillShape(shape);
+                      // A first switch to blanks starts with one blank to fill.
+                      if (shape === 'blanks' && blankDrafts.length === 0) setBlankDrafts([newBlankDraft([])]);
+                    }}
+                  >
+                    {shape === 'blanks' ? 'Blanks' : 'Table'}
+                  </button>
+                ))}
+              </div>
+            </div>
+            {isFillTable ? (
+              <>
+                <p className="mm-note mm-hint">
+                  The student fills a blank table — the arguments as well as the values — and it
+                  is autograded as a function: each key row passes when exactly one of the
+                  student&#8217;s rows has its arguments and that row&#8217;s values match. Row
+                  order never matters, empty rows are ignored, and two rows with the same
+                  arguments fail that key row. Cells compare as blanks do (surrounding spaces and
+                  leading zeros ignored); a digits-only column refuses every other character.
+                </p>
+                {misplacedAnswers.length > 0 && (
+                  <p className="instructor-preview-warning" role="alert">
+                    {misplacedAnswersWarning(misplacedAnswers)}
+                  </p>
+                )}
+                <FillInTableEditor draft={tableDraft} saved={savedTable} onChange={setTableDraft} />
+              </>
+            ) : (
+              <>
+                <p className="mm-note mm-hint">
+                  The student types an answer into each labelled blank, and it is autograded by
+                  string comparison — surrounding spaces and leading zeros are ignored
+                  (&#8220;0011&#8221; matches &#8220;11&#8221;). A digits-only blank refuses every
+                  other character. Answers match blanks by position: once students have started,
+                  relabel blanks in place and add new ones at the end.
+                </p>
+                {misplacedTable && (
+                  <p className="instructor-preview-warning" role="alert">{misplacedTable}</p>
+                )}
+                <FillInBlanksEditor drafts={blankDrafts} saved={savedBlanks} onChange={setBlankDrafts} />
+              </>
+            )}
           </>
         )}
         {isTurbot && (

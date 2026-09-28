@@ -266,6 +266,19 @@ a.wb-brand:hover { color: var(--mm-accent); text-decoration: none; }
   height: 44px; padding: 0 12px; font-family: var(--mm-font-mono); font-size: 16px; color: var(--mm-ink);
   background: var(--mm-surface); border: 1px solid var(--mm-line-2); border-radius: var(--mm-radius);
 }
+/* A fill-in TABLE (task 079): theme.css's .mm-table, each cell a whole-width
+   mono input; a rule parts the argument columns from the value columns.
+   Headers keep their case — they are math ("j(x, y)"), not eyebrows. */
+.wb-fill-tablewrap { max-width: 480px; }
+.mm-table.wb-fill-table th { text-transform: none; letter-spacing: 0; font-size: var(--mm-fs-small); color: var(--mm-ink-2); }
+.mm-table.wb-fill-table td { padding: 0; }
+.wb-fill-table .wb-fill-value-start { border-left: 1px solid var(--mm-line-2); }
+.wb-answer .wb-fill-cell {
+  display: block; width: 100%; height: 40px; padding: 0 12px; font-family: var(--mm-font-mono); font-size: 16px;
+  color: var(--mm-ink); background: var(--mm-surface); border: 0; border-radius: 0;
+}
+.wb-fill-cell:focus { outline: none; box-shadow: inset 0 0 0 2px var(--mm-accent); }
+.wb-fill-cell[readonly] { background: var(--mm-surface-3); color: var(--mm-ink-2); }
 .wb-answer-foot { margin-top: 10px; font-size: var(--mm-fs-meta); color: var(--mm-ink-3); text-align: left; }
 .wb-answer-foot.paste-notice { color: var(--mm-link); font-weight: 500; }
 .wb-answer-foot--error { color: var(--mm-danger); }

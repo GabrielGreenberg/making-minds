@@ -8,9 +8,9 @@ requires:
 area: app
 source: feedback
 created: 2026-09-28T10:55:00-07:00
-status: in-progress
+status: done
 after:
-branch: robot/079-argument-value-table-answers
+branch:
 merged_into:
 ---
 
@@ -104,3 +104,64 @@ Nothing can show a table, or grade an answer whose arguments the student supplie
 ## Progress log
 - 2026-09-28 — Raised to `high` (Gabriel's 043 session): 048, the interleaved worksheet he asked
   for, now builds on this task's table and waits on it.
+
+### 2026-09-28 — implemented (work loop)
+- **Built (deepFix).** A fill-in question can now be a blank argument–value table. The
+  student writes the arguments too, and the table is graded as a function with row order
+  ignored. `FillInSpec` gains an optional `table {columns, argColumns, rows}`; with no
+  `table` it is the old blanks, unchanged. `engine/fillIn.ts` is the one reader of the shape
+  (`fillInShape`, `fillInCaseCount`, `fillInKeyProblem`, `gradeFillIn` → blanks | table). The
+  grader, `score.ts questionCaseCount` (the ½ rule's N = key rows), `workbench.ts` ("Table"
+  tag), `problemSet.ts validateDocument`, `FillInPanel` (a real `mm-table`, each cell
+  paste-guarded, digits-only per column), `GradeSheet` ("row @"), the instructor's
+  submission page ("rows correct"), and the Grading Queue (read-only table) all go through it. The key stays row-major in
+  `fill_in_answers` (already stripped). The answer stays row-major in `fillAnswers`, so there
+  is no new persistence or provenance path. The creator has a Blanks | Table switch with
+  `FillInTableEditor.tsx` (headers, argument count, rows, key grid, reorder) over pure
+  `fillInAuthoring.ts` (`tableDraftOf`/`fillInTableFields`/`fillInTableDefects`/
+  `misplacedTableWarning`). HW1 P14 is now a 2-row Argument | Value table, and P9b a 9-row
+  x | y | j(x, y) table. The PDF wording is kept; P14's app-added "In the boxes" line now says
+  "In the table". The sample submissions are updated to the table shape.
+- **Pins.** `pipelineCheck [fill-in tables]` covers: rows in any order pass, a swapped value
+  fails, a duplicated argument fails, an empty table grades 0/N (never pending), stale
+  positional answers grade 0/2 without throwing, labels are arguments only, stripped HW1
+  submit → grade, creator round-trip byte-for-byte, defects and misplace warnings, the
+  100-row cap, and a grep pin that only `fillIn.ts` reads `.labels`. Also: `scoreCheck`
+  (N = key rows, ½ at 8/9), `statementFormatCheck` (validateDocument on tables, every HW
+  valid), `workbenchCheck` ("Table" tag, started mark, and FillInPanel added to the list of
+  key-free renderers), `pasteCheck` (FillInPanel ≥ 2 guarded fields), and `parityCheck` (the
+  student copy keeps the layout with no key, rows are named by arguments only, and the table
+  grades the same server-side). `homeworkSyncCheck` only gained the optional-`labels` type
+  fix.
+- **Gates:** app-tsc=0 app-build=0 app-check=0 server-tsc=0 server-check=0; context budgets ok.
+- **Review:** fixed [minor] no cap on a table's authored rows. `FILL_IN_TABLE_MAX_ROWS = 100`
+  is enforced in `fillInKeyProblem` and the creator, and `fillInShape` clamps to it. The
+  grader builds only the rows the answer reaches. Skipped: none. Nits left alone:
+  `fillInAuthoring.ts`'s header still says "React-free" but it now imports `moveItem` from
+  `dragReorder` (the file is instructor-side, so law 2 is unaffected), and duplicate React
+  keys can occur on key-row defect messages when two columns share a header.
+- **Owed (eyeball, not claimed).** (1) Local mode: Load HW1–HW7 → publish HW1 → P14 shows a
+  2-row Argument | Value table, where '@'/'#' can be typed and Value refuses letters. P9b
+  shows 9 × x | y | j(x, y), digits only. Mark done makes the cells read-only, and an
+  outside paste is refused. (2) Submit P14 with the values swapped, release, and check that
+  the Grades sheet shows "row @" / "row #", the submission page shows "rows correct" with
+  expected/got, and the Queue shows the read-only table. (3) Creator: edit P14 as a table
+  and save with no change; a re-run of Load HW1–HW7 should still show HW1 unedited. Then
+  create a new 2-argument table. (4) After release: the sync lists hw1 refreshed, P14/P9b
+  show on the pilot, and old HW1 results show as stale until a re-grade.
+- **NEXT STEP:** loop session: the visual check owed above, then land per PROFILE §5.
+
+### 2026-09-28 — landed (robot)
+- **Nits fixed** (a291ddf): `fillInAuthoring.ts`'s header now says what is pure (its functions
+  make no React calls; `dragReorder.ts` also holds a hook). The key-defect notices in
+  `FillInTableEditor` are keyed by index, so two columns with the same header can't collide.
+  App tsc, tools tsc and the build were green after the fix.
+- **Headless check (robot, CDP against a Bash-run Vite, local mode, HW1 seeded and
+  published, as the toy student):** P14 renders a 2-row table headed Argument | Value; "@"
+  types into Argument, and "ab1" typed into Value keeps only "1". P9b renders 9 rows ×
+  x | y | j(x, y), 27 cells, all digits-only ("x2" → "2", "z" → ""). Both read as tables in
+  the 640px answer column. The rail tags each "Table", with the started mark.
+- **Still owed (Gabriel's eyeball, not claimed):** items (1)–(4) of the entry above, except
+  what the headless check covered. That leaves (1)'s mark-done lock and paste refusal, and
+  all of (2) the grade sheet / submission page / queue, (3) the creator round-trip, and
+  (4) the pilot after release. The recipe is as written above.

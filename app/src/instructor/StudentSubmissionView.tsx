@@ -9,6 +9,7 @@ import { hashLink } from '../components/PageShell';
 import { formatDateTime, formatDueDate, formatDuration, lateBy, lateLabel } from '../dueDates';
 import { useAsyncValue } from '../useAsyncValue';
 import { halfCreditProblem, pointsLabel, type ProblemScore, type Score } from '../engine/score';
+import { fillInCaseNoun } from '../engine/fillIn';
 import { GradeValue } from './GradingParts';
 import { adjacentStudents, OFF_ROSTER_LABEL } from './gradingViews';
 import { LateAdjustControls } from './LateAdjustControls';
@@ -400,17 +401,19 @@ function SubmissionDetail({
             </div>
           );
         }
-        // Fill-in questions grade one typed string per blank.
+        // Fill-in questions grade one typed string per blank, or one key row
+        // of a table (named by its arguments; engine/fillIn.ts).
         if (qr.fillCases) {
           const wrong = qr.fillCases.filter((c) => !c.pass);
+          const noun = fillInCaseNoun(q?.fill_in);
           return (
             <div className="instructor-detail-q" key={qr.questionId}>
-              {head(`${qr.passed}/${qr.total} blanks correct`)}
+              {head(`${qr.passed}/${qr.total} ${noun}s correct`)}
               {wrong.length > 0 && (
                 <table className="instructor-detail-table">
                   <thead>
                     <tr>
-                      <th>blank</th>
+                      <th>{noun}</th>
                       <th>expected</th>
                       <th>got</th>
                     </tr>
@@ -420,7 +423,7 @@ function SubmissionDetail({
                       <tr key={ci}>
                         <td>{c.label}</td>
                         <td className="instructor-bits">{c.expected}</td>
-                        <td className="instructor-bits instructor-fail">{c.got === '' ? '(blank)' : c.got}</td>
+                        <td className="instructor-bits instructor-fail">{c.got === '' ? (noun === 'row' ? '(no row)' : '(blank)') : c.got}</td>
                       </tr>
                     ))}
                   </tbody>

@@ -573,6 +573,9 @@
 .gr-blanks > div { display: flex; gap: 12px; align-items: baseline; }
 .gr-blanks dt { color: var(--mm-ink-3); font-size: var(--mm-fs-small); min-width: 8em; }
 .gr-blanks dd { margin: 0; }
+/* A fill-in table answer (task 079): its headers are math, kept in case. */
+.gr-fill-table { max-width: 480px; }
+.gr-fill-table .mm-table th { text-transform: none; letter-spacing: 0; }
 .gr-notice { font-size: var(--mm-fs-small); padding: 8px 12px; margin: 0 0 14px; background: var(--mm-surface-2); border: 1px solid var(--mm-line-2); }
 .gr-notice--changed { background: var(--mm-date-soft); color: var(--mm-date); }
 .gr-notice--conflict { background: var(--mm-danger-soft); color: var(--mm-danger); }

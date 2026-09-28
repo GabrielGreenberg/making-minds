@@ -620,8 +620,8 @@ export function buildAttemptDetail(input: {
 // ── The hand-grading queue's feed (task 066) ─────────────────────────────
 
 /** A response's answer as the queue shows it: an open answer's text, a
- *  fill-in's blanks (in the spec's order), or a machine by reference — the
- *  attempt to open in full, never its circuit. */
+ *  fill-in's blanks (in the spec's order; a table's cells row-major), or a
+ *  machine by reference — the attempt to open in full, never its circuit. */
 export type QueueAnswer =
   | { kind: 'text'; text: string }
   | { kind: 'fill'; blanks: string[] }

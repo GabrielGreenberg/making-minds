@@ -8,6 +8,7 @@ import { hashLink } from '../components/PageShell';
 import { StatementBody } from '../components/StatementBody';
 import { formatDateTime } from '../dueDates';
 import { problemNumber } from '../problemSet';
+import { fillInShape, fillInTableRows } from '../engine/fillIn';
 import { useAsyncValue } from '../useAsyncValue';
 import { useAuth } from '../auth/authProvider';
 import { loadUiPrefs, saveUiPref } from '../uiPrefs';
@@ -796,13 +797,36 @@ function Answer({ item, question, assignmentId }: { item: QueueResponse; questio
     );
   }
   if (a.kind === 'fill') {
-    const labels = question.fill_in?.labels ?? [];
+    const shape = question.fill_in ? fillInShape(question.fill_in) : null;
+    // A table answer reads as the table the student filled — plain text,
+    // row-major like the answer (engine/fillIn.ts fillInTableRows).
+    if (shape?.kind === 'table') {
+      return (
+        <div className="gr-answer">
+          <div className="mm-tablewrap gr-fill-table">
+            <table className="mm-table">
+              <thead>
+                <tr>{shape.columns.map((col, j) => <th key={j}>{col.header}</th>)}</tr>
+              </thead>
+              <tbody>
+                {fillInTableRows(shape, a.blanks).map((row, r) => (
+                  <tr key={r}>
+                    {row.map((cell, j) => <td key={j} className="mono">{cell}</td>)}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      );
+    }
+    const blanks = shape?.blanks ?? [];
     return (
       <div className="gr-answer">
         <dl className="gr-blanks">
-          {labels.map((l, i) => (
+          {blanks.map((b, i) => (
             <div key={i}>
-              <dt>{l}</dt>
+              <dt>{b.label}</dt>
               <dd className="mono">{a.blanks[i]?.trim() ? a.blanks[i] : <span className="dim">(blank)</span>}</dd>
             </div>
           ))}

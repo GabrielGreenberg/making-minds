@@ -8,7 +8,7 @@
 import type { AssignmentData, AssignmentQuestion, QuestionCircuit } from './types';
 import { questionModeLabel, questionTask } from './types';
 import { DEFAULT_CALLOUT_TITLE, documentSections, type ResolvedSection } from './problemSet';
-import { fillInBlanks } from './engine/fillIn';
+import { fillInShape } from './engine/fillIn';
 import { formatDateTime } from './dueDates';
 
 // ── Columns ────────────────────────────────────────────────────────────────
@@ -68,15 +68,17 @@ export function questionMark(qc: QuestionCircuit | undefined): QuestionMark {
 
 /** The list's type tag: a machine question shows its mode (CC, SC -
  *  perception, turbot - FSM …) as the accent tag; a prose one says what it
- *  asks for — "Written" (open), "Number" (every blank digits-only) or
- *  "Fill-in". */
+ *  asks for — "Written" (open), "Table" (an argument–value table), "Number"
+ *  (every blank digits-only) or "Fill-in". */
 export function questionListTag(
   q: Pick<AssignmentQuestion, 'buildMode' | 'innerMode' | 'perception' | 'fill_in'>,
 ): { text: string; machine: boolean } {
   const task = questionTask(q);
   if (task === 'open') return { text: 'Written', machine: false };
   if (task === 'fill-in') {
-    const blanks = q.fill_in ? fillInBlanks(q.fill_in) : [];
+    const shape = q.fill_in ? fillInShape(q.fill_in) : null;
+    if (shape?.kind === 'table') return { text: 'Table', machine: false };
+    const blanks = shape?.blanks ?? [];
     return { text: blanks.length > 0 && blanks.every((b) => b.digitsOnly) ? 'Number' : 'Fill-in', machine: false };
   }
   return { text: questionModeLabel(q), machine: true };
