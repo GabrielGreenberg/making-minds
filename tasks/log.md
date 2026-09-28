@@ -67,3 +67,4 @@
 2026-09-25-059 · feature · Let an instructor mark an authored perception film "show to students as an example", delivered without exposing the grading bank · 2026-09-27T23:03:49-0700 · robot/059-perception-example-films · fe46f59
 2026-09-28-075 · feature · Make the CC I/O table earned — outputs appear only for rows the student has run · 2026-09-28T10:30:22-0700 · robot/075-earned-cc-truth-table · 9c0bf01
 2026-09-28-076 · feature · Let the instructor file a Feedback report from the Dashboard · 2026-09-28T11:14:15-0700 · robot/076-instructor-files-feedback-from-dashboard · 16a770e
+2026-09-28-077 · bug · Remove the grey sliver at the left edge of the HW1 P16–17 schematic, and pin every problem-set figure against cropped-in neighbours · 2026-09-28T12:07:48-0700 · robot/077-figure-crop-slivers · a718ba2
