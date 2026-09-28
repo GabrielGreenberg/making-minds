@@ -38,9 +38,11 @@ import { DEFAULT_ENV, PilotError, REPO, call, readEnv, withSession } from './pil
 // ── the rules (data) ────────────────────────────────────────────
 
 /** A change under any of these waits for Gabriel's own release. Matched as a
- *  prefix of the changed path (a trailing / = a whole directory). */
+ *  prefix of the changed path (a trailing / = a whole directory). Held is what a
+ *  bad release can't undo; the grader (`app/src/engine/`) is not held (Gabriel,
+ *  task 073): a wrong grade is undone by a fix and a re-grade, and the gates pin
+ *  grading hard. */
 export const HOLD_PATHS = [
-  ['app/src/engine/', 'grading: the simulators and the grader'],
   ['app/src/devData/homeworks/', 'homework content and answer keys'],
   ['app/src/devData/homeworkSync.ts', 'how homework content reaches the database'],
   ['server/src/homeworks.ts', 'how homework content reaches the database'],

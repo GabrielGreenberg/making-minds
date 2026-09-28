@@ -53,6 +53,12 @@ request (memo §4.6–§4.7, §7.4, §7.7). Today lateness is a tag only (`dueDa
   `provenance/notice.ts:25-31`, `server/src/sanitize.ts` (per-student due date), website
   `Phil 133 - web/claude redesign/data/course.json`.
 
+### Resolved decisions (Gabriel, 2026-09-27)
+- Land it with the eyeball owed: the code and every gate are green on
+  `robot/068-late-penalty-calendar-extensions`; land it (headless check if the run can), and
+  write the browser check in `## Verify` into the progress log as owed, not claimed, with its
+  recipe. Gabriel eyeballs it before the hand release.
+
 ## Verify
 Gates; browser: a toy late submission shows the deduction; an extension moves the due
 date on the student's Home; a waiver reduces it.

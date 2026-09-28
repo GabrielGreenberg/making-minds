@@ -10,7 +10,7 @@ source: chat
 created: 2026-09-26T21:34:00-07:00
 status: ready
 after: 2026-09-26-065
-branch:
+branch: robot/069-regrade-dry-run
 merged_into:
 ---
 
@@ -36,7 +36,13 @@ memo F2, §5; mockup 7, `tasks/attachments/2026-09-23-031-7-regrade.png`).
   explicit (`assignment_hash`).
 - Pointers: `server/src/app.ts:581-620`, `homeworks.ts:108`, `deploy/README.md` (backups).
 
+### Resolved decisions (Gabriel, 2026-09-27)
+- Land it with the eyeball owed (as 068): the code and every gate are green on
+  `robot/069-regrade-dry-run`; land it (headless check if the run can), and write the browser
+  check in `## Verify` into the progress log as owed, not claimed, with its recipe.
+
 ## Verify
 Gates; browser on local mode: edit a toy question's bank, see the banner, dry-run, commit.
 
 ## Progress log
+- 2026-09-27 (robot): claimed, worked by the mm-task workflow, gates green; parked for the browser check — the full log is on the branch.

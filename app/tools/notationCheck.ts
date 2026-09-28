@@ -24,7 +24,10 @@
 //   BIT ORDER (asymmetric)  a k=2 FSM computing x + 2*y — NOT symmetric x+y —
 //     grades end-to-end, and the same machine with swapped symbol halves
 //     FAILS: wire order = cc_spec declaration order (x is the LEFT char).
-//   TOTALITY/ARITY     Stage-1 names the student's actual mistake ("has a
+//   PARTIAL TABLES     (047) a missing arrow halts the run and the output so
+//     far is graded (the textbook p. 101 machine passes HW4 P3); two arrows
+//     for one input stay a Stage-1 error; turbot FSM brains keep totality.
+//   ARITY              Stage-1 names the student's actual mistake ("has a
 //     1-bit input symbol; this question has 2 input wires"), never grades a
 //     wrong-arity machine, and caps kIn at 3 with an explicit reason.
 
@@ -35,6 +38,7 @@ import type { AssignmentQuestion, TMNotation } from '../src/types';
 import { buildQuestionBank } from '../src/engine/testVectorGen';
 import { gradeQuestion } from '../src/engine/grader';
 import { validateMachine } from '../src/engine/machineValidation';
+import { runValueCase } from '../src/engine/caseRun';
 import { comp, transition, circuit } from './builder';
 import {
   parseTurbotInternalLabel,
@@ -42,6 +46,7 @@ import {
   TURBOT_FORWARD,
   TURBOT_TURN_RIGHT,
   TURBOT_TURN_LEFT,
+  validateTurbotFSM,
 } from '../src/engine/turbot';
 import {
   fsmNotation,
@@ -49,6 +54,7 @@ import {
   tmNotation,
   turbotInternalNotation,
   turbotExternalNotation,
+  uncoveredInputs,
   type TransitionNotation,
   type ParsedTransition,
 } from '../src/engine/notation';
@@ -325,8 +331,8 @@ console.log('\n[k=2 grade pin: x + 2*y end-to-end]');
   check(`swapped-halves machine (y + 2*x) FAILS (${rSwapped.passed}/${rSwapped.total})`,
     rSwapped.status === 'graded' && rSwapped.passed < rSwapped.total);
 
-  // ── Totality/arity Stage-1 pins (the footgun dies loudly) ──
-  console.log('\n[Stage-1 totality/arity on the 2-group question]');
+  // ── Arity/partial-table Stage-1 pins (the footgun dies loudly) ──
+  console.log('\n[Stage-1 arity + missing arrows on the 2-group question]');
   const oneBitIdentity = circuit(
     [comp('s0', 'STATE', 'S₀', 100, 100)],
     [transition('t1', 's0', 's0', '0:0'), transition('t2', 's0', 's0', '1:1')],
@@ -340,10 +346,16 @@ console.log('\n[k=2 grade pin: x + 2*y end-to-end]');
   const missingSymbol = circuit(states,
     rows.filter(([, , , id]) => id !== 't04')
       .map(([from, label, to, id]) => transition(id, from, to, label)));
-  const rTotality = gradeQuestion(question, missingSymbol);
-  check('missing one symbol fails totality with the symbol named',
-    rTotality.status === 'graded' && rTotality.passed === 0 &&
-    (rTotality.cases[0]?.reason ?? '').includes('must have exactly one transition for input 11 (found 0)'));
+  // A missing arrow is NOT a Stage-1 error (task 047): the run halts there
+  // and the output so far is graded — a case fails only on a wrong output.
+  const rPartial = gradeQuestion(question, missingSymbol);
+  check('missing one symbol is graded, not rejected (no Stage-1 reason on any case)',
+    rPartial.status === 'graded' && rPartial.total > 0 &&
+    rPartial.cases.every((c) => c.reason === undefined));
+  check('…some cases still pass (the halt only bites where 11 is read in S₀)',
+    rPartial.passed > 0);
+  check('…and every failing case failed on its output (carries a got value)',
+    rPartial.cases.filter((c) => !c.pass).every((c) => c.got.length > 0));
 
   const kInCap = validateMachine(xPlus2y, 'FSM', {
     axis: 'time', rep: 'binary',
@@ -351,6 +363,84 @@ console.log('\n[k=2 grade pin: x + 2*y end-to-end]');
   }, 'binary');
   check('kIn > 3 fails Stage 1 with an explicit cap reason',
     !kInCap.ok && (kInCap.reason ?? '').includes('at most 3 input groups'));
+}
+
+// ─── Partial transition tables (task 047) ────────────────────────────
+// The textbook's machines leave out arrows for inputs a well-formed input
+// never sends (p. 101's +1 T: no arrow from S₁ on 1), and "a machine halts
+// in a given state, given an input, if there are no arrows leaving that
+// state for that input". Stage 1 allows a missing arrow; the run halts and
+// the grader decodes the output so far (unreached steps read as 0). Two
+// arrows for one input stay an error. Turbot FSM brains keep totality.
+
+console.log('\n[partial tables — 047]');
+{
+  const HERE = dirname(fileURLToPath(import.meta.url));
+  const hw4 = JSON.parse(readFileSync(join(HERE, '../src/devData/homeworks/hw4.json'), 'utf8')) as
+    { questions: AssignmentQuestion[] };
+  const q = hw4.questions.find((x) => x.id === 3)!;
+  check('HW4 P3 is the tally +1 FSM question', q.buildMode === 'FSM' && q.representation === 'tally');
+
+  const s0 = comp('s0', 'STATE', 'S₀', 100, 100);
+  const s1 = comp('s1', 'STATE', 'S₁', 300, 100);
+  const allPass = (label: string, c: ReturnType<typeof circuit>) => {
+    const r = gradeQuestion(q, c);
+    check(`${label} (${r.passed}/${r.total})`, r.status === 'graded' && r.total > 0 && r.passed === r.total);
+  };
+
+  // (a) p. 101 exactly as drawn: S₀ 1:1 loop, S₀ 0:1 → S₁, S₁ 0:0 loop.
+  const book = circuit([s0, s1], [
+    transition('t1', 's0', 's0', '1:1'),
+    transition('t2', 's0', 's1', '0:1'),
+    transition('t3', 's1', 's1', '0:0'),
+  ]);
+  allPass('the textbook p. 101 machine, as drawn, passes HW4 P3', book);
+
+  // (b) halts mid-run (S₁ has no arrows at all) — the steps after the halt
+  // decode as 0, so the output so far is exactly x + 1.
+  const halting = circuit([s0, s1], [
+    transition('t1', 's0', 's0', '1:1'),
+    transition('t2', 's0', 's1', '0:1'),
+  ]);
+  allPass('a machine that halts in S₁ right after the +1 still passes', halting);
+  const run3 = runValueCase(q, halting, [3]);
+  check('…runValueCase on 3 halts to got [4] with no reason',
+    run3.reason === undefined && run3.got?.length === 1 && run3.got[0] === 4);
+
+  // (c) halting too early is a WRONG OUTPUT, not a rejection.
+  const echo = circuit([s0], [transition('t1', 's0', 's0', '1:1')]);
+  const rEcho = gradeQuestion(q, echo);
+  check(`S₀ 1:1 alone fails every case (${rEcho.passed}/${rEcho.total})`,
+    rEcho.total > 0 && rEcho.passed === 0);
+  check('…each on its output: got [x], no reason',
+    rEcho.cases.every((c) => c.reason === undefined && c.got.length === 1 && c.got[0] === c.input[0]));
+
+  // (d) two arrows for one input stay a Stage-1 error.
+  const nondet = circuit([s0], [
+    transition('t1', 's0', 's0', '1:1'),
+    transition('t2', 's0', 's0', '1:0'),
+  ]);
+  const rNondet = gradeQuestion(q, nondet);
+  check('two arrows for one input fail every case, reason "at most one"',
+    rNondet.total > 0 && rNondet.passed === 0 &&
+    rNondet.cases.every((c) => (c.reason ?? '').includes('at most one')));
+
+  // (e) the editor's warning source: exactly the uncovered (state, symbol)s.
+  const n1 = fsmNotation(1, 1);
+  const unc = uncoveredInputs([s0, s1], book.wires, () => n1);
+  check('uncoveredInputs(book) = { S₁: [1] }',
+    unc.size === 1 && JSON.stringify(unc.get('s1')) === '["1"]');
+  const total = circuit([s0, s1], [...book.wires, transition('t4', 's1', 's1', '1:1')]);
+  check('uncoveredInputs(total machine) is empty',
+    uncoveredInputs([s0, s1], total.wires, () => n1).size === 0);
+  const badLabel = circuit([s0], [transition('t1', 's0', 's0', '1:1'), transition('t2', 's0', 's0', 'x')]);
+  check('…an unparseable label covers nothing',
+    JSON.stringify(uncoveredInputs([s0], badLabel.wires, () => n1).get('s0')) === '["0"]');
+
+  // (f) turbot FSM brains are unchanged: a missing arrow is still an error.
+  const brain = circuit([s0], [transition('t1', 's0', 's0', '0:11')]);
+  check('validateTurbotFSM still reports a missing arrow (turbot brains keep totality)',
+    validateTurbotFSM(brain.components, brain.wires).some((e) => e.message.includes('found 0')));
 }
 
 // ─── Grep gate: label dissection lives ONLY behind the seam ──────────

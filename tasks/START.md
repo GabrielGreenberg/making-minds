@@ -38,7 +38,8 @@ session on that Mac told "set up the robot using `tasks/START.md`" (task 043), G
    `secrets/feedback.env` only. All gitignored.
 4. **The work clone's dev server**: create its gitignored `.claude/launch.json` with one
    configuration, `"name": "Robot Dev Server"`, `npm run dev --prefix app -- --port 5190
-   --strictPort`, port 5190.
+   --strictPort`, port 5190. (For attended sessions in that clone: an unattended run can't
+   start a dev server — `ROBOT-WORK.md` §3 checks visuals headlessly.)
 5. **Check the pieces by hand**, in a session in each clone: `node tasks/tools/feedback.mjs
    list --review` (catch: the credentials work); `deploy/release.sh --check` (work: ssh and
    the pilot API answer); `npm run check` in `app/` and `server/` (work: the gates run here).
@@ -54,7 +55,8 @@ session on that Mac told "set up the robot using `tasks/START.md`" (task 043), G
 7. **Approvals**: "Run now" each routine once while watching and "always allow" every tool
    it asks for (Bash, Read, Edit, Write, Glob, Grep, Workflow, push notifications, the
    browser tools). Confirm, and write into 043's log: the Workflow
-   tool runs in a routine and the run waits for it; the browser pane works; a push
+   tool runs in a routine and the run waits for it; the browser pane (it can't start a dev
+   server unattended: 043); a push
    notification reaches the phone (the app withholds one while you're at the Mac: test it
    away). Whatever doesn't, fix this recipe (and the prompts).
 8. **Always on**: the Claude app opens at login and stays open (routines run only while it

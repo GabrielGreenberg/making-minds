@@ -30,14 +30,14 @@ Gabriel, stop). `git -C <repo> fetch origin --prune`; `git -C <repo> checkout ma
 `git -C <repo> merge --ff-only origin/main`. If that fails because `main` is only *ahead*
 (`git merge-base --is-ancestor origin/main main`: a land whose push failed), push it; if
 it has diverged, tell Gabriel and stop. No Workflow tool in this session → tell Gabriel
-(a setup fault, task 043) and stop. Note whether you have the browser pane's tools.
+(a setup fault, task 043) and stop.
 
 ## 2. Pick — first match wins
 1. **Resume**: an `in-progress/` task whose `branch:` starts with `robot/`. Check it out
    (from `origin/` if not local) and continue from its progress log's last line. Its third
    `(robot, unfinished)` entry → park it instead: it doesn't fit a run.
 2. **Claim**: the top eligible `incoming/` task by LOOP §2.2 (`status: ready`, its `after:`
-   in `done/`, `requires:` empty — or `browser` only if you have the browser pane). On
+   in `done/`, `requires:` empty or `browser` — checked headlessly, §3). On
    `main`: `status: in-progress`, `branch: robot/NNN-slug` (or the branch the file already
    names — a parked task Gabriel released), `git mv` → `in-progress/`, commit
    `tasks: claim NNN (robot)`, and **push before any work** — the claim is the lock between
@@ -53,11 +53,15 @@ args: {task, branch, repo: "<repo>", today, coauthor}})` (LOOP §3). It runs in 
 background: wait for its completion notification, doing nothing else meanwhile. Read the
 result; spot-check it (`git diff --stat main`, a file or two).
 - `needsGabriel` non-empty → park (§5) with those as the questions.
-- **Visual checks.** An eyeball the task needs in order to land (`requires: browser`, or its
-  `## Verify` says so): do it yourself against this clone's dev server — `.claude/launch.json`
-  → "Robot Dev Server" — as LOOP §2.5 says; fix small misses, send a bigger one back into the
-  workflow (resume it with the finding). Any other eyeball, the Plan's `owedChecks`
-  included: write it into the progress log as owed, not claimed, and land.
+- **Visual checks.** The app won't start a dev server in an unattended run (`preview_start`:
+  "nobody is present to approve", 043), so the browser pane has nothing of this clone's to
+  show. An eyeball the task needs in order to land (`requires: browser`, or its `## Verify`
+  says so) is checked headlessly instead — the app run from Bash, headless Chrome driven
+  over CDP (as 065–067 did); fix small misses, send a bigger one back into the workflow
+  (resume it with the finding). It passes → land, with Gabriel's eyeball written into the
+  progress log as owed, not claimed, recipe included — the gate's hold list keeps the risky
+  paths for a hand release anyway. No headless check possible → park. Any other eyeball,
+  the Plan's `owedChecks` included: owed, not claimed, and land.
 - Gates still red after the workflow's rounds plus one attempt of yours → park.
 - Out of time or context before it's done → §5 "Unfinished".
 

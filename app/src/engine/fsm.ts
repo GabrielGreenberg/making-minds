@@ -64,7 +64,9 @@ export interface FSMSymbolEvalResult {
 }
 
 /**
- * Run a Mealy FSM against a sequence of input symbols, starting at S₀.
+ * Run a Mealy FSM against a sequence of input symbols, starting at S₀. A
+ * state with no arrow for the symbol read halts the run: `outputs` holds the
+ * steps taken (the grader decodes them, unreached steps as 0 — caseRun.ts).
  */
 export function evaluateFSMSymbolSequence(
   components: CircuitComponent[],

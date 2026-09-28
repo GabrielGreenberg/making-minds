@@ -8,12 +8,14 @@
 //   CC   interface: #INPUT == Σ inputWidths, #OUTPUT == Σ outputWidths.
 //   SC   interface: #INPUT == #input groups, #OUTPUT == #output groups (one wire
 //        per value; the per-value width is the step count, not structural).
-//   FSM  well-definedness: ≥1 state and every STATE has exactly one transition
-//        per input SYMBOL (total + deterministic; precludes a mid-run halt).
-//        The symbol alphabet is all 2^kIn k-bit strings where kIn = the
-//        question's input-GROUP count (cc_spec declaration order) — so a
-//        multi-group FSM question either validates against the full alphabet
-//        or fails Stage 1 loudly; it can never silently grade against wire 0.
+//   FSM  well-definedness: ≥1 state, every label parses, and every STATE has
+//        AT MOST one transition per input SYMBOL (deterministic). A missing
+//        arrow is allowed, as in the textbook: the run halts there and the
+//        output so far is decoded (caseRun.ts) — the editor warns, never
+//        blocks (task 047). The symbol alphabet is all 2^kIn k-bit strings
+//        where kIn = the question's input-GROUP count (cc_spec declaration
+//        order) — so a label of the wrong arity fails Stage 1 loudly; it can
+//        never silently grade against wire 0.
 //   TM   delegated to validateTMTable (≤ one transition per read symbol; labels
 //        parse) — see engine/tmValidate.ts.
 
@@ -191,7 +193,7 @@ function sum(ns: number[]): number {
   return ns.reduce((a, b) => a + b, 0);
 }
 
-/** Hard cap on FSM input groups: totality is checked over 2^kIn symbols and
+/** Hard cap on FSM input groups: the alphabet has 2^kIn symbols and
  *  the editor enters symbols one bit per group — beyond 3 groups the alphabet
  *  (16+) stops being teachable or checkable. Nothing silently degrades: a
  *  wider question fails Stage 1 with an explicit reason. */
@@ -230,8 +232,8 @@ export function validateMachine(
     const states = sortStateComponents(circuit.components);
     if (states.length === 0) return { ok: false, reason: 'machine has no states' };
     // THE FOOTGUN GUARD: kIn comes from the question's cc_spec input-group
-    // count (via the codec layout the grader built from it), so the totality
-    // check below covers every k-bit symbol the grader will feed. A machine
+    // count (via the codec layout the grader built from it), so the table
+    // check below parses against every k-bit symbol the grader will feed. A machine
     // labeled for the wrong arity fails here with the arity named — it can
     // never author fine and grade wrong against wire 0 alone.
     const kIn = layout.inputWidths.length;
@@ -239,11 +241,11 @@ export function validateMachine(
     if (kIn > FSM_MAX_INPUT_GROUPS) {
       return {
         ok: false,
-        reason: `FSM questions support at most ${FSM_MAX_INPUT_GROUPS} input groups (this question declares ${kIn}; totality would need ${2 ** kIn} transitions per state)`,
+        reason: `FSM questions support at most ${FSM_MAX_INPUT_GROUPS} input groups (this question declares ${kIn}; its alphabet would have ${2 ** kIn} input symbols)`,
       };
     }
     const notation = fsmNotation(kIn, kOut);
-    const errors = validateTransitionTable(states, circuit.wires, () => notation, 'total');
+    const errors = validateTransitionTable(states, circuit.wires, () => notation, 'at-most-one');
     if (errors.length > 0) return { ok: false, reason: errors.map((e) => e.message).join(' ') };
     return OK;
   }

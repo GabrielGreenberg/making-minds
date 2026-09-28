@@ -91,3 +91,13 @@ Items 2–3, recorded in the progress log.
   one work run") and `.claude/commands/robot-catch.md` / `robot-work.md` still describe the
   chain. Next: Gabriel sets the work schedule, re-enables catch, turns Remote Control on;
   then the first unattended hour and the day-after probe.
+- 2026-09-27 16:47 — Unattended since 11:04 (catch at ~:04, 6 quiet runs) and 11:44 (work at
+  ~:44; the app adds a fixed per-routine delay to the cron minute): landed 065, 066, 067,
+  047; parked 068; no overlap, the lock released each time. Gabriel set the work schedule
+  himself; my `update_scheduled_task` confirmed it and re-enabled catch. Second platform
+  limit: `preview_start` → "Dev servers can't be started from unattended sessions … nobody is
+  present to approve the command" — the browser pane can't show this clone's app. 065–067
+  landed on headless-Chrome checks with the eyeball owed; 068 parked on the same gap.
+  Gabriel's rule (this commit, `ROBOT-WORK.md` §3): check headlessly, land with his eyeball
+  owed, park only when no headless check is possible; `START.md` steps 4 and 7 say so.
+  068 released back to `incoming/` ("land it, eyeball owed").
