@@ -1,6 +1,6 @@
 import { useRef, useState, useCallback, useEffect, useMemo } from 'react';
 import { useStore, selectEffectiveMode, selectLiveFsmStateId, selectFsmUncoveredInputs, selectTransitionNotationForSource, selectPasteScope, selectShowUnboundBoxWarning } from '../store';
-import { inputCharTokens, hasCombinationalLoop, memorySlots } from '../engine';
+import { inputCharTokens, hasCombinationalLoop } from '../engine';
 import { usePasteGuard, useNotice } from '../usePasteGuard';
 import { CanvasActions } from './CanvasActions';
 import { Palette } from './Palette';
@@ -956,8 +956,9 @@ function WireView({
   const C = canvasColors();
   const isBlankWire = wire.value === -1;
   // A wire is 2px in its signal's colour, selected or not (black = 0, red =
-  // 1); a selected wire gets a lavender halo under it.
-  const color = signalColor(C, isBlankWire ? 0 : wire.value);
+  // 1, faint = unset — a blank wire's -1); a selected wire gets a lavender
+  // halo under it.
+  const color = signalColor(C, wire.value);
   const valStr = isBlankWire ? '' : String(wire.value);
 
   // Route-quality indicator (warn, don't block — wire-routing design memo):
@@ -2987,22 +2988,9 @@ export function CircuitCanvas() {
         // Toggle input value immediately without selecting or starting a drag
         const targetEl = e.target as Element;
         if (targetEl?.getAttribute?.('data-input-toggle') != null) {
-          if (comp.type === 'INPUT') {
-            // Cycle: undefined → 0 → 1 → 0 → 1...
-            const newVal = comp.value == null ? 0 : comp.value === 0 ? 1 : 0;
-            state.setInputValue(comp.id, newVal);
-            // Auto-select the matching row in the I/O table
-            setTimeout(() => {
-              const s = useStore.getState();
-              const inputs = s.components
-                .filter((c) => c.type === 'INPUT')
-                .sort((a, b) => parseInt(a.label.replace('IN', '')) - parseInt(b.label.replace('IN', '')));
-              const mems = memorySlots(s.components); // boxed MEMs included
-              const inBits = inputs.map((c) => c.value ?? 0);
-              const memBits = mems.length > 0 ? mems.map((m) => m.value) : undefined;
-              s.localStepSelect(inBits, memBits);
-            }, 0);
-          }
+          // Cycle the input; the store selects the row once every input is
+          // set (task 075: a click never sets an input the student didn't).
+          if (comp.type === 'INPUT') state.toggleInput(comp.id);
           // Still select the component so Backspace can delete it
           state.setSelectedIds([comp.id]);
           return;

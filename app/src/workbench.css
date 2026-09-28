@@ -306,6 +306,10 @@ a.wb-brand:hover { color: var(--mm-accent); text-decoration: none; }
 .op-table td { padding: 8px 0; text-align: center; border-bottom: 1px solid var(--mm-line); }
 .op-table .op-out { border-left: 1px solid var(--mm-line-2); }
 .op-table .op-1 { color: var(--mm-signal-1); font-weight: 600; }
+/* A row not run yet (task 075): its output cell is empty and muted, not a 0. */
+.op-table .op-unrun { background: var(--mm-surface-2); }
+/* A row run on a circuit that leaves the output undriven: a dim dash, not a 0. */
+.op-table .op-unset { color: var(--mm-ink-3); }
 .op-row { cursor: pointer; }
 .op-row:hover td { background: var(--mm-surface-3); }
 .op-row--current td, .op-row--current:hover td { background: var(--mm-lav-soft); }

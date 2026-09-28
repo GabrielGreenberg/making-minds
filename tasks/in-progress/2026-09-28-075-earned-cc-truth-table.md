@@ -45,7 +45,9 @@ Today (from the code):
   clicked in the table, or reached by setting the canvas inputs to that row. Unrun rows
   show an empty cell (clearly "not run yet", not 0).
 - A machine edit (the `gradedMachineKey` change the store already watches) forgets the
-  run rows, so a stale output can never stand beside a changed circuit.
+  run rows, so a stale output can never stand beside a changed circuit. (The one row the
+  canvas INPUTs still stand at is re-earned at once, from the NEW circuit: the canvas is
+  showing that row's answer, and the table must not contradict it — review, fix stage.)
 - A fresh circuit, and one opened on a question / after a canvas swap, shows no 0/1 on any
   INPUT, OUTPUT, gate or wire until an input is set or a row is run; unset draws visibly
   unlike 0 (blank numeral; the neutral/faint stroke, not the 0 ink).
@@ -83,6 +85,51 @@ Gates: `npx tsc -p tsconfig.app.json --noEmit`, `npm run build`, `npm run check`
 (`workbenchCheck` re-pinned, `navResetCheck` extended). Browser (owed eyeball): in the
 sandbox and on an HW1 CC question — fresh canvas shows no digits; wire a gate, table shows
 inputs only; click a row → that output appears and stays; toggle inputs to another row →
-it appears too; move a wire → run rows clear.
+it appears too; move a wire → every other run row clears (the row the inputs stand at
+stays, recomputed); one click on a blank INPUT sets only that input (no row until every
+input is set); a gate with an unwired input shows "–" on its run rows, not 0.
 
 ## Progress log
+- 2026-09-28 (robot, implement): store-owned `ccRunRows` (AppState, never saved), recorded ONLY by
+  the machine-key subscriber (`recordCcRunRow`: memoryless canvas, every INPUT 0/1 → that row's
+  key); a machine edit clears it there before re-recording the row the inputs stand at now;
+  `resetAllSimState` clears it (every swap + principal change). `LiveTruthTable` reads it and
+  shows an output only for earned rows (`op-unrun` muted cell, "Not run yet"). New parts start
+  `value: undefined`; `signalColor` draws unset (undefined/null/-1) with the faint role; WireView
+  no longer maps a blank wire to 0. Consequences by design: CC Reset (inputs → 0…0) runs that row;
+  after an edit the row the inputs stand at re-earns itself (the canvas is showing it). Pins:
+  workbenchCheck [output panel] + [signal colour]; navResetCheck `checkAllSimFresh` (every swap)
+  + [earned CC table]. Gates green (tsc, tools typecheck, build, `npm run check`, server
+  typecheck). Browser eyeball still owed (see Verify).
+- 2026-09-28 (robot, fix): review findings. The cells moved into pure `src/ccTable.ts`
+  (`ccOutputCell`/`ccTableView`, `ccRowKey` shared with the store) and workbenchCheck now pins
+  the rendered rule (blank until run, the grader's bit once run; mutation-tested). A run row
+  the circuit leaves undriven shows "–", not the grader's 0 (table ≡ canvas). The canvas's
+  INPUT click is the store's `toggleInput`: it sets that input only and runs the row once
+  every input is set (no 0 on an input nobody set); navResetCheck drives that path. A paste
+  lands its INPUTs blank; the palette's drag ghost is unset. Done-when 2 / Verify reworded to
+  the kept choice: after an edit the row the inputs stand at is re-earned from the new circuit.
+
+### 2026-09-28 — implemented (work loop)
+- **Built:** the CC I/O table is earned. Every input row is listed, but a row's output shows
+  only once the student has run it (row click, or canvas inputs set to it); unrun cells are
+  empty and muted ("Not run yet"), an undriven output on a run row shows "–". The run set is
+  store-owned (`ccRunRows`, never saved), cleared on every canvas swap / principal change
+  and on a machine edit (the row the inputs stand at is re-earned from the new circuit).
+  Unset is not 0 anywhere: new, pasted and palette-ghost parts start `undefined`, unset
+  signals draw faint (`signalColor`), and one INPUT click sets only that input
+  (`toggleInput`). Cells decided in pure `app/src/ccTable.ts`; no engine or grader change.
+- **Pins:** workbenchCheck [output panel] (rendered rule, HW1 P3 `.. 01 .. 10`, undriven
+  "––"), [signal colour], [palette] ghosts unset; navResetCheck `checkAllSimFresh` (no row
+  earned after any swap) + [earned CC table] (fresh tab, one-click, row click, canvas earn,
+  move keeps, edit forgets, Reset, paste blank, SC earns none). Mutation-tested.
+- **Gates:** app-tsc=0, tools typecheck=0, app-build=0, app-check=0, server-tsc=0,
+  server-check=0; context budgets ok (CLAUDE.md 39,995 / 40,000).
+- **Review:** 6 findings fixed (rendered-rule pin, paste carried INPUT values, ghost drew 0,
+  Done-when 2 reworded to the kept re-earn, undriven output showed 0, one click filled other
+  inputs), 0 skipped. Nits left: `addWire` still creates wires `value: 0` until the deferred
+  evaluation; `truthTableCC`'s doc comment still calls the table live; CC Reset earns 0…0
+  without a canvas run.
+- **Owed:** the browser eyeball in Verify (sandbox CC tab; an HW1 CC question incl. swap and
+  back; SC wires start faint, FSM/TM arrows unchanged; dark theme).
+- **NEXT STEP:** loop session: visual check (owed), then land per PROFILE §5.

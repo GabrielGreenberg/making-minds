@@ -244,14 +244,15 @@ export function toolComponent(tool: ArmedTool, library: readonly ConfirmedBoxDef
     const box = library.find((b) => b.id === tool.box);
     if (!box) return null;
     return {
-      id: 'palette-ghost', type: 'BOXED', x: 0, y: 0, label: box.name, value: 0,
+      id: 'palette-ghost', type: 'BOXED', x: 0, y: 0, label: box.name, value: undefined,
       ports: boxPorts(box.inputPortIds.length, box.outputPortIds.length),
       boxedCircuitId: box.id,
       internalCircuit: { components: box.internalComponents, wires: box.internalWires },
     };
   }
   const label = tool === 'INPUT' ? 'IN' : tool === 'OUTPUT' ? 'OUT' : tool === 'MEM' ? 'M' : tool === 'STATE' ? 'S' : tool;
-  return { id: 'palette-ghost', type: tool, x: 0, y: 0, label, ports: getPortsForType(tool), value: 0 };
+  // Unset, like the part that lands (task 075): the ghost shows no 0.
+  return { id: 'palette-ghost', type: tool, x: 0, y: 0, label, ports: getPortsForType(tool), value: undefined };
 }
 
 /** Where a part dropped (or clicked) at canvas point (px, py) goes: centred

@@ -72,6 +72,7 @@ import { parseWorkbookFile, serializeWorkbook, titleFromFileName, workbookKeyHas
 import { orderBoxPorts, rebindLegacyBoxes, rebindLegacyLibrary } from './boxPorts';
 import { boxCircuitProblem, boxEntryFromCanvas, boxEntryFromInstance, containsCopyOf, editableBoxCircuit, extractSelection, replaceCopies, replaceCopiesInLibrary } from './boxEditing';
 import { placementOrigin, toolComponent, type ArmedTool } from './palette';
+import { ccRowKey } from './ccTable';
 import { clampZoom } from './canvasView';
 import { getComponentSize } from './componentGeometry';
 
@@ -918,6 +919,10 @@ interface AppState {
   snapComponentToGrid: (id: string) => void;
   removeComponent: (id: string) => void;
   setInputValue: (id: string, value: number | undefined) => void;
+  // A canvas click on an INPUT's toggle (task 075): cycles that input
+  // (blank → 0 → 1 → 0 …) and, once every INPUT stands at 0/1, runs that row
+  // — never sets an input the student didn't. Simulation: never locked.
+  toggleInput: (id: string) => void;
   setMemStoredValue: (id: string, value: number) => void;
 
   // Wire operations
@@ -1220,6 +1225,14 @@ interface AppState {
   // The canvas answers it by fitting the view (task 055) — a view change,
   // never part of the reset itself.
   canvasSwapSeq: number;
+  // The CC I/O table's earned rows (task 075): the input rows the student has
+  // run — each the IN-label-ordered bits joined by ',' (LiveTruthTable's row
+  // key). A row is earned when the canvas INPUTs stand at it (a table click, a
+  // canvas toggle, a Reset, a replayed case): the machine-key subscriber, and
+  // only it, records one. UI only — never saved, so a resume starts the table
+  // un-earned; cleared by every canvas swap (resetAllSimState) and by a
+  // machine edit (the same subscriber).
+  ccRunRows: string[];
 
   // Box drawing mode state
   boxDrawing: {
@@ -2097,7 +2110,9 @@ export const useStore = create<AppState>()((set, get) => ({
       y: sy,
       label,
       ports: getPortsForType(type),
-      value: type === 'INPUT' ? undefined : 0,
+      // Nothing holds a value until an input is set or a row is run (task
+      // 075): a fresh OUTPUT or gate is unset, never a 0 nobody computed.
+      value: undefined,
       inputValues: type === 'INPUT' ? [undefined as unknown as number] : undefined,
       storedValue: type === 'MEM' ? 0 : undefined,
     };
@@ -2172,6 +2187,24 @@ export const useStore = create<AppState>()((set, get) => ({
     if (!get().localStepActive) {
       setTimeout(() => get().evaluateCircuit(), 0);
     }
+  },
+
+  toggleInput: (id) => {
+    const comp = get().components.find((c) => c.id === id);
+    if (!comp || comp.type !== 'INPUT') return;
+    // Cycle: undefined → 0 → 1 → 0 → 1...
+    get().setInputValue(id, comp.value == null ? 0 : comp.value === 0 ? 1 : 0);
+    // Then select the row the inputs stand at in the I/O table, readying its
+    // signal-flow animation — after the evaluation setInputValue queued. Only
+    // once every INPUT is set: a click sets the input clicked and no other,
+    // so no 0 lands on an input nobody set (task 075; unset is not 0).
+    setTimeout(() => {
+      const s = get();
+      const inputs = sortByLabel(s.components, 'IN');
+      if (!inputs.every((c) => c.value === 0 || c.value === 1)) return;
+      const mems = memorySlots(s.components); // boxed MEMs included
+      s.localStepSelect(inputs.map((c) => c.value as number), mems.length > 0 ? mems.map((m) => m.value) : undefined);
+    }, 0);
   },
 
   setMemStoredValue: (id, value) => {
@@ -3326,7 +3359,7 @@ export const useStore = create<AppState>()((set, get) => ({
       y: snapToGrid(y),
       label: name,
       ports: [...inputPorts, ...outputPorts],
-      value: 0,
+      value: undefined,
       boxedCircuitId: boxId,
       internalCircuit: {
         // Each instance keeps its own memory, starting at rest.
@@ -3602,6 +3635,11 @@ export const useStore = create<AppState>()((set, get) => ({
       } else if (c.type === 'MEM') {
         label = `M${nextMem}`;
         nextMem++;
+      }
+      // A pasted INPUT lands blank, like a placed one (task 075): the value
+      // it held on the canvas it was copied from was never set on this one.
+      if (c.type === 'INPUT') {
+        return { ...c, x: c.x + 40, y: c.y + 40, label, value: undefined, inputValues: [undefined as unknown as number] };
       }
       return { ...c, x: c.x + 40, y: c.y + 40, label };
     });
@@ -4574,6 +4612,7 @@ export const useStore = create<AppState>()((set, get) => ({
   boxesPopoutOpen: false,
   setBoxesPopoutOpen: (open) => set({ boxesPopoutOpen: open }),
   canvasSwapSeq: 0,
+  ccRunRows: [],
 
   // Box drawing mode state
   boxDrawing: {
@@ -5308,6 +5347,9 @@ export const useStore = create<AppState>()((set, get) => ({
     set((s) => ({
       selectedTool: null, boxesPopoutOpen: false, selectedIds: [], undoStack: [], redoStack: [],
       canvasSwapSeq: s.canvasSwapSeq + 1,
+      // The run rows belong to the canvas they were earned on. scGlobalReset
+      // (above) has already blanked the INPUTs, so no row re-earns itself.
+      ccRunRows: [],
     }));
   },
 
@@ -5934,21 +5976,38 @@ useStore.subscribe((state, prev) => {
   const key = gradedMachineKey({ components: state.components, wires: state.wires });
   if (lastMachineKey === null) {
     lastMachineKey = key;
-    return;
-  }
-  if (key === lastMachineKey) return;
-  lastMachineKey = key;
+  } else if (key !== lastMachineKey) {
+    lastMachineKey = key;
 
-  suppressAutoAddRow = true;
-  if (state.tableRows.length > 0) useStore.getState().clearTableRows();
-  if (state.localStepActive) useStore.getState().localStepClear();
-  // The SC rows keep what was typed; what the old machine output is gone.
-  const seqs = useStore.getState().scGlobalSequences;
-  if (seqs.some((q) => q.outputStr !== '')) {
-    useStore.setState({ scGlobalSequences: seqs.map((q) => ({ ...q, outputStr: '' })) });
+    suppressAutoAddRow = true;
+    if (state.tableRows.length > 0) useStore.getState().clearTableRows();
+    if (state.localStepActive) useStore.getState().localStepClear();
+    // The SC rows keep what was typed; what the old machine output is gone.
+    const seqs = useStore.getState().scGlobalSequences;
+    if (seqs.some((q) => q.outputStr !== '')) {
+      useStore.setState({ scGlobalSequences: seqs.map((q) => ({ ...q, outputStr: '' })) });
+    }
+    restartLiveRuns(inputCount(prev.components));
+    // What the old machine output is no output of this one (task 075): the
+    // CC table forgets every earned row. Only the row the inputs stand at now
+    // comes back, below — the canvas is showing this machine's answer to it.
+    if (useStore.getState().ccRunRows.length > 0) useStore.setState({ ccRunRows: [] });
   }
-  restartLiveRuns(inputCount(prev.components));
+  recordCcRunRow();
 });
+
+/** Earn the CC I/O table's current row (task 075): on a memoryless canvas
+ *  whose INPUTs all stand at 0/1, that row has been run. Reads fresh state —
+ *  the machine-edit resets above may have moved it. Setting ccRunRows leaves
+ *  components/wires alone, so the nested notification returns at once. */
+function recordCcRunRow(): void {
+  const s = useStore.getState();
+  if (hasMemory(s.components)) return;
+  const inputs = sortByLabel(s.components, 'IN');
+  if (inputs.length === 0 || !inputs.every((c) => c.value === 0 || c.value === 1)) return;
+  const row = ccRowKey(inputs.map((c) => c.value as number));
+  if (!s.ccRunRows.includes(row)) useStore.setState({ ccRunRows: [...s.ccRunRows, row] });
+}
 
 // ─── The sandbox's per-person load (reset law 2) ───────────────────
 // Nothing loads at module import: which sandbox appears depends on who is

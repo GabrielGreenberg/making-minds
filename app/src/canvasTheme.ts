@@ -22,7 +22,7 @@ export const CANVAS_TOKENS = {
   /** Hairlines: a transition label's frame and divider. */
   line: '--mm-line',
   line2: '--mm-line-2',
-  /** A MEM's undecided chevrons, an unset input's toggle. */
+  /** A MEM's undecided chevrons, an unset input's toggle, an unset signal. */
   faint: '--mm-edge-2',
   /** Selection: outline and body. */
   select: '--mm-accent',
@@ -71,7 +71,9 @@ export function canvasVar(role: CanvasRole): string {
   return `var(${CANVAS_TOKENS[role]})`;
 }
 
-/** A signal's colour: 1 red, anything else (0, blank) the ink. */
+/** A signal's colour: 1 red, 0 the ink, and unset (undefined, null, a wire's
+ *  -1) the faint stroke — visibly unlike 0, since nothing computed it yet
+ *  (task 075; CLAUDE.md Critical design rules). */
 export function signalColor(c: CanvasColors, value: number | null | undefined): string {
-  return value === 1 ? c.signal1 : c.signal0;
+  return value === 1 ? c.signal1 : value === 0 ? c.signal0 : c.faint;
 }
