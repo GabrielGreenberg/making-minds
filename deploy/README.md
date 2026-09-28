@@ -25,7 +25,7 @@ deploy/release.sh --unattended # the robot's release: only if the gate says so (
 
 **The release gate** (`deploy/release-gate.mjs`, task 042) decides whether an
 *unattended* release may go out now: **release**, **hold** (the new commits
-touch the hold list — grading, homework content and answer keys, what students
+touch the hold list — homework content and answer keys, what students
 may see, sign-in, passwords, the database schema, `deploy/` itself — the daily
 backups aren't running, or CI failed on the commit; Gabriel releases by hand),
 **wait** (outside 07:00–22:00 Pacific, within 24 h before a published assignment
