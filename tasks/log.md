@@ -58,3 +58,4 @@
 2026-09-26-066 · feature · Build the hand-grading queue — one problem across students, 0 / ½ / 1 keys, hide names, soft claims, changed-since-graded suggestions · 2026-09-27T13:18:14-0700 · robot/066-hand-grading-queue · 70c120d
 2026-09-26-067 · feature · Show one student's submission to an instructor — full autograde detail, overrides, and the submitted machine in the read-only viewer · 2026-09-27T14:19:08-0700 · robot/067-instructor-submission-page-and-viewer · 93a01e7
 2026-09-25-047 · bug · Accept an FSM that leaves out arrows for inputs that can't occur, as the textbook's machines do · 2026-09-27T16:04:05-0700 · robot/047-fsm-partial-transition-tables · e70e9f6
+2026-09-27-073 · chore · Let the robot release grading changes on its own — take the grader off the release gate's hold list · 2026-09-27T17:25:09-0700 · task/073-grader-releases-unattended · a56bba1
