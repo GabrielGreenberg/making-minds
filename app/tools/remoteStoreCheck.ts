@@ -40,6 +40,10 @@
 // person (never the dev key), and the grader grep gate covers
 // provenance/integrity.ts too.
 //
+// Task 076: an instructor files a report through RemoteFeedbackStore (the
+// Dashboard's Feedback) — the server stamps the instructor role whatever the
+// client says, and a report sent without a context lists without one.
+//
 // Exits non-zero on the first tally of failures.
 
 // Type-only, so erased at runtime (verbatimModuleSyntax): it loads nothing and
@@ -659,6 +663,23 @@ await remoteFeedbackStore.setStatus(filedViaSeam.id, 'resolved');
 const afterResolveViaSeam = await remoteFeedbackStore.list();
 check('setStatus persists through the seam',
   afterResolveViaSeam.find((f) => f.id === filedViaSeam.id)?.status === 'resolved');
+
+// Task 076: the instructor files from the Dashboard — the same seam, the
+// role the session's (not the client's), and no context (the route gives none).
+api.setToken(iTok);
+const filedByInstructor = await remoteFeedbackStore.submit({
+  student: 'someone-else@ucla.edu', // deliberately wrong — the server's word wins
+  authorRole: 'student', // likewise
+  category: 'platform design',
+  message: 'a report filed from the Dashboard',
+  screenshots: [],
+});
+check('an instructor files through the seam: the server stamps the instructor role',
+  filedByInstructor.authorRole === 'instructor' && filedByInstructor.status === 'open');
+check('…with no context when none is sent', filedByInstructor.context === undefined);
+const instructorFiled = (await remoteFeedbackStore.list()).find((f) => f.id === filedByInstructor.id);
+check('…and it lists in the queue tagged instructor, context-free',
+  instructorFiled?.authorRole === 'instructor' && instructorFiled.context === undefined);
 
 // ── instructor notes (storage/remoteStores.ts RemoteNotesStore) ──
 api.setToken(iTok);

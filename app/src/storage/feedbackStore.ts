@@ -6,7 +6,7 @@
 // here, a server-backed Remote implementation in remoteStores.ts, picked by
 // storage/backend.ts.
 
-import type { FeedbackCategory, FeedbackScreenshot, FeedbackStatus, PlatformFeedback } from '../types';
+import type { FeedbackCategory, FeedbackContext, FeedbackScreenshot, FeedbackStatus, PlatformFeedback } from '../types';
 import type { Role } from '../auth/accounts';
 
 export interface FeedbackStore {
@@ -18,12 +18,35 @@ export interface FeedbackStore {
     category: FeedbackCategory;
     message: string;
     screenshots: FeedbackScreenshot[];
-    context?: { assignmentId?: string; questionId?: number };
+    context?: FeedbackContext;
   }): Promise<PlatformFeedback>;
   /** Instructor only. */
   list(): Promise<PlatformFeedback[]>;
   /** Instructor only. */
   setStatus(id: string, status: FeedbackStatus): Promise<void>;
+}
+
+/**
+ * What a report form files: its fields, stamped with the SESSION's principal
+ * — the author's email and role come from who is signed in, never from the
+ * form or the page, so an instructor's report from any entry point (the
+ * Dashboard's included, task 076) carries the instructor tag. `context` is
+ * the caller's (the route — routing.ts feedbackContextFor); absent = none.
+ * The one builder FeedbackPanel files through.
+ */
+export function feedbackFromSession(
+  user: { email: string; role: Role },
+  form: { category: FeedbackCategory; message: string; screenshots: FeedbackScreenshot[] },
+  context?: FeedbackContext,
+): Parameters<FeedbackStore['submit']>[0] {
+  return {
+    student: user.email,
+    authorRole: user.role,
+    category: form.category,
+    message: form.message.trim(),
+    screenshots: form.screenshots,
+    context,
+  };
 }
 
 const KEY = 'mm:feedback';
@@ -56,7 +79,7 @@ class LocalFeedbackStore implements FeedbackStore {
     category: FeedbackCategory;
     message: string;
     screenshots: FeedbackScreenshot[];
-    context?: { assignmentId?: string; questionId?: number };
+    context?: FeedbackContext;
   }): Promise<PlatformFeedback> {
     const all = this.read();
     const record: PlatformFeedback = {

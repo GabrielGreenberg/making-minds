@@ -72,8 +72,8 @@ is the student's served `dueDate` ("(extended)"). Released grades: the **Grades*
 case, recorded vs live verdict); Home and the overview re-fetch every visit. **Viewing a
 submission**: the sheet opens a graded attempt read-only (`attempt` route).
 **Freezing** (`isFrozen`, Due dates row) forces the latest attempt. **Mark done**: a self-lock
-checkbox. **Feedback** link: platform/homework reports (category, message, ≤ 2 downscaled
-screenshots). **Paste provenance** (Critical design rules); the sandbox is free.
+checkbox. **Feedback** on every signed-in page: reports (category, message, ≤ 2
+screenshots; route context). **Paste provenance** (Critical design rules); the sandbox is free.
 **Watermark**: ids carry a MAC under a per-student, per-assignment key, each question a
 signed editing record; at submit the server names whose ids they are and flags one-piece
 work (`integrity`, instructor-only, never a verdict). **Visitors**: access is per route
@@ -101,9 +101,9 @@ meeting past the effective due date; HW6 per day; floor 0; less waivers) over `d
 **Instructor side** (`#/instructor`, the **Dashboard**, sections as tabs — Assignments ·
 Grading · Roster & accounts · Feedback · Notes). **Roster & accounts** (remote: the registrar's class
 list as exported, status report + who-left review; accounts, password reset, add/remove,
-access requests); **Feedback** queue (open/resolved/all; instructor tag, triage mark);
-shared **Notes** (one markdown document, `marked` + `dompurify`, saved only on Save, warns
-before overwriting a newer save); dashboard (drag-to-reorder, **Publish/Hide**, local-mode
+access requests); **Feedback** queue (open/resolved/all; instructor tag, triage mark; New
+report); shared **Notes** (one markdown document, `marked` + `dompurify`, saved on Save,
+warns before overwriting a newer save); dashboard (drag-to-reorder, **Publish/Hide**, local-mode
 "Load HW1–HW7"); assignment editor (drag-to-reorder questions; the document around them —
 preamble, source PDF, late policy, counts-toward-grade, sections with intro / layout /
 callouts / figures, live preview); **question creator** (all six modes on one form; per-problem
@@ -111,7 +111,7 @@ callouts, figures; formula DSL → test banks; turbot: inner machine, encoding, 
 30×30, each with criterion + max-steps; perception: rule, retina, own SC films (any a student example); component
 restrictions/limits; TM halt toggle; fill-in blanks); **Grading** (065; views read the 064 summaries, none grades): the course
 list (submitted, autograde, hand grading, mean, released; not-counted dimmed) under a
-Needs-attention box, flagged list, Settings (070), Export CSV (071); per assignment Overview (tiles,
+Needs-attention box, flagged list, Settings, Export CSV; per assignment Overview (tiles,
 per-problem shares, Release warns while pending; the stale banner's **Re-grade…**: dry run, Commit, 069) · Matrix (1 / ½ / 0 / ✎ / ↻ / — cells, filter chips, row ⚑) · Queue (066: by problem or by
 student; keys 0 / h / 1, ↵ Save & next; soft 5-minute claims; a 409 shows the other grade; changed answers offer
 the old grade; Hide names); a row opens the student's **submission page** (067: each problem's

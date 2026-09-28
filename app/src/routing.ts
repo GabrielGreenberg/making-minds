@@ -13,6 +13,7 @@
 
 import { useStore } from './store';
 import { instructorRole } from './auth/instructorRole';
+import type { FeedbackContext } from './types';
 
 export type Route =
   | { kind: 'home' }
@@ -402,6 +403,27 @@ export function editorRoute(
     ? { kind: 'assignment', id: s.assignment.id, student: s.viewingOwner.key, attempt }
     : { kind: 'assignment', id: s.assignment.id, attempt };
   return questionIndex != null ? { ...route, questionIndex } : route;
+}
+
+/**
+ * A Feedback report's context (task 076): where the reporter is, read from
+ * the ROUTE — never from whatever the editor store last held, since leaving
+ * the editor keeps its assignment in memory (store goHome) and the instructor
+ * routes never touch the store. Only an assignment route whose assignment is
+ * the one actually open gives a context: its id, plus the question's id when
+ * the URL names a question in range (the document page: the assignment
+ * alone). The viewer route (another's attempt, `student` set) follows the
+ * same rule, and only ids go out — never the student's key. Home, Grades,
+ * the sandbox and every Dashboard page, or an assignment still opening (the
+ * store behind the URL): none. Pure.
+ */
+export function feedbackContextFor(
+  route: Route,
+  assignment: { id: string; questions: readonly { id: number }[] } | null,
+): FeedbackContext | undefined {
+  if (route.kind !== 'assignment' || !assignment || assignment.id !== route.id) return undefined;
+  const questionId = route.questionIndex != null ? assignment.questions[route.questionIndex]?.id : undefined;
+  return questionId != null ? { assignmentId: route.id, questionId } : { assignmentId: route.id };
 }
 
 /** The viewer route (task 067): `student`'s attempt in the read-only editor.

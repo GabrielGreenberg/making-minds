@@ -23,7 +23,13 @@
 // `#/instructor/grading/:asg/student/:sid/submission/:n[/q/:i[/case/:k]]`)
 // round-trips, needs the instructor role, falls back to the student's page on
 // a malformed attempt, leaves the own `#/a/:id/submission/:n` unchanged; and
-// editorRoute keeps the owner on every in-editor navigation; [viewer apply]
+// editorRoute keeps the owner on every in-editor navigation; [feedback
+// context] — a Feedback report's context is the route's (task 076): an
+// assignment route whose assignment is the one open gives its id (+ the
+// question's, in range), every other route — Home, Grades, the sandbox, the
+// Dashboard — none, whatever the store last held; local filing keeps the
+// instructor role with no context key; the report form reads no store, no
+// shell hides Feedback, and the Feedback tab files and reloads; [viewer apply]
 // only an instructor's apply opens it (openSubmissionOf), and any other
 // route leaves it. [front door] — the bare site (`#/`,
 // or no hash) is Home, which needs sign-in, so anyone not signed in meets the
@@ -70,7 +76,7 @@ const setUrl = (_s: unknown, _t: string, url: string) => {
 };
 g.history = { pushState: setUrl, replaceState: setUrl };
 
-const { routeAccess, initRouting, setRoutingPrincipal, parseHash, routeToHash, navigate, canonicalHash, editorRoute } = await import('../src/routing');
+const { routeAccess, initRouting, setRoutingPrincipal, parseHash, routeToHash, navigate, canonicalHash, editorRoute, feedbackContextFor } = await import('../src/routing');
 const { useStore } = await import('../src/store');
 type Route = import('../src/routing').Route;
 
@@ -238,6 +244,84 @@ console.log('[viewer route]');
       `${base}/q/4`);
   check("editorRoute on the principal's own work is the plain route",
     routeToHash(editorRoute({ assignment: { id: 'hw1' }, viewingSubmission: null, viewingOwner: null }, 4)!) === '#/a/hw1/q/4');
+}
+
+console.log('[feedback context]');
+{
+  // A report's context comes from the ROUTE, checked against the assignment
+  // actually open (task 076) — never from what the editor store last held:
+  // leaving the editor keeps its assignment in memory (store goHome), and the
+  // instructor routes never touch the store. `A` plays that stale leftover.
+  const A = { id: 'hw1', questions: [{ id: 1 }, { id: 2 }, { id: 3 }] };
+  const same = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b);
+  for (const h of ['#/', '#/grades', '#/grades/hw1', '#/sandbox', '#/instructor', '#/instructor/feedback',
+    '#/instructor/assignments/hw1/edit', '#/instructor/grading/hw1']) {
+    check(`'${h}' with a stale assignment in the store: no context`, feedbackContextFor(parseHash(h), A) === undefined);
+  }
+  check("the document page '#/a/hw1': the assignment alone",
+    same(feedbackContextFor(parseHash('#/a/hw1'), A), { assignmentId: 'hw1' }));
+  check("'#/a/hw1/q/2': the assignment and question index 2's id",
+    same(feedbackContextFor(parseHash('#/a/hw1/q/2'), A), { assignmentId: 'hw1', questionId: 3 }));
+  check("an out-of-range question '#/a/hw1/q/9': the assignment alone",
+    same(feedbackContextFor(parseHash('#/a/hw1/q/9'), A), { assignmentId: 'hw1' }));
+  check("'#/a/hw2/q/0' while hw1 is still the one open (hw2 opening): no context",
+    feedbackContextFor(parseHash('#/a/hw2/q/0'), A) === undefined);
+  check("'#/a/hw1/q/1' with nothing open: no context",
+    feedbackContextFor(parseHash('#/a/hw1/q/1'), null) === undefined);
+  const viewer = feedbackContextFor(parseHash('#/instructor/grading/hw1/student/abc/submission/1/q/0'), A);
+  check("the viewer route: the assignment and question, ids only (never the student's key)",
+    same(viewer, { assignmentId: 'hw1', questionId: 1 }) && !JSON.stringify(viewer).includes('abc'));
+
+  // Filing: FeedbackPanel files `feedbackFromSession(user, form, context)`
+  // through the feedbackStore seam, `user` being useAuth()'s. Driven here with
+  // the SIGNED-IN account exactly as LocalAuthProvider restores it
+  // (readPersistedAccount off the session key): the toy instructor's
+  // Dashboard report takes its author and role from the session, not the form,
+  // and carries no context — not even the key.
+  const { localFeedbackStore, feedbackFromSession } = await import('../src/storage/feedbackStore');
+  const { readPersistedAccount, SESSION_KEY } = await import('../src/auth/accounts');
+  backing.delete('mm:feedback');
+  backing.set(SESSION_KEY, 'instructor-ada');
+  const prof = readPersistedAccount();
+  const form = { category: 'platform design' as const, message: '  a report from the Dashboard\n', screenshots: [] };
+  const filed = await localFeedbackStore.submit(
+    feedbackFromSession(prof!, form, feedbackContextFor(parseHash('#/instructor/feedback'), A)));
+  const listed = (await localFeedbackStore.list())[0];
+  const raw = JSON.parse(backing.get('mm:feedback') ?? '[]') as Record<string, unknown>[];
+  check("local: the signed-in instructor's Dashboard report lists under their email, with the instructor role, trimmed, no context",
+    prof?.role === 'instructor' && listed?.id === filed.id && listed.student === prof.email &&
+      listed.authorRole === 'instructor' && listed.message === 'a report from the Dashboard' && listed.context === undefined);
+  check("local: the stored record has no 'context' key at all",
+    raw.length === 1 && raw[0].id === filed.id && !('context' in raw[0]));
+  // The same builder for a signed-in student in the editor: the student role,
+  // and the route's context.
+  backing.set(SESSION_KEY, 'student-jane');
+  const stu = readPersistedAccount();
+  const fromEditor = feedbackFromSession(stu!, form, feedbackContextFor(parseHash('#/a/hw1/q/2'), A));
+  check("a signed-in student's report from '#/a/hw1/q/2': the student role and the route's context",
+    stu?.role === 'student' && fromEditor.student === stu.email && fromEditor.authorRole === 'student' &&
+      same(fromEditor.context, { assignmentId: 'hw1', questionId: 3 }));
+  backing.delete(SESSION_KEY);
+  backing.delete('mm:feedback');
+
+  // Source pins: the panel's one filing path; the context from the route.
+  const SRC = join(dirname(fileURLToPath(import.meta.url)), '../src');
+  const read = (rel: string) => readFileSync(join(SRC, rel), 'utf8');
+  const panel = read('components/FeedbackPanel.tsx');
+  check("FeedbackPanel reads no editor store (no '../store' import, no useStore)",
+    !/from '\.\.\/store'/.test(panel) && !/useStore\b/.test(panel));
+  check("FeedbackPanel files feedbackFromSession(user, …) with useAuth()'s user, setting no author or role itself",
+    /const \{ user \} = useAuth\(\)/.test(panel) &&
+      /feedbackStore\.submit\(feedbackFromSession\(user, /.test(panel) && !/authorRole:/.test(panel));
+  check('FeedbackPanel takes its context as a prop and announces a filed report',
+    /context\?: FeedbackContext/.test(panel) && /dispatchEvent\(new Event\(FEEDBACK_FILED_EVENT\)\)/.test(panel));
+  check('SessionControls derives the context from the route (feedbackContextFor)',
+    /feedbackContextFor\(/.test(read('components/SessionControls.tsx')));
+  const queue = read('instructor/FeedbackQueueView.tsx');
+  check('the Feedback tab opens FeedbackPanel from its New report action, and reloads on a filed report',
+    /<FeedbackPanel\b/.test(queue) && /addEventListener\(FEEDBACK_FILED_EVENT/.test(queue));
+  // That the Dashboard shell SHOWS Feedback (and the tab New report) is a
+  // real render: [dashboard shell], last (it signs the toy instructor in).
 }
 
 console.log('[front door]');
@@ -480,6 +564,44 @@ installSpies();
 useStore.getState().resetForPrincipal(null); // me() refuses: routing is not told (null → null)
 check('a refused token boot on #/sandbox still shows a sandbox (the visitor\'s)',
   useStore.getState().workbookOpen === true && useStore.getState().assignment === null);
+
+console.log('[dashboard shell]');
+{
+  // A REAL render (react-dom/server) of the Dashboard shell for the signed-in
+  // toy instructor, through the real LocalAuthProvider: every Dashboard tab
+  // shows the topbar Feedback button (task 076 — no role gate anywhere between
+  // the shell and the button), and the Feedback tab its New report action.
+  // Last in this tool: the provider signs the instructor in (store
+  // resetForPrincipal). tsx compiles .tsx with the classic JSX transform
+  // (tsconfig.json sets no `jsx`), so the components need a global React.
+  const React = await import('react');
+  const { renderToStaticMarkup } = await import('react-dom/server');
+  const { AuthProvider } = await import('../src/auth');
+  const { InstructorLayout } = await import('../src/instructor/InstructorLayout');
+  const { FeedbackQueueView } = await import('../src/instructor/FeedbackQueueView');
+  const { SESSION_KEY } = await import('../src/auth/accounts');
+  g.React = React;
+  backing.set(SESSION_KEY, 'instructor-ada');
+  const shell = (hash: string, body: ReturnType<typeof React.createElement>) => {
+    const route = parseHash(hash);
+    if (!route.kind.startsWith('instructor')) return '';
+    return renderToStaticMarkup(React.createElement(AuthProvider, {
+      children: React.createElement(InstructorLayout, { route: route as Parameters<typeof InstructorLayout>[0]['route'], children: body }),
+    }));
+  };
+  const session = (html: string) => /<div class="session">(.*?)<\/div>/.exec(html)?.[1] ?? '';
+  for (const h of ['#/instructor', '#/instructor/grading', '#/instructor/grading/hw1', '#/instructor/roster',
+    '#/instructor/feedback', '#/instructor/notes']) {
+    const s = session(shell(h, React.createElement('p', null, 'tab')));
+    check(`'${h}': the Dashboard shell's topbar shows the instructor a Feedback button`,
+      /Prof\. Ada · Instructor/.test(s) && /<button type="button">Feedback<\/button>/.test(s));
+  }
+  const tab = shell('#/instructor/feedback', React.createElement(FeedbackQueueView));
+  check('the Feedback tab renders its New report action beside the filter',
+    /<select class="mm-input">.*?<\/select><button class="mm-btn">New report<\/button>/.test(tab));
+  backing.delete(SESSION_KEY);
+  delete g.React;
+}
 
 console.log(failures === 0 ? '\nAll routing checks passed.' : `\n${failures} routing check(s) FAILED.`);
 process.exit(failures === 0 ? 0 : 1);

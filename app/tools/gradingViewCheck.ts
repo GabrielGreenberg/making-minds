@@ -57,6 +57,7 @@ import {
   hideNamesPrefKey,
   nextToGrade,
   queueCounts,
+  queueKeyAction,
   queueProblemIds,
   queueState,
   responseLabel,
@@ -371,6 +372,32 @@ console.log('[queue]');
   const order = submitterKeys(summary);
   check('by student: submitters in the stable key order (roster, then the rest); the ones with work waiting',
     order.join() === 'ka,kb,kc,kd,kf,kx' && studentsWithWork(summary).map((r) => r.student.key).join() === 'kb,kc,kd,kx');
+
+  // The keys (queueKeyAction). Enter saves & moves on only from the card's
+  // own note or the page — never from another textarea: since task 076 the
+  // topbar's Feedback form can sit over the queue, and Enter in its message
+  // must type a newline, not save a grade behind the modal.
+  const press = (key: string, target: Parameters<typeof queueKeyAction>[1], modal = false, shift = false, modifier = false) =>
+    queueKeyAction({ key, shift, modifier }, target, modal);
+  check('keys: Enter in the note or on the page → Save & next; Shift+Enter → nothing (a newline)',
+    press('Enter', 'note') === 'save-next' && press('Enter', 'page') === 'save-next' &&
+      press('Enter', 'note', false, true) === null && press('Enter', 'page', false, true) === null);
+  check("keys: Enter in any other field (another textarea — the Feedback form's message) → nothing; on a button/link → nothing (it clicks)",
+    press('Enter', 'field') === null && press('Enter', 'control') === null);
+  check('keys: 0 / h / 1 choose, J / K step — on the page or a button, case-insensitive',
+    press('0', 'page') === 'choose-0' && press('h', 'page') === 'choose-half' && press('H', 'control') === 'choose-half' &&
+      press('1', 'page') === 'choose-1' && press('j', 'page') === 'next' && press('K', 'page') === 'prev' && press('x', 'page') === null);
+  check('keys: typed in a field or the note, they are text (nothing)',
+    (['0', 'h', '1', 'j', 'k'] as const).every((k) => press(k, 'field') === null && press(k, 'note') === null));
+  check('keys: a modal over the queue owns the keyboard — nothing, wherever focus is',
+    (['Enter', '0', 'h', '1', 'j', 'k'] as const).every((k) =>
+      (['note', 'field', 'control', 'page'] as const).every((t) => press(k, t, true) === null)));
+  check('keys: with a modifier (Cmd/Ctrl/Alt) → nothing', press('Enter', 'page', false, false, true) === null && press('1', 'page', false, false, true) === null);
+  const queueSrc = readFileSync(new URL('../src/instructor/GradingQueue.tsx', import.meta.url), 'utf8');
+  check("GradingQueue's key handler goes through queueKeyAction, placing the note by ref and asking for an open modal",
+    /queueKeyAction\(/.test(queueSrc) && /keyTarget\(e\.target, noteRef\.current\)/.test(queueSrc) &&
+      /<textarea ref=\{noteRef\}/.test(queueSrc) && /querySelector\('\.mm-modal-backdrop'\)/.test(queueSrc) &&
+      !/tagName !== 'TEXTAREA'/.test(queueSrc));
 }
 
 console.log('[feed]');
