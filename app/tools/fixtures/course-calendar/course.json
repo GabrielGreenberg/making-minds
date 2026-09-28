@@ -1,0 +1,20 @@
+{
+  "_readme": "Synthetic course.json for dueDateCheck's [calendar import] pin (task 068): the website's shape, made-up dates.",
+  "course": {
+    "timezone": "America/Los_Angeles",
+    "lecture": { "days": "Tue & Thu", "start": "12:30", "end": "13:45" },
+    "calendar": { "instructionStart": "2026-10-27", "instructionEnd": "2026-11-12" }
+  },
+  "schedule": [
+    { "date": "2026-11-03", "type": "lesson" },
+    { "date": "2026-10-27", "type": "lesson" },
+    { "date": "2026-11-01", "type": "hw", "title": "Homework due" },
+    { "date": "2026-10-29", "type": "exam", "title": "Midterm" },
+    { "date": "2026-10-29", "type": "lesson" },
+    { "date": "2026-11-05", "type": "holiday", "title": "No class" },
+    { "date": "2026-11-10", "type": "lesson" },
+    { "date": "2026-11-12", "type": "lesson" },
+    { "date": "2026-11-18", "type": "exam", "title": "Final exam" },
+    { "type": "lesson" }
+  ]
+}

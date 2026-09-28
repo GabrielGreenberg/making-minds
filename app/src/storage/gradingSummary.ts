@@ -23,9 +23,27 @@
 //
 // Pure: no storage, no clock (the caller passes `now`) — the server imports it.
 
-import type { AssignmentData, GradeEvent, HumanGrade, IntegrityFlagCode, Points, SubmissionRecord } from '../types';
+import type {
+  AssignmentData,
+  GradeEvent,
+  HumanGrade,
+  IntegrityFlagCode,
+  LateExtension,
+  LateWaiver,
+  Points,
+  SubmissionRecord,
+} from '../types';
 import { questionTask } from '../types';
-import { answerKey, scoreRecord, scoreSubmission, type ProblemSource, type Score, type ScoreInput } from '../engine/score';
+import {
+  answerKey,
+  scoreRecord,
+  scoreSubmission,
+  type CourseCalendar,
+  type ProblemSource,
+  type Score,
+  type ScoreInput,
+} from '../engine/score';
+import { dueInput } from '../lateContext';
 import { homeworkContentHash } from '../devData/homeworkSync';
 import { sortAssignments } from '../assignmentOrder';
 import { sha256, toHex, utf8 } from '../provenance/sha256';
@@ -56,10 +74,10 @@ export interface GradingIdentity {
 export interface GradingAttemptMeta {
   attempt: number;
   submittedAt: string;
-  /** `late` against the effective due date; `units`/`deduction` stay null
-   *  until the course calendar prices lateness (task 068) and whenever the
-   *  attempt is on time. `deduction` is net of any waiver — what the grade
-   *  actually lost. */
+  /** `late` against the effective due date; `units`/`deduction` are the
+   *  course calendar's price (task 068) — null whenever the attempt is on
+   *  time, or no calendar is known. `deduction` is net of any waiver — what
+   *  the grade actually lost. */
   late: { late: boolean; units: number | null; deduction: number | null };
   /** Graded against an older version of the assignment (its content hash
    *  differs; a result with no hash predates the stamp and counts as stale). */
@@ -80,6 +98,12 @@ export interface GradingProblem {
 
 export interface GradingRow {
   student: GradingIdentity;
+  /** This student's extension on the assignment (their effective due date),
+   *  when they have one (task 068). */
+  extendedTo?: string;
+  /** Late points waived for them on it (the points only; the note and who
+   *  gave it are the attempt detail's). */
+  waived?: number;
   /** null = never submitted. */
   latest: GradingAttemptMeta | null;
   /** Empty when never submitted. */
@@ -173,15 +197,33 @@ export interface AttemptDetail {
   record: SubmissionRecord;
   events: GradeEvent[];
   score: Score;
+  /** The student's effective due date (their extension, else the
+   *  assignment's); absent = no due date. */
+  due?: string;
+  /** The extension and the waiver in full — who set them, when, the note
+   *  (task 068). Instructor-only, like the rest of the detail. */
+  extension?: LateExtension;
+  waiver?: LateWaiver;
+}
+
+/** What prices lateness for one assignment (task 068): the course calendar
+ *  (absent = no deduction is computed, never a silent −5) and each student's
+ *  extension and waiver, by `GradingIdentity.key`. Both adapters build it —
+ *  the server from its tables, the local store from localStorage. */
+export interface LateContext {
+  calendar?: CourseCalendar;
+  byStudent: ReadonlyMap<string, { extension?: LateExtension; waiver?: LateWaiver }>;
 }
 
 /**
- * A student's effective due date — the ONE place an extension and the course
- * calendar's late policy will enter (task 068). Today: the assignment's own
- * due date, and no late deduction (`late` absent — never a silent −5).
+ * A student's effective due date and late policy — the ONE hook both
+ * grading adapters' builders call (lateContext.ts dueInput): their
+ * extension ?? the assignment's date, and, with a calendar, the policy and
+ * their waiver.
  */
-export function dueFor(assignment: AssignmentData, _student: GradingIdentity): ScoreInput['due'] {
-  return assignment.dueDate ? { at: assignment.dueDate } : undefined;
+export function dueFor(assignment: AssignmentData, student: GradingIdentity, late?: LateContext): ScoreInput['due'] {
+  const mine = late?.byStudent.get(student.key);
+  return dueInput(assignment, { extension: mine?.extension, waived: mine?.waiver?.points }, late?.calendar);
 }
 
 const round1 = (x: number) => Math.round(x * 10) / 10;
@@ -218,18 +260,25 @@ function scoredRow(
   student: GradingIdentity,
   record: SubmissionRecord | undefined,
   now: number,
+  late: LateContext | undefined,
 ): { row: GradingRow; hand: { x: number; y: number } } {
-  const due = dueFor(assignment, student);
+  const due = dueFor(assignment, student, late);
+  const mine = late?.byStudent.get(student.key);
+  const adjusted = {
+    ...(mine?.extension ? { extendedTo: mine.extension.dueDate } : {}),
+    ...(mine?.waiver ? { waived: mine.waiver.points } : {}),
+  };
   if (!record) {
     const s = scoreSubmission({ questions: assignment.questions, latest: null, due, now });
     const grade = { raw: s.raw, final: s.final, provisional: s.provisional, missing: s.missing };
-    return { row: { student, latest: null, problems: [], grade }, hand: { x: 0, y: 0 } };
+    return { row: { student, ...adjusted, latest: null, problems: [], grade }, hand: { x: 0, y: 0 } };
   }
   const s = scoreRecord(assignment.questions, record, now, due);
   const toPerson = s.problems.filter((p) => p.autoPoints === null);
   return {
     row: {
       student,
+      ...adjusted,
       latest: {
         attempt: record.attempt,
         submittedAt: record.submittedAt,
@@ -258,6 +307,7 @@ export function buildAssignmentSummary(input: {
   identify: (key: string) => GradingIdentity;
   released: boolean;
   now: number;
+  late?: LateContext;
 }): AssignmentGradingSummary {
   const { assignment, now } = input;
   const hash = homeworkContentHash(assignment);
@@ -268,12 +318,12 @@ export function buildAssignmentSummary(input: {
     if (!prev || r.attempt > prev.attempt) byKey.set(key, r);
   }
   const rostered = new Set(input.roster.map((s) => s.key));
-  const rosterRows = [...input.roster].sort(byName).map((s) => scoredRow(assignment, hash, s, byKey.get(s.key), now));
+  const rosterRows = [...input.roster].sort(byName).map((s) => scoredRow(assignment, hash, s, byKey.get(s.key), now, input.late));
   const offRows = [...byKey.keys()]
     .filter((k) => !rostered.has(k))
     .map((k) => input.identify(k))
     .sort(byName)
-    .map((s) => scoredRow(assignment, hash, s, byKey.get(s.key), now).row);
+    .map((s) => scoredRow(assignment, hash, s, byKey.get(s.key), now, input.late).row);
 
   const progress: GradingProgress = {
     roster: rosterRows.length,
@@ -355,14 +405,14 @@ export function buildCourseGrading(input: {
  *  the assignment's summary holds for them. */
 export function buildStudentGrading(input: {
   student: GradingIdentity;
-  assignments: readonly { assignment: AssignmentData; released: boolean; latest: SubmissionRecord | null }[];
+  assignments: readonly { assignment: AssignmentData; released: boolean; latest: SubmissionRecord | null; late?: LateContext }[];
   now: number;
 }): StudentGrading {
   const { student } = input;
   return {
     student,
     assignments: sortAssignments(input.assignments.map((a) => ({ ...a, title: a.assignment.title, order: a.assignment.order }))).map(
-      ({ assignment, released, latest }) => {
+      ({ assignment, released, latest, late }) => {
         const summary = buildAssignmentSummary({
           assignment,
           roster: [student],
@@ -370,6 +420,7 @@ export function buildStudentGrading(input: {
           identify: () => student,
           released,
           now: input.now,
+          late,
         });
         return {
           assignmentId: assignment.id,
@@ -391,13 +442,19 @@ export function buildAttemptDetail(input: {
   record: SubmissionRecord;
   events: readonly GradeEvent[];
   now: number;
+  late?: LateContext;
 }): AttemptDetail {
   const { assignment, student, record } = input;
+  const due = dueFor(assignment, student, input.late);
+  const mine = input.late?.byStudent.get(student.key);
   return {
     student,
     record,
     events: [...input.events],
-    score: scoreRecord(assignment.questions, record, input.now, dueFor(assignment, student)),
+    score: scoreRecord(assignment.questions, record, input.now, due),
+    ...(due ? { due: due.at } : {}),
+    ...(mine?.extension ? { extension: mine.extension } : {}),
+    ...(mine?.waiver ? { waiver: mine.waiver } : {}),
   };
 }
 
@@ -468,6 +525,7 @@ export function buildQuestionResponses(input: {
   claims: ReadonlyMap<string, ClaimView>;
   released: boolean;
   now: number;
+  late?: LateContext;
 }): QuestionResponses | null {
   const { assignment, questionId, now } = input;
   const index = assignment.questions.findIndex((q) => q.id === questionId);
@@ -487,7 +545,7 @@ export function buildQuestionResponses(input: {
   const responses = ordered.map((student): QueueResponse => {
     const record = latestByKey.get(student.key)!;
     const given = record.submission.answers.find((a) => a.questionId === questionId);
-    const problem = scoreRecord(assignment.questions, record, now, dueFor(assignment, student)).problems[index];
+    const problem = scoreRecord(assignment.questions, record, now, dueFor(assignment, student, input.late)).problems[index];
     const stored = record.grades?.find((g) => g.questionId === questionId) ?? null;
     const answer: QueueAnswer =
       task === 'open'

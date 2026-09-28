@@ -40,6 +40,12 @@ Memo §6.5, §8; mockups 1 (Needs attention) and 6
 - **deepFix:** flags are pure functions over the 064 summaries + settings; no flag stores
   state.
 - Pointers: `provenance/integrity.ts:332`, `types.ts:538-570`, `instructor/RosterView.tsx`.
+- Hand-off from 068: the interim student page (`instructor/StudentGradingView.tsx`) already
+  carries **Extension…** / **Waive…** per assignment row (`instructor/LateAdjustControls.tsx`,
+  fed by `GradingRow.extendedTo` / `.waived`); the rebuild keeps them. Extension and waiver
+  changes are `grade_events` of kind `extension` / `waiver` (no `questionId`) — the grade
+  history lists them. The effective due date for "not submitted by" is
+  `storage/gradingSummary.ts dueFor` (already extension-aware).
 
 ## Verify
 Gates; browser: each flag shows on a toy fixture; a note added appears only to

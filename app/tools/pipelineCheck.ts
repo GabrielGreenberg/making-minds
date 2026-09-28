@@ -35,6 +35,15 @@
 //                        whole in the student copy and graded per arena in
 //                        order (`turbotCases[k]` is `turbot_cases[k]`), and a
 //                        grep pin: no single-arena path left in the creator.
+//
+//   [local extensions/waivers]  (task 068) the local GradingStore's
+//                        setExtension / setWaiver over a shimmed
+//                        localStorage: the summary row priced by the bundled
+//                        calendar and netted by the waiver, an extension
+//                        clearing lateness and Missing, both logged with no
+//                        questionId, the student's served copy (never the
+//                        instructor's) carrying the extended date, a released
+//                        own record carrying `lateWaived` — and no fetch at all.
 
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';
@@ -747,6 +756,85 @@ console.log('\n[group listing]');
   check('the grader never reads the group: a listed group grades identically',
     JSON.stringify(gradeSubmission(def, buildSubmission(def, empty, { submittedAt: NOW_ISO, group: ['k-ann'] }))) ===
     JSON.stringify(gradeSubmission(def, buildSubmission(def, empty, { submittedAt: NOW_ISO }))));
+}
+
+// ─── Extensions and waivers, local mode (task 068) ───────────────────────
+console.log('\n[local extensions/waivers]');
+{
+  const mem = new Map<string, string>();
+  (globalThis as unknown as Record<string, unknown>).localStorage = {
+    getItem: (k: string) => mem.get(k) ?? null,
+    setItem: (k: string, v: string) => void mem.set(k, String(v)),
+    removeItem: (k: string) => void mem.delete(k),
+    clear: () => mem.clear(),
+    key: (i: number) => [...mem.keys()][i] ?? null,
+    get length() {
+      return mem.size;
+    },
+  };
+  let fetches = 0;
+  (globalThis as unknown as Record<string, unknown>).fetch = () => {
+    fetches++;
+    return Promise.reject(new Error('local mode must not fetch'));
+  };
+  const { backendMode, assignmentStore, gradingStore, submissionStore } = await import('../src/storage/backend');
+  const { localSubmissionStore } = await import('../src/storage/submissionStore');
+  const { SESSION_KEY, TOY_ACCOUNTS } = await import('../src/auth/accounts');
+  check('the harness resolves to the local backend', backendMode === 'local');
+  const [john, jane] = TOY_ACCOUNTS.filter((a) => a.role === 'student').map((a) => a.email.toLowerCase());
+  const ada = TOY_ACCOUNTS.find((a) => a.role === 'instructor')!.email.toLowerCase();
+  const signIn = (email: string) => mem.set(SESSION_KEY, TOY_ACCOUNTS.find((a) => a.email.toLowerCase() === email)!.id);
+  signIn(ada);
+  // HW1's real due date; John submits Tue Oct 6 at 14:00 — after that lecture ended.
+  const DUE = '2026-10-05T06:59:00.000Z';
+  const def: AssignmentData = { ...buildSampleAssignment(), id: 'late-local', dueDate: DUE };
+  const old: AssignmentData = { ...def, id: 'late-local-past', dueDate: '2026-01-01T00:00:00.000Z' };
+  await assignmentStore.save(def);
+  await assignmentStore.save(old);
+  const sub = { ...buildCorrectSubmission(john), submittedAt: '2026-10-06T21:00:00.000Z' };
+  const record: SubmissionRecord = { assignmentId: def.id, attempt: 1, submittedAt: sub.submittedAt, submission: sub, result: gradeSubmission(def, sub) };
+  mem.set(`mm:sub:${def.id}`, JSON.stringify([record]));
+  const rowOf = async (id: string, key: string) => (await gradingStore.summary(id))!.rows.find((r) => r.student.key === key)!;
+
+  const priced = await rowOf(def.id, john);
+  check('the row is priced by the bundled calendar: 1 meeting ended → −10',
+    priced.latest?.late.late === true && priced.latest.late.units === 1 && priced.latest.late.deduction === 10);
+  check('Jane, past an old due date with nothing submitted, is Missing', (await rowOf(old.id, jane)).grade.missing);
+
+  const w = await gradingStore.setWaiver(def.id, john, { points: 5, note: 'granted' });
+  const netted = await rowOf(def.id, john);
+  check('a waiver nets the deduction to −5', w.ok && netted.latest?.late.deduction === 5 && netted.waived === 5);
+  const bad = await gradingStore.setWaiver(def.id, john, { points: 0 });
+  const unknown = await gradingStore.setExtension(def.id, 'nobody@example.com', DUE);
+  check('bad points and an unknown student are refused', !bad.ok && !unknown.ok);
+
+  const e = await gradingStore.setExtension(def.id, john, '2026-10-09T06:59:00.000Z');
+  const onTime = await rowOf(def.id, john);
+  check('an extension: the row is on time against it', e.ok && onTime.extendedTo === '2026-10-09T06:59:00.000Z' &&
+    onTime.latest?.late.late === false && onTime.latest.late.deduction === null);
+  await gradingStore.setExtension(old.id, jane, '2099-01-01T00:00:00.000Z');
+  check('…and clears Missing', !(await rowOf(old.id, jane)).grade.missing);
+  const detail = (await gradingStore.attempt(def.id, john, 1))!;
+  check('the attempt detail carries the effective due date, the extension and the waiver',
+    detail.due === '2026-10-09T06:59:00.000Z' && detail.extension?.setBy === ada && detail.waiver?.note === 'granted');
+  const events = localSubmissionStore.gradeLog(def.id);
+  check('each write is logged — waiver, extension — with no questionId, the grader as actor',
+    events.map((x) => x.kind).join() === 'waiver,extension' && events.every((x) => x.questionId === undefined && x.actor === ada && x.student === john));
+
+  const instructorCopy = (await assignmentStore.get(def.id))!.assignment;
+  signIn(john);
+  const studentOne = (await assignmentStore.get(def.id))!.assignment;
+  const studentRow = (await assignmentStore.list()).find((a) => a.id === def.id)!;
+  check("the student's copy and row carry their extended date, marked dueExtended",
+    studentOne.dueDate === '2026-10-09T06:59:00.000Z' && studentOne.dueExtended === true &&
+      studentRow.dueDate === '2026-10-09T06:59:00.000Z' && studentRow.dueExtended === true);
+  check("the instructor's copy is the stored one", instructorCopy.dueDate === DUE && !('dueExtended' in instructorCopy));
+  check('before release, no waiver reaches the student', (await submissionStore.listOwn(def.id, john)).every((r) => r.lateWaived === undefined));
+  await assignmentStore.setGradesReleased(def.id, true);
+  const own = await submissionStore.listOwn(def.id, john);
+  check('a released own record carries lateWaived (the points only)',
+    own.length === 1 && own[0].lateWaived === 5 && !JSON.stringify(own).includes('granted'));
+  check('law 5: no fetch in local mode', fetches === 0);
 }
 
 console.log(`\n${failures === 0 ? 'PIPELINE OK' : `PIPELINE FAILED (${failures} checks)`}`);

@@ -10,7 +10,8 @@
 //   RemoteSubmissionStore → submitAssignment / listSubmissions / listAllSubmissions / getClassmates
 //   RemoteGradingStore    → putGrade / deleteGrade / getGradingSummary / getCourseGrading /
 //                           getStudentGrading / getGradingAttempt /
-//                           getQuestionResponses / postGradingClaim
+//                           getQuestionResponses / postGradingClaim /
+//                           putExtension / putWaiver
 //   remote auth           → login / logout / me
 //
 // Configuration: VITE_API_BASE (e.g. "https://api.phil133.example.edu") set at
@@ -27,6 +28,8 @@ import type {
   AssignmentState,
   Classmate,
   HumanGrade,
+  LateExtension,
+  LateWaiver,
   Points,
   FeedbackCategory,
   FeedbackScreenshot,
@@ -559,6 +562,33 @@ export async function deleteGrade(
     `/assignments/${encodeURIComponent(assignmentId)}/grades/${encodeURIComponent(studentKey)}/${questionId}`,
     { version },
   );
+}
+
+/** Instructor only: give one student their own due date on an assignment
+ *  (task 068), or clear it (null). Returns the stored extension (null =
+ *  cleared); a bad body is a 400, an unknown student a 404. */
+export async function putExtension(assignmentId: string, studentKey: string, dueDate: string | null): Promise<LateExtension | null> {
+  const { extension } = await request<{ extension: LateExtension | null }>(
+    'PUT',
+    `/assignments/${encodeURIComponent(assignmentId)}/students/${encodeURIComponent(studentKey)}/extension`,
+    { dueDate },
+  );
+  return extension;
+}
+
+/** Instructor only: waive late points for one student ({points, note?}), or
+ *  clear the waiver (null). Returns the stored waiver (null = cleared). */
+export async function putWaiver(
+  assignmentId: string,
+  studentKey: string,
+  write: { points: number; note?: string } | null,
+): Promise<LateWaiver | null> {
+  const { waiver } = await request<{ waiver: LateWaiver | null }>(
+    'PUT',
+    `/assignments/${encodeURIComponent(assignmentId)}/students/${encodeURIComponent(studentKey)}/waiver`,
+    write ?? { clear: true },
+  );
+  return waiver;
 }
 
 /** Instructor only: one assignment's grading summary (task 064) — a row per

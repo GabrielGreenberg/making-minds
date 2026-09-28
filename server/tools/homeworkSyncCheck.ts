@@ -1,15 +1,18 @@
 // homeworkSyncCheck — pins the repo → server homework sync (task
 // 2026-09-21-007; src/homeworks.ts + app/src/devData/homeworkSync.ts). Part of
 // `npm run check`. Runs against in-memory databases and the real HW JSON; the
-// API pins boot the real app on an ephemeral port, like serverCheck.
+// API pins boot the real app on an ephemeral port, like serverCheck. Task 068:
+// [owned fields] (countsTowardGrade / latePolicy filled only where unset on
+// any copy, an edited one's content untouched) and [calendar] (syncCalendar → course_settings).
 //
 //   cd server && npx tsx tools/homeworkSyncCheck.ts
 
 import { createApp } from '../src/app';
 import { Db } from '../src/db';
 import type { ServerConfig } from '../src/config';
-import { gitLineage, readRepoHomeworks, syncHomeworks, type RepoHomework } from '../src/homeworks';
-import { homeworkContentHash, planHomeworkSync } from '../../app/src/devData/homeworkSync';
+import { readFileSync } from 'node:fs';
+import { CALENDAR_FILE, gitLineage, readRepoHomeworks, syncCalendar, syncHomeworks, type RepoHomework } from '../src/homeworks';
+import { canonicalJson, describeSyncStep, homeworkContentHash, planHomeworkSync } from '../../app/src/devData/homeworkSync';
 import { TOY_ACCOUNTS } from '../../app/src/auth/accounts';
 import type { AssignmentData } from '../../app/src/types';
 
@@ -188,10 +191,84 @@ console.log('\n[due date]');
   const steps = syncHomeworks(d, { lineage: noLineage });
   const s1 = steps.find((s) => s.id === 'hw1')!;
   check('an undated current copy gets the repo due date, keeping its order',
-    s1.action === 'refresh' && s1.matched === 'due date' &&
+    s1.action === 'refresh' && s1.matched === 'owned fields' && s1.filled?.join() === 'due date' &&
       d.getAssignment('hw1')!.dueDate === byId.get('hw1')!.assignment.dueDate && d.getAssignment('hw1')!.order === 2);
   check('a due date set on the deployment is kept',
     steps.find((s) => s.id === 'hw2')!.action === 'unchanged' && d.getAssignment('hw2')!.dueDate === '2026-10-20T06:59:00.000Z');
+}
+
+// ── the other instructor-owned fields (task 068) ─────────────────
+console.log('\n[owned fields]');
+{
+  const hw6 = byId.get('hw6')!.assignment;
+  const hw7 = byId.get('hw7')!.assignment;
+  check('the repo: HW6 is per-day, HW7 does not count toward the grade',
+    hw6.latePolicy === 'per-day' && hw7.countsTowardGrade === false);
+  const a = clone(byId.get('hw1')!.assignment);
+  check('countsTowardGrade and latePolicy never move the content hash (nor served-only dueExtended)',
+    homeworkContentHash(a) === homeworkContentHash({ ...a, countsTowardGrade: false, latePolicy: 'per-day', dueExtended: true }));
+  const d = freshDb();
+  syncHomeworks(d, { lineage: noLineage });
+  check('an inserted copy carries the repo\'s owned fields',
+    d.getAssignment('hw6')!.latePolicy === 'per-day' && d.getAssignment('hw7')!.countsTowardGrade === false);
+  // A copy loaded before 068: no latePolicy / countsTowardGrade on it.
+  const { latePolicy: _p, ...hw6Old } = d.getAssignment('hw6')!;
+  const { countsTowardGrade: _c, ...hw7Old } = d.getAssignment('hw7')!;
+  d.saveAssignment(hw6Old);
+  d.saveAssignment(hw7Old);
+  // An instructor's own choice on another: kept.
+  d.saveAssignment({ ...d.getAssignment('hw5')!, latePolicy: 'per-day', countsTowardGrade: false });
+  const steps = syncHomeworks(d, { lineage: noLineage });
+  const at = (id: string) => steps.find((s) => s.id === id)!;
+  check('unset owned fields on an unchanged copy are filled from the repo',
+    at('hw6').action === 'refresh' && at('hw6').filled?.join() === 'late policy' && d.getAssignment('hw6')!.latePolicy === 'per-day' &&
+      at('hw7').action === 'refresh' && d.getAssignment('hw7')!.countsTowardGrade === false,
+    JSON.stringify([at('hw6'), at('hw7')].map((s) => [s.action, s.filled])));
+  check('…and say so', describeSyncStep(at('hw7')) === 'hw7: counts toward grade set from the repo' &&
+    describeSyncStep(at('hw6'), true) === 'hw6: late policy would be set from the repo', describeSyncStep(at('hw7')));
+  check('an instructor-set value is kept across a sync',
+    at('hw5').action === 'unchanged' && d.getAssignment('hw5')!.latePolicy === 'per-day' && d.getAssignment('hw5')!.countsTowardGrade === false);
+  // An EDITED copy lacking them: its content left alone and not recorded as
+  // synced, but the unset owned fields still filled (they are outside the hash).
+  const edited = clone(hw7Old);
+  edited.questions[0].statement += ' (edited here)';
+  d.saveAssignment(edited);
+  const editedHw6 = clone(hw6Old);
+  editedHw6.questions[0].statement += ' (edited here)';
+  d.saveAssignment(editedHw6);
+  const saves = countSaves(d);
+  const all = syncHomeworks(d, { lineage: noLineage });
+  const e = all.find((s) => s.id === 'hw7')!;
+  const e6 = all.find((s) => s.id === 'hw6')!;
+  check('an edited copy keeps its content but takes the repo\'s unset owned fields',
+    e.action === 'edited' && d.getAssignment('hw7')!.countsTowardGrade === false &&
+      d.getAssignment('hw7')!.questions[0].statement === edited.questions[0].statement &&
+      e6.action === 'edited' && d.getAssignment('hw6')!.latePolicy === 'per-day' &&
+      d.getAssignment('hw6')!.questions[0].statement === editedHw6.questions[0].statement && saves() === 2,
+    JSON.stringify([e, e6].map((s) => [s.action, s.filled])));
+  check('…is still not recorded as synced, still reads as edited next time',
+    !d.syncedHashes('hw7').has(homeworkContentHash(edited)) && !d.syncedHashes('hw6').has(homeworkContentHash(editedHw6)) &&
+      syncHomeworks(d, { lineage: noLineage, dryRun: true }).find((s) => s.id === 'hw7')!.action === 'edited');
+  check('…and says so', describeSyncStep(e) === 'hw7: left as is — edited here since it was loaded; counts toward grade set from the repo',
+    describeSyncStep(e));
+  const again = countSaves(d);
+  syncHomeworks(d, { lineage: noLineage });
+  check('…once filled, a later sync writes nothing', again() === 0);
+}
+
+// ── the course calendar (task 068) ────────────────────────────────
+console.log('\n[calendar]');
+{
+  const d = freshDb();
+  const file: unknown = JSON.parse(readFileSync(CALENDAR_FILE, 'utf8'));
+  check('before any sync the server has no calendar (no deduction is priced)', d.courseCalendar() === undefined);
+  check('a dry run says it would set it, and writes nothing',
+    /would be set/.test(syncCalendar(d, { dryRun: true })) && d.getCourseSetting('calendar') === undefined);
+  const first = syncCalendar(d);
+  check('syncCalendar writes course_settings.calendar equal to the repo file',
+    /^calendar: set from the repo \(20 class meetings\)$/.test(first) && canonicalJson(d.getCourseSetting('calendar')) === canonicalJson(file), first);
+  check('…which the server reads as 20 meetings', d.courseCalendar()?.meetings.length === 20);
+  check('a second run is a no-op', /already current/.test(syncCalendar(d)));
 }
 
 // ── git lineage ───────────────────────────────────────────────────

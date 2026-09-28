@@ -53,7 +53,7 @@ function AssignmentsTab() {
   const { user } = useAuth();
   // The row whose Submit dialog is open (components/SubmitDialog.tsx) — it
   // records the SAVED work, since the assignment isn't open here.
-  const [submitting, setSubmitting] = useState<{ id: string; title: string } | null>(null);
+  const [submitting, setSubmitting] = useState<AssignmentSummary | null>(null);
 
   // Re-fetch on every visit to this screen (not just once at app boot) so a
   // grade or feedback note the instructor recorded after the student's last
@@ -126,6 +126,7 @@ function AssignmentsTab() {
                   {a.dueDate && status && (
                     <span className={`home-due home-due--${status}`}>
                       Due {formatDueDate(a.dueDate)}
+                      {a.dueExtended && ' (extended)'}
                       {status === 'overdue' && ' · overdue'}
                     </span>
                   )}
@@ -163,7 +164,7 @@ function AssignmentsTab() {
                   🔒 Past due
                 </span>
               ) : (
-                <button className="mm-btn" onClick={() => setSubmitting({ id: a.id, title: a.title })}>
+                <button className="mm-btn" onClick={() => setSubmitting(a)}>
                   Submit
                 </button>
               )}
@@ -182,8 +183,7 @@ function AssignmentsTab() {
       </div>
       {submitting && (
         <SubmitDialog
-          assignmentId={submitting.id}
-          title={submitting.title}
+          assignment={submitting}
           saved
           onClose={() => setSubmitting(null)}
         />

@@ -23,7 +23,7 @@
 // Local: a ClaimBook in this page's memory, the signed-in toy account the
 // grader. Remote: the server's, one per process.
 
-import type { AssignmentData, HumanGrade, Points, SubmissionRecord } from '../types';
+import type { AssignmentData, HumanGrade, LateExtension, LateWaiver, Points, SubmissionRecord } from '../types';
 import { readPersistedAccount, TOY_ACCOUNTS } from '../auth/accounts';
 import type { localSubmissionStore } from './submissionStore';
 import type { AssignmentStore } from './AssignmentStore';
@@ -37,10 +37,13 @@ import {
   type AttemptDetail,
   type CourseGrading,
   type GradingIdentity,
+  type LateContext,
   type QuestionResponses,
   type StudentGrading,
 } from './gradingSummary';
 import { ClaimBook, type ClaimOutcome } from './gradingClaims';
+import { readExtensions, readWaivers } from './lateLocal';
+import { COURSE_CALENDAR } from '../courseCalendar';
 
 export type {
   AssignmentGradingSummary,
@@ -49,6 +52,7 @@ export type {
   GradingIdentity,
   GradingProgress,
   GradingRow,
+  LateContext,
   QueueAnswer,
   QueueResponse,
   QuestionResponses,
@@ -63,6 +67,10 @@ export type GradeWriteOutcome =
   | { ok: true; grade: HumanGrade | null }
   | { ok: false; conflict: true; current: HumanGrade | null }
   | { ok: false; conflict: false; error: string };
+
+/** How an extension or waiver write came out (task 068): the stored value
+ *  (null = cleared), or the refusal's reason. */
+export type LateWriteOutcome<T> = { ok: true; value: T | null } | { ok: false; error: string };
 
 export interface GradingStore {
   /**
@@ -98,6 +106,13 @@ export interface GradingStore {
    *  unless someone else holds it). Another grader's live claim is never taken — the
    *  outcome names them. null = no such assignment, question or student. */
   claim(assignmentId: string, studentKey: string, questionId: number, opts?: { release?: boolean }): Promise<ClaimOutcome | null>;
+  /** Give one student their own due date on an assignment (their effective
+   *  due date from then on), or clear it (null). Logged. Instructor-only
+   *  (task 068; memo §4.7) — and no reason is ever recorded. */
+  setExtension(assignmentId: string, studentKey: string, dueDate: string | null): Promise<LateWriteOutcome<LateExtension>>;
+  /** Waive late points for one student on an assignment ({points, note?}),
+   *  or clear the waiver (null). Logged. Instructor-only (memo §4.6). */
+  setWaiver(assignmentId: string, studentKey: string, write: { points: number; note?: string } | null): Promise<LateWriteOutcome<LateWaiver>>;
 }
 
 /** The toy roster: its students, keyed as local records are (the email). */
@@ -162,6 +177,45 @@ export class LocalGradingStore implements GradingStore {
     return plan.ok ? { ok: true, grade: null } : plan;
   }
 
+  /** The late context: the bundled calendar and this browser's extensions
+   *  and waivers, keyed by email — the local studentKey (storage/lateLocal.ts). */
+  private lateOf(assignmentId: string): LateContext {
+    const extensions = readExtensions(assignmentId);
+    const waivers = readWaivers(assignmentId);
+    const byStudent = new Map<string, { extension?: LateExtension; waiver?: LateWaiver }>();
+    for (const key of new Set([...Object.keys(extensions), ...Object.keys(waivers)])) {
+      byStudent.set(key, {
+        ...(extensions[key] ? { extension: extensions[key] } : {}),
+        ...(waivers[key] ? { waiver: waivers[key] } : {}),
+      });
+    }
+    return { calendar: COURSE_CALENDAR, byStudent };
+  }
+
+  /** Is this key a student the store can name (a toy account or a submitter)? */
+  private async knows(assignmentId: string, studentKey: string): Promise<boolean> {
+    return (
+      TOY_ACCOUNTS.some((a) => a.email.toLowerCase() === studentKey) ||
+      (await this.subs.listAll(assignmentId)).some((r) => r.studentKey === studentKey)
+    );
+  }
+
+  async setExtension(assignmentId: string, studentKey: string, dueDate: string | null): Promise<LateWriteOutcome<LateExtension>> {
+    if (!(await this.assignments.get(assignmentId)) || !(await this.knows(assignmentId, studentKey))) {
+      return { ok: false, error: 'no such assignment or student' };
+    }
+    const plan = this.subs.applyExtension(assignmentId, studentKey, dueDate, this.actor());
+    return plan.ok ? { ok: true, value: plan.value } : plan;
+  }
+
+  async setWaiver(assignmentId: string, studentKey: string, write: { points: number; note?: string } | null): Promise<LateWriteOutcome<LateWaiver>> {
+    if (!(await this.assignments.get(assignmentId)) || !(await this.knows(assignmentId, studentKey))) {
+      return { ok: false, error: 'no such assignment or student' };
+    }
+    const plan = this.subs.applyWaiver(assignmentId, studentKey, write, this.actor());
+    return plan.ok ? { ok: true, value: plan.value } : plan;
+  }
+
   private async summaryOf(assignment: AssignmentData, released: boolean, now: number): Promise<AssignmentGradingSummary> {
     return buildAssignmentSummary({
       assignment,
@@ -170,6 +224,7 @@ export class LocalGradingStore implements GradingStore {
       identify: localIdentity,
       released,
       now,
+      late: this.lateOf(assignment.id),
     });
   }
 
@@ -196,14 +251,19 @@ export class LocalGradingStore implements GradingStore {
 
   async student(studentKey: string): Promise<StudentGrading | null> {
     const now = Date.now();
-    const assignments: { assignment: AssignmentData; released: boolean; latest: SubmissionRecord | null }[] = [];
+    const assignments: { assignment: AssignmentData; released: boolean; latest: SubmissionRecord | null; late: LateContext }[] = [];
     let seen = TOY_ACCOUNTS.some((a) => a.email.toLowerCase() === studentKey);
     for (const row of await this.assignments.list()) {
       const got = await this.assignments.get(row.id);
       if (!got) continue;
       const mine = (await this.subs.listAll(row.id)).filter((r) => r.studentKey === studentKey);
       if (mine.length) seen = true;
-      assignments.push({ assignment: got.assignment, released: got.gradesReleased, latest: latestPerStudent(mine)[0] ?? null });
+      assignments.push({
+        assignment: got.assignment,
+        released: got.gradesReleased,
+        latest: latestPerStudent(mine)[0] ?? null,
+        late: this.lateOf(row.id),
+      });
     }
     return seen ? buildStudentGrading({ student: localIdentity(studentKey), assignments, now }) : null;
   }
@@ -220,6 +280,7 @@ export class LocalGradingStore implements GradingStore {
       record,
       events: this.subs.gradeLog(assignmentId).filter((e) => e.student === studentKey),
       now: Date.now(),
+      late: this.lateOf(assignmentId),
     });
   }
 
@@ -236,6 +297,7 @@ export class LocalGradingStore implements GradingStore {
       claims: this.claims.active(assignmentId, questionId, now, this.actor()),
       released: got.gradesReleased,
       now,
+      late: this.lateOf(assignmentId),
     });
   }
 

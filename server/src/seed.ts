@@ -2,7 +2,8 @@
 // five-mode sample assignment plus its graded demo submissions — the server
 // twin of app/src/devData/seed.ts. Idempotent: reruns upsert/replace. With
 // --homeworks it also runs the homework sync (src/homeworks.ts — the same
-// step every release runs), so a fresh box starts with HW1–HW7, unpublished.
+// step every release runs), so a fresh box starts with HW1–HW7, unpublished,
+// and the course calendar.
 //
 //   MM_DB_PATH=making-minds.sqlite npm run seed          # toy roster only
 //   MM_DB_PATH=making-minds.sqlite npm run seed -- --sample
@@ -11,7 +12,7 @@
 import { loadConfig } from './config';
 import { Db } from './db';
 import { hashPassword } from './password';
-import { syncHomeworks } from './homeworks';
+import { syncCalendar, syncHomeworks } from './homeworks';
 import { describeSyncStep } from '../../app/src/devData/homeworkSync';
 import { gradeSubmission } from '../../app/src/engine/grader';
 import { TOY_ACCOUNTS } from '../../app/src/auth/accounts';
@@ -59,6 +60,7 @@ if (process.argv.includes('--sample')) {
 
 if (process.argv.includes('--homeworks')) {
   for (const step of syncHomeworks(db)) console.log(`homework ${describeSyncStep(step)}`);
+  console.log(syncCalendar(db));
 }
 
 db.close();

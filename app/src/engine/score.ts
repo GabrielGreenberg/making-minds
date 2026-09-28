@@ -21,6 +21,7 @@
 import type {
   AssignmentQuestion,
   HumanGrade,
+  LatePolicy,
   Points,
   QuestionResult,
   SubmissionData,
@@ -62,10 +63,8 @@ export interface CourseCalendar {
   meetings: readonly ClassMeeting[];
 }
 
-/** Policy: 5 points once late, then 5 more per class meeting that has ENDED
- *  since the due date — or per full day, for an assignment due on the last
- *  day of instruction (HW6). */
-export type LatePolicy = 'per-meeting' | 'per-day';
+// The policy's name is a domain type (types.ts): assignments carry it.
+export type { LatePolicy } from '../types';
 export const LATE_FIRST = 5;
 export const LATE_STEP = 5;
 const DAY_MS = 86_400_000;

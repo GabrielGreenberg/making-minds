@@ -59,3 +59,4 @@
 2026-09-26-067 · feature · Show one student's submission to an instructor — full autograde detail, overrides, and the submitted machine in the read-only viewer · 2026-09-27T14:19:08-0700 · robot/067-instructor-submission-page-and-viewer · 93a01e7
 2026-09-25-047 · bug · Accept an FSM that leaves out arrows for inputs that can't occur, as the textbook's machines do · 2026-09-27T16:04:05-0700 · robot/047-fsm-partial-transition-tables · e70e9f6
 2026-09-27-073 · chore · Let the robot release grading changes on its own — take the grader off the release gate's hold list · 2026-09-27T17:25:09-0700 · task/073-grader-releases-unattended · a56bba1
+2026-09-26-068 · feature · Apply the late policy from the class calendar — a repo copy of the website's course.json, per-student extensions, waivers, and the late warning at submit · 2026-09-27T17:49:40-0700 · robot/068-late-penalty-calendar-extensions · 9e3e09c

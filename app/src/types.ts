@@ -456,9 +456,19 @@ export interface AssignmentData {
   order?: number;
   /** Whether this assignment counts toward the course grade (the six problem
    *  sets do; HW7, the final project, does not). Absent = counts. The Grading
-   *  tab dims a `false` row and lists it after the counting ones; task 068
-   *  makes it instructor-owned and syncs HW7's `false`. */
+   *  tab dims a `false` row and lists it after the counting ones.
+   *  Instructor-owned (devData/homeworkSync.ts): the repo's value fills an
+   *  unset copy; an instructor's value is never overwritten by a sync. */
   countsTowardGrade?: boolean;
+  /** How lateness is priced (engine/score.ts lateDeduction; memo
+   *  grading-interface.md §4.6): per class meeting ended since the due date
+   *  (absent = 'per-meeting'), or per full day (HW6). Instructor-owned, like
+   *  `countsTowardGrade`. */
+  latePolicy?: LatePolicy;
+  /** SERVED-ONLY, never stored or synced: set on a student's copy whose
+   *  `dueDate` is their extension (task 068, `lateContext.ts studentCopy`),
+   *  so Home and the overview can say "(extended)". */
+  dueExtended?: true;
   questions: AssignmentQuestion[];
   /** Statement markup shown under the title, before the first section
    *  (HW1's "Note: I have put key words in bold …"). */
@@ -693,6 +703,9 @@ export interface SubmissionRecord {
   /** Instructor copies only: the student's opaque key, which names them in
    *  the grading API's paths (remote: `users.public_id`; local: the email). */
   studentKey?: string;
+  /** Late points waived on this student's assignment (task 068) — the
+   *  student's copy carries only this number, and only once released. */
+  lateWaived?: number;
   /** The content hash of the assignment this result was graded against
    *  (devData/homeworkSync.ts homeworkContentHash), stamped at submit — how a
    *  stale result is told apart (the re-grade, task 2026-09-26-069). */
@@ -706,10 +719,40 @@ export interface GradeEvent {
   at: string;
   actor: string;
   student: string;
-  questionId: number;
-  kind: 'grade' | 'override' | 'clear' | 'migrate';
-  before: HumanGrade | null;
-  after: HumanGrade | null;
+  /** The problem a grade event judges; absent on an assignment-level event
+   *  (an extension or a waiver, task 068). */
+  questionId?: number;
+  kind: 'grade' | 'override' | 'clear' | 'migrate' | 'extension' | 'waiver';
+  before: HumanGrade | LateExtension | LateWaiver | null;
+  after: HumanGrade | LateExtension | LateWaiver | null;
+}
+
+/** Policy: 5 points once late, then 5 more per class meeting that has ENDED
+ *  since the due date — or per full day, for an assignment due on the last
+ *  day of instruction (HW6). engine/score.ts prices it. */
+export type LatePolicy = 'per-meeting' | 'per-day';
+
+/**
+ * A per-(assignment, student) due date (task 068; memo grading-interface.md
+ * §4.7). The student's EFFECTIVE due date is this, else the assignment's. It
+ * has no reason field, by design: accommodation details are P4 and stay out
+ * of the platform (memo §9). Instructor-only, but the date itself reaches
+ * the student as their copy's `dueDate`.
+ */
+export interface LateExtension {
+  dueDate: string;
+  setBy: string;
+  setAt: string;
+}
+
+/** Late points given back to one student on one assignment (memo §4.6):
+ *  reduces the deduction, never below 0. The note is instructor-only (never
+ *  accommodation details); the student sees only the points, once released. */
+export interface LateWaiver {
+  points: number;
+  note?: string;
+  by: string;
+  at: string;
 }
 
 /** A problem's points: every problem is worth 1 (memo grading-interface.md §4.1). */

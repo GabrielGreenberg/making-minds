@@ -31,6 +31,8 @@ import type {
   AssignmentState,
   Classmate,
   HumanGrade,
+  LateExtension,
+  LateWaiver,
   Points,
   FeedbackCategory,
   FeedbackScreenshot,
@@ -51,6 +53,7 @@ import type {
   CourseGrading,
   GradingStore,
   GradeWriteOutcome,
+  LateWriteOutcome,
   QuestionResponses,
   StudentGrading,
 } from './gradingStore';
@@ -81,6 +84,8 @@ import {
   getGradingAttempt,
   getQuestionResponses,
   postGradingClaim,
+  putExtension,
+  putWaiver,
   submitFeedback,
   listFeedback,
   setFeedbackStatus,
@@ -261,6 +266,25 @@ class RemoteGradingStore implements GradingStore {
 
   claim(assignmentId: string, studentKey: string, questionId: number, opts?: { release?: boolean }): Promise<ClaimOutcome | null> {
     return this.orNull(() => postGradingClaim({ assignmentId, studentKey, questionId, ...(opts?.release ? { release: true } : {}) }));
+  }
+
+  // Extensions and waivers (task 068): the server plans (gradeWrites.ts)
+  // and stamps who and when; a 400 / 404 is the refusal's reason.
+  private async lateOutcome<T>(write: () => Promise<T | null>): Promise<LateWriteOutcome<T>> {
+    try {
+      return { ok: true, value: await write() };
+    } catch (err) {
+      if (err instanceof ApiError && (err.status === 400 || err.status === 404)) return { ok: false, error: err.message };
+      throw err;
+    }
+  }
+
+  setExtension(assignmentId: string, studentKey: string, dueDate: string | null): Promise<LateWriteOutcome<LateExtension>> {
+    return this.lateOutcome(() => putExtension(assignmentId, studentKey, dueDate));
+  }
+
+  setWaiver(assignmentId: string, studentKey: string, write: { points: number; note?: string } | null): Promise<LateWriteOutcome<LateWaiver>> {
+    return this.lateOutcome(() => putWaiver(assignmentId, studentKey, write));
   }
 }
 

@@ -4,12 +4,14 @@
 //   MM_DB_PATH=making-minds.sqlite npm run homeworks -- status
 //   MM_DB_PATH=making-minds.sqlite npm run homeworks -- sync [--dry-run] [--force=hw1,hw3]
 //
+// The course calendar (task 068) syncs in the same step: syncCalendar.
+//
 // `status` is `sync --dry-run`. An edited copy is reported and left alone; the
 // exit code stays 0 so a release never fails over an instructor's edit.
 
 import { loadConfig } from './config';
 import { Db } from './db';
-import { syncHomeworks } from './homeworks';
+import { syncCalendar, syncHomeworks } from './homeworks';
 import { describeSyncStep } from '../../app/src/devData/homeworkSync';
 
 const [command = 'status', ...rest] = process.argv.slice(2);
@@ -31,6 +33,7 @@ try {
     `homeworks: ${count('insert')} added, ${count('refresh')} refreshed, ${count('unchanged')} current, ` +
       `${count('edited')} left as edited${dryRun ? ' — dry run, nothing written' : ''} (${config.dbPath})`,
   );
+  console.log(syncCalendar(db, { dryRun }) + (dryRun ? ' — dry run' : ''));
   const edited = steps.filter((s) => s.action === 'edited').map((s) => s.id);
   if (edited.length) {
     console.log(`  to replace an edited copy with the repo's: npm run homeworks -- sync --force=${edited.join(',')}`);

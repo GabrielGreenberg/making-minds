@@ -8,6 +8,8 @@ import { assignmentStore } from '../storage/backend';
 import { figureUrl } from '../problemSet';
 import { problemVerdict } from '../gradeDisplay';
 import { scoreRecord } from '../engine/score';
+import { dueInput } from '../lateContext';
+import { COURSE_CALENDAR } from '../courseCalendar';
 import { formatDueDate, formatDateTime } from '../dueDates';
 import { SubmitDialog } from './SubmitDialog';
 import type { AssignmentQuestion } from '../types';
@@ -49,7 +51,10 @@ export function AssignmentOverview() {
   const total = assignment.questions.length;
   const done = assignment.questions.filter((q) => questionCircuits.get(q.id)?.done).length;
   // Once released: each problem's points, from the one grade definition.
-  const score = released && sub?.result ? scoreRecord(assignment.questions, sub, Date.now()) : null;
+  const score =
+    released && sub?.result
+      ? scoreRecord(assignment.questions, sub, Date.now(), dueInput(assignment, { waived: sub.lateWaived }, COURSE_CALENDAR))
+      : null;
   const results = new Map((sub?.result?.questions ?? []).map((r) => [r.questionId, r]));
   const status = (q: AssignmentQuestion): ProblemStatus => ({
     done: questionCircuits.get(q.id)?.done,
@@ -68,7 +73,12 @@ export function AssignmentOverview() {
         </a>
         <h1>{assignment.title}</h1>
         <p className="mm-lede overview-meta">
-          {assignment.dueDate && <span>Due {formatDueDate(assignment.dueDate)}</span>}
+          {assignment.dueDate && (
+            <span>
+              Due {formatDueDate(assignment.dueDate)}
+              {assignment.dueExtended && ' (extended)'}
+            </span>
+          )}
           <span>
             {total} problem{total === 1 ? '' : 's'}
             {total > 0 && ` · ${done} of ${total} marked done`}
@@ -129,7 +139,7 @@ export function AssignmentOverview() {
       </div>
 
       {submitting && (
-        <SubmitDialog assignmentId={assignment.id} title={assignment.title} onClose={() => setSubmitting(false)} />
+        <SubmitDialog assignment={assignment} onClose={() => setSubmitting(false)} />
       )}
     </StudentLayout>
   );
