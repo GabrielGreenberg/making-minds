@@ -8,9 +8,9 @@ requires: browser
 area: app
 source: chat
 created: 2026-09-25T16:15:00-07:00
-status: ready
+status: in-progress
 after: 2026-09-21-013
-branch:
+branch: robot/059-perception-example-films
 merged_into:
 ---
 
