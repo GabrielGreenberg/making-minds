@@ -8,14 +8,16 @@
  * "up" is toward IN1, as the motion rule reads it. Cells are buttons (no
  * text field: frames are clicked, never typed or pasted). One optional row
  * under the wires shows a bit per step (the player: the machine's output;
- * the editor: the rule's expected output). The grid holds no state: every
- * change is the caller's.
+ * the editor: the rule's expected output), and a second optional row under
+ * it (the player: a loaded example's expected output). The grid holds no
+ * state: every change is the caller's.
  */
 export function FrameFilmGrid({
   frames,
   width,
   rowLabels,
   outputRow,
+  expectedRow,
   selected,
   current = null,
   maxFrames,
@@ -30,6 +32,8 @@ export function FrameFilmGrid({
   rowLabels?: string[];
   /** A bit per frame (index = frame), undefined where there is none yet. */
   outputRow?: { label: string; bits: (number | undefined)[] };
+  /** A second bit row under `outputRow` (same shape). */
+  expectedRow?: { label: string; bits: (number | undefined)[] };
   /** The frame picked for the caller's per-frame tools (0-based), or null. */
   selected: number | null;
   /** The frame on show now (0-based) — the player's clocked-in frame. */
@@ -51,7 +55,7 @@ export function FrameFilmGrid({
         <tbody>
           <tr>
             {!readOnly && (
-              <td className="pf-add" rowSpan={width + (outputRow ? 2 : 1)}>
+              <td className="pf-add" rowSpan={width + 1 + (outputRow ? 1 : 0) + (expectedRow ? 1 : 0)}>
                 <button
                   className="pf-add-btn"
                   onClick={onAdd}
@@ -98,19 +102,19 @@ export function FrameFilmGrid({
               </tr>
             );
           })}
-          {outputRow && (
-            <tr className="pf-out">
+          {[outputRow, expectedRow].map((row, r) => row && (
+            <tr key={r} className="pf-out">
               {steps.map((t) => {
-                const out = outputRow.bits[t - 1];
+                const out = row.bits[t - 1];
                 return (
                   <td key={t} className={`pf-out-bit${out === 1 ? ' val-1' : ''} ${colClass(t)}`}>
                     {out ?? ''}
                   </td>
                 );
               })}
-              <th className="pf-label">{outputRow.label}</th>
+              <th className="pf-label">{row.label}</th>
             </tr>
-          )}
+          ))}
         </tbody>
       </table>
     </div>

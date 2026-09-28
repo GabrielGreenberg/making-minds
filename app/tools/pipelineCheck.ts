@@ -67,7 +67,7 @@ import {
   perceptionMotionDetector,
 } from '../src/devData/sampleData';
 import { perceptionFields, type PerceptionDraft } from '../src/instructor/perceptionAuthoring';
-import { buildPerceptionCases, objectFrame } from '../src/engine/perception';
+import { buildPerceptionCases, expectedPerceptionOutputs, objectFrame } from '../src/engine/perception';
 import { boxAcross, boxWhole } from './builder';
 import { gradeQuestion, gradeSubmission } from '../src/engine/grader';
 import { answerKey, autoPoints, scoreRecord, type ProblemScore } from '../src/engine/score';
@@ -203,15 +203,16 @@ console.log('\n[boxed-across answers]');
 }
 
 // An SC perception question carrying the instructor's own films (task 013):
-// the same submit → grade path, the films graded after the battery.
+// the same submit → grade path, the films graded after the battery. Film 1
+// is flagged "Example for students" (task 059): it reaches the student copy
+// as `perception_examples`, film 2 never does, and the grade ignores it.
 console.log('\n[perception films]');
 {
+  const film1 = [objectFrame(8, 3, 0), objectFrame(8, 3, 1), objectFrame(8, 3, 2)];
+  const film2 = [[1, 1, 1, 0, 0, 0, 0, 1], [0, 1, 1, 1, 0, 0, 0, 1]];
   const draft: PerceptionDraft = {
     kind: 'motion', width: 8, runLength: 3, pattern: '', direction: 'down', scene: 'multi',
-    films: [
-      [objectFrame(8, 3, 0), objectFrame(8, 3, 1), objectFrame(8, 3, 2)],
-      [[1, 1, 1, 0, 0, 0, 0, 1], [0, 1, 1, 1, 0, 0, 0, 1]],
-    ],
+    films: [{ frames: film1, example: true }, { frames: film2, example: false }],
   };
   const q: AssignmentQuestion = {
     id: 1, label: 'Films', statement: 'Detect downward motion.', buildMode: 'SC', representation: 'binary',
@@ -219,8 +220,8 @@ console.log('\n[perception films]');
   };
   const asg: AssignmentData = { id: 'perception-films', title: 'Perception films', questions: [q] };
   const generated = buildPerceptionCases(q.perception!).length;
-  const submit = (circuit: CircuitData) =>
-    gradeSubmission(asg, { assignmentTitle: asg.title, submittedAt: NOW_ISO, answers: [{ questionId: 1, circuit }] }).questions[0];
+  const submit = (circuit: CircuitData, on: AssignmentData = asg) =>
+    gradeSubmission(on, { assignmentTitle: asg.title, submittedAt: NOW_ISO, answers: [{ questionId: 1, circuit }] }).questions[0];
   const good = submit(perceptionMotionDetector({ width: 8, k: 3, direction: 'down', scene: 'multi' }));
   const bad = submit(perceptionMotionDetector({ width: 8, k: 3, direction: 'down', scene: 'single' }));
   check(`total = ${generated} generated + 2 authored`, good.total === generated + 2 && q.perception_cases!.filter((c) => c.authored).length === 2);
@@ -231,6 +232,22 @@ console.log('\n[perception films]');
   check('the student copy carries no perception case (films included) and the rule unchanged',
     (served.perception_cases ?? []).length === 0 && JSON.stringify(served.perception) === JSON.stringify(q.perception) &&
     !JSON.stringify(served).includes('authored'));
+  check('the student copy carries perception_examples: film 1 + its rule expected, nothing else',
+    JSON.stringify(served.perception_examples) === JSON.stringify([{ frames: film1, expected: expectedPerceptionOutputs(q.perception!.rule, film1) }]));
+  check("the unflagged film's frames and the flag keys never reach the student copy",
+    !JSON.stringify(served).includes(JSON.stringify(film2)) && !/"(authored|example)"/.test(JSON.stringify(served)));
+  // The grader never reads the field: tampered or missing examples grade the same.
+  const withQ = (patch: Partial<AssignmentQuestion>): AssignmentData => ({ ...asg, questions: [{ ...q, ...patch }] });
+  const { perception_examples: _dropped, ...noExamples } = q;
+  const tampered = [
+    withQ({ perception_examples: [{ frames: film1, expected: [1, 0, 0] }, { frames: film2, expected: [1, 1] }] }),
+    { ...asg, questions: [noExamples] },
+  ];
+  for (const circuit of [perceptionMotionDetector({ width: 8, k: 3, direction: 'down', scene: 'multi' }), perceptionMotionDetector({ width: 8, k: 3, direction: 'down', scene: 'single' })]) {
+    const base = JSON.stringify(submit(circuit));
+    check('a grade with tampered / missing perception_examples ≡ the untampered grade',
+      tampered.every((t) => JSON.stringify(submit(circuit, t)) === base));
+  }
 }
 
 // Human grades (task 063): the ONE write planner both GradingStores run

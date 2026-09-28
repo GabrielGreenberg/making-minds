@@ -20,6 +20,7 @@ import type {
   CircuitData,
   MotionDirection,
   MotionScene,
+  PerceptionExample,
   PerceptionRule,
   PerceptionSpec,
   PerceptionTestCase,
@@ -353,9 +354,15 @@ export function filmProblem(film: number[][], width: number): string | null {
  * `films` are the instructor's own SC frame sequences, appended after the
  * generated battery as `authored: true` cases — their expected outputs, too,
  * come from the rule, never from the caller. A CC bank is already exhaustive,
- * so a CC rule takes none (throws).
+ * so a CC rule takes none (throws). `exampleIdx` lists the films the
+ * instructor flagged "Example for students": those cases also carry
+ * `example: true` (perceptionExamples derives the student-visible copy).
  */
-export function buildPerceptionCases(spec: PerceptionSpec, films: number[][][] = []): PerceptionTestCase[] {
+export function buildPerceptionCases(
+  spec: PerceptionSpec,
+  films: number[][][] = [],
+  exampleIdx: readonly number[] = [],
+): PerceptionTestCase[] {
   const { rule, width } = spec;
   if (
     !Number.isInteger(width) ||
@@ -393,15 +400,44 @@ export function buildPerceptionCases(spec: PerceptionSpec, films: number[][][] =
     const problem = filmProblem(film, width);
     if (problem) throw new Error(`film ${i + 1}: ${problem}`);
   });
+  for (const i of exampleIdx) {
+    if (!Number.isInteger(i) || i < 0 || i >= films.length) throw new Error(`example film ${i + 1} does not exist`);
+  }
+  const examples = new Set(exampleIdx);
   const rand = lcg(0x133 + width * 31 + (rule.kind === 'motion' ? rule.objectLength : 0));
   const seqs = rule.kind === 'motion'
     ? motionSequences(width, rule.objectLength, rand, rule.direction, rule.scene)
     : changeSequences(width, rand);
-  const authored = films.map((film): PerceptionTestCase => ({
+  const authored = films.map((film, i): PerceptionTestCase => ({
     ...caseOf(rule, film.map((f) => [...f])),
     authored: true,
+    ...(examples.has(i) ? { example: true as const } : {}),
   }));
   return [...seqs.map((frames) => caseOf(rule, frames)), ...authored];
+}
+
+/**
+ * The student-visible examples of a bank: every authored case flagged
+ * `example`, in order, as fresh `{frames, expected}` copies — no flag keys, so
+ * nothing about the bank's shape leaks. Derived at save into the question's
+ * `perception_examples`; the grader never reads that field.
+ */
+export function perceptionExamples(cases: readonly PerceptionTestCase[]): PerceptionExample[] {
+  return cases
+    .filter((c) => c.authored && c.example)
+    .map((c) => ({ frames: c.frames.map((f) => [...f]), expected: [...c.expected] }));
+}
+
+/** The index of the example whose film deep-equals `frames`, else null — the
+ *  frame player shows an expected row only while the loaded film is unedited. */
+export function matchingPerceptionExample(
+  examples: readonly PerceptionExample[],
+  frames: readonly (readonly number[])[],
+): number | null {
+  const i = examples.findIndex((ex) =>
+    ex.frames.length === frames.length &&
+    ex.frames.every((f, t) => f.length === frames[t].length && f.every((b, j) => b === frames[t][j])));
+  return i < 0 ? null : i;
 }
 
 // ── Grading primitives (used by engine/grader.ts) ───────────────────

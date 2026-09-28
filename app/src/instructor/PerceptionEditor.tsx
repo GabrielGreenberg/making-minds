@@ -21,7 +21,7 @@ import {
   effectiveKind,
   effectiveWidth,
   fitFilmToWidth,
-  newFilm,
+  newDraftFilm,
   removeFilm,
   removeFilmFrame,
   replaceFilm,
@@ -40,7 +40,9 @@ import {
  * to the generated battery at save (perceptionAuthoring.ts). The active film
  * is drawn in the student's grid (FrameFilmGrid) with the rule's expected
  * output under it: the expected bits are always the rule's, never typed.
- * Films are clicked, not typed — no text field, no paste path.
+ * A film flagged "Example for students" (task 059) is also saved, with its
+ * expected row, as `perception_examples` — the student's frame player lists
+ * it. Films are clicked, not typed — no text field, no paste path.
  */
 export function PerceptionEditor({
   mode,
@@ -63,10 +65,10 @@ export function PerceptionEditor({
   const set = (patch: Partial<PerceptionDraft>) => onChange({ ...draft, ...patch });
 
   const active = films && activeFilm < draft.films.length ? activeFilm : null;
-  const film = active === null ? null : draft.films[active];
+  const film = active === null ? null : draft.films[active].frames;
   const frame = film && selectedFrame !== null && selectedFrame < film.length ? selectedFrame : null;
   const setFilm = (next: number[][]) => {
-    if (active !== null) set({ films: replaceFilm(draft.films, active, next) });
+    if (active !== null) set({ films: replaceFilm(draft.films, active, { ...draft.films[active], frames: next }) });
   };
   const pick = (i: number | null) => {
     setActiveFilm(i ?? 0);
@@ -181,7 +183,8 @@ export function PerceptionEditor({
           <p className="mm-note mm-hint">
             Grading bank: {summary.generated} generated case{summary.generated === 1 ? '' : 's'}
             {summary.authored > 0 && ` + ${summary.authored} film${summary.authored === 1 ? '' : 's'} of yours`}
-            {' '}— {summary.positives} with an expected 1 somewhere.
+            {' '}— {summary.positives} with an expected 1 somewhere
+            {summary.examples > 0 && ` · ${summary.examples} shown to students as example${summary.examples === 1 ? '' : 's'}`}.
           </p>
         )}
       </section>
@@ -194,7 +197,7 @@ export function PerceptionEditor({
               type="button"
               className="mm-btn mm-btn--small"
               onClick={() => {
-                set({ films: [...draft.films, newFilm(width)] });
+                set({ films: [...draft.films, newDraftFilm(width)] });
                 pick(draft.films.length);
               }}
             >
@@ -203,9 +206,12 @@ export function PerceptionEditor({
           </div>
           <p className="mm-note mm-hint">
             Frame sequences of your own, graded after the generated ones — every step, like
-            theirs. The expected output is always the rule's; students never see these films.
+            theirs. The expected output is always the rule's. Students see only the films
+            marked "Example for students" (with their expected output) before grading; the
+            rest stay hidden in the grading bank.
           </p>
-          {draft.films.map((f, i) => {
+          {draft.films.map((df, i) => {
+            const f = df.frames;
             const isActive = i === active;
             const bad = filmProblem(f, width);
             return (
@@ -220,6 +226,14 @@ export function PerceptionEditor({
                     {f.length} frame{f.length === 1 ? '' : 's'} · expected{' '}
                     {bad ? '—' : expectedPerceptionOutputs(rule, f).join('')} (t1 first)
                   </span>
+                  <label className="mm-inline-field">
+                    <input
+                      type="checkbox"
+                      checked={df.example}
+                      onChange={() => set({ films: replaceFilm(draft.films, i, { ...df, example: !df.example }) })}
+                    />
+                    Example for students
+                  </label>
                   <span className="instructor-section-actions">
                     <button
                       type="button"
@@ -255,7 +269,7 @@ export function PerceptionEditor({
                   <button
                     type="button"
                     className="mm-btn mm-btn--small"
-                    onClick={() => set({ films: replaceFilm(draft.films, i, fitFilmToWidth(f, width)) })}
+                    onClick={() => set({ films: replaceFilm(draft.films, i, { ...df, frames: fitFilmToWidth(f, width) }) })}
                   >
                     Fit to {width} inputs
                   </button>

@@ -302,6 +302,12 @@ export interface AssignmentQuestion {
   // engine/perception.ts + gradePerception in grader.ts).
   perception?: PerceptionSpec;
   perception_cases?: PerceptionTestCase[];
+  // The authored films the instructor flagged "Example for students", derived
+  // at save from `perception_cases` (engine/perception.ts perceptionExamples).
+  // Student-visible BY DESIGN — its own field, so the sanitizer keeps
+  // stripping `perception_cases` wholesale and never learns the flag. The
+  // grader never reads it (perceptionCheck grep gate).
+  perception_examples?: PerceptionExample[];
   // Fill-in-the-blank fields (buildMode 'open'). A `fill_in` spec turns the
   // open question's writing panel into a list of labelled boxes and makes it
   // autogradable; `fill_in_answers` is the key, and is stripped from student
@@ -1271,6 +1277,17 @@ export interface PerceptionTestCase {
    *  (engine/perception.ts buildPerceptionCases); its `expected` still comes
    *  from the rule. Never copied into a result. */
   authored?: true;
+  /** An authored film the instructor flagged "Example for students". Lives
+   *  inside the (stripped) bank; the student copy gets it only through the
+   *  derived `perception_examples`. Never copied into a result. */
+  example?: true;
+}
+
+/** One worked example a student may load into the frame player: an authored
+ *  film and its rule-derived expected output row (no flags). */
+export interface PerceptionExample {
+  frames: number[][];
+  expected: number[];
 }
 
 /** Grading outcome for one perception case (parallel to CaseResult, bit-level shape). */

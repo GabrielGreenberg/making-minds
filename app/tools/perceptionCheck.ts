@@ -49,6 +49,8 @@ import {
   lanesToFrames,
   shiftFrame,
   runPerceptionCase,
+  perceptionExamples,
+  matchingPerceptionExample,
 } from '../src/engine/perception';
 import { gradeQuestion } from '../src/engine/grader';
 import { gradingCircuit, gradedMachineKey } from '../src/engine/caseRun';
@@ -282,8 +284,9 @@ console.log('\n[authored films]');
     throws(() => buildPerceptionCases(spec, [Array.from({ length: 24 }, () => objectFrame(8, 3, 0)), [objectFrame(8, 3, 0)]])) === null);
 
   // The draft (instructor/perceptionAuthoring.ts) round-trips through a save.
+  const draftFilms = films.map((frames) => ({ frames, example: false }));
   const draft: PerceptionDraft = {
-    kind: 'motion', width: 8, runLength: 3, pattern: '', direction: 'either', scene: 'multi', films,
+    kind: 'motion', width: 8, runLength: 3, pattern: '', direction: 'either', scene: 'multi', films: draftFilms,
   };
   const saved = perceptionFields(draft, 'SC');
   const back = draftFromQuestion(saved);
@@ -302,8 +305,8 @@ console.log('\n[authored films]');
     summary !== null && summary.authored === 2 && summary.generated === buildPerceptionCases(saved.perception).length && summary.positives > 0);
   check('draftProblems: none for a sound draft', draftProblems(draft, 'SC').length === 0);
   check('draftProblems: a film of the wrong width is named',
-    /Film 2: frame t1 has 6 bits/.test(draftProblems({ ...draft, films: [films[0], [bits('000000')]] }, 'SC').join(' ')));
-  check('draftProblems: an empty film', /Film 1: a film needs at least one frame/.test(draftProblems({ ...draft, films: [[]] }, 'SC').join(' ')));
+    /Film 2: frame t1 has 6 bits/.test(draftProblems({ ...draft, films: [draftFilms[0], { frames: [bits('000000')], example: false }] }, 'SC').join(' ')));
+  check('draftProblems: an empty film', /Film 1: a film needs at least one frame/.test(draftProblems({ ...draft, films: [{ frames: [], example: false }] }, 'SC').join(' ')));
   check('draftProblems: films on a CC rule', /films are for SC rules/.test(draftProblems({ ...draft, kind: 'min-run' }, 'CC').join(' ')));
   check('draftProblems: object length past the retina', /object length/.test(draftProblems({ ...draft, runLength: 9 }, 'SC').join(' ')));
   check('a mode flip coerces the kind (CC → min-run), films ignored for the CC save',
@@ -318,8 +321,77 @@ console.log('\n[authored films]');
   const full = Array.from({ length: MAX_FILM_FRAMES }, () => objectFrame(8, 3, 0));
   check(`addFilmFrame copies the newest, never past ${MAX_FILM_FRAMES}`,
     same(addFilmFrame(f, 8)[2], f[1]) && addFilmFrame(full, 8).length === MAX_FILM_FRAMES);
-  check('duplicateFilm / removeFilm', duplicateFilm(films, 0).length === 3 && same(removeFilm(films, 0), [films[1]]));
+  check('duplicateFilm / removeFilm', duplicateFilm(draftFilms, 0).length === 3 && same(removeFilm(draftFilms, 0), [draftFilms[1]]));
   check('fitFilmToWidth pads / cuts at the bottom', same(fitFilmToWidth([bits('111')], 5), [bits('11100')]) && same(fitFilmToWidth([bits('11101')], 3), [bits('111')]));
+}
+
+// ── example films (task 059) ───────────────────────────────────────
+// A film flagged "Example for students" is marked `example: true` inside the
+// (stripped) bank and derived, at save, into its own student-visible field
+// `perception_examples` ({frames, expected}, no flags). The grader never
+// reads that field.
+console.log('\n[example films]');
+{
+  const spec = { rule: { kind: 'motion', objectLength: 3, direction: 'down' } as PerceptionRule, width: 8 };
+  const filmA = [objectFrame(8, 3, 0), objectFrame(8, 3, 1), objectFrame(8, 3, 2)];
+  const filmB = [objectFrame(8, 3, 4), objectFrame(8, 3, 3)];
+  const filmC = [objectFrame(8, 3, 2)];
+  const generated = buildPerceptionCases(spec);
+  const bank = buildPerceptionCases(spec, [filmA, filmB, filmC], [0, 2]);
+  check('exampleIdx marks exactly those authored cases example: true',
+    same(bank.slice(generated.length).map((c) => c.example === true), [true, false, true]));
+  check('generated cases are never examples', bank.slice(0, generated.length).every((c) => c.example === undefined));
+  check('no exampleIdx: no case is an example', buildPerceptionCases(spec, [filmA]).every((c) => c.example === undefined));
+  const throws = (fn: () => unknown): string | null => { try { fn(); return null; } catch (e) { return (e as Error).message; } };
+  check('throws: an example index past the films', /example film 3 does not exist/.test(throws(() => buildPerceptionCases(spec, [filmA, filmB], [2])) ?? ''));
+  const examples = perceptionExamples(bank);
+  check('perceptionExamples = the flagged films, in order, expected from the rule',
+    same(examples, [
+      { frames: filmA, expected: expectedPerceptionOutputs(spec.rule, filmA) },
+      { frames: filmC, expected: expectedPerceptionOutputs(spec.rule, filmC) },
+    ]));
+  check('examples carry no flag keys', examples.every((ex) => same(Object.keys(ex).sort(), ['expected', 'frames'])));
+  const flagged = bank[generated.length];
+  check('examples are copies, not aliases',
+    examples[0].frames !== flagged.frames && examples[0].frames[0] !== flagged.frames[0] && examples[0].expected !== flagged.expected);
+  check('perceptionExamples of an unflagged bank is empty', perceptionExamples(buildPerceptionCases(spec, [filmA])).length === 0);
+
+  // The draft round-trips the flags.
+  const draft: PerceptionDraft = {
+    kind: 'motion', width: 8, runLength: 3, pattern: '', direction: 'down', scene: 'single',
+    films: [{ frames: filmA, example: false }, { frames: filmB, example: true }],
+  };
+  const saved = perceptionFields(draft, 'SC');
+  check('perceptionFields: perception_examples = the flagged film + its rule expected',
+    same(saved.perception_examples, [{ frames: filmB, expected: expectedPerceptionOutputs(spec.rule, filmB) }]));
+  check('perceptionFields: the bank flags the film', same(saved.perception_cases.slice(generated.length).map((c) => c.example === true), [false, true]));
+  check('draft → save → draft keeps the example flags', same(draftFromQuestion(saved), draft));
+  const none = perceptionFields({ ...draft, films: draft.films.map((f) => ({ ...f, example: false })) }, 'SC');
+  check('no flagged film: the perception_examples key is absent', !('perception_examples' in none));
+  check('a CC rule (no films): no perception_examples', !('perception_examples' in perceptionFields({ ...draft, kind: 'min-run' }, 'CC')));
+  const p12 = JSON.parse(readFileSync(join(dirname(fileURLToPath(import.meta.url)), '../src/devData/homeworks/hw3.json'), 'utf8'))
+    .questions.find((q: AssignmentQuestion) => q.id === 12) as AssignmentQuestion;
+  const p12Saved = perceptionFields(draftFromQuestion(p12), 'SC');
+  check("HW3 P12 no-op edit: no perception_examples key, the committed fields unchanged (content hash stable)",
+    !('perception_examples' in p12Saved) && same(p12Saved, { perception: p12.perception, perception_cases: p12.perception_cases }));
+  const summary = bankSummary(draft, 'SC');
+  check('bankSummary counts the examples', summary !== null && summary.examples === 1 && summary.authored === 2);
+  // Film list edits keep the flag with its film.
+  const dup = duplicateFilm(draft.films, 1);
+  check('duplicateFilm copies the flag (and the frames deeply)',
+    dup.length === 3 && dup[2].example === true && same(dup[2].frames, filmB) && dup[2].frames[0] !== filmB[0]);
+  const removed = removeFilm(draft.films, 0);
+  check('removeFilm keeps the others aligned with their flags', same(removed, [{ frames: filmB, example: true }]));
+  // The player's expected-row match.
+  check('matchingPerceptionExample: a hit', matchingPerceptionExample(examples, filmC.map((f) => [...f])) === 1);
+  check('matchingPerceptionExample: an edited film misses',
+    matchingPerceptionExample(examples, [filmA[0], filmA[1], shiftFrame(filmA[2], 'down')]) === null &&
+    matchingPerceptionExample(examples, filmA.slice(0, 2)) === null && matchingPerceptionExample([], filmA) === null);
+  // Grep gate: the grader's path never reads the student-visible field.
+  const SRC = join(dirname(fileURLToPath(import.meta.url)), '../src/engine');
+  for (const f of ['grader.ts', 'caseRun.ts', 'score.ts']) {
+    check(`grep gate: engine/${f} never reads perception_examples`, !readFileSync(join(SRC, f), 'utf8').includes('perception_examples'));
+  }
 }
 
 // ── grading ────────────────────────────────────────────────────────
