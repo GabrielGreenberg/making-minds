@@ -99,6 +99,11 @@ memo first (`docs/buildout/designs/`); Gabriel approves.
   must migrate by id. Timing is Gabriel's call (asked 2026-09-26). Recommended: build the
   feature now, use it for HW2 onwards, and fold HW1 back only after HW1 is due (2026-10-04),
   with that migration.
+- **Tables come from 079 (robot catch, 2026-09-28).** Task 079 builds a blank
+  argument–value table as a fill-in shape, autograded as a function, for HW1 P14 and P9b.
+  That retires P9b's fixed blanks noted above. This task's "table" part kind should reuse
+  079's renderer, answer shape (row-major `string[]`) and grader, not build a second table.
+  Task 080 adds a rule-graded fill-in shape (HW1 P12) through the same dispatch.
 
 Touches the answer model (`types.ts` `QuestionCircuit` responseText / fillAnswers), the
 panels (`OpenResponsePanel` / `FillInPanel`), the problem-set document, the grader, the
