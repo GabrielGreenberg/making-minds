@@ -7,7 +7,8 @@
 // The load-bearing properties: CONSERVATISM — plain prose comes back as plain
 // text, so markup support never silently reflows a statement nobody re-read —
 // and DOCUMENT INTEGRITY — every seeded homework's sections partition its
-// question ids, every callout has a known kind, every figure's file exists,
+// question ids, every callout has a known kind, every figure's file exists
+// and holds no cropped-in piece of a neighbour (tools/figureCrop.ts, task 077),
 // and every piece of markup in the corpus parses and renders to prose. The
 // corpus sweep at the bottom asserts both over the real HW1-HW7 JSON.
 
@@ -25,6 +26,7 @@ import {
   validateDocument,
 } from '../src/problemSet';
 import type { AssignmentData, AssignmentQuestion } from '../src/types';
+import { figureCropFaults } from './figureCrop';
 
 let passed = 0;
 let failed = 0;
@@ -220,6 +222,89 @@ console.log('\n[problem set: sections, numbering, shapes, runs]');
     figureUrl('https://a/b.png', '/making-minds/') === 'https://a/b.png');
 }
 
+console.log('\n[figures: no cropped-in neighbours]');
+{
+  // The figures are hand crops of the HW PDFs, so a crop can keep a sliver of
+  // the shape beside the drawing (task 077; the rule and its blind spots:
+  // tools/figureCrop.ts). The offending lines below are the pre-077 files'
+  // own, verbatim — the fixture; the check never reads git history (CI clones
+  // are shallow).
+  const svg = (viewBox: string, body: string) =>
+    `<?xml version="1.0" encoding="UTF-8"?>\n<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="${viewBox}">\n${body}\n</svg>\n`;
+  const faultsOf = (viewBox: string, body: string) => figureCropFaults(svg(viewBox, body));
+  const HW1_WHITE = '<rect x="-12.5" y="-8" width="150" height="96" fill="rgb(100%, 100%, 100%)" fill-opacity="1"/>';
+  const HW1_HINT_SLIVER = '<path fill-rule="nonzero" fill="rgb(93.331909%, 91.763306%, 92.941284%)" fill-opacity="1" d="M -349.621094 3.605469 L 0.605469 3.605469 L 0.605469 67.742188 L -349.621094 67.742188 Z M -349.621094 3.605469 "/>';
+  const HW2_FORMAT_GREY = '<path fill-rule="nonzero" fill="rgb(93.331909%, 91.763306%, 92.941284%)" fill-opacity="1" d="M -220.492188 -71.042969 L 242.492188 -71.042969 L 242.492188 222.46875 L -220.492188 222.46875 Z M -220.492188 -71.042969 "/>';
+  const HW2_ARROWHEAD = '<defs>\n<clipPath id="clip-16">\n<path clip-rule="nonzero" d="M 105 51.136719 L 106 51.136719 L 106 57.507812 L 105 57.507812 Z M 105 51.136719 "/>\n</clipPath>\n</defs>\n' +
+    '<g clip-path="url(#clip-16)">\n<path fill-rule="nonzero" fill="rgb(0%, 0%, 0%)" fill-opacity="1" d="M 105.976562 57.089844 L 111.511719 54.324219 L 105.976562 51.554688 Z M 105.976562 57.089844 "/>\n</g>';
+  const HW2_LONG_GREY = '<rect x="-22" y="-9.2" width="264" height="110.4" fill="rgb(93.331909%, 91.763306%, 92.941284%)" fill-opacity="1"/>';
+  const HW3_TERMINAL = '<path fill-rule="nonzero" fill="rgb(0%, 0%, 0%)" fill-opacity="1" d="M -1.550781 29.101562 L 3.0625 29.101562 L 3.0625 33.710938 L -1.550781 33.710938 Z M -1.550781 29.101562 "/>';
+
+  const hw1 = faultsOf('0 0 125 80', `${HW1_WHITE}\n${HW1_HINT_SLIVER}`);
+  check('the pre-077 HW1 schematic fails: the hint box\'s last 0.6 units, past the left edge, 0.2% inside',
+    hw1.length === 1 && /runs past the left edge/.test(hw1[0]) && /with 0\.2% inside/.test(hw1[0]));
+  check('…and without that path it is clean', faultsOf('0 0 125 80', HW1_WHITE).length === 0);
+  const sliver = faultsOf('0 0 100 50', '<rect x="90" y="10" width="100" height="20" fill="#888"/>');
+  check('a neighbour entering from the right edge, 10% inside, fails',
+    sliver.length === 1 && /right edge/.test(sliver[0]) && /10\.0% inside/.test(sliver[0]));
+  const short = faultsOf('0 0 245 92', HW2_FORMAT_GREY);
+  check('a background that stops short of an edge fails (the pre-077 HW2 machine-format grey)',
+    short.length === 1 && /stops 2\.51 short of the right edge/.test(short[0]));
+  const head = faultsOf('0 0 106 126', HW2_ARROWHEAD);
+  check('a remnant the crop cut away fails even under a <g clip-path> (the pre-077 HW2 retina arrowhead)',
+    head.length === 1 && /right edge/.test(head[0]));
+  check('…and passes once the frame takes the whole head (112 wide)', faultsOf('0 0 112 126', HW2_ARROWHEAD).length === 0);
+  check('full-frame backgrounds pass: a rect, a path, the exact frame, a band across the width',
+    faultsOf('0 0 220 92', `${HW2_LONG_GREY}\n<path fill="#eee" d="M -5 -5 L 230 -5 L 230 100 L -5 100 Z"/>`).length === 0 &&
+    faultsOf('0 0 100 50', '<rect x="0" y="0" width="100" height="50" fill="#eee"/>').length === 0 &&
+    faultsOf('0 0 100 50', '<rect x="-3" y="10" width="106" height="20" fill="#eee"/>').length === 0);
+  const trimmed = faultsOf('0 0 112 138', HW3_TERMINAL);
+  check('no exemption for how much is kept: the figure\'s own shape, trimmed (a pre-077 hw3-retina terminal, 66.4% inside), fails',
+    trimmed.length === 1 && /left edge/.test(trimmed[0]) && /66\.4% inside/.test(trimmed[0]));
+  check('…and passes once the frame takes the whole square (viewBox -2 0 114 138)', faultsOf('-2 0 114 138', HW3_TERMINAL).length === 0);
+  check('a thin neighbour mostly inside the frame fails: a 0.4-wide rule 62% in, a grey bar 60% in, a wider one 67% in',
+    faultsOf('0 0 125 80', `${HW1_WHITE}\n<rect x="-0.15" y="4" width="0.4" height="60" fill="black"/>`).length === 1 &&
+    faultsOf('0 0 125 80', `${HW1_WHITE}\n<path fill="rgb(93.33%, 91.76%, 92.94%)" d="M -0.8 3.6 L 1.2 3.6 L 1.2 67.7 L -0.8 67.7 Z"/>`).length === 1 &&
+    faultsOf('0 0 125 80', `${HW1_WHITE}\n<path fill="rgb(93.33%, 91.76%, 92.94%)" d="M -0.3 3.6 L 0.6 3.6 L 0.6 67.7 L -0.3 67.7 Z"/>`).length === 1);
+  check('…as does a neighbour covering 41% of the frame from the left, and an arrowhead 55% inside the right edge',
+    faultsOf('0 0 245 92', '<rect x="-10" y="-5" width="110" height="102" fill="#eee"/>').length === 1 &&
+    faultsOf('0 0 106 126', '<path d="M 103 57 L 108.5 54.3 L 103 51.5 Z"/>').length === 1);
+  check('ignored: <defs> (nested <g>s and all), comments, fill="none" strokes, fill-opacity 0, <use> glyphs, a shape wholly outside the frame',
+    faultsOf('0 0 100 50', [
+      '<defs><g><g id="glyph-0"><path d="M -50 0 L 5 0 L 5 5 Z"/></g></g><rect id="r" x="-80" width="81" height="9"/></defs><defs/>',
+      '<!-- <rect x="-80" width="81" height="9"/> -->',
+      '<path fill="none" stroke="rgb(0%, 0%, 0%)" d="M 60 20 L 140 20"/>',
+      '<g fill="none"><path stroke="black" d="M -40 5 L 3 5 L 3 9 Z"/></g>',
+      '<rect x="-80" y="5" width="81" height="9" fill="#888" fill-opacity="0"/>',
+      '<g fill="black"><use xlink:href="#glyph-0" x="98" y="30"/></g>',
+      '<rect x="200" y="5" width="30" height="9" fill="#888"/><rect x="-30" y="5" width="30" height="9" fill="#888"/>',
+    ].join('\n')).length === 0);
+  check('fill inherits: from an ancestor <g>, else the SVG default black',
+    faultsOf('0 0 100 50', '<g fill="rgb(50%, 50%, 50%)"><g><path d="M -40 5 L 3 5 L 3 9 L -40 9 Z"/></g></g>').length === 1 &&
+    faultsOf('0 0 100 50', '<path d="M -40 5 L 3 5 L 3 9 L -40 9 Z"/>').length === 1 &&
+    faultsOf('0 0 100 50', '<rect style="fill:none" x="-40" y="5" width="43" height="4"/>').length === 0);
+  check('transforms apply: an in-frame rect moved out by an ancestor\'s matrix, or by its own translate, fails',
+    faultsOf('0 0 100 50', '<g transform="matrix(1, 0, 0, 1, -45, 0)"><rect x="10" y="10" width="50" height="20"/></g>').length === 1 &&
+    faultsOf('0 0 100 50', '<rect x="10" y="10" width="50" height="20" transform="translate(-45)"/>').length === 1 &&
+    faultsOf('0 0 100 50', '<g transform="translate(100 0)"><rect x="-90" y="10" width="20" height="20"/></g>').length === 0);
+  check('…the element\'s own transform first, then its ancestors\' (outward)',
+    faultsOf('0 0 100 50', '<g transform="matrix(2,0,0,2,0,0)"><rect x="44" y="5" width="4" height="4" transform="translate(10)"/></g>').length === 0 &&
+    faultsOf('0 0 100 50', '<g transform="translate(10)"><rect x="44" y="5" width="4" height="4" transform="matrix(2,0,0,2,0,0)"/></g>').length === 1);
+  const unread = (viewBox: string, body: string) => faultsOf(viewBox, body).some((f) => /cannot be judged/.test(f));
+  check('geometry it cannot read is a fault, never a silent pass: rotate(), relative / H / V / A commands, a % rect, circle / ellipse / polygon, no viewBox',
+    unread('0 0 100 50', '<rect x="10" y="10" width="10" height="10" transform="rotate(45)"/>') &&
+    unread('0 0 100 50', '<g transform="rotate(45)"><g><rect x="10" y="10" width="10" height="10"/></g></g>') &&
+    unread('0 0 100 50', '<path d="m 10 10 l 5 0 l 0 5 z"/>') &&
+    unread('0 0 100 50', '<path d="M 10 10 H 20 V 20 Z"/>') &&
+    unread('0 0 100 50', '<path d="M 10 10 A 5 5 0 0 1 20 20 Z"/>') &&
+    unread('0 0 100 50', '<rect width="100%" height="100%" fill="#fff"/>') &&
+    unread('0 0 100 50', '<circle cx="0" cy="0" r="5"/>') &&
+    unread('0 0 100 50', '<ellipse cx="0" cy="0" rx="5" ry="3" fill="#888"/>') &&
+    unread('0 0 100 50', '<polygon points="0,0 5,0 5,5"/>') &&
+    faultsOf('0 0 100 50', '<circle cx="0" cy="0" r="5" fill="none" stroke="black"/>').length === 0 &&
+    figureCropFaults('<svg xmlns="http://www.w3.org/2000/svg"><rect width="10" height="10"/></svg>').some((f) => /viewBox/.test(f)));
+}
+
 console.log('\n[corpus: the seeded HW1-HW7 documents]');
 {
   const dir = join(import.meta.dirname, '../src/devData/homeworks');
@@ -230,6 +315,8 @@ console.log('\n[corpus: the seeded HW1-HW7 documents]');
   const parted: string[] = [];
   const invalid: string[] = [];
   const missingFigures: string[] = [];
+  const cropFaults: string[] = [];
+  const judgedSvgs = new Set<string>();
   const missingPdf: string[] = [];
   const emptyDoc: string[] = [];
   // Every piece of markup the document renders, parsed and flattened: a
@@ -251,7 +338,14 @@ console.log('\n[corpus: the seeded HW1-HW7 documents]');
     if (hw.sourcePdf && UNLINKED_PDF.has(name)) emptyDoc.push(`${name} links the PDF it must not`);
     if (hw.sourcePdf && !existsSync(join(publicDir, hw.sourcePdf))) missingPdf.push(`${name}: ${hw.sourcePdf}`);
     for (const { where, figure } of collectFigures(hw)) {
-      if (!/^data:/.test(figure.src) && !existsSync(join(publicDir, figure.src))) missingFigures.push(`${name} ${where}: ${figure.src}`);
+      // A data: URL is an upload from the question creator, judged by no file
+      // (none in the corpus); a missing file is the check below's to report.
+      if (/^data:/.test(figure.src)) continue;
+      const file = join(publicDir, figure.src);
+      if (!existsSync(file)) { missingFigures.push(`${name} ${where}: ${figure.src}`); continue; }
+      if (!figure.src.endsWith('.svg') || judgedSvgs.has(figure.src)) continue;
+      judgedSvgs.add(figure.src);
+      for (const fault of figureCropFaults(readFileSync(file, 'utf8'))) cropFaults.push(`${name} ${where}: ${figure.src} — ${fault}`);
     }
     render(`${name} preamble`, hw.preamble);
     for (const s of hw.sections ?? []) {
@@ -273,6 +367,8 @@ console.log('\n[corpus: the seeded HW1-HW7 documents]');
   check(`every HW carries sections and its source PDF (HW1 deliberately unlinked)${emptyDoc.length ? ' — ' + emptyDoc.join(', ') : ''}`, emptyDoc.length === 0);
   check(`every source PDF exists under public/${missingPdf.length ? ' — ' + missingPdf.join(', ') : ''}`, missingPdf.length === 0);
   check(`every figure file exists under public/${missingFigures.length ? ' — ' + missingFigures.join(', ') : ''}`, missingFigures.length === 0);
+  check(`every figure is free of cropped-in neighbours (${judgedSvgs.size} SVGs)${cropFaults.length ? ' — ' + cropFaults.join('; ') : ''}`,
+    judgedSvgs.size > 0 && cropFaults.length === 0);
   // The five HW1 truth-table problems are exactly the ones that tabulate;
   // anything else joining them is a false positive of the profile regex.
   check(`exactly the five HW1 truth tables tabulate (${tabulated.join(', ')})`,

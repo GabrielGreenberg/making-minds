@@ -80,7 +80,6 @@
 </g>
 </defs>
 <rect x="-12.5" y="-8" width="150" height="96" fill="rgb(100%, 100%, 100%)" fill-opacity="1"/>
-<path fill-rule="nonzero" fill="rgb(93.331909%, 91.763306%, 92.941284%)" fill-opacity="1" d="M -349.621094 3.605469 L 0.605469 3.605469 L 0.605469 67.742188 L -349.621094 67.742188 Z M -349.621094 3.605469 "/>
 <path fill="none" stroke-width="1.257534" stroke-linecap="butt" stroke-linejoin="miter" stroke="rgb(0%, 0%, 0%)" stroke-opacity="1" stroke-miterlimit="4" d="M 63.402464 45.269362 L 83.988402 45.269308 " transform="matrix(1, 0.00000266316, -0.00000266316, 1, 0, 0)"/>
 <path fill-rule="nonzero" fill="rgb(0%, 0%, 0%)" fill-opacity="1" d="M 83.359375 48.035156 L 88.890625 45.269531 L 83.359375 42.5 Z M 83.359375 48.035156 "/>
 <path fill="none" stroke-width="1.257534" stroke-linecap="butt" stroke-linejoin="miter" stroke="rgb(0%, 0%, 0%)" stroke-opacity="1" stroke-miterlimit="4" d="M 63.402412 25.531081 L 83.988349 25.531026 " transform="matrix(1, 0.00000266316, -0.00000266316, 1, 0, 0)"/>
