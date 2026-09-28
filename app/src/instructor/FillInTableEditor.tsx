@@ -201,8 +201,8 @@ export function FillInTableEditor({
       )}
       {defects
         .filter((d) => d.keyRow !== null)
-        .map((d) => (
-          <p key={`${d.keyRow}:${d.message}`} className="instructor-preview-warning">
+        .map((d, i) => (
+          <p key={i} className="instructor-preview-warning">
             Key row #{d.keyRow! + 1} {d.message}.
           </p>
         ))}

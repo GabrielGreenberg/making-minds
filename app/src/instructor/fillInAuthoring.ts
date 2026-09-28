@@ -1,7 +1,8 @@
 // Fill-in authoring (task 005; tables, task 079) — the pure half of the
-// question creator's "Fill-in" task, React-free like ccPreview.ts and
-// arenaEditing.ts (FillInBlanksEditor.tsx and FillInTableEditor.tsx are the
-// widgets over it). A fill-in question is one of two shapes
+// question creator's "Fill-in" task: pure functions, no React calls (its one
+// borrowing, dragReorder.ts's `moveItem`, is pure too, though that module
+// also holds a hook), like ccPreview.ts and arenaEditing.ts
+// (FillInBlanksEditor.tsx and FillInTableEditor.tsx are the widgets over it). A fill-in question is one of two shapes
 // (engine/fillIn.ts `fillInShape`): labelled blanks, or an argument–value
 // table graded as a function.
 //
