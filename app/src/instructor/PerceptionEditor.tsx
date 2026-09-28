@@ -180,7 +180,7 @@ export function PerceptionEditor({
         {summary && (
           <p className="mm-note mm-hint">
             Grading bank: {summary.generated} generated case{summary.generated === 1 ? '' : 's'}
-            {summary.authored > 0 && ` + ${summary.authored} of your film${summary.authored === 1 ? '' : 's'}`}
+            {summary.authored > 0 && ` + ${summary.authored} film${summary.authored === 1 ? '' : 's'} of yours`}
             {' '}— {summary.positives} with an expected 1 somewhere.
           </p>
         )}

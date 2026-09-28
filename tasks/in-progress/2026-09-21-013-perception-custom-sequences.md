@@ -128,3 +128,11 @@ Remains (owed, PROFILE §7): browser eyeball per ## Verify — creator (selects,
 expected row, save/reopen, width flag, phone width), student replay from the Grades sheet (SC
 and CC perception), 012 frame-player regression (n / 24 frames).
 NEXT STEP: loop session: visual check if owed, then land per PROFILE §5.
+
+### 2026-09-27 — headless check and land (robot)
+Headless Chrome over CDP against a Bash-run Vite (local mode, HW3 seeded): HW3 P12's creator
+shows the rule row (motion, up, single), the bank summary, "Add film" draws the frame grid
+with its expected row, the summary counts the film; no console errors, no horizontal
+overflow at 1280 or 400 px. Wording fix: "+ 1 film of yours". Still owed to Gabriel's
+eyeball (not claimed): clicking bits live, save/reopen, width flag, the student replay from
+the Grades sheet (SC and CC perception), the 012 frame player — recipe in ## Verify.
