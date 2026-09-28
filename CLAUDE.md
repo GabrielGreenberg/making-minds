@@ -61,18 +61,17 @@ per problem, an "Original PDF" link) → the question **editor**, a workbench bu
 memo (top bar, resizable columns, floating parts palette) in the right mode: **CC, SC, FSM, TM, turbot** (TM:
 clickable tape strip + machine table / run / history panels, alphabet from the question's
 `representation`; turbot: the `innerMode` brain's editor + the arena "Map"
-(Step/Run/Pause/Reset), a TM brain's tape read-only; SC perception: a retina frame player),
+(Step/Run/Pause/Reset), a TM brain's tape read-only; SC perception: a retina frame player + flagged example films),
 **open** (free text), **fill-in** (labelled boxes, autograded). Debounced autosave through
-`WorkbookStore` (remote: PUT, an `'error'` indicator + backoff retry, keepalive unload
-flush, the per-email crash journal — a hard tab kill loses nothing); leave and resume.
+`WorkbookStore` (remote: PUT, `'error'` indicator + backoff retry, keepalive unload
+flush, per-email crash journal); leave and resume.
 **Submit** a timestamped snapshot in one `SubmitDialog` (≤ 2 group members; online-only: a
 failure records nothing — server stamps time; past due it states the late cost). An extension
 is the student's served `dueDate` ("(extended)"). Released grades: the **Grades** sheet
-(the grade / 100 and each problem's points, the instructor's note, "▸ failed inputs" in safe fields, a link into the question, and **Run this input**: the grader's run of that
+(grade / 100, each problem's points, the instructor's note, "▸ failed inputs" in safe fields, a link into the question, **Run this input**: the grader's run of that
 case, recorded vs live verdict); Home and the overview re-fetch every visit. **Viewing a
-submission**: the sheet opens a graded attempt read-only (the `attempt` route).
-**Freezing** (`isFrozen`, Due dates
-row) forces the latest attempt, no way back. **Mark done**: the question panel's self-lock
+submission**: the sheet opens a graded attempt read-only (`attempt` route).
+**Freezing** (`isFrozen`, Due dates row) forces the latest attempt. **Mark done**: a self-lock
 checkbox. **Feedback** link: platform/homework reports (category, message, ≤ 2 downscaled
 screenshots). **Paste provenance** (Critical design rules); the sandbox is free.
 **Watermark**: ids carry a MAC under a per-student, per-assignment key, each question a
@@ -109,7 +108,7 @@ before overwriting a newer save); dashboard (drag-to-reorder, **Publish/Hide**, 
 preamble, source PDF, late policy, counts-toward-grade, sections with intro / layout /
 callouts / figures, live preview); **question creator** (all six modes on one form; per-problem
 callouts, figures; formula DSL → test banks; turbot: inner machine, encoding, arenas ≤
-30×30, each with criterion + max-steps; perception: rule, retina, own SC films; component
+30×30, each with criterion + max-steps; perception: rule, retina, own SC films (any a student example); component
 restrictions/limits; TM halt toggle; fill-in blanks); **Grading** (065; views read the 064 summaries, none grades): the course
 list (submitted, autograde, hand grading, mean, released; not-counted dimmed) under a
 Needs-attention box, flagged list, Settings (070), Export CSV (071); per assignment Overview (tiles,
@@ -143,8 +142,7 @@ every release syncs it into the pilot DB** (`deploy/release.sh` → `npm run hom
 sync`: missing homeworks added unpublished, unedited copies refreshed, instructor-edited
 ones left alone and listed); local mode's "Load HW1–HW7" runs the same planner.
 
-**Reference-fixture coverage:** 56/56 at-tier — 46 exact + 10 interface —
-`app/tools/coverageCheck.ts`.
+**Reference-fixture coverage:** 56/56 at-tier (46 exact + 10 interface; `coverageCheck`).
 
 ## What's next
 
@@ -189,7 +187,7 @@ wrappers.
 
 | Area | Path | What's there |
 | --- | --- | --- |
-| Types | `app/src/types.ts` | Domain types: `AssignmentData` (+ document level: `preamble`, `sections: AssignmentSection[]`, `sourcePdf`) / `AssignmentQuestion` (+ `title`, `hint`, `callouts`, `figures`, `allowed_components`, `component_limits`, `maxTapeCells`, `requireStandardHaltPosition`, `perception`/`perception_cases`, `turbot_cases`, `fill_in`/`fill_in_answers`), `SubmissionData`/`SubmissionRecord`, `QuestionResult` (+ `ManualReview`), `CircuitData`, `CCSpec`, `ArenaConfig`/`TurbotCaseResult`, `PerceptionCaseResult`, `QuestionCircuit` (`responseText`, `done`). `questionTask`/`QUESTION_TASKS`: the ONE task classifier (panel, grader, answer); `questionModeLabel` chips it. |
+| Types | `app/src/types.ts` | Domain types: `AssignmentData` (+ document level: `preamble`, `sections: AssignmentSection[]`, `sourcePdf`) / `AssignmentQuestion` (+ `title`, `hint`, `callouts`, `figures`, `allowed_components`, `component_limits`, `maxTapeCells`, `requireStandardHaltPosition`, `perception`/`perception_cases`/`perception_examples`, `turbot_cases`, `fill_in`/`fill_in_answers`), `SubmissionData`/`SubmissionRecord`, `QuestionResult` (+ `ManualReview`), `CircuitData`, `CCSpec`, `ArenaConfig`/`TurbotCaseResult`, `PerceptionCaseResult`, `QuestionCircuit` (`responseText`, `done`). `questionTask`/`QUESTION_TASKS`: the ONE task classifier (panel, grader, answer); `questionModeLabel` chips it. |
 | Engine | `app/src/engine/cc.ts`, `sc.ts`, `netlist.ts`, `fsm.ts` | Pure simulators: topological eval (CC; `truthTableCC` every row), clocked step (SC; MEM-holding boxes inlined, `memorySlots` the state vector), transition matching (FSM; a missing arrow halts — the output so far decodes, unreached steps 0). `sortByLabel` orders I/O; `boxInterior` binds box ports (`Port.bind`, via `boxPorts.ts`). |
 | Engine | `app/src/engine/tm.ts`, `tmValidate.ts`, `tmCodec.ts` | Notation-aware tape engine — **two-output** labels `read:write,move` (`1:0,R`; legacy `1:0R` a permanent alias), one atomic step each; table validation (ambiguous/unparseable, via the generic walker); the codec `tape` axis (accept honors `requireStandardHaltPosition`); `tapeCellsUsed` for `maxTapeCells` (both: Homework JSON). |
 | Engine | `app/src/engine/caseRun.ts`, `grader.ts` | `caseRun.ts`: one case run as graded, key-free (`questionLayout`, `gradingCircuit` — MEMs from 0, `validateQuestionMachine`, `caseStimulus`, `runValueCase`/`runTurbotCase`); `grader.ts` = that + the comparison (`gradeQuestion` results parallel the banks; turbot, perception bit-level, fill-in, open → `'pending'`); `score.ts`: THE grade (`scoreRecord`/`scoreSubmission`, `autoPoints`, `answerKey`, `lateDeduction`, `halfCreditProblem`), which every surface renders. |
@@ -324,8 +322,9 @@ CC → SC (a box may hold MEM, SC canvases only) → FSM → Turbots → TMs (tw
 - **Test cases never ship to the client in production — SOLVED in remote mode.** The server
   strips `test_cases`/`perception_cases`/`fill_in_answers` from student copies, and the
   answer key (`expected`/`got`) and `integrity` from student results, keeping safe per-case
-  fields (`sanitize.ts`; parity-pinned both ways). LOCAL mode holds answers and grades in the
-  browser **by design** (the dev/demo prototype students never use). Never wire the engine
+  fields (`sanitize.ts`; parity-pinned both ways); `perception_examples` (flagged films,
+  derived at save) is served. LOCAL mode holds answers and grades in the browser **by
+  design** (dev/demo only). Never wire the engine
   grader (or any answer-carrying JSON) into the remote-store module graph (`remoteStoreCheck`
   grep gate).
 - **localStorage is LOCAL mode only.** Remotely: the token (`mm:auth:token`) + its owner

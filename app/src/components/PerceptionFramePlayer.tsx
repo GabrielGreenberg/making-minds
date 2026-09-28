@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { useStore } from '../store';
 import { sortByLabel } from '../engine';
-import { lanesToFrames, shiftFrame, MAX_FILM_FRAMES as MAX_FRAMES } from '../engine/perception';
+import { lanesToFrames, matchingPerceptionExample, shiftFrame, MAX_FILM_FRAMES as MAX_FRAMES } from '../engine/perception';
 import { validateQuestionMachine } from '../engine/caseRun';
 import { RunSpeedControl } from './RunSpeedControl';
 import { FrameFilmGrid } from './FrameFilmGrid';
@@ -19,7 +19,11 @@ import { FrameFilmGrid } from './FrameFilmGrid';
  * after the last frame (selectScRunWindow) — the grader's run of the same
  * frames. The Sequential Timeline below reads the same lanes, so the two
  * never disagree. Nothing here reads perception_cases or evaluates the rule:
- * the OUT row is the machine's own output, never an answer. The run speed is
+ * the OUT row is the machine's own output. The one answer shown is the
+ * instructor's own worked examples (task 059): `perception_examples`, served
+ * to students by design — one click loads an example's film, and its
+ * expected row shows while the film on the grid is that example unedited
+ * (matchingPerceptionExample; no store slice, so any edit drops it). The run speed is
  * the panel's (DataTable), whose Global I/O block this player replaces — so
  * its speed control lives here too.
  *
@@ -46,6 +50,8 @@ export function PerceptionFramePlayer({ width, runSpeed, onRunSpeedChange }: {
 
   const frames = useMemo(() => lanesToFrames(scInputSequence, width), [scInputSequence, width]);
   const count = frames.length;
+  const examples = useMemo(() => question?.perception_examples ?? [], [question]);
+  const shown = useMemo(() => matchingPerceptionExample(examples, frames), [examples, frames]);
 
   // The frame picked for the per-frame tools — view state, scoped to the
   // question it was picked on, so navigating away drops it.
@@ -95,6 +101,11 @@ export function PerceptionFramePlayer({ width, runSpeed, onRunSpeedChange }: {
     setScFrames([]);
     select(null);
   };
+  // Loading an example is stimulus, like any film edit — not a machine edit.
+  const loadExample = (i: number) => {
+    setScFrames(examples[i].frames.map((f) => [...f]));
+    select(null);
+  };
 
   // ── Playback: the store's SC run, ended by selectScRunWindow at the film's end ──
   const run = () => {
@@ -116,6 +127,23 @@ export function PerceptionFramePlayer({ width, runSpeed, onRunSpeedChange }: {
         </button>
       </div>
 
+      {examples.length > 0 && (
+        <div className="pf-tools">
+          <span className="pf-hint">Examples:</span>
+          {examples.map((ex, i) => (
+            <button
+              key={i}
+              className="toggle-btn pf-small"
+              aria-pressed={shown === i}
+              onClick={() => loadExample(i)}
+              title="Load this worked example (with its expected output) into the frames"
+            >
+              Example {i + 1} · {ex.frames.length} frame{ex.frames.length === 1 ? '' : 's'}
+            </button>
+          ))}
+        </div>
+      )}
+
       <FrameFilmGrid
         frames={frames}
         width={width}
@@ -124,6 +152,7 @@ export function PerceptionFramePlayer({ width, runSpeed, onRunSpeedChange }: {
           label: outputLabel,
           bits: frames.map((_, k) => scHistory.find((h) => h.t === k + 1)?.outputBits[0]),
         }}
+        expectedRow={shown === null ? undefined : { label: 'expected', bits: examples[shown].expected }}
         selected={selected}
         current={scTimeStep - 2 /* the last frame clocked in; -1 before t1 */}
         maxFrames={MAX_FRAMES}

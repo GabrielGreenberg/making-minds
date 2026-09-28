@@ -63,3 +63,31 @@ Showing one film's answer reveals nothing the statement doesn't. Flag it in `/wo
   - After grading, both films appear under "Run this input" as 013 built it.
 
 ## Progress log
+- 2026-09-27 (robot, implement): per-film "Example for students" flag in the perception editor
+  (`DraftFilm {frames, example}`); `buildPerceptionCases(spec, films, exampleIdx)` marks
+  `example: true` inside the stripped bank, `perceptionExamples` derives the flag-free
+  `perception_examples` at save (key omitted when none — HW3 P12's hash stable). The frame
+  player lists them (one click → `setScFrames`), showing an `expected` row while the grid is an
+  example unedited (`matchingPerceptionExample`). `sanitize.ts` logic untouched (comment only).
+  Pins: perceptionCheck [example films] (+ grader/caseRun/score grep gate), caseRunCheck
+  [perception example ≡ grader], pipelineCheck [perception films] (served example; tampered
+  examples grade the same), parityCheck (scoped `expected` allow-list + self-test; unflagged
+  film absent from the student assignment), remoteStoreCheck. Browser checks still owed.
+
+### 2026-09-27 — implemented (work loop)
+- **Built:** instructors tick "Example for students" on any authored SC perception film; at
+  save the flagged films become `perception_examples` ({frames, expected}), a separate
+  student-visible field. The student frame player lists them; one click loads the film, and its
+  expected row shows while the grid holds that example unedited. `perception_cases` is still
+  stripped wholesale (`sanitize.ts` logic unchanged); the grader never reads the new field.
+  Decision kept: an example shows its expected row.
+- **Pins:** perceptionCheck [example films] (+ grader/caseRun grep gate), caseRunCheck
+  [perception example ≡ grader], pipelineCheck [perception films] (tampered examples grade the
+  same), parityCheck (scoped `expected` allow-list; unflagged film absent), remoteStoreCheck
+  (student get: one example, unflagged frames nowhere).
+- **Gates:** app-tsc=0 app-build=0 app-check=0 server-tsc=0 server-check=0. Review findings
+  fixed: none; skipped: none.
+- **Owed:** browser checks (local + remote: author/flag/persist; student Examples row loads and
+  runs, expected row hides on edit, works on locked questions; network payload shows
+  `perception_cases: []`; post-grading "Run this input" lists both films).
+- **Next step:** loop session: visual check if owed, then land per PROFILE §5.

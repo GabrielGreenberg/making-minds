@@ -96,6 +96,8 @@ import { nextTrace } from '../../app/src/provenance/trace';
 import { prepareKey } from '../../app/src/provenance/ids';
 import { comp, transition, circuit, boxAcross, unbind } from '../../app/tools/builder';
 import { rebindLegacyBoxes } from '../../app/src/boxPorts';
+import { perceptionFields } from '../../app/src/instructor/perceptionAuthoring';
+import { objectFrame } from '../../app/src/engine/perception';
 import type {
   AssignmentData,
   AssignmentQuestion,
@@ -143,6 +145,22 @@ const fillInQuestion = JSON.parse(
 ).questions.find((q: { id: number }) => q.id === 11);
 const FILL_ANSWERS = Array.from({ length: 11 }, (_, n) => n.toString(2));
 
+// An SC perception question authored as the question creator saves it
+// (perceptionFields), HW3 P12's rule with two films of the instructor's own:
+// film 1 flagged "Example for students" (task 059), film 2 not. The example
+// reaches the student in `perception_examples`; film 2 must reach no student
+// payload. Graded with HW3 P12's reference machines.
+const examplesFixture = loadFixture('hw3-p12');
+const EXAMPLE_FILM = [objectFrame(8, 3, 5), objectFrame(8, 3, 4), objectFrame(8, 3, 3)];
+const HIDDEN_FILM = [objectFrame(8, 3, 1), objectFrame(8, 3, 1), objectFrame(8, 3, 0), [1, 0, 0, 0, 0, 0, 0, 1]];
+const examplesQuestion: AssignmentQuestion = {
+  ...examplesFixture.question,
+  ...perceptionFields({
+    kind: 'motion', width: 8, runLength: 3, pattern: '', direction: 'up', scene: 'single',
+    films: [{ frames: EXAMPLE_FILM, example: true }, { frames: HIDDEN_FILM, example: false }],
+  }, 'SC'),
+};
+
 const ASSIGNMENT_ID = 'parity-hw';
 const assignment: AssignmentData = {
   id: ASSIGNMENT_ID,
@@ -151,6 +169,7 @@ const assignment: AssignmentData = {
     ...fixtures.map((fx, i) => ({ ...fx.question, id: i + 1, label: FIXTURE_IDS[i] })),
     { ...openQuestion, id: 7, label: 'open' },
     { ...fillInQuestion, id: 8, label: 'fill-in' },
+    { ...examplesQuestion, id: 9, label: 'perception-examples' },
   ],
 };
 
@@ -177,6 +196,7 @@ const correctAnswers: Answers = [
   ...fixtures.map((fx, i) => ({ questionId: i + 1, circuit: fx.correct })),
   { questionId: 7, circuit: emptyCircuit, responseText: OPEN_RESPONSE },
   { questionId: 8, circuit: emptyCircuit, fillAnswers: FILL_ANSWERS },
+  { questionId: 9, circuit: examplesFixture.correct },
 ];
 
 const brokenAnswers: Answers = [
@@ -189,6 +209,7 @@ const brokenAnswers: Answers = [
   { questionId: 7, circuit: emptyCircuit, responseText: '' },
   // One padded (still correct — leading zeros normalise) and one wrong.
   { questionId: 8, circuit: emptyCircuit, fillAnswers: FILL_ANSWERS.map((a, i) => (i === 4 ? '1' : '00' + a)) },
+  { questionId: 9, circuit: examplesFixture.broken! },
 ];
 
 // ── Direct in-process grades (side A) ────────────────────────────────────────
@@ -239,11 +260,17 @@ function diffPaths(a: unknown, b: unknown, path = '$', out: string[] = []): stri
   return out;
 }
 
-/** Recursively find keys from `forbidden` holding non-empty arrays. */
-function findLeaks(value: unknown, forbidden: Set<string>, path = '$', out: string[] = []): string[] {
+/** The ONE path a non-empty `expected` may sit at in a student's copy: a
+ *  perception example's expected row, served by design (task 059). The scan
+ *  still descends into it and rejects `expected` everywhere else. */
+const EXAMPLE_EXPECTED = /\.perception_examples\[\d+\]\.expected$/;
+
+/** Recursively find keys from `forbidden` holding non-empty arrays, except
+ *  at paths `allow` matches. */
+function findLeaks(value: unknown, forbidden: Set<string>, path = '$', out: string[] = [], allow?: RegExp): string[] {
   if (value === null || typeof value !== 'object' || out.length >= 12) return out;
   if (Array.isArray(value)) {
-    value.forEach((v, i) => findLeaks(v, forbidden, `${path}[${i}]`, out));
+    value.forEach((v, i) => findLeaks(v, forbidden, `${path}[${i}]`, out, allow));
     return out;
   }
   for (const [k, v] of Object.entries(value)) {
@@ -251,10 +278,11 @@ function findLeaks(value: unknown, forbidden: Set<string>, path = '$', out: stri
     // non-empty; string-valued ones (FillInCaseResult.expected/got) leak by
     // being non-empty text — both must be caught, or a blanked '' reads clean
     // even when a regression puts the answer back.
-    if (forbidden.has(k) && ((Array.isArray(v) && v.length > 0) || (typeof v === 'string' && v.length > 0))) {
+    if (forbidden.has(k) && ((Array.isArray(v) && v.length > 0) || (typeof v === 'string' && v.length > 0)) &&
+      !allow?.test(`${path}.${k}`)) {
       out.push(`${path}.${k}`);
     }
-    findLeaks(v, forbidden, `${path}.${k}`, out);
+    findLeaks(v, forbidden, `${path}.${k}`, out, allow);
   }
   return out;
 }
@@ -275,6 +303,13 @@ check(
   'self-test: findLeaks detects a planted leak (string-valued, e.g. fill-in expected)',
   findLeaks({ q: [{ expected: 'answer' }] }, new Set(['expected'])).length === 1 &&
     findLeaks({ q: [{ expected: '' }] }, new Set(['expected'])).length === 0,
+);
+check(
+  'self-test: the example allow-list admits only .perception_examples[n].expected',
+  findLeaks({ questions: [{ perception_examples: [{ frames: [[1]], expected: [1] }] }] }, new Set(['expected']), '$', [], EXAMPLE_EXPECTED).length === 0 &&
+    findLeaks({ questions: [{ perception_cases: [{ frames: [[1]], expected: [1] }] }] }, new Set(['expected']), '$', [], EXAMPLE_EXPECTED).length === 1 &&
+    findLeaks({ questions: [{ perception_examples: [{ expected: [1], extra: { expected: [1] } }] }] }, new Set(['expected']), '$', [], EXAMPLE_EXPECTED).length === 1 &&
+    findLeaks({ questions: [{ perception_examples: [{ expected: [1] }] }] }, new Set(['expected'])).length === 1,
 );
 
 // ── Boot the real server (same harness pattern as serverCheck) ──────────────
@@ -346,8 +381,22 @@ const sAsg = await api<{ assignment: AssignmentData }>('GET', `/assignments/${AS
 const asgLeaks = findLeaks(
   sAsg.json.assignment,
   new Set(['test_cases', 'perception_cases', 'fill_in_answers', 'expected']),
+  '$', [], EXAMPLE_EXPECTED,
 );
 check('student assignment copy leaks no answer banks (incl. perception + fill-in)', asgLeaks.length === 0, asgLeaks.join(', '));
+// Perception examples (task 059): the flagged film is served, the other never.
+const sExamples = sAsg.json.assignment.questions.find((q) => q.id === 9);
+check(
+  'student assignment copy carries the one flagged perception example, as authored',
+  JSON.stringify(sExamples?.perception_examples) === JSON.stringify(examplesQuestion.perception_examples) &&
+    sExamples?.perception_examples?.length === 1 &&
+    JSON.stringify(sExamples.perception_examples[0].frames) === JSON.stringify(EXAMPLE_FILM),
+);
+check(
+  "an unflagged film's frames reach no student assignment payload",
+  examplesQuestion.perception_cases!.some((c) => c.authored && !c.example && JSON.stringify(c.frames) === JSON.stringify(HIDDEN_FILM)) &&
+    !JSON.stringify(sAsg.json).includes(JSON.stringify(HIDDEN_FILM)),
+);
 check(
   'student assignment copy keeps the fill-in labels (they are the prompts)',
   (sAsg.json.assignment.questions.find((q) => q.id === 8)?.fill_in?.labels ?? []).length === 11,
@@ -451,8 +500,13 @@ check(
   o1.status === 'pending' && o1.passed === 0 && o1.total === 0 && o1.response === OPEN_RESPONSE,
 );
 check(
+  'anchor: attempt 1 perception-with-examples full-pass, its films graded',
+  q(directCorrect, 9).passed === q(directCorrect, 9).total &&
+    q(directCorrect, 9).total === examplesQuestion.perception_cases!.length,
+);
+check(
   'anchor: attempt 2 codec + perception questions all fail somewhere',
-  [1, 2, 3, 4, 6].every((id) => {
+  [1, 2, 3, 4, 6, 9].every((id) => {
     const r = q(directBroken, id);
     return r.status === 'graded' && r.passed < r.total;
   }),

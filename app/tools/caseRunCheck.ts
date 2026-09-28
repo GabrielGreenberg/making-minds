@@ -97,6 +97,7 @@ import {
   DEFAULT_TM_MAX_STEPS,
 } from '../src/engine';
 import { tapeCellsUsed } from '../src/engine/tm';
+import { buildPerceptionCases, objectFrame, perceptionExamples } from '../src/engine/perception';
 import { stripAnswers, studentRecord } from '../../server/src/sanitize';
 import { gradedCaseView } from '../src/gradeDisplay';
 import { comp, wire, transition, circuit } from './builder';
@@ -809,6 +810,42 @@ console.log('\n[dismiss: ✕ puts the Map back on the primary arena]');
   useStore.getState().clearLoadedCase();
   check('a value case dismissed: the loaded inputs stay on the canvas',
     useStore.getState().loadedCase === null && JSON.stringify(useStore.getState().components) === before);
+}
+
+// ── [perception example ≡ grader] ───────────────────────────────────────────
+// A film the instructor flagged "Example for students" (task 059) reaches the
+// student as `perception_examples`; the frame player loads it with
+// setScFrames and Steps through it — the grader's run of the same film, and
+// for a correct machine exactly the example's expected row. It works on the
+// student copy too: the player path needs no bank.
+console.log('\n[perception example ≡ grader]');
+{
+  const fx = loadFixture('hw3-p12');
+  const spec = fx.question.perception!;
+  const films = [
+    [objectFrame(8, 3, 5), objectFrame(8, 3, 4), objectFrame(8, 3, 3), objectFrame(8, 3, 2)],
+    [objectFrame(8, 3, 0), objectFrame(8, 3, 1)],
+  ];
+  const cases = buildPerceptionCases(spec, films, [0]);
+  const q: AssignmentQuestion = { ...fx.question, perception_cases: cases, perception_examples: perceptionExamples(cases) };
+  const example = q.perception_examples![0];
+  check('the question carries one example (the flagged film)', q.perception_examples!.length === 1 && same(example.frames, films[0]));
+  for (const remote of [false, true]) {
+    for (const [name, machine] of [['correct', fx.correct], ['broken', fx.broken!]] as const) {
+      const tag = `${remote ? 'student copy' : 'local'} ${name}`;
+      openGraded(q, machine, remote);
+      const st0 = useStore.getState();
+      const served = st0.assignment!.questions[0];
+      check(`${tag}: the store's question has the example${remote ? ', no bank' : ''}`,
+        same(served.perception_examples, q.perception_examples) && (!remote || (served.perception_cases ?? []).length === 0));
+      st0.setScFrames(served.perception_examples![0].frames.map((f) => [...f]));
+      for (let t = 0; t < example.frames.length; t++) useStore.getState().scStep();
+      const outs = useStore.getState().scHistory.map((h) => h.outputBits[0]);
+      const graded = runPerceptionFilm(q, machine, example.frames);
+      check(`${tag}: Step × ${example.frames.length} on the example ≡ the grader's run (${outs.join('')})`, same(outs, graded));
+      if (name === 'correct') check(`${tag}: …and equals the example's expected row`, same(outs, example.expected));
+    }
+  }
 }
 
 // ── [step budgets] ──────────────────────────────────────────────────────────

@@ -4,12 +4,14 @@
 //
 // The creator edits ONE draft: the rule's fields (kind, retina width, run /
 // object length, pattern, a motion rule's direction and scene) and the
-// instructor's own SC frame films. `perceptionFields` turns it into the two
-// saved fields — the rule (`perception`) and the bank (`perception_cases`:
+// instructor's own SC frame films. `perceptionFields` turns it into the
+// saved fields — the rule (`perception`), the bank (`perception_cases`:
 // engine/perception.ts buildPerceptionCases, the generated battery with the
-// films appended as `authored: true` cases). The films live ONLY in the
-// bank, which the server strips from a student's copy (sanitize.ts, law 1),
-// so a student sees none of them; the draft reads them back from it.
+// films appended as `authored: true` cases) and, when any film is flagged
+// "Example for students" (task 059), `perception_examples`: those films'
+// frames + expected rows, derived from the bank. The bank is stripped from a
+// student's copy wholesale (sanitize.ts, law 1), so an unflagged film reaches
+// no student; the draft reads the films and their flags back from the bank.
 //
 // A motion rule with today's defaults (up, single object) is written without
 // `direction`/`scene`, HW3 P12's stored form — a no-op edit of it keeps its
@@ -19,6 +21,7 @@ import type {
   AssignmentQuestion,
   MotionDirection,
   MotionScene,
+  PerceptionExample,
   PerceptionRule,
   PerceptionSpec,
   PerceptionTestCase,
@@ -26,6 +29,7 @@ import type {
 import {
   buildPerceptionCases,
   filmProblem,
+  perceptionExamples,
   shiftFrame,
   MAX_FILM_FRAMES,
   MAX_PERCEPTION_WIDTH,
@@ -68,8 +72,15 @@ export interface PerceptionDraft {
   pattern: string;
   direction: MotionDirection;
   scene: MotionScene;
-  /** The instructor's own films (SC rules), each a list of frames, IN1 first. */
-  films: number[][][];
+  /** The instructor's own films (SC rules). */
+  films: DraftFilm[];
+}
+
+/** One authored film: its frames (IN1 first) and whether students get it as
+ *  a worked example. The flag travels with the film through every edit. */
+export interface DraftFilm {
+  frames: number[][];
+  example: boolean;
 }
 
 /** The draft of a saved question — a new question (or one of another task)
@@ -85,7 +96,9 @@ export function draftFromQuestion(
     pattern: r?.kind === 'pattern' ? r.pattern : '',
     direction: r?.kind === 'motion' ? r.direction ?? 'up' : 'up',
     scene: r?.kind === 'motion' ? r.scene ?? 'single' : 'single',
-    films: (q?.perception_cases ?? []).filter((c) => c.authored).map((c) => c.frames.map((f) => [...f])),
+    films: (q?.perception_cases ?? [])
+      .filter((c) => c.authored)
+      .map((c) => ({ frames: c.frames.map((f) => [...f]), example: c.example === true })),
   };
 }
 
@@ -157,33 +170,39 @@ export function draftProblems(draft: PerceptionDraft, mode: PerceptionMode): str
     return problems;
   }
   draft.films.forEach((film, i) => {
-    const problem = filmProblem(film, width);
+    const problem = filmProblem(film.frames, width);
     if (problem) problems.push(`Film ${i + 1}: ${problem}.`);
   });
   return problems;
 }
 
-/** The two saved fields. Throws (buildPerceptionCases) on a draft with
+/** The saved fields. `perception_examples` is present only when a film is
+ *  flagged, so a question without examples keeps its stored form (and HW3
+ *  P12 its content hash). Throws (buildPerceptionCases) on a draft with
  *  problems — the creator gates saving on draftProblems first. */
 export function perceptionFields(
   draft: PerceptionDraft,
   mode: PerceptionMode,
-): { perception: PerceptionSpec; perception_cases: PerceptionTestCase[] } {
+): { perception: PerceptionSpec; perception_cases: PerceptionTestCase[]; perception_examples?: PerceptionExample[] } {
   const perception = specFromDraft(draft, mode);
   const films = takesFilms(draft, mode) ? draft.films : [];
-  return { perception, perception_cases: buildPerceptionCases(perception, films) };
+  const exampleIdx = films.flatMap((f, i) => (f.example ? [i] : []));
+  const perception_cases = buildPerceptionCases(perception, films.map((f) => f.frames), exampleIdx);
+  const examples = perceptionExamples(perception_cases);
+  return { perception, perception_cases, ...(examples.length > 0 ? { perception_examples: examples } : {}) };
 }
 
 /** How the bank the draft saves is made up, or null while it cannot be built. */
 export function bankSummary(
   draft: PerceptionDraft,
   mode: PerceptionMode,
-): { generated: number; authored: number; positives: number } | null {
+): { generated: number; authored: number; examples: number; positives: number } | null {
   if (draftProblems(draft, mode).length > 0) return null;
   try {
     const cases = perceptionFields(draft, mode).perception_cases;
     const authored = cases.filter((c) => c.authored).length;
-    return { generated: cases.length - authored, authored, positives: cases.filter((c) => c.expected.includes(1)).length };
+    const examples = cases.filter((c) => c.authored && c.example).length;
+    return { generated: cases.length - authored, authored, examples, positives: cases.filter((c) => c.expected.includes(1)).length };
   } catch {
     return null;
   }
@@ -198,17 +217,23 @@ export function newFilm(width: number): number[][] {
   return [blankFrame(width), blankFrame(width)];
 }
 
-export function replaceFilm(films: number[][][], i: number, film: number[][]): number[][][] {
+/** A new draft film: `newFilm`'s frames, not an example. */
+export function newDraftFilm(width: number): DraftFilm {
+  return { frames: newFilm(width), example: false };
+}
+
+export function replaceFilm<F>(films: readonly F[], i: number, film: F): F[] {
   return films.map((f, k) => (k === i ? film : f));
 }
 
-export function removeFilm(films: number[][][], i: number): number[][][] {
+export function removeFilm<F>(films: readonly F[], i: number): F[] {
   return films.filter((_, k) => k !== i);
 }
 
-export function duplicateFilm(films: number[][][], i: number): number[][][] {
+/** Insert a deep copy of film i after it (its example flag kept). */
+export function duplicateFilm(films: readonly DraftFilm[], i: number): DraftFilm[] {
   const next = [...films];
-  next.splice(i + 1, 0, films[i].map((f) => [...f]));
+  next.splice(i + 1, 0, { ...films[i], frames: films[i].frames.map((f) => [...f]) });
   return next;
 }
 

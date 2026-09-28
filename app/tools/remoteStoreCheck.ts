@@ -163,7 +163,30 @@ await remoteAssignmentStore.setVisible(SAMPLE_ASSIGNMENT_ID, true);
 check('publishing it flips the summary', 
   (await remoteAssignmentStore.list()).find((a) => a.id === SAMPLE_ASSIGNMENT_ID)?.visible === true);
 
-const created = { ...buildSampleAssignment(), id: 'remote-check-asg', title: 'Remote Check' };
+// The created assignment gains an SC perception question authored as the
+// question creator saves it, with two films of the instructor's own — film 1
+// flagged "Example for students" (task 059), film 2 not.
+const { perceptionFields } = await import('../src/instructor/perceptionAuthoring');
+const { objectFrame } = await import('../src/engine/perception');
+const EXAMPLE_FILM = [objectFrame(8, 3, 5), objectFrame(8, 3, 4), objectFrame(8, 3, 3)];
+const HIDDEN_FILM = [objectFrame(8, 3, 1), objectFrame(8, 3, 1), objectFrame(8, 3, 0), [1, 0, 0, 0, 0, 0, 0, 1]];
+const sampleForCreate = buildSampleAssignment();
+const EXAMPLES_QID = Math.max(...sampleForCreate.questions.map((q) => q.id)) + 1;
+const created = {
+  ...sampleForCreate,
+  id: 'remote-check-asg',
+  title: 'Remote Check',
+  questions: [
+    ...sampleForCreate.questions,
+    {
+      id: EXAMPLES_QID, label: 'Films', statement: 'Detect upward motion.', buildMode: 'SC' as const, representation: 'binary' as const,
+      ...perceptionFields({
+        kind: 'motion', width: 8, runLength: 3, pattern: '', direction: 'up', scene: 'single',
+        films: [{ frames: EXAMPLE_FILM, example: true }, { frames: HIDDEN_FILM, example: false }],
+      }, 'SC'),
+    },
+  ],
+};
 await remoteAssignmentStore.save(created);
 const createdBack = await remoteAssignmentStore.get('remote-check-asg');
 check(
@@ -221,6 +244,22 @@ check('…so getVisible answers false for them too',
 await api.login(instructor.email);
 await remoteAssignmentStore.setVisible('remote-check-asg', true);
 check('publishing restores it for the student', (await remoteAssignmentStore.getVisible('remote-check-asg')) === true);
+
+// Perception examples (task 059) across both copies of the created assignment.
+const iFilms = (await remoteAssignmentStore.get('remote-check-asg'))?.assignment.questions.find((q) => q.id === EXAMPLES_QID);
+check('instructor get() keeps perception_cases with both authored films and their example flags',
+  JSON.stringify((iFilms?.perception_cases ?? []).filter((c) => c.authored).map((c) => [c.frames, c.example === true])) ===
+    JSON.stringify([[EXAMPLE_FILM, true], [HIDDEN_FILM, false]]));
+await api.login(student.email);
+const sFilmsCopy = await remoteAssignmentStore.get('remote-check-asg');
+const sFilms = sFilmsCopy?.assignment.questions.find((q) => q.id === EXAMPLES_QID);
+check('student get(): no perception bank, perception_examples = the flagged film alone',
+  (sFilms?.perception_cases ?? []).length === 0 && sFilms?.perception_examples?.length === 1 &&
+    JSON.stringify(sFilms.perception_examples[0].frames) === JSON.stringify(EXAMPLE_FILM) &&
+    JSON.stringify(sFilms.perception_examples) === JSON.stringify(iFilms?.perception_examples));
+check("…and the unflagged film's frames appear nowhere in the student copy",
+  sFilmsCopy != null && !JSON.stringify(sFilmsCopy).includes(JSON.stringify(HIDDEN_FILM)));
+await api.login(instructor.email);
 
 await remoteAssignmentStore.remove('remote-check-asg');
 check('remove() → get() resolves null (404 → seam null)', (await remoteAssignmentStore.get('remote-check-asg')) === null);
