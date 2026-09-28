@@ -251,7 +251,7 @@ output (80 × a JSON row with a short rationale) is about **5k tokens**, plus ad
 billed as output.
 - Per request: 12k × $5/M + 5k × $25/M ≈ $0.06 + $0.13 ≈ **$0.19**. With generous thinking
   (×2 output), about **$0.35**.
-- Per homework: HW1 (10 problems) ≈ **$2–4**, and HW2–7 are $0.35–1.40 each.
+- Per homework: HW1 (10 problems) ≈ **$2–4**, and HW2–7 are $0.19–1.40 each.
 - The whole course, every problem once, is about **$5–9 a term**. Re-runs after resubmissions
   are marginal.
 - The Batches API would halve this, but it trades seconds for hours. That isn't worth it at

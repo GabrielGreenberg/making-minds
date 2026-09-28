@@ -96,3 +96,8 @@ n/a (research) — docs only; gates: check-budgets.
   Gabriel confirms UCLA P3 approval (memo §9) and whether HW1 rubric drafts move into hw1.json. No visual
   check (no UI).
 - NEXT STEP: loop session: no visual check owed; land per PROFILE §5, then /catch files the follow-up.
+
+### 2026-09-27 — parked for review (robot)
+- Fixed the §8 cost nit (HW2–7 floor $0.19). Left the `fromBatch`-beside-kind nit for review (memo §4 / §10).
+- Design task → parked for Gabriel's review of the memo (LOOP §4), not landed. NEXT STEP: Gabriel answers the
+  Questions (on the `blocked/` copy on main); then land the memo and /catch files the §11 follow-up into blocked/.
