@@ -92,6 +92,7 @@ import {
   putWaiver,
   putGradingSettings,
   postStudentNote,
+  getGradesExport,
   submitFeedback,
   listFeedback,
   setFeedbackStatus,
@@ -321,6 +322,12 @@ class RemoteGradingStore implements GradingStore {
       if (err instanceof ApiError && (err.status === 400 || err.status === 404)) return { ok: false, error: err.message };
       throw err;
     }
+  }
+
+  // The server builds the CSV (storage/gradesExport.ts, over its summaries)
+  // and logs the export; an unknown assignment's 404 is the seam's null.
+  exportGrades(assignmentId?: string): Promise<{ filename: string; csv: string } | null> {
+    return or404(getGradesExport(assignmentId), null);
   }
 }
 

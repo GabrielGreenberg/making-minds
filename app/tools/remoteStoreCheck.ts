@@ -351,6 +351,14 @@ check('remoteGradingStore.summary: the roster-joined rows, the hand grade in pla
   !!summary && summary.progress.roster === TOY_ACCOUNTS.filter((a) => a.role === 'student').length &&
     sRow?.latest?.attempt === 2 && sRow.problems[summary.questionIds.indexOf(openQ.id)]?.source === 'human' &&
     (await remoteGradingStore.summary('no-such-assignment')) === null);
+// The grades CSV through the seam (task 071): the server builds it; the
+// client keeps its BOM and the server's filename; an unknown id → null.
+const exported = await remoteGradingStore.exportGrades(SAMPLE_ASSIGNMENT_ID);
+check('remoteGradingStore.exportGrades: the CSV (BOM kept, UID,name,email,section,…), the server\'s filename; an unknown id → null',
+  !!exported && exported.csv.startsWith('﻿UID,name,email,section,') &&
+    new RegExp(`^making-minds-${SAMPLE_ASSIGNMENT_ID}-grades-\\d{4}-\\d{2}-\\d{2}\\.csv$`).test(exported.filename) &&
+    (await remoteGradingStore.exportGrades('no-such-assignment')) === null,
+  JSON.stringify(exported).slice(0, 200));
 // Extensions and waivers through the seam (task 068): the server plans and
 // stamps; a refusal is the seam's error.
 const ext = await remoteGradingStore.setExtension(SAMPLE_ASSIGNMENT_ID, sKey, '2099-01-01T08:00:00.000Z');

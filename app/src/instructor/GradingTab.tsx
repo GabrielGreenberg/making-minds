@@ -6,7 +6,7 @@ import { hashLink } from '../components/PageShell';
 import { formatDueDate } from '../dueDates';
 import { useAsyncValue } from '../useAsyncValue';
 import { flagKindCounts, flagLabel, isCounted, plural, sortGradingRows } from './gradingViews';
-import { FlagChip, GradeValue, Prog } from './GradingParts';
+import { ExportCsvButton, FlagChip, GradeValue, Prog } from './GradingParts';
 
 /**
  * The Grading tab (task 065; memo grading-interface.md §6.1, mockup 1): every
@@ -17,7 +17,8 @@ import { FlagChip, GradeValue, Prog } from './GradingParts';
  * not count toward the course grade (HW7) is dimmed and listed last.
  * Above it the Needs-attention box, below it the flagged students (task
  * 070; memo §8 — prompts to look, never verdicts, over published
- * assignments), and a Settings panel for the flags' thresholds.
+ * assignments), a Settings panel for the flags' thresholds, and Export CSV
+ * (task 071: the counted published sets and the average).
  */
 export function GradingTab() {
   const { value: course, loading, error, reload } = useAsyncValue(() => gradingStore.course(), []);
@@ -36,6 +37,7 @@ export function GradingTab() {
         </div>
         {course && (
           <div className="mm-actions">
+            <ExportCsvButton />
             <button type="button" className="mm-btn mm-btn--quiet" aria-expanded={settings} onClick={() => setSettings(!settings)}>
               Settings
             </button>

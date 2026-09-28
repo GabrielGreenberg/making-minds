@@ -27,7 +27,9 @@
 // off-roster never flagged, the Flagged chip, struggling over settled (due)
 // counted sets in catalog order, no account, hidden assignments dropped,
 // custom thresholds, normalizeThresholds, countedAverage, the history line,
-// gradingFlags.ts grader-free); [no view grades] the grep gate (no view — the re-grade dialog
+// gradingFlags.ts grader-free); [export] the grades CSV (task 071 — shape,
+// quoting, formula guard, cells ≡ the summary's finals, the average,
+// one-assignment mode, gradesExport.ts scorer-free); [no view grades] the grep gate (no view — the re-grade dialog
 // too — imports the grader or a scorer) and the retired gradebook's files
 // are gone.
 
@@ -49,6 +51,7 @@ import {
   type QueueResponse,
 } from '../src/storage/gradingSummary';
 import { ClaimBook, CLAIM_TTL_MS, type ClaimView } from '../src/storage/gradingClaims';
+import { buildGradesExport, csvCell, exportColumnLabel, exportFilename } from '../src/storage/gradesExport';
 import type { RegradeChange, RegradePlan } from '../src/storage/regrade';
 import {
   hideNamesPrefKey,
@@ -686,6 +689,112 @@ console.log('[flags]');
   const src = readFileSync(new URL('../src/storage/gradingFlags.ts', import.meta.url), 'utf8');
   check('gradingFlags.ts imports no grader or scorer (types from engine/score only)',
     !/engine\/grader|\bscoreRecord\b|\bscoreSubmission\b/.test(src) && !/^import (?!type )[^;]*engine\//m.test(src));
+}
+
+console.log('[export]');
+{
+  // The grades CSV (task 071; storage/gradesExport.ts): a rendering of the
+  // summaries — every cell is a row's grade.final, the average countedAverage.
+  const parse = (csv: string): string[][] => {
+    const out: string[][] = [];
+    let rowCells: string[] = [];
+    let cellText = '';
+    let quoted = false;
+    for (let i = 0; i < csv.length; i++) {
+      const ch = csv[i]!;
+      if (quoted) {
+        if (ch === '"' && csv[i + 1] === '"') { cellText += '"'; i++; }
+        else if (ch === '"') quoted = false;
+        else cellText += ch;
+      } else if (ch === '"') quoted = true;
+      else if (ch === ',') { rowCells.push(cellText); cellText = ''; }
+      else if (ch === '\r' && csv[i + 1] === '\n') { rowCells.push(cellText); out.push(rowCells); rowCells = []; cellText = ''; i++; }
+      else cellText += ch;
+    }
+    return out;
+  };
+  const people = [who('e1', 'Doe, "Jo"', '2A'), who('e2', '=HYPERLINK("x")'), who('e3', 'Line\nBreak', '2B')];
+  const PAST = '2026-10-01T00:00:00.000Z';
+  const FUTURE = '2026-10-20T00:00:00.000Z';
+  const set = (id: string, title: string, dueDate: string, extra: Partial<AssignmentData> = {}): AssignmentData =>
+    ({ ...asg, id, title, dueDate, ...extra });
+  const rec = (a: AssignmentData, key: string, passed: number): SubmissionRecord => {
+    const r = record(key, { passed, text: 'a' });
+    return { ...r, assignmentId: a.id, assignmentHash: homeworkContentHash(a) };
+  };
+  const extended: LateContext = {
+    byStudent: new Map([['e3', { extension: { dueDate: '2026-10-15T00:00:00.000Z', setBy: 'i', setAt: 'x' } }]]),
+  };
+  const build = (a: AssignmentData, latestRecs: SubmissionRecord[], late?: LateContext) =>
+    buildAssignmentSummary({
+      assignment: a, roster: people, latest: latestRecs, released: false, now: NOW,
+      identify: (key) => ({ ...who(key, 'Someone else'), offRoster: 'not-rostered' }), ...(late ? { late } : {}),
+    });
+  const h1 = set('h1', 'HW1. Basics: Circuits', PAST);
+  const h2 = set('h2', 'HW2. Later', FUTURE);
+  const h1b = set('h1b', 'HW1 redux', PAST);
+  const h7 = set('h7', 'HW7. Final Project', PAST, { countsTowardGrade: false });
+  const hid = set('hid', 'HW3. Hidden', PAST);
+  const odd = set('odd', 'Bonus set', PAST);
+  const sets = [
+    { summary: build(h2, [rec(h2, 'e1', 4)]), order: 2, visible: true },
+    { summary: build(h1, [rec(h1, 'e1', 4), rec(h1, 'e3', 2), rec(h1, 'kx', 4)], extended), order: 1, visible: true },
+    { summary: build(h1b, [rec(h1b, 'e1', 0)]), order: 3, visible: true },
+    { summary: build(h7, [rec(h7, 'e1', 4)]), order: 7, visible: true },
+    { summary: build(hid, [rec(hid, 'e1', 4)]), order: 4, visible: false },
+    { summary: build(odd, []), order: 5, visible: true },
+  ];
+  const emailOf = (key: string) => `${key}@toy.example`;
+  const out = buildGradesExport({ assignments: sets, emailOf, now: NOW })!;
+  check('the file: UTF-8 BOM, CRLF line ends only, a dated filename',
+    out.csv.startsWith('﻿') && out.csv.endsWith('\r\n') && !/[^\r]\n/.test(out.csv.replace(/"[^"]*"/g, '')) &&
+      out.filename === 'making-minds-grades-2026-10-09.csv', out.filename);
+  const table = parse(out.csv.slice(1));
+  check('header: UID, name, email, section, the counted published sets in catalog order (labels HW<n>, deduped, else the id), average',
+    table[0]!.join() === 'UID,name,email,section,HW1,HW2,HW1 (2),odd,average' && out.columns.join() === 'HW1,HW2,HW1 (2),odd', table[0]!.join());
+  const order = sets[0]!.summary.rows.filter((r) => !r.student.offRoster).map((r) => emailOf(r.student.key));
+  check('rows: the roster only (no off-roster submitter), in the summaries’ order',
+    out.rows === 3 && table.length === 4 && table.slice(1).map((r) => r[2]).join() === order.join() && order.length === 3,
+    table.slice(1).map((r) => r[2]).join());
+  const line = (key: string) => table.find((r) => r[2] === emailOf(key))!;
+  check('quoting: comma, quote and newline survive a round trip',
+    line('e1')[1] === 'Doe, "Jo"' && line('e3')[1] === 'Line\nBreak' && out.csv.includes('"Doe, ""Jo"""'));
+  check('formula guard: a text cell starting with = gets a leading apostrophe', line('e2')[1] === `'=HYPERLINK("x")`, line('e2')[1]);
+  check('csvCell: + - @ tab guarded, numbers never', csvCell('+1') === "'+1" && csvCell('-x') === "'-x" && csvCell('@a') === "'@a" &&
+    csvCell('\tx') === "'\tx" && csvCell('-5', true) === '-5' && csvCell('plain') === 'plain');
+  const byId = new Map(sets.map((x) => [x.summary.assignmentId, x.summary]));
+  const cols = ['h1', 'h2', 'h1b', 'odd'];
+  const rowOf = (id: string, key: string) => byId.get(id)!.rows.find((x) => x.student.key === key)!;
+  const cellsMatch = people.every((p) => cols.every((id, c) => {
+    const final = rowOf(id, p.key).grade.final;
+    return line(p.key)[4 + c] === (final === null ? '' : String(final));
+  }));
+  check('every grade cell is the summary row’s grade.final (blank when null)', cellsMatch);
+  check('…a missing set past due is 0, one not yet due blank', line('e2')[4] === '0' && line('e2')[5] === '' && line('e1')[5] !== '', line('e2').join('|'));
+  const avgOf = (key: string) => countedAverage(cols.map((id) => {
+    const sm = byId.get(id)!;
+    return { countsTowardGrade: sm.countsTowardGrade, dueDate: sm.dueDate, row: rowOf(id, key) };
+  }), NOW).value;
+  // e1: HW1 70, HW1 (2) 40, odd 0 (missing) — HW2 (not yet due), HW7 (not counted), HW3 (hidden) out.
+  check('average = countedAverage over exactly the columns (not-yet-due, not-counted and hidden sets left out)',
+    people.every((p) => line(p.key)[8] === String(avgOf(p.key) ?? '')) && line('e1')[8] === '36.7',
+    table.slice(1).map((r) => r[8]).join('|'));
+  check('…an extension past now keeps that set out of the student’s average (e3: HW1 extended → only HW1 (2), odd)',
+    line('e3')[8] === '0' && line('e3')[4] !== '', line('e3').join('|'));
+  const one = buildGradesExport({ assignments: sets, emailOf, now: NOW, only: 'h7' })!;
+  const oneTable = parse(one.csv.slice(1));
+  check('one assignment: just its column, no average — any set, even one not counted',
+    oneTable[0]!.join() === 'UID,name,email,section,HW7' && oneTable.length === 4 && one.filename === 'making-minds-h7-grades-2026-10-09.csv',
+    oneTable[0]!.join() + ' ' + one.filename);
+  check('…an unknown assignment → null', buildGradesExport({ assignments: sets, emailOf, now: NOW, only: 'nope' }) === null);
+  check('labels: "HW1. Basics…" → HW1, "hw 12 x" → HW12, none → the id',
+    exportColumnLabel('HW1. Basics: Circuits', 'a') === 'HW1' && exportColumnLabel('hw 12 x', 'a') === 'HW12' && exportColumnLabel('Final', 'fin') === 'fin');
+  check('the filename is the course’s date and carries no student data; an odd id is made safe',
+    exportFilename(Date.parse('2026-10-10T06:30:00Z')) === 'making-minds-grades-2026-10-09.csv' &&
+      exportFilename(Date.parse('2026-10-10T08:00:00Z'), 'a"b/c') === 'making-minds-a_b_c-grades-2026-10-10.csv');
+  const src = readFileSync(new URL('../src/storage/gradesExport.ts', import.meta.url), 'utf8');
+  check('gradesExport.ts renders the summary: no grader, no scorer, no engine import (no third grade computation)',
+    !/engine\/grader|engine\/score|\bscoreRecord\b|\bscoreSubmission\b|^import[^;]*engine\//m.test(src));
 }
 
 console.log('[no view grades]');

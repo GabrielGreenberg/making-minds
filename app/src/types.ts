@@ -796,6 +796,20 @@ export interface NoteEvent {
 }
 
 /**
+ * A grades export (task 2026-09-26-071; memo grading-interface.md §7.5), as
+ * the grading log records it: who downloaded what, never whose grades — no
+ * `student` field. Filed under COURSE_LOG_ID even for one assignment's column
+ * (its id rides in `after`), so no assignment's log ever lists it.
+ */
+export interface ExportEvent {
+  at: string;
+  actor: string;
+  kind: 'export';
+  before: null;
+  after: { assignmentId: string | null; rows: number; columns: string[] };
+}
+
+/**
  * One private note on a student (task 2026-09-26-070; memo
  * grading-interface.md §6.5, decision 15): dated, append-only — no edit or
  * delete path anywhere — and instructors only; nothing student-facing reads

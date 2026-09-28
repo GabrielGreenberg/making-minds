@@ -52,6 +52,13 @@
 // note a course-wide `note` grade_events entry; a hidden set out of the
 // average. And
 // [local ≡ remote] covers row groups and flags (the local toy-id listing).
+// And the grades export (task 071): [export] GET /api/grading/export.csv —
+// text/csv attachment, no-store, BOM + CRLF; the header is the counted
+// published sets (not the not-counted, not the hidden) + average; a row per
+// roster student in the summary's order, every cell the summary's (the
+// student page's average); one course-wide `export` event naming no
+// student; ?assignment= one column, 404 unknown, 403 student, 401 none —
+// and [local ≡ remote] the local store's CSV ≡ the server's (names, grades).
 
 import { mkdtempSync, readdirSync, readFileSync, rmSync, statSync } from 'node:fs';
 import { DatabaseSync } from 'node:sqlite';
@@ -80,6 +87,36 @@ import type {
 import { assignmentSummary } from '../src/gradingSummary';
 import type { RegradeOutcome, RegradePlan } from '../../app/src/storage/regrade';
 import { syncCalendar } from '../src/homeworks';
+import { exportColumnLabel } from '../../app/src/storage/gradesExport';
+
+/** RFC 4180, CRLF rows — the grades CSV read back in memory (task 071). */
+function parseCsv(csv: string): string[][] {
+  const out: string[][] = [];
+  let row: string[] = [];
+  let cell = '';
+  let quoted = false;
+  for (let i = 0; i < csv.length; i++) {
+    const ch = csv[i]!;
+    if (quoted) {
+      if (ch === '"' && csv[i + 1] === '"') {
+        cell += '"';
+        i++;
+      } else if (ch === '"') quoted = false;
+      else cell += ch;
+    } else if (ch === '"') quoted = true;
+    else if (ch === ',') {
+      row.push(cell);
+      cell = '';
+    } else if (ch === '\r' && csv[i + 1] === '\n') {
+      row.push(cell);
+      out.push(row);
+      row = [];
+      cell = '';
+      i++;
+    } else cell += ch;
+  }
+  return out;
+}
 
 let failures = 0;
 function check(label: string, ok: boolean, detail?: string) {
@@ -298,6 +335,11 @@ console.log('[migration]');
 
   console.log('[summary]');
   const getSummary = async () => (await call<AssignmentGradingSummary>('GET', `${u2}/summary`, { token: i2Tok })).json;
+  // The grades CSV (task 071), with its headers; parsed in memory only.
+  const getCsv = async (query: string, token?: string) => {
+    const res = await fetch(`${base2}/grading/export.csv${query}`, { headers: token ? { Authorization: `Bearer ${token}` } : {} });
+    return { status: res.status, headers: res.headers, text: new TextDecoder('utf-8', { ignoreBOM: true }).decode(await res.arrayBuffer()) };
+  };
   const s1 = await getSummary();
   const names = s1.rows.map((r) => r.student.name);
   const johnRow = s1.rows.find((r) => r.student.name === john.name)!;
@@ -513,6 +555,26 @@ console.log('[migration]');
       [localSummary, remoteSummary].every((s) => mismatch(s, jane.name) && mismatch(s, john.name)) &&
         localSummary.rows.find((r) => r.student.name === jane.name)?.group?.join() === johnEmail &&
         remoteSummary.rows.find((r) => r.student.name === jane.name)?.group?.join() === johnKey);
+
+    // The grades CSV (task 071): the same builder over the same records.
+    // Keys, and so UID / email / section, differ by design (public_id vs the
+    // toy address; the toy roster has none): compare the names and grades.
+    const exporter = local.gradingStore as unknown as { exportGrades(id?: string): Promise<{ filename: string; csv: string } | null> };
+    const localStores = local as unknown as { assignmentStore: { setVisible(id: string, v: boolean): Promise<void> } };
+    await localStores.assignmentStore.setVisible(asg2.id, true);
+    db2.setVisible(asg2.id, true);
+    const namesAndGrades = (csv: string) => parseCsv(csv.replace(/^\uFEFF/, '')).map((r) => [r[1], ...r.slice(4)].join('|')).join('\n');
+    for (const only of [undefined, asg2.id]) {
+      const l = (await exporter.exportGrades(only))!;
+      const r = await getCsv(only === undefined ? '' : `?assignment=${only}`, i2Tok);
+      check(`LocalGradingStore.exportGrades ≡ the server's CSV (names + grade columns; ${only ? 'one assignment' : 'the course'})`,
+        namesAndGrades(l.csv) === namesAndGrades(r.text) && parseCsv(l.csv.slice(1))[0]!.join() === parseCsv(r.text.slice(1))[0]!.join(),
+        `\n local  ${namesAndGrades(l.csv)}\n remote ${namesAndGrades(r.text)}`);
+    }
+    const localLog = JSON.parse(mem.get(`mm:grade-log:${COURSE_LOG_ID}`) ?? '[]') as { kind: string; after?: { assignmentId?: string | null } }[];
+    check('…the local store logs each export course-wide too',
+      localLog.filter((e) => e.kind === 'export').map((e) => e.after?.assignmentId ?? 'null').join() === `null,${asg2.id}`, JSON.stringify(localLog));
+    db2.setVisible(asg2.id, false);
   }
   console.log('[queue feed]');
   {
@@ -822,6 +884,77 @@ console.log('[migration]');
         hiddenPage.assignments.some((a) => a.assignmentId === asg2.id) && hiddenPage.average.sets === shownFinals.length &&
         hiddenPage.average.sets === page.json.average.sets - 1,
       JSON.stringify([page.json.average, hiddenPage.average]));
+  }
+
+  console.log('[export]');
+  {
+    // GET /api/grading/export.csv (task 071): a rendering of the summaries.
+    // Published: asg2 and the not-counted set; a counted set stays hidden.
+    db2.setVisible(asg2.id, true);
+    db2.setVisible('not-counted', true);
+    db2.saveAssignment({ ...asg2, id: 'hidden-set', title: 'HW9. Hidden' });
+    const before = db2.listGradeEvents(COURSE_LOG_ID).length;
+    const res = await getCsv('', i2Tok);
+    check('200 text/csv, an attachment named by date (no student data), never cached',
+      res.status === 200 && /^text\/csv; charset=utf-8$/i.test(res.headers.get('Content-Type') ?? '') &&
+        /^attachment; filename="making-minds-grades-\d{4}-\d{2}-\d{2}\.csv"$/.test(res.headers.get('Content-Disposition') ?? '') &&
+        res.headers.get('Cache-Control') === 'no-store',
+      JSON.stringify([res.status, res.headers.get('Content-Type'), res.headers.get('Content-Disposition'), res.headers.get('Cache-Control')]));
+    check('…UTF-8 BOM, CRLF', res.text.startsWith('\uFEFF') && res.text.endsWith('\r\n'));
+    const table = parseCsv(res.text.slice(1));
+    const course = (await call<CourseGrading>('GET', '/grading', { token: i2Tok })).json;
+    const counted = course.assignments.filter((a) => a.visible && a.countsTowardGrade !== false);
+    const labels = counted.map((a) => exportColumnLabel(a.title, a.id));
+    check('header: UID, name, email, section, the counted published sets, average — not the not-counted or the hidden set',
+      table[0]!.join() === ['UID', 'name', 'email', 'section', ...labels, 'average'].join() && counted.length === 1 &&
+        counted[0]!.id === asg2.id && !course.assignments.find((a) => a.id === 'hidden-set')!.visible,
+      table[0]!.join());
+    const summary = await getSummary();
+    const roster = summary.rows.filter((r) => !r.student.offRoster);
+    const toyEmails = new Map(TOY_ACCOUNTS.map((a) => [a.name, a.email.toLowerCase()]));
+    check('one row per roster student, in the summary\'s order — no removed, instructor or off-roster submitter',
+      table.length === roster.length + 1 && table.slice(1).map((r) => r[1]).join() === roster.map((r) => r.student.name).join() &&
+        !table.some((r) => r.includes(LEAVER) || r.includes(instructor.email.toLowerCase())),
+      table.slice(1).map((r) => r[1]).join());
+    let same = true;
+    for (const [i, r] of roster.entries()) {
+      const line = table[i + 1]!;
+      const page = (await call<StudentGrading>('GET', `/students/${r.student.key}`, { token: i2Tok })).json;
+      const want = [r.student.uid, r.student.name, toyEmails.get(r.student.name) ?? '?', r.student.section ?? '',
+        r.grade.final === null ? '' : String(r.grade.final), page.average.value === null ? '' : String(page.average.value)];
+      if (line.join('|') !== want.join('|')) {
+        same = false;
+        console.log(`    ${line.join('|')}  ≠  ${want.join('|')}`);
+      }
+    }
+    check("every cell is the summary's: UID, name, the account email, section, grade.final, the student page's average", same);
+    const log = db2.listGradeEvents(COURSE_LOG_ID) as unknown as { kind: string; actor: string; after: { assignmentId: string | null; rows: number; columns: string[] } }[];
+    const ev = log.at(-1)!;
+    const studentData = [...roster.flatMap((r) => [toyEmails.get(r.student.name) ?? '', r.student.uid, r.student.key]), LEAVER].filter(Boolean);
+    check('logged: one course-wide `export` event — the instructor, which columns, how many rows; no student in it',
+      log.length === before + 1 && ev.kind === 'export' && ev.actor === instructor.email.toLowerCase() && ev.after.assignmentId === null &&
+        ev.after.rows === roster.length && ev.after.columns.join() === labels.join() && !('student' in ev) &&
+        !studentData.some((x) => JSON.stringify(ev).includes(x)) &&
+        ![asg2.id, 'not-counted'].some((id) => (db2.listGradeEvents(id) as { kind: string }[]).some((e) => e.kind === 'export')),
+      JSON.stringify(ev));
+    const one = await getCsv('?assignment=not-counted', i2Tok);
+    const oneTable = parseCsv(one.text.slice(1));
+    const nc = (await call<AssignmentGradingSummary>('GET', '/assignments/not-counted/summary', { token: i2Tok })).json;
+    check('?assignment=<id>: just that column (any set — even one not counted), no average; its id in the filename and the log',
+      one.status === 200 && oneTable[0]!.join() === `UID,name,email,section,${exportColumnLabel(nc.title, nc.assignmentId)}` &&
+        oneTable.slice(1).every((l, i) => l[4] === String(nc.rows.filter((r) => !r.student.offRoster)[i]!.grade.final ?? '')) &&
+        /filename="making-minds-not-counted-grades-/.test(one.headers.get('Content-Disposition') ?? '') &&
+        (db2.listGradeEvents(COURSE_LOG_ID) as unknown as { after: { assignmentId: string | null } }[]).at(-1)!.after.assignmentId === 'not-counted',
+      one.text);
+    check('…a set nobody submitted, past due: every student missing, every cell 0',
+      nc.rows.filter((r) => !r.student.offRoster).every((r) => r.grade.missing) && oneTable.length > 1 && oneTable.slice(1).every((l) => l[4] === '0'),
+      one.text);
+    const after = db2.listGradeEvents(COURSE_LOG_ID).length;
+    check('an unknown assignment → 404; a student → 403; no session → 401 — none of them logged',
+      (await getCsv('?assignment=nope', i2Tok)).status === 404 && (await getCsv('', jTok)).status === 403 &&
+        (await getCsv('')).status === 401 && db2.listGradeEvents(COURSE_LOG_ID).length === after);
+    db2.setVisible(asg2.id, false);
+    db2.setVisible('not-counted', false);
   }
   server2.close();
   db2.close();

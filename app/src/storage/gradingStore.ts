@@ -36,6 +36,14 @@
 // Local: localStorage `mm:flag-thresholds` and `mm:student-notes:<email>`
 // (each note also logged in the course-wide grading log, `mm:grade-log:`).
 // Remote: course_settings.flagThresholds and the student_notes table.
+//
+// And the grades export (task 2026-09-26-071): the CSV (`exportGrades`),
+// rendered from the same summaries by the ONE pure builder,
+// storage/gradesExport.ts — every export logged as an `export` event under
+// COURSE_LOG_ID. Local: built in the page (the email column is the key, the
+// toy address), logged in `mm:grade-log:`. Remote: the server's
+// GET /api/grading/export.csv. Either way the caller downloads it; nothing
+// writes the file anywhere else.
 
 import type { AssignmentData, GradeEvent, HumanGrade, LateExtension, LateWaiver, Points, StudentNote, SubmissionRecord } from '../types';
 import { readPersistedAccount, TOY_ACCOUNTS } from '../auth/accounts';
@@ -61,6 +69,7 @@ import { readExtensions, readWaivers } from './lateLocal';
 import { COURSE_CALENDAR } from '../courseCalendar';
 import { courseFlags, normalizeThresholds, type FlagThresholds } from './gradingFlags';
 import { checkStudentNote } from './gradeWrites';
+import { buildGradesExport, type ExportAssignment } from './gradesExport';
 
 export type {
   AssignmentGradingSummary,
@@ -152,6 +161,12 @@ export interface GradingStore {
   /** Add one private note to a student's log (append-only; never edited or
    *  deleted). Instructor-only; nothing student-facing reads it. */
   addStudentNote(studentKey: string, body: string): Promise<NoteWriteOutcome>;
+
+  /** The grades CSV (task 071): a row per roster student, a column per
+   *  counted published set and their average — or, with `assignmentId`, that
+   *  one set's column. Logged as an `export` event. null = no such
+   *  assignment. Instructor-only. */
+  exportGrades(assignmentId?: string): Promise<{ filename: string; csv: string } | null>;
 }
 
 /** Where local mode keeps the thresholds and each student's notes. */
@@ -303,11 +318,10 @@ export class LocalGradingStore implements GradingStore {
     return got ? this.summaryOf(got.assignment, got.gradesReleased, Date.now()) : null;
   }
 
-  async course(): Promise<CourseGrading> {
-    const now = Date.now();
-    const rows = await this.assignments.list();
-    const assignments = [];
-    for (const row of rows) {
+  /** Every assignment's full summary, with its place and visibility. */
+  private async allSummaries(now: number): Promise<ExportAssignment[]> {
+    const assignments: ExportAssignment[] = [];
+    for (const row of await this.assignments.list()) {
       const got = await this.assignments.get(row.id);
       if (!got) continue;
       assignments.push({
@@ -316,7 +330,33 @@ export class LocalGradingStore implements GradingStore {
         visible: row.visible,
       });
     }
+    return assignments;
+  }
+
+  async course(): Promise<CourseGrading> {
+    const now = Date.now();
+    const assignments = await this.allSummaries(now);
     return buildCourseGrading({ roster: localRoster(), assignments, thresholds: readThresholds(), calendar: COURSE_CALENDAR, now });
+  }
+
+  async exportGrades(assignmentId?: string): Promise<{ filename: string; csv: string } | null> {
+    const now = Date.now();
+    const out = buildGradesExport({
+      assignments: await this.allSummaries(now),
+      // Locally a key is the student's (toy) address.
+      emailOf: (key) => key,
+      now,
+      ...(assignmentId !== undefined ? { only: assignmentId } : {}),
+    });
+    if (!out) return null;
+    this.subs.logCourseEvent({
+      at: new Date(now).toISOString(),
+      actor: this.actor(),
+      kind: 'export',
+      before: null,
+      after: { assignmentId: assignmentId ?? null, rows: out.rows, columns: out.columns },
+    });
+    return { filename: out.filename, csv: out.csv };
   }
 
   async student(studentKey: string): Promise<StudentGrading | null> {
@@ -395,7 +435,7 @@ export class LocalGradingStore implements GradingStore {
     } catch {
       return { ok: false, error: 'the note could not be saved in this browser' };
     }
-    this.subs.logNote({ at: note.at, actor: note.author, student: studentKey, kind: 'note', before: null, after: { noteId: note.id } });
+    this.subs.logCourseEvent({ at: note.at, actor: note.author, student: studentKey, kind: 'note', before: null, after: { noteId: note.id } });
     return { ok: true, note };
   }
 

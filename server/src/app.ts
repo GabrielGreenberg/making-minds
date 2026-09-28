@@ -56,6 +56,10 @@
 //                                              and the flag thresholds (task 070)
 //   PUT    /api/grading/settings               instructor: {thresholds} → normalized, stored
 //                                              in course_settings.flagThresholds
+//   GET    /api/grading/export.csv             instructor: the grades CSV (task 071) — a row
+//                                              per roster student, the counted published
+//                                              sets and the average; ?assignment=<id> →
+//                                              that one column. Logged as an `export` event
 //   GET    /api/students/:sid                  instructor: the student page — every
 //                                              assignment's row, flags, the counted
 //                                              average, private notes, the grade log
@@ -100,7 +104,8 @@
 
 import express from 'express';
 import type { Request, Response, NextFunction } from 'express';
-import type { AssignmentData, AssignmentState, FeedbackTriage, FeedbackTriageOutcome, SubmissionData, SubmissionRecord } from '../../app/src/types';
+import type { AssignmentData, AssignmentState, ExportEvent, FeedbackTriage, FeedbackTriageOutcome, SubmissionData, SubmissionRecord } from '../../app/src/types';
+import { COURSE_LOG_ID } from '../../app/src/types';
 import { gradeSubmission } from '../../app/src/engine/grader';
 import { checkStudentNote, planExtensionWrite, planGradeWrite, planWaiverWrite, type GradeWrite } from '../../app/src/storage/gradeWrites';
 import { normalizeThresholds } from '../../app/src/storage/gradingFlags';
@@ -128,6 +133,7 @@ import {
   assignmentSummary,
   attemptDetail,
   courseGrading,
+  gradesExport,
   questionResponses,
   studentEmailOf,
   regradeInputs,
@@ -156,6 +162,9 @@ export function createApp(config: ServerConfig, db: Db) {
         res.setHeader('Access-Control-Allow-Methods', 'GET,PUT,POST,DELETE,OPTIONS');
         res.setHeader('Access-Control-Allow-Headers', 'Content-Type,Authorization');
         res.setHeader('Access-Control-Max-Age', '86400');
+        // A cross-origin fetch hides every header outside the CORS safelist;
+        // the grades export (task 071) names its file in Content-Disposition.
+        res.setHeader('Access-Control-Expose-Headers', 'Content-Disposition');
       }
       if (req.method === 'OPTIONS') {
         res.status(204).end();
@@ -827,6 +836,34 @@ export function createApp(config: ServerConfig, db: Db) {
   // Students are named by opaque keys, never an email or UID.
   app.get('/api/grading', auth, requireInstructor, (_req, res) => {
     res.json(courseGrading(db, mintSecret, Date.now()));
+  });
+
+  // The grades CSV (task 071): a rendering of the same summaries, downloaded;
+  // every export is logged under COURSE_LOG_ID (who, which, how many — never
+  // whose grades). Nothing writes the file anywhere on the server.
+  app.get('/api/grading/export.csv', auth, requireInstructor, (req, res) => {
+    const raw = req.query.assignment;
+    const assignmentId = typeof raw === 'string' && raw !== '' ? raw : undefined;
+    const now = Date.now();
+    const out = gradesExport(db, mintSecret, now, assignmentId);
+    if (!out) {
+      res.status(404).json({ error: 'unknown assignment' });
+      return;
+    }
+    const event: ExportEvent = {
+      at: new Date(now).toISOString(),
+      actor: req.user!.email,
+      kind: 'export',
+      before: null,
+      after: { assignmentId: assignmentId ?? null, rows: out.rows, columns: out.columns },
+    };
+    db.addGradeEvent(COURSE_LOG_ID, event);
+    res.set({
+      'Content-Type': 'text/csv; charset=utf-8',
+      'Content-Disposition': `attachment; filename="${out.filename}"`,
+      'Cache-Control': 'no-store',
+    });
+    res.send(out.csv);
   });
 
   // The flag thresholds (task 070): normalized — a missing or junk field is
