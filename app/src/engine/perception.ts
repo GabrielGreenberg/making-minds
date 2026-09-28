@@ -18,6 +18,8 @@
 
 import type {
   CircuitData,
+  MotionDirection,
+  MotionScene,
   PerceptionRule,
   PerceptionSpec,
   PerceptionTestCase,
@@ -28,6 +30,12 @@ import { evaluateSCSequence } from './sc';
 /** Largest retina a perception question may declare (CC banks enumerate 2^width). */
 export const MAX_PERCEPTION_WIDTH = 10;
 export const MIN_PERCEPTION_WIDTH = 2;
+/** Longest film a perception case may hold — the student's frame player and
+ *  the instructor's authored films alike (a generated case is 2–19 frames). */
+export const MAX_FILM_FRAMES = 24;
+
+export const MOTION_DIRECTIONS: readonly MotionDirection[] = ['up', 'down', 'either'];
+export const MOTION_SCENES: readonly MotionScene[] = ['single', 'multi'];
 
 /** Which canvas/engine a rule belongs to: run rules & patterns are spatial
  *  (CC, one frame); change & motion are temporal (SC, a frame stream). */
@@ -46,8 +54,12 @@ export function describePerceptionRule(rule: PerceptionRule): string {
       return `output 1 iff the input = ${rule.pattern}`;
     case 'change':
       return 'output 1 iff the current input differs in any way from the previous input';
-    case 'motion':
-      return `output 1 iff an object image (a string of exactly ${rule.objectLength} consecutive 1s) is moving upwards 1 unit per unit of time`;
+    case 'motion': {
+      const dir = rule.direction ?? 'up';
+      const way = dir === 'up' ? 'upwards' : dir === 'down' ? 'downwards' : 'up or down';
+      const scene = (rule.scene ?? 'single') === 'multi' ? ', whatever else is in view' : '';
+      return `output 1 iff an object image (a string of exactly ${rule.objectLength} consecutive 1s) is moving ${way} 1 unit per unit of time${scene}`;
+    }
   }
 }
 
@@ -92,6 +104,20 @@ export function singleObjectAt(bits: number[], k: number): number | null {
   return runs.length === 1 && runs[0].len === k ? runs[0].start : null;
 }
 
+/** The start index of every object image in the frame — every maximal run of
+ *  exactly k 1s (a run of k+1 is not one), top (IN1) first. */
+export function objectStarts(bits: number[], k: number): number[] {
+  return onesRuns(bits).filter((r) => r.len === k).map((r) => r.start);
+}
+
+/** Did an object at `q` in the previous frame move one unit, in `dir`, to `p`?
+ *  "Up" is toward IN1: the start index drops by one. */
+function movedOneUnit(dir: MotionDirection, p: number, q: number): boolean {
+  if (dir === 'up') return q === p + 1;
+  if (dir === 'down') return q === p - 1;
+  return Math.abs(q - p) === 1;
+}
+
 /** Parse a pattern string ("110010111") into a bit-vector. */
 export function patternBits(pattern: string): number[] {
   return pattern.split('').map((c) => (c === '1' ? 1 : 0));
@@ -117,9 +143,18 @@ export function expectedPerceptionOutputs(rule: PerceptionRule, frames: number[]
       case 'change':
         return framesEqual(cur, prev) ? 0 : 1;
       case 'motion': {
-        const p = singleObjectAt(cur, rule.objectLength);
-        const q = singleObjectAt(prev, rule.objectLength);
-        return p != null && q != null && q === p + 1 ? 1 : 0;
+        const k = rule.objectLength;
+        const dir = rule.direction ?? 'up';
+        if ((rule.scene ?? 'single') === 'single') {
+          // Each frame is one object image and nothing else.
+          const p = singleObjectAt(cur, k);
+          const q = singleObjectAt(prev, k);
+          return p != null && q != null && movedOneUnit(dir, p, q) ? 1 : 0;
+        }
+        // Any number of objects: SOME object image now sits one unit from
+        // some object image in the previous frame, whatever else is in view.
+        const before = objectStarts(prev, k);
+        return objectStarts(cur, k).some((p) => before.some((q) => movedOneUnit(dir, p, q))) ? 1 : 0;
       }
     }
   });
@@ -186,8 +221,21 @@ function changeSequences(width: number, rand: () => number): number[][][] {
   return seqs;
 }
 
-/** SC motion-detector sequences: true upward motion plus every near-miss. */
-function motionSequences(width: number, k: number, rand: () => number): number[][][] {
+/**
+ * SC motion-detector sequences: true upward motion plus every near-miss —
+ * HW3 P12's committed battery, which must never drift: the same films, the
+ * same random draws in the same order. Any other direction or scene appends
+ * a deterministic set after it (motionExtras) that consumes no random draw;
+ * every film's expected output comes from the rule, so one film is a
+ * positive under one variant and a near-miss under another.
+ */
+function motionSequences(
+  width: number,
+  k: number,
+  rand: () => number,
+  direction: MotionDirection = 'up',
+  scene: MotionScene = 'single',
+): number[][][] {
   const blank = Array<number>(width).fill(0);
   const bottom = width - k; // lowest start index an object can have
   const upward = (from: number, to: number): number[][] => {
@@ -218,7 +266,82 @@ function motionSequences(width: number, k: number, rand: () => number): number[]
   for (let i = 0; i < 2; i++) {
     seqs.push(Array.from({ length: 6 }, () => randomFrame(width, rand)));
   }
+  if (direction !== 'up' || scene === 'multi') seqs.push(...motionExtras(width, k));
   return seqs;
+}
+
+/**
+ * The films a downward, either-way or multi-object motion rule adds: the
+ * upward battery's near-misses mirrored, a bounce, and scenes with more than
+ * one thing in view (two objects, a stray bit, a static object beside a
+ * moving one). Films that do not fit the retina are dropped; each is 2 to
+ * MAX_FILM_FRAMES frames.
+ */
+function motionExtras(width: number, k: number): number[][][] {
+  const blank = Array<number>(width).fill(0);
+  const bottom = width - k;
+  const at = (...starts: number[]): number[] => {
+    const f = [...blank];
+    for (const s of starts) objectFrame(width, k, s).forEach((b, i) => { if (b) f[i] = 1; });
+    return f;
+  };
+  const span = (from: number, to: number): number[] => {
+    const out: number[] = [];
+    for (let s = from; from <= to ? s <= to : s >= to; s += from <= to ? 1 : -1) out.push(s);
+    return out;
+  };
+  const films: number[][][] = [
+    // jumps two units DOWN per step
+    [0, 2, 4].filter((s) => s <= bottom).map((s) => at(s)),
+    // a too-long (k+1 run) object falling
+    bottom >= 1 ? span(0, bottom - 1).map((s) => objectFrame(width, k + 1, s)) : [],
+    // appears at the top, falls two steps, vanishes, reappears at the bottom
+    bottom >= 1 ? [blank, at(0), at(1), blank, at(bottom)] : [],
+    // falls with a stray bit at the bottom wire
+    bottom >= 2 ? span(0, bottom - 2).map((s) => { const g = at(s); g[width - 1] = 1; return g; }) : [],
+    // bounce: climbs to the top, then falls back
+    [...span(bottom, 0), ...span(1, bottom)].map((s) => at(s)),
+    // climbs with a stray bit at the bottom wire, one wire clear of it
+    bottom >= 2 ? span(bottom - 2, 0).map((s) => { const g = at(s); g[width - 1] = 1; return g; }) : [],
+  ];
+  // A stray bit appears, one wire clear, just as the object steps up (then
+  // down): the only films that separate the scenes on a small retina (w4 k2),
+  // where every other clutter film here needs more room — single says 0 at
+  // the step, multi 1.
+  if (bottom >= 2) {
+    const withStray = (s: number, wire: number): number[] => { const g = at(s); g[wire] = 1; return g; };
+    films.push([at(bottom - 1), withStray(bottom - 2, width - 1)]);
+    films.push([at(1), withStray(2, 0)]);
+  }
+  // Two objects converging from the ends (a gap always between), then diverging.
+  const converge: number[][] = [];
+  for (let a = 0, b = bottom; a + k < b; a++, b--) converge.push(at(a, b));
+  films.push(converge, [...converge].reverse());
+  // Two objects falling together, one wire apart.
+  const together: number[][] = [];
+  for (let a = 0; a + 2 * k + 1 <= width; a++) together.push(at(a, a + k + 1));
+  films.push(together);
+  // An object climbing toward a static object at the bottom.
+  films.push(span(bottom - k - 1, 0).filter((s) => s >= 0 && bottom - k - 1 >= 0).map((s) => at(s, bottom)));
+  return films
+    .filter((f) => f.length >= 2)
+    .map((f) => f.slice(0, MAX_FILM_FRAMES));
+}
+
+/** Why a film cannot be a case of an SC perception question `width` wires
+ *  wide, or null when it can: 1..MAX_FILM_FRAMES frames of exactly `width`
+ *  bits, each 0 or 1. */
+export function filmProblem(film: number[][], width: number): string | null {
+  if (!Array.isArray(film) || film.length === 0) return 'a film needs at least one frame';
+  if (film.length > MAX_FILM_FRAMES) return `a film holds at most ${MAX_FILM_FRAMES} frames (this one has ${film.length})`;
+  for (let t = 0; t < film.length; t++) {
+    const f = film[t];
+    if (!Array.isArray(f) || f.length !== width) {
+      return `frame t${t + 1} has ${Array.isArray(f) ? f.length : 0} bits — the retina is ${width} wires`;
+    }
+    if (!f.every((b) => b === 0 || b === 1)) return `frame t${t + 1} holds a value that is not 0 or 1`;
+  }
+  return null;
 }
 
 /**
@@ -226,8 +349,13 @@ function motionSequences(width: number, k: number, rand: () => number): number[]
  * time. CC rules enumerate every 2^width frame exhaustively (width is capped
  * at MAX_PERCEPTION_WIDTH); SC rules get a fixed, deterministic battery of
  * frame sequences whose expected outputs come from the rule evaluator.
+ *
+ * `films` are the instructor's own SC frame sequences, appended after the
+ * generated battery as `authored: true` cases — their expected outputs, too,
+ * come from the rule, never from the caller. A CC bank is already exhaustive,
+ * so a CC rule takes none (throws).
  */
-export function buildPerceptionCases(spec: PerceptionSpec): PerceptionTestCase[] {
+export function buildPerceptionCases(spec: PerceptionSpec, films: number[][][] = []): PerceptionTestCase[] {
   const { rule, width } = spec;
   if (
     !Number.isInteger(width) ||
@@ -245,18 +373,35 @@ export function buildPerceptionCases(spec: PerceptionSpec): PerceptionTestCase[]
   if ((rule.kind === 'min-run' || rule.kind === 'exact-run') && (rule.runLength < 1 || rule.runLength > width)) {
     throw new Error('run length must be between 1 and the input width');
   }
-  if (rule.kind === 'motion' && (rule.objectLength < 1 || rule.objectLength > width)) {
-    throw new Error('object length must be between 1 and the input width');
+  if (rule.kind === 'motion') {
+    if (rule.objectLength < 1 || rule.objectLength > width) {
+      throw new Error('object length must be between 1 and the input width');
+    }
+    if (rule.direction !== undefined && !MOTION_DIRECTIONS.includes(rule.direction)) {
+      throw new Error(`motion direction must be one of ${MOTION_DIRECTIONS.join(', ')}`);
+    }
+    if (rule.scene !== undefined && !MOTION_SCENES.includes(rule.scene)) {
+      throw new Error(`motion scene must be one of ${MOTION_SCENES.join(', ')}`);
+    }
   }
 
   if (perceptionModeFor(rule) === 'CC') {
+    if (films.length > 0) throw new Error('a CC perception bank is already exhaustive — films are for SC rules only');
     return allFrames(width).map((f) => caseOf(rule, [f]));
   }
+  films.forEach((film, i) => {
+    const problem = filmProblem(film, width);
+    if (problem) throw new Error(`film ${i + 1}: ${problem}`);
+  });
   const rand = lcg(0x133 + width * 31 + (rule.kind === 'motion' ? rule.objectLength : 0));
-  const seqs = rule.kind === 'change'
-    ? changeSequences(width, rand)
-    : motionSequences(width, (rule as { objectLength: number }).objectLength, rand);
-  return seqs.map((frames) => caseOf(rule, frames));
+  const seqs = rule.kind === 'motion'
+    ? motionSequences(width, rule.objectLength, rand, rule.direction, rule.scene)
+    : changeSequences(width, rand);
+  const authored = films.map((film): PerceptionTestCase => ({
+    ...caseOf(rule, film.map((f) => [...f])),
+    authored: true,
+  }));
+  return [...seqs.map((frames) => caseOf(rule, frames)), ...authored];
 }
 
 // ── Grading primitives (used by engine/grader.ts) ───────────────────

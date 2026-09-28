@@ -34,7 +34,7 @@ import { navigate } from '../routing';
 
 /** The failing rows for one question's result, in whatever shape it graded
  *  under — always the SAFE fields only (never expected/got/the answer key).
- *  Value and turbot rows carry a "Run this input" link: the question opens
+ *  Value, turbot and perception rows carry a "Run this input" link: the question opens
  *  with that case (its index in the result, parallel to the bank) loaded. */
 function FailedInputs({
   qr,
@@ -66,12 +66,16 @@ function FailedInputs({
     );
   }
   if (qr.perceptionCases) {
-    const failed = qr.perceptionCases.filter((c) => !c.pass);
+    // Keep each film's index in the bank (map before filter): it is the case.
+    const failed = qr.perceptionCases.map((c, k) => ({ ...c, k })).filter((c) => !c.pass);
     if (failed.length === 0) return null;
     return (
       <ul className="grades-failed-list">
-        {failed.map((c, i) => (
-          <li key={i}>frames {c.frames.map((f) => f.join('')).join(' → ')}{c.failStep != null && ` — first wrong at step ${c.failStep}`}</li>
+        {failed.map((c) => (
+          <li key={c.k}>
+            frames {c.frames.map((f) => f.join('')).join(' → ')}{c.failStep != null && ` — first wrong at step ${c.failStep}`}
+            {c.reason && ` — ${c.reason}`} {runLink(c.k)}
+          </li>
         ))}
       </ul>
     );

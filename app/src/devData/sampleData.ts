@@ -23,6 +23,8 @@ import type {
   CCSpec,
   CircuitComponent,
   CircuitData,
+  MotionDirection,
+  MotionScene,
   PerceptionRule,
   RepSystem,
   SubmissionData,
@@ -470,22 +472,47 @@ export function perceptionChangeIncorrect(): CircuitData {
   return net.circuit();
 }
 
-// ── SC perception: motion detector (3-long object moving up 1/step) ──
-// matchNow(p) recognises "the frame is exactly one object at position p"
-// (AND over all 8 literals); matchPrev(q) recognises the same on the MEM
-// copy of the previous frame. Upward motion = object now at p, before at p+1.
+// ── SC perception: motion detectors ──
+// exactAt(wires, p) recognises an object image at position p — single scene:
+// "the frame is exactly one object at p" (AND over every literal); multi
+// scene: "a maximal run of exactly k starts at p" (the run's bits and its
+// two boundary NOTs only). The same on the MEM copy of the previous frame
+// reads where objects were. Motion = an object now at p, before at q, with
+// q = p+1 (up, toward IN1), p−1 (down) or either.
 
-export function perceptionMotionCorrect(): CircuitData {
+export function perceptionMotionDetector({ width, k, direction, scene }: {
+  width: number;
+  k: number;
+  direction: MotionDirection;
+  scene: MotionScene;
+}): CircuitData {
   const net = new Netlist('pmo');
-  const ins = retina(net, 8);
+  const ins = retina(net, width);
   const mems = ins.map((r, i) => net.mem(`M${i + 1}`, r));
-  const exactObjectAt = (wires: NetRef[], p: number): NetRef =>
-    net.and(wires.map((r, i) => (i >= p && i < p + 3 ? r : net.not(r))));
-  const terms = Array.from({ length: 5 }, (_, p) =>
-    net.gate('AND', exactObjectAt(ins, p), exactObjectAt(mems, p + 1)),
-  );
-  net.output('OUT1', net.or(terms));
+  const bottom = width - k;
+  const exactAt = (wires: NetRef[], p: number): NetRef =>
+    scene === 'single'
+      ? net.and(wires.map((r, i) => (i >= p && i < p + k ? r : net.not(r))))
+      : net.and([
+          ...wires.slice(p, p + k),
+          ...(p > 0 ? [net.not(wires[p - 1])] : []),
+          ...(p + k < width ? [net.not(wires[p + k])] : []),
+        ]);
+  const terms: NetRef[] = [];
+  for (let p = 0; p <= bottom; p++) {
+    const before = direction === 'up' ? [p + 1] : direction === 'down' ? [p - 1] : [p - 1, p + 1];
+    for (const q of before.filter((x) => x >= 0 && x <= bottom)) {
+      terms.push(net.gate('AND', exactAt(ins, p), exactAt(mems, q)));
+    }
+  }
+  // No motion fits the retina: the constant 0 (IN1 AND NOT IN1).
+  net.output('OUT1', terms.length > 0 ? net.or(terms) : net.gate('AND', ins[0], net.not(ins[0])));
   return net.circuit();
+}
+
+// HW3 P12: a 3-long object moving up over 8 wires, one object in view.
+export function perceptionMotionCorrect(): CircuitData {
+  return perceptionMotionDetector({ width: 8, k: 3, direction: 'up', scene: 'single' });
 }
 
 // Wrong: detects an object in the CURRENT frame only (no memory of where it

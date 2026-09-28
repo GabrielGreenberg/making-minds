@@ -13,6 +13,11 @@
 //     runTurbotCase deep-equals turbotCases[k]. Results are PARALLEL to their
 //     banks (cases[k].input is test_cases[k].inputs; a case's separations
 //     ride on its result).
+//   [perception engine ≡ grader]  every perception fixture (hw2 P10–12,
+//     hw3 P11–12), correct / broken / empty machine and a component-
+//     restricted copy: validateQuestionMachine is gradePerception's Stage 1
+//     (every case carries its reason), else runPerceptionFilm gives every
+//     case's `got` (task 013).
 //   [MEM scratch]  the grader grades from rest: an SC machine and an SC-
 //     brained turbot saved with every MEM holding 1 grade exactly as with 0
 //     (gradingCircuit) — and the raw engine WOULD differ, so the pin bites.
@@ -73,6 +78,8 @@ import { gradeQuestion } from '../src/engine/grader';
 import {
   runValueCase,
   runTurbotCase,
+  runPerceptionFilm,
+  validateQuestionMachine,
   caseStimulus,
   questionLayout,
   gradingCircuit,
@@ -181,6 +188,46 @@ for (const id of fixtureIds) {
 check(`compared ${valueCasesCompared} value cases and ${turbotCasesCompared} arenas (non-trivial)`,
   valueCasesCompared > 500 && turbotCasesCompared > 10);
 check(`hw5-p4's gap cases carry their separations onto the result (${separationsSeen} seen)`, separationsSeen >= 48);
+
+// ── [perception engine ≡ grader] ────────────────────────────────────────────
+console.log('\n[perception engine ≡ grader]');
+let perceptionCasesCompared = 0;
+let perceptionRejections = 0;
+for (const id of fixtureIds) {
+  const fx = loadFixture(id);
+  if (!fx.question.perception) continue;
+  const empty: CircuitData = { components: [], wires: [] };
+  // A copy that forbids every gate the correct machine uses: Stage 1's
+  // component rules reject it before the retina check.
+  const restricted: AssignmentQuestion = { ...fx.question, allowed_components: ['MEM'] };
+  const runs: [string, AssignmentQuestion, CircuitData][] = [
+    ['correct', fx.question, fx.correct],
+    ['empty', fx.question, empty],
+    ['correct, restricted to MEM', restricted, fx.correct],
+  ];
+  if (fx.broken) runs.push(['broken', fx.question, fx.broken]);
+  for (const [name, q, m] of runs) {
+    const graded = gradeQuestion(q, m);
+    const bank = q.perception_cases ?? [];
+    const valid = validateQuestionMachine(q, gradingCircuit(m));
+    const problems: string[] = [];
+    if ((graded.perceptionCases ?? []).length !== bank.length) problems.push('perceptionCases not parallel to perception_cases');
+    bank.forEach((tc, k) => {
+      const rec = graded.perceptionCases?.[k];
+      perceptionCasesCompared++;
+      if (!valid.ok) {
+        perceptionRejections++;
+        if (rec?.reason !== valid.reason || rec?.got.length !== 0) problems.push(`case ${k}: reason ${rec?.reason} vs ${valid.reason}`);
+      } else if (!same(runPerceptionFilm(q, m, tc.frames), rec?.got)) {
+        problems.push(`case ${k}: got ${JSON.stringify(rec?.got)} vs the film run`);
+      }
+    });
+    check(`${id} ${name}: Stage 1 (${valid.ok ? 'ok' : valid.reason}) + runPerceptionFilm ≡ gradePerception`,
+      problems.length === 0, problems.slice(0, 3).join(' | '));
+  }
+}
+check(`compared ${perceptionCasesCompared} perception cases, ${perceptionRejections} of them Stage-1 rejections (non-trivial)`,
+  perceptionCasesCompared > 1000 && perceptionRejections > 0 && perceptionRejections < perceptionCasesCompared);
 
 // ── [MEM scratch] ───────────────────────────────────────────────────────────
 console.log('\n[MEM scratch: every machine is graded from rest]');

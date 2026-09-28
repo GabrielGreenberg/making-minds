@@ -13,15 +13,34 @@
 // same frames: the same bits fed, the same output bit per step, from MEMs at
 // 0, stopping after the last frame (no sandbox drain step), never reading the
 // answer key, never locked.
+//
+// And task 013: motion rules by direction (up / down / either) and scene
+// (single object / any number), their generated banks — today's specs'
+// banks byte-for-byte the committed HW2/HW3 ones — the instructor's authored
+// films (appended, expected from the rule; perceptionAuthoring's draft),
+// grading of the new rules, and "Run this input" for a perception film
+// (store loadCaseInput, from a stripped copy too).
 
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
-import type { AssignmentData, AssignmentQuestion, CircuitData, PerceptionRule } from '../src/types';
+import type {
+  AssignmentData,
+  AssignmentQuestion,
+  CircuitData,
+  MotionDirection,
+  MotionScene,
+  PerceptionRule,
+  QuestionResult,
+  SubmissionRecord,
+} from '../src/types';
 import {
   hasRunAtLeast,
   hasRunExactly,
   singleObjectAt,
+  objectStarts,
+  describePerceptionRule,
+  MAX_FILM_FRAMES,
   expectedPerceptionOutputs,
   buildPerceptionCases,
   perceptionModeFor,
@@ -32,15 +51,34 @@ import {
   runPerceptionCase,
 } from '../src/engine/perception';
 import { gradeQuestion } from '../src/engine/grader';
-import { gradingCircuit } from '../src/engine/caseRun';
+import { gradingCircuit, gradedMachineKey } from '../src/engine/caseRun';
+import { gradedCaseView } from '../src/gradeDisplay';
+import { stripAnswers, studentRecord } from '../../server/src/sanitize';
+import {
+  draftFromQuestion,
+  draftProblems,
+  perceptionFields,
+  ruleFromDraft,
+  bankSummary,
+  newFilm,
+  addFilmFrame,
+  toggleFilmBit,
+  shiftFilmFrame,
+  duplicateFilm,
+  removeFilm,
+  fitFilmToWidth,
+  type PerceptionDraft,
+} from '../src/instructor/perceptionAuthoring';
 import { memorySlots } from '../src/engine/netlist';
 import { boxWhole, comp } from './builder';
+import { sortByLabel } from '../src/engine';
 import {
   perceptionEdgeCorrect, perceptionEdgeIncorrect,
   perceptionObjectCorrect, perceptionObjectIncorrect,
   perceptionLandmarkCorrect, perceptionLandmarkIncorrect,
   perceptionChangeCorrect, perceptionChangeIncorrect,
   perceptionMotionCorrect, perceptionMotionIncorrect,
+  perceptionMotionDetector,
 } from '../src/devData/sampleData';
 
 let failures = 0;
@@ -50,6 +88,7 @@ function check(label: string, cond: boolean) {
 }
 
 const bits = (s: string) => s.split('').map((c) => (c === '1' ? 1 : 0));
+const same = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b);
 
 // ── rule evaluators ────────────────────────────────────────────────
 console.log('[rule evaluators]');
@@ -120,6 +159,169 @@ try {
 }
 check('pattern length must equal width', threw);
 
+// ── task 013: motion by direction and scene ────────────────────────
+console.log('\n[motion variants]');
+check('objectStarts: maximal runs of exactly k only', same(objectStarts(bits('01110000'), 3), [1]));
+check('objectStarts: a k+1 run is not an object', same(objectStarts(bits('11110000'), 3), []));
+check('objectStarts: two objects → two starts (top first)', same(objectStarts(bits('11101110'), 3), [0, 4]));
+check('objectStarts: an object beside clutter still counts', same(objectStarts(bits('10011100'), 3), [3]));
+{
+  const m = (direction?: MotionDirection, scene?: MotionScene): PerceptionRule =>
+    ({ kind: 'motion', objectLength: 3, ...(direction ? { direction } : {}), ...(scene ? { scene } : {}) });
+  const down = [...up].reverse();
+  const out = (r: PerceptionRule, f: number[][]) => expectedPerceptionOutputs(r, f).join('');
+  check('absent direction/scene reads as up/single (HW3 P12)',
+    out(m(), up) === out(m('up', 'single'), up) && out(m(), down) === out(m('up', 'single'), down));
+  check('down: a downward drift → 0 then 1s', out(m('down'), down) === '011');
+  check('down: an upward climb → all 0', out(m('down'), up) === '000');
+  check('either: catches both ways', out(m('either'), up) === '011' && out(m('either'), down) === '011');
+  const bounce = [5, 4, 3, 4, 5].map((s) => objectFrame(8, 3, s));
+  check('either: a bounce → 1 after t1, every step', out(m('either'), bounce) === '01111');
+  check('up / down read the bounce by halves', out(m('up'), bounce) === '01100' && out(m('down'), bounce) === '00011');
+  const withClutter = up.map((f) => { const g = [...f]; g[0] = 1; return g; }); // stray bit at IN1; objects at 5,4,3
+  check('single scene: an object climbing beside a stray bit → 0', out(m('up', 'single'), withClutter) === '000');
+  check('multi scene: the same film → 1 (whatever else is in view)', out(m('up', 'multi'), withClutter) === '011');
+  const pairs = [bits('11001100'), bits('01100110')]; // runs of 2: not 3-objects
+  check('multi: runs that are not k long never move', out(m('either', 'multi'), pairs) === '00');
+  const twoWays = [
+    [...objectFrame(9, 3, 0)].map((b, i) => (i >= 6 ? 1 : b)), // objects at 0 and 6
+    [...objectFrame(9, 3, 1)].map((b, i) => (i >= 5 && i < 8 ? 1 : b)), // objects at 1 and 5
+  ];
+  check('multi: two objects moving opposite ways → 1 under up (the one climbing)',
+    out(m('up', 'multi'), twoWays) === '01' && out(m('down', 'multi'), twoWays) === '01');
+  check('single: the same two objects → 0', out(m('either', 'single'), twoWays) === '00');
+  check('describe: direction and scene in words',
+    /upwards/.test(describePerceptionRule(m())) && !/whatever/.test(describePerceptionRule(m())) &&
+    /downwards/.test(describePerceptionRule(m('down'))) &&
+    /up or down 1 unit per unit of time, whatever else is in view/.test(describePerceptionRule(m('either', 'multi'))));
+}
+
+// ── bank identity: today's specs build today's banks, byte for byte ─
+console.log('\n[bank identity]');
+{
+  const hwFile = (n: number) =>
+    JSON.parse(readFileSync(join(dirname(fileURLToPath(import.meta.url)), `../src/devData/homeworks/hw${n}.json`), 'utf8')) as AssignmentData;
+  for (const n of [2, 3]) {
+    for (const q of hwFile(n).questions.filter((x) => x.perception)) {
+      check(`hw${n} #${q.id} (${q.perception!.rule.kind}): buildPerceptionCases(spec) ≡ the committed bank`,
+        same(buildPerceptionCases(q.perception!), q.perception_cases));
+    }
+  }
+  const plain = buildPerceptionCases({ rule: { kind: 'motion', objectLength: 3 }, width: 8 });
+  check('explicit up/single ≡ absent (the same bank)',
+    same(plain, buildPerceptionCases({ rule: { kind: 'motion', objectLength: 3, direction: 'up', scene: 'single' }, width: 8 })));
+  for (const direction of ['up', 'down', 'either'] as MotionDirection[]) {
+    for (const scene of ['single', 'multi'] as MotionScene[]) {
+      for (const [width, k] of [[8, 3], [5, 1], [10, 2], [4, 2]]) {
+        const spec = { rule: { kind: 'motion' as const, objectLength: k, direction, scene }, width };
+        const bank = buildPerceptionCases(spec);
+        const tag = `${direction}/${scene} w${width} k${k}`;
+        check(`${tag}: deterministic, positive and all-negative films, ≤ ${MAX_FILM_FRAMES} frames, frames ${width} wide`,
+          same(bank, buildPerceptionCases(spec)) &&
+          bank.some((c) => c.expected.includes(1)) && bank.some((c) => !c.expected.includes(1)) &&
+          bank.every((c) => c.frames.length <= MAX_FILM_FRAMES && c.frames.every((f) => f.length === width)) &&
+          bank.every((c) => same(c.expected, expectedPerceptionOutputs(spec.rule, c.frames)) && !c.authored));
+        if (direction !== 'up' || scene !== 'single') {
+          check(`${tag}: today's upward battery first, unchanged`,
+            same(bank.slice(0, 9).map((c) => c.frames),
+              buildPerceptionCases({ rule: { kind: 'motion', objectLength: k }, width }).map((c) => c.frames)));
+          // Every size, not just w8 k3: the bank passes its own detector and
+          // fails each of the five others (the other scene included). up/single
+          // is HW3 P12's frozen battery, which at w4 k2 cannot see scenes.
+          const q = { id: 1, label: 'P', statement: 's', buildMode: 'SC' as const, representation: 'binary' as const,
+            perception: spec, perception_cases: bank };
+          const passes = (d: MotionDirection, s: MotionScene) => {
+            const g = gradeQuestion(q, perceptionMotionDetector({ width, k, direction: d, scene: s }));
+            return g.status === 'graded' && g.passed === g.total;
+          };
+          check(`${tag}: separates every direction and scene — only its own detector passes`,
+            (['up', 'down', 'either'] as MotionDirection[]).every((d) =>
+              (['single', 'multi'] as MotionScene[]).every((s) => passes(d, s) === (d === direction && s === scene))));
+        }
+      }
+    }
+  }
+  const upSingle = gradeQuestion(
+    { id: 1, label: 'P', statement: 's', buildMode: 'SC', representation: 'binary', perception: { rule: { kind: 'motion', objectLength: 3, scene: 'multi' }, width: 8 },
+      perception_cases: buildPerceptionCases({ rule: { kind: 'motion', objectLength: 3, scene: 'multi' }, width: 8 }) },
+    perceptionMotionCorrect());
+  check("the multi bank separates the scenes: HW3 P12's single-object detector fails it",
+    upSingle.status === 'graded' && upSingle.passed < upSingle.total);
+}
+
+// ── authored films ─────────────────────────────────────────────────
+console.log('\n[authored films]');
+{
+  const spec = { rule: { kind: 'motion', objectLength: 3, direction: 'down' } as PerceptionRule, width: 8 };
+  const films = [[objectFrame(8, 3, 0), objectFrame(8, 3, 1), objectFrame(8, 3, 2)], [objectFrame(8, 3, 4)]];
+  const generated = buildPerceptionCases(spec);
+  const bank = buildPerceptionCases(spec, films);
+  check('bank = the generated battery ++ the films, in order',
+    same(bank.slice(0, generated.length), generated) && bank.length === generated.length + films.length &&
+    same(bank.slice(generated.length).map((c) => c.frames), films));
+  check('films are marked authored: true; generated cases are not',
+    bank.slice(generated.length).every((c) => c.authored === true) && generated.every((c) => c.authored === undefined));
+  check("an authored film's expected comes from the rule",
+    same(bank[generated.length].expected, [0, 1, 1]) && same(bank[generated.length + 1].expected, [0]));
+  // A caller's bogus expected never reaches the bank: only frames go in.
+  const bogus = films.map((f) => Object.assign([...f], { expected: [1, 1, 1] })) as number[][][];
+  check('whatever the caller holds, expected is recomputed', same(buildPerceptionCases(spec, bogus), bank));
+  check('the films are copied, not aliased', bank[generated.length].frames[0] !== films[0][0]);
+  const throws = (fn: () => unknown): string | null => { try { fn(); return null; } catch (e) { return (e as Error).message; } };
+  check('throws: a frame of the wrong width', /film 1: frame t1 has 7 bits/.test(throws(() => buildPerceptionCases(spec, [[bits('0000000')]])) ?? ''));
+  check('throws: a non-bit', /not 0 or 1/.test(throws(() => buildPerceptionCases(spec, [[[0, 0, 0, 0, 0, 0, 0, 2]]])) ?? ''));
+  check('throws: an empty film', /at least one frame/.test(throws(() => buildPerceptionCases(spec, [[]])) ?? ''));
+  check(`throws: more than ${MAX_FILM_FRAMES} frames`,
+    /at most 24/.test(throws(() => buildPerceptionCases(spec, [Array.from({ length: 25 }, () => objectFrame(8, 3, 0))])) ?? ''));
+  check('throws: films on a CC rule (its bank is exhaustive)',
+    /SC rules only/.test(throws(() => buildPerceptionCases({ rule: { kind: 'min-run', runLength: 3 }, width: 8 }, [[bits('00000000')]])) ?? ''));
+  check('throws: an unknown direction / scene',
+    throws(() => buildPerceptionCases({ rule: { kind: 'motion', objectLength: 3, direction: 'left' as MotionDirection }, width: 8 })) !== null &&
+    throws(() => buildPerceptionCases({ rule: { kind: 'motion', objectLength: 3, scene: 'crowd' as MotionScene }, width: 8 })) !== null);
+  check(`a film of exactly ${MAX_FILM_FRAMES} frames and one of 1 frame are fine`,
+    throws(() => buildPerceptionCases(spec, [Array.from({ length: 24 }, () => objectFrame(8, 3, 0)), [objectFrame(8, 3, 0)]])) === null);
+
+  // The draft (instructor/perceptionAuthoring.ts) round-trips through a save.
+  const draft: PerceptionDraft = {
+    kind: 'motion', width: 8, runLength: 3, pattern: '', direction: 'either', scene: 'multi', films,
+  };
+  const saved = perceptionFields(draft, 'SC');
+  const back = draftFromQuestion(saved);
+  check('draft → save → draft keeps the rule and the films', same(back, draft));
+  check('the saved bank ≡ buildPerceptionCases(spec, films)',
+    same(saved.perception_cases, buildPerceptionCases(saved.perception, films)));
+  check('ruleFromDraft omits direction/scene at up/single (HW3 P12 stays hash-stable)',
+    same(ruleFromDraft({ ...draft, direction: 'up', scene: 'single' }, 'SC'), { kind: 'motion', objectLength: 3 }) &&
+    same(ruleFromDraft(draft, 'SC'), { kind: 'motion', objectLength: 3, direction: 'either', scene: 'multi' }));
+  const hw3 = JSON.parse(readFileSync(join(dirname(fileURLToPath(import.meta.url)), '../src/devData/homeworks/hw3.json'), 'utf8')) as AssignmentData;
+  const p12 = hw3.questions.find((q) => q.id === 12)!;
+  check('HW3 P12 opened and saved unchanged: the same two fields, byte for byte',
+    same(perceptionFields(draftFromQuestion(p12), 'SC'), { perception: p12.perception, perception_cases: p12.perception_cases }));
+  const summary = bankSummary(draft, 'SC');
+  check('bankSummary counts generated + authored',
+    summary !== null && summary.authored === 2 && summary.generated === buildPerceptionCases(saved.perception).length && summary.positives > 0);
+  check('draftProblems: none for a sound draft', draftProblems(draft, 'SC').length === 0);
+  check('draftProblems: a film of the wrong width is named',
+    /Film 2: frame t1 has 6 bits/.test(draftProblems({ ...draft, films: [films[0], [bits('000000')]] }, 'SC').join(' ')));
+  check('draftProblems: an empty film', /Film 1: a film needs at least one frame/.test(draftProblems({ ...draft, films: [[]] }, 'SC').join(' ')));
+  check('draftProblems: films on a CC rule', /films are for SC rules/.test(draftProblems({ ...draft, kind: 'min-run' }, 'CC').join(' ')));
+  check('draftProblems: object length past the retina', /object length/.test(draftProblems({ ...draft, runLength: 9 }, 'SC').join(' ')));
+  check('a mode flip coerces the kind (CC → min-run), films ignored for the CC save',
+    ruleFromDraft(draft, 'CC').kind === 'min-run');
+  // Film edits.
+  let f = newFilm(8);
+  check('newFilm: two blank frames', f.length === 2 && f.every((x) => same(x, Array(8).fill(0))));
+  f = toggleFilmBit(f, 1, 7);
+  check('toggleFilmBit flips one bit', f[1][7] === 1 && f[0][7] === 0);
+  f = shiftFilmFrame(f, 1, 'up');
+  check('shiftFilmFrame up moves toward IN1', f[1][6] === 1 && f[1][7] === 0);
+  const full = Array.from({ length: MAX_FILM_FRAMES }, () => objectFrame(8, 3, 0));
+  check(`addFilmFrame copies the newest, never past ${MAX_FILM_FRAMES}`,
+    same(addFilmFrame(f, 8)[2], f[1]) && addFilmFrame(full, 8).length === MAX_FILM_FRAMES);
+  check('duplicateFilm / removeFilm', duplicateFilm(films, 0).length === 3 && same(removeFilm(films, 0), [films[1]]));
+  check('fitFilmToWidth pads / cuts at the bottom', same(fitFilmToWidth([bits('111')], 5), [bits('11100')]) && same(fitFilmToWidth([bits('11101')], 3), [bits('111')]));
+}
+
 // ── grading ────────────────────────────────────────────────────────
 console.log('\n[grading]');
 
@@ -164,6 +366,47 @@ gradePair('change', change, 8,
   perceptionChangeCorrect(), perceptionChangeIncorrect());
 gradePair('motion', motion, 8,
   perceptionMotionCorrect(), perceptionMotionIncorrect());
+
+// ── task 013: grading the new rules (authored films included) ──────
+console.log('\n[grading new rules]');
+const newVariantFilms = [
+  [objectFrame(8, 3, 2), objectFrame(8, 3, 3), objectFrame(8, 3, 2), objectFrame(8, 3, 1)],
+  [bits('10000000'), bits('10111000'), bits('10011100'), bits('10001110')],
+];
+function variantQuestion(direction: MotionDirection, scene: MotionScene, films: number[][][] = newVariantFilms): AssignmentQuestion {
+  const spec = { rule: { kind: 'motion', objectLength: 3, direction, scene } as PerceptionRule, width: 8 };
+  return {
+    id: 1, label: 'P', statement: 's', buildMode: 'SC', representation: 'binary',
+    perception: spec, perception_cases: buildPerceptionCases(spec, films),
+  };
+}
+for (const [direction, scene, wrongDirection, wrongScene] of [
+  ['down', 'single', 'up', 'single'],
+  ['either', 'multi', 'either', 'single'],
+  ['down', 'multi', 'down', 'single'],
+  ['either', 'single', 'up', 'single'],
+] as [MotionDirection, MotionScene, MotionDirection, MotionScene][]) {
+  const q = variantQuestion(direction, scene);
+  const good = gradeQuestion(q, perceptionMotionDetector({ width: 8, k: 3, direction, scene }));
+  const bad = gradeQuestion(q, perceptionMotionDetector({ width: 8, k: 3, direction: wrongDirection, scene: wrongScene }));
+  const authoredAt = (q.perception_cases ?? []).findIndex((c) => c.authored);
+  check(`${direction}/${scene}: the detector passes every case, the authored films included (${good.passed}/${good.total})`,
+    good.status === 'graded' && good.passed === good.total && authoredAt > 0 && good.total === q.perception_cases!.length);
+  const miss = bad.perceptionCases?.find((c) => !c.pass);
+  check(`${direction}/${scene}: a ${wrongDirection}/${wrongScene} detector fails some case, first wrong step reported (${bad.passed}/${bad.total})`,
+    bad.passed < bad.total && (miss?.failStep ?? 0) >= 1);
+  check(`${direction}/${scene}: results carry no authored flag`,
+    !JSON.stringify(good).includes('authored'));
+}
+{
+  // An authored film is graded like a generated one: HW3's memoryless
+  // detector fails a static object at its first step.
+  const upQ = variantQuestion('up', 'single', [[objectFrame(8, 3, 2), objectFrame(8, 3, 2)]]);
+  const g = gradeQuestion(upQ, perceptionMotionIncorrect());
+  const last = g.perceptionCases![g.perceptionCases!.length - 1];
+  check('an authored film is graded like any case (static object: the memoryless detector fails at t1)',
+    !last.pass && last.failStep === 1 && same(last.expected, [0, 0]));
+}
 
 // Structural rejection: wrong retina size fails every case with a reason.
 const q8 = perceptionQuestion({ kind: 'min-run', runLength: 3 }, 8);
@@ -276,8 +519,6 @@ function storeRun(): { fed: number[][]; out: number[] } {
 function withDirtyMems(m: CircuitData): CircuitData {
   return { ...m, components: m.components.map((c) => (c.type === 'MEM' ? { ...c, storedValue: 1 } : c)) };
 }
-
-const same = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b);
 
 console.log('\n[store: SC perception frame run ≡ grader]');
 const perceptionPairs: [number, string, () => CircuitData, () => CircuitData][] = [
@@ -418,6 +659,125 @@ for (const [id, name, correct, incorrect] of perceptionPairs) {
     useStore.getState().resetAllSimState();
     check(`${name}: a canvas swap (resetAllSimState) drops the film`,
       useStore.getState().scInputSequence.every((lane) => lane.length === 0));
+  }
+}
+
+// ── task 013: the new rules and authored films play as graded ─────
+console.log('\n[store: new rules + authored films ≡ grader]');
+{
+  const q = variantQuestion('either', 'multi');
+  const cases = q.perception_cases ?? [];
+  for (const [mName, machine] of [
+    ['either/multi detector', perceptionMotionDetector({ width: 8, k: 3, direction: 'either', scene: 'multi' })],
+    ['up/single detector', perceptionMotionCorrect()],
+  ] as [string, CircuitData][]) {
+    const graded = gradeQuestion(q, machine);
+    let identical = true;
+    let authoredPlayed = 0;
+    cases.forEach((tc, k) => {
+      openPerception(q, machine);
+      useStore.getState().setScFrames(tc.frames);
+      stepToEnd();
+      const run = storeRun();
+      identical &&= same(run.fed, tc.frames) && same(run.out, graded.perceptionCases?.[k]?.got);
+      if (tc.authored) authoredPlayed++;
+    });
+    check(`${mName}: every case (${authoredPlayed} authored) plays in the store as the grader ran it (${graded.passed}/${graded.total})`,
+      identical && authoredPlayed === newVariantFilms.length);
+  }
+}
+
+console.log('\n[replay: Run this input on a perception film]');
+{
+  /** `machine` submitted for `q`, graded, as the latest record — local or
+   *  a student's copy (stripAnswers + studentRecord: no bank, no key). */
+  const openGraded = (q: AssignmentQuestion, machine: CircuitData, remote: boolean): QuestionResult => {
+    const full: AssignmentData = { id: `perception-replay-${q.buildMode}-${remote ? 'r' : 'l'}`, title: 'replay', questions: [q] };
+    const graded = gradeQuestion(q, machine);
+    const record: SubmissionRecord = {
+      assignmentId: full.id,
+      attempt: 1,
+      submittedAt: '2026-09-27T00:00:00.000Z',
+      submission: { assignmentTitle: full.title, submittedAt: '2026-09-27T00:00:00.000Z', answers: [{ questionId: q.id, circuit: machine }] },
+      result: { student: 's', questions: [graded], passed: graded.passed, total: graded.total },
+    };
+    useStore.getState().loadAssignment(remote ? stripAnswers(full) : full);
+    useStore.setState({
+      components: machine.components,
+      wires: machine.wires,
+      submissions: { [full.id]: remote ? studentRecord(record, true) : record },
+    });
+    return graded;
+  };
+
+  // SC: a down/single question, graded on the up/single detector.
+  const scQ = variantQuestion('down', 'single');
+  const wrong = perceptionMotionCorrect();
+  for (const remote of [false, true]) {
+    const tag = remote ? 'student copy' : 'local';
+    const graded = openGraded(scQ, wrong, remote);
+    const failed = graded.perceptionCases!.map((c, k) => ({ c, k })).filter(({ c }) => !c.pass);
+    const authoredFail = failed.find(({ k }) => scQ.perception_cases![k].authored);
+    const picks = [failed[0], authoredFail].filter((x) => x !== undefined);
+    check(`SC ${tag}: failed cases to replay, an authored film among them`, picks.length === 2);
+    for (const { c, k } of picks) {
+      if (remote) check(`SC ${tag}: the store holds no bank`, (useStore.getState().assignment?.questions[0].perception_cases ?? []).length === 0);
+      await useStore.getState().loadCaseInput(scQ.id, k);
+      const st = useStore.getState();
+      const lc = st.loadedCase;
+      check(`SC ${tag} case ${k}: loadedCase is the result's film, with no expected/got`,
+        lc !== null && lc.kind === 'perception' && same(lc.frames, c.frames) &&
+        !/"(expected|got)"/.test(JSON.stringify(lc)) && lc.recorded.pass === false);
+      check(`SC ${tag} case ${k}: the film is the run's lanes, played to its end (${c.frames.length} frames)`,
+        same(st.scInputSequence, framesToLanes(c.frames, 8)) &&
+        st.scHistory.length === c.frames.length && st.scTimeStep === c.frames.length + 1);
+      const run = storeRun();
+      check(`SC ${tag} case ${k}: fed the frames, OUT row ≡ the grader's got (${c.got.join('')})`,
+        same(run.fed, c.frames) && same(run.out, c.got));
+      const view = lc ? gradedCaseView(scQ, lc, { components: st.components, wires: st.wires }, 1) : null;
+      check(`SC ${tag} case ${k}: the banner reads the machine's output, same as graded`,
+        view !== null && view.note === 'same' && !view.recorded.pass && view.now.text.includes(c.got.join(' ')));
+    }
+    // A done question still replays (stimulus is never locked), and the
+    // undo history is untouched.
+    const k = failed[0].k;
+    useStore.getState().toggleCurrentQuestionDone();
+    const undoBefore = useStore.getState().undoStack.length;
+    await useStore.getState().loadCaseInput(scQ.id, k);
+    check(`SC ${tag}: a locked question still replays, undo untouched`,
+      selectQuestionLocked(useStore.getState()) && useStore.getState().scHistory.length === failed[0].c.frames.length &&
+      useStore.getState().undoStack.length === undoBefore);
+    // A canvas swap drops the loaded case (reset law 1).
+    useStore.getState().resetAllSimState();
+    check(`SC ${tag}: resetAllSimState clears the loaded case`, useStore.getState().loadedCase === null);
+  }
+
+  // A machine the grader rejects: the banner says why, like the recorded case.
+  {
+    const graded = openGraded(scQ, perceptionLandmarkCorrect(), false); // 9 inputs, retina is 8
+    await useStore.getState().loadCaseInput(scQ.id, 0);
+    const st = useStore.getState();
+    const view = st.loadedCase ? gradedCaseView(scQ, st.loadedCase, { components: st.components, wires: st.wires }, 1) : null;
+    check('SC rejected machine: recorded and live verdicts both carry the Stage-1 reason',
+      view !== null && view.note === 'same' && view.recorded.text.includes(graded.perceptionCases![0].reason!) &&
+      view.now.text.includes(graded.perceptionCases![0].reason!));
+  }
+
+  // CC: one frame on the INPUT toggles by label.
+  const ccQ = perceptionQuestion({ kind: 'min-run', runLength: 3 }, 8);
+  for (const remote of [false, true]) {
+    const tag = remote ? 'student copy' : 'local';
+    const graded = openGraded(ccQ, perceptionEdgeIncorrect(), remote);
+    const k = graded.perceptionCases!.findIndex((c) => !c.pass);
+    const c = graded.perceptionCases![k];
+    await useStore.getState().loadCaseInput(ccQ.id, k);
+    const st = useStore.getState();
+    const ins = sortByLabel(st.components, 'IN').map((x) => x.value ?? 0);
+    const out = sortByLabel(st.components, 'OUT').map((x) => x.value ?? 0);
+    check(`CC ${tag} case ${k}: INPUT toggles = frames[0] (${c.frames[0].join('')}), OUT = the grader's got`,
+      st.loadedCase?.kind === 'perception' && same(ins, c.frames[0]) && same(out, c.got));
+    check(`CC ${tag} case ${k}: the machine graded is the canvas's`,
+      st.loadedCase?.gradedKey === gradedMachineKey(perceptionEdgeIncorrect()));
   }
 }
 

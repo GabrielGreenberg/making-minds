@@ -20,6 +20,7 @@
 //   runValueCase        a CC/SC/FSM/TM case → the decoded output, or why the
 //                       run was rejected
 //   runTurbotCase       a turbot arena case → the grader's TurbotCaseResult
+//   runPerceptionFilm   a perception film → the machine's output bit per step
 
 import type {
   AssignmentQuestion,
@@ -56,6 +57,7 @@ import {
   type RawOutput,
 } from './codec';
 import { encodeTM, acceptTM, decodeTM, notationForRepresentation } from './tmCodec';
+import { validatePerceptionMachine, runPerceptionCase } from './perception';
 
 /** Stage-1 verdict. `skip` marks a question the grader cannot grade at all
  *  (an authoring gap — no spec, no inner mode), as opposed to a machine it
@@ -149,20 +151,22 @@ function turbotLayout(innerMode: BuildMode): CodecLayout {
 }
 
 /**
- * Stage 1 for a value or turbot question, in the grader's order: the
+ * Stage 1 for a value, turbot or perception question, in the grader's order: the
  * question-wide component rules first, then the machine's interface/table.
  * A turbot TM brain is a *turbot TM* (per-state internal/external grammar,
  * single actions) with its own validator; an FSM brain validates through
  * validateTurbotFSM, which delegates to turbotFsmNotation — the SAME
  * notation runBrainStep executes and the store's label editor accepts;
  * CC/SC brains reuse the shared machine validation. The question's encoding
- * (representation) picks a turbot TM's internal tape alphabet. (The type
+ * (representation) picks a turbot TM's internal tape alphabet. A perception
+ * question's interface is its retina: `width` input wires, one output. (The type
  * restriction is vacuous for STATE-vocabulary FSM/TM machines — STATE is
  * infrastructure — but uniform; a budget can still bite.)
  */
 export function validateQuestionMachine(question: AssignmentQuestion, circuit: CircuitData): StageOne {
   const restriction = questionComponentRules(question, circuit);
   if (!restriction.ok) return restriction;
+  if (question.perception) return validatePerceptionMachine(circuit, question.perception.width);
   const rep = question.representation ?? 'binary';
   if (question.buildMode === 'turbot') {
     const innerMode = question.innerMode;
@@ -378,6 +382,23 @@ export function runTurbotCase(
   if (!valid.ok) return rejectedTurbotCase(tc, valid.reason);
   const notation = notationForRepresentation(question.representation ?? 'binary');
   return runValidatedTurbotCase(machine, innerMode, tc, notation, question.maxTapeCells);
+}
+
+/**
+ * One perception film on any machine, as the grader runs it: the grading
+ * circuit (MEMs from 0), the film's frames clocked straight through the
+ * question's engine (CC: one evaluation per frame; SC: one tick per frame) —
+ * the machine's output bit per step. Stage 1 is the caller's
+ * (validateQuestionMachine); the rule is never read, so a film from a
+ * stripped copy or the instructor's editor runs the same.
+ */
+export function runPerceptionFilm(
+  question: AssignmentQuestion,
+  circuit: CircuitData,
+  frames: number[][],
+): number[] {
+  const mode = question.buildMode === 'CC' ? 'CC' : 'SC';
+  return runPerceptionCase(gradingCircuit(circuit), mode, { frames, expected: [] });
 }
 
 /**

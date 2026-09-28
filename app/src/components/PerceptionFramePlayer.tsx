@@ -1,12 +1,10 @@
 import { useMemo, useState } from 'react';
 import { useStore } from '../store';
 import { sortByLabel } from '../engine';
-import { lanesToFrames, shiftFrame, validatePerceptionMachine } from '../engine/perception';
-import { questionComponentRules } from '../engine/caseRun';
+import { lanesToFrames, shiftFrame, MAX_FILM_FRAMES as MAX_FRAMES } from '../engine/perception';
+import { validateQuestionMachine } from '../engine/caseRun';
 import { RunSpeedControl } from './RunSpeedControl';
-
-/** Longest film the player builds (a grader case is 5–9 frames). */
-const MAX_FRAMES = 24;
+import { FrameFilmGrid } from './FrameFilmGrid';
 
 /**
  * The SC perception question's frame player (task 012): the student draws a
@@ -25,10 +23,9 @@ const MAX_FRAMES = 24;
  * the panel's (DataTable), whose Global I/O block this player replaces — so
  * its speed control lives here too.
  *
- * Layout follows the SC tables: time flows right to left (t1 rightmost, a
- * new frame appears on the left); rows are the retina's wires, IN1 on top —
- * "up" is toward IN1, as the motion rule reads it. Cells are buttons (no
- * text field: frames are clicked, never typed or pasted).
+ * The grid is FrameFilmGrid (time right to left, IN1 on top, cells are
+ * buttons — frames are clicked, never typed or pasted), shared with the
+ * instructor's authored films.
  */
 export function PerceptionFramePlayer({ width, runSpeed, onRunSpeedChange }: {
   width: number;
@@ -64,11 +61,10 @@ export function PerceptionFramePlayer({ width, runSpeed, onRunSpeedChange }: {
 
   // Warn, don't block: the grader's Stage 1 for this question (component
   // rules, then the retina interface), shown as text; the run still plays.
-  const verdict = useMemo(() => {
-    const circuit = { components, wires };
-    const rules = question ? questionComponentRules(question, circuit) : { ok: true };
-    return rules.ok ? validatePerceptionMachine(circuit, width) : rules;
-  }, [components, wires, question, width]);
+  const verdict = useMemo(
+    () => (question ? validateQuestionMachine(question, { components, wires }) : { ok: true, reason: undefined }),
+    [components, wires, question],
+  );
 
   // ── Film edits (each one resets the run to t=1: setScFrames) ──
   const toggleBit = (index: number, wire: number) =>
@@ -111,12 +107,6 @@ export function PerceptionFramePlayer({ width, runSpeed, onRunSpeedChange }: {
     if (!running && count > 0 && scTimeStep <= count) scStep();
   };
 
-  // The frame on the retina now: the last one clocked in (0 = none yet).
-  const shown = scTimeStep - 1;
-  const steps = Array.from({ length: count }, (_, k) => count - k); // t descending: t1 rightmost
-  const colClass = (t: number) =>
-    [t === shown ? 'pf-col-current' : '', t - 1 === selected ? 'pf-col-selected' : ''].join(' ').trim();
-
   return (
     <div className="table-section">
       <div className="table-section-label pf-head">
@@ -126,69 +116,21 @@ export function PerceptionFramePlayer({ width, runSpeed, onRunSpeedChange }: {
         </button>
       </div>
 
-      <div className="pf-scroll">
-        <table className="pf-grid">
-          <tbody>
-            <tr>
-              <td className="pf-add" rowSpan={width + 2}>
-                <button
-                  className="pf-add-btn"
-                  onClick={addFrame}
-                  disabled={count >= MAX_FRAMES}
-                  title={count >= MAX_FRAMES ? `At most ${MAX_FRAMES} frames` : 'Add a frame (a copy of the newest)'}
-                >
-                  +
-                </button>
-              </td>
-              {steps.map((t) => (
-                <th
-                  key={t}
-                  className={`pf-t ${colClass(t)}`}
-                  onClick={() => select(selected === t - 1 ? null : t - 1)}
-                  title={`Frame t${t}: click to shift, duplicate or delete it`}
-                >
-                  t{t}
-                </th>
-              ))}
-              <th className="pf-label" />
-            </tr>
-            {Array.from({ length: width }, (_, wire) => {
-              const label = inputLabels[wire] ?? `IN${wire + 1}`;
-              return (
-                <tr key={wire}>
-                  {steps.map((t) => {
-                    const bit = frames[t - 1][wire];
-                    return (
-                      <td key={t} className={colClass(t)}>
-                        <button
-                          className={`pf-bit${bit ? ' on' : ''}`}
-                          onClick={() => toggleBit(t - 1, wire)}
-                          aria-pressed={bit === 1}
-                          aria-label={`${label} at t${t}: ${bit}`}
-                        >
-                          {bit}
-                        </button>
-                      </td>
-                    );
-                  })}
-                  <th className="pf-label">{label}</th>
-                </tr>
-              );
-            })}
-            <tr className="pf-out">
-              {steps.map((t) => {
-                const out = scHistory.find((h) => h.t === t)?.outputBits[0];
-                return (
-                  <td key={t} className={`pf-out-bit${out === 1 ? ' val-1' : ''} ${colClass(t)}`}>
-                    {out ?? ''}
-                  </td>
-                );
-              })}
-              <th className="pf-label">{outputLabel}</th>
-            </tr>
-          </tbody>
-        </table>
-      </div>
+      <FrameFilmGrid
+        frames={frames}
+        width={width}
+        rowLabels={inputLabels}
+        outputRow={{
+          label: outputLabel,
+          bits: frames.map((_, k) => scHistory.find((h) => h.t === k + 1)?.outputBits[0]),
+        }}
+        selected={selected}
+        current={scTimeStep - 2 /* the last frame clocked in; -1 before t1 */}
+        maxFrames={MAX_FRAMES}
+        onToggle={toggleBit}
+        onSelect={select}
+        onAdd={addFrame}
+      />
 
       <div className="pf-tools">
         {selected === null ? (
