@@ -8,9 +8,9 @@ requires:
 area: app
 source: feedback
 created: 2026-09-28T10:50:00-07:00
-status: in-progress
+status: done
 after:
-branch: robot/077-figure-crop-slivers
+branch:
 merged_into:
 ---
 
@@ -164,3 +164,16 @@ outlines inside `<defs>`, not page shapes.
   addition" hint, HW2 retina aside) via `node app/tools/shootProblemSets.mjs` on the 5173 dev
   server. Nothing is owed to Gabriel.
 - **Next step:** loop session: visual check if owed, then land per PROFILE §5.
+
+### 2026-09-28 — landed (robot)
+- **Figure eyeball done:** headless Chrome rendered the four SVGs before and after at their
+  document widths. HW1 zoomed at the left edge: before shows the grey bar, after is clean
+  white. hw2-machine-format on the hint tint: before has a white right strip, after is grey to
+  the edge. hw2-retina: the arrowhead shows. hw3-retina: the terminal squares are whole.
+- **Owed, not claimed (Gabriel's eyeball):** the in-app view. Run `npm run dev` in `app/`,
+  sign in as the toy instructor, Dashboard → "Load HW1–HW7", and publish. Then check the HW1
+  overview (P16–17 schematic) and the editor at P16/P17, HW2's "On binary addition" hint, and
+  the HW2/HW3 retina asides. Or run `node app/tools/shootProblemSets.mjs <dir> 1280` against
+  the 5173 dev server.
+- `origin/main` had nothing new at land, so the workflow's gates stand (all 0). CLAUDE.md is
+  unchanged: no line in it is made false by this task.
