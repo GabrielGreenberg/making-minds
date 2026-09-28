@@ -209,7 +209,7 @@ export function GradingMatrix({ summary, assignment }: { summary: AssignmentGrad
         <span><span className="gr-cell gr-cell--c">↻</span>changed since graded</span>
         <span><span className="gr-cell gr-cell--m">—</span>not submitted</span>
         <span><span className="gr-prov">*</span> provisional</span>
-        <span><span className="gr-flag">⚑</span>on a problem: integrity flags; after a name: that student's flags here — to look at, not a verdict</span>
+        <span><span className="gr-flag">⚑</span> on a problem: integrity flags; after a name: that student's flags here — to look at, not a verdict</span>
         <span>Accent problem numbers are graded by hand.</span>
       </div>
     </>
