@@ -1,5 +1,5 @@
 ---
-id: 2026-09-28-082
+id: 2026-09-28-083
 type: feature
 title: Show the robot's state on the instructor Dashboard — what's live, what waits for release, what waits for Gabriel's answer
 priority: high
