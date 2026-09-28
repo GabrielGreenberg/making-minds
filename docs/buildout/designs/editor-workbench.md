@@ -174,13 +174,13 @@ Background `--mm-bg`. Three stacked parts.
 - **Header row:** "OUTPUT" as an eyebrow (11.5px/600 uppercase `.09em` `--mm-ink-3`), with a collapse button "»" (32×32) on the right. No other title: "Your circuit" and the explainer line were removed on purpose.
 - **Controls,** 8px below: Run · Step · Reset.
   - Each is 34px tall, padding `0 12px`, 13px/600, border 1px `--mm-line-2`, hover `--mm-lav-soft`. The ▶ is `--mm-accent`, and Run becomes "■ Stop" while running.
-  - For CC: ~~Run walks the table rows (one every 700ms), Step advances to the next row~~ — **overridden (decision 6):** Step and Run keep today's signal-flow animation for the current row; the table is live. Reset sets every input to 0.
+  - For CC: ~~Run walks the table rows (one every 700ms), Step advances to the next row~~ — **overridden (decision 6):** Step and Run keep today's signal-flow animation for the current row. Reset sets every input to 0 (which runs the 0…0 row).
   - This is the **only** run-control set on screen. Delete the toolbar Reset and the second Reset under the table.
-- **The table,** 14px below: the circuit's live input/output table, styled like the goal table.
+- **The table,** 14px below: the circuit's input/output table, styled like the goal table. **Earned (task 075; supersedes "every row at once"):** every input row is listed, but a row's outputs show only once the student has run it — clicked it, or set the canvas inputs to it (the store's `ccRunRows`, recorded by its machine-key subscriber). An unrun output cell is empty and `--mm-surface-2` (`.op-unrun`, title "Not run yet"), never a 0; a run row whose output the circuit leaves undriven (a gate input unwired on its path — the canvas draws that OUTPUT blank) shows a dim "–" (`.op-unset`), not the 0 the grader would read. The cells are `src/ccTable.ts`'s `ccTableView` (pure, pinned in workbenchCheck). A machine edit forgets every run row but the one the inputs stand at (the canvas shows the new circuit's answer to it); a canvas swap forgets them all; they are never saved. A canvas click on an INPUT (the store's `toggleInput`) sets that input only; the row is run once every input is set — a click never puts a 0 on an input nobody set. A pasted INPUT lands blank.
   - A value of 1 is `#E53935` at weight 600.
   - The row matching the current inputs is `--mm-lav-soft`.
-  - Clicking a row sets the canvas inputs to that row.
-- **Note** under the table, 10px below: "Click a row to set the inputs." at 12.5px `--mm-ink-3`.
+  - Clicking a row sets the canvas inputs to that row (and so runs it).
+- **Note** under the table, 10px below: "Click a row, or set the inputs, to run it." at 12.5px `--mm-ink-3`.
 - **Empty:** "Add at least one Input and one Output to see your circuit's table."
 - **Collapsed strip:** 40px, left border 1px `--mm-line-2`, "«" at the top, and "OUTPUT" set vertically at 11.5px/600.
 - **SC, FSM, TM and turbot this pass:** the panel keeps today's `DataTable` content for those modes (timeline, Map, tape and so on) inside this frame, under the same header and the one control row. Do not redesign them yet.

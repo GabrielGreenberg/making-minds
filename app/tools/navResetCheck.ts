@@ -169,6 +169,8 @@ function checkAllSimFresh(label: string) {
   // the Global I/O row a Run plays, the Map editor — all canvas-scoped.
   check(`${label}: no local-step row, no local run`, !s.localStepActive && !s.localStepRunning && s.localStepRunId === null);
   check(`${label}: no Global I/O row picked, Map editor closed`, s.scActiveGlobalIndex === null && !s.turbotEditingMap);
+  // The CC table's earned rows (task 075) were earned on the last canvas.
+  check(`${label}: no CC row earned`, s.ccRunRows.length === 0);
 }
 
 // Junk that only navigation (not the actions used to build real runs above)
@@ -206,6 +208,7 @@ function plantSimJunk() {
     localStepRunning: true,
     scActiveGlobalIndex: 2,
     turbotEditingMap: true,
+    ccRunRows: ['1,0'],
     undoStack: [{ components: [], wires: [], boxes: [], confirmedBoxes: [] }],
     redoStack: [{ components: [], wires: [], boxes: [], confirmedBoxes: [] }],
   });
@@ -1440,6 +1443,95 @@ console.log('[edit during run]');
   await flushTimers();
   useStore.getState().removeTab(useStore.getState().activeTabId);
   await flushTimers();
+  useStore.getState().goHome();
+}
+
+// ═════ The earned CC table (task 075) ═══════════════════════════
+// A CC row's output shows only once the student has run it: the store's
+// machine-key subscriber records the row the INPUTs stand at; a machine edit
+// forgets every row but the one the canvas is showing now; a canvas swap
+// forgets them all (checkAllSimFresh, above, on every swap). Nothing on a
+// fresh canvas holds a 0 nobody computed — nor a pasted one, nor one a click
+// on ANOTHER input filled in. The canvas's click is driven through its own
+// path (CircuitCanvas → the store's toggleInput), not setInputValue alone.
+
+console.log('[earned CC table]');
+{
+  const rows = () => useStore.getState().ccRunRows.join(' ');
+  const comp = (id: string) => useStore.getState().components.find((c) => c.id === id);
+  const ins = () => sortByLabel(useStore.getState().components, 'IN').map((c) => `${c.label}=${c.value ?? '_'}`).join(' ');
+  const click = async (id: string) => { useStore.getState().toggleInput(id); await flushTimers(); };
+  useStore.getState().enterSandbox();
+  useStore.getState().addTab('Earned', 'CC');
+  check('a fresh CC tab has earned no row', rows() === '');
+  useStore.getState().addComponent('OUTPUT', 400, 100);
+  useStore.getState().addComponent('AND', 200, 100);
+  {
+    const s = useStore.getState();
+    check('a fresh OUTPUT and gate are unset (no 0 nobody computed)',
+      s.components.length === 2 && s.components.every((c) => c.value === undefined));
+  }
+  await flushTimers();
+  useStore.setState(JSON.parse(JSON.stringify(ccCorrect())));
+  await flushTimers();
+  useStore.getState().evaluateCircuit();
+  {
+    const s = useStore.getState();
+    check('blank INPUTs: no row earned, every wire unset (-1), the OUTPUT unset',
+      rows() === '' && s.wires.every((w) => w.value === -1) && comp('cc-out1')?.value === undefined);
+  }
+  await click('cc-in1');
+  check('one canvas click sets the INPUT clicked and no other: IN2 stays blank, no row earned or picked',
+    ins() === 'IN1=0 IN2=_' && rows() === '' && !useStore.getState().localStepActive, ins());
+  await click('cc-in2');
+  check('…the click that completes a row earns it and picks it in the table',
+    ins() === 'IN1=0 IN2=0' && rows() === '0,0' && useStore.getState().localStepActive &&
+      useStore.getState().localStepSelectedKey === '0,0', `${ins()} / ${rows()}`);
+  useStore.getState().localStepSelect([0, 1]);
+  check('a row click earns that row', rows() === '0,0 0,1');
+  await click('cc-in1');
+  check('…a canvas click earns the row the inputs now stand at (1,1)', rows() === '0,0 0,1 1,1');
+  await click('cc-in2');
+  check('…and the next, keeping the earlier ones (1,0)', rows() === '0,0 0,1 1,1 1,0');
+  await click('cc-in2');
+  check('…re-reaching an earned row adds nothing', rows() === '0,0 0,1 1,1 1,0');
+  useStore.getState().moveComponent('cc-and', 260, 140);
+  check('a move is not an edit: the earned rows stay', rows() === '0,0 0,1 1,1 1,0');
+  useStore.getState().removeWire('cc-w3');
+  check('a machine edit forgets the earned rows but the one the inputs stand at now', rows() === '1,1');
+  useStore.getState().runControl('reset');
+  check('CC Reset sets the inputs to 0…0 — that row is run', rows() === '1,1 0,0');
+  await flushTimers();
+
+  // A paste lands its INPUTs blank: the values they held on the canvas they
+  // were copied from were never set on this one.
+  await click('cc-in1');
+  check('(the copied canvas holds IN1=1)', ins() === 'IN1=1 IN2=0', ins());
+  useStore.setState({ selectedIds: useStore.getState().components.map((c) => c.id) });
+  useStore.getState().copySelected();
+  useStore.getState().addTab('Earned paste', 'CC');
+  const refused = useStore.getState().paste();
+  await flushTimers();
+  {
+    const s = useStore.getState();
+    check('a paste lands every INPUT blank — no 0/1 carried over, no OUTPUT value, no row earned',
+      refused === null && ins() === 'IN1=_ IN2=_' &&
+        s.components.filter((c) => c.type === 'INPUT').every((c) => c.inputValues?.[0] == null) &&
+        s.components.filter((c) => c.type === 'OUTPUT').every((c) => c.value === undefined) && rows() === '',
+      `${ins()} / ${rows()}`);
+  }
+  await flushTimers();
+
+  // An SC canvas never earns CC rows: its table runs step by step.
+  useStore.getState().addTab('Earned SC', 'SC');
+  useStore.setState(JSON.parse(JSON.stringify(scCorrect())));
+  useStore.getState().setInputValue('sc-in1', 1);
+  check('an SC canvas (MEM present) earns no CC row', rows() === '');
+  await flushTimers();
+  for (let i = 0; i < 3; i++) {
+    useStore.getState().removeTab(useStore.getState().activeTabId);
+    await flushTimers();
+  }
   useStore.getState().goHome();
 }
 

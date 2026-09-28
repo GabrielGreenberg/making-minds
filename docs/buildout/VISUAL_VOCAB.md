@@ -14,7 +14,8 @@ turbot `Mock_Ups-10.jpg`, TM `Mock_Ups-6.jpg`.
 
 - **Directionality** — every component has inputs on the **left**, outputs on the
   **right**; signal flows left → right (gates, MEM, boxed circuits, states alike).
-- **Wire color** — **black = 0, red = 1** (the live signal value).
+- **Wire color** — **black = 0, red = 1** (the live signal value); **unset** (nothing
+  computed it yet: blank inputs, a fresh canvas) is the faint stroke, never the 0 ink (task 075).
 - **Wires** — straight segments (H/V/diagonal). Splitting one output to many
   inputs is allowed and drawn with a **dot** at the junction; merging is forbidden.
   Crossings that don't connect draw a **bump/arc**.

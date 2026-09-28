@@ -9,7 +9,7 @@ stands; Part 2: the technical reference), kept **under 40 KB** by
 > append**, and bump the date. The dated story lives in the task file's `## Progress log` and
 > one `tasks/log.md` line; the changelog through 2026-09-21 is frozen in `docs/HISTORY.md`.
 
-_Last updated: 2026-09-27_
+_Last updated: 2026-09-28_
 
 ## How work flows — the task pipeline (`tasks/`)
 
@@ -211,7 +211,7 @@ wrappers.
 | Provenance | `app/src/provenance.ts`, `usePasteGuard.ts` | The paste seam (pure): `canPaste`, `canvasPasteVerdict` (in an assignment + canvas kind, `allowed_components`), `textPasteVerdict`, `refusalMessage`; a module-memory clipboard (canvas + text slots). `usePasteGuard`: the answer fields' DOM adapter (copy/cut/paste/drop/`beforeinput`). `provenance/` (pure, server-imported): `ids` (`mintId`, the ONE id source; `verifyId`; the memory-only key registry), `sha256`, `trace` (the signed record), `integrity` (`assessIntegrity`, thresholds), `notice`. |
 | Assignments | `app/src/assignments/index.ts` | Thin registry over the `AssignmentStore` seam (`listAssignments`/`getAssignment`/`createAssignment`) + `sortAssignments` (instructor `order` asc, then title). Nothing is bundled: local mode starts empty until the dashboard's dev seeds load content. |
 | Instructor UI | `app/src/instructor/` | `InstructorApp`, `InstructorGate`, `InstructorDashboard`, `RosterView`, `FeedbackQueueView`, `NotesView`, `AssignmentEditor`, `dragReorder.ts` (pure `moveItem` + `useDragReorder`; pinned rows immovable), `QuestionCreator` (+ `ccPreview.ts`, `arenaEditing.ts`, `turbotCaseAuthoring.ts` / `TurbotArenasEditor`, `fillInAuthoring.ts`, `perceptionAuthoring.ts`/`PerceptionEditor`), `Grading*.tsx` (pure: `gradingViews.ts`; the queue's `gradingQueueViews.ts`), `Student{Submission,Grading}View`, `DocumentEditors.tsx` (callout/figure widgets of both editors; figure uploads ≤ 300 KB). |
-| Student UI | `app/src/components/` | `CircuitCanvas` (colours: `canvasTheme.ts` roles; zoom/Fit/hint: `canvasView.ts`, `CanvasGuide`), `Palette` (parts, Boxes pop-out; pure: `palette.ts`; keys: `shortcuts.ts`), `DataTable`, `PerceptionFramePlayer`, `StudentLayout` (the Home tabs), `HomeScreen` (Assignments tab + up-next box), `GradesView` + `GradeSheet` (the Grades tab, its inline sheet), `GradedCaseBanner`, `AssignmentOverview` (the document page), `ProblemSetDocument`, `EditorShell` (+ `EditorTopBar`, `QuestionPanel`; pure: `workbench.ts`), `FeedbackPanel`, `SequentialTimeline`, `TMTapePanel` (under the canvas), `ArenaCanvas`, `OutputPanel` (the run row over `DataTable`; `LiveTruthTable`), `CanvasActions` (canvas edit buttons), `TurbotArenaPanel` (Map, right panel; sandbox "Edit map"), `TurbotTapePanel`, `OpenResponsePanel`/`FillInPanel` (read-only when locked; paste-guarded), `TabBar` (sandbox tabs), `outputDisplay.ts` (t1-rightmost OUT rows). |
+| Student UI | `app/src/components/` | `CircuitCanvas` (colours: `canvasTheme.ts` roles; zoom/Fit/hint: `canvasView.ts`, `CanvasGuide`), `Palette` (parts, Boxes pop-out; pure: `palette.ts`; keys: `shortcuts.ts`), `DataTable`, `PerceptionFramePlayer`, `StudentLayout` (the Home tabs), `HomeScreen` (Assignments tab + up-next box), `GradesView` + `GradeSheet` (the Grades tab, its inline sheet), `GradedCaseBanner`, `AssignmentOverview` (the document page), `ProblemSetDocument`, `EditorShell` (+ `EditorTopBar`, `QuestionPanel`; pure: `workbench.ts`), `FeedbackPanel`, `SequentialTimeline`, `TMTapePanel` (under the canvas), `ArenaCanvas`, `OutputPanel` (the run row over `DataTable`; `LiveTruthTable`, earned: `ccTable.ts`), `CanvasActions` (canvas edit buttons), `TurbotArenaPanel` (Map, right panel; sandbox "Edit map"), `TurbotTapePanel`, `OpenResponsePanel`/`FillInPanel` (read-only when locked; paste-guarded), `TabBar` (sandbox tabs), `outputDisplay.ts` (t1-rightmost OUT rows). |
 | API client | `app/src/api/client.ts` | One typed function per endpoint; bearer token under `mm:auth:token`; `onUnauthorized` hook; `health()`; `putWorkbook` takes `keepalive`. `setApiBase` is the harness override. |
 | Dev tool | `app/tools/shootProblemSets.mjs`, `shootCircuits.mjs`, `geometryCensus.ts` | Headless-Chrome shots (HW documents, the editor, fixture circuits) without the pane; a census of stored circuits a geometry change overlaps. |
 | Server | `server/src/app.ts`, `db.ts`, `auth.ts`, `identity.ts`, `password.ts`, `roster.ts`, `rosterImport.ts`, `sanitize.ts`, `config.ts`, `seed.ts`, `roster-cli.ts`, `homeworks.ts`, `homeworks-cli.ts`, `gradingSummary.ts` | Routes, SQLite, the `AuthProvider` seam (`createAuthProvider` — `MM_AUTH_MODE`; `LoginThrottle`), scrypt credentials, `identity.ts` (the ONE place an email or UID resolves to an account; `users.uid` unique, `user_emails` aliases, keys never rekeyed), `roster.ts` (pure reader of the registrar's export as-is) + `rosterImport.ts` (never removes; lists who left), `sanitize.ts` (redaction + grade-release withholding: Things to watch), env config, seeding, admin CLI (`npm run roster`). `homeworks.ts`, the homework sync: a copy is pristine iff its content hash is a committed version of its file (`gitLineage` over the box's clone) or one the sync wrote (`content_sync` table); `seed.ts --homeworks` runs it too. `gradingSummary.ts`: the summary routes' Db adapter (opaque keys; a removed submitter's derived from the mint secret). `server/tools/*Check.ts` (`parityCheck`: server ≡ in-process grading, deep-compared). |
@@ -252,15 +252,15 @@ become numeric `test_cases` (the grader never sees a formula).
 
 ## Build phases (from the spec) — all built
 
-CC → SC (a box may hold MEM, SC canvases only) → FSM → Turbots → TMs (two-output
-`read:write,move` labels, the one textbook departure, spec §10.3) → TM turbots.
+CC → SC (a box may hold MEM, SC canvases only) → FSM → Turbots → TMs (labels: the
+one textbook departure, spec §10.3) → TM turbots.
 
 ## Critical design rules (don't miss these)
 
 - **Directionality** — inputs on the **left**, outputs on the **right**; signal flows
   left→right (gates, MEM, boxed circuits alike).
 - **Wires** — split freely (one output → many inputs), never merge. Crossings draw a bump,
-  splits a dot. Color: **black = 0, red = 1**.
+  splits a dot. Color: **black = 0, red = 1**, unset faint.
 - **Validation** — _warn, don't block_ on loops, merged links, free ends (red + tooltip).
 - **I/O tables** — the right panel shows raw per-wire bits (no Argument/Value table).
   `repSystem` (persisted, never set) picks a SANDBOX TM's alphabet: binary {0,1,*}.

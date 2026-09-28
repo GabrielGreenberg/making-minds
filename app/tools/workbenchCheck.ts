@@ -15,8 +15,10 @@
 //                    EditorShell; the sandbox has no question panel; the
 //                    retired MenuBar is gone; the question text left the data
 //                    panel; nothing in the frame reads the answer key.
-//   [output panel]   (task 053) a circuit's live truth table (engine
-//                    truthTableCC) against a reference circuit; ONE control
+//   [output panel]   (task 053) a circuit's truth table (engine
+//                    truthTableCC) against a reference circuit, EARNED (task
+//                    075: ccTable.ts's cells — blank until run, a dash where
+//                    the circuit drives nothing); ONE control
 //                    row — the retired toolbar is gone, no panel builds a
 //                    Run/Step of its own for CC, FSM, TM or turbot, the row
 //                    renders the store's one descriptor; the canvas's action
@@ -81,6 +83,8 @@ import {
   canvasHint, circuitBounds, clampZoom, fitView, freeArea, zoomAbout, type HintState,
 } from '../src/canvasView';
 import { toolLabel } from '../src/palette';
+import { signalColor, type CanvasColors } from '../src/canvasTheme';
+import { ccOutputCell, ccRowKey, ccTableView } from '../src/ccTable';
 import { documentSections } from '../src/problemSet';
 import {
   COLLAPSED_STRIP,
@@ -242,7 +246,7 @@ console.log('\n[output panel]');
   // HW1 P3: OUT1 = IN1 AND IN2, OUT2 = its NOT.
   const p3 = fixture('hw1-p3.json').correct;
   const t = truthTableCC(p3.components, p3.wires);
-  check('the live table: every row at once, IN1 most significant, 00 first',
+  check('the table\'s rows: every row computed (shown once earned), IN1 most significant, 00 first',
     t !== null && t !== 'too-many' && t.rows.map((r) => r.inputBits.join('')).join(' ') === '00 01 10 11');
   check('…each row the grader\'s evaluation (HW1 P3: AND and NAND)',
     t !== null && t !== 'too-many' && t.rows.map((r) => r.outputBits.join('')).join(' ') === '01 01 01 10' &&
@@ -260,6 +264,36 @@ console.log('\n[output panel]');
     check(`more than ${TRUTH_TABLE_MAX_INPUTS} inputs → 'too-many'`, truthTableCC([...many, p3.components.find((c) => c.type === 'OUTPUT')!], []) === 'too-many');
   }
 
+  // Task 075: the table is EARNED. What each output cell shows is ccTable.ts's
+  // (pure), so the reveal rule itself is pinned here, not just its tokens.
+  check('a cell: unwired blank; unrun blank and marked (never a 0), whatever the bit',
+    ccOutputCell(false, true, 1).text === '' && ccOutputCell(false, true, 1).state === 'unwired' &&
+      [0, 1, undefined].every((b) => { const c = ccOutputCell(true, false, b); return c.text === '' && c.state === 'unrun' && c.title === 'Not run yet'; }));
+  check('…a run row its bit; run but undriven a dash, not 0',
+    ccOutputCell(true, true, 0).text === '0' && ccOutputCell(true, true, 1).text === '1' && ccOutputCell(true, true, 1).bit === 1 &&
+      ccOutputCell(true, true, undefined).text === '–' && ccOutputCell(true, true, undefined).state === 'unset');
+  const texts = (v: ReturnType<typeof ccTableView>) =>
+    v !== null && v !== 'too-many' ? v.rows.map((r) => r.cells.map((c) => c.text || '.').join('')).join(' ') : String(v);
+  check('a table no one has run lists every row and shows no output at all',
+    texts(ccTableView(p3.components, p3.wires, [])) === '.. .. .. ..');
+  check('…a run row shows the grader\'s bits, every other row stays blank (HW1 P3, 01 and 11 run)',
+    texts(ccTableView(p3.components, p3.wires, ['0,1', '1,1'])) === '.. 01 .. 10');
+  {
+    const v = ccTableView(p3.components, p3.wires, ['1,0']);
+    check('…row keys are the store\'s spelling (ccRowKey), and only the run row is earned',
+      ccRowKey([1, 0]) === '1,0' && v !== null && v !== 'too-many' &&
+        v.rows.map((r) => `${r.key}${r.earned ? '*' : ''}`).join(' ') === '0,0 0,1 1,0* 1,1');
+  }
+  {
+    // AND's second input unwired: the canvas leaves OUT1/OUT2 undriven (blank);
+    // the grader would read 0. A run row shows the canvas's "no value".
+    const open = { ...p3, wires: p3.wires.filter((w) => w.id !== 'hw1-p3-w2') };
+    const g = truthTableCC(open.components, open.wires);
+    check('…a run row the circuit leaves undriven shows "–", never the 0 the grader reads',
+      g !== null && g !== 'too-many' && g.rows[2].outputBits.join('') === '00' &&
+        texts(ccTableView(open.components, open.wires, ['1,0'])) === '.. .. –– ..');
+  }
+
   const app = code('App.tsx');
   check('the retired simulation toolbar is gone', !existsSync(join(SRC, 'components/SimulationPanel.tsx')) && !/SimulationToolbar/.test(app));
   check('the output panel is OutputPanel', /<EditorShell output=\{<OutputPanel \/>\}>/.test(app));
@@ -272,11 +306,32 @@ console.log('\n[output panel]');
   check('no panel builds a Run/Step of its own for CC, FSM, TM or turbot',
     !/\b(fsmRun|fsmStep|tmRun|tmStep|scSequenceRun|scSequenceStep)\b/.test(table) && !/\b(turbotRun|turbotStep)\b/.test(map) &&
       !/setInterval/.test(table));
-  check('the CC table is the live one', /<LiveTruthTable \/>/.test(table) && /truthTableCC/.test(code('components/LiveTruthTable.tsx')));
+  // Task 075: the CC table is EARNED — an output shows only for a row the
+  // student has run. The store records the rows (ccRunRows, its machine-key
+  // subscriber; navResetCheck [earned CC table]); the table only reads them.
+  const live = code('components/LiveTruthTable.tsx');
+  check('the CC table is the live one', /<LiveTruthTable \/>/.test(table) && /truthTableCC/.test(read('ccTable.ts')));
+  check('…drawn from ccTableView over the store\'s earned rows — each output cell its text, no bit of its own',
+    /useStore\(\(s\) => s\.ccRunRows\)/.test(live) && /ccTableView\(components, wires, ccRunRows\)/.test(live) &&
+      /\{cell\.text\}/.test(live) && !/truthTableCC|evaluateCC|outputBits/.test(live) && /op-unrun/.test(live) && /op-unset/.test(live));
+  check('…which it never writes (the reveal is the store\'s)',
+    !/setState/.test(live) && !/ccRunRows\s*:/.test(live));
+  check('…and the grader never reads them (the table is UI only)',
+    ['engine/caseRun.ts', 'engine/grader.ts', 'engine/cc.ts'].every((rel) => !/ccRunRows/.test(read(rel))));
   const actions = code('components/CanvasActions.tsx');
   check('the canvas\'s action group: Undo · Redo · Delete · Rotate · Clear through the store\'s own actions',
     ['undo()', 'redo()', 'deleteSelected()', 'rotateComponent(id)', 'clearWorkspace()', 'toggleStateKind(id)'].every((a) => actions.includes(a)) &&
       !/isCurrentQuestionLocked/.test(actions));
+}
+
+console.log('\n[signal colour]');
+{
+  // Unset is not 0 (task 075): a signal nobody computed draws faint.
+  const fake = { signal0: 'ink', signal1: 'red', faint: 'faint' } as CanvasColors;
+  check('signalColor: 0 the ink, 1 red', signalColor(fake, 0) === 'ink' && signalColor(fake, 1) === 'red');
+  check('signalColor: unset (undefined, null, a wire\'s -1) the faint stroke, never the 0 ink',
+    [undefined, null, -1].every((v) => signalColor(fake, v) === 'faint'));
+  check('the canvas no longer draws a blank wire as a 0', !/isBlankWire \? 0/.test(code('components/CircuitCanvas.tsx')));
 }
 
 console.log('\n[palette]');
@@ -376,6 +431,8 @@ console.log('\n[palette]');
   check('a box tool draws the box as it lands: BOXED, its name, its port counts',
     b1?.type === 'BOXED' && b1.label === 'Box 1' && b1.boxedCircuitId === 'b1' &&
       b1.ports.filter((p) => p.side === 'left').length === 2 && b1.ports.filter((p) => p.side === 'right').length === 1);
+  check('the drag ghost is unset like the part that lands — no 0 on an INPUT, OUTPUT, gate or box (task 075)',
+    (['INPUT', 'OUTPUT', 'AND'] as const).every((t) => toolComponent(t, lib)!.value === undefined) && b1?.value === undefined);
   check('NEW_BOX and a vanished box place nothing', toolComponent('NEW_BOX', lib) === null && toolComponent({ box: 'gone' }, lib) === null);
   check('screen → canvas through the pan and zoom',
     JSON.stringify(clientToCanvas({ x: 250, y: 150 }, { left: 50, top: 50 }, { panX: 100, panY: 0, zoom: 2 })) === '{"x":50,"y":50}');

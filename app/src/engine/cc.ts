@@ -330,9 +330,9 @@ export interface CCTruthTable {
 export const TRUTH_TABLE_MAX_INPUTS = 8;
 
 /**
- * Every row of a combinational circuit's truth table at once (task 053: the
- * output panel's table is live — CC propagation is instantaneous, so no row
- * waits to be "run"). Null when the circuit has no INPUT or no OUTPUT;
+ * Every row of a combinational circuit's truth table at once. The output
+ * panel shows a row's outputs only once the student has run it (task 075,
+ * `ccTable.ts`); this computes them all. Null when the circuit has no INPUT or no OUTPUT;
  * 'too-many' past TRUTH_TABLE_MAX_INPUTS inputs. Each row is the headless
  * grading primitive's evaluation (evaluateCCInputs), so the table reads
  * exactly what the grader would.
