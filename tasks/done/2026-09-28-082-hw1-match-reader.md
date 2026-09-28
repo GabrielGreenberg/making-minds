@@ -8,9 +8,9 @@ requires:
 area: app
 source: chat
 created: 2026-09-28T11:20:00-07:00
-status: in-progress
+status: done
 after:
-branch: task/082-hw1-match-reader
+branch:
 merged_into:
 ---
 
@@ -67,3 +67,12 @@ the P10/P16 editor panels in the dev server.
 ## Progress log
 - 2026-09-28 — Filed and claimed from chat. Diffed the reader's HW1 (builds 20260924 → 20260928)
   and the app's `hw1.json`. Next: edit on `task/082-hw1-match-reader`.
+- 2026-09-28 — Landed. `hw1.json`: P6a, P6b, P8, P10a–c, P14, P15, P16, P17 and the challenge title
+  now use the reader's wording. P14 keeps its value boxes, with "In the boxes, give the value of *f* for
+  each symbol." after the reader's "Use a table or an equation." The `workbenchCheck` pin and the
+  `workbench.ts` comment follow the new title. The headless overview shots (`shootProblemSets.mjs`)
+  show the new text, bold and italics, and P16/P17's arrows and subscripts. Gates green: app tsc,
+  `npm run build`, `npm run check`, server `npm run check`. Left as printed: the reference fixtures
+  `app/tools/fixtures/reference/hw1-p16/17.json` (answer-key fixtures, not shown to students) and the
+  repo's `problem sets/hw1.pdf` (the 9.30.25 print, still unlinked since 050). The next release's
+  homework sync refreshes an unedited pilot HW1.
