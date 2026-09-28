@@ -63,3 +63,4 @@
 2026-09-26-069 · feature · Re-grade an assignment against its current version — dry run first, then commit with a snapshot; never touching human grades · 2026-09-27T18:51:28-0700 · robot/069-regrade-dry-run · 2142c76
 2026-09-26-070 · feature · Flag students who need attention, and give each student an instructor page with private notes and grade history · 2026-09-27T20:39:30-0700 · robot/070-flags-student-page-notes · 40c68fc
 2026-09-26-071 · feature · Export problem-set grades as a CSV — one row per student, HW1–HW6 out of 100 and their average · 2026-09-27T21:07:58-0700 · robot/071-grades-export-csv · 46d4464
+2026-09-21-013 · feature · Instructor-authored SC perception films and motion rules by direction (up / down / either) and scene (single / any number) · 2026-09-27T22:11:41-0700 · robot/013-perception-custom-sequences · facbd45
