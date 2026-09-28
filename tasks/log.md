@@ -66,3 +66,4 @@
 2026-09-21-013 · feature · Instructor-authored SC perception films and motion rules by direction (up / down / either) and scene (single / any number) · 2026-09-27T22:11:41-0700 · robot/013-perception-custom-sequences · facbd45
 2026-09-25-059 · feature · Let an instructor mark an authored perception film "show to students as an example", delivered without exposing the grading bank · 2026-09-27T23:03:49-0700 · robot/059-perception-example-films · fe46f59
 2026-09-28-075 · feature · Make the CC I/O table earned — outputs appear only for rows the student has run · 2026-09-28T10:30:22-0700 · robot/075-earned-cc-truth-table · 9c0bf01
+2026-09-28-076 · feature · Let the instructor file a Feedback report from the Dashboard · 2026-09-28T11:14:15-0700 · robot/076-instructor-files-feedback-from-dashboard · 16a770e

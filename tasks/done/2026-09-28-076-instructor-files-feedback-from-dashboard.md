@@ -8,9 +8,9 @@ requires:
 area: app
 source: feedback
 created: 2026-09-28T10:00:00-07:00
-status: in-progress
+status: done
 after:
-branch: robot/076-instructor-files-feedback-from-dashboard
+branch:
 merged_into:
 ---
 
@@ -115,3 +115,18 @@ instructor, context none.
   context kept from `#/a/<id>/q/1`; 375px head row wraps). For Gabriel after release: file
   one report from the pilot Dashboard, confirm it lands tagged instructor.
 - **Next step:** loop session: visual check if owed, then land per PROFILE §5.
+- 2026-09-28 (robot, land): headless-Chrome eyeball over CDP, local mode (Vite from Bash
+  on :5188, a throwaway profile; the pane can't start a server unattended): 15/15 —
+  topbar "Prof. Ada · Instructor | Feedback | Log out" on `#/instructor`, `/grading`,
+  `/roster`; the topbar modal carries the instructor wording; with hw1 still open in the
+  store after crossing from `#/a/hw1/q/1` to `#/instructor/feedback` (the stale case
+  live), "New report" sits beside the filter, files, the queue reloads with a card tagged
+  instructor and NO assignment line; a topbar filing on the Feedback tab refreshes the
+  list too; the editor's Name ▾ → Feedback files `{assignmentId: hw1, questionId: 2}`;
+  375px: no horizontal overflow, the head row wraps; no page errors. After merging
+  `origin/main` (task files only) the full PROFILE §6 table re-ran green by exit code:
+  app-tsc 0, app-build 0, app-check 0, server-tsc 0, server-check 0. CLAUDE.md updated in
+  place by the workflow (Feedback on every signed-in page; the queue's New report).
+  **Owed, not claimed:** Gabriel's own eyeball (the recipe above, in the pane), and on
+  the pilot after release: file one report from the Dashboard, confirm it lands tagged
+  instructor with no context.
