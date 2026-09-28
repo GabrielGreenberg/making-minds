@@ -8,9 +8,9 @@ requires: browser
 area: server
 source: inbox
 created: 2026-09-28T11:45:00-07:00
-status: in-progress
+status: done
 after:
-branch: robot/083-robot-status-panel
+branch:
 merged_into:
 ---
 
@@ -234,3 +234,25 @@ makingminds; `sudo -u makingminds systemctl is-active makingminds-backup.timer` 
 backup reads "unknown", which is acceptable); the box reaches api.github.com.
 **Next step:** loop session: do the headless remote-mode visual check owed in (a), then land
 per PROFILE §5.
+
+### 2026-09-28 — landed (robot)
+**Headless eyeball passed** (ROBOT-WORK §3; no browser pane in an unattended run). A local
+server on :8199 (dev auth, sample seed, its mirror in the scratchpad) plus Vite remote mode on
+:5191, driven by headless Chrome over CDP with the toy instructor's token: at 1280 px the Robot
+tab shows the four sections, the as-of line, and robot tags on the queue rows; the one-line
+strip sits over the tab row ("Robot: 4 questions wait", with a "Robot tab" link on the Feedback
+tab). Refresh moved as-of from 1:49 to 1:50. At 375 px nothing overflows sideways. With the
+server killed, Refresh keeps the last answer and adds one line: "Couldn't refresh (Failed to
+fetch) — showing the last answer." Local mode (:5190) shows "Not available in local mode", no
+strip, no `/api` request. The first uncached fetch took about 3.6 s (mirror clone included).
+**CLAUDE.md:** the workflow's trim had dropped the still-true "Next: robot (043), pilot
+domain (008)" pointer; restored it, trimming an equal amount from the new Robot lines (39,997
+bytes).
+**Gates after merging origin/main** (one queue-only commit came in): app-tsc=0 app-build=0
+server-tsc=0 server-check=0 app-check=0.
+**Owed, not claimed — Gabriel's eyeball:** in "Vite Remote Mode" with a local server on 8199,
+open `#/instructor/robot` and check the four sections, the strip on another tab, Refresh, and
+phone width. **Owed on the box after the first release (ssh):** the list in (b) above: Live's
+sha and verdict match `node deploy/release-gate.mjs` on the robot;
+`/srv/making-minds/data/repo-mirror.git` exists, owned by makingminds; `systemctl is-active`
+answers as makingminds (else backup reads "unknown"); the box reaches api.github.com.
