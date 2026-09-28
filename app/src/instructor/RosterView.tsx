@@ -4,6 +4,7 @@ import * as api from '../api/client';
 import type { RosterEntryView, AccessRequestView, RosterImportReport } from '../api/client';
 import { backendMode } from '../storage/backend';
 import { useAsyncValue } from '../useAsyncValue';
+import { hashLink } from '../components/PageShell';
 import { NO_LONGER_LISTED_TEXT, sentenceCase, skippedLinesText, statusCountText } from './rosterReportText';
 
 /**
@@ -20,6 +21,7 @@ import { NO_LONGER_LISTED_TEXT, sentenceCase, skippedLinesText, statusCountText 
  *   · reset a forgotten password (clears it; the student registers again)
  *   · add or remove one person
  *   · approve or reject "the roster doesn't have me" requests
+ *   · open a student's page (task 070) from their name
  *
  * Remote mode only: local mode has no server to hold a roster, and its two toy
  * accounts are a hardcoded mockup (see auth/accounts.ts).
@@ -154,7 +156,10 @@ function RosterRow({
 }) {
   return (
     <tr>
-      <td>{row.name}</td>
+      <td>
+        {/* A student's name opens their page (task 070), by opaque key — never the email. */}
+        {row.key ? <a {...hashLink({ kind: 'instructor-student', student: row.key })}>{row.name}</a> : row.name}
+      </td>
       <td className="roster-email">
         {row.email}
         {row.aliases.length > 0 && (

@@ -28,8 +28,16 @@
 // planned by the ONE pure planner, storage/regrade.ts. Local: over the local
 // SubmissionStore's records, the snapshot a copy of them in localStorage.
 // Remote: the server's route. Human grades are never written by either.
+//
+// And flags and the student page (task 2026-09-26-070): the summaries carry
+// each row's flags under the course's thresholds (storage/gradingFlags.ts —
+// pure, no state), set here (`setFlagThresholds`); a student's private
+// notes are added here (`addStudentNote`, append-only, instructors only).
+// Local: localStorage `mm:flag-thresholds` and `mm:student-notes:<email>`
+// (each note also logged in the course-wide grading log, `mm:grade-log:`).
+// Remote: course_settings.flagThresholds and the student_notes table.
 
-import type { AssignmentData, HumanGrade, LateExtension, LateWaiver, Points, SubmissionRecord } from '../types';
+import type { AssignmentData, GradeEvent, HumanGrade, LateExtension, LateWaiver, Points, StudentNote, SubmissionRecord } from '../types';
 import { readPersistedAccount, TOY_ACCOUNTS } from '../auth/accounts';
 import type { localSubmissionStore } from './submissionStore';
 import type { AssignmentStore } from './AssignmentStore';
@@ -51,6 +59,8 @@ import { ClaimBook, type ClaimOutcome } from './gradingClaims';
 import { planRegrade, regradeEvents, type RegradeOutcome } from './regrade';
 import { readExtensions, readWaivers } from './lateLocal';
 import { COURSE_CALENDAR } from '../courseCalendar';
+import { courseFlags, normalizeThresholds, type FlagThresholds } from './gradingFlags';
+import { checkStudentNote } from './gradeWrites';
 
 export type {
   AssignmentGradingSummary,
@@ -64,7 +74,9 @@ export type {
   QueueResponse,
   QuestionResponses,
   StudentGrading,
+  StudentHistoryEntry,
 } from './gradingSummary';
+export type { FlaggedStudent, FlagThresholds, StudentFlag, StudentFlagKind } from './gradingFlags';
 export type { ClaimOutcome, ClaimView } from './gradingClaims';
 export type { RegradeChange, RegradeOutcome, RegradePlan } from './regrade';
 export { CLAIM_TTL_MS } from './gradingClaims';
@@ -79,6 +91,9 @@ export type GradeWriteOutcome =
 /** How an extension or waiver write came out (task 068): the stored value
  *  (null = cleared), or the refusal's reason. */
 export type LateWriteOutcome<T> = { ok: true; value: T | null } | { ok: false; error: string };
+
+/** How adding a private note came out: the stored note, or the refusal's reason. */
+export type NoteWriteOutcome = { ok: true; note: StudentNote } | { ok: false; error: string };
 
 export interface GradingStore {
   /**
@@ -130,6 +145,42 @@ export interface GradingStore {
   /** Waive late points for one student on an assignment ({points, note?}),
    *  or clear the waiver (null). Logged. Instructor-only (memo §4.6). */
   setWaiver(assignmentId: string, studentKey: string, write: { points: number; note?: string } | null): Promise<LateWriteOutcome<LateWaiver>>;
+
+  /** Store the course's flag thresholds (task 070; normalized — a missing or
+   *  junk field is its default) and return what was stored. Instructor-only. */
+  setFlagThresholds(thresholds: Partial<FlagThresholds>): Promise<FlagThresholds>;
+  /** Add one private note to a student's log (append-only; never edited or
+   *  deleted). Instructor-only; nothing student-facing reads it. */
+  addStudentNote(studentKey: string, body: string): Promise<NoteWriteOutcome>;
+}
+
+/** Where local mode keeps the thresholds and each student's notes. */
+const FLAG_THRESHOLDS_KEY = 'mm:flag-thresholds';
+const STUDENT_NOTES_PREFIX = 'mm:student-notes:';
+
+function readJson(key: string): unknown {
+  try {
+    const raw = localStorage.getItem(key);
+    return raw === null ? undefined : (JSON.parse(raw) as unknown);
+  } catch {
+    return undefined;
+  }
+}
+
+function readThresholds(): FlagThresholds {
+  return normalizeThresholds(readJson(FLAG_THRESHOLDS_KEY));
+}
+
+function readNotes(email: string): StudentNote[] {
+  const got = readJson(STUDENT_NOTES_PREFIX + email);
+  return Array.isArray(got) ? (got as StudentNote[]) : [];
+}
+
+/** A group listing's key → the identity key: locally a classmate is listed by
+ *  toy account id (Classmate.key) and named by email (the one key mismatch;
+ *  the server's agree — both public_id). */
+function localGroupKey(raw: string): string | null {
+  return TOY_ACCOUNTS.find((a) => a.id === raw)?.email.toLowerCase() ?? null;
 }
 
 /** The toy roster: its students, keyed as local records are (the email). */
@@ -242,6 +293,8 @@ export class LocalGradingStore implements GradingStore {
       released,
       now,
       late: this.lateOf(assignment.id),
+      thresholds: readThresholds(),
+      groupKey: localGroupKey,
     });
   }
 
@@ -263,26 +316,87 @@ export class LocalGradingStore implements GradingStore {
         visible: row.visible,
       });
     }
-    return buildCourseGrading({ roster: localRoster(), assignments });
+    return buildCourseGrading({ roster: localRoster(), assignments, thresholds: readThresholds(), calendar: COURSE_CALENDAR, now });
   }
 
   async student(studentKey: string): Promise<StudentGrading | null> {
     const now = Date.now();
-    const assignments: { assignment: AssignmentData; released: boolean; latest: SubmissionRecord | null; late: LateContext }[] = [];
+    const assignments: {
+      assignment: AssignmentData;
+      released: boolean;
+      visible: boolean;
+      latest: SubmissionRecord | null;
+      late: LateContext;
+      summary: AssignmentGradingSummary;
+      events: GradeEvent[];
+    }[] = [];
+    const summaries: { summary: AssignmentGradingSummary; visible: boolean; order?: number }[] = [];
     let seen = TOY_ACCOUNTS.some((a) => a.email.toLowerCase() === studentKey);
     for (const row of await this.assignments.list()) {
       const got = await this.assignments.get(row.id);
       if (!got) continue;
       const mine = (await this.subs.listAll(row.id)).filter((r) => r.studentKey === studentKey);
       if (mine.length) seen = true;
+      // The full summary, so the row's flags see the whole class.
+      const summary = await this.summaryOf(got.assignment, got.gradesReleased, now);
+      summaries.push({ summary, visible: row.visible, ...(got.assignment.order !== undefined ? { order: got.assignment.order } : {}) });
       assignments.push({
         assignment: got.assignment,
         released: got.gradesReleased,
+        visible: row.visible,
         latest: latestPerStudent(mine)[0] ?? null,
         late: this.lateOf(row.id),
+        summary,
+        // Locally the log is kept by email — the local key.
+        events: this.subs.gradeLog(row.id).filter((e) => e.student === studentKey),
       });
     }
-    return seen ? buildStudentGrading({ student: localIdentity(studentKey), assignments, now }) : null;
+    if (!seen) return null;
+    const flagged = courseFlags({ roster: localRoster(), summaries, thresholds: readThresholds(), calendar: COURSE_CALENDAR, now });
+    return buildStudentGrading({
+      student: localIdentity(studentKey),
+      assignments,
+      flags: flagged.find((f) => f.student.key === studentKey)?.flags ?? [],
+      notes: readNotes(studentKey),
+      now,
+    });
+  }
+
+  async setFlagThresholds(thresholds: Partial<FlagThresholds>): Promise<FlagThresholds> {
+    const value = normalizeThresholds(thresholds);
+    try {
+      localStorage.setItem(FLAG_THRESHOLDS_KEY, JSON.stringify(value));
+    } catch {
+      // Storage full or blocked: the defaults stand.
+    }
+    return value;
+  }
+
+  async addStudentNote(studentKey: string, body: string): Promise<NoteWriteOutcome> {
+    const known =
+      TOY_ACCOUNTS.some((a) => a.email.toLowerCase() === studentKey) ||
+      (await Promise.all((await this.assignments.list()).map((a) => this.subs.listAll(a.id)))).some((rs) =>
+        rs.some((r) => r.studentKey === studentKey),
+      );
+    if (!known) return { ok: false, error: 'no such student' };
+    const checked = checkStudentNote(body);
+    if (!checked.ok) return checked;
+    const notes = readNotes(studentKey);
+    const account = readPersistedAccount();
+    const note: StudentNote = {
+      id: notes.reduce((n, x) => Math.max(n, x.id), 0) + 1,
+      body: checked.body,
+      author: this.actor(),
+      ...(account ? { authorName: account.name } : {}),
+      at: new Date().toISOString(),
+    };
+    try {
+      localStorage.setItem(STUDENT_NOTES_PREFIX + studentKey, JSON.stringify([...notes, note]));
+    } catch {
+      return { ok: false, error: 'the note could not be saved in this browser' };
+    }
+    this.subs.logNote({ at: note.at, actor: note.author, student: studentKey, kind: 'note', before: null, after: { noteId: note.id } });
+    return { ok: true, note };
   }
 
   async attempt(assignmentId: string, studentKey: string, attempt: number): Promise<AttemptDetail | null> {

@@ -18,11 +18,12 @@ import type {
   HumanGrade,
   LateExtension,
   LateWaiver,
+  NoteEvent,
   QuestionCircuit,
   SubmissionData,
   SubmissionRecord,
 } from '../types';
-import { questionTask } from '../types';
+import { COURSE_LOG_ID, questionTask } from '../types';
 import { emptyQuestionCircuit } from './workbookStore';
 import { gradeSubmission } from '../engine/grader';
 import { assessIntegrity } from '../provenance/integrity';
@@ -222,15 +223,21 @@ class LocalSubmissionStore implements SubmissionStore {
     }
   }
 
-  private appendLog(id: string, events: GradeEvent[]): void {
+  private appendLog(id: string, events: (GradeEvent | NoteEvent)[]): void {
     if (events.length === 0) return;
     try {
       const raw = localStorage.getItem(GRADE_LOG_PREFIX + id);
-      const log = raw ? (JSON.parse(raw) as GradeEvent[]) : [];
+      const log = raw ? (JSON.parse(raw) as (GradeEvent | NoteEvent)[]) : [];
       localStorage.setItem(GRADE_LOG_PREFIX + id, JSON.stringify([...log, ...events]));
     } catch {
       // ignore
     }
+  }
+
+  /** Log a private note (memo §9), course-wide: under COURSE_LOG_ID, which
+   *  no assignment's log (gradeLog) ever reads. */
+  logNote(event: NoteEvent): void {
+    this.appendLog(COURSE_LOG_ID, [event]);
   }
 
   /** The change log, oldest first (dev / checks; the server's is the table). */

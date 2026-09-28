@@ -40,6 +40,18 @@
 // 400 / 404 / 403, an extension moves the row on time and the STUDENT's
 // served copy (never the instructor's), a waiver nets the deduction, both
 // logged without a questionId, a released record carries `lateWaived` only.
+// And flags and the student page (task 070): [flags & notes] GET /api/grading
+// carries the flagged list and the thresholds (a hidden assignment's flags
+// off it); an unreturned public_id group listing flags both on /summary and,
+// once published, the tab; PUT /api/grading/settings — 403 / 400, normalized,
+// persisted, and it moves a flag; POST /api/students/:sid/notes — 403, 404
+// (an email too), 400; notes on the student page newest first, with the
+// history (an extension without a questionId, no `student`), flags and the
+// counted average, never the student's address; a note's marker in NO
+// student response nor the summary or tab; no update or delete path; each
+// note a course-wide `note` grade_events entry; a hidden set out of the
+// average. And
+// [local ≡ remote] covers row groups and flags (the local toy-id listing).
 
 import { mkdtempSync, readdirSync, readFileSync, rmSync, statSync } from 'node:fs';
 import { DatabaseSync } from 'node:sqlite';
@@ -54,7 +66,9 @@ import { buildSampleAssignment, buildCorrectSubmission, buildIncorrectSubmission
 import { gradeSubmission } from '../../app/src/engine/grader';
 import { scoreRecord } from '../../app/src/engine/score';
 import { homeworkContentHash } from '../../app/src/devData/homeworkSync';
-import type { AssignmentData, GradeChangeEvent, GradeEvent, HumanGrade, RegradeEvent, SubmissionData, SubmissionRecord } from '../../app/src/types';
+import type { AssignmentData, GradeChangeEvent, GradeEvent, HumanGrade, NoteEvent, RegradeEvent, StudentNote, SubmissionData, SubmissionRecord } from '../../app/src/types';
+import { COURSE_LOG_ID } from '../../app/src/types';
+import { DEFAULT_FLAG_THRESHOLDS, type FlagThresholds } from '../../app/src/storage/gradingFlags';
 import type {
   AssignmentGradingSummary,
   AttemptDetail,
@@ -332,9 +346,11 @@ console.log('[migration]');
     janeRow2.latest?.late.late === false && s2.progress.late === 1 && s2.progress.missing === 0 && s2.progress.submitted === 2);
 
   console.log('[no circuits]');
+  // `"integrity":` is the attempt's integrity record; a row's flag of kind
+  // "integrity" (task 070) is a count, and may ride.
   const noLeak = (label: string, text: string) =>
     check(`${label}: no circuits, cases, answers, integrity, notes or emails`,
-      !/circuit|components|expected|"got"|integrity|responseText|fillAnswers|answerKey|"note"|@/.test(text), text.slice(0, 200));
+      !/circuit|components|expected|"got"|"integrity":|responseText|fillAnswers|answerKey|"note"|@/.test(text), text.slice(0, 200));
   noLeak('/summary', (await call('GET', `${u2}/summary`, { token: i2Tok })).text);
   noLeak('/grading', (await call('GET', '/grading', { token: i2Tok })).text);
   noLeak('/students/:sid', (await call('GET', `/students/${johnRow.student.key}`, { token: i2Tok })).text);
@@ -433,6 +449,11 @@ console.log('[migration]');
     // Local mode prices lateness with the bundled calendar; give the server
     // the same one, the way a release does (homeworks.ts syncCalendar).
     syncCalendar(db2);
+    // A group listing that isn't returned (task 070): Jane resubmits (still
+    // stale) listing John, who lists nobody — both carry a group mismatch.
+    // Remotely a listing is a public_id; locally the toy account's id.
+    db2.addSubmission(asg2.id, jane.email.toLowerCase(), { ...janeSub, group: [johnKey] }, gradeSubmission(asg2, janeSub), undefined, 'an-older-version');
+    const toyIdOf = new Map(TOY_ACCOUNTS.map((a) => [db2.publicIdOf(a.email.toLowerCase()) ?? '', a.id]));
     // The local GradingStore over the same records: localStorage shimmed
     // BEFORE the app's storage modules load (the harness resolves to local).
     const mem = new Map<string, string>();
@@ -459,22 +480,39 @@ console.log('[migration]');
     await local.assignmentStore.save(asg2);
     // Toy accounts only: locally nobody is "removed" (no accounts to remove).
     const toy = new Set(TOY_ACCOUNTS.map((a) => a.email.toLowerCase()));
-    mem.set(`mm:sub:${asg2.id}`, JSON.stringify(db2.listSubmissions(asg2.id).filter((r) => toy.has(r.submission.student ?? ''))));
+    mem.set(`mm:sub:${asg2.id}`, JSON.stringify(db2.listSubmissions(asg2.id).filter((r) => toy.has(r.submission.student ?? ''))
+      .map((r) => (r.submission.group ? { ...r, submission: { ...r.submission, group: r.submission.group.map((k) => toyIdOf.get(k) ?? k) } } : r))));
     mem.set(`mm:grades:${asg2.id}`, JSON.stringify(Object.fromEntries(db2.listGrades(asg2.id))));
     const localSummary = (await local.gradingStore.summary(asg2.id))!;
     const remoteSummary = await getSummary();
     // Keys differ by design (public_id vs email), and the toy roster has no
-    // UID, section or credential: compare by name.
-    const norm = (s: AssignmentGradingSummary) => ({
-      ...s,
-      rows: s.rows
-        .filter((r) => r.student.offRoster !== 'removed')
-        .map((r: GradingRow) => ({ ...r, student: { name: r.student.name, sortName: r.student.sortName, offRoster: r.student.offRoster } })),
-      progress: { ...s.progress, offRosterSubmitted: 0 },
-    });
+    // UID, section or credential: compare by name — a group listing's and a
+    // flag's keys too (task 070).
+    const norm = (s: AssignmentGradingSummary) => {
+      const nameOf = new Map(s.rows.map((r) => [r.student.key, r.student.name]));
+      const named = (keys: string[] | undefined) => keys?.map((k) => nameOf.get(k) ?? k);
+      return {
+        ...s,
+        rows: s.rows
+          .filter((r) => r.student.offRoster !== 'removed')
+          .map((r: GradingRow) => ({
+            ...r,
+            student: { name: r.student.name, sortName: r.student.sortName, offRoster: r.student.offRoster },
+            ...(r.group ? { group: named(r.group) } : {}),
+            ...(r.flags ? { flags: r.flags.map((f) => ({ ...f, ...(f.others ? { others: named(f.others) } : {}) })) } : {}),
+          })),
+        progress: { ...s.progress, offRosterSubmitted: 0 },
+      };
+    };
     const a = JSON.stringify(norm(localSummary));
     const b = JSON.stringify(norm(remoteSummary));
     check('LocalGradingStore.summary ≡ the server\'s /summary on the same records', a === b, `\n local  ${a.slice(0, 400)}\n remote ${b.slice(0, 400)}`);
+    const mismatch = (s: AssignmentGradingSummary, name: string) =>
+      s.rows.find((r) => r.student.name === name)?.flags?.some((f) => f.kind === 'group-mismatch') ?? false;
+    check('…both carry the group mismatch (Jane lists John, who lists nobody) — the local listing mapped toy id → email',
+      [localSummary, remoteSummary].every((s) => mismatch(s, jane.name) && mismatch(s, john.name)) &&
+        localSummary.rows.find((r) => r.student.name === jane.name)?.group?.join() === johnEmail &&
+        remoteSummary.rows.find((r) => r.student.name === jane.name)?.group?.join() === johnKey);
   }
   console.log('[queue feed]');
   {
@@ -679,6 +717,111 @@ console.log('[migration]');
     check('removing an assignment drops its extensions and waivers; a re-added copy has none',
       db2.getExtension(gone.id, johnEmail) === null && db2.getWaiver(gone.id, johnEmail) === null && db2.listExtensions(gone.id).size === 0);
     db2.removeAssignment(gone.id);
+  }
+  console.log('[flags & notes]');
+  {
+    // Task 070: flags ride the summaries under the stored thresholds; private
+    // notes are instructor-only, append-only, and never reach a student.
+    const flagsOf = async (name: string) => (await getSummary()).rows.find((r) => r.student.name === name)?.flags ?? [];
+    const kindsOf = async (name: string) => (await flagsOf(name)).map((f) => f.kind);
+    const course0 = await call<CourseGrading>('GET', '/grading', { token: i2Tok });
+    check('GET /api/grading carries the flagged list and the thresholds (the defaults until set)',
+      Array.isArray(course0.json.flagged) && JSON.stringify(course0.json.thresholds) === JSON.stringify(DEFAULT_FLAG_THRESHOLDS));
+    check("…a hidden assignment's flags stay off the tab", !course0.json.flagged.some((f) => f.flags.some((x) => x.assignmentId === asg2.id)));
+    check('the summary rows carry the unreturned group listing (Jane lists John by public_id)',
+      (await kindsOf(jane.name)).includes('group-mismatch') && (await kindsOf(john.name)).includes('group-mismatch') &&
+        (await flagsOf(jane.name)).find((f) => f.kind === 'group-mismatch')?.others?.join() === johnKey);
+    db2.setVisible(asg2.id, true);
+    const course1 = (await call<CourseGrading>('GET', '/grading', { token: i2Tok })).json;
+    const janeFlags = course1.flagged.find((f) => f.student.name === jane.name)?.flags ?? [];
+    check('…published, /api/grading lists them too', janeFlags.some((f) => f.kind === 'group-mismatch' && f.assignmentId === asg2.id),
+      JSON.stringify(course1.flagged));
+    // No account: against a fixture calendar whose first meeting is long past
+    // (the committed one may have begun days ago), then the synced one back.
+    db2.setCourseSetting('calendar', { timezone: 'UTC', meetings: [meeting('2026-01-06')] });
+    const noAccount = (await call<CourseGrading>('GET', '/grading', { token: i2Tok })).json.flagged
+      .filter((f) => f.flags.some((x) => x.kind === 'no-account')).map((f) => f.student.name).sort().join();
+    syncCalendar(db2);
+    check('…and no account: the toy roster never set a password, 7+ days after the first meeting',
+      noAccount === [jane.name, john.name].sort().join(), noAccount);
+
+    const settings = (tok: string, body: unknown) => call<{ thresholds: FlagThresholds }>('PUT', '/grading/settings', { token: tok, body });
+    check('PUT /api/grading/settings: a student → 403; junk → 400',
+      (await settings(jTok, { thresholds: {} })).status === 403 && (await settings(i2Tok, { thresholds: 'x' })).status === 400 &&
+        (await settings(i2Tok, [])).status === 400 && (await settings(i2Tok, {})).status === 400);
+    check('before: John is very late (a submission months past the due date)', (await kindsOf(john.name)).includes('very-late'));
+    const put = await settings(i2Tok, { thresholds: { veryLateDays: 9999, struggleBelow: 'x' } });
+    check('…a stored threshold is normalized, persisted in course_settings, and changes a flag outcome',
+      put.status === 200 && put.json.thresholds.veryLateDays === 365 && put.json.thresholds.struggleBelow === 70 &&
+        JSON.stringify(db2.getCourseSetting('flagThresholds')) === JSON.stringify(put.json.thresholds) &&
+        !(await kindsOf(john.name)).includes('very-late') &&
+        (await call<CourseGrading>('GET', '/grading', { token: i2Tok })).json.thresholds.veryLateDays === 365, JSON.stringify(put.json));
+    await settings(i2Tok, { thresholds: DEFAULT_FLAG_THRESHOLDS });
+    check('…and back', (await kindsOf(john.name)).includes('very-late'));
+
+    const notePath = (sid: string) => `/students/${sid}/notes`;
+    const MARK = `note-marker-${Math.random().toString(36).slice(2)}`;
+    check('POST /api/students/:sid/notes: a student → 403; an unknown key → 404; empty or too long → 400',
+      (await call('POST', notePath(johnKey), { token: jTok, body: { body: MARK } })).status === 403 &&
+        (await call('POST', notePath('no-such-key'), { token: i2Tok, body: { body: 'x' } })).status === 404 &&
+        (await call('POST', notePath(encodeURIComponent(johnEmail)), { token: i2Tok, body: { body: 'x' } })).status === 404 &&
+        (await call('POST', notePath(johnKey), { token: i2Tok, body: { body: '   ' } })).status === 400 &&
+        (await call('POST', notePath(johnKey), { token: i2Tok, body: {} })).status === 400 &&
+        (await call('POST', notePath(johnKey), { token: i2Tok, body: { body: 'x'.repeat(4001) } })).status === 400);
+    const added = await call<{ note: StudentNote }>('POST', notePath(johnKey), { token: i2Tok, body: { body: ` ${MARK} first ` } });
+    await call('POST', notePath(johnKey), { token: i2Tok, body: { body: `${MARK} second` } });
+    check('a note is stored trimmed, dated, under its author', added.status === 200 && added.json.note.body === `${MARK} first` &&
+      added.json.note.author === instructor.email.toLowerCase() && added.json.note.authorName === instructor.name && !!Date.parse(added.json.note.at));
+    const page = await call<StudentGrading>('GET', `/students/${johnKey}`, { token: i2Tok });
+    check('the instructor\'s student page lists the notes, newest first',
+      page.status === 200 && page.json.notes.map((n) => n.body).join('|') === `${MARK} second|${MARK} first` &&
+        page.json.notes.every((n) => n.authorName === instructor.name), JSON.stringify(page.json.notes));
+    check('…its history lists the extension (no problem number) and the grades, newest first, without the student field',
+      page.json.history.some((h) => h.event.kind === 'extension' && h.event.questionId === undefined && h.assignmentId === asg2.id) &&
+        page.json.history.some((h) => h.event.kind === 'grade') && page.json.history.every((h) => !('student' in h.event)) &&
+        page.json.history.every((h, i, all) => i === 0 || all[i - 1].event.at >= h.event.at), JSON.stringify(page.json.history.map((h) => h.event.kind)));
+    const finals = page.json.assignments
+      .filter((a) => a.countsTowardGrade !== false && Date.parse(a.row.extendedTo ?? a.dueDate ?? '') < Date.now() && a.row.grade.final !== null)
+      .map((a) => a.row.grade.final!);
+    check('…its flags, and the counted average (the counted sets due so far)', page.json.flags.some((f) => f.kind === 'group-mismatch') &&
+      page.json.average.sets === finals.length && finals.length >= 1 &&
+      page.json.average.value === Math.round((finals.reduce((n, f) => n + f, 0) / finals.length) * 10) / 10, JSON.stringify(page.json.average));
+    check('…and never the student\'s address', !page.text.includes(johnEmail));
+    const studentTexts = await Promise.all([
+      '/auth/me', '/assignments', u2, `${u2}/submissions`, `/workbooks/${asg2.id}`, '/classmates',
+    ].map(async (r) => ({ r, ...(await call('GET', r, { token: jTok })) })));
+    check('the notes reach NO student response (me, assignments, one assignment, submissions, workbook, classmates)',
+      studentTexts.every((x) => x.status === 200 && !x.text.includes(MARK)), JSON.stringify(studentTexts.map((x) => [x.r, x.status])));
+    check('…nor the summary or the Grading tab',
+      !(await call('GET', `${u2}/summary`, { token: i2Tok })).text.includes(MARK) && !(await call('GET', '/grading', { token: i2Tok })).text.includes(MARK));
+    const noEdit = await Promise.all([
+      call('PUT', `${notePath(johnKey)}/${added.json.note.id}`, { token: i2Tok, body: { body: 'changed' } }),
+      call('DELETE', `${notePath(johnKey)}/${added.json.note.id}`, { token: i2Tok }),
+      call('DELETE', notePath(johnKey), { token: i2Tok }),
+    ]);
+    const dbSrc = readFileSync(new URL('../src/db.ts', import.meta.url), 'utf8');
+    check('notes have no update or delete path (no route, no SQL)',
+      noEdit.every((x) => x.status === 404) && !/(UPDATE|DELETE FROM)\s+student_notes/.test(dbSrc) &&
+        db2.listStudentNotes(johnEmail).length === 2, JSON.stringify(noEdit.map((x) => x.status)));
+    const noteLog = (db2.listGradeEvents(COURSE_LOG_ID) as unknown as NoteEvent[]).filter((e) => e.kind === 'note');
+    const noteIds = db2.listStudentNotes(johnEmail).map((n) => n.id);
+    check("every note is logged in grade_events (memo §9): a course-wide `note` event per note, actor + student, no text; none in an assignment's log",
+      noteLog.length === 2 && noteLog.every((e, i) => e.student === johnEmail && e.actor === instructor.email.toLowerCase() &&
+        e.before === null && e.after.noteId === noteIds[i] && !JSON.stringify(e).includes(MARK)) &&
+        ![asg.id, asg2.id].some((id) => (db2.listGradeEvents(id) as { kind: string }[]).some((e) => e.kind === 'note')),
+      JSON.stringify(noteLog));
+    db2.setVisible(asg2.id, false);
+    // A hidden set is listed on the page but never counted in its average.
+    const hiddenPage = (await call<StudentGrading>('GET', `/students/${johnKey}`, { token: i2Tok })).json;
+    const shownFinals = hiddenPage.assignments
+      .filter((a) => a.assignmentId !== asg2.id && a.countsTowardGrade !== false &&
+        Date.parse(a.row.extendedTo ?? a.dueDate ?? '') < Date.now() && a.row.grade.final !== null)
+      .map((a) => a.row.grade.final!);
+    check("…the average leaves out a hidden assignment (listed, but students were never shown it)",
+      page.json.assignments.some((a) => a.assignmentId === asg2.id && Date.parse(a.row.extendedTo ?? a.dueDate ?? '') < Date.now()) &&
+        hiddenPage.assignments.some((a) => a.assignmentId === asg2.id) && hiddenPage.average.sets === shownFinals.length &&
+        hiddenPage.average.sets === page.json.average.sets - 1,
+      JSON.stringify([page.json.average, hiddenPage.average]));
   }
   server2.close();
   db2.close();

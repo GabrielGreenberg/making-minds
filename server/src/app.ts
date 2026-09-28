@@ -52,8 +52,15 @@
 //                                              instructor: one attempt in full (circuits,
 //                                              expected/got, integrity, grades, the log)
 //   GET    /api/grading                        instructor: every assignment's progress +
-//                                              course-wide counts
-//   GET    /api/students/:sid                  instructor: one student across assignments
+//                                              course-wide counts, the flagged students
+//                                              and the flag thresholds (task 070)
+//   PUT    /api/grading/settings               instructor: {thresholds} → normalized, stored
+//                                              in course_settings.flagThresholds
+//   GET    /api/students/:sid                  instructor: the student page — every
+//                                              assignment's row, flags, the counted
+//                                              average, private notes, the grade log
+//   POST   /api/students/:sid/notes            instructor: {body} → one private note,
+//                                              append-only (no update or delete route)
 //   PUT    /api/assignments/:id/grades/:sid/:qid
 //   DELETE /api/assignments/:id/grades/:sid/:qid
 //                                              instructor: write / clear one human grade
@@ -95,7 +102,8 @@ import express from 'express';
 import type { Request, Response, NextFunction } from 'express';
 import type { AssignmentData, AssignmentState, FeedbackTriage, FeedbackTriageOutcome, SubmissionData, SubmissionRecord } from '../../app/src/types';
 import { gradeSubmission } from '../../app/src/engine/grader';
-import { planExtensionWrite, planGradeWrite, planWaiverWrite, type GradeWrite } from '../../app/src/storage/gradeWrites';
+import { checkStudentNote, planExtensionWrite, planGradeWrite, planWaiverWrite, type GradeWrite } from '../../app/src/storage/gradeWrites';
+import { normalizeThresholds } from '../../app/src/storage/gradingFlags';
 import { homeworkContentHash } from '../../app/src/devData/homeworkSync';
 import { deriveMintKey } from '../../app/src/provenance/ids';
 import { assessIntegrity, saveSummary } from '../../app/src/provenance/integrity';
@@ -116,6 +124,7 @@ import { matchAccount, placeRosterEntry } from './identity';
 import { importRosterCsv } from './rosterImport';
 import { stripAnswers, studentRecord } from './sanitize';
 import {
+  addStudentNote,
   assignmentSummary,
   attemptDetail,
   courseGrading,
@@ -820,6 +829,19 @@ export function createApp(config: ServerConfig, db: Db) {
     res.json(courseGrading(db, mintSecret, Date.now()));
   });
 
+  // The flag thresholds (task 070): normalized — a missing or junk field is
+  // its default — so a flag rule never reads a bad value.
+  app.put('/api/grading/settings', auth, requireInstructor, (req, res) => {
+    const raw = (req.body ?? {}) as { thresholds?: unknown };
+    if (!raw.thresholds || typeof raw.thresholds !== 'object' || Array.isArray(raw.thresholds)) {
+      res.status(400).json({ error: 'body must be {thresholds: {…}}' });
+      return;
+    }
+    const thresholds = normalizeThresholds(raw.thresholds);
+    db.setCourseSetting('flagThresholds', thresholds);
+    res.json({ thresholds });
+  });
+
   app.get('/api/assignments/:id/summary', auth, requireInstructor, (req, res) => {
     const summary = assignmentSummary(db, mintSecret, String(req.params.id), Date.now());
     if (!summary) {
@@ -836,6 +858,23 @@ export function createApp(config: ServerConfig, db: Db) {
       return;
     }
     res.json(student);
+  });
+
+  // Private notes on a student (task 070; memo §6.5, §9): instructors only,
+  // append-only — this is the only write, and no student route reads them.
+  // The student is named by their opaque key, never an email.
+  app.post('/api/students/:sid/notes', auth, requireInstructor, (req, res) => {
+    const checked = checkStudentNote((req.body ?? {}).body);
+    if (!checked.ok) {
+      res.status(400).json({ error: checked.error });
+      return;
+    }
+    const note = addStudentNote(db, mintSecret, String(req.params.sid), checked.body, req.user!.email);
+    if (!note) {
+      res.status(404).json({ error: 'no such student' });
+      return;
+    }
+    res.json({ note });
   });
 
   app.get('/api/assignments/:id/submissions/:sid/:attempt', auth, requireInstructor, (req, res) => {

@@ -21,19 +21,31 @@
 // fixture (who is in it and in what order, answers by kind, the suggestion,
 // no answer key or circuit); [regrade dialog] the re-grade's rows and
 // summary line (task 069 — an autograde's move, the grade's, the override
-// that stays); [no view grades] the grep gate (no view — the re-grade dialog
+// that stays); [flags] task 070's flag rules, each both ways (not
+// submitted and extensions, very late, group mismatch incl. a chained group
+// of four and groupKey, integrity per row, identical text and "same group",
+// off-roster never flagged, the Flagged chip, struggling over settled (due)
+// counted sets in catalog order, no account, hidden assignments dropped,
+// custom thresholds, normalizeThresholds, countedAverage, the history line,
+// gradingFlags.ts grader-free); [no view grades] the grep gate (no view — the re-grade dialog
 // too — imports the grader or a scorer) and the retired gradebook's files
 // are gone.
 
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import type { AssignmentData, AssignmentQuestion, HumanGrade, Points, QuestionResult, SubmissionData, SubmissionRecord } from '../src/types';
+import { courseFlags, DEFAULT_FLAG_THRESHOLDS, normalizeThresholds, type FlaggedStudent, type FlagThresholds } from '../src/storage/gradingFlags';
 import { answerKey } from '../src/engine/score';
 import { homeworkContentHash } from '../src/devData/homeworkSync';
 import {
   buildAssignmentSummary,
   buildQuestionResponses,
+  countedAverage,
+  type AssignmentGradingSummary,
   type CourseAssignmentRow,
   type GradingIdentity,
+  type GradingRow,
+  type LateContext,
+  type StudentHistoryEntry,
   type QueueResponse,
 } from '../src/storage/gradingSummary';
 import { ClaimBook, CLAIM_TTL_MS, type ClaimView } from '../src/storage/gradingClaims';
@@ -55,6 +67,8 @@ import {
   cellOf,
   filterCounts,
   filterTest,
+  flagKindCounts,
+  historyLine,
   isCounted,
   matchesSearch,
   MATRIX_FILTERS,
@@ -183,8 +197,8 @@ check('no attempt → — (every problem)', [0, 1].every((i) => cell('ke', i).st
 console.log('[filters]');
 const { roster: rosterRows, offRoster } = splitRows(summary);
 const keysOf = (id: (typeof MATRIX_FILTERS)[number]['id']) => rosterRows.filter(filterTest(id)).map((r) => r.student.key).join();
-check('the chips, in order (Flagged waits for task 070)',
-  MATRIX_FILTERS.map((f) => f.label).join('|') === 'All|Needs grading|Changed|Late|Missing|Below 70');
+check('the chips, in order (memo §6.2)',
+  MATRIX_FILTERS.map((f) => f.label).join('|') === 'All|Needs grading|Changed|Late|Missing|Flagged|Below 70');
 check('Needs grading = a pending or changed problem', keysOf('needs-grading') === 'kb,kc,kd', keysOf('needs-grading'));
 check('Changed', keysOf('changed') === 'kd');
 check('Late', keysOf('late') === 'kc');
@@ -430,6 +444,248 @@ console.log('[regrade dialog]');
     JSON.stringify(line));
   check('…singular when one', regradeSummary({ ...plan, changed: [change({})], humanGrades: { hand: 1, overrides: 1 } }).rest ===
     '71 unchanged · 1 hand grade and 1 override untouched.');
+}
+
+console.log('[flags]');
+{
+  // Task 070: each flag rule both ways, over summaries the one builder makes
+  // (buildAssignmentSummary with thresholds) — synthetic students only.
+  const DAY = 86_400_000;
+  const DUE = '2026-10-01T00:00:00.000Z';
+  const due = Date.parse(DUE);
+  const at = (days: number) => new Date(due + days * DAY).toISOString();
+  const T = DEFAULT_FLAG_THRESHOLDS;
+  const mkAsg = (id: string, qs: AssignmentQuestion[], extra: Partial<AssignmentData> = {}): AssignmentData =>
+    ({ id, title: id.toUpperCase(), dueDate: DUE, questions: qs, ...extra });
+  const rec = (
+    a: AssignmentData,
+    key: string,
+    o: { m?: number; text?: string; at?: string; group?: string[]; gradeO?: Points; flag?: boolean } = {},
+  ): SubmissionRecord => {
+    const submission: SubmissionData = {
+      assignmentTitle: a.title,
+      submittedAt: o.at ?? at(-1),
+      answers: a.questions.map((q) => (q.id === O.id ? { questionId: q.id, circuit: EMPTY, responseText: o.text ?? '' } : { questionId: q.id, circuit: EMPTY })),
+      ...(o.group ? { group: o.group } : {}),
+    };
+    const grades: HumanGrade[] = o.gradeO !== undefined
+      ? [{ questionId: O.id, points: o.gradeO, answerKey: answerKey(O, submission.answers.find((x) => x.questionId === O.id)), gradedAt: at(2), grader: 'g', attempt: 1, version: 1 }]
+      : [];
+    return {
+      assignmentId: a.id,
+      attempt: 1,
+      submittedAt: submission.submittedAt,
+      submission,
+      result: { student: key, questions: a.questions.map((q) => (q.id === O.id ? openResult : machineResult(o.m ?? 4))), passed: o.m ?? 4, total: 4 },
+      grades,
+      studentKey: key,
+      assignmentHash: homeworkContentHash(a),
+      ...(o.flag
+        ? { integrity: { v: 1 as const, flagged: 1, questions: [{ questionId: M.id, ids: { total: 0, self: 0, unbound: 0, legacy: 0, others: [] }, text: 'none' as const, record: 'none' as const, flags: [{ code: 'one-save' as const, detail: 'x' }] }] } }
+        : {}),
+    };
+  };
+  const sum = (a: AssignmentData, ros: GradingIdentity[], recs: SubmissionRecord[], now: number, extra: { thresholds?: FlagThresholds; late?: LateContext } = {}) =>
+    buildAssignmentSummary({
+      assignment: a, roster: ros, latest: recs, identify: (k) => ({ ...who(k, 'Off'), offRoster: 'not-rostered' }),
+      released: false, now, thresholds: extra.thresholds ?? T, ...(extra.late ? { late: extra.late } : {}),
+    });
+  const kinds = (s: AssignmentGradingSummary, key: string) => (s.rows.find((r) => r.student.key === key)?.flags ?? []).map((f) => f.kind);
+  const has = (s: AssignmentGradingSummary, key: string, kind: string) => kinds(s, key).includes(kind as never);
+  const flagOf = (s: AssignmentGradingSummary, key: string, kind: string) => s.rows.find((r) => r.student.key === key)?.flags?.find((f) => f.kind === kind);
+  const A1 = mkAsg('fa', [M, O]);
+
+  // Not submitted / very late.
+  {
+    const ros = [who('n1', 'N1'), who('n2', 'N2'), who('n3', 'N3'), who('n4', 'N4'), who('n5', 'N5')];
+    const ext = { dueDate: at(30), setBy: 'i', setAt: at(0) };
+    const late: LateContext = { byStudent: new Map([['n2', { extension: ext }]]) };
+    const s15 = sum(A1, ros, [rec(A1, 'n3', { at: at(15) }), rec(A1, 'n4', { at: at(13) })], due + 15 * DAY + 1000, { late });
+    check('not submitted: fires past the effective due date', has(s15, 'n1', 'not-submitted'), kinds(s15, 'n1').join());
+    check('…NOT when an extension moves the due date past now', !has(s15, 'n2', 'not-submitted') && !has(s15, 'n2', 'very-late'),
+      kinds(s15, 'n2').join());
+    check('very late: a submission 15 days after the due date fires; 13 days does not',
+      has(s15, 'n3', 'very-late') && !has(s15, 'n4', 'very-late') && !has(s15, 'n3', 'not-submitted'),
+      `${kinds(s15, 'n3')} / ${kinds(s15, 'n4')}`);
+    check('…nothing by due + 15 days fires too', has(s15, 'n1', 'very-late') && has(s15, 'n5', 'very-late'));
+    const s13 = sum(A1, ros, [], due + 13 * DAY);
+    check('…nothing by due + 13 days: not submitted, not (yet) very late', has(s13, 'n1', 'not-submitted') && !has(s13, 'n1', 'very-late'));
+    const custom = sum(A1, ros, [rec(A1, 'n3', { at: at(15) })], due + 15 * DAY + 1000, { thresholds: { ...T, veryLateDays: 20 } });
+    check('custom thresholds change the outcome: veryLateDays 20 → 15 days late is not very late', !has(custom, 'n3', 'very-late'));
+    const before = sum(A1, ros, [], due - DAY);
+    check('before the due date nobody is flagged', before.rows.every((r) => !r.flags));
+  }
+
+  // Group mismatch.
+  {
+    const ros = ['ga', 'gb', 'gc', 'gd', 'gg', 'gh', 'k1', 'k2', 'k3', 'k4'].map((k) => who(k, k.toUpperCase()));
+    const s = sum(A1, ros, [
+      rec(A1, 'ga', { group: ['gb'] }), rec(A1, 'gb'), //                    B submitted, didn't list A
+      rec(A1, 'gc', { group: ['gd'] }), //                                   D never submitted, due passed
+      rec(A1, 'gg', { group: ['gh'] }), rec(A1, 'gh', { group: ['gg'] }), // reciprocal
+      rec(A1, 'k1', { group: ['k2'] }), rec(A1, 'k2', { group: ['k1', 'k3'] }), rec(A1, 'k3', { group: ['k2', 'k4'] }), rec(A1, 'k4', { group: ['k3'] }),
+    ], due + DAY);
+    check('group mismatch: B submitted without listing A → both flagged, each naming the other by key',
+      flagOf(s, 'ga', 'group-mismatch')?.others?.join() === 'gb' && flagOf(s, 'gb', 'group-mismatch')?.others?.join() === 'ga');
+    check('…B missing past the due date → both flagged', has(s, 'gc', 'group-mismatch') && has(s, 'gd', 'group-mismatch'));
+    check('…a reciprocal pair → neither', !has(s, 'gg', 'group-mismatch') && !has(s, 'gh', 'group-mismatch'));
+    check('…four listed together through chained listings (all reciprocal) → all four flagged',
+      ['k1', 'k2', 'k3', 'k4'].every((k) => flagOf(s, k, 'group-mismatch')?.detail.includes('4 people')),
+      JSON.stringify(flagOf(s, 'k1', 'group-mismatch')));
+    check('…a row carries its group listing (keys)', s.rows.find((r) => r.student.key === 'k2')?.group?.join() === 'k1,k3' &&
+      !('group' in s.rows.find((r) => r.student.key === 'gb')!));
+    const early = sum(A1, ros, [rec(A1, 'ga', { group: ['gb'] })], due - DAY);
+    check('…NOT while B has not submitted before the due date', !has(early, 'ga', 'group-mismatch') && !has(early, 'gb', 'group-mismatch'));
+    const mapped = buildAssignmentSummary({
+      assignment: A1, roster: ros, latest: [rec(A1, 'ga', { group: ['toy-gb'] })], identify: (k) => who(k, 'x'),
+      released: false, now: due - DAY, thresholds: T, groupKey: (raw) => (raw.startsWith('toy-') ? raw.slice(4) : null),
+    });
+    check('…groupKey maps a listing to identity keys (local: toy id → email)', mapped.rows.find((r) => r.student.key === 'ga')?.group?.join() === 'gb');
+  }
+
+  // Integrity and identical text.
+  {
+    const ros = ['i1', 'i2', 'i3', 'i4', 'i5', 'i6'].map((k) => who(k, k.toUpperCase()));
+    const text = 'The machine counts the ones, then halts.';
+    const s = sum(A1, ros, [
+      rec(A1, 'i1', { flag: true, text }),
+      rec(A1, 'i2', { text: `  the machine   counts THE ones, then halts. ` }),
+      rec(A1, 'i3', { text: 'Different words entirely, and long enough.' }),
+      rec(A1, 'i4', { text: 'yes it does' }), rec(A1, 'i5', { text: 'yes it does' }),
+    ], due + DAY);
+    check('integrity: a row with a flagged problem is flagged, counted per row',
+      flagOf(s, 'i1', 'integrity')?.detail === '1 problem with integrity flags' && !has(s, 'i2', 'integrity'));
+    const same = flagOf(s, 'i1', 'identical-text');
+    check('identical text: the same open answer (whitespace, case aside) flags both, naming the problem and each other',
+      same?.questionId === O.id && same.others?.join() === 'i2' && same.sameGroup === false &&
+        flagOf(s, 'i2', 'identical-text')?.others?.join() === 'i1' && !has(s, 'i3', 'identical-text'), JSON.stringify(same));
+    check('…never below identicalTextMinChars', !has(s, 'i4', 'identical-text') && !has(s, 'i5', 'identical-text'));
+    check('…the fingerprints never ship: no answer text in the summary', !JSON.stringify(s).includes('halts') && !JSON.stringify(s).includes('yes it does'));
+    const grouped = sum(A1, ros, [rec(A1, 'i1', { text, group: ['i2'] }), rec(A1, 'i2', { text, group: ['i1'] })], due + DAY);
+    check('…annotated "same group" when the two list each other', flagOf(grouped, 'i1', 'identical-text')?.sameGroup === true &&
+      flagOf(grouped, 'i1', 'identical-text')!.detail.includes('same group'));
+    const strict = sum(A1, ros, [rec(A1, 'i1', { text }), rec(A1, 'i2', { text })], due + DAY, { thresholds: { ...T, identicalTextMinChars: 100 } });
+    check('…custom identicalTextMinChars 100 → not compared', !has(strict, 'i1', 'identical-text'));
+    const off = buildAssignmentSummary({
+      assignment: A1, roster: [who('i1', 'I1')], latest: [rec(A1, 'i1', { text }), rec(A1, 'zz', { text, flag: true })],
+      identify: (k) => ({ ...who(k, 'Off'), offRoster: 'not-rostered' }), released: false, now: due + 20 * DAY, thresholds: T,
+    });
+    check('an off-roster submitter is never flagged (nor compared)', !off.rows.find((r) => r.student.key === 'zz')?.flags && !has(off, 'i1', 'identical-text'));
+    check('the Flagged chip: rows with any flag, counted over the roster',
+      filterCounts(s).flagged === s.rows.filter((r) => !r.student.offRoster && r.flags?.length).length && filterCounts(s).flagged >= 3 &&
+        filterTest('flagged')(s.rows.find((r) => r.student.key === 'i1')!) && !filterTest('flagged')(s.rows.find((r) => r.student.key === 'i3')!) &&
+        filterCounts(off).flagged === 0);
+  }
+
+  // Course-wide: struggling, no account, hidden assignments.
+  {
+    const S1 = mkAsg('s1', [M], { order: 1 });
+    const S2 = mkAsg('s2', [M, O], { order: 2 });
+    const S3 = mkAsg('s3', [M], { order: 3, countsTowardGrade: false });
+    const S4 = mkAsg('s4', [M], { order: 4 });
+    const ros = [who('sa', 'SA'), who('sb', 'SB'), who('sc', 'SC'), who('sd', 'SD')];
+    const now = due + 3 * DAY;
+    const low = { m: 0, gradeO: 0 as Points };
+    const high = { m: 4, gradeO: 1 as Points };
+    const plan: Record<string, [typeof low, typeof low, typeof low, typeof low]> = {
+      sa: [low, low, high, high], //                             40, 40 → struggling
+      sb: [low, high, low, low], //                              40, 100, (uncounted 40), 40 → not
+      sc: [high, high, low, low], //                             …, (uncounted 40), 40 → not (the uncounted set is skipped)
+      sd: [low, { m: 0 } as typeof low, high, high], //         40, 40* provisional → not
+    };
+    const sets = [S1, S2, S3, S4];
+    const summaries = sets.map((a, i) => ({
+      summary: sum(a, ros, ros.map((r) => rec(a, r.key, plan[r.key][i])), now),
+      visible: true,
+      order: a.order,
+    }));
+    const flagged = (extra: Partial<Parameters<typeof courseFlags>[0]> = {}) =>
+      courseFlags({ roster: ros, summaries, thresholds: T, now, ...extra });
+    const struggling = (f: FlaggedStudent[]) => f.filter((x) => x.flags.some((y) => y.kind === 'struggling')).map((x) => x.student.key).join();
+    check('struggling: two consecutive counted settled sets below 70 — not across a set ≥ 70, an uncounted set or a provisional grade',
+      struggling(flagged()) === 'sa', struggling(flagged()));
+    check('…the provisional grade is < 70 but unsettled', summaries[1].summary.rows.find((r) => r.student.key === 'sd')!.grade.provisional &&
+      summaries[1].summary.rows.find((r) => r.student.key === 'sd')!.grade.final! < 70);
+    check('…custom struggleRun 1 flags every one with a settled grade under 70', struggling(flagged({ thresholds: { ...T, struggleRun: 1 } })) === 'sa,sb,sc,sd');
+    check('…counted sets in catalog order, whatever order they arrive in', struggling(courseFlags({ roster: ros, summaries: [...summaries].reverse(), thresholds: T, now })) === 'sa');
+    // A set not yet due is unsettled even if submitted and fully autograded:
+    // sa's two lows, the second due after now → no run of two.
+    const early = mkAsg('s2', [M], { order: 2, dueDate: at(10) });
+    const earlySum = { summary: sum(early, ros, ros.map((r) => rec(early, r.key, low)), now), visible: true, order: 2 };
+    const earlyRow = earlySum.summary.rows.find((r) => r.student.key === 'sa')!;
+    check('…a submitted set not yet due breaks the run (settled only past its effective due date)',
+      !earlyRow.grade.provisional && earlyRow.grade.final! < 70 &&
+        struggling(courseFlags({ roster: ros, summaries: [summaries[0], earlySum], thresholds: T, now })) === '' &&
+        struggling(courseFlags({ roster: ros, summaries: [summaries[0], earlySum], thresholds: T, now: due + 11 * DAY })).includes('sa'),
+      JSON.stringify(earlyRow.grade));
+    const cal = { meetings: [{ start: at(-10), end: at(-10) }] };
+    const noAcc = [{ ...who('na', 'NA'), hasAccount: false }, who('nb', 'NB')];
+    const acct = (days: number) => courseFlags({ roster: noAcc, summaries: [], thresholds: T, calendar: cal, now: due - 10 * DAY + days * DAY })
+      .filter((x) => x.flags.some((y) => y.kind === 'no-account')).map((x) => x.student.key).join();
+    check('no account: fires 8 days after the first meeting; not at 6 days; never with an account; never without a calendar',
+      acct(8) === 'na' && acct(6) === '' &&
+        courseFlags({ roster: noAcc, summaries: [], thresholds: T, now: due + 30 * DAY }).length === 0, `${acct(8)} / ${acct(6)}`);
+    const missing = sum(S1, ros, [], now);
+    const withHidden = (visible: boolean) => courseFlags({ roster: ros, summaries: [{ summary: missing, visible }], thresholds: T, now })
+      .filter((x) => x.flags.some((y) => y.kind === 'not-submitted' && y.assignmentId === 's1')).length;
+    check('courseFlags carries a published assignment\'s row flags, and drops a hidden one\'s', withHidden(true) === 4 && withHidden(false) === 0);
+    const counts = flagKindCounts(flagged());
+    check('the Needs-attention counts: students flagged, per kind (a student once per kind)',
+      counts.total === flagged().length && counts.kinds.find((k) => k.kind === 'struggling')?.count === 1, JSON.stringify(counts));
+  }
+
+  // Thresholds.
+  check('normalizeThresholds: defaults for nothing or junk', JSON.stringify(normalizeThresholds(undefined)) === JSON.stringify(T) &&
+    JSON.stringify(normalizeThresholds('junk')) === JSON.stringify(T) && JSON.stringify(normalizeThresholds([3])) === JSON.stringify(T));
+  const n = normalizeThresholds({ veryLateDays: 3.6, struggleBelow: 'x', maxGroupSize: -5, noAccountDays: Infinity, extra: 1 });
+  check('…whole numbers, clamped into range; a bad field is its default; unknown fields dropped',
+    n.veryLateDays === 4 && n.struggleBelow === 70 && n.maxGroupSize === 1 && n.noAccountDays === 7 && !('extra' in n), JSON.stringify(n));
+
+  // The counted average (the student page; 071's export).
+  {
+    const row = (final: number | null, o: { provisional?: boolean; extendedTo?: string } = {}): GradingRow => ({
+      student: who('av', 'AV'), latest: null, problems: [], ...(o.extendedTo ? { extendedTo: o.extendedTo } : {}),
+      grade: { raw: final, final, provisional: !!o.provisional, missing: false },
+    });
+    const now = due + DAY;
+    const avg = countedAverage([
+      { dueDate: DUE, row: row(40) },
+      { dueDate: DUE, row: row(100, { provisional: true }) },
+      { dueDate: DUE, countsTowardGrade: false, row: row(0) },
+      { dueDate: at(10), row: row(0) },
+      { dueDate: DUE, row: row(0, { extendedTo: at(5) }) },
+      { row: row(10) },
+    ], now);
+    check('countedAverage: counted sets whose effective due date passed — not uncounted, not due yet, not extended past now',
+      avg.value === 70 && avg.sets === 2 && avg.provisional, JSON.stringify(avg));
+    check('…none due → null', countedAverage([{ dueDate: at(10), row: row(50) }], now).value === null);
+  }
+
+  // The history line.
+  {
+    const base = { assignmentId: 'hw2', title: 'HW2' };
+    const g = (points: Points, note?: string) => ({ questionId: 3, points, answerKey: 'k', gradedAt: 'x', ...(note ? { note } : {}) });
+    const fmt = (iso: string) => iso.slice(0, 10);
+    const line = (event: StudentHistoryEntry['event']) => historyLine({ ...base, event }, fmt);
+    check('history: a hand grade, an override (with its note), a clear',
+      line({ at: 'a', actor: 'i', questionId: 3, kind: 'grade', before: null, after: g(0.5) }) === 'HW2 P3: — → ½ (hand grade)' &&
+        line({ at: 'a', actor: 'i', questionId: 3, kind: 'override', before: g(1), after: g(0.5, 'one wire off') }) === 'HW2 P3: 1 → ½ (override) — “one wire off”' &&
+        line({ at: 'a', actor: 'i', questionId: 3, kind: 'clear', before: g(1), after: null }) === 'HW2 P3: grade cleared (was 1)',
+      line({ at: 'a', actor: 'i', questionId: 3, kind: 'override', before: g(1), after: g(0.5, 'one wire off') }));
+    check('…an extension and a waiver (no problem number), set and cleared',
+      line({ at: 'a', actor: 'i', kind: 'extension', before: null, after: { dueDate: '2026-10-08T06:59:00.000Z', setBy: 'i', setAt: 'x' } }) === 'HW2: extension to 2026-10-08' &&
+        line({ at: 'a', actor: 'i', kind: 'extension', before: { dueDate: 'd', setBy: 'i', setAt: 'x' }, after: null }) === 'HW2: extension cleared' &&
+        line({ at: 'a', actor: 'i', kind: 'waiver', before: null, after: { points: 5, by: 'i', at: 'x' } }) === 'HW2: 5 late points waived');
+    check('…a re-grade', line({
+      at: 'a', actor: 'i', questionId: 3, kind: 'regrade', attempt: 1, fromHash: null, toHash: 'h',
+      before: { auto: 0, points: 0 }, after: { auto: 1, points: 1 }, underOverride: false,
+    }) === 'HW2 P3: re-graded, 0 → 1');
+  }
+
+  // The flags module stays grader-free (the remote store's graph imports it — remoteStoreCheck).
+  const src = readFileSync(new URL('../src/storage/gradingFlags.ts', import.meta.url), 'utf8');
+  check('gradingFlags.ts imports no grader or scorer (types from engine/score only)',
+    !/engine\/grader|\bscoreRecord\b|\bscoreSubmission\b/.test(src) && !/^import (?!type )[^;]*engine\//m.test(src));
 }
 
 console.log('[no view grades]');

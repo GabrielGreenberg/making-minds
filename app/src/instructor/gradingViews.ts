@@ -19,6 +19,8 @@ import type {
   OffRoster,
 } from '../storage/gradingSummary';
 import type { RegradeChange, RegradePlan } from '../storage/regrade';
+import type { FlaggedStudent, StudentFlag, StudentFlagKind } from '../storage/gradingFlags';
+import type { StudentHistoryEntry } from '../storage/gradingSummary';
 
 /** A problem graded by hand: an open (prose) question. Everything else — a
  *  machine, perception, a turbot, fill-in blanks — the autograder scores, and
@@ -110,10 +112,9 @@ export function adjacentStudents(
   return { prev: order[i - 1] ?? null, next: order[i + 1] ?? null };
 }
 
-export type MatrixFilter = 'all' | 'needs-grading' | 'changed' | 'late' | 'missing' | 'below-70';
+export type MatrixFilter = 'all' | 'needs-grading' | 'changed' | 'late' | 'missing' | 'flagged' | 'below-70';
 
-/** The matrix's filter chips, in order. (Flagged arrives with task 070,
- *  which puts integrity and group flags on the row.) */
+/** The matrix's filter chips, in order. */
 export const MATRIX_FILTERS: readonly { id: MatrixFilter; label: string; test: (r: GradingRow) => boolean }[] = [
   { id: 'all', label: 'All', test: () => true },
   // A problem still waiting on a person: pending, or changed since graded.
@@ -121,6 +122,8 @@ export const MATRIX_FILTERS: readonly { id: MatrixFilter; label: string; test: (
   { id: 'changed', label: 'Changed', test: (r) => r.problems.some((p) => p.source === 'changed') },
   { id: 'late', label: 'Late', test: (r) => !!r.latest?.late.late },
   { id: 'missing', label: 'Missing', test: (r) => r.grade.missing },
+  // Any of this assignment's flags on the row (task 070).
+  { id: 'flagged', label: 'Flagged', test: (r) => !!r.flags?.length },
   // A submitted grade under 70 (a missing student is under Missing instead).
   { id: 'below-70', label: 'Below 70', test: (r) => !!r.latest && r.grade.final !== null && r.grade.final < 70 },
 ];
@@ -311,4 +314,73 @@ export function regradeSummary(plan: RegradePlan): { changes: string; rest: stri
       `${plan.unchanged} unchanged · ` +
       `${plural(plan.humanGrades.hand, 'hand grade')} and ${plural(plan.humanGrades.overrides, 'override')} untouched.`,
   };
+}
+
+// ── Flags (task 2026-09-26-070; memo §8) ─────────────────────────────────
+
+/** Each flag kind in a few words — a chip's text (prompts, never verdicts). */
+export const FLAG_KIND_LABEL: Record<StudentFlagKind, string> = {
+  'not-submitted': 'Not submitted',
+  'very-late': 'Very late',
+  struggling: 'Struggling',
+  'no-account': 'No account',
+  'group-mismatch': 'Group mismatch',
+  integrity: 'Integrity',
+  'identical-text': 'Identical text',
+};
+
+export function flagLabel(kind: StudentFlagKind): string {
+  return FLAG_KIND_LABEL[kind];
+}
+
+/** A flag as a chip: the kind, where (the assignment's title, when
+ *  `titleOf` knows it), and "same group" when a group explains identical text. */
+export function flagChipText(flag: StudentFlag, titleOf?: (assignmentId: string) => string | undefined): string {
+  const where = flag.assignmentId ? titleOf?.(flag.assignmentId) : undefined;
+  return `${flagLabel(flag.kind)}${where ? ` · ${where}` : ''}${flag.sameGroup ? ' (same group)' : ''}`;
+}
+
+/** The Needs-attention box: how many roster students are flagged, and how
+ *  many carry each kind (a student counts once per kind), in label order. */
+export function flagKindCounts(flagged: readonly FlaggedStudent[]): { total: number; kinds: { kind: StudentFlagKind; count: number }[] } {
+  const kinds = (Object.keys(FLAG_KIND_LABEL) as StudentFlagKind[])
+    .map((kind) => ({ kind, count: flagged.filter((f) => f.flags.some((x) => x.kind === kind)).length }))
+    .filter((k) => k.count > 0);
+  return { total: flagged.length, kinds };
+}
+
+/** One line of the student page's grade history: "HW2 P3: ✎ → ½ (hand
+ *  grade)", "HW2: extension to Oct 8, 11:59 PM", …. `formatDate` renders a
+ *  date (the view passes dueDates' formatter; the check a plain one). */
+export function historyLine(entry: StudentHistoryEntry, formatDate: (iso: string) => string): string {
+  const e = entry.event;
+  const where = e.questionId !== undefined ? `${entry.title} P${e.questionId}` : entry.title;
+  const pts = (x: unknown) => {
+    const p = (x as { points?: Points } | null)?.points;
+    return p === undefined || p === null ? '—' : pointsLabel(p);
+  };
+  const note = (x: unknown) => {
+    const n = (x as { note?: string } | null)?.note;
+    return n ? ` — “${n}”` : '';
+  };
+  switch (e.kind) {
+    case 'grade':
+      return `${where}: ${pts(e.before)} → ${pts(e.after)} (hand grade)${note(e.after)}`;
+    case 'override':
+      return `${where}: ${pts(e.before)} → ${pts(e.after)} (override)${note(e.after)}`;
+    case 'clear':
+      return `${where}: grade cleared (was ${pts(e.before)})`;
+    case 'migrate':
+      return `${where}: ${pts(e.after)} (carried over from a review)`;
+    case 'extension': {
+      const to = (e.after as { dueDate?: string } | null)?.dueDate;
+      return to ? `${where}: extension to ${formatDate(to)}` : `${where}: extension cleared`;
+    }
+    case 'waiver': {
+      const w = e.after as { points?: number } | null;
+      return w?.points ? `${where}: ${w.points} late points waived` : `${where}: waiver cleared`;
+    }
+    case 'regrade':
+      return `${where}: re-graded, ${pts(e.before)} → ${pts(e.after)}${e.underOverride ? ' (an override stands)' : ''}`;
+  }
 }

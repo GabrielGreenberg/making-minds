@@ -11,7 +11,8 @@
 //   RemoteGradingStore    → putGrade / deleteGrade / getGradingSummary / getCourseGrading /
 //                           getStudentGrading / getGradingAttempt /
 //                           getQuestionResponses / postGradingClaim /
-//                           putExtension / putWaiver
+//                           putExtension / putWaiver /
+//                           putGradingSettings / postStudentNote
 //   remote auth           → login / logout / me
 //
 // Configuration: VITE_API_BASE (e.g. "https://api.phil133.example.edu") set at
@@ -36,9 +37,11 @@ import type {
   FeedbackStatus,
   InstructorNote,
   PlatformFeedback,
+  StudentNote,
   SubmissionData,
   SubmissionRecord,
 } from '../types';
+import type { FlagThresholds } from '../storage/gradingFlags';
 import type {
   AssignmentGradingSummary,
   AttemptDetail,
@@ -75,6 +78,9 @@ export interface AuthCapabilities {
 
 /** One roster row with its account state — the instructor's roster screen. */
 export interface RosterEntryView {
+  /** A student's opaque key (`users.public_id`) — their student page's path
+   *  (task 070); absent for an instructor. */
+  key?: string;
   /** The account's key: the email it was first rostered under. */
   email: string;
   name: string;
@@ -614,6 +620,19 @@ export function getCourseGrading(): Promise<CourseGrading> {
 /** Instructor only: one student (by opaque key) across assignments. */
 export function getStudentGrading(studentKey: string): Promise<StudentGrading> {
   return request<StudentGrading>('GET', `/students/${encodeURIComponent(studentKey)}`);
+}
+
+/** Instructor only: store the course's flag thresholds (task 070) — the
+ *  server normalizes them and returns what it stored. */
+export async function putGradingSettings(thresholds: Partial<FlagThresholds>): Promise<FlagThresholds> {
+  const { thresholds: stored } = await request<{ thresholds: FlagThresholds }>('PUT', '/grading/settings', { thresholds });
+  return stored;
+}
+
+/** Instructor only: add one private note to a student's log (append-only). */
+export async function postStudentNote(studentKey: string, body: string): Promise<StudentNote> {
+  const { note } = await request<{ note: StudentNote }>('POST', `/students/${encodeURIComponent(studentKey)}/notes`, { body });
+  return note;
 }
 
 /** Instructor only: one attempt in full (circuits, expected/got, integrity,

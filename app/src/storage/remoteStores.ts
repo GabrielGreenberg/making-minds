@@ -52,8 +52,10 @@ import type {
   ClaimOutcome,
   CourseGrading,
   GradingStore,
+  FlagThresholds,
   GradeWriteOutcome,
   LateWriteOutcome,
+  NoteWriteOutcome,
   QuestionResponses,
   RegradeOutcome,
   StudentGrading,
@@ -88,6 +90,8 @@ import {
   postRegrade,
   putExtension,
   putWaiver,
+  putGradingSettings,
+  postStudentNote,
   submitFeedback,
   listFeedback,
   setFeedbackStatus,
@@ -302,6 +306,21 @@ class RemoteGradingStore implements GradingStore {
 
   setWaiver(assignmentId: string, studentKey: string, write: { points: number; note?: string } | null): Promise<LateWriteOutcome<LateWaiver>> {
     return this.lateOutcome(() => putWaiver(assignmentId, studentKey, write));
+  }
+
+  // Flags and notes (task 070): the server normalizes and stamps the author
+  // and time; a 400 / 404 is the refusal's reason.
+  setFlagThresholds(thresholds: Partial<FlagThresholds>): Promise<FlagThresholds> {
+    return putGradingSettings(thresholds);
+  }
+
+  async addStudentNote(studentKey: string, body: string): Promise<NoteWriteOutcome> {
+    try {
+      return { ok: true, note: await postStudentNote(studentKey, body) };
+    } catch (err) {
+      if (err instanceof ApiError && (err.status === 400 || err.status === 404)) return { ok: false, error: err.message };
+      throw err;
+    }
   }
 }
 

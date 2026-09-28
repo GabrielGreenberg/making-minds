@@ -1,10 +1,12 @@
 // Small pieces the Grading tab's views share (task 065): the progress bar,
-// a grade as the summaries report it, and the release tag. Display only —
-// every number arrives from the grading summaries (gradingViews.ts).
+// a grade as the summaries report it, the release tag, and a flag's chip
+// (task 070). Display only — every number arrives from the grading
+// summaries (gradingViews.ts).
 
 import type { ReactNode } from 'react';
 import { formatGrade } from '../engine/score';
-import { percent } from './gradingViews';
+import type { StudentFlag, StudentFlagKind } from '../storage/gradingFlags';
+import { flagChipText, percent } from './gradingViews';
 
 /** A bar at x / of (`ok` = the done colour, for a finished count). */
 export function Bar({ x, of, ok }: { x: number; of: number; ok?: boolean }) {
@@ -48,4 +50,37 @@ export function GradeValue({ value, provisional }: { value: number | null; provi
 
 export function ReleaseTag({ released }: { released: boolean }) {
   return released ? <span className="tag tag--ok">Grades released</span> : <span className="tag">Grades hidden</span>;
+}
+
+/** A flag kind's tag colour: a missing or failing record in the danger
+ *  tone, a listing or account to chase in the warning one, integrity prompts
+ *  in the accent. */
+const FLAG_TONE: Record<StudentFlagKind, string> = {
+  'not-submitted': 'tag--danger',
+  'very-late': 'tag--danger',
+  struggling: 'tag--danger',
+  'no-account': 'tag--warn',
+  'group-mismatch': 'tag--warn',
+  integrity: 'tag--accent',
+  'identical-text': 'tag--accent',
+};
+
+/** One flag as a chip — a prompt to look, never a verdict; the detail (and
+ *  who else, by name when `nameOf` knows them) in its tooltip. */
+export function FlagChip({
+  flag,
+  titleOf,
+  nameOf,
+}: {
+  flag: StudentFlag;
+  titleOf?: (assignmentId: string) => string | undefined;
+  nameOf?: (key: string) => string | undefined;
+}) {
+  const others = (flag.others ?? []).map((k) => nameOf?.(k)).filter(Boolean);
+  const tip = `${flag.detail}${others.length ? ` — ${others.join(', ')}` : ''}`;
+  return (
+    <span className={`tag gr-flagchip ${FLAG_TONE[flag.kind]}`} title={tip}>
+      ⚑ {flagChipText(flag, titleOf)}
+    </span>
+  );
 }
