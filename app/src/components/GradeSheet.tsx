@@ -29,6 +29,7 @@ import { dueInput } from '../lateContext';
 import { COURSE_CALENDAR } from '../courseCalendar';
 import { lateLabel } from '../dueDates';
 import { recordedCaseSeparations } from '../engine/caseRun';
+import { fillInCaseNoun } from '../engine/fillIn';
 import { useAsyncValue } from '../useAsyncValue';
 import { navigate } from '../routing';
 
@@ -83,9 +84,12 @@ function FailedInputs({
   if (qr.fillCases) {
     const failed = qr.fillCases.filter((c) => !c.pass);
     if (failed.length === 0) return null;
+    // A table's case is a key row, named by its arguments ("row (0, 1)");
+    // a blank is named by its quoted label.
+    const noun = fillInCaseNoun(question?.fill_in);
     return (
       <ul className="grades-failed-list">
-        {failed.map((c, i) => <li key={i}>blank "{c.label}"</li>)}
+        {failed.map((c, i) => <li key={i}>{noun === 'row' ? `row ${c.label}` : `blank "${c.label}"`}</li>)}
       </ul>
     );
   }

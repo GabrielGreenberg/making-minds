@@ -23,6 +23,18 @@
 //                        classifier, and a grep pin: one reader and one
 //                        writer of `numericOnly`.
 //
+//   [fill-in tables]     (task 079) an argument–value table graded as a
+//                        function: HW1 P14 / P9b's shape and key, order-free
+//                        (rows in any order pass), a wrong value or a
+//                        repeated argument fails that key row, empty rows and
+//                        cells past the table ignored, normalisation, stale
+//                        positional answers harmless, labels = arguments
+//                        only, submit from the stripped copy → graded, the
+//                        student copy's `fill_in.table` layout-only; the
+//                        creator's table draft (round-trips P14 / P9b, each
+//                        defect named, which edits misplace answers); and a
+//                        grep pin: `.labels` is read only in engine/fillIn.ts.
+//
 //   [perception films]   (task 013) an SC perception question authored with
 //                        films (instructor/perceptionAuthoring.ts): submit →
 //                        grade counts generated + authored cases, the right
@@ -77,15 +89,26 @@ import { checkGroup, MAX_GROUP_OTHERS } from '../src/submissionGroup';
 import { emptyQuestionCircuit } from '../src/storage/workbookStore';
 import { buildAssignmentSummary } from '../src/storage/gradingSummary';
 import { problemVerdict } from '../src/gradeDisplay';
-import { fillInBlanks } from '../src/engine/fillIn';
+import { FILL_IN_TABLE_MAX_ROWS, fillInBlanks, fillInKeyProblem, fillInShape } from '../src/engine/fillIn';
 import {
+  addTableColumn,
   blankDraftsOf,
   fillInFields,
   fillInProblems,
+  fillInTableFields,
+  fillInTableProblems,
   misplacedAnswersWarning,
   misplacedBlanks,
+  misplacedTableWarning,
+  moveTableColumn,
   newBlankDraft,
+  newTableDraft,
+  newTableKeyRow,
+  removeTableColumn,
+  tableDraftOf,
+  tableRowCount,
   type FillInBlankDraft,
+  type FillInTableDraft,
 } from '../src/instructor/fillInAuthoring';
 import { moveItem } from '../src/instructor/dragReorder';
 import {
@@ -333,10 +356,10 @@ console.log('\n[fill-in blanks]');
   ) as AssignmentData;
   const q = hw1.questions.find((x) => x.id === 11)!;
   check('HW1 P11 carries a fill-in spec and a same-length answer key',
-    !!q.fill_in && q.fill_in.labels.length === 11 &&
+    !!q.fill_in && fillInBlanks(q.fill_in).length === 11 &&
     q.fill_in_answers?.length === 11);
   check('the boxes are labelled zero through ten, in words (task 046)',
-    q.fill_in!.labels.join(',') === 'zero,one,two,three,four,five,six,seven,eight,nine,ten');
+    fillInBlanks(q.fill_in!).map((b) => b.label).join(',') === 'zero,one,two,three,four,five,six,seven,eight,nine,ten');
 
   const correct = Array.from({ length: 11 }, (_, n) => n.toString(2));
   const graded = gradeQuestion(q, undefined, undefined, correct);
@@ -430,7 +453,7 @@ console.log('\n[fill-in authoring]');
   check('no digits-only blank omits the key',
     !('numericOnly' in fillInFields(drafts.map((d) => ({ ...d, digitsOnly: false }))).fill_in));
   check('labels and answers are saved trimmed, parallel, in row order',
-    fields.fill_in.labels.join('|') === 'seven in binary|the capital of France|four in binary' &&
+    fields.fill_in.labels!.join('|') === 'seven in binary|the capital of France|four in binary' &&
       fields.fill_in_answers.join('|') === '111|Paris|100');
   check('a lone array entry that is not true reads as a free-text blank',
     fillInBlanks({ labels: ['a', 'b'], numericOnly: [true] }).map((b) => b.digitsOnly).join() === 'true,false');
@@ -438,7 +461,7 @@ console.log('\n[fill-in authoring]');
   // (3) Reordering moves a whole row: label, answer and flag stay together.
   const moved = fillInFields(moveItem(drafts, 0, 2));
   check('moving blank #1 to the end moves its label, answer and flag together',
-    moved.fill_in.labels.join('|') === 'the capital of France|four in binary|seven in binary' &&
+    moved.fill_in.labels!.join('|') === 'the capital of France|four in binary|seven in binary' &&
       moved.fill_in_answers.join('|') === 'Paris|100|111' &&
       JSON.stringify(moved.fill_in.numericOnly) === '[false,true,true]');
 
@@ -494,8 +517,8 @@ console.log('\n[fill-in authoring]');
   const authored: AssignmentData = { id: 'authored-fill-in', title: 'Authored', questions: [authoredQ] };
   const studentQ = stripAnswers(authored).questions[0];
   check('the student copy has an empty answer key', studentQ.fill_in_answers?.length === 0);
-  check('the student copy\'s fill_in has only labels and numericOnly',
-    Object.keys(studentQ.fill_in ?? {}).every((k) => k === 'labels' || k === 'numericOnly'));
+  check('the student copy\'s fill_in has only labels / table and numericOnly',
+    Object.keys(studentQ.fill_in ?? {}).every((k) => k === 'labels' || k === 'table' || k === 'numericOnly'));
   check('...and is the authored spec unchanged (the prompts and per-blank flags)',
     canonicalJson(studentQ.fill_in) === canonicalJson(authoredQ.fill_in));
   check('no answer appears anywhere in the student copy',
@@ -554,6 +577,247 @@ console.log('\n[fill-in authoring]');
   check('`numericOnly` is named only in types.ts, engine/fillIn.ts and instructor/fillInAuthoring.ts',
     strays.length === 0 && allowed.every((f) => mentions.includes(f)));
   for (const f of strays) console.log(`        → ${f}`);
+}
+
+// ── Fill-in tables (task 079) ──────────────────────────────────────
+// A "define it with a table" problem is a blank argument–value table the
+// student fills whole — arguments too — graded as a FUNCTION: each key row is
+// one case, passed iff exactly one student row has its arguments and that
+// row's values match (engine/fillIn.ts). Answers and key both stay row-major
+// string lists, so nothing new travels or persists.
+console.log('\n[fill-in tables]');
+{
+  const hw1 = JSON.parse(
+    readFileSync(new URL('../src/devData/homeworks/hw1.json', import.meta.url), 'utf8'),
+  ) as AssignmentData;
+  const p14 = hw1.questions.find((x) => x.id === 14)!;
+  const p9b = hw1.questions.find((x) => x.id === 20)!;
+  const grade = (q: AssignmentQuestion, cells: string[]) => gradeQuestion(q, undefined, undefined, cells);
+  const score = (r: QuestionResult) => `${r.passed}/${r.total}`;
+  const failedLabels = (r: QuestionResult) => (r.fillCases ?? []).filter((c) => !c.pass).map((c) => c.label);
+  // P9b's function j(x, y) = x·y on {0, 1, 2}², as rows in the key's order.
+  const J_ROWS: [number, number][] = [];
+  for (let x = 0; x < 3; x++) for (let y = 0; y < 3; y++) J_ROWS.push([x, y]);
+  const jCells = (rows: [number, number][]) => rows.flatMap(([x, y]) => [String(x), String(y), String(x * y)]);
+
+  // (a) HW1 P14 and P9b are tables, their keys whole rows.
+  const s14 = fillInShape(p14.fill_in!);
+  const s9 = fillInShape(p9b.fill_in!);
+  check('HW1 P14 is a 2-row table: Argument | Value, one argument column, a 4-cell key',
+    s14.kind === 'table' && s14.argColumns === 1 && s14.rows === 2 &&
+      s14.columns.map((c) => c.header).join('|') === 'Argument|Value' &&
+      s14.columns.map((c) => c.digitsOnly).join() === 'false,true' && p14.fill_in_answers?.length === 4);
+  check('HW1 P9b is a 9-row table: x | y | j(x, y), two argument columns, a 27-cell key',
+    s9.kind === 'table' && s9.argColumns === 2 && s9.rows === 9 &&
+      s9.columns.map((c) => c.header).join('|') === 'x|y|j(x, y)' &&
+      s9.columns.every((c) => c.digitsOnly) && p9b.fill_in_answers?.length === 27);
+  check('both keys fit their tables (fillInKeyProblem null) and are blank-free (fillInBlanks [])',
+    fillInKeyProblem(p14.fill_in!, p14.fill_in_answers!) === null &&
+      fillInKeyProblem(p9b.fill_in!, p9b.fill_in_answers!) === null &&
+      fillInBlanks(p14.fill_in!).length === 0);
+
+  // (b) Order-free.
+  const right14 = grade(p14, ['@', '0', '#', '1']);
+  check('P14 in key order grades 2/2', right14.status === 'graded' && score(right14) === '2/2');
+  check('P14 with its rows reversed still grades 2/2', score(grade(p14, ['#', '1', '@', '0'])) === '2/2');
+  const shuffled = [8, 3, 0, 5, 1, 7, 2, 6, 4].map((i) => J_ROWS[i]);
+  check('P9b with its rows shuffled grades 9/9', score(grade(p9b, jCells(shuffled))) === '9/9');
+
+  // (c) A wrong value fails exactly its key row, named by the arguments.
+  const swapped = grade(p14, ['@', '1', '#', '0']);
+  check('P14 with the values swapped grades 0/2', score(swapped) === '0/2');
+  const oneWrong = jCells(J_ROWS);
+  oneWrong[5 * 3 + 2] = '3'; // j(1, 2) = 2, written 3
+  const r9 = grade(p9b, oneWrong);
+  check('P9b with one wrong value grades 8/9 and names that row "(1, 2)"',
+    score(r9) === '8/9' && failedLabels(r9).join() === '(1, 2)');
+  const bad = (r9.fillCases ?? []).find((c) => !c.pass)!;
+  check('...its expected / got are the values, not the arguments', bad.expected === '2' && bad.got === '3');
+
+  // (d) A repeated argument is not a function: that key row fails.
+  const dup14 = grade(p14, ['@', '0', '@', '0']);
+  check('P14 with "@" twice grades 0/2 ("@" repeated, "#" missing)', score(dup14) === '0/2');
+  const dup9 = jCells(J_ROWS.map(([x, y]) => (x === 2 && y === 2 ? [0, 0] : [x, y])));
+  check('P9b with row (2, 2) replaced by (0, 0, 0) grades 7/9',
+    score(grade(p9b, dup9)) === '7/9' && failedLabels(grade(p9b, dup9)).join('|') === '(0, 0)|(2, 2)');
+
+  // (e) An empty table fails every key row.
+  const empty = grade(p14, []);
+  check('an empty table is graded (never pending) 0/2, every got ""',
+    empty.status === 'graded' && score(empty) === '0/2' && (empty.fillCases ?? []).every((c) => c.got === ''));
+
+  // (f) Empty rows are no rows; cells past the table are not in it.
+  const fourRows: AssignmentQuestion = {
+    ...p14, fill_in: { ...p14.fill_in!, table: { ...p14.fill_in!.table!, rows: 4 } },
+  };
+  check('a 4-row table with a 2-row key, answered in rows 1 and 3, grades 2/2',
+    score(grade(fourRows, ['#', '1', '', '', '@', '0', '', ''])) === '2/2');
+  const dupGot = grade(fourRows, ['@', '0', '@', '1', '#', '1']);
+  check('a repeated argument fails even when one repeat is right; got lists every repeat',
+    failedLabels(dupGot).join() === '@' && (dupGot.fillCases ?? [])[0].got === '0 / 1');
+  check('cells past rows × columns are ignored (a stale longer answer adds no repeat)',
+    score(grade(p14, ['@', '0', '#', '1', '@', '5'])) === '2/2');
+
+  // (f2) The row cap: an authored count past FILL_IN_TABLE_MAX_ROWS (a typo in
+  // the creator's rows field) never has the grader or the panel build rows by
+  // the million, and the grader builds only the rows an answer has cells for.
+  const MAX_ROWS = FILL_IN_TABLE_MAX_ROWS;
+  const withRows = (rows: number): AssignmentQuestion => ({
+    ...p14, fill_in: { ...p14.fill_in!, table: { ...p14.fill_in!.table!, rows } },
+  });
+  check(`a ${MAX_ROWS}-row table is gradeable; ${MAX_ROWS + 1} rows is named by fillInKeyProblem`,
+    fillInKeyProblem(withRows(MAX_ROWS).fill_in!, p14.fill_in_answers!) === null &&
+      new RegExp(`most it may give is ${MAX_ROWS}$`).test(
+        fillInKeyProblem(withRows(MAX_ROWS + 1).fill_in!, p14.fill_in_answers!) ?? ''));
+  const huge = withRows(5_000_000);
+  const hugeShape = fillInShape(huge.fill_in!);
+  check('an authored 5,000,000 rows renders only the cap (fillInShape), and its grading is skipped',
+    hugeShape.kind === 'table' && hugeShape.rows === MAX_ROWS &&
+      grade(huge, ['@', '0', '#', '1']).status === 'skipped');
+  const lastRow = ['@', '0', ...Array<string>(2 * (MAX_ROWS - 2)).fill(''), '#', '1'];
+  check(`a ${MAX_ROWS}-row table answered in rows 1 and ${MAX_ROWS} grades 2/2 (the last row reached)`,
+    lastRow.length === 2 * MAX_ROWS && score(grade(withRows(MAX_ROWS), lastRow)) === '2/2');
+
+  // (g) Normalisation: as blanks — surrounding spaces, leading zeros.
+  check('" @ " and "00" match "@" and "0"', score(grade(p14, [' @ ', '00', '#', '01'])) === '2/2');
+
+  // (h) Stale positional answers (the old f(@) / f(#) boxes) load harmlessly.
+  const stale = grade(p14, ['0', '1']);
+  check('the old boxes\' answers read as one row ("0", "1") and grade 0/2, no throw',
+    stale.status === 'graded' && score(stale) === '0/2');
+
+  // (i) A result's label names the key row's arguments, never a value.
+  check('P14 case labels are its arguments ["@", "#"]',
+    (right14.fillCases ?? []).map((c) => c.label).join() === '@,#');
+  check('P9b case labels are the argument pairs "(0, 0)" … "(2, 2)", in key order',
+    (grade(p9b, []).fillCases ?? []).map((c) => c.label).join('|') ===
+      J_ROWS.map(([x, y]) => `(${x}, ${y})`).join('|'));
+
+  // (j) Submit → graded, from the copy a student is sent.
+  const studentHw1 = stripAnswers(hw1);
+  const built = buildSubmission(studentHw1, new Map([
+    [14, { ...emptyQuestionCircuit(), fillAnswers: ['#', '1', '@', '0'] }],
+    [20, { ...emptyQuestionCircuit(), fillAnswers: jCells(shuffled) }],
+  ]), { student: 'table@example.com', submittedAt: NOW_ISO });
+  const whole = gradeSubmission(hw1, built);
+  check('buildSubmission from the stripped HW1 → gradeSubmission grades P14 2/2 and P9b 9/9',
+    whole.questions.find((r) => r.questionId === 14)?.passed === 2 &&
+      whole.questions.find((r) => r.questionId === 20)?.passed === 9);
+
+  // (k) The student copy: the layout, never the key.
+  const s14q = studentHw1.questions.find((x) => x.id === 14)!;
+  const s9q = studentHw1.questions.find((x) => x.id === 20)!;
+  check('the student copy keeps fill_in.table with exactly columns / argColumns / rows',
+    [s14q, s9q].every((q) => Object.keys(q.fill_in?.table ?? {}).sort().join() === 'argColumns,columns,rows'));
+  check('...the authored layout unchanged, and an empty fill_in_answers',
+    canonicalJson(s14q.fill_in) === canonicalJson(p14.fill_in) &&
+      canonicalJson(s9q.fill_in) === canonicalJson(p9b.fill_in) &&
+      s14q.fill_in_answers?.length === 0 && s9q.fill_in_answers?.length === 0);
+
+  // (l) Authoring: the creator's table draft.
+  const d14 = tableDraftOf(p14)!;
+  const d9 = tableDraftOf(p9b)!;
+  check('tableDraftOf → fillInTableFields round-trips HW1 P14 and P9b byte-for-byte (canonicalJson)',
+    canonicalJson(fillInTableFields(d14)) === canonicalJson({ fill_in: p14.fill_in, fill_in_answers: p14.fill_in_answers }) &&
+      canonicalJson(fillInTableFields(d9)) === canonicalJson({ fill_in: p9b.fill_in, fill_in_answers: p9b.fill_in_answers }));
+  check('a table has no blank drafts; blanks have no table draft',
+    blankDraftsOf(p14).length === 0 && tableDraftOf(hw1.questions.find((x) => x.id === 11)) === null &&
+      tableDraftOf(undefined) === null);
+  check('P9b loads as 9 key rows of 3 cells, rows "9"',
+    d9.keyRows.length === 9 && d9.keyRows.every((r) => r.cells.length === 3) && d9.rows === '9');
+  const fresh = newTableDraft();
+  check('a new table: Argument | Value, one argument column, one empty key row, rows following the key',
+    fresh.columns.map((c) => c.header).join('|') === 'Argument|Value' && fresh.argColumns === 1 &&
+      fresh.keyRows.length === 1 && fresh.rows === '' && tableRowCount(fresh) === 1 &&
+      tableRowCount({ ...fresh, keyRows: [...fresh.keyRows, newTableKeyRow(fresh), newTableKeyRow(fresh)] }) === 3);
+  const filled: FillInTableDraft = {
+    ...fresh,
+    keyRows: [{ ...fresh.keyRows[0], cells: [' a ', '1'] }, { ...newTableKeyRow(fresh), cells: ['b', '0'] }],
+  };
+  const ff = fillInTableFields(filled);
+  check('fields: trimmed headers and key, rows = the key\'s count, no numericOnly when none is digits-only',
+    canonicalJson(ff) === canonicalJson({
+      fill_in: { table: { columns: ['Argument', 'Value'], argColumns: 1, rows: 2 } },
+      fill_in_answers: ['a', '1', 'b', '0'],
+    }));
+  check('numericOnly per column in the blanks\' canonical form (mixed → flags, all → true)',
+    JSON.stringify(fillInTableFields({ ...filled, columns: [filled.columns[0], { ...filled.columns[1], digitsOnly: true }] }).fill_in.numericOnly) === '[false,true]' &&
+      fillInTableFields({ ...filled, columns: filled.columns.map((c) => ({ ...c, digitsOnly: true })) }).fill_in.numericOnly === true);
+  const wide = addTableColumn(d9);
+  check('adding a column adds an empty key cell to every row',
+    wide.columns.length === 4 && wide.keyRows.every((r) => r.cells.length === 4 && r.cells[3] === ''));
+  const narrowed = removeTableColumn(d9, 0);
+  check('removing an argument column takes its cells and one argument',
+    narrowed.argColumns === 1 && narrowed.keyRows[5].cells.join() === '2,2');
+  const movedCol = moveTableColumn(d9, 2, 0);
+  check('moving a column moves its key cells with it',
+    movedCol.columns[0].header === 'j(x, y)' && movedCol.keyRows[8].cells.join() === '4,2,2');
+
+  // Each defect, named.
+  const probs = (d: FillInTableDraft) => fillInTableProblems(d);
+  check('a sound table (P14, P9b, a filled new one) has no problems',
+    probs(d14).length === 0 && probs(d9).length === 0 && probs(filled).length === 0);
+  check('0 argument columns, or all of them, is named',
+    probs({ ...d14, argColumns: 0 }).includes('Make 1 to 1 of the columns arguments.') &&
+      probs({ ...d14, argColumns: 2 }).includes('Make 1 to 1 of the columns arguments.'));
+  check('an empty header is named',
+    probs({ ...d14, columns: [{ ...d14.columns[0], header: ' ' }, d14.columns[1]] }).includes('Column #1 needs a header.'));
+  check('a repeated header is named, pointing at the first',
+    probs({ ...d14, columns: [d14.columns[0], { ...d14.columns[1], header: 'Argument' }] })
+      .includes('Column #2 repeats the header "Argument" of column #1.'));
+  const withKey = (d: FillInTableDraft, cells: string[][]) =>
+    ({ ...d, keyRows: cells.map((c) => ({ ...newTableKeyRow(d), cells: c })) });
+  check('an empty key cell is named by its column',
+    probs(withKey(d14, [['@', ' '], ['#', '1']])).includes('Key row #1 needs a "Value" cell.'));
+  check('repeated key arguments are named (after normalising)',
+    probs(withKey(d9, [['0', '1', '0'], ['00', ' 1', '0']])).includes('Key row #2 repeats the arguments (00, 1) of key row #1.'));
+  check('letters in a digits-only column are named',
+    probs(withKey(d14, [['@', 'zero'], ['#', '1']])).some((p) => p.startsWith('Key row #1 has "zero" in the digits-only "Value"')));
+  check('fewer rows than key rows is named',
+    probs({ ...d14, rows: '1' }).includes('Students need at least 2 rows — one for each key row.'));
+  check('rows that are not a whole number ≥ 1 are named',
+    ['0', '1.5', 'x', '-2'].every((rows) => probs({ ...d14, rows }).includes('The rows students see must be a whole number, at least 1.')));
+  check(`more than ${FILL_IN_TABLE_MAX_ROWS} rows for students is named (a typo in the rows field)`,
+    ['101', '5000000'].every((rows) => probs({ ...d14, rows }).includes('The rows students see can be at most 100.')) &&
+      probs({ ...d14, rows: '100' }).length === 0);
+  check(`a key of more than ${FILL_IN_TABLE_MAX_ROWS} rows is named as such`,
+    probs({ ...withKey(d14, Array.from({ length: 101 }, (_, i) => [`a${i}`, '1'])), rows: '' })
+      .includes('A table\'s key can have at most 100 rows.'));
+  check('zero key rows is named', probs({ ...d14, keyRows: [] }).includes('Add at least one key row.'));
+  check('fewer than two columns is named',
+    probs({ ...removeTableColumn(d14, 1), argColumns: 1 }).includes('Give the table at least two columns — an argument and a value.'));
+
+  // Which edits misplace answers already given (stored row-major).
+  const edited9: FillInTableDraft = {
+    ...d9,
+    columns: d9.columns.map((c, j) => (j === 2 ? { ...c, header: 'x·y', digitsOnly: false } : c)),
+    keyRows: [...d9.keyRows.slice(1).map((r, i) => (i === 0 ? { ...r, cells: ['0', '1', '7'] } : r)), newTableKeyRow(d9)],
+  };
+  check('renaming a column, changing its flag, or editing / adding / removing key rows misplaces nothing',
+    misplacedTableWarning(d9, d9) === null && misplacedTableWarning(d9, edited9) === null);
+  check('giving students more rows misplaces nothing', misplacedTableWarning(d9, { ...d9, rows: '12' }) === null);
+  check('removing, adding or reordering a column warns',
+    [removeTableColumn(d9, 1), addTableColumn(d9), moveTableColumn(d9, 0, 1)].every((d) =>
+      /shift into other columns/.test(misplacedTableWarning(d9, d) ?? '')));
+  check('fewer rows warns', /past row 8 will be dropped/.test(misplacedTableWarning(d9, { ...d9, rows: '8' }) ?? ''));
+  check('switching the shape away from a saved table warns', misplacedTableWarning(d9, null) !== null);
+  check('a question that was no table has nothing to misplace', misplacedTableWarning(null, fresh) === null);
+
+  // (m) One reader of `labels`: every other file goes through engine/fillIn.ts
+  // (fillInShape), so none can miss that a table has no labels.
+  const root = fileURLToPath(new URL('../../', import.meta.url));
+  const walk = (dir: string): string[] =>
+    readdirSync(dir).flatMap((name) => {
+      const p = join(dir, name);
+      if (name === 'node_modules') return [];
+      return statSync(p).isDirectory() ? walk(p) : /\.(ts|tsx)$/.test(name) ? [p] : [];
+    });
+  const labelReaders = [...walk(join(root, 'app/src')), ...walk(join(root, 'server/src'))]
+    .filter((f) => /\.labels\b/.test(readFileSync(f, 'utf8')))
+    .map((f) => relative(root, f).split('\\').join('/'));
+  check('`.labels` is read only in engine/fillIn.ts',
+    labelReaders.length === 1 && labelReaders[0] === 'app/src/engine/fillIn.ts');
+  for (const f of labelReaders.filter((x) => x !== 'app/src/engine/fillIn.ts')) console.log(`        → ${f}`);
 }
 
 // ── Authoring a turbot arena family (task 010) ─────────────────────

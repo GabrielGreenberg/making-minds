@@ -164,24 +164,46 @@ export interface TestCase {
 }
 
 /**
- * A fill-in-the-blank question: a short list of labelled text boxes the
- * student types an answer into. Graded by string comparison, not by running a
- * machine (engine/fillIn.ts) — the only normalisation is leading zeros.
+ * A fill-in question: boxes the student types answers into, graded by string
+ * comparison, not by running a machine (engine/fillIn.ts) — the only
+ * normalisation is leading zeros. Two shapes, told apart ONLY by
+ * engine/fillIn.ts `fillInShape` (a present `table` wins):
+ *  - blanks: a short list of labelled boxes (`labels`), box i against key i;
+ *  - a table (task 079): a blank argument–value table the student fills
+ *    whole, arguments too, graded as a function — order-free, one case per
+ *    key row.
  *
- * The spec ships to students (the labels ARE the prompts); the answers live
- * in the separate `fill_in_answers` bank, which is stripped server-side
- * exactly like `test_cases`.
+ * The spec ships to students (labels and headers ARE the prompts). The key
+ * for both shapes lives only in the separate `fill_in_answers` bank —
+ * row-major for a table — which is stripped server-side exactly like
+ * `test_cases`; nothing key-bearing may enter `fill_in`.
  */
 export interface FillInSpec {
-  labels: string[];
-  /** Restrict boxes to digits: `true` = every blank (the HW1 P11
-   *  binary-numeral case), an array = per blank, parallel to `labels`.
-   *  Read it ONLY through engine/fillIn.ts `fillInBlanks` — an array is
-   *  truthy, so a bare `if (spec.numericOnly)` would lock every blank. */
+  /** The blanks shape's labels, one per box. Read them only through
+   *  engine/fillIn.ts (a table has none). */
+  labels?: string[];
+  table?: FillInTable;
+  /** Restrict boxes to digits: `true` = every box (the HW1 P11
+   *  binary-numeral case), an array = per blank (parallel to `labels`) or per
+   *  table column (parallel to `table.columns`). Read it ONLY through
+   *  engine/fillIn.ts `fillInShape` — an array is truthy, so a bare
+   *  `if (spec.numericOnly)` would lock every box. */
   numericOnly?: boolean | boolean[];
 }
 
-/** One blank's outcome — instructor-only, like CaseResult. */
+/** A fill-in table's layout — headers and sizes only, never a key cell. */
+export interface FillInTable {
+  /** Column headers, left to right: the first `argColumns` are the
+   *  function's arguments, the rest its values. */
+  columns: string[];
+  /** How many leading columns are arguments (1 ≤ argColumns < columns). */
+  argColumns: number;
+  /** How many empty rows the student sees (at least the key's rows). */
+  rows: number;
+}
+
+/** One blank's (or one key row's) outcome — instructor-only, like
+ *  CaseResult; a student keeps `label` + `pass` (sanitize.ts). */
 export interface FillInCaseResult {
   label: string;
   expected: string;
@@ -281,7 +303,8 @@ export interface AssignmentQuestion {
   maxTapeCells?: number;
   /** Automatic half credit (task 061; memo grading-interface.md §4.3): the
    *  problem earns ½ when at least this many of its N cases pass (value
-   *  cases, turbot arenas, perception films or fill-in blanks alike), with
+   *  cases, turbot arenas, perception films, fill-in blanks or table key
+   *  rows alike), with
    *  1 ≤ K < N. A machine refused at Stage 1 never earns it. Absent = the
    *  autograde is 0 or 1. Not an answer key: students' copies keep it. */
   half_credit_at?: number;
@@ -344,7 +367,8 @@ export function questionModeLabel(
  *   perception — a CC/SC classifier graded bit-level on `perception_cases`
  *   turbot     — a brain driven through `turbot_cases` arenas
  *   open       — free prose, `pending` manual review
- *   fill-in    — labelled blanks, autograded against `fill_in_answers`
+ *   fill-in    — labelled blanks or an argument–value table, autograded
+ *                against `fill_in_answers`
  * The order below is the grader's historical precedence, so classification
  * never moved a grade. Pure (no engine import), so every side can call it.
  */

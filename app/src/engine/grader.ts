@@ -43,7 +43,7 @@ import type {
   SubmissionResult,
 } from '../types';
 import { questionTask } from '../types';
-import { gradeFillIn } from './fillIn';
+import { fillInKeyProblem, gradeFillIn } from './fillIn';
 import { notationForRepresentation } from './tmCodec';
 import {
   gradingCircuit,
@@ -123,9 +123,10 @@ function pendingOpen(questionId: number, responseText: string | undefined): Ques
 }
 
 /**
- * Fill-in-the-blank grading: one string comparison per blank, all-or-nothing
+ * Fill-in grading: one case per blank (a string comparison) or per key row of
+ * a table (graded as a function, order-free — engine/fillIn.ts), all-or-nothing
  * at the question level like every other mode (passed === total ⇒ the
- * question passes). The per-blank detail carries the expected answers, so it
+ * question passes). The per-case detail carries the expected answers, so it
  * is instructor-only — server/src/sanitize.ts strips it.
  */
 function gradeFillInQuestion(
@@ -134,9 +135,8 @@ function gradeFillInQuestion(
 ): QuestionResult {
   const spec = question.fill_in!;
   const answers = question.fill_in_answers ?? [];
-  if (spec.labels.length === 0 || answers.length !== spec.labels.length) {
-    return skip(question.id, 'fill-in question has no answer key');
-  }
+  const problem = fillInKeyProblem(spec, answers);
+  if (problem) return skip(question.id, problem);
   const fillCases = gradeFillIn(spec, answers, fillAnswers);
   return {
     questionId: question.id,

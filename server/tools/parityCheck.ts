@@ -14,7 +14,9 @@
 //      so criterionRequiresStop + failure reasons are exercised; its
 //      interface-tier "correct" brain scores 1/3, so failing turbot cases with
 //      reasons cross the wire even on attempt 1), a perception question
-//      (hw2-p12), and the devData open question (pending, 0/0).
+//      (hw2-p12), the devData open question (pending, 0/0), and HW1's
+//      fill-in shapes — P11's blanks and P9b's argument–value table, graded
+//      as a function (task 079).
 //   2. Submit twice as a student: attempt 1 = the fixtures' correct machines,
 //      attempt 2 = the fixtures' broken variants plus a hand-built
 //      never-stopping turbot brain (hitStepLimit=true / 'exceeded max steps'
@@ -138,12 +140,23 @@ const fixtures = FIXTURE_IDS.map((id) => loadFixture(id));
 // The open question comes from devData (buildSampleAssignment), as the
 // fixtures never author open questions.
 const openQuestion = buildSampleAssignment().questions.find((q) => q.buildMode === 'open')!;
+const hw1Questions = (JSON.parse(
+  readFileSync(new URL('../../app/src/devData/homeworks/hw1.json', import.meta.url), 'utf8'),
+) as AssignmentData).questions;
 // HW1 P11: the fill-in-the-blank shape. Its `fill_in_answers` are the answer
 // key and must be stripped from the student's copy like any other bank.
-const fillInQuestion = JSON.parse(
-  readFileSync(new URL('../../app/src/devData/homeworks/hw1.json', import.meta.url), 'utf8'),
-).questions.find((q: { id: number }) => q.id === 11);
+const fillInQuestion = hw1Questions.find((q) => q.id === 11)!;
 const FILL_ANSWERS = Array.from({ length: 11 }, (_, n) => n.toString(2));
+// HW1 P9b (task 079): the fill-in TABLE shape — j(x, y) = x·y on {0, 1, 2}²
+// as a blank argument–value table, graded as a function, order-free. Its key
+// rides row-major in the same stripped `fill_in_answers`. Digits only, so no
+// '@' ever meets an email-leak scan. Correct: every row, shuffled; broken:
+// row (2, 2) written as a second (0, 0) — not a function, so (0, 0) and
+// (2, 2) both fail.
+const tableQuestion = hw1Questions.find((q) => q.id === 20)!;
+const jRows = (pairs: [number, number][]) => pairs.flatMap(([x, y]) => [String(x), String(y), String(x * y)]);
+const TABLE_ANSWERS = jRows([[2, 2], [1, 0], [0, 0], [1, 2], [0, 1], [2, 1], [0, 2], [2, 0], [1, 1]]);
+const TABLE_BROKEN = jRows([[0, 0], [0, 1], [0, 2], [1, 0], [1, 1], [1, 2], [2, 0], [2, 1], [0, 0]]);
 
 // An SC perception question authored as the question creator saves it
 // (perceptionFields), HW3 P12's rule with two films of the instructor's own:
@@ -170,6 +183,7 @@ const assignment: AssignmentData = {
     { ...openQuestion, id: 7, label: 'open' },
     { ...fillInQuestion, id: 8, label: 'fill-in' },
     { ...examplesQuestion, id: 9, label: 'perception-examples' },
+    { ...tableQuestion, id: 10, label: 'fill-in-table' },
   ],
 };
 
@@ -197,6 +211,7 @@ const correctAnswers: Answers = [
   { questionId: 7, circuit: emptyCircuit, responseText: OPEN_RESPONSE },
   { questionId: 8, circuit: emptyCircuit, fillAnswers: FILL_ANSWERS },
   { questionId: 9, circuit: examplesFixture.correct },
+  { questionId: 10, circuit: emptyCircuit, fillAnswers: TABLE_ANSWERS },
 ];
 
 const brokenAnswers: Answers = [
@@ -210,6 +225,7 @@ const brokenAnswers: Answers = [
   // One padded (still correct — leading zeros normalise) and one wrong.
   { questionId: 8, circuit: emptyCircuit, fillAnswers: FILL_ANSWERS.map((a, i) => (i === 4 ? '1' : '00' + a)) },
   { questionId: 9, circuit: examplesFixture.broken! },
+  { questionId: 10, circuit: emptyCircuit, fillAnswers: TABLE_BROKEN },
 ];
 
 // ── Direct in-process grades (side A) ────────────────────────────────────────
@@ -229,6 +245,11 @@ function directGrade(answers: Answers): SubmissionResult {
 
 const directCorrect = directGrade(correctAnswers);
 const directBroken = directGrade(brokenAnswers);
+const tableResult = (r: SubmissionResult) => r.questions.find((q) => q.questionId === 10);
+check('the fill-in table grades 9/9 shuffled, 7/9 with a repeated argument (direct)',
+  tableResult(directCorrect)?.passed === 9 && tableResult(directCorrect)?.total === 9 &&
+    tableResult(directBroken)?.passed === 7 &&
+    (tableResult(directBroken)?.fillCases ?? []).filter((c) => !c.pass).map((c) => c.label).join('|') === '(0, 0)|(2, 2)');
 
 // ── Deep JSON comparison ─────────────────────────────────────────────────────
 
@@ -400,6 +421,14 @@ check(
 check(
   'student assignment copy keeps the fill-in labels (they are the prompts)',
   (sAsg.json.assignment.questions.find((q) => q.id === 8)?.fill_in?.labels ?? []).length === 11,
+);
+const sTable = sAsg.json.assignment.questions.find((q) => q.id === 10);
+check(
+  'student assignment copy keeps the fill-in table layout (headers, argument count, rows) and no key',
+  Object.keys(sTable?.fill_in?.table ?? {}).sort().join() === 'argColumns,columns,rows' &&
+    JSON.stringify(sTable?.fill_in?.table?.columns) === JSON.stringify(tableQuestion.fill_in?.table?.columns) &&
+    sTable?.fill_in?.table?.argColumns === 2 && sTable?.fill_in?.table?.rows === 9 &&
+    (sTable?.fill_in_answers ?? ['x']).length === 0,
 );
 check(
   'student assignment copy keeps the turbot arenas',
@@ -589,6 +618,12 @@ check(
   (sFillIn.fillCases ?? []).length > 0 &&
     (sFillIn.fillCases ?? []).some((c) => !c.pass) &&
     (sFillIn.fillCases ?? []).every((c) => c.label.length > 0 && c.expected === '' && c.got === ''),
+);
+const sTableCases = brokenRecord.result!.questions.find((x) => x.questionId === 10)?.fillCases ?? [];
+check(
+  "student sees which rows a fill-in table got wrong, named by their arguments '(x, y)' only",
+  sTableCases.length === 9 && sTableCases.filter((c) => !c.pass).length === 2 &&
+    sTableCases.every((c) => /^\(\d, \d\)$/.test(c.label) && c.expected === '' && c.got === ''),
 );
 
 // ── Grade parity: the grade route ≡ the pure planGradeWrite (task 063) ──────

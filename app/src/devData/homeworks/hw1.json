@@ -502,17 +502,15 @@
       "buildMode": "open",
       "representation": "binary",
       "fill_in": {
-        "labels": [
-          "j(0, 0)",
-          "j(0, 1)",
-          "j(0, 2)",
-          "j(1, 0)",
-          "j(1, 1)",
-          "j(1, 2)",
-          "j(2, 0)",
-          "j(2, 1)",
-          "j(2, 2)"
-        ],
+        "table": {
+          "columns": [
+            "x",
+            "y",
+            "j(x, y)"
+          ],
+          "argColumns": 2,
+          "rows": 9
+        },
         "numericOnly": true
       },
       "fill_in_answers": [
@@ -521,8 +519,26 @@
         "0",
         "0",
         "1",
+        "0",
+        "0",
         "2",
         "0",
+        "1",
+        "0",
+        "0",
+        "1",
+        "1",
+        "1",
+        "1",
+        "2",
+        "2",
+        "2",
+        "0",
+        "0",
+        "2",
+        "1",
+        "2",
+        "2",
         "2",
         "4"
       ]
@@ -627,18 +643,27 @@
     {
       "id": 14,
       "label": "Problem 14",
-      "statement": "Define a function *f* which maps the symbol “@” to the number zero and the symbol “#” to the number one. Use a table or an equation.\n\nIn the boxes, give the value of *f* for each symbol.",
+      "statement": "Define a function *f* which maps the symbol “@” to the number zero and the symbol “#” to the number one. Use a table or an equation.\n\nIn the table, give each symbol and its value.",
       "buildMode": "open",
       "representation": "binary",
       "fill_in": {
-        "labels": [
-          "f(@)",
-          "f(#)"
-        ],
-        "numericOnly": true
+        "table": {
+          "columns": [
+            "Argument",
+            "Value"
+          ],
+          "argColumns": 1,
+          "rows": 2
+        },
+        "numericOnly": [
+          false,
+          true
+        ]
       },
       "fill_in_answers": [
+        "@",
         "0",
+        "#",
         "1"
       ]
     },

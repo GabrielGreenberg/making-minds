@@ -173,6 +173,11 @@ console.log('\n[question list]');
     questionListTag({ buildMode: 'open', fill_in: { labels: ['a', 'b'], numericOnly: true } }).text === 'Number' &&
       questionListTag({ buildMode: 'open', fill_in: { labels: ['a', 'b'], numericOnly: [true, false] } }).text === 'Fill-in' &&
       questionListTag({ buildMode: 'open', fill_in: { labels: ['a'] } }).text === 'Fill-in');
+  check('a fill-in table (task 079) is tagged "Table", digits-only or not',
+    questionListTag({ buildMode: 'open', fill_in: { table: { columns: ['x', 'y', 'j(x, y)'], argColumns: 2, rows: 9 }, numericOnly: true } }).text === 'Table' &&
+      questionListTag({ buildMode: 'open', fill_in: { table: { columns: ['Argument', 'Value'], argColumns: 1, rows: 2 } } }).text === 'Table');
+  check('a table\'s row-major cells start a question like blanks do',
+    questionMark(circuit({ fillAnswers: ['', '', '#', ''] })) === 'started' && questionMark(circuit({ fillAnswers: ['', '', '', ''] })) === null);
   check('machine tags name the mode (turbot with its brain, perception)',
     questionListTag({ buildMode: 'turbot', innerMode: 'FSM' }).text === 'turbot - FSM' &&
       questionListTag({ buildMode: 'SC', perception: { rule: { kind: 'change' }, width: 8 } } as never).text === 'SC - perception');
@@ -225,7 +230,9 @@ console.log('\n[one frame]');
   check('…and no longer sizes itself (the frame\'s column does)', !/panelWidth|panel-resize-handle/.test(table));
   // F1 (law 1): the goal table comes from the statement's own profile —
   // students never receive test_cases in remote mode.
-  for (const rel of ['workbench.ts', 'components/QuestionPanel.tsx', 'components/EditorShell.tsx', 'components/EditorTopBar.tsx']) {
+  // The fill-in panel draws a table from its headers and row count (task
+  // 079), never from the key, so a student's key-less copy renders the same.
+  for (const rel of ['workbench.ts', 'components/QuestionPanel.tsx', 'components/EditorShell.tsx', 'components/EditorTopBar.tsx', 'components/FillInPanel.tsx']) {
     check(`${rel} reads no answer key`, !/test_cases|perception_cases|fill_in_answers/.test(read(rel)));
   }
   const panel = code('components/QuestionPanel.tsx');

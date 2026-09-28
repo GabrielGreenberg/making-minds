@@ -421,8 +421,10 @@ console.log('\n[grep gate]');
     'TabBar.tsx': { fields: 1, reason: 'sandbox tab titles; not work' },
     'FeedbackPanel.tsx': { fields: 1, reason: 'platform/homework reports to the instructor; not work' },
   };
-  // The files whose answer fields wear the guard today (each keeps at least one).
+  // The files whose answer fields wear the guard today (each keeps at least
+  // one; FillInPanel two — the blank's box and the table's cell, task 079).
   const GUARDED = ['OpenResponsePanel.tsx', 'FillInPanel.tsx', 'Palette.tsx', 'CircuitCanvas.tsx'];
+  const MIN_GUARDED: Record<string, number> = { 'FillInPanel.tsx': 2 };
   const NON_TEXT = /\btype=["'](range|checkbox|radio|file|color|button|submit|hidden)["']/;
   const GUARD_REF = /\bref=\{pasteGuardRef\}/;
   const BARE_READONLY = /\breadOnly\b(?!\s*=)/;
@@ -477,7 +479,8 @@ console.log('\n[grep gate]');
       continue;
     }
     if (GUARDED.includes(name)) {
-      check(`${name}: ${guarded.length} guarded field(s), every other one read-only`, guarded.length > 0 && loose.length === 0);
+      check(`${name}: ${guarded.length} guarded field(s), every other one read-only`,
+        guarded.length >= (MIN_GUARDED[name] ?? 1) && loose.length === 0);
     }
     for (const f of loose) offenders.push(`${name}:${f.line} a text field neither wearing ref={pasteGuardRef}, bare readOnly, nor EXEMPT`);
   }

@@ -30,6 +30,7 @@ import type {
 } from '../types';
 import { questionTask } from '../types';
 import { gradedMachineKey } from './caseRun';
+import { fillInCaseCount } from './fillIn';
 
 // The grade record itself is a domain type (types.ts, task 063).
 export type { HumanGrade, Points } from '../types';
@@ -300,12 +301,13 @@ export function scoreRecord(
 }
 
 /** How many cases a question is autograded on — the N of its ½ rule: value
- *  cases, turbot arenas, perception films or fill-in blanks; 0 for an open
- *  problem. (Authoring-side: a student's sanitized copy has no banks.) */
+ *  cases, turbot arenas, perception films, fill-in blanks or a fill-in
+ *  table's key rows; 0 for an open problem. (Authoring-side: a student's
+ *  sanitized copy has no banks.) */
 export function questionCaseCount(q: AssignmentQuestion): number {
   const task = questionTask(q);
   if (task === 'open') return 0;
-  if (task === 'fill-in') return q.fill_in?.labels.length ?? 0;
+  if (task === 'fill-in') return fillInCaseCount(q.fill_in, q.fill_in_answers);
   if (task === 'turbot') return q.turbot_cases?.length ?? 0;
   if (task === 'perception') return q.perception_cases?.length ?? 0;
   return q.test_cases?.length ?? 0;

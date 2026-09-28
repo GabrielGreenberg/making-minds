@@ -189,6 +189,22 @@ console.log('\n[problem set: sections, numbering, shapes, runs]');
   })());
   check('validateDocument is empty for a well-formed document',
     validateDocument({ ...flat, sections: [{ heading: 'I', questionIds: [1] }, { heading: '', questionIds: [2] }] }).length === 0);
+  // A fill-in table's key must be whole rows with distinct arguments (task
+  // 079; engine/fillIn.ts fillInKeyProblem) — the every-HW loop below holds
+  // HW1 P14 and P9b to it.
+  const table = (fill_in_answers: string[]): AssignmentData => ({
+    id: 't', title: 'T', questions: [q(1, 'Define f with a table.', {
+      buildMode: 'open',
+      fill_in: { table: { columns: ['Argument', 'Value'], argColumns: 1, rows: 3 } },
+      fill_in_answers,
+    })],
+  });
+  check('validateDocument accepts a sound fill-in table',
+    validateDocument(table(['a', '1', 'b', '0'])).length === 0);
+  check('validateDocument flags a table key that is not whole rows',
+    validateDocument(table(['a', '1', 'b'])).some((m) => /^Problem 1: .*not whole rows of 2 cells/.test(m)));
+  check('validateDocument flags a table key with repeated arguments',
+    validateDocument(table(['a', '1', ' a', '0'])).some((m) => /^Problem 1: .*rows 1 and 2 have the same arguments a/.test(m)));
   check('sectionOf finds a question\'s section',
     sectionOf(structured, 3)?.heading === '' && sectionOf(structured, 1)?.heading === 'I');
   check('problemNumber reads the label, else the position',

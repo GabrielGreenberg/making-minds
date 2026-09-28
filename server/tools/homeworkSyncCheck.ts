@@ -114,7 +114,7 @@ console.log('\n[API]');
     sHw1.status === 200 &&
       (sHw1.json.assignment.sections?.length ?? 0) > 0 &&
       sHw1.json.assignment.questions.every((q) => (q.test_cases ?? []).length === 0) &&
-      (q11?.fill_in?.labels.length ?? 0) > 0 && (q11?.fill_in_answers ?? []).length === 0);
+      (q11?.fill_in?.labels?.length ?? 0) > 0 && (q11?.fill_in_answers ?? []).length === 0);
   server.close();
 }
 

@@ -17,9 +17,10 @@ import type {
   Figure,
   SectionLayout,
 } from './types';
-import { CALLOUT_KINDS } from './types';
+import { CALLOUT_KINDS, questionTask } from './types';
 import { parseStatement, statementProse } from './statementFormat';
 import { halfCreditProblem } from './engine/score';
+import { fillInKeyProblem } from './engine/fillIn';
 
 /** A problem as the document shows it: the question, its index in the flat
  *  list (the canvas route), its printed number and its layout shape. */
@@ -187,7 +188,9 @@ const PLACEMENTS = ['before', 'aside', 'after'];
  *  sections list existing ids once each and between them cover every
  *  question; callouts have a known kind and a body; figures have a source and
  *  alt text; layouts and placements are known values; a question's ½ rule is
- *  sound (engine/score.ts halfCreditProblem). */
+ *  sound (engine/score.ts halfCreditProblem); a fill-in question's key fits
+ *  its shape (engine/fillIn.ts fillInKeyProblem — so authoring-side: a
+ *  student's copy has no key). */
 export function validateDocument(assignment: AssignmentData): string[] {
   const problems: string[] = [];
   const ids = new Set(assignment.questions.map((q) => q.id));
@@ -233,6 +236,10 @@ export function validateDocument(assignment: AssignmentData): string[] {
     checkFigures(q.label, q.figures);
     const half = halfCreditProblem(q);
     if (half) problems.push(`${q.label}: ${half}`);
+    if (questionTask(q) === 'fill-in' && q.fill_in) {
+      const key = fillInKeyProblem(q.fill_in, q.fill_in_answers ?? []);
+      if (key) problems.push(`${q.label}: ${key}`);
+    }
   }
   return problems;
 }
