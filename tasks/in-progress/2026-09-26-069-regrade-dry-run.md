@@ -8,7 +8,7 @@ requires: browser
 area: server
 source: chat
 created: 2026-09-26T21:34:00-07:00
-status: ready
+status: in-progress
 after: 2026-09-26-065
 branch: robot/069-regrade-dry-run
 merged_into:
