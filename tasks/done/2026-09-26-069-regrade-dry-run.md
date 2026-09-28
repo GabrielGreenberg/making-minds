@@ -8,9 +8,9 @@ requires: browser
 area: server
 source: chat
 created: 2026-09-26T21:34:00-07:00
-status: in-progress
+status: done
 after: 2026-09-26-065
-branch: robot/069-regrade-dry-run
+branch:
 merged_into:
 ---
 
@@ -90,3 +90,16 @@ Gates; browser on local mode: edit a toy question's bank, see the banner, dry-ru
   `/srv/making-minds/backups/regrade` (makingminds, mode 600).
 - **NEXT STEP:** loop session: visual check if owed, then land per PROFILE §5.
 - 2026-09-27 (robot): parked for the owed eyeball. Code complete on `robot/069-regrade-dry-run` (3343211), all five gates green by exit code, review clean. The unattended run can't start a dev server (the harness refuses `preview_start` in scheduled runs), so the `requires: browser` check wasn't done. Recipe: the workflow's owedChecks — local mode: instructor loads HW, publishes; student submits a machine answer; instructor edits that question's bank; Grading → Overview banner → Re-grade… → dry-run table (student, Pn, before → after, grade) → Cancel keeps banner; Commit re-grade → banner gone, Matrix updated; an overridden problem shows "under your override"; 375px: modal table scrolls. Remote mode with `MM_SNAPSHOT_DIR` set: snapshot file appears. After release (ssh): `sudo ls -l /srv/making-minds/backups/regrade`. Nit left alone: the CLAUDE.md trim (to fit 40 KB) dropped "which case failed and why" / "recorded vs live verdict" from the Grades-sheet line.
+- 2026-09-27 (robot, land): released by Gabriel ("land it, eyeball owed"). Merged origin/main
+  into the branch: additive conflicts with 068 (the stores, remoteStores, gradingCheck header
+  and imports, CLAUDE.md) resolved as unions; one semantic fix — 068's `LateWritePlan.event`
+  is now `GradeChangeEvent` (069 made `GradeEvent` the union with `RegradeEvent`). CLAUDE.md
+  keeps 068's full Grades-sheet line (the earlier trim nit is gone), trimmed to 39 997 bytes.
+  Gates after the merge, by exit code: app tsc 0, app build 0, app check 0, server tsc 0,
+  server check 0. **Owed, not claimed — Gabriel's eyeball** (no headless run of this flow):
+  local mode — instructor loads HW, publishes; a student submits a machine answer; the
+  instructor edits that question's bank; Grading → Overview banner → Re-grade… → dry-run table
+  (student, Pn, before → after, grade) → Cancel keeps the banner; Commit re-grade → banner
+  gone, Matrix updated; an overridden problem reads "under your override"; at 375px the modal
+  table scrolls. Remote mode with `MM_SNAPSHOT_DIR` set: a snapshot file appears. On the box
+  after release (ssh): `sudo ls -l /srv/making-minds/backups/regrade`.
