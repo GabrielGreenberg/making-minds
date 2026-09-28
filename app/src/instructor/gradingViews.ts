@@ -7,9 +7,10 @@
 // table and the release warning are only counts and shares of what it said.
 // No view computes a grade (gradingViewCheck's grep gate).
 
-import type { AssignmentData, AssignmentQuestion, IntegrityFlagCode } from '../types';
+import type { AssignmentData, AssignmentQuestion, IntegrityFlagCode, Points } from '../types';
 import { questionModeLabel, questionTask } from '../types';
 import { problemNumber } from '../problemSet';
+import { formatGrade, pointsLabel } from '../engine/score';
 import type {
   AssignmentGradingSummary,
   CourseAssignmentRow,
@@ -17,6 +18,7 @@ import type {
   GradingRow,
   OffRoster,
 } from '../storage/gradingSummary';
+import type { RegradeChange, RegradePlan } from '../storage/regrade';
 
 /** A problem graded by hand: an open (prose) question. Everything else — a
  *  machine, perception, a turbot, fill-in blanks — the autograder scores, and
@@ -267,4 +269,46 @@ export function percent(x: number, of: number): number {
 
 export function plural(n: number, noun: string): string {
   return `${n} ${noun}${n === 1 ? '' : 's'}`;
+}
+
+// ── The re-grade dialog (task 069; mockup 7) ─────────────────────────────
+
+const pts = (p: Points | null) => (p === null ? 'pending' : pointsLabel(p));
+const gradeText = (g: number | null) => (g === null ? '—' : formatGrade(g));
+
+/** One row of the dry run's table, as text: the autograde's move, and the
+ *  grade's — or, under an override, the override that stays. */
+export interface RegradeRowView {
+  student: string;
+  problem: string;
+  autograde: string;
+  /** The autograde went up (true), down (false), or to/from pending (null). */
+  up: boolean | null;
+  grade: string;
+  /** Set when a human override stands over the change: its points. */
+  override: string | null;
+}
+
+export function regradeRow(c: RegradeChange): RegradeRowView {
+  const a = c.before.auto;
+  const b = c.after.auto;
+  return {
+    student: c.student.name,
+    problem: `P${c.number}`,
+    autograde: `${pts(a)} → ${pts(b)}`,
+    up: a === null || b === null ? null : b > a,
+    grade: c.underOverride ? '' : `${gradeText(c.gradeBefore)} → ${gradeText(c.gradeAfter)}`,
+    override: c.underOverride && c.after.points !== null ? pointsLabel(c.after.points) : null,
+  };
+}
+
+/** The dry run's summary line, its lead (bold) apart: "3 results would
+ *  change" · "71 unchanged · 108 hand grades and 2 overrides untouched." */
+export function regradeSummary(plan: RegradePlan): { changes: string; rest: string } {
+  return {
+    changes: `${plural(plan.changed.length, 'result')} would change`,
+    rest:
+      `${plan.unchanged} unchanged · ` +
+      `${plural(plan.humanGrades.hand, 'hand grade')} and ${plural(plan.humanGrades.overrides, 'override')} untouched.`,
+  };
 }

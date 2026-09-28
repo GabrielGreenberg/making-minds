@@ -10,7 +10,7 @@
 
 import type {
   AssignmentQuestion,
-  GradeEvent,
+  GradeChangeEvent,
   HumanGrade,
   Points,
   SubmissionRecord,
@@ -24,7 +24,7 @@ export type GradeWrite =
   | { clear: true; version: number };
 
 export type GradeWritePlan =
-  | { ok: true; grade: HumanGrade | null; event: GradeEvent }
+  | { ok: true; grade: HumanGrade | null; event: GradeChangeEvent }
   | { ok: false; conflict: true; current: HumanGrade | null }
   | { ok: false; conflict: false; error: string };
 

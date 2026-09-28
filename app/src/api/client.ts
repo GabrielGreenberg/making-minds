@@ -44,6 +44,7 @@ import type {
   StudentGrading,
 } from '../storage/gradingSummary';
 import type { ClaimOutcome } from '../storage/gradingClaims';
+import type { RegradeOutcome } from '../storage/regrade';
 
 export interface ApiUser {
   email: string;
@@ -565,6 +566,14 @@ export async function deleteGrade(
  *  roster student and per other submitter, no circuits. */
 export function getGradingSummary(assignmentId: string): Promise<AssignmentGradingSummary> {
   return request<AssignmentGradingSummary>('GET', `/assignments/${encodeURIComponent(assignmentId)}/summary`);
+}
+
+/** Instructor only: re-grade an assignment's stale latest attempts against
+ *  its current version (task 069) — `dryRun` returns the plan and writes
+ *  nothing; a commit naming `expectHash` is a 409 (body: the fresh `plan`)
+ *  when the assignment changed since. */
+export function postRegrade(assignmentId: string, body: { dryRun: boolean; expectHash?: string }): Promise<RegradeOutcome> {
+  return request<RegradeOutcome>('POST', `/assignments/${encodeURIComponent(assignmentId)}/regrade`, body);
 }
 
 /** Instructor only: every assignment's grading progress + course-wide counts. */

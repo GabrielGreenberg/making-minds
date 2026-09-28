@@ -33,6 +33,13 @@ export interface ServerConfig {
    * before would read as nobody's.
    */
   mintSecret?: string;
+  /**
+   * Where a re-grade's pre-commit database snapshots go (task 069,
+   * MM_SNAPSHOT_DIR; server/src/snapshot.ts). Unset: `backups/regrade` beside
+   * the database's directory — on the box /srv/making-minds/backups/regrade,
+   * next to the daily backups.
+   */
+  snapshotDir?: string;
 }
 
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): ServerConfig {
@@ -49,5 +56,6 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): ServerConfig {
     authMode,
     sessionTtlSeconds: Number(env.MM_SESSION_TTL_SECONDS) || 30 * 24 * 60 * 60,
     mintSecret: env.MM_MINT_SECRET || undefined,
+    snapshotDir: env.MM_SNAPSHOT_DIR || undefined,
   };
 }

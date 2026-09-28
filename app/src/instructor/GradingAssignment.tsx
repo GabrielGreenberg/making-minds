@@ -113,7 +113,7 @@ export function GradingAssignment({ route }: { route: Extract<Route, { kind: 'in
         </span>
       </div>
 
-      {view === 'overview' && <GradingOverview summary={summary} assignment={assignment} />}
+      {view === 'overview' && <GradingOverview summary={summary} assignment={assignment} onChanged={reload} />}
       {view === 'matrix' && <GradingMatrix summary={summary} assignment={assignment} />}
       {view === 'queue' && <GradingQueue summary={summary} assignment={assignment} route={route} onChanged={reload} />}
     </div>

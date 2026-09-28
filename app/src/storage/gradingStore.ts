@@ -22,6 +22,12 @@
 // (`claim`; storage/gradingClaims.ts — advisory, a write never checks one).
 // Local: a ClaimBook in this page's memory, the signed-in toy account the
 // grader. Remote: the server's, one per process.
+//
+// And the re-grade (task 069): every stale latest attempt re-run against the
+// current version — a dry run's plan, or a commit (snapshot, rewrite, log),
+// planned by the ONE pure planner, storage/regrade.ts. Local: over the local
+// SubmissionStore's records, the snapshot a copy of them in localStorage.
+// Remote: the server's route. Human grades are never written by either.
 
 import type { AssignmentData, HumanGrade, Points, SubmissionRecord } from '../types';
 import { readPersistedAccount, TOY_ACCOUNTS } from '../auth/accounts';
@@ -41,6 +47,7 @@ import {
   type StudentGrading,
 } from './gradingSummary';
 import { ClaimBook, type ClaimOutcome } from './gradingClaims';
+import { planRegrade, regradeEvents, type RegradeOutcome } from './regrade';
 
 export type {
   AssignmentGradingSummary,
@@ -55,6 +62,7 @@ export type {
   StudentGrading,
 } from './gradingSummary';
 export type { ClaimOutcome, ClaimView } from './gradingClaims';
+export type { RegradeChange, RegradeOutcome, RegradePlan } from './regrade';
 export { CLAIM_TTL_MS } from './gradingClaims';
 
 /** How a write came out. A conflict carries the grade someone else wrote
@@ -98,6 +106,14 @@ export interface GradingStore {
    *  unless someone else holds it). Another grader's live claim is never taken — the
    *  outcome names them. null = no such assignment, question or student. */
   claim(assignmentId: string, studentKey: string, questionId: number, opts?: { release?: boolean }): Promise<ClaimOutcome | null>;
+  /** Re-grade every stale latest attempt against the assignment's current
+   *  version (task 069). `dryRun`: the plan, nothing written. Otherwise a
+   *  commit — recomputed, never the dry run's — that snapshots, rewrites
+   *  those results and logs one `regrade` event per changed problem; a no-op
+   *  when nothing is stale; `conflict` (nothing written, the fresh plan) when
+   *  `expectHash` is no longer the current version. Human grades untouched.
+   *  null = no such assignment. Instructor-only. */
+  regrade(assignmentId: string, opts: { dryRun: boolean; expectHash?: string }): Promise<RegradeOutcome | null>;
 }
 
 /** The toy roster: its students, keyed as local records are (the email). */
@@ -253,5 +269,24 @@ export class LocalGradingStore implements GradingStore {
     }
     const account = readPersistedAccount();
     return this.claims.claim(target, { actor: this.actor(), name: account?.name ?? 'Someone' }, now);
+  }
+
+  async regrade(assignmentId: string, opts: { dryRun: boolean; expectHash?: string }): Promise<RegradeOutcome | null> {
+    const got = await this.assignments.get(assignmentId);
+    if (!got) return null;
+    const now = new Date();
+    const { plan, writes } = planRegrade({
+      assignment: got.assignment,
+      latest: latestPerStudent(await this.subs.listAll(assignmentId)),
+      identify: localIdentity,
+      now: now.getTime(),
+    });
+    if (opts.dryRun) return { plan, committed: false };
+    if (opts.expectHash !== undefined && opts.expectHash !== plan.assignmentHash) return { plan, committed: false, conflict: true };
+    if (writes.length === 0) return { plan, committed: false };
+    // Locally the keys are the emails the log is kept by.
+    const events = regradeEvents(plan, writes, { actor: this.actor(), at: now.toISOString(), emailOf: (key) => key });
+    const snapshot = this.subs.rewriteResults(assignmentId, writes, plan.assignmentHash, events);
+    return { plan, committed: true, snapshot };
   }
 }

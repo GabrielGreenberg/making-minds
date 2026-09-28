@@ -1345,22 +1345,45 @@ export class Db {
   }
 
   /**
-   * Overwrite the stored autograde of one attempt (a re-grade's write path,
-   * task 2026-09-26-069). The submission snapshot is immutable; `result` is
-   * the machine's side of the record, which the server owns. Human grades live
-   * in `grades` and are never touched here; nor is `integrity`.
+   * Overwrite the stored autograde of one attempt and the version it was
+   * graded against (a re-grade's write path, task 2026-09-26-069). The
+   * submission snapshot is immutable; `result` is the machine's side of the
+   * record, which the server owns. Human grades live in `grades` and are never
+   * touched here; nor are `integrity` or the submission time.
    */
   updateSubmissionResult(
     assignmentId: string,
     email: string,
     attempt: number,
     result: SubmissionResult,
+    assignmentHash: string,
   ): void {
     this.db
       .prepare(
-        'UPDATE submissions SET result = ? WHERE assignment_id = ? AND email = ? AND attempt = ?',
+        'UPDATE submissions SET result = ?, assignment_hash = ? WHERE assignment_id = ? AND email = ? AND attempt = ?',
       )
-      .run(JSON.stringify(result), assignmentId, email, attempt);
+      .run(JSON.stringify(result), assignmentHash, assignmentId, email, attempt);
+  }
+
+  /** Run `fn` in one transaction: every write it makes lands, or none does. */
+  transaction<T>(fn: () => T): T {
+    this.db.exec('BEGIN');
+    try {
+      const out = fn();
+      this.db.exec('COMMIT');
+      return out;
+    } catch (err) {
+      this.db.exec('ROLLBACK');
+      throw err;
+    }
+  }
+
+  /** A consistent copy of the whole database at `path` (`VACUUM INTO` — the
+   *  daily backup's own method; deploy/backup-daily.sh). The target must not
+   *  exist; never call inside a transaction. The re-grade's pre-commit
+   *  snapshot (task 069, server/src/snapshot.ts). */
+  snapshotTo(path: string): void {
+    this.db.prepare('VACUUM INTO ?').run(path);
   }
 
   clearSubmissions(assignmentId: string): void {

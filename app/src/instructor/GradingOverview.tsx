@@ -1,18 +1,26 @@
+import { useState } from 'react';
 import type { AssignmentData } from '../types';
 import type { AssignmentGradingSummary } from '../storage/gradingStore';
 import { hashLink } from '../components/PageShell';
 import { formatGrade } from '../engine/score';
 import { overviewTiles, percent, plural, problemStats } from './gradingViews';
 import { Bar, GradeValue } from './GradingParts';
+import { RegradeDialog } from './RegradeDialog';
 
 /**
  * An assignment's Overview (task 065; memo §6.2, mockup 2): four progress
  * tiles, the stale banner, and the per-problem table — counts and shares of
  * the 064 summary (gradingViews.ts), never a grade of its own; a hand
- * problem's "Grade →" opens its queue (task 066). (Re-grade… arrives with
- * task 069, the Export CSV file with 071.)
+ * problem's "Grade →" opens its queue (task 066). The stale banner's
+ * Re-grade… opens the dry run (task 069, RegradeDialog); a commit reloads
+ * the summary (`onChanged`). (The Export CSV file arrives with 071.)
  */
-export function GradingOverview({ summary, assignment }: { summary: AssignmentGradingSummary; assignment: AssignmentData }) {
+export function GradingOverview({ summary, assignment, onChanged }: {
+  summary: AssignmentGradingSummary;
+  assignment: AssignmentData;
+  onChanged: () => void;
+}) {
+  const [regrading, setRegrading] = useState(false);
   const t = overviewTiles(summary, assignment);
   const problems = problemStats(summary, assignment);
   const matrix = hashLink({ kind: 'instructor-grading-assignment', id: summary.assignmentId, view: 'matrix' });
@@ -75,7 +83,18 @@ export function GradingOverview({ summary, assignment }: { summary: AssignmentGr
             <b>{plural(t.autograded.stale, 'submission')} graded against an older version of this assignment.</b> Their
             autogrades stand until a re-grade; hand grades are never touched by one.
           </span>
+          <button type="button" className="mm-btn mm-btn--small" onClick={() => setRegrading(true)}>
+            Re-grade…
+          </button>
         </div>
+      )}
+      {regrading && (
+        <RegradeDialog
+          assignmentId={summary.assignmentId}
+          title={summary.title}
+          onClose={() => setRegrading(false)}
+          onCommitted={onChanged}
+        />
       )}
 
       <div className="mm-tablewrap">

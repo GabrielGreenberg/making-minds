@@ -27,6 +27,7 @@ import {
   type StudentGrading,
 } from '../../app/src/storage/gradingSummary';
 import type { ClaimBook } from '../../app/src/storage/gradingClaims';
+import { planRegrade, type RegradePlan, type RegradeWrite } from '../../app/src/storage/regrade';
 
 function derivedKey(secret: string, email: string): string {
   return 'x' + createHash('sha256').update(`${secret}\0grading\0${email}`).digest('base64url').slice(0, 12);
@@ -77,17 +78,20 @@ class Directory {
   }
 }
 
-/** The latest attempts, each carrying its student's key and human grades. */
+/** The latest attempts, each carrying its student's key and human grades;
+ *  who each key is, and the address it names. */
 function latestRecords(db: Db, dir: Directory, assignmentId: string, email?: string) {
   const grades = db.listGrades(assignmentId);
   const identities = new Map<string, GradingIdentity>();
+  const emails = new Map<string, string>();
   const latest = db.listLatestSubmissions(assignmentId, email).map(({ email: e, record }): SubmissionRecord => {
     const who = dir.identityOf(e);
     identities.set(who.key, who);
+    emails.set(who.key, e);
     const mine = grades.get(e) ?? [];
     return { ...record, studentKey: who.key, ...(mine.length ? { grades: mine } : {}) };
   });
-  return { latest, identities };
+  return { latest, identities, emails };
 }
 
 function summaryWith(db: Db, dir: Directory, id: string, now: number): AssignmentGradingSummary | null {
@@ -193,4 +197,21 @@ export function questionResponses(
     released: db.getGradesReleased(id),
     now,
   });
+}
+
+/** POST /api/assignments/:id/regrade (task 069): the re-grade's plan over
+ *  every latest attempt, its writes, and the address each write's key names
+ *  (the write and the log are by email; the plan never carries one). null =
+ *  no such assignment. */
+export function regradeInputs(
+  db: Db,
+  secret: string,
+  id: string,
+  now: number,
+): { plan: RegradePlan; writes: RegradeWrite[]; emailOf: (key: string) => string } | null {
+  const assignment = db.getAssignment(id);
+  if (!assignment) return null;
+  const { latest, identities, emails } = latestRecords(db, new Directory(db, secret), id);
+  const { plan, writes } = planRegrade({ assignment, latest, identify: (key) => identities.get(key)!, now });
+  return { plan, writes, emailOf: (key) => emails.get(key)! };
 }
