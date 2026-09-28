@@ -8,7 +8,7 @@ requires:
 area: server
 source: claude-md
 created: 2026-09-21T15:30:00-07:00
-status: in-progress
+status: blocked
 after: 2026-09-26-066
 branch: robot/014-llm-open-question-grading
 merged_into:
@@ -55,3 +55,17 @@ Implementation seam is `applyManualReview` + a `source: 'llm'` marker on the rev
 n/a (research).
 
 ## Progress log
+
+## Questions
+Parked by the robot (2026-09-27): a design task — the memo `docs/buildout/designs/llm-grading.md` is written
+on branch `robot/014-llm-open-question-grading` (not yet on main) and awaits your review (LOOP §4).
+1. Approve the memo's recommendation — the LLM only *suggests* 0 / ½ / 1, a person accepts each (option B)?
+   Recommend: yes; the other option is to make its verdict final.
+2. OK to land the memo as is, and have the next /catch file its §11 follow-up feature task into blocked/?
+   Recommend: yes.
+3. The Policies page says prose is human-graded and computer grading is "not with AI". Reword it before the
+   first LLM-suggested release? Recommend: yes, wording per memo §9.
+4. Will you check with UCLA (Privacy / IT Security) that anonymized student prose (P3/FERPA) may go to Claude,
+   via the Anthropic API or AWS Bedrock? Recommend: yes, before launch; the memo gates release on it.
+5. The memo prices the default model as `claude-opus-5` at $5/$25 per M tokens. Should the follow-up use the
+   current model (`claude-opus-5-5`) and recheck prices then? Recommend: yes.
