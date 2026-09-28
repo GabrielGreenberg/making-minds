@@ -8,9 +8,9 @@ requires: browser
 area: app
 source: chat
 created: 2026-09-26T21:34:00-07:00
-status: ready
+status: in-progress
 after: 2026-09-26-068
-branch:
+branch: robot/070-flags-student-page-notes
 merged_into:
 ---
 
