@@ -68,7 +68,7 @@ clickable tape strip + machine table / run / history panels, alphabet from the q
 flush, the per-email crash journal — a hard tab kill loses nothing); leave and resume.
 **Submit** a timestamped snapshot in one `SubmitDialog` (≤ 2 group members; online-only: a
 failure records nothing — server stamps time; past due it states the late cost). An extension
-reaches the student as their copy's `dueDate` ("(extended)"), so Home and the freeze follow. Released grades: the **Grades** sheet
+is the student's served `dueDate` ("(extended)"). Released grades: the **Grades** sheet
 (the grade / 100 and each problem's points, the instructor's note, "▸ failed inputs" in safe fields — which case
 failed and why — a link into the question, and **Run this input**: the grader's run of that
 case, recorded vs live verdict); Home and the overview re-fetch every visit. **Viewing a
@@ -98,9 +98,8 @@ string compare, leading zeros/whitespace normalised), **open** (`'pending'`, the
 kept for manual review). Question-level constraints: Homework JSON, Part 2. Submissions
 autograde on receipt (Grading seam). **Points** are `engine/score.ts`'s alone (task 061): 1 per
 problem, ½ by a question's `half_credit_at` (≥ K of N cases), a human grade over either while
-it judges the same answer; grade = 40 + 60·P less the **late** deduction (068: −5, −5 per class
-meeting ended past the effective due date, extension ?? assignment's; HW6 per day; floor 0; less
-waivers) over `devData/courseCalendar.json` (`npm run calendar -- import`; synced like HWs).
+it judges the same answer; grade = 40 + 60·P less the **late** deduction (068: −5, then −5 per class
+meeting past the effective due date; HW6 per day; floor 0; less waivers) over `devData/courseCalendar.json` (`npm run calendar -- import`; synced like HWs).
 
 **Instructor side** (`#/instructor`, the **Dashboard**, sections as tabs — Assignments ·
 Grading · Roster & accounts · Feedback · Notes). **Roster & accounts** (remote: the registrar's class
@@ -129,7 +128,7 @@ registration, scrypt, login throttle; `dev` passwordless; `sso` — capabilities
 `authenticate` a TODO), **identity by UID** (emails are aliases), roster import (UI + CLI),
 the **homework sync** (`npm run homeworks -- sync | status`; Deployment below), assignment
 CRUD, workbooks (+ mint key, per-save size history), submit-with-grading + integrity, human
-grades, `extensions` / `late_waivers` (logged) + `course_settings.calendar`, the **grading summaries** (task 064: `/api/assignments/:id/summary` — roster-joined,
+grades, `extensions` / `late_waivers` + `course_settings.calendar`, the **grading summaries** (task 064: `/api/assignments/:id/summary` — roster-joined,
 latest attempt, no circuits — `/api/grading`, `/api/students/:sid`, one attempt in full; the
 queue feed `…/questions/:qid/responses` + in-memory `/api/grading/claims`, task 066),
 grade release, feedback (+ role, triage mark), notes, `/api/health`.
@@ -221,7 +220,7 @@ wrappers.
 | API client | `app/src/api/client.ts` | One typed function per endpoint; bearer token under `mm:auth:token`; `onUnauthorized` hook; `health()`; `putWorkbook` takes `keepalive`. `setApiBase` is the harness override. |
 | Dev tool | `app/tools/shootProblemSets.mjs`, `shootCircuits.mjs`, `geometryCensus.ts` | Headless-Chrome shots (HW documents, the editor; fixture circuits before/after) when the pane is unavailable; the census of stored circuits a geometry change overlaps. |
 | Server | `server/src/app.ts`, `db.ts`, `auth.ts`, `identity.ts`, `password.ts`, `roster.ts`, `rosterImport.ts`, `sanitize.ts`, `config.ts`, `seed.ts`, `roster-cli.ts`, `homeworks.ts`, `homeworks-cli.ts`, `gradingSummary.ts` | Routes, SQLite, the `AuthProvider` seam (`createAuthProvider` — `MM_AUTH_MODE`; `LoginThrottle`), scrypt credentials, `identity.ts` (the ONE place an email or UID resolves to an account; `users.uid` unique, `user_emails` aliases, keys never rekeyed), `roster.ts` (pure reader of the registrar's export as-is) + `rosterImport.ts` (never removes; lists who left), `sanitize.ts` (redaction + grade-release withholding: Things to watch), env config, seeding, admin CLI (`npm run roster`). `homeworks.ts`, the homework sync: a copy is pristine iff its content hash is a committed version of its file (`gitLineage` over the box's clone) or one the sync wrote (`content_sync` table); `seed.ts --homeworks` runs it too. `gradingSummary.ts`: the summary routes' Db adapter (opaque keys; a removed submitter's derived from the mint secret). `server/tools/*Check.ts` (`parityCheck`: server ≡ in-process grading, deep-compared). |
-| Dev/sample | `app/src/devData/sampleData.ts`, `seed.ts`, `homeworks.ts`, `homeworks/hw{1..7}.json` | Sample assignment for all modes (netlist-built perception circuits, one turbot question per inner mode, open Q14) + sample submissions; `seedHomeworks()` syncs the real HW1–HW7 (record `mm:seeded-homework:<id>`) + reseeds 22 sample submissions; `homeworkSync.ts`: the pure planner it shares with the server (content hash = canonical JSON minus the instructor-owned `order`/`dueDate`; insert / unchanged / refresh / edited). |
+| Dev/sample | `app/src/devData/sampleData.ts`, `seed.ts`, `homeworks.ts`, `homeworks/hw{1..7}.json` | Sample assignment for all modes (netlist-built perception circuits, one turbot question per inner mode, open Q14) + sample submissions; `seedHomeworks()` syncs the real HW1–HW7 (record `mm:seeded-homework:<id>`) + reseeds 22 sample submissions; `homeworkSync.ts`: the pure planner it shares with the server (content hash = canonical JSON minus the instructor-owned fields; insert / unchanged / refresh / edited). |
 | Tools | `app/tools/*.ts` | The headless harness = the test suite, all in `npm run check` (besides `grade.ts` CLI grader, `builder.ts` netlist builder, `layoutCheck.ts` layout oracle): `portabilityCheck` (first: tool imports in-repo, declared), `codecCheck`, `dueDateCheck` (+ calendar import), `statementFormatCheck` (markup, document model, every HW valid), `notationCheck` (grammar pins + label-dissection grep gate), `themeCheck`, `workbenchCheck` (editor frame), `tmCheck`, `turbotCheck` (all four brains, multi-arena, criteria), `perceptionCheck`, `scWindowCheck` (question runs ≡ grader), `caseRunCheck` (caseRun ≡ grader; replay, budgets), `routerCheck` (fallback budget 0; hw3-p4 pin), `bumpCheck`, `pipelineCheck` (submit → grade, every mode; local extensions), `scoreCheck` (the grade: ½ rule, precedence, late math over the real calendar), `gradingViewCheck` (cells, filters, tiles; queue claims/skips/feed; no view grades), `navResetCheck` (the reset laws; done / frozen / viewed locks), `routingCheck` (route access, landing, held routes, principal change), `boxScopeCheck` (box library scope, sequential + drawn-across boxes ≡ unboxed, `[naming]`), `pasteCheck` (paste policy + provenance grep gates), `provenanceCheck` (mint/verify, attribution, trace flags, uuid grep gate), `workbookFileCheck` (round trip, bad files), `remoteStoreCheck` (boots the REAL server; grader-import grep gate; password auth client), `coverageCheck` (two-tier reference-fixture ledger + `allowed_components` pins). |
 | Queue | `tasks/` | The task pipeline (top of this file). |
 
@@ -297,8 +296,7 @@ CC → SC (a box may hold MEM, SC canvases only) → FSM → Turbots → TMs (tw
   always-allowed INPUT/OUTPUT/STATE; boxed internals recursed; absent/empty = unrestricted;
   enforced at Stage 1 and in the palette, authored in the creator) and `component_limits`
   (`{TYPE: max}`, counted through boxed internals — HW2 P6's "one +1 sub-part" is `{BOXED: 1}`).
-  Instructor-owned (never content, never overwritten by the sync, which fills them only where
-  unset): `order`, `dueDate`, `countsTowardGrade`, `latePolicy` (`homeworkSync.ts`).
+  Instructor-owned (outside the content hash; the sync only fills them when unset): `order`, `dueDate`, `countsTowardGrade`, `latePolicy` (`homeworkSync.ts`).
 - **Editing locks** — a question refuses edits when marked done OR showing a submission
   (viewed, or frozen: past due AND submitted, `dueDates.ts isFrozen`), both via `store.ts`'s
   `isCurrentQuestionLocked`/`selectQuestionLocked`, inlined atop every mutating action —
