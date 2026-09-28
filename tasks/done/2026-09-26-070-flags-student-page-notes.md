@@ -8,9 +8,9 @@ requires: browser
 area: app
 source: chat
 created: 2026-09-26T21:34:00-07:00
-status: in-progress
+status: done
 after: 2026-09-26-068
-branch: robot/070-flags-student-page-notes
+branch:
 merged_into:
 ---
 
@@ -100,3 +100,18 @@ Nits left: PUT /api/grading/settings resets unsent fields to defaults; very-late
 Owed: browser checks (local: box/list/Settings/⚑/student page/notes/group+identical flow, light+dark vs
 the 031 attachments; remote: No account + roster link). Nothing owed by ssh (CREATE TABLE IF NOT EXISTS).
 NEXT STEP: loop session: visual check if owed, then land per PROFILE §5.
+
+### 2026-09-27 (robot) — landed
+- **Headless check (local mode, CDP, Vite on :5177, Prof. Ada, HW1–HW7 seeded + published, HW1 due
+  moved to Sep 10):** Grading tab: the Needs-attention box reads "2 not submitted · 2 very late · See all 2
+  students →"; the flagged list shows John Doe and Jane Roe, each with Not submitted and Very late for HW1
+  (both flags on a missing set, as memo §8 says: "or none by then"); Settings opens the six threshold
+  fields. HW1 Matrix: ⚑ after both names, the "Flagged 2" chip. John's page `#/instructor/students/…`:
+  identity, both flags, a row per set with Extension…, "Average so far (1 counted set): 0", an empty grade
+  history, notes placeholder "No medical or accommodation details". Adding a note shows it dated
+  with no edit or delete control, and it survives a reload. As student John the same URL shows no note.
+  Fixed: the matrix legend's missing space ("⚑ on a problem").
+- Gates: the workflow's (all 0); origin/main brought nothing in; after the legend fix, app-tsc 0.
+- **Owed, not claimed (Gabriel's eyeball):** the recipes above: the group-mismatch/identical-text flow,
+  dark theme vs the 031 attachments, remote mode's No-account flag and the roster link (Vite Remote Mode + a
+  local server on 8199).

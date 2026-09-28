@@ -61,3 +61,4 @@
 2026-09-27-073 · chore · Let the robot release grading changes on its own — take the grader off the release gate's hold list · 2026-09-27T17:25:09-0700 · task/073-grader-releases-unattended · a56bba1
 2026-09-26-068 · feature · Apply the late policy from the class calendar — a repo copy of the website's course.json, per-student extensions, waivers, and the late warning at submit · 2026-09-27T17:49:40-0700 · robot/068-late-penalty-calendar-extensions · 9e3e09c
 2026-09-26-069 · feature · Re-grade an assignment against its current version — dry run first, then commit with a snapshot; never touching human grades · 2026-09-27T18:51:28-0700 · robot/069-regrade-dry-run · 2142c76
+2026-09-26-070 · feature · Flag students who need attention, and give each student an instructor page with private notes and grade history · 2026-09-27T20:39:30-0700 · robot/070-flags-student-page-notes · 40c68fc
