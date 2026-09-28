@@ -70,3 +70,4 @@
 2026-09-28-077 · bug · Remove the grey sliver at the left edge of the HW1 P16–17 schematic, and pin every problem-set figure against cropped-in neighbours · 2026-09-28T12:07:48-0700 · robot/077-figure-crop-slivers · a718ba2
 2026-09-28-082 · chore · Bring the app's HW1 wording up to date with the reader's revised HW1 (makingminds.org book, pp. 181–182) · 2026-09-28T12:13:20-0700 · task/082-hw1-match-reader · cad04bf
 2026-09-28-083 · feature · Show the robot's state on the instructor Dashboard — what's live, what waits for release, what waits for Gabriel's answer · 2026-09-28T13:57:25-0700 · robot/083-robot-status-panel · 36aa638
+2026-09-28-079 · feature · Answer "define it with a table" problems in a blank argument–value table, autograded as a function (HW1 P14, P9b) · 2026-09-28T15:34:51-0700 · robot/079-argument-value-table-answers · a291ddf

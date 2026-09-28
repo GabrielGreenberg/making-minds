@@ -8,9 +8,9 @@ requires:
 area: app
 source: feedback
 created: 2026-09-28T10:55:00-07:00
-status: in-progress
+status: done
 after:
-branch: robot/079-argument-value-table-answers
+branch:
 merged_into:
 ---
 
@@ -150,3 +150,18 @@ Nothing can show a table, or grade an answer whose arguments the student supplie
   create a new 2-argument table. (4) After release: the sync lists hw1 refreshed, P14/P9b
   show on the pilot, and old HW1 results show as stale until a re-grade.
 - **NEXT STEP:** loop session: the visual check owed above, then land per PROFILE §5.
+
+### 2026-09-28 — landed (robot)
+- **Nits fixed** (a291ddf): `fillInAuthoring.ts`'s header now says what is pure (its functions
+  make no React calls; `dragReorder.ts` also holds a hook). The key-defect notices in
+  `FillInTableEditor` are keyed by index, so two columns with the same header can't collide.
+  App tsc, tools tsc and the build were green after the fix.
+- **Headless check (robot, CDP against a Bash-run Vite, local mode, HW1 seeded and
+  published, as the toy student):** P14 renders a 2-row table headed Argument | Value; "@"
+  types into Argument, and "ab1" typed into Value keeps only "1". P9b renders 9 rows ×
+  x | y | j(x, y), 27 cells, all digits-only ("x2" → "2", "z" → ""). Both read as tables in
+  the 640px answer column. The rail tags each "Table", with the started mark.
+- **Still owed (Gabriel's eyeball, not claimed):** items (1)–(4) of the entry above, except
+  what the headless check covered. That leaves (1)'s mark-done lock and paste refusal, and
+  all of (2) the grade sheet / submission page / queue, (3) the creator round-trip, and
+  (4) the pilot after release. The recipe is as written above.
