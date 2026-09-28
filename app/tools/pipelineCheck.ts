@@ -23,6 +23,12 @@
 //                        classifier, and a grep pin: one reader and one
 //                        writer of `numericOnly`.
 //
+//   [perception films]   (task 013) an SC perception question authored with
+//                        films (instructor/perceptionAuthoring.ts): submit →
+//                        grade counts generated + authored cases, the right
+//                        detector passes all, a wrong one fails an authored
+//                        film; the student copy carries no case.
+//
 //   [turbot arena authoring]  (task 010) the question creator's arena family:
 //                        drafts → `turbot_cases` round-trips every sample and
 //                        HW1–HW7 turbot question exactly (the homework sync
@@ -48,7 +54,7 @@
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import type { AssignmentData, AssignmentQuestion, HumanGrade, QuestionResult, SubmissionRecord } from '../src/types';
+import type { AssignmentData, AssignmentQuestion, CircuitData, HumanGrade, QuestionResult, SubmissionRecord } from '../src/types';
 import { QUESTION_TASKS, questionModeLabel, questionTask } from '../src/types';
 import {
   buildSampleAssignment,
@@ -58,7 +64,10 @@ import {
   scCorrect,
   turbotCorrect,
   turbotIncorrect,
+  perceptionMotionDetector,
 } from '../src/devData/sampleData';
+import { perceptionFields, type PerceptionDraft } from '../src/instructor/perceptionAuthoring';
+import { buildPerceptionCases, objectFrame } from '../src/engine/perception';
 import { boxAcross, boxWhole } from './builder';
 import { gradeQuestion, gradeSubmission } from '../src/engine/grader';
 import { answerKey, autoPoints, scoreRecord, type ProblemScore } from '../src/engine/score';
@@ -191,6 +200,37 @@ console.log('\n[boxed-across answers]');
     check(`...its per-case results equal the unboxed ${mode} grade`,
       JSON.stringify(acrossQ) === JSON.stringify(plainQ));
   }
+}
+
+// An SC perception question carrying the instructor's own films (task 013):
+// the same submit → grade path, the films graded after the battery.
+console.log('\n[perception films]');
+{
+  const draft: PerceptionDraft = {
+    kind: 'motion', width: 8, runLength: 3, pattern: '', direction: 'down', scene: 'multi',
+    films: [
+      [objectFrame(8, 3, 0), objectFrame(8, 3, 1), objectFrame(8, 3, 2)],
+      [[1, 1, 1, 0, 0, 0, 0, 1], [0, 1, 1, 1, 0, 0, 0, 1]],
+    ],
+  };
+  const q: AssignmentQuestion = {
+    id: 1, label: 'Films', statement: 'Detect downward motion.', buildMode: 'SC', representation: 'binary',
+    ...perceptionFields(draft, 'SC'),
+  };
+  const asg: AssignmentData = { id: 'perception-films', title: 'Perception films', questions: [q] };
+  const generated = buildPerceptionCases(q.perception!).length;
+  const submit = (circuit: CircuitData) =>
+    gradeSubmission(asg, { assignmentTitle: asg.title, submittedAt: NOW_ISO, answers: [{ questionId: 1, circuit }] }).questions[0];
+  const good = submit(perceptionMotionDetector({ width: 8, k: 3, direction: 'down', scene: 'multi' }));
+  const bad = submit(perceptionMotionDetector({ width: 8, k: 3, direction: 'down', scene: 'single' }));
+  check(`total = ${generated} generated + 2 authored`, good.total === generated + 2 && q.perception_cases!.filter((c) => c.authored).length === 2);
+  check(`the down/multi detector passes all (${good.passed}/${good.total})`, good.status === 'graded' && good.passed === good.total);
+  check('a down/single detector fails the authored clutter film',
+    bad.passed < bad.total && bad.perceptionCases![generated + 1].pass === false && bad.perceptionCases![generated].pass === true);
+  const served = stripAnswers(asg).questions[0];
+  check('the student copy carries no perception case (films included) and the rule unchanged',
+    (served.perception_cases ?? []).length === 0 && JSON.stringify(served.perception) === JSON.stringify(q.perception) &&
+    !JSON.stringify(served).includes('authored'));
 }
 
 // Human grades (task 063): the ONE write planner both GradingStores run

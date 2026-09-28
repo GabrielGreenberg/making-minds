@@ -814,6 +814,17 @@ export type LoadedCase =
       gradedKey: string | null;
       // A turbot case's result has no answer key (positional pass/fail).
       recorded: TurbotCaseResult;
+    }
+  | {
+      kind: 'perception';
+      questionId: number;
+      caseIndex: number;
+      attempt: number;
+      gradedKey: string | null;
+      // The film, from the RESULT (a student's copy of the question has no
+      // perception_cases); the verdict without expected/got.
+      frames: number[][];
+      recorded: { pass: boolean; failStep?: number; reason?: string };
     };
 
 interface HistoryEntry {
@@ -5082,11 +5093,11 @@ export const useStore = create<AppState>()((set, get) => ({
     const a = state.assignment;
     const q = a?.questions[state.currentQuestionIndex];
     // Only the open question's own cases, and only tasks with a case bank
-    // shape the replay understands (value cases, turbot arenas — not
-    // perception frames, fill-in blanks or open prose; types.ts questionTask).
+    // shape the replay understands (value cases, turbot arenas, perception
+    // films — not fill-in blanks or open prose; types.ts questionTask).
     if (!a || !q || q.id !== questionId) return Promise.resolve();
     const task = questionTask(q);
-    if (task !== 'function' && task !== 'turbot') return Promise.resolve();
+    if (task !== 'function' && task !== 'turbot' && task !== 'perception') return Promise.resolve();
     // The result of the attempt on show (viewingSubmission — its own
     // machine is on the canvas), else the latest recorded submission's —
     // remotely the student's own sanitized copy (present once grades are
@@ -5099,7 +5110,25 @@ export const useStore = create<AppState>()((set, get) => ({
     const gradedKey = graded ? gradedMachineKey(graded) : null;
 
     let loaded: LoadedCase;
-    if (q.buildMode === 'turbot') {
+    if (task === 'perception') {
+      // The film rides on the student's own result (sanitize.ts keeps its
+      // frames and verdict, strips expected/got), never on the bank.
+      const c = qr.perceptionCases?.[caseIndex];
+      if (!c || c.frames.length === 0) return Promise.resolve();
+      loaded = {
+        kind: 'perception',
+        questionId,
+        caseIndex,
+        attempt: record.attempt,
+        gradedKey,
+        frames: c.frames.map((f) => [...f]),
+        recorded: {
+          pass: c.pass,
+          ...(c.failStep !== undefined ? { failStep: c.failStep } : {}),
+          ...(c.reason !== undefined ? { reason: c.reason } : {}),
+        },
+      };
+    } else if (q.buildMode === 'turbot') {
       // Dispatch on the literal buildMode FIRST: selectEffectiveMode would
       // answer a turbot's INNER mode (an FSM brain is not an FSM question).
       const recorded = qr.turbotCases?.[caseIndex];
@@ -5139,7 +5168,30 @@ export const useStore = create<AppState>()((set, get) => ({
 
     // The grader's stimulus, then (deferred) the run to the grader's end.
     let runToEnd: () => void;
-    if (loaded.kind === 'turbot') {
+    if (loaded.kind === 'perception' && q.buildMode === 'SC') {
+      // The film as the run's lanes (the frame player's own path), clocked
+      // frame by frame to its end — the grader's run (perceptionCheck).
+      get().setScFrames(loaded.frames);
+      const steps = loaded.frames.length;
+      runToEnd = () => {
+        for (let t = 0; t < steps; t++) get().scStep();
+      };
+    } else if (loaded.kind === 'perception') {
+      // CC: the one frame on the INPUT toggles, bit i to the i-th INPUT in
+      // label order — how evaluateCCInputs binds it.
+      const bits = loaded.frames[0];
+      const inputs = sortByLabel(get().components, 'IN');
+      set({
+        components: get().components.map((c) => {
+          const i = inputs.indexOf(c);
+          if (i < 0) return c;
+          const v = bits[i] ?? 0;
+          return { ...c, value: v, inputValues: [v] };
+        }),
+      });
+      suppressAutoAddRow = false; // an explicit input: the I/O table records it
+      runToEnd = () => get().evaluateCircuit();
+    } else if (loaded.kind === 'turbot') {
       runToEnd = () => {
         const budget = selectQuestionStepBudget(get()) ?? 0;
         // turbotStep stops itself at the budget ('limit'), one call past it.

@@ -116,6 +116,7 @@ export {
   recordedCaseSeparations,
   runValueCase,
   runTurbotCase,
+  runPerceptionFilm,
   gradedMachineKey,
 } from './caseRun';
 export type { StageOne, ValueCaseRun, CaseStimulus } from './caseRun';

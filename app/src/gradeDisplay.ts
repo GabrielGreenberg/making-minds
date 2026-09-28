@@ -6,7 +6,14 @@
 import type { AssignmentQuestion, CaseResult, CircuitData, QuestionResult, TurbotCaseResult } from './types';
 import { pointsLabel, type ProblemScore } from './engine/score';
 import type { LoadedCase } from './store';
-import { runValueCase, runTurbotCase, gradedMachineKey } from './engine/caseRun';
+import {
+  runValueCase,
+  runTurbotCase,
+  runPerceptionFilm,
+  gradingCircuit,
+  validateQuestionMachine,
+  gradedMachineKey,
+} from './engine/caseRun';
 
 export type VerdictTone = 'pass' | 'half' | 'fail' | 'pending' | 'none';
 export interface Verdict {
@@ -109,6 +116,26 @@ export function gradedCaseView(
     const r = runTurbotCase(question, canvas, loaded.caseIndex);
     now = r ? { text: turbotOutcome(r), pass: r.pass } : { text: 'no such arena' };
     same = r != null && sameTurbotOutcome(r, loaded.recorded);
+  } else if (loaded.kind === 'perception') {
+    const n = loaded.frames.length;
+    what = n === 1 ? `Frame ${loaded.frames[0].join('')}` : `Film #${loaded.caseIndex + 1} — ${n} frames`;
+    const rec = loaded.recorded;
+    recorded = {
+      text: rec.pass
+        ? '✓ correct'
+        : `✗ ${rec.reason ?? (rec.failStep !== undefined && n > 1 ? `wrong output at t${rec.failStep}` : 'wrong output')}`,
+      pass: rec.pass,
+    };
+    // The grader's Stage 1, then its run of the film — the machine's own
+    // output bits (t1 first), never the expected ones.
+    const valid = validateQuestionMachine(question, gradingCircuit(canvas));
+    if (!valid.ok) {
+      now = { text: `✗ ${valid.reason ?? 'invalid machine'}`, pass: false };
+    } else {
+      const got = runPerceptionFilm(question, canvas, loaded.frames);
+      now = { text: n === 1 ? `output ${got[0] ?? 0}` : `output ${got.join(' ')} (t1 first)` };
+    }
+    same = (valid.ok ? '' : valid.reason ?? '') === (rec.reason ?? '');
   } else {
     what = `Input ${describeCaseInput(question, loaded)}`;
     const rec = loaded.recorded;

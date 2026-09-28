@@ -43,17 +43,16 @@ import type {
   SubmissionResult,
 } from '../types';
 import { questionTask } from '../types';
-import { validatePerceptionMachine, runPerceptionCase } from './perception';
 import { gradeFillIn } from './fillIn';
 import { notationForRepresentation } from './tmCodec';
 import {
   gradingCircuit,
-  questionComponentRules,
   questionLayout,
   validateQuestionMachine,
   runValidatedValueCase,
   runValidatedTurbotCase,
   rejectedTurbotCase,
+  runPerceptionFilm,
   type ValueCaseRun,
 } from './caseRun';
 
@@ -204,7 +203,6 @@ export function gradeQuestion(
  * bit is compared per time step; a case passes iff every step matches.
  */
 function gradePerception(question: AssignmentQuestion, circuit: CircuitData): QuestionResult {
-  const spec = question.perception!;
   const mode = question.buildMode;
   if (mode !== 'CC' && mode !== 'SC') {
     return skip(question.id, `perception questions must be CC or SC (got ${mode})`);
@@ -213,11 +211,10 @@ function gradePerception(question: AssignmentQuestion, circuit: CircuitData): Qu
   const cases = question.perception_cases;
   if (!cases || cases.length === 0) return skip(question.id, 'question has no perception cases');
 
-  // Stage 1: the question-wide component rules, then the retina interface
-  // (width input wires, one output wire). Invalid ⇒ fail every case with the
-  // reason, never `skipped`.
-  const restriction = questionComponentRules(question, circuit);
-  const valid = restriction.ok ? validatePerceptionMachine(circuit, spec.width) : restriction;
+  // Stage 1 (validateQuestionMachine): the question-wide component rules,
+  // then the retina interface (width input wires, one output wire). Invalid
+  // ⇒ fail every case with the reason, never `skipped`.
+  const valid = validateQuestionMachine(question, circuit);
   if (!valid.ok) {
     const rejected: PerceptionCaseResult[] = cases.map((tc) => ({
       pass: false,
@@ -229,17 +226,17 @@ function gradePerception(question: AssignmentQuestion, circuit: CircuitData): Qu
     return { questionId: question.id, status: 'graded', passed: 0, total: rejected.length, cases: [], perceptionCases: rejected };
   }
 
-  const results = cases.map((tc) => gradePerceptionCase(circuit, mode, tc));
+  const results = cases.map((tc) => gradePerceptionCase(question, circuit, tc));
   const passed = results.filter((c) => c.pass).length;
   return { questionId: question.id, status: 'graded', passed, total: results.length, cases: [], perceptionCases: results };
 }
 
 function gradePerceptionCase(
+  question: AssignmentQuestion,
   circuit: CircuitData,
-  mode: 'CC' | 'SC',
   tc: PerceptionTestCase,
 ): PerceptionCaseResult {
-  const got = runPerceptionCase(circuit, mode, tc);
+  const got = runPerceptionFilm(question, circuit, tc.frames);
   const mismatch = tc.expected.findIndex((e, t) => got[t] !== e);
   return {
     pass: mismatch < 0,

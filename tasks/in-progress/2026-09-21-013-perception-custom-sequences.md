@@ -8,9 +8,9 @@ requires:
 area: app
 source: claude-md
 created: 2026-09-21T15:30:00-07:00
-status: ready
+status: in-progress
 after: 2026-09-21-012
-branch:
+branch: robot/013-perception-custom-sequences
 merged_into:
 ---
 
@@ -70,7 +70,18 @@ Gabriel, 2026-09-25 (catch):
    "scene: single object / any number of objects" switch on the motion rule.
 
 ## Verify
-`perceptionCheck`, `pipelineCheck`.
+`perceptionCheck` ([motion variants], [bank identity], [authored films], [grading new
+rules], [store: new rules + authored films ≡ grader], [replay]), `caseRunCheck`
+([perception engine ≡ grader]), `pipelineCheck` ([perception films]), server `parityCheck`.
+
+Owed (browser eyeball, PROFILE §7): in the dev server, Dashboard → an assignment → New
+question → SC → Perception → Motion detector: the direction / scene selects appear; Add film
+draws the student's frame grid with an "expected" row that follows the rule as bits are
+clicked (t1 rightmost, IN1 on top); ↑/↓/duplicate/delete work on a picked frame; the bank
+summary counts generated + authored; a width change flags the films with "Fit to N
+inputs". Save, reopen: the films come back. As a student, submit a wrong motion detector,
+release grades: the Grades sheet's failed film has "Run this input →", which opens the
+question with the film in the frame player, played to its end, and the banner under it.
 
 ## Progress log
 
@@ -84,3 +95,36 @@ then `/work` or the loop claims 013 again and implements the plan above.
 Gabriel answered the three questions (### Resolved decisions). Decision 2 spawned a follow-up
 task for the per-film example flag, filed after this one. Next step: `/work` or the loop claims
 013 and implements the plan in ## Design unchanged.
+
+### 2026-09-27 — implemented (robot, Implement stage)
+Built the plan in ## Design: motion `direction`/`scene` (absent = up/single), `objectStarts`,
+the extra deterministic films appended only for new variants (today's banks byte-identical,
+pinned against hw2/hw3.json), `MAX_FILM_FRAMES`, `filmProblem`, `buildPerceptionCases(spec,
+films)`; `validateQuestionMachine`'s perception branch + `runPerceptionFilm`, used by
+`gradePerception`; `FrameFilmGrid` extracted from the player; `perceptionAuthoring.ts` +
+`PerceptionEditor.tsx` in the creator; the `perception` replay kind (store, banner,
+GradeSheet, the instructor's submission page); `perceptionMotionDetector` in sampleData
+(HW3 P12's detector graph-identical). Next: checkpoint, gates, review.
+
+### 2026-09-27 — implemented (work loop)
+Built: an instructor can now author films for a perception question (the creator's
+`PerceptionEditor`: rule row with motion direction up/down/either and scene single/any number,
+a films list drawn in the student's grid with a live "expected" row, a bank summary). Authored
+films add to the generated battery, expected always from the rule. Engine: `objectStarts`,
+direction/scene motion, `motionExtras` (only for non-up/single rules), `MAX_FILM_FRAMES`=24,
+`buildPerceptionCases(spec, films)`, `runPerceptionFilm` + a perception branch in
+`validateQuestionMachine`. Replay: a `perception` kind in `loadCaseInput`; "Run this input" on
+failed films in the Grades sheet and the instructor's submission page.
+Pins: perceptionCheck [motion variants], [bank identity] (HW2/HW3 banks byte-identical;
+every non-up/single bank at w8k3/w5k1/w10k2/w4k2 passes only its own detector of six),
+[authored films], [grading new rules], [store ≡ grader], [replay]; caseRunCheck [perception
+engine ≡ grader]; pipelineCheck [perception films].
+Gates: app-tsc 0, app-build 0, app-check 0, server-tsc 0, server-check 0.
+Review: fixed Finding 1 (w4 k2 banks could not separate scenes: two stray-bit films added to
+`motionExtras`, gated on bottom ≥ 2). Skipped: up/single at w4 k2 still cannot separate scenes
+— it is HW3 P12's frozen battery (commented in the pin). Nit left: `gradeDisplay.ts:121`
+labels a one-frame SC film like a CC frame.
+Remains (owed, PROFILE §7): browser eyeball per ## Verify — creator (selects, films,
+expected row, save/reopen, width flag, phone width), student replay from the Grades sheet (SC
+and CC perception), 012 frame-player regression (n / 24 frames).
+NEXT STEP: loop session: visual check if owed, then land per PROFILE §5.

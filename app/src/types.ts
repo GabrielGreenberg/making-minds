@@ -1242,7 +1242,16 @@ export type PerceptionRule =
   | { kind: 'exact-run'; runLength: number }  // CC: a maximal run of exactly k 1s
   | { kind: 'pattern'; pattern: string }      // CC: input equals this exact bit string
   | { kind: 'change' }                        // SC: current frame differs from the previous
-  | { kind: 'motion'; objectLength: number }; // SC: a k-long object moving up 1/step
+  // SC: a k-long object moving 1 unit per step. `direction` (absent = 'up',
+  // toward IN1) and `scene` (absent = 'single': the frame holds that object
+  // and nothing else; 'multi': SOME object moves, whatever else is in view) —
+  // absent is HW3 P12's stored form, so its content hash never drifts.
+  | { kind: 'motion'; objectLength: number; direction?: MotionDirection; scene?: MotionScene };
+
+/** Which way a motion rule's object must move: 'up' is toward IN1. */
+export type MotionDirection = 'up' | 'down' | 'either';
+/** What else a motion rule's frames may hold besides the moving object. */
+export type MotionScene = 'single' | 'multi';
 
 /** Authored perception spec: the rule plus the retina size (# input wires). */
 export interface PerceptionSpec {
@@ -1258,6 +1267,10 @@ export interface PerceptionSpec {
 export interface PerceptionTestCase {
   frames: number[][];
   expected: number[];
+  /** An instructor-authored film appended after the generated battery
+   *  (engine/perception.ts buildPerceptionCases); its `expected` still comes
+   *  from the rule. Never copied into a result. */
+  authored?: true;
 }
 
 /** Grading outcome for one perception case (parallel to CaseResult, bit-level shape). */

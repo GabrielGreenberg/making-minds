@@ -319,8 +319,8 @@ function SubmissionDetail({
         );
         // "Run this input" replays one graded case in the viewer — only for
         // the case banks the replay understands (store loadCaseInput: value
-        // cases, turbot arenas).
-        const replayable = q ? ['function', 'turbot'].includes(questionTask(q)) : false;
+        // cases, turbot arenas, perception films).
+        const replayable = q ? ['function', 'turbot', 'perception'].includes(questionTask(q)) : false;
         const runLink = (caseIndex: number) =>
           replayable && (
             <a className="mm-link" {...hashLink(viewer(qr.questionId, caseIndex))}>
@@ -433,7 +433,8 @@ function SubmissionDetail({
         // Perception questions grade raw frames bit-level — their failures
         // report the stimulus and the first mismatching time step.
         if (qr.perceptionCases) {
-          const failedCases = qr.perceptionCases.filter((c) => !c.pass);
+          // Map before filter: a film's index in the bank is the case.
+          const failedCases = qr.perceptionCases.map((c, k) => ({ ...c, k })).filter((c) => !c.pass);
           return (
             <div className="instructor-detail-q" key={qr.questionId}>
               {head(`${qr.passed}/${qr.total} cases passed`)}
@@ -445,15 +446,17 @@ function SubmissionDetail({
                       <th>expected</th>
                       <th>got</th>
                       <th>first wrong step</th>
+                      <th />
                     </tr>
                   </thead>
                   <tbody>
-                    {failedCases.map((c, ci) => (
-                      <tr key={ci}>
+                    {failedCases.map((c) => (
+                      <tr key={c.k}>
                         <td className="instructor-bits">{c.frames.map((f) => f.join('')).join(' → ')}</td>
                         <td className="instructor-bits">{c.expected.join('')}</td>
                         <td className="instructor-bits instructor-fail">{c.reason ?? c.got.join('')}</td>
                         <td className="instructor-bits">{c.failStep ?? '—'}</td>
+                        <td>{runLink(c.k)}</td>
                       </tr>
                     ))}
                   </tbody>
