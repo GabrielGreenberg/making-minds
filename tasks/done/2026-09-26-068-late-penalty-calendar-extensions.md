@@ -8,9 +8,9 @@ requires: browser
 area: app
 source: chat
 created: 2026-09-26T21:34:00-07:00
-status: in-progress
+status: done
 after: 2026-09-26-067
-branch: robot/068-late-penalty-calendar-extensions
+branch:
 merged_into:
 ---
 
@@ -116,3 +116,21 @@ date on the student's Home; a waiver reduces it.
   (preview_start refuses in scheduled runs), so the owed eyeball above couldn't be done.
   Code and gates are complete on `robot/068-late-penalty-calendar-extensions` (9e3e09c).
 - **NEXT STEP:** do the owed browser checks (entry above), then land per PROFILE §5.
+
+### 2026-09-27 (robot) — landed
+- Claimed after Gabriel's release (land with the eyeball owed). Merged `origin/main` (047,
+  073): CLAUDE.md came out 93 bytes over budget — trimmed in place, and the Dev/sample row's
+  owned-fields nit fixed. Gates re-run by exit code: app-tsc 0, app-build 0, app-check 0,
+  server-tsc 0, server-check 0.
+- **Headless check (local mode, CDP):** HW1 due moved to Sep 22; John's Sep 27 submission
+  shows "late by 1 class meeting: −10" (matrix LATE column and submission page, 43*); **Waive…**
+  5 → "−10; 5 waived", 48*; **Extension…** to Oct 8 → "Oct 8 (extended from Sep 22)", no
+  deduction, 53*; John's Home reads "Due Oct 8, 11:59 PM (extended)" and the up-next box
+  follows it; his Grades sheet 53/100.
+- **Owed, not claimed (Gabriel, before/at the hand release):** a browser eyeball of the same —
+  `npm run dev`, instructor → Load HW1–HW7, set HW1's due date in the past in the editor,
+  submit as John: the submit dialog's late warning; matrix/submission page deduction;
+  Extension… moves John's Home date and unfreezes; Waive… nets it; HW6 "per day", HW7 dimmed.
+  Remote: the served copy carries the extended date; the instructor editor keeps the original.
+  After release: `npm run homeworks -- status` on the box (set HW6/HW7 owned fields by hand if
+  'edited').
