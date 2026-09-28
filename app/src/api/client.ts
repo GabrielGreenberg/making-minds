@@ -13,6 +13,7 @@
 //                           getQuestionResponses / postGradingClaim /
 //                           putExtension / putWaiver /
 //                           putGradingSettings / postStudentNote / getGradesExport
+//   RemoteRobotStatusStore → robotStatus (task 083)
 //   remote auth           → login / logout / me
 //
 // Configuration: VITE_API_BASE (e.g. "https://api.phil133.example.edu") set at
@@ -51,6 +52,7 @@ import type {
 } from '../storage/gradingSummary';
 import type { ClaimOutcome } from '../storage/gradingClaims';
 import type { RegradeOutcome } from '../storage/regrade';
+import type { RobotStatus } from '../storage/robotStatus';
 
 export interface ApiUser {
   email: string;
@@ -729,4 +731,12 @@ export async function getInstructorNote(): Promise<InstructorNote | null> {
 export async function saveInstructorNote(content: string): Promise<InstructorNote> {
   const { note } = await request<{ note: InstructorNote }>('PUT', '/instructor-notes', { content });
   return note;
+}
+
+// ── the robot's state (task 083) ─────────────────────────────────
+
+/** Instructor only: the robot's state for the Dashboard — the server's
+ *  cached answer (≤ 10 minutes old), or a fresh look with `refresh`. */
+export async function robotStatus(refresh = false): Promise<RobotStatus> {
+  return request<RobotStatus>('GET', refresh ? '/robot/status?refresh=1' : '/robot/status');
 }

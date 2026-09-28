@@ -5,7 +5,13 @@
 //
 // Pins: [routeAccess] — the sandbox is the one public route; the student
 // routes need sign-in; every instructor route needs the instructor role (and
-// every Route kind is classified). [case route] — `#/a/:id/q/:i/case/:k`
+// every Route kind is classified). [robot route] — the Dashboard's Robot tab
+// (task 083, `#/instructor/robot`) round-trips, instructor-only; the shell
+// renders it after Notes, current on its route, with no strip before an
+// answer; the tab over a synthetic answer renders its four sections, the
+// verdict, the student-fix tag, review marks as id + category, an unknown
+// line, the local-mode reason, and a failed refresh beside the last answer.
+// [case route] — `#/a/:id/q/:i/case/:k`
 // ("Run this input") parses and round-trips, a malformed case segment is
 // dropped (the question kept), and applying it loads case k of question i
 // into the run after the question opens. [submission route] —
@@ -49,6 +55,7 @@
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join, relative } from 'node:path';
+import type { RobotStatus } from '../src/storage/robotStatus';
 
 // The store and routing touch window / document / localStorage / location /
 // history, so install minimal shims BEFORE dynamically importing them.
@@ -112,6 +119,7 @@ const ALL: Route[] = [
   { kind: 'instructor-roster' },
   { kind: 'instructor-feedback' },
   { kind: 'instructor-notes' },
+  { kind: 'instructor-robot' },
 ];
 check('the sandbox is public', routeAccess({ kind: 'sandbox' }) === 'public');
 check('the sandbox is the ONLY public route', ALL.filter((r) => routeAccess(r) === 'public').length === 1);
@@ -122,6 +130,16 @@ check(
   'every instructor-* route needs the instructor role',
   ALL.filter((r) => r.kind.startsWith('instructor')).every((r) => routeAccess(r) === 'instructor'),
 );
+
+console.log('[robot route]');
+{
+  // The Dashboard's Robot tab (task 083): after Notes, instructor-only (the
+  // ALL pin above), and its hash round-trips.
+  const r = parseHash('#/instructor/robot');
+  check("'#/instructor/robot' → the Robot tab", r.kind === 'instructor-robot');
+  check('…and round-trips through routeToHash', routeToHash(r) === '#/instructor/robot');
+  check('…instructor-only', routeAccess(r) === 'instructor');
+}
 
 console.log('[case route]');
 {
@@ -591,11 +609,57 @@ console.log('[dashboard shell]');
   };
   const session = (html: string) => /<div class="session">(.*?)<\/div>/.exec(html)?.[1] ?? '';
   for (const h of ['#/instructor', '#/instructor/grading', '#/instructor/grading/hw1', '#/instructor/roster',
-    '#/instructor/feedback', '#/instructor/notes']) {
+    '#/instructor/feedback', '#/instructor/notes', '#/instructor/robot']) {
     const s = session(shell(h, React.createElement('p', null, 'tab')));
     check(`'${h}': the Dashboard shell's topbar shows the instructor a Feedback button`,
       /Prof\. Ada · Instructor/.test(s) && /<button type="button">Feedback<\/button>/.test(s));
   }
+  // The Robot tab (task 083) closes the tab row, current on its own route;
+  // before any answer (a static render runs no effect) there is no strip.
+  const robotShell = shell('#/instructor/robot', React.createElement('p', null, 'tab'));
+  check('the tab row ends Notes · Robot, Robot current on #/instructor/robot',
+    /data-text="Notes"[^]*data-text="Robot"/.test(robotShell) &&
+      /class="mm-tab mm-tab--active" aria-current="page" data-text="Robot" href="#\/instructor\/robot"/.test(robotShell));
+  check('…and no robot strip before an answer', !/robot-strip/.test(robotShell));
+  // The Robot tab itself over a synthetic answer (the layout's fetch is an
+  // effect, which a static render never runs, so the answer is provided).
+  const { RobotView } = await import('../src/instructor/RobotView');
+  const { RobotStatusContext } = await import('../src/instructor/useRobotStatus');
+  const answer: RobotStatus = {
+    available: true,
+    asOf: '2026-09-28T17:00:00.000Z',
+    stale: null,
+    live: { ok: true, sha: 'a'.repeat(40), shortSha: 'aaaaaaa', subject: 'Merge robot/080-x: y', releasedAt: '2026-09-28T14:00:00.000Z', releasedAtSource: 'reflog', lastLanded: { id: '2026-09-27-080', title: 'The last one' } },
+    release: {
+      ok: true, head: 'b'.repeat(40), verdict: 'hold', line: 'held: the database schema and its migrations',
+      reasons: [{ verdict: 'hold', brief: 'the database schema and its migrations', detail: 'the database schema and its migrations: server/src/db.ts' }],
+      rows: [{ id: '2026-09-28-099', title: 'A test task', landedAt: '2026-09-28T16:00:00.000Z' }],
+    },
+    answers: { ok: true, tasks: [{ id: '2026-09-28-100', title: 'A student report', question: 'Work this student-reported fix? (yes / no)', studentFix: true }] },
+    review: { ok: true, items: [{ id: 'fb-1', category: 'homework content' }] },
+    activity: { ok: false, unknown: 'cannot read GitHub main\'s history: timed out' },
+  };
+  const robotTab = (value: RobotStatus | undefined, error: Error | null = null) =>
+    shell('#/instructor/robot', React.createElement(RobotStatusContext.Provider, {
+      value: { value, loading: false, error, refresh: () => {} },
+      children: React.createElement(RobotView),
+    }));
+  const tabHtml = robotTab(answer);
+  check('the Robot tab renders its four sections and Refresh',
+    ['Live', 'Waiting for release', 'Waiting for your answer', 'Recent queue activity'].every((h) => tabHtml.includes(`<h2>${h}</h2>`)) &&
+      /<button class="mm-btn">Refresh<\/button>/.test(tabHtml));
+  check('…the verdict line, the waiting task, the student-fix tag',
+    tabHtml.includes('held: the database schema and its migrations') && tabHtml.includes('2026-09-28-099') && tabHtml.includes('student fix'));
+  check('…a review mark as its id and category, linking to the Feedback tab',
+    /href="#\/instructor\/feedback"[^>]*><span class="mono robot-id mm-row-title">fb-1<\/span><span class="tag tag--ok">homework content<\/span>/.test(tabHtml));
+  check('…and an unreadable section as one "Unknown:" line', tabHtml.includes('Unknown: cannot read GitHub main'));
+  check('local mode: the tab says "Not available in local mode"', robotTab({ available: false, reason: 'Not available in local mode' }).includes('Not available in local mode'));
+  const failed = robotTab(answer, new Error('Failed to fetch'));
+  check('a failed refresh keeps the last answer beside a one-line error',
+    failed.includes('Couldn’t refresh (Failed to fetch) — showing the last answer.') && failed.includes('<h2>Live</h2>'));
+  check('a failed first load shows the error line and Refresh, no sections',
+    /Couldn’t read the robot’s state: Failed to fetch/.test(robotTab(undefined, new Error('Failed to fetch'))) &&
+      !robotTab(undefined, new Error('Failed to fetch')).includes('<h2>Live</h2>'));
   const tab = shell('#/instructor/feedback', React.createElement(FeedbackQueueView));
   check('the Feedback tab renders its New report action beside the filter',
     /<select class="mm-input">.*?<\/select><button class="mm-btn">New report<\/button>/.test(tab));

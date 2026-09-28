@@ -51,6 +51,9 @@ npm run roster      # roster + account admin CLI; see "Accounts" below
 | `MM_AUTH_MODE`           | `password`            | `password` = email + password against the roster (the real system). `dev` = **passwordless** roster-email login, development only. `sso` = UCLA SSO (capabilities reported; authentication unimplemented) |
 | `MM_SSO_LOGIN_URL`       | `/api/auth/sso/start` | Where the browser goes to start SSO, when `MM_AUTH_MODE=sso`     |
 | `MM_SESSION_TTL_SECONDS` | 30 days               | Bearer-token session lifetime                                   |
+| `MM_REPO_DIR`            | the repo it runs from | The robot panel's "what's live": the clone whose HEAD the pilot runs (read-only git — never status or a fetch there) |
+| `MM_REPO_MIRROR`         | `repo-mirror.git` beside the database | The robot panel's fetch-only bare mirror of GitHub `main`, fetched from that clone's `remote.origin.url` at most every 10 minutes, and only when asked; every mirror command runs by `--git-dir`, so a malformed folder is "unknown", never a repository above it. None for `:memory:` (no network in the harnesses) |
+| `MM_BACKUP_DIR`          | `backups/daily` beside the database's folder | Where the robot panel reads the newest `daily-*.sqlite` for the release gate's backup rule (with `systemctl is-active makingminds-backup.timer`; either unreadable → the panel waits on "the daily backups are unknown") |
 
 ## API
 
@@ -85,6 +88,7 @@ All routes are under `/api`, JSON in/out, auth via `Authorization: Bearer <token
 | `POST /api/assignments/:id/submissions` | logged in  | `{answers}` → server stamps identity/time, **grades**, stores, returns `{record}`; the student's copy carries **no grade** until grades are released (then scores only, never per-case detail) |
 | `GET /api/assignments/:id/submissions`  | logged in  | the caller's own attempts, any role — student: no grades before release, scores-only after; instructor: their own, full detail |
 | `GET /api/assignments/:id/submissions/all` | instructor | every student's attempts, full detail (the gradebook feed) |
+| `GET /api/robot/status`                 | instructor | the robot's state for the Dashboard (task 083; `src/robotStatus.ts` gathers, `app/src/storage/robotStatus.ts` builds): what the pilot runs and since when; the release gate's own verdict (`deploy/release-gate.mjs` `decide`) on GitHub `main` and the landed tasks it holds; `tasks/blocked/` first questions; open feedback marked `review` as id + category only; recent queue events. Cached 10 minutes; `?refresh=1` looks again. Fixed-argument `execFile` only; a git or network failure is a section saying `unknown: <why>`, never a 500 |
 
 The browser counterpart is `app/src/api/client.ts` — a typed function per
 endpoint, ready to back `Remote*` implementations of the `WorkbookStore` /
@@ -102,6 +106,7 @@ endpoint, ready to back `Remote*` implementations of the `WorkbookStore` /
 | `src/roster.ts`         | `normalizeEmail` / `normalizeUid` / `isCampusEmail`; pure CSV roster parsing: RFC-4180 reader; header discovery past a preamble (the registrar's export as-is); strict column matching (exact, then whole word — no substring fallback) for email / name or first+last / student ID / role / section / status; `LAST, FIRST` → display name + surname sort key; `STATUS_TABLE` (E/W/H imported, D/C/withdrawn not); `rosterReview` (who is no longer on the class list, matched by ID or any email); per-row issues (incl. a repeated ID) |
 | `src/rosterImport.ts`   | `importRosterCsv` — parse, place each row (identity.ts; a conflict becomes an issue), and the import report (added / updated / statuses / columns / no longer listed), shared by `POST /api/roster/import` and the CLI |
 | `src/sanitize.ts`       | student-facing redaction: `stripAnswers` (no `test_cases`), `stripResultDetail` (scores only), `studentRecord` (no grade at all until grades are released) |
+| `src/robotStatus.ts`    | the robot panel's facts (task 083): the server's own clone, the mirror of GitHub `main`, the backups, CI — async fixed-argument `execFile`, each step failing on its own into "unknown"; a 10-minute cache per app |
 | `src/app.ts`            | the Express app (factory, no `listen`) — all routes                     |
 | `src/index.ts`          | entry point: config → db → listen, graceful shutdown                    |
 | `src/seed.ts`           | seed the toy roster (+ the sample assignment) (`npm run seed [-- --sample] [-- --password=X]`) |

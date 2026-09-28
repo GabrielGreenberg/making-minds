@@ -64,6 +64,8 @@ import type {
 import type { FeedbackStore } from './feedbackStore';
 import type { Role } from '../auth/accounts';
 import type { NotesStore } from './NotesStore';
+import type { RobotStatusStore } from './robotStatusStore';
+import type { RobotStatus } from './robotStatus';
 import { SubmitRefused } from '../submissionGroup';
 import {
   ApiError,
@@ -99,6 +101,7 @@ import {
   setFeedbackStatus,
   getInstructorNote,
   saveInstructorNote,
+  robotStatus,
 } from '../api/client';
 
 /** Resolve a thrown ApiError 404 to `fallback` (the seams' "not found" shape). */
@@ -373,9 +376,19 @@ class RemoteNotesStore implements NotesStore {
   }
 }
 
+// The robot's state (task 083): instructor-only; the server answers from its
+// cache unless asked to look again, and every section it could not read
+// arrives as "unknown: <why>" — nothing here retries or fills in.
+class RemoteRobotStatusStore implements RobotStatusStore {
+  get(refresh = false): Promise<RobotStatus> {
+    return robotStatus(refresh);
+  }
+}
+
 export const remoteWorkbookStore: WorkbookStore = new RemoteWorkbookStore();
 export const remoteAssignmentStore: AssignmentStore = new RemoteAssignmentStore();
 export const remoteSubmissionStore: SubmissionStore = new RemoteSubmissionStore();
 export const remoteGradingStore: GradingStore = new RemoteGradingStore();
 export const remoteFeedbackStore: FeedbackStore = new RemoteFeedbackStore();
 export const remoteNotesStore: NotesStore = new RemoteNotesStore();
+export const remoteRobotStatusStore: RobotStatusStore = new RemoteRobotStatusStore();

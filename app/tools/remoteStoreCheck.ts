@@ -44,6 +44,9 @@
 // Dashboard's Feedback) — the server stamps the instructor role whatever the
 // client says, and a report sent without a context lists without one.
 //
+// Task 083: the instructor reads the robot's state through
+// RemoteRobotStatusStore (get and get(true)); a student gets 403.
+//
 // Exits non-zero on the first tally of failures.
 
 // Type-only, so erased at runtime (verbatimModuleSyntax): it loads nothing and
@@ -76,6 +79,7 @@ const {
   remoteGradingStore,
   remoteFeedbackStore,
   remoteNotesStore,
+  remoteRobotStatusStore,
 } = await import('../src/storage/remoteStores');
 const { TOY_ACCOUNTS } = await import('../src/auth/accounts');
 const { sortAssignments } = await import('../src/assignments');
@@ -112,6 +116,10 @@ for (const rel of [
   '../src/courseCalendar.ts',
   '../src/engine/calendar.ts',
   '../src/storage/lateLocal.ts',
+  // The robot's state (task 083): the seam and its pure builder — git and
+  // queue facts, never answers.
+  '../src/storage/robotStatusStore.ts',
+  '../src/storage/robotStatus.ts',
 ]) {
   const source = readFileSync(new URL(rel, import.meta.url), 'utf8');
   check(
@@ -698,6 +706,27 @@ try {
   notesForbidden = e instanceof api.ApiError && e.status === 403;
 }
 check('a student cannot read the notes through the seam', notesForbidden);
+
+// ── the robot's state (storage/remoteStores.ts RemoteRobotStatusStore) ──
+// Task 083: an in-memory server keeps no mirror of GitHub main, so it never
+// touches the network — the mirror's sections say so; the review list (the
+// database's) answers; a student is refused.
+api.setToken(iTok);
+const robot = await remoteRobotStatusStore.get();
+check('the instructor reads the robot\'s state through the seam',
+  robot.available === true && robot.review.ok === true && typeof robot.asOf === 'string');
+check('…with no mirror, the release section is unknown and names the missing mirror',
+  robot.available && !robot.release.ok && /mirror/.test(robot.release.unknown) &&
+    !robot.answers.ok && !robot.activity.ok);
+const robotFresh = await remoteRobotStatusStore.get(true);
+check('get(true) asks the server to look again (?refresh=1) and round-trips',
+  robotFresh.available === true && robotFresh.asOf >= (robot.available ? robot.asOf : ''));
+api.setToken(sTok);
+const robotDenied = await remoteRobotStatusStore
+  .get()
+  .then(() => null as ApiError | null)
+  .catch((e: unknown) => (e instanceof api.ApiError ? e : null));
+check('a student cannot read the robot\'s state (ApiError 403)', robotDenied?.status === 403);
 
 // ── the submit dialog's group listing, through the seam (task 062) ─
 {

@@ -13,6 +13,9 @@ notes/
 *.sqlite
 *.sqlite-wal
 *.sqlite-shm
+# the robot panel's fetch-only mirror of GitHub main, kept beside the
+# database (task 083; server/src/robotStatus.ts) — a dev server's lands in server/
+repo-mirror.git/
 
 # local credentials — never committed
 secrets/

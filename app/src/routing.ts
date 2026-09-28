@@ -43,7 +43,10 @@ export type Route =
   | { kind: 'instructor-student'; student: string }
   | { kind: 'instructor-roster' }
   | { kind: 'instructor-feedback' }
-  | { kind: 'instructor-notes' };
+  | { kind: 'instructor-notes' }
+  // The robot's state (task 083): what the pilot runs, what waits for
+  // release, what waits for an answer, the queue's recent activity.
+  | { kind: 'instructor-robot' };
 
 /** An assignment's grading views (the segmented control; the URL keeps it). */
 export type GradingView = 'overview' | 'matrix' | 'queue';
@@ -116,6 +119,7 @@ export function parseHash(hash: string): Route {
     if (parts[1] === 'roster') return { kind: 'instructor-roster' };
     if (parts[1] === 'feedback') return { kind: 'instructor-feedback' };
     if (parts[1] === 'notes') return { kind: 'instructor-notes' };
+    if (parts[1] === 'robot') return { kind: 'instructor-robot' };
     if (parts[1] === 'assignments') {
       if (parts[2] === 'new') return { kind: 'instructor-new-assignment' };
       if (parts[2]) {
@@ -179,6 +183,8 @@ export function routeToHash(route: Route): string {
       return '#/instructor/feedback';
     case 'instructor-notes':
       return '#/instructor/notes';
+    case 'instructor-robot':
+      return '#/instructor/robot';
     case 'instructor-new-assignment':
       return '#/instructor/assignments/new';
     case 'instructor-edit':
@@ -255,6 +261,7 @@ export function routeAccess(route: Route): RouteAccess {
     case 'instructor-roster':
     case 'instructor-feedback':
     case 'instructor-notes':
+    case 'instructor-robot':
       return 'instructor';
   }
 }
@@ -316,6 +323,7 @@ function applyRoute(route: Route): void {
     case 'instructor-roster':
     case 'instructor-feedback':
     case 'instructor-notes':
+    case 'instructor-robot':
       // Instructor routes bypass the student Zustand store entirely — the
       // instructor UI reads the hash directly (see useInstructorRoute). Role
       // gating is handled by <InstructorGate> (which shows an unlock screen when

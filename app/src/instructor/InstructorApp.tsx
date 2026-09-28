@@ -13,6 +13,7 @@ import { StudentGradingView } from './StudentGradingView';
 import { RosterView } from './RosterView';
 import { FeedbackQueueView } from './FeedbackQueueView';
 import { NotesView } from './NotesView';
+import { RobotView } from './RobotView';
 import type { InstructorRoute } from './useInstructorRoute';
 
 export function InstructorApp({ route }: { route: InstructorRoute }) {
@@ -49,5 +50,7 @@ function InstructorView({ route }: { route: InstructorRoute }) {
       return <FeedbackQueueView />;
     case 'instructor-notes':
       return <NotesView />;
+    case 'instructor-robot':
+      return <RobotView />;
   }
 }
