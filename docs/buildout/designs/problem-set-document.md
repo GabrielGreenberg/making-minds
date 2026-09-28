@@ -60,5 +60,6 @@ re-transcribed to the PDFs' structure; the seeded figures are SVG crops of the P
 `app/public/problem-sets/` beside the PDFs themselves (readable JSON; a public path resolves
 against the app's base URL in either backend), instructor uploads are size-capped data URLs.
 Pins: `statementFormatCheck` (sections partition the ids, callout kinds, figure sources
-resolve, every HW parses and renders to prose), `pipelineCheck`, `remoteStoreCheck`, server
+resolve and carry no cropped-in neighbour — `tools/figureCrop.ts`, task 077 — every HW
+parses and renders to prose), `pipelineCheck`, `remoteStoreCheck`, server
 `parityCheck`. Visual proof: every HW beside its PDF at 1280 and ~700 wide.
