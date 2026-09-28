@@ -17,6 +17,7 @@
 //     is answer-stripped → workbook save/load → submit (answers only;
 //     identity + timestamp are the server's word; no grade shown) →
 //     instructor reads server grades → a human grade through the GradingStore seam →
+//     an extension and a late waiver through it (task 068) →
 //     release/unrelease gates what the student's records carry
 //   - own reads for every role (task 037): an instructor's own-read (the
 //     Student view) holds only the instructor's attempts, whatever email is
@@ -101,6 +102,12 @@ for (const rel of [
   '../src/provenance/integrity.ts',
   '../src/provenance/ids.ts',
   '../src/provenance/trace.ts',
+  // The late policy (task 068): the due helper and the bundled calendar the
+  // student's sheet and submit dialog read — course data, never answers.
+  '../src/lateContext.ts',
+  '../src/courseCalendar.ts',
+  '../src/engine/calendar.ts',
+  '../src/storage/lateLocal.ts',
 ]) {
   const source = readFileSync(new URL(rel, import.meta.url), 'utf8');
   check(
@@ -344,6 +351,19 @@ check('remoteGradingStore.summary: the roster-joined rows, the hand grade in pla
   !!summary && summary.progress.roster === TOY_ACCOUNTS.filter((a) => a.role === 'student').length &&
     sRow?.latest?.attempt === 2 && sRow.problems[summary.questionIds.indexOf(openQ.id)]?.source === 'human' &&
     (await remoteGradingStore.summary('no-such-assignment')) === null);
+// Extensions and waivers through the seam (task 068): the server plans and
+// stamps; a refusal is the seam's error.
+const ext = await remoteGradingStore.setExtension(SAMPLE_ASSIGNMENT_ID, sKey, '2099-01-01T08:00:00.000Z');
+const extCleared = await remoteGradingStore.setExtension(SAMPLE_ASSIGNMENT_ID, sKey, null);
+const waiver = await remoteGradingStore.setWaiver(SAMPLE_ASSIGNMENT_ID, sKey, { points: 5, note: 'n' });
+const badWaiver = await remoteGradingStore.setWaiver(SAMPLE_ASSIGNMENT_ID, sKey, { points: 0 });
+const unknownExt = await remoteGradingStore.setExtension(SAMPLE_ASSIGNMENT_ID, 'no-such-key', null);
+check('setExtension / setWaiver round-trip: stamped by the server, cleared to null, refusals carry the reason',
+  ext.ok && ext.value?.dueDate === '2099-01-01T08:00:00.000Z' && ext.value.setBy === instructor.email.toLowerCase() &&
+    extCleared.ok && extCleared.value === null && waiver.ok && waiver.value?.points === 5 &&
+    !badWaiver.ok && /whole number/.test(badWaiver.error) && !unknownExt.ok,
+  JSON.stringify([ext, extCleared, waiver, badWaiver, unknownExt]));
+check('the waiver shows on the summary row', (await remoteGradingStore.summary(SAMPLE_ASSIGNMENT_ID))?.rows.find((r) => r.student.key === sKey)?.waived === 5);
 check('the gradebook read carries the grade in full',
   (await remoteSubmissionStore.listAll(SAMPLE_ASSIGNMENT_ID)).some((r) => r.grades?.[0]?.version === 1));
 
@@ -356,6 +376,7 @@ check('…and the human grade, student-safe: points and note, no grader or versi
   releasedLatest?.grades?.length === 1 && releasedLatest.grades[0].points === 1 &&
     releasedLatest.grades[0].note === 'clear justification' && releasedLatest.grades[0].grader === undefined &&
     releasedLatest.grades[0].version === undefined);
+check('…and the waived late points, the number only', releasedLatest?.lateWaived === 5);
 // notes/todos.md item 4: per-case detail is now safe-widened (which input,
 // pass/fail) — server/tools/parityCheck.ts pins the widening itself; here
 // just confirm the answer key stays hidden through the seam too.

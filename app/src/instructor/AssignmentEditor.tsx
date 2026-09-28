@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import type { AssignmentData, AssignmentQuestion, AssignmentSection, SectionLayout } from '../types';
+import type { AssignmentData, AssignmentQuestion, AssignmentSection, LatePolicy, SectionLayout } from '../types';
 import { questionModeLabel } from '../types';
 import { getAssignment } from '../assignments';
 import { assignmentStore } from '../storage/backend';
@@ -11,16 +11,7 @@ import { useAsyncValue } from '../useAsyncValue';
 import { useDragReorder } from './dragReorder';
 import { CalloutsEditor, FiguresEditor } from './DocumentEditors';
 import { ProblemSetDocument } from '../components/ProblemSetDocument';
-
-/** ISO timestamp → the local wall-clock "YYYY-MM-DDTHH:MM" a datetime-local input wants. */
-function toLocalInputValue(iso: string): string {
-  const d = new Date(iso);
-  const pad = (n: number) => String(n).padStart(2, '0');
-  return (
-    `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}` +
-    `T${pad(d.getHours())}:${pad(d.getMinutes())}`
-  );
-}
+import { toLocalInputValue } from '../dueDates';
 
 const LAYOUTS: { value: SectionLayout; label: string }[] = [
   { value: 'auto', label: 'auto (tables in a grid, one-liners in columns)' },
@@ -126,6 +117,16 @@ export function AssignmentEditor({ id }: { id: string }) {
     if (iso !== assignment.dueDate) commit({ ...assignment, dueDate: iso });
   };
 
+  // The grading fields (task 068) are instructor-owned: always written as an
+  // explicit value, never removed — an absent key would let the next homework
+  // sync fill in the repo's (HW7's `countsTowardGrade: false`) over this choice.
+  const handleCountsChange = (counts: boolean) => {
+    if (assignment.countsTowardGrade !== counts) commit({ ...assignment, countsTowardGrade: counts });
+  };
+  const handleLatePolicyChange = (policy: LatePolicy) => {
+    if (assignment.latePolicy !== policy) commit({ ...assignment, latePolicy: policy });
+  };
+
   // Optional text fields: an empty value removes the key.
   const handleOptionalBlur = (key: 'preamble' | 'sourcePdf', value: string) => {
     const v = value.trim();
@@ -229,6 +230,28 @@ export function AssignmentEditor({ id }: { id: string }) {
           defaultValue={assignment.dueDate ? toLocalInputValue(assignment.dueDate) : ''}
           onBlur={(e) => handleDueDateBlur(e.target.value)}
         />
+      </label>
+
+      <label className="mm-field">
+        <span className="mm-label">Late policy</span>
+        <select
+          className="mm-input"
+          value={assignment.latePolicy ?? 'per-meeting'}
+          onChange={(e) => handleLatePolicyChange(e.target.value as LatePolicy)}
+          title="−5 once late, then −5 per class meeting that has ended since the due date — or per full day"
+        >
+          <option value="per-meeting">−5, then −5 per class meeting</option>
+          <option value="per-day">−5, then −5 per day</option>
+        </select>
+      </label>
+
+      <label className="mm-inline-field">
+        <input
+          type="checkbox"
+          checked={assignment.countsTowardGrade !== false}
+          onChange={(e) => handleCountsChange(e.target.checked)}
+        />
+        Counts toward the course grade
       </label>
       </div>
 

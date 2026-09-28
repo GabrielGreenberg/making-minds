@@ -95,7 +95,7 @@ import express from 'express';
 import type { Request, Response, NextFunction } from 'express';
 import type { AssignmentData, AssignmentState, FeedbackTriage, FeedbackTriageOutcome, SubmissionData, SubmissionRecord } from '../../app/src/types';
 import { gradeSubmission } from '../../app/src/engine/grader';
-import { planGradeWrite, type GradeWrite } from '../../app/src/storage/gradeWrites';
+import { planExtensionWrite, planGradeWrite, planWaiverWrite, type GradeWrite } from '../../app/src/storage/gradeWrites';
 import { homeworkContentHash } from '../../app/src/devData/homeworkSync';
 import { deriveMintKey } from '../../app/src/provenance/ids';
 import { assessIntegrity, saveSummary } from '../../app/src/provenance/integrity';
@@ -128,6 +128,7 @@ import { regradeEvents } from '../../app/src/storage/regrade';
 import { snapshotDirFor, takeRegradeSnapshot } from './snapshot';
 import { ClaimBook } from '../../app/src/storage/gradingClaims';
 import { checkGroup } from '../../app/src/submissionGroup';
+import { studentCopy } from '../../app/src/lateContext';
 
 export function createApp(config: ServerConfig, db: Db) {
   const app = express();
@@ -515,15 +516,21 @@ export function createApp(config: ServerConfig, db: Db) {
       // with-a-flag: they must not learn it exists before it is published.
       // Unpublished is the default, so an unknown id counts as hidden.
       .filter((a) => isInstructor || (visible.get(a.id) ?? false))
-      .map((a) => ({
-        id: a.id,
-        title: a.title,
-        questionCount: a.questions.length,
-        gradesReleased: released.get(a.id) ?? false,
-        visible: visible.get(a.id) ?? false,
-        dueDate: a.dueDate,
-        order: a.order,
-      }));
+      .map((a) => {
+        const row = {
+          id: a.id,
+          title: a.title,
+          questionCount: a.questions.length,
+          gradesReleased: released.get(a.id) ?? false,
+          visible: visible.get(a.id) ?? false,
+          dueDate: a.dueDate,
+          order: a.order,
+          ...(a.latePolicy ? { latePolicy: a.latePolicy } : {}),
+        };
+        // A student's row carries THEIR due date (task 068): an extension,
+        // marked dueExtended. Never an instructor's.
+        return isInstructor ? row : studentCopy(row, db.getExtension(a.id, req.user!.email) ?? undefined);
+      });
     res.json({ assignments: summaries });
   });
 
@@ -537,23 +544,40 @@ export function createApp(config: ServerConfig, db: Db) {
       return;
     }
     res.json({
-      assignment: isInstructor ? assignment : stripAnswers(assignment),
+      // A student's copy: no answers, and their effective due date (task 068 —
+      // an overlay of a date, no answer data). The instructor's copy is the
+      // stored one: the editor saves it back, so it must never carry an
+      // overlaid date.
+      assignment: isInstructor
+        ? assignment
+        : studentCopy(stripAnswers(assignment), db.getExtension(assignment.id, req.user!.email) ?? undefined),
       gradesReleased: db.getGradesReleased(assignment.id),
       visible: db.getVisible(assignment.id),
     });
   });
 
   app.put('/api/assignments/:id', auth, requireInstructor, (req, res) => {
-    const assignment = req.body as AssignmentData;
+    const body = req.body as AssignmentData | undefined;
     if (
-      !assignment ||
-      assignment.id !== String(req.params.id) ||
-      typeof assignment.title !== 'string' ||
-      !Array.isArray(assignment.questions)
+      !body ||
+      body.id !== String(req.params.id) ||
+      typeof body.title !== 'string' ||
+      !Array.isArray(body.questions)
     ) {
       res.status(400).json({ error: 'malformed assignment (id must match URL)' });
       return;
     }
+    // The instructor-owned grading fields (task 068) take only their values.
+    if (body.latePolicy !== undefined && body.latePolicy !== 'per-meeting' && body.latePolicy !== 'per-day') {
+      res.status(400).json({ error: "latePolicy must be 'per-meeting' or 'per-day'" });
+      return;
+    }
+    if (body.countsTowardGrade !== undefined && typeof body.countsTowardGrade !== 'boolean') {
+      res.status(400).json({ error: 'countsTowardGrade must be true or false' });
+      return;
+    }
+    // `dueExtended` is served-only (a student's copy); it is never stored.
+    const { dueExtended: _served, ...assignment } = body;
     db.saveAssignment(assignment);
     res.json({ ok: true });
   });
@@ -745,7 +769,7 @@ export function createApp(config: ServerConfig, db: Db) {
       record:
         req.user!.role === 'instructor'
           ? record
-          : studentRecord(record, db.getGradesReleased(assignment.id), assignment),
+          : studentRecord(record, db.getGradesReleased(assignment.id), assignment, [], db.getWaiver(assignment.id, email)?.points),
     });
   });
 
@@ -763,7 +787,8 @@ export function createApp(config: ServerConfig, db: Db) {
     const released = db.getGradesReleased(id);
     // The full assignment fills older results' case separations (sanitize.ts).
     const assignment = db.getAssignment(id) ?? undefined;
-    res.json({ records: own.map((r) => studentRecord(r, released, assignment, grades)) });
+    const waived = db.getWaiver(id, req.user!.email)?.points;
+    res.json({ records: own.map((r) => studentRecord(r, released, assignment, grades, waived)) });
   });
 
   // Everyone's attempts (the gradebook): each with its student's human grades
@@ -935,6 +960,70 @@ export function createApp(config: ServerConfig, db: Db) {
       return;
     }
     gradeRoute(req, res, { clear: true, version });
+  });
+
+  // ── extensions and late waivers (instructor; task 068) ──────────
+  // Per (assignment, student), set or cleared, planned by the SAME pure
+  // planners the local GradingStore uses (storage/gradeWrites.ts) and logged
+  // in grade_events. The student is named by their opaque key, never an
+  // email. An extension has no reason field, by design (memo §9).
+  const lateTarget = (req: Request, res: Response): { assignmentId: string; email: string } | null => {
+    const assignmentId = String(req.params.id);
+    const email = db.getAssignment(assignmentId) ? studentEmailOf(db, mintSecret, String(req.params.sid)) : null;
+    if (!email) {
+      res.status(404).json({ error: 'no such assignment or student' });
+      return null;
+    }
+    return { assignmentId, email };
+  };
+
+  app.put('/api/assignments/:id/students/:sid/extension', auth, requireInstructor, (req, res) => {
+    const body = (req.body ?? {}) as { dueDate?: unknown };
+    if (!('dueDate' in body) || (body.dueDate !== null && typeof body.dueDate !== 'string')) {
+      res.status(400).json({ error: 'body must be {dueDate: an ISO date and time, or null to clear}' });
+      return;
+    }
+    const target = lateTarget(req, res);
+    if (!target) return;
+    const plan = planExtensionWrite({
+      existing: db.getExtension(target.assignmentId, target.email),
+      dueDate: body.dueDate,
+      student: target.email,
+      actor: req.user!.email,
+      now: new Date().toISOString(),
+    });
+    if (!plan.ok) {
+      res.status(400).json({ error: plan.error });
+      return;
+    }
+    db.putExtension(target.assignmentId, target.email, plan.value);
+    db.addGradeEvent(target.assignmentId, plan.event);
+    res.json({ extension: plan.value });
+  });
+
+  app.put('/api/assignments/:id/students/:sid/waiver', auth, requireInstructor, (req, res) => {
+    const body = (req.body ?? {}) as { points?: unknown; note?: unknown; clear?: unknown };
+    const clear = body.clear === true;
+    if (!clear && body.points === undefined) {
+      res.status(400).json({ error: 'body must be {points, note?} or {clear: true}' });
+      return;
+    }
+    const target = lateTarget(req, res);
+    if (!target) return;
+    const plan = planWaiverWrite({
+      existing: db.getWaiver(target.assignmentId, target.email),
+      write: clear ? null : { points: body.points, note: body.note },
+      student: target.email,
+      actor: req.user!.email,
+      now: new Date().toISOString(),
+    });
+    if (!plan.ok) {
+      res.status(400).json({ error: plan.error });
+      return;
+    }
+    db.putWaiver(target.assignmentId, target.email, plan.value);
+    db.addGradeEvent(target.assignmentId, plan.event);
+    res.json({ waiver: plan.value });
   });
 
   // ── feedback (notes/todos.md item 9) ────────────────────────────

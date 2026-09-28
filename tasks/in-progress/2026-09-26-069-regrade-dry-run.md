@@ -36,6 +36,11 @@ memo F2, §5; mockup 7, `tasks/attachments/2026-09-23-031-7-regrade.png`).
   explicit (`assignment_hash`).
 - Pointers: `server/src/app.ts:581-620`, `homeworks.ts:108`, `deploy/README.md` (backups).
 
+### Resolved decisions (Gabriel, 2026-09-27)
+- Land it with the eyeball owed (as 068): the code and every gate are green on
+  `robot/069-regrade-dry-run`; land it (headless check if the run can), and write the browser
+  check in `## Verify` into the progress log as owed, not claimed, with its recipe.
+
 ## Verify
 Gates; browser on local mode: edit a toy question's bank, see the banner, dry-run, commit.
 - Pinned (green): `server/tools/gradingCheck.ts` [regrade] + [regrade local];

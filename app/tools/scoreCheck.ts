@@ -9,7 +9,9 @@
 // with the old grade as a suggestion), 40 + 60·P and its rounding, pending =
 // 0 earned + provisional, Missing, and the late math over a fixture calendar
 // (a meeting passes when it ENDS; a holiday week; an in-class exam meeting;
-// per-day; the floor at 0; waivers).
+// per-day; the floor at 0; waivers). Task 068, [real calendar]: the same
+// math over the COMMITTED course calendar (src/courseCalendar.ts) and the
+// homeworks' real due dates and policies, through lateContext.ts dueInput.
 
 import type { AssignmentQuestion, QuestionResult, SubmissionData } from '../src/types';
 import {
@@ -25,6 +27,10 @@ import {
   type HumanGrade,
 } from '../src/engine/score';
 import { gradeSubmission } from '../src/engine/grader';
+import { readFileSync } from 'node:fs';
+import type { AssignmentData } from '../src/types';
+import { COURSE_CALENDAR } from '../src/courseCalendar';
+import { dueInput } from '../src/lateContext';
 import { validateDocument } from '../src/problemSet';
 import { buildSampleAssignment, buildCorrectSubmission, buildIncorrectSubmission } from '../src/devData/sampleData';
 
@@ -166,7 +172,7 @@ check('per-day: a full day and more → −10', lateDeduction('2026-12-06T10:00:
   const plain = scoreSubmission(base);
   const docked = scoreSubmission({ ...base, due: { at: HW2_DUE, late: { policy: 'per-meeting', calendar: CAL } } });
   check('the deduction comes off the scaled grade', docked.late?.deduction === 15 && docked.final === Math.round((plain.raw! - 15) * 10) / 10);
-  check('no late input → no deduction computed (until the calendar lands)', plain.late === null && plain.final === plain.raw);
+  check('no late input → no deduction computed (no calendar given)', plain.late === null && plain.final === plain.raw);
   const waived = scoreSubmission({ ...base, due: { at: HW2_DUE, late: { policy: 'per-meeting', calendar: CAL, waived: 5 } } });
   check('a waiver reduces it', waived.late?.waived === 5 && waived.final === Math.round((plain.raw! - 10) * 10) / 10);
   const over = scoreSubmission({ ...base, due: { at: HW2_DUE, late: { policy: 'per-meeting', calendar: CAL, waived: 99 } } });
@@ -175,6 +181,58 @@ check('per-day: a full day and more → −10', lateDeduction('2026-12-06T10:00:
   const floor = scoreSubmission({ questions: asg.questions, latest: latest(wrongLate), now: NOW,
     due: { at: HW2_DUE, late: { policy: 'per-day', calendar: CAL } } });
   check('it may carry the grade below 40, never below 0', floor.raw === 40 && floor.late!.deduction > 40 && floor.final === 0);
+}
+
+// ─── [real calendar] ──────────────────────────────────────────────────────
+console.log('[real calendar]');
+{
+  const hw = (n: number) =>
+    JSON.parse(readFileSync(new URL(`../src/devData/homeworks/hw${n}.json`, import.meta.url), 'utf8')) as AssignmentData;
+  const [hw1, hw2, hw3, hw4, hw5, hw6] = [hw(1), hw(2), hw(3), hw(4), hw(5), hw(6)];
+  /** The deduction for `a` submitted at `iso`, through the one due helper. */
+  const cost = (a: AssignmentData, iso: string, student: Parameters<typeof dueInput>[1] = {}) => {
+    const due = dueInput(a, student, COURSE_CALENDAR)!;
+    return lateDeduction(iso, due.at, due.late!.policy, due.late!.calendar);
+  };
+  check('the homeworks\' due dates are the ones pinned here',
+    hw1.dueDate === '2026-10-05T06:59:00.000Z' && hw2.dueDate === '2026-10-19T06:59:00.000Z' &&
+      hw3.dueDate === '2026-10-26T06:59:00.000Z' && hw4.dueDate === '2026-11-09T07:59:00.000Z' && hw5.dueDate === '2026-11-23T07:59:00.000Z' && hw6.dueDate === '2026-12-05T07:59:00.000Z' && hw6.latePolicy === 'per-day');
+  check('HW1 (due Sun Oct 4, 23:59) submitted Tue Oct 6, 10:00 → no meeting ended yet → −5',
+    cost(hw1, '2026-10-06T10:00:00-07:00').units === 0 && cost(hw1, '2026-10-06T10:00:00-07:00').deduction === 5);
+  check('…DURING the Oct 6 lecture → still −5 (a meeting counts once it has ended)', cost(hw1, '2026-10-06T13:00:00-07:00').deduction === 5);
+  check('…Oct 6, 14:00, after the lecture ended → −10', cost(hw1, '2026-10-06T14:00:00-07:00').deduction === 10);
+  const laLocal = (iso: string) => new Date(iso).toLocaleString('en-US', {
+    timeZone: 'America/Los_Angeles', weekday: 'short', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' });
+  check('every HW1–HW6 due date is a Sunday 23:59 in Los Angeles (HW4 on: past the Nov 1 DST change, 07:59Z)',
+    [hw1, hw2, hw3, hw4, hw5].every((a) => laLocal(a.dueDate!) === 'Sun 23:59'),
+    [hw1, hw2, hw3, hw4, hw5].map((a) => laLocal(a.dueDate!)).join(', '));
+  check('HW2 (due Sun Oct 18) submitted Tue Oct 20, 14:00 → the Oct 20 lecture ended → −10',
+    cost(hw2, '2026-10-20T14:00:00-07:00').units === 1 && cost(hw2, '2026-10-20T14:00:00-07:00').deduction === 10);
+  check('HW2 submitted a minute after its due time → −5', cost(hw2, '2026-10-19T00:00:00-07:00').deduction === 5 &&
+    cost(hw2, '2026-10-18T23:59:00-07:00').deduction === 0);
+  check('HW4 (due Sun Nov 8, 23:59 PST) submitted Nov 8, 23:30 PST → on time (the standard-time offset holds)',
+    cost(hw4, '2026-11-08T23:30:00-08:00').deduction === 0);
+  check('HW4 submitted Mon Nov 9, 00:30 PST → −5; Thu Nov 12, 14:00 → Nov 10 + Nov 12 → −15',
+    cost(hw4, '2026-11-09T00:30:00-08:00').deduction === 5 && cost(hw4, '2026-11-12T14:00:00-08:00').deduction === 15);
+  check('HW3 submitted Oct 29, 14:00 → Oct 27 + the in-class midterm → −15', cost(hw3, '2026-10-29T14:00:00-07:00').deduction === 15);
+  check('HW5 (due Nov 22) submitted Nov 30 → only Nov 24 (Thanksgiving has no meeting) → −10',
+    cost(hw5, '2026-11-30T09:00:00-08:00').deduction === 10);
+  check('HW5 submitted Dec 10 → Nov 24, Dec 1, Dec 3 — the Dec 9 final is no meeting → −20',
+    cost(hw5, '2026-12-10T09:00:00-08:00').units === 3 && cost(hw5, '2026-12-10T09:00:00-08:00').deduction === 20);
+  check('HW6 is per day (its JSON\'s latePolicy): Dec 6, 10:00 → a full day → −10', cost(hw6, '2026-12-06T10:00:00-08:00').deduction === 10);
+  const lateSub = { ...correct, submittedAt: '2026-12-06T10:00:00-08:00' };
+  const base = { questions: asg.questions, latest: latest(lateSub, gradeSubmission(asg, lateSub)), now: NOW };
+  const raw = scoreSubmission(base).raw!;
+  const netted = scoreSubmission({ ...base, due: dueInput(hw6, { waived: 5 }, COURSE_CALENDAR) });
+  check('a waiver of 5 nets −10 to −5', netted.late?.deduction === 10 && netted.late.waived === 5 && netted.final === Math.round((raw - 5) * 10) / 10);
+  const extended = scoreSubmission({ ...base, due: dueInput(hw6, { extension: { dueDate: '2026-12-07T07:59:00.000Z' } }, COURSE_CALENDAR) });
+  check('an extension moves lateness: on time against the extension', extended.late?.late === false && extended.final === raw);
+  const uncalendared = scoreSubmission({ ...base, due: dueInput(hw6, {}) });
+  check('no calendar → no deduction computed (never a silent −5)', uncalendared.late === null && uncalendared.final === raw);
+  check('no due date → no due input at all', dueInput({}, {}, COURSE_CALENDAR) === undefined);
+  const wrongLate = { ...buildIncorrectSubmission('pat@example.com'), submittedAt: '2026-12-10T09:00:00-08:00' };
+  const floor = scoreSubmission({ questions: asg.questions, latest: latest(wrongLate), now: NOW, due: dueInput(hw1, {}, COURSE_CALENDAR) });
+  check('the floor at 0 holds over the real calendar', floor.late!.deduction > floor.raw! && floor.final === 0, JSON.stringify(floor.late));
 }
 
 // ─── [authoring the ½ rule] ───────────────────────────────────────────────

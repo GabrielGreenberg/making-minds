@@ -16,10 +16,14 @@
 //              is left alone and reported (a forced id refreshes anyway)
 //
 // "Content" is the assignment minus the fields the deployment owns: the
-// dashboard's `order` and the instructor's `dueDate`. They are ignored when
-// comparing and carried over by a refresh; a copy that has no due date takes
-// the repo's. Publish and release flags are not
-// in the JSON at all (they are store-level flags), so no sync can touch them.
+// dashboard's `order`, and the instructor's `dueDate`, `countsTowardGrade`
+// and `latePolicy` (task 068). They are ignored when comparing and carried
+// over by a refresh; any copy that lacks one the repo sets takes the repo's —
+// an EDITED copy too: its content is left alone and its hash never recorded as
+// synced, and since owned fields are outside the hash, filling them cannot make
+// the instructor's edit look pristine. Publish and release flags are
+// not in the JSON at all (they are store-level flags), so no sync can touch
+// them.
 
 import type { AssignmentData } from '../types';
 import { canonicalJson } from '../canonicalJson';
@@ -28,14 +32,34 @@ import { canonicalJson } from '../canonicalJson';
 export { canonicalJson };
 
 /** Fields a deployment sets on its copy; never part of the repo's content. */
-export const INSTRUCTOR_OWNED_FIELDS = ['order', 'dueDate'] as const;
+export const INSTRUCTOR_OWNED_FIELDS = ['order', 'dueDate', 'countsTowardGrade', 'latePolicy'] as const;
 type InstructorOwned = (typeof INSTRUCTOR_OWNED_FIELDS)[number];
 
-/** The assignment without its instructor-owned fields. */
-export function homeworkContent(a: AssignmentData): Omit<AssignmentData, InstructorOwned> {
-  const { order: _order, dueDate: _dueDate, ...content } = a;
+/** The assignment without its instructor-owned fields (nor the served-only
+ *  `dueExtended`, which no stored copy should carry). */
+export function homeworkContent(a: AssignmentData): Omit<AssignmentData, InstructorOwned | 'dueExtended'> {
+  const {
+    order: _order,
+    dueDate: _dueDate,
+    countsTowardGrade: _counts,
+    latePolicy: _latePolicy,
+    dueExtended: _served,
+    ...content
+  } = a;
   return content;
 }
+
+/** The owned fields the repo sets and this copy lacks — what a sync fills. */
+function unsetOwned(repo: AssignmentData, copy: AssignmentData): InstructorOwned[] {
+  return INSTRUCTOR_OWNED_FIELDS.filter((k) => copy[k] === undefined && repo[k] !== undefined);
+}
+
+const OWNED_LABEL: Record<InstructorOwned, string> = {
+  order: 'order',
+  dueDate: 'due date',
+  countsTowardGrade: 'counts toward grade',
+  latePolicy: 'late policy',
+};
 
 /** cyrb53 — a small, fast, well-mixed 53-bit string hash (public domain, bryc).
  *  Not cryptographic; it only has to tell a handful of versions apart. */
@@ -77,9 +101,14 @@ export interface SyncStep {
   repoHash: string;
   /** The target copy's content hash, when it has one. */
   currentHash?: string;
-  /** For a refresh: which known version the copy matched ("forced" if none). */
+  /** For a refresh: which known version the copy matched ("forced" if none;
+   *  "owned fields" for an unchanged copy given the repo's unset ones). */
   matched?: string;
-  /** What to store, for insert and refresh. */
+  /** For an "owned fields" refresh, or an edited copy the sync still gave the
+   *  repo's unset owned fields: which ones were filled, as words. */
+  filled?: string[];
+  /** What to store, for insert and refresh (and an edited copy whose unset
+   *  owned fields were filled — its content untouched). */
   next?: AssignmentData;
 }
 
@@ -106,13 +135,23 @@ export function planHomeworkSync(
     if (!copy) return { ...base, action: 'insert', next: { ...a } };
     const currentHash = homeworkContentHash(copy);
     if (currentHash === repoHash) {
-      if (copy.dueDate === undefined && a.dueDate !== undefined) {
-        return { ...base, action: 'refresh', currentHash, matched: 'due date', next: withInstructorOwned(a, copy) };
+      const fill = unsetOwned(a, copy);
+      if (fill.length) {
+        return { ...base, action: 'refresh', currentHash, matched: 'owned fields', filled: fill.map((k) => OWNED_LABEL[k]), next: withInstructorOwned(a, copy) };
       }
       return { ...base, action: 'unchanged', currentHash };
     }
     const matched = known(a.id, currentHash) ?? (force.has(a.id) ? 'forced' : undefined);
     if (matched) return { ...base, action: 'refresh', currentHash, matched, next: withInstructorOwned(a, copy) };
+    // Edited: the content stays the instructor's, but owned fields the copy
+    // lacks still come from the repo (they are outside the content hash, and
+    // an edited step is never recorded as synced).
+    const fill = unsetOwned(a, copy);
+    if (fill.length) {
+      const next: AssignmentData = { ...copy };
+      for (const k of fill) (next as unknown as Record<string, unknown>)[k] = a[k];
+      return { ...base, action: 'edited', currentHash, filled: fill.map((k) => OWNED_LABEL[k]), next };
+    }
     return { ...base, action: 'edited', currentHash };
   });
 }
@@ -125,8 +164,14 @@ export function describeSyncStep(step: SyncStep, planned = false): string {
     case 'insert': return `${step.id}: ${will('added', 'would be added')} (unpublished)`;
     case 'unchanged': return `${step.id}: already current`;
     case 'refresh':
-      if (step.matched === 'due date') return `${step.id}: ${will('due date set', 'due date would be set')} from the repo`;
+      if (step.matched === 'owned fields') {
+        const what = (step.filled ?? []).join(', ');
+        return `${step.id}: ${what} ${will('set', 'would be set')} from the repo`;
+      }
       return `${step.id}: ${will('refreshed', 'would be refreshed')} from the repo (${step.matched === 'forced' ? 'forced' : `the copy was the ${step.matched} version`})`;
-    case 'edited': return `${step.id}: left as is — edited here since it was loaded`;
+    case 'edited': {
+      const filled = step.filled?.length ? `; ${step.filled.join(', ')} ${will('set', 'would be set')} from the repo` : '';
+      return `${step.id}: left as is — edited here since it was loaded${filled}`;
+    }
   }
 }

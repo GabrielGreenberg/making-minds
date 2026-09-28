@@ -16,6 +16,8 @@ import type {
   Classmate,
   GradeEvent,
   HumanGrade,
+  LateExtension,
+  LateWaiver,
   QuestionCircuit,
   SubmissionData,
   SubmissionRecord,
@@ -28,7 +30,17 @@ import { deriveMintKey, DEV_MINT_SECRET } from '../provenance/ids';
 import { TOY_ACCOUNTS, readPersistedAccount } from '../auth/accounts';
 import { checkGroup, SubmitRefused } from '../submissionGroup';
 import { homeworkContentHash } from '../devData/homeworkSync';
-import { legacyGradesByStudent, planGradeWrite, studentGrade, type GradeWrite, type GradeWritePlan } from './gradeWrites';
+import {
+  legacyGradesByStudent,
+  planExtensionWrite,
+  planGradeWrite,
+  planWaiverWrite,
+  studentGrade,
+  type GradeWrite,
+  type GradeWritePlan,
+  type LateWritePlan,
+} from './gradeWrites';
+import { EXTENSIONS_PREFIX, WAIVERS_PREFIX, readExtensions, readWaivers, writeLateRow } from './lateLocal';
 import type { RegradeWrite } from './regrade';
 
 
@@ -114,6 +126,16 @@ const GRADES_PREFIX = 'mm:grades:';
 const GRADE_LOG_PREFIX = 'mm:grade-log:';
 const REGRADE_SNAPSHOT_PREFIX = 'mm:regrade-snapshot:';
 
+/** The local release flag (AssignmentStore's `mm:release:<id>`), read here
+ *  without importing the assignment store. */
+function readReleased(id: string): boolean {
+  try {
+    return localStorage.getItem('mm:release:' + id) === '1';
+  } catch {
+    return false;
+  }
+}
+
 /** A record's student as the local grades are keyed — the email, lowercased
  *  (a dev-seed attempt with no student is ''). */
 function studentOf(r: SubmissionRecord): string {
@@ -147,7 +169,10 @@ class LocalSubmissionStore implements SubmissionStore {
     const own = this.read(id).filter((r) => sameStudent(r.submission.student, email));
     if (own.length === 0) return own;
     const grades = ((await this.grades(id))[studentOf(own[0])] ?? []).map(studentGrade);
-    return own.map((r) => ({ ...r, ...(grades.length ? { grades } : {}) }));
+    // A waiver reaches the student as its points only, once grades are
+    // released (the server's studentRecord rule; task 068).
+    const waived = readReleased(id) ? readWaivers(id)[studentOf(own[0])]?.points : undefined;
+    return own.map((r) => ({ ...r, ...(grades.length ? { grades } : {}), ...(waived ? { lateWaived: waived } : {}) }));
   }
 
   async getLatestOwn(id: string, email: string | null): Promise<SubmissionRecord | null> {
@@ -271,6 +296,33 @@ class LocalSubmissionStore implements SubmissionStore {
     return REGRADE_SNAPSHOT_PREFIX + id;
   }
 
+  // ── Extensions and waivers (task 068): storage/lateLocal.ts keeps them;
+  // gradeWrites.ts plans each write; every one lands in the grade log.
+
+  /** Set or clear (null) one student's extension. */
+  applyExtension(id: string, student: string, dueDate: string | null, actor: string): LateWritePlan<LateExtension> {
+    const plan = planExtensionWrite({
+      existing: readExtensions(id)[student] ?? null,
+      dueDate,
+      student,
+      actor,
+      now: new Date().toISOString(),
+    });
+    if (!plan.ok) return plan;
+    writeLateRow(EXTENSIONS_PREFIX, id, student, plan.value);
+    this.appendLog(id, [plan.event]);
+    return plan;
+  }
+
+  /** Set or clear (null) one student's late waiver. */
+  applyWaiver(id: string, student: string, write: { points: number; note?: string } | null, actor: string): LateWritePlan<LateWaiver> {
+    const plan = planWaiverWrite({ existing: readWaivers(id)[student] ?? null, write, student, actor, now: new Date().toISOString() });
+    if (!plan.ok) return plan;
+    writeLateRow(WAIVERS_PREFIX, id, student, plan.value);
+    this.appendLog(id, [plan.event]);
+    return plan;
+  }
+
   async listClassmates(): Promise<Classmate[]> {
     // Locally the toy accounts are the roster and an account's id is its key.
     const self = readPersistedAccount();
@@ -288,6 +340,8 @@ class LocalSubmissionStore implements SubmissionStore {
       localStorage.removeItem(GRADES_PREFIX + id);
       localStorage.removeItem(GRADE_LOG_PREFIX + id);
       localStorage.removeItem(REGRADE_SNAPSHOT_PREFIX + id);
+      localStorage.removeItem(EXTENSIONS_PREFIX + id);
+      localStorage.removeItem(WAIVERS_PREFIX + id);
     } catch {
       // ignore
     }

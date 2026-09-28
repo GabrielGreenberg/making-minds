@@ -112,7 +112,8 @@ export function stripResultDetail(result: SubmissionResult, assignment?: Assignm
  * A student's own submission record. Grades are withheld entirely until the
  * instructor releases them for the assignment ("release grades"); once
  * released, the student sees scores and their human grades (`grades`, points
- * + note only) but never the per-case answer key. The
+ * + note only) and any late points waived (`lateWaived`, the number only)
+ * but never the per-case answer key. The
  * integrity check (task 034) is instructor-only, released or not: it never
  * reaches a student. Pass the full `assignment` so a result graded before
  * cases recorded their TM block separations gets them (stripResultDetail).
@@ -122,8 +123,9 @@ export function studentRecord(
   gradesReleased: boolean,
   assignment?: AssignmentData,
   grades: readonly HumanGrade[] = [],
+  lateWaived?: number,
 ): SubmissionRecord {
-  const { integrity: _instructorOnly, grades: _unsafe, studentKey: _key, ...rest } = record;
+  const { integrity: _instructorOnly, grades: _unsafe, studentKey: _key, lateWaived: _stale, ...rest } = record;
   const released = gradesReleased && record.result;
   return {
     ...rest,
@@ -131,5 +133,8 @@ export function studentRecord(
     // The human grades on this student's work (task 063): once released, and
     // then only points, note and what they judged — never grader or version.
     ...(released && grades.length ? { grades: grades.map(studentGrade) } : {}),
+    // A late waiver (task 068): once released, its points only — never the
+    // note or who gave it.
+    ...(released && lateWaived ? { lateWaived } : {}),
   };
 }

@@ -24,6 +24,11 @@ export interface AssignmentSummary {
   dueDate?: string;
   /** Instructor-chosen position; absent sorts last (see sortAssignments). */
   order?: number;
+  /** A student's row: `dueDate` is their extension (task 068). */
+  dueExtended?: true;
+  /** How lateness is priced (AssignmentData.latePolicy) — the submit
+   *  dialog's warning reads it. */
+  latePolicy?: AssignmentData['latePolicy'];
 }
 
 // The ordering rule lives in a pure module the server imports too (task 064).

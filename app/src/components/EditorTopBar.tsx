@@ -158,7 +158,7 @@ export function EditorTopBar() {
               {submission ? 'Submit again' : 'Submit assignment'}
             </button>
             {submitting && (
-              <SubmitDialog assignmentId={assignment.id} title={assignment.title} onClose={() => setSubmitting(false)} />
+              <SubmitDialog assignment={assignment} onClose={() => setSubmitting(false)} />
             )}
           </>
         )}

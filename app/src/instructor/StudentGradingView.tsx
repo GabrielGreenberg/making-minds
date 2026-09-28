@@ -4,15 +4,18 @@ import { hashLink } from '../components/PageShell';
 import { formatDateTime, formatDueDate } from '../dueDates';
 import { useAsyncValue } from '../useAsyncValue';
 import { GradeValue } from './GradingParts';
+import { LateAdjustControls } from './LateAdjustControls';
 
 /**
  * One student across assignments (task 065, interim — task 070 builds the
  * memo's §6.5 student page here): their identity and a row per assignment
  * from GradingStore.student(), the same row each assignment's summary holds
- * for them. Each row opens that assignment's submission.
+ * for them. Each row opens that assignment's submission, and carries the
+ * student's **Extension…** / **Waive…** on it (task 068 — 070's rebuild keeps
+ * them).
  */
 export function StudentGradingView({ route }: { route: Extract<Route, { kind: 'instructor-student' }> }) {
-  const { value: one, loading, error } = useAsyncValue(() => gradingStore.student(route.student), [route.student]);
+  const { value: one, loading, error, reload } = useAsyncValue(() => gradingStore.student(route.student), [route.student]);
   const back = (
     <a className="eyebrow" {...hashLink({ kind: 'instructor-grading' })}>
       ← Grading
@@ -51,6 +54,7 @@ export function StudentGradingView({ route }: { route: Extract<Route, { kind: 'i
               <th>Submitted</th>
               <th className="num">Grade</th>
               <th>Grades</th>
+              <th>Late</th>
             </tr>
           </thead>
           <tbody>
@@ -63,7 +67,9 @@ export function StudentGradingView({ route }: { route: Extract<Route, { kind: 'i
                       {a.title}
                     </a>
                   </td>
-                  <td className="date">{a.dueDate ? formatDueDate(a.dueDate) : '—'}</td>
+                  <td className="date">
+                    {a.row.extendedTo ? `${formatDueDate(a.row.extendedTo)} (extended)` : a.dueDate ? formatDueDate(a.dueDate) : '—'}
+                  </td>
                   <td>
                     {latest ? (
                       <>
@@ -78,6 +84,22 @@ export function StudentGradingView({ route }: { route: Extract<Route, { kind: 'i
                   </td>
                   <td className="num">{latest || grade.missing ? <GradeValue value={grade.final} provisional={grade.provisional} /> : '—'}</td>
                   <td>{a.released ? <span className="tag tag--ok">Released</span> : <span className="tag">Hidden</span>}</td>
+                  <td>
+                    <LateAdjustControls
+                      assignmentId={a.assignmentId}
+                      studentKey={student.key}
+                      assignmentDue={a.dueDate}
+                      extendedTo={a.row.extendedTo}
+                      waiver={a.row.waived ? { points: a.row.waived } : undefined}
+                      loadWaiverNote={
+                        latest
+                          ? async () => (await gradingStore.attempt(a.assignmentId, student.key, latest.attempt))?.waiver?.note
+                          : undefined
+                      }
+                      canWaive={latest !== null}
+                      onChanged={reload}
+                    />
+                  </td>
                 </tr>
               );
             })}

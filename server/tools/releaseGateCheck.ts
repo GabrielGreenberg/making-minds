@@ -84,14 +84,16 @@ section('[verdicts]');
   check('an ordinary change at 10:00 Pacific → release', ok.verdict === 'release', JSON.stringify(ok.reasons));
   check('a release carries no hold note; its summary names the landed tasks', ok.note === '' && ok.summary.includes('2026-09-25-040'));
 
-  const held = decide(facts({ changedFiles: ['app/src/engine/grader.ts', 'app/src/components/X.tsx'] }));
-  check('a change under app/src/engine/ → hold', held.verdict === 'hold');
-  check('the reason names the path and why', held.reasons.some((r) => r.detail.includes('app/src/engine/grader.ts') && r.detail.includes('grading')));
+  const held = decide(facts({ changedFiles: ['server/src/sanitize.ts', 'app/src/components/X.tsx'] }));
+  check('a change to server/src/sanitize.ts → hold', held.verdict === 'hold');
+  check('the reason names the path and why', held.reasons.some((r) => r.detail.includes('server/src/sanitize.ts') && r.detail.includes('what students may see')));
   check(
     'the note says what it waits on and what is pending, briefly',
-    held.note.startsWith('Held bbbbbbb') && held.note.includes('grading') && held.note.includes('2026-09-25-040') && !held.note.includes('grader.ts'),
+    held.note.startsWith('Held bbbbbbb') && held.note.includes('what students may see') && held.note.includes('2026-09-25-040') && !held.note.includes('sanitize.ts'),
     held.note,
   );
+  const graded = decide(facts({ changedFiles: ['app/src/engine/grader.ts', 'app/src/engine/fsm.ts'] }));
+  check('a change under app/src/engine/ alone → release (the grader is not held, task 073)', graded.verdict === 'release', JSON.stringify(graded.reasons));
   for (const path of ['app/src/devData/homeworks/hw3.json', 'server/src/sanitize.ts', 'server/src/auth.ts', 'server/src/password.ts',
     'server/src/db.ts', 'app/src/auth/LoginScreen.tsx', 'deploy/release.sh', 'server/src/homeworks.ts', 'app/src/devData/homeworkSync.ts']) {
     check(`${path} is on the hold list`, heldPaths([path]).length === 1);
@@ -168,7 +170,7 @@ section('[note key]');
   const noon = decide(facts({ changedFiles: ['server/src/db.ts'], now: new Date('2026-10-01T19:00:00Z') }));
   check('the same hold an hour later has the same key (not re-sent)', noteKey(nine, head) === noteKey(noon, head));
   check('a new commit gets a new key', noteKey(nine, head) !== noteKey(nine, 'c'.repeat(40)));
-  const more = decide(facts({ changedFiles: ['server/src/db.ts', 'app/src/engine/grader.ts'] }));
+  const more = decide(facts({ changedFiles: ['server/src/db.ts', 'server/src/sanitize.ts'] }));
   check('a new reason to hold gets a new key', noteKey(nine, head) !== noteKey(more, head));
 }
 
@@ -177,7 +179,7 @@ section('[facts]');
 const tmp = mkdtempSync(join(tmpdir(), 'mm-gate-'));
 {
   const repo = join(tmp, 'repo');
-  mkdirSync(join(repo, 'app', 'src', 'engine'), { recursive: true });
+  mkdirSync(join(repo, 'server', 'src'), { recursive: true });
   const git = (...args: string[]) =>
     execFileSync('git', ['-C', repo, ...args], {
       encoding: 'utf8',
@@ -188,9 +190,9 @@ const tmp = mkdtempSync(join(tmpdir(), 'mm-gate-'));
   git('add', '.');
   git('commit', '-q', '-m', 'first');
   const released = git('rev-parse', 'HEAD');
-  writeFileSync(join(repo, 'app', 'src', 'engine', 'grader.ts'), 'y\n');
+  writeFileSync(join(repo, 'server', 'src', 'sanitize.ts'), 'y\n');
   git('add', '.');
-  git('commit', '-q', '-m', '099: change the grader');
+  git('commit', '-q', '-m', '099: change what students may see');
   git('commit', '-q', '--allow-empty', '-m', 'tasks: land 2026-09-25-099 — A test task');
   const head = git('rev-parse', 'HEAD');
 
@@ -203,7 +205,7 @@ const tmp = mkdtempSync(join(tmpdir(), 'mm-gate-'));
   });
   check('CI is asked about HEAD', f.ci?.status === 'completed' && f.ciProblem === null);
   check('head and last-released come from git and the box', f.head === head && f.lastReleased === released);
-  check('the changed paths span last-released..head', JSON.stringify(f.changedFiles) === '["app/src/engine/grader.ts"]', JSON.stringify(f.changedFiles));
+  check('the changed paths span last-released..head', JSON.stringify(f.changedFiles) === '["server/src/sanitize.ts"]', JSON.stringify(f.changedFiles));
   check('landed tasks come from `tasks: land` subjects', JSON.stringify(f.landed) === '[{"id":"2026-09-25-099","title":"A test task"}]', JSON.stringify(f.landed));
   check('… and that history holds', decide(f).verdict === 'hold');
 

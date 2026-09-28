@@ -12,7 +12,7 @@
 
 import { createHash } from 'node:crypto';
 import type { Db, GradingUserRow } from './db';
-import type { SubmissionRecord } from '../../app/src/types';
+import type { LateExtension, LateWaiver, SubmissionRecord } from '../../app/src/types';
 import {
   buildAssignmentSummary,
   buildAttemptDetail,
@@ -23,6 +23,7 @@ import {
   type AttemptDetail,
   type CourseGrading,
   type GradingIdentity,
+  type LateContext,
   type QuestionResponses,
   type StudentGrading,
 } from '../../app/src/storage/gradingSummary';
@@ -94,6 +95,22 @@ function latestRecords(db: Db, dir: Directory, assignmentId: string, email?: str
   return { latest, identities, emails };
 }
 
+/** One assignment's late context (task 068): the synced course calendar and
+ *  each student's extension and waiver, re-keyed from account email to the
+ *  opaque key the builder names students by. */
+function lateContext(db: Db, dir: Directory, assignmentId: string): LateContext {
+  const byStudent = new Map<string, { extension?: LateExtension; waiver?: LateWaiver }>();
+  const at = (email: string) => {
+    const key = dir.identityOf(email).key;
+    if (!byStudent.has(key)) byStudent.set(key, {});
+    return byStudent.get(key)!;
+  };
+  for (const [email, extension] of db.listExtensions(assignmentId)) at(email).extension = extension;
+  for (const [email, waiver] of db.listWaivers(assignmentId)) at(email).waiver = waiver;
+  const calendar = db.courseCalendar();
+  return { ...(calendar ? { calendar } : {}), byStudent };
+}
+
 function summaryWith(db: Db, dir: Directory, id: string, now: number): AssignmentGradingSummary | null {
   const assignment = db.getAssignment(id);
   if (!assignment) return null;
@@ -105,6 +122,7 @@ function summaryWith(db: Db, dir: Directory, id: string, now: number): Assignmen
     identify: (key) => identities.get(key)!,
     released: db.getGradesReleased(id),
     now,
+    late: lateContext(db, dir, id),
   });
 }
 
@@ -146,7 +164,12 @@ export function studentGrading(db: Db, secret: string, key: string, now: number)
     student,
     assignments: db.listAssignments().map((assignment) => {
       const { latest } = latestRecords(db, dir, assignment.id, email);
-      return { assignment, released: released.get(assignment.id) ?? false, latest: latest[0] ?? null };
+      return {
+        assignment,
+        released: released.get(assignment.id) ?? false,
+        latest: latest[0] ?? null,
+        late: lateContext(db, dir, assignment.id),
+      };
     }),
     now,
   });
@@ -168,6 +191,7 @@ export function attemptDetail(db: Db, secret: string, id: string, key: string, a
     record: { ...record, studentKey: student.key, ...(grades.length ? { grades } : {}) },
     events: db.listGradeEvents(id).filter((e) => e.student === email),
     now,
+    late: lateContext(db, dir, id),
   });
 }
 
@@ -196,6 +220,7 @@ export function questionResponses(
     claims: claims.active(id, questionId, now, viewer),
     released: db.getGradesReleased(id),
     now,
+    late: lateContext(db, dir, id),
   });
 }
 

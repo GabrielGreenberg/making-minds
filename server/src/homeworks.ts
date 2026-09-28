@@ -16,6 +16,11 @@
 //                 also covers a shallow clone with no history)
 //
 // New homeworks arrive unpublished, like every other assignment.
+//
+// The course calendar rides the same step (task 068, `syncCalendar`): the
+// repo's app/src/devData/courseCalendar.json — generated from the course
+// website by `npm run calendar -- import` — is written into
+// `course_settings.calendar`, the class meetings the late policy counts.
 
 import { execFileSync } from 'node:child_process';
 import { readFileSync, readdirSync } from 'node:fs';
@@ -23,7 +28,8 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { Db } from './db';
 import type { AssignmentData } from '../../app/src/types';
-import { homeworkContentHash, planHomeworkSync, type SyncStep } from '../../app/src/devData/homeworkSync';
+import { canonicalJson, homeworkContentHash, planHomeworkSync, type SyncStep } from '../../app/src/devData/homeworkSync';
+import { isCourseCalendarFile } from '../../app/src/engine/calendar';
 
 export const HOMEWORK_DIR = fileURLToPath(new URL('../../app/src/devData/homeworks/', import.meta.url));
 
@@ -112,4 +118,22 @@ export function syncHomeworks(db: Db, opts: SyncOptions = {}): SyncStep[] {
     }
   }
   return steps;
+}
+
+export const CALENDAR_FILE = fileURLToPath(new URL('../../app/src/devData/courseCalendar.json', import.meta.url));
+
+/**
+ * Write the repo's course calendar into `course_settings.calendar` (unless
+ * `dryRun`), when it differs. Returns one line for the CLI and release log.
+ * Throws on a file that is not a calendar — a release must not sync nonsense.
+ */
+export function syncCalendar(db: Db, opts: { dryRun?: boolean; file?: string } = {}): string {
+  const file: unknown = JSON.parse(readFileSync(opts.file ?? CALENDAR_FILE, 'utf8'));
+  if (!isCourseCalendarFile(file)) throw new Error(`${opts.file ?? CALENDAR_FILE} is not a course calendar`);
+  const current = db.getCourseSetting('calendar');
+  const what = `${file.meetings.length} class meetings`;
+  if (current !== undefined && canonicalJson(current) === canonicalJson(file)) return `calendar: already current (${what})`;
+  if (!opts.dryRun) db.setCourseSetting('calendar', file);
+  const done = current === undefined ? 'set' : 'updated';
+  return `calendar: ${opts.dryRun ? `would be ${done}` : done} from the repo (${what})`;
 }

@@ -1,0 +1,125 @@
+{
+  "timezone": "America/Los_Angeles",
+  "meetings": [
+    {
+      "date": "2026-09-24",
+      "start": "12:30",
+      "end": "13:45",
+      "kind": "lesson"
+    },
+    {
+      "date": "2026-09-29",
+      "start": "12:30",
+      "end": "13:45",
+      "kind": "lesson"
+    },
+    {
+      "date": "2026-10-01",
+      "start": "12:30",
+      "end": "13:45",
+      "kind": "lesson"
+    },
+    {
+      "date": "2026-10-06",
+      "start": "12:30",
+      "end": "13:45",
+      "kind": "lesson"
+    },
+    {
+      "date": "2026-10-08",
+      "start": "12:30",
+      "end": "13:45",
+      "kind": "lesson"
+    },
+    {
+      "date": "2026-10-13",
+      "start": "12:30",
+      "end": "13:45",
+      "kind": "lesson"
+    },
+    {
+      "date": "2026-10-15",
+      "start": "12:30",
+      "end": "13:45",
+      "kind": "lesson"
+    },
+    {
+      "date": "2026-10-20",
+      "start": "12:30",
+      "end": "13:45",
+      "kind": "lesson"
+    },
+    {
+      "date": "2026-10-22",
+      "start": "12:30",
+      "end": "13:45",
+      "kind": "lesson"
+    },
+    {
+      "date": "2026-10-27",
+      "start": "12:30",
+      "end": "13:45",
+      "kind": "lesson"
+    },
+    {
+      "date": "2026-10-29",
+      "start": "12:30",
+      "end": "13:45",
+      "kind": "exam"
+    },
+    {
+      "date": "2026-11-03",
+      "start": "12:30",
+      "end": "13:45",
+      "kind": "lesson"
+    },
+    {
+      "date": "2026-11-05",
+      "start": "12:30",
+      "end": "13:45",
+      "kind": "lesson"
+    },
+    {
+      "date": "2026-11-10",
+      "start": "12:30",
+      "end": "13:45",
+      "kind": "lesson"
+    },
+    {
+      "date": "2026-11-12",
+      "start": "12:30",
+      "end": "13:45",
+      "kind": "lesson"
+    },
+    {
+      "date": "2026-11-17",
+      "start": "12:30",
+      "end": "13:45",
+      "kind": "lesson"
+    },
+    {
+      "date": "2026-11-19",
+      "start": "12:30",
+      "end": "13:45",
+      "kind": "lesson"
+    },
+    {
+      "date": "2026-11-24",
+      "start": "12:30",
+      "end": "13:45",
+      "kind": "lesson"
+    },
+    {
+      "date": "2026-12-01",
+      "start": "12:30",
+      "end": "13:45",
+      "kind": "lesson"
+    },
+    {
+      "date": "2026-12-03",
+      "start": "12:30",
+      "end": "13:45",
+      "kind": "lesson"
+    }
+  ]
+}
