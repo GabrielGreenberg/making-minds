@@ -133,3 +133,23 @@ input is set); a gate with an unwired input shows "–" on its run rows, not 0.
 - **Owed:** the browser eyeball in Verify (sandbox CC tab; an HW1 CC question incl. swap and
   back; SC wires start faint, FSM/TM arrows unchanged; dark theme).
 - **NEXT STEP:** loop session: visual check (owed), then land per PROFILE §5.
+
+### 2026-09-28 — robot run: headless check, two nits fixed, landed
+- Fixed two review nits: `addWire` now makes a new wire unset (`-1`, not `0`) until
+  `evaluateCircuit` runs (every wire reader treats −1 as unset); `truthTableCC`'s doc comment
+  no longer calls the table live (comment only, no engine logic changed). tsc,
+  `navResetCheck` (689 passed) and `workbenchCheck` stay green.
+- **Headless eyeball in the sandbox CC tab** (Chrome over CDP against the robot's Vite): a
+  fresh IN, IN, AND, OUT circuit showed no 0/1 anywhere and faint grey wires, and its table
+  listed 00/01/10/11 with empty outputs. Clicking row 10 earned only that row (OUT1 0, 0/4
+  animation ready). Toggling IN2 earned row 11 too. Moving a part kept both rows. Re-adding
+  a wire kept only 11, recomputed with the canvas live. Switching tab and back left the table
+  un-earned and the inputs blank. Passed.
+- **Owed to Gabriel, not claimed:** the eyeball on an HW1 CC question (open → no digits;
+  switch question and back → un-earned; a CC perception table), SC wires starting faint then
+  colouring on Step, FSM/TM arrows unchanged, and dark theme (`--mm-edge-2` visible). Recipe:
+  the Verify section above.
+- Choices recorded: an edit re-earns the row the inputs stand at, recomputed from the new
+  circuit (Done-when 2 was reworded to match). CC Reset earns 0…0 without a canvas run. The
+  CLAUDE.md Build-phases line dropped its duplicate `read:write,move` wording to stay under
+  budget (the Engine row still states it).

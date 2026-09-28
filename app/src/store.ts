@@ -2253,7 +2253,7 @@ export const useStore = create<AppState>()((set, get) => ({
       sourcePortId: sourcePortId,
       targetComponentId: targetCompId,
       targetPortId: targetPortId,
-      value: 0,
+      value: -1, // unset until evaluateCircuit computes it (task 075)
       transitionLabel: defaultLabel,
     };
     const newWires = [...state.wires, wire];
