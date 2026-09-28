@@ -8,9 +8,9 @@ requires: browser
 area: server
 source: inbox
 created: 2026-09-28T11:45:00-07:00
-status: ready
+status: in-progress
 after:
-branch:
+branch: robot/083-robot-status-panel
 merged_into:
 ---
 
