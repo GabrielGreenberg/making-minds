@@ -62,3 +62,4 @@
 2026-09-26-068 · feature · Apply the late policy from the class calendar — a repo copy of the website's course.json, per-student extensions, waivers, and the late warning at submit · 2026-09-27T17:49:40-0700 · robot/068-late-penalty-calendar-extensions · 9e3e09c
 2026-09-26-069 · feature · Re-grade an assignment against its current version — dry run first, then commit with a snapshot; never touching human grades · 2026-09-27T18:51:28-0700 · robot/069-regrade-dry-run · 2142c76
 2026-09-26-070 · feature · Flag students who need attention, and give each student an instructor page with private notes and grade history · 2026-09-27T20:39:30-0700 · robot/070-flags-student-page-notes · 40c68fc
+2026-09-26-071 · feature · Export problem-set grades as a CSV — one row per student, HW1–HW6 out of 100 and their average · 2026-09-27T21:07:58-0700 · robot/071-grades-export-csv · 46d4464

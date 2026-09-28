@@ -8,9 +8,9 @@ requires: browser
 area: server
 source: chat
 created: 2026-09-26T21:34:00-07:00
-status: in-progress
+status: done
 after: 2026-09-26-068
-branch: robot/071-grades-export-csv
+branch:
 merged_into:
 ---
 
@@ -84,3 +84,8 @@ Gates; open the CSV from local mode in a spreadsheet.
   the button, direct fetch 403); Gabriel after release — export on the pilot, spot-check two
   students and the average, leading-zero UIDs, file saved outside the repo.
 - **NEXT STEP:** loop session: visual check if owed, then land per PROFILE §5.
+- 2026-09-27 (robot, land): CLAUDE.md nit fixed (the 069 line keeps "stale latest results").
+  Landed. Owed, not claimed: Gabriel's eyeball — open the exported CSV in Numbers/Excel
+  (local: toy instructor → Grading → Export CSV; HW1 Overview → one column), the 375px header
+  wrap, remote mode (200 text/csv attachment; student 403), and on the pilot after release a
+  spot-check of two students + the average and leading-zero UIDs.

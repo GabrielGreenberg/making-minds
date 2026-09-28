@@ -130,7 +130,7 @@ grades, `extensions` / `late_waivers` + `course_settings.calendar`, the **gradin
 latest attempt, no circuits — `/api/grading`, `/api/students/:sid`, one attempt in full; the
 queue feed `…/questions/:qid/responses` + in-memory `/api/grading/claims`, 066),
 grade release, the **re-grade** (069: `POST …/regrade {dryRun}`; commit = snapshot, stale
-results rewritten, `regrade` events; grades untouched), flags (070: pure
+latest results rewritten, `regrade` events; grades untouched), flags (070: pure
 `gradingFlags.ts`, `course_settings.flagThresholds`) + `student_notes`, `/api/grading/export.csv` (071), feedback (+ role, triage mark), notes, `/api/health`.
 
 **Deployment — pilot live.** Cloudflare Pages `https://making-minds.pages.dev` → Lightsail
@@ -149,7 +149,7 @@ ones left alone and listed); local mode's "Load HW1–HW7" runs the same planner
 ## What's next
 
 The open work is the queue (`tasks/incoming/` ready, `tasks/blocked/` waiting on Gabriel);
-`/work` offers it. Next: the robot (043), pilot domain (008); SSO (006) deferred.
+`/work` offers it. Next: robot (043), pilot domain (008); SSO (006) deferred.
 
 ---
 
