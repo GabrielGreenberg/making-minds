@@ -8,9 +8,9 @@ requires:
 area: pipeline
 source: chat
 created: 2026-09-27T17:22:00-07:00
-status: in-progress
+status: done
 after:
-branch: task/073-grader-releases-unattended
+branch:
 merged_into:
 ---
 
@@ -44,3 +44,9 @@ Gates: the full PROFILE §6 table (the pin is `releaseGateCheck`, in `server/ np
 - 2026-09-27 17:22 — Minted and claimed on the robot (Mac Studio), in the 043 session with
   Gabriel, who asked for the change to be made here. The robot's run lock is held for the
   duration, so no work run shares the clone.
+- 2026-09-27 17:25 — Landed. `app/src/engine/` is off `HOLD_PATHS` (the reason in its doc
+  comment); `releaseGateCheck` pins a grader-only change → `release`, and its hold examples
+  (the verdict, the note key, the test repo in [facts]) moved to `server/src/sanitize.ts`;
+  `deploy/README.md` updated. Gates, full PROFILE §6 table, by exit code: app tsc, build,
+  `npm run check`; server `npm run check` — all 0. Released by hand from the robot after
+  the merge (this change is under `deploy/`, which stays held).
