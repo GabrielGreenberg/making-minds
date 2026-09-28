@@ -1,9 +1,12 @@
 // Small pieces the Grading tab's views share (task 065): the progress bar,
 // a grade as the summaries report it, the release tag, and a flag's chip
-// (task 070). Display only — every number arrives from the grading
-// summaries (gradingViews.ts).
+// (task 070), and the Export CSV button (task 071). Display only — every
+// number arrives from the grading summaries (gradingViews.ts); the CSV from
+// the GradingStore seam, which builds and logs it.
 
-import type { ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
+import { gradingStore } from '../storage/backend';
+import { downloadText } from '../download';
 import { formatGrade } from '../engine/score';
 import type { StudentFlag, StudentFlagKind } from '../storage/gradingFlags';
 import { flagChipText, percent } from './gradingViews';
@@ -82,5 +85,40 @@ export function FlagChip({
     <span className={`tag gr-flagchip ${FLAG_TONE[flag.kind]}`} title={tip}>
       ⚑ {flagChipText(flag, titleOf)}
     </span>
+  );
+}
+
+/** Export CSV (task 071): the course's grades, or with `assignmentId` that
+ *  one set's column — built (and logged) by the GradingStore, downloaded
+ *  here. Nothing is written anywhere but the viewer's download. */
+export function ExportCsvButton({ assignmentId }: { assignmentId?: string }) {
+  const [busy, setBusy] = useState(false);
+  const [problem, setProblem] = useState<string | null>(null);
+  const run = async () => {
+    setBusy(true);
+    setProblem(null);
+    try {
+      const out = await gradingStore.exportGrades(assignmentId);
+      if (!out) setProblem('No such assignment.');
+      else downloadText(out.filename, out.csv, 'text/csv;charset=utf-8');
+    } catch {
+      setProblem('Couldn’t export — the server may be unreachable.');
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <>
+      {problem && <span className="mm-danger">{problem}</span>}
+      <button
+        type="button"
+        className="mm-btn"
+        disabled={busy}
+        title={assignmentId ? 'This assignment’s grades as a CSV (one column)' : 'Every counted, published problem set’s grades and the average, as a CSV'}
+        onClick={() => void run()}
+      >
+        {busy ? 'Exporting…' : 'Export CSV'}
+      </button>
+    </>
   );
 }

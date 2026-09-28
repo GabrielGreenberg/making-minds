@@ -19,6 +19,7 @@ import type {
   LateExtension,
   LateWaiver,
   NoteEvent,
+  ExportEvent,
   QuestionCircuit,
   SubmissionData,
   SubmissionRecord,
@@ -223,20 +224,21 @@ class LocalSubmissionStore implements SubmissionStore {
     }
   }
 
-  private appendLog(id: string, events: (GradeEvent | NoteEvent)[]): void {
+  private appendLog(id: string, events: (GradeEvent | NoteEvent | ExportEvent)[]): void {
     if (events.length === 0) return;
     try {
       const raw = localStorage.getItem(GRADE_LOG_PREFIX + id);
-      const log = raw ? (JSON.parse(raw) as (GradeEvent | NoteEvent)[]) : [];
+      const log = raw ? (JSON.parse(raw) as (GradeEvent | NoteEvent | ExportEvent)[]) : [];
       localStorage.setItem(GRADE_LOG_PREFIX + id, JSON.stringify([...log, ...events]));
     } catch {
       // ignore
     }
   }
 
-  /** Log a private note (memo §9), course-wide: under COURSE_LOG_ID, which
-   *  no assignment's log (gradeLog) ever reads. */
-  logNote(event: NoteEvent): void {
+  /** Log a course-wide event — a private note (memo §9) or a grades export
+   *  (task 071): under COURSE_LOG_ID, which no assignment's log (gradeLog)
+   *  ever reads. */
+  logCourseEvent(event: NoteEvent | ExportEvent): void {
     this.appendLog(COURSE_LOG_ID, [event]);
   }
 

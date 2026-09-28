@@ -31,6 +31,7 @@ import {
   type QuestionResponses,
   type StudentGrading,
 } from '../../app/src/storage/gradingSummary';
+import { buildGradesExport, type GradesExport } from '../../app/src/storage/gradesExport';
 import type { ClaimBook } from '../../app/src/storage/gradingClaims';
 import { planRegrade, type RegradePlan, type RegradeWrite } from '../../app/src/storage/regrade';
 import { courseFlags, normalizeThresholds, type FlagThresholds } from '../../app/src/storage/gradingFlags';
@@ -48,6 +49,8 @@ function derivedKey(secret: string, email: string): string {
 class Directory {
   readonly roster: GradingIdentity[];
   private readonly byEmail = new Map<string, GradingUserRow>();
+  /** Each account's key → its address (the export's email column). */
+  private readonly emailByKey = new Map<string, string>();
   private readonly db: Db;
   private readonly secret: string;
 
@@ -57,6 +60,12 @@ class Directory {
     const users = db.listGradingUsers();
     for (const u of users) this.byEmail.set(u.email, u);
     this.roster = users.filter((u) => u.role === 'student').map((u) => this.identity(u));
+    for (const u of users) this.emailByKey.set(this.identity(u).key, u.email);
+  }
+
+  /** The address of an account's key, without a query ('' for none). */
+  accountEmail(key: string): string {
+    return this.emailByKey.get(key) ?? '';
   }
 
   private identity(u: GradingUserRow): GradingIdentity {
@@ -167,6 +176,24 @@ export function courseGrading(db: Db, secret: string, now: number): CourseGradin
     thresholds,
     ...(calendar ? { calendar } : {}),
     now,
+  });
+}
+
+/** GET /api/grading/export.csv (task 071): the grades CSV over the same
+ *  full summaries the Grading tab reads, the email column from the account
+ *  table (no query per row); with `assignmentId`, that one column — null =
+ *  no such assignment. */
+export function gradesExport(db: Db, secret: string, now: number, assignmentId?: string): GradesExport | null {
+  const dir = new Directory(db, secret);
+  const thresholds = flagThresholds(db);
+  const assignments = assignmentId === undefined
+    ? allSummaries(db, dir, now, thresholds)
+    : [summaryWith(db, dir, assignmentId, now, thresholds)].filter((s) => s !== null).map((summary) => ({ summary, visible: true }));
+  return buildGradesExport({
+    assignments,
+    emailOf: (key) => dir.accountEmail(key),
+    now,
+    ...(assignmentId !== undefined ? { only: assignmentId } : {}),
   });
 }
 

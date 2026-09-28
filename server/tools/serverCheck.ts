@@ -80,6 +80,18 @@ async function api<T>(
   return { status: res.status, json: (await res.json().catch(() => ({}))) as T };
 }
 
+// ── CORS ─────────────────────────────────────────────────────────
+// The pilot is cross-origin: the grades export's filename (Content-Disposition)
+// reaches the browser only if the server exposes that header.
+{
+  const res = await fetch(base + '/health', { headers: { Origin: 'http://localhost:5173' } });
+  check(
+    'CORS exposes Content-Disposition to an allowed origin',
+    res.headers.get('Access-Control-Allow-Origin') === 'http://localhost:5173' &&
+      /content-disposition/i.test(res.headers.get('Access-Control-Expose-Headers') ?? ''),
+  );
+}
+
 // ── health + auth ────────────────────────────────────────────────
 const health = await api<{ ok: boolean }>('GET', '/health');
 check('health', health.status === 200 && health.json.ok === true);

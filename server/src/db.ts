@@ -66,6 +66,7 @@ import type {
   PlatformFeedback,
   GradeEvent,
   NoteEvent,
+  ExportEvent,
   HumanGrade,
   LateExtension,
   LateWaiver,
@@ -663,8 +664,8 @@ export class Db {
   }
 
   /** Append one change to the log — the only write the log ever takes. A
-   *  `note` goes under COURSE_LOG_ID, which is no assignment's id. */
-  addGradeEvent(assignmentId: string, event: GradeEvent | NoteEvent): void {
+   *  `note` or an `export` goes under COURSE_LOG_ID, which is no assignment's id. */
+  addGradeEvent(assignmentId: string, event: GradeEvent | NoteEvent | ExportEvent): void {
     this.db
       .prepare('INSERT INTO grade_events (assignment_id, event) VALUES (?, ?)')
       .run(assignmentId, JSON.stringify(event));

@@ -7,7 +7,7 @@ import { hashLink } from '../components/PageShell';
 import { formatDueDate } from '../dueDates';
 import { useAsyncValue } from '../useAsyncValue';
 import { isHandQuestion, plural, releaseWarning, sectionsOf } from './gradingViews';
-import { ReleaseTag } from './GradingParts';
+import { ExportCsvButton, ReleaseTag } from './GradingParts';
 import { GradingOverview } from './GradingOverview';
 import { GradingMatrix } from './GradingMatrix';
 import { GradingQueue } from './GradingQueue';
@@ -75,11 +75,8 @@ export function GradingAssignment({ route }: { route: Extract<Route, { kind: 'in
           </p>
         </div>
         <div className="mm-actions">
-          {/* The CSV itself is task 071's (its format spans HW1–HW6); the
-              control stands here so the Overview's actions are complete. */}
-          <button className="mm-btn" disabled title="Export CSV — arrives with task 071">
-            Export CSV
-          </button>
+          {/* This set's column alone (task 071); the Grading tab's exports the course. */}
+          <ExportCsvButton assignmentId={id} />
           {summary.released ? (
             <button className="mm-btn" onClick={() => void toggleRelease()}>
               Hide grades

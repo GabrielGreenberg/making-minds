@@ -12,7 +12,7 @@
 //                           getStudentGrading / getGradingAttempt /
 //                           getQuestionResponses / postGradingClaim /
 //                           putExtension / putWaiver /
-//                           putGradingSettings / postStudentNote
+//                           putGradingSettings / postStudentNote / getGradesExport
 //   remote auth           → login / logout / me
 //
 // Configuration: VITE_API_BASE (e.g. "https://api.phil133.example.edu") set at
@@ -242,6 +242,25 @@ async function request<T>(
     throw new ApiError(res.status, typeof json.error === 'string' ? json.error : res.statusText, json);
   }
   return json as T;
+}
+
+/** A GET whose answer is a file, not JSON (the grades CSV, task 071): the
+ *  same bearer header, 401 hook and ApiError as `request`, the body as text
+ *  and the response's headers. */
+async function requestText(path: string): Promise<{ text: string; headers: Headers }> {
+  const token = getToken();
+  const res = await fetch(`${apiBase}/api${path}`, {
+    method: 'GET',
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+  });
+  if (!res.ok) {
+    const json = (await res.json().catch(() => ({}))) as Record<string, unknown>;
+    if (res.status === 401) onUnauthorized?.();
+    throw new ApiError(res.status, typeof json.error === 'string' ? json.error : res.statusText, json);
+  }
+  // Decoded keeping a leading BOM (res.text() drops it): the grades CSV
+  // carries one so a spreadsheet reads it as UTF-8.
+  return { text: new TextDecoder('utf-8', { ignoreBOM: true }).decode(await res.arrayBuffer()), headers: res.headers };
 }
 
 // ── health ───────────────────────────────────────────────────────
@@ -615,6 +634,16 @@ export function postRegrade(assignmentId: string, body: { dryRun: boolean; expec
 /** Instructor only: every assignment's grading progress + course-wide counts. */
 export function getCourseGrading(): Promise<CourseGrading> {
   return request<CourseGrading>('GET', '/grading');
+}
+
+/** Instructor only: the grades CSV (task 071) — the course's, or with
+ *  `assignmentId` that one set's column — and the filename the server gave
+ *  it. The server logs every export. */
+export async function getGradesExport(assignmentId?: string): Promise<{ filename: string; csv: string }> {
+  const query = assignmentId !== undefined ? `?assignment=${encodeURIComponent(assignmentId)}` : '';
+  const { text, headers } = await requestText(`/grading/export.csv${query}`);
+  const named = /filename="([^"]+)"/.exec(headers.get('Content-Disposition') ?? '')?.[1];
+  return { filename: named ?? 'making-minds-grades.csv', csv: text };
 }
 
 /** Instructor only: one student (by opaque key) across assignments. */
