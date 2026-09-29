@@ -10,9 +10,11 @@
 // armed, Esc disarms), or drag it onto the canvas, where a 55% ghost of the
 // part follows the pointer (CircuitCanvas draws it from usePaletteDrag) and
 // the drop places it centred on the pointer. A box row dragged onto the
-// palette pins it there.
+// palette pins it there. The one exception is the BOX tile (task 085), a
+// tool rather than a part: a click only, which the store's boxTool turns
+// into a draft around the selection or the armed draw tool.
 
-import { useLayoutEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type { PointerEvent as ReactPointerEvent } from 'react';
 import {
   useStore,
@@ -27,13 +29,13 @@ import {
   clampPalette,
   clearOf,
   clientToCanvas,
+  paletteBoxTiles,
   paletteHasBoxes,
   paletteLength,
   paletteOrientation,
   paletteParts,
   palettePlacementFromPrefs,
   partRefusal,
-  pinnedRows,
   pinsFromPrefs,
   pinsPrefKey,
   sameTool,
@@ -123,6 +125,16 @@ function BoxIcon({ numIn, numOut }: { numIn: number; numOut: number }) {
       <rect className="pal-ico-fill" x="8" y="4" width="20" height="18" />
       {numIn > 0 && <path d={stubs(numIn, 3, 8)} />}
       {numOut > 0 && <path d={stubs(numOut, 28, 33)} />}
+    </svg>
+  );
+}
+
+/** The BOX tool: a dashed box with a + in it (the old palette's New Box). */
+function BoxToolIcon() {
+  return (
+    <svg className="pal-ico" viewBox="0 0 36 26" aria-hidden>
+      <rect className="pal-ico-dash" x="7" y="3.5" width="22" height="19" rx="3" />
+      <path d="M18 8.5 V17.5 M13.5 13 H22.5" />
     </svg>
   );
 }
@@ -271,6 +283,7 @@ export function Palette({ canvasW, canvasH }: { canvasW: number; canvasH: number
   const mayHoldMemory = useStore(selectMayHoldMemory);
   const fullLibrary = useStore((s) => s.confirmedBoxLibrary);
   const editingBoxId = useStore((s) => s.boxEditor?.boxId ?? null);
+  const boxToolArmed = useStore((s) => s.selectedTool === 'NEW_BOX');
   const library = editingBoxId
     ? fullLibrary.filter((b) => b.id !== editingBoxId && !containsCopyOf(b.internalComponents, editingBoxId))
     : fullLibrary;
@@ -331,7 +344,14 @@ export function Palette({ canvasW, canvasH }: { canvasW: number; canvasH: number
   const parts = paletteParts(effectiveMode, mayHoldMemory);
   const hasBoxes = paletteHasBoxes(effectiveMode);
   const rows = hasBoxes ? boxRows(library, placeableKinds, allowed, pins, problemOf) : [];
-  const pinned = pinnedRows(pins, rows);
+  const boxTiles = paletteBoxTiles({ hasBoxes, editingBox: editingBoxId !== null, rows, pins });
+  const { pinned } = boxTiles;
+  const boxGroupSize = (boxTiles.boxTool ? 1 : 0) + pinned.length + (boxTiles.boxesTile ? 1 : 0);
+  // An open pop-out whose last row went (removed, or another canvas kind)
+  // closes: with no rows there is no Boxes tile to close it from.
+  useEffect(() => {
+    if (rows.length === 0 && popoutOpen) useStore.getState().setBoxesPopoutOpen(false);
+  }, [rows.length, popoutOpen]);
   const groups: PalettePart[][] = [
     parts.filter((p) => p.group === 'io' || p.group === 'states'),
     parts.filter((p) => p.group === 'gates'),
@@ -340,8 +360,8 @@ export function Palette({ canvasW, canvasH }: { canvasW: number; canvasH: number
   // Which way it runs: the student's choice, unless only the other way fits
   // this canvas (palette.ts paletteOrientation). The turn button flips what
   // is shown, and stands down when the other way would not fit.
-  const tileCount = parts.length + (hasBoxes ? pinned.length + 1 : 0);
-  const dividerCount = groups.length - 1 + (hasBoxes ? 1 : 0) + 1;
+  const tileCount = parts.length + boxGroupSize;
+  const dividerCount = groups.length - 1 + (boxGroupSize > 0 ? 1 : 0) + 1;
   const length = paletteLength(tileCount, dividerCount);
   const canvas = { w: canvasW, h: canvasH };
   const horiz = paletteOrientation(placement.horiz, length, canvas);
@@ -436,10 +456,29 @@ export function Palette({ canvasW, canvasH }: { canvasW: number; canvasH: number
             </div>
           </div>
         ))}
-        {hasBoxes && (
+        {boxGroupSize > 0 && (
           <>
             <div className="pal-div" />
             <div className="pal-group">
+              {boxTiles.boxTool && (
+                <button
+                  type="button"
+                  className={`pal-tile${boxToolArmed ? ' pal-tile--armed' : ''}${boxTiles.boxToolRefusal ? ' pal-tile--off' : ''}`}
+                  title={boxTiles.boxToolRefusal ??
+                    'Box: select parts and click to box them, or click and then drag a rectangle around them. ' +
+                    'IN and OUT nodes inside become its ports, and so does every wire end its edge cuts.'}
+                  aria-disabled={boxTiles.boxToolRefusal ? true : undefined}
+                  aria-pressed={boxToolArmed}
+                  onClick={() => {
+                    if (boxTiles.boxToolRefusal) return;
+                    const err = useStore.getState().boxTool();
+                    if (err) alert(err);
+                  }}
+                >
+                  <BoxToolIcon />
+                  <span className="pal-tile-label">BOX</span>
+                </button>
+              )}
               {pinned.map((row) => (
                 <Tile
                   key={row.box.id}
@@ -452,17 +491,19 @@ export function Palette({ canvasW, canvasH }: { canvasW: number; canvasH: number
                   onPin={pin}
                 />
               ))}
-              <button
-                type="button"
-                className={`pal-tile${popoutOpen ? ' pal-tile--armed' : ''}`}
-                title="Your boxes"
-                aria-expanded={popoutOpen}
-                onClick={() => useStore.getState().setBoxesPopoutOpen(!popoutOpen)}
-              >
-                <BoxesIcon />
-                <span className="pal-tile-label">Boxes</span>
-                {rows.length > 0 && <span className="pal-badge">{rows.length}</span>}
-              </button>
+              {boxTiles.boxesTile && (
+                <button
+                  type="button"
+                  className={`pal-tile${popoutOpen ? ' pal-tile--armed' : ''}`}
+                  title="Your boxes"
+                  aria-expanded={popoutOpen}
+                  onClick={() => useStore.getState().setBoxesPopoutOpen(!popoutOpen)}
+                >
+                  <BoxesIcon />
+                  <span className="pal-tile-label">Boxes</span>
+                  <span className="pal-badge">{rows.length}</span>
+                </button>
+              )}
             </div>
           </>
         )}
@@ -477,7 +518,7 @@ export function Palette({ canvasW, canvasH }: { canvasW: number; canvasH: number
           <TurnIcon />
         </button>
       </div>
-      {hasBoxes && popoutOpen && (
+      {boxTiles.boxesTile && popoutOpen && (
         <BoxesPopout rows={rows} style={popStyle} armedTool={armedTool} onPin={pin} setPinned={setPinned} />
       )}
     </>
@@ -486,7 +527,7 @@ export function Palette({ canvasW, canvasH }: { canvasW: number; canvasH: number
 
 // ── The Boxes pop-out ───────────────────────────────────────────────────────
 
-function openEditor(boxId: string | null) {
+function openEditor(boxId: string) {
   const err = useStore.getState().openBoxEditor(boxId);
   if (err) alert(err);
   else useStore.getState().setBoxesPopoutOpen(false);
@@ -508,24 +549,12 @@ function BoxesPopout({ rows, style, armedTool, onPin, setPinned }: {
         </button>
       </div>
       <div className="pal-pop-list">
-        {rows.length === 0 ? (
-          <p className="pal-pop-empty">Boxes you make are kept here and can be used in later questions.</p>
-        ) : (
-          rows.map((row) => (
-            <BoxRowView key={row.box.id} row={row} armed={sameTool(armedTool, { box: row.box.id })} onPin={onPin} setPinned={setPinned} />
-          ))
-        )}
+        {rows.map((row) => (
+          <BoxRowView key={row.box.id} row={row} armed={sameTool(armedTool, { box: row.box.id })} onPin={onPin} setPinned={setPinned} />
+        ))}
       </div>
       <div className="pal-pop-foot">
-        <button
-          type="button"
-          className="pal-newbox"
-          title="Build a new box in the box editor"
-          onClick={() => openEditor(null)}
-        >
-          New box
-        </button>
-        <p className="pal-pop-note">Or select parts on the canvas and press Box. Drag a box onto the toolbar to keep it there.</p>
+        <p className="pal-pop-note">Drag a box onto the toolbar to keep it there.</p>
       </div>
     </div>
   );

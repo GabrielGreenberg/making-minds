@@ -75,3 +75,4 @@
 2026-09-28-078 · feature · Give the editor's question panel a fixed, draggable split between the problem statement and the question list · 2026-09-28T18:20:41-0700 · robot/078-question-panel-fixed-split · e50034c
 2026-09-28-080 · feature · Autograde HW1 P12's invented base-6 system — a field per digit symbol, one for thirty-two, checked against the student's own symbols; fields sized to fit · 2026-09-28T19:31:50-0700 · robot/080-invented-base-numeral-answers · d32a81d
 2026-09-28-084 · feature · Fill a CC I/O-table row only when a Run carries its signal to the OUTPUT, and let Reset clear the table · 2026-09-28T22:17:14-0700 · robot/084-cc-table-earned-by-run · 42f90a2
+2026-09-29-085 · bug · Make boxing work on HW1 P4→P5 through one Box tool in the palette — the dashed "+ BOX" tile back, Box out of the edit strip, one icon set for undo, redo and rotate · 2026-09-29T16:55:09-0700 · robot/085-box-tool-back-in-palette · a8cf5fa

@@ -89,7 +89,7 @@ const {
 const { nextTrace, verifyTrace, textDigest, insertedChars } = await import('../src/provenance/trace');
 const { assessIntegrity, MAX_TYPING_CHARS_PER_SEC } = await import('../src/provenance/integrity');
 const { INTEGRITY_NOTICE, SUBMIT_INTEGRITY_SENTENCE, submitConfirmMessage } = await import('../src/provenance/notice');
-const { useStore, selectPasteScope, autoSaveDelay, AUTO_SAVE_MAX_WAIT } = await import('../src/store');
+const { useStore, autoSaveDelay, AUTO_SAVE_MAX_WAIT } = await import('../src/store');
 const { buildSampleAssignment, buildCorrectSubmission } = await import('../src/devData/sampleData');
 const { localAssignmentStore } = await import('../src/storage/AssignmentStore');
 const { gradeSubmission } = await import('../src/engine/grader');
@@ -356,14 +356,14 @@ const keyB = deriveMintKey(DEV_MINT_SECRET, A, 'prov-hw-b');
   s().addWire(and.id, 'out', out.id, 'in');
   check('addComponent ids bind to the dev key of (A, HW-A)', [in1, in2, and, out].every((c) => verifyId(c.id, keyA)));
   check('addWire ids bind too', s().wires.length === 3 && s().wires.every((w) => verifyId(w.id, keyA)));
-  // The box id: the canvas mints it with exactly this expression (pinned below).
-  const boxId = mintId(selectPasteScope(s()));
-  check("the box id (CircuitCanvas's mint) binds too", verifyId(boxId, keyA));
-  check('…and CircuitCanvas mints it that way',
-    readFileSync(new URL('../src/components/CircuitCanvas.tsx', import.meta.url), 'utf8')
-      .includes('id: mintId(selectPasteScope(useStore.getState()))'));
+  // The box id: the store mints the draft (startBoxDraft — the one way a box
+  // starts, the canvas's drawn rectangle and the BOX tile's selection draft
+  // alike, task 085); the canvas mints none of its own.
   const idsBeforeBox = new Set(s().components.map((c) => c.id));
-  s().addBox({ id: boxId, name: '', x: 150, y: 120, width: 400, height: 220, componentIds: [], inputPortIds: [], outputPortIds: [] });
+  const boxId = s().startBoxDraft({ x: 150, y: 120, width: 400, height: 220 })!;
+  check("the draft box's id (startBoxDraft's mint) binds too", boxId !== null && verifyId(boxId, keyA));
+  check('…and CircuitCanvas mints no box id of its own',
+    !readFileSync(new URL('../src/components/CircuitCanvas.tsx', import.meta.url), 'utf8').includes('mintId('));
   check('confirmBox succeeds', s().confirmBox(boxId) === null);
   const lib = s().confirmedBoxLibrary.find((b) => b.id === boxId)!;
   check('confirmBox keeps the ids (the library internals are the same components)',

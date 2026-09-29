@@ -1,5 +1,5 @@
-import { useRef, useState, useCallback, useEffect, useMemo } from 'react';
-import { useStore, selectEffectiveMode, selectLiveFsmStateId, selectFsmUncoveredInputs, selectTransitionNotationForSource, selectPasteScope, selectShowUnboundBoxWarning } from '../store';
+import { useRef, useState, useCallback, useEffect, useLayoutEffect, useMemo } from 'react';
+import { useStore, selectEffectiveMode, selectLiveFsmStateId, selectFsmUncoveredInputs, selectTransitionNotationForSource, selectShowUnboundBoxWarning } from '../store';
 import { inputCharTokens, hasCombinationalLoop } from '../engine';
 import { usePasteGuard, useNotice } from '../usePasteGuard';
 import { CanvasActions } from './CanvasActions';
@@ -9,7 +9,7 @@ import { clientToCanvas, placementOrigin, toolComponent } from '../palette';
 import { editorShortcut, isTextEntryTarget } from '../shortcuts';
 import { applyManualSegments } from '../wireSegments';
 import { canvasColors, canvasVar, signalColor } from '../canvasTheme';
-import { circuitBounds, fitView, freeArea, zoomAbout, ZOOM_STEP } from '../canvasView';
+import { circuitBounds, draftActionsAt, fitView, freeArea, zoomAbout, ZOOM_STEP } from '../canvasView';
 import { CanvasGuide } from './CanvasGuide';
 import type {
   CircuitComponent,
@@ -23,7 +23,6 @@ import {
   isMemSourcePort,
   isMemSinkPort,
 } from '../types';
-import { mintId } from '../provenance/ids';
 import { unboundBoxes } from '../boxPorts';
 import { BoxEditorBar } from './BoxEditorBar';
 import {
@@ -1959,13 +1958,10 @@ export function CircuitCanvas() {
       switch (command) {
         case 'escape':
           // Esc disarms the palette tool, closes the Boxes pop-out and
-          // cancels a box being drawn.
+          // cancels a box being drawn (its unnamed draft goes too).
           state.setSelectedTool(null);
           if (state.boxesPopoutOpen) state.setBoxesPopoutOpen(false);
-          if (state.boxDrawing.phase !== 'idle') {
-            state.setBoxDrawingPhase('idle');
-            state.setDraftBox(null);
-          }
+          state.cancelBoxDraft();
           return;
         case 'delete':
           e.preventDefault();
@@ -2572,25 +2568,10 @@ export function CircuitCanvas() {
         setDrawBoxPreview(null);
         requestOverlayUpdate();
 
+        // The store makes the draft (its id, the undo step, the phase) — the
+        // one path the BOX tile's selection draft takes too (task 085).
         if (preview && preview.w > 20 && preview.h > 20) {
-          const newBox: BoxDefinition = {
-            // Minted like every id (task 034): bound to this assignment.
-            id: mintId(selectPasteScope(useStore.getState())),
-            name: '',
-            x: preview.x,
-            y: preview.y,
-            width: preview.w,
-            height: preview.h,
-            componentIds: [],
-            inputPortIds: [],
-            outputPortIds: [],
-          };
-          state.addBox(newBox);
-          state.setSelectedTool(null);
-          if (useStore.getState().boxes.some((b) => b.id === newBox.id)) {
-            state.setDraftBox(newBox);
-            state.setBoxDrawingPhase('adjusting');
-          }
+          state.startBoxDraft({ x: preview.x, y: preview.y, width: preview.w, height: preview.h });
         }
         return;
       }
@@ -3631,8 +3612,10 @@ export function CircuitCanvas() {
     const insideIds = new Set(
       components
         .filter((c) => {
-          const cx = c.x + 40;
-          const cy = c.y + 30;
+          // Inside by its centre, as confirmBox decides (componentGeometry sizes).
+          const { w, h } = getCompDimensions(c);
+          const cx = c.x + w / 2;
+          const cy = c.y + h / 2;
           return cx >= draftBox.x && cx <= draftBox.x + draftBox.width && cy >= draftBox.y && cy <= draftBox.y + draftBox.height;
         })
         .map((c) => c.id)
@@ -3648,6 +3631,31 @@ export function CircuitCanvas() {
     return highlighted;
   }, [draftBox, components, wires]);
 
+  // The draft's Ready to Box · Cancel, measured once shown, placed where the
+  // canvas has room (canvasView.ts draftActionsAt) — beside a draft that
+  // reaches the canvas's right edge they would be clipped out of reach.
+  const draftActionsRef = useRef<HTMLDivElement>(null);
+  const [draftActionsSize, setDraftActionsSize] = useState({ w: 170, h: 28 });
+  const draftShown = !!draftBox && boxDrawing.phase === 'adjusting';
+  useLayoutEffect(() => {
+    const el = draftActionsRef.current;
+    if (!el) return;
+    const next = { w: el.offsetWidth, h: el.offsetHeight };
+    setDraftActionsSize((prev) => (prev.w === next.w && prev.h === next.h ? prev : next));
+  }, [draftShown]);
+  const draftActions = draftBox
+    ? draftActionsAt(
+        {
+          x0: draftBox.x * zoom + panX,
+          y0: draftBox.y * zoom + panY,
+          x1: (draftBox.x + draftBox.width) * zoom + panX,
+          y1: (draftBox.y + draftBox.height) * zoom + panY,
+        },
+        draftActionsSize,
+        { w: containerSize.width, h: containerSize.height },
+      )
+    : null;
+
   // Derive cursor
   let cursor = 'default';
   if (isPanning) cursor = 'grabbing';
@@ -3662,13 +3670,14 @@ export function CircuitCanvas() {
       style={gridStyle}
     >
       {/* Ready to Box button */}
-      {draftBox && boxDrawing.phase === 'adjusting' && (
+      {draftBox && draftActions && boxDrawing.phase === 'adjusting' && (
         <div
+          ref={draftActionsRef}
           className="ready-to-box-btn"
           style={{
             position: 'absolute',
-            left: (draftBox.x + draftBox.width) * zoom + panX + 8,
-            top: (draftBox.y) * zoom + panY,
+            left: draftActions.left,
+            top: draftActions.top,
             zIndex: 60,
           }}
         >
@@ -3689,11 +3698,7 @@ export function CircuitCanvas() {
           <button
             type="button"
             className="cv-btn"
-            onClick={() => {
-              useStore.getState().removeBox(draftBox.id);
-              useStore.getState().setBoxDrawingPhase('idle');
-              useStore.getState().setDraftBox(null);
-            }}
+            onClick={() => useStore.getState().cancelBoxDraft()}
           >
             Cancel
           </button>

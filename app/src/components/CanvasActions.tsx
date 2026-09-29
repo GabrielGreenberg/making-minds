@@ -3,10 +3,13 @@
 // Delete · Rotate · Clear, and a turbot TM's Swap state type — taking over
 // what the retired simulation toolbar held (run controls went to the output
 // panel). Every button calls the store's own action, which carries the lock
-// (law 3); the disabled look only mirrors it.
+// (law 3); the disabled look only mirrors it. Boxing is the palette's BOX
+// tile, not a button here (task 085); the arrows are one icon set
+// (CanvasIcons.tsx).
 
 import { useState } from 'react';
-import { useStore, selectEffectiveMode, selectQuestionLocked, selectPlaceableBoxKinds } from '../store';
+import { useStore, selectEffectiveMode, selectQuestionLocked } from '../store';
+import { RedoIcon, RotateIcon, UndoIcon } from './CanvasIcons';
 
 export function CanvasActions() {
   const canUndo = useStore((s) => s.undoStack.length > 0);
@@ -17,12 +20,6 @@ export function CanvasActions() {
   const buildMode = useStore((s) => s.buildMode);
   const effectiveMode = useStore(selectEffectiveMode);
   const [confirmClear, setConfirmClear] = useState(false);
-  const canBox = useStore((s) => selectPlaceableBoxKinds(s).length > 0);
-  const editingBox = useStore((s) => s.boxEditor !== null);
-  const hasBoxable = selectedIds.some((id) => {
-    const t = components.find((c) => c.id === id)?.type;
-    return t !== undefined && t !== 'INPUT' && t !== 'OUTPUT' && t !== 'STATE';
-  });
 
   const hasSelection = selectedIds.length > 0;
   const hasStateSelected = selectedIds.some((id) => components.find((c) => c.id === id)?.type === 'STATE');
@@ -36,10 +33,10 @@ export function CanvasActions() {
     <div className="cv-actions">
       <div className="cv-group" role="toolbar" aria-label="Edit the canvas">
         <button type="button" disabled={locked || !canUndo} onClick={act(() => s().undo())} title="Undo (⌘Z / Ctrl+Z)">
-          ↶ Undo
+          <UndoIcon /> Undo
         </button>
-        <button type="button" disabled={locked || !canRedo} onClick={act(() => s().redo())} title="Redo (⇧⌘Z / Ctrl+Shift+Z)" aria-label="Redo">
-          ↷
+        <button type="button" disabled={locked || !canRedo} onClick={act(() => s().redo())} title="Redo (⇧⌘Z / Ctrl+Shift+Z / Ctrl+Y)" aria-label="Redo">
+          <RedoIcon />
         </button>
         <button type="button" disabled={locked || !hasSelection} onClick={act(() => s().deleteSelected())} title="Delete the selection (Delete key)">
           Delete
@@ -52,21 +49,8 @@ export function CanvasActions() {
           })}
           title="Rotate the selection 90° (or shift+click a part)"
         >
-          ↻ Rotate
+          <RotateIcon /> Rotate
         </button>
-        {canBox && !editingBox && (
-          <button
-            type="button"
-            disabled={locked || !hasBoxable}
-            onClick={act(() => {
-              const err = s().boxSelection();
-              if (err) alert(err);
-            })}
-            title="Turn the selected parts into a box (inputs and outputs stay on the canvas)"
-          >
-            ▣ Box
-          </button>
-        )}
         {isTurbotTM && (
           <button
             type="button"
@@ -85,7 +69,7 @@ export function CanvasActions() {
       </div>
       {/* The gesture, beside its button (task 024) — a sibling, so a disabled
           Rotate (nothing selected, most of the time) never fades it. */}
-      <span className="cv-hint">(shift+click to ↻)</span>
+      <span className="cv-hint">(shift+click to <RotateIcon label="rotate" />)</span>
       {confirmClear && (
         <div className="cv-confirm mm-surface" role="alertdialog" aria-label="Clear the canvas?">
           <p>Clear everything on this canvas?</p>

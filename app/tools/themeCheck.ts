@@ -44,6 +44,7 @@ const PAGE_COMPONENTS = [
   'components/OutputPanel.tsx',
   'components/LiveTruthTable.tsx',
   'components/CanvasActions.tsx',
+  'components/CanvasIcons.tsx',
   'components/Palette.tsx',
   'components/CanvasGuide.tsx',
   'components/PageShell.tsx',

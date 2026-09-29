@@ -71,11 +71,11 @@ import { INTEGRITY_NOTICE } from './provenance/notice';
 // The sandbox workbook file (task 028): parsing, the saved-content key.
 import { parseWorkbookFile, serializeWorkbook, titleFromFileName, workbookKeyHash } from './workbookFile';
 import { orderBoxPorts, rebindLegacyBoxes, rebindLegacyLibrary } from './boxPorts';
-import { boxCircuitProblem, boxEntryFromCanvas, boxEntryFromInstance, containsCopyOf, editableBoxCircuit, extractSelection, replaceCopies, replaceCopiesInLibrary } from './boxEditing';
-import { placementOrigin, toolComponent, type ArmedTool } from './palette';
+import { boxCircuitProblem, boxEntryFromCanvas, boxEntryFromInstance, containsCopyOf, editableBoxCircuit, replaceCopies, replaceCopiesInLibrary } from './boxEditing';
+import { BOX_TOOL_EDITING_REFUSAL, placementOrigin, sameTool, toolComponent, type ArmedTool } from './palette';
 import { ccRowKey } from './ccTable';
 import { clampZoom } from './canvasView';
-import { getComponentSize } from './componentGeometry';
+import { getComponentBounds, getComponentSize } from './componentGeometry';
 
 /**
  * TM tape notation (alphabet) for the current context. Inside an assignment
@@ -852,6 +852,9 @@ interface HistoryEntry {
   wires: Wire[];
   boxes: BoxDefinition[];
   confirmedBoxes: ConfirmedBoxDef[];
+  /** The draft box being adjusted when this snapshot was taken (task 085):
+   *  undo / redo bring back THAT draft and no other unnamed box (draftIn). */
+  draftId?: string;
 }
 
 /** One part's live written answer (AppState.liveText): the free text of an
@@ -1117,6 +1120,20 @@ interface AppState {
   updateBox: (id: string, updates: Partial<BoxDefinition>) => void;
   removeBox: (id: string) => void;
   confirmBox: (id: string) => string | null; // returns error or null
+  // THE one way to make a box (task 085): the palette's BOX tile. With parts
+  // selected it drafts a box around them (startBoxDraft, padded by
+  // BOX_DRAFT_PAD); with none it arms (or disarms) the NEW_BOX draw tool,
+  // whose drag the canvas hands to startBoxDraft. Either way the draft is
+  // adjusted on the canvas and made a box by confirmBox (Ready to Box) — the
+  // parts stay where they are, inside a named outline. Returns a refusal or
+  // null.
+  boxTool: () => string | null;
+  // A draft box at `rect`, in the 'adjusting' phase (any earlier draft is
+  // cancelled first). Returns the draft's id, or null when refused.
+  startBoxDraft: (rect: { x: number; y: number; width: number; height: number }) => string | null;
+  // Drop the draft (Esc, its Cancel button, every canvas swap): an unnamed
+  // draft is never saved into a canvas.
+  cancelBoxDraft: () => void;
   // Remove a box from the LIBRARY (and its drawn outline on this canvas) —
   // never a placed copy: each carries its own internalCircuit and keeps
   // working (decision 7, task 054: a library action never destroys placed
@@ -1129,10 +1146,11 @@ interface AppState {
   renameBox: (id: string, name: string) => string | null;
   placeBoxInstance: (boxId: string, x: number, y: number) => void; // place a copy of a box as a BOXED component
   boxEditor: BoxEditorSession | null;
-  openBoxEditor: (boxId: string | null) => string | null;
+  // The box editor EDITS a library box (the pop-out's Edit, double-clicking
+  // a placed copy) — making one is boxTool's.
+  openBoxEditor: (boxId: string) => string | null;
   saveBoxEditor: (name?: string) => string | null;
   cancelBoxEditor: () => void;
-  boxSelection: () => string | null;
 
   // The confirmed-box library behind the palette's "Boxes" section. Its SCOPE
   // depends on where you are:
@@ -1397,6 +1415,47 @@ interface AppState {
 
 function snapToGrid(val: number): number {
   return Math.round(val / GRID_SIZE) * GRID_SIZE;
+}
+
+// ─── Box drafts ─────────────────────────────────────────────────────
+/** The margin the BOX tool leaves around a selection it drafts a box for —
+ *  one grid step, so the outline clears every selected part's footprint
+ *  (componentGeometry getComponentBounds, the one geometry). */
+export const BOX_DRAFT_PAD = GRID_SIZE;
+
+const NO_BOX_DRAFT: AppState['boxDrawing'] = { phase: 'idle', draftBox: null };
+
+/** The boxes a canvas saves, loads and restores: the named ones. An unnamed
+ *  box is a draft being adjusted — UI, never content — so no save, swap,
+ *  file or load carries one (a workbook saved before task 085 may hold one:
+ *  its load drops it). Same array when there is none to drop. */
+function namedBoxes(boxes: BoxDefinition[]): BoxDefinition[] {
+  return boxes.some((b) => !b.name) ? boxes.filter((b) => b.name) : boxes;
+}
+
+/** A history snapshot of the live canvas (pushHistory, undo, redo), with the
+ *  draft being adjusted, if any (HistoryEntry.draftId). */
+function historyEntryOf(s: AppState): HistoryEntry {
+  return {
+    components: JSON.parse(JSON.stringify(s.components)),
+    wires: JSON.parse(JSON.stringify(s.wires)),
+    boxes: JSON.parse(JSON.stringify(s.boxes)),
+    confirmedBoxes: JSON.parse(JSON.stringify(s.confirmedBoxLibrary)),
+    ...(s.boxDrawing.draftBox ? { draftId: s.boxDrawing.draftBox.id } : {}),
+  };
+}
+
+/** What an undo / redo restores of the boxes: the snapshot's named boxes and
+ *  the draft it was taken with, adjusted again — never any other unnamed box
+ *  (an orphan is not a draft) — so a 'Ready to Box' never floats over a
+ *  canvas that lost its box, nor comes back for a box this canvas did not
+ *  draft. */
+function restoredBoxes(entry: HistoryEntry): Pick<AppState, 'boxes' | 'boxDrawing'> {
+  const draft = entry.draftId ? entry.boxes.find((b) => b.id === entry.draftId && !b.name) : undefined;
+  return {
+    boxes: entry.boxes.filter((b) => b.name || b === draft),
+    boxDrawing: draft ? { phase: 'adjusting', draftBox: draft } : NO_BOX_DRAFT,
+  };
 }
 
 // ─── Box naming ─────────────────────────────────────────────────────
@@ -1760,7 +1819,7 @@ function loadProblemFields(
     liveText[id] = { responseText: saved.responseText ?? '', fillAnswers: saved.fillAnswers ?? [] };
     liveTraces[id] = saved.provenance ?? null;
   }
-  return { components: canvas.components, wires: canvas.wires, boxes: canvas.boxes, liveText, liveTraces };
+  return { components: canvas.components, wires: canvas.wires, boxes: namedBoxes(canvas.boxes ?? []), liveText, liveTraces };
 }
 
 // ─── The sandbox as a workbook (task 028) ─────────────────────────────
@@ -1879,11 +1938,20 @@ export interface BoxEditorSession {
   };
 }
 
+/** The live canvas as every save and fold takes it (foldLiveProblem,
+ *  sandboxTabCircuits): the stashed canvas while the box editor is open, and
+ *  never an unnamed draft box (namedBoxes). */
 function liveCanvas(s: AppState): { components: CircuitComponent[]; wires: Wire[]; boxes: BoxDefinition[] } {
-  return s.boxEditor ? s.boxEditor.stash : s;
+  const c = s.boxEditor ? s.boxEditor.stash : s;
+  return { components: c.components, wires: c.wires, boxes: namedBoxes(c.boxes) };
 }
 
+/** Every canvas swap's first step (question and tab navigation, sign-out,
+ *  a submission on show, …), before the swap folds the live canvas away: an
+ *  unnamed draft box is dropped (never saved into the canvas it was drawn
+ *  on), and an open box editor saves — or, if its box is refused, cancels. */
 function closeBoxEditorForSwap(get: () => AppState): void {
+  get().cancelBoxDraft();
   if (!get().boxEditor) return;
   if (get().saveBoxEditor() !== null) get().cancelBoxEditor();
 }
@@ -2022,7 +2090,7 @@ export const useStore = create<AppState>()((set, get) => ({
       tabCircuits.set(ws.id, {
         components: rebindLegacyBoxes(resolveMemDirections(ws.circuit.components, ws.circuit.wires), confirmedBoxes),
         wires: ws.circuit.wires,
-        boxes: ws.boxes,
+        boxes: namedBoxes(ws.boxes),
         confirmedBoxes,
       });
       // Turbot worksheets: restore brain kind + arena (the starter arena for
@@ -2476,15 +2544,7 @@ export const useStore = create<AppState>()((set, get) => ({
   pushHistory: (added = 0) => {
     const state = get();
     set({
-      undoStack: [
-        ...state.undoStack.slice(-49),
-        {
-          components: JSON.parse(JSON.stringify(state.components)),
-          wires: JSON.parse(JSON.stringify(state.wires)),
-          boxes: JSON.parse(JSON.stringify(state.boxes)),
-          confirmedBoxes: JSON.parse(JSON.stringify(state.confirmedBoxLibrary)),
-        },
-      ],
+      undoStack: [...state.undoStack.slice(-49), historyEntryOf(state)],
       redoStack: [],
       ...recordEdit(state, liveQuestionId(state), { compIns: added }),
     });
@@ -2495,18 +2555,10 @@ export const useStore = create<AppState>()((set, get) => ({
     const prev = state.undoStack[state.undoStack.length - 1];
     set({
       undoStack: state.undoStack.slice(0, -1),
-      redoStack: [
-        ...state.redoStack,
-        {
-          components: JSON.parse(JSON.stringify(state.components)),
-          wires: JSON.parse(JSON.stringify(state.wires)),
-          boxes: JSON.parse(JSON.stringify(state.boxes)),
-          confirmedBoxes: JSON.parse(JSON.stringify(state.confirmedBoxLibrary)),
-        },
-      ],
+      redoStack: [...state.redoStack, historyEntryOf(state)],
       // The snapshot's structure with today's live values (withLiveValues).
       ...withLiveValues(prev, state),
-      boxes: prev.boxes,
+      ...restoredBoxes(prev),
       confirmedBoxLibrary: prev.confirmedBoxes,
       // An edit action, adding nothing new (what it restores was counted).
       ...recordEdit(state, liveQuestionId(state), {}),
@@ -2520,17 +2572,9 @@ export const useStore = create<AppState>()((set, get) => ({
     const next = state.redoStack[state.redoStack.length - 1];
     set({
       redoStack: state.redoStack.slice(0, -1),
-      undoStack: [
-        ...state.undoStack,
-        {
-          components: JSON.parse(JSON.stringify(state.components)),
-          wires: JSON.parse(JSON.stringify(state.wires)),
-          boxes: JSON.parse(JSON.stringify(state.boxes)),
-          confirmedBoxes: JSON.parse(JSON.stringify(state.confirmedBoxLibrary)),
-        },
-      ],
+      undoStack: [...state.undoStack, historyEntryOf(state)],
       ...withLiveValues(next, state), // as undo
-      boxes: next.boxes,
+      ...restoredBoxes(next),
       confirmedBoxLibrary: next.confirmedBoxes,
       ...recordEdit(state, liveQuestionId(state), {}),
     });
@@ -2726,7 +2770,7 @@ export const useStore = create<AppState>()((set, get) => ({
       tc.set(state.activeTabId, {
         components: state.components,
         wires: state.wires,
-        boxes: state.boxes,
+        boxes: namedBoxes(state.boxes),
         confirmedBoxes: state.confirmedBoxLibrary,
       });
       set({ tabCircuits: tc });
@@ -3007,7 +3051,7 @@ export const useStore = create<AppState>()((set, get) => ({
           components: state.components,
           wires: state.wires,
         },
-        boxes: state.boxes,
+        boxes: namedBoxes(state.boxes),
         confirmedBoxes: state.confirmedBoxLibrary,
         repSystem: state.repSystem,
       },
@@ -3375,6 +3419,71 @@ export const useStore = create<AppState>()((set, get) => ({
 
     return null;
   },
+  boxTool: () => {
+    const state = get();
+    if (isCurrentQuestionLocked(state)) return lockRefusal(state, 'make a box');
+    if (state.boxEditor) return BOX_TOOL_EDITING_REFUSAL;
+    if (selectPlaceableBoxKinds(state).length === 0) return 'Boxing is not available for this kind of machine.';
+    // The selection's parts (selectedIds holds wire ids too): a draft around
+    // them, which the student adjusts and confirms like a drawn one.
+    const selected = new Set(state.selectedIds);
+    const parts = state.components.filter((c) => selected.has(c.id));
+    if (parts.length > 0) {
+      const bs = parts.map(getComponentBounds);
+      const left = Math.min(...bs.map((b) => b.left)) - BOX_DRAFT_PAD;
+      const top = Math.min(...bs.map((b) => b.top)) - BOX_DRAFT_PAD;
+      const right = Math.max(...bs.map((b) => b.right)) + BOX_DRAFT_PAD;
+      const bottom = Math.max(...bs.map((b) => b.bottom)) + BOX_DRAFT_PAD;
+      return get().startBoxDraft({ x: left, y: top, width: right - left, height: bottom - top }) === null
+        ? 'The box could not be started.'
+        : null;
+    }
+    // Nothing selected: the draw tool, armed or (clicked again) disarmed.
+    set({ selectedTool: sameTool(state.selectedTool, 'NEW_BOX') ? null : 'NEW_BOX' });
+    return null;
+  },
+  startBoxDraft: (rect) => {
+    if (isCurrentQuestionLocked(get())) return null;
+    if (get().boxEditor || selectPlaceableBoxKinds(get()).length === 0) return null;
+    get().cancelBoxDraft();
+    const box: BoxDefinition = {
+      // Minted like every id (task 034): bound to this assignment.
+      id: mintId(selectPasteScope(get())),
+      name: '',
+      x: rect.x,
+      y: rect.y,
+      width: rect.width,
+      height: rect.height,
+      componentIds: [],
+      inputPortIds: [],
+      outputPortIds: [],
+    };
+    // addBox takes the undo snapshot, so one undo steps back over the draft
+    // and its confirm together (confirmBox takes none of its own).
+    get().addBox(box);
+    set({ boxDrawing: { phase: 'adjusting', draftBox: box }, selectedTool: null });
+    return box.id;
+  },
+  cancelBoxDraft: () => {
+    const state = get();
+    const draft = state.boxDrawing.draftBox;
+    if (!draft && state.boxDrawing.phase === 'idle') return;
+    // Leaving the adjusting phase is UI; the unnamed box it drew is on the
+    // canvas, which a locked question keeps as it is (law 3) — never saved
+    // all the same (namedBoxes).
+    if (draft && !isCurrentQuestionLocked(state)) {
+      // The snapshot startBoxDraft's addBox took, if nothing has been pushed
+      // over it (every later snapshot holds the draft): the canvas is back to
+      // it, so it goes too — else the first undo after Cancel would do nothing.
+      const top = state.undoStack[state.undoStack.length - 1];
+      const drafted = top !== undefined && !top.boxes.some((b) => b.id === draft.id);
+      set({
+        boxes: state.boxes.filter((b) => b.id !== draft.id),
+        ...(drafted ? { undoStack: state.undoStack.slice(0, -1) } : {}),
+      });
+    }
+    set({ boxDrawing: NO_BOX_DRAFT });
+  },
 
   placeBoxInstance: (boxId, x, y) => {
     const state = get();
@@ -3460,41 +3569,31 @@ export const useStore = create<AppState>()((set, get) => ({
     if (isCurrentQuestionLocked(state)) return lockRefusal(state, 'edit a box');
     if (selectPlaceableBoxKinds(state).length === 0) return 'Boxes are not available on this canvas.';
     const scope = selectPasteScope(state);
-    const mint = () => mintId(scope);
-    let id: string;
-    let name: string;
-    let isNew: boolean;
-    let circuit: { components: CircuitComponent[]; wires: Wire[] };
-    if (boxId === null) {
-      id = mint();
-      name = nextBoxName('Box', takenBoxNames(state.confirmedBoxLibrary, state.boxes));
-      isNew = true;
-      circuit = { components: [], wires: [] };
-    } else {
-      const inLibrary = state.confirmedBoxLibrary.find((b) => b.id === boxId);
-      const placed = state.components.find((c) => c.type === 'BOXED' && c.boxedCircuitId === boxId);
-      const entry = inLibrary ?? (placed ? boxEntryFromInstance(placed) : null);
-      if (!entry) return 'Box not found.';
-      id = entry.id;
-      name = entry.name;
-      isNew = !inLibrary;
-      circuit = editableBoxCircuit(entry, mint);
-    }
+    // A library box, or a placed copy whose entry was removed from the
+    // library (saving puts it back: isNew).
+    const inLibrary = state.confirmedBoxLibrary.find((b) => b.id === boxId);
+    const placed = state.components.find((c) => c.type === 'BOXED' && c.boxedCircuitId === boxId);
+    const entry = inLibrary ?? (placed ? boxEntryFromInstance(placed) : null);
+    if (!entry) return 'Box not found.';
+    const circuit = editableBoxCircuit(entry, () => mintId(scope));
+    // The editor swaps the canvas: a draft box being adjusted goes first.
+    get().cancelBoxDraft();
+    const live = get();
     set({
       boxEditor: {
-        boxId: id,
-        isNew,
-        name,
+        boxId: entry.id,
+        isNew: !inLibrary,
+        name: entry.name,
         stash: {
-          components: state.components,
-          wires: state.wires,
-          boxes: state.boxes,
-          undoStack: state.undoStack,
-          redoStack: state.redoStack,
-          buildMode: state.buildMode,
+          components: live.components,
+          wires: live.wires,
+          boxes: live.boxes,
+          undoStack: live.undoStack,
+          redoStack: live.redoStack,
+          buildMode: live.buildMode,
         },
       },
-      buildMode: selectEffectiveMode(state),
+      buildMode: selectEffectiveMode(live),
       components: circuit.components,
       wires: circuit.wires,
       boxes: [],
@@ -3567,30 +3666,6 @@ export const useStore = create<AppState>()((set, get) => ({
     get().resetAllSimState();
     set({ undoStack: ed.stash.undoStack, redoStack: ed.stash.redoStack });
     setTimeout(() => get().evaluateCircuit(), 0);
-  },
-  boxSelection: () => {
-    const state = get();
-    if (isCurrentQuestionLocked(state)) return lockRefusal(state, 'box parts');
-    if (state.boxEditor) return 'Save or cancel the box you are editing first.';
-    if (selectPlaceableBoxKinds(state).length === 0) return 'Boxing is not available for this kind of machine.';
-    const scope = selectPasteScope(state);
-    const result = extractSelection(state.components, state.wires, state.selectedIds, {
-      id: mintId(scope),
-      name: nextBoxName('Box', takenBoxNames(state.confirmedBoxLibrary, state.boxes)),
-      origin: state.assignment?.questions[state.currentQuestionIndex]?.id,
-      mint: () => mintId(scope),
-    });
-    if ('error' in result) return result.error;
-    if (!selectPlaceableBoxKinds(state).includes(result.entry.kind === 'SC' ? 'SC' : 'CC'))
-      return 'Memory cannot go inside a box here: this canvas takes combinational boxes only. Box the gates around it and leave the memory on the canvas.';
-    state.pushHistory(1);
-    set({
-      components: result.components,
-      wires: result.wires,
-      confirmedBoxLibrary: [...state.confirmedBoxLibrary, result.entry],
-      selectedIds: [result.instance.id],
-    });
-    return get().openBoxEditor(result.entry.id);
   },
 
   // Delete
@@ -3747,7 +3822,7 @@ export const useStore = create<AppState>()((set, get) => ({
     updatedTabCircuits.set(state.activeTabId, {
       components: state.components,
       wires: state.wires,
-      boxes: state.boxes,
+      boxes: namedBoxes(state.boxes),
       confirmedBoxes: state.confirmedBoxLibrary,
     });
     set({
@@ -3772,7 +3847,7 @@ export const useStore = create<AppState>()((set, get) => ({
     updatedTabCircuits.set(state.activeTabId, {
       components: state.components,
       wires: state.wires,
-      boxes: state.boxes,
+      boxes: namedBoxes(state.boxes),
       confirmedBoxes: state.confirmedBoxLibrary,
     });
     const saved = updatedTabCircuits.get(id) || { components: [], wires: [], boxes: [], confirmedBoxes: [] };
@@ -5445,9 +5520,12 @@ export const useStore = create<AppState>()((set, get) => ({
     // would restore the previous question (or sandbox tab) over this one.
     // The selection is canvas-scoped for the same reason: ids from the last
     // canvas select nothing here, and a stale one would let Delete act on
-    // this canvas's namesake (task 052).
+    // this canvas's namesake (task 052). So is a box draft: a 'Ready to Box'
+    // from the last canvas would name a box this one does not hold (task
+    // 085; closeBoxEditorForSwap has already dropped the draft itself).
     set((s) => ({
       selectedTool: null, boxesPopoutOpen: false, selectedIds: [], undoStack: [], redoStack: [],
+      boxDrawing: NO_BOX_DRAFT,
       canvasSwapSeq: s.canvasSwapSeq + 1,
       // The run rows belong to the canvas they were earned on. Only a
       // finished play earns one, and the local step was cleared above.
@@ -6219,7 +6297,8 @@ function storedTabCircuit(c: TabCircuitData): TabCircuitData {
   const confirmedBoxes = Array.isArray(stored) ? rebindLegacyLibrary(stored) : stored;
   const library = Array.isArray(confirmedBoxes) ? confirmedBoxes : [];
   const components = Array.isArray(c.components) ? rebindLegacyBoxes(c.components, library) : c.components;
-  return { ...c, components, confirmedBoxes };
+  const boxes = Array.isArray(c.boxes) ? namedBoxes(c.boxes) : c.boxes;
+  return { ...c, components, boxes, confirmedBoxes };
 }
 
 /** Parse one stored sandbox blob into a store patch; {} when absent or
@@ -6301,7 +6380,7 @@ function sandboxPatchFrom(raw: string | null): Partial<AppState> {
         repSystem: data.repSystem || 'binary',
         components,
         wires: data.wires || [],
-        boxes: data.boxes || [],
+        boxes: Array.isArray(data.boxes) ? namedBoxes(data.boxes) : [],
         tabs,
         activeTabId,
         ...(tabCircuits.size > 0 ? { tabCircuits } : {}),

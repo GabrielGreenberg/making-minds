@@ -113,6 +113,29 @@ export function fitView(bounds: Rect | null, area: Rect): CanvasView {
   };
 }
 
+// ── A box draft's buttons ──────────────────────────────────────────────────
+
+/** Where a box draft's "Ready to Box · Cancel" sit (task 085): beside the
+ *  draft's top-right corner; else, where the canvas ends first, above that
+ *  corner (right-aligned); else below the draft — and always inside the
+ *  canvas, 8px in. The one way to finish a box is never off screen. Rects in
+ *  canvas-container px. */
+export function draftActionsAt(
+  box: { x0: number; y0: number; x1: number; y1: number },
+  size: { w: number; h: number },
+  canvas: { w: number; h: number },
+): { left: number; top: number } {
+  const M = 8;
+  const clamp = (v: number, span: number, room: number) => Math.round(Math.max(M, Math.min(room - span - M, v)));
+  let left = box.x1 + M;
+  let top = box.y0;
+  if (left + size.w + M > canvas.w) {
+    left = box.x1 - size.w;
+    top = box.y0 - M - size.h >= M ? box.y0 - M - size.h : box.y1 + M;
+  }
+  return { left: clamp(left, size.w, canvas.w), top: clamp(top, size.h, canvas.h) };
+}
+
 // ── The hint line ──────────────────────────────────────────────────────────
 
 export interface HintState {
@@ -126,6 +149,8 @@ export interface HintState {
   stateMachine: boolean;
   /** The question refuses edits (done, frozen, a submission on show). */
   locked: boolean;
+  /** A box draft is being adjusted (store.ts boxDrawing phase 'adjusting'). */
+  drafting?: boolean;
 }
 
 /** The canvas's one-line hint (memo §Canvas), or null for none. An empty
@@ -136,6 +161,7 @@ export function canvasHint(s: HintState): string | null {
   if (s.locked) {
     return s.stateMachine ? null : 'This question is locked. You can still switch the inputs and run it.';
   }
+  if (s.drafting) return 'Drag the corners to fit the box, then press Ready to Box. Esc cancels.';
   if (s.tool === 'NEW_BOX') return 'Drag a rectangle around the parts to box them. Esc cancels.';
   if (s.tool) return `Click the canvas to place ${s.tool}. Shift-click to place several. Esc cancels.`;
   if (s.selectedParts > 0) return `Drag to move. Delete removes ${s.selectedParts + s.selectedWires > 1 ? 'them' : 'it'}.`;

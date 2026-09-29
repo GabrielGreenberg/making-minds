@@ -16,6 +16,7 @@ export function CanvasGuide() {
   const effectiveMode = useStore(selectEffectiveMode);
   const locked = useStore(selectQuestionLocked);
   const editingBox = useStore((s) => s.boxEditor !== null);
+  const drafting = useStore((s) => s.boxDrawing.phase === 'adjusting');
 
   if (components.length === 0) {
     return locked ? null : <p className="cv-guide-empty">{editingBox ? EMPTY_BOX_MESSAGE : EMPTY_CANVAS_MESSAGE}</p>;
@@ -29,6 +30,7 @@ export function CanvasGuide() {
     wires: wires.length,
     stateMachine: effectiveMode === 'FSM' || effectiveMode === 'TM',
     locked,
+    drafting,
   });
   return hint ? <p className="cv-guide-hint">{hint}</p> : null;
 }

@@ -42,7 +42,12 @@
 //   [palette]        (task 054) the parts each canvas offers, dimmed (never
 //                    hidden) when a question excludes them, boxes likewise;
 //                    the box rows, their meta line and pins (unresolved pins
-//                    skipped); the position clamp and prefs; the way it
+//                    skipped); the box group (task 085): the BOX tile — a
+//                    click, never a drag, through the store's boxTool, dimmed
+//                    with its refusal in the box editor — and
+//                    the Boxes tile only once a placeable box exists, no New
+//                    box, the editor for editing only, the canvas drafting
+//                    only through the store; the position clamp and prefs; the way it
 //                    runs (the student's choice, unless only the other way
 //                    fits the canvas); placement
 //                    centred; the retired parts column and its HTML drag gone,
@@ -72,12 +77,14 @@ import type { ConfirmedBoxDef, CircuitComponent } from '../src/types';
 import { getPortsForType } from '../src/types';
 import { getComponentSize } from '../src/componentGeometry';
 import {
+  BOX_TOOL_EDITING_REFUSAL,
   PALETTE_DEFAULT,
   boxMetaLine,
   boxRows,
   clampPalette,
   clearOf,
   clientToCanvas,
+  paletteBoxTiles,
   paletteHasBoxes,
   paletteLength,
   paletteOrientation,
@@ -96,7 +103,7 @@ import {
 import { editorShortcut, isTextEntryTarget, type KeyPress } from '../src/shortcuts';
 import {
   EMPTY_CANVAS_MESSAGE, FIT_MAX, FIT_MIN, ZOOM_MAX, ZOOM_MIN,
-  canvasHint, circuitBounds, clampZoom, fitView, freeArea, zoomAbout, type HintState,
+  canvasHint, circuitBounds, clampZoom, draftActionsAt, fitView, freeArea, zoomAbout, type HintState,
 } from '../src/canvasView';
 import { toolLabel } from '../src/palette';
 import { signalColor, type CanvasColors } from '../src/canvasTheme';
@@ -534,6 +541,19 @@ console.log('\n[output panel]');
   check('the canvas\'s action group: Undo · Redo · Delete · Rotate · Clear through the store\'s own actions',
     ['undo()', 'redo()', 'deleteSelected()', 'rotateComponent(id)', 'clearWorkspace()', 'toggleStateKind(id)'].every((a) => actions.includes(a)) &&
       !/isCurrentQuestionLocked/.test(actions));
+  // Task 085: no Box button (boxing is the palette's BOX tile), and the
+  // arrows are one icon set — Redo drawn from Undo's own path, mirrored.
+  const icons = code('components/CanvasIcons.tsx');
+  check('…no Box button in the strip, and no text-glyph arrows',
+    !/boxSelection|boxTool|▣|↶|↷|↻/.test(actions));
+  check('…Undo, Redo and Rotate from the one icon set, the rotate hint wearing the same Rotate',
+    /import \{ RedoIcon, RotateIcon, UndoIcon \} from '\.\/CanvasIcons'/.test(actions) &&
+      /<UndoIcon \/> Undo/.test(actions) && /<RedoIcon \/>/.test(actions) && /<RotateIcon \/> Rotate/.test(actions) &&
+      /className="cv-hint">\(shift\+click to <RotateIcon label="rotate" \/>\)/.test(actions));
+  check('…Redo is Undo\'s own path mirrored, in currentColor strokes (the palette\'s weight)',
+    /<g transform="translate\(16 0\) scale\(-1 1\)">\s*<path d=\{UNDO_PATH\} \/>/.test(icons) &&
+      (icons.match(/d=\{UNDO_PATH\}/g) ?? []).length === 2 && /className="cv-ico"/.test(icons) &&
+      /\.cv-actions \.cv-ico \{[^}]*stroke: currentColor; stroke-width: 1\.6;/.test(read('workbench.css')));
 }
 
 console.log('\n[signal colour]');
@@ -553,7 +573,7 @@ console.log('\n[palette]');
     types('CC', false) === 'INPUT OUTPUT AND OR NOT');
   check('a canvas that may hold memory adds MEM', types('SC', true) === 'INPUT OUTPUT AND OR NOT MEM');
   check('FSM and TM offer STATE only', types('FSM', false) === 'STATE' && types('TM', false) === 'STATE');
-  check('boxing (New box, the Boxes group) on circuit canvases only',
+  check('boxing (the BOX tile, the Boxes group) on circuit canvases only',
     paletteHasBoxes('CC') && paletteHasBoxes('SC') && !paletteHasBoxes('FSM') && !paletteHasBoxes('TM'));
   const or = paletteParts('CC', false).find((p) => p.type === 'OR')!;
   const input = paletteParts('CC', false).find((p) => p.type === 'INPUT')!;
@@ -585,6 +605,25 @@ console.log('\n[palette]');
   check('rows know whether they are pinned', !onCC[0].pinned && onCC[1].pinned);
   check('pinned tiles in pin order; a pin that resolves to nothing is skipped silently (F12)',
     pinnedRows(['gone', 'b2', 'b1', 'b2'], onCC).map((r) => r.box.id).join() === 'b2,b1');
+  {
+    // Task 085: the box group — BOX, the pinned boxes, then Boxes once there is one.
+    const tiles = (hasBoxes: boolean, rows: typeof onCC, over: { editingBox?: boolean; pins?: string[] } = {}) =>
+      paletteBoxTiles({ hasBoxes, editingBox: over.editingBox ?? false, rows, pins: over.pins ?? [] });
+    const none = tiles(paletteHasBoxes('CC'), []);
+    check('box group: a circuit canvas with no boxes shows the BOX tile alone',
+      none.boxTool && !none.boxesTile && none.pinned.length === 0);
+    const one = tiles(paletteHasBoxes('CC'), onCC.slice(0, 1));
+    check('…one placeable box: BOX and the Boxes tile', one.boxTool && one.boxesTile);
+    check('…FSM and TM: neither',
+      (['FSM', 'TM'] as const).every((m) => { const t = tiles(paletteHasBoxes(m), onCC); return !t.boxTool && !t.boxesTile && t.pinned.length === 0; }));
+    const editing = tiles(true, onCC, { editingBox: true });
+    check('…the box editor open: the BOX tile still shows, dimmed with the store\'s refusal (a box is made on a problem\'s canvas), the library still there',
+      editing.boxTool && editing.boxToolRefusal === BOX_TOOL_EDITING_REFUSAL && editing.boxesTile &&
+        none.boxToolRefusal === null && one.boxToolRefusal === null);
+    check('…pinned tiles resolved from the rows (an unresolved pin skipped)',
+      tiles(true, onCC, { pins: ['gone', 'b2'] }).pinned.map((r) => r.box.id).join() === 'b2' &&
+        tiles(true, [], { pins: ['b2'] }).pinned.length === 0);
+  }
   check('pinning appends once; unpinning removes',
     togglePin(['b1'], 'b2', true).join() === 'b1,b2' && togglePin(['b1', 'b2'], 'b1', true).join() === 'b2,b1' &&
       togglePin(['b1', 'b2'], 'b1', false).join() === 'b2');
@@ -603,7 +642,7 @@ console.log('\n[palette]');
       JSON.stringify(clampPalette({ x: 900, y: 500 }, size, canvas)) === '{"x":732,"y":192}' &&
       JSON.stringify(clampPalette({ x: 100, y: 100 }, size, canvas)) === '{"x":100,"y":100}');
   {
-    // 7 tiles, 3 hairlines: the CC palette with its Boxes tile.
+    // 7 tiles, 3 hairlines: the CC palette with its BOX and Boxes tiles.
     const len = paletteLength(7, 3);
     check('the palette\'s run: grip 16 + turn 24 + border 2 + hairlines + 58 per tile', len === 16 + 24 + 2 + 3 + 7 * 58);
     check('it runs the way the student chose when that fits',
@@ -664,6 +703,37 @@ console.log('\n[palette]');
     /if \(!e\.shiftKey\) state\.setSelectedTool\(null\);/.test(canvasSrc));
   check('a click on empty canvas and Esc close the Boxes pop-out',
     (canvasSrc.match(/setBoxesPopoutOpen\(false\)/g) ?? []).length >= 2);
+  {
+    // Task 085: ONE way to make a box — the BOX tile, a click through the
+    // store's boxTool (the lock first, law 3); the canvas's drawn rectangle
+    // hands its draft to the same store path; the editor only edits.
+    const boxTile = paletteSrc.slice(paletteSrc.indexOf('boxTiles.boxTool &&'), paletteSrc.indexOf('<BoxToolIcon />'));
+    check('the palette\'s BOX tile: labelled BOX, its click the store\'s boxTool (no drag, no armToggle of its own)',
+      /<span className="pal-tile-label">BOX<\/span>/.test(paletteSrc) && /useStore\.getState\(\)\.boxTool\(\)/.test(boxTile) &&
+        !/startTileDrag|armToggle|onPointerDown/.test(boxTile) && /aria-pressed=\{boxToolArmed\}/.test(boxTile));
+    check('…dimmed (pal-tile--off, aria-disabled, the refusal its title, a click doing nothing) when paletteBoxTiles gives a refusal; the store refuses in the same words',
+      /boxTiles\.boxToolRefusal \? ' pal-tile--off' : ''/.test(boxTile) && /title=\{boxTiles\.boxToolRefusal \?\?/.test(boxTile) &&
+        /aria-disabled=\{boxTiles\.boxToolRefusal \? true : undefined\}/.test(boxTile) &&
+        /if \(boxTiles\.boxToolRefusal\) return;\s*const err = useStore\.getState\(\)\.boxTool\(\)/.test(boxTile) &&
+        /if \(state\.boxEditor\) return BOX_TOOL_EDITING_REFUSAL;/.test(code('store.ts')));
+    check('…rendered from paletteBoxTiles: the Boxes tile and its pop-out only once a placeable box exists',
+      /paletteBoxTiles\(\{/.test(paletteSrc) && /\{boxTiles\.boxesTile && \(/.test(paletteSrc) &&
+        /\{boxTiles\.boxesTile && popoutOpen && \(/.test(paletteSrc) && /rows\.length === 0 && popoutOpen/.test(paletteSrc));
+    check('no New box, and the editor never opens on nothing: the row\'s Edit and a copy\'s double-click edit a box',
+      !/New box|pal-newbox|openBoxEditor\(null\)|openEditor\(null\)/.test(paletteSrc + canvasSrc) &&
+        /openEditor\(box\.id\)/.test(paletteSrc) && /openBoxEditor\(comp\.boxedCircuitId\)/.test(canvasSrc) &&
+        /openBoxEditor: \(boxId: string\) =>/.test(read('store.ts')));
+    check('the canvas drafts a box only through the store: startBoxDraft on a drawn rectangle, cancelBoxDraft on Esc and Cancel',
+      /state\.startBoxDraft\(\{ x: preview\.x, y: preview\.y, width: preview\.w, height: preview\.h \}\)/.test(canvasSrc) &&
+        !/addBox\(|setDraftBox\(|mintId\(/.test(canvasSrc) &&
+        /case 'escape':[\s\S]*?state\.cancelBoxDraft\(\);[\s\S]*?case 'delete'/.test(canvasSrc) &&
+        /onClick=\{\(\) => useStore\.getState\(\)\.cancelBoxDraft\(\)\}/.test(canvasSrc));
+    const storeSrc = code('store.ts');
+    check('…whose boxTool and startBoxDraft carry the lock first (law 3); no selection-boxing path is left',
+      /boxTool: \(\) => \{\s*const state = get\(\);\s*if \(isCurrentQuestionLocked\(state\)\)/.test(storeSrc) &&
+        /startBoxDraft: \(rect\) => \{\s*if \(isCurrentQuestionLocked\(get\(\)\)\)/.test(storeSrc) &&
+        !/boxSelection|extractSelection/.test(storeSrc + code('boxEditing.ts')));
+  }
   check('the palette holds no lock of its own (law 3) and its rename wears the paste guard (law 8)',
     !/isCurrentQuestionLocked|selectQuestionLocked/.test(paletteSrc) && /ref=\{pasteGuardRef\}/.test(paletteSrc));
 }
@@ -717,15 +787,34 @@ console.log('\n[canvas]');
     check('hint: parts but no wires', hint({ wires: 0 }) === 'Drag from one dot to another to connect parts.');
     check('hint: otherwise', hint({}) === 'Click an input to switch it between 0 and 1.');
     check('hint: none on an empty canvas', hint({ parts: 0, wires: 0 }) === null);
-    check('hint: the New box tool, a state machine, a locked question say what applies there',
+    check('hint: the BOX draw tool, a state machine, a locked question say what applies there',
       hint({ tool: 'NEW_BOX' })!.startsWith('Drag a rectangle') && hint({ stateMachine: true, wires: 0 })!.includes('state') &&
         hint({ locked: true, selectedParts: 1 })!.startsWith('This question is locked'));
+    check('hint: adjusting a box draft says how to finish it (task 085)',
+      hint({ drafting: true })!.includes('Ready to Box') && hint({ drafting: true, tool: 'AND' })!.includes('Ready to Box'));
     check('the empty canvas\'s message, as the memo words it',
       EMPTY_CANVAS_MESSAGE === 'Drag parts from the toolbar onto the canvas, or click a part and then click here.');
     check('the hint names a tool as its tile does', toolLabel('INPUT', []) === 'Input' && toolLabel('AND', []) === 'AND');
   }
+  {
+    // Task 085: a draft's Ready to Box · Cancel are never out of reach.
+    const size = { w: 160, h: 28 };
+    const room = { w: 900, h: 600 };
+    const beside = draftActionsAt({ x0: 100, y0: 120, x1: 400, y1: 300 }, size, room);
+    check('draft buttons: beside the draft\'s top-right corner when the canvas has room', beside.left === 408 && beside.top === 120);
+    const atEdge = draftActionsAt({ x0: 300, y0: 120, x1: 880, y1: 300 }, size, room);
+    check('…a draft reaching the right edge: above its corner, right-aligned, inside the canvas',
+      atEdge.left === 880 - 160 && atEdge.top === 120 - 8 - 28);
+    const topRight = draftActionsAt({ x0: 300, y0: 10, x1: 895, y1: 300 }, size, room);
+    check('…at the top as well: below the draft, still inside', topRight.top === 308 && topRight.left + 160 <= 900 - 8);
+    const huge = draftActionsAt({ x0: -50, y0: -50, x1: 2000, y1: 2000 }, size, room);
+    check('…and a draft bigger than the canvas keeps them 8px inside',
+      huge.left >= 8 && huge.left + 160 <= 892 && huge.top >= 8 && huge.top + 28 <= 592);
+  }
   const canvasSrc = code('components/CircuitCanvas.tsx');
   const store = code('store.ts');
+  check('the canvas places a draft\'s buttons through draftActionsAt (task 085)',
+    /draftActionsAt\(/.test(canvasSrc) && /left: draftActions\.left,\s*top: draftActions\.top,/.test(canvasSrc));
   check('the zoom group: − · % · + · Fit, and no slider',
     /className="cv-zoom"/.test(canvasSrc) && /onClick=\{fitCanvas\}/.test(canvasSrc) && !/zoom-slider|type="range"/.test(canvasSrc));
   check('the dot grid follows pan and zoom (the container\'s background, cell = GRID_SIZE × zoom)',
