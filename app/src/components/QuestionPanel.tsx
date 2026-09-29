@@ -3,24 +3,43 @@
 // (Prev / Next, position, the lock tags, collapse), the current problem
 // (section, title, statement with its goal table — or a multi-part problem's
 // stem, lettered parts and closing, task 048 — figures, caution notes in
-// view, hints and section notes behind links, the done mark), and the
-// homework's problems grouped by section with the student's own marks.
-// Navigation, the position and the list count PROBLEMS (problemSet.ts
-// problemPages): a multi-part problem is one page, one row, one Mark done.
+// view, hints and section notes behind links; the done mark pinned at its
+// foot), and the homework's problems grouped by section with the student's
+// own marks. Navigation, the position and the list count PROBLEMS
+// (problemSet.ts problemPages): a multi-part problem is one page, one row,
+// one Mark done.
+//
+// The problem and the list split the panel below the nav strip at ONE
+// fraction (task 078; workbench.ts QUESTION_SPLIT), never at the statement's
+// length: a long statement scrolls inside its share, a short one leaves room,
+// and the list stays put from problem to problem. The row divider between
+// them (PanelDivider.tsx) sets the fraction; EditorShell stores it with the
+// column widths.
 //
 // Display only: navigation goes through `navigate` exactly as the old TabBar
 // did (a viewed submission's attempt carried along), the done mark through
 // the store's toggle, and every lock stays the store's (law 3) — the tags
 // here only say which one applies.
 
-import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { memo, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import type { AssignmentData, Callout, QuestionCircuit } from '../types';
 import { questionTask } from '../types';
 import { useStore, selectAssignmentFrozen, selectProblemDone, showsSubmission } from '../store';
 import { editorRoute, navigate } from '../routing';
 import { DEFAULT_CALLOUT_TITLE, problemPages, resolveProblem, sectionOf, type ResolvedProblem } from '../problemSet';
 import { parseStatement } from '../statementFormat';
-import { assignmentShortName, questionHeading, questionList, sectionNotesLabel } from '../workbench';
+import {
+  QUESTION_SPLIT_FLOOR,
+  assignmentShortName,
+  clampQuestionSplit,
+  questionHeading,
+  questionList,
+  questionSplitFromDrag,
+  questionSplitFromStep,
+  questionSplitRange,
+  sectionNotesLabel,
+} from '../workbench';
+import { PanelDivider } from './PanelDivider';
 import { FigureView, ProblemBody } from './ProblemSetDocument';
 import { StatementBody } from './StatementBody';
 
@@ -38,15 +57,35 @@ function problemHeading(problem: Pick<ResolvedProblem, 'label' | 'question'>): s
   return questionHeading({ label: problem.label, title: problem.question.title });
 }
 
-export function QuestionPanel({ onCollapse }: { onCollapse: () => void }) {
+export function QuestionPanel({
+  onCollapse,
+  split,
+  onResizeSplit,
+}: {
+  onCollapse: () => void;
+  /** The problem's share of the panel below the nav strip (workbench.ts QUESTION_SPLIT). */
+  split: number;
+  onResizeSplit: (split: number, done: boolean) => void;
+}) {
   const assignment = useStore((s) => s.assignment);
   const index = useStore((s) => s.currentQuestionIndex);
   const go = useGoToQuestion();
+  // The split is a share of this box's height: measured afresh as a drag or a
+  // key press starts, and kept (splitHeight) for what the divider reports.
+  const [splitEl, setSplitEl] = useState<HTMLDivElement | null>(null);
+  const height = () => splitEl?.getBoundingClientRect().height ?? 0;
+  const splitHeight = useElementHeight(splitEl);
   const pages = useMemo(() => (assignment ? problemPages(assignment) : []), [assignment]);
   const problem = useMemo(() => (assignment ? resolveProblem(assignment, index) : undefined), [assignment, index]);
   if (!assignment) return null;
   // Prev / Next walk the problems: a multi-part problem is one page.
   const at = pages.indexOf(index);
+  // The split on screen: a stored one outside this height's range (stored on
+  // a taller window) shows at its end (the CSS floors), and the divider
+  // reports — and a drag or a key press starts from — that one.
+  const shown = clampQuestionSplit(split, splitHeight);
+  const range = questionSplitRange(splitHeight);
+  const pct = (f: number) => Math.round(f * 100);
 
   return (
     <div className="qp mm-surface">
@@ -65,10 +104,45 @@ export function QuestionPanel({ onCollapse }: { onCollapse: () => void }) {
           «
         </button>
       </div>
-      {problem && <CurrentQuestion key={problem.question.id} assignment={assignment} problem={problem} />}
-      <QuestionList assignment={assignment} onPick={go} />
+      <div className="qp-split" ref={setSplitEl}>
+        {/* Never keyed: the pane keeps its height from problem to problem;
+            the problem inside it is keyed, so each opens scrolled to its top. */}
+        <div className="qp-current" style={{ flex: `0 1 ${split * 100}%`, minHeight: QUESTION_SPLIT_FLOOR.statement }}>
+          {problem && <CurrentQuestion key={problem.question.id} assignment={assignment} problem={problem} />}
+        </div>
+        <PanelDivider
+          orientation="horizontal"
+          label="Resize the problem and the question list"
+          value={pct(shown)}
+          min={pct(range.min)}
+          max={pct(range.max)}
+          valueText={`Problem ${pct(shown)}% of the panel`}
+          drag={() => {
+            const h = height();
+            return (dy) => questionSplitFromDrag(split, dy, h);
+          }}
+          step={(dir) => questionSplitFromStep(split, dir, height())}
+          onResize={onResizeSplit}
+        />
+        <QuestionList assignment={assignment} onPick={go} />
+      </div>
     </div>
   );
+}
+
+/** An element's height in px, kept current as it resizes (0 until laid out,
+ *  or where there is no ResizeObserver). */
+function useElementHeight(el: HTMLElement | null): number {
+  const [h, setH] = useState(0);
+  useEffect(() => {
+    if (!el || typeof ResizeObserver === 'undefined') return;
+    const measure = () => setH(el.getBoundingClientRect().height);
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [el]);
+  return h;
 }
 
 /** The collapsed panel: a strip that opens it again, the problem's title set
@@ -104,7 +178,10 @@ function LockTag() {
   return null;
 }
 
-function CurrentQuestion({ assignment, problem }: { assignment: AssignmentData; problem: ResolvedProblem }) {
+/** The open problem: its text scrolls in `.qp-current-body`, the done mark
+ *  stays at the pane's foot. Memoized — its props hold still while the split
+ *  is dragged, so a drag never re-renders the statement. */
+const CurrentQuestion = memo(function CurrentQuestion({ assignment, problem }: { assignment: AssignmentData; problem: ResolvedProblem }) {
   // Both links start closed, and reset on every problem: the panel is keyed
   // by problem, so this state never carries over.
   const [hintOpen, setHintOpen] = useState(false);
@@ -126,32 +203,34 @@ function CurrentQuestion({ assignment, problem }: { assignment: AssignmentData; 
   const showRep = questionTask(question) === 'function' && !profileOnly;
 
   return (
-    <div className="qp-current">
-      {section?.heading && <div className="qp-eyebrow">{section.heading}</div>}
-      <h2 className="qp-title">{problemHeading(problem)}</h2>
-      {showRep && <div className="qp-meta">{question.representation} representation</div>}
-      <div className="qp-statement">
-        {section?.intro && <StatementBody text={section.intro} className="qp-intro" />}
-        <ProblemBody problem={problem} showArena={false} showTitle={false} showHint={false} omitKinds={['hint', 'caution']} />
+    <>
+      <div className="qp-current-body">
+        {section?.heading && <div className="qp-eyebrow">{section.heading}</div>}
+        <h2 className="qp-title">{problemHeading(problem)}</h2>
+        {showRep && <div className="qp-meta">{question.representation} representation</div>}
+        <div className="qp-statement">
+          {section?.intro && <StatementBody text={section.intro} className="qp-intro" />}
+          <ProblemBody problem={problem} showArena={false} showTitle={false} showHint={false} omitKinds={['hint', 'caution']} />
+        </div>
+        {cautions.map((c, i) => (
+          <PanelNote key={i} callout={c} className="qp-caution" />
+        ))}
+        {hints.length > 0 && (
+          <Disclosure label="Hint" open={hintOpen} onToggle={() => setHintOpen((o) => !o)}>
+            {hints.map((c, i) => <PanelNote key={i} callout={c} />)}
+          </Disclosure>
+        )}
+        {section && notesLabel && (
+          <Disclosure label={notesLabel} open={notesOpen} onToggle={() => setNotesOpen((o) => !o)}>
+            {section.callouts.map((c, i) => <PanelNote key={`c${i}`} callout={c} />)}
+            {section.figures.map((f, i) => <FigureView key={`f${i}`} figure={f} />)}
+          </Disclosure>
+        )}
       </div>
-      {cautions.map((c, i) => (
-        <PanelNote key={i} callout={c} className="qp-caution" />
-      ))}
-      {hints.length > 0 && (
-        <Disclosure label="Hint" open={hintOpen} onToggle={() => setHintOpen((o) => !o)}>
-          {hints.map((c, i) => <PanelNote key={i} callout={c} />)}
-        </Disclosure>
-      )}
-      {section && notesLabel && (
-        <Disclosure label={notesLabel} open={notesOpen} onToggle={() => setNotesOpen((o) => !o)}>
-          {section.callouts.map((c, i) => <PanelNote key={`c${i}`} callout={c} />)}
-          {section.figures.map((f, i) => <FigureView key={`f${i}`} figure={f} />)}
-        </Disclosure>
-      )}
       <DoneMark multi={problem.parts.length > 1} />
-    </div>
+    </>
   );
-}
+});
 
 /** A callout as the panel shows it: its title (or its kind's) run into the
  *  text in bold, then any figures it carries. */
@@ -189,13 +268,16 @@ function DoneMark({ multi }: { multi: boolean }) {
   // A button with checkbox semantics, not an <input>: the canvas's keyboard
   // shortcuts stand down while an input has focus, so a checkbox would leave
   // Delete and ⌘Z dead after the click.
+  // The lock note goes ABOVE the checkbox: the foot is pinned to the pane's
+  // bottom, so it grows upward — the checkbox, last, holds still (on done and
+  // open problems alike, and under the pointer that just ticked it).
   return (
     <div className="qp-done">
+      {done && <div className="qp-done-note">🔒 Locked against edits — uncheck to keep working.</div>}
       <button type="button" role="checkbox" aria-checked={done} className="qp-done-label" onClick={() => toggle()}>
         <span className={done ? 'qp-done-box qp-done-box--on' : 'qp-done-box'} aria-hidden>{done ? '✓' : ''}</span>
         {multi ? "I'm done with this problem" : "I'm done with this question"}
       </button>
-      {done && <div className="qp-done-note">🔒 Locked against edits — uncheck to keep working.</div>}
     </div>
   );
 }
@@ -233,8 +315,11 @@ function QuestionList({ assignment, onPick }: { assignment: AssignmentData; onPi
   }, [index]);
 
   const short = assignmentShortName(assignment.title);
+  // Grows into what the problem leaves, never below its header, a section
+  // label and two rows: its basis is that floor, so a short panel shrinks the
+  // problem instead.
   return (
-    <>
+    <div className="qp-list-pane" style={{ flex: `1 0 ${QUESTION_SPLIT_FLOOR.list}px`, minHeight: QUESTION_SPLIT_FLOOR.list }}>
       <div className="qp-list-head">{short ? `${short} · Questions` : 'Questions'}</div>
       <div className="qp-list">
         {sections.map((section, si) => (
@@ -258,6 +343,6 @@ function QuestionList({ assignment, onPick }: { assignment: AssignmentData; onPi
           </div>
         ))}
       </div>
-    </>
+    </div>
   );
 }

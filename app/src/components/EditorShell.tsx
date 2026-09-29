@@ -1,8 +1,9 @@
 // The editor's frame (task 052; design memo editor-workbench.md §Layout): one
 // full-height column — the top bar, a thin band, then the body row: the
 // question panel on the left, the workspace in the middle, the output panel
-// on the right. Both side panels resize by dragging their divider and
-// collapse to a 40px strip; widths and open states persist per browser
+// on the right. Both side panels resize by dragging their divider
+// (PanelDivider.tsx, the one divider) and collapse to a 40px strip; widths,
+// open states and the question panel's split (task 078) persist per browser
 // (uiPrefs.ts, workbench.ts EDITOR_PREF_KEYS).
 //
 // ONE frame for every question kind and the sandbox: a circuit question
@@ -10,7 +11,7 @@
 // its answer area and no output panel; the sandbox has no question panel
 // (Gabriel, 2026-09-25) and keeps its worksheet tabs over the canvas.
 
-import { useCallback, useRef, useState, type KeyboardEvent, type PointerEvent, type ReactNode } from 'react';
+import { useCallback, useState, type ReactNode } from 'react';
 import { useStore } from '../store';
 import { useAuth } from '../auth';
 import { loadUiPrefs, saveUiPref } from '../uiPrefs';
@@ -24,6 +25,7 @@ import {
   type WidthRange,
 } from '../workbench';
 import { EditorTopBar } from './EditorTopBar';
+import { PanelDivider } from './PanelDivider';
 import { QuestionPanel, QuestionPanelStrip } from './QuestionPanel';
 import { VisitorBanner } from './VisitorBanner';
 
@@ -56,12 +58,15 @@ export function EditorShell({ children, output }: { children: ReactNode; output?
           (layout.leftOpen ? (
             <>
               <aside className="wb-left" style={{ width: layout.leftW }} aria-label="Question">
-                <QuestionPanel onCollapse={() => update({ leftOpen: false })} />
+                <QuestionPanel
+                  onCollapse={() => update({ leftOpen: false })}
+                  split={layout.qpSplit}
+                  onResizeSplit={(v, done) => update({ qpSplit: v }, done)}
+                />
               </aside>
               <PanelDivider
-                side="left"
-                width={layout.leftW}
-                range={LEFT_PANEL}
+                orientation="vertical"
+                {...columnDivider('left', layout.leftW, LEFT_PANEL)}
                 onResize={(w, done) => update({ leftW: w }, done)}
               />
             </>
@@ -73,9 +78,8 @@ export function EditorShell({ children, output }: { children: ReactNode; output?
           (layout.rightOpen ? (
             <>
               <PanelDivider
-                side="right"
-                width={layout.rightW}
-                range={RIGHT_PANEL}
+                orientation="vertical"
+                {...columnDivider('right', layout.rightW, RIGHT_PANEL)}
                 onResize={(w, done) => update({ rightW: w }, done)}
               />
               <aside className="wb-right" style={{ width: layout.rightW }} aria-label="Output">
@@ -112,70 +116,18 @@ export function EditorShell({ children, output }: { children: ReactNode; output?
 }
 
 /**
- * A column divider: a 9px hit area over a 1px rule, with a grip. Dragging
- * resizes the panel on `side` (live, stored on release); the arrow keys do
- * it in 16px steps for keyboard users.
+ * A column divider's value: the width of the panel on `side`, which grows as
+ * the pointer moves away from it (the left panel's rightwards, the right
+ * one's leftwards), clamped to its range; the arrow keys step it 16px.
  */
-function PanelDivider({
-  side,
-  width,
-  range,
-  onResize,
-}: {
-  side: 'left' | 'right';
-  width: number;
-  range: WidthRange;
-  onResize: (width: number, done: boolean) => void;
-}) {
-  const drag = useRef<{ startX: number; startW: number; last: number } | null>(null);
-  // The left panel grows as the pointer moves right; the right one as it moves left.
+function columnDivider(side: 'left' | 'right', width: number, range: WidthRange) {
   const sign = side === 'left' ? 1 : -1;
-
-  const onPointerDown = (e: PointerEvent<HTMLDivElement>) => {
-    if (e.button !== 0) return;
-    e.preventDefault();
-    e.currentTarget.setPointerCapture(e.pointerId);
-    drag.current = { startX: e.clientX, startW: width, last: width };
+  return {
+    label: side === 'left' ? 'Resize the question panel' : 'Resize the output panel',
+    value: width,
+    min: range.min,
+    max: range.max,
+    drag: () => (dx: number) => clampPanelWidth(width + sign * dx, range),
+    step: (dir: 1 | -1) => clampPanelWidth(width + sign * 16 * dir, range),
   };
-  const onPointerMove = (e: PointerEvent<HTMLDivElement>) => {
-    const d = drag.current;
-    if (!d) return;
-    const next = clampPanelWidth(d.startW + sign * (e.clientX - d.startX), range);
-    if (next === d.last) return;
-    d.last = next;
-    onResize(next, false);
-  };
-  const onPointerUp = (e: PointerEvent<HTMLDivElement>) => {
-    const d = drag.current;
-    if (!d) return;
-    drag.current = null;
-    e.currentTarget.releasePointerCapture(e.pointerId);
-    onResize(d.last, true);
-  };
-  const onKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
-    const step = e.key === 'ArrowRight' ? 16 : e.key === 'ArrowLeft' ? -16 : 0;
-    if (!step) return;
-    e.preventDefault();
-    onResize(clampPanelWidth(width + sign * step, range), true);
-  };
-
-  return (
-    <div
-      className="wb-divider"
-      role="separator"
-      aria-orientation="vertical"
-      aria-label={side === 'left' ? 'Resize the question panel' : 'Resize the output panel'}
-      aria-valuemin={range.min}
-      aria-valuemax={range.max}
-      aria-valuenow={width}
-      tabIndex={0}
-      onPointerDown={onPointerDown}
-      onPointerMove={onPointerMove}
-      onPointerUp={onPointerUp}
-      onPointerCancel={onPointerUp}
-      onKeyDown={onKeyDown}
-    >
-      <span className="wb-divider-grip" aria-hidden />
-    </div>
-  );
 }
