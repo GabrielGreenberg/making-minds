@@ -8,9 +8,9 @@ requires: browser
 area: app
 source: audit
 created: 2026-09-25T10:35:00-07:00
-status: in-progress
+status: done
 after: 2026-09-28-079
-branch: robot/048-multi-part-questions
+branch:
 merged_into:
 ---
 
@@ -192,3 +192,36 @@ Gates; pins per part kind; browser.
     refreshed, not edited. Then a Re-grade… dry run should show 0 point changes → Commit.
 - **Next step:** loop session: the visual check (owed), then land per PROFILE §5 (held for
   Gabriel's hand release: schema, sanitize, homework content).
+
+### 2026-09-28 (robot, land)
+- **Visual check, headless** (the browser pane can't start a dev server unattended): headless
+  Chrome over CDP (the shootProblemSets recipe) on a scratch Vite (:5190), local mode, HW1
+  seeded and published. As John Doe: the overview reads "17 problems", numbered 1–17, with no
+  lettered labels; 6, 9, 10 and 13 each show one stem, their a./b./c. parts and the closing (9
+  and 13). Problem 6's page shows the stem, then a. with a paragraph, b. with a line and c.
+  with a blank, then "Saved as you type.". Problem 9 shows a. with a line, b. with a 9-row
+  x | y | j(x, y) table (27 cells, no key), then the closing. Problem 13 shows two blanks and
+  the closing. Problem 7 shows its statement and then a paragraph.
+  - Typed answers persist after going Home and reopening through 6b's route (`q/6`).
+  - "I'm done with this problem" makes all three fields read-only, and typing then doesn't
+    land. Unchecking it unlocks them.
+  - A synthetic outside paste into 6b is refused with the provenance notice.
+  - Next goes from 6 to 7 (`q/5` → `q/8`) and Prev comes back. The list has one row per
+    problem (17).
+  - At 700 px there is no horizontal scroll on problems 6 and 9, and nothing overflows the
+    sheet.
+  - Submitting records attempt 1. As Prof. Ada, Grading → HW1 → Queue for 6b shows the stem
+    and the (b) prompt over John's answer. The Matrix keeps a column per part (6a–6c, 9a–9b,
+    10a–10c, 13a–13b). The assignment editor tags 6b, 6c, 9b, 10b, 10c and 13b as "part of
+    Problem …".
+  - No console errors.
+- **Still owed, not claimed:**
+  - Gabriel's own eyeball in local mode: the recipe above, plus the Grades sheet after release
+    and the question creator on question 18.
+  - All of remote mode: Vite Remote Mode with a local server on :8199, including the frozen
+    view and "Open in viewer".
+  - The box step after the hand release: `npm run homeworks -- status` should show HW1
+    refreshed, not edited. Then run a Re-grade… dry run on HW1; it should show 0 point
+    changes, then Commit.
+- Landed; no conflict with `origin/main` (nothing new since the claim), so the workflow's
+  gates stand (all five exited 0).

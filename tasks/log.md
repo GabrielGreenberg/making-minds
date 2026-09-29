@@ -71,3 +71,4 @@
 2026-09-28-082 · chore · Bring the app's HW1 wording up to date with the reader's revised HW1 (makingminds.org book, pp. 181–182) · 2026-09-28T12:13:20-0700 · task/082-hw1-match-reader · cad04bf
 2026-09-28-083 · feature · Show the robot's state on the instructor Dashboard — what's live, what waits for release, what waits for Gabriel's answer · 2026-09-28T13:57:25-0700 · robot/083-robot-status-panel · 36aa638
 2026-09-28-079 · feature · Answer "define it with a table" problems in a blank argument–value table, autograded as a function (HW1 P14, P9b) · 2026-09-28T15:34:51-0700 · robot/079-argument-value-table-answers · a291ddf
+2026-09-25-048 · feature · Multi-part questions — one problem, parts of different kinds (line, paragraph, blanks, table), one Mark done · 2026-09-28T17:13:47-0700 · robot/048-multi-part-questions · e6d9dc1
