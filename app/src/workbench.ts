@@ -85,9 +85,10 @@ export function questionListTag(
 }
 
 export interface QuestionListRow {
-  /** Position in `assignment.questions` — what navigation takes. */
+  /** Position in `assignment.questions` of the problem's page (its first
+   *  part) — what navigation takes. */
   index: number;
-  /** The document's number ("6a"). */
+  /** The document's number ("6", "12"). */
   number: string;
   /** The problem's title, or null when untitled (the row then shows the label). */
   title: string | null;
@@ -99,13 +100,21 @@ export interface QuestionListRow {
 
 export interface QuestionListSection { heading: string; rows: QuestionListRow[] }
 
+/** A multi-part problem's mark over its parts' (task 048): done only when
+ *  every part is (its one Mark done), started when any part holds work. */
+export function problemMark(parts: readonly QuestionMark[]): QuestionMark {
+  if (parts.length > 0 && parts.every((m) => m === 'done')) return 'done';
+  return parts.some((m) => m !== null) ? 'started' : null;
+}
+
 /**
  * The question panel's list: the document's sections (problemSet.ts
  * documentSections — the same grouping and numbering as the overview), each
- * problem a row with its tag and the student's mark; a section with no
- * problems (a rules preamble) has nothing to navigate to and is left out.
- * `circuitOf` answers a question's work — the caller folds the live canvas in
- * for the open one.
+ * PROBLEM a row with its tag and the student's mark — a multi-part problem
+ * one row, marked over its parts, tagged by the kind its parts share (else
+ * "Written"); a section with no problems (a rules preamble) has nothing to
+ * navigate to and is left out. `circuitOf` answers a question's work — the
+ * caller folds the live problem in for the open one.
  */
 export function questionList(
   assignment: AssignmentData,
@@ -114,15 +123,19 @@ export function questionList(
 ): QuestionListSection[] {
   return documentSections(assignment).filter((section) => section.problems.length > 0).map((section) => ({
     heading: section.heading,
-    rows: section.problems.map((p) => ({
-      index: p.index,
-      number: p.number,
-      title: p.question.title?.trim() || null,
-      label: p.question.label,
-      tag: questionListTag(p.question),
-      mark: questionMark(circuitOf(p.question.id)),
-      current: p.index === currentIndex,
-    })),
+    rows: section.problems.map((p) => {
+      const tags = p.parts.map((part) => questionListTag(part.question));
+      const shared = tags.every((t) => t.text === tags[0].text);
+      return {
+        index: p.index,
+        number: p.number,
+        title: p.question.title?.trim() || null,
+        label: p.label,
+        tag: shared ? tags[0] : { text: 'Written', machine: false },
+        mark: problemMark(p.parts.map((part) => questionMark(circuitOf(part.question.id)))),
+        current: p.parts.some((part) => part.index === currentIndex),
+      };
+    }),
   }));
 }
 

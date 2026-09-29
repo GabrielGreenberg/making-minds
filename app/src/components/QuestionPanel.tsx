@@ -1,9 +1,12 @@
 // The editor's question panel (task 052; design memo editor-workbench.md
 // §Question panel): the problem first. Three stacked parts — a nav strip
-// (Prev / Next, position, the lock tags, collapse), the current question
-// (section, title, statement with its goal table, figures, caution notes in
+// (Prev / Next, position, the lock tags, collapse), the current problem
+// (section, title, statement with its goal table — or a multi-part problem's
+// stem, lettered parts and closing, task 048 — figures, caution notes in
 // view, hints and section notes behind links, the done mark), and the
-// homework's questions grouped by section with the student's own marks.
+// homework's problems grouped by section with the student's own marks.
+// Navigation, the position and the list count PROBLEMS (problemSet.ts
+// problemPages): a multi-part problem is one page, one row, one Mark done.
 //
 // Display only: navigation goes through `navigate` exactly as the old TabBar
 // did (a viewed submission's attempt carried along), the done mark through
@@ -11,11 +14,11 @@
 // here only say which one applies.
 
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import type { AssignmentData, AssignmentQuestion, Callout, QuestionCircuit } from '../types';
+import type { AssignmentData, Callout, QuestionCircuit } from '../types';
 import { questionTask } from '../types';
-import { useStore, selectAssignmentFrozen, showsSubmission } from '../store';
+import { useStore, selectAssignmentFrozen, selectProblemDone, showsSubmission } from '../store';
 import { editorRoute, navigate } from '../routing';
-import { DEFAULT_CALLOUT_TITLE, sectionOf } from '../problemSet';
+import { DEFAULT_CALLOUT_TITLE, problemPages, resolveProblem, sectionOf, type ResolvedProblem } from '../problemSet';
 import { parseStatement } from '../statementFormat';
 import { assignmentShortName, questionHeading, questionList, sectionNotesLabel } from '../workbench';
 import { FigureView, ProblemBody } from './ProblemSetDocument';
@@ -30,57 +33,63 @@ function useGoToQuestion(): (i: number) => void {
   };
 }
 
+/** The current problem's heading: "Problem 1 · NAND", or just its name. */
+function problemHeading(problem: Pick<ResolvedProblem, 'label' | 'question'>): string {
+  return questionHeading({ label: problem.label, title: problem.question.title });
+}
+
 export function QuestionPanel({ onCollapse }: { onCollapse: () => void }) {
   const assignment = useStore((s) => s.assignment);
   const index = useStore((s) => s.currentQuestionIndex);
   const go = useGoToQuestion();
+  const pages = useMemo(() => (assignment ? problemPages(assignment) : []), [assignment]);
+  const problem = useMemo(() => (assignment ? resolveProblem(assignment, index) : undefined), [assignment, index]);
   if (!assignment) return null;
-  const q = assignment.questions[index];
-  const count = assignment.questions.length;
+  // Prev / Next walk the problems: a multi-part problem is one page.
+  const at = pages.indexOf(index);
 
   return (
     <div className="qp mm-surface">
       <div className="qp-nav">
-        <button type="button" className="qp-navbtn" disabled={index === 0} onClick={() => go(index - 1)} title="Previous question">
+        <button type="button" className="qp-navbtn" disabled={at <= 0} onClick={() => go(pages[at - 1])} title="Previous problem">
           ← Prev
         </button>
-        <button type="button" className="qp-navbtn" disabled={index >= count - 1} onClick={() => go(index + 1)} title="Next question">
+        <button type="button" className="qp-navbtn" disabled={at < 0 || at >= pages.length - 1} onClick={() => go(pages[at + 1])} title="Next problem">
           Next →
         </button>
         <span className="qp-pos">
           <LockTag />
-          {index + 1} of {count}
+          {at + 1} of {pages.length}
         </span>
         <button type="button" className="qp-collapse" onClick={onCollapse} title="Hide the question panel" aria-label="Hide the question panel">
           «
         </button>
       </div>
-      {q && <CurrentQuestion key={q.id} assignment={assignment} question={q} />}
+      {problem && <CurrentQuestion key={problem.question.id} assignment={assignment} problem={problem} />}
       <QuestionList assignment={assignment} onPick={go} />
     </div>
   );
 }
 
-/** The collapsed panel: a strip that opens it again, the question's title set
+/** The collapsed panel: a strip that opens it again, the problem's title set
  *  vertically so the student still knows where they are. */
 export function QuestionPanelStrip({ onExpand }: { onExpand: () => void }) {
-  const q = useStore((s) => s.assignment?.questions[s.currentQuestionIndex]);
+  const assignment = useStore((s) => s.assignment);
+  const index = useStore((s) => s.currentQuestionIndex);
+  const problem = useMemo(() => (assignment ? resolveProblem(assignment, index) : undefined), [assignment, index]);
   return (
     <button type="button" className="wb-strip wb-strip--left mm-surface" onClick={onExpand} title="Show the question panel" aria-label="Show the question panel">
       <span className="wb-strip-toggle" aria-hidden>»</span>
-      {q && <span className="wb-strip-title">{questionHeading(q)}</span>}
+      {problem && <span className="wb-strip-title">{problemHeading(problem)}</span>}
     </button>
   );
 }
 
-/** Which lock the open question is under, as the nav strip's tag. */
+/** Which lock the open problem is under, as the nav strip's tag. */
 function LockTag() {
   const frozen = useStore(selectAssignmentFrozen);
   const viewing = useStore((s) => s.viewingSubmission);
-  const done = useStore((s) => {
-    const q = s.assignment?.questions[s.currentQuestionIndex];
-    return q ? (s.questionCircuits.get(q.id)?.done ?? false) : false;
-  });
+  const done = useStore(selectProblemDone);
   if (frozen) {
     return <span className="qp-tag" title="This assignment closed after its due date — showing your submitted answer, read-only.">🔒 past due</span>;
   }
@@ -95,16 +104,19 @@ function LockTag() {
   return null;
 }
 
-function CurrentQuestion({ assignment, question }: { assignment: AssignmentData; question: AssignmentQuestion }) {
-  // Both links start closed, and reset on every question: the panel is keyed
-  // by question, so this state never carries over.
+function CurrentQuestion({ assignment, problem }: { assignment: AssignmentData; problem: ResolvedProblem }) {
+  // Both links start closed, and reset on every problem: the panel is keyed
+  // by problem, so this state never carries over.
   const [hintOpen, setHintOpen] = useState(false);
   const [notesOpen, setNotesOpen] = useState(false);
+  const question = problem.question;
   const section = sectionOf(assignment, question.id);
-  const callouts = question.callouts ?? [];
+  // Every part's cautions stay in view and its hints go behind the one link.
+  const parts = problem.parts.map((p) => p.question);
+  const callouts = parts.flatMap((q) => q.callouts ?? []);
   const cautions = callouts.filter((c) => c.kind === 'caution');
   const hints: Callout[] = [
-    ...(question.hint ? [{ kind: 'hint' as const, body: question.hint }] : []),
+    ...parts.flatMap((q) => (q.hint ? [{ kind: 'hint' as const, body: q.hint }] : [])),
     ...callouts.filter((c) => c.kind === 'hint'),
   ];
   const notesLabel = section ? sectionNotesLabel(section) : null;
@@ -116,11 +128,11 @@ function CurrentQuestion({ assignment, question }: { assignment: AssignmentData;
   return (
     <div className="qp-current">
       {section?.heading && <div className="qp-eyebrow">{section.heading}</div>}
-      <h2 className="qp-title">{questionHeading(question)}</h2>
+      <h2 className="qp-title">{problemHeading(problem)}</h2>
       {showRep && <div className="qp-meta">{question.representation} representation</div>}
       <div className="qp-statement">
         {section?.intro && <StatementBody text={section.intro} className="qp-intro" />}
-        <ProblemBody question={question} showArena={false} showTitle={false} showHint={false} omitKinds={['hint', 'caution']} />
+        <ProblemBody problem={problem} showArena={false} showTitle={false} showHint={false} omitKinds={['hint', 'caution']} />
       </div>
       {cautions.map((c, i) => (
         <PanelNote key={i} callout={c} className="qp-caution" />
@@ -136,7 +148,7 @@ function CurrentQuestion({ assignment, question }: { assignment: AssignmentData;
           {section.figures.map((f, i) => <FigureView key={`f${i}`} figure={f} />)}
         </Disclosure>
       )}
-      <DoneMark questionId={question.id} />
+      <DoneMark multi={problem.parts.length > 1} />
     </div>
   );
 }
@@ -166,11 +178,12 @@ function Disclosure({ label, open, onToggle, children }: { label: string; open: 
 
 /** "I'm done with this question" — the student's own mark, and still a lock
  *  (Gabriel, 2026-09-25: done keeps locking, through the store's
- *  isCurrentQuestionLocked). Hidden while a submission is on show, where the
- *  toggle is refused. */
-function DoneMark({ questionId }: { questionId: number }) {
+ *  isCurrentQuestionLocked). One per problem: a multi-part problem is done
+ *  when every part is (selectProblemDone), and the toggle writes them all.
+ *  Hidden while a submission is on show, where the toggle is refused. */
+function DoneMark({ multi }: { multi: boolean }) {
   const showing = useStore(showsSubmission);
-  const done = useStore((s) => s.questionCircuits.get(questionId)?.done ?? false);
+  const done = useStore(selectProblemDone);
   const toggle = useStore((s) => s.toggleCurrentQuestionDone);
   if (showing) return null;
   // A button with checkbox semantics, not an <input>: the canvas's keyboard
@@ -180,7 +193,7 @@ function DoneMark({ questionId }: { questionId: number }) {
     <div className="qp-done">
       <button type="button" role="checkbox" aria-checked={done} className="qp-done-label" onClick={() => toggle()}>
         <span className={done ? 'qp-done-box qp-done-box--on' : 'qp-done-box'} aria-hidden>{done ? '✓' : ''}</span>
-        I'm done with this question
+        {multi ? "I'm done with this problem" : "I'm done with this question"}
       </button>
       {done && <div className="qp-done-note">🔒 Locked against edits — uncheck to keep working.</div>}
     </div>
@@ -191,20 +204,28 @@ function QuestionList({ assignment, onPick }: { assignment: AssignmentData; onPi
   const index = useStore((s) => s.currentQuestionIndex);
   const questionCircuits = useStore((s) => s.questionCircuits);
   const showing = useStore(showsSubmission);
-  // The open question's work is live on the canvas, not yet folded into the
-  // map; a submission on show is not the student's work, so the map answers.
+  // The open problem's work is live (its canvas, each part's text), not yet
+  // folded into the map; a submission on show is not the student's work, so
+  // the map answers.
   const components = useStore((s) => s.components);
-  const openResponse = useStore((s) => s.openResponse);
-  const fillAnswers = useStore((s) => s.fillAnswers);
+  const liveText = useStore((s) => s.liveText);
   const sections = useMemo(() => {
     const currentId = assignment.questions[index]?.id;
     const circuitOf = (id: number): QuestionCircuit | undefined => {
       const saved = questionCircuits.get(id);
-      if (showing || id !== currentId) return saved;
-      return { components, wires: [], boxes: [], responseText: openResponse, fillAnswers, done: saved?.done };
+      const text = liveText[id];
+      if (showing || !text) return saved;
+      return {
+        components: id === currentId ? components : saved?.components ?? [],
+        wires: [],
+        boxes: [],
+        responseText: text.responseText,
+        fillAnswers: text.fillAnswers,
+        done: saved?.done,
+      };
     };
     return questionList(assignment, circuitOf, index);
-  }, [assignment, index, questionCircuits, showing, components, openResponse, fillAnswers]);
+  }, [assignment, index, questionCircuits, showing, components, liveText]);
 
   const currentRef = useRef<HTMLButtonElement>(null);
   useEffect(() => {

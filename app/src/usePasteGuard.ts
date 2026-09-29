@@ -24,7 +24,7 @@
 //                  does our own execCommand('insertText').
 // Native listeners, not React props: React's onBeforeInput carries no
 // inputType. The ref is a React 19 callback ref returning its cleanup, stable
-// across renders, so one guard can serve several inputs (FillInPanel's blanks).
+// across renders, so one guard can serve several inputs (a Worksheet page's fields).
 // The text setters stay lock-gated in the store (law 3); a read-only field
 // here just never inserts.
 

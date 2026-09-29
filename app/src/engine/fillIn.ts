@@ -11,6 +11,8 @@
 //    one case, passed iff exactly one student row has that row's arguments and
 //    its values match. Two rows with the same arguments are not a function
 //    (that case fails); empty rows are ignored; row order never matters.
+// A table authored with no key is a REVIEW table (task 048): nothing to
+// compare, so the grader leaves it pending for a person (isReviewTable).
 // Both keep their key in `fill_in_answers` (row-major for a table) and their
 // answers in `fillAnswers` (row-major for a table), so persistence, the
 // editing record and provenance see one shape: a list of strings.
@@ -140,12 +142,20 @@ export function normalizeFillAnswer(raw: string): string {
   return stripped === '' && trimmed !== '' ? '0' : stripped;
 }
 
+/** A REVIEW table (task 048): a table authored with no key at all — the
+ *  student fills it and a person grades it (the grader returns it pending).
+ *  Authoring-side only: a student's copy has no key, so to it every table
+ *  would look like one — never ask this of a student's copy. */
+export function isReviewTable(spec: FillInSpec | undefined, key: readonly string[] | undefined): boolean {
+  return spec !== undefined && fillInShape(spec).kind === 'table' && (key?.length ?? 0) === 0;
+}
+
 /** Why this spec and key cannot be graded, or null when they can. The grader
  *  skips with this reason; `problemSet.ts validateDocument` reports it
  *  (authoring-side — a student's copy has no key). Blanks need a key cell
  *  per blank. A table needs ≥ 2 columns, 1 ≤ argColumns < columns, a whole
  *  row count from 1 to `FILL_IN_TABLE_MAX_ROWS`, and a key of whole rows —
- *  at least one, no more than
+ *  none at all (a review table, graded by hand), or no more than
  *  students get, no empty cell, and no two with the same arguments (a
  *  function's table lists each argument once). */
 export function fillInKeyProblem(spec: FillInSpec, key: readonly string[]): string | null {
@@ -166,7 +176,7 @@ export function fillInKeyProblem(spec: FillInSpec, key: readonly string[]): stri
   if (rows > FILL_IN_TABLE_MAX_ROWS) {
     return `fill-in table gives students ${rows} rows; the most it may give is ${FILL_IN_TABLE_MAX_ROWS}`;
   }
-  if (key.length === 0) return 'fill-in question has no answer key';
+  if (key.length === 0) return null; // a review table (isReviewTable)
   if (key.length % c !== 0) return `fill-in table's key is not whole rows of ${c} cells (it has ${key.length})`;
   const keyRows = key.length / c;
   if (keyRows > rows) return `fill-in table's key has ${keyRows} rows but students get only ${rows}`;

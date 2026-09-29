@@ -35,6 +35,14 @@
 //                        defect named, which edits misplace answers); and a
 //                        grep pin: `.labels` is read only in engine/fillIn.ts.
 //
+//   [multi-part problems] (task 048) the HW1 fold changed no grading unit:
+//                        question ids, sections and the grading projection
+//                        (everything but display fields) equal what they were
+//                        before it; the new fields reach the student copy and
+//                        carry no key; a review table (a table with no key)
+//                        grades pending and keeps its cells, a keyed one still
+//                        grades by script, blanks with no key still skip.
+//
 //   [perception films]   (task 013) an SC perception question authored with
 //                        films (instructor/perceptionAuthoring.ts): submit →
 //                        grade counts generated + authored cases, the right
@@ -89,7 +97,9 @@ import { checkGroup, MAX_GROUP_OTHERS } from '../src/submissionGroup';
 import { emptyQuestionCircuit } from '../src/storage/workbookStore';
 import { buildAssignmentSummary } from '../src/storage/gradingSummary';
 import { problemVerdict } from '../src/gradeDisplay';
-import { FILL_IN_TABLE_MAX_ROWS, fillInBlanks, fillInKeyProblem, fillInShape } from '../src/engine/fillIn';
+import { FILL_IN_TABLE_MAX_ROWS, fillInBlanks, fillInKeyProblem, fillInShape, isReviewTable } from '../src/engine/fillIn';
+import { sha256, toHex, utf8 } from '../src/provenance/sha256';
+import { problemGroups } from '../src/problemSet';
 import {
   addTableColumn,
   blankDraftsOf,
@@ -783,7 +793,12 @@ console.log('\n[fill-in tables]');
   check(`a key of more than ${FILL_IN_TABLE_MAX_ROWS} rows is named as such`,
     probs({ ...withKey(d14, Array.from({ length: 101 }, (_, i) => [`a${i}`, '1'])), rows: '' })
       .includes('A table\'s key can have at most 100 rows.'));
-  check('zero key rows is named', probs({ ...d14, keyRows: [] }).includes('Add at least one key row.'));
+  // Zero key rows is a REVIEW table (task 048), graded by hand: sound, once
+  // the rows students see are typed (the key can't size them).
+  check('zero key rows is a review table: no defect with the rows typed; left to the key, the count is named',
+    probs({ ...d14, keyRows: [] }).length === 0 &&
+      probs({ ...d14, keyRows: [], rows: '' }).includes('The rows students see must be a whole number, at least 1.'));
+  check('…and it saves with an empty key', fillInTableFields({ ...d14, keyRows: [] }).fill_in_answers.length === 0);
   check('fewer than two columns is named',
     probs({ ...removeTableColumn(d14, 1), argColumns: 1 }).includes('Give the table at least two columns — an argument and a value.'));
 
@@ -818,6 +833,59 @@ console.log('\n[fill-in tables]');
   check('`.labels` is read only in engine/fillIn.ts',
     labelReaders.length === 1 && labelReaders[0] === 'app/src/engine/fillIn.ts');
   for (const f of labelReaders.filter((x) => x !== 'app/src/engine/fillIn.ts')) console.log(`        → ${f}`);
+}
+
+// ── Multi-part problems (task 048) ────────────────────────────────
+// A problem's parts are questions grouped for display (problemSet.ts
+// problemGroups): every part keeps its id, its grading and its 1 point. So
+// folding HW1's lettered questions back into problems changed display fields
+// only — pinned against the grading projection recorded BEFORE the fold.
+console.log('\n[multi-part problems]');
+{
+  const hw1 = JSON.parse(
+    readFileSync(new URL('../src/devData/homeworks/hw1.json', import.meta.url), 'utf8'),
+  ) as AssignmentData;
+  // Recorded from hw1.json at 3949bc9, before the fold.
+  const IDS_BEFORE = '1,2,3,4,5,6,18,19,7,8,9,20,10,21,22,11,12,13,23,14,15,16,17';
+  const PROJECTION_BEFORE = '6a9e4d2e1eb25f7bed8f8887ccf345c1280a0a1f63e993fd1c41ff79eb6b016c';
+  const SECTIONS_BEFORE = '1,2,3,4,5|6,18,19,7,8,9,20,10,21,22|11,12,13,23,14,15|16,17';
+  const DISPLAY = new Set(['statement', 'title', 'hint', 'callouts', 'figures', 'notes', 'label', 'stem', 'closing', 'partOf', 'answerField']);
+  const projection = hw1.questions.map((q) => Object.fromEntries(Object.entries(q).filter(([k]) => !DISPLAY.has(k))));
+  check('the HW1 fold kept every question id, in order', hw1.questions.map((q) => q.id).join() === IDS_BEFORE);
+  check('…every grading field byte-for-byte (the projection without display fields)',
+    toHex(sha256(utf8(canonicalJson(projection)))) === PROJECTION_BEFORE);
+  check('…and every section\'s ids', (hw1.sections ?? []).map((x) => x.questionIds.join()).join('|') === SECTIONS_BEFORE);
+  check('…while 23 questions read as 17 problems', problemGroups(hw1).length === 17 && hw1.questions.length === 23);
+  check('the new fields carry no answer (the student copy keeps them, minus nothing new)',
+    (() => {
+      const student = stripAnswers(hw1).questions;
+      return hw1.questions.every((q, i) =>
+        student[i].partOf === q.partOf && student[i].stem === q.stem && student[i].closing === q.closing && student[i].answerField === q.answerField);
+    })());
+
+  // A REVIEW table: a table authored with no key is graded by hand.
+  const p9b = hw1.questions.find((x) => x.id === 20)!;
+  const review: AssignmentQuestion = { ...p9b, id: 90, fill_in_answers: [] };
+  const cells = ['0', '0', '0', '2', '2', '4'];
+  check('fillInKeyProblem accepts an empty table key (a review table), isReviewTable names it',
+    fillInKeyProblem(review.fill_in!, []) === null && isReviewTable(review.fill_in, []) &&
+      !isReviewTable(p9b.fill_in, p9b.fill_in_answers) && !isReviewTable({ labels: ['a'] }, []) && !isReviewTable(undefined, []));
+  const pending = gradeQuestion(review, undefined, undefined, cells);
+  check('a review table grades pending (0/0, no case, no key to leak)',
+    pending.status === 'pending' && pending.total === 0 && pending.cases.length === 0 && pending.fillCases === undefined);
+  const reviewAsg: AssignmentData = { id: 'review', title: 'Review', questions: [review] };
+  const sub = buildSubmission(reviewAsg, new Map([[90, { ...emptyQuestionCircuit(), fillAnswers: cells }]]), { submittedAt: NOW_ISO });
+  const reviewRecord: SubmissionRecord = { assignmentId: 'review', attempt: 1, submittedAt: NOW_ISO, submission: sub, result: gradeSubmission(reviewAsg, sub) };
+  const reviewScore = scoreRecord(reviewAsg.questions, reviewRecord, Date.now()).problems[0];
+  check('…the submission keeps its cells for the person grading it',
+    sub.answers[0].fillAnswers?.join() === cells.join() && reviewRecord.result?.questions[0].status === 'pending');
+  check('…and it counts as pending until a person grades it (score.ts untouched)',
+    reviewScore.points === null && reviewScore.source === 'pending');
+  const keyed = gradeQuestion(p9b, undefined, undefined, ['0', '0', '0', '2', '2', '4']);
+  check('a keyed table still grades by script (2 of its 9 key rows here)', keyed.status === 'graded' && keyed.passed === 2 && keyed.total === 9);
+  const p11 = hw1.questions.find((x) => x.id === 11)!;
+  check('blanks with no key still skip (never pending)',
+    gradeQuestion({ ...p11, fill_in_answers: [] }, undefined, undefined, ['0']).status === 'skipped');
 }
 
 // ── Authoring a turbot arena family (task 010) ─────────────────────

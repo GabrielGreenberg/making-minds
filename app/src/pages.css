@@ -158,6 +158,14 @@
 .ps-arena { margin: 8px 0 4px; }
 .ps-arena-more { margin-top: 4px; font-size: 0.85em; color: var(--mm-ink-3); }
 .ps-body .arena-grid { border-width: 1px; }
+/* A multi-part problem (task 048): the stem, then each part with its letter
+   (and, once released, its verdict mark) hanging in the left margin, then
+   the closing — the PDFs' "a. … b. …" under a problem. */
+.ps-part { display: grid; grid-template-columns: 1.6em minmax(0, 1fr); margin-top: 0.4em; }
+.ps-part-letter { font-weight: 600; white-space: nowrap; }
+.ps-part-letter .ps-mark { margin-left: 1px; }
+.ps-part-main { min-width: 0; }
+.ps-closing { margin-top: 0.4em; }
 
 /* Callouts: the PDFs' boxes. Hint = lavender field, challenge = the date
    blue field, advice / caution = an outlined box with a heading line, note =
@@ -388,6 +396,7 @@
 }
 .instructor-question-main { display: flex; align-items: center; gap: 4px; min-width: 0; flex-wrap: wrap; }
 .instructor-question-label { font-weight: 600; }
+.instructor-part-tag--loose { color: var(--mm-warn); border-color: var(--mm-warn); }
 .instructor-question-summary { color: var(--mm-ink-2); font-size: 13px; font-family: var(--mm-font-mono); }
 .instructor-question-actions { display: flex; gap: 6px; flex-shrink: 0; }
 

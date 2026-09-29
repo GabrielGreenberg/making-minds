@@ -221,6 +221,24 @@ export function QuestionCreator({ assignment, existingQuestion, onSave, onCancel
   // The problem's own callout boxes and figures (the document level).
   const [callouts, setCallouts] = useState<Callout[]>(existingQuestion?.callouts ?? []);
   const [figures, setFigures] = useState<Figure[]>(existingQuestion?.figures ?? []);
+  // Multi-part problems (task 048; types.ts AssignmentQuestion.partOf): a
+  // written question may take a one-line field, be a later part of another
+  // written question's problem, or — standing as a problem, or as its first
+  // part — carry the problem's stem and closing. Display only; every one is
+  // rebuilt into the saved question below, or a save would drop it.
+  const [answerField, setAnswerField] = useState<'paragraph' | 'line'>(
+    existingQuestion?.answerField === 'line' ? 'line' : 'paragraph',
+  );
+  const [partOf, setPartOf] = useState<number | null>(existingQuestion?.partOf ?? null);
+  const [stem, setStem] = useState(existingQuestion?.stem ?? '');
+  const [closing, setClosing] = useState(existingQuestion?.closing ?? '');
+  // A question others are parts of is a first part: it cannot become a part
+  // itself (parts do not nest). The problems it may join: written questions
+  // that are no part themselves.
+  const ownParts = existingQuestion ? assignment.questions.filter((q) => q.partOf === existingQuestion.id) : [];
+  const partOfChoices = assignment.questions.filter(
+    (q) => q.buildMode === 'open' && q.partOf === undefined && q.id !== existingQuestion?.id,
+  );
 
   // What the question asks for (types.ts questionTask) — a choice among the
   // tasks its mode offers: Function/Perception on CC and SC, Free response/
@@ -432,6 +450,7 @@ export function QuestionCreator({ assignment, existingQuestion, onSave, onCancel
     // The representation field is meaningless for them; store the default so
     // the type stays uniform.
     if (mode === 'open') {
+      const part = ownParts.length === 0 && partOf !== null ? partOf : null;
       saveQuestion({
         id: newId,
         label: label.trim(),
@@ -443,6 +462,12 @@ export function QuestionCreator({ assignment, existingQuestion, onSave, onCancel
         buildMode: 'open',
         representation: 'binary',
         ...(isFillIn ? (isFillTable ? fillInTableFields(tableDraft) : fillInFields(blankDrafts)) : {}),
+        ...(!isFillIn && answerField === 'line' ? { answerField: 'line' as const } : {}),
+        // A part's problem text lives on its first part; only a problem's
+        // own first question keeps a stem and closing.
+        ...(part !== null
+          ? { partOf: part }
+          : { ...(stem.trim() ? { stem: stem.trim() } : {}), ...(closing.trim() ? { closing: closing.trim() } : {}) }),
       });
       return;
     }
@@ -701,6 +726,7 @@ export function QuestionCreator({ assignment, existingQuestion, onSave, onCancel
                   order never matters, empty rows are ignored, and two rows with the same
                   arguments fail that key row. Cells compare as blanks do (surrounding spaces and
                   leading zeros ignored); a digits-only column refuses every other character.
+                  With no key rows at all it is graded by hand instead (type the rows students see).
                 </p>
                 {misplacedAnswers.length > 0 && (
                   <p className="instructor-preview-warning" role="alert">
@@ -947,11 +973,72 @@ export function QuestionCreator({ assignment, existingQuestion, onSave, onCancel
       </>
       )}
 
+      {/* A written question's place in a multi-part problem (task 048). */}
+      {isOpen && (
+        <section className="instructor-creator-section">
+          <div className="mm-section-head">
+            <h3>Problem</h3>
+          </div>
+          {ownParts.length > 0 ? (
+            <p className="mm-note">
+              The first part of a problem: {ownParts.map((q) => q.label).join(', ')}{' '}
+              {ownParts.length === 1 ? 'is a later part' : 'are its later parts'}. Its stem and closing are the problem&#8217;s.
+            </p>
+          ) : (
+            <label className="mm-inline-field">
+              Part of
+              <select
+                className="mm-input"
+                value={partOf ?? ''}
+                onChange={(e) => setPartOf(e.target.value === '' ? null : Number(e.target.value))}
+              >
+                <option value="">its own problem</option>
+                {partOfChoices.map((q) => <option key={q.id} value={q.id}>{q.label}</option>)}
+              </select>
+            </label>
+          )}
+          {partOf !== null && ownParts.length === 0 ? (
+            <p className="mm-note mm-hint">
+              A part shows on its problem&#8217;s page, after the problem&#8217;s earlier parts —
+              keep it directly after them in the list, in the same section. It is still graded
+              on its own (1 point).
+            </p>
+          ) : (
+            <>
+              <label className="mm-field">
+                <span className="mm-label">Stem (optional) — the problem&#8217;s text before its parts</span>
+                <textarea className="mm-input mm-input--area" rows={3} value={stem} onChange={(e) => setStem(e.target.value)} />
+              </label>
+              <label className="mm-field">
+                <span className="mm-label">Closing (optional) — the problem&#8217;s text after its parts</span>
+                <textarea className="mm-input mm-input--area" rows={2} value={closing} onChange={(e) => setClosing(e.target.value)} />
+              </label>
+            </>
+          )}
+          {!isFillIn && (
+            <div className="mm-section-head">
+              <h3>Answer field</h3>
+              <div className="mm-segmented">
+                {(['paragraph', 'line'] as const).map((f) => (
+                  <button
+                    key={f}
+                    className={'mm-segmented-btn' + (answerField === f ? ' mm-segmented-btn--active' : '')}
+                    onClick={() => setAnswerField(f)}
+                  >
+                    {f === 'paragraph' ? 'Paragraph' : 'One line'}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+        </section>
+      )}
+
       {/* Statement — for an open question this IS the question. */}
       <section className="instructor-creator-section">
         <label className="mm-field">
           <span className="mm-label">
-            {isOpen ? 'Question shown to students' : 'Instructions shown to students'}
+            {isOpen ? (partOf !== null || ownParts.length > 0 ? 'This part, shown to students' : 'Question shown to students') : 'Instructions shown to students'}
           </span>
           <textarea
             className="mm-input mm-input--area"

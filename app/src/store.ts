@@ -51,6 +51,7 @@ import { buildSubmission } from './storage/submissionStore';
 import { workbookStore, submissionStore, assignmentStore, gradingStore, backendMode } from './storage/backend';
 import { writeJournal, clearJournal, clearJournalIfHolds, reconcileJournal } from './storage/journal';
 import { isFrozen } from './dueDates';
+import { pageIndexOf, problemPartIds } from './problemSet';
 import { getSessionUser } from './auth/session';
 import { instructorRole } from './auth/instructorRole';
 import {
@@ -154,10 +155,28 @@ export function showsSubmission(s: {
 }
 
 /**
- * Why the open question refuses edits, or null when it doesn't: it shows a
+ * Is the open problem marked done — every one of its parts (task 048: a
+ * multi-part problem has one Mark done, which toggleCurrentQuestionDone
+ * writes to every part)? A problem without parts is its one question.
+ * problemPartIds is memoized, so this is cheap enough for every selector.
+ */
+export function selectProblemDone(s: {
+  assignment: AssignmentData | null;
+  currentQuestionIndex: number;
+  questionCircuits: Map<number, QuestionCircuit>;
+}): boolean {
+  if (!s.assignment) return false;
+  const ids = problemPartIds(s.assignment, s.currentQuestionIndex);
+  return ids.length > 0 && ids.every((id) => s.questionCircuits.get(id)?.done === true);
+}
+
+/**
+ * Why the open problem refuses edits, or null when it doesn't: it shows a
  * submission (viewed, or the assignment is frozen — showsSubmission), or the
- * student marked it done. The one answer behind every lock (selectQuestionLocked)
- * and every lock notice (selectLockNotice, the store's refusal strings).
+ * student marked it done (selectProblemDone — every part). The one answer
+ * behind every lock (selectQuestionLocked) and every lock notice
+ * (selectLockNotice, the store's refusal strings). One lock covers every
+ * part of the page.
  */
 function lockReason(s: {
   assignment: AssignmentData | null;
@@ -170,7 +189,7 @@ function lockReason(s: {
   const q = s.assignment?.questions[s.currentQuestionIndex];
   if (!q) return null;
   if (showsSubmission(s)) return 'submission';
-  return s.questionCircuits.get(q.id)?.done ? 'done' : null;
+  return selectProblemDone(s) ? 'done' : null;
 }
 
 /**
@@ -835,6 +854,13 @@ interface HistoryEntry {
   confirmedBoxes: ConfirmedBoxDef[];
 }
 
+/** One part's live written answer (AppState.liveText): the free text of an
+ *  open question, the typed cells of a fill-in one — both always present,
+ *  as a container saves them. */
+export interface LiveText {
+  responseText: string;
+  fillAnswers: string[];
+}
 
 interface AppState {
   // Auto-save status
@@ -977,31 +1003,35 @@ interface AppState {
   currentQuestionIndex: number;
   // Per-question circuit + annotations, keyed by AssignmentQuestion.id.
   questionCircuits: Map<number, QuestionCircuit>;
-  // The live free-text answer for the current OPEN question (the text-panel
-  // analogue of components/wires for machine questions). Synced into
-  // questionCircuits.responseText at the same points the canvas is.
-  openResponse: string;
-  setOpenResponse: (text: string) => void;
-  // The live typed blanks for the current FILL-IN question, in the spec's
-  // order (a table's cells row-major; engine/fillIn.ts). Synced into
-  // questionCircuits.fillAnswers alongside openResponse.
-  fillAnswers: string[];
-  setFillAnswer: (index: number, value: string) => void;
-  // The live signed editing record of the current question (task 034,
-  // provenance/trace.ts): advanced by recordEdit at every edit, synced into
-  // questionCircuits.provenance at the same points as the canvas (one fold,
-  // foldLiveQuestion). null before the question's first edit.
-  questionTrace: QuestionProvenance | null;
+  // The open PROBLEM's live written answers (task 048), by question id — one
+  // entry per part of the page (problemSet.ts problemPartIds; a machine or
+  // single written question is a one-part page): the free text of an open
+  // part, the typed cells of a fill-in one (in the spec's order, a table's
+  // row-major; engine/fillIn.ts). The text-panel analogue of
+  // components/wires, synced into each part's questionCircuits entry at the
+  // same points the canvas is (one fold, foldLiveProblem).
+  liveText: Record<number, LiveText>;
+  // Both setters take the part's question id and refuse one not on the
+  // open page; the lock (isCurrentQuestionLocked) covers every part.
+  setOpenResponse: (questionId: number, text: string) => void;
+  setFillAnswer: (questionId: number, index: number, value: string) => void;
+  // The live signed editing record of each part of the open problem (task
+  // 034, provenance/trace.ts), by question id: advanced by recordEdit at
+  // every edit of THAT part, synced into its questionCircuits.provenance at
+  // the same points as the canvas. null before the part's first edit.
+  liveTraces: Record<number, QuestionProvenance | null>;
   loadAssignment: (assignment: AssignmentData) => void;
   // Open an assignment by id and show its workbook. Resolves false if the id is
   // unknown. A stale open (one superseded by a newer navigation while its seam
   // reads were in flight) resolves true and applies nothing — the newer open
   // owns the outcome.
   openAssignment: (id: string) => Promise<boolean>;
+  // Open the problem holding question `index`: its page, the first part's
+  // index (problemSet.ts pageIndexOf). The page already open is a no-op.
   switchQuestion: (index: number) => void;
-  // Toggle the current question's self-imposed "done" lock (notes/todos.md
-  // item 8). No-op outside an assignment, and while the canvas shows a
-  // submission (there is no live question to lock).
+  // Toggle the current problem's self-imposed "done" lock (notes/todos.md
+  // item 8) — every part of it at once. No-op outside an assignment, and
+  // while the canvas shows a submission (there is no live question to lock).
   toggleCurrentQuestionDone: () => void;
   // The submitted attempt the canvas shows instead of the live workbook
   // (task 003), or null for the live workbook. Every question then shows
@@ -1612,81 +1642,122 @@ function textInsertion(field: string, before: string, after: string): number {
   return restores ? 0 : insertedChars(before, after);
 }
 
-/** The recent-values key of an answer field of the live question. */
-function textFieldKey(state: AppState, field: string): string {
-  const q = state.assignment?.questions[state.currentQuestionIndex];
-  return `${state.assignment?.id ?? ''}:${q?.id ?? ''}:${field}`;
+/** The recent-values key of an answer field of a part of the live problem. */
+function textFieldKey(state: AppState, questionId: number, field: string): string {
+  return `${state.assignment?.id ?? ''}:${questionId}:${field}`;
 }
 
+/** The open page's question — its first part, which owns the canvas. */
+function liveQuestionId(state: AppState): number | undefined {
+  return state.assignment?.questions[state.currentQuestionIndex]?.id;
+}
+
+/** Is `questionId` a part of the open problem (the page the live fields
+ *  hold)? The text setters refuse any other. */
+function onOpenPage(state: AppState, questionId: number): boolean {
+  return !!state.assignment && problemPartIds(state.assignment, state.currentQuestionIndex).includes(questionId);
+}
+
+const NO_TEXT: LiveText = { responseText: '', fillAnswers: [] };
+
 /**
- * The trace update for one edit of the live question, merged into that
- * edit's own set(). Called by every edit AFTER its isCurrentQuestionLocked
- * return — through pushHistory (every canvas edit), undo/redo and the two
- * text setters — and a no-op on a locked question anyway (belt and braces)
- * and in the sandbox, which keeps no trace. `textAfter`: the answer text the
- * edit leaves (text setters); canvas edits leave it as it was.
+ * The trace update for one edit of a part of the live problem, merged into
+ * that edit's own set(). Called by every edit AFTER its isCurrentQuestionLocked
+ * return — through pushHistory (every canvas edit: the page's own question),
+ * undo/redo and the two text setters (the part edited) — and a no-op on a
+ * locked problem anyway (belt and braces), for a question not on the page,
+ * and in the sandbox, which keeps no trace. Each part's record is its own,
+ * signed under its own question id. `textAfter`: the answer text the edit
+ * leaves (text setters); canvas edits leave it as it was.
  */
 function recordEdit(
   state: AppState,
+  questionId: number | undefined,
   change: TraceChange,
   textAfter?: TextContent,
-): Partial<Pick<AppState, 'questionTrace'>> {
+): Partial<Pick<AppState, 'liveTraces'>> {
   const a = state.assignment;
-  const q = a?.questions[state.currentQuestionIndex];
-  if (!a || !q || isCurrentQuestionLocked(state)) return {};
+  if (!a || questionId === undefined || !onOpenPage(state, questionId) || isCurrentQuestionLocked(state)) return {};
   const now = Date.now();
   const gapMs = lastEditAt > 0 ? now - lastEditAt : 0;
   lastEditAt = now;
-  const textBefore: TextContent = { responseText: state.openResponse, fillAnswers: state.fillAnswers };
+  const textBefore: TextContent = state.liveText[questionId] ?? NO_TEXT;
   return {
-    questionTrace: nextTrace(
-      state.questionTrace,
-      change,
-      {
-        questionId: q.id,
-        textBefore,
-        textAfter: textAfter ?? textBefore,
-        countBefore: state.components.length,
-        gapMs,
-      },
-      mintKeyFor(a.id),
-    ),
+    liveTraces: {
+      ...state.liveTraces,
+      [questionId]: nextTrace(
+        state.liveTraces[questionId] ?? null,
+        change,
+        {
+          questionId,
+          textBefore,
+          textAfter: textAfter ?? textBefore,
+          // The canvas is the page's own question's; a later part has none.
+          countBefore: questionId === liveQuestionId(state) ? state.components.length : 0,
+          gapMs,
+        },
+        mintKeyFor(a.id),
+      ),
+    },
   };
 }
 
-/** The live question folded into its saved container — THE one fold, shared
- *  by every canvas swap and save (goHome, switchQuestion, the done toggle,
- *  syncedQuestionCircuits), so no live field (the done lock, the editing
- *  record) can be dropped on the way. */
-function foldLiveQuestion(
+/** The live problem folded into its parts' saved containers — THE one fold,
+ *  shared by every canvas swap and save (goHome, switchQuestion, the done
+ *  toggle, viewSubmission, syncedQuestionCircuits), so no live field (the
+ *  done lock, an editing record, a part's text) can be dropped on the way.
+ *  Writes every part of the page into `into` and returns it: the live
+ *  canvas into the page's own question (the only one a canvas can belong
+ *  to — a machine question is never a part), each part's live text and
+ *  record into its own; `overrides` apply to every part. */
+function foldLiveProblem(
   s: AppState,
-  questionId: number,
+  into: Map<number, QuestionCircuit>,
   overrides: Partial<QuestionCircuit> = {},
-): QuestionCircuit {
+): Map<number, QuestionCircuit> {
+  const a = s.assignment;
+  const pageId = liveQuestionId(s);
+  if (!a || pageId === undefined) return into;
   const live = liveCanvas(s);
-  return {
-    components: live.components,
-    wires: live.wires,
-    boxes: live.boxes,
-    responseText: s.openResponse,
-    fillAnswers: s.fillAnswers,
-    done: s.questionCircuits.get(questionId)?.done,
-    ...(s.questionTrace ? { provenance: s.questionTrace } : {}),
-    ...overrides,
-  };
+  for (const id of problemPartIds(a, s.currentQuestionIndex)) {
+    const saved = s.questionCircuits.get(id);
+    const canvas = id === pageId ? live : { components: saved?.components ?? [], wires: saved?.wires ?? [], boxes: saved?.boxes ?? [] };
+    const text = s.liveText[id] ?? { responseText: saved?.responseText ?? '', fillAnswers: saved?.fillAnswers ?? [] };
+    const trace = id in s.liveTraces ? s.liveTraces[id] : saved?.provenance ?? null;
+    into.set(id, {
+      components: canvas.components,
+      wires: canvas.wires,
+      boxes: canvas.boxes,
+      responseText: text.responseText,
+      fillAnswers: text.fillAnswers,
+      done: saved?.done,
+      ...(trace ? { provenance: trace } : {}),
+      ...overrides,
+    });
+  }
+  return into;
 }
 
-/** A saved question's live fields — THE one load, foldLiveQuestion's inverse
- *  (openAssignment, switchQuestion, the frozen view). */
-function loadQuestionFields(saved: QuestionCircuit) {
-  return {
-    components: saved.components,
-    wires: saved.wires,
-    boxes: saved.boxes,
-    openResponse: saved.responseText ?? '',
-    fillAnswers: saved.fillAnswers ?? [],
-    questionTrace: saved.provenance ?? null,
-  };
+/** The problem at `index`'s live fields from its parts' saved containers —
+ *  THE one load, foldLiveProblem's inverse (openAssignment, switchQuestion,
+ *  viewSubmission, the frozen view). `savedOf` answers each part: the
+ *  workbook's container, or the submitted one on show. `index` is the
+ *  problem's page (its first part), whose canvas goes live. */
+function loadProblemFields(
+  assignment: AssignmentData,
+  index: number,
+  savedOf: (questionId: number) => QuestionCircuit,
+): Pick<AppState, 'components' | 'wires' | 'boxes' | 'liveText' | 'liveTraces'> {
+  const q = assignment.questions[index];
+  const canvas = q ? savedOf(q.id) : emptyQuestionCircuit();
+  const liveText: Record<number, LiveText> = {};
+  const liveTraces: Record<number, QuestionProvenance | null> = {};
+  for (const id of problemPartIds(assignment, index)) {
+    const saved = id === q?.id ? canvas : savedOf(id);
+    liveText[id] = { responseText: saved.responseText ?? '', fillAnswers: saved.fillAnswers ?? [] };
+    liveTraces[id] = saved.provenance ?? null;
+  }
+  return { components: canvas.components, wires: canvas.wires, boxes: canvas.boxes, liveText, liveTraces };
 }
 
 // ─── The sandbox as a workbook (task 028) ─────────────────────────────
@@ -2412,7 +2483,7 @@ export const useStore = create<AppState>()((set, get) => ({
         },
       ],
       redoStack: [],
-      ...recordEdit(state, { compIns: added }),
+      ...recordEdit(state, liveQuestionId(state), { compIns: added }),
     });
   },
   undo: () => {
@@ -2435,7 +2506,7 @@ export const useStore = create<AppState>()((set, get) => ({
       boxes: prev.boxes,
       confirmedBoxLibrary: prev.confirmedBoxes,
       // An edit action, adding nothing new (what it restores was counted).
-      ...recordEdit(state, {}),
+      ...recordEdit(state, liveQuestionId(state), {}),
     });
     // A restore that changes the machine re-evaluates, as every edit does.
     if (gradedMachineKey(prev) !== gradedMachineKey(state)) setTimeout(() => get().evaluateCircuit(), 0);
@@ -2458,7 +2529,7 @@ export const useStore = create<AppState>()((set, get) => ({
       ...withLiveValues(next, state), // as undo
       boxes: next.boxes,
       confirmedBoxLibrary: next.confirmedBoxes,
-      ...recordEdit(state, {}),
+      ...recordEdit(state, liveQuestionId(state), {}),
     });
     if (gradedMachineKey(next) !== gradedMachineKey(state)) setTimeout(() => get().evaluateCircuit(), 0);
   },
@@ -2468,39 +2539,47 @@ export const useStore = create<AppState>()((set, get) => ({
   assignmentView: 'overview',
   currentQuestionIndex: 0,
   questionCircuits: new Map(),
-  openResponse: '',
-  // The text setters stamp the answer as they change it (recordEdit): the
-  // record is signed at EDIT time, never at save time.
-  setOpenResponse: (text) => {
+  liveText: {},
+  // The text setters stamp the part's answer as they change it (recordEdit):
+  // the record is signed at EDIT time, never at save time. The lock first
+  // (law 3), then the page: a part not open here is refused.
+  setOpenResponse: (questionId, text) => {
     const state = get();
     if (isCurrentQuestionLocked(state)) return;
+    if (!onOpenPage(state, questionId)) return;
+    const before = state.liveText[questionId] ?? NO_TEXT;
+    const after: LiveText = { ...before, responseText: text };
     set({
-      openResponse: text,
+      liveText: { ...state.liveText, [questionId]: after },
       ...recordEdit(
         state,
-        { textIns: textInsertion(textFieldKey(state, 'r'), state.openResponse, text) },
-        { responseText: text, fillAnswers: state.fillAnswers },
+        questionId,
+        { textIns: textInsertion(textFieldKey(state, questionId, 'r'), before.responseText, text) },
+        after,
       ),
     });
   },
-  fillAnswers: [],
-  setFillAnswer: (index, value) => {
+  setFillAnswer: (questionId, index, value) => {
     const state = get();
     if (isCurrentQuestionLocked(state)) return;
-    const next = state.fillAnswers.slice();
-    while (next.length <= index) next.push('');
-    const before = next[index];
-    next[index] = value;
+    if (!onOpenPage(state, questionId)) return;
+    const before = state.liveText[questionId] ?? NO_TEXT;
+    const cells = before.fillAnswers.slice();
+    while (cells.length <= index) cells.push('');
+    const was = cells[index];
+    cells[index] = value;
+    const after: LiveText = { ...before, fillAnswers: cells };
     set({
-      fillAnswers: next,
+      liveText: { ...state.liveText, [questionId]: after },
       ...recordEdit(
         state,
-        { textIns: textInsertion(textFieldKey(state, `f${index}`), before, value) },
-        { responseText: state.openResponse, fillAnswers: next },
+        questionId,
+        { textIns: textInsertion(textFieldKey(state, questionId, `f${index}`), was, value) },
+        after,
       ),
     });
   },
-  questionTrace: null,
+  liveTraces: {},
   loadAssignment: (assignment) => {
     closeBoxEditorForSwap(get);
     const questionCircuits = new Map<number, QuestionCircuit>();
@@ -2509,15 +2588,16 @@ export const useStore = create<AppState>()((set, get) => ({
     }
     set({
       assignment,
-      currentQuestionIndex: 0,
+      // The first question's page (itself, unless a section order made it a
+      // later part — task 048).
+      currentQuestionIndex: pageIndexOf(assignment, 0),
       questionCircuits,
       components: [],
       wires: [],
       boxes: [],
       confirmedBoxLibrary: [],
-      openResponse: '',
-      fillAnswers: [],
-      questionTrace: null,
+      liveText: {},
+      liveTraces: {},
       viewingSubmission: null,
       viewingOwner: null,
       buildMode: assignment.questions[0]?.buildMode || 'CC',
@@ -2587,23 +2667,22 @@ export const useStore = create<AppState>()((set, get) => ({
       set({ submissions: { ...get().submissions, [id]: latestSubmission } });
     }
 
-    // Restore any saved work for this assignment (merged by question id).
-    const { questionCircuits, currentQuestionIndex, boxLibrary } = restoreQuestionCircuits(def, saved);
+    // Restore any saved work for this assignment (merged by question id). A
+    // saved index on a later part opens its problem's page (task 048).
+    const restored = restoreQuestionCircuits(def, saved);
+    const { questionCircuits, boxLibrary } = restored;
+    const currentQuestionIndex = pageIndexOf(def, restored.currentQuestionIndex);
     const activeQ = def.questions[currentQuestionIndex];
     // Frozen (item 3): show what was actually SUBMITTED, read-only, not the
     // live in-progress work — even if the two have since diverged. Frozen is
     // the trigger that forces the submission view on (viewingSubmission).
     const view = latestSubmission && selectAssignmentFrozen(get()) ? latestSubmission : null;
-    const activeCircuit = activeQ
-      ? view
-        ? submittedQuestionCircuit(view, activeQ.id)
-        : questionCircuits.get(activeQ.id) ?? emptyQuestionCircuit()
-      : emptyQuestionCircuit();
     set({
       questionCircuits,
       currentQuestionIndex,
       viewingSubmission: view,
-      ...loadQuestionFields(activeCircuit),
+      ...loadProblemFields(def, currentQuestionIndex, (id) =>
+        view ? submittedQuestionCircuit(view, id) : questionCircuits.get(id) ?? emptyQuestionCircuit()),
       // Assignment-wide: a box built for one question is available in every
       // question of the homework that can place its kind.
       confirmedBoxLibrary: boxLibrary,
@@ -2630,11 +2709,8 @@ export const useStore = create<AppState>()((set, get) => ({
     // already in the map, and folding the SUBMITTED canvas there would
     // overwrite it in the save below.
     if (state.assignment) {
-      const q = state.assignment.questions[state.currentQuestionIndex];
-      if (q && !state.viewingSubmission) {
-        const qc = new Map(state.questionCircuits);
-        qc.set(q.id, foldLiveQuestion(state, q.id));
-        set({ questionCircuits: qc });
+      if (!state.viewingSubmission) {
+        set({ questionCircuits: foldLiveProblem(state, new Map(state.questionCircuits)) });
       }
       // Flush immediately so a quick Home click persists (don't wait for
       // debounce). Fire-and-forget: the local seam writes synchronously before
@@ -2686,7 +2762,13 @@ export const useStore = create<AppState>()((set, get) => ({
     });
     get().resetAllSimState();
   },
-  switchQuestion: (index) => {
+  switchQuestion: (target) => {
+    const a0 = get().assignment;
+    if (!a0) return;
+    // Any part opens its problem's page (task 048); the page already open is
+    // no swap at all — a re-applied route never wipes a run.
+    const index = pageIndexOf(a0, target);
+    if (index === get().currentQuestionIndex) return;
     closeBoxEditorForSwap(get);
     const state = get();
     const a = state.assignment;
@@ -2708,31 +2790,27 @@ export const useStore = create<AppState>()((set, get) => ({
       let questionCircuits = state.questionCircuits;
       if (!state.viewingSubmission) {
         flushAutoSave();
-        questionCircuits = new Map(questionCircuits);
-        questionCircuits.set(currentQ.id, foldLiveQuestion(state, currentQ.id));
+        questionCircuits = foldLiveProblem(state, new Map(questionCircuits));
       }
       set({
         currentQuestionIndex: index,
         questionCircuits,
         viewingSubmission: view,
-        ...loadQuestionFields(submittedQuestionCircuit(view, nextQ.id)),
+        ...loadProblemFields(a, index, (id) => submittedQuestionCircuit(view, id)),
         buildMode: nextQ.buildMode,
       });
       get().resetAllSimState();
       return;
     }
 
-    // Save the live question's canvas, load the target question's.
-    const updatedMap = new Map(state.questionCircuits);
-    updatedMap.set(currentQ.id, foldLiveQuestion(state, currentQ.id));
-
-    const saved = updatedMap.get(nextQ.id) ?? emptyQuestionCircuit();
+    // Save the live problem's canvas and text, load the target problem's.
+    const updatedMap = foldLiveProblem(state, new Map(state.questionCircuits));
     set({
       currentQuestionIndex: index,
       questionCircuits: updatedMap,
       // confirmedBoxLibrary deliberately NOT swapped: it belongs to the
       // assignment, not the question (notes/pset_updates.md item 8).
-      ...loadQuestionFields(saved),
+      ...loadProblemFields(a, index, (id) => updatedMap.get(id) ?? emptyQuestionCircuit()),
       buildMode: nextQ.buildMode,
     });
     get().resetAllSimState();
@@ -2746,13 +2824,12 @@ export const useStore = create<AppState>()((set, get) => ({
     // must stay possible — but never while a submission is on show: the fold
     // below would write the SUBMITTED canvas into the live workbook.
     if (showsSubmission(state)) return;
-    // Fold in the live canvas (mirrors switchQuestion/goHome's sync) rather
-    // than the possibly-stale map entry, so toggling done never discards an
-    // edit made since the last navigation.
-    const qc = new Map(state.questionCircuits);
-    const wasDone = qc.get(q.id)?.done ?? false;
-    qc.set(q.id, foldLiveQuestion(state, q.id, { done: !wasDone }));
-    set({ questionCircuits: qc });
+    // Fold in the live canvas and text (mirrors switchQuestion/goHome's
+    // sync) rather than the possibly-stale map entries, so toggling done
+    // never discards an edit made since the last navigation. One Mark done
+    // per problem: it writes every part (selectProblemDone reads them all).
+    const wasDone = selectProblemDone(state);
+    set({ questionCircuits: foldLiveProblem(state, new Map(state.questionCircuits), { done: !wasDone }) });
   },
   closeAssignment: () => {
     closeBoxEditorForSwap(get);
@@ -2766,9 +2843,8 @@ export const useStore = create<AppState>()((set, get) => ({
       wires: [],
       boxes: [],
       confirmedBoxLibrary: [],
-      openResponse: '',
-      fillAnswers: [],
-      questionTrace: null,
+      liveText: {},
+      liveTraces: {},
       undoStack: [],
       redoStack: [],
     });
@@ -2829,27 +2905,26 @@ export const useStore = create<AppState>()((set, get) => ({
     // Leaving another person's attempt for this person's own: their map was
     // never loaded under it (openSubmissionOf) — the view can't hand back.
     if (s.viewingOwner && !owner) return false;
-    const q = a.questions[s.currentQuestionIndex];
     let questionCircuits = s.questionCircuits;
     if (!shown && !owner) {
       // Leaving the live workbook: its pending save goes out NOW (the
       // snapshot is taken synchronously, before the swap — the autosave
-      // refuses while a submission is on show), and the live canvas lands in
-      // the map, which the view never writes to. Never for another person's
-      // attempt: openSubmissionOf already left this person's workbook, and
-      // what is in memory now (an empty map) is nobody's to fold or save.
+      // refuses while a submission is on show), and the live problem lands
+      // in the map, which the view never writes to. Never for another
+      // person's attempt: openSubmissionOf already left this person's
+      // workbook, and what is in memory now (an empty map) is nobody's to
+      // fold or save.
       flushAutoSave();
-      if (q) {
-        questionCircuits = new Map(questionCircuits);
-        questionCircuits.set(q.id, foldLiveQuestion(s, q.id));
-      }
+      questionCircuits = foldLiveProblem(s, new Map(questionCircuits));
     }
-    const canvas = !q
-      ? emptyQuestionCircuit()
-      : target
-        ? submittedQuestionCircuit(target, q.id)
-        : questionCircuits.get(q.id) ?? emptyQuestionCircuit();
-    set({ viewingSubmission: target, viewingOwner: target ? owner : null, questionCircuits, ...loadQuestionFields(canvas) });
+    const shownCircuits = questionCircuits;
+    set({
+      viewingSubmission: target,
+      viewingOwner: target ? owner : null,
+      questionCircuits,
+      ...loadProblemFields(s.assignment ?? a, s.currentQuestionIndex, (id) =>
+        target ? submittedQuestionCircuit(target, id) : shownCircuits.get(id) ?? emptyQuestionCircuit()),
+    });
     get().resetAllSimState();
     return true;
   },
@@ -5379,7 +5454,7 @@ export const useStore = create<AppState>()((set, get) => ({
     // The clipboard lives in the provenance seam, not in store state: empty
     // it here too, and hand the seam the arriving principal. So do the mint
     // keys (task 034): they are the leaving person's; the arriving person's
-    // come with their own opens. (questionTrace resets with the store.)
+    // come with their own opens. (liveTraces reset with the store.)
     resetClipboard(email);
     clearMintKeys();
     lastEditAt = 0;
@@ -5529,9 +5604,9 @@ function submittedQuestionCircuit(record: SubmissionRecord, questionId: number):
 // Persist the open assignment's work (syncing the live question first) via the
 // storage seam, keyed by assignment id — separate from the sandbox blob.
 /**
- * The assignment's per-question circuits with the live canvas folded into the
- * current question (the same save step as switchQuestion/goHome), so callers see
- * the latest in-progress work for the open question. Caller must ensure an
+ * The assignment's per-question circuits with the live problem folded into
+ * its parts (foldLiveProblem, the same save step as switchQuestion/goHome), so
+ * callers see the latest in-progress work for the open problem. Caller must ensure an
  * assignment is active. While a submission is on show (viewingSubmission) the
  * canvas is NOT live work and is never folded — the map already holds the
  * live work (viewSubmission folded it on the way in) — so every save built
@@ -5540,9 +5615,7 @@ function submittedQuestionCircuit(record: SubmissionRecord, questionId: number):
  */
 function syncedQuestionCircuits(s: AppState): Map<number, QuestionCircuit> {
   const circuits = new Map(s.questionCircuits);
-  const q = s.assignment?.questions[s.currentQuestionIndex];
-  if (q && !s.viewingSubmission) circuits.set(q.id, foldLiveQuestion(s, q.id));
-  return circuits;
+  return s.viewingSubmission ? circuits : foldLiveProblem(s, circuits);
 }
 
 /** The open assignment's persistable workbook state (live canvas folded in). */
@@ -5688,9 +5761,8 @@ useStore.subscribe((state, prev) => {
     state.wires !== prev.wires ||
     state.boxes !== prev.boxes ||
     state.confirmedBoxLibrary !== prev.confirmedBoxLibrary ||
-    // the open-question text panel is that mode's "canvas"
-    state.openResponse !== prev.openResponse ||
-    state.fillAnswers !== prev.fillAnswers;
+    // the written parts' fields are that mode's "canvas"
+    state.liveText !== prev.liveText;
 
   let changed: boolean;
   if (state.assignment) {

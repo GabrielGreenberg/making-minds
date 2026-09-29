@@ -13,6 +13,7 @@
 
 import { useStore } from './store';
 import { instructorRole } from './auth/instructorRole';
+import { pageIndexOf } from './problemSet';
 import type { FeedbackContext } from './types';
 
 export type Route =
@@ -368,10 +369,12 @@ function applyRoute(route: Route): void {
         }
         if (route.questionIndex != null) {
           const { assignment, currentQuestionIndex, switchQuestion } = useStore.getState();
+          // Any part of a multi-part problem opens its page (task 048): the
+          // page already open is no swap, so a re-applied route keeps a run.
           if (
             assignment &&
             route.questionIndex < assignment.questions.length &&
-            route.questionIndex !== currentQuestionIndex
+            pageIndexOf(assignment, route.questionIndex) !== currentQuestionIndex
           ) {
             switchQuestion(route.questionIndex);
           }
@@ -456,7 +459,7 @@ function applyForeignView(route: Extract<Route, { kind: 'assignment' }>, student
     }
     const { assignment: a, currentQuestionIndex, switchQuestion } = useStore.getState();
     const qi = route.questionIndex ?? 0;
-    if (a && qi < a.questions.length && qi !== currentQuestionIndex) switchQuestion(qi);
+    if (a && qi < a.questions.length && pageIndexOf(a, qi) !== currentQuestionIndex) switchQuestion(qi);
     useStore.setState({ assignmentView: 'question' });
     const q = a?.questions[qi];
     if (route.caseIndex != null && q) void useStore.getState().loadCaseInput(q.id, route.caseIndex);

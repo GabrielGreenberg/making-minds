@@ -129,7 +129,7 @@ export function fillInProblems(drafts: readonly FillInBlankDraft[]): string[] {
  * The saved blanks whose students' answers an edit would misplace, by their
  * saved label, in saved order; empty = every answer already given still lines
  * up. A student's answers are stored by POSITION (store.ts setFillAnswer,
- * FillInPanel, engine/fillIn.ts gradeFillIn) and nothing re-maps a saved
+ * Worksheet, engine/fillIn.ts gradeFillIn) and nothing re-maps a saved
  * workbook or submission when the question changes, so slot k keeps its
  * answers only while the blank saved at k is still at k. `saved` are the
  * drafts the question opened with, `next` those about to be saved (none when
@@ -304,7 +304,8 @@ export interface FillInTableDefect {
  *  - fewer than two columns, or an argument count outside 1…C−1: there is
  *    no argument, or no value, to grade;
  *  - an empty or repeated header: the student's table names its columns;
- *  - no key row: nothing to grade (the grader skips an empty key);
+ *  (No key row at all is sound: a REVIEW table, graded by hand — task 048,
+ *  engine/fillIn.ts isReviewTable. Its row count must then be typed.)
  *  - a rows count that is not a whole number ≥ 1, or fewer rows than the key
  *    has: the student could never write the whole function;
  *  - more than `FILL_IN_TABLE_MAX_ROWS` rows (typed, or a key that long):
@@ -333,7 +334,6 @@ export function fillInTableDefects(draft: FillInTableDraft): FillInTableDefect[]
       firstWithHeader.set(header, j);
     }
   });
-  if (draft.keyRows.length === 0) whole('Add at least one key row.');
   const rows = tableRowCount(draft);
   if (!Number.isInteger(rows) || rows < 1) {
     whole('The rows students see must be a whole number, at least 1.');
@@ -384,7 +384,7 @@ export function fillInTableProblems(draft: FillInTableDraft): string[] {
  * table this question was saved with, as one sentence for the creator's
  * warning and its save confirmation — or null when every such answer still
  * reads as it did. Answers are stored cell by cell, ROW-MAJOR (store.ts
- * setFillAnswer, FillInPanel, engine/fillIn.ts), and nothing re-maps a saved
+ * setFillAnswer, Worksheet, engine/fillIn.ts), and nothing re-maps a saved
  * workbook or submission, so they survive only while the saved columns keep
  * their sequence (a draft's `key` survives renames and flag changes) and no
  * saved row is taken away. Grading is order-free, so editing, adding or

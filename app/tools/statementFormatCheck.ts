@@ -19,11 +19,16 @@ import {
   collectFigures,
   documentSections,
   figureUrl,
+  pageIndexOf,
+  problemGroups,
+  problemLabel,
   problemNumber,
+  problemPartIds,
   problemRuns,
   problemShape,
   sectionOf,
   validateDocument,
+  writtenKind,
 } from '../src/problemSet';
 import type { AssignmentData, AssignmentQuestion } from '../src/types';
 import { figureCropFaults } from './figureCrop';
@@ -238,6 +243,86 @@ console.log('\n[problem set: sections, numbering, shapes, runs]');
     figureUrl('https://a/b.png', '/making-minds/') === 'https://a/b.png');
 }
 
+console.log('\n[multi-part problems]');
+{
+  // Task 048: a printed problem's parts are written questions grouped by
+  // `partOf` (problemSet.ts problemGroups) — display only, each part still
+  // its own grading unit.
+  const w = (id: number, label: string, extra: Partial<AssignmentQuestion> = {}): AssignmentQuestion =>
+    ({ id, label, statement: `${label}.`, buildMode: 'open', representation: 'binary', ...extra });
+  const doc: AssignmentData = {
+    id: 'mp', title: 'MP',
+    questions: [
+      w(5, 'Problem 5'),
+      w(6, 'Problem 6a', { stem: 'Consider *m*.', closing: 'Show your work.' }),
+      w(18, 'Problem 6b', { partOf: 6, answerField: 'line' }),
+      w(19, 'Problem 6c', { partOf: 6, fill_in: { labels: ['Places'] }, fill_in_answers: ['3'] }),
+      w(7, 'Problem 7'),
+    ],
+    sections: [{ heading: 'I', questionIds: [5, 6, 18, 19, 7] }],
+  };
+  const [sec] = documentSections(doc);
+  const six = sec.problems[1];
+  check('a contiguous partOf run folds into ONE problem (3 problems, not 5)',
+    sec.problems.length === 3 && problemGroups(doc).length === 3 && six.parts.map((p) => p.question.id).join() === '6,18,19');
+  check('its number is the first part\'s minus its letter, its parts lettered a/b/c',
+    six.number === '6' && six.parts.map((p) => p.letter).join('') === 'abc' && six.index === 1);
+  check('problemLabel names the problem ("Problem 6"); a single question keeps its label',
+    problemLabel(doc, 3) === 'Problem 6' && six.label === 'Problem 6' && problemLabel(doc, 0) === 'Problem 5' &&
+      sec.problems[0].parts.length === 1 && sec.problems[0].parts[0].letter === '');
+  check('every part\'s index opens the first part\'s page; problemPartIds lists the parts',
+    [1, 2, 3].every((i) => pageIndexOf(doc, i) === 1) && pageIndexOf(doc, 4) === 4 &&
+      problemPartIds(doc, 3).join() === '6,18,19' && problemPartIds(doc, 0).join() === '5' && problemPartIds(doc, 99).length === 0);
+  check('a multi-part (or stemmed) problem is full width', six.shape === 'full');
+  check('letters come by position when the labels carry none',
+    documentSections({ ...doc, questions: doc.questions.map((q) => ({ ...q, label: `Q${q.id}` })) })[0].problems[1].parts.map((p) => p.letter).join('') === 'abc');
+  check('a well-formed multi-part document is valid', validateDocument(doc).length === 0);
+  check('writtenKind: a line, a paragraph (the default), blanks, a table — none for a machine',
+    writtenKind(doc.questions[2]) === 'line' && writtenKind(doc.questions[1]) === 'paragraph' &&
+      writtenKind(doc.questions[3]) === 'blanks' &&
+      writtenKind(w(1, 'T', { fill_in: { table: { columns: ['x', 'f'], argColumns: 1, rows: 2 } } })) === 'table' &&
+      writtenKind({ ...w(1, 'C'), buildMode: 'CC' }) === null);
+
+  // A broken group degrades to separate problems, and validateDocument names it.
+  const broken = (edit: (d: AssignmentData) => AssignmentData) => {
+    const d = edit(structuredClone(doc));
+    return { problems: documentSections(d).flatMap((x) => x.problems).length, issues: validateDocument(d) };
+  };
+  const apart = broken((d) => ({ ...d, sections: [{ heading: 'I', questionIds: [5, 6, 18, 7, 19] }] }));
+  check('not contiguous (another problem between): the stray part stands alone, named',
+    apart.problems === 4 && apart.issues.some((m) => /Problem 6c: part of 6, but it must follow Problem 6a's parts directly/.test(m)));
+  const split = broken((d) => ({ ...d, sections: [{ heading: 'I', questionIds: [5, 6, 18] }, { heading: 'II', questionIds: [19, 7] }] }));
+  check('in another section: stands alone, named',
+    split.problems === 4 && split.issues.some((m) => /Problem 6c: part of 6, but it must follow/.test(m)));
+  const missing = broken((d) => { d.questions[2].partOf = 99; return d; });
+  // (Part c then follows no part of problem 6 either: it stands alone too.)
+  check('its first part missing: stands alone, named',
+    missing.problems === 5 && missing.issues.some((m) => /Problem 6b: part of 99, but no question has id 99/.test(m)));
+  const nested = broken((d) => { d.questions[3].partOf = 18; return d; });
+  check('nested (a part of a part): stands alone, named',
+    nested.problems === 4 && nested.issues.some((m) => /Problem 6c: part of 18, but Problem 6b is itself a part/.test(m)));
+  const machine = broken((d) => { d.questions[2].buildMode = 'CC'; delete d.questions[2].answerField; return d; });
+  check('a machine question is never a part: stands alone, named',
+    machine.problems === 5 && machine.issues.some((m) => /Problem 6b: part of 6, but only written \(open\) questions have parts/.test(m)));
+  const stemmed = broken((d) => { d.questions[2].stem = 'x'; return d; });
+  check('a stem on a part is named (it belongs to the first part)',
+    stemmed.problems === 3 && stemmed.issues.some((m) => /Problem 6b: a part carries no stem or closing/.test(m)));
+  const field = broken((d) => { d.questions[0] = { ...d.questions[0], buildMode: 'CC', answerField: 'line' }; return d; });
+  check('answerField on a non-written question is named',
+    field.issues.some((m) => /Problem 5: answerField is for a written \(open\) question/.test(m)));
+  check('…and on a fill-in one',
+    broken((d) => { d.questions[3].answerField = 'line'; return d; }).issues.some((m) => /Problem 6c: answerField is for a written/.test(m)));
+
+  // The real HW1 (task 048): its lettered questions fold back into four problems.
+  const hw1 = JSON.parse(readFileSync(join(import.meta.dirname, '../src/devData/homeworks/hw1.json'), 'utf8')) as AssignmentData;
+  const multi = documentSections(hw1).flatMap((x) => x.problems).filter((p) => p.parts.length > 1)
+    .map((p) => `${p.number}[${p.parts.map((x) => x.question.id).join(',')}]`);
+  check(`HW1 has exactly problems 6[6,18,19], 9[9,20], 10[10,21,22] and 13[13,23] (${multi.join(' ')})`,
+    multi.join(' ') === '6[6,18,19] 9[9,20] 10[10,21,22] 13[13,23]' && problemGroups(hw1).length === 17);
+  check('…and no part\'s prompt points back at another part ("from 6a", "9a")',
+    hw1.questions.filter((q) => q.partOf !== undefined).every((q) => !/\b\d+[a-c]\b/.test(q.statement)));
+}
+
 console.log('\n[figures: no cropped-in neighbours]');
 {
   // The figures are hand crops of the HW PDFs, so a crop can keep a sliver of
@@ -371,6 +456,8 @@ console.log('\n[corpus: the seeded HW1-HW7 documents]');
     for (const q of hw.questions) {
       statements++;
       render(`${name} ${q.label}`, q.statement);
+      render(`${name} ${q.label} stem`, q.stem);
+      render(`${name} ${q.label} closing`, q.closing);
       render(`${name} ${q.label} hint`, q.hint);
       for (const c of q.callouts ?? []) render(`${name} ${q.label} callout`, c.body);
       const blocks = parseStatement(q.statement);
@@ -389,10 +476,11 @@ console.log('\n[corpus: the seeded HW1-HW7 documents]');
   // anything else joining them is a false positive of the profile regex.
   check(`exactly the five HW1 truth tables tabulate (${tabulated.join(', ')})`,
     tabulated.join('|') === 'hw1 Problem 1|hw1 Problem 2|hw1 Problem 3|hw1 Problem 4|hw1 Problem 5');
-  // No statement splits into parts: HW1's multi-part problems are lettered
-  // questions now ("Problem 6a", task 046), and no "p(1, 2)", "j(⋅)" or "(1)"
-  // reference is mistaken for a marker anywhere. (The part grammar itself is
-  // pinned in [multi-part questions] above.)
+  // No statement splits into parts: HW1's multi-part problems are parts
+  // authored as questions (`partOf`, task 048 — [multi-part problems]
+  // above), and no "p(1, 2)", "j(⋅)" or "(1)" reference is mistaken for a
+  // marker anywhere. (The part grammar itself is pinned in [multi-part
+  // questions] above.)
   check(`no HW statement splits into parts (${parted.join(', ') || 'none'})`,
     parted.length === 0);
 }
