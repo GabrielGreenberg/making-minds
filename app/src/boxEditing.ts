@@ -2,7 +2,7 @@ import type { CircuitComponent, ConfirmedBoxDef, Port, Wire } from './types';
 import { getPortsForType, GRID_SIZE } from './types';
 import { orderBoxPorts, type BoxPortKeys } from './boxPorts';
 import { hasCombinationalLoop, hasMemory, parsePortKey, sortByLabel, zeroMemState } from './engine/netlist';
-import { boxSize, getComponentBounds, getPortPosition, PART_SIZE } from './componentGeometry';
+import { getComponentBounds, getPortPosition, PART_SIZE } from './componentGeometry';
 import { isMemSinkPort } from './types';
 
 type BoxShape = Pick<ConfirmedBoxDef, 'internalComponents' | 'inputPortIds' | 'outputPortIds'>;
@@ -218,87 +218,4 @@ export function replaceCopiesInLibrary(library: ConfirmedBoxDef[], entry: Confir
     if (inner.components === b.internalComponents && inner.wires === b.internalWires) return b;
     return { ...b, internalComponents: inner.components, internalWires: inner.wires };
   });
-}
-
-export type Extraction =
-  | { error: string }
-  | { entry: ConfirmedBoxDef; instance: CircuitComponent; components: CircuitComponent[]; wires: Wire[] };
-
-export function extractSelection(
-  components: CircuitComponent[],
-  wires: Wire[],
-  selectedIds: readonly string[],
-  opts: { id: string; name: string; origin?: number; mint: () => string },
-): Extraction {
-  const selected = new Set(selectedIds);
-  const inside = components.filter(
-    (c) => selected.has(c.id) && c.type !== 'INPUT' && c.type !== 'OUTPUT' && c.type !== 'STATE',
-  );
-  if (inside.length === 0) return { error: 'Select the parts to box first. Inputs and outputs stay on the canvas.' };
-  const ids = new Set(inside.map((c) => c.id));
-  const byId = new Map(components.map((c) => [c.id, c]));
-  const internal = wires.filter((w) => ids.has(w.sourceComponentId) && ids.has(w.targetComponentId));
-  const incoming = wires.filter((w) => !ids.has(w.sourceComponentId) && ids.has(w.targetComponentId));
-  const outgoing = wires.filter((w) => ids.has(w.sourceComponentId) && !ids.has(w.targetComponentId));
-  if (hasCombinationalLoop(inside, internal)) return { error: 'Loop detected: a box cannot contain a loop.' };
-
-  const srcKey = (w: Wire) => `${w.sourceComponentId}:${w.sourcePortId}`;
-  const at = (key: string) => {
-    const { compId, portId } = parsePortKey(key);
-    const c = byId.get(compId);
-    return c ? getPortPosition(c, portId) : { x: 0, y: 0 };
-  };
-  const distinct = (ws: Wire[]) =>
-    [...new Set(ws.map(srcKey))].sort((a, b) => at(a).y - at(b).y || at(a).x - at(b).x || (a < b ? -1 : 1));
-  const inSources = distinct(incoming);
-  const outSources = distinct(outgoing);
-
-  const b = bounds(inside);
-  const firstTarget = (key: string) => {
-    const w = incoming.find((x) => srcKey(x) === key)!;
-    return portY(byId.get(w.targetComponentId), w.targetPortId, b.top);
-  };
-  const inYs = stack(inSources.map(firstTarget));
-  const outYs = stack(outSources.map((key) => at(key).y - PART_SIZE.OUTPUT.h / 2));
-  const ins = inSources.map((_, k) => ioNode('INPUT', opts.mint(), `IN${k + 1}`, b.left - 100, inYs[k]));
-  const outs = outSources.map((_, j) => ioNode('OUTPUT', opts.mint(), `OUT${j + 1}`, b.right + 60, outYs[j]));
-
-  const innerWires: Wire[] = clone(internal);
-  for (const w of incoming) {
-    const k = inSources.indexOf(srcKey(w));
-    innerWires.push(link(opts.mint(), ins[k].id, 'out', w.targetComponentId, w.targetPortId));
-  }
-  outSources.forEach((key, j) => {
-    const { compId, portId } = parsePortKey(key);
-    innerWires.push(link(opts.mint(), compId, portId, outs[j].id, 'in'));
-  });
-  const entry = boxEntryFromCanvas(opts.id, opts.name, [...clone(inside), ...ins, ...outs], innerWires, opts.origin);
-
-  const size = boxSize(ins.length, outs.length);
-  const instance: CircuitComponent = {
-    id: opts.mint(),
-    type: 'BOXED',
-    x: snap((b.left + b.right) / 2 - size.w / 2),
-    y: snap((b.top + b.bottom) / 2 - size.h / 2),
-    label: opts.name,
-    ports: instancePorts(entry),
-    value: 0,
-    boxedCircuitId: entry.id,
-    internalCircuit: { components: clone(entry.internalComponents), wires: clone(entry.internalWires) },
-  };
-  const outerWires = wires.filter((w) => !ids.has(w.sourceComponentId) && !ids.has(w.targetComponentId));
-  inSources.forEach((key, k) => {
-    const { compId, portId } = parsePortKey(key);
-    outerWires.push(link(opts.mint(), compId, portId, instance.id, `in${k + 1}`));
-  });
-  for (const w of outgoing) {
-    const j = outSources.indexOf(srcKey(w));
-    outerWires.push(link(opts.mint(), instance.id, `out${j + 1}`, w.targetComponentId, w.targetPortId));
-  }
-  return {
-    entry,
-    instance,
-    components: [...components.filter((c) => !ids.has(c.id)), instance],
-    wires: outerWires,
-  };
 }

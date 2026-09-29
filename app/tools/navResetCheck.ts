@@ -193,6 +193,8 @@ function checkAllSimFresh(label: string) {
   check(`${label}: no Global I/O row picked, Map editor closed`, s.scActiveGlobalIndex === null && !s.turbotEditingMap);
   // The CC table's earned rows (task 075) were earned on the last canvas.
   check(`${label}: no CC row earned`, s.ccRunRows.length === 0);
+  // A box draft (task 085): its 'Ready to Box' names a box on the last canvas.
+  check(`${label}: no box draft`, s.boxDrawing.phase === 'idle' && s.boxDrawing.draftBox === null);
 }
 
 // Junk that only navigation (not the actions used to build real runs above)
@@ -231,6 +233,10 @@ function plantSimJunk() {
     scActiveGlobalIndex: 2,
     turbotEditingMap: true,
     ccRunRows: ['1,0'],
+    boxDrawing: {
+      phase: 'adjusting',
+      draftBox: { id: 'ghost-draft', name: '', x: 0, y: 0, width: 100, height: 80, componentIds: [], inputPortIds: [], outputPortIds: [] },
+    },
     undoStack: [{ components: [], wires: [], boxes: [], confirmedBoxes: [] }],
     redoStack: [{ components: [], wires: [], boxes: [], confirmedBoxes: [] }],
   });
@@ -2826,8 +2832,10 @@ console.log('[canvas gestures]');
   // The Rotate button lives in the canvas's action group since task 053.
   const actions = read('../src/components/CanvasActions.tsx');
   const css = read('../src/workbench.css');
-  check('the Rotate button carries the muted "(shift+click to ↻)" hint',
-    /↻ Rotate/.test(actions) && /<span className="cv-hint">\(shift\+click to ↻\)<\/span>/.test(actions) &&
+  // Task 085: the rotate arrow is the strip's one icon set (CanvasIcons.tsx).
+  check('the Rotate button carries the muted "(shift+click to …)" hint, drawn with the button\'s own rotate icon',
+    /<RotateIcon \/> Rotate/.test(actions) &&
+    /<span className="cv-hint">\(shift\+click to <RotateIcon label="rotate" \/>\)<\/span>/.test(actions) &&
     /\.cv-hint\s*\{[^}]*color:\s*var\(--mm-ink-3\)/.test(css));
 }
 

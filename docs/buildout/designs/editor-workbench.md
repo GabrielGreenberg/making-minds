@@ -110,11 +110,14 @@ One component (`PanelDivider.tsx`), one drag and keyboard behaviour on either ax
 
 ### Canvas
 - `--mm-surface` with a dot grid: `radial-gradient(#DAD4E2 1px, transparent 1.2px)`. The spacing is `GRID_SIZE × zoom`, and `background-position` follows the pan.
-- **Top-right, 14/12 from the edges:** a joined button group, border 1px `--mm-line-2`, 13px: "↶ Undo" · "↷" · "Delete". Each is padding `6px 12px` with a `--mm-line` divider between them. Disabled items are `--mm-ink-3` at 45%.
+- **Top-right, 14/12 from the edges:** a joined button group, border 1px `--mm-line-2`, 13px: Undo · Redo · Delete · Rotate · Clear (plus a turbot TM's Swap state type). Each is padding `6px 12px` with a `--mm-line` divider between them. Disabled items are `--mm-ink-3` at 45%. No Box button: boxing is the palette's BOX tile (task 085).
+  - Undo, Redo and Rotate wear **one icon set** (`CanvasIcons.tsx`): inline SVGs on a 16×16 viewBox drawn at 14px, `currentColor`, stroke 1.6 with round caps and joins (the palette's weight). Redo is Undo's own path mirrored, so the pair can't drift. Each button has a label or `aria-label` and its shortcut in the title. The muted hint under the group, "(shift+click to ⟳)", uses the same Rotate icon.
 - **Bottom-right, 12/12:** zoom group "−" · "100%" (mono 11.5, min-width 48) · "+" · "Fit", 12.5px, same style.
   - Fit centres the circuit in the space not covered by the palette, **never below 80% zoom**. If the circuit is wider than that, it left-aligns and the student pans.
 - **Bottom-left, 16/14 (right edge clears the zoom group):** a one-line hint at 12.5px `--mm-ink-3` on `rgba(255,255,255,.85)`, ellipsis, `pointer-events:none`. The text depends on state:
   - a tool is armed: "Click the canvas to place AND. Shift-click to place several. Esc cancels."
+  - the BOX draw tool is armed: "Drag a rectangle around the parts to box them. Esc cancels."
+  - a box draft is being adjusted: "Drag the corners to fit the box, then press Ready to Box. Esc cancels."
   - a part is selected: "Drag to move. Delete removes it."
   - a wire is selected: "Delete removes this wire."
   - there are parts but no wires: "Drag from one dot to another to connect parts."
@@ -132,7 +135,7 @@ One component (`PanelDivider.tsx`), one drag and keyboard behaviour on either ax
   3. 1px `--mm-line` divider.
   4. **Group Gates:** AND, OR, NOT, plus XOR/HA/MEM where the mode allows them (they're not designed yet, so use the same tile).
   5. Divider.
-  6. **Group Boxes:** pinned box tiles, then the **Boxes** tile.
+  6. **Group Boxes:** the **BOX** tile, pinned box tiles, then the **Boxes** tile, which shows only once this canvas has a box it may place (`palette.ts paletteBoxTiles`; while the box editor is open the BOX tile is dimmed with its refusal — a box is made on a problem's canvas, not inside another box).
   7. Divider.
   8. **Turn button:** 24px band with a rotate glyph. It toggles vertical ⇄ horizontal and re-clamps the position.
 - **Tiles:**
@@ -148,17 +151,17 @@ One component (`PanelDivider.tsx`), one drag and keyboard behaviour on either ax
   - AND: `M8 3 H18 A10 10 0 0 1 18 23 H8 Z` with ∧ `M13 16 L16.5 9.5 L20 16`
   - OR: `M7 3 H15 Q27 4 31 13 Q27 22 15 23 H7 Q11 13 7 3 Z` with ∨ `M14 10 L17.5 16.5 L21 10`
   - NOT: `9,3 30,13 9,23` with ¬ `M12 11.5 H17.5 V15`
+  - BOX (the tool): a dashed rounded rect 7,3.5 22×19 rx 3 (`.pal-ico-dash`, dasharray 3 2.4) with a + `M18 8.5 V17.5 M13.5 13 H22.5`
   - Box: rect 8,4 20×18 on `#F7F5FA` with two left stubs and one right stub
   - Boxes: two offset rects plus a small ▾ corner mark
 - The palette position, orientation, and the panel widths and collapse states persist per student through `uiPrefs.ts` (keys suggested: `editor.leftW`, `editor.rightW`, `editor.leftOpen`, `editor.rightOpen`, `editor.palette = {x,y,horiz}`).
 
 ### Boxes: the pop-out and pinning
-- The **Boxes** tile shows a count badge: 16px min, `--mm-accent` background, white, mono 10/600, top-right. Clicking the tile toggles the **Boxes pop-out**.
+- The **Boxes** tile appears once the homework (the sandbox: the tab) holds a box this canvas may place. It shows a count badge: 16px min, `--mm-accent` background, white, mono 10/600, top-right. Clicking the tile toggles the **Boxes pop-out**; an open pop-out whose last row goes closes.
 - **Pop-out position and frame:**
   - 8px to the right of the palette (vertical) or 8px below it (horizontal).
   - 260 wide, `--mm-surface`, border 1px `--mm-line-2`, shadow `0 10px 28px rgba(3,13,36,.16)`.
 - **Header:** "YOUR BOXES" as an eyebrow, with a close button "×".
-- **Empty state:** "Boxes you make are kept here and can be used in later questions."
 - **Box rows** list the homework's `confirmedBoxLibrary`:
   - Grid `36px 1fr auto`, padding `8px 12px`.
   - Contents: the icon; the name at 13.5px/600; a meta line at 11.5px `--mm-ink-3` reading "2 in · 1 out · Problem 1" (the question it came from); and a pin button, 12px, padding `4px 8px`, reading "Add to toolbar", or "On toolbar" in `--mm-accent` on a `--mm-lav-line` border.
@@ -166,10 +169,18 @@ One component (`PanelDivider.tsx`), one drag and keyboard behaviour on either ax
     - dragged onto the canvas to place the box
     - dragged onto the palette to **pin** it (the palette border turns `--mm-accent` while it's a valid drop)
     - clicked to arm it
-  - Rename and delete stay here, using today's `ConfirmedBoxItem` actions and `renameBox`.
-- **Footer:** the **New box** tool button (full width, 34px, border `--mm-line-2`, 13px/600, hover `--mm-lav-soft`). It arms the existing NEW_BOX draw tool. Under it, at 12px `--mm-ink-3`: "Drag a box onto the toolbar to keep it there."
+  - Its tools: **Edit** (the box editor, below), rename ✎ (`renameBox`) and remove ✕ (`removeConfirmedBox`; placed copies stay).
+- **Footer:** at 12px `--mm-ink-3`: "Drag a box onto the toolbar to keep it there."
 - **Pinned boxes:** a per-homework list of box ids (a cosmetic pref, e.g. `uiPrefs['pinnedBoxes:<asgId>']`). They render as palette tiles showing the box name, truncated at 54px. Unpin from the pop-out. If a pinned box is deleted, it drops off the palette silently.
 - Scoping rules are unchanged: `selectPlaceableBoxKinds`, and the per-homework library.
+
+### Making and editing a box (task 085)
+- **The BOX tile is the one way to make a box** (`store.ts boxTool`; a click, never a drag). With parts selected it drafts a box around them: the union of their `getComponentBounds`, `BOX_DRAFT_PAD` (one grid step) clear, straight to adjusting. With nothing selected it arms the NEW_BOX draw tool (crosshair, the hint above; drag a rectangle, Esc disarms); a second click disarms it. Both hand the rectangle to `startBoxDraft`, which mints the id and takes the undo snapshot.
+- **Adjust, then Ready to Box.** The draft's corners resize it. Its **Ready to Box · Cancel** sit beside its top-right corner, or above it (below it at the top) where the canvas ends first, always inside the canvas (`canvasView.ts draftActionsAt`). Parts whose centre it encloses go in, and the ports its edge cuts highlight. **Ready to Box** runs `confirmBox`: the parts stay on the canvas, loose, inside a solid outline carrying the box's name (the name field opens at once and wears the paste guard). The box joins the library for every problem of the homework that may place its kind. One undo steps back over the draft and its confirm together. Cancel or Esc drop the draft, and the undo step it took with it while nothing has been pushed over that step (the next undo is never a no-op).
+- **Its ports** follow the textbook's Rule 3 (every free end is an input or an output): an IN or OUT node inside becomes one port, and so does **every wire end the edge cuts, one port per cut end** — never merged by source. Box an XOR's four gates without its IN nodes and it has four inputs, each variable wired to two of them; box the circuit with its IN and OUT nodes (select all, or draw round them) and it has two. The BOX tile's tooltip says so. (The retired ▣ Box merged cut ends by source; `boxEditorCheck [the BOX tool]` pins both counts.)
+- **A draft is canvas-scoped, and never saved.** Every canvas swap drops an unnamed draft before the fold (`closeBoxEditorForSwap` → `cancelBoxDraft`), and `resetAllSimState` idles `boxDrawing`. No save, fold, file or load carries an unnamed box (`store.ts namedBoxes`, in `liveCanvas` and every load), so an autosave mid-draft or a workbook saved before 085 never brings one back. A history snapshot records the draft it was taken with (`HistoryEntry.draftId`): undo and redo bring back that draft, with its box, and no other unnamed box.
+- **The box editor edits; it never makes one.** The pop-out row's **Edit** and double-clicking a placed copy open it on a library box. The canvas swaps for the box's insides, with IN/OUT nodes as its ports. The bar at the top centre, under the edit strip (Undo and Redo stay in reach), names it; **Save** updates every copy (not those in a problem marked done), and **Cancel** restores the canvas.
+- **A drawn outline is not a copy.** Editing a library box rewrites every placed copy, and copies inside other boxes. It never rewrites the loose parts inside an outline: those are that problem's own graded answer.
 
 ### Output panel (right; replaces `SimulationToolbar` + `DataTable` for CC)
 - `--mm-surface`, padding `16px 22px`, flex column, its own scroll.

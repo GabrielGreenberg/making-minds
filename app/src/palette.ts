@@ -5,7 +5,7 @@
 // app/tools/workbenchCheck.ts pins them.
 //
 // The armed tool is ONE tagged value (`ArmedTool`): a part type, the NEW_BOX
-// draw tool, or a box from the library. A gate tile, a box row and a pinned
+// draw tool (the BOX tile's, task 085), or a box from the library. A gate tile, a box row and a pinned
 // box tile all arm, drag and place through it — the canvas has one branch
 // per gesture, never one per source.
 
@@ -57,8 +57,9 @@ export function paletteParts(effectiveMode: string, mayHoldMemory: boolean): Pal
   return CIRCUIT_PARTS.filter((p) => p.type !== 'MEM' || mayHoldMemory);
 }
 
-/** Does this canvas box circuits (the New box tool, the Boxes group)? Boxing
- *  a TM or an FSM is refused by design (types.ts placeableBoxKinds). */
+/** Does this canvas box circuits (the BOX tile, the Boxes group — see
+ *  paletteBoxTiles)? Boxing a TM or an FSM is refused by design (types.ts
+ *  placeableBoxKinds). */
 export function paletteHasBoxes(effectiveMode: string): boolean {
   return effectiveMode === 'CC' || effectiveMode === 'SC';
 }
@@ -132,6 +133,33 @@ export function pinnedRows(pins: readonly string[], rows: readonly BoxRow[]): Bo
     if (row && !out.includes(row)) out.push(row);
   }
   return out;
+}
+
+/** Why the BOX tile is dimmed while the box editor is open, and what the
+ *  store's boxTool answers there: one string for both. */
+export const BOX_TOOL_EDITING_REFUSAL = 'Save or cancel the box you are editing first.';
+
+/** The palette's box group (task 085), in order: the BOX tile (the one way
+ *  to make a box — store.ts boxTool), the pinned boxes, and the Boxes tile
+ *  (the library pop-out) — the last only once this canvas has a box it may
+ *  place, so an empty library shows the BOX tile alone. The BOX tile shows
+ *  on every canvas that may hold boxes; while the box editor is open it is
+ *  dimmed with its refusal (a box is made on a problem's canvas, not inside
+ *  another box), as a disallowed part is dimmed, never hidden. `rows` is
+ *  boxRows' (the placeable boxes). */
+export function paletteBoxTiles(s: {
+  hasBoxes: boolean;
+  editingBox: boolean;
+  rows: readonly BoxRow[];
+  pins: readonly string[];
+}): { boxTool: boolean; boxToolRefusal: string | null; pinned: BoxRow[]; boxesTile: boolean } {
+  if (!s.hasBoxes) return { boxTool: false, boxToolRefusal: null, pinned: [], boxesTile: false };
+  return {
+    boxTool: true,
+    boxToolRefusal: s.editingBox ? BOX_TOOL_EDITING_REFUSAL : null,
+    pinned: pinnedRows(s.pins, s.rows),
+    boxesTile: s.rows.length > 0,
+  };
 }
 
 /** A tool as the hint line names it: a part by its tile label ("AND",
