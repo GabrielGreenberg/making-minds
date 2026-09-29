@@ -8,9 +8,9 @@ requires:
 area: app
 source: feedback
 created: 2026-09-28T10:52:00-07:00
-status: ready
+status: in-progress
 after:
-branch:
+branch: robot/078-question-panel-fixed-split
 merged_into:
 ---
 
