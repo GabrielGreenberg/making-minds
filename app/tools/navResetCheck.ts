@@ -59,7 +59,8 @@
 // part's prompt directly followed by its field by kind (paragraph, line,
 // blank, 079's table set through the store), the closing, the foot; a
 // single question likewise; read-only when done; a line part holding a
-// line break keeps a paragraph field.
+// line break keeps a paragraph field. The document marks each lettered part
+// with its own question index, which the instructor editor's preview opens.
 // [edit during run] (task 011) pins the EDIT law beside the two: a machine
 // edit (gradedMachineKey changes) restarts every live run — SC, FSM, TM,
 // turbot — at t=1 keeping its input and the undo history; moves, rotation,
@@ -2264,6 +2265,21 @@ console.log('[multi-part problem]');
     check('…the stem once, above every part (not restated per part)',
       count(html, 'defined by the following') === 1 && html.indexOf('defined by the following') < html.indexOf(letter('a')));
     check('…and nothing on it is read-only while the problem is open', !/readOnly|readonly/.test(html));
+  }
+  // The problem-set document (the overview, and the instructor editor's
+  // preview) marks each lettered part with its OWN question index: a click in
+  // the editor's preview opens the part it lands in, not only the first.
+  {
+    const { ProblemSetDocument } = await import('../src/components/ProblemSetDocument');
+    const html = renderToStaticMarkup(React.createElement(ProblemSetDocument, { assignment: st().assignment!, onOpen: () => undefined }));
+    const marked = [...html.matchAll(/class="ps-part" data-part-index="(\d+)"/g)].map((m) => Number(m[1]));
+    const lettered = [6, 18, 19, 9, 20, 10, 21, 22, 13, 23].map(idx);
+    check('the document marks each lettered part of 6, 9, 10 and 13 with its own question index',
+      JSON.stringify(marked) === JSON.stringify(lettered), `${marked} vs ${lettered}`);
+    const src = readFileSync(new URL('../src/components/ProblemSetDocument.tsx', import.meta.url), 'utf8');
+    check('…and a click on a part opens that index (the stem and closing: the first part\'s)',
+      /closest<HTMLElement>\('\[data-part-index\]'\)\?\.dataset\.partIndex/.test(src) &&
+        /open\(part === undefined \? problem\.index : Number\(part\)\)/.test(src));
   }
   // A single written question reads the same way: its statement, then its field.
   st().switchQuestion(idx(7));
