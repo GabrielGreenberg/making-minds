@@ -5,7 +5,7 @@ import { ProblemSetDocument, type ProblemStatus } from './ProblemSetDocument';
 import { useEffect, useState } from 'react';
 import { useAsyncValue } from '../useAsyncValue';
 import { assignmentStore } from '../storage/backend';
-import { figureUrl } from '../problemSet';
+import { figureUrl, problemGroups } from '../problemSet';
 import { problemVerdict } from '../gradeDisplay';
 import { scoreRecord } from '../engine/score';
 import { dueInput } from '../lateContext';
@@ -48,8 +48,11 @@ export function AssignmentOverview() {
 
   if (!assignment) return null;
   const sub = submissions[assignment.id];
-  const total = assignment.questions.length;
-  const done = assignment.questions.filter((q) => questionCircuits.get(q.id)?.done).length;
+  // Problems, not questions: a multi-part problem (task 048) counts once, and
+  // is done when every part is (its one Mark done).
+  const problems = problemGroups(assignment);
+  const total = problems.length;
+  const done = problems.filter((g) => g.parts.every((i) => questionCircuits.get(assignment.questions[i].id)?.done)).length;
   // Once released: each problem's points, from the one grade definition.
   const score =
     released && sub?.result

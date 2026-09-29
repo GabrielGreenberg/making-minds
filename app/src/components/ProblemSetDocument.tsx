@@ -4,13 +4,15 @@
 // run-in bold titles, truth tables several per row, one-liners in columns,
 // callout boxes styled per kind, figures, a turbot's arena drawn live. Each
 // problem links to its canvas and carries an unobtrusive status mark in the
-// number gutter. The semantics (section normalisation, numbering, layout)
-// are src/problemSet.ts; the markup renderer is StatementBody.
+// number gutter. A multi-part problem (task 048) is one problem: its stem,
+// its lettered parts (each with its own verdict mark once released), its
+// closing. The semantics (section normalisation, grouping, numbering,
+// layout) are src/problemSet.ts; the markup renderer is StatementBody.
 //
-// `ProblemBody` and `ProblemContext` are the two parts the editor panels
-// reuse (DataTable's QuestionStatement, FillInPanel, OpenResponsePanel), so a
-// problem transcribed PDF-style — "NAND" over a table under a section intro —
-// reads correctly on its own canvas too.
+// `ProblemBody` is the part the editor reuses — the question panel
+// (QuestionPanel.tsx) renders the whole problem with it, so a problem
+// transcribed PDF-style — "NAND" over a table, or "6." over parts a–c —
+// reads correctly on its own page too.
 
 import type { MouseEvent, ReactNode } from 'react';
 import type { AssignmentData, AssignmentQuestion, Callout, CalloutKind, Figure, Placement } from '../types';
@@ -22,7 +24,6 @@ import {
   figureUrl,
   placementOf,
   problemRuns,
-  sectionOf,
   type ResolvedProblem,
   type ResolvedSection,
 } from '../problemSet';
@@ -40,7 +41,9 @@ export interface ProblemStatus {
   verdict?: Verdict;
 }
 
-const BASE_URL: string = import.meta.env.BASE_URL;
+// `?.`: import.meta.env exists only under Vite, and the harness renders the
+// Worksheet (which borrows FigureView) under tsx (navResetCheck [worksheet]).
+const BASE_URL: string = import.meta.env?.BASE_URL ?? '/';
 
 export function FigureView({ figure }: { figure: Figure }) {
   return (
@@ -91,40 +94,30 @@ function arenaCellSize(width: number): number {
   return Math.max(6, Math.min(22, Math.floor(220 / width)));
 }
 
-/**
- * One problem's own content: run-in title, statement, hint, its callouts and
- * figures, and (for a turbot) its first arena. `showArena` is off in the
- * editor, whose right panel already draws the live arena. The editor's
- * question panel (QuestionPanel.tsx) heads the problem with its own title,
- * keeps caution notes always in view and puts the hints behind a link, so it
- * passes `showTitle={false}`, `showHint={false}` and omits those kinds here.
- */
-export function ProblemBody({
-  question,
-  showArena = true,
-  showTitle = true,
-  showHint = true,
-  omitKinds = [],
-}: {
-  question: AssignmentQuestion;
-  showArena?: boolean;
-  showTitle?: boolean;
-  showHint?: boolean;
-  omitKinds?: readonly CalloutKind[];
-}) {
+/** A problem's bold title, run into `text`'s first paragraph when it opens
+ *  with one — the PDFs' idiom: "**Edge detector.** Design a machine …", the
+ *  period only when text follows on the same line. */
+function titleLead(title: string, text: string): ReactNode {
+  const first = parseStatement(text)[0];
+  const runsIn = first !== undefined && first.kind === 'para' && !first.part;
+  return <strong className="ps-title"><InlineMarkup text={title} />{runsIn && !/[.!?:]$/.test(title) ? '.' : ''}</strong>;
+}
+
+/** The body options ProblemBody passes down to each question's content. */
+interface BodyOptions {
+  showArena: boolean;
+  showHint: boolean;
+  omitKinds: readonly CalloutKind[];
+}
+
+/** One question's content: its statement (with `lead` run in), hint,
+ *  callouts and figures, and (for a turbot) its first arena. */
+function QuestionContent({ question, lead, showArena, showHint, omitKinds }: BodyOptions & { question: AssignmentQuestion; lead?: ReactNode }) {
   const callouts = (question.callouts ?? []).filter((c) => !omitKinds.includes(c.kind));
   const figures = question.figures ?? [];
   const arena = showArena && question.buildMode === 'turbot' ? question.turbot_cases?.[0]?.arena : undefined;
-  const title = showTitle ? question.title?.trim() : undefined;
-  // The PDFs' run-in idiom: "**Edge detector.** Design a machine …" — the
-  // period only when text follows on the same line.
-  const first = parseStatement(question.statement)[0];
-  const runsIn = first !== undefined && first.kind === 'para' && !first.part;
-  const lead: ReactNode = title ? (
-    <strong className="ps-title"><InlineMarkup text={title} />{runsIn && !/[.!?:]$/.test(title) ? '.' : ''}</strong>
-  ) : undefined;
   return (
-    <div className="ps-body">
+    <>
       <Attachments callouts={callouts} figures={figures} where="before" />
       <StatementBody text={question.statement} lead={lead} />
       {/* A problem has no margin of its own: its asides follow it as notes. */}
@@ -141,31 +134,64 @@ export function ProblemBody({
         </div>
       )}
       <Attachments callouts={callouts} figures={figures} where="after" />
-    </div>
+    </>
   );
 }
 
 /**
- * A problem's section, as context on its canvas: the heading, the intro that
- * carries the instruction, and the section's callouts and figures behind a
- * disclosure so a long hint box never pushes the problem off the panel.
+ * One problem's own content: run-in title, then — a problem without parts —
+ * its statement, hint, callouts and figures, and (for a turbot) its first
+ * arena; or — a multi-part problem (task 048) — its stem, each lettered part
+ * with its own statement and attachments, and its closing. `showArena` is
+ * off in the editor, whose right panel already draws the live arena. The
+ * editor's question panel (QuestionPanel.tsx) heads the problem with its own
+ * title, keeps caution notes always in view and puts the hints behind a
+ * link, so it passes `showTitle={false}`, `showHint={false}` and omits those
+ * kinds here. `partMark` is what sits beside a part's letter (the
+ * document's per-part verdict).
  */
-export function ProblemContext({ assignment, questionId }: { assignment: AssignmentData; questionId: number }) {
-  const section = sectionOf(assignment, questionId);
-  if (!section) return null;
-  const extras = section.callouts.length + section.figures.length;
-  if (!section.heading && !section.intro && extras === 0) return null;
+export function ProblemBody({
+  problem,
+  showArena = true,
+  showTitle = true,
+  showHint = true,
+  omitKinds = [],
+  partMark,
+}: {
+  problem: Pick<ResolvedProblem, 'question' | 'parts'>;
+  showArena?: boolean;
+  showTitle?: boolean;
+  showHint?: boolean;
+  omitKinds?: readonly CalloutKind[];
+  partMark?: (q: AssignmentQuestion) => ReactNode;
+}) {
+  const first = problem.question;
+  const title = showTitle ? first.title?.trim() : undefined;
+  const stem = first.stem?.trim() ?? '';
+  const closing = first.closing?.trim() ?? '';
+  const options: BodyOptions = { showArena, showHint, omitKinds };
+  const lettered = problem.parts.some((p) => p.letter !== '');
+  if (!lettered && !stem && !closing) {
+    return (
+      <div className="ps-body">
+        <QuestionContent question={first} lead={title ? titleLead(title, first.statement) : undefined} {...options} />
+      </div>
+    );
+  }
   return (
-    <div className="ps-context">
-      {section.heading && <div className="ps-context-heading">{section.heading}</div>}
-      {section.intro && <StatementBody text={section.intro} className="ps-context-intro" />}
-      {extras > 0 && (
-        <details className="ps-context-more">
-          <summary>{extras === 1 ? 'Note for this section' : `Notes for this section (${extras})`}</summary>
-          {section.callouts.map((c, i) => <CalloutView key={`c${i}`} callout={c} />)}
-          {section.figures.map((f, i) => <FigureView key={`f${i}`} figure={f} />)}
-        </details>
+    <div className="ps-body">
+      {(stem || title) && <StatementBody text={stem} lead={title ? titleLead(title, stem) : undefined} />}
+      {problem.parts.map((part) =>
+        part.letter ? (
+          <div key={part.question.id} className="ps-part">
+            <span className="ps-part-letter">{part.letter}.{partMark?.(part.question)}</span>
+            <div className="ps-part-main"><QuestionContent question={part.question} {...options} /></div>
+          </div>
+        ) : (
+          <QuestionContent key={part.question.id} question={part.question} {...options} />
+        ),
       )}
+      {closing && <StatementBody text={closing} className="ps-closing" />}
     </div>
   );
 }
@@ -184,6 +210,15 @@ function StatusMarks({ status }: { status: ProblemStatus | undefined }) {
       ) : null}
     </>
   );
+}
+
+/** A problem's own margin status: a problem without parts is its question's;
+ *  a multi-part one is done only when every part is (its one Mark done), and
+ *  its verdicts sit beside the part letters instead (each part is graded). */
+function problemStatus(problem: ResolvedProblem, status?: (q: AssignmentQuestion) => ProblemStatus): ProblemStatus | undefined {
+  if (!status) return undefined;
+  if (problem.parts.length === 1) return status(problem.question);
+  return { done: problem.parts.every((p) => status(p.question).done) };
 }
 
 /** Where a problem opens: a route (the student's canvas) or a callback (the
@@ -212,19 +247,26 @@ function ProblemView({
     if (window.getSelection()?.toString()) return;
     open();
   };
+  // A multi-part problem's parts share their mode, but a part may be a
+  // fill-in: the chip then just says what they all are.
+  const modes = new Set(problem.parts.map((p) => questionModeLabel(p.question)));
+  const mode = modes.size === 1 ? [...modes][0] : problem.question.buildMode;
+  const partMark = status && problem.parts.length > 1
+    ? (q: AssignmentQuestion) => <StatusMarks status={{ verdict: status(q).verdict }} />
+    : undefined;
   return (
     <div className={`ps-problem ps-problem--${problem.shape}`} onClick={onClick}>
       <div className="ps-gutter">
         {link ? (
-          <a className="ps-num" {...link} aria-label={problem.question.label}>{problem.number}.</a>
+          <a className="ps-num" {...link} aria-label={problem.label}>{problem.number}.</a>
         ) : (
-          <button type="button" className="ps-num" aria-label={problem.question.label} onClick={open}>{problem.number}.</button>
+          <button type="button" className="ps-num" aria-label={problem.label} onClick={open}>{problem.number}.</button>
         )}
-        <StatusMarks status={status?.(problem.question)} />
+        <StatusMarks status={problemStatus(problem, status)} />
       </div>
       <div className="ps-problem-main">
-        <span className="tag ps-mode" title="Canvas mode">{questionModeLabel(problem.question)}</span>
-        <ProblemBody question={problem.question} />
+        <span className="tag ps-mode" title="Canvas mode">{mode}</span>
+        <ProblemBody problem={problem} partMark={partMark} />
       </div>
     </div>
   );

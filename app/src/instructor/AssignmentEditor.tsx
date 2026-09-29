@@ -11,6 +11,7 @@ import { useAsyncValue } from '../useAsyncValue';
 import { useDragReorder } from './dragReorder';
 import { CalloutsEditor, FiguresEditor } from './DocumentEditors';
 import { ProblemSetDocument } from '../components/ProblemSetDocument';
+import { problemPartIds } from '../problemSet';
 import { toLocalInputValue } from '../dueDates';
 
 const LAYOUTS: { value: SectionLayout; label: string }[] = [
@@ -362,6 +363,11 @@ export function AssignmentEditor({ id }: { id: string }) {
         <ol className="instructor-question-list">
           {drag.items.map((q, i) => {
             const { draggable, onDragStart, ...rowDrop } = drag.rowProps(i);
+            // A part of a multi-part problem (task 048) names its problem,
+            // and says so when it is not where it folds (problemSet.ts
+            // problemGroups: directly after the problem's parts, same section).
+            const problem = q.partOf !== undefined ? assignment.questions.find((x) => x.id === q.partOf) : undefined;
+            const folds = q.partOf !== undefined && problemPartIds(assignment, assignment.questions.findIndex((x) => x.id === q.id))[0] === q.partOf;
             return (
             <li
               key={q.id}
@@ -380,6 +386,14 @@ export function AssignmentEditor({ id }: { id: string }) {
                 </span>
                 <span className="instructor-question-label">{q.label}</span>
                 <span className="tag tag--accent">{questionModeLabel(q)}</span>
+                {q.partOf !== undefined && (
+                  <span
+                    className={folds ? 'tag' : 'tag instructor-part-tag--loose'}
+                    title={folds ? 'Shown on its problem’s page; graded on its own' : 'Not folded: a part must follow its problem’s parts directly, in the same section'}
+                  >
+                    part of {problem?.label ?? `#${q.partOf}`}{folds ? '' : ' — not folded'}
+                  </span>
+                )}
                 <span className="instructor-question-summary">{q.title ? `${q.title}. ` : ''}{summarizeQuestion(q)}</span>
                 {sections.length > 0 && (
                   <label className="mm-inline-field instructor-question-section">

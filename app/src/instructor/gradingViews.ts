@@ -11,6 +11,7 @@ import type { AssignmentData, AssignmentQuestion, IntegrityFlagCode, Points } fr
 import { questionModeLabel, questionTask } from '../types';
 import { problemNumber } from '../problemSet';
 import { formatGrade, pointsLabel } from '../engine/score';
+import { isReviewTable } from '../engine/fillIn';
 import type {
   AssignmentGradingSummary,
   CourseAssignmentRow,
@@ -22,11 +23,16 @@ import type { RegradeChange, RegradePlan } from '../storage/regrade';
 import type { FlaggedStudent, StudentFlag, StudentFlagKind } from '../storage/gradingFlags';
 import type { StudentHistoryEntry } from '../storage/gradingSummary';
 
-/** A problem graded by hand: an open (prose) question. Everything else — a
- *  machine, perception, a turbot, fill-in blanks — the autograder scores, and
- *  a human grade on it is an override. */
-export function isHandQuestion(q: Pick<AssignmentQuestion, 'buildMode' | 'perception' | 'fill_in'>): boolean {
-  return questionTask(q) === 'open';
+/** A problem graded by hand: an open (prose) question, or a review table (a
+ *  fill-in table authored with no key, task 048 — engine/fillIn.ts
+ *  isReviewTable — asked of the instructor's copy, which carries every key).
+ *  Everything else — a machine, perception, a turbot, fill-in blanks, a keyed
+ *  table — the autograder scores, and a human grade on it is an override. */
+export function isHandQuestion(
+  q: Pick<AssignmentQuestion, 'buildMode' | 'perception' | 'fill_in' | 'fill_in_answers'>,
+): boolean {
+  const task = questionTask(q);
+  return task === 'open' || (task === 'fill-in' && isReviewTable(q.fill_in, q.fill_in_answers));
 }
 
 // ── The matrix cell ──────────────────────────────────────────────────────

@@ -7,7 +7,7 @@ import { navigate, type Route } from '../routing';
 import { hashLink } from '../components/PageShell';
 import { StatementBody } from '../components/StatementBody';
 import { formatDateTime } from '../dueDates';
-import { problemNumber } from '../problemSet';
+import { pageIndexOf, problemNumber } from '../problemSet';
 import { fillInShape, fillInTableRows } from '../engine/fillIn';
 import { useAsyncValue } from '../useAsyncValue';
 import { useAuth } from '../auth/authProvider';
@@ -228,7 +228,7 @@ function ByProblem({
     <div className="gr-queue">
       <div>
         <p className="dim gr-qcounts">{counts.text}</p>
-        <Prompt question={question} number={number} />
+        <Prompt assignment={assignment} question={question} number={number} />
         {items.length === 0 ? (
           <p className="mm-empty">Nobody has submitted this assignment yet.</p>
         ) : !item ? (
@@ -309,19 +309,29 @@ function SideNotes({ items, hideNames }: { items: QueueResponse[]; hideNames: bo
   );
 }
 
-/** The problem's statement, collapsible (the choice is remembered). */
-function Prompt({ question, number }: { question: AssignmentQuestion; number: string }) {
+/** The problem's statement, collapsible (the choice is remembered). A part
+ *  of a multi-part problem (task 048) is graded on its own, so it shows its
+ *  problem's stem, then its own prompt, then the closing. */
+function Prompt({ assignment, question, number }: { assignment: AssignmentData; question: AssignmentQuestion; number: string }) {
   const [open, setOpen] = useState(() => loadUiPrefs()[PROMPT_PREF] !== false);
   const toggle = () => {
     saveUiPref(PROMPT_PREF, !open);
     setOpen(!open);
   };
+  const index = assignment.questions.findIndex((q) => q.id === question.id);
+  const first = assignment.questions[pageIndexOf(assignment, index)] ?? question;
   return (
     <div className="gr-prompt">
       <button type="button" className="eyebrow gr-prompt-toggle" onMouseDown={keepFocus} aria-expanded={open} onClick={toggle}>
         Problem {number} {open ? '▾' : '▸'}
       </button>
-      {open && <StatementBody text={question.statement} />}
+      {open && (
+        <>
+          {first.stem?.trim() && <StatementBody text={first.stem} />}
+          <StatementBody text={question.statement} />
+          {first.closing?.trim() && <StatementBody text={first.closing} />}
+        </>
+      )}
     </div>
   );
 }
@@ -477,7 +487,7 @@ function StudentProblem({
   const item = items.find((r) => r.student.key === studentKey);
   return (
     <>
-      <Prompt question={question} number={number} />
+      <Prompt assignment={assignment} question={question} number={number} />
       {!item ? (
         <p className="mm-empty">No response from this student to Problem {number}.</p>
       ) : (

@@ -19,7 +19,9 @@
 // read-only, task 003) parses and round-trips, a malformed attempt is dropped
 // (the rest kept), and applying it shows the attempt (store viewSubmission)
 // BEFORE the question opens; an unknown attempt repairs the URL to the live
-// route; a superseded apply does nothing. [grading routes] — the Grading
+// route; a superseded apply does nothing. [multi-part route: applied] (task
+// 048) — a later part's route opens its problem's page (the first part's
+// index), and applying it again, or another part's, is no swap. [grading routes] — the Grading
 // tab's routes (task 065; the queue by student, 066) round-trip with the student key URI-encoded whole,
 // a malformed queue problem is dropped (the queue kept), an unknown view is
 // the Overview, and the retired gradebook URL
@@ -498,6 +500,49 @@ console.log('[submission route: applied]');
   await tick();
   check('a superseded apply does nothing (no switch, no URL repair)',
     calls.join() === 'view:7,view:null,switch:2' && loc.hash === '#/a/hws/q/2');
+  useStore.setState({ assignment: null, currentQuestionIndex: 0 });
+}
+
+// A later part of a multi-part problem (task 048) opens its problem's page:
+// the store's own switchQuestion (spied) lands on the first part, and the
+// same route applied again — or another part's — is no swap.
+console.log('[multi-part route: applied]');
+{
+  const init = useStore.getInitialState();
+  const switched: number[] = [];
+  const w = (id: number, label: string, partOf?: number) =>
+    ({ id, label, statement: `${label}.`, buildMode: 'open', representation: 'binary', ...(partOf ? { partOf } : {}) });
+  const questions = [w(6, 'Problem 6a'), w(18, 'Problem 6b', 6), w(19, 'Problem 6c', 6), w(7, 'Problem 7')];
+  useStore.setState({
+    assignment: { id: 'hwp', title: 'parts', questions } as unknown as import('../src/types').AssignmentData,
+    currentQuestionIndex: 3,
+    questionCircuits: new Map(questions.map((q) => [q.id, { components: [], wires: [], boxes: [] }])),
+    viewingSubmission: null,
+    viewingOwner: null,
+    submissions: {},
+    // The assignment is open already; the rest are the store's own.
+    openAssignment: async () => true,
+    viewSubmission: init.viewSubmission,
+    loadCaseInput: init.loadCaseInput,
+    switchQuestion: (i: number) => {
+      switched.push(i);
+      init.switchQuestion(i);
+    },
+  });
+  const tick = () => new Promise((r) => setTimeout(r, 0));
+  navigate({ kind: 'assignment', id: 'hwp', questionIndex: 1 });
+  await tick();
+  check("#/a/hwp/q/1 (part b) opens problem 6's page: the first part's index",
+    useStore.getState().currentQuestionIndex === 0 && switched.join() === '1' && useStore.getState().assignmentView === 'question');
+  navigate({ kind: 'assignment', id: 'hwp', questionIndex: 1 }, { replace: true });
+  await tick();
+  navigate({ kind: 'assignment', id: 'hwp', questionIndex: 2 }, { replace: true });
+  await tick();
+  check('re-applying it, or another part\'s route, is stable (no swap)',
+    useStore.getState().currentQuestionIndex === 0 && switched.join() === '1');
+  navigate({ kind: 'assignment', id: 'hwp', questionIndex: 3 });
+  await tick();
+  check('…while another problem still switches', useStore.getState().currentQuestionIndex === 3 && switched.join() === '1,3');
   useStore.setState({ assignment: null, currentQuestionIndex: 0 });
 }
 

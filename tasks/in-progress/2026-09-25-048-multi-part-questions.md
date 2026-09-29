@@ -8,9 +8,9 @@ requires: browser
 area: app
 source: audit
 created: 2026-09-25T10:35:00-07:00
-status: ready
+status: in-progress
 after: 2026-09-28-079
-branch:
+branch: robot/048-multi-part-questions
 merged_into:
 ---
 
@@ -52,6 +52,18 @@ kind (blanks by script; a line, paragraph or table pending review, or by an LLM)
 result keeps per-part verdicts. HW1's lettered questions are folded back into parts. Design
 memo in `docs/buildout/designs/`, written as part of this task — no separate approval
 (Gabriel, 2026-09-28: see Resolved decisions).
+
+**As built (2026-09-28; memo `docs/buildout/designs/multi-part-problems.md`, decision C).**
+The `parts: [{label, kind, prompt, …}]` clause is met by grouping, not nesting: each part
+stays its own `AssignmentQuestion` (own id, result, grade, point and signed editing record),
+and display-only fields group a run of them into one problem — `partOf` (the first part's
+id), `stem` / `closing` (on the first part), `answerField: 'line' | 'paragraph'`. A part's
+label is its letter, its prompt its `statement`, its kind `problemSet.ts writtenKind`, and
+its verdict its own question's result. Nesting (option A) would have re-keyed every HW1
+workbook, attempt and grade and broken every signed editing record, for a change Gabriel
+called cosmetic. The table kind is 079's table as it stands: the author sets the row count
+(spare rows allowed, so it need not give the domain away); "rows the student adds" is not
+built — it would change 079's grader row bound and its parity pin (a follow-up if wanted).
 
 ## Design
 ### Catch notes (2026-09-26)
@@ -127,3 +139,56 @@ Gates; pins per part kind; browser.
 ## Progress log
 - 2026-09-26 (catch): Gabriel's interleaved-worksheet requirement added (Done when 0); priority
   raised to high; catch notes added. Next: the design memo, starting from Done when 0 and the notes.
+- 2026-09-28 (robot): built per the memo, decision C (Done when's As-built note): the
+  Worksheet (stem → each part's prompt and field → closing), one page and one Mark done per
+  problem, per-part answers and records under unchanged ids, key-less tables pending for hand
+  grading, HW1 6/9/10/13 folded by display fields only. Review fixes: `Worksheet` is now a
+  connector over the store-free `WorksheetSheet`, rendered for real in `navResetCheck
+  [worksheet]` (Done when 0: order and field kind per part, 9b's table set through the store,
+  read-only when done); a line part whose saved text holds a line break keeps a paragraph
+  field (HW1's pilot answers to 6b, 9a, 10a–c were written in a textarea); the memo records
+  the author-set table rows and the stale-tab gap. **Release note:** a tab loaded before the
+  release shows HW1 6a/9a/10a without their setup text, 13a without its closing and 6b/6c/9b
+  without "from 6a / 9a", until reloaded — grading unaffected. **Owed, not claimed** (no dev
+  server in an unattended run): Gabriel's browser eyeball — `npm run dev` in `app/`; as the
+  toy instructor, Load HW1–HW7 (publish HW1 if hidden); as John Doe, open HW1 problems 6, 9,
+  10 and 13: each reads stem → a. prompt + its field → b. … → closing on one page, one Mark
+  done, fields of the right kind (6a paragraph, 6b line, 6c blank, 9b a 9-row table).
+
+### 2026-09-28 — implemented (work loop)
+- **Built.** A written problem now reads as a worksheet: the stem, each part's prompt with
+  its own field right under it (a line, a paragraph, blanks or 079's table), then the
+  closing. All the parts sit on one page, with one Mark done and one row in the problem list.
+  Prev/Next step by problem. The answer area is `components/Worksheet.tsx` (a connector over
+  the store-free `WorksheetSheet`), which replaces `OpenResponsePanel`/`FillInPanel`. The
+  grouping is display-only (memo decision C: `partOf`, `stem`, `closing`, `answerField`).
+  Every part keeps its id, result, grade, point and signed record, and live answers/records
+  are kept per part in the store. A table with no key grades `pending` for a person. HW1
+  6/9/10/13 are folded back: the 23 questions now read as 17 problems.
+- **Pins.**
+  - `navResetCheck [multi-part problem]` + `[worksheet]`: a real render with part order and
+    field kinds; an old save on 18/19 opens problem 6's page; one Mark done locks every part;
+    a legacy line answer that contains a line break keeps a textarea.
+  - `pipelineCheck [multi-part problems]`: ids, grading projection hash and sections are
+    unchanged from 3949bc9; the new fields carry no answer; the review table is pending.
+  - `statementFormatCheck [multi-part problems]`, `workbenchCheck` (one row/page per problem;
+    connector → sheet), `routingCheck` (a later part's route opens its page),
+    `provenanceCheck [parts]`, `pasteCheck`, `gradingViewCheck` (the review table is a hand
+    problem).
+- **Gates:** app-tsc=0, app-build=0, app-check=0, server-tsc=0, server-check=0.
+- **Review:** 5 findings fixed, 0 skipped:
+  - an As-built note (grouping, not nesting);
+  - table rows are set by the author (recorded as a follow-up);
+  - a real render pin for Done when 0;
+  - a multi-line line answer keeps its textarea;
+  - the stale-tab release note.
+- **Nit left:** in the assignment editor's preview, clicking a multi-part problem opens only
+  its first part.
+- **Owed, not claimed:**
+  - The browser eyeball in local and remote mode, by the recipe above (problems 6/9/10/13,
+    persist, done-lock, paste refusal, the Grades sheet, the Queue by problem, the creator's
+    "Part of", a narrow-width shot).
+  - After the hand release, on the box: `npm run homeworks -- status` should show HW1
+    refreshed, not edited. Then a Re-grade… dry run should show 0 point changes → Commit.
+- **Next step:** loop session: the visual check (owed), then land per PROFILE §5 (held for
+  Gabriel's hand release: schema, sanitize, homework content).

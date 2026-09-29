@@ -5,8 +5,7 @@ import { OutputPanel } from './components/OutputPanel';
 import { SequentialTimeline } from './components/SequentialTimeline';
 import { TMTapePanel } from './components/TMTapePanel';
 import { TurbotTapePanel } from './components/TurbotTapePanel';
-import { OpenResponsePanel } from './components/OpenResponsePanel';
-import { FillInPanel } from './components/FillInPanel';
+import { Worksheet } from './components/Worksheet';
 import { HomeScreen } from './components/HomeScreen';
 import { AssignmentOverview } from './components/AssignmentOverview';
 import { InstructorApp } from './instructor/InstructorApp';
@@ -15,7 +14,6 @@ import { InstructorGate } from './instructor/InstructorGate';
 import { useRoute } from './useRoute';
 import { useStore, selectEffectiveMode } from './store';
 import { useAuth } from './auth';
-import { questionTask } from './types';
 import { useEffect } from 'react';
 
 function App() {
@@ -35,7 +33,6 @@ function AppEditor() {
   const effectiveMode = useStore(selectEffectiveMode);
   const assignment = useStore((s) => s.assignment);
   const assignmentView = useStore((s) => s.assignmentView);
-  const currentQuestionIndex = useStore((s) => s.currentQuestionIndex);
 
   // Hydrate the latest-submission map from the submission seam once someone
   // is signed in (a visitor's sandbox reads no seam). Idempotent, so
@@ -63,13 +60,12 @@ function AppEditor() {
   if (assignment && assignmentView === 'overview') return <AssignmentOverview />;
 
   // Every question and the sandbox render inside ONE frame (EditorShell: the
-  // top bar, the question panel, the workspace, the output panel). An open
-  // question's workspace is a writing area and it has no output panel; a
-  // fill-in question (types.ts questionTask) narrows the writing area to a
-  // grid of labelled boxes, which IS autograded.
+  // top bar, the question panel, the workspace, the output panel). A written
+  // problem's workspace is its worksheet — the problem's text with each
+  // part's field (a line, a paragraph, blanks or a table) after its prompt —
+  // and it has no output panel.
   if (buildMode === 'open') {
-    const q = assignment?.questions[currentQuestionIndex];
-    return <EditorShell>{q && questionTask(q) === 'fill-in' ? <FillInPanel /> : <OpenResponsePanel />}</EditorShell>;
+    return <EditorShell><Worksheet /></EditorShell>;
   }
 
   return (

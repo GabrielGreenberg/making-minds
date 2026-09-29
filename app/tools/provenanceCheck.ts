@@ -22,6 +22,10 @@
 // [stamp]         a record fails when moved to another question or when any
 //                 field changes; changed text reads as a mismatch; an edit
 //                 after an outside text change sets `outside`, sticky.
+// [parts]         (task 048) a multi-part problem's parts on one page: each
+//                 part's record is its own, signed under its own question id,
+//                 with its own outside check and insertions; integrity at
+//                 submit is per question, unchanged.
 // [trace]         a paragraph set in one insertion is flagged, the same text
 //                 typed in steps is not; one "typed" at machine speed is
 //                 (too-fast); injected text the trace cannot account for is
@@ -323,6 +327,12 @@ const FRIEND = 'friend@x.test';
 console.log('\n[store]');
 const A = 'student-a@x.test';
 const s = () => useStore.getState();
+/** The open page's own question id, and — task 048: live answers and
+ *  records are per part — a part's live record, and a text edit of a part
+ *  (the page's own question unless named). */
+const pageQ = () => s().assignment?.questions[s().currentQuestionIndex]?.id ?? -1;
+const liveRecord = (id = pageQ()) => s().liveTraces[id] ?? null;
+const respond = (text: string, id = pageQ()) => s().setOpenResponse(id, text);
 const keyA = deriveMintKey(DEV_MINT_SECRET, A, 'prov-hw-a');
 const keyB = deriveMintKey(DEV_MINT_SECRET, A, 'prov-hw-b');
 {
@@ -395,7 +405,7 @@ const keyB = deriveMintKey(DEV_MINT_SECRET, A, 'prov-hw-b');
     (ic?.wires.length ?? 0) > 0 && ic!.wires.every((w) => icIds.has(w.sourceComponentId) && icIds.has(w.targetComponentId)));
   check('…and boxedCircuitId, a library reference, untouched', pastedBox?.boxedCircuitId === boxId);
   check('the paste counts as ONE insertion of 3 in the trace',
-    s().questionTrace?.maxCompIns === 3 && s().questionTrace?.compAdded === 3);
+    liveRecord()?.maxCompIns === 3 && liveRecord()?.compAdded === 3);
 
   s().goHome();
   s().enterSandbox();
@@ -403,7 +413,7 @@ const keyB = deriveMintKey(DEV_MINT_SECRET, A, 'prov-hw-b');
   s().addComponent('AND', 100, 100);
   const sbGate = s().components.find((c) => !sb.has(c.id))!;
   check('a sandbox add is unbound (neither assignment key)', !verifyId(sbGate.id, keyA) && !verifyId(sbGate.id, keyB));
-  check('the sandbox keeps no trace', s().questionTrace === null || s().assignment === null);
+  check('the sandbox keeps no trace', liveRecord() === null || s().assignment === null);
 }
 
 // ─── [stamp] ───────────────────────────────────────────────────────────────
@@ -442,17 +452,72 @@ console.log('\n[stamp]');
   await s().openAssignment('prov-hw-a');
   s().switchQuestion(13);
   const q14 = s().assignment!.questions[13].id;
-  for (const t of ['I', 'I w', 'I wou', 'I would']) s().setOpenResponse(t);
-  const live = s().questionTrace!;
+  for (const t of ['I', 'I w', 'I wou', 'I would']) respond(t);
+  const live = liveRecord()!;
   check('setOpenResponse signs the record under the key, for its question',
     live != null && verifyTrace(q14, live, prepareKey(keyA)!) && live.td === textDigest({ responseText: 'I would' }));
   check('…counting the inserted characters, largest insertion included',
     live.textIns >= 7 && live.maxTextIns === 2);
-  useStore.setState({ openResponse: 'I would INJECTED from outside' });
-  s().setOpenResponse('I would INJECTED from outside!');
-  check('an in-store edit after an outside change bumps `outside`', s().questionTrace?.outside === 1);
-  s().setOpenResponse('I would INJECTED from outside!!');
-  check('…and it stays', s().questionTrace?.outside === 1);
+  useStore.setState({ liveText: { ...s().liveText, [q14]: { responseText: 'I would INJECTED from outside', fillAnswers: [] } } });
+  respond('I would INJECTED from outside!');
+  check('an in-store edit after an outside change bumps `outside`', liveRecord()?.outside === 1);
+  respond('I would INJECTED from outside!!');
+  check('…and it stays', liveRecord()?.outside === 1);
+  s().goHome();
+}
+
+// ─── [parts] ───────────────────────────────────────────────────────────────
+console.log('\n[parts]');
+{
+  // A multi-part problem (task 048): parts a (a paragraph), b (a line) and c
+  // (a blank) on one page. Each part is still its own question: its own
+  // record, signed under its own id, its own outside check and insertions,
+  // and the integrity check at submit judges each part as before.
+  const hwP: AssignmentData = {
+    id: 'prov-parts',
+    title: 'Parts',
+    questions: [
+      { id: 6, label: 'Problem 6a', stem: 'Consider *m*.', statement: 'Define it.', buildMode: 'open', representation: 'binary' },
+      { id: 18, label: 'Problem 6b', partOf: 6, statement: 'Describe it.', answerField: 'line', buildMode: 'open', representation: 'binary' },
+      { id: 19, label: 'Problem 6c', partOf: 6, statement: 'How many places?', buildMode: 'open', representation: 'binary',
+        fill_in: { labels: ['Places'], numericOnly: true }, fill_in_answers: ['3'] },
+    ],
+  };
+  await localAssignmentStore.save(hwP);
+  await localAssignmentStore.setVisible(hwP.id, true);
+  const keyP = deriveMintKey(DEV_MINT_SECRET, A, hwP.id);
+  const pP = prepareKey(keyP)!;
+  check('A opens the problem, all three parts on its page',
+    (await s().openAssignment(hwP.id)) === true && Object.keys(s().liveText).join() === '6,18,19');
+  for (const t of ['It', 'It adds']) respond(t, 6);
+  for (const t of ['m', 'm maps']) respond(t, 18);
+  s().setFillAnswer(19, 0, '3');
+  const [r6, r18, r19] = [6, 18, 19].map((id) => liveRecord(id));
+  check('each part\'s record is signed under its own question id (18 is not 6)',
+    r6 != null && r18 != null && r19 != null &&
+      verifyTrace(6, r6, pP) && verifyTrace(18, r18, pP) && verifyTrace(19, r19, pP) &&
+      !verifyTrace(6, r18, pP) && !verifyTrace(18, r6, pP));
+  check('…each stamping its own field',
+    r6!.td === textDigest({ responseText: 'It adds' }) && r18!.td === textDigest({ responseText: 'm maps' }) &&
+      r19!.td === textDigest({ fillAnswers: ['3'] }));
+  check('…and counting its own edits and insertions only',
+    r6!.edits === 2 && r6!.textIns === 7 && r18!.edits === 2 && r18!.textIns === 6 && r19!.edits === 1 && r19!.textIns === 1);
+  // Text changed outside the editor in part b: b's record sees it, a's not.
+  useStore.setState({ liveText: { ...s().liveText, 18: { responseText: 'm maps INJECTED', fillAnswers: [] } } });
+  respond('m maps INJECTED!', 18);
+  respond('It adds!', 6);
+  check("an outside change to part b bumps b's `outside`, never a's", liveRecord(18)?.outside === 1 && liveRecord(6)?.outside === 0);
+  const rec = await s().submitAssignment(hwP.id, A);
+  const answers = rec!.submission.answers;
+  check('the submission carries each part\'s record beside its own answer',
+    [6, 18, 19].every((id) => JSON.stringify(answers.find((x) => x.questionId === id)?.provenance) === JSON.stringify(liveRecord(id))));
+  const judged = assessIntegrity({ questionIds: [6, 18, 19], answers, self: { email: A, key: keyP }, others: [] }).questions;
+  const at = (id: number) => judged.find((q) => q.questionId === id)!;
+  check('integrity at submit is per question: each part\'s text and record are the student\'s own',
+    judged.length === 3 && [6, 18, 19].every((id) => at(id).text === 'self' && at(id).record === 'self'));
+  check('…and only part b carries the outside flag',
+    at(18).flags.some((f) => f.code === 'outside') && !at(6).flags.some((f) => f.code === 'outside') &&
+      !at(19).flags.some((f) => f.code === 'outside'));
   s().goHome();
 }
 
@@ -536,16 +601,16 @@ const codes = (q: { flags: { code: string }[] }) => q.flags.map((f) => f.code);
   await s().openAssignment('prov-hw-a');
   s().switchQuestion(13);
   const q14 = s().assignment!.questions[13].id;
-  s().setOpenResponse('');
+  respond('');
   let typedText = '';
   for (const ch of P) {
     typedText += ch;
-    s().setOpenResponse(typedText);
+    respond(typedText);
   }
-  const beforeCut = s().questionTrace!;
-  s().setOpenResponse(''); // select all, delete
-  s().setOpenResponse(P); // the browser's undo
-  const afterUndo = s().questionTrace!;
+  const beforeCut = liveRecord()!;
+  respond(''); // select all, delete
+  respond(P); // the browser's undo
+  const afterUndo = liveRecord()!;
   check('a text box\'s undo restoring a deleted paragraph inserts nothing new (still one edit each)',
     afterUndo.textIns === beforeCut.textIns && afterUndo.maxTextIns === beforeCut.maxTextIns &&
     afterUndo.edits === beforeCut.edits + 2 && afterUndo.maxTextIns < 10,
@@ -553,8 +618,8 @@ const codes = (q: { flags: { code: string }[] }) => q.flags.map((f) => f.code);
   const undone = assessIntegrity({ questionIds: [q14], answers: [{ questionId: q14, responseText: P, provenance: afterUndo }],
     self: { email: A, key: keyA }, others: [] }).questions[0];
   check('…so the restored paragraph is not flagged one-piece', !codes(undone).includes('one-piece-text'), JSON.stringify(codes(undone)));
-  s().setOpenResponse(P + ' Z');
-  check('…while new text after it still counts', s().questionTrace!.textIns === afterUndo.textIns + 2);
+  respond(P + ' Z');
+  check('…while new text after it still counts', liveRecord()!.textIns === afterUndo.textIns + 2);
   s().goHome();
 }
 
@@ -603,10 +668,10 @@ console.log('\n[history]');
   }) as typeof setTimeout;
   try {
     // One keystroke a second for ten seconds: never a 1.5 s pause.
-    let text = s().openResponse;
+    let text = s().liveText[pageQ()]?.responseText ?? '';
     for (let i = 0; i <= 10; i++) {
       text += 'k';
-      s().setOpenResponse(text);
+      respond(text);
       T += 1000;
     }
   } finally {

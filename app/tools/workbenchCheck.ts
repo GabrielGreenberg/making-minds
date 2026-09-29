@@ -7,14 +7,20 @@
 //                    panels open unless a pref says exactly false, the old
 //                    data panel's width carries over.
 //   [question list]  the document's sections and numbering, a row per
-//                    problem in each, empty sections left out, the student's
-//                    own marks only (done / started — never a grade), the
-//                    list tags, the heading, the short name, the notes links.
+//                    problem in each (a multi-part problem one row, marked
+//                    over its parts; task 048), empty sections left out, the
+//                    student's own marks only (done / started — never a
+//                    grade), the list tags, the heading, the short name, the
+//                    notes links; problemPages for Prev / Next.
 //   [top bar labels] the save state's every branch, the submitted time.
 //   [one frame]      every question kind and the sandbox render inside
 //                    EditorShell; the sandbox has no question panel; the
 //                    retired MenuBar is gone; the question text left the data
-//                    panel; nothing in the frame reads the answer key.
+//                    panel; nothing in the frame reads the answer key; the
+//                    Worksheet replaced the two answer panels and is one
+//                    connector over the store-free WorksheetSheet (whose
+//                    render navResetCheck [worksheet] pins), ProblemContext
+//                    is retired.
 //   [output panel]   (task 053) a circuit's truth table (engine
 //                    truthTableCC) against a reference circuit, EARNED (task
 //                    075: ccTable.ts's cells — blank until run, a dash where
@@ -85,7 +91,7 @@ import {
 import { toolLabel } from '../src/palette';
 import { signalColor, type CanvasColors } from '../src/canvasTheme';
 import { ccOutputCell, ccRowKey, ccTableView } from '../src/ccTable';
-import { documentSections } from '../src/problemSet';
+import { documentSections, pageIndexOf, problemPages } from '../src/problemSet';
 import {
   COLLAPSED_STRIP,
   LEFT_PANEL,
@@ -93,6 +99,7 @@ import {
   assignmentShortName,
   clampPanelWidth,
   editorLayoutFromPrefs,
+  problemMark,
   questionHeading,
   questionList,
   questionListTag,
@@ -140,25 +147,53 @@ console.log('\n[question list]');
 {
   const hw1 = hw(1);
   const doc = documentSections(hw1);
+  const at = (id: number) => hw1.questions.findIndex((q) => q.id === id);
   const marks = new Map<number, QuestionCircuit>([
     [hw1.questions[0].id, circuit({ done: true })],
     [hw1.questions[1].id, circuit({ components: [{ id: 'c', type: 'AND', x: 0, y: 0, ports: [], rotation: 0, label: '' } as unknown as QuestionCircuit['components'][number]] })],
-    [hw1.questions[5].id, circuit({ responseText: '   ' })],
-    [hw1.questions[6].id, circuit({ responseText: 'An answer.' })],
+    // Problem 6 (task 048: parts 6, 18, 19): a blank part a, an answered b.
+    [6, circuit({ responseText: '   ' })],
+    [18, circuit({ responseText: 'An answer.' })],
+    // Problem 7: blank text.
+    [7, circuit({ responseText: '   ' })],
+    // Problem 9 (parts 9, 20): both marked done. Problem 10 (10, 21, 22): two of three.
+    [9, circuit({ done: true })],
+    [20, circuit({ done: true })],
+    [10, circuit({ done: true })],
+    [21, circuit({ done: true })],
   ]);
   const list = questionList(hw1, (id) => marks.get(id), 3);
   check('HW1: the document\'s four sections, in order', list.map((s) => s.heading).join(' | ') === doc.map((s) => s.heading).join(' | ') && list.length === 4);
   const rows = list.flatMap((s) => s.rows);
-  check('HW1: one row per problem (23), each index once', rows.length === 23 && new Set(rows.map((r) => r.index)).size === 23);
-  check('HW1: the document\'s numbering (1…5, 6a, 6b, 6c, 7 …)',
-    rows.slice(0, 8).map((r) => r.number).join(',') === '1,2,3,4,5,6a,6b,6c');
+  const row = (n: string) => rows.find((r) => r.number === n)!;
+  check('HW1: one row per PROBLEM (17 — 6, 9, 10 and 13 have parts), each index once',
+    rows.length === 17 && new Set(rows.map((r) => r.index)).size === 17);
+  check('HW1: the document\'s numbering, a multi-part problem numbered once (1…17)',
+    rows.map((r) => r.number).join(',') === '1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17');
+  check('a multi-part problem\'s row opens its first part and names the problem ("Problem 6")',
+    row('6').index === at(6) && row('6').label === 'Problem 6' && row('13').index === at(13) && row('13').label === 'Problem 13');
   check('exactly the open question is current', rows.filter((r) => r.current).map((r) => r.index).join() === '3');
-  check('marks are the student\'s own: done, started (a part), none (blank text), started (text)',
-    rows[0].mark === 'done' && rows[1].mark === 'started' && rows[5].mark === null && rows[6].mark === 'started' && rows[2].mark === null);
+  check('…and a later part\'s index makes its problem\'s row current',
+    questionList(hw1, () => undefined, at(19)).flatMap((s) => s.rows).filter((r) => r.current).map((r) => r.number).join() === '6');
+  check('marks are the student\'s own: done, started (a part), none (blank text)',
+    rows[0].mark === 'done' && rows[1].mark === 'started' && row('7').mark === null && rows[2].mark === null);
+  check('a multi-part problem is started when any part is, done only when every part is',
+    row('6').mark === 'started' && row('9').mark === 'done' && row('10').mark === 'started' && row('13').mark === null);
+  check('problemMark over parts: all done → done; any work → started; none → null',
+    problemMark(['done', 'done']) === 'done' && problemMark(['done', null]) === 'started' &&
+      problemMark([null, 'started']) === 'started' && problemMark([null, null]) === null && problemMark(['done']) === 'done');
   check('a titled row shows its title; an untitled one its label',
-    rows[0].title === 'NAND' && rows[5].title === null && rows[5].label === 'Problem 6a');
-  check('HW1 tags: the circuits CC (accent), the prose "Written"',
-    rows[0].tag.text === 'CC' && rows[0].tag.machine && rows[5].tag.text === 'Written' && !rows[5].tag.machine);
+    rows[0].title === 'NAND' && row('7').title === null && row('7').label === 'Problem 7');
+  check('HW1 tags: the circuits CC (accent), the prose "Written"; parts of mixed kinds "Written", one kind shared',
+    rows[0].tag.text === 'CC' && rows[0].tag.machine && row('7').tag.text === 'Written' && !row('7').tag.machine &&
+      row('6').tag.text === 'Written' && row('13').tag.text === 'Number');
+  // Prev / Next and "k of M" walk problemPages: a multi-part problem is ONE page.
+  const pages = problemPages(hw1);
+  check('problemPages: HW1\'s 17 pages, the rows\' indices, in document order',
+    pages.length === 17 && pages.join() === rows.map((r) => r.index).join());
+  check('every part\'s index opens its problem\'s page (Prev / Next and the position read it)',
+    [6, 18, 19].every((id) => pageIndexOf(hw1, at(id)) === at(6)) && pageIndexOf(hw1, at(23)) === at(13) &&
+      pages.indexOf(pageIndexOf(hw1, at(18))) === 5 && pages[6] === at(7));
   check('done outranks started', questionMark(circuit({ done: true, responseText: 'x' })) === 'done');
   check('a filled blank starts a question; an empty map entry does not',
     questionMark(circuit({ fillAnswers: ['', '42'] })) === 'started' && questionMark(circuit({ fillAnswers: ['', ' '] })) === null && questionMark(undefined) === null);
@@ -183,7 +218,8 @@ console.log('\n[question list]');
       questionListTag({ buildMode: 'SC', perception: { rule: { kind: 'change' }, width: 8 } } as never).text === 'SC - perception');
 
   check('the heading: "Problem 1 · NAND", or just the label',
-    questionHeading(hw1.questions[0]) === 'Problem 1 · NAND' && questionHeading(hw1.questions[5]) === 'Problem 6a');
+    questionHeading(hw1.questions[0]) === 'Problem 1 · NAND' && questionHeading(hw1.questions[5]) === 'Problem 6a' &&
+      questionHeading({ label: 'Problem 6' }) === 'Problem 6');
   check('the list header\'s short name: "HW1" from the title; none without a code',
     assignmentShortName(hw1.title) === 'HW1' && assignmentShortName('HW12a. Later') === 'HW12a' && assignmentShortName('Practice set') === null);
   check('section notes are named by what is behind them',
@@ -232,9 +268,30 @@ console.log('\n[one frame]');
   // students never receive test_cases in remote mode.
   // The fill-in panel draws a table from its headers and row count (task
   // 079), never from the key, so a student's key-less copy renders the same.
-  for (const rel of ['workbench.ts', 'components/QuestionPanel.tsx', 'components/EditorShell.tsx', 'components/EditorTopBar.tsx', 'components/FillInPanel.tsx']) {
-    check(`${rel} reads no answer key`, !/test_cases|perception_cases|fill_in_answers/.test(read(rel)));
+  // So does the Worksheet (task 048) — and it never asks a key-reading
+  // question (isReviewTable) of a student's key-less copy.
+  for (const rel of ['workbench.ts', 'components/QuestionPanel.tsx', 'components/EditorShell.tsx', 'components/EditorTopBar.tsx', 'components/Worksheet.tsx']) {
+    check(`${rel} reads no answer key`, !/test_cases|perception_cases|fill_in_answers|isReviewTable/.test(read(rel)));
   }
+  check('the old answer panels are gone (the Worksheet replaces them)',
+    !existsSync(join(SRC, 'components/OpenResponsePanel.tsx')) && !existsSync(join(SRC, 'components/FillInPanel.tsx')) &&
+      /<Worksheet \/>/.test(app));
+  // The rendered order (stem, prompt → field per part, closing) is pinned by
+  // a real render of WorksheetSheet in navResetCheck [worksheet]; here, that
+  // the app shows that same sheet, fed straight from the store.
+  const ws = code('components/Worksheet.tsx');
+  const sheetAt = ws.indexOf('export function WorksheetSheet');
+  const sheetOnward = sheetAt < 0 ? '' : ws.slice(sheetAt);
+  check('the Worksheet is one connector: the store\'s page, live text, lock, save state and setters and the one paste guard go straight into WorksheetSheet',
+    /<WorksheetSheet\b/.test(ws) &&
+      ['assignment', 'index', 'liveText', 'lockNotice', 'pasteNotice', 'saveFailing', 'pasteGuardRef'].every((p) => ws.includes(`${p}={${p}}`)) &&
+      ws.includes('onText={setOpenResponse}') && ws.includes('onFill={setFillAnswer}') &&
+      (ws.match(/usePasteGuard\(/g) ?? []).length === 1);
+  check('…and the sheet reads nothing from the store (it draws from its props alone, as rendered)',
+    sheetAt > ws.indexOf('export function Worksheet()') && ws.indexOf('export function Worksheet()') >= 0 &&
+      !/useStore|getState/.test(sheetOnward));
+  check('ProblemContext is retired (the question panel renders the whole problem through ProblemBody)',
+    !/ProblemContext/.test(read('components/ProblemSetDocument.tsx')) && /<ProblemBody problem=\{problem\}/.test(code('components/QuestionPanel.tsx')));
   const panel = code('components/QuestionPanel.tsx');
   check('the done mark goes through the store\'s toggle (the lock stays the store\'s, law 3)',
     /toggleCurrentQuestionDone/.test(panel) && !/isCurrentQuestionLocked/.test(panel));

@@ -447,21 +447,25 @@
     {
       "id": 6,
       "label": "Problem 6a",
-      "statement": "Consider the function *m*(⋅) defined by the following **equation**: for any integers *x*, *y*, and *z*: *m*(*x*, *y*, *z*) = 3 + (*x* • *y* • *z*)\n\nDefine the function in English, with no mathematical symbolism, using the terms “function”, “argument”, “value”, “apply”, and “return” correctly.",
+      "stem": "Consider the function *m*(⋅) defined by the following **equation**: for any integers *x*, *y*, and *z*: *m*(*x*, *y*, *z*) = 3 + (*x* • *y* • *z*)",
+      "statement": "Define the function in English, with no mathematical symbolism, using the terms “function”, “argument”, “value”, “apply”, and “return” correctly.",
       "buildMode": "open",
       "representation": "binary"
     },
     {
       "id": 18,
       "label": "Problem 6b",
-      "statement": "Describe the function *m*(⋅) from 6a with another English sentence using the phrase “maps ... to”.",
+      "partOf": 6,
+      "statement": "Describe the function with another English sentence using the phrase “maps ... to”.",
+      "answerField": "line",
       "buildMode": "open",
       "representation": "binary"
     },
     {
       "id": 19,
       "label": "Problem 6c",
-      "statement": "How many **places** does the function *m*(⋅) from 6a have?",
+      "partOf": 6,
+      "statement": "How many **places** does the function have?",
       "buildMode": "open",
       "representation": "binary",
       "fill_in": {
@@ -491,14 +495,18 @@
     {
       "id": 9,
       "label": "Problem 9a",
-      "statement": "Consider the function *j*(⋅) that maps two integers *x* and *y* to their product, so long as both *x* and *y* are between 0 and 2, inclusive. For any other arguments, it is undefined. This is a problem about **partial functions**.\n\nDefine *j*(⋅) with an equation.",
+      "stem": "Consider the function *j*(⋅) that maps two integers *x* and *y* to their product, so long as both *x* and *y* are between 0 and 2, inclusive. For any other arguments, it is undefined.",
+      "statement": "Define *j*(⋅) with an equation.",
+      "closing": "This is a problem about **partial functions**.",
+      "answerField": "line",
       "buildMode": "open",
       "representation": "binary"
     },
     {
       "id": 20,
       "label": "Problem 9b",
-      "statement": "Define *j*(⋅) from 9a with a table: give its value for each pair of arguments where it is defined.",
+      "partOf": 9,
+      "statement": "Define *j*(⋅) with a table: give its value for each pair of arguments where it is defined.",
       "buildMode": "open",
       "representation": "binary",
       "fill_in": {
@@ -546,21 +554,27 @@
     {
       "id": 10,
       "label": "Problem 10a",
-      "statement": "The **Boolean numbers** are 0 and 1. A **Boolean function** is a function which has only Boolean numbers as arguments and values.\n\nUsing an equation, define a 1-place Boolean function which maps 1’s to 0’s, and 0’s to 1’s.",
+      "stem": "The **Boolean numbers** are 0 and 1. A **Boolean function** is a function which has only Boolean numbers as arguments and values.",
+      "statement": "Using an equation, define a 1-place Boolean function which maps 1’s to 0’s, and 0’s to 1’s.",
+      "answerField": "line",
       "buildMode": "open",
       "representation": "binary"
     },
     {
       "id": 21,
       "label": "Problem 10b",
+      "partOf": 10,
       "statement": "Using an equation, define a 1-place Boolean function which maps any Boolean number to itself. This is called the **identity function**.",
+      "answerField": "line",
       "buildMode": "open",
       "representation": "binary"
     },
     {
       "id": 22,
       "label": "Problem 10c",
+      "partOf": 10,
       "statement": "Using an equation, define a 1-place Boolean function which maps any Boolean number to the number one. This is called a **constant function**.",
+      "answerField": "line",
       "buildMode": "open",
       "representation": "binary"
     },
@@ -611,7 +625,8 @@
     {
       "id": 13,
       "label": "Problem 13a",
-      "statement": "Add the binary number 1111 to the binary number 1, using one of the methods of addition from the Petzold reading. Type the sum as a binary numeral.",
+      "statement": "Add the binary number 1111 to the binary number 1.",
+      "closing": "Use one of the methods of addition from the Petzold reading, and type each sum as a binary numeral.",
       "buildMode": "open",
       "representation": "binary",
       "fill_in": {
@@ -627,6 +642,7 @@
     {
       "id": 23,
       "label": "Problem 13b",
+      "partOf": 13,
       "statement": "Add the binary number 1011 to the binary number 11001.",
       "buildMode": "open",
       "representation": "binary",

@@ -17,7 +17,8 @@
 // hand-grading queue's soft claims (task 066; storage/gradingClaims.ts — TTL,
 // renewal, never stolen, one per grader); [queue] the queue's pure logic
 // (src/instructor/gradingQueueViews.ts — states, Save & next's skips, J/K,
-// the counts line, hidden names); [feed] buildQuestionResponses over the same
+// the counts line, hidden names; a review table — task 048 — is a hand
+// problem the queue offers); [feed] buildQuestionResponses over the same
 // fixture (who is in it and in what order, answers by kind, the suggestion,
 // no answer key or circuit); [regrade dialog] the re-grade's rows and
 // summary line (task 069 — an autograde's move, the grade's, the override
@@ -74,6 +75,7 @@ import {
   flagKindCounts,
   historyLine,
   isCounted,
+  isHandQuestion,
   matchesSearch,
   MATRIX_FILTERS,
   overviewTiles,
@@ -369,6 +371,26 @@ console.log('[queue]');
     hideNamesPrefKey('a@x.edu') !== hideNamesPrefKey('b@x.edu'));
   check('the problem picker: hand problems, and any other with a response waiting on a person',
     queueProblemIds(summary, asg).join() === String(O.id));
+  // A REVIEW table (task 048): a fill-in table authored with no key is
+  // graded by hand — the queue offers it before anyone submits, as it does a
+  // prose problem; a keyed table is the autograder's.
+  const R = { id: 7, label: 'Problem 7', statement: 'Define f with a table.', buildMode: 'open', representation: 'binary',
+    fill_in: { table: { columns: ['x', 'f(x)'], argColumns: 1, rows: 2 } }, fill_in_answers: [] } as AssignmentQuestion;
+  const K = { ...R, id: 8, label: 'Problem 8', fill_in_answers: ['0', '1', '1', '0'] } as AssignmentQuestion;
+  check('isHandQuestion: prose and a review table are hand problems; a keyed table and a machine are not',
+    isHandQuestion(O) && isHandQuestion(R) && !isHandQuestion(K) && !isHandQuestion(M));
+  const asgR: AssignmentData = { ...asg, questions: [M, O, R, K] };
+  const noneYet = buildAssignmentSummary({ assignment: asgR, roster, latest: [], identify: (key) => who(key, 'x'), released: false, now: NOW });
+  check('…so the queue offers a review table before anyone submits (a keyed one only once a response waits)',
+    queueProblemIds(noneYet, asgR).join() === `${O.id},${R.id}`);
+  const pendingR = latest.map((r) => ({
+    ...r,
+    submission: { ...r.submission, answers: [...r.submission.answers, { questionId: R.id, circuit: EMPTY, fillAnswers: ['0', '1'] }] },
+    result: { ...r.result!, questions: [...r.result!.questions, { questionId: R.id, status: 'pending', passed: 0, total: 0, cases: [] } as unknown as QuestionResult] },
+  }));
+  const withR = buildAssignmentSummary({ assignment: asgR, roster, latest: pendingR, identify: (key) => who(key, 'x'), released: false, now: NOW });
+  check('…and a submitted review table waits on a person in the queue',
+    queueProblemIds(withR, asgR).includes(R.id) && withR.rows.some((r) => r.latest && r.problems[2]?.source === 'pending'));
   const order = submitterKeys(summary);
   check('by student: submitters in the stable key order (roster, then the rest); the ones with work waiting',
     order.join() === 'ka,kb,kc,kd,kf,kx' && studentsWithWork(summary).map((r) => r.student.key).join() === 'kb,kc,kd,kx');

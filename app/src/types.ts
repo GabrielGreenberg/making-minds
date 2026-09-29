@@ -218,7 +218,8 @@ export interface FillInCaseResult {
 // belong to a section or a problem, and figures. These types give that level a
 // home in the data so one renderer (components/ProblemSetDocument.tsx) can show
 // any assignment the way its author laid it out. `questions[]` stays flat and
-// stays the grading unit; everything here is display-only — the grader,
+// stays the grading unit (a multi-part problem groups several of them — see
+// AssignmentQuestion.partOf); everything here is display-only — the grader,
 // submissions, workbooks and the server's sanitizer never read it. Semantics
 // (section normalisation, numbering, layout) live in src/problemSet.ts.
 
@@ -342,6 +343,27 @@ export interface AssignmentQuestion {
   callouts?: Callout[];
   figures?: Figure[];
   notes?: string;
+  // ── Multi-part problems (task 048; memo multi-part-problems.md) ──────────
+  // A printed problem with parts (a), (b), (c) is a run of WRITTEN questions,
+  // each still its own grading unit — its own id, result, grade, 1 point and
+  // editing record — grouped for display: one page, one stem, one Mark done
+  // (src/problemSet.ts problemGroups). Display only, like the document level
+  // above: the grader, score and sanitize.ts never read these fields, and
+  // none carries an answer.
+  /** A written (open) question's field: one `line`, or a `paragraph`
+   *  (absent = paragraph). Fill-in blanks and tables take their shape from
+   *  `fill_in`. */
+  answerField?: 'line' | 'paragraph';
+  /** This question is a later part of the problem whose FIRST part has this
+   *  id. It must follow that problem's parts directly, in the same section;
+   *  anything else stands as a problem of its own (validateDocument names it). */
+  partOf?: number;
+  /** On a problem's first part (or a single written question): the text
+   *  before its parts — the problem's shared setup. */
+  stem?: string;
+  /** On a problem's first part: the text after its last part ("This is a
+   *  problem about partial functions."). */
+  closing?: string;
 }
 
 /**

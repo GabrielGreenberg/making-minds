@@ -43,7 +43,7 @@ import type {
   SubmissionResult,
 } from '../types';
 import { questionTask } from '../types';
-import { fillInKeyProblem, gradeFillIn } from './fillIn';
+import { fillInKeyProblem, gradeFillIn, isReviewTable } from './fillIn';
 import { notationForRepresentation } from './tmCodec';
 import {
   gradingCircuit,
@@ -127,7 +127,9 @@ function pendingOpen(questionId: number, responseText: string | undefined): Ques
  * a table (graded as a function, order-free — engine/fillIn.ts), all-or-nothing
  * at the question level like every other mode (passed === total ⇒ the
  * question passes). The per-case detail carries the expected answers, so it
- * is instructor-only — server/src/sanitize.ts strips it.
+ * is instructor-only — server/src/sanitize.ts strips it. A review table (no
+ * key at all, task 048) is left `pending` for a person, like an open
+ * question; its cells stay on the submission's answer (`fillAnswers`).
  */
 function gradeFillInQuestion(
   question: AssignmentQuestion,
@@ -135,6 +137,9 @@ function gradeFillInQuestion(
 ): QuestionResult {
   const spec = question.fill_in!;
   const answers = question.fill_in_answers ?? [];
+  if (isReviewTable(spec, answers)) {
+    return { questionId: question.id, status: 'pending', reason: 'table — needs manual review', passed: 0, total: 0, cases: [] };
+  }
   const problem = fillInKeyProblem(spec, answers);
   if (problem) return skip(question.id, problem);
   const fillCases = gradeFillIn(spec, answers, fillAnswers);

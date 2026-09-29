@@ -455,8 +455,9 @@ unpublished.
 Student regrade requests (decision 14) · exam and participation grades and the course letter
 (decision 12b) · per-problem release · read-access logging · a cross-student
 structure-fingerprint for machines · LLM suggestions in the queue (task 014: a suggestion a
-human confirms, never a grade) · per-part grades (task 048 extends the grade key with a part
-when multi-part questions land; 048 decides how parts roll up to the problem's 1 point).
+human confirms, never a grade) · per-part grades — resolved by 048: a part is a question
+(its own id, grade and 1 point; parts don't roll up, so the grade key needs no part —
+multi-part-problems.md).
 
 ## 11. Mockups
 `docs/buildout/designs/grading-interface/mockups.html` draws every surface above, using the

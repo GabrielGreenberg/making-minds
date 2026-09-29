@@ -48,6 +48,18 @@
 // and the live editing record (the next person mints under their own key only
 // once their open registers it), and [provenance across canvas swaps] — every
 // swap carries each question's record through the ONE fold / load helper.
+// [multi-part problem] (task 048): HW1 problem 6 is ONE page — a saved
+// index on a later part opens it, old answers under 18 and 19 show there,
+// each part's field and record are its own (folded under its own id), one
+// done toggle writes every part and the one lock refuses every part's
+// setter, a viewed or frozen submission shows every part's submitted
+// answer, a follower index is no swap, and a principal change clears all.
+// Within it, [worksheet] renders the answer area for real (react-dom/server,
+// the store's page and live text handed to WorksheetSheet): the stem, each
+// part's prompt directly followed by its field by kind (paragraph, line,
+// blank, 079's table set through the store), the closing, the foot; a
+// single question likewise; read-only when done; a line part holding a
+// line break keeps a paragraph field.
 // [edit during run] (task 011) pins the EDIT law beside the two: a machine
 // edit (gradedMachineKey changes) restarts every live run — SC, FSM, TM,
 // turbot — at t=1 keeping its input and the undo history; moves, rotation,
@@ -120,6 +132,15 @@ const { peekClipboard, stampText, currentProvenance } = await import('../src/pro
 const { mintKeyFor, mintId, verifyId, deriveMintKey, DEV_MINT_SECRET } = await import('../src/provenance/ids');
 /** Both of the seam's slots empty. */
 const clipboardEmpty = () => peekClipboard().canvas === null && peekClipboard().text === null;
+/** The open page's own question id (its first part, which owns the canvas),
+ *  and — task 048: the live answers and records are per part — that part's
+ *  live text and live editing record. */
+const pageId = (): number => {
+  const s = useStore.getState();
+  return s.assignment?.questions[s.currentQuestionIndex]?.id ?? -1;
+};
+const liveResponse = (id = pageId()): string => useStore.getState().liveText[id]?.responseText ?? '';
+const liveTrace = (id = pageId()) => useStore.getState().liveTraces[id] ?? null;
 
 let passed = 0;
 let failed = 0;
@@ -374,9 +395,9 @@ console.log('[mark as done]');
   useStore.getState().paste();
   useStore.getState().clearWorkspace();
   check('clearWorkspace is refused while locked', useStore.getState().components.length === before);
-  const openBefore = useStore.getState().openResponse;
-  useStore.getState().setOpenResponse('sneaking in an edit');
-  check('setOpenResponse is refused while locked', useStore.getState().openResponse === openBefore);
+  const openBefore = liveResponse();
+  useStore.getState().setOpenResponse(pageId(), 'sneaking in an edit');
+  check('setOpenResponse is refused while locked', liveResponse() === openBefore);
 
   useStore.getState().switchQuestion(1);
   useStore.getState().switchQuestion(0);
@@ -446,8 +467,8 @@ console.log('[frozen assignment]');
   const beforeRefusedEdit = useStore.getState().components.length;
   useStore.getState().addComponent('NOT', 300, 100);
   check('edits are refused once frozen', useStore.getState().components.length === beforeRefusedEdit);
-  useStore.getState().setOpenResponse('sneaking in an edit');
-  check('setOpenResponse is refused once frozen', useStore.getState().openResponse === '');
+  useStore.getState().setOpenResponse(pageId(), 'sneaking in an edit');
+  check('setOpenResponse is refused once frozen', liveResponse() === '');
 
   useStore.getState().switchQuestion(1);
   useStore.getState().switchQuestion(0);
@@ -530,7 +551,7 @@ console.log('[viewing a submission]');
   useStore.setState({ selectedIds: [useStore.getState().components[0].id] });
   useStore.getState().copySelected(); // something a paste could land, were it allowed
   useStore.getState().addComponent('OR', 200, 100);
-  const liveTrace = useStore.getState().questionTrace;
+  const q1Trace = liveTrace();
   check('live Q1 diverged to 2 components; not frozen (due in the future)',
     useStore.getState().components.length === 2 && !selectAssignmentFrozen(useStore.getState()));
 
@@ -558,8 +579,8 @@ console.log('[viewing a submission]');
       (useStore.getState().components[0].rotation ?? 0) === (only.rotation ?? 0) &&
       useStore.getState().undoStack.length === undoBefore);
   }
-  useStore.getState().setOpenResponse('sneaking in an edit');
-  check('setOpenResponse is refused', useStore.getState().openResponse === '');
+  useStore.getState().setOpenResponse(pageId(), 'sneaking in an edit');
+  check('setOpenResponse is refused', liveResponse() === '');
   useStore.setState({ undoStack: [{ components: [], wires: [], boxes: [], confirmedBoxes: [] }] });
   useStore.getState().undo();
   check('undo is refused', useStore.getState().components.length === 1 && useStore.getState().undoStack.length === 1);
@@ -606,7 +627,7 @@ console.log('[viewing a submission]');
     const live = useStore.getState().questionCircuits.get(q1.id);
     check('questionCircuits holds the diverged live Q1 (2 components)', live?.components.length === 2);
     check("…and the live Q1's editing record, unchanged",
-      JSON.stringify(live?.provenance ?? null) === JSON.stringify(liveTrace ?? null));
+      JSON.stringify(live?.provenance ?? null) === JSON.stringify(q1Trace ?? null));
   }
   // (e) …and in the saved workbook: goHome's direct save writes the live map.
   useStore.getState().goHome();
@@ -1836,7 +1857,7 @@ console.log('[principal change]');
   const keyOf = (who: string) => deriveMintKey(DEV_MINT_SECRET, who, SAMPLE_ASSIGNMENT_ID);
   check("A's open registered A's mint key: A's gate binds to A",
     mintKeyFor(SAMPLE_ASSIGNMENT_ID) != null && verifyId(aGate.id, keyOf(A)));
-  check('…and the edit started a live editing record', useStore.getState().questionTrace != null);
+  check('…and the edit started a live editing record', liveTrace() != null);
   useStore.setState({ selectedIds: [aGate.id] });
   useStore.getState().copySelected();
   // …and a sentence copied in an answer field (usePasteGuard's text slot).
@@ -1871,7 +1892,8 @@ console.log('[principal change]');
     check('sign-out: submissions map empty', Object.keys(s.submissions).length === 0);
     check('sign-out: back to the welcome state', !s.workbookOpen && s.autoSaveStatus === 'saved');
     check("sign-out: the mint keys are gone (they were A's)", mintKeyFor(SAMPLE_ASSIGNMENT_ID) === null);
-    check('sign-out: no live editing record', s.questionTrace === null);
+    check('sign-out: no live answer text or editing record (task 048: every part\'s)',
+      Object.keys(s.liveText).length === 0 && Object.keys(s.liveTraces).length === 0);
   }
   checkAllSimFresh('after sign-out');
   useStore.getState().resetForPrincipal(null);
@@ -2091,27 +2113,31 @@ console.log('[own submissions]');
 
 console.log('[provenance across canvas swaps]');
 {
-  // The fold and the load are written ONCE (store.ts foldLiveQuestion /
-  // loadQuestionFields), so no swap can drop a live field on the way.
+  // The fold and the load are written ONCE (store.ts foldLiveProblem /
+  // loadProblemFields — every part of the open problem, task 048), so no
+  // swap can drop a live field on the way.
   const { readFileSync } = await import('node:fs');
   const storeSrc = readFileSync(new URL('../src/store.ts', import.meta.url), 'utf8');
-  const folds = storeSrc.match(/boxes: \w+\.boxes,\s*\n\s*responseText: \w+\.openResponse/g) ?? [];
-  check('one fold: the live canvas + text are folded into a container in one place only', folds.length === 1);
+  const folds = storeSrc.match(/responseText: \w+\.responseText,\s*\n\s*fillAnswers: \w+\.fillAnswers,\s*\n\s*done: /g) ?? [];
+  check('one fold: the live canvas + text are folded into a container in one place only',
+    folds.length === 1 && (storeSrc.match(/\bfunction foldLiveProblem\(/g) ?? []).length === 1);
   check('one load: a container is loaded into the live text in one place only',
-    storeSrc.split('openResponse: saved.responseText').length - 1 === 1 &&
-    !storeSrc.includes('openResponse: activeCircuit.responseText'));
+    (storeSrc.match(/responseText: saved\.responseText \?\? ''/g) ?? []).length === 1 &&
+    (storeSrc.match(/\bfunction loadProblemFields\(/g) ?? []).length === 1);
+  check('…and the single-question fields are gone (openResponse, fillAnswers, questionTrace)',
+    !/\b(openResponse|questionTrace|foldLiveQuestion|loadQuestionFields)\b|\bs(tate)?\.fillAnswers\b/.test(storeSrc));
 
   useStore.getState().resetForPrincipal('swap@x.test');
   await useStore.getState().openAssignment(SAMPLE_ASSIGNMENT_ID);
   const asg = useStore.getState().assignment!;
   const [q1, q2] = [asg.questions[0].id, asg.questions[1].id];
-  const trace = () => JSON.stringify(useStore.getState().questionTrace);
+  const trace = () => JSON.stringify(liveTrace());
   const saved = (qid: number) => JSON.stringify(useStore.getState().questionCircuits.get(qid)?.provenance ?? null);
   useStore.getState().switchQuestion(0);
   if (useStore.getState().questionCircuits.get(q1)?.done) useStore.getState().toggleCurrentQuestionDone();
   useStore.getState().addComponent('AND', 120, 120);
   const t1 = trace();
-  check('an edit on P1 writes its live record', useStore.getState().questionTrace != null);
+  check('an edit on P1 writes its live record', liveTrace() != null);
   useStore.getState().switchQuestion(1);
   check('switchQuestion folds P1\'s record into its container', saved(q1) === t1);
   check('…and loads P2\'s own (none yet), not P1\'s', trace() !== t1);
@@ -2130,12 +2156,233 @@ console.log('[provenance across canvas swaps]');
   useStore.getState().goHome();
   check('goHome folds the live record', saved(q1) === t1);
   useStore.getState().closeAssignment();
-  check('closeAssignment drops the live record', useStore.getState().questionTrace === null);
+  check('closeAssignment drops the live record', liveTrace() === null);
   await useStore.getState().openAssignment(SAMPLE_ASSIGNMENT_ID);
   useStore.getState().switchQuestion(0);
   check('openAssignment loads each record back from the workbook seam, byte-equal',
     trace() === t1 && saved(q2) === t2);
   useStore.getState().goHome();
+}
+
+// ═════ A multi-part problem is ONE page (task 048) ═══════════════
+
+console.log('[multi-part problem]');
+{
+  // The real HW1 (its problems 6, 9, 10 and 13 have parts), undated so it
+  // freezes only when this section says so.
+  const { readFileSync } = await import('node:fs');
+  const hw1 = JSON.parse(readFileSync(new URL('../src/devData/homeworks/hw1.json', import.meta.url), 'utf8'));
+  const PARTS_ID = 'hw1-parts';
+  const who = 'parts@x.test';
+  const def = { ...hw1, id: PARTS_ID, dueDate: undefined };
+  await localAssignmentStore.save(def);
+  await localAssignmentStore.setVisible(PARTS_ID, true);
+  const idx = (id: number) => def.questions.findIndex((q: { id: number }) => q.id === id);
+  const st = () => useStore.getState();
+  const saved = (id: number) => st().questionCircuits.get(id);
+
+  // A workbook saved before the fold (task 046's lettered questions): the
+  // student was on "6b", with answers under 18 and 19.
+  await workbookStore.saveAssignmentState(PARTS_ID, {
+    currentQuestionIndex: idx(18),
+    questionCircuits: {
+      18: { components: [], wires: [], boxes: [], responseText: 'It maps x, y, z to 3 + xyz.' },
+      19: { components: [], wires: [], boxes: [], fillAnswers: ['3'] },
+    },
+  });
+  st().resetForPrincipal(who);
+  check('HW1 opens', (await st().openAssignment(PARTS_ID)) === true);
+  check('a saved index on part b opens problem 6\'s page (its first part)', st().currentQuestionIndex === idx(6));
+  check('the old answers under 18 and 19 show on that page',
+    liveResponse(18) === 'It maps x, y, z to 3 + xyz.' && st().liveText[19]?.fillAnswers[0] === '3' && liveResponse(6) === '');
+  check('the page holds exactly its three parts', Object.keys(st().liveText).map(Number).sort((a, b) => a - b).join() === '6,18,19');
+
+  // Each part's field is its own; navigating away folds every part.
+  st().setOpenResponse(6, 'Apply m to three arguments; it returns 3 plus their product.');
+  st().setOpenResponse(18, 'm maps x, y and z to 3 + xyz.');
+  st().setFillAnswer(19, 0, '3');
+  st().setOpenResponse(7, 'not on this page');
+  check('a part not on the open page is refused', st().liveText[7] === undefined && saved(7)?.responseText === undefined);
+  check('each part keeps its own editing record, signed under its own id',
+    liveTrace(6) != null && liveTrace(18) != null && liveTrace(19) != null &&
+    JSON.stringify(liveTrace(6)) !== JSON.stringify(liveTrace(18)));
+
+  // [worksheet] Done when 0, rendered for real (react-dom/server) from the
+  // store's own page, live text and lock, as the Worksheet connector hands
+  // them over: the stem, then each part's letter and prompt DIRECTLY followed
+  // by that part's field (by its kind, holding that part's answer), then the
+  // closing, then the one foot line.
+  console.log('[worksheet]');
+  // KaTeX (the statements' math) asks the document for standards mode.
+  (globalThis as unknown as { document: Record<string, unknown> }).document.compatMode = 'CSS1Compat';
+  const React = await import('react');
+  const { renderToStaticMarkup } = await import('react-dom/server');
+  const { WorksheetSheet } = await import('../src/components/Worksheet');
+  // tsx compiles .tsx with the classic JSX transform: a global React.
+  (globalThis as unknown as Record<string, unknown>).React = React;
+  const sheet = (): string => renderToStaticMarkup(React.createElement(WorksheetSheet, {
+    assignment: st().assignment!,
+    index: st().currentQuestionIndex,
+    liveText: st().liveText,
+    lockNotice: selectLockNotice(st()),
+    pasteNotice: null,
+    saveFailing: false,
+    pasteGuardRef: () => undefined,
+    onText: st().setOpenResponse,
+    onFill: st().setFillAnswer,
+  }));
+  /** Every piece found, each after the one before it (null = in order). */
+  const outOfOrder = (html: string, pieces: string[]): string | null => {
+    let at = 0;
+    for (const p of pieces) {
+      const i = html.indexOf(p, at);
+      if (i < 0) return `"${p}" missing after offset ${at}`;
+      at = i + p.length;
+    }
+    return null;
+  };
+  const count = (html: string, piece: string) => html.split(piece).length - 1;
+  const letter = (x: string) => `<strong class="wb-sheet-letter">${x}.</strong>`;
+  const LINE = '<input class="wb-sheet-line"';
+  const PARAGRAPH = '<textarea class="wb-answer-text wb-sheet-paragraph"';
+  const BLANK = '<input class="wb-fill-input"';
+  const CELL = '<input class="wb-fill-cell"';
+  const FOOT = '<div class="wb-answer-foot">Saved as you type.</div>';
+  {
+    const html = sheet();
+    const order = outOfOrder(html, [
+      'Problem 6', 'defined by the following', // the stem
+      letter('a'), 'Define the function in English', PARAGRAPH, '>Apply m to three arguments', '</textarea>',
+      letter('b'), 'Describe the function with another English sentence', LINE, 'value="m maps x, y and z to 3 + xyz."',
+      letter('c'), 'How many', BLANK, 'value="3"',
+      FOOT,
+    ]);
+    check('problem 6 reads as a worksheet: the stem, then a, b, c — each prompt directly followed by its own field and answer, then the foot',
+      order === null, order ?? undefined);
+    check('…each part\'s field by its kind: a paragraph (6a), a line (6b), a blank (6c) — one each, nothing else',
+      count(html, PARAGRAPH) === 1 && count(html, LINE) === 1 && count(html, BLANK) === 1 && count(html, CELL) === 0);
+    check('…the stem once, above every part (not restated per part)',
+      count(html, 'defined by the following') === 1 && html.indexOf('defined by the following') < html.indexOf(letter('a')));
+    check('…and nothing on it is read-only while the problem is open', !/readOnly|readonly/.test(html));
+  }
+  // A single written question reads the same way: its statement, then its field.
+  st().switchQuestion(idx(7));
+  st().setOpenResponse(7, 'k(x, y) = xy + 1');
+  {
+    const html = sheet();
+    const order = outOfOrder(html, ['Problem 7', 'successor', PARAGRAPH, '>k(x, y) = xy + 1</textarea>', FOOT]);
+    check('a single written question (7): its statement, then its one paragraph field, then the foot — no letter',
+      order === null && !html.includes('wb-sheet-letter') && count(html, PARAGRAPH) === 1, order ?? undefined);
+  }
+  // Problem 9: a line and 079's table, then the closing. The table part is
+  // set through the store like any part (cell (r, c) is fillAnswers[r·3 + c]).
+  st().switchQuestion(idx(20));
+  check('opening 9b lands on problem 9\'s page', st().currentQuestionIndex === idx(9));
+  st().setOpenResponse(9, 'j(x, y) = x times y');
+  for (const [i, v] of [[0, '0'], [1, '0'], [2, '0'], [24, '2'], [25, '2'], [26, '4']] as const) st().setFillAnswer(20, i, v);
+  check('the table part (9b) takes its cells through the store, under its own id',
+    st().liveText[20]?.fillAnswers.slice(0, 3).join() === '0,0,0' && st().liveText[20]?.fillAnswers[26] === '4' &&
+      liveTrace(20) != null && liveResponse(9) === 'j(x, y) = x times y');
+  {
+    const html = sheet();
+    const order = outOfOrder(html, [
+      'Problem 9', 'maps two integers', // the stem
+      letter('a'), 'with an equation', LINE, 'value="j(x, y) = x times y"',
+      letter('b'), 'with a table', '<table class="mm-table wb-fill-table">', '>x</th>', '>y</th>', '>j(x, y)</th>',
+      CELL, 'value="0"', 'aria-label="j(x, y), row 9"', 'value="4"', '</table>',
+      'partial functions', // the closing, after the last part
+      FOOT,
+    ]);
+    check('problem 9 reads as a worksheet: the stem, a\'s line, b\'s table (headers, then its 9 rows of cells), then the closing',
+      order === null, order ?? undefined);
+    check('…the table draws exactly its authored 9 rows × 3 columns of cells, from no key',
+      count(html, CELL) === 27 && count(html, LINE) === 1 && count(html, PARAGRAPH) === 0);
+  }
+  // A line part holding a line break (an answer saved while 9a was a
+  // paragraph) keeps a paragraph field: an <input> would flatten the break.
+  st().setOpenResponse(9, 'j(x, y) = x times y for x, y from 0 to 2\nundefined otherwise');
+  {
+    const html = sheet();
+    check('a line part whose answer already holds a line break renders a paragraph field, the break intact',
+      count(html, LINE) === 0 && count(html, PARAGRAPH) === 1 &&
+        html.includes('>j(x, y) = x times y for x, y from 0 to 2\nundefined otherwise</textarea>'));
+  }
+  st().switchQuestion(idx(6));
+  check('leaving problem 9 folds the table part under its own id',
+    saved(20)?.fillAnswers?.[26] === '4' && saved(20)?.provenance != null && saved(9)?.responseText?.includes('\n') === true);
+  check('back on problem 6, its parts load back', liveResponse(18) === 'm maps x, y and z to 3 + xyz.');
+
+  st().switchQuestion(idx(7));
+  check('navigating away folds every part under its own id',
+    saved(6)?.responseText?.startsWith('Apply m') === true && saved(18)?.responseText === 'm maps x, y and z to 3 + xyz.' &&
+      saved(19)?.fillAnswers?.[0] === '3' && saved(18)?.provenance != null && saved(19)?.provenance != null);
+  st().switchQuestion(idx(19));
+  check('switchQuestion(part c) lands on the first part\'s page', st().currentQuestionIndex === idx(6));
+  const textBefore = st().liveText;
+  st().switchQuestion(idx(18));
+  check('…and another part of the open page is no swap at all', st().liveText === textBefore && st().currentQuestionIndex === idx(6));
+  check('its parts load back', liveResponse(18) === 'm maps x, y and z to 3 + xyz.' && st().liveText[19]?.fillAnswers[0] === '3');
+
+  // One Mark done covers the problem: the toggle writes every part, and the
+  // one lock (isCurrentQuestionLocked) refuses every part's setter.
+  st().toggleCurrentQuestionDone();
+  check('the done toggle writes every part', [6, 18, 19].every((id) => saved(id)?.done === true));
+  check('the problem reads locked', selectQuestionLocked(st()));
+  {
+    const html = sheet();
+    const notice = selectLockNotice(st());
+    check('[worksheet] done: every part\'s field renders read-only, and the foot says why',
+      notice !== null && count(html, 'readOnly=""') === 3 && html.includes(`<div class="wb-answer-foot">${notice}</div>`) &&
+        !html.includes(FOOT));
+  }
+  st().setOpenResponse(18, 'sneaking in an edit');
+  st().setFillAnswer(19, 0, '4');
+  st().setOpenResponse(6, 'sneaking in an edit');
+  check('every part\'s setter is refused while done',
+    liveResponse(18) === 'm maps x, y and z to 3 + xyz.' && st().liveText[19]?.fillAnswers[0] === '3' && liveResponse(6).startsWith('Apply m'));
+  st().toggleCurrentQuestionDone();
+  check('toggling again unlocks every part', [6, 18, 19].every((id) => saved(id)?.done === false) && !selectQuestionLocked(st()));
+  // A legacy save with only some parts done (each part had its own mark):
+  // the problem is not done until every part is, and the toggle marks all.
+  useStore.setState({ questionCircuits: new Map(st().questionCircuits).set(18, { ...saved(18)!, done: true }) });
+  check('one part done of three: the problem is not done (not locked)', !selectQuestionLocked(st()));
+  st().toggleCurrentQuestionDone();
+  check('…and the toggle then marks every part', [6, 18, 19].every((id) => saved(id)?.done === true));
+  st().toggleCurrentQuestionDone();
+
+  // A submission on show shows every part's SUBMITTED answer, read-only.
+  const rec = await st().submitAssignment(PARTS_ID, who);
+  const n = rec!.attempt;
+  check('the submission carries each part as its own answer',
+    rec?.submission.answers.find((a) => a.questionId === 18)?.responseText === 'm maps x, y and z to 3 + xyz.' &&
+      rec?.submission.answers.find((a) => a.questionId === 19)?.fillAnswers?.[0] === '3');
+  st().setOpenResponse(18, 'changed after submitting');
+  check('(b edited after submitting)', liveResponse(18) === 'changed after submitting');
+  check(`viewSubmission(${n}) resolves`, (await st().viewSubmission(n)) === true);
+  check('the view shows every part\'s submitted answer',
+    liveResponse(18) === 'm maps x, y and z to 3 + xyz.' && st().liveText[19]?.fillAnswers[0] === '3' && liveResponse(6).startsWith('Apply m'));
+  st().setOpenResponse(18, 'sneaking in an edit');
+  st().setFillAnswer(19, 0, '9');
+  check('…read-only: every part\'s setter is refused', liveResponse(18) === 'm maps x, y and z to 3 + xyz.' && st().liveText[19]?.fillAnswers[0] === '3');
+  await st().viewSubmission(null);
+  check('back to the live work: part b as last edited', liveResponse(18) === 'changed after submitting');
+
+  // Frozen (past due + submitted): every part shows the submission.
+  useStore.setState({ assignment: { ...st().assignment!, dueDate: new Date(Date.now() - 86_400_000).toISOString() } });
+  check('now frozen', selectAssignmentFrozen(st()));
+  st().setOpenResponse(18, 'sneaking in an edit');
+  check('every part is locked once frozen', liveResponse(18) === 'changed after submitting');
+  st().switchQuestion(idx(7));
+  st().switchQuestion(idx(18));
+  check('the frozen page shows every part\'s submitted answer',
+    st().currentQuestionIndex === idx(6) && liveResponse(18) === 'm maps x, y and z to 3 + xyz.' && st().liveText[19]?.fillAnswers[0] === '3');
+
+  st().goHome();
+  st().resetForPrincipal(null);
+  check('a principal change clears every part\'s live text and record',
+    Object.keys(st().liveText).length === 0 && Object.keys(st().liveTraces).length === 0);
+  // It has a submission now, so it is hidden rather than removed.
+  await localAssignmentStore.setVisible(PARTS_ID, false);
 }
 
 // ═════ One sandbox per person per browser ═══════════════════════
