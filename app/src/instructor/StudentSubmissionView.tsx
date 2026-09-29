@@ -401,8 +401,9 @@ function SubmissionDetail({
             </div>
           );
         }
-        // Fill-in questions grade one typed string per blank, or one key row
-        // of a table (named by its arguments; engine/fillIn.ts).
+        // Fill-in questions grade one typed string per blank, one key row of
+        // a table (named by its arguments), or one box of an invented
+        // numeral (by rule, with its reason; engine/fillIn.ts).
         if (qr.fillCases) {
           const wrong = qr.fillCases.filter((c) => !c.pass);
           const noun = fillInCaseNoun(q?.fill_in);
@@ -423,7 +424,10 @@ function SubmissionDetail({
                       <tr key={ci}>
                         <td>{c.label}</td>
                         <td className="instructor-bits">{c.expected}</td>
-                        <td className="instructor-bits instructor-fail">{c.got === '' ? (noun === 'row' ? '(no row)' : '(blank)') : c.got}</td>
+                        <td className="instructor-bits instructor-fail">
+                          {c.got === '' ? (noun === 'row' ? '(no row)' : '(blank)') : c.got}
+                          {c.reason && ` — ${c.reason}`}
+                        </td>
                       </tr>
                     ))}
                   </tbody>

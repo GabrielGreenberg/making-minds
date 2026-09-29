@@ -310,6 +310,18 @@ a.wb-brand:hover { color: var(--mm-accent); text-decoration: none; }
   height: 44px; padding: 0 12px; font-family: var(--mm-font-mono); font-size: 16px; color: var(--mm-ink);
   background: var(--mm-surface); border: 1px solid var(--mm-line-2); border-radius: var(--mm-radius);
 }
+/* An invented numeral (task 080): boxes sized to what goes in them — a
+   compact square per digit symbol, its type large enough to read a comma or
+   an emoji, and a short box per number; never a stretched grid. Same
+   specificity as the rule above, so these (after it) win. */
+.wb-numeral { display: flex; flex-direction: column; gap: 18px; }
+.wb-numeral-head { margin-bottom: 8px; font-size: var(--mm-fs-small); font-weight: 600; color: var(--mm-ink); }
+.wb-numeral-group { display: flex; flex-wrap: wrap; gap: 12px 16px; }
+.wb-fill-field--symbol { align-items: center; }
+.wb-answer .wb-fill-input--symbol {
+  width: 56px; height: 56px; padding: 0; text-align: center; font-family: var(--mm-font-sans); font-size: 28px;
+}
+.wb-answer .wb-fill-input--short { width: 240px; max-width: 100%; height: 52px; font-family: var(--mm-font-sans); font-size: 24px; }
 /* A fill-in TABLE (task 079): theme.css's .mm-table, each cell a whole-width
    mono input; a rule parts the argument columns from the value columns.
    Headers keep their case — they are math ("j(x, y)"), not eyebrows. */

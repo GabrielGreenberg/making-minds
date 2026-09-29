@@ -11,12 +11,17 @@
 // paragraph, labelled blanks, or a blank argument–value TABLE (task 079;
 // cell (r, c) is fillAnswers[r·C + c]) drawn from the spec's headers and row
 // count, never from a key — a student's copy has none, and nothing here
-// reads one. Each part's answer is its own: the store's liveText[its id],
-// saved and graded as that question.
+// reads one. An invented NUMERAL system (task 080) is blanks sized to what
+// goes in them: a compact symbol box per digit, labelled by its meaning,
+// then a short box per number to write (box i is fillAnswers[i]). Nothing
+// here derives the numeral from the symbols — that is the answer. Each
+// part's answer is its own: the store's liveText[its id], saved and graded
+// as that question.
 //
 // Every field on the page wears the ONE provenance guard (usePasteGuard; law
 // 8): only text copied in the student's own assignments pastes in, and
-// nothing copied here reaches the system clipboard. Into a digits-only blank
+// nothing copied here reaches the system clipboard — a numeral's boxes are
+// the blank's one guarded <input> (BlankField). Into a digits-only blank
 // or column no characters but digits reach the store. Locking is the
 // store's (both setters ask isCurrentQuestionLocked first; law 3) —
 // `readOnly` here only shows it.
@@ -30,7 +35,7 @@ import type { AssignmentData, AssignmentQuestion } from '../types';
 import { useStore, selectLockNotice, type LiveText } from '../store';
 import { usePasteGuard } from '../usePasteGuard';
 import { problemLabel, resolveProblem, writtenKind } from '../problemSet';
-import { fillInShape, fillInTableRows, type FillInTableShape } from '../engine/fillIn';
+import { fillInShape, fillInTableRows, type FillInBlank, type FillInTableShape } from '../engine/fillIn';
 import { FigureView } from './ProblemSetDocument';
 import { InlineMarkup, StatementBody } from './StatementBody';
 
@@ -195,27 +200,41 @@ function PartField({
         />
       );
     }
-    return (
-      <div className="wb-fill-grid">
-        {/* Keyed by position: answers are positional (fillAnswers[i] is
-            blank i), and labels are unique only by authoring. */}
-        {shape.blanks.map((blank, i) => (
-          <label key={i} className="wb-fill-field">
-            <span className="wb-fill-label">{blank.label}</span>
-            <input
-              className="wb-fill-input"
-              value={text.fillAnswers[i] ?? ''}
-              inputMode={blank.digitsOnly ? 'numeric' : 'text'}
-              autoComplete="off"
-              spellCheck={false}
-              readOnly={locked}
-              ref={pasteGuardRef}
-              onChange={(e) => setFillAnswer(i, blank.digitsOnly ? e.target.value.replace(/\D/g, '') : e.target.value)}
-            />
-          </label>
-        ))}
-      </div>
+    // Keyed by position: answers are positional (fillAnswers[i] is box i),
+    // and labels are unique only by authoring.
+    const field = (blank: FillInBlank, i: number, ariaLabel?: string) => (
+      <BlankField
+        key={i}
+        blank={blank}
+        value={text.fillAnswers[i] ?? ''}
+        ariaLabel={ariaLabel}
+        locked={locked}
+        pasteGuardRef={pasteGuardRef}
+        onChange={(value) => setFillAnswer(i, value)}
+      />
     );
+    if (shape.kind === 'numeral') {
+      // The symbols come first, one per digit; then a box per number.
+      const symbols = shape.blanks.length - shape.numbers.length;
+      return (
+        <div className="wb-numeral">
+          <div className="wb-numeral-part">
+            <div className="wb-numeral-head">Your symbols</div>
+            <div className="wb-numeral-group">
+              {shape.blanks.slice(0, symbols).map((blank, i) => field(blank, i, `Symbol for ${blank.label}`))}
+            </div>
+          </div>
+          <div className="wb-numeral-part">
+            <div className="wb-numeral-head">In your system</div>
+            <div className="wb-numeral-group">
+              {shape.blanks.slice(symbols).map((blank, k) =>
+                field(blank, symbols + k, `${blank.label} in your system`))}
+            </div>
+          </div>
+        </div>
+      );
+    }
+    return <div className="wb-fill-grid">{shape.blanks.map((blank, i) => field(blank, i))}</div>;
   }
   return (
     <textarea
@@ -228,6 +247,49 @@ function PartField({
       spellCheck
       readOnly={locked}
     />
+  );
+}
+
+/** One labelled box — THE fill-in <input> (plain blanks and a numeral's
+ *  boxes alike), wearing the page's one paste guard. Sized by the shape
+ *  (FillInBlank.size): a plain blank keeps exactly class "wb-fill-input"; a
+ *  symbol or short box adds its modifier, and — its case being part of the
+ *  answer — turns the phone keyboard's capitals and corrections off. It
+ *  never refuses a second character as you type (that would cut an emoji or
+ *  an IME composition short): the grader holds the one-character rule. */
+function BlankField({
+  blank,
+  value,
+  ariaLabel,
+  locked,
+  pasteGuardRef,
+  onChange,
+}: {
+  blank: FillInBlank;
+  value: string;
+  ariaLabel?: string;
+  locked: boolean;
+  pasteGuardRef: GuardRef;
+  onChange: (value: string) => void;
+}) {
+  const sized = blank.size !== 'blank';
+  return (
+    <label className={sized ? `wb-fill-field wb-fill-field--${blank.size}` : 'wb-fill-field'}>
+      <span className="wb-fill-label">{blank.label}</span>
+      <input
+        className={sized ? `wb-fill-input wb-fill-input--${blank.size}` : 'wb-fill-input'}
+        value={value}
+        aria-label={ariaLabel}
+        inputMode={blank.digitsOnly ? 'numeric' : 'text'}
+        autoComplete="off"
+        autoCapitalize={sized ? 'off' : undefined}
+        autoCorrect={sized ? 'off' : undefined}
+        spellCheck={false}
+        readOnly={locked}
+        ref={pasteGuardRef}
+        onChange={(e) => onChange(blank.digitsOnly ? e.target.value.replace(/\D/g, '') : e.target.value)}
+      />
+    </label>
   );
 }
 

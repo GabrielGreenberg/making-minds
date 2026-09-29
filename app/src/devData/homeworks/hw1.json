@@ -618,9 +618,20 @@
     {
       "id": 12,
       "label": "Problem 12",
-      "statement": "Invent a new **base-6 counting system**, with all new symbols for the 6 digits (including zero!). List your basic symbols and their meanings. Then represent the number thirty-two in this system.\n\nFor your symbols, use characters you can type (letters, punctuation marks, emoji), but not the digits 0–9.",
+      "statement": "Invent a new **base-6 counting system**, with all new symbols for the 6 digits (including zero!). Type each of your symbols in the box for its meaning. Then represent the number thirty-two in this system.\n\nEach symbol must be a single character you can type (a letter, a punctuation mark, an emoji), different from your other symbols, and not one of the digits 0–9.",
       "buildMode": "open",
-      "representation": "binary"
+      "representation": "binary",
+      "fill_in": {
+        "numeral": {
+          "base": 6,
+          "numbers": [
+            {
+              "value": 32,
+              "label": "thirty-two"
+            }
+          ]
+        }
+      }
     },
     {
       "id": 13,

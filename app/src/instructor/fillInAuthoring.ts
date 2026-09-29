@@ -1,10 +1,12 @@
-// Fill-in authoring (task 005; tables, task 079) — the pure half of the
-// question creator's "Fill-in" task: pure functions, no React calls (its one
-// borrowing, dragReorder.ts's `moveItem`, is pure too, though that module
-// also holds a hook), like ccPreview.ts and arenaEditing.ts
-// (FillInBlanksEditor.tsx and FillInTableEditor.tsx are the widgets over it). A fill-in question is one of two shapes
-// (engine/fillIn.ts `fillInShape`): labelled blanks, or an argument–value
-// table graded as a function.
+// Fill-in authoring (task 005; tables, task 079; numerals, task 080) — the
+// pure half of the question creator's "Fill-in" task: pure functions, no
+// React calls (its one borrowing, dragReorder.ts's `moveItem`, is pure too,
+// though that module also holds a hook), like ccPreview.ts and
+// arenaEditing.ts (FillInBlanksEditor.tsx, FillInTableEditor.tsx and
+// FillInNumeralEditor.tsx are the widgets over it). A fill-in question is
+// one of three shapes (engine/fillIn.ts `fillInShape`): labelled blanks, an
+// argument–value table graded as a function, or an invented numeral system
+// graded by rule.
 //
 // Blanks: the creator edits a list of blank DRAFTS, one row object per blank
 // — label, digits-only flag and answer together — so adding, removing or
@@ -16,7 +18,8 @@
 // `fillInShape` is the one reader). They write each field in a single
 // canonical form, so a no-op edit of a hand-written question (HW1 P11, P14,
 // P9b) reproduces it exactly and the homework sync still sees it as
-// untouched.
+// untouched. A numeral: ONE draft of its base and the numbers to write
+// (value + label), saved by `fillInNumeralFields` with no key at all.
 //
 // Answers go ONLY into `fill_in_answers` (row-major for a table), never
 // inside `fill_in`: the server strips `fill_in_answers` from a student's copy
@@ -25,8 +28,10 @@
 
 import type { AssignmentQuestion, FillInSpec } from '../types';
 import {
+  FILL_IN_NUMERAL_MAX_BASE,
   FILL_IN_TABLE_MAX_ROWS,
   fillInBlanks,
+  fillInCaseCount,
   fillInRowLabel,
   fillInShape,
   normalizeFillAnswer,
@@ -439,4 +444,159 @@ export function fillInTableFields(
     fill_in,
     fill_in_answers: draft.keyRows.flatMap((row) => draft.columns.map((_, j) => (row.cells[j] ?? '').trim())),
   };
+}
+
+// ── An invented NUMERAL system (task 080) ───────────────────────────────────
+
+export interface FillInNumeralNumberDraft {
+  /** React key — a counter, never saved (see FillInBlankDraft.key). It also
+   *  names the number across edits, so `misplacedNumeralWarning` can tell a
+   *  relabelled number from a moved one. */
+  key: number;
+  /** The number, as typed. */
+  value: string;
+  /** Its box's label ("thirty-two"). */
+  label: string;
+}
+
+export interface FillInNumeralDraft {
+  /** The base, as typed. */
+  base: string;
+  numbers: FillInNumeralNumberDraft[];
+}
+
+/** The numeral draft of a saved question — null unless its shape is a
+ *  numeral. */
+export function numeralDraftOf(
+  q: Pick<AssignmentQuestion, 'fill_in'> | undefined,
+): FillInNumeralDraft | null {
+  if (!q?.fill_in) return null;
+  const shape = fillInShape(q.fill_in);
+  if (shape.kind !== 'numeral') return null;
+  return {
+    base: String(shape.base),
+    numbers: shape.numbers.map((n) => ({ key: freshKey(), value: String(n.value), label: n.label })),
+  };
+}
+
+/** A new number to write, empty. */
+export function newNumeralNumber(): FillInNumeralNumberDraft {
+  return { key: freshKey(), value: '', label: '' };
+}
+
+/** A new numeral: base 6 (HW1 P12's), one empty number to fill in. */
+export function newNumeralDraft(): FillInNumeralDraft {
+  return { base: '6', numbers: [newNumeralNumber()] };
+}
+
+/** One thing that blocks saving a numeral: `number` is the 0-based number it
+ *  belongs to (null = the system as a whole); `message` is a verb phrase
+ *  about that number, or a sentence for the whole. */
+export interface FillInNumeralDefect {
+  number: number | null;
+  message: string;
+}
+
+/**
+ * Everything that makes a numeral draft unsaveable — each rule guards
+ * something the student or the grader would otherwise hit
+ * (engine/fillIn.ts `fillInKeyProblem` refuses the same spec):
+ *  - a base that is not a whole number from 2 to `FILL_IN_NUMERAL_MAX_BASE`:
+ *    base 1 has no positional numerals, and past 16 the symbol boxes have
+ *    no names;
+ *  - no numbers: the system would never be used;
+ *  - a value that is not a whole number ≥ 0: it has no numeral;
+ *  - an empty or repeated label: the student's box and the grade sheet name
+ *    a number by its label, so two must never read the same.
+ */
+export function fillInNumeralDefects(draft: FillInNumeralDraft): FillInNumeralDefect[] {
+  const out: FillInNumeralDefect[] = [];
+  const base = Number(draft.base.trim());
+  if (draft.base.trim() === '' || !Number.isInteger(base) || base < 2 || base > FILL_IN_NUMERAL_MAX_BASE) {
+    out.push({ number: null, message: `The base must be a whole number from 2 to ${FILL_IN_NUMERAL_MAX_BASE}.` });
+  }
+  if (draft.numbers.length === 0) out.push({ number: null, message: 'Add at least one number to write.' });
+  const firstWithLabel = new Map<string, number>();
+  draft.numbers.forEach((n, j) => {
+    const raw = n.value.trim();
+    const value = Number(raw);
+    if (raw === '' || !Number.isSafeInteger(value) || value < 0) {
+      out.push({ number: j, message: 'needs a value — a whole number, 0 or more' });
+    }
+    const label = n.label.trim();
+    if (label === '') {
+      out.push({ number: j, message: 'needs a label' });
+    } else if (firstWithLabel.has(label)) {
+      out.push({ number: j, message: `repeats the label "${label}" of number #${firstWithLabel.get(label)! + 1}` });
+    } else {
+      firstWithLabel.set(label, j);
+    }
+  });
+  return out;
+}
+
+/** The defects as sentences naming their number ("Number #2 needs a
+ *  label."); empty = saveable. */
+export function fillInNumeralProblems(draft: FillInNumeralDraft): string[] {
+  return fillInNumeralDefects(draft).map((d) =>
+    d.number === null ? d.message : `Number #${d.number + 1} ${d.message}.`);
+}
+
+/**
+ * The saved field: `fill_in` holding the numeral alone — the base and each
+ * number's value and trimmed label, in one canonical form (so a no-op edit
+ * of HW1 P12 reproduces it exactly). No `fill_in_answers`: a numeral has no
+ * key, and saving one would be refused (engine/fillIn.ts fillInKeyProblem).
+ */
+export function fillInNumeralFields(draft: FillInNumeralDraft): Required<Pick<AssignmentQuestion, 'fill_in'>> {
+  return {
+    fill_in: {
+      numeral: {
+        base: Number(draft.base.trim()),
+        numbers: draft.numbers.map((n) => ({ value: Number(n.value.trim()), label: n.label.trim() })),
+      },
+    },
+  };
+}
+
+/** How many cases the draft will be graded on — the N of its ½ rule: its
+ *  symbols and its numbers (engine/fillIn.ts fillInCaseCount, the one
+ *  count). */
+export function numeralCaseCount(draft: FillInNumeralDraft): number {
+  return fillInCaseCount(fillInNumeralFields(draft).fill_in, []);
+}
+
+/**
+ * What an edit would do to the answers students have already given to the
+ * numeral this question was saved with, as one sentence for the creator's
+ * warning and its save confirmation — or null when every such answer still
+ * reads as it did. Answers are stored BY POSITION — the symbols, then one
+ * box per number (store.ts setFillAnswer, Worksheet, engine/fillIn.ts) — and
+ * nothing re-maps a saved workbook or submission, so they survive only
+ * while the base stays (it fixes how many symbols come first, and what they
+ * mean) and every saved number keeps its slot (a draft's `key` survives a
+ * relabel). Changing a number's value or label, or appending numbers, is
+ * safe. `saved` is the numeral the question opened with (null: none);
+ * `next` the one about to be saved (null: it stops being a numeral).
+ */
+export function misplacedNumeralWarning(
+  saved: FillInNumeralDraft | null,
+  next: FillInNumeralDraft | null,
+): string | null {
+  if (!saved) return null;
+  const lead = 'Answers students have already given to the invented numeral';
+  if (!next) {
+    return `${lead} will be read as something else, or dropped — they are stored box by box. ` +
+      `Keep the question a numeral to keep them.`;
+  }
+  if (Number(saved.base.trim()) !== Number(next.base.trim())) {
+    return `${lead} will shift — the base sets how many symbol boxes come first and what each one ` +
+      `means, so every symbol and number answer moves. Keep the base to keep them lined up.`;
+  }
+  const moved = saved.numbers.filter((n, k) => next.numbers[k]?.key !== n.key).map((n) => `"${n.label.trim()}"`);
+  if (moved.length > 0) {
+    return `${lead} for ${moved.join(', ')} will now sit beside a different number, or be dropped — ` +
+      `answers match boxes by position. Relabel numbers in place and add new ones at the end.`;
+  }
+  return null;
 }

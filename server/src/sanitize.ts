@@ -55,7 +55,9 @@ export function stripAnswers(assignment: AssignmentData): AssignmentData {
       // — that's the statement) but lose the generated case bank (the key);
       // fill-in questions keep their `fill_in` labels or table headers and
       // sizes (they ARE the prompts — nothing key-bearing enters `fill_in`)
-      // and lose the answers (a table's key rows too, row-major).
+      // and lose the answers (a table's key rows too, row-major). An
+      // invented numeral's base and numbers are prompts too, with no key at
+      // all (task 080: graded by rule against the student's own symbols).
       // `perception_examples` passes through BY DESIGN (task 059): the films
       // the instructor flagged "Example for students", derived into their own
       // field at save — safe by construction, so this stripper stays
@@ -84,6 +86,9 @@ function stripPerceptionCaseResult(c: PerceptionCaseResult): PerceptionCaseResul
   return { pass: c.pass, frames: c.frames, expected: [], got: [], failStep: c.failStep, reason: c.reason };
 }
 
+/** Keep `label` + `pass`. `expected` / `got` are the key, and `reason` (an
+ *  invented numeral's, task 080) stays with the instructor like them —
+ *  whitelisted, so it drops by construction. */
 function stripFillInCaseResult(c: FillInCaseResult): FillInCaseResult {
   return { label: c.label, expected: '', got: '', pass: c.pass };
 }

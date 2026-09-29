@@ -207,8 +207,10 @@ export function problemLabel(assignment: AssignmentData, index: number): string 
 
 /** What a written question's answer field is: a `line`, a `paragraph`
  *  (an open question — `answerField`, absent = paragraph), labelled
- *  `blanks` or a `table` (a fill-in question — its shape). Null for a
- *  machine question. Reads no key, so a student's copy classifies alike. */
+ *  `blanks` or a `table` (a fill-in question — its shape; an invented
+ *  numeral's boxes are `blanks`, drawn to its own shape by the Worksheet).
+ *  Null for a machine question. Reads no key, so a student's copy
+ *  classifies alike. */
 export function writtenKind(q: AssignmentQuestion): 'line' | 'paragraph' | 'blanks' | 'table' | null {
   const task = questionTask(q);
   if (task === 'open') return q.answerField === 'line' ? 'line' : 'paragraph';

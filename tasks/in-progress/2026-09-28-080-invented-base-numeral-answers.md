@@ -91,3 +91,45 @@ renders the same size: `.wb-fill-grid` columns ≥ 160px, mono 16px
   short numeral box, as a worksheet, not a stretched grid.
 
 ## Progress log
+
+### 2026-09-28 — implemented (work loop)
+**Built.** HW1 P12 is machine-graded now. Students see six small symbol boxes, zero to five
+(56px square, 28px type), under "Your symbols", then one short box (240px) for thirty-two
+under "In your system". It is a third fill-in shape, `fill_in.numeral: {base, numbers:
+[{value, label}]}`, next to blanks and table. `engine/fillIn.ts` stays the one reader
+(`fillInShape`, `fillInKeyProblem`, `fillInCaseCount`), and a pure `gradeInventedNumeral`
+grades it by rule with no key. Each symbol must be one grapheme (`Intl.Segmenter`), must not
+be a digit (`isDigitSymbol`: NFKD, marks and invisibles stripped, `\p{Nd}`, so disguised
+digits fail too), and must differ from the other symbols. The numeral, with whitespace
+removed and in NFC, must equal the student's symbol for five then for two, and both of those
+symbols must be sound. A failed case carries a `reason`, which is instructor-only like
+`expected`/`got`, so sanitize keeps label + pass. The creator has a "Numeral" shape
+(`FillInNumeralEditor` over pure `fillInAuthoring.ts` numeral drafts) that round-trips P12
+byte-for-byte and warns when an edit would misplace saved answers. `validateDocument` checks
+the shape. The P12 statement was lightly edited to match the boxes. The HW1 demo seed now
+answers P12 in its boxes.
+**Pins.** `pipelineCheck [fill-in numerals]` covers: the shape and N = 7; 7/7 for a sound
+set; a repeat fails both copies; a digit fails, including keycap, fullwidth, VS16,
+combining-accent, circled, math-bold and Arabic-Indic forms; two characters fail; the wrong
+order fails; whitespace is ignored; an emoji is one character; NFC; case matters; empty
+boxes fail; an unsound symbol fails the numeral that uses it; labels never show an answer;
+submit from the stripped copy gives 7/7; the seed grades 7/7 and 5/7; the creator
+round-trip; a grep gate. `scoreCheck` pins N = 7 and the ½ math. `statementFormatCheck`
+pins `validateDocument` and `writtenKind`. `navResetCheck` pins the worksheet markup and
+folding. `workbenchCheck` pins the "Fill-in" tag. `parityCheck` pins server ≡ direct at 7/7
+and 2/7, and that the student copy keeps the spec, has an empty key, and shows label + pass
+only. The `pasteCheck` comment now says the boxes are BlankField's guarded input.
+**Gates** (exit codes): app-tsc 0, app-build 0, app-check 0, server-tsc 0, server-check 0.
+At checkpoint, app-tsc and pipelineCheck were re-run: both 0.
+**Review.** Fixed: the seed's P12 answers were moved to boxes, and disguised digits
+(keycap, fullwidth, etc.) are now rejected. Skipped: none. Nit left alone: the grading
+queue lists numeral boxes under bare labels "zero" … "five" (`GradingQueue.tsx:839`), with
+no "symbol" wording.
+**Owed (not claimed).** An eyeball in the Robot Dev Server (port 5190, local mode). Check P12
+at desktop width and at 375px (the boxes wrap, with no page scroll), and the locked
+styling after Mark done. Then check the grading flow: submit to Grades, where P12 is 1
+point, then a reversed numeral, which lists 'blank "thirty-two"' failed with no expected
+string. Then the instructor submission page, and a creator save with no edits, after which
+hw1 must still read unchanged. After release, Gabriel checks the pilot: P12 shows the
+fields and `homeworks -- status` lists hw1 as refreshed.
+**Next step:** loop session: visual check if owed, then land per PROFILE §5.

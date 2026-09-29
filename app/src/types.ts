@@ -164,25 +164,33 @@ export interface TestCase {
 }
 
 /**
- * A fill-in question: boxes the student types answers into, graded by string
- * comparison, not by running a machine (engine/fillIn.ts) — the only
- * normalisation is leading zeros. Two shapes, told apart ONLY by
- * engine/fillIn.ts `fillInShape` (a present `table` wins):
- *  - blanks: a short list of labelled boxes (`labels`), box i against key i;
+ * A fill-in question: boxes the student types answers into, graded as
+ * strings, not by running a machine (engine/fillIn.ts). Three shapes, told
+ * apart ONLY by engine/fillIn.ts `fillInShape` (a present `table` wins, then
+ * a `numeral`, else `labels`):
+ *  - blanks: a short list of labelled boxes (`labels`), box i against key i
+ *    (the only normalisation is leading zeros);
  *  - a table (task 079): a blank argument–value table the student fills
  *    whole, arguments too, graded as a function — order-free, one case per
- *    key row.
+ *    key row;
+ *  - an invented numeral system (task 080): a symbol box per digit of a
+ *    base, then a box per number to write in it, graded BY RULE against the
+ *    student's own symbols — one case per box, and no key at all.
  *
- * The spec ships to students (labels and headers ARE the prompts). The key
- * for both shapes lives only in the separate `fill_in_answers` bank —
- * row-major for a table — which is stripped server-side exactly like
- * `test_cases`; nothing key-bearing may enter `fill_in`.
+ * The spec ships to students (labels, headers, the base and the numbers ARE
+ * the prompts). The key of the first two lives only in the separate
+ * `fill_in_answers` bank — row-major for a table — which is stripped
+ * server-side exactly like `test_cases`; nothing key-bearing may enter
+ * `fill_in`. A numeral's `fill_in_answers` stays empty.
  */
 export interface FillInSpec {
   /** The blanks shape's labels, one per box. Read them only through
    *  engine/fillIn.ts (a table has none). */
   labels?: string[];
   table?: FillInTable;
+  /** An invented numeral system (task 080). Read it only through
+   *  engine/fillIn.ts `fillInShape`. */
+  numeral?: FillInNumeral;
   /** Restrict boxes to digits: `true` = every box (the HW1 P11
    *  binary-numeral case), an array = per blank (parallel to `labels`) or per
    *  table column (parallel to `table.columns`). Read it ONLY through
@@ -202,6 +210,29 @@ export interface FillInTable {
   rows: number;
 }
 
+/**
+ * An invented numeral system (task 080; HW1 P12): the student invents one
+ * symbol for each digit 0…base−1, then writes each number in it. It carries
+ * no key and needs none — the base and the numbers are in the statement, and
+ * the right numeral is spelled in the student's OWN symbols — so it ships
+ * whole to students. The boxes, in answer order: a symbol box per digit
+ * (labelled by its value in words, "zero" …), then one per number.
+ */
+export interface FillInNumeral {
+  /** The system's base: a whole number from 2 to 16
+   *  (engine/fillIn.ts FILL_IN_NUMERAL_MAX_BASE). */
+  base: number;
+  /** The numbers to write in the student's system, in order. */
+  numbers: FillInNumeralNumber[];
+}
+
+export interface FillInNumeralNumber {
+  /** The number, a whole number ≥ 0 (32). */
+  value: number;
+  /** Its box's label, and its graded case's name ("thirty-two"). */
+  label: string;
+}
+
 /** One blank's (or one key row's) outcome — instructor-only, like
  *  CaseResult; a student keeps `label` + `pass` (sanitize.ts). */
 export interface FillInCaseResult {
@@ -209,6 +240,10 @@ export interface FillInCaseResult {
   expected: string;
   got: string;
   pass: boolean;
+  /** Why the case failed, when the rule says more than expected ≠ got — an
+   *  invented numeral's ("is a digit", "repeats the symbol for two").
+   *  Instructor-only too: sanitize.ts keeps label + pass alone. */
+  reason?: string;
 }
 
 // ── The problem-set document (task 2026-09-21-020) ─────────────────────────
@@ -333,9 +368,10 @@ export interface AssignmentQuestion {
   // grader never reads it (perceptionCheck grep gate).
   perception_examples?: PerceptionExample[];
   // Fill-in-the-blank fields (buildMode 'open'). A `fill_in` spec turns the
-  // open question's writing panel into a list of labelled boxes and makes it
-  // autogradable; `fill_in_answers` is the key, and is stripped from student
-  // copies like `test_cases` (see engine/fillIn.ts + server/src/sanitize.ts).
+  // open question's writing panel into labelled boxes (or a table) and makes
+  // it autogradable; `fill_in_answers` is the key — empty for an invented
+  // numeral, graded by rule — and is stripped from student copies like
+  // `test_cases` (see engine/fillIn.ts + server/src/sanitize.ts).
   fill_in?: FillInSpec;
   fill_in_answers?: string[];
   /** Boxed asides and figures that belong to this problem alone (the
@@ -390,7 +426,8 @@ export function questionModeLabel(
  *   turbot     — a brain driven through `turbot_cases` arenas
  *   open       — free prose, `pending` manual review
  *   fill-in    — labelled blanks or an argument–value table, autograded
- *                against `fill_in_answers`
+ *                against `fill_in_answers`, or an invented numeral system,
+ *                autograded by rule (task 080)
  * The order below is the grader's historical precedence, so classification
  * never moved a grade. Pure (no engine import), so every side can call it.
  */
