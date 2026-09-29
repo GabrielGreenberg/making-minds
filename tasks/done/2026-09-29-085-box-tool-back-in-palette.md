@@ -8,9 +8,9 @@ requires: browser
 area: app
 source: feedback
 created: 2026-09-29T15:10:00-07:00
-status: in-progress
+status: done
 after:
-branch: robot/085-box-tool-back-in-palette
+branch:
 merged_into:
 ---
 
@@ -333,3 +333,16 @@ The first step of this task is to run it and name the failure (see Verify).
   the strip at 100%/200% (light only: the app has no dark theme), and the real-pointer drag
   feel of drawing and resizing a draft (recipes in `## Verify`).
 - **Next step:** loop session: visual check if owed, then land per PROFILE §5.
+
+### 2026-09-29 — landed (robot)
+- `origin/main` brought in one new task file (087), so the full PROFILE §6 table was re-run
+  on the merged branch: app-tsc=0 app-build=0 app-check=0 server-tsc=0 server-check=0.
+- Visual check done headless (the attachments above, local and remote), per ROBOT-WORK §3.
+  Spot-checked: the strip at 200% (`-5-`), the palette with a box and its pop-out (`-7-`), and
+  P5's half adder after Run (`-4-`). Checked that `namedBoxes` drops only drafts: before 085,
+  `confirmBox` always gave a box a suggested name, so a saved unnamed box can only be a draft.
+- `CLAUDE.md`: the Student UI row names the BOX tool; date bumped (39,980 bytes).
+- **Owed, not claimed — Gabriel's eyeball by hand** (recipes in `## Verify`): the palette
+  standing and flat with 0 boxes, 1 box, and the box editor open (BOX dimmed); Undo · Redo ·
+  Rotate at 100% and 200%; the real-pointer feel of drawing a box with the armed BOX tile and
+  resizing a draft by its corners.
