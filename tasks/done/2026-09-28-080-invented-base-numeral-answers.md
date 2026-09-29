@@ -8,9 +8,9 @@ requires:
 area: app
 source: feedback
 created: 2026-09-28T10:58:00-07:00
-status: in-progress
+status: done
 after: 2026-09-28-079
-branch: robot/080-invented-base-numeral-answers
+branch:
 merged_into:
 ---
 
@@ -133,3 +133,15 @@ string. Then the instructor submission page, and a creator save with no edits, a
 hw1 must still read unchanged. After release, Gabriel checks the pilot: P12 shows the
 fields and `homeworks -- status` lists hw1 as refreshed.
 **Next step:** loop session: visual check if owed, then land per PROFILE §5.
+
+### 2026-09-28 — landed (robot)
+**Headless look** (Chrome over CDP, Robot Dev Server :5190, local mode, student-john, HW1
+page 12 of 17): six 56×56 symbol boxes labelled zero … five in one row, a 240×52 thirty-two
+box under "In your system", no full-width line; `!`, `?`, `%`, `~`, a skin-toned 👍🏽 and a
+ZWJ family emoji all legible. At 375px the document is 375 wide (no page scroll); the
+editor's 320px question panel leaves the answer column narrow there — the workbench's own
+phone layout, not this task's. `main` had nothing new, so the workflow's gates stand.
+**Still owed to Gabriel (not claimed):** the grading flow (submit → Grades: P12 1 point; a
+reversed numeral lists 'blank "thirty-two"' failed, no expected string), the Mark done
+locked styling, a creator save with no edits leaving hw1 unchanged, and on the pilot after
+release that P12 shows the boxes and `npm run homeworks -- status` lists hw1 refreshed.
