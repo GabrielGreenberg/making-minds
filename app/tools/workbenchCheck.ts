@@ -293,6 +293,8 @@ console.log('\n[question list]');
   check('HW1 tags: the circuits CC (accent), the prose "Written"; parts of mixed kinds "Written", one kind shared',
     rows[0].tag.text === 'CC' && rows[0].tag.machine && row('7').tag.text === 'Written' && !row('7').tag.machine &&
       row('6').tag.text === 'Written' && row('13').tag.text === 'Number');
+  check('HW1 P12, an invented numeral (task 080), is tagged "Fill-in" — its boxes take symbols, not digits',
+    row('12').tag.text === 'Fill-in' && !row('12').tag.machine);
   // Prev / Next and "k of M" walk problemPages: a multi-part problem is ONE page.
   const pages = problemPages(hw1);
   check('problemPages: HW1\'s 17 pages, the rows\' indices, in document order',

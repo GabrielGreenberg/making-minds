@@ -35,6 +35,24 @@
 //                        defect named, which edits misplace answers); and a
 //                        grep pin: `.labels` is read only in engine/fillIn.ts.
 //
+//   [fill-in numerals]   (task 080) HW1 P12's invented base-6 system, graded
+//                        BY RULE against the student's own symbols (no key):
+//                        the shape (6 symbol boxes zero…five, one short box
+//                        "thirty-two", 7 cases), a sound set + the right
+//                        numeral 7/7, a repeat fails both copies, a digit
+//                        (even disguised: keycap 5️⃣, fullwidth ５, 5+VS16,
+//                        5+accent, ⑤, another script's) or a two-character
+//                        symbol fails, the numeral in the
+//                        wrong order fails, whitespace ignored, an emoji is
+//                        one character, NFC, case matters, an unsound symbol
+//                        fails the numeral using it, labels never an answer,
+//                        submit from the stripped copy → 7/7 with the spec
+//                        whole; the HW1 demo seed answers P12 in its boxes
+//                        (7/7 and 5/7); the creator's numeral draft (round-trips P12,
+//                        each defect named, which edits misplace answers);
+//                        and a grep pin: `.numeral` is read only in
+//                        engine/fillIn.ts.
+//
 //   [multi-part problems] (task 048) the HW1 fold changed no grading unit:
 //                        question ids, sections and the grading projection
 //                        (everything but display fields) equal what they were
@@ -42,6 +60,8 @@
 //                        carry no key; a review table (a table with no key)
 //                        grades pending and keeps its cells, a keyed one still
 //                        grades by script, blanks with no key still skip.
+//                        (P12's `fill_in`, task 080's on purpose, sits
+//                        outside the projection; [fill-in numerals] pins it.)
 //
 //   [perception films]   (task 013) an SC perception question authored with
 //                        films (instructor/perceptionAuthoring.ts): submit →
@@ -74,7 +94,7 @@
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import type { AssignmentData, AssignmentQuestion, CircuitData, HumanGrade, QuestionResult, SubmissionRecord } from '../src/types';
+import type { AssignmentData, AssignmentQuestion, CircuitData, HumanGrade, QuestionResult, SubmissionData, SubmissionRecord } from '../src/types';
 import { QUESTION_TASKS, questionModeLabel, questionTask } from '../src/types';
 import {
   buildSampleAssignment,
@@ -97,27 +117,42 @@ import { checkGroup, MAX_GROUP_OTHERS } from '../src/submissionGroup';
 import { emptyQuestionCircuit } from '../src/storage/workbookStore';
 import { buildAssignmentSummary } from '../src/storage/gradingSummary';
 import { problemVerdict } from '../src/gradeDisplay';
-import { FILL_IN_TABLE_MAX_ROWS, fillInBlanks, fillInKeyProblem, fillInShape, isReviewTable } from '../src/engine/fillIn';
+import {
+  FILL_IN_TABLE_MAX_ROWS,
+  fillInBlanks,
+  fillInCaseCount,
+  fillInKeyProblem,
+  fillInShape,
+  isReviewTable,
+} from '../src/engine/fillIn';
 import { sha256, toHex, utf8 } from '../src/provenance/sha256';
 import { problemGroups } from '../src/problemSet';
 import {
   addTableColumn,
   blankDraftsOf,
   fillInFields,
+  fillInNumeralFields,
+  fillInNumeralProblems,
   fillInProblems,
   fillInTableFields,
   fillInTableProblems,
   misplacedAnswersWarning,
   misplacedBlanks,
+  misplacedNumeralWarning,
   misplacedTableWarning,
   moveTableColumn,
   newBlankDraft,
+  newNumeralDraft,
+  newNumeralNumber,
   newTableDraft,
   newTableKeyRow,
+  numeralCaseCount,
+  numeralDraftOf,
   removeTableColumn,
   tableDraftOf,
   tableRowCount,
   type FillInBlankDraft,
+  type FillInNumeralDraft,
   type FillInTableDraft,
 } from '../src/instructor/fillInAuthoring';
 import { moveItem } from '../src/instructor/dragReorder';
@@ -835,6 +870,218 @@ console.log('\n[fill-in tables]');
   for (const f of labelReaders.filter((x) => x !== 'app/src/engine/fillIn.ts')) console.log(`        → ${f}`);
 }
 
+// ── Fill-in numerals (task 080) ────────────────────────────────────
+// HW1 P12: invent a base-6 counting system — a symbol for each digit, then
+// thirty-two in it. No fixed key can exist (the right numeral is the
+// student's OWN symbol for five, then for two), so the shape is graded BY
+// RULE (engine/fillIn.ts gradeInventedNumeral), one case per box, and
+// carries no `fill_in_answers` at all.
+console.log('\n[fill-in numerals]');
+{
+  const hw1 = JSON.parse(
+    readFileSync(new URL('../src/devData/homeworks/hw1.json', import.meta.url), 'utf8'),
+  ) as AssignmentData;
+  const p12 = hw1.questions.find((x) => x.id === 12)!;
+  const p11 = hw1.questions.find((x) => x.id === 11)!;
+  const p14 = hw1.questions.find((x) => x.id === 14)!;
+  const WORDS = ['zero', 'one', 'two', 'three', 'four', 'five'];
+  const SYMBOL_LABELS = WORDS.map((w) => `symbol for ${w}`);
+
+  // (a) The shape: 6 compact symbol boxes named by meaning, then one short
+  // box for thirty-two; no key, 7 cases.
+  const shape = fillInShape(p12.fill_in!);
+  const boxes = shape.kind === 'numeral' ? shape.blanks : [];
+  check('HW1 P12 is a numeral: base 6, boxes zero … five then "thirty-two"',
+    shape.kind === 'numeral' && shape.base === 6 &&
+      boxes.map((b) => b.label).join() === [...WORDS, 'thirty-two'].join());
+  check('…sized symbol ×6 then short, none digits-only; plain blanks (P11) stay size "blank"',
+    boxes.map((b) => b.size).join() === 'symbol,symbol,symbol,symbol,symbol,symbol,short' &&
+      boxes.every((b) => !b.digitsOnly) &&
+      fillInShape(p11.fill_in!).kind === 'blanks' && fillInBlanks(p11.fill_in!).every((b) => b.size === 'blank'));
+  check('it needs no key (fillInKeyProblem null with none) and refuses one',
+    fillInKeyProblem(p12.fill_in!, []) === null && p12.fill_in_answers === undefined &&
+      /takes no answer key/.test(fillInKeyProblem(p12.fill_in!, ['x']) ?? ''));
+  check('it is no review table, and is graded on 7 cases (with or without a key)',
+    !isReviewTable(p12.fill_in, []) && fillInCaseCount(p12.fill_in, []) === 7 && fillInCaseCount(p12.fill_in, undefined) === 7);
+  check('the creator drafts it as neither blanks nor a table',
+    blankDraftsOf(p12).length === 0 && tableDraftOf(p12) === null && fillInBlanks(p12.fill_in!).length === 0);
+
+  const grade = (answers: string[]) => gradeQuestion(p12, undefined, undefined, answers);
+  const score = (r: QuestionResult) => `${r.passed}/${r.total}`;
+  const failed = (r: QuestionResult) => (r.fillCases ?? []).filter((c) => !c.pass).map((c) => c.label).join('|');
+  const reasonOf = (r: QuestionResult, label: string) => (r.fillCases ?? []).find((c) => c.label === label)?.reason;
+  const SYMS = ['a', 'b', 'c', 'd', 'e', 'f'];
+
+  // (b) A sound set and the right numeral: five then two.
+  const right = grade([...SYMS, 'fc']);
+  check('a sound set and the right numeral ("f" for five, then "c" for two) grade 7/7',
+    right.status === 'graded' && score(right) === '7/7' && (right.fillCases ?? []).every((c) => c.reason === undefined));
+  check('case labels name the box: "symbol for zero" … "symbol for five", then "thirty-two"',
+    (right.fillCases ?? []).map((c) => c.label).join('|') === [...SYMBOL_LABELS, 'thirty-two'].join('|'));
+
+  // (c) A repeated symbol fails both copies; the numeral does not use them.
+  const twice = grade(['a', 'a', 'c', 'd', 'e', 'f', 'fc']);
+  check('a repeated symbol (zero = one) fails both copies, each naming the other; the numeral still passes',
+    score(twice) === '5/7' && failed(twice) === 'symbol for zero|symbol for one' &&
+      reasonOf(twice, 'symbol for zero') === 'repeats the symbol for one' &&
+      reasonOf(twice, 'symbol for one') === 'repeats the symbol for zero');
+
+  // (d) A digit, (e) two characters.
+  const digit = grade(['a', 'b', 'c', '3', 'e', 'f', 'fc']);
+  check('"3" as the symbol for three fails: a digit',
+    failed(digit) === 'symbol for three' && reasonOf(digit, 'symbol for three') === 'is a digit');
+  // A digit in disguise is still a digit: the keycap emoji (5 + VS16 +
+  // U+20E3), fullwidth (what a CJK IME types), 5 + an invisible variation
+  // selector, 5 + a combining accent, circled, mathematical bold, and another
+  // script's five (Arabic-Indic) — each fails as the symbol for five.
+  const DISGUISED = ['5\uFE0F\u20E3', '\uFF15', '5\uFE0F', '5\u0301', '\u2464', '\u{1D7D3}', '\u0665'];
+  const disguisedOk = DISGUISED.map((five) => grade(['a', 'b', 'c', 'd', 'e', five, `${five}c`]))
+    .every((r) => failed(r) === 'symbol for five|thirty-two' && reasonOf(r, 'symbol for five') === 'is a digit' &&
+      reasonOf(r, 'thirty-two') === 'uses the invalid symbol for five');
+  check('a disguised digit fails as a symbol: keycap 5\uFE0F\u20E3, fullwidth \uFF15, 5+VS16, 5+accent, \u2464, \u{1D7D3}, Arabic-Indic \u0665',
+    disguisedOk);
+  const fullwidth = grade(['\uFF10', '\uFF11', '\uFF12', '\uFF13', '\uFF14', '\uFF15', '\uFF15\uFF12']);
+  const keycaps = grade([0, 1, 2, 3, 4, 5].map((d) => `${d}\uFE0F\u20E3`).concat('5\uFE0F\u20E32\uFE0F\u20E3'));
+  check('the digits 0\u20135 handed in fullwidth or as keycap emoji grade 0/7, not 7/7',
+    score(fullwidth) === '0/7' && score(keycaps) === '0/7');
+  check('\u2026while a non-digit keycap (#\uFE0F\u20E3), an accented letter (\u00E9) and a digit-like letter (O) stay sound symbols',
+    score(grade(['#\uFE0F\u20E3', '\u00E9', 'O', 'd', 'e', 'f', 'fO'])) === '7/7');
+  const pair = grade(['a', 'b', 'c', 'ab', 'e', 'f', 'fc']);
+  check('"ab" as a symbol fails: two characters',
+    failed(pair) === 'symbol for three' && reasonOf(pair, 'symbol for three') === 'is 2 characters');
+
+  // (f) The numeral in the wrong order.
+  const swapped = grade([...SYMS, 'cf']);
+  check('the numeral in the wrong order (two then five) fails',
+    failed(swapped) === 'thirty-two' && reasonOf(swapped, 'thirty-two') === 'is not your five then two');
+  check('…as does a different numeral, or the digits "52"',
+    failed(grade([...SYMS, 'fcc'])) === 'thirty-two' && failed(grade([...SYMS, '52'])) === 'thirty-two');
+
+  // (g) Whitespace.
+  check('whitespace inside the numeral is ignored (" f  c ", "f\tc")',
+    score(grade([...SYMS, ' f  c '])) === '7/7' && score(grade([...SYMS, 'f\tc'])) === '7/7');
+  check('surrounding spaces on a symbol are ignored', score(grade([' a ', 'b ', ' c', 'd', 'e', ' f', 'fc'])) === '7/7');
+
+  // (h) One character = one grapheme: emoji with a skin tone, a ZWJ family.
+  const EMOJI = ['a', 'b', '👨‍👩‍👧', 'd', 'e', '👍🏽'];
+  const emoji = grade([...EMOJI, '👍🏽 👨‍👩‍👧']);
+  check('"👍🏽" and "👨‍👩‍👧" are one character each, and a numeral built of them passes 7/7',
+    score(emoji) === '7/7');
+  check('…while two emoji in one box are two characters',
+    reasonOf(grade(['a', 'b', 'c', 'd', 'e', '👍🏽👍🏽', '']), 'symbol for five') === 'is 2 characters');
+  check('a decomposed "é" symbol matches a precomposed "é" in the numeral (NFC, joined)',
+    score(grade(['a', 'b', 'c', 'd', 'e', 'e\u0301', '\u00e9c'])) === '7/7');
+
+  // (i) Empty boxes fail, never pending.
+  const none = grade([]);
+  check('no answers at all: graded 0/7, every box "is empty" but the numeral, whose symbols are unsound',
+    none.status === 'graded' && score(none) === '0/7' &&
+      SYMBOL_LABELS.every((l) => reasonOf(none, l) === 'is empty') &&
+      reasonOf(none, 'thirty-two') === 'uses the invalid symbol for five');
+  check('a short answer array (no numeral typed) fails the numeral: "is empty"',
+    score(grade(SYMS)) === '6/7' && reasonOf(grade(SYMS), 'thirty-two') === 'is empty');
+  check('an empty symbol box fails', failed(grade(['', 'b', 'c', 'd', 'e', 'f', 'fc'])) === 'symbol for zero');
+
+  // (j) The numeral needs its symbols sound, whatever it says.
+  const unsound = grade(['a', 'b', 'c', 'd', 'e', 'ab', 'abc']);
+  const unsoundCase = (unsound.fillCases ?? []).find((c) => c.label === 'thirty-two')!;
+  check('with "ab" for five, "abc" (literally ab then c) still fails the numeral, expecting nothing',
+    failed(unsound) === 'symbol for five|thirty-two' && unsoundCase.expected === '' &&
+      unsoundCase.reason === 'uses the invalid symbol for five');
+
+  // (k) Case matters.
+  check('"a" and "A" are two different symbols', score(grade(['a', 'A', 'c', 'd', 'e', 'f', 'fc'])) === '7/7');
+  check('…so "FC" is not "fc"', failed(grade([...SYMS, 'FC'])) === 'thirty-two');
+
+  // (l) A label names a box, never an answer.
+  const typed = [...SYMS, 'fc'];
+  check('no case label equals anything typed',
+    (right.fillCases ?? []).every((c) => !typed.includes(c.label)));
+  check('instructor detail: a symbol expects "a new symbol", the numeral the student\'s own spelling',
+    (right.fillCases ?? []).slice(0, 6).every((c, i) => c.expected === 'a new symbol' && c.got === SYMS[i]) &&
+      (right.fillCases ?? [])[6].expected === 'fc' && (right.fillCases ?? [])[6].got === 'fc');
+
+  // (m) Submit → graded, from the copy a student is sent.
+  const studentHw1 = stripAnswers(hw1);
+  const s12 = studentHw1.questions.find((x) => x.id === 12)!;
+  check('the student copy keeps the numeral whole (base and numbers are prompts) and an empty key',
+    canonicalJson(s12.fill_in) === canonicalJson(p12.fill_in) && s12.fill_in_answers?.length === 0 &&
+      fillInCaseCount(s12.fill_in, s12.fill_in_answers) === 7);
+  const built = buildSubmission(studentHw1, new Map([[12, { ...emptyQuestionCircuit(), fillAnswers: [...EMOJI, '👍🏽👨‍👩‍👧'] }]]),
+    { student: 'numeral@example.com', submittedAt: NOW_ISO });
+  check('buildSubmission from the stripped HW1 → gradeSubmission grades P12 7/7',
+    built.answers.find((a) => a.questionId === 12)?.fillAnswers?.length === 7 &&
+      gradeSubmission(hw1, built).questions.find((r) => r.questionId === 12)?.passed === 7);
+
+  // The demo seed follows the shape: its P12 answers are boxes, not prose —
+  // the worked one (! ? & % $ ~, "~&") 7/7, the ran-out-of-time one partial.
+  const seedSubs = JSON.parse(
+    readFileSync(new URL('../src/devData/homeworks/submissions/hw1.json', import.meta.url), 'utf8'),
+  ) as SubmissionData[];
+  const seedP12 = seedSubs.flatMap((s) => {
+    const a = s.answers.find((x) => x.questionId === 12);
+    return a ? [{ a, r: gradeSubmission(hw1, s).questions.find((r) => r.questionId === 12)! }] : [];
+  });
+  check('the HW1 sample submissions answer P12 in its boxes (no responseText): the worked one 7/7, the other 5/7',
+    seedP12.length === 2 && seedP12.every(({ a }) => a.responseText === undefined && a.fillAnswers?.length === 7) &&
+      seedP12.map(({ r }) => score(r)).join() === '7/7,5/7');
+
+  // (n) Authoring: the creator's numeral draft.
+  const d12 = numeralDraftOf(p12)!;
+  const fields12 = fillInNumeralFields(d12);
+  check('numeralDraftOf → fillInNumeralFields round-trips HW1 P12 byte-for-byte (canonicalJson), with no key',
+    canonicalJson(fields12) === canonicalJson({ fill_in: p12.fill_in }) && !('fill_in_answers' in fields12));
+  check('P12 loads as base "6" and one number, 32 "thirty-two"; its N is 7',
+    d12.base === '6' && d12.numbers.length === 1 && d12.numbers[0].value === '32' &&
+      d12.numbers[0].label === 'thirty-two' && numeralCaseCount(d12) === 7);
+  check('a numeral has no blank or table draft; blanks and tables have no numeral draft',
+    numeralDraftOf(p11) === null && numeralDraftOf(p14) === null && numeralDraftOf(undefined) === null);
+  const nprobs = (d: FillInNumeralDraft) => fillInNumeralProblems(d);
+  const withNumber = (d: FillInNumeralDraft, value: string, label: string): FillInNumeralDraft =>
+    ({ ...d, numbers: [{ ...newNumeralNumber(), value, label }] });
+  check('a sound numeral (P12, a new one filled in) has no problems',
+    nprobs(d12).length === 0 && nprobs(withNumber(newNumeralDraft(), '7', ' seven ')).length === 0 &&
+      canonicalJson(fillInNumeralFields(withNumber(newNumeralDraft(), ' 7 ', ' seven '))) ===
+        canonicalJson({ fill_in: { numeral: { base: 6, numbers: [{ value: 7, label: 'seven' }] } } }));
+  check('a base of 1, 17, 6.5, "x" or nothing is named',
+    ['1', '17', '6.5', 'x', ' '].every((base) => nprobs({ ...d12, base }).includes('The base must be a whole number from 2 to 16.')));
+  check('no numbers is named', nprobs({ ...d12, numbers: [] }).includes('Add at least one number to write.'));
+  check('an empty label is named', nprobs(withNumber(d12, '32', ' ')).includes('Number #1 needs a label.'));
+  check('a repeated label is named, pointing at the first',
+    nprobs({ ...d12, numbers: [d12.numbers[0], { ...newNumeralNumber(), value: '7', label: ' thirty-two ' }] })
+      .includes('Number #2 repeats the label "thirty-two" of number #1.'));
+  check('a value of -1, 2.5, "x" or nothing is named',
+    ['-1', '2.5', 'x', ''].every((value) => nprobs(withNumber(d12, value, 'n')).includes('Number #1 needs a value — a whole number, 0 or more.')));
+
+  // Which edits misplace answers already given (stored box by box).
+  check('relabelling a number, changing its value, or appending one misplaces nothing',
+    misplacedNumeralWarning(d12, d12) === null &&
+      misplacedNumeralWarning(d12, { ...d12, numbers: [{ ...d12.numbers[0], label: '32', value: '33' }, newNumeralNumber()] }) === null &&
+      misplacedNumeralWarning(d12, { ...d12, base: ' 6 ' }) === null);
+  check('changing the base warns', /Keep the base/.test(misplacedNumeralWarning(d12, { ...d12, base: '5' }) ?? ''));
+  check('removing, or moving, a saved number warns, naming it',
+    /for "thirty-two" will now sit/.test(misplacedNumeralWarning(d12, { ...d12, numbers: [] }) ?? '') &&
+      /for "thirty-two"/.test(misplacedNumeralWarning(d12, { ...d12, numbers: [newNumeralNumber(), d12.numbers[0]] }) ?? ''));
+  check('switching the shape away from a saved numeral warns; one that was no numeral has nothing to misplace',
+    misplacedNumeralWarning(d12, null) !== null && misplacedNumeralWarning(null, d12) === null);
+
+  // (o) One reader of `numeral`: every other file goes through
+  // engine/fillIn.ts (fillInShape), so none can grade it as blanks.
+  const root = fileURLToPath(new URL('../../', import.meta.url));
+  const walk = (dir: string): string[] =>
+    readdirSync(dir).flatMap((name) => {
+      const p = join(dir, name);
+      if (name === 'node_modules') return [];
+      return statSync(p).isDirectory() ? walk(p) : /\.(ts|tsx)$/.test(name) ? [p] : [];
+    });
+  const numeralReaders = [...walk(join(root, 'app/src')), ...walk(join(root, 'server/src'))]
+    .filter((f) => /\.numeral\b/.test(readFileSync(f, 'utf8')))
+    .map((f) => relative(root, f).split('\\').join('/'));
+  check('`.numeral` is read only in engine/fillIn.ts',
+    numeralReaders.length === 1 && numeralReaders[0] === 'app/src/engine/fillIn.ts');
+  for (const f of numeralReaders.filter((x) => x !== 'app/src/engine/fillIn.ts')) console.log(`        → ${f}`);
+}
+
 // ── Multi-part problems (task 048) ────────────────────────────────
 // A problem's parts are questions grouped for display (problemSet.ts
 // problemGroups): every part keeps its id, its grading and its 1 point. So
@@ -850,11 +1097,18 @@ console.log('\n[multi-part problems]');
   const PROJECTION_BEFORE = '6a9e4d2e1eb25f7bed8f8887ccf345c1280a0a1f63e993fd1c41ff79eb6b016c';
   const SECTIONS_BEFORE = '1,2,3,4,5|6,18,19,7,8,9,20,10,21,22|11,12,13,23,14,15|16,17';
   const DISPLAY = new Set(['statement', 'title', 'hint', 'callouts', 'figures', 'notes', 'label', 'stem', 'closing', 'partOf', 'answerField']);
-  const projection = hw1.questions.map((q) => Object.fromEntries(Object.entries(q).filter(([k]) => !DISPLAY.has(k))));
+  // Task 080 made P12 (id 12) an invented-numeral fill-in ON PURPOSE — a new
+  // grading field, not fold drift — so its `fill_in` stays out of the
+  // projection recorded before the fold ([fill-in numerals] pins it).
+  const projection = hw1.questions.map((q) =>
+    Object.fromEntries(Object.entries(q).filter(([k]) => !DISPLAY.has(k) && !(q.id === 12 && k === 'fill_in'))));
   check('the HW1 fold kept every question id, in order', hw1.questions.map((q) => q.id).join() === IDS_BEFORE);
   check('…every grading field byte-for-byte (the projection without display fields)',
     toHex(sha256(utf8(canonicalJson(projection)))) === PROJECTION_BEFORE);
   check('…and every section\'s ids', (hw1.sections ?? []).map((x) => x.questionIds.join()).join('|') === SECTIONS_BEFORE);
+  const p12 = hw1.questions.find((x) => x.id === 12)!;
+  check('…the one grading field since: P12\'s invented numeral (task 080), no key',
+    !!p12.fill_in && fillInShape(p12.fill_in).kind === 'numeral' && p12.fill_in_answers === undefined);
   check('…while 23 questions read as 17 problems', problemGroups(hw1).length === 17 && hw1.questions.length === 23);
   check('the new fields carry no answer (the student copy keeps them, minus nothing new)',
     (() => {

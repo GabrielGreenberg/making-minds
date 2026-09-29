@@ -123,13 +123,16 @@ function pendingOpen(questionId: number, responseText: string | undefined): Ques
 }
 
 /**
- * Fill-in grading: one case per blank (a string comparison) or per key row of
- * a table (graded as a function, order-free — engine/fillIn.ts), all-or-nothing
- * at the question level like every other mode (passed === total ⇒ the
- * question passes). The per-case detail carries the expected answers, so it
- * is instructor-only — server/src/sanitize.ts strips it. A review table (no
- * key at all, task 048) is left `pending` for a person, like an open
- * question; its cells stay on the submission's answer (`fillAnswers`).
+ * Fill-in grading: one case per blank (a string comparison), per key row of
+ * a table (graded as a function, order-free) or per box of an invented
+ * numeral (graded by rule against the student's own symbols, task 080 — no
+ * key, so its empty `fill_in_answers` is sound: whether a key fits is the
+ * shape's to say, engine/fillIn.ts fillInKeyProblem), all-or-nothing at the
+ * question level like every other mode (passed === total ⇒ the question
+ * passes). The per-case detail carries the expected answers, so it is
+ * instructor-only — server/src/sanitize.ts strips it. A review table (no key
+ * at all, task 048) is left `pending` for a person, like an open question;
+ * its cells stay on the submission's answer (`fillAnswers`).
  */
 function gradeFillInQuestion(
   question: AssignmentQuestion,

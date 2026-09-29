@@ -423,7 +423,8 @@ console.log('\n[grep gate]');
   };
   // The files whose answer fields wear the guard today (each keeps at least
   // one; the Worksheet four — a part's line, paragraph, blank and table
-  // cell, tasks 048 and 079).
+  // cell, tasks 048 and 079; an invented numeral's boxes are the blank's one
+  // guarded <input>, BlankField, task 080).
   const GUARDED = ['Worksheet.tsx', 'Palette.tsx', 'CircuitCanvas.tsx'];
   const MIN_GUARDED: Record<string, number> = { 'Worksheet.tsx': 4 };
   const NON_TEXT = /\btype=["'](range|checkbox|radio|file|color|button|submit|hidden)["']/;

@@ -271,6 +271,25 @@ console.log('[authoring the ½ rule]');
   check('P9b graded 8/9 with half_credit_at 5 → autoPoints ½',
     graded.passed === 8 && graded.total === 9 && autoPoints(withHalf(p9b, 5), graded) === 0.5,
     JSON.stringify({ p: graded.passed, t: graded.total }));
+
+  // An invented numeral (task 080, HW1 P12): N is its boxes — 6 symbols and
+  // thirty-two — from the shape, with no key, so a student's copy (served
+  // with an empty key, sanitize.ts) counts the same 7.
+  const p12 = hw1.questions.find((q) => q.id === 12)!;
+  check('an invented numeral\'s N is its boxes: 7 for HW1 P12, and 7 for its keyless student copy',
+    questionCaseCount(p12) === 7 && questionCaseCount({ ...p12, fill_in_answers: [] }) === 7);
+  check('...so ½ at 7 of 7 is refused and 6 is sound',
+    /fewer than all/.test(halfCreditProblem(withHalf(p12, 7)) ?? '') && halfCreditProblem(withHalf(p12, 6)) === null);
+  const gradeP12 = (fillAnswers: string[]) => gradeSubmission(hw1, { assignmentTitle: hw1.title, submittedAt: '2026-10-01T00:00:00Z',
+    answers: [{ questionId: 12, circuit: { components: [], wires: [] }, fillAnswers }] })
+    .questions.find((r) => r.questionId === 12)!;
+  // "3" for three is no symbol, but thirty-two (five then two) never uses it.
+  const sixOfSeven = gradeP12(['a', 'b', 'c', '3', 'e', 'f', 'fc']);
+  const sevenOfSeven = gradeP12(['a', 'b', 'c', 'd', 'e', 'f', 'fc']);
+  check('P12 graded 6/7 with half_credit_at 5 → autoPoints ½; 7/7 → 1',
+    sixOfSeven.passed === 6 && sixOfSeven.total === 7 && autoPoints(withHalf(p12, 5), sixOfSeven) === 0.5 &&
+      sevenOfSeven.passed === 7 && autoPoints(withHalf(p12, 5), sevenOfSeven) === 1,
+    JSON.stringify({ p: sixOfSeven.passed, t: sixOfSeven.total }));
 }
 
 // ─── [display] ────────────────────────────────────────────────────────────

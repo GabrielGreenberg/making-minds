@@ -2328,6 +2328,42 @@ console.log('[multi-part problem]');
     saved(20)?.fillAnswers?.[26] === '4' && saved(20)?.provenance != null && saved(9)?.responseText?.includes('\n') === true);
   check('back on problem 6, its parts load back', liveResponse(18) === 'm maps x, y and z to 3 + xyz.');
 
+  // Problem 12: an invented numeral (task 080) — six compact symbol boxes
+  // labelled by meaning, then one short box for thirty-two, as a worksheet
+  // (never the blanks' stretched grid), set through the store like any part.
+  st().switchQuestion(idx(12));
+  for (const [i, v] of [[0, '@'], [2, '👨‍👩‍👧'], [5, '👍🏽']] as const) st().setFillAnswer(12, i, v);
+  check('the numeral takes its boxes through the store, under its own id',
+    st().liveText[12]?.fillAnswers.join('|') === '@||👨‍👩‍👧|||👍🏽' && liveTrace(12) != null);
+  {
+    const html = sheet();
+    const SYMBOL = '<input class="wb-fill-input wb-fill-input--symbol"';
+    const SHORT = '<input class="wb-fill-input wb-fill-input--short"';
+    const box = (label: string, input: string) => [`<span class="wb-fill-label">${label}</span>`, input];
+    const order = outOfOrder(html, [
+      'Problem 12', 'base-6 counting system',
+      'Your symbols',
+      ...box('zero', SYMBOL), 'aria-label="Symbol for zero"', 'value="@"',
+      ...box('one', SYMBOL), ...box('two', SYMBOL), 'value="👨‍👩‍👧"',
+      ...box('three', SYMBOL), ...box('four', SYMBOL), ...box('five', SYMBOL), 'value="👍🏽"',
+      'In your system',
+      ...box('thirty-two', SHORT), 'aria-label="thirty-two in your system"',
+      FOOT,
+    ]);
+    check('problem 12 reads as a worksheet: its statement, "Your symbols" — six symbol boxes zero … five holding what was typed — then "In your system" and one short box for thirty-two',
+      order === null, order ?? undefined);
+    check('…exactly 6 symbol boxes and 1 short one, no plain blank, grid or cell',
+      count(html, SYMBOL) === 6 && count(html, SHORT) === 1 && count(html, BLANK) === 0 &&
+        count(html, CELL) === 0 && !html.includes('wb-fill-grid'));
+    check('…its sized boxes turn capitals and corrections off (case is part of the answer)',
+      count(html, 'autoCapitalize="off"') === 7 && count(html, 'autoCorrect="off"') === 7);
+    check('…and never shows the numeral the symbols spell (five then two — the answer)',
+      !html.includes('👍🏽👨‍👩‍👧') && !html.includes('value="👍🏽 👨‍👩‍👧"'));
+  }
+  st().switchQuestion(idx(6));
+  check('leaving problem 12 folds its boxes under its own id',
+    saved(12)?.fillAnswers?.[5] === '👍🏽' && saved(12)?.provenance != null);
+
   st().switchQuestion(idx(7));
   check('navigating away folds every part under its own id',
     saved(6)?.responseText?.startsWith('Apply m') === true && saved(18)?.responseText === 'm maps x, y and z to 3 + xyz.' &&

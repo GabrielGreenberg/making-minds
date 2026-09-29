@@ -11,18 +11,25 @@ import type {
 } from '../types';
 import { QUESTION_TASKS, questionTask, modeHoldsMemory } from '../types';
 import { FillInBlanksEditor } from './FillInBlanksEditor';
+import { FillInNumeralEditor } from './FillInNumeralEditor';
 import { FillInTableEditor } from './FillInTableEditor';
 import {
   blankDraftsOf,
   fillInFields,
+  fillInNumeralFields,
+  fillInNumeralProblems,
   fillInProblems,
   fillInTableFields,
   fillInTableProblems,
   misplacedAnswersWarning,
   misplacedBlanks,
+  misplacedNumeralWarning,
   misplacedTableWarning,
   newBlankDraft,
+  newNumeralDraft,
   newTableDraft,
+  numeralCaseCount,
+  numeralDraftOf,
   tableDraftOf,
 } from './fillInAuthoring';
 import { PerceptionEditor } from './PerceptionEditor';
@@ -249,19 +256,24 @@ export function QuestionCreator({ assignment, existingQuestion, onSave, onCancel
   );
 
   // ── Fill-in fields (open questions with task === 'fill-in') ────
-  // Two shapes (engine/fillIn.ts fillInShape), both drafted in
+  // Three shapes (engine/fillIn.ts fillInShape), all drafted in
   // ./fillInAuthoring.ts and saved as `fill_in` + the stripped
   // `fill_in_answers`: labelled blanks, one row per blank — label, digits-only
-  // flag and answer together — or an argument–value table (task 079). Each
-  // keeps its own draft, so flipping the shape and back loses nothing.
-  // `savedBlanks` / `savedTable` are what the question opened with: students'
-  // answers are stored by position, so an edit that would misplace them is
-  // warned about in the editor and confirmed at save.
+  // flag and answer together — an argument–value table (task 079), or an
+  // invented numeral system (task 080 — no key at all). Each keeps its own
+  // draft, so flipping the shape and back loses nothing.
+  // `savedBlanks` / `savedTable` / `savedNumeral` are what the question
+  // opened with: students' answers are stored by position, so an edit that
+  // would misplace them is warned about in the editor and confirmed at save.
   const [savedBlanks] = useState(() => blankDraftsOf(existingQuestion));
   const [blankDrafts, setBlankDrafts] = useState(savedBlanks);
   const [savedTable] = useState(() => tableDraftOf(existingQuestion));
   const [tableDraft, setTableDraft] = useState(() => savedTable ?? newTableDraft());
-  const [fillShape, setFillShape] = useState<'blanks' | 'table'>(savedTable ? 'table' : 'blanks');
+  const [savedNumeral] = useState(() => numeralDraftOf(existingQuestion));
+  const [numeralDraft, setNumeralDraft] = useState(() => savedNumeral ?? newNumeralDraft());
+  const [fillShape, setFillShape] = useState<'blanks' | 'table' | 'numeral'>(
+    savedTable ? 'table' : savedNumeral ? 'numeral' : 'blanks',
+  );
 
   // ── Perception fields (CC/SC questions with task === 'perception') ──
   // Perception questions grade raw bit frames against a rule, not a formula
@@ -300,13 +312,18 @@ export function QuestionCreator({ assignment, existingQuestion, onSave, onCancel
   const isPerception = effTask === 'perception';
   const isFillIn = effTask === 'fill-in';
   const isFillTable = isFillIn && fillShape === 'table';
+  const isFillNumeral = isFillIn && fillShape === 'numeral';
+  const isFillBlanks = isFillIn && fillShape === 'blanks';
   const fillInErrors = isFillIn
-    ? isFillTable ? fillInTableProblems(tableDraft) : fillInProblems(blankDrafts)
+    ? isFillTable ? fillInTableProblems(tableDraft)
+      : isFillNumeral ? fillInNumeralProblems(numeralDraft)
+        : fillInProblems(blankDrafts)
     : [];
-  // Saving anything but these blanks (a table, another task, another mode)
-  // drops them; likewise the table.
-  const misplacedAnswers = misplacedBlanks(savedBlanks, isFillIn && !isFillTable ? blankDrafts : []);
+  // Saving anything but these blanks (a table, a numeral, another task,
+  // another mode) drops them; likewise the table and the numeral.
+  const misplacedAnswers = misplacedBlanks(savedBlanks, isFillBlanks ? blankDrafts : []);
   const misplacedTable = misplacedTableWarning(savedTable, isFillTable ? tableDraft : null);
+  const misplacedNumeral = misplacedNumeralWarning(savedNumeral, isFillNumeral ? numeralDraft : null);
 
   // The restriction applies to gate-vocabulary canvases: CC/SC questions
   // (function or perception) and turbot questions whose brain is CC/SC.
@@ -341,13 +358,13 @@ export function QuestionCreator({ assignment, existingQuestion, onSave, onCancel
     return raw === '' ? {} : { half_credit_at: Number(raw) };
   })();
   // N as far as it is known before save: the drafts for turbot arenas,
-  // fill-in blanks and a table's key rows; an edited question's own bank
-  // otherwise (a generated bank is rebuilt at save, where the rule is checked
-  // against it).
+  // fill-in blanks, a table's key rows and a numeral's boxes; an edited
+  // question's own bank otherwise (a generated bank is rebuilt at save, where
+  // the rule is checked against it).
   const knownCaseCount: number | null = isTurbot
     ? caseDrafts.length
     : isFillIn
-      ? isFillTable ? tableDraft.keyRows.length : blankDrafts.length
+      ? isFillTable ? tableDraft.keyRows.length : isFillNumeral ? numeralCaseCount(numeralDraft) : blankDrafts.length
       : existingQuestion && existingQuestion.buildMode === mode
         ? questionCaseCount(existingQuestion)
         : null;
@@ -434,6 +451,7 @@ export function QuestionCreator({ assignment, existingQuestion, onSave, onCancel
     const misplacing = [
       ...(misplacedAnswers.length > 0 ? [misplacedAnswersWarning(misplacedAnswers)] : []),
       ...(misplacedTable ? [misplacedTable] : []),
+      ...(misplacedNumeral ? [misplacedNumeral] : []),
       ...(misplacedRuns.length > 0 ? [misplacedArenasWarning(misplacedRuns)] : []),
     ];
     if (misplacing.length > 0 && !window.confirm(`${misplacing.join('\n\n')}\n\nSave anyway?`)) {
@@ -461,7 +479,9 @@ export function QuestionCreator({ assignment, existingQuestion, onSave, onCancel
         statement: statement.trim(),
         buildMode: 'open',
         representation: 'binary',
-        ...(isFillIn ? (isFillTable ? fillInTableFields(tableDraft) : fillInFields(blankDrafts)) : {}),
+        ...(isFillTable ? fillInTableFields(tableDraft)
+          : isFillNumeral ? fillInNumeralFields(numeralDraft)
+            : isFillBlanks ? fillInFields(blankDrafts) : {}),
         ...(!isFillIn && answerField === 'line' ? { answerField: 'line' as const } : {}),
         // A part's problem text lives on its first part; only a problem's
         // own first question keeps a stem and closing.
@@ -686,7 +706,7 @@ export function QuestionCreator({ assignment, existingQuestion, onSave, onCancel
             <span className="instructor-count">
               {halfCreditAt.trim() === ''
                 ? 'blank = 0 or 1 only; a number K gives ½ when at least K cases pass'
-                : `½ if at least ${halfCreditAt.trim()} of ${knownCaseCount ?? 'N'} ${isTurbot ? 'arenas' : isFillTable ? 'rows' : isFillIn ? 'blanks' : 'cases'} pass` +
+                : `½ if at least ${halfCreditAt.trim()} of ${knownCaseCount ?? 'N'} ${isTurbot ? 'arenas' : isFillTable ? 'rows' : isFillNumeral ? 'fields' : isFillIn ? 'blanks' : 'cases'} pass` +
                   (knownCaseCount === null ? ' (N is set when the bank is built at save)' : '')}
             </span>
           </label>
@@ -702,7 +722,7 @@ export function QuestionCreator({ assignment, existingQuestion, onSave, onCancel
             <div className="mm-section-head">
               <h3>Answer shape</h3>
               <div className="mm-segmented">
-                {(['blanks', 'table'] as const).map((shape) => (
+                {(['blanks', 'table', 'numeral'] as const).map((shape) => (
                   <button
                     key={shape}
                     className={'mm-segmented-btn' + (fillShape === shape ? ' mm-segmented-btn--active' : '')}
@@ -712,7 +732,7 @@ export function QuestionCreator({ assignment, existingQuestion, onSave, onCancel
                       if (shape === 'blanks' && blankDrafts.length === 0) setBlankDrafts([newBlankDraft([])]);
                     }}
                   >
-                    {shape === 'blanks' ? 'Blanks' : 'Table'}
+                    {shape === 'blanks' ? 'Blanks' : shape === 'table' ? 'Table' : 'Numeral'}
                   </button>
                 ))}
               </div>
@@ -733,7 +753,33 @@ export function QuestionCreator({ assignment, existingQuestion, onSave, onCancel
                     {misplacedAnswersWarning(misplacedAnswers)}
                   </p>
                 )}
+                {misplacedNumeral && (
+                  <p className="instructor-preview-warning" role="alert">{misplacedNumeral}</p>
+                )}
                 <FillInTableEditor draft={tableDraft} saved={savedTable} onChange={setTableDraft} />
+              </>
+            ) : isFillNumeral ? (
+              <>
+                <p className="mm-note mm-hint">
+                  The student invents a symbol for each digit of the base, typed in a box labelled
+                  with its meaning, then writes each number below in that system. There is no answer
+                  key: it is autograded by rule, against the student&#8217;s own symbols. A symbol
+                  passes when it is one character (an emoji counts as one), not a digit 0&#8211;9, and
+                  unlike the other symbols (&#8220;a&#8221; and &#8220;A&#8221; differ); a number
+                  passes when it is exactly the student&#8217;s symbols for its digits in the base
+                  (spaces ignored), and those symbols pass. Answers match boxes by position: once
+                  students have started, keep the base, relabel numbers in place and add new ones at
+                  the end.
+                </p>
+                {misplacedAnswers.length > 0 && (
+                  <p className="instructor-preview-warning" role="alert">
+                    {misplacedAnswersWarning(misplacedAnswers)}
+                  </p>
+                )}
+                {misplacedTable && (
+                  <p className="instructor-preview-warning" role="alert">{misplacedTable}</p>
+                )}
+                <FillInNumeralEditor draft={numeralDraft} saved={savedNumeral} onChange={setNumeralDraft} />
               </>
             ) : (
               <>
@@ -746,6 +792,9 @@ export function QuestionCreator({ assignment, existingQuestion, onSave, onCancel
                 </p>
                 {misplacedTable && (
                   <p className="instructor-preview-warning" role="alert">{misplacedTable}</p>
+                )}
+                {misplacedNumeral && (
+                  <p className="instructor-preview-warning" role="alert">{misplacedNumeral}</p>
                 )}
                 <FillInBlanksEditor drafts={blankDrafts} saved={savedBlanks} onChange={setBlankDrafts} />
               </>

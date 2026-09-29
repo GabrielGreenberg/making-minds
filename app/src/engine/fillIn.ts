@@ -1,35 +1,49 @@
-// Fill-in grading — typed text answers compared as strings (engine-pure: no
-// React/DOM, same code in the browser and on the server). Outside the value
-// codec: there is no machine to run, so nothing to encode or simulate.
+// Fill-in grading — typed text answers checked as strings (engine-pure: no
+// React/DOM, same code in the browser and on the server; `Intl.Segmenter` is
+// ECMAScript, not the DOM). Outside the value codec: there is no machine to
+// run, so nothing to encode or simulate.
 //
-// A spec has one of two SHAPES, and this file is the ONE reader of them
-// (`fillInShape`; a pipelineCheck grep pin keeps every other file off
-// `labels`, and another off `numericOnly`):
+// A spec has one of three SHAPES, and this file is the ONE reader of them
+// (`fillInShape`; pipelineCheck grep pins keep every other file off
+// `labels`, `numericOnly` and `numeral`):
 //  - blanks: labelled boxes, box i compared with key i;
 //  - a table (task 079): a blank argument–value table. The student writes the
 //    arguments too, so it is graded as a FUNCTION, order-free: each key row is
 //    one case, passed iff exactly one student row has that row's arguments and
 //    its values match. Two rows with the same arguments are not a function
 //    (that case fails); empty rows are ignored; row order never matters.
+//  - an invented numeral system (task 080): a symbol box per digit of a base,
+//    then a box per number to write in it. There is no key — the right
+//    numeral is spelled in the student's OWN symbols — so it is graded BY
+//    RULE, one case per box (`gradeInventedNumeral`).
 // A table authored with no key is a REVIEW table (task 048): nothing to
 // compare, so the grader leaves it pending for a person (isReviewTable).
-// Both keep their key in `fill_in_answers` (row-major for a table) and their
-// answers in `fillAnswers` (row-major for a table), so persistence, the
-// editing record and provenance see one shape: a list of strings.
+// The first two keep their key in `fill_in_answers` (row-major for a table);
+// all three keep their answers in `fillAnswers` (row-major for a table, in
+// box order for a numeral), so persistence, the editing record and
+// provenance see one shape: a list of strings.
 //
-// The one normalisation is leading zeros: "0011" and "11" name the same
-// binary numeral, and a student who pads is not wrong. Surrounding whitespace
-// goes too. Everything else is compared literally — the answers are strings,
-// not numbers, so "1010" stays a numeral and never becomes one thousand and
-// ten.
+// Blanks and tables normalise one thing, leading zeros: "0011" and "11" name
+// the same binary numeral, and a student who pads is not wrong. Surrounding
+// whitespace goes too. Everything else is compared literally — the answers
+// are strings, not numbers, so "1010" stays a numeral and never becomes one
+// thousand and ten. A numeral normalises only what its rule says (see
+// `gradeInventedNumeral`).
 
 import type { FillInCaseResult, FillInSpec } from '../types';
+
+/** How big a box is drawn, from what goes in it — never from a key (a
+ *  student's copy has none): a plain `blank` (today's box), a one-character
+ *  `symbol` (compact, large type — punctuation and emoji must be legible) or
+ *  a `short` numeral. */
+export type FillInFieldSize = 'blank' | 'symbol' | 'short';
 
 /** One blank of a fill-in spec, as the student panel and the creator see it. */
 export interface FillInBlank {
   label: string;
   /** Only digits may be typed into this blank. */
   digitsOnly: boolean;
+  size: FillInFieldSize;
 }
 
 /** One column of a fill-in table. */
@@ -50,7 +64,21 @@ export interface FillInTableShape {
   rows: number;
 }
 
-export type FillInShape = { kind: 'blanks'; blanks: FillInBlank[] } | FillInTableShape;
+/** An invented numeral system (task 080), as the student panel, the grader
+ *  and the creator see it: the base and the numbers as authored, and every
+ *  box in answer order — `fillAnswers[i]` is `blanks[i]`. A symbol box per
+ *  digit comes first (labelled by its value in words, sized `symbol`), then a
+ *  box per number (its authored label, sized `short`). A base that is not a
+ *  whole number from 2 to `FILL_IN_NUMERAL_MAX_BASE` draws no symbol box
+ *  (`fillInKeyProblem` names it). */
+export interface FillInNumeralShape {
+  kind: 'numeral';
+  base: number;
+  numbers: { value: number; label: string }[];
+  blanks: FillInBlank[];
+}
+
+export type FillInShape = { kind: 'blanks'; blanks: FillInBlank[] } | FillInTableShape | FillInNumeralShape;
 
 /** The most rows a table gives students. Rendering and grading both work
  *  row by row, so an authored count past this (a typo in the creator's
@@ -58,6 +86,36 @@ export type FillInShape = { kind: 'blanks'; blanks: FillInBlank[] } | FillInTabl
  *  `fillInKeyProblem` and the creator's `fillInTableDefects` refuse it, and
  *  `fillInShape` never renders more. */
 export const FILL_IN_TABLE_MAX_ROWS = 100;
+
+/** The largest base an invented numeral may have — as far as its symbol
+ *  boxes have names ("zero" … "fifteen"). */
+export const FILL_IN_NUMERAL_MAX_BASE = 16;
+
+const NUMBER_WORDS = [
+  'zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven',
+  'eight', 'nine', 'ten', 'eleven', 'twelve', 'thirteen', 'fourteen', 'fifteen',
+];
+
+/** A digit's value in words ("zero" … "fifteen"); past them, its numeral. */
+export function numberWord(n: number): string {
+  return NUMBER_WORDS[n] ?? String(n);
+}
+
+/** Whether `base` is one an invented numeral may have: whole, 2 to 16. */
+function isNumeralBase(base: number): boolean {
+  return Number.isInteger(base) && base >= 2 && base <= FILL_IN_NUMERAL_MAX_BASE;
+}
+
+/** `value`'s digits in `base`, most significant first (0 → [0]). */
+export function numeralDigits(value: number, base: number): number[] {
+  const digits: number[] = [];
+  let v = value;
+  do {
+    digits.unshift(v % base);
+    v = Math.floor(v / base);
+  } while (v > 0);
+  return digits;
+}
 
 /** Box i's digits-only flag: `true` locks every box, an array locks box i
  *  iff its entry i is `true` — an array is truthy, so nothing may test it
@@ -67,11 +125,12 @@ function digitsOnlyAt(spec: FillInSpec, i: number): boolean {
   return Array.isArray(n) ? n[i] === true : n === true;
 }
 
-/** The spec's shape — the ONE reader of `labels`, `table` and `numericOnly`.
- *  A present `table` wins; `numericOnly` is per table column there, per blank
- *  otherwise. A row count below 1 (or not a number) renders no rows, one
- *  past `FILL_IN_TABLE_MAX_ROWS` renders that many (`fillInKeyProblem` names
- *  both). */
+/** The spec's shape — the ONE reader of `labels`, `table`, `numeral` and
+ *  `numericOnly`. A present `table` wins, then a `numeral`; `numericOnly` is
+ *  per table column in a table, per blank in blanks, and means nothing to a
+ *  numeral (its symbols are anything but digits). A row count below 1 (or
+ *  not a number) renders no rows, one past `FILL_IN_TABLE_MAX_ROWS` renders
+ *  that many (`fillInKeyProblem` names both). */
 export function fillInShape(spec: FillInSpec): FillInShape {
   const t = spec.table;
   if (t) {
@@ -87,25 +146,44 @@ export function fillInShape(spec: FillInSpec): FillInShape {
       rows: rows > 0 ? Math.min(rows, FILL_IN_TABLE_MAX_ROWS) : 0,
     };
   }
+  const n = spec.numeral;
+  if (n) {
+    const base = n.base;
+    const numbers = (n.numbers ?? []).map(({ value, label }) => ({ value, label }));
+    return {
+      kind: 'numeral',
+      base,
+      numbers,
+      blanks: [
+        ...Array.from({ length: isNumeralBase(base) ? base : 0 }, (_, i): FillInBlank =>
+          ({ label: numberWord(i), digitsOnly: false, size: 'symbol' })),
+        ...numbers.map(({ label }): FillInBlank => ({ label, digitsOnly: false, size: 'short' })),
+      ],
+    };
+  }
   return {
     kind: 'blanks',
-    blanks: (spec.labels ?? []).map((label, i) => ({ label, digitsOnly: digitsOnlyAt(spec, i) })),
+    blanks: (spec.labels ?? []).map((label, i) => ({ label, digitsOnly: digitsOnlyAt(spec, i), size: 'blank' })),
   };
 }
 
-/** The spec's blanks, in order ([] for a table). */
+/** The spec's plain blanks, in order ([] for a table or a numeral — whose
+ *  boxes are not key-matched blanks: the creator must never draft them as
+ *  such). */
 export function fillInBlanks(spec: FillInSpec): FillInBlank[] {
   const shape = fillInShape(spec);
   return shape.kind === 'blanks' ? shape.blanks : [];
 }
 
 /** How many cases the question is graded on — the N of its ½ rule: one per
- *  blank, or one per KEY row of a table (never its cells, columns, or the
- *  rows students see). A student's copy has no key, so its table counts 0. */
+ *  blank, one per box of a numeral (its symbols and its numbers; no key, so
+ *  a student's copy counts alike), or one per KEY row of a table (never its
+ *  cells, columns, or the rows students see). A student's copy has no key,
+ *  so its table counts 0. */
 export function fillInCaseCount(spec: FillInSpec | undefined, key: readonly string[] | undefined): number {
   if (!spec) return 0;
   const shape = fillInShape(spec);
-  if (shape.kind === 'blanks') return shape.blanks.length;
+  if (shape.kind !== 'table') return shape.blanks.length;
   const c = shape.columns.length;
   return c > 0 ? Math.floor((key?.length ?? 0) / c) : 0;
 }
@@ -129,7 +207,7 @@ export function fillInRowLabel(args: readonly string[]): string {
 }
 
 /** What one graded case of this spec is called: a "row" of a table, a
- *  "blank" otherwise (and when the spec is unknown). */
+ *  "blank" otherwise — a numeral's boxes too (and when the spec is unknown). */
 export function fillInCaseNoun(spec: FillInSpec | undefined): 'row' | 'blank' {
   return spec && fillInShape(spec).kind === 'table' ? 'row' : 'blank';
 }
@@ -153,11 +231,14 @@ export function isReviewTable(spec: FillInSpec | undefined, key: readonly string
 /** Why this spec and key cannot be graded, or null when they can. The grader
  *  skips with this reason; `problemSet.ts validateDocument` reports it
  *  (authoring-side — a student's copy has no key). Blanks need a key cell
- *  per blank. A table needs ≥ 2 columns, 1 ≤ argColumns < columns, a whole
- *  row count from 1 to `FILL_IN_TABLE_MAX_ROWS`, and a key of whole rows —
- *  none at all (a review table, graded by hand), or no more than
- *  students get, no empty cell, and no two with the same arguments (a
- *  function's table lists each argument once). */
+ *  per blank. A numeral needs a whole base from 2 to
+ *  `FILL_IN_NUMERAL_MAX_BASE`, at least one number, each a whole number ≥ 0
+ *  with its own non-empty label — and NO key (its rule is the key). A table
+ *  needs ≥ 2 columns, 1 ≤ argColumns < columns, a whole row count from 1 to
+ *  `FILL_IN_TABLE_MAX_ROWS`, and a key of whole rows — none at all (a review
+ *  table, graded by hand), or no more than students get, no empty cell, and
+ *  no two with the same arguments (a function's table lists each argument
+ *  once). */
 export function fillInKeyProblem(spec: FillInSpec, key: readonly string[]): string | null {
   const shape = fillInShape(spec);
   if (shape.kind === 'blanks') {
@@ -165,6 +246,7 @@ export function fillInKeyProblem(spec: FillInSpec, key: readonly string[]): stri
       ? 'fill-in question has no answer key'
       : null;
   }
+  if (shape.kind === 'numeral') return numeralProblem(shape, key);
   const c = shape.columns.length;
   const a = shape.argColumns;
   const rows = spec.table!.rows;
@@ -195,10 +277,35 @@ export function fillInKeyProblem(spec: FillInSpec, key: readonly string[]): stri
   return null;
 }
 
-/** One result per case, in the key's order. Blanks: missing answers (a
- *  shorter array, or a blank the student left empty) fail rather than being
- *  skipped. A table: see `gradeFillInTable`. Call only when
- *  `fillInKeyProblem` is null. */
+/** `fillInKeyProblem` for a numeral (see there). */
+function numeralProblem(shape: FillInNumeralShape, key: readonly string[]): string | null {
+  const { base, numbers } = shape;
+  if (!isNumeralBase(base)) {
+    return `invented-numeral question needs a whole base from 2 to ${FILL_IN_NUMERAL_MAX_BASE}, not ${base}`;
+  }
+  if (numbers.length === 0) return 'invented-numeral question needs at least one number to write';
+  const firstWithLabel = new Map<string, number>();
+  for (const [j, { value, label }] of numbers.entries()) {
+    if (!Number.isSafeInteger(value) || value < 0) {
+      return `invented-numeral question's number #${j + 1} must be a whole number, 0 or more, not ${value}`;
+    }
+    const name = typeof label === 'string' ? label.trim() : '';
+    if (name === '') return `invented-numeral question's number #${j + 1} needs a label`;
+    const first = firstWithLabel.get(name);
+    if (first !== undefined) {
+      return `invented-numeral question's numbers #${first + 1} and #${j + 1} have the same label "${name}"`;
+    }
+    firstWithLabel.set(name, j);
+  }
+  if (key.length > 0) return "an invented-numeral question takes no answer key (the student's own symbols are the key)";
+  return null;
+}
+
+/** One result per case, in the key's order (a numeral's: its boxes' order).
+ *  Blanks: missing answers (a shorter array, or a blank the student left
+ *  empty) fail rather than being skipped. A table: see `gradeFillInTable`; a
+ *  numeral: `gradeInventedNumeral`. Call only when `fillInKeyProblem` is
+ *  null. */
 export function gradeFillIn(
   spec: FillInSpec,
   answers: readonly string[],
@@ -206,6 +313,8 @@ export function gradeFillIn(
 ): FillInCaseResult[] {
   const shape = fillInShape(spec);
   if (shape.kind === 'table') return gradeFillInTable(shape, answers, given ?? []);
+  // Before the blanks map: a numeral has `blanks` too, but no key to match.
+  if (shape.kind === 'numeral') return gradeInventedNumeral(shape, given ?? []);
   return shape.blanks.map(({ label }, i) => {
     const expected = normalizeFillAnswer(answers[i] ?? '');
     const got = normalizeFillAnswer(given?.[i] ?? '');
@@ -251,4 +360,103 @@ function gradeFillInTable(
       pass,
     };
   });
+}
+
+/** Grapheme segmentation, made once on first use (every modern browser and
+ *  Node has it; where one does not, code points stand in — an emoji built
+ *  of several would then count as several). */
+let graphemes: Intl.Segmenter | null | undefined;
+
+/** How many user-perceived characters `text` is: "👍🏽" and "👨‍👩‍👧" are one. */
+function graphemeCount(text: string): number {
+  if (graphemes === undefined) {
+    graphemes = typeof Intl.Segmenter === 'function' ? new Intl.Segmenter('en', { granularity: 'grapheme' }) : null;
+  }
+  if (!graphemes) return Array.from(text).length;
+  let n = 0;
+  for (const _ of graphemes.segment(text)) n++;
+  return n;
+}
+
+/**
+ * Whether a symbol is an existing digit dressed up: its compatibility form
+ * (NFKD — fullwidth ５, circled ⑤, superscript ⁵, mathematical 𝟓 all fold to
+ * a plain digit) with every mark and invisible stripped (the keycap in 5️⃣,
+ * the variation selector in 5️, the accent in 5́) holds a decimal digit of
+ * any script. Any script, not just 0–9: an Arabic-Indic ٥ is the digit five
+ * too, not a new symbol for it.
+ */
+function isDigitSymbol(symbol: string): boolean {
+  const base = symbol.normalize('NFKD').replace(/[\p{M}\p{Default_Ignorable_Code_Point}]/gu, '');
+  return /\p{Nd}/u.test(base);
+}
+
+/**
+ * An invented numeral system graded by rule (task 080) — against the
+ * student's OWN symbols, since no fixed key can exist. One case per box, in
+ * box order; the shape's base is sound (`fillInKeyProblem` is null).
+ *
+ * Symbol i ("symbol for two"): surrounding whitespace trimmed, then NFC. It
+ * passes iff it is exactly ONE character — one grapheme, so an emoji with a
+ * skin tone or a ZWJ family counts as one — is not a digit (`isDigitSymbol`:
+ * no 0–9 in disguise — keycap 5️⃣, fullwidth ５, 5 with an accent or a
+ * variation selector — nor another script's digit), and no other symbol is
+ * the same (case matters: "a" and "A" are two characters; a repeat fails
+ * every copy — the system could not be read). Only the digit test folds; the
+ * sameness test and the numeral compare the NFC text as typed, a variation
+ * selector part of the character.
+ *
+ * Number j (its label, "thirty-two"): every whitespace removed, then NFC. It
+ * passes iff it is not empty, every symbol its base-b digits use is sound,
+ * and it equals those symbols in order (32 in base 6: the symbol for five,
+ * then the symbol for two) — joined first and normalised as a whole, so a
+ * combining mark composes as the student typed it. A number whose symbols
+ * are unsound fails whatever it says: there is no numeral to write.
+ *
+ * `expected` is the rule's own words for a symbol, the student's spelling for
+ * a number ('' when a symbol it needs is unsound); `got` what was checked;
+ * `reason` why a case failed. All three are instructor-only (sanitize.ts).
+ */
+function gradeInventedNumeral(shape: FillInNumeralShape, given: readonly string[]): FillInCaseResult[] {
+  const b = shape.base;
+  const raw = Array.from({ length: b }, (_, i) => (given[i] ?? '').trim());
+  const symbols = raw.map((x) => x.normalize('NFC'));
+  const symbolName = (d: number) => `symbol for ${numberWord(d)}`;
+  const symbolFault = (i: number): string | null => {
+    const s = symbols[i];
+    if (s === '') return 'is empty';
+    const chars = graphemeCount(s);
+    if (chars !== 1) return `is ${chars} characters`;
+    if (isDigitSymbol(s)) return 'is a digit';
+    const twin = symbols.findIndex((x, k) => k !== i && x === s);
+    return twin >= 0 ? `repeats the ${symbolName(twin)}` : null;
+  };
+  const faults = symbols.map((_, i) => symbolFault(i));
+
+  const symbolCases = symbols.map((s, i): FillInCaseResult => {
+    const fault = faults[i];
+    return {
+      label: symbolName(i),
+      expected: 'a new symbol',
+      got: s,
+      pass: fault === null,
+      ...(fault ? { reason: fault } : {}),
+    };
+  });
+  const numberCases = shape.numbers.map(({ value, label }, j): FillInCaseResult => {
+    const digits = numeralDigits(value, b);
+    const got = (given[b + j] ?? '').replace(/\s+/g, '').normalize('NFC');
+    const unsound = digits.find((d) => faults[d] !== null);
+    const expected = unsound === undefined ? digits.map((d) => raw[d]).join('').normalize('NFC') : '';
+    const reason =
+      unsound !== undefined ? `uses the invalid ${symbolName(unsound)}`
+        : got === '' ? 'is empty'
+          : got !== expected
+            ? digits.length === 1
+              ? `is not your ${symbolName(digits[0])}`
+              : `is not your ${digits.map(numberWord).join(' then ')}`
+            : null;
+    return { label: label.trim(), expected, got, pass: reason === null, ...(reason ? { reason } : {}) };
+  });
+  return [...symbolCases, ...numberCases];
 }

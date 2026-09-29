@@ -15,8 +15,9 @@
 //      interface-tier "correct" brain scores 1/3, so failing turbot cases with
 //      reasons cross the wire even on attempt 1), a perception question
 //      (hw2-p12), the devData open question (pending, 0/0), and HW1's
-//      fill-in shapes — P11's blanks and P9b's argument–value table, graded
-//      as a function (task 079).
+//      fill-in shapes — P11's blanks, P9b's argument–value table, graded
+//      as a function (task 079), and P12's invented numeral, graded by rule
+//      against the student's own symbols with no key (task 080).
 //   2. Submit twice as a student: attempt 1 = the fixtures' correct machines,
 //      attempt 2 = the fixtures' broken variants plus a hand-built
 //      never-stopping turbot brain (hitStepLimit=true / 'exceeded max steps'
@@ -157,6 +158,16 @@ const tableQuestion = hw1Questions.find((q) => q.id === 20)!;
 const jRows = (pairs: [number, number][]) => pairs.flatMap(([x, y]) => [String(x), String(y), String(x * y)]);
 const TABLE_ANSWERS = jRows([[2, 2], [1, 0], [0, 0], [1, 2], [0, 1], [2, 1], [0, 2], [2, 0], [1, 1]]);
 const TABLE_BROKEN = jRows([[0, 0], [0, 1], [0, 2], [1, 0], [1, 1], [1, 2], [2, 0], [2, 1], [0, 0]]);
+// HW1 P12 (task 080): an invented base-6 numeral — a symbol per digit, then
+// thirty-two in it (the symbol for five, then for two). No key at all: the
+// student's copy carries the spec whole and an empty `fill_in_answers`.
+// No '@' among the symbols (the email-leak scan). Correct: six sound
+// symbols, the numeral with a space in it (ignored); broken: a repeat (zero =
+// one), a digit (three), two characters (four) and the numeral backwards —
+// only the symbol for two and the symbol for five pass.
+const numeralQuestion = hw1Questions.find((q) => q.id === 12)!;
+const NUMERAL_ANSWERS = ['a', 'b', 'c', 'd', 'e', 'f', 'f c'];
+const NUMERAL_BROKEN = ['a', 'a', 'c', '3', 'de', 'f', 'cf'];
 
 // An SC perception question authored as the question creator saves it
 // (perceptionFields), HW3 P12's rule with two films of the instructor's own:
@@ -184,6 +195,7 @@ const assignment: AssignmentData = {
     { ...fillInQuestion, id: 8, label: 'fill-in' },
     { ...examplesQuestion, id: 9, label: 'perception-examples' },
     { ...tableQuestion, id: 10, label: 'fill-in-table' },
+    { ...numeralQuestion, id: 11, label: 'fill-in-numeral' },
   ],
 };
 
@@ -212,6 +224,7 @@ const correctAnswers: Answers = [
   { questionId: 8, circuit: emptyCircuit, fillAnswers: FILL_ANSWERS },
   { questionId: 9, circuit: examplesFixture.correct },
   { questionId: 10, circuit: emptyCircuit, fillAnswers: TABLE_ANSWERS },
+  { questionId: 11, circuit: emptyCircuit, fillAnswers: NUMERAL_ANSWERS },
 ];
 
 const brokenAnswers: Answers = [
@@ -226,6 +239,7 @@ const brokenAnswers: Answers = [
   { questionId: 8, circuit: emptyCircuit, fillAnswers: FILL_ANSWERS.map((a, i) => (i === 4 ? '1' : '00' + a)) },
   { questionId: 9, circuit: examplesFixture.broken! },
   { questionId: 10, circuit: emptyCircuit, fillAnswers: TABLE_BROKEN },
+  { questionId: 11, circuit: emptyCircuit, fillAnswers: NUMERAL_BROKEN },
 ];
 
 // ── Direct in-process grades (side A) ────────────────────────────────────────
@@ -250,6 +264,12 @@ check('the fill-in table grades 9/9 shuffled, 7/9 with a repeated argument (dire
   tableResult(directCorrect)?.passed === 9 && tableResult(directCorrect)?.total === 9 &&
     tableResult(directBroken)?.passed === 7 &&
     (tableResult(directBroken)?.fillCases ?? []).filter((c) => !c.pass).map((c) => c.label).join('|') === '(0, 0)|(2, 2)');
+const numeralResult = (r: SubmissionResult) => r.questions.find((q) => q.questionId === 11);
+check('the invented numeral grades 7/7 right, 2/7 broken — only the symbols for two and five pass (direct)',
+  numeralResult(directCorrect)?.status === 'graded' && numeralResult(directCorrect)?.passed === 7 &&
+    numeralResult(directCorrect)?.total === 7 && numeralResult(directBroken)?.passed === 2 &&
+    (numeralResult(directBroken)?.fillCases ?? []).filter((c) => c.pass).map((c) => c.label).join('|') ===
+      'symbol for two|symbol for five');
 
 // ── Deep JSON comparison ─────────────────────────────────────────────────────
 
@@ -429,6 +449,12 @@ check(
     JSON.stringify(sTable?.fill_in?.table?.columns) === JSON.stringify(tableQuestion.fill_in?.table?.columns) &&
     sTable?.fill_in?.table?.argColumns === 2 && sTable?.fill_in?.table?.rows === 9 &&
     (sTable?.fill_in_answers ?? ['x']).length === 0,
+);
+const sNumeral = sAsg.json.assignment.questions.find((q) => q.id === 11);
+check(
+  'student assignment copy keeps the invented numeral whole (base and numbers are prompts) with an empty key',
+  JSON.stringify(sNumeral?.fill_in) === JSON.stringify({ numeral: { base: 6, numbers: [{ value: 32, label: 'thirty-two' }] } }) &&
+    (sNumeral?.fill_in_answers ?? ['x']).length === 0,
 );
 check(
   'student assignment copy keeps the turbot arenas',
@@ -624,6 +650,14 @@ check(
   "student sees which rows a fill-in table got wrong, named by their arguments '(x, y)' only",
   sTableCases.length === 9 && sTableCases.filter((c) => !c.pass).length === 2 &&
     sTableCases.every((c) => /^\(\d, \d\)$/.test(c.label) && c.expected === '' && c.got === ''),
+);
+const sNumeralCases = brokenRecord.result!.questions.find((x) => x.questionId === 11)?.fillCases ?? [];
+check(
+  "student sees which invented-numeral boxes failed, by label and pass only (no expected, got or reason)",
+  sNumeralCases.length === 7 && sNumeralCases.filter((c) => !c.pass).length === 5 &&
+    sNumeralCases.every((c) => Object.keys(c).sort().join() === 'expected,got,label,pass' && c.expected === '' && c.got === '') &&
+    sNumeralCases.map((c) => c.label).join('|') ===
+      'symbol for zero|symbol for one|symbol for two|symbol for three|symbol for four|symbol for five|thirty-two',
 );
 
 // ── Grade parity: the grade route ≡ the pure planGradeWrite (task 063) ──────

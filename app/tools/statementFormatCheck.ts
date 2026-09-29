@@ -210,6 +210,30 @@ console.log('\n[problem set: sections, numbering, shapes, runs]');
     validateDocument(table(['a', '1', 'b'])).some((m) => /^Problem 1: .*not whole rows of 2 cells/.test(m)));
   check('validateDocument flags a table key with repeated arguments',
     validateDocument(table(['a', '1', ' a', '0'])).some((m) => /^Problem 1: .*rows 1 and 2 have the same arguments a/.test(m)));
+  // An invented numeral (task 080; engine/fillIn.ts fillInKeyProblem) takes
+  // no key and a sound system — the every-HW loop below holds HW1 P12 to it.
+  const numeral = (spec: Record<string, unknown>, fill_in_answers?: string[]): AssignmentData => ({
+    id: 'n', title: 'N', questions: [q(1, 'Invent a base-6 system.', {
+      buildMode: 'open',
+      fill_in: { numeral: { base: 6, numbers: [{ value: 32, label: 'thirty-two' }], ...spec } },
+      ...(fill_in_answers ? { fill_in_answers } : {}),
+    })],
+  });
+  const flags = (d: AssignmentData, re: RegExp) => validateDocument(d).some((m) => re.test(m));
+  check('validateDocument accepts a sound invented numeral, keyless (or with an empty key)',
+    validateDocument(numeral({})).length === 0 && validateDocument(numeral({}, [])).length === 0);
+  check('validateDocument flags an invented numeral carrying a key',
+    flags(numeral({}, ['a']), /^Problem 1: an invented-numeral question takes no answer key/));
+  check('validateDocument flags a numeral base of 1, 17 or 6.5',
+    [1, 17, 6.5].every((base) => flags(numeral({ base }), new RegExp(`^Problem 1: .*whole base from 2 to 16, not ${base}$`))));
+  check('validateDocument flags a numeral with no numbers',
+    flags(numeral({ numbers: [] }), /^Problem 1: .*needs at least one number to write/));
+  check('validateDocument flags a numeral number with an empty or a repeated label',
+    flags(numeral({ numbers: [{ value: 32, label: ' ' }] }), /number #1 needs a label/) &&
+      flags(numeral({ numbers: [{ value: 32, label: 'n' }, { value: 7, label: ' n ' }] }), /numbers #1 and #2 have the same label "n"/));
+  check('validateDocument flags a negative or fractional numeral value',
+    flags(numeral({ numbers: [{ value: -1, label: 'n' }] }), /number #1 must be a whole number, 0 or more, not -1/) &&
+      flags(numeral({ numbers: [{ value: 2.5, label: 'n' }] }), /not 2\.5/));
   check('sectionOf finds a question\'s section',
     sectionOf(structured, 3)?.heading === '' && sectionOf(structured, 1)?.heading === 'I');
   check('problemNumber reads the label, else the position',
@@ -282,6 +306,8 @@ console.log('\n[multi-part problems]');
       writtenKind(doc.questions[3]) === 'blanks' &&
       writtenKind(w(1, 'T', { fill_in: { table: { columns: ['x', 'f'], argColumns: 1, rows: 2 } } })) === 'table' &&
       writtenKind({ ...w(1, 'C'), buildMode: 'CC' }) === null);
+  check('writtenKind: an invented numeral (task 080) is blanks — sized boxes the Worksheet draws to its shape',
+    writtenKind(w(1, 'N', { fill_in: { numeral: { base: 6, numbers: [{ value: 32, label: 'thirty-two' }] } } })) === 'blanks');
 
   // A broken group degrades to separate problems, and validateDocument names it.
   const broken = (edit: (d: AssignmentData) => AssignmentData) => {
