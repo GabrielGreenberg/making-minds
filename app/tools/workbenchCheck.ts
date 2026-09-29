@@ -515,9 +515,10 @@ console.log('\n[output panel]');
   check('no panel builds a Run/Step of its own for CC, FSM, TM or turbot',
     !/\b(fsmRun|fsmStep|tmRun|tmStep|scSequenceRun|scSequenceStep)\b/.test(table) && !/\b(turbotRun|turbotStep)\b/.test(map) &&
       !/setInterval/.test(table));
-  // Task 075: the CC table is EARNED — an output shows only for a row the
-  // student has run. The store records the rows (ccRunRows, its machine-key
-  // subscriber; navResetCheck [earned CC table]); the table only reads them.
+  // Tasks 075, 084: the CC table is EARNED — an output shows only for a row
+  // the student has run. The store records a row in localStepOne when a play
+  // of it reaches the OUTPUTs; Reset and a machine edit clear them
+  // (ccRunRows; navResetCheck [earned CC table]); the table only reads them.
   const live = code('components/LiveTruthTable.tsx');
   check('the CC table is the live one', /<LiveTruthTable \/>/.test(table) && /truthTableCC/.test(read('ccTable.ts')));
   check('…drawn from ccTableView over the store\'s earned rows — each output cell its text, no bit of its own',
@@ -527,6 +528,8 @@ console.log('\n[output panel]');
     !/setState/.test(live) && !/ccRunRows\s*:/.test(live));
   check('…and the grader never reads them (the table is UI only)',
     ['engine/caseRun.ts', 'engine/grader.ts', 'engine/cc.ts'].every((rel) => !/ccRunRows/.test(read(rel))));
+  check('…its hint says a row fills when Run plays it — not when the inputs are set (task 084)',
+    /Click a row, then Run it to fill in its output\./.test(live) && !/set the inputs/.test(live));
   const actions = code('components/CanvasActions.tsx');
   check('the canvas\'s action group: Undo · Redo · Delete · Rotate · Clear through the store\'s own actions',
     ['undo()', 'redo()', 'deleteSelected()', 'rotateComponent(id)', 'clearWorkspace()', 'toggleStateKind(id)'].every((a) => actions.includes(a)) &&
