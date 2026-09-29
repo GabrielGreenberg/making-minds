@@ -1,10 +1,10 @@
 /* ═══════════════════════════════════════════════════════════════════════
    workbench.css — the editor's frame (task 052)
 
-   The top bar, the question panel, the column dividers and collapse strips,
+   The top bar, the question panel, the panel dividers and collapse strips,
    and the written problem's worksheet (open and fill-in parts):
    components/EditorShell.tsx, EditorTopBar.tsx, QuestionPanel.tsx,
-   Worksheet.tsx.
+   PanelDivider.tsx, Worksheet.tsx.
    The spec is docs/buildout/designs/editor-workbench.md (every size here is
    its value); the look is the course website's, so this file speaks only in
    theme.css's --mm-* tokens — themeCheck pins it literal-free, like pages.css.
@@ -29,8 +29,9 @@
 }
 .wb-right-head .wb-collapse:hover { color: var(--mm-accent); background: var(--mm-lav-soft); }
 
-/* A column divider: a 9px hit area that nets 1px of layout, the visible rule
-   in its middle, a grip at half height. */
+/* A panel divider (columns and the question panel's row; PanelDivider.tsx):
+   a 9px hit area that nets 1px of layout, the visible rule in its middle, a
+   grip at half height. */
 .wb-divider {
   position: relative; flex: 0 0 9px; margin: 0 -4px; z-index: 5;
   cursor: col-resize; touch-action: none; background: transparent;
@@ -47,6 +48,14 @@
 .wb-divider-grip::after {
   content: ''; position: absolute; left: 2px; top: 7px; width: 1px; height: 14px; background: var(--mm-edge-2);
 }
+/* The row between the question panel's problem and its list (task 078): it
+   nets 0px, the list header's top border (the rule the memo draws) in its
+   middle, so it has no line of its own; the grip lies flat at half width. It
+   stays under the column divider (z 4 < 5), which keeps the panel's edge. */
+.wb-divider.wb-divider--row { flex: 0 0 9px; margin: -4px 0 -5px; cursor: row-resize; z-index: 4; }
+.wb-divider--row::before { display: none; }
+.wb-divider--row .wb-divider-grip { top: 1px; left: 50%; width: 30px; height: 7px; transform: translateX(-50%); }
+.wb-divider--row .wb-divider-grip::after { left: 7px; top: 2px; width: 14px; height: 1px; }
 
 /* A collapsed side panel: a 40px strip that opens it again. */
 .wb-strip {
@@ -148,11 +157,17 @@ a.wb-brand:hover { color: var(--mm-accent); text-decoration: none; }
 }
 .qp .qp-collapse:hover { color: var(--mm-accent); background: var(--mm-lav-soft); }
 
-/* The current question: it takes what it needs, up to 64% of the panel, and
-   scrolls on its own; the question list below has the rest. */
-.qp-current {
-  flex-shrink: 0; max-height: 64%; overflow-y: auto;
-  display: flex; flex-direction: column; gap: 12px; padding: 16px 20px 22px; background: var(--mm-surface);
+/* Below the nav strip, the problem and the list split the panel (task 078).
+   The problem's pane is a FIXED share of it (QuestionPanel sets its basis
+   from the dragged split and its floor; workbench.ts QUESTION_SPLIT), never
+   sized by its content: the text scrolls inside it, the done mark is pinned
+   at its foot, and the list below takes the rest from the same place on
+   every problem. */
+.qp-split { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+.qp-current { display: flex; flex-direction: column; background: var(--mm-surface); }
+.qp-current-body {
+  flex: 1; min-height: 0; overflow-y: auto;
+  display: flex; flex-direction: column; gap: 12px; padding: 16px 20px 22px;
 }
 .qp-eyebrow { font-size: 11px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--mm-accent); }
 .mm-surface .qp-title {
@@ -201,7 +216,13 @@ a.wb-brand:hover { color: var(--mm-accent); text-decoration: none; }
 .qp-link-caret { display: inline-block; width: 0.8em; }
 .qp-disclosure-body { margin-top: 8px; display: flex; flex-direction: column; gap: 8px; }
 
-/* The done mark: the student's own, and still a lock (store.ts). */
+/* The done mark: the student's own, and still a lock (store.ts) — the
+   problem pane's foot, outside its scroll, so it never moves. The foot grows
+   upward (it is pinned to the pane's bottom), so the lock note sits above the
+   checkbox, which stays put whether or not the problem is done. */
+.qp-done {
+  flex-shrink: 0; padding: 8px 20px 12px; border-top: 1px solid var(--mm-line); background: var(--mm-surface);
+}
 .qp .qp-done-label {
   display: inline-flex; align-items: center; gap: 10px; min-height: 32px; padding: 0; cursor: pointer;
   border: 0; background: none; font: inherit; font-size: var(--mm-fs-small); color: var(--mm-ink-2); text-align: left;
@@ -213,9 +234,12 @@ a.wb-brand:hover { color: var(--mm-accent); text-decoration: none; }
 }
 .qp-done-box--on { background: var(--mm-accent); border-color: var(--mm-accent); }
 .qp-done-label:focus-visible .qp-done-box { outline: 2px solid var(--mm-focus); outline-offset: 1px; }
-.qp-done-note { margin: 2px 0 0 28px; font-size: var(--mm-fs-meta); color: var(--mm-ink-3); }
+.qp-done-note { margin: 0 0 2px 28px; font-size: var(--mm-fs-meta); color: var(--mm-ink-3); }
 
-/* The homework's questions, grouped by section. */
+/* The homework's questions, grouped by section: the rest of the split (its
+   basis and floor — the header, a section label and two rows — are
+   QuestionPanel's). */
+.qp-list-pane { display: flex; flex-direction: column; }
 .qp-list-head {
   height: 34px; flex-shrink: 0; display: flex; align-items: center; padding: 0 20px;
   background: var(--mm-surface-2); border-top: 1px solid var(--mm-edge); border-bottom: 1px solid var(--mm-line);

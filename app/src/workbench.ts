@@ -1,9 +1,10 @@
 // The editor workbench's pure parts (task 052; the design memo is
 // docs/buildout/designs/editor-workbench.md): the three-column layout's
-// widths and collapse states, the question panel's grouped question list,
-// and the top bar's save and submitted labels. No React, no store — the
-// components in EditorShell.tsx / QuestionPanel.tsx / EditorTopBar.tsx render
-// what these decide, and app/tools/workbenchCheck.ts pins them.
+// widths and collapse states, the question panel's split between the problem
+// and the list (task 078), its grouped question list, and the top bar's save
+// and submitted labels. No React, no store — the components in
+// EditorShell.tsx / QuestionPanel.tsx / PanelDivider.tsx / EditorTopBar.tsx
+// render what these decide, and app/tools/workbenchCheck.ts pins them.
 
 import type { AssignmentData, AssignmentQuestion, QuestionCircuit } from './types';
 import { questionModeLabel, questionTask } from './types';
@@ -26,26 +27,84 @@ export function clampPanelWidth(v: unknown, range: WidthRange): number {
   return Math.round(Math.min(range.max, Math.max(range.min, v)));
 }
 
-export interface EditorLayout { leftW: number; rightW: number; leftOpen: boolean; rightOpen: boolean }
+/** A fraction's range: dragging and a stored value clamp to [min, max]; a
+ *  key press moves it by `step`. */
+export interface FractionRange { min: number; max: number; initial: number; step: number }
 
-/** The uiPrefs keys (one bag per browser — uiPrefs.ts; cosmetic only). */
+/** The question panel's split (task 078): the problem's share of the panel
+ *  below its nav strip, the question list taking the rest. ONE height for
+ *  every problem — it never follows the statement's length, so the list sits
+ *  still as the student moves through the homework; the divider between them
+ *  sets it. The default is about the old look (the problem took what it
+ *  needed, up to 64%). */
+export const QUESTION_SPLIT: FractionRange = { min: 0.25, max: 0.8, initial: 0.58, step: 0.04 };
+/** Neither side of the split collapses below these, in px: the problem keeps
+ *  its title, a few lines and the done mark; the list its header (34px, the
+ *  nav strip's height), the section label heading a sectioned homework's list
+ *  (32px) and two rows (36px each) — workbench.css .qp-list-head /
+ *  .qp-list-label / .qp .qp-row. */
+export const QUESTION_SPLIT_FLOOR = { statement: 200, list: 34 + 32 + 2 * 36 } as const;
+
+/** The split's range over a panel `height` px tall: QUESTION_SPLIT's, narrowed
+ *  so both floors hold — unless the panel is too short for both (or not laid
+ *  out), when the fraction range alone applies (the CSS floors then decide).
+ *  What the divider reports as its min and max. */
+export function questionSplitRange(height?: number): { min: number; max: number } {
+  const { min, max } = QUESTION_SPLIT;
+  if (height === undefined || !(height > 0)) return { min, max };
+  const lo = Math.max(min, QUESTION_SPLIT_FLOOR.statement / height);
+  const hi = Math.min(max, 1 - QUESTION_SPLIT_FLOOR.list / height);
+  return lo <= hi ? { min: lo, max: hi } : { min, max };
+}
+
+/** A split clamped to its range (questionSplitRange: given the panel's
+ *  height, both floors hold as well); junk (a pref from nowhere) is the
+ *  initial one. Rounded to 0.001, so a stored value stays short. At a height,
+ *  this is also the split ON SCREEN: the pane's CSS floors turn a stored split
+ *  outside the height's range (stored on a taller window) into its end. */
+export function clampQuestionSplit(v: unknown, height?: number): number {
+  if (typeof v !== 'number' || !Number.isFinite(v)) return QUESTION_SPLIT.initial;
+  const { min, max } = questionSplitRange(height);
+  return Math.round(Math.min(max, Math.max(min, v)) * 1000) / 1000;
+}
+
+/** The split after dragging its divider `dy` px down, over a panel `height` px
+ *  tall (a panel not laid out just clamps). The drag starts from the split on
+ *  screen — `start` clamped to the height — not the stored one, so the
+ *  divider follows the pointer from its first pixel. */
+export function questionSplitFromDrag(start: number, dy: number, height: number): number {
+  return height > 0 ? clampQuestionSplit(clampQuestionSplit(start, height) + dy / height, height) : clampQuestionSplit(start);
+}
+
+/** The split after one arrow key on its divider (+1 = ↓, −1 = ↑): a step
+ *  from the split on screen, so every press shows. */
+export function questionSplitFromStep(split: number, dir: 1 | -1, height: number): number {
+  return clampQuestionSplit(clampQuestionSplit(split, height) + dir * QUESTION_SPLIT.step, height);
+}
+
+export interface EditorLayout { leftW: number; rightW: number; leftOpen: boolean; rightOpen: boolean; qpSplit: number }
+
+/** The uiPrefs keys (one bag per browser — uiPrefs.ts; cosmetic only). Every
+ *  layout field has one: EditorShell stores a change under its key. */
 export const EDITOR_PREF_KEYS = {
   leftW: 'editor.leftW',
   rightW: 'editor.rightW',
   leftOpen: 'editor.leftOpen',
   rightOpen: 'editor.rightOpen',
+  qpSplit: 'editor.qpSplit',
 } as const;
 
-/** The layout a browser's stored prefs describe: widths clamped, both panels
- *  open unless a pref says exactly false. The right column inherits the old
- *  data panel's own width pref (`panelWidth`, before task 052) until it has
- *  one of its own. */
+/** The layout a browser's stored prefs describe: widths and the split
+ *  clamped, both panels open unless a pref says exactly false. The right
+ *  column inherits the old data panel's own width pref (`panelWidth`, before
+ *  task 052) until it has one of its own. */
 export function editorLayoutFromPrefs(prefs: Record<string, unknown>): EditorLayout {
   return {
     leftW: clampPanelWidth(prefs[EDITOR_PREF_KEYS.leftW], LEFT_PANEL),
     rightW: clampPanelWidth(prefs[EDITOR_PREF_KEYS.rightW] ?? prefs.panelWidth, RIGHT_PANEL),
     leftOpen: prefs[EDITOR_PREF_KEYS.leftOpen] !== false,
     rightOpen: prefs[EDITOR_PREF_KEYS.rightOpen] !== false,
+    qpSplit: clampQuestionSplit(prefs[EDITOR_PREF_KEYS.qpSplit]),
   };
 }
 

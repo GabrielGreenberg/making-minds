@@ -66,7 +66,7 @@ Background `--mm-bg`. Three stacked parts.
 - Then the collapse button "«": 28×26, `--mm-ink-3`, hover `--mm-accent` on `--mm-lav-soft`.
 
 **2. Current question.**
-- Background `--mm-surface`, padding `16px 20px 22px`, flex column, gap 12, `max-height:64%` with its own scroll.
+- Background `--mm-surface`. **A fixed share of the panel below the nav strip** (task 078), set by a row divider and never by the statement's length, so the list below sits still from problem to problem: default 58%, range 25–80%, floors 200px for the problem and the list's header + a section label + 2 rows (138px) for the list, which win on a short window; pref `editor.qpSplit`, a fraction, so a window resize keeps the proportion (a stored split the window is now too short for shows at its end, and the divider reports, drags and steps from the split on screen). Inside, the body scrolls (padding `16px 20px 22px`, flex column, gap 12) and the done mark is pinned at its foot.
 - **Section eyebrow:** the section heading, e.g. "I. COMBINATORIAL CIRCUITS", 11px/600 uppercase, letter-spacing `.08em`, `--mm-accent`.
 - **Title:** "Problem 1 · NAND" (title, or just "Problem 6a"), `--mm-font-serif` 19px/600, line-height 1.25, `--mm-ink`, `text-wrap:balance`, margin-top −6.
 - **Statement:** through `StatementBody` / `ProblemBody` at 15px/1.5 `--mm-ink-2`, bold `--mm-ink` 600, 10px paragraph gap. For CC questions whose statement is a profile, show the section intro ("Design **combinatorial circuits** with the following input-output profiles:") followed by the goal table.
@@ -81,11 +81,11 @@ Background `--mm-bg`. Three stacked parts.
 - **Section notes:** the section's callouts sit behind a second link labelled by kind, e.g. "▸ Hint for this section" or "▸ Challenge problem (optional, not collected)". Same expanded style.
   - Both links are closed by default, and both reset closed on question change.
   - This replaces today's "▶ Note for this section".
-- **Done mark:** "I'm done with this question", 13.5px `--mm-ink-2`, with a 32px min hit height. The box is 18px square: border `#B9B2C4` when unchecked; when checked, fill and border `--mm-accent` with a white ✓ at 12px. It keeps the lock (decision 1).
+- **Done mark:** "I'm done with this question", 13.5px `--mm-ink-2`, with a 32px min hit height, pinned at the pane's foot outside the scroll (padding `8px 20px 12px`, top rule 1px `--mm-line`), so it never moves and never needs a scroll. The foot grows upward, so the lock note ("🔒 Locked against edits…") sits above the checkbox, which holds still whether or not the problem is done. The box is 18px square: border `#B9B2C4` when unchecked; when checked, fill and border `--mm-accent` with a white ✓ at 12px. It keeps the lock (decision 1).
 
 **3. Question list.**
 - **Header band:** 34px, `--mm-surface-2`, top border 1px `#CFC8D8` and bottom border 1px `--mm-line`. It is the visual divider from the current question. Text "HW1 · QUESTIONS" in 11.5px/600 uppercase, `.09em`, `--mm-ink`, padding `0 20px`.
-- **The list** takes the remaining height and scrolls. It is grouped by `documentSections`.
+- **The list** takes the rest of the split and scrolls. It is grouped by `documentSections`.
 - **Section label:** 10.5px/600 uppercase, `.08em`, `--mm-ink-3`, padding `12px 20px 4px`.
 - **Rows:**
   - Grid columns `30px minmax(0,1fr) auto 50px`, gap 8, min-height 36, padding `0 20px`, 13.5px. The whole row is clickable and navigates.
@@ -98,13 +98,15 @@ Background `--mm-bg`. Three stacked parts.
 
 **Collapsed strip:** 40px, `--mm-surface`, right border 1px `--mm-line-2`, clickable. It shows "»" (30×30, `--mm-accent`) at the top, then the question title set vertically (`writing-mode:vertical-rl`) in serif 15px/600.
 
-### Dividers (both)
-- 9px hit area with `margin:0 -4px` (so the net layout width is 1px), `cursor:col-resize`, `touch-action:none`, z-index above the panels.
+### Dividers (all three: the two columns and the question panel's row)
+One component (`PanelDivider.tsx`), one drag and keyboard behaviour on either axis (task 078).
+- **Columns:** 9px hit area with `margin:0 -4px` (so the net layout width is 1px), `cursor:col-resize`, `touch-action:none`, z-index 5, above the panels.
 - Visible parts:
   - a 1px `--mm-line-2` line
   - a centred grip: 7×30, `--mm-surface`, border 1px `#CFC8D8`, holding a 1×14 `#B9B2C4` stroke
 - Hover background: `rgba(194,85,185,.12)`.
-- Clamps: left 260–480, right 240–480 *(tunable)*.
+- Clamps: left 260–480, right 240–480 *(tunable)*; ←/→ step 16px.
+- **The question panel's row** (between the problem and the list): 9px hit area with `margin:-4px 0 -5px` (net 0px), `cursor:row-resize`, z-index 4, under the column divider, which keeps the panel's right edge. No line of its own: the list header's top border sits in its middle. The grip lies flat, 30×7 with a 14×1 stroke. ↑/↓ step 4%.
 
 ### Canvas
 - `--mm-surface` with a dot grid: `radial-gradient(#DAD4E2 1px, transparent 1.2px)`. The spacing is `GRID_SIZE × zoom`, and `background-position` follows the pan.
@@ -247,14 +249,14 @@ Background `--mm-bg`. Three stacked parts.
   
   Keep every existing gesture that isn't listed (rotate, shift-click rotate, rename and so on).
 - **Palette:** drag it by the grip; the turn button flips its orientation; both persist. The Boxes pop-out closes on ×, Esc, or a click on empty canvas.
-- **Dividers:** drag to resize. The collapse buttons, and clicking a collapsed strip, toggle the panels. All of this persists.
+- **Dividers:** drag or arrow keys to resize (live while dragging, stored on release). The collapse buttons, and clicking a collapsed strip, toggle the panels. All of this persists.
 - **Save indicator:** from the existing autosave. Map `WorkbookStore` states to "Saving…", "Saved just now", "Saved N min ago" (refreshed every 30 seconds) and the error state.
 - **Locks are unchanged:** frozen, viewing a submission, and `isCurrentQuestionLocked` still gate every mutating action in `store.ts`. The UI shows the existing read-only tags in the nav strip, where "4 of 23" sits.
 
 ## State
 
 - **No new domain state** except pinned boxes, which are cosmetic and live in a per-homework pref.
-- **New UI prefs:** panel widths, the open/closed states, and the palette position and orientation.
+- **New UI prefs:** panel widths, the open/closed states, the question panel's split (task 078), and the palette position and orientation.
 - **Transient component state:** whether the hint and section-note links are open, whether the pop-out is open, and the armed tool.
 - `done` keeps its current storage (`QuestionCircuit.done`).
 

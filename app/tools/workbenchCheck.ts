@@ -6,6 +6,12 @@
 //   [columns]        widths clamp to their ranges (a stored pref too), both
 //                    panels open unless a pref says exactly false, the old
 //                    data panel's width carries over.
+//   [question split] (task 078) the problem's share of the question panel:
+//                    the range and default (about the old look), the clamp
+//                    (junk → the default, rounded), both floors at a real
+//                    height (the fraction range alone on a panel too short
+//                    for both), a drag; the pref read from a fresh, old or
+//                    bad bag; every layout field stored under its own key.
 //   [question list]  the document's sections and numbering, a row per
 //                    problem in each (a multi-part problem one row, marked
 //                    over its parts; task 048), empty sections left out, the
@@ -20,7 +26,11 @@
 //                    Worksheet replaced the two answer panels and is one
 //                    connector over the store-free WorksheetSheet (whose
 //                    render navResetCheck [worksheet] pins), ProblemContext
-//                    is retired.
+//                    is retired; ONE panel divider (PanelDivider.tsx) for
+//                    both columns and the question panel's row, the split
+//                    threaded from EditorShell, the problem's pane a fixed
+//                    share (never its content's height) with the done mark
+//                    outside its scroll (task 078).
 //   [output panel]   (task 053) a circuit's truth table (engine
 //                    truthTableCC) against a reference circuit, EARNED (task
 //                    075: ccTable.ts's cells — blank until run, a dash where
@@ -94,16 +104,23 @@ import { ccOutputCell, ccRowKey, ccTableView } from '../src/ccTable';
 import { documentSections, pageIndexOf, problemPages } from '../src/problemSet';
 import {
   COLLAPSED_STRIP,
+  EDITOR_PREF_KEYS,
   LEFT_PANEL,
+  QUESTION_SPLIT,
+  QUESTION_SPLIT_FLOOR,
   RIGHT_PANEL,
   assignmentShortName,
   clampPanelWidth,
+  clampQuestionSplit,
   editorLayoutFromPrefs,
   problemMark,
   questionHeading,
   questionList,
   questionListTag,
   questionMark,
+  questionSplitFromDrag,
+  questionSplitFromStep,
+  questionSplitRange,
   saveLabel,
   sectionNotesLabel,
   submittedLabel,
@@ -141,6 +158,95 @@ check('a missing or junk width falls back to the initial one',
     editorLayoutFromPrefs({ panelWidth: 420 }).rightW === 420 &&
       editorLayoutFromPrefs({ panelWidth: 100 }).rightW === 240 &&
       editorLayoutFromPrefs({ panelWidth: 420, 'editor.rightW': 360 }).rightW === 360);
+}
+
+console.log('\n[question split]');
+{
+  const { min, max, initial, step } = QUESTION_SPLIT;
+  check('the range is sane and the default about the old look (≈ 55–60% of the panel)',
+    0 < min && min < initial && initial < max && max < 1 && initial >= 0.55 && initial <= 0.6 && step > 0);
+  // The list's floor, from workbench.css itself: the header's height, a
+  // section label's padding plus its line (10.5px text, ~16px) — a sectioned
+  // homework's list opens with one — and two rows' min-height.
+  {
+    const css = read('workbench.css');
+    const px = (sel: string, prop: string) => {
+      const body = new RegExp(`(?:^|[\\s}/])${sel.replace(/[.]/g, '\\.')}\\s*\\{([^}]*)\\}`).exec(css)?.[1] ?? '';
+      return new RegExp(`(?:^|[;\\s])${prop}:\\s*([^;]+);`).exec(body)?.[1]?.trim() ?? '';
+    };
+    const head = parseFloat(px('.qp-list-head', 'height'));
+    const labelPad = px('.qp-list-label', 'padding').split(/\s+/).map(parseFloat);
+    const labelLine = Math.ceil(parseFloat(px('.qp-list-label', 'font-size')) * 1.5);
+    const row = parseFloat(px('.qp .qp-row', 'min-height'));
+    const floor = head + (labelPad[0] + labelPad[2] + labelLine) + 2 * row;
+    check('the list\'s floor is its header, a section label and two rows (34 + 32 + 2 × 36px, as workbench.css draws them); the problem keeps a usable floor',
+      QUESTION_SPLIT_FLOOR.list === 34 + 32 + 2 * 36 && Math.abs(QUESTION_SPLIT_FLOOR.list - floor) <= 1 &&
+        QUESTION_SPLIT_FLOOR.statement >= 150,
+      `css: ${head} + ${labelPad[0]}+${labelPad[2]}+${labelLine} + 2 × ${row} = ${floor}`);
+  }
+  check('a split clamps into the range, rounded to 0.001',
+    clampQuestionSplit(0.5) === 0.5 && clampQuestionSplit(0.5678901) === 0.568 &&
+      clampQuestionSplit(0.05) === min && clampQuestionSplit(5) === max);
+  check('a missing or junk split falls back to the default',
+    [undefined, null, 'tall', NaN, Infinity, -Infinity, {}].every((v) => clampQuestionSplit(v) === initial));
+  // At 600px the problem's floor binds (200 / 600 > min); at 400px both do.
+  const ends = (h: number) => [clampQuestionSplit(0.01, h), clampQuestionSplit(0.99, h)];
+  const [top6, bottom6] = ends(600);
+  const [top4, bottom4] = ends(400);
+  check('at a real height, the problem keeps its floor (dragged all the way up)',
+    [[top6, 600], [top4, 400]].every(([s, h]) => s * h >= QUESTION_SPLIT_FLOOR.statement - 0.5) && top6 > min && top4 > min,
+    `${top6} × 600, ${top4} × 400`);
+  check('…and the list keeps its header, a section label and two rows (dragged all the way down)',
+    [[bottom6, 600], [bottom4, 400]].every(([s, h]) => (1 - s) * h >= QUESTION_SPLIT_FLOOR.list - 0.5) && bottom4 < max,
+    `${bottom6} × 600, ${bottom4} × 400`);
+  check('…a split between the floors is left alone', clampQuestionSplit(0.5, 600) === 0.5 && clampQuestionSplit(initial, 600) === initial);
+  check('a panel too short for both floors: the fraction range alone (the CSS floors decide)',
+    [0.05, 0.3, 0.5, 0.95, 'x'].every((v) => clampQuestionSplit(v, 250) === clampQuestionSplit(v)) &&
+      [0.05, 0.95].every((v) => clampQuestionSplit(v, 0) === clampQuestionSplit(v)));
+  check('a drag moves the split by its share of the height, clamped',
+    questionSplitFromDrag(0.5, 60, 600) === 0.6 && questionSplitFromDrag(0.5, -30, 600) === 0.45 &&
+      questionSplitFromDrag(0.5, 5000, 600) === clampQuestionSplit(1, 600) &&
+      questionSplitFromDrag(0.5, -5000, 600) === clampQuestionSplit(0, 600));
+  check('…a panel not laid out (height 0) leaves the start, clamped',
+    questionSplitFromDrag(0.5, 60, 0) === 0.5 && questionSplitFromDrag(0.95, 60, 0) === max);
+  // A split stored on a taller window: at 600px, 0.25 shows at the problem's
+  // floor (200 / 600), 0.8 at the list's; drags and keys start from THAT.
+  const shownTop = clampQuestionSplit(0.25, 600);
+  const shownBottom = clampQuestionSplit(0.8, 600);
+  check('a stored split outside the height\'s range shows at its end (the split on screen)',
+    shownTop > 0.25 && Math.abs(shownTop * 600 - QUESTION_SPLIT_FLOOR.statement) < 1 &&
+      shownBottom < 0.8 && Math.abs((1 - shownBottom) * 600 - QUESTION_SPLIT_FLOOR.list) < 1,
+    `${shownTop}, ${shownBottom}`);
+  check('…a drag starts from the split on screen: the divider follows the pointer from its first pixel, no dead zone',
+    [1, 20, 40].every((dy) => questionSplitFromDrag(0.25, dy, 600) > shownTop) &&
+      Math.abs(questionSplitFromDrag(0.25, 60, 600) - (shownTop + 0.1)) < 0.002 &&
+      [-1, -20].every((dy) => questionSplitFromDrag(0.8, dy, 600) < shownBottom) &&
+      questionSplitFromDrag(0.25, 0, 600) === shownTop,
+    `${questionSplitFromDrag(0.25, 1, 600)}, ${questionSplitFromDrag(0.25, 60, 600)}`);
+  check('an arrow key steps the split on screen by the step, clamped — so every press shows',
+    questionSplitFromStep(0.5, 1, 600) === 0.54 && questionSplitFromStep(0.5, -1, 600) === 0.46 &&
+      questionSplitFromStep(0.25, 1, 600) === clampQuestionSplit(shownTop + step, 600) &&
+      questionSplitFromStep(0.25, 1, 600) > shownTop && questionSplitFromStep(0.8, -1, 600) < shownBottom &&
+      questionSplitFromStep(0.25, -1, 600) === shownTop && questionSplitFromStep(0.8, 1, 600) === shownBottom &&
+      questionSplitFromStep(0.5, 1, 0) === 0.54);
+  const r600 = questionSplitRange(600);
+  check('the divider\'s range is the height\'s (both floors), the fraction range alone when unmeasured or too short',
+    r600.min === QUESTION_SPLIT_FLOOR.statement / 600 && r600.max === 1 - QUESTION_SPLIT_FLOOR.list / 600 &&
+      [undefined, 0, 250].every((h) => { const r = questionSplitRange(h); return r.min === min && r.max === max; }) &&
+      questionSplitRange(2000).min === min && questionSplitRange(2000).max === max);
+  check('the pref: none, an old bag (widths only) or junk → the default; a stored split clamped',
+    editorLayoutFromPrefs({}).qpSplit === initial &&
+      editorLayoutFromPrefs({ 'editor.leftW': 300 }).qpSplit === initial &&
+      editorLayoutFromPrefs({ 'editor.qpSplit': 'tall' }).qpSplit === initial &&
+      editorLayoutFromPrefs({ 'editor.qpSplit': 0.05 }).qpSplit === min &&
+      editorLayoutFromPrefs({ 'editor.qpSplit': 5 }).qpSplit === max &&
+      editorLayoutFromPrefs({ 'editor.qpSplit': 0.5 }).qpSplit === 0.5);
+  const keys = Object.values(EDITOR_PREF_KEYS);
+  check('the split\'s key is editor.qpSplit; every key distinct and editor.-prefixed',
+    EDITOR_PREF_KEYS.qpSplit === 'editor.qpSplit' && new Set(keys).size === keys.length && keys.every((k) => k.startsWith('editor.')));
+  // useEditorLayout stores each changed field under EDITOR_PREF_KEYS[field].
+  check('every layout field is stored under its own key (and no key names a field that is not)',
+    Object.keys(EDITOR_PREF_KEYS).sort().join() === Object.keys(editorLayoutFromPrefs({})).sort().join());
 }
 
 console.log('\n[question list]');
@@ -258,7 +364,7 @@ console.log('\n[one frame]');
   // the panel and its collapsed strip render nowhere else.
   const left = shell.slice(Math.max(0, shell.indexOf('{inAssignment &&')), shell.indexOf('<main'));
   check('the question panel renders only in an assignment (the sandbox has none)',
-    left.startsWith('{inAssignment &&') && left.includes('<QuestionPanel ') && left.includes('<QuestionPanelStrip ') &&
+    left.startsWith('{inAssignment &&') && /<QuestionPanel\s/.test(left) && left.includes('<QuestionPanelStrip ') &&
       (shell.match(/<QuestionPanel(Strip)?\b/g) ?? []).length === 2);
   const table = code('components/DataTable.tsx');
   check('the data panel no longer renders the question (it is in the question panel)',
@@ -270,7 +376,7 @@ console.log('\n[one frame]');
   // 079), never from the key, so a student's key-less copy renders the same.
   // So does the Worksheet (task 048) — and it never asks a key-reading
   // question (isReviewTable) of a student's key-less copy.
-  for (const rel of ['workbench.ts', 'components/QuestionPanel.tsx', 'components/EditorShell.tsx', 'components/EditorTopBar.tsx', 'components/Worksheet.tsx']) {
+  for (const rel of ['workbench.ts', 'components/QuestionPanel.tsx', 'components/EditorShell.tsx', 'components/PanelDivider.tsx', 'components/EditorTopBar.tsx', 'components/Worksheet.tsx']) {
     check(`${rel} reads no answer key`, !/test_cases|perception_cases|fill_in_answers|isReviewTable/.test(read(rel)));
   }
   check('the old answer panels are gone (the Worksheet replaces them)',
@@ -301,6 +407,43 @@ console.log('\n[one frame]');
   // task 067, whose it is), pinned in routingCheck [viewer route].
   check('navigation goes through navigate() with the viewed attempt (and its owner) carried along',
     /editorRoute\(useStore\.getState\(\), i\)/.test(panel) && /navigate\(route, \{ replace: true \}\)/.test(panel));
+  // Task 078: one divider for both axes, the question panel's split.
+  const divider = existsSync(join(SRC, 'components/PanelDivider.tsx')) ? code('components/PanelDivider.tsx') : '';
+  check('ONE panel divider: PanelDivider is a separator with its orientation and value, dragged on either axis, stepped by the keys along it',
+    ['role="separator"', 'aria-orientation', 'aria-valuenow', 'aria-valuemin', 'aria-valuemax', 'clientX', 'clientY',
+      'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'setPointerCapture'].every((t) => divider.includes(t)));
+  check('…the frame and the question panel draw no divider of their own',
+    [shell, panel].every((src) => !/onPointerMove|setPointerCapture|role="separator"/.test(src)));
+  check('…the columns are two vertical ones, the problem / list split one horizontal one',
+    (shell.match(/<PanelDivider\s+orientation="vertical"/g) ?? []).length === 2 &&
+      (shell.match(/<PanelDivider\b/g) ?? []).length === 2 &&
+      (panel.match(/<PanelDivider\s+orientation="horizontal"/g) ?? []).length === 1 &&
+      (panel.match(/<PanelDivider\b/g) ?? []).length === 1);
+  check('the split is the layout\'s: EditorShell hands it to the question panel and stores a change like a width',
+    shell.includes('split={layout.qpSplit}') && shell.includes('update({ qpSplit'));
+  const css = read('workbench.css');
+  // A rule's body, its selector standing alone (after a rule, a comment or a line break).
+  const rule = (sel: string) => new RegExp(`(?:^|[\\s}/])${sel.replace(/[.]/g, '\\.')}\\s*\\{([^}]*)\\}`).exec(css)?.[1] ?? null;
+  const current = rule('.qp-current');
+  check('the problem\'s pane is a fixed share, never its content\'s height: no max-height; its basis the split, its floor the constant',
+    current !== null && !/max-height|flex-shrink:\s*0/.test(current) &&
+      /className="qp-current" style=\{\{ flex: `0 1 \$\{split \* 100\}%`, minHeight: QUESTION_SPLIT_FLOOR\.statement \}\}/.test(panel) &&
+      /minHeight: QUESTION_SPLIT_FLOOR\.list/.test(panel));
+  const bodyAt = panel.indexOf('<div className="qp-current-body"');
+  const doneAt = panel.indexOf('<DoneMark', bodyAt);
+  const between = bodyAt < 0 || doneAt < 0 ? '' : panel.slice(bodyAt, doneAt);
+  const count = (re: RegExp) => (between.match(re) ?? []).length;
+  check('the done mark sits outside the scroll: the body closes before it (so it never moves)',
+    between !== '' && count(/<div\b/g) === count(/<\/div>/g) &&
+      /overflow-y:\s*auto/.test(rule('.qp-current-body') ?? '') && /flex-shrink:\s*0/.test(rule('.qp-done') ?? ''));
+  // Pinned to the pane's bottom, the foot grows upward: a lock note below the
+  // checkbox would lift it (done vs open problems, and out from under the
+  // pointer that just ticked it), so the note comes first.
+  const doneMark = panel.slice(panel.indexOf('function DoneMark'), panel.indexOf('function QuestionList'));
+  const noteAt = doneMark.indexOf('className="qp-done-note"');
+  const boxAt = doneMark.indexOf('className="qp-done-label"');
+  check('…and holds still when ticked: the lock note renders above the checkbox, never below it',
+    noteAt > 0 && boxAt > 0 && noteAt < boxAt && doneMark.lastIndexOf('qp-done-note') < boxAt);
 }
 
 console.log('\n[output panel]');

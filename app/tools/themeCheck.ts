@@ -39,6 +39,7 @@ const PAGE_COMPONENTS = [
   'components/EditorShell.tsx',
   'components/EditorTopBar.tsx',
   'components/QuestionPanel.tsx',
+  'components/PanelDivider.tsx',
   'components/Worksheet.tsx',
   'components/OutputPanel.tsx',
   'components/LiveTruthTable.tsx',

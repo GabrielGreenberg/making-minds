@@ -58,7 +58,7 @@ health retry screen while the server is down; a "Password" control) → **publis
 assignments (hidden until an instructor publishes) → the assignment as a **problem-set
 document** (`AssignmentOverview` → `ProblemSetDocument`: live turbot arenas, a status mark
 per problem, an "Original PDF" link) → the question **editor**, a workbench built to its
-memo (top bar, resizable columns, floating parts palette) — a multi-part problem's parts
+memo (top bar, resizable panels, floating parts palette) — a multi-part problem's parts
 (written questions grouped by `partOf`, each graded alone) share a page and one Mark
 done — in the right mode: **CC, SC, FSM, TM, turbot** (TM:
 clickable tape strip + machine table / run / history panels, alphabet from the question's
