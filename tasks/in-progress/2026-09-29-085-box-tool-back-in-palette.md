@@ -8,9 +8,9 @@ requires: browser
 area: app
 source: feedback
 created: 2026-09-29T15:10:00-07:00
-status: ready
+status: in-progress
 after:
-branch:
+branch: robot/085-box-tool-back-in-palette
 merged_into:
 ---
 
