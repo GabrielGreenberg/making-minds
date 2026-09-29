@@ -19,7 +19,8 @@
 // banks byte-for-byte the committed HW2/HW3 ones — the instructor's authored
 // films (appended, expected from the rule; perceptionAuthoring's draft),
 // grading of the new rules, and "Run this input" for a perception film
-// (store loadCaseInput, from a stripped copy too).
+// (store loadCaseInput, from a stripped copy too; a CC frame's run is a play
+// to the end, which earns its I/O-table row — task 084).
 
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -55,6 +56,7 @@ import {
 import { gradeQuestion } from '../src/engine/grader';
 import { gradingCircuit, gradedMachineKey } from '../src/engine/caseRun';
 import { gradedCaseView } from '../src/gradeDisplay';
+import { ccRowKey } from '../src/ccTable';
 import { stripAnswers, studentRecord } from '../../server/src/sanitize';
 import {
   draftFromQuestion,
@@ -850,6 +852,12 @@ console.log('\n[replay: Run this input on a perception film]');
       st.loadedCase?.kind === 'perception' && same(ins, c.frames[0]) && same(out, c.got));
     check(`CC ${tag} case ${k}: the machine graded is the canvas's`,
       st.loadedCase?.gradedKey === gradedMachineKey(perceptionEdgeIncorrect()));
+    // The run is the Run button's play of the frame's row, stepped to its end
+    // — so the OUT above is where a finished Run leaves it — and it earned
+    // that row in the I/O table (task 084).
+    check(`CC ${tag} case ${k}: Run this input plays the row to the end, which earns it in the table`,
+      st.localStepActive && st.localStepSorted.length > 0 && st.localStepIndex === st.localStepSorted.length &&
+        st.ccRunRows.includes(ccRowKey(ins)));
   }
 }
 

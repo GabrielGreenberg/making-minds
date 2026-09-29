@@ -1,13 +1,14 @@
 // A combinational circuit's output panel (task 053; design memo
 // editor-workbench.md §Output panel): the circuit's I/O table — every input
 // row listed and computed, but an output SHOWN only for a row the student has
-// run (task 075: the table is earned). What each cell shows is ccTable.ts's
-// ccTableView, pure and pinned (workbenchCheck [output panel]); the rows run
-// are the store's ccRunRows (a row click, the canvas inputs set to it), which
-// this component only reads. The row matching the current inputs is
-// highlighted; clicking a row sets the canvas inputs to it and readies its
-// signal-flow animation, which the output panel's one control row then plays
-// (Gabriel, 2026-09-25: CC keeps its animation).
+// run (tasks 075, 084: the table is earned). What each cell shows is
+// ccTable.ts's ccTableView, pure and pinned (workbenchCheck [output panel]);
+// the rows run are the store's ccRunRows — a row's output shows once a play
+// of that row reached the OUTPUTs (Run, or Step to the end), and Reset clears
+// them — which this component only reads. The row matching the current
+// inputs is highlighted; clicking a row sets the canvas inputs to it and
+// readies its signal-flow animation, which the output panel's one control
+// row then plays (Gabriel, 2026-09-25: CC keeps its animation).
 
 import { useMemo, type KeyboardEvent } from 'react';
 import { useStore } from '../store';
@@ -94,7 +95,7 @@ export function LiveTruthTable() {
               })}
             </tbody>
           </table>
-          <p className="op-note">Click a row, or set the inputs, to run it.</p>
+          <p className="op-note">Click a row, then Run it to fill in its output.</p>
         </>
       )}
     </div>

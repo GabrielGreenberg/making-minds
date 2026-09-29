@@ -134,3 +134,33 @@ column blanks; toggle inputs on the canvas → nothing fills until Run.
 
 ## Progress log
 - 2026-09-28 (robot catch): filed from `fb-mum4r0c4-suqknj`.
+
+### 2026-09-28 — implemented (work loop)
+- **Built (deepFix):** a CC table row now fills only when a play of it finishes. The one
+  earning path is `localStepOne` running the play's last step (the OUTPUT evaluations) →
+  `recordCcRunRow` (`store.ts:4269`, body `:6104`); Run and Step both pass through it. The
+  machine-key subscriber no longer earns: a machine edit clears `ccRunRows` and re-earns
+  nothing (`:6093`). CC Reset still moves the inputs to 0…0 (row picked, un-run) and now
+  empties the table (`runControl`, `:5165-5167`). "Run this input" on a CC question or CC
+  perception frame plays the row synchronously to the end (`playCcToEnd`, `:5306`) instead
+  of `evaluateCircuit`, so it earns by the same path. Hint: "Click a row, then Run it to fill
+  in its output." (`LiveTruthTable.tsx:98`). Memo `editor-workbench.md` §Output panel updated.
+- **Pins:** `navResetCheck` [earned CC table] re-pinned (completing canvas click / row click
+  earn nothing; Step short of the end nothing, last Step earns; Stop part-way nothing, Run
+  again earns and keeps earlier rows; Reset empties; machine edit empties + re-earns
+  nothing; memory canvas earns nothing; paste / fresh-canvas / move pins kept);
+  `caseRunCheck` pinValueLoad (CC: nothing earned while the stimulus waits, the finished
+  play earns the case's row — local and remote shapes); `perceptionCheck` (CC frame earns
+  its row); `workbenchCheck` [output panel] comment + hint pin.
+- **Gates:** app-tsc 0 · app-build 0 · app-check 0 · server-tsc 0 · server-check 0.
+- **Review:** no findings fixed or skipped. Nits left: the `toggleInput` interface comment
+  (`store.ts:949`) still says a completing click "runs that row" (now it only picks it);
+  navResetCheck's section header doesn't point to where the `loadCaseInput` pin lives
+  (caseRunCheck / perceptionCheck).
+- **Owed:** browser eyeball (Robot Dev Server) — sandbox CC NAND walk-through (click a row:
+  OUTPUT + cell blank; Run fills only once OUT1 lights; Stop part-way stays blank; Step to
+  the end fills; canvas toggles fill nothing; Reset blanks the column, inputs 0,0 un-run;
+  delete a wire blanks the table, canvas re-evaluates live; the new hint); same on HW1 P1
+  in an assignment, incl. marked done (Run/Reset still work, Reset clears); optionally Run
+  this input from Grades fills the case's row.
+- **Next step:** loop session: visual check (owed above), then land per PROFILE §5.

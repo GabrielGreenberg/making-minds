@@ -1256,13 +1256,15 @@ interface AppState {
   // The canvas answers it by fitting the view (task 055) — a view change,
   // never part of the reset itself.
   canvasSwapSeq: number;
-  // The CC I/O table's earned rows (task 075): the input rows the student has
-  // run — each the IN-label-ordered bits joined by ',' (LiveTruthTable's row
-  // key). A row is earned when the canvas INPUTs stand at it (a table click, a
-  // canvas toggle, a Reset, a replayed case): the machine-key subscriber, and
-  // only it, records one. UI only — never saved, so a resume starts the table
-  // un-earned; cleared by every canvas swap (resetAllSimState) and by a
-  // machine edit (the same subscriber).
+  // The CC I/O table's earned rows (tasks 075, 084): the input rows the
+  // student has run — each the IN-label-ordered bits joined by ','
+  // (LiveTruthTable's row key). A row is earned when a play of it finishes
+  // (localStepOne ran its last step: Run, Step to the end, or Run this
+  // input) — never by a row click, a canvas toggle or a Reset alone;
+  // recordCcRunRow, called by localStepOne and only it, records one. UI only
+  // — never saved, so a resume starts the table un-earned; cleared by Reset
+  // (runControl), a machine edit (the machine-key subscriber) and every
+  // canvas swap (resetAllSimState).
   ccRunRows: string[];
 
   // Box drawing mode state
@@ -4068,149 +4070,28 @@ export const useStore = create<AppState>()((set, get) => ({
       return false;
     }
 
-    // Check if this step is a component evaluation (comp:ID) or a wire annotation
-    const stepId = localStepSorted[localStepIndex];
+    // One step of the play; true while more remain (every path moves the
+    // index on by exactly one).
+    const advance = (): boolean => {
+      // Check if this step is a component evaluation (comp:ID) or a wire annotation
+      const stepId = localStepSorted[localStepIndex];
 
-    if (stepId.startsWith('comp:')) {
-      // Evaluate the component directly (e.g. OUTPUT)
-      const compId = stepId.slice(5);
-      const comp = components.find((c) => c.id === compId);
-      if (!comp) {
-        set({ localStepIndex: localStepIndex + 1 });
-        return localStepIndex + 1 < localStepSorted.length;
-      }
-      const newPortValues = { ...localStepPortValues };
-      const inputPorts = comp.ports.filter((p) => p.side === 'left');
-      const inputVals: (number | undefined)[] = [];
-      let hasUndefined = false;
-      for (const port of inputPorts) {
-        const inWire = wires.find((w) => w.targetComponentId === comp.id && w.targetPortId === port.id);
-        if (inWire) {
-          const val = state.wireValues.has(inWire.id) ? state.wireValues.get(inWire.id) : undefined;
-          inputVals.push(val != null ? val : undefined);
-          if (val == null) hasUndefined = true;
-        } else {
-          inputVals.push(undefined);
-          hasUndefined = true;
+      if (stepId.startsWith('comp:')) {
+        // Evaluate the component directly (e.g. OUTPUT)
+        const compId = stepId.slice(5);
+        const comp = components.find((c) => c.id === compId);
+        if (!comp) {
+          set({ localStepIndex: localStepIndex + 1 });
+          return localStepIndex + 1 < localStepSorted.length;
         }
-      }
-      if (comp.type === 'OUTPUT') {
-        newPortValues[`${comp.id}:in`] = hasUndefined ? undefined : (inputVals[0] ?? 0);
-      } else if (isSequentialBox(comp)) {
-        // A sequential box's memory takes its next value from the inputs
-        // now on its wires — its MEMs' counterpart of the step below.
-        const next = stepBoxedMemory(comp, inputVals.map((v) => v ?? 0));
-        set({ components: components.map((c) => (c.id === compId ? next : c)), localStepIndex: localStepIndex + 1 });
-        return localStepIndex + 1 < localStepSorted.length;
-      } else if (comp.type === 'MEM') {
-        // MEM "evaluation" at end of cycle: read value from the feedback wire
-        // into the MEM input port and record it as the next stored value.
-        const memInputPortId = getMemInputPortId(comp);
-        const feedbackWire = wires.find(
-          (w) => w.targetComponentId === comp.id && w.targetPortId === memInputPortId
-        );
-        const feedbackVal = feedbackWire
-          ? (state.wireValues.get(feedbackWire.id) ?? 0)
-          : 0;
-        newPortValues[`${comp.id}:${memInputPortId}`] = feedbackVal;
-      } else if (!hasUndefined) {
-        const outputs = evaluateGate(comp.type, inputVals as number[], comp);
-        const outputPorts = comp.ports.filter((p) => p.side === 'right');
-        for (let i = 0; i < outputPorts.length; i++) {
-          newPortValues[`${comp.id}:${outputPorts[i].id}`] = outputs[i] ?? 0;
-        }
-      }
-      const updatedComps = components.map((c) => {
-        if (c.id !== compId) return c;
-        if (c.type === 'OUTPUT') return { ...c, value: newPortValues[`${c.id}:in`] };
-        if (c.type === 'MEM') {
-          // Show the incoming value visually on the MEM block
-          const memInputPortId = getMemInputPortId(c);
-          const inVal = newPortValues[`${c.id}:${memInputPortId}`];
-          return { ...c, storedValue: inVal != null ? inVal : (c.storedValue ?? 0) };
-        }
-        const outputPort = c.ports.find((p) => p.side === 'right');
-        if (outputPort) return { ...c, value: newPortValues[`${c.id}:${outputPort.id}`] };
-        return c;
-      });
-
-      // When an OUTPUT is evaluated, upsert the I/O table row with current output values
-      const updates: Record<string, unknown> = { components: updatedComps, localStepIndex: localStepIndex + 1, localStepPortValues: newPortValues };
-      if (comp.type === 'OUTPUT') {
-        const sortedOutputs = components
-          .filter((c) => c.type === 'OUTPUT')
-          .sort((a, b) => parseInt(a.label.replace('OUT', '')) - parseInt(b.label.replace('OUT', '')));
-        const outputBits = sortedOutputs.map((c) => {
-          const val = newPortValues[`${c.id}:in`];
-          return val !== undefined ? val : 0;
-        });
-        // The row is the one SELECTED — inputs and memory as they stood
-        // before the step. (The MEM update steps have already moved the
-        // machine to its next state; keying by that filed the outputs under
-        // the wrong row.)
-        const { inputBits, memBits } = localStepRow(state);
-        const memBitsVal = hasMemory(components) ? memBits : undefined;
-
-        const localKey = [...inputBits, ...(memBitsVal || [])].join(',');
-        const existingRows = state.tableRows;
-        const localIdx = existingRows.findIndex((r) => [...r.inputBits, ...(r.memBits || [])].join(',') === localKey);
-        let newTableRows = existingRows;
-        if (localIdx >= 0) {
-          newTableRows = [...existingRows];
-          newTableRows[localIdx] = { inputBits, memBits: memBitsVal, outputBits };
-        } else {
-          newTableRows = [...existingRows, { inputBits, memBits: memBitsVal, outputBits }];
-        }
-        updates.tableRows = newTableRows;
-      }
-      set(updates);
-      return localStepIndex + 1 < localStepSorted.length;
-    }
-
-    // Annotate one wire
-    const wireId = stepId;
-    const wire = wires.find((w) => w.id === wireId);
-    if (!wire) {
-      set({ localStepIndex: localStepIndex + 1 });
-      return localStepIndex + 1 < localStepSorted.length;
-    }
-
-    const newPortValues = { ...localStepPortValues };
-    const newWireValues = new Map(state.wireValues);
-
-    // Get the source port value and annotate this wire
-    const srcVal = newPortValues[`${wire.sourceComponentId}:${wire.sourcePortId}`];
-    if (srcVal != null) {
-      newWireValues.set(wire.id, srcVal);
-    }
-
-    // Update the wire object
-    const updatedWires = wires.map((w) =>
-      w.id === wireId ? { ...w, value: srcVal != null ? srcVal : -1 } : w
-    );
-
-    // Check if the target component now has ALL its input wires annotated.
-    // If so, evaluate it so its output port values are available for downstream wires.
-    const targetComp = components.find((c) => c.id === wire.targetComponentId);
-    let updatedComps = components;
-
-    if (targetComp && targetComp.type !== 'INPUT' && targetComp.type !== 'MEM' && targetComp.type !== 'OUTPUT') {
-      const inputPorts = targetComp.ports.filter((p) => p.side === 'left');
-      const allInputsReady = inputPorts.every((port) => {
-        const inWire = wires.find((w) => w.targetComponentId === targetComp.id && w.targetPortId === port.id);
-        if (!inWire) return true; // unconnected = ready (undefined)
-        // Check if this wire has been annotated (either just now or previously)
-        return inWire.id === wireId ? srcVal != null : newWireValues.has(inWire.id);
-      });
-
-      if (allInputsReady) {
-        // Gather input values and evaluate
+        const newPortValues = { ...localStepPortValues };
+        const inputPorts = comp.ports.filter((p) => p.side === 'left');
         const inputVals: (number | undefined)[] = [];
         let hasUndefined = false;
         for (const port of inputPorts) {
-          const inWire = wires.find((w) => w.targetComponentId === targetComp.id && w.targetPortId === port.id);
+          const inWire = wires.find((w) => w.targetComponentId === comp.id && w.targetPortId === port.id);
           if (inWire) {
-            const val = inWire.id === wireId ? srcVal : newWireValues.get(inWire.id);
+            const val = state.wireValues.has(inWire.id) ? state.wireValues.get(inWire.id) : undefined;
             inputVals.push(val != null ? val : undefined);
             if (val == null) hasUndefined = true;
           } else {
@@ -4218,42 +4099,175 @@ export const useStore = create<AppState>()((set, get) => ({
             hasUndefined = true;
           }
         }
-
-        // A sequential box's memory-decided outputs were seeded at select
-        // time (boxMemoryPortValues) and stay: only the outputs its inputs
-        // decide are blanked or evaluated here.
-        const seeded = boxMemoryPortValues(targetComp);
-        const outputPorts = targetComp.ports.filter((p) => p.side === 'right');
-        const outputs = hasUndefined ? [] : evaluateGate(targetComp.type, inputVals as number[], targetComp);
-        for (let i = 0; i < outputPorts.length; i++) {
-          const key = `${targetComp.id}:${outputPorts[i].id}`;
-          if (seeded.has(key)) continue;
-          newPortValues[key] = hasUndefined ? undefined : (outputs[i] ?? 0);
+        if (comp.type === 'OUTPUT') {
+          newPortValues[`${comp.id}:in`] = hasUndefined ? undefined : (inputVals[0] ?? 0);
+        } else if (isSequentialBox(comp)) {
+          // A sequential box's memory takes its next value from the inputs
+          // now on its wires — its MEMs' counterpart of the step below.
+          const next = stepBoxedMemory(comp, inputVals.map((v) => v ?? 0));
+          set({ components: components.map((c) => (c.id === compId ? next : c)), localStepIndex: localStepIndex + 1 });
+          return localStepIndex + 1 < localStepSorted.length;
+        } else if (comp.type === 'MEM') {
+          // MEM "evaluation" at end of cycle: read value from the feedback wire
+          // into the MEM input port and record it as the next stored value.
+          const memInputPortId = getMemInputPortId(comp);
+          const feedbackWire = wires.find(
+            (w) => w.targetComponentId === comp.id && w.targetPortId === memInputPortId
+          );
+          const feedbackVal = feedbackWire
+            ? (state.wireValues.get(feedbackWire.id) ?? 0)
+            : 0;
+          newPortValues[`${comp.id}:${memInputPortId}`] = feedbackVal;
+        } else if (!hasUndefined) {
+          const outputs = evaluateGate(comp.type, inputVals as number[], comp);
+          const outputPorts = comp.ports.filter((p) => p.side === 'right');
+          for (let i = 0; i < outputPorts.length; i++) {
+            newPortValues[`${comp.id}:${outputPorts[i].id}`] = outputs[i] ?? 0;
+          }
         }
-
-        // Update the target component's displayed value
-        updatedComps = components.map((c) => {
-          if (c.id !== targetComp.id) return c;
-          if (c.type === 'OUTPUT') {
-            return { ...c, value: newPortValues[`${c.id}:in`] };
+        const updatedComps = components.map((c) => {
+          if (c.id !== compId) return c;
+          if (c.type === 'OUTPUT') return { ...c, value: newPortValues[`${c.id}:in`] };
+          if (c.type === 'MEM') {
+            // Show the incoming value visually on the MEM block
+            const memInputPortId = getMemInputPortId(c);
+            const inVal = newPortValues[`${c.id}:${memInputPortId}`];
+            return { ...c, storedValue: inVal != null ? inVal : (c.storedValue ?? 0) };
           }
           const outputPort = c.ports.find((p) => p.side === 'right');
-          if (outputPort) {
-            return { ...c, value: newPortValues[`${c.id}:${outputPort.id}`] };
-          }
+          if (outputPort) return { ...c, value: newPortValues[`${c.id}:${outputPort.id}`] };
           return c;
         });
-      }
-    }
 
-    set({
-      components: updatedComps,
-      wires: updatedWires,
-      wireValues: newWireValues,
-      localStepIndex: localStepIndex + 1,
-      localStepPortValues: newPortValues,
-    });
-    return localStepIndex + 1 < localStepSorted.length;
+        // When an OUTPUT is evaluated, upsert the I/O table row with current output values
+        const updates: Record<string, unknown> = { components: updatedComps, localStepIndex: localStepIndex + 1, localStepPortValues: newPortValues };
+        if (comp.type === 'OUTPUT') {
+          const sortedOutputs = components
+            .filter((c) => c.type === 'OUTPUT')
+            .sort((a, b) => parseInt(a.label.replace('OUT', '')) - parseInt(b.label.replace('OUT', '')));
+          const outputBits = sortedOutputs.map((c) => {
+            const val = newPortValues[`${c.id}:in`];
+            return val !== undefined ? val : 0;
+          });
+          // The row is the one SELECTED — inputs and memory as they stood
+          // before the step. (The MEM update steps have already moved the
+          // machine to its next state; keying by that filed the outputs under
+          // the wrong row.)
+          const { inputBits, memBits } = localStepRow(state);
+          const memBitsVal = hasMemory(components) ? memBits : undefined;
+
+          const localKey = [...inputBits, ...(memBitsVal || [])].join(',');
+          const existingRows = state.tableRows;
+          const localIdx = existingRows.findIndex((r) => [...r.inputBits, ...(r.memBits || [])].join(',') === localKey);
+          let newTableRows = existingRows;
+          if (localIdx >= 0) {
+            newTableRows = [...existingRows];
+            newTableRows[localIdx] = { inputBits, memBits: memBitsVal, outputBits };
+          } else {
+            newTableRows = [...existingRows, { inputBits, memBits: memBitsVal, outputBits }];
+          }
+          updates.tableRows = newTableRows;
+        }
+        set(updates);
+        return localStepIndex + 1 < localStepSorted.length;
+      }
+
+      // Annotate one wire
+      const wireId = stepId;
+      const wire = wires.find((w) => w.id === wireId);
+      if (!wire) {
+        set({ localStepIndex: localStepIndex + 1 });
+        return localStepIndex + 1 < localStepSorted.length;
+      }
+
+      const newPortValues = { ...localStepPortValues };
+      const newWireValues = new Map(state.wireValues);
+
+      // Get the source port value and annotate this wire
+      const srcVal = newPortValues[`${wire.sourceComponentId}:${wire.sourcePortId}`];
+      if (srcVal != null) {
+        newWireValues.set(wire.id, srcVal);
+      }
+
+      // Update the wire object
+      const updatedWires = wires.map((w) =>
+        w.id === wireId ? { ...w, value: srcVal != null ? srcVal : -1 } : w
+      );
+
+      // Check if the target component now has ALL its input wires annotated.
+      // If so, evaluate it so its output port values are available for downstream wires.
+      const targetComp = components.find((c) => c.id === wire.targetComponentId);
+      let updatedComps = components;
+
+      if (targetComp && targetComp.type !== 'INPUT' && targetComp.type !== 'MEM' && targetComp.type !== 'OUTPUT') {
+        const inputPorts = targetComp.ports.filter((p) => p.side === 'left');
+        const allInputsReady = inputPorts.every((port) => {
+          const inWire = wires.find((w) => w.targetComponentId === targetComp.id && w.targetPortId === port.id);
+          if (!inWire) return true; // unconnected = ready (undefined)
+          // Check if this wire has been annotated (either just now or previously)
+          return inWire.id === wireId ? srcVal != null : newWireValues.has(inWire.id);
+        });
+
+        if (allInputsReady) {
+          // Gather input values and evaluate
+          const inputVals: (number | undefined)[] = [];
+          let hasUndefined = false;
+          for (const port of inputPorts) {
+            const inWire = wires.find((w) => w.targetComponentId === targetComp.id && w.targetPortId === port.id);
+            if (inWire) {
+              const val = inWire.id === wireId ? srcVal : newWireValues.get(inWire.id);
+              inputVals.push(val != null ? val : undefined);
+              if (val == null) hasUndefined = true;
+            } else {
+              inputVals.push(undefined);
+              hasUndefined = true;
+            }
+          }
+
+          // A sequential box's memory-decided outputs were seeded at select
+          // time (boxMemoryPortValues) and stay: only the outputs its inputs
+          // decide are blanked or evaluated here.
+          const seeded = boxMemoryPortValues(targetComp);
+          const outputPorts = targetComp.ports.filter((p) => p.side === 'right');
+          const outputs = hasUndefined ? [] : evaluateGate(targetComp.type, inputVals as number[], targetComp);
+          for (let i = 0; i < outputPorts.length; i++) {
+            const key = `${targetComp.id}:${outputPorts[i].id}`;
+            if (seeded.has(key)) continue;
+            newPortValues[key] = hasUndefined ? undefined : (outputs[i] ?? 0);
+          }
+
+          // Update the target component's displayed value
+          updatedComps = components.map((c) => {
+            if (c.id !== targetComp.id) return c;
+            if (c.type === 'OUTPUT') {
+              return { ...c, value: newPortValues[`${c.id}:in`] };
+            }
+            const outputPort = c.ports.find((p) => p.side === 'right');
+            if (outputPort) {
+              return { ...c, value: newPortValues[`${c.id}:${outputPort.id}`] };
+            }
+            return c;
+          });
+        }
+      }
+
+      set({
+        components: updatedComps,
+        wires: updatedWires,
+        wireValues: newWireValues,
+        localStepIndex: localStepIndex + 1,
+        localStepPortValues: newPortValues,
+      });
+      return localStepIndex + 1 < localStepSorted.length;
+    };
+    // The play's LAST step has run — the OUTPUT evaluations come last, so
+    // the signal has reached every OUTPUT: the CC table earns the row (task
+    // 084; Run, Step and Run this input alike — the one place a row is
+    // earned). Recorded after the step's set, so the value is on the canvas.
+    // A Step on a finished play returns above and earns nothing.
+    const more = advance();
+    if (!more) recordCcRunRow();
+    return more;
   },
 
   localStepReset: () => {
@@ -5148,7 +5162,9 @@ export const useStore = create<AppState>()((set, get) => ({
         // selected or the last play finished.
         const bits = inputCount(s.components) === 0 ? [] : sortByLabel(s.components, 'IN').map((i) => i.value ?? 0);
         if (command === 'reset') {
+          // …and the table's earned rows go back to "Not run yet" (task 084).
           s.localStepSelect(bits.map(() => 0));
+          set({ ccRunRows: [] });
           return;
         }
         if (!s.localStepActive) s.localStepSelect(bits);
@@ -5283,6 +5299,15 @@ export const useStore = create<AppState>()((set, get) => ({
 
     // The grader's stimulus, then (deferred) the run to the grader's end.
     let runToEnd: () => void;
+    // A CC case's run is a PLAY of its row — the Run button's own, stepped
+    // synchronously to the end — so it earns the table's row by the one path
+    // (task 084) and leaves the canvas as a finished Run does. The row is read
+    // back from the INPUT toggles set below: one bit per INPUT, the table's key.
+    const playCcToEnd = () => {
+      const bits = sortByLabel(get().components, 'IN').map((c) => c.value ?? 0);
+      get().localStepSelect(bits);
+      while (get().localStepOne()) { /* the play, synchronously */ }
+    };
     if (loaded.kind === 'perception' && q.buildMode === 'SC') {
       // The film as the run's lanes (the frame player's own path), clocked
       // frame by frame to its end — the grader's run (perceptionCheck).
@@ -5305,7 +5330,7 @@ export const useStore = create<AppState>()((set, get) => ({
         }),
       });
       suppressAutoAddRow = false; // an explicit input: the I/O table records it
-      runToEnd = () => get().evaluateCircuit();
+      runToEnd = playCcToEnd;
     } else if (loaded.kind === 'turbot') {
       runToEnd = () => {
         const budget = selectQuestionStepBudget(get()) ?? 0;
@@ -5327,7 +5352,7 @@ export const useStore = create<AppState>()((set, get) => ({
         }),
       });
       suppressAutoAddRow = false; // an explicit input: the I/O table records it
-      runToEnd = () => get().evaluateCircuit();
+      runToEnd = playCcToEnd;
     } else if (q.buildMode === 'SC' || q.buildMode === 'FSM') {
       const layout = questionLayout(q)!;
       const digits = codecTypedDigits(loaded.input, layout);
@@ -5423,8 +5448,8 @@ export const useStore = create<AppState>()((set, get) => ({
     set((s) => ({
       selectedTool: null, boxesPopoutOpen: false, selectedIds: [], undoStack: [], redoStack: [],
       canvasSwapSeq: s.canvasSwapSeq + 1,
-      // The run rows belong to the canvas they were earned on. scGlobalReset
-      // (above) has already blanked the INPUTs, so no row re-earns itself.
+      // The run rows belong to the canvas they were earned on. Only a
+      // finished play earns one, and the local step was cleared above.
       ccRunRows: [],
     }));
   },
@@ -6062,23 +6087,26 @@ useStore.subscribe((state, prev) => {
     }
     restartLiveRuns(inputCount(prev.components));
     // What the old machine output is no output of this one (task 075): the
-    // CC table forgets every earned row. Only the row the inputs stand at now
-    // comes back, below — the canvas is showing this machine's answer to it.
+    // CC table forgets every earned row, and nothing re-earns one — the
+    // student runs the row again (task 084). The canvas's live
+    // re-evaluation after the edit is unchanged.
     if (useStore.getState().ccRunRows.length > 0) useStore.setState({ ccRunRows: [] });
   }
-  recordCcRunRow();
 });
 
-/** Earn the CC I/O table's current row (task 075): on a memoryless canvas
- *  whose INPUTs all stand at 0/1, that row has been run. Reads fresh state —
- *  the machine-edit resets above may have moved it. Setting ccRunRows leaves
- *  components/wires alone, so the nested notification returns at once. */
+/** Earn the CC I/O table's row (tasks 075, 084): called by localStepOne, and
+ *  only it, once a play has run its LAST step — the signal has reached every
+ *  OUTPUT. The row is the one SELECTED (localStepRow: the play's port values
+ *  were seeded when it was picked, so a canvas toggle mid-play doesn't move
+ *  it). A canvas with memory earns nothing: its table runs step by step.
+ *  Setting ccRunRows leaves components/wires alone, so the machine-key
+ *  subscriber returns at once. */
 function recordCcRunRow(): void {
   const s = useStore.getState();
   if (hasMemory(s.components)) return;
-  const inputs = sortByLabel(s.components, 'IN');
-  if (inputs.length === 0 || !inputs.every((c) => c.value === 0 || c.value === 1)) return;
-  const row = ccRowKey(inputs.map((c) => c.value as number));
+  const { inputBits } = localStepRow(s);
+  if (inputBits.length === 0) return;
+  const row = ccRowKey(inputBits);
   if (!s.ccRunRows.includes(row)) useStore.setState({ ccRunRows: [...s.ccRunRows, row] });
 }
 

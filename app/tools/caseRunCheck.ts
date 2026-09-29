@@ -29,7 +29,9 @@
 //     the run's end state decodes to the RECORDED result (CC/SC/FSM decode →
 //     got, TM acceptTM/decodeTM → got or the recorded reason, turbot final
 //     pose + steps). loadedCase never carries expected/got. TM: Reset then
-//     Step to the end reproduces the fast-forwarded tape + history.
+//     Step to the end reproduces the fast-forwarded tape + history. CC: the
+//     run is the Run button's play stepped to its end, which alone earns the
+//     case's row in the I/O table (task 084) — none while the stimulus waits.
 //   [remote shape]  the same load against a student's copy — stripAnswers
 //     (no bank) + studentRecord (expected/got blank): hw5-p4's gap cases
 //     still get the grader's tape, and the live verdict equals the recorded
@@ -100,6 +102,7 @@ import { tapeCellsUsed } from '../src/engine/tm';
 import { buildPerceptionCases, objectFrame, perceptionExamples } from '../src/engine/perception';
 import { stripAnswers, studentRecord } from '../../server/src/sanitize';
 import { gradedCaseView } from '../src/gradeDisplay';
+import { ccRowKey } from '../src/ccTable';
 import { comp, wire, transition, circuit } from './builder';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -345,7 +348,13 @@ function failingIndices(r: QuestionResult, cap: number): number[] {
 async function pinValueLoad(tag: string, q: AssignmentQuestion, full: QuestionResult, k: number) {
   const tc = full.cases[k];
   const label = `${tag} case ${k} (${tc.input.join(',')}${tc.separations ? ` gap ${tc.separations.join(',')}` : ''})`;
-  await useStore.getState().loadCaseInput(q.id, k);
+  // A CC case earns its table row by the play's own path (task 084): not
+  // when the stimulus lands on the INPUTs, only once the run reaches the end.
+  const cc = q.buildMode === 'CC';
+  if (cc) useStore.setState({ ccRunRows: [] });
+  const loading = useStore.getState().loadCaseInput(q.id, k);
+  if (cc) check(`${label}: CC the stimulus is on the INPUTs, not yet run — no row earned`, useStore.getState().ccRunRows.length === 0);
+  await loading;
   const s = useStore.getState();
   const layout = questionLayout(q)!;
   const stim = caseStimulus(q, tc.input, tc.separations)!;
@@ -363,6 +372,11 @@ async function pinValueLoad(tag: string, q: AssignmentQuestion, full: QuestionRe
     const raw = { axis: 'space' as const, bits: outBits };
     check(`${label}: CC outputs decode to the recorded result`,
       tc.reason === 'malformed output' ? !outputAccepted(raw, layout) : same(decodeOutput(raw, layout), tc.got));
+    // The run is a play of the row, stepped to its end — so the outputs
+    // above are where a finished Run leaves the canvas — and it earned the row.
+    check(`${label}: CC Run this input plays the row to the end, which earns it in the table`,
+      s.localStepActive && s.localStepIndex === s.localStepSorted.length && s.localStepSorted.length > 0 &&
+        s.ccRunRows.includes(ccRowKey(ins.map((v) => v ?? 0))), s.ccRunRows.join(' '));
   } else if (q.buildMode === 'SC') {
     const hist = s.scHistory.slice().sort((a, b) => a.t - b.t);
     check(`${label}: SC fed the codec's stream`, stim.axis === 'time' && same(hist.map((h) => h.inputBits), stim.steps));
