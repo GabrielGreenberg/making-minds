@@ -225,3 +225,17 @@ Gates; pins per part kind; browser.
     changes, then Commit.
 - Landed; no conflict with `origin/main` (nothing new since the claim), so the workflow's
   gates stand (all five exited 0).
+
+### 2026-09-28 (follow-up, Gabriel's ask)
+- **The nit is fixed.** In the assignment editor's preview, a click on a lettered part now
+  opens that part's question. A click on the stem, the closing or the problem number still
+  opens the first part. `ProblemBody` marks each `.ps-part` with `data-part-index`, and
+  `ProblemView` opens the index the click landed in. A student's click still routes to the
+  problem's page.
+- **Pinned:** `navResetCheck [worksheet]` renders the document and checks each lettered part's
+  index for 6, 9, 10 and 13, plus the click resolution. The pin fails without the fix.
+- **Headless check** (real mouse events, scratch Vite, local mode):
+  - Clicks on 6a, 6b, 6c, 9b, 10c and 13b each open "Edit Problem …" for that part.
+  - The 6 stem and the number open 6a; problem 7 opens 7.
+  - A student's click on 6b goes to `q/5`.
+- **Gates:** app-tsc, tools-tsc, app-build, app-check, server-tsc and server-check all exited 0.

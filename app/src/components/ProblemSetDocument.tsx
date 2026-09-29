@@ -183,7 +183,7 @@ export function ProblemBody({
       {(stem || title) && <StatementBody text={stem} lead={title ? titleLead(title, stem) : undefined} />}
       {problem.parts.map((part) =>
         part.letter ? (
-          <div key={part.question.id} className="ps-part">
+          <div key={part.question.id} className="ps-part" data-part-index={part.index}>
             <span className="ps-part-letter">{part.letter}.{partMark?.(part.question)}</span>
             <div className="ps-part-main"><QuestionContent question={part.question} {...options} /></div>
           </div>
@@ -238,14 +238,19 @@ function ProblemView({
 }) {
   const route = target.route?.(problem.index);
   const link = route ? hashLink(route) : undefined;
-  const open = () => (route ? navigate(route) : target.onOpen?.(problem.index));
+  const open = (index = problem.index) => (route ? navigate(route) : target.onOpen?.(index));
   // The whole block opens the problem (the PDF idiom has no button); a click
   // that lands on a real link, or carries a modifier, is left to the browser.
+  // A student's page holds every part, so their route is the problem's; the
+  // instructor's editor authors each part as its own question, so there a
+  // click on a lettered part opens that part (the stem and closing: the first).
   const onClick = (e: MouseEvent<HTMLDivElement>) => {
-    if ((e.target as HTMLElement).closest('a, button')) return;
+    const hit = e.target as HTMLElement;
+    if (hit.closest('a, button')) return;
     if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button !== 0) return;
     if (window.getSelection()?.toString()) return;
-    open();
+    const part = hit.closest<HTMLElement>('[data-part-index]')?.dataset.partIndex;
+    open(part === undefined ? problem.index : Number(part));
   };
   // A multi-part problem's parts share their mode, but a part may be a
   // fill-in: the chip then just says what they all are.
@@ -260,7 +265,7 @@ function ProblemView({
         {link ? (
           <a className="ps-num" {...link} aria-label={problem.label}>{problem.number}.</a>
         ) : (
-          <button type="button" className="ps-num" aria-label={problem.label} onClick={open}>{problem.number}.</button>
+          <button type="button" className="ps-num" aria-label={problem.label} onClick={() => open()}>{problem.number}.</button>
         )}
         <StatusMarks status={problemStatus(problem, status)} />
       </div>
