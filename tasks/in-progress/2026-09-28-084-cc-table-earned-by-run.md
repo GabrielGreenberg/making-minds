@@ -8,9 +8,9 @@ requires:
 area: app
 source: feedback
 created: 2026-09-28T21:08:27-07:00
-status: ready
+status: in-progress
 after:
-branch:
+branch: robot/084-cc-table-earned-by-run
 merged_into:
 ---
 
