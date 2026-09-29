@@ -8,9 +8,9 @@ requires:
 area: app
 source: feedback
 created: 2026-09-28T10:52:00-07:00
-status: in-progress
+status: done
 after:
-branch: robot/078-question-panel-fixed-split
+branch:
 merged_into:
 ---
 
@@ -119,3 +119,20 @@ unchanged; the sandbox has no panel. Owed to Gabriel: drag feel by hand, and Pre
 P1 → P6 → P16 (plus a submission on show) to confirm nothing jumps.
 
 **Next step.** Loop session: the headless visual check above, then land per PROFILE §5.
+
+### 2026-09-28 — landed (robot)
+- **Headless check (robot, CDP against a Bash-run Vite on :5190, local mode, HW1 seeded and
+  published, as the toy student, 1280×900):** on all 30 HW1 editor routes (`#/a/hw1/q/0`–`29`)
+  the "Questions" header's top is one value (558.1px) and "I'm done" sits inside the problem
+  pane and the viewport; 15 of them have statements long enough to scroll inside the pane.
+  ↑/↓: ArrowDown ×2 on the row divider takes aria-valuenow 58 → 66 and writes
+  `editor.qpSplit` = 0.66, which a reload on another problem keeps. A 120px drag upward moves
+  the header 119.7px live; the pref is unchanged mid-drag and written on release (0.513). At
+  1280×500 the problem pane is 212px and the list 202px, nothing past the viewport; back at
+  900 the proportion returns. At the corner the column divider wins the hit test.
+  Screenshots of P1, P6 (long) and P16 (figure) read right: flat grip on the list header's
+  rule, the done mark at the pane's foot.
+- **Still owed (Gabriel's eyeball, not claimed):** the drag's feel by hand (row-resize
+  cursor, hover band, grip), and Prev/Next through HW1 P1 → P6 → P16 with a submission on
+  show (no done mark) to confirm the list still stays put. Recipe: the robot dev server or
+  the pilot after release, HW1, as a student.
