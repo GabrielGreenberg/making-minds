@@ -8,9 +8,9 @@ requires:
 area: app
 source: feedback
 created: 2026-09-28T21:08:27-07:00
-status: in-progress
+status: done
 after:
-branch: robot/084-cc-table-earned-by-run
+branch:
 merged_into:
 ---
 
@@ -163,4 +163,21 @@ column blanks; toggle inputs on the canvas → nothing fills until Run.
   delete a wire blanks the table, canvas re-evaluates live; the new hint); same on HW1 P1
   in an assignment, incl. marked done (Run/Reset still work, Reset clears); optionally Run
   this input from Grades fills the case's row.
-- **Next step:** loop session: visual check (owed above), then land per PROFILE §5.
+- **Next step:** landed (below).
+
+### 2026-09-28 — landed (robot)
+- Fixed both review nits in place: `toggleInput`'s interface comment now says a completing
+  click picks the row and readies its play (Run earns it); navResetCheck [earned CC table]'s
+  header points to the `loadCaseInput` pins in caseRunCheck [store load] and perceptionCheck.
+  Comment-only; app tsc, typecheck:tools and navResetCheck (750/0) re-run green.
+- `origin/main` brought nothing in, so the workflow's full gates stand (all five exit 0).
+- No `CLAUDE.md` change: no Part 1/Part 2 line names the earning rule.
+- **Owed, not claimed — Gabriel's browser eyeball** (the task has no `requires: browser`;
+  unattended runs can't start a dev server). Recipe: sandbox → new CC tab → NAND (IN1, IN2 →
+  AND → NOT → OUT1): click row 0,1 → canvas OUTPUT and cell both blank; Run → the signal
+  walks to OUT1, then the 1 appears; row 1,1, Run, Stop part-way → stays blank, Run again
+  fills; Step row 1,0 to the end → fills on the last Step; toggle canvas INPUTs → nothing
+  fills; Reset → whole OUT column blanks, inputs 0,0, row 0,0 highlighted un-run; delete a
+  wire → table blanks, canvas re-evaluates live; hint reads "Click a row, then Run it to
+  fill in its output." Same on HW1 P1 in an assignment (also marked done: Run/Reset still
+  work, Reset clears). Optionally Grades → a failed CC case → Run this input fills its row.
