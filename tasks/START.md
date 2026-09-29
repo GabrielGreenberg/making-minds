@@ -76,6 +76,6 @@ gate's rules in `deploy/release-gate.mjs` (hold list, hours, deadline freeze).
 
 ## Later, deliberately not built yet
 
-- **Auditor** (the robot's idle mode: audit one surface read-only, file findings) — add
-  once the robot is stable. The Virgil template's §7 is the recipe:
-  `~/virgil-tasks/AUDITOR.md`.
+- **Auditor** (the robot's idle nights: audit one part of the app read-only, file findings)
+  — add once the robot is stable (043 closed). The design:
+  `docs/buildout/designs/robot-auditor.md`.
