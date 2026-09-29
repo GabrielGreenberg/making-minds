@@ -1479,7 +1479,9 @@ console.log('[edit during run]');
 // 0 nobody computed — nor a pasted one, nor one a click on ANOTHER input
 // filled in. The canvas's click is driven through its own path
 // (CircuitCanvas → the store's toggleInput), not setInputValue alone; Run's
-// one interval is ticked by hand, as [turbot goal flash] does.
+// one interval is ticked by hand, as [turbot goal flash] does. Run this input
+// (loadCaseInput) earns its row by the same play: pinned over real HW CC
+// questions in caseRunCheck [store load], the CC frame in perceptionCheck.
 
 console.log('[earned CC table]');
 {

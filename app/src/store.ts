@@ -946,8 +946,9 @@ interface AppState {
   removeComponent: (id: string) => void;
   setInputValue: (id: string, value: number | undefined) => void;
   // A canvas click on an INPUT's toggle (task 075): cycles that input
-  // (blank → 0 → 1 → 0 …) and, once every INPUT stands at 0/1, runs that row
-  // — never sets an input the student didn't. Simulation: never locked.
+  // (blank → 0 → 1 → 0 …) and, once every INPUT stands at 0/1, picks that row
+  // and readies its play (Run earns it, task 084) — never sets an input the
+  // student didn't. Simulation: never locked.
   toggleInput: (id: string) => void;
   setMemStoredValue: (id: string, value: number) => void;
 
