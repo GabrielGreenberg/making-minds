@@ -8,9 +8,9 @@ requires: browser
 area: app
 source: chat
 created: 2026-09-29T16:34:08-07:00
-status: ready
+status: in-progress
 after:
-branch:
+branch: robot/087-embeddable-sandbox-demo
 merged_into:
 ---
 
