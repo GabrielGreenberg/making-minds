@@ -8,9 +8,9 @@ requires:
 area: app
 source: feedback
 created: 2026-09-29T17:08:40-07:00
-status: in-progress
+status: done
 after:
-branch: robot/088-modals-portaled-feedback-paste-screenshots
+branch:
 merged_into:
 ---
 
@@ -292,3 +292,10 @@ code that reads it must live in the seam's DOM adapter, not in `FeedbackPanel.ts
   Home, the editor and the Dashboard queue. The grading queue's keys (0 / h / 1 / ↵) inert
   behind a modal and live after it closes (pinned in gradingViewCheck, not eyeballed). The
   Password form in remote mode (the same `<Modal narrow>`; pinned, not eyeballed).
+
+### 2026-09-29 — landed (robot)
+- Gates (exit codes, final tree): app tsc 0, app build 0, app `npm run check` 0; server
+  typecheck 0, `npm run check` 0 (the workflow's run; nothing server-side changed since).
+  `origin/main` brought nothing in. Merged `--no-ff` into `main` and pushed; the release
+  gate decides the pilot. Owed checks: above (the real clipboard, Safari, the queue keys
+  and the Password form by eye).
