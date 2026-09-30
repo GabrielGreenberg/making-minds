@@ -265,3 +265,30 @@ code that reads it must live in the seam's DOM adapter, not in `FeedbackPanel.ts
   the real clipboard on his Mac, Chrome and Safari (⌘⇧⌃4, then ⌘V in the message box and on
   the card's blank area), and the form's look side by side.
 - **Next step**: loop session: headless visual check (owed above), then land per PROFILE §5.
+
+### 2026-09-29 — headless check + nits (robot)
+- **Nits fixed**: a Remove now clears the limit line (there is room again; pinned in
+  pasteCheck [image paste]); `shortcuts.ts MOD_KEY`'s comment corrected (Node has a
+  `navigator.platform` too, so a harness on a Mac reads "⌘"). MOD_KEY stays beside the
+  table as a display const; the table itself is unchanged.
+- **Headless re-run after the fix stage** (the built app, local mode, headless Chrome over
+  CDP; scratch script, not committed): Feedback from the editor's Name ▾ (instructor and
+  student, HW1 q/10), Home and the Dashboard's queue — portaled (child of body), role
+  dialog, aria-modal, z-index 500 and topmost; `.mm-modal-sub` identical on all three
+  (white-space normal, 12.5px, rgb(123,123,123)); scrollWidth = clientWidth at 1280 and
+  640, nothing past the card's edge; Escape closes. Paste (synthetic ClipboardEvents): text
+  into the message → not cancelled, no thumbnail; image into the message → 1, cancelled;
+  image + text on the card → 2; a third → still 2 + the limit line; Remove → 1, line
+  cleared; text + image into the message → the text's (not cancelled, no thumbnail); image
+  again → 2. Sandbox: an AND placed and selected, Feedback open, the card's heading
+  clicked, Delete / Backspace / ⌘V / ⌘Z → the part still there, the modal still open;
+  after Escape, Delete alone removes it. The sandbox "Unsaved changes" prompt: portaled,
+  wraps at 1280 and 640. No console errors.
+- **Owed, not claimed** (Gabriel, a real browser): the real clipboard on his Mac in Chrome
+  and Safari — ⌘⇧⌃4 a region, open HW1 q11 → Name ▾ → Feedback, ⌘V (a) in the message box
+  and (b) after clicking the card's blank area → a thumbnail each time, nothing pasted into
+  the canvas behind (Safari may fire `paste` only with focus in the message box — note
+  whether (b) works); plain text into the message → text; the form's look side by side on
+  Home, the editor and the Dashboard queue. The grading queue's keys (0 / h / 1 / ↵) inert
+  behind a modal and live after it closes (pinned in gradingViewCheck, not eyeballed). The
+  Password form in remote mode (the same `<Modal narrow>`; pinned, not eyeballed).

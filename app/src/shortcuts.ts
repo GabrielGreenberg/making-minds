@@ -60,6 +60,7 @@ export function isTextEntryTarget(el: { tagName?: string; isContentEditable?: bo
 }
 
 /** The command key as the page names it in a hint: ⌘ on Apple devices, else
- *  "Ctrl+" (so "⌘S" / "Ctrl+S"). Read once; outside a browser it is "Ctrl+". */
+ *  "Ctrl+" (so "⌘S" / "Ctrl+S"). Read once from `navigator.platform` (Node has
+ *  one too, so a harness on a Mac reads "⌘"); with no navigator, "Ctrl+". */
 export const MOD_KEY =
   typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform ?? '') ? '⌘' : 'Ctrl+';

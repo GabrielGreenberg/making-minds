@@ -638,6 +638,8 @@ console.log('\n[image paste]');
   check('FeedbackPanel gives slots back on a failed decode and on Remove, its only two other list writes',
     /slots\.release\(take\)/.test(panel) && /slots\.release\(1\);\s*setScreenshots\(\(all\) => all\.filter/.test(panel) &&
       /onClick=\{\(\) => removeScreenshot\(i\)\}/.test(panel) && (panel.match(/setScreenshots\(/g) ?? []).length === 2);
+  check('a Remove clears the limit line (there is room again) and no other message',
+    /setError\(\(e\) => \(e === LIMIT_MESSAGE \? null : e\)\)/.test(panel));
   check('FeedbackPanel calls useImagePaste (from the seam) into addFiles, the picker\'s own path, and reads no clipboard itself',
     /import \{ useImagePaste \} from '\.\.\/usePasteGuard'/.test(panel) &&
       /useImagePaste\(\(files\) => void addFiles\(files\), !sent\)/.test(panel) &&

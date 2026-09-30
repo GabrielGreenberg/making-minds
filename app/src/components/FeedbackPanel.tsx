@@ -81,6 +81,7 @@ export function FeedbackPanel({ onClose, context }: { onClose: () => void; conte
   const removeScreenshot = (i: number) => {
     slots.release(1);
     setScreenshots((all) => all.filter((_, j) => j !== i));
+    setError((e) => (e === LIMIT_MESSAGE ? null : e)); // there is room again
   };
   // A pasted image (⌘V / Ctrl+V anywhere on the form) attaches like a picked one.
   useImagePaste((files) => void addFiles(files), !sent);
