@@ -8,9 +8,9 @@ requires:
 area: app
 source: feedback
 created: 2026-09-29T17:08:40-07:00
-status: ready
+status: in-progress
 after:
-branch:
+branch: robot/088-modals-portaled-feedback-paste-screenshots
 merged_into:
 ---
 
