@@ -89,6 +89,8 @@ const {
 const { nextTrace, verifyTrace, textDigest, insertedChars } = await import('../src/provenance/trace');
 const { assessIntegrity, MAX_TYPING_CHARS_PER_SEC } = await import('../src/provenance/integrity');
 const { INTEGRITY_NOTICE, SUBMIT_INTEGRITY_SENTENCE, submitConfirmMessage } = await import('../src/provenance/notice');
+// The app's course backend (task 087), installed as main.tsx installs it.
+await import('../src/storage/appBackend');
 const { useStore, autoSaveDelay, AUTO_SAVE_MAX_WAIT } = await import('../src/store');
 const { buildSampleAssignment, buildCorrectSubmission } = await import('../src/devData/sampleData');
 const { localAssignmentStore } = await import('../src/storage/AssignmentStore');

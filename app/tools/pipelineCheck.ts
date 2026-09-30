@@ -171,7 +171,7 @@ import {
   DEFAULT_MAX_STEPS,
   type TurbotCaseDraft,
 } from '../src/instructor/turbotCaseAuthoring';
-import { resizeArena, setArenaCell } from '../src/instructor/arenaEditing';
+import { resizeArena, setArenaCell } from '../src/arenaEditing';
 import { canonicalJson } from '../src/devData/homeworkSync';
 import { stripAnswers } from '../../server/src/sanitize';
 

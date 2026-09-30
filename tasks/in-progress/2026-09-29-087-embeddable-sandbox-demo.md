@@ -176,3 +176,125 @@ unattended run stops at the handoff and reports the snippet.
   makingminds.org page (the handoff).
 
 ## Progress log
+
+### 2026-09-29 — implement (robot)
+- **Built** (deep fix throughout; memo `docs/buildout/designs/embeddable-sandbox.md`):
+  `app/embed.html` + `src/embed/` (first import `ephemeral.ts`; `example.ts`,
+  `layout.ts`, `EmbedApp`), a second Vite input. The store and routing now read the
+  course through an installed slot, `storage/pageBackend.ts` (the app's `main.tsx`
+  imports `storage/appBackend.ts`; the embed installs none); `persistence.ts`
+  (`makeEphemeral` / `pageStorage`) behind every storage site in `store.ts` and
+  `uiPrefs.ts` (+ `setUiPrefDefaults`); `EditorShell` is layout-only with
+  bar / banner / question / output slots, the canvas column moved to
+  `EditorWorkspace`; `editorHost.ts` gates the canvas wheel on a click-in;
+  `buildSubmission` split to `storage/buildSubmission.ts`; `arenaEditing.ts` moved to
+  `src/`. `public/_headers` (site-wide `frame-ancestors 'self'` + `SAMEORIGIN`;
+  `/embed`, `/embed.html` detach both and allow makingminds.org only).
+- **Examples** (`app/public/embed-examples/`, authored fresh with `tools/builder.ts`
+  in a scratch script, never from fixtures): `majority` (CC, default), `parity`
+  (FSM), `square-patrol` (turbot, FSM brain: forward, turn right; a block ahead
+  stops it). A first patrol (F, F, R, turning right at a block) earned FULL credit on
+  HW2 P14 "Full circle" once its FSM brain was swapped in for the problem's CC one,
+  so it was replaced; embedCheck now grades every example against every HW1–HW7
+  machine problem, turbot problems also with the example's brain — no credit
+  anywhere. No TM example (optional; not attempted).
+- **Size** (`npx tsx tools/embedCheck.ts --dist`): embed JS = 4 chunks, 518.1 KB raw,
+  **158.2 KB gzipped** (+ 17.4 KB gz CSS), same in the Pages configuration
+  (`VITE_BASE_PATH=/ VITE_API_BASE=…`); compare today's single app chunk 1.7 MB /
+  355 KB gz. None of the markers (auth token key, KaTeX, DOMPurify, marked, the
+  instructor UI, `/api/` in the remote build) is in the embed's chunks; all are in
+  the app's.
+- **Layout, measured** (headless Chrome, `node tools/shootEmbedPosters.mjs
+  --measure <dir>` at 640×420, 800×500, 1000×560): a circuit / FSM starts with the
+  output panel folded below 760px wide; a turbot keeps it, its Map moved above the
+  glossary (embed-scoped CSS) and its cells sized to the arena (28px at 640–800,
+  32px at 1000). The palette keeps the app's own placement: docking it flat along
+  the top (the plan) pushed a one-tile FSM palette under the canvas actions and
+  cropped the machine at 640×420.
+- **Browser, verified** (headless Chrome over CDP; a host page iframing the built
+  embed at 100% × 500): a plain wheel over the canvas scrolled the HOST (300 → 420)
+  and left the canvas alone; after a click inside, the wheel panned the canvas
+  (translate y 132 → 12) and the host stayed put; ctrl-wheel zoomed (154%); once
+  the pointer left the frame a plain wheel scrolled the host again; deleting a gate
+  (9 → 8) then Reset gave 9 parts back with Undo disabled; a reload showed the
+  example; the frame's storage held 0 keys; parity's Run gave OUT `011011`; the
+  turbot ran (cycle 8); `?example=nope` showed Majority vote; at 375×640 the poster,
+  "Try it on a larger screen." and the sandbox link. Screenshots were scratch; the
+  committed posters (`embed-examples/*.png`, 800×500) are the stills.
+- **Owed, not claimed:** after the release (held by the gate: `deploy/README.md`
+  changed), `curl -sI https://making-minds.pages.dev/embed` and `/` must show the
+  framing headers; a real-trackpad scroll check in a real browser; the embed on
+  makingminds.org — the handoff, Gabriel's yes (`GabrielGreenberg/making-minds-website`):
+  `<iframe src="https://making-minds.pages.dev/embed?example=majority" width="100%"
+  height="500" style="border:0" loading="lazy" title="Making Minds sandbox"></iframe>`.
+- **Next:** Checkpoint (commit), then review; nothing is left to build.
+
+### 2026-09-29 — fix (robot)
+Six review findings, all fixed:
+- **The load's Fit ran before the palette settled** (majors 1 and 5: at 640×420 the
+  default example opened with IN1 and the top AND gate under the palette, and IN1's
+  label was covered at 100% × 500 on a 1000px page). The swap's fit now follows the
+  layout until the person does anything (a press or key anywhere, or a view of their
+  own): `CircuitCanvas` re-fits on each canvas resize and on each placement the palette
+  renders (`Palette` `onPlaced`). This is the app's fix too, for its own short windows.
+  workbenchCheck pins it. Re-measured with `shootEmbedPosters.mjs --measure`: majority
+  at 640×420 is 80%, the palette lies flat, and the whole circuit sits below it. Iframed at
+  100% × 500 on a 1000px host, the palette ends at y 171 and IN1's label starts at y 187.
+  The posters were re-shot.
+- **A state machine's Run was folded away at 600–759px** (minor 2). Now only a
+  combinational circuit folds its output panel; SC, FSM, TM and turbot keep it at every
+  width. parity at 640×420 shows Run and Step, with the machine in full view.
+- **README "Adding one" produced a file embedCheck refused** (minor 3). The README now
+  says to set `metadata.title` after the first Save (it writes "Untitled Workbook"). It
+  also lists what embedCheck checks. embedCheck now has a validator for every machine
+  kind: SC (and SC-brained turbots) are checked as wired through, TM uses
+  `validateTMTable`, and a TM-brained turbot uses `validateTurbotTM`. On a scratch run over
+  the reference fixtures (test only, never an example) every correct SC/TM/turbot-TM
+  machine came out clean.
+- **Touch swipes over the canvas never scrolled the host** (major 4). The claim is now
+  `editorHost.ts` `gestureClaim` (`wheelNeedsActivation` → `gesturesNeedActivation`),
+  a pure machine: a mouse or pen press claims at once, and a touch claims only as a tap
+  (no `pointercancel`). Until the claim, the canvas's and palette's `touch-action` is
+  `manipulation`, and an unclaimed touch is kept from the canvas's handlers. embedCheck
+  [host] drives the machine. Verified on CDP against a host page iframing the build at
+  100% × 500. A touch swipe over the canvas scrolled the host (0 → 121), and a second swipe
+  did too (→ 242). A mouse wheel over the canvas scrolled the host (→ 120). A tap claimed
+  the canvas (touch-action `none`), and the next swipe left the host at 0. A mouse click
+  followed by a wheel panned the canvas (translate y 161 → 41) with the host at 0.
+- **The ephemeral ordering guarantee did not hold in the bundle** (minor 6). The page
+  now declares it: `embed.html` has `<html data-persistence="ephemeral">`, and
+  `persistence.ts` reads that as it evaluates. Every module that keeps anything imports
+  `persistence.ts`, so the order of the bundle's chunks no longer matters. There is no
+  switch and no `embed/ephemeral.ts`. embedCheck pins the declaration in the source and,
+  with `--dist`, in the built page, and checks that `index.html` has none.
+- **Size:** embed JS 519.7 KB raw, **158.7 KB gzipped** (4 chunks).
+- **Gates:** app tsc 0, app build 0, app check 0, server typecheck 0, server check 0.
+- **Next:** Checkpoint (commit), then the release step. What is owed has not changed.
+
+### 2026-09-29 — implemented (work loop)
+- **Built:** a second page, `embed.html`, that shows ONE example machine in the app's
+  editor with a slim bar (name, Reset, "Open the full sandbox ↗"), keeps nothing, lets the
+  host page scroll past it until clicked (or tapped) into, and shows a poster below 600px.
+  Three fresh examples (`majority` CC default, `parity` FSM, `square-patrol` turbot).
+  `_headers` lets only makingminds.org frame `/embed` and `/embed.html` and every other
+  page only itself. Deep fixes: host descriptor (`editorHost.ts`), page-declared
+  persistence (`persistence.ts`), installed backend slot (`storage/pageBackend.ts`),
+  layout-only `EditorShell` + `EditorWorkspace`. Memo `docs/buildout/designs/embeddable-sandbox.md`.
+- **Pins:** new `tools/embedCheck.ts` in `npm run check` — [examples] [not homework]
+  [ephemeral] [reset] [module graph] [host] [headers] [wiring], `--dist` (built page
+  ephemeral, no app-only markers, gz size: 158.7 KB); workbenchCheck (swap's Fit follows
+  the palette until the person acts); the other checks moved to the new seams.
+- **Gates (exit codes):** app tsc 0, app build 0, app check 0 (embedCheck re-run at
+  checkpoint: all passed; budgets: CLAUDE.md 39999/40000), server tsc 0, server check 0.
+- **Review:** 6 findings fixed (2 major Fit-before-palette + 1 related minor; 1 major touch
+  scroll trap; minors: FSM Run folded at 600–759px, README "Adding one", ephemeral chunk
+  order), 0 skipped. Nits left: two "Reset" buttons (bar vs run row); layout defaults
+  computed once at load (a frame that widens after loading narrow keeps narrow defaults).
+- **Owed:** the loop session's headless-browser pass (host page iframing the dev embed:
+  wheel/touch handoff, Reset, reload, zero storage keys, 640×420 / 800×500 / 1000×560
+  shots, 375×667 poster, sandbox link) — earlier stages drove it over CDP, recorded above;
+  optional `wrangler pages dev` header check. OWED TO GABRIEL: the release is held
+  (`deploy/` on HOLD_PATHS); after his hand release, `curl -sI` `/embed`, `/embed.html`
+  (308 → `/embed`), `/` and `/embed?example=parity` show the intended headers; then the
+  website iframe (handoff, his yes).
+- **Next step:** loop session: visual check if owed, then land per PROFILE §5.

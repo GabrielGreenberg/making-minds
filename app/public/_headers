@@ -1,0 +1,21 @@
+# Cloudflare Pages response headers (task 087). vite copies public/ into
+# dist/, and deploy/release.sh uploads dist/. Pages merges the headers of
+# every rule that matches a path; `! Name` detaches a header an earlier rule
+# set.
+#
+# Every page: framable only by this site itself.
+/*
+  Content-Security-Policy: frame-ancestors 'self'
+  X-Frame-Options: SAMEORIGIN
+
+# The embeddable sandbox — framable by the course website alone. Pages also
+# serves embed.html at /embed (pretty URLs), so both forms are covered.
+/embed
+  ! Content-Security-Policy
+  ! X-Frame-Options
+  Content-Security-Policy: frame-ancestors https://makingminds.org https://www.makingminds.org
+
+/embed.html
+  ! Content-Security-Policy
+  ! X-Frame-Options
+  Content-Security-Policy: frame-ancestors https://makingminds.org https://www.makingminds.org

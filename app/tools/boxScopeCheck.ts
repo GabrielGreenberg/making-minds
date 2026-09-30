@@ -53,6 +53,8 @@ const backing = new Map<string, string>();
   visibilityState: 'visible',
 };
 
+// The app's course backend (task 087), installed as main.tsx installs it.
+await import('../src/storage/appBackend');
 const { useStore } = await import('../src/store');
 const { buildSampleAssignment, SAMPLE_ASSIGNMENT_ID } = await import(
   '../src/devData/sampleData'

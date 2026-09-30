@@ -41,7 +41,7 @@ import { COMPONENT_TYPES } from './types';
 import { canonicalJson } from './canonicalJson';
 import { sha256, toHex, utf8 } from './provenance/sha256';
 import { mintId } from './provenance/ids';
-import { MAX_ARENA_SIZE } from './instructor/arenaEditing';
+import { MAX_ARENA_SIZE } from './arenaEditing';
 
 /** The largest file Open reads — the class of a browser's localStorage quota,
  *  where the sandbox has to live once it is open (autosave). A picked file is

@@ -20,7 +20,10 @@
 //                    notes links; problemPages for Prev / Next.
 //   [top bar labels] the save state's every branch, the submitted time.
 //   [one frame]      every question kind and the sandbox render inside
-//                    EditorShell; the sandbox has no question panel; the
+//                    EditorShell, a layout-only frame the host hands its
+//                    chrome (task 087: bar, banner, question panel, output
+//                    panel) and the canvas column (EditorWorkspace, the
+//                    embed's too); the sandbox has no question panel; the
 //                    retired MenuBar is gone; the question text left the data
 //                    panel; nothing in the frame reads the answer key; the
 //                    Worksheet replaced the two answer panels and is one
@@ -369,12 +372,29 @@ console.log('\n[one frame]');
   check('the sandbox keeps its worksheet tabs over the canvas, only outside an assignment', /\{!assignment && <TabBar \/>\}/.test(app));
   check('the retired MenuBar is gone', !existsSync(join(SRC, 'components/MenuBar.tsx')));
   const shell = code('components/EditorShell.tsx');
-  // The left column is the one `{inAssignment && …}` block before <main>;
-  // the panel and its collapsed strip render nowhere else.
-  const left = shell.slice(Math.max(0, shell.indexOf('{inAssignment &&')), shell.indexOf('<main'));
-  check('the question panel renders only in an assignment (the sandbox has none)',
-    left.startsWith('{inAssignment &&') && /<QuestionPanel\s/.test(left) && left.includes('<QuestionPanelStrip ') &&
-      (shell.match(/<QuestionPanel(Strip)?\b/g) ?? []).length === 2);
+  // The left column is the one `{question && …}` block before <main>; the
+  // panel and its collapsed strip render nowhere else — drawn from the slot
+  // the host passes (task 087).
+  const left = shell.slice(Math.max(0, shell.indexOf('{question &&')), shell.indexOf('<main'));
+  check('the question panel renders only in the frame\'s left block, from the host\'s slot',
+    left.startsWith('{question &&') && left.includes('question.panel({') && left.includes('question.strip(') &&
+      (shell.match(/question\.(panel|strip)\(/g) ?? []).length === 2 && !/<QuestionPanel/.test(shell));
+  const shellImports = [...shell.matchAll(/from\s+['"]([^'"]+)['"]/g)].map((m) => m[1]);
+  check('the frame is layout only: no store, no session, no chrome of its own (the host passes the bar, banner and panels)',
+    shellImports.length > 0 &&
+      shellImports.every((i) => !/^\.\.\/store$|^\.\.\/auth|^\.\/(EditorTopBar|QuestionPanel|VisitorBanner)$/.test(i)) &&
+      !/useStore|useAuth/.test(shell), shellImports.join(', '));
+  check('App passes the question panel only in an assignment (the sandbox has none), its top bar and the visitor banner',
+    /const question = assignment \? questionSidePanel : undefined;/.test(app) &&
+      (app.match(/question=\{question\}/g) ?? []).length === 2 &&
+      /const bar = <EditorTopBar \/>;/.test(app) && /isVisitor \? <VisitorBanner \/> : undefined/.test(app));
+  const qpSrc = code('components/QuestionPanel.tsx');
+  check('…questionSidePanel is the panel and its strip, the frame\'s control passed through',
+    /export const questionSidePanel: QuestionSidePanel = \{/.test(qpSrc) &&
+      /<QuestionPanel onCollapse=\{onCollapse\} split=\{split\} onResizeSplit=\{onResizeSplit\} \/>/.test(qpSrc) &&
+      /strip: \(expand\) => <QuestionPanelStrip onExpand=\{expand\} \/>/.test(qpSrc));
+  check('the canvas column is EditorWorkspace (the app\'s and the embed\'s)',
+    /<EditorWorkspace \/>/.test(app) && /<CircuitCanvas \/>/.test(code('components/EditorWorkspace.tsx')) && !/<CircuitCanvas/.test(app));
   const table = code('components/DataTable.tsx');
   check('the data panel no longer renders the question (it is in the question panel)',
     !/ProblemBody|ProblemContext|QuestionStatement/.test(table));
@@ -429,7 +449,7 @@ console.log('\n[one frame]');
       (panel.match(/<PanelDivider\s+orientation="horizontal"/g) ?? []).length === 1 &&
       (panel.match(/<PanelDivider\b/g) ?? []).length === 1);
   check('the split is the layout\'s: EditorShell hands it to the question panel and stores a change like a width',
-    shell.includes('split={layout.qpSplit}') && shell.includes('update({ qpSplit'));
+    shell.includes('split: layout.qpSplit') && shell.includes('update({ qpSplit'));
   const css = read('workbench.css');
   // A rule's body, its selector standing alone (after a rule, a comment or a line break).
   const rule = (sel: string) => new RegExp(`(?:^|[\\s}/])${sel.replace(/[.]/g, '\\.')}\\s*\\{([^}]*)\\}`).exec(css)?.[1] ?? null;
@@ -512,7 +532,7 @@ console.log('\n[output panel]');
 
   const app = code('App.tsx');
   check('the retired simulation toolbar is gone', !existsSync(join(SRC, 'components/SimulationPanel.tsx')) && !/SimulationToolbar/.test(app));
-  check('the output panel is OutputPanel', /<EditorShell output=\{<OutputPanel \/>\}>/.test(app));
+  check('the output panel is OutputPanel', /<EditorShell\b[^>]*\boutput=\{<OutputPanel \/>\}>/.test(app));
   const out = code('components/OutputPanel.tsx');
   check('ONE control row, rendered from the store\'s descriptor and dispatched through runControl',
     /selectRunControls/.test(out) && /runControl\('run'/.test(out) && /runControl\('step'\)/.test(out) &&
@@ -693,7 +713,7 @@ console.log('\n[palette]');
   const paletteSrc = code('components/Palette.tsx');
   check('the parts column is gone (no ComponentLibrary), the palette floats in the canvas',
     !existsSync(join(SRC, 'components/ComponentLibrary.tsx')) && !/ComponentLibrary/.test(app) &&
-      /<Palette canvasW=\{containerSize\.width\} canvasH=\{containerSize\.height\} \/>/.test(canvasSrc));
+      /<Palette canvasW=\{containerSize\.width\} canvasH=\{containerSize\.height\} onPlaced=\{onLayoutMoved\} \/>/.test(canvasSrc));
   check('no HTML drag-and-drop left: the palette\'s pointer drag and the canvas\'s ghost replace it',
     !/onDrop=|dataTransfer|draggable/.test(canvasSrc + paletteSrc) && /<PaletteGhost /.test(canvasSrc));
   check('ONE placement path: the canvas click and the palette drop both call the store\'s placeTool',
@@ -823,6 +843,15 @@ console.log('\n[canvas]');
     /stroke=\{C\.halo\}\s+strokeWidth=\{8\}/.test(canvasSrc) && /stroke=\{color\}\s+strokeWidth=\{2\}/.test(canvasSrc));
   check('Fit runs on every canvas swap: the store\'s counter, bumped by resetAllSimState, answered by the canvas',
     /canvasSwapSeq: s\.canvasSwapSeq \+ 1/.test(store) && /\[canvasSwapSeq, fitCanvas\]/.test(canvasSrc));
+  // Task 087: a short canvas lays the palette flat only after its first
+  // measure, and a flat palette drops under the actions a render later — the
+  // swap's two frames fitted around where it stood.
+  check('…and until the person does anything (a press or key anywhere, a view of their own) the swap\'s fit follows the layout as it settles: the canvas\'s size and each placement the palette renders',
+    /layoutMoved\.current = \(\) => \{/.test(canvasSrc) &&
+      /window\.addEventListener\('pointerdown', stop, true\);/.test(canvasSrc) && /window\.addEventListener\('keydown', stop, true\);/.test(canvasSrc) &&
+      /s\.zoom !== fitted\.zoom \|\| s\.panX !== fitted\.panX \|\| s\.panY !== fitted\.panY/.test(canvasSrc) &&
+      /onPlaced=\{onLayoutMoved\}/.test(canvasSrc) && /\}, \[containerSize, onLayoutMoved\]\);/.test(canvasSrc) &&
+      /onPlaced\?\.\(\);\s*\}, \[onPlaced, shown\.x, shown\.y, size\.w, size\.h, horiz\]\);/.test(code('components/Palette.tsx')));
   check('setZoom clamps to the one range', /setZoom: \(z\) => set\(\{ zoom: clampZoom\(z\) \}\)/.test(store));
 }
 

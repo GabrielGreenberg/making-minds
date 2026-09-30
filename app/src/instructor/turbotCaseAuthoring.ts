@@ -25,7 +25,7 @@
 
 import type { AssignmentQuestion, ArenaConfig, TurbotSuccessCriterion, TurbotTestCase } from '../types';
 import { arenaHasGoal, criterionNeedsGoal } from '../engine/turbot';
-import { blankArena } from './arenaEditing';
+import { blankArena } from '../arenaEditing';
 
 export interface TurbotCaseDraft {
   /** The row's identity — its React key and the creator's active-arena

@@ -276,7 +276,13 @@ function Tile({ tool, label, icon, refusal, armed, title, onPin }: TileProps) {
   );
 }
 
-export function Palette({ canvasW, canvasH }: { canvasW: number; canvasH: number }) {
+export function Palette({ canvasW, canvasH, onPlaced }: {
+  canvasW: number;
+  canvasH: number;
+  /** After every placement it renders — where it sits, its size, which way
+   *  it runs: the canvas's swap-time Fit keeps clear of where it settles. */
+  onPlaced?: () => void;
+}) {
   const effectiveMode = useStore(selectEffectiveMode);
   const allowed = useStore(selectAllowedComponents);
   const placeableKinds = useStore(selectPlaceableBoxKinds);
@@ -368,6 +374,9 @@ export function Palette({ canvasW, canvasH }: { canvasW: number; canvasH: number
   const canTurn = paletteOrientation(!horiz, length, canvas) === !horiz;
   const canvasKnown = canvasW > 0 && canvasH > 0 && size.w > 0;
   const shown = canvasKnown ? clearOf(clampPalette(placement, size, canvas), size, actions, canvas) : placement;
+  useLayoutEffect(() => {
+    onPlaced?.();
+  }, [onPlaced, shown.x, shown.y, size.w, size.h, horiz]);
 
   // Moving it: the grip drags it (clamped as it goes); the pref is written on release.
   const onGripDown = (e: ReactPointerEvent<HTMLDivElement>) => {

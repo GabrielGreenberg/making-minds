@@ -4,8 +4,8 @@
 // pointer and keyboard behaviour on either axis — a drag is live and stored
 // on release, the arrow keys along the axis step it — while the caller owns
 // the value: `drag` maps the pointer's travel to one, `step` a key press.
-// Its own module because both EditorShell and QuestionPanel draw it, and
-// EditorShell imports QuestionPanel.
+// Its own module because both EditorShell and QuestionPanel draw it (the
+// frame takes the question panel as a slot, task 087).
 
 import { useRef, type KeyboardEvent, type PointerEvent } from 'react';
 

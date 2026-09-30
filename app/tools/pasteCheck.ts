@@ -71,6 +71,8 @@ type Provenance = import('../src/provenance').Provenance;
 type CanvasClip = import('../src/provenance').CanvasClip;
 type ClipItem<T> = import('../src/provenance').ClipItem<T>;
 type SystemClipboard = import('../src/provenance').SystemClipboard;
+// The app's course backend (task 087), installed as main.tsx installs it.
+await import('../src/storage/appBackend');
 const { useStore, selectPasteScope } = await import('../src/store');
 const { buildSampleAssignment } = await import('../src/devData/sampleData');
 const { comp: build } = await import('./builder');
