@@ -8,9 +8,9 @@ requires:
 area: server
 source: feedback
 created: 2026-09-29T15:12:00-07:00
-status: in-progress
+status: done
 after:
-branch: robot/086-auto-resolve-fixed-feedback
+branch:
 merged_into:
 ---
 
@@ -199,3 +199,15 @@ Nits left alone:
     line and no "could not read tasks/done" warning.
 
 **Next step:** loop session: do the owed visual check, then land per PROFILE §5.
+
+### 2026-09-29 — landed (robot)
+Workflow `wf_e1383e06-38a` result checked: every Done-when met, `needsGabriel` empty, the
+five gates 0 after the review fixes (re-run by the Fix stage). `origin/main` brought nothing
+in, so those gates are what ships. Spot-checked `app.ts`'s boot sweep and the triage /
+status routes, `feedbackResolution.ts`'s done-set reader (an in-memory database with no
+`MM_REPO_DIR` reads nothing; a missing `tasks/done/` is quiet) and the CLAUDE.md Server row
+(edited in place, 39992/40000 bytes).
+**Owed, not claimed** (no dev server in an unattended run, and the label only shows in
+remote mode): Gabriel's eyeball of the Feedback tab per the recipe in the entry above, and
+on the pilot after this release: the first boot resolves every open report already marked
+`dismissed` or filed into live tasks, so the Open count drops (intended).
