@@ -8,9 +8,9 @@ requires: browser
 area: app
 source: chat
 created: 2026-09-29T08:00:00-07:00
-status: in-progress
+status: done
 after:
-branch: robot/089-rewrite-app-copy-from-copy-pass
+branch:
 merged_into:
 ---
 
@@ -269,3 +269,39 @@ robot to take.
   remote-only strings (sign-in setup pane, claim errors, throttle, Roster & accounts,
   Robot tab, re-grade dialog, Password panel).
 - **Next step.** Loop session: the headless visual check, then land per PROFILE §5.
+
+### 2026-09-30 — landed (robot)
+- **Headless visual check (required to land): passed.** The app ran from Bash (Vite on
+  :5190), and headless Chrome was driven over CDP (a scratch script seeding LOCAL mode as
+  `shootProblemSets.mjs` does). Checked at 1280 and 375 as the toy student:
+  - Home has no intro, and the up-next line reads "· submitted <date>. You can submit
+    again until then".
+  - Grades has no intro. With HW1 released, the sheet foot reads "Grade 40 / 100 (0 of 23
+    points, scaled as 40 + 60 × 0/23). 9 problems still awaiting review. The grade may
+    rise."
+  - The editor's top-bar tooltips read as the attachment says.
+  - The Submit dialog has its 3 paragraphs and the group line, and "Attempt 1 is
+    recorded." after submitting.
+  - Feedback shows the student intro (the parenthesis wraps cleanly at 375) and the
+    instructor intro ("File a report here, with the instructor tag.").
+  - Signed out, "Continue as visitor" is still a link.
+  - Past due after a submission: Home shows the "🔒 Past due" tooltip, and the overview
+    and editor show "🔒 Past due. Your submission is read-only." with the FROZEN_NOTICE
+    title. The top bar fits at 1024 and 800 because the title truncates.
+  - No horizontal overflow on any checked page at 375, and no console errors.
+  - The editor's top bar is cramped at 375 with or without the new text. That was already
+    so on `main` (the editor is not a phone surface).
+- **Fixes of mine.** The review's two nits: CLAUDE.md gets back the Notes `marked` +
+  `dompurify` pointer (39,982 bytes, under 40,000), and `deploy/README.md` now quotes the
+  roster heading "no longer on the class list". These are docs only, and `origin/main` had
+  nothing new, so the workflow's gates stand (app tsc/build/check 0, server tsc/check 0).
+- **Owed, not claimed.**
+  - Gabriel's own eyeball in the browser pane (Vite Dev Server, :5173), on the same routes
+    as above.
+  - The instructor surfaces, once: Grading › Matrix legend and flag tooltips, a
+    submission page's Integrity and ½ lines, the Question creator's fill-in and numeral
+    help, the assignment editor's labels, and the Dashboard's delete-a-submitted-HW alert.
+  - On the pilot after release, the remote-only strings: the sign-in setup pane, claim
+    errors, the throttle reply, Roster & accounts, the Robot tab, the re-grade dialog and
+    the Password panel.
+
