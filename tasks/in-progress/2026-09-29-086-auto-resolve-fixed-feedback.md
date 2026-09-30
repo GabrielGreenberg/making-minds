@@ -8,9 +8,9 @@ requires:
 area: server
 source: feedback
 created: 2026-09-29T15:12:00-07:00
-status: ready
+status: in-progress
 after:
-branch:
+branch: robot/086-auto-resolve-fixed-feedback
 merged_into:
 ---
 
