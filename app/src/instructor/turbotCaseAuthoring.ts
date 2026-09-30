@@ -47,7 +47,7 @@ export const DEFAULT_CRITERION: TurbotSuccessCriterion = 'reach-and-stop';
 export const TURBOT_CRITERIA: { value: TurbotSuccessCriterion; label: string; hint: string }[] = [
   { value: 'reach-and-stop', label: 'Reach goal and stop', hint: 'The turbot must halt itself (motor 00) on a goal cell.' },
   { value: 'pass-through', label: 'Pass through goal', hint: 'The turbot must visit a goal cell at some step.' },
-  { value: 'return-to-start', label: 'Return to start', hint: 'The turbot must end on its starting cell — first visiting a goal cell, if the arena has one.' },
+  { value: 'return-to-start', label: 'Return to start', hint: 'The turbot must end on its starting cell, after visiting a goal cell if the arena has one.' },
 ];
 
 export function criterionLabel(criterion: TurbotSuccessCriterion): string {
@@ -188,9 +188,9 @@ export function misplacedArenasWarning(positions: readonly number[]): string {
   const which = `arena${positions.length === 1 ? '' : 's'} ${shown}${more}`;
   return (
     `Runs already graded in ${which} will now be listed in the gradebook, and replayed ` +
-    `by students' "Run this input", against a different arena, or none — graded runs ` +
-    `match arenas by position. To keep each run beside the arena it was graded in, add ` +
-    `new arenas at the end instead of moving, removing or inserting one.`
+    `by students' "Run this input", against a different arena, or none. To keep each run ` +
+    `beside the arena it was graded in, add new arenas at the end instead of moving, ` +
+    `removing or inserting one.`
   );
 }
 

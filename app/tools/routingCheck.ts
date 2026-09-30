@@ -703,7 +703,7 @@ console.log('[dashboard shell]');
   check('local mode: the tab says "Not available in local mode"', robotTab({ available: false, reason: 'Not available in local mode' }).includes('Not available in local mode'));
   const failed = robotTab(answer, new Error('Failed to fetch'));
   check('a failed refresh keeps the last answer beside a one-line error',
-    failed.includes('Couldn’t refresh (Failed to fetch) — showing the last answer.') && failed.includes('<h2>Live</h2>'));
+    failed.includes('Couldn’t refresh (Failed to fetch). Showing the last answer.') && failed.includes('<h2>Live</h2>'));
   check('a failed first load shows the error line and Refresh, no sections',
     /Couldn’t read the robot’s state: Failed to fetch/.test(robotTab(undefined, new Error('Failed to fetch'))) &&
       !robotTab(undefined, new Error('Failed to fetch')).includes('<h2>Live</h2>'));

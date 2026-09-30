@@ -660,7 +660,7 @@ export type IntegrityFlagCode =
 
 export interface IntegrityFlag {
   code: IntegrityFlagCode;
-  /** Plain words for the instructor, phrased as something to look at. */
+  /** Plain words for the instructor: what was seen, and the evidence (a prompt to look, never a verdict). */
   detail: string;
 }
 

@@ -71,7 +71,7 @@ export function TMTapePanel() {
                     if (e.shiftKey) setTmHead(i);
                     else setTmCell(i);
                   }}
-                  title={editable ? `cell ${i} — click to change` : `cell ${i}`}
+                  title={editable ? `cell ${i}: click to change` : `cell ${i}`}
                   style={{
                     width: 40,
                     height: 46,

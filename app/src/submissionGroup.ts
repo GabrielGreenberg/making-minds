@@ -45,13 +45,13 @@ export function checkGroup(
   if (raw === undefined || raw === null) return { ok: true, group: [] };
   if (!Array.isArray(raw)) return { ok: false, error: 'The group must be a list of classmates.' };
   if (raw.length > MAX_GROUP_OTHERS) {
-    return { ok: false, error: `List at most ${MAX_GROUP_OTHERS} group members — groups are at most 3 people, you included.` };
+    return { ok: false, error: `List at most ${MAX_GROUP_OTHERS} group members. Groups are at most 3 people, including you.` };
   }
   const seen = new Set<string>();
   for (const key of raw) {
     if (typeof key !== 'string' || key === '') return { ok: false, error: 'A group member is missing.' };
     if (seen.has(key)) return { ok: false, error: 'The same classmate is listed twice.' };
-    if (key === selfKey) return { ok: false, error: "Don't list yourself — only the classmates you worked with." };
+    if (key === selfKey) return { ok: false, error: "Don't list yourself." };
     if (!studentKeys.has(key)) return { ok: false, error: 'A listed group member is not a student on the class roster.' };
     seen.add(key);
   }

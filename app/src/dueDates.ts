@@ -73,6 +73,11 @@ export function isFrozen(dueDate: string | undefined, now: number, hasSubmission
   return hasSubmission && dueDate != null && dueStatus(dueDate, now) === 'overdue';
 }
 
+/** What a frozen assignment says, in one wording everywhere: the sentence
+ *  (a tooltip, the question panel's tag) and the short badge. */
+export const FROZEN_NOTICE = 'The due date for this assignment has passed. Your submission is now read-only.';
+export const FROZEN_BADGE = '🔒 Past due. Your submission is read-only.';
+
 /** Short display form for a due date, e.g. "Jul 22, 5:00 PM". */
 export function formatDueDate(iso: string): string {
   const d = new Date(iso);

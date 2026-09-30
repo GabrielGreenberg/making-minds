@@ -182,16 +182,19 @@ async function runMigration(u: { email: string; role: 'student' | 'instructor' }
   }
 }
 
+/** Every sign-in call's message when the server gives none (a network failure). */
+const UNREACHABLE = 'Could not reach the server. Check your connection.';
+
 /**
  * Turn a failed API call into a message for the person in front of the screen.
  * The server writes these (it knows which rule was broken); anything without
  * one is a network failure.
  */
-function describeError(e: unknown, fallback: string): string {
+function describeError(e: unknown): string {
   if (e instanceof api.ApiError && e.message) {
     return e.message.charAt(0).toUpperCase() + e.message.slice(1);
   }
-  return fallback;
+  return UNREACHABLE;
 }
 
 function RemoteAuthProvider({ children }: { children: ReactNode }) {
@@ -302,7 +305,7 @@ function RemoteAuthProvider({ children }: { children: ReactNode }) {
       } catch (e) {
         return {
           ok: false,
-          error: describeError(e, 'Could not reach the server — check your connection.'),
+          error: describeError(e),
         };
       }
     },
@@ -319,7 +322,7 @@ function RemoteAuthProvider({ children }: { children: ReactNode }) {
       } catch (e) {
         return {
           ok: false,
-          error: describeError(e, 'Could not reach the server — check your connection.'),
+          error: describeError(e),
           // The server refuses an off-roster ID or email with 403 (and only that).
           notOnRoster: e instanceof api.ApiError && e.status === 403,
         };
@@ -336,7 +339,7 @@ function RemoteAuthProvider({ children }: { children: ReactNode }) {
       } catch (e) {
         return {
           ok: false,
-          error: describeError(e, 'Could not reach the server — check your connection.'),
+          error: describeError(e),
         };
       }
     },
@@ -350,7 +353,7 @@ function RemoteAuthProvider({ children }: { children: ReactNode }) {
     } catch (e) {
       return {
         ok: false,
-        error: describeError(e, 'Could not reach the server — check your connection.'),
+        error: describeError(e),
       };
     }
   }, []);

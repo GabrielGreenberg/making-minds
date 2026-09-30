@@ -24,9 +24,8 @@ export const SUBMIT_INTEGRITY_SENTENCE =
  *  from the catalog, which sends the saved work rather than the open canvas. */
 export function submitConfirmMessage(title: string, opts: { saved?: boolean } = {}): string {
   return (
-    `Submit "${title}"? This records a snapshot of your ${opts.saved ? 'saved' : 'current'} work.\n\n` +
-    'Note: only your most recent submission is graded — submitting again replaces any earlier ' +
-    'submission for grading purposes.\n\n' +
+    `Submit "${title}"? This records your ${opts.saved ? 'saved' : 'current'} work.\n\n` +
+    'Only your most recent submission is graded.\n\n' +
     SUBMIT_INTEGRITY_SENTENCE
   );
 }

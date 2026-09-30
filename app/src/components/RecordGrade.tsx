@@ -18,7 +18,7 @@ export function RecordGrade({ assignmentId, record }: { assignmentId: string; re
   const score = scoreRecord(assignment.questions, record, Date.now(), dueInput(assignment, { waived: record.lateWaived }, COURSE_CALENDAR));
   if (score.final === null) return null;
   return (
-    <span title={score.provisional ? 'Some problems are still awaiting review — the grade may rise.' : undefined}>
+    <span title={score.provisional ? 'Some problems are still awaiting review. The grade may rise.' : undefined}>
       {formatGrade(score.final)} / 100{score.provisional ? ' (provisional)' : ''}
     </span>
   );

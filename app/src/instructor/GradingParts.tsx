@@ -43,7 +43,7 @@ export function GradeValue({ value, provisional }: { value: number | null; provi
     <>
       {formatGrade(value)}
       {provisional ? (
-        <span className="gr-prov" title="Provisional — some problems still await a hand grade">
+        <span className="gr-prov" title="Provisional. Some problems still need a hand grade.">
           *
         </span>
       ) : null}
@@ -80,7 +80,7 @@ export function FlagChip({
   nameOf?: (key: string) => string | undefined;
 }) {
   const others = (flag.others ?? []).map((k) => nameOf?.(k)).filter(Boolean);
-  const tip = `${flag.detail}${others.length ? ` — ${others.join(', ')}` : ''}`;
+  const tip = `${flag.detail}${others.length ? ` (${others.join(', ')})` : ''}`;
   return (
     <span className={`tag gr-flagchip ${FLAG_TONE[flag.kind]}`} title={tip}>
       ⚑ {flagChipText(flag, titleOf)}
@@ -102,7 +102,7 @@ export function ExportCsvButton({ assignmentId }: { assignmentId?: string }) {
       if (!out) setProblem('No such assignment.');
       else downloadText(out.filename, out.csv, 'text/csv;charset=utf-8');
     } catch {
-      setProblem('Couldn’t export — the server may be unreachable.');
+      setProblem('Couldn’t export. The server may be unreachable.');
     } finally {
       setBusy(false);
     }

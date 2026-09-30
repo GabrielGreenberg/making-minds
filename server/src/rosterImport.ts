@@ -49,7 +49,7 @@ export function importRosterCsv(db: Db, csv: string, defaultRole: Role): RosterI
     const placed = placeRosterEntry(db, entry, 'class-list');
     if (placed.kind === 'added') added++;
     else if (placed.kind === 'updated') updated++;
-    else issues.push({ line: entry.line, reason: `${placed.reason} — row not imported` });
+    else issues.push({ line: entry.line, reason: `${placed.reason} (row not imported)` });
   }
   issues.sort((a, b) => a.line - b.line);
   return {

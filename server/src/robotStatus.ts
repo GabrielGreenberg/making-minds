@@ -210,7 +210,7 @@ async function syncMirror(
   mirrorDir: string | null,
 ): Promise<{ mirror: RobotFacts['mirror']; origin: string | null }> {
   if (!mirrorDir) {
-    return { mirror: unknown('no mirror of GitHub main: an in-memory database has no data folder to keep one in (set MM_REPO_MIRROR)'), origin: null };
+    return { mirror: unknown('no mirror of GitHub main, since an in-memory database has no data folder to keep one in (set MM_REPO_MIRROR)'), origin: null };
   }
   let origin: string;
   try {
@@ -309,7 +309,7 @@ async function readBlocked(mirrorDir: string, head: string) {
  *  view then waits on them (robotStatus.ts `completeGate`). */
 async function readBackup(backupDir: string | null): Promise<Pick<RobotFacts, 'backup' | 'backupProblem'>> {
   const none = (backupProblem: string) => ({ backup: null, backupProblem });
-  if (!backupDir) return none('no backups folder: an in-memory database has none (set MM_BACKUP_DIR)');
+  if (!backupDir) return none('no backups folder, since an in-memory database has none (set MM_BACKUP_DIR)');
   let timerActive: boolean;
   try {
     const { stdout } = await execFileAsync('systemctl', ['is-active', 'makingminds-backup.timer'], {
@@ -402,7 +402,7 @@ export async function gatherRobotFacts(opts: RobotSourceOptions): Promise<RobotF
   );
   // The backups and CI only matter to a release: when main is ahead of live.
   const ahead = live.ok && live.value.sha !== head;
-  const notAsked = live.ok ? 'not asked: nothing new to ship' : 'not asked: what the pilot runs is unknown';
+  const notAsked = live.ok ? 'not asked (nothing new to ship)' : 'not asked (what the pilot runs is unknown)';
   const backup = ahead ? await readBackup(opts.backupDir) : { backup: null, backupProblem: notAsked };
   const ci = ahead && origin ? await readCi(origin, head) : { ci: null, ciProblem: notAsked };
   return { fetchedAt, live, mirror, pending, blocked, recent, ...backup, ...ci };

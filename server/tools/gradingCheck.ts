@@ -246,7 +246,7 @@ check('…and holds again when the answer is back to the one it judged',
 // ── deleting an assignment ──────────────────────────────────────────────
 console.log('[delete]');
 const del = await api<{ error?: string }>('DELETE', url, { token: iTok });
-check('an assignment with submissions cannot be deleted (409)', del.status === 409 && /hide it/.test(del.json.error ?? '') &&
+check('an assignment with submissions cannot be deleted (409)', del.status === 409 && /Hide it/.test(del.json.error ?? '') &&
   db.getAssignment(SAMPLE_ASSIGNMENT_ID) !== null);
 
 server.close();

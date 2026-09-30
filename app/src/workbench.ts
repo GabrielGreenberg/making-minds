@@ -238,7 +238,7 @@ export function saveLabel(
   lastSavedAt: number | null,
   now: number,
 ): { text: string; error: boolean } {
-  if (status === 'error') return { text: 'Not saved — retrying', error: true };
+  if (status === 'error') return { text: 'Not saved. Retrying…', error: true };
   if (status === 'saving' || status === 'unsaved') return { text: 'Saving…', error: false };
   if (lastSavedAt == null) return { text: 'Saved', error: false };
   const minutes = Math.floor(Math.max(0, now - lastSavedAt) / 60_000);

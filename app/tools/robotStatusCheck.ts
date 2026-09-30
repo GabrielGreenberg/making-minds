@@ -157,7 +157,7 @@ section('[box]');
     gate?.verdict === 'wait' && s.release.ok && s.release.line.includes('cannot tell what the box runs: fatal: not a git repository'),
     s.release.ok ? s.release.line : '');
   check('…and live says unknown with the why', !s.live.ok && s.live.unknown === 'fatal: not a git repository');
-  const noBackup = avail(viewOf(factsWith({ live: { ok: false, unknown: 'x' }, backup: null, backupProblem: 'not asked: what the pilot runs is unknown' }), TEN_AM).status);
+  const noBackup = avail(viewOf(factsWith({ live: { ok: false, unknown: 'x' }, backup: null, backupProblem: 'not asked (what the pilot runs is unknown)' }), TEN_AM).status);
   check('…where the backups go unasked, as on the robot, with no extra reason',
     noBackup.release.ok && noBackup.release.verdict === 'wait' && !noBackup.release.reasons.some((r) => /backups/.test(r.detail)),
     JSON.stringify(noBackup.release));
@@ -194,7 +194,7 @@ section('[backup]');
   check('a hold stays a hold, the unread backups listed beside it',
     held.release.ok && held.release.verdict === 'hold' && held.release.line === 'held: the database schema and its migrations' &&
       held.release.reasons.some((r) => r.verdict === 'wait' && r.detail.includes('backups are unknown')));
-  const quiet = avail(viewOf(factsWith({ changedFiles: ['docs/x.md'], backup: null, backupProblem: 'not asked: nothing new to ship' }), TEN_AM).status);
+  const quiet = avail(viewOf(factsWith({ changedFiles: ['docs/x.md'], backup: null, backupProblem: 'not asked (nothing new to ship)' }), TEN_AM).status);
   check('nothing that ships → "Up to date", backups not asked',
     quiet.release.ok && quiet.release.verdict === 'current' && quiet.release.line === 'Up to date' && !quiet.release.reasons.some((r) => /backups/.test(r.detail)));
   const known = avail(viewOf(factsWith(shipping), TEN_AM).status);
@@ -335,7 +335,7 @@ section('[review]');
 // ── [unknown] ────────────────────────────────────────────────────
 section('[unknown]');
 {
-  const why = 'no mirror of GitHub main: an in-memory database has no data folder to keep one in';
+  const why = 'no mirror of GitHub main, since an in-memory database has no data folder to keep one in';
   const facts = factsWith({
     mirror: { ok: false, unknown: why },
     pending: { ok: false, unknown: why },

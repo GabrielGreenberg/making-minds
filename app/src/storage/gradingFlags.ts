@@ -185,7 +185,7 @@ export function assignmentFlags(input: {
       if (other.latest || (bDue !== null && now > bDue)) {
         const detail = other.latest ? 'a listed group member did not list them back' : 'a listed group member never submitted';
         mark(a.student.key, b, detail);
-        mark(b, a.student.key, other.latest ? 'listed by a classmate they did not list' : 'listed by a classmate; no submission');
+        mark(b, a.student.key, other.latest ? 'listed by a classmate they did not list' : 'listed by a classmate but has not submitted');
       }
     }
   }
@@ -214,7 +214,7 @@ export function assignmentFlags(input: {
     }
   }
   for (const [key, m] of mismatch) {
-    add(key, { kind: 'group-mismatch', others: [...m.others].sort(), detail: [...m.details].join('; ') });
+    add(key, { kind: 'group-mismatch', others: [...m.others].sort(), detail: [...m.details].join(', ') });
   }
 
   // Identical open-response text on the same problem across roster students.

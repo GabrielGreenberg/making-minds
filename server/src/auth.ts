@@ -129,7 +129,7 @@ export class PasswordAuthProvider implements AuthProvider {
       return {
         ok: false,
         reason: 'already-registered',
-        message: 'An account already exists for you — sign in instead.',
+        message: 'An account already exists for you. Sign in instead.',
       };
     }
     const problem = passwordProblem(details.password);

@@ -158,7 +158,7 @@ export function misplacedAnswersWarning(labels: readonly string[]): string {
   const which = `blank${labels.length === 1 ? '' : 's'} ${shown}${more}`;
   return (
     `Answers students have already given to ${which} will now sit beside a different ` +
-    `blank, or be dropped, and be graded there — answers match blanks by position. ` +
+    `blank, or be dropped, and be graded there. ` +
     `Relabel blanks in place and add new ones at the end to keep those answers lined up.`
   );
 }
@@ -326,7 +326,7 @@ export function fillInTableDefects(draft: FillInTableDraft): FillInTableDefect[]
   const whole = (message: string) => out.push({ column: null, keyRow: null, message });
   const c = draft.columns.length;
   const a = draft.argColumns;
-  if (c < 2) whole('Give the table at least two columns — an argument and a value.');
+  if (c < 2) whole('Give the table at least two columns (an argument and a value).');
   else if (!Number.isInteger(a) || a < 1 || a >= c) whole(`Make 1 to ${c - 1} of the columns arguments.`);
   const firstWithHeader = new Map<string, number>();
   draft.columns.forEach((col, j) => {
@@ -347,7 +347,7 @@ export function fillInTableDefects(draft: FillInTableDraft): FillInTableDefect[]
       ? `A table's key can have at most ${FILL_IN_TABLE_MAX_ROWS} rows.`
       : `The rows students see can be at most ${FILL_IN_TABLE_MAX_ROWS}.`);
   } else if (rows < draft.keyRows.length) {
-    whole(`Students need at least ${draft.keyRows.length} rows — one for each key row.`);
+    whole(`Students need at least ${draft.keyRows.length} rows (one for each key row).`);
   }
   const firstWithArgs = new Map<string, number>();
   draft.keyRows.forEach((row, r) => {
@@ -404,19 +404,18 @@ export function misplacedTableWarning(
   if (!saved) return null;
   const lead = 'Answers students have already given in the table';
   if (!next) {
-    return `${lead} will be read as something else, or dropped — they are stored cell by cell, ` +
-      `row by row. Keep the question a table to keep them.`;
+    return `${lead} will be read as something else, or dropped. Keep the question a table to keep them.`;
   }
   const sameColumns =
     saved.columns.length === next.columns.length && saved.columns.every((col, j) => next.columns[j].key === col.key);
   if (!sameColumns) {
-    return `${lead} will shift into other columns — they are stored row by row, so adding, removing ` +
-      `or reordering columns misreads every row. Rename columns in place to keep them lined up.`;
+    return `${lead} will shift into other columns. To keep them lined up, rename columns in place ` +
+      `instead of adding, removing or reordering them.`;
   }
   const savedRows = tableRowCount(saved);
   const nextRows = tableRowCount(next);
   if (nextRows < savedRows) {
-    return `${lead} past row ${nextRows} will be dropped — students saw ${savedRows} rows. ` +
+    return `${lead} past row ${nextRows} will be dropped. Students saw ${savedRows} rows. ` +
       `Keep at least ${savedRows} to keep them.`;
   }
   return null;
@@ -521,7 +520,7 @@ export function fillInNumeralDefects(draft: FillInNumeralDraft): FillInNumeralDe
     const raw = n.value.trim();
     const value = Number(raw);
     if (raw === '' || !Number.isSafeInteger(value) || value < 0) {
-      out.push({ number: j, message: 'needs a value — a whole number, 0 or more' });
+      out.push({ number: j, message: 'needs a value (a whole number, 0 or more)' });
     }
     const label = n.label.trim();
     if (label === '') {
@@ -586,17 +585,16 @@ export function misplacedNumeralWarning(
   if (!saved) return null;
   const lead = 'Answers students have already given to the invented numeral';
   if (!next) {
-    return `${lead} will be read as something else, or dropped — they are stored box by box. ` +
-      `Keep the question a numeral to keep them.`;
+    return `${lead} will be read as something else, or dropped. Keep the question a numeral to keep them.`;
   }
   if (Number(saved.base.trim()) !== Number(next.base.trim())) {
-    return `${lead} will shift — the base sets how many symbol boxes come first and what each one ` +
-      `means, so every symbol and number answer moves. Keep the base to keep them lined up.`;
+    return `${lead} will shift. Changing the base moves every symbol and number answer. ` +
+      `Keep the base to keep them lined up.`;
   }
   const moved = saved.numbers.filter((n, k) => next.numbers[k]?.key !== n.key).map((n) => `"${n.label.trim()}"`);
   if (moved.length > 0) {
-    return `${lead} for ${moved.join(', ')} will now sit beside a different number, or be dropped — ` +
-      `answers match boxes by position. Relabel numbers in place and add new ones at the end.`;
+    return `${lead} for ${moved.join(', ')} will now sit beside a different number, or be dropped. ` +
+      `Relabel numbers in place and add new ones at the end.`;
   }
   return null;
 }

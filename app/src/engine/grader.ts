@@ -114,7 +114,7 @@ function pendingOpen(questionId: number, responseText: string | undefined): Ques
   return {
     questionId,
     status: 'pending',
-    reason: 'open question — needs manual review',
+    reason: 'open question (needs manual review)',
     response: responseText ?? '',
     passed: 0,
     total: 0,
@@ -141,7 +141,7 @@ function gradeFillInQuestion(
   const spec = question.fill_in!;
   const answers = question.fill_in_answers ?? [];
   if (isReviewTable(spec, answers)) {
-    return { questionId: question.id, status: 'pending', reason: 'table — needs manual review', passed: 0, total: 0, cases: [] };
+    return { questionId: question.id, status: 'pending', reason: 'table (needs manual review)', passed: 0, total: 0, cases: [] };
   }
   const problem = fillInKeyProblem(spec, answers);
   if (problem) return skip(question.id, problem);

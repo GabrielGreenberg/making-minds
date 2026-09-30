@@ -26,9 +26,8 @@ export function InstructorGate({ children }: { children: ReactNode }) {
         <div className="mm-card mm-card--narrow">
           <h1>Instructors only</h1>
           <p className="mm-lede">
-            This area is for authoring assignments and reviewing submissions. You are
-            signed in as {user ? `${user.name} (student)` : 'a student'}, so it isn't
-            available to you.
+            You are signed in as {user ? `${user.name} (student)` : 'a student'}, so this area
+            isn't available to you.
           </p>
           <button className="mm-btn mm-btn--primary" onClick={() => navigate({ kind: 'home' })}>
             Back to my assignments

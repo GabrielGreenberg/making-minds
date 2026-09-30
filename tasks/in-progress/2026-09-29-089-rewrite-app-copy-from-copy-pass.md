@@ -8,9 +8,9 @@ requires: browser
 area: app
 source: chat
 created: 2026-09-29T08:00:00-07:00
-status: ready
+status: in-progress
 after:
-branch:
+branch: robot/089-rewrite-app-copy-from-copy-pass
 merged_into:
 ---
 
@@ -122,6 +122,22 @@ in `app/`). In the browser preview, look at each student surface that changed: H
 Feedback and sign-in. Check wrapping at phone width. Remote-only strings (server replies,
 sign-in claim errors) are owed a look on the pilot after release.
 
+**Owed, not claimed (2026-09-30, robot run):**
+- Gabriel's eyeball of the student surfaces. Checked headlessly instead (recipe: `npm run
+  build`, serve `app/dist` in local mode, drive headless Chrome over CDP: sign in as Prof.
+  Ada, Load HW1–HW7, publish all, set HW1's `dueDate` past in `mm:inst-asg:<id>`, sign in
+  as John Doe, submit HW1 from Home, then shoot Home, Submit, Grades, Feedback, the
+  assignment page, the editor and the visitor sandbox at 1200×800 and 375×812).
+- The pilot, after release: sign-in "Set up your account" and "Ask to be added to the class
+  roster" links; a wrong sign-in five times (c0109 "Too many sign-in attempts. Wait a few
+  minutes and try again."); a setup without a UID (c0104) and with a taken email (c0108);
+  deleting an assignment with submissions from the Dashboard (c1018: "Students have
+  submitted this assignment. Hide it instead of deleting it."); a roster import with a
+  UID conflict (c1013 "(row not imported)").
+- The review fixes (next progress entry), unseen in a browser: the Grades sheet's failed-case
+  lines with a grader reason ("arena #1: … N (exceeded max steps)"; a released grade with a
+  failed case), the Queue's "Being graded" note with two claims, and the Matrix flag tooltip.
+
 ### Resolved decisions
 Gabriel's rewrites, 2026-09-30 (row id · `file:line` at `e2c7f12`):
 - c0001 `HomeScreen.tsx:84` Assignments intro: **cut**.
@@ -160,3 +176,96 @@ robot to take.
   Next step: claim, then apply the attachment row by row (student surfaces first). Then
   write VISUAL_VOCAB §Copy and `copyCheck`, update the pinned strings in the harness, and
   run the gates.
+- 2026-09-30 — Applied (robot). All 260 rows: 257 rewrites and 3 cuts. A scratch verifier over
+  `copyCensus` found each row's new text at its location and none of the old (260/260, 0
+  left), and every string changed since `main` maps to a row id. Most rows went in by a
+  scripted replace inside the literal; about 35 by hand (the JSX that spans elements, the
+  `+` chains, `submitConfirmMessage`, the GradeSheet foot, the Matrix flags). Two
+  neighbouring rows the script crossed (c0301/c0302, c0758/c0759) were caught by the
+  verifier and redone. Structure: the frozen notice is one wording in `dueDates.ts`
+  (`FROZEN_NOTICE` for the sentence, `FROZEN_BADGE` for "🔒 Past due. Your submission is
+  read-only.", used by Home, the assignment page, the question panel and the top bar), and
+  c0123 is `authProvider.tsx`'s `UNREACHABLE` (`describeError` lost its fallback
+  parameter). The c0163 cut took the dead `usedFallback` prop off `WireView` and the wire
+  data (the router's `WireRouteResult.usedFallback` stays, `routerCheck` pins it).
+  Suggested rows judged in place and kept: c0994 ("Columns used. Email: …"), c0061/c0062
+  (the banner's "This run" row already says what runs). No suggested row needed a fix. One
+  small deviation: `tools/grade.ts` prints "open question (needs manual review, N words)".
+  Post-pass copy: none. `copyCheck` flags nothing added since `e2c7f12` (087/088's copy is
+  clean). New `app/tools/copyCensus.ts` (the AST census, `collectCopy`, TSV when run) and
+  `copyCheck.ts` (R1 dash, R2 semicolon, R3 double space; tripwire, sweep, pins, wiring;
+  after `themeCheck` in `npm run check`), with 11 `EXCEPTIONS`: 6 rows the pass kept
+  (`lateLabel`'s "; n waived", "✓ passes — pose", two GradingQueue labels, two
+  StudentSubmissionView labels), `INTEGRITY_NOTICE`, formulaEval's generated code, two
+  header values and a `db.ts` internal throw. Pins moved to the new words: navResetCheck,
+  caseRunCheck, workbenchCheck, notationCheck, pipelineCheck, provenanceCheck (plus: the
+  confirmation is 3 paragraphs, the second the grading rule; the flag details carry their
+  evidence and no dash), routingCheck, robotStatusCheck fixtures, rosterCheck,
+  gradingCheck (`/Hide it/`), `grade.ts`; the `types.ts` flag comment. Docs:
+  VISUAL_VOCAB §Copy (rules, examples, the gate, the allowlist, the census) and the stale
+  §Page surfaces quotes; CLAUDE.md in place (Page surfaces row, Tools row, a Copy line in
+  Critical design rules, "Set up your account"; 39,958 bytes). Gates: app tsc 0,
+  typecheck:tools 0, build 0, `npm run check` 0; server `npm run check` 0. Headless look
+  (recipe under Verify): every shot free of horizontal scroll; the new text reads as
+  written on Home, Submit (3 paragraphs), Grades, Feedback (both intros), the assignment
+  page, the question panel and top bar (frozen), the visitor banner and sign-in. Seen in
+  passing, not new: at 375px the editor's top bar overlaps its crumbs, because its right
+  side never shrinks (`.wb-topbar-right`) and the editor is not laid out for phones; no
+  overlap from 700px up. Next step: land.
+- 2026-09-30 — Review fixes (robot). The review found copyCheck blind to a dash that opens
+  or closes a fragment (`{x && ' — dry run'}`, `<> — {why}</>`) and to joiners with no
+  letters of their own (`` `${a} — ${b}` ``, `.join('; ')`), so six rows this pass rewrote
+  (c0045, c0509, c0686, c0692, c0715, c0895) could come back unflagged. It also found
+  suggested rows that still break rules 1–2 in place through the expression they wrap, so
+  the earlier "No suggested row needed a fix" was wrong. Applied (old → suggested → applied):
+  - c0660 Queue "Being graded": `{label} — {by}` claims joined by '; ' → suggested fixed
+    only "idle; nothing" → "Response 3 by Prof. Ada, Response 7 by TA Bob. Claims lapse…".
+  - c0606 integrity "unaccounted": "The answer has {parts.join('; ')} — to look at." →
+    "The answer has {parts.join('; ')}." → parts joined by ", and ".
+  - c0575 group-mismatch detail: "listed by a classmate; no submission" → "listed by a
+    classmate but has not submitted" (still joined to its siblings by '; ') → joined by ", ".
+  - c0044 / c0045 Grades sheet: the arena and film lines kept "— {c.reason}" → " ({c.reason})".
+    The value-case line (not a row) takes the same form, so the sheet reads one way.
+  - c0633 Matrix "Flags (to look at, not verdicts): {flagTip(r)}": the tip rendered
+    "detail — names" → "detail (names)". The flag chip's tooltip (GradingParts, the same
+    fact) follows.
+  Gate: R1 now takes the item's edge as a side (a fragment's open end is where the sentence
+  goes on), holds joiners and bare separators (`' — '`), and exempts only a dash-wrapped
+  label that is its whole item ("— none —"). R2 likewise takes the edge (`.join('; ')`).
+  The rules run on every census item, not only prose-shaped ones, and an exception covers
+  one hit. Tripwire: 7 new checks over 13 new synthetic strings, the review's shapes among
+  them. The widened sweep found 24 new hits: 9 fixed above, 15 allowlisted (26 `EXCEPTIONS`
+  now). Those 15 are two rows the pass kept ("— Robot tab", and the Matrix legend's "—" cell, not punctuation), statementProse's `;`
+  row syntax, and 12 joiners the pass never listed (they have no letters, so the census
+  didn't show them): turbotOutcome's ✗ branch, problemVerdict's "1 point — 5/5", the Matrix
+  column tooltip, the roster import line's "; {status}", the who-left list (dashboard and
+  CLI), statusCountText, the submission page's waiver note and failed-case reason, the grade
+  history note, "Still open: …; …", and releaseLine's '; '. Left for the next copy pass.
+  VISUAL_VOCAB §Copy says a fragment is read where it lands. Gates below. Next step: land.
+
+### 2026-09-29 — implemented (work loop)
+- **Built.** The app's on-screen copy now reads as Gabriel's copy pass decided: all 260
+  attachment rows (257 rewrites, 3 cuts) at their locations, server replies changed where
+  they are set, and the frozen notice as one wording (`dueDates.ts` `FROZEN_NOTICE` /
+  `FROZEN_BADGE`). The house style is written down (VISUAL_VOCAB §Copy, a CLAUDE.md
+  pointer) and held by the new `copyCheck` (on `copyCensus`'s AST census, in `npm run
+  check` after `themeCheck`): R1 dash, R2 semicolon, R3 double space; fragments and
+  joiners read where they land; 26 one-hit `EXCEPTIONS`, each with a reason.
+- **Pins.** copyCheck tripwire (the review's fragment / joiner / `.join('; ')` shapes),
+  sweep, exception liveness, wiring. Copy pins moved to the new words: navResetCheck,
+  caseRunCheck, workbenchCheck, notationCheck, pipelineCheck, provenanceCheck,
+  routingCheck, robotStatusCheck, rosterCheck, gradingCheck, `grade.ts`.
+- **Gates (exit codes).** app tsc 0, app build 0, app `npm run check` 0 (copyCheck all
+  green), server tsc 0, server check 0.
+- **Review.** Fixed 1+3 majors/minors and the widened-gate joiners (entry above:
+  c0660, c0606, c0575, c0044/c0045, c0633). Skipped: none. Nits left alone: CLAUDE.md
+  lost a few true, unrelated facts to stay under 40 KB (the Notes `marked` + `dompurify`
+  sanitizer pointer is the one worth restoring); `deploy/README.md:293` still quotes the
+  old roster-report heading "no longer on the class list — review".
+- **Owed.** The headless visual check (required to land): student Home / Grades /
+  overview / editor / Submit / Feedback / visitor at 1280 and 375; the past-due and
+  viewing states; the review fixes' reason parentheses, two-claim Queue note and Matrix
+  flag tooltip; the instructor surfaces once. To Gabriel on the pilot after release: the
+  remote-only strings (sign-in setup pane, claim errors, throttle, Roster & accounts,
+  Robot tab, re-grade dialog, Password panel).
+- **Next step.** Loop session: the headless visual check, then land per PROFILE §5.

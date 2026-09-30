@@ -47,7 +47,7 @@ function LoginCard({ children }: { children: ReactNode }) {
       <div className="mm-card mm-card--narrow">
         {children}
         <p className="login-visitor">
-          Just exploring? <a {...hashLink({ kind: 'sandbox' })}>Continue as visitor</a> to build
+          <a {...hashLink({ kind: 'sandbox' })}>Continue as visitor</a> to build
           circuits, state machines and Turing machines. No account needed.
         </p>
       </div>
@@ -160,12 +160,12 @@ function RemoteLoginScreen() {
       <SignInPane capabilities={capabilities} />
       {capabilities.allowsRegistration ? (
         <button type="button" className="login-switch" onClick={() => setView('setup')}>
-          First time here? Set up your account
+          Set up your account
         </button>
       ) : (
         capabilities.allowsAccessRequests && (
           <button type="button" className="login-switch" onClick={() => setView('request')}>
-            Not on the class roster? Ask to be added
+            Ask to be added to the class roster
           </button>
         )
       )}
@@ -240,8 +240,7 @@ function SignInPane({ capabilities }: { capabilities: AuthCapabilities }) {
       {error && <p className="mm-error">{error}</p>}
       {capabilities.usesPassword && (
         <p className="mm-note">
-          Forgot your password? Ask your instructor to reset it — they can clear it so you can set
-          a new one.
+          If you forget your password, ask your instructor to reset it.
         </p>
       )}
     </>
@@ -291,8 +290,8 @@ function CreateAccountPane({
   return (
     <>
       <p className="mm-lede">
-        Your UID (student ID) finds you on the class roster. Then choose the email you'll sign
-        in with — your UCLA address, or the email on your class-list record — and a password.
+        Enter your UID (student ID). Then choose a password and the email you'll sign
+        in with (your UCLA address, or the email on your class-list record).
       </p>
       <form className="mm-form login-form" onSubmit={(e) => void handleSubmit(e)}>
         <input
@@ -397,7 +396,7 @@ function RequestAccessPane({ prefill, onDone }: { prefill: Prefill; onDone: () =
     return (
       <>
         <p className="mm-lede">
-          Request sent. Your instructor will review it — once they add you, come back and set up
+          Request sent. Your instructor will review it. When they add you, come back and set up
           your account.
         </p>
         <button className="mm-btn mm-btn--primary" onClick={onDone}>

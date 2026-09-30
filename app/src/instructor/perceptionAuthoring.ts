@@ -164,7 +164,7 @@ export function draftProblems(draft: PerceptionDraft, mode: PerceptionMode): str
   if (!takesFilms(draft, mode)) {
     if (draft.films.length > 0) {
       problems.push(
-        `A ${mode} perception bank already covers every input — remove the ${draft.films.length} film${draft.films.length === 1 ? '' : 's'} (films are for SC rules).`,
+        `A ${mode} perception bank already covers every input. Remove the ${draft.films.length} film${draft.films.length === 1 ? '' : 's'} (films are for SC rules).`,
       );
     }
     return problems;

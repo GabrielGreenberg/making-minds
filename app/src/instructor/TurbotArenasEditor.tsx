@@ -103,9 +103,8 @@ export function TurbotArenasEditor({
         </div>
         <p className="mm-note mm-hint">
           The brain is graded in every arena, each by its own success criterion and step
-          budget, and the question passes only if every arena passes — so a family of arenas
-          rejects a brain that only works in one. Students see arena #1 on the problem page
-          and in the Map; a failed arena can be replayed from their grade sheet.
+          budget. The question passes only if every arena passes. Students see arena #1 on the
+          problem page and in the Map. They can replay a failed arena from their grade sheet.
         </p>
         {misplaced.length > 0 && (
           <p className="instructor-preview-warning" role="alert">
@@ -203,7 +202,7 @@ export function TurbotArenasEditor({
           </div>
           <p className="mm-note mm-hint">
             Click cells to paint with the selected tool. With the Turbot tool, click a cell to
-            move the start there; click the turbot again to rotate it.
+            move the start there. Click the turbot again to rotate it.
           </p>
           <div className="instructor-arena-size">
             <label className="mm-inline-field">

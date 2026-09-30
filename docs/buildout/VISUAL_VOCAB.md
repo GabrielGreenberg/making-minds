@@ -167,17 +167,17 @@ literal or an undefined token. Task: `tasks/done/2026-09-21-019-*`._
   student Home's Assignments · Grades on the catalog, the Grades page and an
   assignment's overview; the Dashboard's Assignments · Grading · Roster & accounts ·
   Feedback · Notes on every instructor page. (The remote sign-in has no tabs: one form, with a quiet
-  "First time here?" link to setup and an access request only when setup finds the
+  "Set up your account" link to setup and an access request only when setup finds the
   email off-roster.)
 - **Visitor** (task 027) — someone not signed in reaches only the sandbox (the editor):
   its top bar shows "Visitor" and **Sign in** where the name menu sits (the brand is not
   a link — a visitor has no Home), and under it one dismissible lavender
-  `.visitor-banner` line ("…as a visitor — PHIL 133 student? Sign in"; dismissed for the
-  browser session). On page surfaces `SessionControls` shows Visitor · Sign in. The
+  `.visitor-banner` line ("…as a visitor. Anything you build stays in this browser.
+  PHIL 133 students: Sign in", dismissed for the browser session). On page surfaces `SessionControls` shows Visitor · Sign in. The
   sign-in card is the one front door (the bare site opens it for anyone not signed in,
   task 040): every pane (local picker; remote password / setup / request / dev / SSO)
-  LEADS with signing in, then a hairline and one quiet meta-size `--mm-ink-3` line, "Just
-  exploring? *Continue as visitor* to build…", its link the only way into the sandbox
+  LEADS with signing in, then a hairline and one quiet meta-size `--mm-ink-3` line,
+  "*Continue as visitor* to build…", its link the only way into the sandbox
   from there; the server-health card offers "Open the sandbox" beside Retry.
 - **Up next** — the site's `.next`/`.nx` box (`.mm-next`/`.mm-nx`): a lavender field with
   a chip on the left (NEXT DUE) and date-in-`--mm-date` + title + a detail line on the
@@ -247,3 +247,61 @@ literal or an undefined token. Task: `tasks/done/2026-09-21-019-*`._
   (− · % · + · Fit), bottom-left the hint line, centred the empty-canvas message. What is
   still inside `index.css` is the data panel's and sandbox's older internals; `themeCheck`
   ratchets its colour literals (they may only go down). The goal and output tables use Plex Sans with tabular digits, never Mono.
+
+## Copy (every on-screen string)
+
+_The house style for the words on every surface, student and instructor, the server's
+replies and thrown messages included. Derived from Gabriel's own rewrites in the copy
+pass (task `2026-09-29-089`; the decisions are
+`tasks/attachments/2026-09-29-089-1-copy-decisions.md`)._
+
+1. **No em or en dashes as punctuation.** Split at the dash into two sentences, or drop
+   the part after it if it only explains.
+2. **No semicolons.** A full stop instead.
+3. **Cut page intros** that explain what a page is for when the page makes it obvious.
+4. **Don't describe the machinery** (queues, tags, canvases, snapshots). Say what is true
+   for the reader.
+5. **No rhetorical-question openers.** A plain statement or instruction.
+6. **Confirmations are short**: "Filed." "Thank you."
+7. **Errors**: what went wrong, then what to do, in short sentences.
+8. **Side information goes last in parentheses**, or goes.
+9. **No colon-then-reveal inside a sentence.** A colon after a short label ("Free end:")
+   stays.
+10. **Leave text that already works.** Short labels and plain messages mostly stay.
+
+Before → after, from Gabriel's rows:
+
+- "This assignment closed after its due date — open it to see your submission,
+  read-only." → "The due date for this assignment has passed. Your submission is now
+  read-only." (one wording for every frozen notice: `dueDates.ts FROZEN_NOTICE`)
+- "Could not send feedback — the server may be unreachable. Try again in a moment." →
+  "Could not send feedback. Try again in a moment."
+- "Filed — it's in the Feedback queue." → "Filed."
+- "Something broken, confusing, or wrong in a homework? Tell the instructors. …" →
+  "Report a bug or technical problem with the homework here. (For issues relating to the
+  class, contact your instructor directly.)"
+
+**The gate.** `app/tools/copyCheck.ts` (in `npm run check`, after `themeCheck`) reads every
+string in `app/src` and `server/src` off TypeScript's parse tree
+(`app/tools/copyCensus.ts`: JSX text flattened per element, string and template
+literals, `+` chains, `title`/`placeholder`/`aria-label`/`alt` and custom-component
+props; class names, SQL, console output, keys, comparisons, `devData/` and the CLIs are
+not copy) and fails on the three rules a machine can see: **R1** an em dash as
+punctuation (or a spaced en dash; ranges like HW1–HW7, a lone "—" cell and a whole
+"— none —" label pass), **R2** a semicolon as punctuation, **R3** two spaces after a
+full stop in a string. A fragment is read where it lands: a conditional suffix
+(`{dry && ' — dry run'}`), a joiner with no letters of its own (`` `${a} — ${b}` ``,
+`<> — {why}</>`) and a separator (`.join('; ')`) put their mark in the sentence around
+them, so the gate holds them too. Check the words an expression brings in, not only the
+literal. The other seven rules are judgment: they are met in review.
+
+**The allowlist.** A string that must keep its mark (a header value, generated code, a
+row the pass read and kept, a compact label joiner the pass never listed) goes in
+copyCheck's `EXCEPTIONS` with its file, a substring, the rule and **a reason**, one entry
+per string. An entry that no longer matches fails the gate, so the list only shrinks:
+rewrite the string and delete its entry. New copy is written to the rules, not
+allowlisted.
+
+**A future copy pass** starts from the census: `cd app && npx tsx tools/copyCensus.ts >
+census.tsv` lists every prose-shaped string (file, line, kind, text); `--all` adds the
+rest.

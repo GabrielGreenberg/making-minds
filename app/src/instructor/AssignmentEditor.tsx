@@ -239,7 +239,7 @@ export function AssignmentEditor({ id }: { id: string }) {
           className="mm-input"
           value={assignment.latePolicy ?? 'per-meeting'}
           onChange={(e) => handleLatePolicyChange(e.target.value as LatePolicy)}
-          title="−5 once late, then −5 per class meeting that has ended since the due date — or per full day"
+          title="−5 once late, then −5 per class meeting that has ended since the due date (or per full day)"
         >
           <option value="per-meeting">−5, then −5 per class meeting</option>
           <option value="per-day">−5, then −5 per day</option>
@@ -258,7 +258,7 @@ export function AssignmentEditor({ id }: { id: string }) {
 
       <div className="mm-form">
         <label className="mm-field">
-          <span className="mm-label">Preamble (optional — shown under the title, before the first section)</span>
+          <span className="mm-label">Preamble (optional, shown under the title before the first section)</span>
           <textarea
             className="mm-input mm-input--area"
             rows={2}
@@ -268,7 +268,7 @@ export function AssignmentEditor({ id }: { id: string }) {
           />
         </label>
         <label className="mm-field">
-          <span className="mm-label">Original PDF (optional — a URL, or a path under the app such as problem-sets/hw1.pdf)</span>
+          <span className="mm-label">Original PDF (optional, a URL or a path under the app such as problem-sets/hw1.pdf)</span>
           <input
             className="mm-input mm-input--title"
             key={`pdf-${assignment.sourcePdf ?? ''}`}
@@ -284,8 +284,8 @@ export function AssignmentEditor({ id }: { id: string }) {
       </div>
       {sections.length === 0 ? (
         <p className="mm-empty">
-          No sections: the problems are listed in order. Add a section to give a run of problems a
-          heading and an instruction of its own, as the printed problem sets do.
+          No sections. The problems are listed in order. Add a section to give a run of problems its own
+          heading and instruction.
         </p>
       ) : (
         sections.map((s, i) => (
@@ -314,7 +314,7 @@ export function AssignmentEditor({ id }: { id: string }) {
               </div>
             </div>
             <label className="mm-field">
-              <span className="mm-label">Intro (optional — the instruction for this run of problems)</span>
+              <span className="mm-label">Intro (optional, the instruction for this run of problems)</span>
               <textarea
                 className="mm-input mm-input--area"
                 rows={2}
@@ -332,7 +332,7 @@ export function AssignmentEditor({ id }: { id: string }) {
             </label>
             <p className="mm-note">
               Problems: {s.questionIds.length === 0
-                ? 'none yet — file them from the question list below.'
+                ? 'none yet. File them from the question list below.'
                 : s.questionIds.map((qid) => assignment.questions.find((q) => q.id === qid)?.label ?? `#${qid}`).join(' · ')}
             </p>
             <CalloutsEditor
@@ -389,9 +389,9 @@ export function AssignmentEditor({ id }: { id: string }) {
                 {q.partOf !== undefined && (
                   <span
                     className={folds ? 'tag' : 'tag instructor-part-tag--loose'}
-                    title={folds ? 'Shown on its problem’s page; graded on its own' : 'Not folded: a part must follow its problem’s parts directly, in the same section'}
+                    title={folds ? 'Shown on its problem’s page. Graded on its own.' : 'Not folded: a part must follow its problem’s parts directly, in the same section'}
                   >
-                    part of {problem?.label ?? `#${q.partOf}`}{folds ? '' : ' — not folded'}
+                    part of {problem?.label ?? `#${q.partOf}`}{folds ? '' : ' (not folded)'}
                   </span>
                 )}
                 <span className="instructor-question-summary">{q.title ? `${q.title}. ` : ''}{summarizeQuestion(q)}</span>
@@ -430,7 +430,7 @@ export function AssignmentEditor({ id }: { id: string }) {
       )}
 
       <details className="instructor-doc-preview">
-        <summary>Preview — the problem set as students see it (click a problem to edit it)</summary>
+        <summary>Preview of the problem set as students see it (click a problem to edit it)</summary>
         <ProblemSetDocument
           assignment={assignment}
           onOpen={(index) => setCreator({ existing: assignment.questions[index] })}

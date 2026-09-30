@@ -34,7 +34,7 @@ export function StudentGradingView({ route }: { route: Extract<Route, { kind: 'i
       <div className="mm-head">
         {back}
         <p className="mm-empty">
-          {loading ? 'Loading…' : error ? 'Couldn’t load this student — the server may be unreachable.' : 'No such student.'}
+          {loading ? 'Loading…' : error ? 'Couldn’t load this student. The server may be unreachable.' : 'No such student.'}
         </p>
       </div>
     );
@@ -53,7 +53,7 @@ export function StudentGradingView({ route }: { route: Extract<Route, { kind: 'i
           {student.offRoster && <span className="tag gr-tag-gap">not on the roster</span>}
         </p>
         {one.flags.length > 0 && (
-          <div className="gr-flagchips" aria-label="Flags — prompts to look, never verdicts">
+          <div className="gr-flagchips" aria-label="Flags">
             {one.flags.map((flag, i) => (
               <FlagChip key={i} flag={flag} titleOf={titleOf} />
             ))}
@@ -140,7 +140,7 @@ export function StudentGradingView({ route }: { route: Extract<Route, { kind: 'i
                   {formatGrade(average.value)}
                   {average.provisional && <span className="gr-prov">*</span>}
                 </b>
-                {average.provisional && ' — provisional, hand grading still pending'}
+                {average.provisional && ' (provisional, hand grading still pending)'}
               </>
             )}
           </p>
@@ -186,7 +186,7 @@ function StudentNotes({ one, onAdded }: { one: StudentGrading; onAdded: () => vo
         setProblem(out.error);
       }
     } catch {
-      setProblem('Couldn’t save the note — the server may be unreachable.');
+      setProblem('Couldn’t save the note. The server may be unreachable.');
     } finally {
       setBusy(false);
     }
@@ -194,7 +194,7 @@ function StudentNotes({ one, onAdded }: { one: StudentGrading; onAdded: () => vo
   return (
     <section className="sg-notes">
       <h2>Private notes</h2>
-      <p className="mm-note">Instructors only — never shown to the student. Notes can't be edited or deleted.</p>
+      <p className="mm-note">Only instructors see these notes. They can't be edited or deleted.</p>
       {one.notes.length > 0 && (
         <ul className="sg-notelist">
           {one.notes.map((n) => (

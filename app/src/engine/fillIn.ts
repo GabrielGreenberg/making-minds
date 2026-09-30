@@ -256,7 +256,7 @@ export function fillInKeyProblem(spec: FillInSpec, key: readonly string[]): stri
   }
   if (!Number.isInteger(rows) || rows < 1) return `fill-in table needs a whole, positive row count, not ${rows}`;
   if (rows > FILL_IN_TABLE_MAX_ROWS) {
-    return `fill-in table gives students ${rows} rows; the most it may give is ${FILL_IN_TABLE_MAX_ROWS}`;
+    return `fill-in table gives students ${rows} rows, but the most it may give is ${FILL_IN_TABLE_MAX_ROWS}`;
   }
   if (key.length === 0) return null; // a review table (isReviewTable)
   if (key.length % c !== 0) return `fill-in table's key is not whole rows of ${c} cells (it has ${key.length})`;

@@ -59,8 +59,8 @@ function FailedInputs({
       <ul className="grades-failed-list">
         {failed.map((c) => (
           <li key={c.k}>
-            arena #{c.k + 1} — {c.stepsTaken} step{c.stepsTaken === 1 ? '' : 's'}, ended at ({c.finalPosition.x}, {c.finalPosition.y}) {c.finalPosition.facing}
-            {c.reason && <> — {c.reason}</>} {runLink(c.k)}
+            arena #{c.k + 1}: {c.stepsTaken} step{c.stepsTaken === 1 ? '' : 's'}, ended at ({c.finalPosition.x}, {c.finalPosition.y}) {c.finalPosition.facing}
+            {c.reason && ` (${c.reason})`} {runLink(c.k)}
           </li>
         ))}
       </ul>
@@ -74,8 +74,8 @@ function FailedInputs({
       <ul className="grades-failed-list">
         {failed.map((c) => (
           <li key={c.k}>
-            frames {c.frames.map((f) => f.join('')).join(' → ')}{c.failStep != null && ` — first wrong at step ${c.failStep}`}
-            {c.reason && ` — ${c.reason}`} {runLink(c.k)}
+            frames {c.frames.map((f) => f.join('')).join(' → ')}{c.failStep != null && ` (first wrong at step ${c.failStep})`}
+            {c.reason && ` (${c.reason})`} {runLink(c.k)}
           </li>
         ))}
       </ul>
@@ -106,7 +106,7 @@ function FailedInputs({
             // (a remote student's arrive filled in — sanitize.ts).
             separations: question ? recordedCaseSeparations(question, k, c) : c.separations,
           })}
-          {c.reason && ` — ${c.reason}`} {runLink(k)}
+          {c.reason && ` (${c.reason})`} {runLink(k)}
         </li>
       ))}
     </ul>
@@ -202,10 +202,10 @@ export function GradeSheet({ assignmentId, record }: { assignmentId: string; rec
       <p className="grades-foot">
         {score && score.final !== null && (
           <>
-            <b>Grade {formatGrade(score.final)} / 100</b> — {formatGrade(score.earned)} of {score.available}{' '}
-            point{score.available === 1 ? '' : 's'}, scaled as 40 + 60 × {formatGrade(score.earned)}/{score.available}.
-            {score.late?.late && ` Before the late deduction ${formatGrade(score.raw ?? 0)}; ${lateLabel(score.late, assignment?.latePolicy)}.`}
-            {pending > 0 && ` ${pending} problem${pending === 1 ? '' : 's'} still awaiting review — the grade may rise.`}{' '}
+            <b>Grade {formatGrade(score.final)} / 100</b> ({formatGrade(score.earned)} of {score.available}{' '}
+            point{score.available === 1 ? '' : 's'}, scaled as 40 + 60 × {formatGrade(score.earned)}/{score.available}).
+            {score.late?.late && ` Before the late deduction: ${formatGrade(score.raw ?? 0)} (${lateLabel(score.late, assignment?.latePolicy)}).`}
+            {pending > 0 && ` ${pending} problem${pending === 1 ? '' : 's'} still awaiting review. The grade may rise.`}{' '}
           </>
         )}
         <button className="mm-link" onClick={() => openSubmission()} title="Every answer as submitted in this attempt, read-only">

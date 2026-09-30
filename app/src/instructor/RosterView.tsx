@@ -33,7 +33,7 @@ export function RosterView() {
         <h1>Roster</h1>
         <p className="mm-empty">
           The roster lives on the server. This build runs in local mode, where the two demo
-          accounts are built in — there is nothing to manage here.
+          accounts are built in. There is nothing to manage here.
         </p>
       </div>
     );
@@ -113,7 +113,7 @@ function RemoteRosterView() {
         {error && <p className="mm-empty">Could not load the roster.</p>}
         {roster && rows.length === 0 && (
           <p className="mm-empty">
-            {roster.length === 0 ? 'Nobody on the roster yet — import the class CSV above.' : 'No matches.'}
+            {roster.length === 0 ? 'Nobody on the roster yet. Import the class CSV above.' : 'No matches.'}
           </p>
         )}
         {rows.length > 0 && (
@@ -182,7 +182,7 @@ function RosterRow({
                     onAction(async () => {
                       const { credentialCleared } = await api.removeRosterAlias(row.email, alias);
                       return credentialCleared
-                        ? `${alias} no longer signs in, and the password set up through it is cleared — ${row.name} sets up their account again.`
+                        ? `${alias} no longer signs in, and the password set up through it is cleared. ${row.name} sets up their account again.`
                         : `${alias} no longer signs in to ${row.name}'s account.`;
                     })
                   }
@@ -197,7 +197,7 @@ function RosterRow({
       <td>
         {row.studentId || '—'}
         {row.studentId && !row.uid && (
-          <span className="roster-match" title="Typed into an access request; not from the class list">
+          <span className="roster-match" title="Typed into an access request, not from the class list">
             unverified
           </span>
         )}
@@ -218,11 +218,11 @@ function RosterRow({
               confirm(
                 `Reset the password for ${row.email}?\n\n` +
                   'Their password is cleared and they are signed out everywhere. ' +
-                  'They set up their account again with their student ID; their work is untouched.',
+                  'They set up their account again with their student ID. Their work is untouched.',
               ) &&
               onAction(async () => {
                 await api.resetRosterPassword(row.email);
-                return `Password reset for ${row.email} — they can create their account again.`;
+                return `Password reset for ${row.email}. They can create their account again.`;
               })
             }
           >
@@ -284,11 +284,10 @@ function ImportPanel({
     <section className="roster-section">
       <h2>Import a roster CSV</h2>
       <p className="mm-note mm-hint">
-        The registrar's class-list export works as-is: its heading lines are skipped, names are
-        put in display form, and the section is kept; dropped students are left out, waitlisted
-        ones are imported. Any other export with an email column works too — name, student ID
-        and role are picked up when present. Importing only adds and updates: nobody is
-        removed, and nobody's password is touched, so a mid-quarter re-import is safe.
+        The registrar's class-list export works as-is. Dropped students are left out and waitlisted
+        ones are imported. Any other export with an email column works too (name, student ID
+        and role are read when present). Importing only adds and updates. Nobody is
+        removed and no password is touched, so a mid-quarter re-import is safe.
       </p>
       <div className="roster-import-controls">
         <input type="file" accept=".csv,text/csv" onChange={handleFile} disabled={busy} />
@@ -323,7 +322,7 @@ function ImportReport({ report }: { report: RosterImportReport }) {
     <div className="roster-report">
       {skippedLines && <p>{sentenceCase(skippedLines)}.</p>}
       <p>
-        Columns used — email: {c.email ?? '(none)'} · name: {c.name ?? '(none)'} · ID:{' '}
+        Columns used. Email: {c.email ?? '(none)'} · name: {c.name ?? '(none)'} · ID:{' '}
         {c.studentId ?? '(none)'} · role: {c.role ?? '(none)'} · section: {c.section ?? '(none)'} ·
         status: {c.status ?? '(none)'}
       </p>
@@ -347,7 +346,7 @@ function ImportReport({ report }: { report: RosterImportReport }) {
         <>
           <p className="roster-review-head">
             {sentenceCase(NO_LONGER_LISTED_TEXT)} ({report.noLongerListed.length}). Nobody was
-            removed: remove someone below once you have checked they left the course.
+            removed. Remove someone below after checking they left the course.
           </p>
           <ul className="roster-issues">
             {report.noLongerListed.map((r) => (
@@ -377,9 +376,9 @@ function AccessRequestsPanel({
         Access requests ({requests.length} waiting)
       </h2>
       <p className="mm-note mm-hint">
-        People the roster doesn't have, asking to be added. Approving adds them — they then create
-        their account the same way everyone else does. When a request's ID or email is already on
-        the roster, approving adds its email to that person's account instead.
+        Approving a request adds the person to the roster. They then create their account like
+        everyone else. If the request's ID or email is already on the roster, approving adds its
+        email to that person's account instead.
       </p>
       <div className="instructor-table-scroll">
         <table className="mm-table roster-table">
@@ -466,9 +465,9 @@ function AddPersonPanel({
       setEmail('');
       setName('');
       setStudentId('');
-      if (placed.added) return `${added} is on the roster — they can now create their account.`;
+      if (placed.added) return `${added} is on the roster. They can now create their account.`;
       return placed.aliasAdded
-        ? `Updated ${placed.account} — ${placed.aliasAdded} now signs in to that account too.`
+        ? `Updated ${placed.account}. ${placed.aliasAdded} now signs in to that account too.`
         : `Updated ${placed.account}.`;
     });
 

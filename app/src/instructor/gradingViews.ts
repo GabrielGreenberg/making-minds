@@ -75,7 +75,7 @@ export function cellOf(problem: GradingProblem | undefined, row: GradingRow): Ma
   const flags = (problem.flags ?? []).map((f) => FLAG_LABEL[f]);
   const human = problem.source === 'human';
   if (problem.source === 'changed') {
-    return { state: 'c', text: '↻', human: false, title: 'changed since graded — the old grade is a suggestion', flags };
+    return { state: 'c', text: '↻', human: false, title: 'changed since graded (the old grade is a suggestion)', flags };
   }
   if (problem.points === null) return { state: 'p', text: '✎', human: false, title: 'awaiting a hand grade', flags };
   const by = human ? ' (a human grade)' : problem.source === 'auto-half' ? ' (the ½ rule)' : '';

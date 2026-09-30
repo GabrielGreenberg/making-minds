@@ -225,8 +225,9 @@ const FRIEND = 'friend@x.test';
   check("Q2: a friend's ids are attributed to the friend",
     q(2).ids.others.length === 1 && q(2).ids.others[0].email === FRIEND && q(2).ids.others[0].count === 5 &&
     q(2).ids.self === 0);
-  check('…and flagged naming them, as something to look at',
-    idFlags(2).some((f) => f.code === 'ids-other' && f.detail.includes(FRIEND) && f.detail.includes('to look at')));
+  check('…and flagged naming them and the evidence, with no dash aside (house style, task 089)',
+    idFlags(2).some((f) => f.code === 'ids-other' && f.detail.includes(FRIEND) &&
+      f.detail.includes(`created in ${FRIEND}'s editor`) && !f.detail.includes(' — ')));
   check('Q3: random ids come back unbound and are flagged',
     q(3).ids.unbound === 3 && idFlags(3).some((f) => f.code === 'ids-unbound'));
   check('Q4: ids in the legacy snapshot count as legacy, unflagged',
@@ -564,7 +565,8 @@ const codes = (q: { flags: { code: string }[] }) => q.flags.map((f) => f.code);
   const script = typeAt(0);
   check('a paragraph "typed" a character at a time with no delay is flagged too-fast',
     codes(script).includes('too-fast') && !codes(script).includes('one-piece-text') &&
-    script.flags.find((f) => f.code === 'too-fast')!.detail.includes('to look at'),
+    script.flags.find((f) => f.code === 'too-fast')!.detail.includes('faster than a person types') &&
+      !script.flags.find((f) => f.code === 'too-fast')!.detail.includes(' — '),
     JSON.stringify(codes(script)));
   check(`…and at 30 ms a character (faster than ${MAX_TYPING_CHARS_PER_SEC}/s) too`, codes(typeAt(30)).includes('too-fast'));
   check('…but not at a fast typist\'s 100 ms a character', !codes(typeAt(100)).includes('too-fast'));
@@ -589,7 +591,7 @@ const codes = (q: { flags: { code: string }[] }) => q.flags.map((f) => f.code);
   const pasteQ = judge({ circuit: eight, provenance: pasteRec });
   const pasteFlag = pasteQ.flags.find((f) => f.code === 'one-piece-circuit');
   check("a big paste is flagged, its detail saying it was an in-app paste",
-    pasteFlag != null && pasteFlag.detail.includes('in-app paste') && pasteFlag.detail.includes('to look at'));
+    pasteFlag != null && pasteFlag.detail.includes('in-app paste') && !pasteFlag.detail.includes(' — '));
   check('…and its ids are all the student\'s own (an in-app paste, not a transplant)',
     pasteQ.ids.self === 8 && !codes(pasteQ).some((c) => c.startsWith('ids-')));
   let built: QuestionProvenance | null = null;
@@ -743,6 +745,15 @@ console.log('\n[notices]');
     submitConfirmMessage('HW1').includes(SUBMIT_INTEGRITY_SENTENCE) &&
     SUBMIT_INTEGRITY_SENTENCE === 'The platform checks that submitted work was created in your own editor.' &&
     submitConfirmMessage('HW1', { saved: true }).includes('saved work'));
+  {
+    // SubmitDialog shows it as paragraphs split on blank lines: three, the
+    // grading rule on its own (task 089's wording).
+    const parts = submitConfirmMessage('HW1').split('\n\n');
+    check('the submit confirmation is three paragraphs, the second the grading rule',
+      parts.length === 3 && parts[1] === 'Only your most recent submission is graded.' &&
+      parts[0] === 'Submit "HW1"? This records your current work.' && parts[2] === SUBMIT_INTEGRITY_SENTENCE,
+      JSON.stringify(parts));
+  }
   const src = (p: string) => readFileSync(new URL(p, import.meta.url), 'utf8');
   // Every Submit opens the ONE dialog (task 062), and the dialog tells the
   // student what submitConfirmMessage says — one wording, no private copies.
@@ -750,12 +761,12 @@ console.log('\n[notices]');
     const text = src(`../src/components/${f}.tsx`);
     check(`${f}: its Submit opens the SubmitDialog (one wording)`,
       text.includes('<SubmitDialog') && !text.includes('submitConfirmMessage') && !text.includes('confirm(') &&
-      !text.includes('This records a snapshot'));
+      !text.includes('This records your'));
   }
   {
     const dialog = src('../src/components/SubmitDialog.tsx');
     check('SubmitDialog shows submitConfirmMessage, with the saved-work variant passed through',
-      dialog.includes('submitConfirmMessage(title, { saved })') && !dialog.includes('This records a snapshot'));
+      dialog.includes('submitConfirmMessage(title, { saved })') && !dialog.includes('This records your'));
   }
   check('main.tsx prints the banner in production builds only',
     /if \(import\.meta\.env\.PROD\) printIntegrityBanner\(\)/.test(src('../src/main.tsx')));

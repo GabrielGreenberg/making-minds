@@ -89,7 +89,7 @@ export function WorkbookFileMenu() {
     // away) is not a save: say so, and write nothing.
     const unopenable = unopenableReason(json);
     if (unopenable) {
-      alert(`Couldn't save the workbook — Open couldn't read the file back: ${unopenable}.`);
+      alert(`Couldn't save the workbook: ${unopenable}.`);
       return null;
     }
     const name = suggestedFileName(s.workbookTitle);
@@ -235,7 +235,7 @@ export function WorkbookFileMenu() {
           </div>
         )}
       </div>
-      <span className="workbook-name" title="This workbook's name — Save as… names it after its file">
+      <span className="workbook-name" title="This workbook's name. Save as… names it after its file.">
         {title}
         {note && <span className="workbook-save-note">{note}</span>}
       </span>
@@ -269,8 +269,8 @@ export function WorkbookFileMenu() {
           ) : prompt.step === 'downloaded' ? (
             <>
               <p className="mm-lede">
-                Your browser is downloading “{prompt.name}”. Once it's in your downloads,{' '}
-                {prompt.pending.kind === 'new' ? 'start the new workbook' : 'choose the file to open'} — it
+                Your browser is downloading “{prompt.name}”. When it's in your downloads,{' '}
+                {prompt.pending.kind === 'new' ? 'start the new workbook' : 'choose the file to open'}. It
                 will replace this one.
               </p>
               <div className="mm-actions workbook-prompt-actions">

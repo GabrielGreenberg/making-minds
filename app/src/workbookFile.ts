@@ -51,7 +51,7 @@ export const MAX_WORKBOOK_FILE_CHARS = 5_000_000;
 /** Why a file of `size` (bytes, or characters) is too large to open, or null. */
 export function oversizeReason(size: number): string | null {
   return size > MAX_WORKBOOK_FILE_CHARS
-    ? `the file is ${(size / 1e6).toFixed(1)} MB; a workbook file is at most ${MAX_WORKBOOK_FILE_CHARS / 1e6} MB`
+    ? `the file is ${(size / 1e6).toFixed(1)} MB, but a workbook file is at most ${MAX_WORKBOOK_FILE_CHARS / 1e6} MB`
     : null;
 }
 

@@ -28,7 +28,7 @@ const MAP_TOOLS: { tool: MapTool; label: string; hint: string }[] = [
   { tool: 'block', label: 'Block', hint: 'Paint walls' },
   { tool: 'goal',  label: 'Goal',  hint: 'Paint goal (food) cells' },
   { tool: 'erase', label: 'Erase', hint: 'Clear cells' },
-  { tool: 'start', label: 'Start', hint: 'Move the turbot start; click its cell again to rotate' },
+  { tool: 'start', label: 'Start', hint: 'Move the turbot start (click its cell again to rotate)' },
 ];
 
 // Map zoom. A 30x30 arena at the default 28px cell is ~840px of grid inside a

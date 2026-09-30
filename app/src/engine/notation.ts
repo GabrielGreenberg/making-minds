@@ -309,11 +309,11 @@ function describeParseFailure(
     const parts = raw.split(':');
     if (parts.length === 2 && /^[01]+$/.test(parts[0]) && /^[01]+$/.test(parts[1])) {
       if (parts[0].length !== notation.inputWidth) {
-        return `transition "${raw}" has a ${parts[0].length}-bit input symbol; this question has ${notation.inputWidth} input wire${notation.inputWidth === 1 ? '' : 's'}.`;
+        return `transition "${raw}" has a ${parts[0].length}-bit input symbol, but this question has ${notation.inputWidth} input wire${notation.inputWidth === 1 ? '' : 's'}.`;
       }
       const outWidth = notation.outputFields.reduce((n, f) => n + f.width, 0);
       if (notation.id === 'fsm' && parts[1].length !== outWidth) {
-        return `transition "${raw}" has a ${parts[1].length}-bit output symbol; this question has ${outWidth} output wire${outWidth === 1 ? '' : 's'}.`;
+        return `transition "${raw}" has a ${parts[1].length}-bit output symbol, but this question has ${outWidth} output wire${outWidth === 1 ? '' : 's'}.`;
       }
     }
   }
@@ -410,7 +410,7 @@ export function validateTransitionTable(
           kind: 'ambiguous',
           message: mode === 'total'
             ? `state ${s.label} has ${ids.length} transitions for input ${sym} (must be exactly one)`
-            : `state ${s.label} has ${ids.length} transitions for input ${sym} (must be at most one — the machine is nondeterministic)`,
+            : `state ${s.label} has ${ids.length} transitions for input ${sym} (must be at most one)`,
           stateId: s.id,
           wireIds: ids,
         });

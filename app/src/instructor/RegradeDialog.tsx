@@ -33,7 +33,7 @@ export function RegradeDialog({ assignmentId, title, onClose, onCommitted }: {
     let live = true;
     gradingStore.regrade(assignmentId, { dryRun: true }).then(
       (out) => live && setPhase(out ? { kind: 'plan', plan: out.plan } : { kind: 'error', message: 'No such assignment.' }),
-      () => live && setPhase({ kind: 'error', message: 'The dry run failed — the server may be unreachable. Nothing was changed.' }),
+      () => live && setPhase({ kind: 'error', message: 'The dry run failed. The server may be unreachable. Nothing was changed.' }),
     );
     return () => {
       live = false;
@@ -51,13 +51,13 @@ export function RegradeDialog({ assignmentId, title, onClose, onCommitted }: {
       if (!out) {
         setPhase({ kind: 'error', message: 'No such assignment.' });
       } else if (out.conflict) {
-        setPhase({ kind: 'plan', plan: out.plan, notice: 'The assignment changed since the dry run — here is the dry run against the current version. Nothing was saved.' });
+        setPhase({ kind: 'plan', plan: out.plan, notice: 'The assignment changed since the dry run. This is a new dry run against the current version. Nothing was saved.' });
       } else {
         setPhase({ kind: 'done', outcome: out });
         if (out.committed) onCommitted();
       }
     } catch {
-      setPhase({ kind: 'plan', plan, error: 'The re-grade failed — nothing was changed. Try again in a moment.' });
+      setPhase({ kind: 'plan', plan, error: 'The re-grade failed. Nothing was changed. Try again in a moment.' });
     }
   };
 
@@ -66,7 +66,7 @@ export function RegradeDialog({ assignmentId, title, onClose, onCommitted }: {
       <div className="mm-modal-head">
         <h2 id="regrade-title">
           Re-grade {title}
-          {phase.kind !== 'done' && ' — dry run'}
+          {phase.kind !== 'done' && ' (dry run)'}
         </h2>
         <button type="button" className="mm-btn mm-btn--quiet" aria-label="Close" onClick={close} disabled={busy}>
           ×
@@ -112,7 +112,7 @@ function PlanView({ plan, title, notice, error, committing, onCancel, onCommit }
     <>
       <p className="mm-modal-sub">
         {plan.stale === 0
-          ? `All ${plural(plan.latest, 'latest submission')} were graded against the current ${title}; there is nothing to re-grade.`
+          ? `All ${plural(plan.latest, 'latest submission')} were graded against the current ${title}. There is nothing to re-grade.`
           : `Re-ran the ${plural(plan.stale, 'latest submission')} graded against an older version of ${title}` +
             ` (of ${plan.latest}). Nothing is saved until you commit.`}
       </p>
@@ -138,8 +138,8 @@ function PlanView({ plan, title, notice, error, committing, onCancel, onCommit }
                     <td>
                       {r.override !== null ? (
                         <>
-                          <span className="tag tag--warn">under your override ({r.override})</span> — override stays; flagged for a
-                          look
+                          <span className="tag tag--warn">under your override ({r.override})</span>. Your override stays and is
+                          flagged for a look.
                         </>
                       ) : (
                         r.grade
@@ -151,11 +151,11 @@ function PlanView({ plan, title, notice, error, committing, onCancel, onCommit }
             </table>
           </div>
         ) : (
-          <p className="mm-note">No problem's points change — a commit only records that these results are current.</p>
+          <p className="mm-note">No problem's points change. A commit records that these results are current.</p>
         ))}
       {plan.stale > 0 && (
         <p className="mm-note gr-regrade-summary">
-          <b>{summary.changes}</b> · {summary.rest} A database snapshot is taken before the commit; every change is logged.
+          <b>{summary.changes}</b> · {summary.rest} A database snapshot is taken before the commit. Every change is logged.
         </p>
       )}
       {error && <p className="mm-error gr-regrade-error">{error}</p>}
@@ -177,9 +177,9 @@ function Done({ outcome, onClose }: { outcome: RegradeOutcome; onClose: () => vo
     <>
       <p className="mm-note">
         {outcome.committed
-          ? `Re-graded ${plural(plan.stale, 'submission')}: ${plural(plan.changed.length, 'result')} changed, each logged. ` +
+          ? `Re-graded ${plural(plan.stale, 'submission')}. ${plural(plan.changed.length, 'result')} changed, each logged. ` +
             `Hand grades and overrides were not touched.`
-          : 'Nothing was stale by the time of the commit — nothing changed.'}
+          : 'Nothing was stale by the time of the commit. Nothing changed.'}
       </p>
       {outcome.snapshot && <p className="mm-modal-foot">Snapshot taken first: <span className="mono">{outcome.snapshot}</span></p>}
       <div className="mm-actions gr-regrade-actions">

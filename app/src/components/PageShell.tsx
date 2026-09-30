@@ -91,7 +91,7 @@ export function PageShell({
               <a
                 className="navbox"
                 {...hashLink({ kind: 'sandbox' })}
-                title="The freeform workbook — opens the circuit editor"
+                title="The freeform workbook"
               >
                 Sandbox
               </a>

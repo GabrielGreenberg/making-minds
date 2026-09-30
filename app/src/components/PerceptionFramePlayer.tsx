@@ -165,7 +165,7 @@ export function PerceptionFramePlayer({ width, runSpeed, onRunSpeedChange }: {
         {selected === null ? (
           <span className="pf-hint">
             {count === 0
-              ? 'Add a frame (+) — each frame is one clock tick.'
+              ? 'Add a frame (+). Each frame is one clock tick.'
               : 'Click a frame’s t to shift, duplicate or delete it.'}
           </span>
         ) : (
@@ -190,7 +190,7 @@ export function PerceptionFramePlayer({ width, runSpeed, onRunSpeedChange }: {
       </div>
 
       {!verdict.ok && verdict.reason && (
-        <div className="pf-warning">⚠ {verdict.reason} — the grader rejects this machine; the run still plays.</div>
+        <div className="pf-warning">⚠ {verdict.reason}. This machine will not pass grading, but the run still plays.</div>
       )}
     </div>
   );

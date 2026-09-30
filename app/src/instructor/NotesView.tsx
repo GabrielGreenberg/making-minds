@@ -61,7 +61,7 @@ export function NotesView() {
       setNotice(`Saved just now by ${saved.updatedBy}.`);
       reload();
     } catch {
-      setNotice('Could not save — the server may be unreachable.');
+      setNotice('Could not save. The server may be unreachable.');
     } finally {
       setSaving(false);
     }
@@ -94,7 +94,7 @@ export function NotesView() {
           className="notes-editor"
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
-          placeholder="Markdown — headings, lists, links, bold/italic, code…"
+          placeholder="Markdown: headings, lists, links, bold/italic, code…"
           spellCheck
         />
         <div className="notes-preview" dangerouslySetInnerHTML={{ __html: html }} />

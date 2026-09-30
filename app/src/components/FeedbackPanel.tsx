@@ -75,7 +75,7 @@ export function FeedbackPanel({ onClose, context }: { onClose: () => void; conte
       setScreenshots((s) => [...s, ...added]);
     } catch {
       slots.release(take);
-      setError('Could not attach that image — try a different file.');
+      setError('Could not attach that image. Try a different file.');
     }
   };
   const removeScreenshot = (i: number) => {
@@ -102,7 +102,7 @@ export function FeedbackPanel({ onClose, context }: { onClose: () => void; conte
       setSent(true);
       window.dispatchEvent(new Event(FEEDBACK_FILED_EVENT));
     } catch {
-      setError('Could not send feedback — the server may be unreachable. Try again in a moment.');
+      setError('Could not send feedback. Try again in a moment.');
     } finally {
       setBusy(false);
     }
@@ -116,19 +116,17 @@ export function FeedbackPanel({ onClose, context }: { onClose: () => void; conte
       </div>
       {instructor ? (
         <p className="mm-modal-sub">
-          A problem or an idea about the platform or a homework? File it here — it
-          joins the Feedback queue with the instructor tag.
+          File a report here, with the instructor tag.
         </p>
       ) : (
         <p className="mm-modal-sub">
-          Something broken, confusing, or wrong in a homework? Tell the instructors.
-          This form is for the platform and the homeworks only: for anything personal
-          (an extension, an absence, a grade), email your instructor instead.
+          Report a bug or technical problem with the homework here.
+          (For issues relating to the class, contact your instructor directly.)
         </p>
       )}
       {sent ? (
         <p className="feedback-sent">
-          {instructor ? 'Filed — it’s in the Feedback queue.' : 'Thanks — an instructor will take a look.'}
+          {instructor ? 'Filed.' : 'Thank you. An instructor will take a look.'}
         </p>
       ) : (
         <div className="mm-form">

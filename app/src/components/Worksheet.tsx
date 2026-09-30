@@ -365,7 +365,7 @@ function AnswerFoot({ pasteNotice, lockNotice, saveFailing }: { pasteNotice: str
   if (saveFailing) {
     return (
       <div className="wb-answer-foot wb-answer-foot--error">
-        Not saved yet — your answer is kept in this browser, and saving retries on its own.
+        Not saved yet. Your answer is kept in this browser, and saving retries on its own.
       </div>
     );
   }

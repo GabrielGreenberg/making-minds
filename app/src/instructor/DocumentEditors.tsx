@@ -31,7 +31,7 @@ export function readFigureFile(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
     if (file.type === 'image/svg+xml') {
       if (file.size > MAX_FIGURE_BYTES) {
-        reject(new Error(`This SVG is ${Math.round(file.size / 1024)} KB; figures are capped at ${MAX_FIGURE_BYTES / 1024} KB.`));
+        reject(new Error(`This SVG is ${Math.round(file.size / 1024)} KB. Figures are capped at ${MAX_FIGURE_BYTES / 1024} KB.`));
         return;
       }
       const reader = new FileReader();
@@ -53,7 +53,7 @@ export function readFigureFile(file: File): Promise<string> {
         canvas.width = Math.max(1, Math.round(img.width * scale));
         canvas.height = Math.max(1, Math.round(img.height * scale));
         const ctx = canvas.getContext('2d');
-        if (!ctx) { reject(new Error('Canvas unavailable.')); return; }
+        if (!ctx) { reject(new Error('Could not process the image.')); return; }
         ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
         const png = canvas.toDataURL('image/png');
         if (dataUrlBytes(png) <= MAX_FIGURE_BYTES) { resolve(png); return; }
@@ -214,7 +214,7 @@ export function CalloutsEditor({
           <textarea
             className="mm-input mm-input--area doc-editor-body"
             rows={3}
-            placeholder="The box's text — same markup as a statement."
+            placeholder="The box's text, in the same markup as a statement."
             value={c.body}
             onChange={(e) => onChange(update(callouts, i, { body: e.target.value }))}
           />

@@ -82,7 +82,7 @@ export function MachineMenu({
         onMouseEnter={hoverOn}
         onMouseLeave={hoverOff}
       >
-        {'‹'} Turbot — pick its brain
+        {'‹'} Turbot: pick its brain
       </div>
       {TURBOT_BRAIN_OPTIONS.map((opt) => (
         <div

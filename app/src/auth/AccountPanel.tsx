@@ -62,7 +62,7 @@ export function ChangePasswordModal({ onClose }: { onClose: () => void }) {
       {done ? (
         <>
           <p className="mm-lede">
-            Password changed. You are still signed in here; any other device has been signed out.
+            Password changed. You are still signed in here. Other devices have been signed out.
           </p>
           <div className="mm-actions">
             <button className="mm-btn mm-btn--primary" onClick={onClose}>

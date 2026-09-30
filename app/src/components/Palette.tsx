@@ -475,7 +475,7 @@ export function Palette({ canvasW, canvasH, onPlaced }: {
                   className={`pal-tile${boxToolArmed ? ' pal-tile--armed' : ''}${boxTiles.boxToolRefusal ? ' pal-tile--off' : ''}`}
                   title={boxTiles.boxToolRefusal ??
                     'Box: select parts and click to box them, or click and then drag a rectangle around them. ' +
-                    'IN and OUT nodes inside become its ports, and so does every wire end its edge cuts.'}
+                    'IN and OUT nodes inside become its ports, and so do wires cut by its edge.'}
                   aria-disabled={boxTiles.boxToolRefusal ? true : undefined}
                   aria-pressed={boxToolArmed}
                   onClick={() => {

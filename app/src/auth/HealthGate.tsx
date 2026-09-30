@@ -96,7 +96,7 @@ export function HealthGate({ children }: { children: ReactNode }) {
           <>
             <h1>The course server can't be reached</h1>
             <p className="mm-lede">
-              Your work is safe — nothing is lost — but signing in and saving need the server.
+              Your work is safe, but signing in and saving need the server.
               Retrying automatically every few seconds. The sandbox works without it.
             </p>
             <div className="login-actions">

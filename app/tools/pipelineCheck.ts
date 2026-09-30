@@ -819,7 +819,7 @@ console.log('\n[fill-in tables]');
   check('letters in a digits-only column are named',
     probs(withKey(d14, [['@', 'zero'], ['#', '1']])).some((p) => p.startsWith('Key row #1 has "zero" in the digits-only "Value"')));
   check('fewer rows than key rows is named',
-    probs({ ...d14, rows: '1' }).includes('Students need at least 2 rows — one for each key row.'));
+    probs({ ...d14, rows: '1' }).includes('Students need at least 2 rows (one for each key row).'));
   check('rows that are not a whole number ≥ 1 are named',
     ['0', '1.5', 'x', '-2'].every((rows) => probs({ ...d14, rows }).includes('The rows students see must be a whole number, at least 1.')));
   check(`more than ${FILL_IN_TABLE_MAX_ROWS} rows for students is named (a typo in the rows field)`,
@@ -835,7 +835,7 @@ console.log('\n[fill-in tables]');
       probs({ ...d14, keyRows: [], rows: '' }).includes('The rows students see must be a whole number, at least 1.'));
   check('…and it saves with an empty key', fillInTableFields({ ...d14, keyRows: [] }).fill_in_answers.length === 0);
   check('fewer than two columns is named',
-    probs({ ...removeTableColumn(d14, 1), argColumns: 1 }).includes('Give the table at least two columns — an argument and a value.'));
+    probs({ ...removeTableColumn(d14, 1), argColumns: 1 }).includes('Give the table at least two columns (an argument and a value).'));
 
   // Which edits misplace answers already given (stored row-major).
   const edited9: FillInTableDraft = {
@@ -1051,7 +1051,7 @@ console.log('\n[fill-in numerals]');
     nprobs({ ...d12, numbers: [d12.numbers[0], { ...newNumeralNumber(), value: '7', label: ' thirty-two ' }] })
       .includes('Number #2 repeats the label "thirty-two" of number #1.'));
   check('a value of -1, 2.5, "x" or nothing is named',
-    ['-1', '2.5', 'x', ''].every((value) => nprobs(withNumber(d12, value, 'n')).includes('Number #1 needs a value — a whole number, 0 or more.')));
+    ['-1', '2.5', 'x', ''].every((value) => nprobs(withNumber(d12, value, 'n')).includes('Number #1 needs a value (a whole number, 0 or more).')));
 
   // Which edits misplace answers already given (stored box by box).
   check('relabelling a number, changing its value, or appending one misplaces nothing',

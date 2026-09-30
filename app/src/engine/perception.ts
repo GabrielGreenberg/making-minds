@@ -338,7 +338,7 @@ export function filmProblem(film: number[][], width: number): string | null {
   for (let t = 0; t < film.length; t++) {
     const f = film[t];
     if (!Array.isArray(f) || f.length !== width) {
-      return `frame t${t + 1} has ${Array.isArray(f) ? f.length : 0} bits — the retina is ${width} wires`;
+      return `frame t${t + 1} has ${Array.isArray(f) ? f.length : 0} bits, but the retina is ${width} wires`;
     }
     if (!f.every((b) => b === 0 || b === 1)) return `frame t${t + 1} holds a value that is not 0 or 1`;
   }
@@ -370,7 +370,7 @@ export function buildPerceptionCases(
     width > MAX_PERCEPTION_WIDTH
   ) {
     throw new Error(
-      `perception width must be an integer in ${MIN_PERCEPTION_WIDTH}..${MAX_PERCEPTION_WIDTH}`,
+      `perception width must be a whole number from ${MIN_PERCEPTION_WIDTH} to ${MAX_PERCEPTION_WIDTH}`,
     );
   }
   if (rule.kind === 'pattern') {
@@ -393,7 +393,7 @@ export function buildPerceptionCases(
   }
 
   if (perceptionModeFor(rule) === 'CC') {
-    if (films.length > 0) throw new Error('a CC perception bank is already exhaustive — films are for SC rules only');
+    if (films.length > 0) throw new Error('a CC perception rule takes no films (films are for SC rules only)');
     return allFrames(width).map((f) => caseOf(rule, [f]));
   }
   films.forEach((film, i) => {

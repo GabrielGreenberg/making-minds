@@ -31,7 +31,7 @@ export function GradingTab() {
         <div>
           <h1>Grading</h1>
           <p className="mm-lede">
-            Every assignment's grading status. The latest submission counts; a grade is 40 + 60·P, less any late
+            The latest submission counts. A grade is 40 + 60·P, less any late
             deduction.
           </p>
         </div>
@@ -62,7 +62,7 @@ export function GradingTab() {
             'Loading…'
           ) : error ? (
             <>
-              Couldn’t load grading — the server may be unreachable.{' '}
+              Couldn’t load grading. The server may be unreachable.{' '}
               <button className="mm-link" onClick={reload}>
                 Retry
               </button>
@@ -142,7 +142,7 @@ export function GradingTab() {
             </table>
           </div>
           <p className="mm-note gr-footnote">
-            <span className="gr-prov">*</span> provisional — hand grading still pending. Submitted, missing and the mean count
+            <span className="gr-prov">*</span> provisional (hand grading still pending). Submitted, missing and the mean count
             roster students only.
           </p>
         </>
@@ -218,7 +218,7 @@ function FlaggedList({ course }: { course: CourseGrading }) {
         </table>
       </div>
       <p className="mm-note gr-footnote">
-        Flags are prompts to look, never verdicts — over published assignments. Hover a flag for its detail; the
+        Flags are prompts to look, not verdicts. They cover published assignments. Hover a flag for its detail. The
         thresholds are in Settings.
       </p>
     </section>
@@ -246,7 +246,7 @@ function FlagSettings({ thresholds, onSaved }: { thresholds: FlagThresholds; onS
       await gradingStore.setFlagThresholds(draft);
       onSaved();
     } catch {
-      setProblem('Couldn’t save — the server may be unreachable.');
+      setProblem('Couldn’t save. The server may be unreachable.');
     } finally {
       setBusy(false);
     }

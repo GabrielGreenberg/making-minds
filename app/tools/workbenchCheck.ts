@@ -355,7 +355,7 @@ console.log('\n[question list]');
 console.log('\n[top bar labels]');
 {
   const now = Date.UTC(2026, 8, 25, 22, 0, 0);
-  check('error → "Not saved — retrying", flagged', saveLabel('error', now, now).text === 'Not saved — retrying' && saveLabel('error', null, now).error);
+  check('error → "Not saved. Retrying…", flagged', saveLabel('error', now, now).text === 'Not saved. Retrying…' && saveLabel('error', null, now).error);
   check('pending or in flight → "Saving…"', saveLabel('unsaved', now, now).text === 'Saving…' && saveLabel('saving', null, now).text === 'Saving…');
   check('saved, nothing confirmed since opening → "Saved"', saveLabel('saved', null, now).text === 'Saved');
   check('under a minute → "Saved just now"', saveLabel('saved', now - 59_000, now).text === 'Saved just now');

@@ -403,7 +403,7 @@ export function DataTable() {
                       <tr
                         key={i}
                         className={[isCurrentRow ? 'row-active' : '', row.nextState === 'HALT' ? 'data-table-row--halt' : ''].filter(Boolean).join(' ')}
-                        title={row.nextState === 'HALT' ? `No arrow for input ${row.input} — the machine halts in ${row.state} if it reads ${row.input}` : undefined}
+                        title={row.nextState === 'HALT' ? `No arrow for input ${row.input}. The machine halts in ${row.state} if it reads ${row.input}.` : undefined}
                       >
                         <td><span className="mono-value">{row.state}</span></td>
                         <td className={row.input === '1' ? 'val-1' : ''}><span className="mono-value">{row.input}</span></td>

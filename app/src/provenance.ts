@@ -158,13 +158,13 @@ export function refusalMessage(reason: RefusalReason, detail?: string): string {
     case 'outside':
       return `Not pasted: that text was not copied in your assignments. ${RULE}`;
     case 'empty':
-      return 'Nothing to paste: copy something in this window first.';
+      return 'Nothing to paste. Copy something in this window first.';
     case 'mode':
       return `Not pasted: ${detail ?? 'that was copied on a different kind of canvas'}.`;
     case 'component':
       return `Not pasted: this question doesn't allow ${detail ?? 'some of those components'}.`;
     case 'drag':
-      return 'Drag-and-drop is off in assignments: copy and paste instead.';
+      return 'Drag-and-drop is off in assignments. Copy and paste instead.';
   }
 }
 

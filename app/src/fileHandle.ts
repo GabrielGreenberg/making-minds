@@ -154,7 +154,7 @@ async function readFile(file: File, handle: FileSystemFileHandle | null): Promis
  *  `cancel` event when the dialog is dismissed. */
 function openWithInput(): Promise<OpenResult> {
   if (!hasUserActivation()) {
-    return Promise.resolve<OpenResult>({ kind: 'failed', reason: 'the browser blocked the file dialog — choose Open… again' });
+    return Promise.resolve<OpenResult>({ kind: 'failed', reason: 'the browser blocked the file dialog. Choose Open… again' });
   }
   return new Promise((resolve) => {
     const input = document.createElement('input');

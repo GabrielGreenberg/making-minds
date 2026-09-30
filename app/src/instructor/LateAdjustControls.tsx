@@ -135,7 +135,7 @@ function useLateWrite<T, A>(write: (arg: A) => Promise<LateWriteOutcome<T>>, onD
       if (out.ok) onDone();
       else setError(out.error);
     } catch {
-      setError('Could not save — the server may be unreachable. Try again.');
+      setError('Could not save. The server may be unreachable. Try again.');
     } finally {
       setBusy(false);
     }
@@ -162,7 +162,7 @@ function ExtensionDialog({
   const { busy, error, setError, run } = useLateWrite(write, onDone);
   const save = () => {
     if (!value) {
-      setError('Pick a date and time — or Clear to remove the extension.');
+      setError('Pick a date and time, or Clear to remove the extension.');
       return;
     }
     void run(new Date(value).toISOString());
@@ -185,7 +185,7 @@ function ExtensionDialog({
         <span className="mm-label">Due for this student</span>
         <input className="mm-input" type="datetime-local" value={value} autoFocus onChange={(e) => setValue(e.target.value)} />
       </label>
-      <p className="mm-note dim">No reason is recorded — accommodation details stay off the platform.</p>
+      <p className="mm-note dim">No reason is recorded. Accommodation details stay off the platform.</p>
     </LateDialog>
   );
 }
@@ -219,7 +219,7 @@ function WaiverDialog({
   const save = () => {
     const n = Number(points);
     if (!Number.isInteger(n) || n < 1) {
-      setError('Waive a whole number of points, at least 1 — or Clear to remove the waiver.');
+      setError('Waive a whole number of points (at least 1), or Clear to remove the waiver.');
       return;
     }
     void run({ points: n, ...(note.trim() ? { note: note.trim() } : {}) });
@@ -227,7 +227,7 @@ function WaiverDialog({
   return (
     <LateDialog
       title="Waive late points"
-      sub="Reduces this student’s late deduction on this assignment — never below zero. The student sees the points, not the note."
+      sub="Reduces this student’s late deduction on this assignment (not below zero). The student sees the points, not the note."
       error={error}
       busy={busy}
       canClear={current !== undefined}

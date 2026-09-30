@@ -59,7 +59,7 @@ export function RobotView() {
       </div>
       {error && (
         <p className="mm-error robot-error">
-          {value ? `Couldn’t refresh (${error.message}) — showing the last answer.` : `Couldn’t read the robot’s state: ${error.message}`}
+          {value ? `Couldn’t refresh (${error.message}). Showing the last answer.` : `Couldn’t read the robot’s state: ${error.message}`}
         </p>
       )}
       {!value && loading && <p className="mm-empty">Loading…</p>}
@@ -91,7 +91,7 @@ function RobotSections({ status, now }: { status: Extract<RobotStatus, { availab
               <span className="robot-label">{live.releasedAtSource === 'reflog' ? 'Released' : 'Running since'}</span>
               <span className="mm-row-fill">
                 {formatTime(live.releasedAt)} <span className="mm-row-meta">({agoLabel(live.releasedAt, now)})</span>
-                {live.releasedAtSource === 'process-start' && <span className="mm-row-sub">the server’s start — its clone keeps no release time</span>}
+                {live.releasedAtSource === 'process-start' && <span className="mm-row-sub">the server’s start</span>}
               </span>
             </div>
             <div className="mm-row">
@@ -172,7 +172,7 @@ function RobotSections({ status, now }: { status: Extract<RobotStatus, { availab
           review.items.length > 0 ? (
             <>
               <p className="mm-note">
-                {review.items.length} {review.items.length === 1 ? 'report waits' : 'reports wait'} for your call —{' '}
+                {review.items.length} {review.items.length === 1 ? 'report waits' : 'reports wait'} for your call in the{' '}
                 <a {...hashLink({ kind: 'instructor-feedback' })}>Feedback tab</a>
               </p>
               <div className="mm-list">
