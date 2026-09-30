@@ -955,9 +955,23 @@ export type FeedbackStatus = 'open' | 'resolved';
  *  filed; `dismissed` — noise, a duplicate or already done (`note` says
  *  which); `review` — a student's feature request, bigger change or unclear
  *  report, waiting for the instructor's call in `/catch` (task 029), which
- *  re-marks it `filed` or `dismissed`. Independent of `status`: resolving
- *  stays the instructor's act. */
+ *  re-marks it `filed` or `dismissed`. Two marks close the report on their
+ *  own (task 086, server/src/feedbackResolution.ts): `dismissed` at once,
+ *  `filed` once every task it names is done and live on the pilot;
+ *  `personal` and `review` wait for the instructor, who can always reopen. */
 export type FeedbackTriageOutcome = 'filed' | 'personal' | 'dismissed' | 'review';
+
+/** The server resolved the report on the pipeline's word (task 086) — once
+ *  per report: the stamp stays across a re-mark, so a reopen sticks. */
+export interface FeedbackAutoResolve {
+  at: string; // ISO; the server's word
+  reason: 'filed' | 'dismissed';
+  /** `filed` only: the tasks whose landing closed it. */
+  tasks?: string[];
+  /** When the instructor first reopened it (the status route): from then on
+   *  the pipeline's resolve no longer stands, whatever the status. */
+  reopenedAt?: string;
+}
 
 export interface FeedbackTriage {
   outcome: FeedbackTriageOutcome;
@@ -966,6 +980,14 @@ export interface FeedbackTriage {
   /** A line on why; required for `dismissed`. */
   note?: string;
   at: string; // ISO; the server's word
+  /** Set by the server alone, never by the mark's sender. */
+  autoResolved?: FeedbackAutoResolve;
+}
+
+/** The report is resolved on the pipeline's word alone (task 086): stamped,
+ *  and never reopened since. A resolve after a reopen is the instructor's. */
+export function autoResolveStands({ status, triage }: { status: FeedbackStatus; triage?: FeedbackTriage }): boolean {
+  return status === 'resolved' && triage?.autoResolved !== undefined && triage.autoResolved.reopenedAt === undefined;
 }
 
 /** One attached screenshot, downscaled and base64-encoded client-side before

@@ -3,6 +3,7 @@ import type { FeedbackStatus, FeedbackTriage, PlatformFeedback } from '../types'
 import { feedbackStore } from '../storage/backend';
 import { useAsyncValue } from '../useAsyncValue';
 import { FEEDBACK_FILED_EVENT, FeedbackPanel } from '../components/FeedbackPanel';
+import { autoResolveLabel } from './feedbackViews';
 
 function formatTime(iso: string): string {
   const d = new Date(iso);
@@ -14,8 +15,10 @@ function formatTime(iso: string): string {
 }
 
 /** What the task pipeline made of a report (task 018), as a tag. `review`
- *  waits for the instructor's file / not now / discard in `/catch` (task 029). */
-function TriageMark({ triage }: { triage: FeedbackTriage }) {
+ *  waits for the instructor's file / not now / discard in `/catch` (task 029).
+ *  Beside it, when the pipeline resolved the report itself (task 086): what
+ *  closed it, or that the instructor reopened it since. */
+function TriageMark({ triage, status }: { triage: FeedbackTriage; status: FeedbackStatus }) {
   const [className, label] =
     triage.outcome === 'filed'
       ? ['tag tag--ok', `Filed → ${triage.tasks?.length === 1 ? 'task' : 'tasks'} ${(triage.tasks ?? []).join(', ')}`]
@@ -24,10 +27,19 @@ function TriageMark({ triage }: { triage: FeedbackTriage }) {
         : triage.outcome === 'review'
           ? ['tag tag--warn', 'Needs your call']
           : ['tag', 'Dismissed'];
+  const auto = autoResolveLabel({ status, triage });
   return (
     <span className="feedback-triage" title={`Processed ${formatTime(triage.at)}`}>
       <span className={className}>{label}</span>
       {triage.note && <span className="feedback-meta">{triage.note}</span>}
+      {auto && triage.autoResolved && (
+        <span
+          className={status === 'resolved' ? 'tag tag--ok' : 'feedback-meta'}
+          title={`Resolved automatically ${formatTime(triage.autoResolved.at)}`}
+        >
+          {auto}
+        </span>
+      )}
     </span>
   );
 }
@@ -36,7 +48,9 @@ function TriageMark({ triage }: { triage: FeedbackTriage }) {
  * The instructor's feedback queue (notes/todos.md item 9): every report filed
  * on the platform or a homework, newest first, filterable by open/resolved,
  * with a status toggle; an instructor's own reports carry a tag, and a report
- * the task pipeline has processed shows what it became (task 018). "New
+ * the task pipeline has processed shows what it became (task 018) and, once
+ * the pipeline resolved it on its own, why (task 086; the toggle still
+ * reopens it, and a reopen sticks). "New
  * report" files one from here (task 076) — the same form as the topbar's
  * Feedback, with no assignment context; the list reloads whenever a report is
  * filed, from either entry point (FEEDBACK_FILED_EVENT). Works in
@@ -125,7 +139,7 @@ export function FeedbackQueueView() {
               </div>
             )}
             <div className="feedback-card-foot">
-              {f.triage && <TriageMark triage={f.triage} />}
+              {f.triage && <TriageMark triage={f.triage} status={f.status} />}
               <button
                 className="mm-btn"
                 disabled={busyId === f.id}

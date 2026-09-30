@@ -70,7 +70,11 @@ as `feedback-<id>.md` plus screenshots. The repo is public, so:
   details.
 - Close every report with `node tasks/tools/feedback.mjs mark <id> filed <task-id>… |
   personal | dismissed "<why>"`. The mark shows in the app's Feedback tab, and the next
-  pull skips the report. Marking never resolves a report; that stays Gabriel's call.
+  pull skips the report. `dismissed` resolves the report at once; `filed` resolves itself
+  once every task it names is done and live on the pilot (the server reads its own
+  `tasks/done/` at each restart); `personal` and `review` stay open for Gabriel; a report
+  he reopens after the pipeline resolved it stays open. `mark <id> clear` undoes a mark,
+  reopening the report if that mark resolved it.
 
 ### 4. Diagnose deeply — this is your whole value
 Per task, before writing: reproduce the path (from the code — you have no browser unless
