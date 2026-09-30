@@ -8,9 +8,9 @@ requires: browser
 area: app
 source: chat
 created: 2026-09-29T16:34:08-07:00
-status: in-progress
+status: done
 after:
-branch: robot/087-embeddable-sandbox-demo
+branch:
 merged_into:
 ---
 
@@ -298,3 +298,29 @@ Six review findings, all fixed:
   (308 → `/embed`), `/` and `/embed?example=parity` show the intended headers; then the
   website iframe (handoff, his yes).
 - **Next step:** loop session: visual check if owed, then land per PROFILE §5.
+
+### 2026-09-29 — landed (robot)
+- **Headless browser pass** (the robot's own, over CDP against the built `dist/`: a host
+  page on another port iframing `/embed?example=majority` at 100% × 500, 1000 wide). A plain
+  wheel over the canvas scrolled the host (1200 → 1400). After a click inside, the wheel
+  panned the canvas and the host stayed at 1400. After a click on the host, the wheel
+  scrolled the host again (→ 1600). The frame held 0 storage keys on a fresh origin (a key
+  seen on a first run was the main app's, left on the same origin by the regression pass
+  before it). The bar has the name, Reset and "Open the full sandbox ↗" (`#/sandbox`,
+  `_blank`), with no File menu, Sign in or feedback. All three examples render at 640×420 and
+  1000×560, and `?example=nope` falls back to Majority vote (its 404 for `nope.json` is the
+  only console error, as designed). At 375 wide the poster shows "Try it on a larger
+  screen." and the link.
+- **Main-app regression** (same build, local mode): the sandbox and the sign-in picker
+  render. As Prof. Ada after Load HW1–HW7, the editor opens HW1 P1, HW2 P4 (CC), HW4 P1
+  (written), HW4 P3 (FSM), HW5 P3 (TM) and HW6 P2 (turbot TM, internal tape) with no console
+  errors.
+- **Gates after merging `origin/main`** (it brought in one task file): app tsc 0, app build
+  0, app check 0, server typecheck 0, server check 0.
+- **Owed, not claimed:** Gabriel's eyeball in a real browser, including a real trackpad
+  (recipe: build, serve `dist/`, and iframe `/embed` from a page on another port, as in the
+  Verify section). After the release, which the gate holds because `deploy/` changed:
+  `curl -sI https://making-minds.pages.dev/embed`, `/embed.html` (308 → `/embed`) and `/`
+  show the framing headers. Then the website iframe (the handoff, which needs his yes):
+  `<iframe src="https://making-minds.pages.dev/embed?example=majority" width="100%"
+  height="500" style="border:0" loading="lazy" title="Making Minds sandbox"></iframe>`.

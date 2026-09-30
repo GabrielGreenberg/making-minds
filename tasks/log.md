@@ -77,3 +77,4 @@
 2026-09-28-084 · feature · Fill a CC I/O-table row only when a Run carries its signal to the OUTPUT, and let Reset clear the table · 2026-09-28T22:17:14-0700 · robot/084-cc-table-earned-by-run · 42f90a2
 2026-09-29-085 · bug · Make boxing work on HW1 P4→P5 through one Box tool in the palette — the dashed "+ BOX" tile back, Box out of the edit strip, one icon set for undo, redo and rotate · 2026-09-29T16:55:09-0700 · robot/085-box-tool-back-in-palette · a8cf5fa
 2026-09-29-086 · feature · Mark a Feedback report resolved on its own once the pipeline has fixed it — when every task it was filed into is done and live · 2026-09-29T18:37:55-0700 · robot/086-auto-resolve-fixed-feedback · bc04ca5
+2026-09-29-087 · feature · Make the sandbox embeddable as a live demo on makingminds.org · 2026-09-29T20:58:31-0700 · robot/087-embeddable-sandbox-demo · 2a50740
