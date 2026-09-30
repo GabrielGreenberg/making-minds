@@ -58,3 +58,8 @@ export function isTextEntryTarget(el: { tagName?: string; isContentEditable?: bo
   const tag = (el.tagName ?? '').toUpperCase();
   return tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || el.isContentEditable === true;
 }
+
+/** The command key as the page names it in a hint: ⌘ on Apple devices, else
+ *  "Ctrl+" (so "⌘S" / "Ctrl+S"). Read once; outside a browser it is "Ctrl+". */
+export const MOD_KEY =
+  typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform ?? '') ? '⌘' : 'Ctrl+';

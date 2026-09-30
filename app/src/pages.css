@@ -306,6 +306,7 @@
 
 /* ── Feedback (the student form; the instructor queue is further down) ── */
 .feedback-sent { padding: 12px 0 4px; }
+.feedback-paste-hint { margin-top: -6px; }
 
 /* ── The Submit dialog (components/SubmitDialog.tsx, task 062) ── */
 .mm-modal .submit-para { margin: 0 0 10px; }

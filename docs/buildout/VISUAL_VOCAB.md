@@ -222,7 +222,9 @@ literal or an undefined token. Task: `tasks/done/2026-09-21-019-*`._
   a small input); focus is a 2px magenta outline; errors `.mm-error` in danger red, notes
   `.mm-note` grey, `.mm-hint` italic.
 - **Modals** — navy-tinted scrim, square white `.mm-modal` card (the one shadow), serif
-  title, dim sub-line, Close as a small quiet button at the right of the head.
+  title, dim sub-line, Close as a small quiet button at the right of the head. Rendered
+  only by `components/Modal.tsx`, portaled to `document.body` (task 088), so a modal
+  looks the same wherever it opens and never inherits its opener's type; `themeCheck` pins it.
 - **Home row** — title · meta (question count, due date) · submission status (which
   carries the grade line and the "View grades" link once released) · ONE action (Submit,
   or the past-due lock). Nothing else.

@@ -12,6 +12,7 @@ import { fillInShape, fillInTableRows } from '../engine/fillIn';
 import { useAsyncValue } from '../useAsyncValue';
 import { useAuth } from '../auth/authProvider';
 import { loadUiPrefs, saveUiPref } from '../uiPrefs';
+import { isModalOpen } from '../modalStack';
 import {
   firstQueueProblem,
   hideNamesPrefKey,
@@ -530,12 +531,6 @@ function keyTarget(t: EventTarget | null, note: HTMLTextAreaElement | null): Que
   return 'page';
 }
 
-/** A modal is up over the page (the shared `.mm-modal-backdrop`): it owns
- *  the keyboard, not the queue behind it. */
-function modalOpen(): boolean {
-  return document.querySelector('.mm-modal-backdrop') !== null;
-}
-
 /** A mouse click must not leave focus on a button: Enter would re-click it
  *  instead of meaning "save & next". Keyboard focus (Tab) is untouched. */
 function keepFocus(e: { preventDefault: () => void }) {
@@ -672,7 +667,7 @@ function ResponseCard({
       const action = queueKeyAction(
         { key: e.key, shift: e.shiftKey, modifier: e.metaKey || e.ctrlKey || e.altKey },
         keyTarget(e.target, noteRef.current),
-        modalOpen(),
+        isModalOpen(),
       );
       if (action === null) return;
       if (action === 'save-next') {

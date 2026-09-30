@@ -3,16 +3,21 @@ import type { FeedbackCategory, FeedbackContext, FeedbackScreenshot } from '../t
 import { feedbackStore } from '../storage/backend';
 import { feedbackFromSession } from '../storage/feedbackStore';
 import { useAuth } from '../auth';
+import { useImagePaste } from '../usePasteGuard';
+import { MOD_KEY } from '../shortcuts';
+import { Modal } from './Modal';
+import { ScreenshotSlots } from './screenshotSlots';
 
 const MAX_SCREENSHOTS = 2;
 const MAX_SIDE = 1600; // downscale so a typical screenshot lands well under 1MB
 const JPEG_QUALITY = 0.7;
+const LIMIT_MESSAGE = `You can attach up to ${MAX_SCREENSHOTS} screenshots. Remove one to add another.`;
 
 /** Fired on `window` when a report is filed, so a view listing reports (the
  *  Dashboard's Feedback queue) reloads whichever entry point filed it. */
 export const FEEDBACK_FILED_EVENT = 'mm:feedback-filed';
 
-/** Downscale + re-encode a picked image file into a small JPEG data URL, so a
+/** Downscale + re-encode a picked or pasted image into a small JPEG data URL, so a
  *  full-resolution screenshot doesn't blow the request body or (in local
  *  mode) localStorage's ~5MB budget. */
 function fileToScreenshot(file: File): Promise<FeedbackScreenshot> {
@@ -54,17 +59,31 @@ export function FeedbackPanel({ onClose, context }: { onClose: () => void; conte
   const [error, setError] = useState<string | null>(null);
   const [sent, setSent] = useState(false);
 
-  const addFiles = async (files: FileList | null) => {
+  // Picked or pasted, the same path: at most MAX_SCREENSHOTS, each
+  // downscaled. The room is claimed on arrival, not read off `screenshots`
+  // (it lags a decode: screenshotSlots.ts), and anything offered and not
+  // taken is said, never dropped quietly.
+  const [slots] = useState(() => new ScreenshotSlots(MAX_SCREENSHOTS));
+  const addFiles = async (files: File[] | FileList | null) => {
     if (!files) return;
-    const room = MAX_SCREENSHOTS - screenshots.length;
-    const picked = Array.from(files).slice(0, room);
+    const list = Array.from(files);
+    const { take, overLimit } = slots.claim(list.length);
+    setError(overLimit ? LIMIT_MESSAGE : null);
+    if (take === 0) return;
     try {
-      const added = await Promise.all(picked.map(fileToScreenshot));
+      const added = await Promise.all(list.slice(0, take).map(fileToScreenshot));
       setScreenshots((s) => [...s, ...added]);
     } catch {
+      slots.release(take);
       setError('Could not attach that image — try a different file.');
     }
   };
+  const removeScreenshot = (i: number) => {
+    slots.release(1);
+    setScreenshots((all) => all.filter((_, j) => j !== i));
+  };
+  // A pasted image (⌘V / Ctrl+V anywhere on the form) attaches like a picked one.
+  useImagePaste((files) => void addFiles(files), !sent);
 
   const submit = async () => {
     if (!message.trim()) {
@@ -89,86 +108,85 @@ export function FeedbackPanel({ onClose, context }: { onClose: () => void; conte
   };
 
   return (
-    <div className="mm-modal-backdrop" onClick={onClose}>
-      <div className="mm-modal mm-surface" onClick={(e) => e.stopPropagation()}>
-        <div className="mm-modal-head">
-          <h2>Feedback</h2>
-          <button className="mm-btn mm-btn--small" onClick={onClose}>Close</button>
-        </div>
-        {instructor ? (
-          <p className="mm-modal-sub">
-            A problem or an idea about the platform or a homework? File it here — it
-            joins the Feedback queue with the instructor tag.
-          </p>
-        ) : (
-          <p className="mm-modal-sub">
-            Something broken, confusing, or wrong in a homework? Tell the instructors.
-            This form is for the platform and the homeworks only: for anything personal
-            (an extension, an absence, a grade), email your instructor instead.
-          </p>
-        )}
-        {sent ? (
-          <p className="feedback-sent">
-            {instructor ? 'Filed — it’s in the Feedback queue.' : 'Thanks — an instructor will take a look.'}
-          </p>
-        ) : (
-          <div className="mm-form">
-            <label className="mm-field">
-              <span>Category</span>
-              <select
-                className="mm-input"
-                value={category}
-                onChange={(e) => setCategory(e.target.value as FeedbackCategory)}
-              >
-                <option value="platform design">Platform design</option>
-                <option value="homework content">Homework content</option>
-              </select>
-            </label>
-            <label className="mm-field">
-              <span>What happened?</span>
-              <textarea
-                className="mm-input"
-                value={message}
-                onChange={(e) => setMessage(e.target.value)}
-                placeholder="Describe the issue or suggestion…"
-                rows={5}
-              />
-            </label>
-            <label className="mm-field">
-              <span>Screenshots (optional, up to {MAX_SCREENSHOTS})</span>
-              <input
-                className="feedback-file"
-                type="file"
-                accept="image/*"
-                multiple
-                disabled={screenshots.length >= MAX_SCREENSHOTS}
-                onChange={(e) => { void addFiles(e.target.files); e.target.value = ''; }}
-              />
-            </label>
-            {screenshots.length > 0 && (
-              <div className="feedback-screenshots">
-                {screenshots.map((s, i) => (
-                  <div key={i} className="feedback-screenshot-preview">
-                    <img className="feedback-screenshot-thumb" src={s.dataUrl} alt={s.filename ?? 'screenshot'} />
-                    <button
-                      className="mm-btn mm-btn--small"
-                      onClick={() => setScreenshots((all) => all.filter((_, j) => j !== i))}
-                    >
-                      Remove
-                    </button>
-                  </div>
-                ))}
-              </div>
-            )}
-            {error && <p className="mm-error">{error}</p>}
-            <div className="mm-actions">
-              <button className="mm-btn mm-btn--primary" disabled={busy} onClick={() => void submit()}>
-                {busy ? 'Sending…' : 'Send feedback'}
-              </button>
-            </div>
-          </div>
-        )}
+    <Modal onClose={onClose} busy={busy} label="Feedback">
+      <div className="mm-modal-head">
+        <h2>Feedback</h2>
+        <button className="mm-btn mm-btn--small" onClick={onClose}>Close</button>
       </div>
-    </div>
+      {instructor ? (
+        <p className="mm-modal-sub">
+          A problem or an idea about the platform or a homework? File it here — it
+          joins the Feedback queue with the instructor tag.
+        </p>
+      ) : (
+        <p className="mm-modal-sub">
+          Something broken, confusing, or wrong in a homework? Tell the instructors.
+          This form is for the platform and the homeworks only: for anything personal
+          (an extension, an absence, a grade), email your instructor instead.
+        </p>
+      )}
+      {sent ? (
+        <p className="feedback-sent">
+          {instructor ? 'Filed — it’s in the Feedback queue.' : 'Thanks — an instructor will take a look.'}
+        </p>
+      ) : (
+        <div className="mm-form">
+          <label className="mm-field">
+            <span>Category</span>
+            <select
+              className="mm-input"
+              value={category}
+              onChange={(e) => setCategory(e.target.value as FeedbackCategory)}
+            >
+              <option value="platform design">Platform design</option>
+              <option value="homework content">Homework content</option>
+            </select>
+          </label>
+          <label className="mm-field">
+            <span>What happened?</span>
+            <textarea
+              className="mm-input"
+              value={message}
+              onChange={(e) => setMessage(e.target.value)}
+              placeholder="Describe the issue or suggestion…"
+              rows={5}
+            />
+          </label>
+          <label className="mm-field">
+            <span>Screenshots (optional, up to {MAX_SCREENSHOTS})</span>
+            <input
+              className="feedback-file"
+              type="file"
+              accept="image/*"
+              multiple
+              disabled={screenshots.length >= MAX_SCREENSHOTS}
+              onChange={(e) => { void addFiles(e.target.files); e.target.value = ''; }}
+            />
+          </label>
+          <p className="mm-note feedback-paste-hint">Paste a screenshot ({MOD_KEY}V) or choose a file.</p>
+          {screenshots.length > 0 && (
+            <div className="feedback-screenshots">
+              {screenshots.map((s, i) => (
+                <div key={i} className="feedback-screenshot-preview">
+                  <img className="feedback-screenshot-thumb" src={s.dataUrl} alt={s.filename ?? 'screenshot'} />
+                  <button
+                    className="mm-btn mm-btn--small"
+                    onClick={() => removeScreenshot(i)}
+                  >
+                    Remove
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+          {error && <p className="mm-error">{error}</p>}
+          <div className="mm-actions">
+            <button className="mm-btn mm-btn--primary" disabled={busy} onClick={() => void submit()}>
+              {busy ? 'Sending…' : 'Send feedback'}
+            </button>
+          </div>
+        </div>
+      )}
+    </Modal>
   );
 }

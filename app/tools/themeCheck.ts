@@ -17,6 +17,10 @@
 //   4. The editor's older stylesheet (index.css — the canvas, palette and data
 //      panel internals) is migrating onto the tokens: its colour literals may
 //      only go DOWN (a ratchet), until tasks 053–055 bring them to zero.
+//   5. One modal (task 088): the scrim and card markup live only in
+//      components/Modal.tsx, which portals to document.body with role=dialog
+//      and aria-modal, and owns Escape. Every dialog renders <Modal>, so none
+//      inherits its opener's type or sits in its stacking context again.
 //
 // Run from app/: npx tsx tools/themeCheck.ts   (part of `npm run check`).
 
@@ -57,6 +61,7 @@ const PAGE_COMPONENTS = [
   'components/GradeSheet.tsx',
   'components/StudentLayout.tsx',
   'components/FeedbackPanel.tsx',
+  'components/Modal.tsx',
   'auth/LoginScreen.tsx',
   'auth/HealthGate.tsx',
   'auth/AccountPanel.tsx',
@@ -151,7 +156,7 @@ check('index.html title is the course, not "app"', /<title>Making Minds/.test(ht
 // are the canvas, palette and data-panel internals that tasks 053–055 move
 // onto the tokens. The ceiling only ever goes down: lower it as they go, and
 // a new literal fails here. At 0 this becomes pin 1's rule for index.css.
-const INDEX_CSS_LITERAL_CEILING = 133;
+const INDEX_CSS_LITERAL_CEILING = 126;
 const editorLiterals = literals(editor);
 check(
   `index.css: colour literals only go down (${editorLiterals.length} ≤ ${INDEX_CSS_LITERAL_CEILING})`,
@@ -174,6 +179,30 @@ const allSrc = (dir: string): string[] =>
     d.isDirectory() ? allSrc(path.join(dir, d.name)) : /\.(tsx?|css)$/.test(d.name) ? [path.join(dir, d.name)] : []);
 const retiredHits = allSrc('.').filter((rel) => RETIRED.test(read(rel)));
 check('the retired header/modal idioms are gone from src/', retiredHits.length === 0, retiredHits.join(', '));
+
+// ── 5. One modal ───────────────────────────────────────────────────────────
+{
+  const MODAL = 'components/Modal.tsx';
+  const codeOf = (rel: string) => read(rel).replace(/\/\*[\s\S]*?\*\/|(?<=^|\s)\/\/[^\n]*/gm, '');
+  const tsx = allSrc('.').filter((rel) => /\.tsx?$/.test(rel));
+  // The scrim's class, and the card's bare token ('mm-modal' not followed by
+  // '-' or a word character: mm-modal-head and mm-modal--narrow are the card's
+  // inner vocabulary, free to use).
+  const markup = tsx.filter((rel) => rel !== MODAL && /mm-modal-backdrop|["' ]mm-modal(?![-\w])/.test(codeOf(rel)));
+  check(`the modal scrim and card markup appear only in ${MODAL} (${tsx.length} files scanned)`, markup.length === 0, markup.join(', '));
+  const modal = codeOf(MODAL);
+  check(`${MODAL} portals to document.body as a dialog (role, aria-modal) and owns Escape`,
+    /createPortal\(/.test(modal) && /document\.body/.test(modal) && /role="dialog"/.test(modal) && /aria-modal="true"/.test(modal) &&
+      /className="mm-modal-backdrop"/.test(modal) && /'mm-modal'/.test(modal) &&
+      /document\.addEventListener\('keydown'/.test(modal) && /pushModal\(/.test(modal) && /popModal\(/.test(modal) &&
+      /latest\.current\.busy/.test(modal));
+  for (const rel of ['components/FeedbackPanel.tsx', 'auth/AccountPanel.tsx', 'components/WorkbookFileMenu.tsx',
+    'components/SubmitDialog.tsx', 'instructor/LateAdjustControls.tsx', 'instructor/RegradeDialog.tsx']) {
+    const text = codeOf(rel);
+    check(`${rel} renders <Modal> and keeps no Escape listener of its own`,
+      /<Modal\b/.test(text) && !/'Escape'/.test(text));
+  }
+}
 
 console.log(failures === 0 ? '\nthemeCheck: all pins hold.' : `\nthemeCheck: ${failures} pin(s) failed.`);
 process.exit(failures === 0 ? 0 : 1);

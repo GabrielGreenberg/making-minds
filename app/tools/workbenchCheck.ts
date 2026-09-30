@@ -69,6 +69,9 @@
 //                    physical key; no shortcut while a text field, select or
 //                    contentEditable has focus; the canvas dispatches the
 //                    table's commands to the store's (locked) undo/redo.
+//                    (task 088) modalStack: open / top / out-of-order pops;
+//                    the canvas's keys and the sandbox's ⌘S stand down
+//                    while a modal is open.
 //
 // Run from app/: npx tsx tools/workbenchCheck.ts   (part of `npm run check`).
 
@@ -104,6 +107,7 @@ import {
   toolKey,
 } from '../src/palette';
 import { editorShortcut, isTextEntryTarget, type KeyPress } from '../src/shortcuts';
+import { isModalOpen, isTopModal, popModal, pushModal } from '../src/modalStack';
 import {
   EMPTY_CANVAS_MESSAGE, FIT_MAX, FIT_MIN, ZOOM_MAX, ZOOM_MIN,
   canvasHint, circuitBounds, clampZoom, draftActionsAt, fitView, freeArea, zoomAbout, type HintState,
@@ -892,6 +896,33 @@ console.log('\n[shortcuts]');
     /const command = editorShortcut\(e\)/.test(canvasSrc) && /isTextEntryTarget\(document\.activeElement/.test(canvasSrc) &&
       /case 'undo':[\s\S]*?state\.undo\(\)/.test(canvasSrc) && /case 'redo':[\s\S]*?state\.redo\(\)/.test(canvasSrc) &&
       !/e\.key === 'z'|e\.key === 'c'|e\.key === 'v'|e\.key === 'a'/.test(canvasSrc));
+
+  // A modal owns the keyboard (task 088): the stack Modal.tsx keeps, and the
+  // page-level handlers that ask it first.
+  {
+    const a = {};
+    const b = {};
+    const atRest = !isModalOpen();
+    pushModal(a);
+    pushModal(b);
+    const stacked = isModalOpen() && isTopModal(b) && !isTopModal(a);
+    popModal(a);
+    const outOfOrder = isModalOpen() && isTopModal(b);
+    popModal(b);
+    const closed = !isModalOpen() && !isTopModal(b);
+    popModal(b);
+    check('modalStack: closed at rest; two open, the later on top; an out-of-order pop keeps it; all popped, closed; a double pop is harmless',
+      atRest && stacked && outOfOrder && closed && !isModalOpen());
+  }
+  const canvasRaw = read('components/CircuitCanvas.tsx');
+  const shortcutHandler = canvasRaw.slice(canvasRaw.indexOf('// ─── Keyboard shortcuts'), canvasRaw.indexOf('// ─── Wheel and touch'));
+  check('the canvas\'s shortcut handler asks isModalOpen() before the table, from modalStack',
+    /import \{ isModalOpen \} from '\.\.\/modalStack'/.test(canvasSrc) && shortcutHandler.length > 0 &&
+      shortcutHandler.indexOf('if (isModalOpen()) return;') >= 0 &&
+      shortcutHandler.indexOf('if (isModalOpen()) return;') < shortcutHandler.indexOf('const command = editorShortcut(e)'));
+  const fileMenu = code('components/WorkbookFileMenu.tsx');
+  check('the sandbox\'s ⌘S stands down behind a modal too',
+    /import \{ isModalOpen \} from '\.\.\/modalStack'/.test(fileMenu) && /if \(busy \|\| prompt \|\| isModalOpen\(\)\) return;/.test(fileMenu));
 }
 
 console.log(failures === 0 ? '\nworkbenchCheck: all checks passed' : `\nworkbenchCheck: ${failures} FAILED`);

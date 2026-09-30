@@ -21,6 +21,7 @@ import { submitConfirmMessage } from '../provenance/notice';
 import { MAX_GROUP_OTHERS, SubmitRefused } from '../submissionGroup';
 import { submitLateWarning } from '../dueDates';
 import { COURSE_CALENDAR } from '../courseCalendar';
+import { Modal } from './Modal';
 import type { AssignmentData, Classmate, SubmissionRecord } from '../types';
 
 type Phase =
@@ -72,13 +73,6 @@ export function SubmitDialog({
   const close = () => {
     if (!busy) onClose();
   };
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') close();
-    };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  });
 
   const submit = async () => {
     setPhase({ kind: 'busy' });
@@ -105,63 +99,55 @@ export function SubmitDialog({
   const nameOf = (key: string) => roster?.find((c) => c.key === key)?.name ?? 'a classmate';
 
   return (
-    <div className="mm-modal-backdrop" onClick={close}>
-      <div
-        className="mm-modal mm-modal--narrow mm-surface"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="submit-dialog-title"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="mm-modal-head">
-          <h2 id="submit-dialog-title">{phase.kind === 'done' ? 'Submitted' : 'Submit assignment'}</h2>
-        </div>
-        {phase.kind === 'done' ? (
-          <>
-            <p className="mm-modal-sub">{title}</p>
-            <p className="mm-note">
-              Attempt {phase.record.attempt} is recorded. Grades will appear under Grades once your
-              instructor releases them.
-            </p>
-            {phase.record.submission.group?.length ? (
-              <p className="mm-note submit-group-done">
-                Group listed: {phase.record.submission.group.map(nameOf).join(', ')}.
-              </p>
-            ) : null}
-            <div className="mm-actions submit-actions">
-              <button type="button" className="mm-btn mm-btn--primary" autoFocus onClick={onClose}>
-                Done
-              </button>
-            </div>
-          </>
-        ) : (
-          <>
-            {/* The notice names the assignment in its first line. */}
-            {submitConfirmMessage(title, { saved }).split('\n\n').map((para, i) => (
-              <p key={i} className="mm-note submit-para">{para}</p>
-            ))}
-            {lateWarning && <p className="mm-warn submit-para">{lateWarning}</p>}
-            <GroupPicker
-              classmates={roster}
-              loading={classmates.loading}
-              failed={classmates.error != null}
-              members={members}
-              disabled={busy}
-              onChange={setMembers}
-            />
-            {phase.kind === 'confirm' && phase.error && <p className="mm-error submit-error">{phase.error}</p>}
-            <div className="mm-actions submit-actions">
-              <button type="button" className="mm-btn" onClick={close} disabled={busy}>
-                Cancel
-              </button>
-              <button type="button" className="mm-btn mm-btn--primary" onClick={() => void submit()} disabled={busy}>
-                {busy ? 'Submitting…' : 'Submit'}
-              </button>
-            </div>
-          </>
-        )}
+    <Modal narrow onClose={onClose} busy={busy} labelledBy="submit-dialog-title">
+      <div className="mm-modal-head">
+        <h2 id="submit-dialog-title">{phase.kind === 'done' ? 'Submitted' : 'Submit assignment'}</h2>
       </div>
-    </div>
+      {phase.kind === 'done' ? (
+        <>
+          <p className="mm-modal-sub">{title}</p>
+          <p className="mm-note">
+            Attempt {phase.record.attempt} is recorded. Grades will appear under Grades once your
+            instructor releases them.
+          </p>
+          {phase.record.submission.group?.length ? (
+            <p className="mm-note submit-group-done">
+              Group listed: {phase.record.submission.group.map(nameOf).join(', ')}.
+            </p>
+          ) : null}
+          <div className="mm-actions submit-actions">
+            <button type="button" className="mm-btn mm-btn--primary" autoFocus onClick={onClose}>
+              Done
+            </button>
+          </div>
+        </>
+      ) : (
+        <>
+          {/* The notice names the assignment in its first line. */}
+          {submitConfirmMessage(title, { saved }).split('\n\n').map((para, i) => (
+            <p key={i} className="mm-note submit-para">{para}</p>
+          ))}
+          {lateWarning && <p className="mm-warn submit-para">{lateWarning}</p>}
+          <GroupPicker
+            classmates={roster}
+            loading={classmates.loading}
+            failed={classmates.error != null}
+            members={members}
+            disabled={busy}
+            onChange={setMembers}
+          />
+          {phase.kind === 'confirm' && phase.error && <p className="mm-error submit-error">{phase.error}</p>}
+          <div className="mm-actions submit-actions">
+            <button type="button" className="mm-btn" onClick={close} disabled={busy}>
+              Cancel
+            </button>
+            <button type="button" className="mm-btn mm-btn--primary" onClick={() => void submit()} disabled={busy}>
+              {busy ? 'Submitting…' : 'Submit'}
+            </button>
+          </div>
+        </>
+      )}
+    </Modal>
   );
 }
 

@@ -2,6 +2,7 @@ import { useEffect, useState, type ReactNode } from 'react';
 import { gradingStore } from '../storage/backend';
 import type { LateWriteOutcome } from '../storage/gradingStore';
 import { formatDueDate, toLocalInputValue } from '../dueDates';
+import { Modal } from '../components/Modal';
 
 /**
  * **Extension…** and **Waive…** for one student on one assignment (task 068;
@@ -97,37 +98,28 @@ function LateDialog({
   onSave: () => void;
   onClose: () => void;
 }) {
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && !busy) onClose();
-    };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  });
   return (
-    <div className="mm-modal-backdrop" onClick={() => !busy && onClose()}>
-      <div className="mm-modal mm-modal--narrow mm-surface" role="dialog" aria-modal="true" aria-label={title} onClick={(e) => e.stopPropagation()}>
-        <div className="mm-modal-head">
-          <h2>{title}</h2>
-        </div>
-        <p className="mm-modal-sub">{sub}</p>
-        <div className="mm-form">{children}</div>
-        {error && <p className="mm-error">{error}</p>}
-        <div className="mm-actions late-adjust-actions">
-          {canClear && (
-            <button type="button" className="mm-btn" disabled={busy} onClick={onClear}>
-              Clear
-            </button>
-          )}
-          <button type="button" className="mm-btn" disabled={busy} onClick={onClose}>
-            Cancel
-          </button>
-          <button type="button" className="mm-btn mm-btn--primary" disabled={busy} onClick={onSave}>
-            {busy ? 'Saving…' : 'Save'}
-          </button>
-        </div>
+    <Modal narrow onClose={onClose} busy={busy} label={title}>
+      <div className="mm-modal-head">
+        <h2>{title}</h2>
       </div>
-    </div>
+      <p className="mm-modal-sub">{sub}</p>
+      <div className="mm-form">{children}</div>
+      {error && <p className="mm-error">{error}</p>}
+      <div className="mm-actions late-adjust-actions">
+        {canClear && (
+          <button type="button" className="mm-btn" disabled={busy} onClick={onClear}>
+            Clear
+          </button>
+        )}
+        <button type="button" className="mm-btn" disabled={busy} onClick={onClose}>
+          Cancel
+        </button>
+        <button type="button" className="mm-btn mm-btn--primary" disabled={busy} onClick={onSave}>
+          {busy ? 'Saving…' : 'Save'}
+        </button>
+      </div>
+    </Modal>
   );
 }
 

@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import type { FormEvent } from 'react';
 import { useAuth } from './authProvider';
+import { Modal } from '../components/Modal';
 
 /**
  * "Password" button + its modal, shown beside the session controls wherever
@@ -54,70 +55,68 @@ export function ChangePasswordModal({ onClose }: { onClose: () => void }) {
   };
 
   return (
-    <div className="mm-modal-backdrop" onClick={onClose}>
-      <div className="mm-modal mm-modal--narrow mm-surface" onClick={(e) => e.stopPropagation()}>
-        <div className="mm-modal-head">
-          <h2>Change password</h2>
-        </div>
-        {done ? (
-          <>
-            <p className="mm-lede">
-              Password changed. You are still signed in here; any other device has been signed out.
-            </p>
+    <Modal narrow onClose={onClose} busy={busy} label="Change password">
+      <div className="mm-modal-head">
+        <h2>Change password</h2>
+      </div>
+      {done ? (
+        <>
+          <p className="mm-lede">
+            Password changed. You are still signed in here; any other device has been signed out.
+          </p>
+          <div className="mm-actions">
+            <button className="mm-btn mm-btn--primary" onClick={onClose}>
+              Done
+            </button>
+          </div>
+        </>
+      ) : (
+        <>
+          <form className="mm-form" onSubmit={(e) => void handleSubmit(e)}>
+            <input
+              className="mm-input"
+              type="password"
+              autoFocus
+              autoComplete="current-password"
+              placeholder="Current password"
+              value={current}
+              onChange={(e) => setCurrent(e.target.value)}
+              disabled={busy}
+            />
+            <input
+              className="mm-input"
+              type="password"
+              autoComplete="new-password"
+              placeholder={`New password (at least ${minLength} characters)`}
+              value={next}
+              onChange={(e) => setNext(e.target.value)}
+              disabled={busy}
+            />
+            <input
+              className="mm-input"
+              type="password"
+              autoComplete="new-password"
+              placeholder="Confirm new password"
+              value={confirm}
+              onChange={(e) => setConfirm(e.target.value)}
+              disabled={busy}
+            />
+            {tooShort && (
+              <p className="mm-error">Password must be at least {minLength} characters.</p>
+            )}
+            {mismatch && <p className="mm-error">The two passwords don't match.</p>}
+            {error && <p className="mm-error">{error}</p>}
             <div className="mm-actions">
-              <button className="mm-btn mm-btn--primary" onClick={onClose}>
-                Done
+              <button type="button" className="mm-btn" onClick={onClose}>
+                Cancel
+              </button>
+              <button className="mm-btn mm-btn--primary" type="submit" disabled={busy || !ready}>
+                {busy ? 'Changing…' : 'Change password'}
               </button>
             </div>
-          </>
-        ) : (
-          <>
-            <form className="mm-form" onSubmit={(e) => void handleSubmit(e)}>
-              <input
-                className="mm-input"
-                type="password"
-                autoFocus
-                autoComplete="current-password"
-                placeholder="Current password"
-                value={current}
-                onChange={(e) => setCurrent(e.target.value)}
-                disabled={busy}
-              />
-              <input
-                className="mm-input"
-                type="password"
-                autoComplete="new-password"
-                placeholder={`New password (at least ${minLength} characters)`}
-                value={next}
-                onChange={(e) => setNext(e.target.value)}
-                disabled={busy}
-              />
-              <input
-                className="mm-input"
-                type="password"
-                autoComplete="new-password"
-                placeholder="Confirm new password"
-                value={confirm}
-                onChange={(e) => setConfirm(e.target.value)}
-                disabled={busy}
-              />
-              {tooShort && (
-                <p className="mm-error">Password must be at least {minLength} characters.</p>
-              )}
-              {mismatch && <p className="mm-error">The two passwords don't match.</p>}
-              {error && <p className="mm-error">{error}</p>}
-              <div className="mm-actions">
-                <button type="button" className="mm-btn" onClick={onClose}>
-                  Cancel
-                </button>
-                <button className="mm-btn mm-btn--primary" type="submit" disabled={busy || !ready}>
-                  {busy ? 'Changing…' : 'Change password'}
-                </button>
-              </div>
-            </form>
-          </>
-        )}
-      </div>
-    </div>
+          </form>
+        </>
+      )}
+    </Modal>
   );
 }
