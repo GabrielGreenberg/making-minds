@@ -105,7 +105,7 @@ meeting past the effective due date; HW6 per day; floor 0; less waivers) over `d
 Grading · Roster & accounts · Feedback · Notes · Robot). **Roster & accounts** (remote: the registrar's class
 list as exported, status report + who-left review; accounts, password reset, add/remove,
 access requests); **Feedback** queue (open/resolved/all;
-triage mark); shared **Notes** (one markdown document, saved on Save,
+triage mark); shared **Notes** (one markdown document, `marked` + `dompurify`, saved on Save,
 warns before overwriting a newer save); dashboard (drag-to-reorder, **Publish/Hide**, local-mode
 "Load HW1–HW7"); assignment editor (drag-to-reorder questions; the document around them —
 preamble, source PDF, late policy, counts-toward-grade, sections with intro / layout /
