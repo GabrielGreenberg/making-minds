@@ -24,6 +24,14 @@
 //                    with a reason.
 // [console hole]     window.__store only in dev builds; importProject and the
 //                    legacy boxed library are gone.
+// [image paste]      (task 088) a pasted image becomes a Feedback screenshot:
+//                    image file items are taken (and only then is the paste
+//                    cancelled); text, HTML and other files pass; into a text
+//                    field, text-with-a-picture is the text's; a paste an
+//                    answer field's guard already took is left alone; the
+//                    read lives in usePasteGuard.ts, the form only calls it.
+//                    The form's slots are claimed on arrival, so two quick
+//                    pastes racing for the last one never drop one quietly.
 
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -387,6 +395,8 @@ const isCommentLine = (line: string) => {
   const t = line.trim();
   return t.startsWith('//') || t.startsWith('*') || t.startsWith('/*');
 };
+/** The seam's DOM adapter, the one file the grep gate lets read the clipboard. */
+const SEAM_DOM_ADAPTER_FILE = 'usePasteGuard.ts';
 
 console.log('\n[grep gate]');
 {
@@ -516,6 +526,127 @@ console.log('\n[console hole]');
   }
   for (const v of stragglers) console.log(`        → ${v}`);
   check('importProject, boxedLibrary, importBoxedCircuit and boxCurrentCircuit are gone', stragglers.length === 0);
+}
+
+console.log('\n[image paste]');
+{
+  const { imageFilesOf, takeImagePaste } = await import('../src/usePasteGuard');
+  type FakeFile = { type: string; name: string };
+  type FakeItem = { kind: string; type: string; getAsFile(): FakeFile | null };
+  const png: FakeFile = { type: 'image/png', name: 'shot.png' };
+  const jpeg: FakeFile = { type: 'image/jpeg', name: 'photo.jpg' };
+  const pdf: FakeFile = { type: 'application/pdf', name: 'hw.pdf' };
+  const fileItem = (f: FakeFile): FakeItem => ({ kind: 'file', type: f.type, getAsFile: () => f });
+  const textItem = (type = 'text/plain'): FakeItem => ({ kind: 'string', type, getAsFile: () => null });
+  /** A paste event over `items` (and `files`, `types`) at `target`, recording
+   *  its preventDefault. */
+  const paste = (
+    items: FakeItem[] | null,
+    files: FakeFile[] = [],
+    defaultPrevented = false,
+    target: unknown = null,
+    types?: string[],
+  ) => {
+    const e = {
+      defaultPrevented,
+      prevented: false,
+      target,
+      clipboardData: items === null ? null : { items, files, types },
+      preventDefault() { this.prevented = true; },
+    };
+    return { e, got: takeImagePaste<FakeFile>(e) };
+  };
+  // Where a paste can land on the form.
+  const messageBox = { tagName: 'TEXTAREA', isContentEditable: false };
+  const textInput = { tagName: 'INPUT', type: 'text', isContentEditable: false };
+  const editable = { tagName: 'DIV', isContentEditable: true };
+  const filePicker = { tagName: 'INPUT', type: 'file', isContentEditable: false };
+  const card = { tagName: 'DIV', isContentEditable: false };
+  const same = (a: FakeFile[], b: FakeFile[]) => a.length === b.length && a.every((f, i) => f === b[i]);
+
+  let r = paste([fileItem(png)]);
+  check('an image file item is taken, and the paste cancelled', same(r.got, [png]) && r.e.prevented);
+  r = paste([textItem()]);
+  check('a text paste passes untouched (nothing taken, not cancelled)', r.got.length === 0 && !r.e.prevented);
+  r = paste([fileItem(pdf)]);
+  check('a non-image file passes untouched', r.got.length === 0 && !r.e.prevented);
+  r = paste([textItem('text/html'), textItem(), fileItem(png)], [], false, card);
+  check('text + an image pasted on the card (not a text field): only the image is taken, and the paste cancelled', same(r.got, [png]) && r.e.prevented);
+  r = paste([textItem('text/html'), textItem(), fileItem(png)], [], false, messageBox);
+  check('text + an image into the message box (copied Office cells): nothing taken, not cancelled — the text goes in',
+    r.got.length === 0 && !r.e.prevented);
+  r = paste([textItem(), fileItem(png)], [], false, textInput);
+  const r2 = paste([textItem(), fileItem(png)], [], false, editable);
+  check('the same into a text input or anything contentEditable: the text\'s', r.got.length === 0 && !r.e.prevented && r2.got.length === 0 && !r2.e.prevented);
+  r = paste([], [png], false, messageBox, ['text/plain', 'Files']);
+  check('Safari (plain text only in types, the image only in files) into the message box: the text\'s', r.got.length === 0 && !r.e.prevented);
+  r = paste([fileItem(png)], [], false, messageBox);
+  check('an image alone into the message box (a screenshot): taken, and the paste cancelled', same(r.got, [png]) && r.e.prevented);
+  r = paste([textItem('text/html'), fileItem(png)], [], false, messageBox);
+  check('HTML + an image, no plain text (a copied web image), into the message box: the image is taken', same(r.got, [png]) && r.e.prevented);
+  r = paste([textItem(), fileItem(png)], [], false, filePicker);
+  check('text + an image with focus on the file picker (it takes no text): the image is taken', same(r.got, [png]) && r.e.prevented);
+  r = paste([textItem()], [], false, messageBox);
+  check('plain text alone into the message box passes untouched', r.got.length === 0 && !r.e.prevented);
+  r = paste([fileItem(png), fileItem(jpeg)]);
+  check('two images: both are taken', same(r.got, [png, jpeg]) && r.e.prevented);
+  r = paste(null);
+  check('no clipboard data: nothing taken, not cancelled', r.got.length === 0 && !r.e.prevented);
+  r = paste([fileItem(png)], [], true);
+  check('a paste already cancelled (an answer field\'s guard took it) is left alone', r.got.length === 0 && !r.e.prevented);
+  r = paste([], [png, pdf]);
+  check('no items but an image in files (Safari): the image is taken, the pdf is not', same(r.got, [png]) && r.e.prevented);
+  r = paste([fileItem(jpeg)], [png]);
+  check('items win over files when they hold an image (no double attach)', same(r.got, [jpeg]));
+  check('imageFilesOf on an empty clipboard is []', imageFilesOf<FakeFile>({ items: [], files: [] }).length === 0 && imageFilesOf<FakeFile>(null).length === 0);
+
+  const guard = readFileSync(join(SRC, SEAM_DOM_ADAPTER_FILE), 'utf8');
+  const hook = guard.slice(guard.indexOf('export function useImagePaste'));
+  check('useImagePaste listens for paste on document while enabled, through takeImagePaste',
+    hook.length > 0 && /document\.addEventListener\('paste'/.test(hook) && /takeImagePaste\(e\)/.test(hook) &&
+      /if \(!enabled\) return;/.test(hook) && /document\.removeEventListener\('paste'/.test(hook));
+  // The form's slots, claimed on arrival (screenshotSlots.ts): the render's
+  // list lags a decode, so two quick pastes must not both see the last slot.
+  const { ScreenshotSlots } = await import('../src/components/screenshotSlots');
+  let slots = new ScreenshotSlots(2);
+  slots.claim(1); // one attached
+  const first = slots.claim(1);
+  const second = slots.claim(1); // ⌘V again before the first decode lands
+  check('two quick pastes race for the last slot: the first takes it, the second is told the limit (none dropped quietly)',
+    first.take === 1 && !first.overLimit && second.take === 0 && second.overLimit && slots.used === 2);
+  slots = new ScreenshotSlots(2);
+  const held = [slots.claim(1), slots.claim(1), slots.claim(1)]; // ⌘V held down, from none
+  check('⌘V held from none: two taken, the third told the limit',
+    held.map((c) => c.take).join() === '1,1,0' && !held[1].overLimit && held[2].overLimit && slots.used === 2);
+  slots = new ScreenshotSlots(2);
+  slots.claim(1);
+  const pair = slots.claim(2);
+  check('two images into one free slot: one taken, the limit said', pair.take === 1 && pair.overLimit);
+  slots.release(1);
+  check('a failed decode or a Remove gives its slot back', slots.claim(1).take === 1);
+  slots = new ScreenshotSlots(2);
+  const none = slots.claim(0);
+  slots.release(5);
+  check('an empty pick takes nothing and says nothing; release never goes below none',
+    none.take === 0 && !none.overLimit && slots.used === 0 && slots.claim(2).take === 2);
+
+  const panel = readFileSync(join(SRC, 'components/FeedbackPanel.tsx'), 'utf8');
+  check('FeedbackPanel claims slots on arrival, says the limit whenever it takes less than offered, and never caps quietly',
+    /new ScreenshotSlots\(MAX_SCREENSHOTS\)/.test(panel) && /slots\.claim\(list\.length\)/.test(panel) &&
+      /setError\(overLimit \? LIMIT_MESSAGE : null\)/.test(panel) && /list\.slice\(0, take\)/.test(panel) &&
+      !/screenshots\.length\s*[-+]|MAX_SCREENSHOTS\s*-/.test(panel) && !/\.slice\(0, MAX_SCREENSHOTS\)/.test(panel));
+  check('FeedbackPanel gives slots back on a failed decode and on Remove, its only two other list writes',
+    /slots\.release\(take\)/.test(panel) && /slots\.release\(1\);\s*setScreenshots\(\(all\) => all\.filter/.test(panel) &&
+      /onClick=\{\(\) => removeScreenshot\(i\)\}/.test(panel) && (panel.match(/setScreenshots\(/g) ?? []).length === 2);
+  check('a Remove clears the limit line (there is room again) and no other message',
+    /setError\(\(e\) => \(e === LIMIT_MESSAGE \? null : e\)\)/.test(panel));
+  check('FeedbackPanel calls useImagePaste (from the seam) into addFiles, the picker\'s own path, and reads no clipboard itself',
+    /import \{ useImagePaste \} from '\.\.\/usePasteGuard'/.test(panel) &&
+      /useImagePaste\(\(files\) => void addFiles\(files\), !sent\)/.test(panel) &&
+      /onChange=\{\(e\) => \{ void addFiles\(e\.target\.files\)/.test(panel) &&
+      !/onPaste|clipboardData/.test(panel));
+  check('FeedbackPanel says so: the paste hint beside the kept picker',
+    /Paste a screenshot \(\{MOD_KEY\}V\) or choose a file\./.test(panel) && /type="file"/.test(panel));
 }
 
 // ─── verdict ─────────────────────────────────────────────────────────

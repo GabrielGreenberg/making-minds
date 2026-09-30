@@ -8,9 +8,9 @@ requires:
 area: app
 source: feedback
 created: 2026-09-29T17:08:40-07:00
-status: in-progress
+status: done
 after:
-branch: robot/088-modals-portaled-feedback-paste-screenshots
+branch:
 merged_into:
 ---
 
@@ -166,3 +166,136 @@ code that reads it must live in the seam's DOM adapter, not in `FeedbackPanel.ts
   Screenshots in the progress log.
 
 ## Progress log
+
+### 2026-09-29 — implement (robot)
+- **Built** (the deep fix): `app/src/modalStack.ts` (pure: `pushModal` / `popModal` /
+  `isModalOpen` / `isTopModal`) and `components/Modal.tsx`, the one modal: backdrop + card
+  portaled to `document.body`, `role="dialog"`, `aria-modal`, a name (`label` or
+  `labelledBy`), focus to the card on open unless a child autofocused (not handed back on
+  close), Escape on a document listener (innermost modal only, stopped there so the
+  canvas's window Escape never sees it, ignored while `busy`), the scrim closes only when a
+  press starts and ends on it, and the click family stops at the root (keydown, paste,
+  pointerup pass). All six files moved onto it (FeedbackPanel, ChangePasswordModal, the
+  sandbox save prompt, SubmitDialog, LateDialog, RegradeDialog); their private Escape
+  effects are gone. The canvas's shortcut handler and its pending-wire Escape, the grading
+  queue (its private `modalOpen()` deleted) and the sandbox's ⌘S ask `isModalOpen()`.
+- **Paste**: `usePasteGuard.ts` gains `imageFilesOf` / `takeImagePaste` (pure, generic
+  over the file type) and `useImagePaste` (a document paste listener; skips a paste an
+  answer field's guard already cancelled). FeedbackPanel calls it into `addFiles`, which
+  now takes pasted `File[]` too, caps in the setter, says "You can attach up to 2
+  screenshots. Remove one to add another." at the limit, and shows the hint "Paste a
+  screenshot (⌘V) or choose a file." (Ctrl+V off Apple). The picker stays. No image drop
+  (optional; skipped to keep the change on the reported gestures).
+- **CSS/docs**: theme.css's leak comments rewritten, `.mm-modal` gets
+  `overflow-wrap: break-word` and no focus ring; the dead `.modal-*` block in index.css is
+  deleted (its literal ceiling 133 → 126). `MOD_KEY` moved to `shortcuts.ts` (a display
+  const beside the table, which is unchanged) so the File menu and the form share it.
+  VISUAL_VOCAB §Modals and CLAUDE.md (Student UI, Provenance, Part 1 Feedback) updated in
+  place; CLAUDE.md 39,996 bytes.
+- **Pins**: themeCheck §5 (scrim/card markup only in Modal.tsx; portal + dialog + Escape
+  owner; the six call sites render `<Modal>` with no Escape of their own); workbenchCheck
+  [shortcuts] (the stack's open/top/out-of-order/double pop; the canvas asks
+  `isModalOpen()` before the table; ⌘S stands down); gradingViewCheck (the queue imports
+  and passes `isModalOpen()`, no `modalOpen`, no scrim query); pasteCheck [image paste]
+  (10 fake-event rows + source pins; grep gate, EXEMPT and SEAM_DOM_ADAPTER untouched).
+- **Gates**: app tsc, typecheck:tools, build, `npm run check` (exit 0); server typecheck,
+  `npm run check` (exit 0).
+- **Headless eyeball** (the built app in local mode, headless Chrome over CDP; the Robot
+  Dev Server can't be started unattended): Feedback from the editor's Name ▾ (instructor
+  and student, HW1 q/10), Home and the Dashboard's queue: the card is a child of body,
+  z-index 500 and topmost, `.mm-modal-sub` identical everywhere (white-space normal,
+  12.5px, rgb(123,123,123); 2 lines instructor, 3 student), scrollWidth = clientWidth at
+  1280 and 640, nothing past the card's edge, Escape closes. Paste (synthetic
+  ClipboardEvents): text into the message not cancelled, no thumbnail; an image into the
+  message → 1 thumbnail, cancelled; image + text on the card → 2; a third → still 2 and the
+  limit message. Sandbox: an AND placed and selected, Feedback opened, the card's heading
+  clicked, then Delete, Backspace, ⌘V, ⌘Z → the part is still there and the modal open;
+  after Escape, Delete alone removes it (the selection held). The sandbox "Unsaved changes"
+  prompt: portaled, wraps (scrollWidth = clientWidth at 1280 and 640). No console errors.
+- **Owed (Gabriel, a real browser)**: the real clipboard. Recipe: HW1 q11, Name ▾ →
+  Feedback; ⌘⇧⌃4 a region, then ⌘V with focus on the form's blank area and again in the
+  message box → a thumbnail each time; copy text and paste into the message → text; a
+  third image → the limit line. Worth one try in Safari too (it may fire `paste` only with
+  focus in the message box). The Password form (remote mode only; local mode has no
+  passwords) is the same `<Modal narrow>`, so it is covered by the pins, not the eyeball.
+- Task 089's FeedbackPanel rows are keyed by file:line; they moved (:65 → :78, :85 → :104,
+  :99 → :118, :104 → :123, :112 → :130; as of the fix below). 089 already allows for drift;
+  the strings are unchanged here.
+
+### 2026-09-29 — fix (robot)
+- **Review findings (4, two pairs)**: (a) two quick pastes (double ⌘V, or ⌘V held) raced for
+  the last slot off the render's stale `screenshots`, and the setter's quiet cap then dropped
+  one with the message cleared; (b) text + a picture of it (copied Office cells) pasted into
+  the message box lost the text to the image.
+- **(a)**: `components/screenshotSlots.ts` (pure `ScreenshotSlots`: `claim(offered)` →
+  `{take, overLimit}`, `release(n)`): FeedbackPanel claims on ARRIVAL (attached + still
+  decoding), says the limit whenever it takes less than offered, gives the slot back on a
+  failed decode and on Remove; the setter's silent `.slice` cap is gone.
+- **(b)**: `takeImagePaste` reads the event's `target`: into a text field (textarea,
+  text-like input, contentEditable — not the file picker) a clipboard that also holds
+  `text/plain` (items or `types`, for Safari) is the text's — nothing taken, not cancelled.
+  An image with no plain text (a screenshot, a copied web image: HTML + PNG) is still taken
+  anywhere, the message box included.
+- **Pins** (pasteCheck [image paste]): 7 text-field rows (message box, text input,
+  contentEditable, Safari types-only, image alone, HTML + image, file picker) and the
+  card-target row renamed; 5 slot rows (the race for the last slot, ⌘V held, two into one,
+  release, empty pick); source pins (claim on arrival, limit said, no quiet cap, release on
+  failure and Remove, `setScreenshots` written twice only).
+
+### 2026-09-29 — implemented (work loop)
+- **Built**: every modal now opens on the page itself (one `components/Modal.tsx`, portaled
+  to `document.body`), so the Feedback form wraps and looks the same from Home, the editor
+  and the Dashboard; while any modal is open the canvas's keys and the grading queue's keys
+  stand down (one `modalStack.ts isModalOpen()`); a screenshot can be pasted into the
+  Feedback form (⌘V / Ctrl+V), read in `usePasteGuard.ts` and downscaled like a picked file,
+  up to 2, with the limit said; text pasted into the message box stays text. Six files moved
+  onto `<Modal>` (the seven openers); the dead `.modal-*` CSS is gone.
+- **Pins**: themeCheck §5 (scrim/card only in Modal.tsx, portal + dialog + Escape owner,
+  the six call sites); workbenchCheck [shortcuts] (stack, canvas asks first, ⌘S);
+  gradingViewCheck [queue] (shared test); pasteCheck [image paste] (fake-event rows,
+  text-field rows, slot race rows, FeedbackPanel source pins; grep gate unchanged).
+- **Gates** (exit codes): app tsc 0, app build 0, app check 0, server tsc 0, server check 0.
+- **Review**: 4 findings (2 pairs) fixed — the last-slot paste race, text + image into the
+  message box; none skipped. Nits left: `shortcuts.ts MOD_KEY` reads `navigator` (and its
+  "outside a browser" comment is wrong); the limit line stays after a Remove.
+- **Owed**: headless re-run after the fix stage (paste rows: 2 thumbnails, a third → limit
+  line, text-only on the textarea not prevented; keyboard: Delete/Backspace/⌘Z/⌘V inert
+  behind Feedback, queue keys 0/h/1/↵ inert then live; wrap + one look on Home / editor /
+  queue at 1280 and 640; the sandbox save prompt). Password form: remote mode only. Gabriel:
+  the real clipboard on his Mac, Chrome and Safari (⌘⇧⌃4, then ⌘V in the message box and on
+  the card's blank area), and the form's look side by side.
+- **Next step**: loop session: headless visual check (owed above), then land per PROFILE §5.
+
+### 2026-09-29 — headless check + nits (robot)
+- **Nits fixed**: a Remove now clears the limit line (there is room again; pinned in
+  pasteCheck [image paste]); `shortcuts.ts MOD_KEY`'s comment corrected (Node has a
+  `navigator.platform` too, so a harness on a Mac reads "⌘"). MOD_KEY stays beside the
+  table as a display const; the table itself is unchanged.
+- **Headless re-run after the fix stage** (the built app, local mode, headless Chrome over
+  CDP; scratch script, not committed): Feedback from the editor's Name ▾ (instructor and
+  student, HW1 q/10), Home and the Dashboard's queue — portaled (child of body), role
+  dialog, aria-modal, z-index 500 and topmost; `.mm-modal-sub` identical on all three
+  (white-space normal, 12.5px, rgb(123,123,123)); scrollWidth = clientWidth at 1280 and
+  640, nothing past the card's edge; Escape closes. Paste (synthetic ClipboardEvents): text
+  into the message → not cancelled, no thumbnail; image into the message → 1, cancelled;
+  image + text on the card → 2; a third → still 2 + the limit line; Remove → 1, line
+  cleared; text + image into the message → the text's (not cancelled, no thumbnail); image
+  again → 2. Sandbox: an AND placed and selected, Feedback open, the card's heading
+  clicked, Delete / Backspace / ⌘V / ⌘Z → the part still there, the modal still open;
+  after Escape, Delete alone removes it. The sandbox "Unsaved changes" prompt: portaled,
+  wraps at 1280 and 640. No console errors.
+- **Owed, not claimed** (Gabriel, a real browser): the real clipboard on his Mac in Chrome
+  and Safari — ⌘⇧⌃4 a region, open HW1 q11 → Name ▾ → Feedback, ⌘V (a) in the message box
+  and (b) after clicking the card's blank area → a thumbnail each time, nothing pasted into
+  the canvas behind (Safari may fire `paste` only with focus in the message box — note
+  whether (b) works); plain text into the message → text; the form's look side by side on
+  Home, the editor and the Dashboard queue. The grading queue's keys (0 / h / 1 / ↵) inert
+  behind a modal and live after it closes (pinned in gradingViewCheck, not eyeballed). The
+  Password form in remote mode (the same `<Modal narrow>`; pinned, not eyeballed).
+
+### 2026-09-29 — landed (robot)
+- Gates (exit codes, final tree): app tsc 0, app build 0, app `npm run check` 0; server
+  typecheck 0, `npm run check` 0 (the workflow's run; nothing server-side changed since).
+  `origin/main` brought nothing in. Merged `--no-ff` into `main` and pushed; the release
+  gate decides the pilot. Owed checks: above (the real clipboard, Safari, the queue keys
+  and the Password form by eye).

@@ -168,8 +168,8 @@ main.page { padding-block: 30px 40px; }
   content: attr(data-text); font-weight: 600; height: 0; overflow: hidden; visibility: hidden; pointer-events: none;
 }
 /* Session controls: name + quiet actions, pushed to the right edge. The
-   direct-child selectors matter: a modal opened from here (Feedback, Password)
-   is a DOM descendant of .session, and its buttons must keep their own look. */
+   selectors are direct-child: they style this row's own controls, nothing
+   nested. (Its modals, Feedback and Password, open on document.body.) */
 .topbar .session { margin-left: auto; display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 16px; font-size: var(--mm-fs-nav); }
 .topbar .session > .who { color: var(--mm-ink-3); white-space: nowrap; }
 .topbar .session > button, .topbar .session > a {
@@ -299,8 +299,10 @@ select.mm-input { width: auto; }
 .mm-error { font-size: var(--mm-fs-small); color: var(--mm-danger); margin: 0; }
 .mm-notice { padding: 10px 14px; font-size: var(--mm-fs-small); background: var(--mm-lav-soft); border: 1px solid var(--mm-lav-line); }
 
-/* Modals: a navy scrim and a square white card; the card is its own surface
-   root because it can open over the editor, outside any .mm-shell. */
+/* Modals: a navy scrim and a square white card, rendered only by
+   components/Modal.tsx, portaled to document.body. So the card inherits
+   nothing from its opener and is its own surface root, outside any .mm-shell.
+   It takes focus on open (no ring: it is not a control). */
 .mm-modal-backdrop {
   position: fixed; inset: 0; background: var(--mm-scrim);
   display: flex; align-items: center; justify-content: center; padding: 24px; z-index: 500;
@@ -308,8 +310,9 @@ select.mm-input { width: auto; }
 .mm-modal {
   width: min(640px, 100%); max-height: 85vh; overflow-y: auto;
   background: var(--mm-surface); border: 1px solid var(--mm-line); box-shadow: var(--mm-shadow);
-  padding: 22px 26px 26px;
+  padding: 22px 26px 26px; overflow-wrap: break-word;
 }
+.mm-modal:focus { outline: none; }
 .mm-modal--narrow { width: min(460px, 100%); }
 .mm-modal-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
 .mm-modal-head h2 { color: var(--mm-ink); font-size: 22px; margin: 0; }

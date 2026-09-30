@@ -3,6 +3,9 @@ import { useStore, workbookSaveState, captureSandboxSession } from '../store';
 import { saveFile, saveFileAs, openWorkbookFile, hasUserActivation, type OpenResult, type SaveResult } from '../fileHandle';
 import { suggestedFileName, unopenableReason } from '../workbookFile';
 import { MachineMenu } from './MachineMenu';
+import { Modal } from './Modal';
+import { MOD_KEY } from '../shortcuts';
+import { isModalOpen } from '../modalStack';
 import type { BuildMode } from '../types';
 
 // The sandbox's File menu (task 028; spec §1.6–1.7, Mock_Ups-6_2): New ▸ a
@@ -32,10 +35,11 @@ type Prompt =
   | { step: 'downloaded'; pending: Pending; name: string }
   | { step: 'pick-file'; pending: Pending };
 
+/** The question's heading at each step (and the dialog's accessible name). */
+const PROMPT_TITLE: Record<Prompt['step'], string> = { ask: 'Unsaved changes', downloaded: 'Downloaded', 'pick-file': 'Saved' };
+
 /** What a finished Save did: wrote a picked file, or handed a download over. */
 type Saved = { kind: 'saved' | 'downloaded'; name: string };
-
-const MOD_KEY = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform) ? '⌘' : 'Ctrl+';
 
 export function WorkbookFileMenu() {
   const title = useStore((s) => s.workbookTitle);
@@ -186,7 +190,8 @@ export function WorkbookFileMenu() {
     const onKey = (e: KeyboardEvent) => {
       if (!(e.metaKey || e.ctrlKey) || e.altKey || e.key.toLowerCase() !== 's') return;
       e.preventDefault();
-      if (busy || prompt) return;
+      // Not behind a modal (the Feedback form, the question below): it owns the keys.
+      if (busy || prompt || isModalOpen()) return;
       void save(e.shiftKey);
     };
     document.addEventListener('keydown', onKey);
@@ -236,63 +241,61 @@ export function WorkbookFileMenu() {
       </span>
 
       {prompt && (
-        <div className="mm-modal-backdrop" onClick={() => setPrompt(null)}>
-          <div className="mm-modal mm-modal--narrow mm-surface" onClick={(e) => e.stopPropagation()}>
-            <div className="mm-modal-head">
-              <h2>{prompt.step === 'ask' ? 'Unsaved changes' : prompt.step === 'downloaded' ? 'Downloaded' : 'Saved'}</h2>
-            </div>
-            {prompt.step === 'ask' ? (
-              <>
-                <p className="mm-lede">
-                  {prompt.downloaded
-                    ? `“${title}” was downloaded, but this page can't tell whether the download finished. `
-                    : `“${title}” has changes that aren't saved to a file. `}
-                  {prompt.pending.kind === 'new' ? 'A new workbook' : 'Opening a file'} will replace it.
-                  Save it first?
-                </p>
-                <div className="mm-actions workbook-prompt-actions">
-                  <button className="mm-btn mm-btn--quiet" onClick={() => { const { pending } = prompt; setPrompt(null); run(pending); }}>
-                    Don't save
-                  </button>
-                  <button className="mm-btn" onClick={() => setPrompt(null)}>
-                    Cancel
-                  </button>
-                  <button className="mm-btn mm-btn--primary" disabled={busy} onClick={() => void saveThenContinue()}>
-                    Save
-                  </button>
-                </div>
-              </>
-            ) : prompt.step === 'downloaded' ? (
-              <>
-                <p className="mm-lede">
-                  Your browser is downloading “{prompt.name}”. Once it's in your downloads,{' '}
-                  {prompt.pending.kind === 'new' ? 'start the new workbook' : 'choose the file to open'} — it
-                  will replace this one.
-                </p>
-                <div className="mm-actions workbook-prompt-actions">
-                  <button className="mm-btn" onClick={() => setPrompt(null)}>
-                    Cancel
-                  </button>
-                  <button className="mm-btn mm-btn--primary" onClick={() => { const { pending } = prompt; setPrompt(null); run(pending); }}>
-                    {prompt.pending.kind === 'new' ? 'New workbook' : 'Open…'}
-                  </button>
-                </div>
-              </>
-            ) : (
-              <>
-                <p className="mm-lede">Your workbook is saved. Now choose the file to open.</p>
-                <div className="mm-actions workbook-prompt-actions">
-                  <button className="mm-btn" onClick={() => setPrompt(null)}>
-                    Cancel
-                  </button>
-                  <button className="mm-btn mm-btn--primary" onClick={() => { setPrompt(null); run({ kind: 'open' }); }}>
-                    Open…
-                  </button>
-                </div>
-              </>
-            )}
+        <Modal narrow onClose={() => setPrompt(null)} label={PROMPT_TITLE[prompt.step]}>
+          <div className="mm-modal-head">
+            <h2>{PROMPT_TITLE[prompt.step]}</h2>
           </div>
-        </div>
+          {prompt.step === 'ask' ? (
+            <>
+              <p className="mm-lede">
+                {prompt.downloaded
+                  ? `“${title}” was downloaded, but this page can't tell whether the download finished. `
+                  : `“${title}” has changes that aren't saved to a file. `}
+                {prompt.pending.kind === 'new' ? 'A new workbook' : 'Opening a file'} will replace it.
+                Save it first?
+              </p>
+              <div className="mm-actions workbook-prompt-actions">
+                <button className="mm-btn mm-btn--quiet" onClick={() => { const { pending } = prompt; setPrompt(null); run(pending); }}>
+                  Don't save
+                </button>
+                <button className="mm-btn" onClick={() => setPrompt(null)}>
+                  Cancel
+                </button>
+                <button className="mm-btn mm-btn--primary" disabled={busy} onClick={() => void saveThenContinue()}>
+                  Save
+                </button>
+              </div>
+            </>
+          ) : prompt.step === 'downloaded' ? (
+            <>
+              <p className="mm-lede">
+                Your browser is downloading “{prompt.name}”. Once it's in your downloads,{' '}
+                {prompt.pending.kind === 'new' ? 'start the new workbook' : 'choose the file to open'} — it
+                will replace this one.
+              </p>
+              <div className="mm-actions workbook-prompt-actions">
+                <button className="mm-btn" onClick={() => setPrompt(null)}>
+                  Cancel
+                </button>
+                <button className="mm-btn mm-btn--primary" onClick={() => { const { pending } = prompt; setPrompt(null); run(pending); }}>
+                  {prompt.pending.kind === 'new' ? 'New workbook' : 'Open…'}
+                </button>
+              </div>
+            </>
+          ) : (
+            <>
+              <p className="mm-lede">Your workbook is saved. Now choose the file to open.</p>
+              <div className="mm-actions workbook-prompt-actions">
+                <button className="mm-btn" onClick={() => setPrompt(null)}>
+                  Cancel
+                </button>
+                <button className="mm-btn mm-btn--primary" onClick={() => { setPrompt(null); run({ kind: 'open' }); }}>
+                  Open…
+                </button>
+              </div>
+            </>
+          )}
+        </Modal>
       )}
     </>
   );

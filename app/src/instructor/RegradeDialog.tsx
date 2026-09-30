@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { gradingStore } from '../storage/backend';
 import type { RegradeOutcome, RegradePlan } from '../storage/gradingStore';
 import { plural, regradeRow, regradeSummary } from './gradingViews';
+import { Modal } from '../components/Modal';
 
 type Phase =
   | { kind: 'loading' }
@@ -42,13 +43,6 @@ export function RegradeDialog({ assignmentId, title, onClose, onCommitted }: {
   const close = () => {
     if (!busy) onClose();
   };
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') close();
-    };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  });
 
   const commit = async (plan: RegradePlan) => {
     setPhase({ kind: 'committing', plan });
@@ -68,46 +62,38 @@ export function RegradeDialog({ assignmentId, title, onClose, onCommitted }: {
   };
 
   return (
-    <div className="mm-modal-backdrop" onClick={close}>
-      <div
-        className="mm-modal gr-regrade mm-surface"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="regrade-title"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="mm-modal-head">
-          <h2 id="regrade-title">
-            Re-grade {title}
-            {phase.kind !== 'done' && ' — dry run'}
-          </h2>
-          <button type="button" className="mm-btn mm-btn--quiet" aria-label="Close" onClick={close} disabled={busy}>
-            ×
-          </button>
-        </div>
-        {phase.kind === 'loading' && <p className="mm-note">Re-running the latest submissions…</p>}
-        {phase.kind === 'error' && (
-          <>
-            <p className="mm-error">{phase.message}</p>
-            <div className="mm-actions gr-regrade-actions">
-              <button type="button" className="mm-btn" onClick={onClose}>Close</button>
-            </div>
-          </>
-        )}
-        {phase.kind === 'done' && <Done outcome={phase.outcome} onClose={onClose} />}
-        {(phase.kind === 'plan' || phase.kind === 'committing') && (
-          <PlanView
-            plan={phase.plan}
-            title={title}
-            notice={phase.kind === 'plan' ? phase.notice : undefined}
-            error={phase.kind === 'plan' ? phase.error : undefined}
-            committing={phase.kind === 'committing'}
-            onCancel={close}
-            onCommit={() => void commit(phase.plan)}
-          />
-        )}
+    <Modal className="gr-regrade" onClose={onClose} busy={busy} labelledBy="regrade-title">
+      <div className="mm-modal-head">
+        <h2 id="regrade-title">
+          Re-grade {title}
+          {phase.kind !== 'done' && ' — dry run'}
+        </h2>
+        <button type="button" className="mm-btn mm-btn--quiet" aria-label="Close" onClick={close} disabled={busy}>
+          ×
+        </button>
       </div>
-    </div>
+      {phase.kind === 'loading' && <p className="mm-note">Re-running the latest submissions…</p>}
+      {phase.kind === 'error' && (
+        <>
+          <p className="mm-error">{phase.message}</p>
+          <div className="mm-actions gr-regrade-actions">
+            <button type="button" className="mm-btn" onClick={onClose}>Close</button>
+          </div>
+        </>
+      )}
+      {phase.kind === 'done' && <Done outcome={phase.outcome} onClose={onClose} />}
+      {(phase.kind === 'plan' || phase.kind === 'committing') && (
+        <PlanView
+          plan={phase.plan}
+          title={title}
+          notice={phase.kind === 'plan' ? phase.notice : undefined}
+          error={phase.kind === 'plan' ? phase.error : undefined}
+          committing={phase.kind === 'committing'}
+          onCancel={close}
+          onCommit={() => void commit(phase.plan)}
+        />
+      )}
+    </Modal>
   );
 }
 

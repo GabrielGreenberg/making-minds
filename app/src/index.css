@@ -833,69 +833,6 @@ thead .sc-label-col {
   font-size: 11px;
 }
 
-/* ── Modal / Dialog ── */
-.modal-overlay {
-  position: fixed;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.3);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 1000;
-}
-
-.modal-dialog {
-  background: white;
-  border-radius: 8px;
-  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.2);
-  padding: 20px 24px;
-  max-width: 400px;
-  width: 90%;
-}
-
-.modal-title {
-  font-size: 16px;
-  font-weight: 600;
-  margin-bottom: 8px;
-}
-
-.modal-body {
-  font-size: 13px;
-  color: var(--text-secondary);
-  margin-bottom: 16px;
-  line-height: 1.5;
-}
-
-.modal-actions {
-  display: flex;
-  gap: 8px;
-  justify-content: flex-end;
-}
-
-.modal-btn {
-  padding: 6px 16px;
-  font-size: 13px;
-  border: 1px solid var(--menu-border);
-  background: white;
-  cursor: pointer;
-  border-radius: 4px;
-  font-family: inherit;
-}
-
-.modal-btn:hover {
-  background: #f0f0f0;
-}
-
-.modal-btn-danger {
-  background: var(--danger);
-  color: white;
-  border-color: var(--danger);
-}
-
-.modal-btn-danger:hover {
-  background: #c62828;
-}
-
 /* ── Problem text banner ── */
 .problem-banner {
   padding: 8px 16px;

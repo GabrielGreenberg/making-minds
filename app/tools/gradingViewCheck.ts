@@ -416,9 +416,11 @@ console.log('[queue]');
       (['note', 'field', 'control', 'page'] as const).every((t) => press(k, t, true) === null)));
   check('keys: with a modifier (Cmd/Ctrl/Alt) → nothing', press('Enter', 'page', false, false, true) === null && press('1', 'page', false, false, true) === null);
   const queueSrc = readFileSync(new URL('../src/instructor/GradingQueue.tsx', import.meta.url), 'utf8');
-  check("GradingQueue's key handler goes through queueKeyAction, placing the note by ref and asking for an open modal",
+  check("GradingQueue's key handler goes through queueKeyAction, placing the note by ref and asking the one modal stack (task 088)",
     /queueKeyAction\(/.test(queueSrc) && /keyTarget\(e\.target, noteRef\.current\)/.test(queueSrc) &&
-      /<textarea ref=\{noteRef\}/.test(queueSrc) && /querySelector\('\.mm-modal-backdrop'\)/.test(queueSrc) &&
+      /<textarea ref=\{noteRef\}/.test(queueSrc) && /import \{ isModalOpen \} from '\.\.\/modalStack'/.test(queueSrc) &&
+      /keyTarget\(e\.target, noteRef\.current\),\s*isModalOpen\(\),/.test(queueSrc) &&
+      !/function modalOpen/.test(queueSrc) && !/mm-modal-backdrop/.test(queueSrc) &&
       !/tagName !== 'TEXTAREA'/.test(queueSrc));
 }
 

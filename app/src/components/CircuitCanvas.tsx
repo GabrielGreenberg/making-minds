@@ -7,6 +7,7 @@ import { Palette } from './Palette';
 import { usePaletteDrag } from './paletteDrag';
 import { clientToCanvas, placementOrigin, toolComponent } from '../palette';
 import { editorShortcut, isTextEntryTarget } from '../shortcuts';
+import { isModalOpen } from '../modalStack';
 import { applyManualSegments } from '../wireSegments';
 import { canvasColors, canvasVar, signalColor } from '../canvasTheme';
 import { circuitBounds, draftActionsAt, fitView, freeArea, zoomAbout, ZOOM_STEP } from '../canvasView';
@@ -1950,9 +1951,11 @@ export function CircuitCanvas() {
   // Which command a key press is lives in ONE pure table (shortcuts.ts, task
   // 058: case-free, so Shift or Caps Lock never turns ⌘Z's "z" into a miss;
   // Ctrl+Y redoes too); this handler only dispatches. Undo and redo are the
-  // store's, which carry the lock (law 3).
+  // store's, which carry the lock (law 3). An open modal owns the keys (task
+  // 088): nothing is deleted, pasted or undone unseen behind it.
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
+      if (isModalOpen()) return;
       if (isTextEntryTarget(document.activeElement as HTMLElement | null)) return;
       const command = editorShortcut(e);
       if (!command) return;
@@ -3148,10 +3151,10 @@ export function CircuitCanvas() {
     };
   }, [stableOnMove, stableOnUp, pendingWireMove]);
 
-  // Escape cancels a pending (armed) wire
+  // Escape cancels a pending (armed) wire, unless a modal is open (its Escape)
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') clearPendingWire();
+      if (e.key === 'Escape' && !isModalOpen()) clearPendingWire();
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
