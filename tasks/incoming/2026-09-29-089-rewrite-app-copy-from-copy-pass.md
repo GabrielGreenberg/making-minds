@@ -4,11 +4,11 @@ type: chore
 title: Rewrite the app's on-screen copy from Gabriel's copy pass, and hold new copy to the house style
 priority: normal
 size: large
-requires: human
+requires: browser
 area: app
 source: chat
 created: 2026-09-29T08:00:00-07:00
-status: blocked
+status: ready
 after:
 branch:
 merged_into:
@@ -37,27 +37,15 @@ the TypeScript AST. It took JSX text flattened per element, string and template 
 string concatenations, and the `title` / `placeholder` / `aria-label` / `alt` attributes.
 It dropped class names, SQL, console output, `devData/` and the CLIs. That gave **1,112
 items**, grouped by screen: student pages 84, sign-in 67, editor 199, machine checks 78,
-sandbox 59, instructor 528, server replies 19, developer-facing 78. They are on the
-**Making Minds Copy Pass** page (https://claude.ai/artifact/BLwAy4V9PFQz6vVPHAV1Qq, private
-to Gabriel). Each row shows the text, where it appears, `file:line` and the code around it,
-with a field for Gabriel's version. Rows can also be marked Keep or Cut. A "House style" box
-holds rules for the rows he doesn't rewrite. **Copy decisions** exports all of it as plain
-text:
+sandbox 59, instructor 528, server replies 19, developer-facing 78. Gabriel reviewed them on
+the private **Making Minds Copy Pass** page (https://claude.ai/artifact/BLwAy4V9PFQz6vVPHAV1Qq).
+A worker does not need the page.
 
-```
-HOUSE STYLE:
-<rules>
-
-### c0001 · REWRITE
-where: Home › Assignments tab · app/src/components/HomeScreen.tsx:84
-old: <the current text; {…} marks an interpolated value>
-new: <Gabriel's text>
-```
-
-`KEEP` and `CUT` blocks have no `new:` line. A `new:` of `[no text]` also means cut
-(Gabriel's own way of marking it). The page's database holds the same decisions, so a worker
-can also read them with `ArtifactData list` (collection `copy`, and `meta/style` for the house
-style). Double spaces after full stops in his text are typing habit: write single spaces.
+**The rows to change are in `tasks/attachments/2026-09-29-089-1-copy-decisions.md`**, the
+source of truth for this task. It lists 13 rows Gabriel decided himself and 247 that Claude
+drafted from his rules (246 rewrites and 1 cut). Each row has `### <id> · REWRITE|CUT ·
+Gabriel|suggested`, then `where:` (screen and `file:line` at `e2c7f12`), `old:` and, for a
+rewrite, `new:`. Every row not listed stays as it is.
 
 ### The house style (from Gabriel's first 13 decisions, 2026-09-30)
 Gabriel rewrote 13 rows himself (Home, Grades, Feedback, the past-due notice). They are
@@ -75,19 +63,20 @@ recorded below under Resolved decisions. The rules they show:
 9. No colon-then-reveal inside a sentence. A colon after a short label ("Free end:") stays.
 10. Leave text that already works. Short labels and plain messages mostly stay.
 
-Claude drafted a suggestion for every other row (except the developer-only group) by these
-rules: 246 rewrites, 1 cut and 774 no-change suggestions across 1,021 rows. They are on the
-page, and a row changes only when Gabriel uses its suggestion or writes his own.
+Claude applied these rules to every other row except the developer-only group: 1,021 rows,
+giving 246 rewrites and 1 cut, with the other 774 left unchanged. Gabriel released that
+extrapolation to be applied (Resolved decisions).
 
 ## Done when
-- Every `REWRITE` is in the app verbatim at its location, with `{…}` placeholders wired back
-  to the same expressions. Line numbers may have drifted since `e2c7f12`, so locate each row
-  by its `old:` text.
+- Every `REWRITE` in the attachment is in the app at its location, with `{…}` placeholders
+  wired back to the same expressions. Line numbers may have drifted since `e2c7f12`, so
+  locate each row by its `old:` text.
+  - `Gabriel` rows are applied verbatim, with single spaces after full stops.
+  - `suggested` rows are applied as written. If one reads wrong in place or breaks a rule,
+    fix it and list the fix in the progress log as old → suggested → applied.
 - Every `CUT` is removed, and the surface still reads and lays out correctly without it (no
   empty `<p>`, no orphaned label, no dangling separator).
-- `KEEP` rows are unchanged.
-- Rows Gabriel left undecided stay as they are. (He has already seen a suggestion for each
-  of them on the page.)
+- Rows not in the attachment are unchanged.
 - The house style is written down where future copy will meet it:
   `docs/buildout/VISUAL_VOCAB.md` gets a §Copy section and CLAUDE.md gets a one-line pointer.
   `copyCheck` in `npm run check` enforces the mechanical rules (for example, no em dash or
@@ -101,7 +90,7 @@ page, and a row changes only when Gabriel uses its suggestion or writes his own.
   AST extraction as the pass: a committed `app/tools/copyCensus.ts` lists user-facing
   strings and fails on the house style's mechanical rules. New copy then meets the rules at
   `npm run check`, the same way `themeCheck` holds colours.
-- **surgicalFix:** Apply the pasted rewrites only. The next feature brings the em dashes
+- **surgicalFix:** Apply the attachment only. The next feature brings the em dashes
   back.
 - Seams: none. This is text only, except the few rows that are thrown `Error` messages or
   server replies (`server/src/app.ts`, `identity.ts`, `password.ts`) that the client shows
@@ -128,7 +117,7 @@ page, and a row changes only when Gabriel uses its suggestion or writes his own.
 
 ## Verify
 `npm run check` (and `npx tsc -p tsconfig.app.json --noEmit` plus `npm run typecheck:tools`
-in `app/`). In the browser preview, look at each student surface Gabriel rewrote: Home
+in `app/`). In the browser preview, look at each student surface that changed: Home
 (Assignments, Grades), the assignment page, the editor's top bar and hint line, Submit,
 Feedback and sign-in. Check wrapping at phone width. Remote-only strings (server replies,
 sign-in claim errors) are owed a look on the pilot after release.
@@ -154,13 +143,9 @@ Gabriel's rewrites, 2026-09-30 (row id · `file:line` at `e2c7f12`):
 - c0022 `FeedbackPanel.tsx:112` → "Thank you. An instructor will take a look."
 - c0028 `AssignmentOverview.tsx:123` → "🔒 Past due. Your submission is read-only."
 
-## Questions
-1. Gabriel: work through the Copy Pass page
-   (https://claude.ai/artifact/BLwAy4V9PFQz6vVPHAV1Qq), then paste the **Copy decisions**
-   output into `/catch` or `/work`, or just say "done" and the worker reads the decisions
-   from the page's database. Use suggestions one by one ("Use this") or in bulk ("Use
-   suggestions in view", which never overrides a row you've decided). The house style
-   above is already written down, so the House style box is only for rules you want to add.
+2026-09-30, Gabriel: no more decisions of his own. The rules extrapolated from his 13 are
+to be applied as drafted (the attachment's `suggested` rows). The task is released for the
+robot to take.
 
 ## Progress log
 - 2026-09-29 — Filed from chat. The copy pass is published with 1,112 items and Paul's three
@@ -169,3 +154,9 @@ Gabriel's rewrites, 2026-09-30 (row id · `file:line` at `e2c7f12`):
 - 2026-09-30 — Gabriel decided 13 rows (Resolved decisions). The house style above was
   derived from them. Six agents drafted suggestions for the other 1,021 rows, and the page was
   republished with them (Version 2). Still waiting on Gabriel. Next step: unchanged.
+- 2026-09-30 — Released. Gabriel has no more decisions and wants the extrapolated rules
+  applied. His 13 rows and Claude's 247 suggested changes were written to
+  `tasks/attachments/2026-09-29-089-1-copy-decisions.md`, which is now the source of truth.
+  Next step: claim, then apply the attachment row by row (student surfaces first). Then
+  write VISUAL_VOCAB §Copy and `copyCheck`, update the pinned strings in the harness, and
+  run the gates.
