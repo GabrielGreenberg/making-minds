@@ -148,7 +148,7 @@ export function FillInTableEditor({
       </div>
 
       <div className="doc-editor-head">
-        <span className="mm-label">Key — one row per case, any order</span>
+        <span className="mm-label">Key (one row per case, any order)</span>
         <button
           type="button"
           className="mm-btn mm-btn--small"

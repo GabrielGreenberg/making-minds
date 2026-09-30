@@ -48,7 +48,7 @@ export function LiveTruthTable() {
       {table === null ? (
         <p className="op-empty">Add at least one Input and one Output to see your circuit's table.</p>
       ) : table === 'too-many' ? (
-        <p className="op-empty">This circuit has more than {TRUTH_TABLE_MAX_INPUTS} inputs — too many rows to list.</p>
+        <p className="op-empty">Too many rows to list. This circuit has more than {TRUTH_TABLE_MAX_INPUTS} inputs.</p>
       ) : (
         <>
           {/* Equal columns up to the memo's 60px each, narrowing to fit a

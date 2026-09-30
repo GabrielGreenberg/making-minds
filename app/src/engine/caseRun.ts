@@ -229,7 +229,7 @@ export function recordedCaseSeparations(
  *  allows, or undefined when it is within budget (or unbudgeted). */
 function tapeOverrun(used: number, maxTapeCells: number | undefined): string | undefined {
   if (maxTapeCells === undefined || used <= maxTapeCells) return undefined;
-  return `machine used ${used} tape cells — this question allows at most ${maxTapeCells}`;
+  return `machine used ${used} tape cells, but this question allows at most ${maxTapeCells}`;
 }
 
 /**

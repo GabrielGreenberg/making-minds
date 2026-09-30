@@ -10,7 +10,7 @@ import { problemVerdict } from '../gradeDisplay';
 import { scoreRecord } from '../engine/score';
 import { dueInput } from '../lateContext';
 import { COURSE_CALENDAR } from '../courseCalendar';
-import { formatDueDate, formatDateTime } from '../dueDates';
+import { FROZEN_BADGE, FROZEN_NOTICE, formatDueDate, formatDateTime } from '../dueDates';
 import { SubmitDialog } from './SubmitDialog';
 import type { AssignmentQuestion } from '../types';
 
@@ -122,13 +122,13 @@ export function AssignmentOverview() {
           {frozen ? (
             <span
               className="home-locked"
-              title="This assignment closed after its due date — each question shows your submission, read-only."
+              title={FROZEN_NOTICE}
             >
-              🔒 Past due — showing your submission
+              {FROZEN_BADGE}
             </span>
           ) : viewing ? (
-            <span className="dim" title="Each problem opens your answer as submitted in this attempt — Run and Step still work, edits are off.">
-              Viewing submission {viewing.attempt}, submitted {formatDateTime(viewing.submittedAt)} — read-only ·{' '}
+            <span className="dim" title="Each problem opens your answer as submitted in this attempt. Run and Step still work. Editing is off.">
+              Viewing submission {viewing.attempt}, submitted {formatDateTime(viewing.submittedAt)} (read-only) ·{' '}
               <button className="mm-link" onClick={() => navigate({ kind: 'assignment', id: assignment.id })}>
                 Back to my work
               </button>

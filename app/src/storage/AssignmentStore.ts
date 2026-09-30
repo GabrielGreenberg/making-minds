@@ -42,7 +42,7 @@ import { readPersistedAccount } from '../auth/accounts';
 import { studentCopy } from '../lateContext';
 import { readExtensions } from './lateLocal';
 
-export const ASSIGNMENT_HAS_SUBMISSIONS = 'students have submitted this assignment — hide it instead of deleting it';
+export const ASSIGNMENT_HAS_SUBMISSIONS = 'students have submitted this assignment. Hide it instead of deleting it';
 
 export interface AssignmentStore {
   list(): Promise<AssignmentSummary[]>;

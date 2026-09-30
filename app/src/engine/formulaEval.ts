@@ -95,7 +95,7 @@ export function evalFormula(expr: string, vars: Record<string, number>): number 
   }
   if (result < 0) {
     throw new FormulaError(
-      `Formula produced a negative result (${result}); circuits cannot represent negative numbers`,
+      `Formula produced a negative result (${result}), which circuits cannot represent`,
     );
   }
   return result;

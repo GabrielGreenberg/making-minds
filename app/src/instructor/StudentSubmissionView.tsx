@@ -41,7 +41,7 @@ export function StudentSubmissionView({ route }: { route: Extract<Route, { kind:
   );
   const matrix = { kind: 'instructor-grading-assignment', id, view: 'matrix' } as const;
 
-  if (!value) return <p className="mm-empty">{loading ? 'Loading…' : 'Couldn’t load this submission — the server may be unreachable.'}</p>;
+  if (!value) return <p className="mm-empty">{loading ? 'Loading…' : 'Couldn’t load this submission. The server may be unreachable.'}</p>;
   const { summary, assignment, row, detail } = value;
   const back = (
     <a className="eyebrow" {...hashLink(summary ? matrix : { kind: 'instructor-grading' })}>
@@ -97,7 +97,7 @@ export function StudentSubmissionView({ route }: { route: Extract<Route, { kind:
               onChanged={reload}
             />
           </p>
-          <p className="mm-empty">{row.grade.missing ? 'Missing — nothing submitted by the due date.' : 'Nothing submitted yet.'}</p>
+          <p className="mm-empty">{row.grade.missing ? 'Missing. Nothing was submitted by the due date.' : 'Nothing submitted yet.'}</p>
         </>
       ) : (
         <>
@@ -131,7 +131,7 @@ export function StudentSubmissionView({ route }: { route: Extract<Route, { kind:
             </p>
             {detail.record.attempt > 1 && (
               <p className="gr-subline">
-                <span className="mm-label">Older attempts</span> {detail.record.attempt - 1}, read-only below — only the latest counts.
+                <span className="mm-label">Older attempts</span> {detail.record.attempt - 1}, read-only below. Only the latest counts.
               </p>
             )}
             {detail.record.submission.group?.length ? <GroupLine keys={detail.record.submission.group} /> : null}
@@ -152,7 +152,7 @@ export function StudentSubmissionView({ route }: { route: Extract<Route, { kind:
           {detail.record.attempt > 1 && (
             <section className="mm-section">
               <h2>Earlier attempts</h2>
-              <p className="mm-note">Read-only — only the latest attempt counts, and only it takes grades.</p>
+              <p className="mm-note">Read-only. Only the latest attempt counts and takes grades.</p>
               {Array.from({ length: detail.record.attempt - 1 }, (_, i) => detail.record.attempt - 1 - i).map((n) => (
                 <EarlierAttempt key={n} assignment={assignment} studentKey={student} attempt={n} />
               ))}
@@ -262,7 +262,7 @@ function problemState(p: ProblemScore | undefined): string {
     case 'pending':
       return 'needs a grade';
     case 'auto-half':
-      return `${pointsLabel(p.points!)} — the ½ rule`;
+      return `${pointsLabel(p.points!)} by the ½ rule`;
     default:
       return `${pointsLabel(p.points!)} point${p.points === 1 ? '' : 's'}`;
   }
@@ -288,7 +288,7 @@ function SubmissionDetail({
   if (!result) {
     return (
       <div className="instructor-detail">
-        <p className="mm-note">Not autograded — this attempt predates grading on receipt.</p>
+        <p className="mm-note">Not autograded. This attempt was submitted before autograding began.</p>
       </div>
     );
   }
@@ -542,7 +542,7 @@ function HalfRuleLine({ question, qr, problem }: { question: AssignmentQuestion;
   const met = problem?.autoPoints != null && problem.autoPoints > 0;
   return (
     <p className="gr-half">
-      ½ rule: at least {k} of {qr.total} case{qr.total === 1 ? '' : 's'} — passed {qr.passed},{' '}
+      ½ rule: at least {k} of {qr.total} case{qr.total === 1 ? '' : 's'} · passed {qr.passed},{' '}
       <span className={met ? 'instructor-pass' : 'instructor-fail'}>{met ? 'met' : 'not met'}</span>
     </p>
   );
@@ -558,7 +558,7 @@ function IntegrityNotes({ record, assignment }: { record: SubmissionRecord; assi
   const flagged = integrity.questions.filter((q) => q.flags.length > 0);
   return (
     <div className="instructor-detail-q instructor-review" id="gr-integrity">
-      <strong>Integrity — to look at, not a verdict</strong>
+      <strong>Integrity (to look at, not a verdict)</strong>
       {flagged.length === 0 ? (
         <p className="mm-note">Nothing to look at.</p>
       ) : (
@@ -601,7 +601,7 @@ function GradeControls({
 
   const done = (o: GradeWriteOutcome) => {
     if (o.ok) setMessage(null);
-    else if (o.conflict) setMessage('Someone else changed this grade meanwhile — showing theirs.');
+    else if (o.conflict) setMessage('Someone else changed this grade meanwhile. Their grade is shown.');
     else setMessage(o.error);
     onReviewed();
   };
@@ -629,8 +629,8 @@ function GradeControls({
           type="text"
           placeholder={
             override
-              ? 'Why override the autograde? (required; the student sees it on release — no medical or accommodation details)'
-              : 'Feedback note (optional; the student sees it on release — no medical or accommodation details)'
+              ? 'Why override the autograde? (required, shown to the student on release, no medical or accommodation details)'
+              : 'Feedback note (optional, shown to the student on release, no medical or accommodation details)'
           }
           value={note}
           onChange={(e) => setNote(e.target.value)}

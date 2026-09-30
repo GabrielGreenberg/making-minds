@@ -80,7 +80,7 @@ export function SubmitDialog({
     try {
       const record = await submitAssignment(assignmentId, getCurrentUserEmail(), { group });
       if (!record) {
-        setPhase({ kind: 'confirm', error: 'This assignment could not be found — reload the page and try again.' });
+        setPhase({ kind: 'confirm', error: 'This assignment could not be found. Reload the page and try again.' });
         return;
       }
       setPhase({ kind: 'done', record });
@@ -90,8 +90,8 @@ export function SubmitDialog({
         error:
           err instanceof SubmitRefused
             ? `Not submitted: ${err.message}`
-            : 'Submission failed — the server could not be reached, and nothing was recorded. ' +
-              'Your work is still saved. Please try Submit again in a moment.',
+            : 'Submission failed. The server could not be reached, and nothing was recorded. ' +
+              'Your work is still saved. Try Submit again in a moment.',
       });
     }
   };
@@ -107,7 +107,7 @@ export function SubmitDialog({
         <>
           <p className="mm-modal-sub">{title}</p>
           <p className="mm-note">
-            Attempt {phase.record.attempt} is recorded. Grades will appear under Grades once your
+            Attempt {phase.record.attempt} is recorded. Grades will appear under Grades when your
             instructor releases them.
           </p>
           {phase.record.submission.group?.length ? (
@@ -173,13 +173,13 @@ function GroupPicker({
     <fieldset className="submit-group">
       <legend className="mm-label">Group members (optional)</legend>
       <p className="mm-note submit-group-note">
-        Worked with classmates? List them here — groups are at most 3 people, and each member lists
+        List any classmates you worked with. Groups are at most 3 people, and each member lists
         the others on their own submission.
       </p>
       {loading ? (
         <p className="mm-note dim">Loading the class list…</p>
       ) : failed ? (
-        <p className="mm-note dim">The class list couldn't be loaded — you can still submit without listing a group.</p>
+        <p className="mm-note dim">The class list couldn't be loaded. You can still submit without listing a group.</p>
       ) : !classmates?.length ? (
         <p className="mm-note dim">No classmates are on the roster yet.</p>
       ) : (

@@ -42,17 +42,13 @@ export function GradesView({ openId }: { openId?: string }) {
     <StudentLayout current="grades">
       <div className="mm-head">
         <h1>Grades</h1>
-        <p className="mm-lede">
-          Your result for each homework, once your instructor releases it. Open a row for
-          the question-by-question sheet.
-        </p>
       </div>
 
       {assignments.length === 0 ? (
         <p className="mm-empty">
           {loading ? 'Loading…' : error ? (
             <>
-              Couldn't load your grades — the server may be unreachable.{' '}
+              Couldn't load your grades. The server may be unreachable.{' '}
               <button className="mm-link" onClick={reload}>Retry</button>
             </>
           ) : 'No assignments yet.'}

@@ -99,7 +99,7 @@ check('the file is read as a class list (it has a status column)', reg.statusCol
 check(
   'an unknown status code is imported, with an issue on its physical line',
   byEmail('otto.oddcode@example.com') != null &&
-    reg.issues.some((i) => i.line === 21 && i.reason === 'unrecognised status "X" — imported'),
+    reg.issues.some((i) => i.line === 21 && i.reason === 'unrecognised status "X" (imported)'),
   JSON.stringify(reg.issues),
 );
 check(
@@ -242,7 +242,7 @@ check(
 const inherited = parseRoster('Email,Status\nproto@example.com,constructor\n');
 check(
   'a status named like an Object property ("constructor") is an unknown code: imported with an issue',
-  inherited.entries.length === 1 && inherited.issues.some((i) => i.reason === 'unrecognised status "constructor" — imported'),
+  inherited.entries.length === 1 && inherited.issues.some((i) => i.reason === 'unrecognised status "constructor" (imported)'),
   JSON.stringify(inherited.issues),
 );
 
@@ -376,8 +376,8 @@ check('"skipped 8 lines before the header"', hasLine('skipped 8 lines before the
 check('"2 waitlisted — imported"', hasLine('2 waitlisted — imported'), lines.join(' | '));
 check('"1 dropped — not imported"', hasLine('1 dropped — not imported'), lines.join(' | '));
 check(
-  '"no longer on the class list — review", then each student with the reason',
-  hasLine('no longer on the class list — review (nobody was removed):') &&
+  '"no longer on the class list", then each student with the reason',
+  hasLine('no longer on the class list (nobody was removed):') &&
     hasLine('Willa Waite <willa.waite@example.com> — status dropped'),
   lines.join(' | '),
 );

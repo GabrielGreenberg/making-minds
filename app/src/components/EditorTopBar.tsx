@@ -13,6 +13,7 @@ import { SessionControls } from './SessionControls';
 import { WorkbookFileMenu } from './WorkbookFileMenu';
 import { SubmitDialog } from './SubmitDialog';
 import { saveLabel, submittedLabel } from '../workbench';
+import { FROZEN_BADGE, FROZEN_NOTICE } from '../dueDates';
 
 /** The clock, re-read every `ms` — for labels that age ("Saved 3 min ago"). */
 function useNow(ms: number): number {
@@ -37,7 +38,7 @@ function ForeignCrumbs({ id, title, owner }: { id: string; title: string; owner:
       <a
         className="wb-crumb-current"
         {...hashLink({ kind: 'instructor-grading-student', id, student: owner.key })}
-        title={`${owner.name}'s submission — every problem`}
+        title={`${owner.name}'s submission (every problem)`}
       >
         {owner.name}
       </a>
@@ -69,7 +70,7 @@ export function EditorTopBar() {
   return (
     <header className="wb-topbar">
       {user ? (
-        <a className="wb-brand" {...hashLink({ kind: 'home' })} title="Home — your assignments">
+        <a className="wb-brand" {...hashLink({ kind: 'home' })} title="Home">
           Making Minds<span className="wb-course">PHIL 133</span>
         </a>
       ) : (
@@ -89,7 +90,7 @@ export function EditorTopBar() {
               <a
                 className="wb-crumb-current"
                 {...hashLink({ kind: 'assignment', id: assignment.id, attempt: viewingSubmission?.attempt })}
-                title={`${assignment.title} — the whole problem set`}
+                title={`${assignment.title} (the whole problem set)`}
               >
                 {assignment.title}
               </a>
@@ -110,21 +111,21 @@ export function EditorTopBar() {
         {save && (
           <span className={save.error ? 'wb-save wb-save--error' : 'wb-save'} role="status" title={
             save.error
-              ? 'The server could not be reached — your work is kept in this browser and saving will retry automatically'
+              ? 'The server could not be reached. Your work is kept in this browser, and saving will retry automatically.'
               : undefined
           }>
             {save.text}
           </span>
         )}
         {assignment && frozen && (
-          <span className="wb-lock" title="This assignment closed after its due date — you're viewing your submission, read-only.">
-            🔒 Past due — viewing your submission
+          <span className="wb-lock" title={FROZEN_NOTICE}>
+            {FROZEN_BADGE}
           </span>
         )}
         {assignment && owner && viewingSubmission && (
           <>
-            <span className="wb-lock" title={`${owner.name}'s answers as submitted in this attempt — Run and Step still work, edits are off.`}>
-              Viewing {owner.name}'s attempt {viewingSubmission.attempt} — read-only
+            <span className="wb-lock" title={`${owner.name}'s answers as submitted in this attempt are read-only. Run and Step still work.`}>
+              Viewing {owner.name}'s attempt {viewingSubmission.attempt} (read-only)
             </span>
             <button
               type="button"
@@ -138,8 +139,8 @@ export function EditorTopBar() {
         )}
         {assignment && !owner && !frozen && viewingSubmission && (
           <>
-            <span className="wb-lock" title="Your answers as submitted in this attempt — Run and Step still work, edits are off.">
-              Viewing submission {viewingSubmission.attempt} — read-only
+            <span className="wb-lock" title="Your answers as submitted in this attempt are read-only. Run and Step still work.">
+              Viewing submission {viewingSubmission.attempt} (read-only)
             </span>
             <button
               type="button"

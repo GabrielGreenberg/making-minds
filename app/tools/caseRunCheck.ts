@@ -688,15 +688,15 @@ console.log("\n[resubmit: the banner compares against the case's own attempt]");
   // The fix, on the canvas, not yet submitted: the settled divergence note.
   useStore.setState({ components: clone(fx.correct.components), wires: clone(fx.correct.wires) });
   const v2 = view();
-  check('fixed on the canvas: "You\'ve changed this question since you submitted — this runs your current machine."',
+  check('fixed on the canvas: "You\'ve changed this question since you submitted."',
     v2.note === 'changed' &&
-      v2.noteText === "You've changed this question since you submitted — this runs your current machine.");
+      v2.noteText === "You've changed this question since you submitted.");
   // The fix submitted: attempt 2 is the latest record, the loaded case is
   // still attempt 1's (its ✗). Never "Same as when graded" beside it.
   useStore.setState({ submissions: { [full.id]: gradedRecord(full, q, fx.correct, 2) } });
   const v3 = view();
   check(`resubmitted: attempt 1's ✗ is not called the same run (${v3.note}: ${v3.noteText})`,
-    v3.note === 'resubmitted' && !v3.recorded.pass && v3.noteText.includes('attempt 1') && v3.noteText.includes('current machine'));
+    v3.note === 'resubmitted' && !v3.recorded.pass && v3.noteText.includes('attempt 1') && v3.noteText.includes('submitted again'));
   check('…and the live run is the fixed machine\'s (it decodes, no rejection)', v3.now.pass === undefined && v3.now.text.startsWith('output '));
   // Run again: the latest attempt's case, on its own machine.
   await useStore.getState().loadCaseInput(q.id, k);

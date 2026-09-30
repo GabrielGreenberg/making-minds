@@ -79,3 +79,4 @@
 2026-09-29-086 · feature · Mark a Feedback report resolved on its own once the pipeline has fixed it — when every task it was filed into is done and live · 2026-09-29T18:37:55-0700 · robot/086-auto-resolve-fixed-feedback · bc04ca5
 2026-09-29-087 · feature · Make the sandbox embeddable as a live demo on makingminds.org · 2026-09-29T20:58:31-0700 · robot/087-embeddable-sandbox-demo · 2a50740
 2026-09-29-088 · bug · Open every modal on the page itself so the Feedback form wraps its text, and let it take a pasted screenshot · 2026-09-29T22:44:55-0700 · robot/088-modals-portaled-feedback-paste-screenshots · 605c01a
+2026-09-29-089 · chore · Rewrite the app's on-screen copy from Gabriel's copy pass, and hold new copy to the house style · 2026-09-30T01:07:53-0700 · robot/089-rewrite-app-copy-from-copy-pass · 9a9d370

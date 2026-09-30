@@ -129,8 +129,8 @@ export function matchAccount(db: Db, facts: { email: string; studentId: string }
       account: holder,
       by: null,
       conflict:
-        `student ID ${written} is also on ${holder.name}'s account (${holder.email}) but was never verified — ` +
-        `if that is this student, add them with that email and this ID; if not, remove that account`,
+        `student ID ${written} is also on ${holder.name}'s account (${holder.email}) but was never verified. ` +
+        `If that is this student, add them with that email and this ID. If not, remove that account`,
     };
   }
   return { account: null, by: null, conflict: null };
@@ -220,7 +220,7 @@ export function claimForSignUp(db: Db, details: { email: unknown; studentId: unk
       return {
         ok: false,
         reason: 'id-required',
-        message: 'Enter your student ID (UID) — it confirms the account is yours.',
+        message: 'Enter your student ID (UID).',
       };
     }
     if (onFile && onFile !== uid) {
@@ -242,7 +242,7 @@ export function claimForSignUp(db: Db, details: { email: unknown; studentId: unk
       ? {
           ok: false,
           reason: 'email-taken',
-          message: 'That email already signs in to another account — use the email on your class-list record, or ask your instructor.',
+          message: 'That email already signs in to another account. Use the email on your class-list record, or ask your instructor.',
         }
       : {
           ok: false,

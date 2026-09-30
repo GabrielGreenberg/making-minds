@@ -84,7 +84,7 @@ export function PerceptionEditor({
         <p className="mm-note mm-hint">
           The machine's inputs are an array of stimulations (like light hitting a retina) and
           its single output classifies them. Grading feeds raw bit patterns
-          {mode === 'SC' ? ' — one frame per clock tick — ' : ' '}to the circuit and checks the
+          {mode === 'SC' ? ' (one frame per clock tick) ' : ' '}to the circuit and checks the
           output bit{mode === 'SC' ? ' at every step. The "previous input" before the first frame is all 0s (what fresh MEM blocks hold).' : '.'}
         </p>
         <div className="instructor-criterion-row">
@@ -183,7 +183,7 @@ export function PerceptionEditor({
           <p className="mm-note mm-hint">
             Grading bank: {summary.generated} generated case{summary.generated === 1 ? '' : 's'}
             {summary.authored > 0 && ` + ${summary.authored} film${summary.authored === 1 ? '' : 's'} of yours`}
-            {' '}— {summary.positives} with an expected 1 somewhere
+            , {summary.positives} with an expected 1 somewhere
             {summary.examples > 0 && ` · ${summary.examples} shown to students as example${summary.examples === 1 ? '' : 's'}`}.
           </p>
         )}
@@ -205,10 +205,9 @@ export function PerceptionEditor({
             </button>
           </div>
           <p className="mm-note mm-hint">
-            Frame sequences of your own, graded after the generated ones — every step, like
-            theirs. The expected output is always the rule's. Students see only the films
-            marked "Example for students" (with their expected output) before grading; the
-            rest stay hidden in the grading bank.
+            Frame sequences of your own, graded at every step after the generated ones. The
+            expected output is always the rule's. Students see only the films marked "Example
+            for students" (with their expected output) before grading. The rest stay hidden.
           </p>
           {draft.films.map((df, i) => {
             const f = df.frames;

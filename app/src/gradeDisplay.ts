@@ -118,7 +118,7 @@ export function gradedCaseView(
     same = r != null && sameTurbotOutcome(r, loaded.recorded);
   } else if (loaded.kind === 'perception') {
     const n = loaded.frames.length;
-    what = n === 1 ? `Frame ${loaded.frames[0].join('')}` : `Film #${loaded.caseIndex + 1} — ${n} frames`;
+    what = n === 1 ? `Frame ${loaded.frames[0].join('')}` : `Film #${loaded.caseIndex + 1} (${n} frames)`;
     const rec = loaded.recorded;
     recorded = {
       text: rec.pass
@@ -161,8 +161,8 @@ export function gradedCaseView(
   const noteText = {
     same: 'Same as when graded.',
     differs: 'This run does not match the recorded grade.',
-    changed: "You've changed this question since you submitted — this runs your current machine.",
-    resubmitted: `You've submitted again since attempt ${loaded.attempt} was graded — this runs your current machine.`,
+    changed: "You've changed this question since you submitted.",
+    resubmitted: `You've submitted again since attempt ${loaded.attempt} was graded.`,
   }[note];
   return { what, recorded, now, note, noteText };
 }

@@ -45,7 +45,7 @@ export function BoxEditorBar() {
           Cancel
         </button>
         <button type="button" className="mm-btn mm-btn--small mm-btn--primary" onClick={save}>
-          {editor.isNew ? 'Save box' : 'Save: update every copy'}
+          {editor.isNew ? 'Save box' : 'Save and update every copy'}
         </button>
       </div>
       <p className="box-editor-note">

@@ -9,6 +9,7 @@ import {
   formatDueDate,
   formatDueDay,
   formatDuration,
+  FROZEN_NOTICE,
   isFrozen,
   lateBy,
 } from '../dueDates';
@@ -81,10 +82,6 @@ function AssignmentsTab() {
     <StudentLayout current="assignments">
       <div className="mm-head">
         <h1>Assignments</h1>
-        <p className="mm-lede">
-          Open a homework to work on it — each question has its own canvas, and your work
-          saves as you go. Submit when you're done; grades appear under Grades once they're released.
-        </p>
       </div>
 
       {next && (
@@ -99,7 +96,7 @@ function AssignmentsTab() {
               <div className="mm-nx-detail">
                 in {formatDuration(next.due - now)}
                 {nextSub
-                  ? ` · submitted ${formatDateTime(nextSub.submittedAt)} — you can submit again until then`
+                  ? ` · submitted ${formatDateTime(nextSub.submittedAt)}. You can submit again until then`
                   : ' · not submitted yet'}
               </div>
             </div>
@@ -159,7 +156,7 @@ function AssignmentsTab() {
               {frozen ? (
                 <span
                   className="home-locked"
-                  title="This assignment closed after its due date — open it to see your submission, read-only."
+                  title={FROZEN_NOTICE}
                 >
                   🔒 Past due
                 </span>
@@ -176,7 +173,7 @@ function AssignmentsTab() {
         )}
         {error && !loading && (
           <p className="mm-empty">
-            Couldn't load assignments — the server may be unreachable.{' '}
+            Couldn't load assignments. The server may be unreachable.{' '}
             <button className="mm-link" onClick={reload}>Retry</button>
           </p>
         )}

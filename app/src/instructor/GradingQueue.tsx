@@ -141,7 +141,7 @@ export function GradingQueue({
         <ByStudent key={route.student} summary={summary} assignment={assignment} studentKey={route.student!} hideNames={hideNames}
           numberOf={numberOf} onChanged={onChanged} />
       ) : landing === null ? (
-        <p className="mm-empty">No problem here needs a person — every answer is autograded.</p>
+        <p className="mm-empty">No problem here needs a person. Every answer is autograded.</p>
       ) : !assignment.questions.some((q) => q.id === landing) ? (
         <p className="mm-empty">No such problem on this assignment.</p>
       ) : (
@@ -292,8 +292,8 @@ function SideNotes({ items, hideNames }: { items: QueueResponse[]; hideNames: bo
         <>
           <h3>Being graded</h3>
           <p className="mm-note gr-sidenote">
-            {claimed.map(({ r, i }) => `${responseLabel(i, r.student, hideNames)} — ${r.claim!.by}`).join('; ')}. Claims lapse after
-            5 minutes idle; nothing is locked.
+            {claimed.map(({ r, i }) => `${responseLabel(i, r.student, hideNames)} by ${r.claim!.by}`).join(', ')}. Claims lapse after
+            5 minutes idle. Nothing is locked.
           </p>
         </>
       )}
@@ -400,7 +400,7 @@ function ByStudent({
 
   if (!row) return <p className="mm-empty">No such student on this assignment.</p>;
   if (walk.length === 0) {
-    return <NextStudent summary={summary} assignmentId={assignment.id} from={studentKey} lead={`${label} has nothing waiting on a person.`} />;
+    return <NextStudent summary={summary} assignmentId={assignment.id} from={studentKey} lead={`${label} has nothing to grade by hand.`} />;
   }
   if (qid === undefined) {
     return <NextStudent summary={summary} assignmentId={assignment.id} from={studentKey} lead={`Done with ${label}.`} />;
@@ -454,7 +454,7 @@ function NextStudent({ summary, assignmentId, from, lead }: { summary: Assignmen
           Next student →
         </button>
       ) : (
-        'All caught up — nobody else has a problem waiting.'
+        'All caught up. Nobody else has a problem waiting.'
       )}
     </div>
   );
@@ -626,7 +626,7 @@ function ResponseCard({
           setMessage(out.error);
         }
       } catch {
-        setMessage('Couldn’t save — the server may be unreachable. Try again.');
+        setMessage('Couldn’t save. The server may be unreachable. Try again.');
       } finally {
         setBusy(false);
       }
@@ -705,7 +705,7 @@ function ResponseCard({
 
       {claimedBy && (
         <p className="gr-notice" role="status">
-          Being graded by {claimedBy} right now. Nothing is locked — but a grade saved over theirs will ask first.
+          Being graded by {claimedBy} right now. Nothing is locked, but you will be asked before saving over their grade.
         </p>
       )}
 
@@ -713,7 +713,7 @@ function ResponseCard({
 
       {suggestion && (
         <p className="gr-notice gr-notice--changed" role="status">
-          Graded {pointsText(suggestion.points)} on attempt {suggestion.attempt ?? '?'} — the answer has since changed.{' '}
+          Graded {pointsText(suggestion.points)} on attempt {suggestion.attempt ?? '?'}. The answer has since changed.{' '}
           <button type="button" className="mm-btn mm-btn--small" disabled={busy}
             onClick={() => void write(suggestion.points, suggestion.note ?? '', base.current.version)}>
             Keep {pointsText(suggestion.points)}
@@ -724,7 +724,7 @@ function ResponseCard({
       {conflict && (
         <p className="gr-notice gr-notice--conflict" role="alert">
           {conflict.current
-            ? `Graded ${pointsText(conflict.current.points)} by ${conflict.current.grader ?? 'someone else'} meanwhile — theirs stands.`
+            ? `Graded ${pointsText(conflict.current.points)} by ${conflict.current.grader ?? 'someone else'} meanwhile. Their grade stands.`
             : 'The grade was cleared meanwhile.'}{' '}
           <button type="button" className="mm-btn mm-btn--small" onClick={() => onResult(null, true)}>
             Keep theirs &amp; next
@@ -793,7 +793,7 @@ function Answer({ item, question, assignmentId }: { item: QueueResponse; questio
     return (
       <div className="gr-answer">
         <p>
-          A machine answer ({questionModeLabel(question)}), autograded {item.autoPoints === null ? '— nothing to grade against' : pointsText(item.autoPoints)}.{' '}
+          A machine answer ({questionModeLabel(question)}), autograded {item.autoPoints === null ? '(nothing to grade against)' : pointsText(item.autoPoints)}.{' '}
           <a className="mm-link" {...hashLink({ kind: 'instructor-grading-student', id: assignmentId, student: item.student.key })}>
             Open the submission →
           </a>

@@ -812,7 +812,7 @@ console.log("[viewing another's attempt]");
     check("…over an EMPTY map (the viewer's workbook was never loaded)",
       [...s.questionCircuits.values()].every((qc) => qc.components.length === 0));
     check("frozen ignores the viewer's own past-due submission", !selectAssignmentFrozen(s));
-    check('the lock notice names the student', selectLockNotice(s) === "Showing John Doe's submission — read-only.");
+    check('the lock notice names the student', selectLockNotice(s) === "John Doe's submission is read-only.");
   }
   checkAllSimFresh("opening another's attempt");
   check('no mint key registered for the assignment (law 8)', mintKeyFor(FOREIGN_ID) === null);
@@ -822,7 +822,7 @@ console.log("[viewing another's attempt]");
   useStore.getState().addComponent('AND', 300, 300);
   check('addComponent is refused', useStore.getState().components.length === johnQ1);
   check('a refusal names the student',
-    useStore.getState().renameBox('nope', 'X') === "This question shows John Doe's submission, read-only — you can't rename a box here.");
+    useStore.getState().renameBox('nope', 'X') === "This question shows John Doe's submission, which is read-only. You can't rename a box here.");
   {
     const clipBefore = peekClipboard().canvas;
     useStore.setState({ selectedIds: [useStore.getState().components[0].id] });

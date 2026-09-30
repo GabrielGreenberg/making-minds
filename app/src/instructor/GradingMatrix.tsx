@@ -52,7 +52,7 @@ export function GradingMatrix({ summary, assignment }: { summary: AssignmentGrad
     (r.flags ?? [])
       .map((f) => {
         const others = (f.others ?? []).map((k) => names.get(k)).filter(Boolean);
-        return `${flagChipText(f)}: ${f.detail}${others.length ? ` — ${others.join(', ')}` : ''}`;
+        return `${flagChipText(f)}: ${f.detail}${others.length ? ` (${others.join(', ')})` : ''}`;
       })
       .join('\n');
 
@@ -69,7 +69,7 @@ export function GradingMatrix({ summary, assignment }: { summary: AssignmentGrad
           {r.flags?.length ? (
             <a
               className="gr-flag gr-rowflag"
-              title={`Flags — to look at, not verdicts:\n${flagTip(r)}`}
+              title={`Flags (to look at, not verdicts):\n${flagTip(r)}`}
               {...hashLink(page)}
               onClick={(e) => { e.stopPropagation(); hashLink(page).onClick(e); }}
             >
@@ -109,7 +109,7 @@ export function GradingMatrix({ summary, assignment }: { summary: AssignmentGrad
                 {c.text}
               </span>
               {c.flags.length > 0 && (
-                <span className="gr-flag" title={`Integrity — to look at, not a verdict:\n${c.flags.join('\n')}`}>
+                <span className="gr-flag" title={`Integrity (to look at, not a verdict):\n${c.flags.join('\n')}`}>
                   ⚑
                 </span>
               )}
@@ -192,7 +192,7 @@ export function GradingMatrix({ summary, assignment }: { summary: AssignmentGrad
             )}
             {offShown.length > 0 && (
               <tr className="gr-divider">
-                <td colSpan={cols}>Not counted — submitted, but not on the roster</td>
+                <td colSpan={cols}>Not counted (submitted, but not on the roster)</td>
               </tr>
             )}
             {offShown.map((r) => row(r, true))}
@@ -209,7 +209,7 @@ export function GradingMatrix({ summary, assignment }: { summary: AssignmentGrad
         <span><span className="gr-cell gr-cell--c">↻</span>changed since graded</span>
         <span><span className="gr-cell gr-cell--m">—</span>not submitted</span>
         <span><span className="gr-prov">*</span> provisional</span>
-        <span><span className="gr-flag">⚑</span> on a problem: integrity flags; after a name: that student's flags here — to look at, not a verdict</span>
+        <span><span className="gr-flag">⚑</span> on a problem: integrity flags. After a name: that student's flags here. (To look at, not a verdict.)</span>
         <span>Accent problem numbers are graded by hand.</span>
       </div>
     </>

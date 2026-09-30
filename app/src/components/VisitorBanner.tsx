@@ -33,8 +33,8 @@ export function VisitorBanner() {
   return (
     <div className="visitor-banner" role="note">
       <span>
-        You're in the sandbox as a visitor — build anything; it stays in this browser.
-        PHIL 133 student?{' '}
+        You're in the sandbox as a visitor. Anything you build stays in this browser.
+        PHIL 133 students:{' '}
         <button type="button" className="visitor-banner-link" onClick={() => navigate({ kind: 'home' })}>
           Sign in
         </button>

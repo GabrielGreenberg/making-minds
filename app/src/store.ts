@@ -227,9 +227,9 @@ export function selectShowUnboundBoxWarning(s: Parameters<typeof selectQuestionL
 export function selectLockNotice(s: Parameters<typeof lockReason>[0]): string | null {
   const reason = lockReason(s);
   if (reason === 'submission') {
-    return s.viewingOwner ? `Showing ${s.viewingOwner.name}'s submission — read-only.` : 'Showing your submission — read-only.';
+    return s.viewingOwner ? `${s.viewingOwner.name}'s submission is read-only.` : 'Your submission is read-only.';
   }
-  if (reason === 'done') return 'Marked done — unlock this question to keep editing.';
+  if (reason === 'done') return 'Marked done. Unlock this question to keep editing.';
   return null;
 }
 
@@ -3627,7 +3627,7 @@ export const useStore = create<AppState>()((set, get) => ({
     const problem = boxCircuitProblem(state.components, state.wires);
     if (problem) return problem;
     if (hasMemory(state.components) && !selectPlaceableBoxKinds(state).includes('SC'))
-      return 'Memory cannot go inside a box here: this canvas takes combinational boxes only.';
+      return 'Memory cannot go inside a box here. This canvas takes combinational boxes only.';
 
     const prev = state.confirmedBoxLibrary.find((b) => b.id === ed.boxId);
     const q = state.assignment?.questions[state.currentQuestionIndex];
@@ -5682,8 +5682,8 @@ function isCurrentQuestionLocked(state: AppState): boolean {
  *  lock's own words. */
 function lockRefusal(state: AppState, what: string): string {
   return lockReason(state) === 'submission'
-    ? `This question shows ${state.viewingOwner ? `${state.viewingOwner.name}'s` : 'your'} submission, read-only — you can't ${what} here.`
-    : `This question is marked done — unlock it to ${what}.`;
+    ? `This question shows ${state.viewingOwner ? `${state.viewingOwner.name}'s` : 'your'} submission, which is read-only. You can't ${what} here.`
+    : `This question is marked done. Unlock it to ${what}.`;
 }
 
 /** A turbot brain's state before its first cycle, from the canvas as it is

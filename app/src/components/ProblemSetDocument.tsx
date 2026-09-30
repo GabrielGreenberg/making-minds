@@ -128,7 +128,7 @@ function QuestionContent({ question, lead, showArena, showHint, omitKinds }: Bod
           <ArenaCanvas arena={arena} cellSize={arenaCellSize(arena.width)} />
           {(question.turbot_cases?.length ?? 0) > 1 && (
             <div className="ps-arena-more">
-              Graded on {question.turbot_cases!.length} arenas — this is the first.
+              Graded on {question.turbot_cases!.length} arenas. This is the first.
             </div>
           )}
         </div>

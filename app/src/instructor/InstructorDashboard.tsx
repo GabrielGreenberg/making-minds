@@ -111,7 +111,7 @@ export function InstructorDashboard() {
             </button>
           )}
           {backendMode === 'local' && (
-            <button className="mm-btn mm-btn--quiet" onClick={() => void handleSeedHomeworks()} title="Load the real PHIL 133 homeworks (HW1–HW7) as editable assignments; a copy you have not edited is refreshed to the repo version, an edited one is left alone">
+            <button className="mm-btn mm-btn--quiet" onClick={() => void handleSeedHomeworks()} title="Load the real PHIL 133 homeworks (HW1–HW7) as editable assignments. Unedited copies are refreshed to the repo version. Edited ones are left alone.">
               Load HW1–HW7
             </button>
           )}
@@ -126,7 +126,7 @@ export function InstructorDashboard() {
           {loading ? 'Loading…'
             : error ? (
                 <>
-                  Couldn’t load assignments — the server may be unreachable.{' '}
+                  Couldn’t load assignments. The server may be unreachable.{' '}
                   <button className="mm-link" onClick={reload}>Retry</button>
                 </>
               )
@@ -199,7 +199,7 @@ export function InstructorDashboard() {
                     <button
                       className="mm-btn mm-btn--danger"
                       disabled={a.submitters > 0}
-                      title={a.submitters > 0 ? 'Students have submitted this — hide it instead' : undefined}
+                      title={a.submitters > 0 ? 'Students have submitted this. Hide it instead.' : undefined}
                       onClick={() => void handleDelete(a.id, a.title)}
                     >
                       Delete

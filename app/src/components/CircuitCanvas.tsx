@@ -769,7 +769,7 @@ function CircuitComponentView({
         // warns, never blocks: a faint dashed amber halo, like a wire's
         // routing violation, with the halting rule in its tooltip.
         const missingTitle = uncoveredSymbols && uncoveredSymbols.length > 0
-          ? `No arrow for input ${uncoveredSymbols.join(', ')} — the machine halts here if it reads ${uncoveredSymbols.length === 1 ? 'it' : 'one'}`
+          ? `No arrow for input ${uncoveredSymbols.join(', ')}. The machine halts here if it reads ${uncoveredSymbols.length === 1 ? 'it' : 'one'}.`
           : null;
         return (
           <g>
@@ -941,7 +941,6 @@ function WireView({
   fromPos,
   toPos,
   showValues,
-  usedFallback,
   violation,
 }: {
   wire: Wire;
@@ -951,7 +950,6 @@ function WireView({
   fromPos: { x: number; y: number };
   toPos: { x: number; y: number };
   showValues: boolean;
-  usedFallback?: boolean;
   violation?: string;
 }) {
   const C = canvasColors();
@@ -963,15 +961,14 @@ function WireView({
   const valStr = isBlankWire ? '' : String(wire.value);
 
   // Route-quality indicator (warn, don't block — wire-routing design memo):
-  // flagged wires stay fully functional; a hover tooltip names the flag, and
-  // a violation additionally gets a faint dashed amber halo under the wire.
-  // Deliberately NOT red/black dashes: wire color is semantic (black=0,
-  // red=1 per VISUAL_VOCAB) and must stay untouched.
+  // a wire the router's final sweep still flags (a violation) stays fully
+  // functional, with a hover tooltip naming it and a faint dashed amber halo
+  // under the wire. A clean fallback path (the router's usedFallback) says
+  // nothing. Deliberately NOT red/black dashes: wire color is semantic
+  // (black=0, red=1 per VISUAL_VOCAB) and must stay untouched.
   const routeFlagTitle = violation
-    ? `Routing warning: ${violation} — try dragging a wire segment`
-    : usedFallback
-      ? 'Routing note: this wire used the simple fallback path'
-      : undefined;
+    ? `Routing warning: ${violation}. Try dragging a wire segment.`
+    : undefined;
 
   return (
     <g data-wire-id={wire.id} style={{ cursor: 'pointer' }}>
@@ -1774,7 +1771,7 @@ function BoxView({
             if (error) onNotice?.(error);
           }}
         >
-          <title>Put away: take this design off the canvas (the box stays in the library)</title>
+          <title>Take this box off the canvas (it stays in the library)</title>
           <circle cx={box.x + box.width - 26} cy={box.y + 8} r={7} fill={C.surface} stroke={C.line2} strokeWidth={1} />
           <text
             x={box.x + box.width - 26}
@@ -1941,7 +1938,7 @@ export function CircuitCanvas() {
     // those ports read 0 until it is placed again.
     if (showUnboundBoxWarning) {
       for (const label of unboundBoxes(components)) {
-        w.push(`Warning: ${label} has ports not connected to anything inside — draw and place it again`);
+        w.push(`Warning: ${label} has ports not connected to anything inside. Draw and place it again.`);
       }
     }
     return w;
@@ -3335,7 +3332,7 @@ export function CircuitCanvas() {
   }, []);
 
   // ─── Wire data ref (for event handlers that need current wire paths) ──
-  const wireDataRef = useRef<Map<string, { pathD: string; points: { x: number; y: number }[]; basePoints: { x: number; y: number }[]; crossings: { x: number; y: number }[]; from: { x: number; y: number }; to: { x: number; y: number }; isFsmTransition?: boolean; labelPos?: { x: number; y: number }; usedFallback?: boolean; violation?: string }>>(new Map());
+  const wireDataRef = useRef<Map<string, { pathD: string; points: { x: number; y: number }[]; basePoints: { x: number; y: number }[]; crossings: { x: number; y: number }[]; from: { x: number; y: number }; to: { x: number; y: number }; isFsmTransition?: boolean; labelPos?: { x: number; y: number }; violation?: string }>>(new Map());
 
   // ─── Previous paths ref for continuity bias (§7.2) ──
   const previousPathsRef = useRef<Map<string, { x: number; y: number }[]>>(new Map());
@@ -3348,7 +3345,7 @@ export function CircuitCanvas() {
 
   // ─── Compute all wire paths (A* grid-based router) ──────────────
   const wireData = useMemo(() => {
-    const data = new Map<string, { pathD: string; points: { x: number; y: number }[]; basePoints: { x: number; y: number }[]; crossings: { x: number; y: number }[]; from: { x: number; y: number }; to: { x: number; y: number }; isFsmTransition?: boolean; labelPos?: { x: number; y: number }; controlPt?: { x: number; y: number }; usedFallback?: boolean; violation?: string }>();
+    const data = new Map<string, { pathD: string; points: { x: number; y: number }[]; basePoints: { x: number; y: number }[]; crossings: { x: number; y: number }[]; from: { x: number; y: number }; to: { x: number; y: number }; isFsmTransition?: boolean; labelPos?: { x: number; y: number }; controlPt?: { x: number; y: number }; violation?: string }>();
 
     // Separate FSM transitions from regular wires
     const fsmWires: Wire[] = [];
@@ -3612,10 +3609,9 @@ export function CircuitCanvas() {
         crossings: result.crossings ?? [],
         from: input.sourcePos,
         to: input.targetPos,
-        // Route-quality flags (warn, don't block — spec/wire-routing memo):
-        // usedFallback = obstacle-blind L-path; violation = the router's final
-        // oracle-predicate sweep still sees an appearance defect.
-        usedFallback: result.usedFallback,
+        // Route-quality flag (warn, don't block — spec/wire-routing memo):
+        // violation = the router's final oracle-predicate sweep still sees an
+        // appearance defect.
         violation: result.violation,
       });
       nextPreviousPaths.set(wire.id, basePoints);
@@ -3909,7 +3905,6 @@ export function CircuitCanvas() {
                 fromPos={wd.from}
                 toPos={wd.to}
                 showValues={showWireValues}
-                usedFallback={wd.usedFallback}
                 violation={wd.violation}
               />
             );

@@ -564,7 +564,7 @@ export function parseRoster(csv: string, defaultRole: Role = 'student'): RosterP
     // A nameless roster row is still a usable account; the email local part is
     // a better placeholder than a blank in the gradebook.
     const name = named.display || email.split('@')[0];
-    if (!status) issues.push({ line, reason: `unrecognised status "${statusCell}" — imported` });
+    if (!status) issues.push({ line, reason: `unrecognised status "${statusCell}" (imported)` });
     else if (status !== ENROLLED) gathered.push({ line, email, studentId, name, label: status.label, imported: true });
 
     const roleCell = at(roleIdx).toLowerCase();

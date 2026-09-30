@@ -230,7 +230,7 @@ export function createApp(config: ServerConfig, db: Db) {
     if (wait > 0) {
       res.setHeader('Retry-After', String(wait));
       res.status(429).json({
-        error: 'too many sign-in attempts — wait a few minutes and try again',
+        error: 'too many sign-in attempts. Wait a few minutes and try again.',
         retryAfter: wait,
       });
       return;
@@ -262,7 +262,7 @@ export function createApp(config: ServerConfig, db: Db) {
     const wait = Math.max(registerBudget.retryAfter('register', ip), ...keys.map((k) => throttle.retryAfter(k, ip)));
     if (wait > 0) {
       res.setHeader('Retry-After', String(wait));
-      res.status(429).json({ error: 'too many attempts — wait a few minutes and try again', retryAfter: wait });
+      res.status(429).json({ error: 'too many attempts. Wait a few minutes and try again.', retryAfter: wait });
       return;
     }
     const result = await authProvider.register(req.body ?? {});
@@ -347,7 +347,7 @@ export function createApp(config: ServerConfig, db: Db) {
     // one source filing thousands under invented addresses.
     const ip = clientIp(req);
     if (requestThrottle.retryAfter('access-request', ip) > 0) {
-      res.status(429).json({ error: 'too many requests — try again later' });
+      res.status(429).json({ error: 'too many requests. Try again later.' });
       return;
     }
     requestThrottle.recordFailure('access-request', ip);
@@ -618,7 +618,7 @@ export function createApp(config: ServerConfig, db: Db) {
     // An assignment with submissions is never removed (task 063; memo §6.6):
     // its attempts and grades would be orphaned. Hide it instead.
     if (db.hasSubmissions(String(req.params.id))) {
-      res.status(409).json({ error: 'students have submitted this assignment — hide it instead of deleting it' });
+      res.status(409).json({ error: 'students have submitted this assignment. Hide it instead of deleting it' });
       return;
     }
     db.removeAssignment(String(req.params.id));
@@ -699,7 +699,7 @@ export function createApp(config: ServerConfig, db: Db) {
       snapshot = takeRegradeSnapshot(db, snapshotDir, id, now);
     } catch (err) {
       console.error('regrade snapshot failed:', err);
-      res.status(500).json({ error: 'snapshot failed; nothing re-graded' });
+      res.status(500).json({ error: 'snapshot failed, so nothing was re-graded' });
       return;
     }
     const events = regradeEvents(plan, writes, { actor: req.user!.email, at: now.toISOString(), emailOf });

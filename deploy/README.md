@@ -290,7 +290,7 @@ Importing only **adds and updates**. It never removes anyone and never touches
 a password, so re-importing an updated enrollment list mid-quarter is safe.
 Instead, a re-import of a class list (a file with a `Status` column) lists the
 students already on the platform whose row is now dropped or who are missing
-from the file under **"no longer on the class list — review"**; remove them by
+from the file under **"no longer on the class list"**; remove them by
 hand once you have checked.
 
 **Class lists never go in git.** They are student records (FERPA). Keep them

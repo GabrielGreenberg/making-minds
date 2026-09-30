@@ -23,7 +23,7 @@ function TriageMark({ triage, status }: { triage: FeedbackTriage; status: Feedba
     triage.outcome === 'filed'
       ? ['tag tag--ok', `Filed → ${triage.tasks?.length === 1 ? 'task' : 'tasks'} ${(triage.tasks ?? []).join(', ')}`]
       : triage.outcome === 'personal'
-        ? ['tag tag--warn', 'Personal — for you']
+        ? ['tag tag--warn', 'Personal (for you)']
         : triage.outcome === 'review'
           ? ['tag tag--warn', 'Needs your call']
           : ['tag', 'Dismissed'];
@@ -108,7 +108,7 @@ export function FeedbackQueueView() {
       {error && <p className="mm-empty">Couldn’t load feedback.</p>}
       {feedback && rows.length === 0 && (
         <p className="mm-empty">
-          {filter === 'open' ? 'No open feedback — nice.' : 'Nothing here.'}
+          {filter === 'open' ? 'No open feedback.' : 'Nothing here.'}
         </p>
       )}
 

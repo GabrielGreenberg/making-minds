@@ -114,7 +114,7 @@ export function validateModeMemory(circuit: CircuitData, mode: BuildMode): Machi
   if (modeHoldsMemory(mode) || !hasMemory(circuit.components)) return OK;
   return {
     ok: false,
-    reason: 'a combinatorial circuit holds no memory: remove its MEM blocks (and any box holding one)',
+    reason: 'a combinatorial circuit holds no memory. Remove its MEM blocks (and any box holding one)',
   };
 }
 
@@ -128,7 +128,7 @@ export function validateAllowedComponents(
   if (offenders.length === 0) return OK;
   return {
     ok: false,
-    reason: `machine uses disallowed component type(s): ${offenders.join(', ')} — this question allows only: ${allowed!.join(', ')} (boxed circuits are checked inside)`,
+    reason: `machine uses disallowed component type(s): ${offenders.join(', ')}. This question allows only ${allowed!.join(', ')} (boxed circuits are checked inside)`,
   };
 }
 
@@ -241,7 +241,7 @@ export function validateMachine(
     if (kIn > FSM_MAX_INPUT_GROUPS) {
       return {
         ok: false,
-        reason: `FSM questions support at most ${FSM_MAX_INPUT_GROUPS} input groups (this question declares ${kIn}; its alphabet would have ${2 ** kIn} input symbols)`,
+        reason: `FSM questions support at most ${FSM_MAX_INPUT_GROUPS} input groups (this question declares ${kIn}, an alphabet of ${2 ** kIn} input symbols)`,
       };
     }
     const notation = fsmNotation(kIn, kOut);

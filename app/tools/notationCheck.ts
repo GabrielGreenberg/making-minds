@@ -28,7 +28,7 @@
 //     far is graded (the textbook p. 101 machine passes HW4 P3); two arrows
 //     for one input stay a Stage-1 error; turbot FSM brains keep totality.
 //   ARITY              Stage-1 names the student's actual mistake ("has a
-//     1-bit input symbol; this question has 2 input wires"), never grades a
+//     1-bit input symbol, but this question has 2 input wires"), never grades a
 //     wrong-arity machine, and caps kIn at 3 with an explicit reason.
 
 import { readdirSync, readFileSync, statSync } from 'node:fs';
@@ -341,7 +341,7 @@ console.log('\n[k=2 grade pin: x + 2*y end-to-end]');
   check('1-bit machine on the 2-group question fails EVERY case (never wire-0 grading)',
     rArity.status === 'graded' && rArity.total > 0 && rArity.passed === 0);
   check('…and the reason names the arity',
-    (rArity.cases[0]?.reason ?? '').includes('has a 1-bit input symbol; this question has 2 input wires'));
+    (rArity.cases[0]?.reason ?? '').includes('has a 1-bit input symbol, but this question has 2 input wires'));
 
   const missingSymbol = circuit(states,
     rows.filter(([, , , id]) => id !== 't04')

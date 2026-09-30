@@ -36,7 +36,7 @@ export function GradingAssignment({ route }: { route: Extract<Route, { kind: 'in
     [id],
   );
 
-  if (!value) return <p className="mm-empty">{loading ? 'Loading…' : 'Couldn’t load grading — the server may be unreachable.'}</p>;
+  if (!value) return <p className="mm-empty">{loading ? 'Loading…' : 'Couldn’t load grading. The server may be unreachable.'}</p>;
   const { summary, assignment } = value;
   if (!summary || !assignment) {
     return (

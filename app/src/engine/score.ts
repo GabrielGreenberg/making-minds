@@ -323,7 +323,7 @@ export function halfCreditProblem(q: AssignmentQuestion): string | null {
   if (questionTask(q) === 'open') return 'an open problem has no cases to give half credit on';
   if (!Number.isInteger(k) || k < 1) return `the ½ rule must be a whole number of cases, at least 1 (got ${k})`;
   const n = questionCaseCount(q);
-  if (k >= n) return `the ½ rule asks for ${k} of ${n} case${n === 1 ? '' : 's'} — it must be fewer than all of them`;
+  if (k >= n) return `the ½ rule asks for ${k} of ${n} case${n === 1 ? '' : 's'}. It must be fewer than all of them`;
   return null;
 }
 

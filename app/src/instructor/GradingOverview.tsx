@@ -81,7 +81,7 @@ export function GradingOverview({ summary, assignment, onChanged }: {
           </span>
           <span>
             <b>{plural(t.autograded.stale, 'submission')} graded against an older version of this assignment.</b> Their
-            autogrades stand until a re-grade; hand grades are never touched by one.
+            autogrades stand until a re-grade. A re-grade does not change hand grades.
           </span>
           <button type="button" className="mm-btn mm-btn--small" onClick={() => setRegrading(true)}>
             Re-grade…
@@ -152,7 +152,7 @@ export function GradingOverview({ summary, assignment, onChanged }: {
         </table>
       </div>
       <p className="mm-note gr-footnote">
-        Shares are over the {plural(summary.progress.submitted, 'roster submission')}; each student's latest attempt counts.
+        Shares are over the {plural(summary.progress.submitted, 'roster submission')}. Each student's latest attempt counts.
         Open the <a className="mm-link" {...matrix}>Matrix</a> to see every student.
       </p>
     </>

@@ -16,7 +16,7 @@ export function statusCountText(s: { count: number; label: string; imported: boo
 }
 
 /** The heading over the students a class list no longer carries (nobody is removed). */
-export const NO_LONGER_LISTED_TEXT = 'no longer on the class list — review';
+export const NO_LONGER_LISTED_TEXT = 'no longer on the class list';
 
 /** The same words starting a sentence, as the dashboard shows them. */
 export const sentenceCase = (text: string): string => text.charAt(0).toUpperCase() + text.slice(1);

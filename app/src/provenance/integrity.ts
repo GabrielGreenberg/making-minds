@@ -148,7 +148,7 @@ function checkQuestion(
   for (const o of otherIds) {
     flags.push({
       code: 'ids-other',
-      detail: `${o.count} of ${plural(ids.length, 'id')} ${o.count === 1 ? 'was' : 'were'} created in ${o.email}'s editor for this assignment — to look at.`,
+      detail: `${o.count} of ${plural(ids.length, 'id')} ${o.count === 1 ? 'was' : 'were'} created in ${o.email}'s editor for this assignment.`,
     });
   }
   if (unbound > 0) {
@@ -156,7 +156,7 @@ function checkQuestion(
       code: 'ids-unbound',
       detail:
         `${unbound} of ${plural(ids.length, 'id')} ${unbound === 1 ? 'was' : 'were'} not created in this student's editor for this assignment ` +
-        '(brought in from the sandbox, a file, the browser console or another tool?) — to look at.',
+        '(brought in from the sandbox, a file, the browser console or another tool?).',
     });
   }
 
@@ -184,24 +184,24 @@ function checkQuestion(
     else textStatus = legacyQ && legacyQ.t > 0 ? 'legacy' : 'unsigned';
   }
   if (textStatus === 'other') {
-    flags.push({ code: 'text-other', detail: `The answer text carries ${from}'s stamp — to look at.` });
+    flags.push({ code: 'text-other', detail: `The answer text carries ${from}'s stamp.` });
   } else if (textStatus === 'mismatch') {
     flags.push({
       code: 'text-mismatch',
-      detail: 'The answer text differs from the text its editing record stamps (changed outside the editor?) — to look at.',
+      detail: 'The answer text differs from the text its editing record stamps (changed outside the editor?).',
     });
   } else if (textStatus === 'unsigned') {
-    flags.push({ code: 'text-unsigned', detail: "The answer text has no stamp from this student's editor — to look at." });
+    flags.push({ code: 'text-unsigned', detail: "The answer text has no stamp from this student's editor." });
   }
 
   // ── the trace ──
   if (record === 'other') {
-    flags.push({ code: 'record-other', detail: `The editing record was made in ${from}'s editor — to look at.` });
+    flags.push({ code: 'record-other', detail: `The editing record was made in ${from}'s editor.` });
   } else if (trace) {
     if (trace.outside > 0) {
       flags.push({
         code: 'outside',
-        detail: `The text was changed outside the editor (${plural(trace.outside, 'time')}) and then edited on — to look at.`,
+        detail: `The text was changed outside the editor (${plural(trace.outside, 'time')}) and then edited on.`,
       });
     }
     if (size.t >= ONE_PIECE_TEXT_MIN_CHARS && trace.maxTextIns >= ONE_PIECE_TEXT_SHARE * size.t) {
@@ -209,7 +209,7 @@ function checkQuestion(
         code: 'one-piece-text',
         detail:
           `${trace.maxTextIns} of ${size.t} characters arrived in one insertion (an in-app paste of the ` +
-          "student's own text, or text set from outside the editor) — to look at.",
+          "student's own text, or text set from outside the editor).",
       });
     }
     // No single insertion needs to be big for a script that "types" one
@@ -221,7 +221,7 @@ function checkQuestion(
         code: 'too-fast',
         detail:
           `${typed} characters were entered in ${(trace.activeMs / 1000).toFixed(1)} s of active editing, faster ` +
-          'than a person types (a script entering text a keystroke at a time?) — to look at.',
+          'than a person types (a script entering text a keystroke at a time?).',
       });
     }
     if (
@@ -233,7 +233,7 @@ function checkQuestion(
         code: 'one-piece-circuit',
         detail:
           `${trace.maxCompIns} of ${size.c} components arrived in one in-app paste (the student's own work ` +
-          'carried from another question or assignment?) — to look at.',
+          'carried from another question or assignment?).',
       });
     }
     // Content the record's insertions cannot explain. What the question held
@@ -246,7 +246,7 @@ function checkQuestion(
       const parts: string[] = [];
       if (accC < size.c) parts.push(`${plural(size.c, 'component')} but its record accounts for ${accC}`);
       if (accT < size.t) parts.push(`${plural(size.t, 'character')} of text but its record accounts for ${accT}`);
-      flags.push({ code: 'unaccounted', detail: `The answer has ${parts.join('; ')} — to look at.` });
+      flags.push({ code: 'unaccounted', detail: `The answer has ${parts.join(', and ')}.` });
     }
   } else if (size.c > 0 || size.t > 0) {
     const legacyCovered = legacyQ != null && size.c <= legacyQ.c && size.t <= legacyQ.t;
@@ -255,7 +255,7 @@ function checkQuestion(
         code: 'record-missing',
         detail:
           `The answer has no ${record === 'invalid' ? 'valid ' : ''}editing record from this student's editor ` +
-          `(${plural(size.c, 'component')}, ${plural(size.t, 'character')} of text) — to look at.`,
+          `(${plural(size.c, 'component')}, ${plural(size.t, 'character')} of text).`,
       });
     }
   }
@@ -294,7 +294,7 @@ function checkQuestion(
         : '';
       flags.push({
         code: 'one-save',
-        detail: `${parts.join(' and ')} appeared between two saves${context} — to look at.`,
+        detail: `${parts.join(' and ')} appeared between two saves${context}.`,
       });
     }
   }

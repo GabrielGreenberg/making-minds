@@ -131,7 +131,7 @@ export function boxEntryFromInstance(comp: CircuitComponent): ConfirmedBoxDef {
 export function boxCircuitProblem(components: CircuitComponent[], wires: Wire[]): string | null {
   if (components.length === 0) return 'The box is empty. Build its circuit first.';
   if (components.some((c) => c.type === 'STATE')) return 'A box holds a circuit, not states.';
-  if (!components.some((c) => c.type === 'OUTPUT')) return 'Give the box at least one output: an OUT node.';
+  if (!components.some((c) => c.type === 'OUTPUT')) return 'Give the box at least one OUT node.';
   if (hasCombinationalLoop(components, wires)) return 'Loop detected: a box cannot contain a loop.';
   const fedCount = new Map<string, number>();
   for (const w of wires) {
@@ -146,7 +146,7 @@ export function boxCircuitProblem(components: CircuitComponent[], wires: Wire[])
       const sink = c.type === 'MEM' ? isMemSinkPort(c, p.id) : p.side === 'left';
       if (sink && (fedCount.get(key) ?? 0) > 1) return `Merged link: ${c.label} has two wires into one input.`;
       if (sink && !fedCount.has(key)) return `Free end: an input of ${c.label} is not connected.`;
-      if (!sink && !used.has(key)) return `Free end: an output of ${c.label} is not connected. Wire it on, or to an OUT node.`;
+      if (!sink && !used.has(key)) return `Free end: an output of ${c.label} is not connected. Wire it to another part or to an OUT node.`;
     }
   }
   return null;

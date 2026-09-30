@@ -9,7 +9,7 @@ stands; Part 2: the technical reference), kept **under 40 KB** by
 > append**, and bump the date. The dated story lives in the task file's `## Progress log` and
 > one `tasks/log.md` line; the changelog through 2026-09-21 is frozen in `docs/HISTORY.md`.
 
-_Last updated: 2026-09-29_
+_Last updated: 2026-09-30_
 
 ## How work flows — the task pipeline (`tasks/`)
 
@@ -44,15 +44,15 @@ their own work** — grading is a server/instructor capability.
 The full flow runs end to end on **two backends behind one switch**
 (`app/src/storage/backend.ts`): **local** mode (browser localStorage — the default, the dev
 environment, what the headless harness drives) and **remote** mode (built with
-`VITE_API_BASE`; every seam backed by the `server/` API — server-side grading, sanitized
-student payloads, real sessions). Flows are identical except where noted.
+`VITE_API_BASE`; every seam backed by the `server/` API). Flows are identical except where
+noted.
 
 **Student side.** Outside the editor every page sits in ONE site-styled shell (`PageShell`).
 **Home** (nav label; an instructor's "Student view" is the same page) has tabs
-**Assignments** (the catalog under the website's up-next box — the soonest due homework) and
+**Assignments** (the catalog under the website's up-next box) and
 **Grades** (`#/grades[/:id]`: a row per homework, its result once released, opening the
 question-by-question sheet). Sign in (local: toy-account picker; remote: any of a person's
-emails + password; "First time here?" claims the roster seat by UID with the class-list or a
+emails + password; "Set up your account" claims the roster seat by UID with the class-list or a
 UCLA email, an access request only for someone the roster lacks; 30-day bearer session; a
 health retry screen while the server is down; a "Password" control) → **published**
 assignments (hidden until an instructor publishes) → the assignment as a **problem-set
@@ -70,7 +70,7 @@ flush, per-email crash journal); leave and resume.
 **Submit** a timestamped snapshot in one `SubmitDialog` (≤ 2 group members; online-only: a
 failure records nothing — server stamps time; past due it states the late cost). An extension
 is the student's served `dueDate` ("(extended)"). Released grades: the **Grades** sheet
-(grade / 100, each problem's points, the instructor's note, "▸ failed inputs" in safe fields, a link into the question, **Run this input**: the grader's run of that
+(grade / 100, each problem's points, the instructor's note, "▸ failed inputs" in safe fields, **Run this input**: the grader's run of that
 case, recorded vs live verdict). **Viewing a
 submission**: the sheet opens a graded attempt read-only (`attempt` route).
 **Freezing** (`isFrozen`, Due dates row) forces the latest attempt. **Mark done**: a self-lock
@@ -121,7 +121,7 @@ the old grade; Hide names); a row opens the student's **submission page** (067: 
 full autograde, ½ count, grade control; prev/next; **Extension…** / **Waive…**) and **Open in
 viewer**; the **student page** (070; from matrix, roster, flags): flags, a row per assignment
 (+ Extension/Waive), counted average, private notes (append-only), grade history. **Robot**
-(083): what runs, what waits for release or an answer, queue activity; a strip over the
+(083): what runs, what waits, queue activity; a strip over the
 tabs if any.
 
 **Server** (`server/`: Express 5 + `node:sqlite`; files: the Server
@@ -142,7 +142,7 @@ API at the placeholder `https://100-22-69-95.sslip.io` (Caddy TLS). Not yet fit 
 students: UCLA SSO is a stub, the roster the toy one (+ a leftover `cc-basics` demo row). **Content:** HW1–HW7 as JSON in the repo
 (`app/src/devData/homeworks/`, 86 questions — machine problems from the reference fixtures,
 prose ones open) in their PDFs' structure (sections, intros, callouts, SVG
-figures cropped into `app/public/problem-sets/`). **The repo is the source;
+figures in `app/public/problem-sets/`). **The repo is the source;
 every release syncs it into the pilot DB** (`deploy/release.sh` → `npm run homeworks --
 sync`: missing homeworks added unpublished, unedited copies refreshed, instructor-edited
 ones left alone and listed); local mode's "Load HW1–HW7" runs the same planner.
@@ -208,7 +208,7 @@ wrappers.
 | Storage | `app/src/storage/workbookStore.ts`, `AssignmentStore.ts`, `submissionStore.ts`, `gradingStore.ts`, `feedbackStore.ts`, `NotesStore.ts`, `robotStatusStore.ts` | The seven Promise-returning seam interfaces + Local impls; `robotStatus.ts`: the robot panel's pure builder. Grade release lives on `AssignmentStore`; records carry their student's human `grades` (task 063); `gradingStore.ts` WRITES them, READS the grading summaries (task 064) and the queue feed + soft claims (`responses`/`claim`; pure `gradingClaims.ts` ClaimBook, task 066), `exportGrades` (pure `gradesExport.ts`, 071). |
 | Storage | `app/src/storage/backend.ts`, `remoteStores.ts`, `gradeWrites.ts`, `gradingSummary.ts`, `regrade.ts`, `journal.ts`, `migrateLocal.ts` | `backend.ts`: the mode switch (seams, above). `remoteStores.ts`: Remote impls as direct `api/client.ts` calls (404 → seam-null; GRADER-FREE, grep-gated). `gradeWrites.ts`: the pure `planGradeWrite` (version → 409, override needs a note) + legacy-review migration, local store AND server. `gradingSummary.ts`: the ONE pure summary builder (roster ∪ off-roster submitters, latest attempt, `scoreRecord` per problem, stale by content hash; `dueFor` → `dueInput`; row flags from the pure, grader-free `gradingFlags.ts`), local store + `server/src/gradingSummary.ts` adapt it, as they do `regrade.ts`. `journal.ts`: the crash buffer `mm:journal:<email>:<asgId>`, replayed on `openAssignment`. `migrateLocal.ts`: first-remote-login fill-empty upload (guard `mm:migrated:<email>`; server never overwritten). |
 | Auth | `app/src/auth/` | `AuthGate.tsx` (per-route gate; `initRouting()` fires here), `HealthGate.tsx` (health provider + retry screen), `LoginScreen.tsx` (toy picker / the server's `AuthCapabilities` panes), `AccountPanel.tsx` (change password), `authProvider.tsx` (one provider per mode), `types.ts`, `session.ts`, `accounts.ts`, `instructorRole.ts`. |
-| Page surfaces | `app/src/theme.css`, `pages.css`, `workbench.css`, `components/PageShell.tsx`, `SessionControls.tsx` | ONE visual language, the makingminds.org look. `theme.css`: the site's palette/type/spacing as `--mm-*` tokens (colour literals ONLY in its `:root`) + the shared vocabulary. `pages.css`: per-surface rules. `PageShell`: topbar (brand → website; `appNav` by role; Sandbox link; session controls) · band · ONE `.page` column (1080px, every route) · footer; `card` variant for login/health; `.mm-tabs`: a section's own tabs. `workbench.css`: the editor frame; `index.css`'s canvas literals ratchet to zero. Rules: `docs/buildout/VISUAL_VOCAB.md` §Page surfaces; gate: `themeCheck`. |
+| Page surfaces | `app/src/theme.css`, `pages.css`, `workbench.css`, `components/PageShell.tsx`, `SessionControls.tsx` | ONE visual language, the makingminds.org look. `theme.css`: the site's palette/type/spacing as `--mm-*` tokens (colour literals ONLY in its `:root`) + the shared vocabulary. `pages.css`: per-surface rules. `PageShell`: topbar (brand → website; `appNav` by role; Sandbox link; session controls) · band · ONE `.page` column (1080px, every route) · footer; `card` variant for login/health; `.mm-tabs`: a section's own tabs. `workbench.css`: the editor frame; `index.css`'s canvas literals ratchet to zero. Rules: `docs/buildout/VISUAL_VOCAB.md` §Page surfaces, §Copy; gates: `themeCheck`, `copyCheck`. |
 | Workbook file | `app/src/workbookFile.ts`, `fileHandle.ts`, `components/WorkbookFileMenu.tsx` | The sandbox as a file: pure `parseWorkbookFile` (validate, legacy) + `workbookKeyHash` (unsaved baseline); pickers, else download (not a save) / file input. |
 | Embed | `app/embed.html`, `src/embed/`, `editorHost.ts` | `data-persistence="ephemeral"`; `example.ts` (`?example=` → `public/embed-examples/*.json` by `importWorkbook`; Reset re-opens); `layout.ts`; `EmbedApp` (slim bar, phone poster, `EMBED_HOST`: gestures after a click/tap); `public/_headers`. |
 | Async UI | `app/src/useAsyncValue.ts` | The fetch-on-mount hook of every view reading an async seam. |
@@ -220,7 +220,7 @@ wrappers.
 | Dev tool | `app/tools/shootProblemSets.mjs`, `shootCircuits.mjs`, `shootEmbedPosters.mjs`, `geometryCensus.ts` | Headless-Chrome shots; a census of stored circuits a geometry change overlaps. |
 | Server | `server/src/app.ts`, `db.ts`, `auth.ts`, `identity.ts`, `password.ts`, `roster.ts`, `rosterImport.ts`, `sanitize.ts`, `config.ts`, `seed.ts`, `roster-cli.ts`, `homeworks.ts`, `homeworks-cli.ts`, `gradingSummary.ts` | Routes, SQLite, the `AuthProvider` seam (`createAuthProvider` — `MM_AUTH_MODE`; `LoginThrottle`), scrypt credentials, `identity.ts` (the ONE place an email or UID resolves to an account; emails are aliases, keys never rekeyed), `roster.ts` (pure reader of the registrar's export as-is) + `rosterImport.ts` (never removes; lists who left), `sanitize.ts` (redaction, grade-release withholding), env config, seeding, admin CLI (`npm run roster`). `homeworks.ts`, the homework sync: a copy is pristine iff its content hash is a committed version of its file (`gitLineage` over the box's clone) or one the sync wrote (`content_sync` table). `gradingSummary.ts`: the summary routes' Db adapter (opaque keys). `robotStatus.ts`: the robot panel's facts (clone, mirror, backups, CI). `feedbackResolution.ts`: a report the pipeline closed resolves once (dismissed; filed, its tasks in the live `tasks/done/`). `server/tools/*Check.ts`. |
 | Dev/sample | `app/src/devData/sampleData.ts`, `seed.ts`, `homeworks.ts`, `homeworks/hw{1..7}.json` | Sample assignment for all modes + sample submissions; `seedHomeworks()` syncs the real HW1–HW7 (record `mm:seeded-homework:<id>`) + reseeds 22 sample submissions; `homeworkSync.ts`: the pure planner it shares with the server (content hash = canonical JSON minus the instructor-owned fields; insert / unchanged / refresh / edited). |
-| Tools | `app/tools/*.ts` | The headless harness = the test suite, all in `npm run check` (besides `grade.ts`, `builder.ts`, `layoutCheck.ts`): `portabilityCheck` (first: tool imports in-repo, declared), `codecCheck`, `dueDateCheck` (+ calendar import), `statementFormatCheck` (markup, document model + parts, every HW valid), `notationCheck` (grammar pins + label-dissection grep gate), `themeCheck`, `workbenchCheck` (editor frame), `tmCheck`, `turbotCheck` (all four brains, multi-arena, criteria), `perceptionCheck`, `scWindowCheck` (question runs ≡ grader), `caseRunCheck` (caseRun ≡ grader; replay, budgets), `routerCheck` (fallback budget 0), `bumpCheck`, `pipelineCheck` (submit → grade, every mode; the HW1 fold), `scoreCheck` (½ rule, precedence, late math), `gradingViewCheck` (cells, tiles, queue, flags, export; no view grades), `robotStatusCheck` (robot panel, the real gate), `navResetCheck` (the reset laws; done / frozen / viewed locks), `routingCheck` (route access, landing, held routes), `boxScopeCheck` (library scope; boxes ≡ unboxed), `pasteCheck` (paste policy + provenance grep gates), `provenanceCheck` (mint/verify, attribution, trace flags, uuid grep gate), `workbookFileCheck` (round trip, bad files), `embedCheck` (not homework, ephemeral, module graph, headers), `remoteStoreCheck` (the REAL server; grader-import gate), `coverageCheck` (reference-fixture ledger). |
+| Tools | `app/tools/*.ts` | The headless harness = the test suite, all in `npm run check` (besides `grade.ts`, `builder.ts`, `layoutCheck.ts`): `portabilityCheck` (first: tool imports in-repo, declared), `codecCheck`, `dueDateCheck` (+ calendar import), `statementFormatCheck` (markup, document model + parts, every HW valid), `notationCheck` (grammar pins + label-dissection grep gate), `themeCheck`, `copyCheck` (copy house style), `workbenchCheck` (editor frame), `tmCheck`, `turbotCheck` (all four brains, multi-arena, criteria), `perceptionCheck`, `scWindowCheck` (question runs ≡ grader), `caseRunCheck` (caseRun ≡ grader; replay, budgets), `routerCheck` (fallback budget 0), `bumpCheck`, `pipelineCheck` (submit → grade, every mode; the HW1 fold), `scoreCheck` (½ rule, precedence, late math), `gradingViewCheck` (cells, tiles, queue, flags, export; no view grades), `robotStatusCheck` (robot panel, the real gate), `navResetCheck` (the reset laws; done / frozen / viewed locks), `routingCheck` (route access, landing, held routes), `boxScopeCheck` (library scope; boxes ≡ unboxed), `pasteCheck` (paste policy + provenance grep gates), `provenanceCheck` (mint/verify, attribution, trace flags, uuid grep gate), `workbookFileCheck` (round trip, bad files), `embedCheck` (not homework, ephemeral, module graph, headers), `remoteStoreCheck` (the REAL server; grader-import gate), `coverageCheck` (reference-fixture ledger). |
 | Queue | `tasks/` | The task pipeline (top of this file). |
 
 ## Reference-function DSL (instructor authoring)
@@ -315,6 +315,7 @@ departure, spec §10.3) → TM turbots.
   principal change empties it and the mint keys, a canvas swap never does. `window.__store`
   is dev-only. Ids come only from `mintId` (grep-gated); the editing record advances in
   `store.ts recordEdit`, at edit time, never at save.
+- **Copy** — every on-screen string follows `VISUAL_VOCAB.md` §Copy (`copyCheck`).
 
 ## Things to watch
 

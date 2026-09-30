@@ -687,7 +687,7 @@ export function QuestionCreator({ assignment, existingQuestion, onSave, onCancel
               onChange={(e) => setMaxTapeCells(e.target.value)}
             />
             <span className="instructor-count">
-              blank = unbudgeted; counts the span of cells the head occupies
+              blank = no limit. Counts the span of cells the head occupies.
             </span>
           </label>
         )}
@@ -705,16 +705,16 @@ export function QuestionCreator({ assignment, existingQuestion, onSave, onCancel
             />
             <span className="instructor-count">
               {halfCreditAt.trim() === ''
-                ? 'blank = 0 or 1 only; a number K gives ½ when at least K cases pass'
+                ? 'blank = 0 or 1 only. A number K gives ½ when at least K cases pass.'
                 : `½ if at least ${halfCreditAt.trim()} of ${knownCaseCount ?? 'N'} ${isTurbot ? 'arenas' : isFillTable ? 'rows' : isFillNumeral ? 'fields' : isFillIn ? 'blanks' : 'cases'} pass` +
-                  (knownCaseCount === null ? ' (N is set when the bank is built at save)' : '')}
+                  (knownCaseCount === null ? ' (N is set when you save)' : '')}
             </span>
           </label>
         )}
         {isOpen && !isFillIn && (
           <p className="mm-note mm-hint">
-            An open question is answered in free text and is not autograded — review the
-            responses in the gradebook. (LLM-assisted grading may plug in here later.)
+            An open question is answered in free text and is not autograded. Grade the
+            responses by hand under Grading.
           </p>
         )}
         {isFillIn && (
@@ -740,13 +740,13 @@ export function QuestionCreator({ assignment, existingQuestion, onSave, onCancel
             {isFillTable ? (
               <>
                 <p className="mm-note mm-hint">
-                  The student fills a blank table — the arguments as well as the values — and it
-                  is autograded as a function: each key row passes when exactly one of the
+                  The student fills a blank table, the arguments as well as the values. It is
+                  autograded as a function. Each key row passes when exactly one of the
                   student&#8217;s rows has its arguments and that row&#8217;s values match. Row
-                  order never matters, empty rows are ignored, and two rows with the same
+                  order does not matter, empty rows are ignored, and two rows with the same
                   arguments fail that key row. Cells compare as blanks do (surrounding spaces and
-                  leading zeros ignored); a digits-only column refuses every other character.
-                  With no key rows at all it is graded by hand instead (type the rows students see).
+                  leading zeros ignored). A digits-only column refuses every other character.
+                  With no key rows at all, it is graded by hand instead (type the rows students see).
                 </p>
                 {misplacedAnswers.length > 0 && (
                   <p className="instructor-preview-warning" role="alert">
@@ -763,11 +763,11 @@ export function QuestionCreator({ assignment, existingQuestion, onSave, onCancel
                 <p className="mm-note mm-hint">
                   The student invents a symbol for each digit of the base, typed in a box labelled
                   with its meaning, then writes each number below in that system. There is no answer
-                  key: it is autograded by rule, against the student&#8217;s own symbols. A symbol
+                  key. It is autograded by rule, against the student&#8217;s own symbols. A symbol
                   passes when it is one character (an emoji counts as one), not a digit 0&#8211;9, and
-                  unlike the other symbols (&#8220;a&#8221; and &#8220;A&#8221; differ); a number
+                  unlike the other symbols (&#8220;a&#8221; and &#8220;A&#8221; differ). A number
                   passes when it is exactly the student&#8217;s symbols for its digits in the base
-                  (spaces ignored), and those symbols pass. Answers match boxes by position: once
+                  (spaces ignored), and those symbols pass. Answers match boxes by position. Once
                   students have started, keep the base, relabel numbers in place and add new ones at
                   the end.
                 </p>
@@ -785,9 +785,9 @@ export function QuestionCreator({ assignment, existingQuestion, onSave, onCancel
               <>
                 <p className="mm-note mm-hint">
                   The student types an answer into each labelled blank, and it is autograded by
-                  string comparison — surrounding spaces and leading zeros are ignored
+                  string comparison. Surrounding spaces and leading zeros are ignored
                   (&#8220;0011&#8221; matches &#8220;11&#8221;). A digits-only blank refuses every
-                  other character. Answers match blanks by position: once students have started,
+                  other character. Answers match blanks by position. Once students have started,
                   relabel blanks in place and add new ones at the end.
                 </p>
                 {misplacedTable && (
@@ -850,9 +850,8 @@ export function QuestionCreator({ assignment, existingQuestion, onSave, onCancel
                 checked={restrictComponents}
                 onChange={(e) => setRestrictComponents(e.target.checked)}
               />
-              Restrict available components (students may build only with the checked
-              components; inputs and outputs are always available, and boxed circuits
-              may not contain anything else)
+              Restrict available components (only the checked ones, plus inputs and outputs,
+              may be used, including inside boxed circuits)
             </label>
             {restrictComponents && (
               <div className="instructor-criterion-row">
@@ -884,8 +883,8 @@ export function QuestionCreator({ assignment, existingQuestion, onSave, onCancel
                 checked={limitComponents}
                 onChange={(e) => setLimitComponents(e.target.checked)}
               />
-              Limit how many components may be used (leave a box blank for no
-              cap; components inside boxed circuits are counted too)
+              Limit how many components may be used (a blank box means no limit,
+              and components inside boxed circuits count too)
             </label>
             {limitComponents && (
               <div className="instructor-criterion-row">
@@ -1030,7 +1029,7 @@ export function QuestionCreator({ assignment, existingQuestion, onSave, onCancel
           </div>
           {ownParts.length > 0 ? (
             <p className="mm-note">
-              The first part of a problem: {ownParts.map((q) => q.label).join(', ')}{' '}
+              This question is the first part of a problem. {ownParts.map((q) => q.label).join(', ')}{' '}
               {ownParts.length === 1 ? 'is a later part' : 'are its later parts'}. Its stem and closing are the problem&#8217;s.
             </p>
           ) : (
@@ -1048,18 +1047,18 @@ export function QuestionCreator({ assignment, existingQuestion, onSave, onCancel
           )}
           {partOf !== null && ownParts.length === 0 ? (
             <p className="mm-note mm-hint">
-              A part shows on its problem&#8217;s page, after the problem&#8217;s earlier parts —
-              keep it directly after them in the list, in the same section. It is still graded
+              A part shows on its problem&#8217;s page, after the problem&#8217;s earlier parts. Keep
+              it directly after them in the list, in the same section. It is still graded
               on its own (1 point).
             </p>
           ) : (
             <>
               <label className="mm-field">
-                <span className="mm-label">Stem (optional) — the problem&#8217;s text before its parts</span>
+                <span className="mm-label">Stem: the problem&#8217;s text before its parts (optional)</span>
                 <textarea className="mm-input mm-input--area" rows={3} value={stem} onChange={(e) => setStem(e.target.value)} />
               </label>
               <label className="mm-field">
-                <span className="mm-label">Closing (optional) — the problem&#8217;s text after its parts</span>
+                <span className="mm-label">Closing: the problem&#8217;s text after its parts (optional)</span>
                 <textarea className="mm-input mm-input--area" rows={2} value={closing} onChange={(e) => setClosing(e.target.value)} />
               </label>
             </>
@@ -1105,7 +1104,7 @@ export function QuestionCreator({ assignment, existingQuestion, onSave, onCancel
         </label>
         <p className="mm-note mm-hint">
           Math goes in LaTeX between dollar signs ($x + 1$, or $$…$$ on its own
-          line); machine literals go in `backticks`; **bold** and *italic* work
+          line). Machine literals go in `backticks`. **bold** and *italic* work
           too. A blank line starts a new paragraph.
         </p>
         <label className="mm-field">

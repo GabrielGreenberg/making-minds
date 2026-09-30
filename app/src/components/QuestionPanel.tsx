@@ -28,6 +28,7 @@ import { useStore, selectAssignmentFrozen, selectProblemDone, showsSubmission } 
 import { editorRoute, navigate } from '../routing';
 import { DEFAULT_CALLOUT_TITLE, problemPages, resolveProblem, sectionOf, type ResolvedProblem } from '../problemSet';
 import { parseStatement } from '../statementFormat';
+import { FROZEN_NOTICE } from '../dueDates';
 import {
   QUESTION_SPLIT_FLOOR,
   assignmentShortName,
@@ -176,16 +177,16 @@ function LockTag() {
   const viewing = useStore((s) => s.viewingSubmission);
   const done = useStore(selectProblemDone);
   if (frozen) {
-    return <span className="qp-tag" title="This assignment closed after its due date — showing your submitted answer, read-only.">🔒 past due</span>;
+    return <span className="qp-tag" title={FROZEN_NOTICE}>🔒 past due</span>;
   }
   if (viewing) {
     return (
-      <span className="qp-tag" title={`Your answer as submitted in attempt ${viewing.attempt}, read-only — Run and Step still work.`}>
+      <span className="qp-tag" title={`Your answer as submitted in attempt ${viewing.attempt} is read-only. Run and Step still work.`}>
         Submission {viewing.attempt}
       </span>
     );
   }
-  if (done) return <span className="qp-tag" title="Locked — uncheck “I'm done” to edit">🔒 done</span>;
+  if (done) return <span className="qp-tag" title="Locked. Uncheck “I'm done” to edit.">🔒 done</span>;
   return null;
 }
 
@@ -284,7 +285,7 @@ function DoneMark({ multi }: { multi: boolean }) {
   // open problems alike, and under the pointer that just ticked it).
   return (
     <div className="qp-done">
-      {done && <div className="qp-done-note">🔒 Locked against edits — uncheck to keep working.</div>}
+      {done && <div className="qp-done-note">🔒 Locked against edits. Uncheck to keep working.</div>}
       <button type="button" role="checkbox" aria-checked={done} className="qp-done-label" onClick={() => toggle()}>
         <span className={done ? 'qp-done-box qp-done-box--on' : 'qp-done-box'} aria-hidden>{done ? '✓' : ''}</span>
         {multi ? "I'm done with this problem" : "I'm done with this question"}
