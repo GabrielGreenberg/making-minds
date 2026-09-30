@@ -14,13 +14,13 @@ import {
   TURBOT_TURN_RIGHT,
   TURBOT_TURN_LEFT,
 } from '../engine/turbot';
-import { setArenaCell, placeStart, resizeArena, MAX_ARENA_SIZE } from '../instructor/arenaEditing';
+import { setArenaCell, placeStart, resizeArena, MAX_ARENA_SIZE } from '../arenaEditing';
 import type { BuildMode, TMNotation } from '../types';
 import { ArenaCanvas } from './ArenaCanvas';
 import { loadUiPrefs, numericPref, saveUiPref } from '../uiPrefs';
 
 // Sandbox map editing reuses the instructor arena editor's tool set (pure
-// helpers in instructor/arenaEditing.ts; ArenaCanvas supplies the clickable
+// helpers in arenaEditing.ts; ArenaCanvas supplies the clickable
 // grid). Inside a question the arena is instructor-authored and read-only.
 type MapTool = 'block' | 'goal' | 'erase' | 'start';
 

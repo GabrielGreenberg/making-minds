@@ -1,10 +1,10 @@
 import { TabBar } from './components/TabBar';
 import { EditorShell } from './components/EditorShell';
-import { CircuitCanvas } from './components/CircuitCanvas';
+import { EditorTopBar } from './components/EditorTopBar';
+import { EditorWorkspace } from './components/EditorWorkspace';
+import { questionSidePanel } from './components/QuestionPanel';
+import { VisitorBanner } from './components/VisitorBanner';
 import { OutputPanel } from './components/OutputPanel';
-import { SequentialTimeline } from './components/SequentialTimeline';
-import { TMTapePanel } from './components/TMTapePanel';
-import { TurbotTapePanel } from './components/TurbotTapePanel';
 import { Worksheet } from './components/Worksheet';
 import { HomeScreen } from './components/HomeScreen';
 import { AssignmentOverview } from './components/AssignmentOverview';
@@ -12,7 +12,7 @@ import { InstructorApp } from './instructor/InstructorApp';
 import { useInstructorRoute } from './instructor/useInstructorRoute';
 import { InstructorGate } from './instructor/InstructorGate';
 import { useRoute } from './useRoute';
-import { useStore, selectEffectiveMode } from './store';
+import { useStore } from './store';
 import { useAuth } from './auth';
 import { useEffect } from 'react';
 
@@ -26,11 +26,10 @@ function App() {
 }
 
 function AppEditor() {
-  const { user } = useAuth();
+  const { user, isVisitor } = useAuth();
   const instructorRoute = useInstructorRoute();
   const workbookOpen = useStore((s) => s.workbookOpen);
   const buildMode = useStore((s) => s.buildMode);
-  const effectiveMode = useStore(selectEffectiveMode);
   const assignment = useStore((s) => s.assignment);
   const assignmentView = useStore((s) => s.assignmentView);
 
@@ -60,31 +59,24 @@ function AppEditor() {
   if (assignment && assignmentView === 'overview') return <AssignmentOverview />;
 
   // Every question and the sandbox render inside ONE frame (EditorShell: the
-  // top bar, the question panel, the workspace, the output panel). A written
-  // problem's workspace is its worksheet — the problem's text with each
-  // part's field (a line, a paragraph, blanks or a table) after its prompt —
-  // and it has no output panel.
+  // top bar, the question panel, the workspace, the output panel), the app
+  // handing it its chrome (task 087): its top bar, the visitor banner, and the
+  // question panel only in an assignment. A written problem's workspace is its
+  // worksheet — the problem's text with each part's field (a line, a
+  // paragraph, blanks or a table) after its prompt — and it has no output
+  // panel.
+  const bar = <EditorTopBar />;
+  const banner = isVisitor ? <VisitorBanner /> : undefined;
+  const question = assignment ? questionSidePanel : undefined;
   if (buildMode === 'open') {
-    return <EditorShell><Worksheet /></EditorShell>;
+    return <EditorShell bar={bar} banner={banner} question={question}><Worksheet /></EditorShell>;
   }
 
   return (
-    <EditorShell output={<OutputPanel />}>
+    <EditorShell bar={bar} banner={banner} question={question} output={<OutputPanel />}>
       {/* The sandbox's worksheet tabs, over its canvas (no question panel). */}
       {!assignment && <TabBar />}
-      <div className="main-area">
-        {/* The parts are a floating palette inside the canvas (task 054). */}
-        <div className="canvas-and-timeline">
-          {/* Turbot questions: the arena ("Map") lives in the output panel
-              (DataTable's turbot branch), not here — the canvas column is the
-              inner machine's normal editor. A TM-brained turbot shows its
-              internal tape (read-only: turbots start on a blank tape). */}
-          <CircuitCanvas />
-          {buildMode !== 'FSM' && buildMode !== 'TM' && buildMode !== 'turbot' && <SequentialTimeline />}
-          {buildMode === 'TM' && <TMTapePanel />}
-          {buildMode === 'turbot' && effectiveMode === 'TM' && <TurbotTapePanel />}
-        </div>
-      </div>
+      <EditorWorkspace />
     </EditorShell>
   );
 }

@@ -85,6 +85,8 @@ const setUrl = (_s: unknown, _t: string, url: string) => {
 };
 g.history = { pushState: setUrl, replaceState: setUrl };
 
+// The app's course backend (task 087), installed as main.tsx installs it.
+await import('../src/storage/appBackend');
 const { routeAccess, initRouting, setRoutingPrincipal, parseHash, routeToHash, navigate, canonicalHash, editorRoute, feedbackContextFor } = await import('../src/routing');
 const { useStore } = await import('../src/store');
 type Route = import('../src/routing').Route;

@@ -12,7 +12,8 @@
 // there is no feedback loop and we never listen to `hashchange`.
 
 import { useStore } from './store';
-import { instructorRole } from './auth/instructorRole';
+// The role, from the page's installed backend (task 087) — never auth/ directly.
+import { pageBackend } from './storage/pageBackend';
 import { pageIndexOf } from './problemSet';
 import type { FeedbackContext } from './types';
 
@@ -441,7 +442,7 @@ export function feedbackContextFor(
  *  Only an instructor opens it (anyone else is sent Home); an unknown
  *  assignment or attempt repairs the URL to the student's submission page. */
 function applyForeignView(route: Extract<Route, { kind: 'assignment' }>, student: string, seq: number): void {
-  if (!instructorRole.isInstructor()) {
+  if (!pageBackend().isInstructor()) {
     navigate({ kind: 'home' }, { replace: true });
     return;
   }

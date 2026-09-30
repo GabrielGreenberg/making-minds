@@ -1,3 +1,4 @@
+import { fileURLToPath } from 'node:url'
 import { defineConfig, type Plugin } from 'vite'
 import react from '@vitejs/plugin-react'
 import { INTEGRITY_NOTICE } from './src/provenance/notice.ts'
@@ -25,4 +26,15 @@ export default defineConfig({
   base: process.env.VITE_BASE_PATH ?? '/making-minds/',
   // Honor an assigned port (parallel sessions run several dev servers).
   server: { port: process.env.PORT ? Number(process.env.PORT) : 5173 },
+  // Two pages: the app, and the embeddable sandbox (task 087) — its own file,
+  // not a route, because framing permission is a header set per path
+  // (public/_headers) and a hash never reaches the server.
+  build: {
+    rolldownOptions: {
+      input: {
+        main: fileURLToPath(new URL('./index.html', import.meta.url)),
+        embed: fileURLToPath(new URL('./embed.html', import.meta.url)),
+      },
+    },
+  },
 })

@@ -1,9 +1,11 @@
-// Pure arena-authoring helpers for the instructor's question creator. All
+// Pure arena-editing helpers: the instructor's question creator, the
+// sandbox's "Edit map" and the workbook file's size check share them. All
 // functions return a new ArenaConfig (no mutation), mirroring the engine's
 // immutability discipline. Kept out of engine/ because these are UI-side
-// editing conveniences, not evaluation logic.
+// editing conveniences, not evaluation logic — and out of instructor/, so the
+// sandbox (and the embed, task 087) never import from there.
 
-import type { ArenaCell, ArenaConfig, TurbotOrientation } from '../types';
+import type { ArenaCell, ArenaConfig, TurbotOrientation } from './types';
 
 export const MIN_ARENA_SIZE = 1;
 // Authoring-side cap only — ArenaCanvas renders any size. 30 is a hard floor

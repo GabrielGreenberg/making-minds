@@ -542,6 +542,8 @@ if (typeof (globalThis as { localStorage?: unknown }).localStorage === 'undefine
 }
 
 // Import AFTER the shims (static imports would hoist above them).
+// The app's course backend (task 087), installed as main.tsx installs it.
+await import('../src/storage/appBackend');
 const {
   useStore,
   selectCodecLayout,

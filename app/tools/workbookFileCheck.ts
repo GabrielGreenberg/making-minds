@@ -31,7 +31,8 @@
 // [names]          suggestedFileName / titleFromFileName.
 // [menu wiring]    the menu's contract, pinned in its source (no DOM here).
 // [grep gate]      the file code is local (law 5), workbookFile.ts is pure,
-//                  openWorkbook is gone, importWorkbook has two callers.
+//                  openWorkbook is gone, importWorkbook has three callers
+//                  (the File menu, the embed's example, the store).
 //
 // What a headless run cannot prove — the real native Save/Open dialogs — is
 // owed to a browser (the task file's ## Verify).
@@ -114,6 +115,8 @@ function fakeFile(name: string, text: string) {
   return { name, size: text.length, text: async () => text };
 }
 
+// The app's course backend (task 087), installed as main.tsx installs it.
+await import('../src/storage/appBackend');
 const { useStore, hasUnsavedWorkbookChanges, workbookSaveState, captureSandboxSession } = await import('../src/store');
 const {
   parseWorkbookFile, suggestedFileName, titleFromFileName, MAX_WORKBOOK_FILE_CHARS,
@@ -818,9 +821,10 @@ console.log('\n[grep gate]');
   }
   check('openWorkbook is gone', stragglers.length === 0, stragglers.join(', '));
   const callerFiles = [...new Set(callers)].sort();
-  check("importWorkbook( is called only by the File menu (and the store itself)",
+  // The embed (task 087) opens and resets its example through the same Open.
+  check("importWorkbook( is called only by the File menu and the embed's example (and the store itself)",
     callerFiles.includes('components/WorkbookFileMenu.tsx') &&
-      callerFiles.every((f) => f === 'components/WorkbookFileMenu.tsx' || f === 'store.ts'), callerFiles.join(', '));
+      callerFiles.every((f) => ['components/WorkbookFileMenu.tsx', 'embed/example.ts', 'store.ts'].includes(f)), callerFiles.join(', '));
   const storeSrc = read('store.ts');
   const blob = storeSrc.slice(storeSrc.indexOf('function getAutoSaveData'), storeSrc.indexOf('function isCurrentQuestionLocked'));
   check('(setup) the sandbox blob is found (it carries the baseline)', /workbookSavedKey/.test(blob));

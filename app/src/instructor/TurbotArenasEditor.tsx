@@ -1,7 +1,7 @@
 // The question creator's family of turbot arenas (task 010): one row per
 // arena — added, duplicated, removed and moved as a whole, so an arena never
 // parts from its criterion or step budget — and, below the list, the arena
-// editor (./arenaEditing.ts, ≤ 30×30) for the ONE active arena with its own
+// editor (../arenaEditing.ts, ≤ 30×30) for the ONE active arena with its own
 // criterion and budget. Only the active arena's grid renders, so a family of
 // three 30×30 worlds (HW6 P2) stays cheap. The drafts, their defects and the
 // saved field are the pure ./turbotCaseAuthoring.ts; this is only the widget.
@@ -15,7 +15,7 @@ import { useState } from 'react';
 import type { TurbotSuccessCriterion } from '../types';
 import { ArenaCanvas } from '../components/ArenaCanvas';
 import { moveItem } from './dragReorder';
-import { MAX_ARENA_SIZE, placeStart, resizeArena, setArenaCell } from './arenaEditing';
+import { MAX_ARENA_SIZE, placeStart, resizeArena, setArenaCell } from '../arenaEditing';
 import {
   describeTurbotCase,
   duplicateTurbotCase,

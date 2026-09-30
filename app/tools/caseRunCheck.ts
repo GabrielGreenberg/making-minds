@@ -286,6 +286,8 @@ if (typeof (globalThis as { localStorage?: unknown }).localStorage === 'undefine
 }
 
 // Import AFTER the shims (static imports would hoist above them).
+// The app's course backend (task 087), installed as main.tsx installs it.
+await import('../src/storage/appBackend');
 const { useStore, selectTurbotArena, selectQuestionStepBudget, selectFsmUncoveredInputs, UI_RUN_STEP_CAP } = await import('../src/store');
 
 async function waitUntil(pred: () => boolean, timeoutMs = 30000): Promise<boolean> {

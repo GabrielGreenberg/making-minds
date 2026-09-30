@@ -11,6 +11,7 @@ import { applyManualSegments } from '../wireSegments';
 import { canvasColors, canvasVar, signalColor } from '../canvasTheme';
 import { circuitBounds, draftActionsAt, fitView, freeArea, zoomAbout, ZOOM_STEP } from '../canvasView';
 import { CanvasGuide } from './CanvasGuide';
+import { gestureClaim, useEditorHost } from '../editorHost';
 import type {
   CircuitComponent,
   Wire,
@@ -1848,6 +1849,7 @@ function NavigationArrow({
 export function CircuitCanvas() {
   const svgRef = useRef<SVGSVGElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const host = useEditorHost();
 
   const dragRef = useRef<DragInfo | null>(null);
 
@@ -1995,11 +1997,27 @@ export function CircuitCanvas() {
     return () => window.removeEventListener('keydown', handler);
   }, [showPasteNotice]);
 
-  // ─── Wheel: zoom / pan ─────────────────────────────────────────
+  // ─── Wheel and touch: zoom / pan ───────────────────────────────
+  // A host that embeds the editor in another page (editorHost.ts, task 087)
+  // gets the page's scroll gestures only once the visitor has clicked or
+  // tapped into the canvas. Until then a wheel over it is the page's (no
+  // preventDefault), and so is a touch: the canvas and its palette let the
+  // browser pan and zoom the page (touch-action), and the touch never reaches
+  // the canvas's handlers — a swipe the browser takes over would leave the
+  // canvas mid-drag. A mouse or pen press claims them at once; a touch only
+  // as a tap (it ends without the browser taking it: no pointercancel), so a
+  // visitor swiping past the frame is never caught by the next swipe. They
+  // are the page's again once the pointer leaves the frame or the frame
+  // loses focus. The claim itself is editorHost.ts gestureClaim; this wires
+  // the DOM to it.
+  const [gesturesClaimed, setGesturesClaimed] = useState(!host.gesturesNeedActivation);
   useEffect(() => {
     const el = containerRef.current;
     if (!el) return;
+    const gate = gestureClaim(host, setGesturesClaimed);
+    setGesturesClaimed(gate.claimed); // a fresh claim (a new host) starts over
     const handler = (e: WheelEvent) => {
+      if (!gate.claimed) return;
       e.preventDefault();
       const state = useStore.getState();
       if (e.ctrlKey || e.metaKey) {
@@ -2009,9 +2027,32 @@ export function CircuitCanvas() {
         state.setPan(state.panX - e.deltaX, state.panY - e.deltaY);
       }
     };
+    const down = (e: PointerEvent) => {
+      if (gate.down(e)) e.stopPropagation(); // the page's touch, not the canvas's
+    };
+    const up = (e: PointerEvent) => gate.up(e);
+    const cancel = (e: PointerEvent) => gate.cancel(e);
+    const release = () => gate.release();
     el.addEventListener('wheel', handler, { passive: false });
-    return () => el.removeEventListener('wheel', handler);
-  }, []);
+    if (host.gesturesNeedActivation) {
+      // Capture: a press anywhere inside counts, whatever handles it.
+      el.addEventListener('pointerdown', down, true);
+      el.addEventListener('pointerup', up, true);
+      el.addEventListener('pointercancel', cancel, true);
+      window.addEventListener('blur', release);
+      document.documentElement.addEventListener('mouseleave', release);
+    }
+    return () => {
+      el.removeEventListener('wheel', handler);
+      if (host.gesturesNeedActivation) {
+        el.removeEventListener('pointerdown', down, true);
+        el.removeEventListener('pointerup', up, true);
+        el.removeEventListener('pointercancel', cancel, true);
+        window.removeEventListener('blur', release);
+        document.documentElement.removeEventListener('mouseleave', release);
+      }
+    };
+  }, [host]);
 
   // ─── Track container size ──────────────────────────────────────
   useEffect(() => {
@@ -3223,17 +3264,61 @@ export function CircuitCanvas() {
   // submission put on show — fits the new canvas: the canvas's response to
   // the store's swap counter (resetAllSimState bumps it), never a separate
   // reset of its own. Two frames: the palette measures and settles first.
+  //
+  // It may take longer than two frames to settle: the canvas's first measure
+  // lays a palette flat that has no room to stand, and a flat one drops under
+  // the canvas's actions a render after that. So until the person does
+  // anything — a press or a key anywhere, or a view of their own — the fit
+  // follows the layout (the canvas's size, the palette's place) as it
+  // settles, and the swap ends where Fit would (task 087: a 640×420 embed was
+  // fitted beside a standing palette, and the example then lay under the flat
+  // one).
   const canvasSwapSeq = useStore((s) => s.canvasSwapSeq);
+  const layoutMoved = useRef<(() => void) | null>(null);
   useEffect(() => {
+    let following = true;
+    let fitted: { zoom: number; panX: number; panY: number } | null = null;
+    let settle = 0;
+    const stop = () => {
+      following = false;
+      layoutMoved.current = null;
+    };
+    const refit = () => {
+      if (!following) return;
+      const s = useStore.getState();
+      if (fitted && (s.zoom !== fitted.zoom || s.panX !== fitted.panX || s.panY !== fitted.panY)) {
+        stop(); // the view is theirs now
+        return;
+      }
+      fitCanvas();
+      const t = useStore.getState();
+      fitted = { zoom: t.zoom, panX: t.panX, panY: t.panY };
+    };
+    layoutMoved.current = () => {
+      cancelAnimationFrame(settle);
+      settle = requestAnimationFrame(refit);
+    };
     let second = 0;
     const first = requestAnimationFrame(() => {
-      second = requestAnimationFrame(() => fitCanvas());
+      second = requestAnimationFrame(refit);
     });
+    window.addEventListener('pointerdown', stop, true);
+    window.addEventListener('keydown', stop, true);
     return () => {
+      stop();
       cancelAnimationFrame(first);
       cancelAnimationFrame(second);
+      cancelAnimationFrame(settle);
+      window.removeEventListener('pointerdown', stop, true);
+      window.removeEventListener('keydown', stop, true);
     };
   }, [canvasSwapSeq, fitCanvas]);
+  // What moves the layout while it settles: the canvas's size, and the
+  // palette's place (Palette's onPlaced, after every placement it renders).
+  const onLayoutMoved = useCallback(() => layoutMoved.current?.(), []);
+  useEffect(() => {
+    onLayoutMoved();
+  }, [containerSize, onLayoutMoved]);
 
   /** − and +: a zoom step about the canvas's centre. */
   const zoomStep = useCallback((factor: number) => {
@@ -3665,7 +3750,7 @@ export function CircuitCanvas() {
 
   return (
     <div
-      className="canvas-container"
+      className={`canvas-container${gesturesClaimed ? '' : ' cv-page-gestures'}`}
       ref={containerRef}
       style={gridStyle}
     >
@@ -3744,7 +3829,9 @@ export function CircuitCanvas() {
         }}
         style={{
           cursor,
-          touchAction: 'none',
+          // Touch is the canvas's own — unless an embed's page still has it
+          // (the gesture effect above).
+          touchAction: gesturesClaimed ? 'none' : 'manipulation',
           userSelect: 'none',
           WebkitUserSelect: 'none',
         }}
@@ -3940,7 +4027,7 @@ export function CircuitCanvas() {
       </svg>
 
       {/* The floating palette and its Boxes pop-out (task 054) */}
-      <Palette canvasW={containerSize.width} canvasH={containerSize.height} />
+      <Palette canvasW={containerSize.width} canvasH={containerSize.height} onPlaced={onLayoutMoved} />
 
       {/* Navigation arrow */}
       {navArrow && (

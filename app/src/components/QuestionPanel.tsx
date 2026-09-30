@@ -40,6 +40,7 @@ import {
   sectionNotesLabel,
 } from '../workbench';
 import { PanelDivider } from './PanelDivider';
+import type { QuestionSidePanel } from './EditorShell';
 import { FigureView, ProblemBody } from './ProblemSetDocument';
 import { StatementBody } from './StatementBody';
 
@@ -129,6 +130,16 @@ export function QuestionPanel({
     </div>
   );
 }
+
+/** The question panel as the frame's left column (EditorShell `question`,
+ *  task 087): the open panel with the frame's collapse and split, and the
+ *  strip it collapses to. The app passes it only in an assignment. */
+export const questionSidePanel: QuestionSidePanel = {
+  panel: ({ onCollapse, split, onResizeSplit }) => (
+    <QuestionPanel onCollapse={onCollapse} split={split} onResizeSplit={onResizeSplit} />
+  ),
+  strip: (expand) => <QuestionPanelStrip onExpand={expand} />,
+};
 
 /** An element's height in px, kept current as it resizes (0 until laid out,
  *  or where there is no ResizeObserver). */

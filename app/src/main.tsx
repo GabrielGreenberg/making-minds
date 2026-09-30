@@ -8,6 +8,9 @@ import './theme.css'
 import './index.css'
 import './pages.css'
 import './workbench.css'
+// The course backend (task 087): the editor store and routing reach the seams,
+// the registry and the session through the slot this fills — before App.
+import './storage/appBackend.ts'
 import App from './App.tsx'
 import { AuthProvider, AuthGate } from './auth'
 import { ServerHealthProvider } from './auth/HealthGate.tsx'

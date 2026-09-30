@@ -43,17 +43,22 @@ import {
 import { topologicalSort, evaluateGate, evaluateCC, scNetlist, evaluateSCStep, boxMemoryOutputs, stepBoxedMemory, memorySlots, withMemState, zeroMemState, hasMemory, isSequentialBox, hasCombinationalLoop, sortStateComponents, evaluateFSMSymbolStep, evaluateTMSingleStep, evaluateTMSequence, DEFAULT_TM_MAX_STEPS, notationForRepresentation, encodeTM, stepCountFor, encodeInput, valueToBits, bitsToValue, bitsToTally, bitsToBinary, sortByLabel, fsmNotation, turbotFsmNotation, uncoveredInputs, tmNotation, turbotInternalNotation, turbotExternalNotation, questionLayout, caseStimulus, recordedCaseSeparations, gradedMachineKey, gradingCircuit, parsePortKey, type CodecLayout, type TransitionNotation } from './engine';
 import { senseAheadSymbol, applyMotorCommand, initialBrainState, runBrainStep, stateKindOf, isGoalCell, type BrainState } from './engine/turbot';
 import { framesToLanes } from './engine/perception';
-import { getAssignment, listAssignments } from './assignments';
 import { emptyQuestionCircuit, restoreQuestionCircuits } from './storage/workbookStore';
-import { buildSubmission } from './storage/submissionStore';
-// Store INSTANCES come from the backend seam (local vs. remote is decided
-// there, nowhere else); the modules above supply only pure helpers + types.
-import { workbookStore, submissionStore, assignmentStore, gradingStore, backendMode } from './storage/backend';
+import { buildSubmission } from './storage/buildSubmission';
+// The course — store INSTANCES, the assignment registry, the session and the
+// role — comes from the page's installed backend (task 087: the app installs
+// storage/appBackend.ts, whose seams storage/backend.ts decides local vs.
+// remote; the embed installs none); the modules above supply only pure
+// helpers + types.
+import { pageBackend, pageBackendOrNull } from './storage/pageBackend';
+// The remote crash buffer keeps to the browser's storage itself: it is only
+// ever written for a remote backend's open assignment, which an ephemeral
+// page (the embed: no backend, no assignment) never has.
 import { writeJournal, clearJournal, clearJournalIfHolds, reconcileJournal } from './storage/journal';
+// Whether this page keeps anything in the browser (the embed keeps nothing).
+import { isEphemeral, pageStorage } from './persistence';
 import { isFrozen } from './dueDates';
 import { pageIndexOf, problemPartIds } from './problemSet';
-import { getSessionUser } from './auth/session';
-import { instructorRole } from './auth/instructorRole';
 import {
   canvasKind,
   canvasPasteVerdict,
@@ -1972,7 +1977,9 @@ export const useStore = create<AppState>()((set, get) => ({
     // Whose submissions: captured with the epoch, never reread after an await.
     const epoch = principalEpoch;
     const who = currentPrincipal;
-    const assignments = await listAssignments();
+    const backend = pageBackend();
+    const { submissionStore } = backend;
+    const assignments = await backend.listAssignments();
     const latests = await Promise.all(
       assignments.map((a) => submissionStore.getLatestOwn(a.id, who)),
     );
@@ -2008,7 +2015,7 @@ export const useStore = create<AppState>()((set, get) => ({
       redoStack: [],
     });
     // Clear THIS principal's sandbox autosave (never another person's).
-    try { localStorage.removeItem(sandboxKey(currentPrincipal)); } catch { /* ignore */ }
+    try { pageStorage().removeItem(sandboxKey(currentPrincipal)); } catch { /* ignore */ }
   },
 
   newWorkbook: (mode = 'CC', innerMode, title = 'Circuit 1') => {
@@ -2667,8 +2674,10 @@ export const useStore = create<AppState>()((set, get) => ({
       return true;
     }
     const seq = ++openAssignmentSeq;
+    const backend = pageBackend();
+    const { workbookStore, submissionStore } = backend;
     const [def, { state: fetched, mintKey }, latestSubmission] = await Promise.all([
-      getAssignment(id),
+      backend.getAssignment(id),
       // The saved work AND this person's mint key for this assignment (task
       // 034), in one fetch: ids minted and editing records signed from here
       // on bind to them.
@@ -2691,9 +2700,9 @@ export const useStore = create<AppState>()((set, get) => ({
     // `def` is undefined above); local mode has no server to refuse, so the
     // same rule is applied here.
     if (
-      backendMode === 'local' &&
-      !instructorRole.isInstructor() &&
-      !(await assignmentStore.getVisible(id))
+      backend.mode === 'local' &&
+      !backend.isInstructor() &&
+      !(await backend.assignmentStore.getVisible(id))
     ) {
       return false;
     }
@@ -2702,8 +2711,8 @@ export const useStore = create<AppState>()((set, get) => ({
     // (storage/journal.ts) — it supersedes the fetched server state and is
     // re-uploaded. Local mode: `fetched` passes through untouched.
     let saved = fetched;
-    if (backendMode === 'remote') {
-      const email = getSessionUser()?.email;
+    if (backend.mode === 'remote') {
+      const email = backend.sessionEmail();
       if (email) {
         saved = await reconcileJournal(email, id, fetched, workbookStore);
         if (seq !== openAssignmentSeq) return true;
@@ -2928,7 +2937,7 @@ export const useStore = create<AppState>()((set, get) => ({
       if (!target) {
         // Own attempts only: attempt numbers count per student, and another
         // person's attempt k is never "yours" (task 037).
-        const own = await submissionStore.listOwn(a.id, who);
+        const own = await pageBackend().submissionStore.listOwn(a.id, who);
         // Superseded (a newer view, open, Home or principal change — on
         // this assignment or another): apply nothing.
         if (viewSeq !== viewSubmissionSeq || get().assignment?.id !== a.id) return true;
@@ -3019,9 +3028,10 @@ export const useStore = create<AppState>()((set, get) => ({
     // The assignment (the instructor's copy: its banks are what a graded
     // case replays against) and the attempt in full, from the grading seam —
     // NEVER this person's workbook (loadForOpen), own submissions or mint key.
+    const backend = pageBackend();
     const [def, detail] = await Promise.all([
-      getAssignment(assignmentId),
-      gradingStore.attempt(assignmentId, studentKey, attempt),
+      backend.getAssignment(assignmentId),
+      backend.gradingStore.attempt(assignmentId, studentKey, attempt),
     ]);
     if (seq !== openAssignmentSeq || viewSeq !== viewSubmissionSeq) return true;
     if (!def || !detail) return false;
@@ -3073,7 +3083,9 @@ export const useStore = create<AppState>()((set, get) => ({
   submitAssignment: async (id, student, opts) => {
     closeBoxEditorForSwap(get);
     const epoch = principalEpoch;
-    const def = await getAssignment(id);
+    const backend = pageBackend();
+    const { workbookStore, submissionStore } = backend;
+    const def = await backend.getAssignment(id);
     if (!def) return null;
     const state = get();
     // Build from live state if this assignment is open; otherwise from the
@@ -5603,7 +5615,7 @@ if (import.meta.env?.DEV === true && typeof window !== 'undefined') {
   (window as any).__store = useStore;
 }
 
-// ─── Auto-save to localStorage ─────────────────────────────────────
+// ─── Auto-save to localStorage (persistence.ts pageStorage) ─────────
 // The sandbox autosaves per PERSON on this browser (reset law 2 loads it):
 // `making-minds-autosave:<email>` for a signed-in user, one shared
 // `making-minds-autosave:visitor` for visitors. The bare prefix is the legacy
@@ -5750,7 +5762,7 @@ async function saveAssignmentState(
   // person's in memory to save (ownsOpenWorkbook).
   if (!a || !ownsOpenWorkbook(s)) return null;
   const state = snapshotAssignmentState(s);
-  await workbookStore.saveAssignmentState(a.id, state, { keepalive });
+  await pageBackend().workbookStore.saveAssignmentState(a.id, state, { keepalive });
   return { id: a.id, state };
 }
 
@@ -5761,10 +5773,13 @@ async function saveAssignmentState(
 // assignment open. Cleared by the next confirmed seam save; replayed by the
 // next openAssignment (reconcileJournal).
 function writeOpenAssignmentJournal(): void {
-  if (backendMode !== 'remote') return;
+  // Asked by every unload flush, the sandbox's too: a page without a backend
+  // (the embed) has no remote to buffer for.
+  const backend = pageBackendOrNull();
+  if (backend?.mode !== 'remote') return;
   const s = useStore.getState();
   if (!s.assignment || !ownsOpenWorkbook(s) || s.autoSaveStatus === 'saved') return;
-  const email = getSessionUser()?.email;
+  const email = backend.sessionEmail();
   if (!email) return;
   writeJournal(email, s.assignment.id, snapshotAssignmentState(s));
 }
@@ -5793,15 +5808,18 @@ async function performAutoSave(keepalive = false): Promise<void> {
   autoSaveInFlight = true;
   // Whose save this is, read BEFORE the seam await: a principal change while
   // it is in flight must not touch the next person's journal or save chip.
+  // (A sandbox save needs no backend: none is asked for unless it is remote.)
   const epoch = principalEpoch;
-  const email = getSessionUser()?.email;
+  const backend = pageBackendOrNull();
+  const remote = backend?.mode === 'remote';
+  const email = backend?.sessionEmail();
   try {
     useStore.setState({ autoSaveStatus: 'saving' });
     let saved: { id: string; state: AssignmentState } | null = null;
     if (useStore.getState().assignment) {
       saved = await saveAssignmentState(keepalive);
     } else {
-      localStorage.setItem(sandboxKey(currentPrincipal), JSON.stringify(getAutoSaveData()));
+      pageStorage().setItem(sandboxKey(currentPrincipal), JSON.stringify(getAutoSaveData()));
     }
     if (epoch !== principalEpoch) {
       // The principal changed mid-save, and the change journaled the leaving
@@ -5810,14 +5828,14 @@ async function performAutoSave(keepalive = false): Promise<void> {
       // confirmed — no edit came after this save started. A NEWER journal is
       // kept for their next open to replay. Nothing else here is theirs any
       // more (the save chip and the retry belong to the next person).
-      if (backendMode === 'remote' && saved && email) {
+      if (remote && saved && email) {
         clearJournalIfHolds(email, saved.id, saved.state);
       }
       return;
     }
     useStore.setState({ autoSaveStatus: 'saved', lastSavedAt: Date.now() });
     autoSaveBackoff = AUTO_SAVE_BACKOFF_INITIAL;
-    if (backendMode === 'remote' && saved) {
+    if (remote && saved) {
       // Confirmed on the server — the crash buffer for this assignment is
       // now obsolete (a newer edit's own flush would rewrite it anyway).
       if (email) clearJournal(email, saved.id);
@@ -5825,7 +5843,7 @@ async function performAutoSave(keepalive = false): Promise<void> {
   } catch {
     // As above: the previous principal's failed save is already journaled.
     if (epoch !== principalEpoch) return;
-    if (backendMode === 'remote') {
+    if (remote) {
       // Server unreachable (or the write failed): buffer the state locally,
       // show the error chip, and retry with backoff. The student's work is
       // in the journal even if the tab dies before a retry lands.
@@ -5854,6 +5872,9 @@ async function performAutoSave(keepalive = false): Promise<void> {
 // Subscribe to state changes that should trigger auto-save. Routes by context:
 // assignment mode → per-assignment storage; sandbox mode → the sandbox blob.
 useStore.subscribe((state, prev) => {
+  // An ephemeral page (the embed, task 087) saves nothing — and never says
+  // it has unsaved work.
+  if (isEphemeral()) return;
   // A submission on show (viewed, task 003, or frozen, item 3): the canvas
   // is not live work-in-progress, so nothing here should ever overwrite the
   // real saved workbook. (Mutations are already refused at the source —
@@ -5908,6 +5929,7 @@ useStore.subscribe((state, prev) => {
 // pagehide only; a merely-hidden tab keeps a normal fetch) lets the remote
 // PUT outlive the page — best-effort at ~64KB, the journal is the safety net.
 function flushAutoSave(opts?: { journal?: boolean; keepalive?: boolean }) {
+  if (isEphemeral()) return; // nothing is kept (persistence.ts)
   if (opts?.journal) writeOpenAssignmentJournal();
   if (!autoSaveTimer) return;
   clearTimeout(autoSaveTimer);
@@ -5940,6 +5962,7 @@ function flushAutoSave(opts?: { journal?: boolean; keepalive?: boolean }) {
 //   device.
 function saveForLeavingPrincipal(): void {
   if (!principalReported) return; // boot: nothing in memory is anyone's yet
+  if (isEphemeral()) return; // nothing is kept (persistence.ts)
   const s = useStore.getState();
   const unsaved = autoSaveTimer != null || autoSaveTrailing || s.autoSaveStatus !== 'saved';
   if (!unsaved) return;
@@ -5949,17 +5972,18 @@ function saveForLeavingPrincipal(): void {
   if (a && !ownsOpenWorkbook(s)) return;
   if (!a) {
     try {
-      localStorage.setItem(sandboxKey(currentPrincipal), JSON.stringify(getAutoSaveData()));
+      pageStorage().setItem(sandboxKey(currentPrincipal), JSON.stringify(getAutoSaveData()));
     } catch {
       // storage full/unavailable — the same silent fail as the autosave
     }
     return;
   }
-  if (backendMode === 'local') {
+  const backend = pageBackend();
+  if (backend.mode === 'local') {
     void saveAssignmentState().catch(() => {});
     return;
   }
-  const email = getSessionUser()?.email;
+  const email = backend.sessionEmail();
   if (email) writeJournal(email, a.id, snapshotAssignmentState(s));
   if (autoSaveTimer) clearTimeout(autoSaveTimer);
   autoSaveTimer = null;
@@ -6196,7 +6220,7 @@ type TabCircuitData = { components: CircuitComponent[]; wires: Wire[]; boxes: Bo
 
 function readStored(key: string): string | null {
   try {
-    return localStorage.getItem(key);
+    return pageStorage().getItem(key);
   } catch {
     return null;
   }
@@ -6206,11 +6230,13 @@ function readStored(key: string): string | null {
  *  visitor sandbox already exists the legacy blob is left untouched — never
  *  overwrite, never delete what can't be placed. */
 function adoptLegacySandbox(): void {
+  if (isEphemeral()) return; // nothing is read (persistence.ts)
   try {
-    const legacy = localStorage.getItem(SANDBOX_KEY_PREFIX);
-    if (legacy == null || localStorage.getItem(sandboxKey(null)) != null) return;
-    localStorage.setItem(sandboxKey(null), legacy);
-    localStorage.removeItem(SANDBOX_KEY_PREFIX);
+    const storage = pageStorage();
+    const legacy = storage.getItem(SANDBOX_KEY_PREFIX);
+    if (legacy == null || storage.getItem(sandboxKey(null)) != null) return;
+    storage.setItem(sandboxKey(null), legacy);
+    storage.removeItem(SANDBOX_KEY_PREFIX);
   } catch {
     // storage unavailable — nothing to adopt
   }
@@ -6271,13 +6297,16 @@ function sandboxHasWork(raw: string | null): boolean {
  *  is ever deleted otherwise: a signed-out person's sandbox just waits under
  *  their key. */
 function readSandbox(principal: string | null): Partial<AppState> {
+  // An ephemeral page (the embed) loads no one's sandbox: it opens its example.
+  if (isEphemeral()) return {};
   adoptLegacySandbox();
   if (principal != null) {
     const visitors = readStored(sandboxKey(null));
     if (!sandboxHasWork(readStored(sandboxKey(principal))) && sandboxHasWork(visitors)) {
       try {
-        localStorage.setItem(sandboxKey(principal), visitors!);
-        localStorage.removeItem(sandboxKey(null));
+        const storage = pageStorage();
+        storage.setItem(sandboxKey(principal), visitors!);
+        storage.removeItem(sandboxKey(null));
       } catch {
         // storage unavailable — they start from their own (empty) sandbox
       }

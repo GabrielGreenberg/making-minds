@@ -11,9 +11,9 @@
 //      surface cannot re-introduce an ad-hoc grey.
 //   2. Every var(--mm-…) used anywhere resolves to a token defined in :root
 //      (a typo'd token silently falls back to nothing in the browser).
-//   3. The wiring: main.tsx imports theme.css → index.css → pages.css →
-//      workbench.css; index.html loads the IBM Plex fonts; each page surface
-//      renders <PageShell>; the retired header idioms are gone.
+//   3. The wiring: main.tsx (and the embed's entry, embed/main.tsx) imports
+//      theme.css → index.css → pages.css → workbench.css; index.html loads
+//      the IBM Plex fonts; each page surface renders <PageShell>; the retired header idioms are gone.
 //   4. The editor's older stylesheet (index.css — the canvas, palette and data
 //      panel internals) is migrating onto the tokens: its colour literals may
 //      only go DOWN (a ratchet), until tasks 053–055 bring them to zero.
@@ -60,6 +60,10 @@ const PAGE_COMPONENTS = [
   'auth/LoginScreen.tsx',
   'auth/HealthGate.tsx',
   'auth/AccountPanel.tsx',
+  // The embeddable sandbox (task 087): its bar, poster and notes.
+  ...readdirSync(path.join(SRC, 'embed'))
+    .filter((f) => f.endsWith('.tsx'))
+    .map((f) => `embed/${f}`),
   ...readdirSync(path.join(SRC, 'instructor'))
     .filter((f) => f.endsWith('.tsx'))
     .map((f) => `instructor/${f}`),
@@ -130,6 +134,13 @@ const main = read('main.tsx');
 const order = ["import './theme.css'", "import './index.css'", "import './pages.css'", "import './workbench.css'"].map((s) => main.indexOf(s));
 check('main.tsx imports theme.css → index.css → pages.css → workbench.css',
   order.every((i) => i >= 0) && order.every((i, k) => k === 0 || order[k - 1] < i));
+
+// The embed's entry (task 087) loads the same sheets in the same order, and no KaTeX.
+const embedMain = read('embed/main.tsx');
+const embedOrder = ["import '../theme.css'", "import '../index.css'", "import '../pages.css'", "import '../workbench.css'"].map((s) => embedMain.indexOf(s));
+check('embed/main.tsx imports theme.css → index.css → pages.css → workbench.css, and no KaTeX css',
+  embedOrder.every((i) => i >= 0) && embedOrder.every((i, k) => k === 0 || embedOrder[k - 1] < i) &&
+    !/katex/i.test(embedMain.replace(/^\s*\/\/.*$/gm, '')));
 
 const html = readFileSync(path.join(SRC, '../index.html'), 'utf8');
 check('index.html loads the IBM Plex fonts (Sans + Serif + Mono)', /fonts\.googleapis\.com\/css2\?[^"]*IBM\+Plex\+Sans[^"]*IBM\+Plex\+Serif[^"]*IBM\+Plex\+Mono/.test(html));

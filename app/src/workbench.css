@@ -422,6 +422,9 @@ a.wb-brand:hover { color: var(--mm-accent); text-decoration: none; }
   font-family: var(--mm-font-sans); user-select: none; touch-action: none;
 }
 .pal--horiz { flex-direction: row; }
+/* An embed's canvas before the visitor taps in (CircuitCanvas's gesture
+   effect, task 087): a swipe over the palette scrolls the host page too. */
+.cv-page-gestures .pal, .cv-page-gestures .pal-row { touch-action: manipulation; }
 .pal--dragging { box-shadow: var(--mm-shadow-palette-drag); }
 .pal--pin-target { border-color: var(--mm-accent); }
 .pal-grip {
@@ -614,3 +617,34 @@ a.wb-brand:hover { color: var(--mm-accent); text-decoration: none; }
 /* The FSM state table's HALT rows — a (state, input) with no arrow. Warned,
    never blocked (task 047): the run halts there, as in the textbook. */
 .data-table tr.data-table-row--halt td:nth-child(n+3) .mono-value { color: var(--mm-warn); font-style: italic; }
+
+/* ── The embeddable sandbox (embed.html, task 087) ─────────────────────────
+   A slim bar over the one example: the brand, the example's name, Reset and
+   the way to the full sandbox. Below 600px the editor gives way to a still
+   of the example (the poster); loading and a failure are a plain note. */
+.wb-topbar.wb-embed-bar { height: 40px; padding: 0 12px; gap: 12px; }
+.wb-embed-brand { font-size: 15px; }
+.wb-embed-title {
+  min-width: 0; flex: 0 1 auto; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  font-size: var(--mm-fs-small); font-weight: 500; color: var(--mm-ink);
+}
+.wb-embed-bar .wb-topbar-right { gap: 12px; }
+.wb-embed-bar .wb-embed-reset { font-size: 13px; padding: 4px 12px; }
+.wb-embed-open {
+  font-size: var(--mm-fs-small); font-weight: 500; color: var(--mm-link); text-decoration: none; white-space: nowrap;
+}
+.wb-embed-open:hover { text-decoration: underline; }
+@media (max-width: 720px) { .wb-embed-brand { display: none; } }
+.wb-embed-note, .wb-embed-poster {
+  height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px;
+  padding: 16px; text-align: center; background: var(--mm-bg); color: var(--mm-ink-2); font-size: var(--mm-fs-small);
+}
+.wb-embed-poster-img {
+  max-width: 100%; min-height: 0; flex: 0 1 auto; object-fit: contain;
+  border: 1px solid var(--mm-line); background: var(--mm-surface);
+}
+.wb-embed-poster-note { color: var(--mm-ink); font-weight: 500; }
+/* A turbot's Map first in the embed's short output panel (the glossary under
+   it, at its own height), so the arena shows without scrolling. */
+.wb-embed-page .turbot-map-col { order: -1; }
+.wb-embed-page .turbot-glossary { flex: 0 0 auto; }

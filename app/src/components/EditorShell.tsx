@@ -6,14 +6,19 @@
 // open states and the question panel's split (task 078) persist per browser
 // (uiPrefs.ts, workbench.ts EDITOR_PREF_KEYS).
 //
-// ONE frame for every question kind and the sandbox: a circuit question
-// passes its canvas and its output panel; an open or fill-in question passes
-// its answer area and no output panel; the sandbox has no question panel
-// (Gabriel, 2026-09-25) and keeps its worksheet tabs over the canvas.
+// ONE frame for every question kind, the sandbox and the embed: a circuit
+// question passes its canvas and its output panel; an open or fill-in
+// question passes its answer area and no output panel; the sandbox has no
+// question panel (Gabriel, 2026-09-25) and keeps its worksheet tabs over the
+// canvas.
+//
+// Layout only (task 087): the host decides the chrome and passes it in — the
+// bar (the app's EditorTopBar, the embed's slim bar), a banner under it (the
+// visitor banner), the question panel as a pair of renderers (QuestionPanel.tsx
+// questionSidePanel), the output panel. The frame reads no store and no
+// session, so the embeddable sandbox mounts it without the course client.
 
 import { useCallback, useState, type ReactNode } from 'react';
-import { useStore } from '../store';
-import { useAuth } from '../auth';
 import { loadUiPrefs, saveUiPref } from '../uiPrefs';
 import {
   EDITOR_PREF_KEYS,
@@ -24,10 +29,21 @@ import {
   type EditorLayout,
   type WidthRange,
 } from '../workbench';
-import { EditorTopBar } from './EditorTopBar';
 import { PanelDivider } from './PanelDivider';
-import { QuestionPanel, QuestionPanelStrip } from './QuestionPanel';
-import { VisitorBanner } from './VisitorBanner';
+
+/** What the frame hands the open question panel: collapse it, and its split. */
+export interface QuestionPanelControl {
+  onCollapse: () => void;
+  /** The problem's share of the panel below the nav strip (workbench.ts QUESTION_SPLIT). */
+  split: number;
+  onResizeSplit: (split: number, done: boolean) => void;
+}
+
+/** The left column: the open panel, and the strip it collapses to. */
+export interface QuestionSidePanel {
+  panel: (control: QuestionPanelControl) => ReactNode;
+  strip: (expand: () => void) => ReactNode;
+}
 
 /** The layout, read once from the browser's prefs; `update` changes it and,
  *  unless told it's a drag in progress, stores what changed. */
@@ -43,26 +59,40 @@ function useEditorLayout(): [EditorLayout, (patch: Partial<EditorLayout>, persis
   return [layout, update];
 }
 
-export function EditorShell({ children, output }: { children: ReactNode; output?: ReactNode }) {
-  const { isVisitor } = useAuth();
-  const inAssignment = useStore((s) => s.assignment !== null);
+export function EditorShell({
+  bar,
+  banner,
+  question,
+  output,
+  children,
+}: {
+  /** The top bar. */
+  bar: ReactNode;
+  /** A notice under the bar (the visitor banner). */
+  banner?: ReactNode;
+  /** The question panel — only in an assignment; the sandbox has none. */
+  question?: QuestionSidePanel;
+  /** The output panel; none for a written problem. */
+  output?: ReactNode;
+  children: ReactNode;
+}) {
   const [layout, update] = useEditorLayout();
 
   return (
     <div className="app wb">
-      <EditorTopBar />
+      {bar}
       <div className="wb-band" />
-      {isVisitor && <VisitorBanner />}
+      {banner}
       <div className="wb-body">
-        {inAssignment &&
+        {question &&
           (layout.leftOpen ? (
             <>
               <aside className="wb-left" style={{ width: layout.leftW }} aria-label="Question">
-                <QuestionPanel
-                  onCollapse={() => update({ leftOpen: false })}
-                  split={layout.qpSplit}
-                  onResizeSplit={(v, done) => update({ qpSplit: v }, done)}
-                />
+                {question.panel({
+                  onCollapse: () => update({ leftOpen: false }),
+                  split: layout.qpSplit,
+                  onResizeSplit: (v, done) => update({ qpSplit: v }, done),
+                })}
               </aside>
               <PanelDivider
                 orientation="vertical"
@@ -71,7 +101,7 @@ export function EditorShell({ children, output }: { children: ReactNode; output?
               />
             </>
           ) : (
-            <QuestionPanelStrip onExpand={() => update({ leftOpen: true })} />
+            question.strip(() => update({ leftOpen: true }))
           ))}
         <main className="wb-center">{children}</main>
         {output !== undefined &&

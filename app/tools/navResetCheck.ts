@@ -120,6 +120,8 @@ backing.set(VISITOR_KEY, JSON.stringify({
   tabCircuits: { 'import-tab': { components: [{ id: 'import-sentinel', type: 'AND', x: 0, y: 0 }], wires: [], boxes: [] } },
 }));
 
+// The app's course backend (task 087), installed as main.tsx installs it.
+await import('../src/storage/appBackend');
 const { useStore, selectTurbotArena, selectAssignmentFrozen, selectQuestionLocked, selectLockNotice, showsSubmission, selectTurbotGoalHit, TURBOT_GOAL_HOLD_TICKS, selectRunControls } =
   await import('../src/store');
 const { sortByLabel } = await import('../src/engine');

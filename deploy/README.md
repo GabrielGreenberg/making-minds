@@ -197,6 +197,55 @@ does it. By hand, from `app/`:
 Then set the Pages URL (and any custom domain) in the API's
 `MM_CORS_ORIGINS` env (systemd unit) and restart the service.
 
+### Embedding the sandbox
+
+The build emits a second page, `embed.html` (task 087): the editor for ONE
+example machine, with a slim bar (its name, **Reset**, **Open the full
+sandbox ↗**). No sign-in, no File menu, no tabs, and it never saves or reads
+browser storage: every load starts from the example. It is meant for the
+course website (`GabrielGreenberg/making-minds-website`), which only needs the
+tag:
+
+```html
+<iframe src="https://making-minds.pages.dev/embed?example=majority" width="100%"
+  height="500" style="border:0" loading="lazy" title="Making Minds sandbox"></iframe>
+```
+
+- **`?example=<name>`** picks the example: a file `app/public/embed-examples/<name>.json`
+  (lowercase letters, digits and hyphens). A missing or unknown name shows the
+  default, `majority`.
+- **The examples** (none is a homework answer — `app/tools/embedCheck.ts`
+  grades each against every HW1–HW7 machine problem and requires no credit):
+  `majority` (circuit: a three-input majority vote), `parity` (state machine:
+  1 while an odd number of 1s has come in), `square-patrol` (turbot with a
+  state-machine brain: forward, turn right, round a square of four cells;
+  stops at a block).
+- **Adding one** (any machine the sandbox builds — circuit, sequential
+  circuit, state machine, Turing machine, turbot with any brain):
+  1. Build it in the sandbox with ONE tab → File → Save.
+  2. Open the saved `.json` and set `metadata.title` to the name the embed's
+     bar should show. A fresh sandbox's first Save writes `"Untitled
+     Workbook"` (the picker names the file only after it is written), and
+     embedCheck refuses that title.
+  3. Drop the `.json` into `app/public/embed-examples/` as `<name>.json`
+     (lowercase letters, digits and hyphens).
+  4. `npm run build && node tools/shootEmbedPosters.mjs` (from `app/`) shoots
+     its still picture `<name>.png`, which a phone-narrow frame shows instead
+     of the editor.
+  5. `npm run check`. embedCheck checks the new file too: it must parse as
+     one worksheet with a real title and its poster beside it, its machine
+     must pass the engine's validator for its kind, and it must earn no
+     credit on any HW1–HW7 machine problem.
+
+  The next release serves it.
+- **Framing** is set by `app/public/_headers` (copied into `dist/`, uploaded
+  with it): every page sends `Content-Security-Policy: frame-ancestors 'self'`
+  and `X-Frame-Options: SAMEORIGIN`; `/embed` and `/embed.html` detach both and
+  allow `https://makingminds.org` and `https://www.makingminds.org` only. A
+  new host site means adding its origin there. Check a release with
+  `curl -sI https://making-minds.pages.dev/embed` and `curl -sI https://making-minds.pages.dev/`.
+- When the app gets its own domain (task 008), the snippet's URL changes once.
+
 ## 3. Accounts and the roster
 
 `MM_AUTH_MODE` picks the whole sign-in system (`server/src/auth.ts` is the one
