@@ -90,7 +90,10 @@
 //   PUT    /api/feedback/:id/status            instructor: {status: 'open'|'resolved'}
 //   PUT    /api/feedback/:id/triage            instructor: what the task pipeline made of
 //                                              it — {outcome: filed|personal|dismissed|review,
-//                                              tasks?, note?} | {clear: true}
+//                                              tasks?, note?} | {clear: true}; dismissed, or
+//                                              filed into tasks already live, also resolves
+//                                              it, and clear undoes that (task 086)
+//                                              → {ok, triage, resolved, reopened, status}
 //   GET    /api/instructor-notes               instructor: the one shared markdown note
 //   PUT    /api/instructor-notes               instructor: {content: string} → saves it
 //   GET    /api/robot/status                   instructor: the robot's state (task 083) — what
@@ -110,7 +113,7 @@
 import express from 'express';
 import type { Request, Response, NextFunction } from 'express';
 import type { AssignmentData, AssignmentState, ExportEvent, FeedbackTriage, FeedbackTriageOutcome, SubmissionData, SubmissionRecord } from '../../app/src/types';
-import { COURSE_LOG_ID } from '../../app/src/types';
+import { autoResolveStands, COURSE_LOG_ID } from '../../app/src/types';
 import { gradeSubmission } from '../../app/src/engine/grader';
 import { checkStudentNote, planExtensionWrite, planGradeWrite, planWaiverWrite, type GradeWrite } from '../../app/src/storage/gradeWrites';
 import { normalizeThresholds } from '../../app/src/storage/gradingFlags';
@@ -151,6 +154,7 @@ import { checkGroup } from '../../app/src/submissionGroup';
 import { studentCopy } from '../../app/src/lateContext';
 import { gateFactsFor, robotStatusUnknown, robotStatusView, type GateFactsLike } from '../../app/src/storage/robotStatus';
 import { backupDirFor, createRobotStatusSource, mirrorDirFor, repoDirFor } from './robotStatus';
+import { autoResolveFeedback, doneDirFor, readDoneTasks, reopenedMark, TASK_ID, type AutoResolve } from './feedbackResolution';
 // The release gate's decision itself (pure; importing it runs nothing), so
 // the Dashboard's reason can never drift from what the robot's gate says.
 import { decide } from '../../deploy/release-gate.mjs';
@@ -1121,6 +1125,18 @@ export function createApp(config: ServerConfig, db: Db) {
   const MAX_SCREENSHOT_DATA_URL_LENGTH = 4_500_000; // ~3.3MB decoded
   const MAX_FEEDBACK_MESSAGE_LENGTH = 5000;
 
+  // The pipeline's reports close themselves (task 086, src/feedbackResolution.ts).
+  // The live tasks are read once, at boot (the tasks/done/ of the code this
+  // process runs), then one sweep over every open, marked report. Neither may
+  // ever stop the server.
+  const liveDone = readDoneTasks(doneDirFor(config.dbPath, config.repoDir));
+  try {
+    const resolved = autoResolveFeedback(db, liveDone).length;
+    if (resolved) console.log(`feedback: auto-resolved ${resolved} report${resolved === 1 ? '' : 's'}`);
+  } catch (e) {
+    console.error(e);
+  }
+
   app.post('/api/feedback', auth, (req, res) => {
     const body = (req.body ?? {}) as {
       category?: unknown;
@@ -1209,28 +1225,44 @@ export function createApp(config: ServerConfig, db: Db) {
     res.json({ feedback: triage === undefined ? feedback : feedback.filter((f) => f.triage?.outcome === triage) });
   });
 
+  // One report, mark and status (listFeedback is the db's one reader).
+  const findFeedback = (id: string) => db.listFeedback().find((f) => f.id === id);
+
   app.put('/api/feedback/:id/status', auth, requireInstructor, (req, res) => {
     const status = (req.body ?? {}).status;
     if (status !== 'open' && status !== 'resolved') {
       res.status(400).json({ error: 'status must be "open" or "resolved"' });
       return;
     }
-    if (!db.setFeedbackStatus(String(req.params.id), status)) {
+    const id = String(req.params.id);
+    const before = findFeedback(id);
+    if (!db.setFeedbackStatus(id, status)) {
       res.status(404).json({ error: 'unknown feedback id' });
       return;
     }
+    // Reopening a report the pipeline resolved (task 086): the stamp notes it,
+    // so the pipeline's resolve stops standing — the tab stops crediting it.
+    const reopened = before ? reopenedMark(before, status, new Date().toISOString()) : null;
+    if (reopened) db.setFeedbackTriage(id, reopened);
     res.json({ ok: true });
   });
 
   // The task pipeline's mark (task 018), set by `tasks/tools/feedback.mjs
   // mark` from the instructor's machine once the catcher has processed a
-  // report. It never touches `status`: resolving stays the instructor's act.
-  const TASK_ID = /^\d{4}-\d{2}-\d{2}-\d{3}$/;
+  // report. A mark that closes the report resolves it too (task 086):
+  // `dismissed` at once, `filed` when its tasks are already live (else the
+  // boot after their release does). Once per report: a re-mark keeps the
+  // server's earlier `autoResolved` stamp, so a reopen sticks; the body's own
+  // is never read. `{clear: true}` drops the mark, stamp and all, and undoes
+  // a resolve of the pipeline's that still stands (it reopens the report, so
+  // the next pull fetches it again). The reply's `status` is the report's now.
   const MAX_TRIAGE_TASKS = 10;
   const MAX_TRIAGE_NOTE_LENGTH = 300;
 
   app.put('/api/feedback/:id/triage', auth, requireInstructor, (req, res) => {
     const body = (req.body ?? {}) as { outcome?: unknown; tasks?: unknown; note?: unknown; clear?: unknown };
+    const id = String(req.params.id);
+    const before = findFeedback(id);
     let triage: FeedbackTriage | null;
     if (body.clear === true) {
       triage = null;
@@ -1263,18 +1295,36 @@ export function createApp(config: ServerConfig, db: Db) {
         res.status(400).json({ error: 'a dismissed report needs a note saying why' });
         return;
       }
+      const prior = before?.triage;
       triage = {
         outcome,
         ...(outcome === 'filed' ? { tasks: [...new Set(tasks as string[])] } : {}),
         ...(cleanNote ? { note: cleanNote } : {}),
         at: new Date().toISOString(),
+        ...(prior?.autoResolved ? { autoResolved: prior.autoResolved } : {}),
       };
     }
-    if (!db.setFeedbackTriage(String(req.params.id), triage)) {
+    // Clearing the mark that resolved it undoes the resolve too: reopen first
+    // (a crash between leaves it open and stamped, never resolved, unmarked).
+    const reopened = triage === null && before !== undefined && autoResolveStands(before);
+    if (reopened) db.setFeedbackStatus(id, 'open');
+    if (!db.setFeedbackTriage(id, triage)) {
       res.status(404).json({ error: 'unknown feedback id' });
       return;
     }
-    res.json({ ok: true, triage });
+    let resolved: AutoResolve | undefined;
+    try {
+      [resolved] = triage ? autoResolveFeedback(db, liveDone, id) : [];
+    } catch (e) {
+      console.error(e);
+    }
+    res.json({
+      ok: true,
+      triage: resolved?.triage ?? triage,
+      resolved: resolved !== undefined,
+      reopened,
+      status: resolved ? 'resolved' : reopened ? 'open' : before?.status,
+    });
   });
 
   // ── instructor notes (notes/todos.md item 12) ───────────────────

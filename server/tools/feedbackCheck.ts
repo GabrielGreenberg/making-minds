@@ -9,8 +9,9 @@
 //                bad values are 400s
 //   [triage]     PUT /api/feedback/:id/triage — instructor-only; filed needs
 //                task ids, dismissed a note, only filed names tasks; review
-//                (task 029) is a mark like personal; set and clear; never
-//                touches `status`; unknown id → 404
+//                (task 029) is a mark like personal; set and clear; a filed
+//                mark whose tasks are not live leaves the report open;
+//                unknown id → 404
 //   [script]     tasks/tools/feedback.mjs against a real password-mode server:
 //                pull writes each open, unprocessed report outside the repo
 //                (role, no email, screenshot bytes intact), a re-pull is a
@@ -21,12 +22,36 @@
 //                prints id/role/category/date and never the report's words
 //                (task 029), and the refusals (an --out
 //                inside the repo, no credentials file, bad usage, a wrong
-//                password)
+//                password); a dismissed mark says the report is now resolved;
+//                clear says whether the report is open again (task 086)
+//   [resolver]   (task 086) the pure planner: dismissed resolves; filed only
+//                once every task is done and live (merged → its target, down
+//                the chain, cycle-safe); personal, review, unmarked, already
+//                resolved and stamped (reopened) reports never; no done set →
+//                filed stays open, dismissed still resolves; the first reopen
+//                of a pipeline resolve is noted (reopenedMark), after which
+//                it no longer stands (autoResolveStands)
+//   [done tasks] a tasks/done/ file: the id from its name, status and
+//                merged_into from its frontmatter; other names skipped; a
+//                missing folder is null, never a throw; where the folder is
+//   [labels]     the Feedback tab's words for a report the pipeline resolved
+//                (app/src/instructor/feedbackViews.ts), never once the
+//                instructor has reopened it and resolved it again by hand
+//   [auto-resolve] end to end on a file database over a temp tasks/done/:
+//                marks resolve as they land, or at the next boot once their
+//                tasks are live (a task done after boot waits for the
+//                restart); a forged stamp is ignored; a reopen survives a
+//                restart and a re-mark, and is noted on the stamp; a hand
+//                resolve after it is not credited; clear drops the stamp and
+//                reopens only a pipeline resolve that still stands
+//
+// Every server here reads a temp repo's tasks/done/ (`repoDir`), never the
+// real checkout's: a task landing there must not change a verdict.
 //
 // Exits non-zero on any failed assertion.
 
 import { execFile } from 'node:child_process';
-import { existsSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -35,7 +60,18 @@ import { createApp } from '../src/app';
 import { Db } from '../src/db';
 import { hashPassword } from '../src/password';
 import type { ServerConfig } from '../src/config';
-import type { FeedbackTriage, PlatformFeedback } from '../../app/src/types';
+import {
+  doneDirFor,
+  isTaskLive,
+  parseDoneTaskFile,
+  planAutoResolves,
+  readDoneTasks,
+  reopenedMark,
+  type DoneTask,
+} from '../src/feedbackResolution';
+import { REPO_ROOT } from '../src/robotStatus';
+import { autoResolveLabel, taskNumber } from '../../app/src/instructor/feedbackViews';
+import { autoResolveStands, type FeedbackStatus, type FeedbackTriage, type PlatformFeedback } from '../../app/src/types';
 
 let failures = 0;
 function check(label: string, ok: boolean, detail?: string) {
@@ -114,12 +150,15 @@ section('[migration]');
 }
 
 // ── the server ───────────────────────────────────────────────────
+// Its tasks/done/ is an empty temp one: no filed mark here is live.
+mkdirSync(join(tmp, 'repo', 'tasks', 'done'), { recursive: true });
 const config: ServerConfig = {
   port: 0,
   dbPath,
   corsOrigins: [],
   authMode: 'password',
   sessionTtlSeconds: 3600,
+  repoDir: join(tmp, 'repo'),
 };
 const db = new Db(dbPath);
 db.setPasswordHash(STUDENT, hashPassword('studentpass'));
@@ -132,9 +171,9 @@ const origin = `http://127.0.0.1:${typeof address === 'object' && address ? addr
 async function api<T>(
   method: string,
   path: string,
-  opts: { token?: string; body?: unknown } = {},
+  opts: { token?: string; body?: unknown; at?: string } = {},
 ): Promise<{ status: number; json: T }> {
-  const res = await fetch(`${origin}/api${path}`, {
+  const res = await fetch(`${opts.at ?? origin}/api${path}`, {
     method,
     headers: {
       'Content-Type': 'application/json',
@@ -223,7 +262,10 @@ section('[triage]');
   );
   const after = (await list()).find((f) => f.id === profReport);
   check('the list carries the mark', after?.triage?.outcome === 'filed');
-  check('marking never touches status', after?.status === 'open');
+  check(
+    'a filed mark whose tasks are not live leaves it open',
+    after?.status === 'open' && !after.triage?.autoResolved && (filed.json as { resolved?: unknown }).resolved === false,
+  );
   check('?triaged=true lists it; ?triaged=false does not', (await list('?triaged=true')).some((f) => f.id === profReport) &&
     !(await list('?triaged=false')).some((f) => f.id === profReport));
   const review = await put({ outcome: 'review' });
@@ -401,6 +443,37 @@ const sessionsBefore = sessionCount();
     decided.code === 0 && !existsSync(mdPath(request)) && after.code === 0 && after.stdout.includes('0 reports marked review'),
     decided.stderr + after.stdout + after.stderr,
   );
+  check(
+    'a dismissed mark resolves the report, and mark says so (task 086)',
+    decided.stdout.includes('marked dismissed; resolved;') &&
+      (await list()).find((f) => f.id === request)?.status === 'resolved',
+    decided.stdout,
+  );
+  // A mistaken dismissal is undone by clear: the report is open again, for
+  // the next pull (task 086).
+  const undo = await run('mark', request, 'clear', '--env', envFile, '--out', out);
+  const undone = (await list()).find((f) => f.id === request);
+  check(
+    "clearing the mark that resolved it reopens the report, and mark says so",
+    undo.code === 0 &&
+      undo.stdout.includes("mark cleared and the pipeline's resolve undone (reopened) — the next pull fetches it again") &&
+      undone?.status === 'open' &&
+      !undone.triage,
+    undo.stdout + undo.stderr,
+  );
+  // Re-dismissed, reopened and resolved in the tab: that resolve is the
+  // instructor's, so clear leaves it and says pull won't fetch it.
+  await run('mark', request, 'dismissed', 'not now (Gabriel)', '--env', envFile, '--out', out);
+  await api('PUT', `/feedback/${request}/status`, { token: iTok, body: { status: 'open' } });
+  await api('PUT', `/feedback/${request}/status`, { token: iTok, body: { status: 'resolved' } });
+  const kept = await run('mark', request, 'clear', '--env', envFile, '--out', out);
+  check(
+    'clearing the mark of a report resolved in the tab leaves it resolved, and mark says pull skips it',
+    kept.code === 0 &&
+      kept.stdout.includes('mark cleared — it stays resolved') &&
+      (await list()).find((f) => f.id === request)?.status === 'resolved',
+    kept.stdout + kept.stderr,
+  );
   const badList = await run('list', '--env', envFile, '--out', out);
   check('list without --review is a usage error (exit 2)', badList.code === 2);
   check('the review commands sign out again too', sessionCount() === sessionsBefore);
@@ -431,6 +504,427 @@ const sessionsBefore = sessionCount();
 
 server.close();
 db.close();
+
+// ── [resolver] (task 086) ────────────────────────────────────────
+section('[resolver]');
+{
+  const NOW = '2026-09-29T12:00:00.000Z';
+  const AT = '2026-09-28T09:00:00.000Z';
+  const DONE = '2026-01-01-001';
+  const ABSENT = '2026-01-01-002';
+  const done = new Map<string, DoneTask>([
+    [DONE, { status: 'done' }],
+    ['2026-01-01-010', { status: 'merged', mergedInto: DONE }], // merged → done
+    ['2026-01-01-011', { status: 'merged', mergedInto: ABSENT }], // merged → not in done/
+    ['2026-01-01-012', { status: 'merged', mergedInto: '2026-01-01-013' }], // merged → an odd status
+    ['2026-01-01-013', { status: 'ready' }],
+    ['2026-01-01-014', { status: 'merged', mergedInto: '2026-01-01-010' }], // a chain down to done
+    ['2026-01-01-015', { status: 'merged', mergedInto: '2026-01-01-016' }], // a cycle
+    ['2026-01-01-016', { status: 'merged', mergedInto: '2026-01-01-015' }],
+    ['2026-01-01-017', { status: 'merged' }], // merged into nothing
+  ]);
+  const report = (triage?: FeedbackTriage, status: FeedbackStatus = 'open') => ({ id: 'fb-r', status, triage });
+  const filed = (...tasks: string[]): FeedbackTriage => ({ outcome: 'filed', tasks, at: AT });
+  const plan = (r: ReturnType<typeof report>, d: ReadonlyMap<string, DoneTask> | null = done) => planAutoResolves([r], d, NOW);
+
+  const one = plan(report(filed(DONE)));
+  check(
+    'filed [A], A done → resolved, the mark kept and stamped {filed, [A]}',
+    one.length === 1 &&
+      one[0].id === 'fb-r' &&
+      JSON.stringify(one[0].triage) ===
+        JSON.stringify({ outcome: 'filed', tasks: [DONE], at: AT, autoResolved: { at: NOW, reason: 'filed', tasks: [DONE] } }),
+    JSON.stringify(one),
+  );
+  check('filed [A, B], only A done → open', plan(report(filed(DONE, ABSENT))).length === 0);
+  const dismissed = plan(report({ outcome: 'dismissed', note: 'already fixed (085)', at: AT }));
+  check(
+    'dismissed → resolved, stamped {dismissed}, no tasks',
+    dismissed.length === 1 &&
+      JSON.stringify(dismissed[0].triage.autoResolved) === JSON.stringify({ at: NOW, reason: 'dismissed' }) &&
+      dismissed[0].triage.note === 'already fixed (085)',
+  );
+  check('personal → open', plan(report({ outcome: 'personal', at: AT })).length === 0);
+  check('review → open', plan(report({ outcome: 'review', at: AT })).length === 0);
+  check('unmarked → open', plan(report()).length === 0);
+  check('an already-resolved report is left alone', plan(report(filed(DONE), 'resolved')).length === 0);
+  check(
+    'a stamped report reopened by the instructor stays open',
+    plan(report({ ...filed(DONE), autoResolved: { at: AT, reason: 'filed', tasks: [DONE] } })).length === 0 &&
+      plan(report({ outcome: 'dismissed', note: 'x', at: AT, autoResolved: { at: AT, reason: 'dismissed' } })).length === 0,
+  );
+  check(
+    '…and one reopened, resolved by hand, then reopened again (reopenedAt) too',
+    plan(report({ ...filed(DONE), autoResolved: { at: AT, reason: 'filed', tasks: [DONE], reopenedAt: AT } })).length === 0,
+  );
+  const stamped: FeedbackTriage = { ...filed(DONE), autoResolved: { at: AT, reason: 'filed', tasks: [DONE] } };
+  const firstReopen = reopenedMark(report(stamped, 'resolved'), 'open', NOW);
+  check(
+    "reopening the pipeline's resolve notes it on the stamp, the mark otherwise kept",
+    JSON.stringify(firstReopen) ===
+      JSON.stringify({ ...filed(DONE), autoResolved: { at: AT, reason: 'filed', tasks: [DONE], reopenedAt: NOW } }),
+    JSON.stringify(firstReopen),
+  );
+  check(
+    'only that first reopen: not a resolve, not open → open, not an unstamped report, not a second reopen',
+    reopenedMark(report(stamped, 'open'), 'resolved', NOW) === null &&
+      reopenedMark(report(stamped, 'open'), 'open', NOW) === null &&
+      reopenedMark(report(filed(DONE), 'resolved'), 'open', NOW) === null &&
+      reopenedMark(report(undefined, 'resolved'), 'open', NOW) === null &&
+      reopenedMark(report(firstReopen!, 'resolved'), 'open', '2026-10-01T00:00:00.000Z') === null,
+  );
+  check(
+    "the pipeline's resolve stands only while resolved, stamped and never reopened",
+    autoResolveStands({ status: 'resolved', triage: stamped }) &&
+      !autoResolveStands({ status: 'open', triage: stamped }) &&
+      !autoResolveStands({ status: 'resolved', triage: firstReopen! }) &&
+      !autoResolveStands({ status: 'resolved', triage: filed(DONE) }) &&
+      !autoResolveStands({ status: 'resolved' }),
+  );
+  check('filed into a task merged into a done one → resolved', plan(report(filed('2026-01-01-010'))).length === 1);
+  check('merged into a task not in done/ → open', plan(report(filed('2026-01-01-011'))).length === 0);
+  check('merged into a task that is not done → open', plan(report(filed('2026-01-01-012'))).length === 0);
+  check('a chain merged → merged → done → resolved', plan(report(filed('2026-01-01-014'))).length === 1);
+  check('a merge cycle → open (and it terminates)', plan(report(filed('2026-01-01-015'))).length === 0);
+  check('merged into nothing → open', !isTaskLive('2026-01-01-017', done));
+  check('isTaskLive: done yes, absent no', isTaskLive(DONE, done) && !isTaskLive(ABSENT, done));
+  check(
+    'no done set: filed stays open, dismissed still resolves',
+    plan(report(filed(DONE)), null).length === 0 &&
+      plan(report({ outcome: 'dismissed', note: 'x', at: AT }), null).length === 1,
+  );
+  check(
+    'a whole queue: only the closable ones, in order',
+    planAutoResolves(
+      [
+        { id: 'a', status: 'open', triage: filed(DONE) },
+        { id: 'b', status: 'open', triage: { outcome: 'personal', at: AT } },
+        { id: 'c', status: 'open', triage: { outcome: 'dismissed', note: 'x', at: AT } },
+        { id: 'd', status: 'open', triage: filed(ABSENT) },
+      ],
+      done,
+      NOW,
+    )
+      .map((p) => p.id)
+      .join() === 'a,c',
+  );
+}
+
+// ── [done tasks] ─────────────────────────────────────────────────
+section('[done tasks]');
+{
+  const fm = (lines: string) => `---\n${lines}\n---\n\n## Description\nstatus: done\n`;
+  const merged = parseDoneTaskFile(
+    '2026-09-21-017-activate-worker.md',
+    fm('id: 2026-09-21-017\ntitle: x\nstatus: merged\nafter:\nbranch:\nmerged_into: 2026-09-22-029'),
+  );
+  check(
+    'status and merged_into come from the frontmatter',
+    merged?.id === '2026-09-21-017' && merged.task.status === 'merged' && merged.task.mergedInto === '2026-09-22-029',
+    JSON.stringify(merged),
+  );
+  const renamed = parseDoneTaskFile('2026-01-01-001-alpha.md', fm('id: 2099-12-31-999\nstatus: done\nmerged_into:'));
+  check(
+    "the id comes from the file name, not the frontmatter's id line",
+    renamed?.id === '2026-01-01-001' && renamed.task.status === 'done' && renamed.task.mergedInto === undefined,
+  );
+  check(
+    'a status line below the frontmatter is not read',
+    parseDoneTaskFile('2026-01-01-002-b.md', fm('id: 2026-01-01-002\ntitle: x'))?.task.status === '',
+  );
+  check(
+    'no frontmatter → no status (never live)',
+    parseDoneTaskFile('2026-01-01-003-c.md', 'status: done\n')?.task.status === '',
+  );
+  check(
+    'a merged_into that is no task id is dropped',
+    parseDoneTaskFile('2026-01-01-004-d.md', fm('status: merged\nmerged_into: soon'))?.task.mergedInto === undefined,
+  );
+  check(
+    'names that are not a task file are skipped',
+    parseDoneTaskFile('README.md', fm('status: done')) === null &&
+      parseDoneTaskFile('2026-01-01-005.md', fm('status: done')) === null &&
+      parseDoneTaskFile('2026-01-01-005-e.txt', fm('status: done')) === null,
+  );
+
+  const dir = join(tmp, 'done-read');
+  mkdirSync(dir);
+  writeFileSync(join(dir, '2026-01-01-001-alpha.md'), fm('status: done\nmerged_into:'));
+  writeFileSync(join(dir, '2026-01-01-002-beta.md'), fm('status: merged\nmerged_into: 2026-01-01-001'));
+  writeFileSync(join(dir, 'README.md'), 'not a task\n');
+  const read = readDoneTasks(dir);
+  check(
+    'readDoneTasks reads every task file and skips the rest',
+    read?.size === 2 && read.get('2026-01-01-001')?.status === 'done' && read.get('2026-01-01-002')?.mergedInto === '2026-01-01-001',
+    JSON.stringify([...(read ?? new Map())]),
+  );
+  let threw = false;
+  let missing: unknown = 'unset';
+  try {
+    missing = readDoneTasks(join(tmp, 'no-such-dir'));
+  } catch {
+    threw = true;
+  }
+  check('a missing folder is null, never a throw', !threw && missing === null && readDoneTasks(null) === null);
+  check(
+    'where it reads: the configured clone, none in memory, else this repo',
+    doneDirFor(':memory:') === null &&
+      doneDirFor(':memory:', join(tmp, 'r')) === join(tmp, 'r', 'tasks', 'done') &&
+      doneDirFor(join(tmp, 'x.sqlite')) === join(REPO_ROOT, 'tasks', 'done'),
+  );
+}
+
+// ── [labels] ─────────────────────────────────────────────────────
+section('[labels]');
+{
+  const AT = '2026-09-29T12:00:00.000Z';
+  const filed = (tasks: string[]): FeedbackTriage => ({ outcome: 'filed', tasks, at: AT, autoResolved: { at: AT, reason: 'filed', tasks } });
+  const dismissed: FeedbackTriage = { outcome: 'dismissed', note: 'x', at: AT, autoResolved: { at: AT, reason: 'dismissed' } };
+  const labels = [
+    autoResolveLabel({ status: 'resolved', triage: filed(['2026-09-28-085']) }),
+    autoResolveLabel({ status: 'resolved', triage: filed(['2026-09-28-085', '2026-09-29-086']) }),
+    autoResolveLabel({ status: 'resolved', triage: dismissed }),
+    autoResolveLabel({ status: 'open', triage: filed(['2026-09-28-085']) }),
+    autoResolveLabel({ status: 'open', triage: dismissed }),
+  ];
+  check(
+    'the exact words: fixed by one task, by two, dismissed, and reopened after each',
+    JSON.stringify(labels) ===
+      JSON.stringify([
+        'Resolved: fixed by 085',
+        'Resolved: fixed by 085, 086',
+        'Resolved: dismissed by the pipeline',
+        'Reopened after the pipeline resolved it (fixed by 085)',
+        'Reopened after the pipeline resolved it (dismissed)',
+      ]),
+    JSON.stringify(labels),
+  );
+  const reopened = (t: FeedbackTriage): FeedbackTriage => ({ ...t, autoResolved: { ...t.autoResolved!, reopenedAt: AT } });
+  check(
+    'reopened (noted on the stamp): the reopen while open, nothing once resolved again by hand',
+    autoResolveLabel({ status: 'open', triage: reopened(filed(['2026-09-28-085'])) }) ===
+      'Reopened after the pipeline resolved it (fixed by 085)' &&
+      autoResolveLabel({ status: 'open', triage: reopened(dismissed) }) === 'Reopened after the pipeline resolved it (dismissed)' &&
+      autoResolveLabel({ status: 'resolved', triage: reopened(filed(['2026-09-28-085'])) }) === null &&
+      autoResolveLabel({ status: 'resolved', triage: reopened(dismissed) }) === null,
+  );
+  check(
+    '…and re-marked into another task: the old stamp never reads as the new mark resolved',
+    autoResolveLabel({
+      status: 'resolved',
+      triage: { outcome: 'filed', tasks: ['2026-10-01-090'], at: AT, autoResolved: reopened(filed(['2026-09-28-085'])).autoResolved },
+    }) === null,
+  );
+  check(
+    'no stamp, no label (a hand resolve, a local report, an unmarked one)',
+    autoResolveLabel({ status: 'resolved', triage: { outcome: 'filed', tasks: ['2026-09-28-085'], at: AT } }) === null &&
+      autoResolveLabel({ status: 'resolved' }) === null,
+  );
+  check('taskNumber keeps the number', taskNumber('2026-09-28-085') === '085');
+}
+
+// ── [auto-resolve] end to end ────────────────────────────────────
+section('[auto-resolve]');
+{
+  // Its own file database and its own tasks/done/, with synthetic ids.
+  const root = join(tmp, 'auto');
+  const doneDir = join(root, 'repo', 'tasks', 'done');
+  mkdirSync(doneDir, { recursive: true });
+  const A = '2026-01-01-001';
+  const B = '2026-01-01-002';
+  const MERGED = '2026-01-01-003';
+  const OPEN = '2026-01-01-004';
+  const task = (id: string, status: string, mergedInto = '') =>
+    writeFileSync(
+      join(doneDir, `${id}-a-fixture.md`),
+      `---\nid: ${id}\ntitle: A fixture task\nstatus: ${status}\nmerged_into: ${mergedInto}\n---\n\n## Description\nx\n`,
+    );
+  task(A, 'done');
+  task(MERGED, 'merged', OPEN);
+  writeFileSync(join(doneDir, 'README.md'), 'not a task\n');
+
+  const autoConfig: ServerConfig = { ...config, dbPath: join(root, 'mm.sqlite'), repoDir: join(root, 'repo') };
+  const seed = new Db(autoConfig.dbPath);
+  seed.upsertUser({ email: INSTRUCTOR, name: 'Prof', role: 'instructor' });
+  seed.setPasswordHash(INSTRUCTOR, hashPassword('instructorpass'));
+  const report = (message: string) =>
+    seed.addFeedback({ email: INSTRUCTOR, authorRole: 'instructor', category: 'platform design', message, screenshots: [] }).id;
+  const partial = report('filed into a done task and one not yet done');
+  const whole = report('filed into a done task');
+  const dismissedId = report('noise');
+  const personal = report('about me');
+  const review = report('a big idea');
+  const merged = report('filed into a task merged into an open one');
+  const forged = report('a mark that claims its own stamp');
+  seed.close();
+
+  // A boot of the server over that database: the sweep runs in createApp.
+  const boot = async () => {
+    const bootDb = new Db(autoConfig.dbPath);
+    const srv = createApp(autoConfig, bootDb).listen(0);
+    await new Promise<void>((done) => srv.on('listening', done));
+    const addr = srv.address();
+    const at = `http://127.0.0.1:${typeof addr === 'object' && addr ? addr.port : 0}`;
+    const token = (await api<{ token: string }>('POST', '/auth/login', { at, body: { email: INSTRUCTOR, password: 'instructorpass' } }))
+      .json.token;
+    return {
+      mark: (id: string, body: unknown) =>
+        api<{ triage: FeedbackTriage | null; resolved?: boolean; reopened?: boolean; status?: FeedbackStatus }>(
+          'PUT',
+          `/feedback/${id}/triage`,
+          { at, token, body },
+        ),
+      setStatus: (id: string, status: FeedbackStatus) => api('PUT', `/feedback/${id}/status`, { at, token, body: { status } }),
+      get: async (id: string) =>
+        (await api<{ feedback: PlatformFeedback[] }>('GET', '/feedback', { at, token })).json.feedback.find((f) => f.id === id),
+      stop: () => {
+        srv.close();
+        bootDb.close();
+      },
+    };
+  };
+
+  const first = await boot();
+  const partialMark = await first.mark(partial, { outcome: 'filed', tasks: [A, B] });
+  check(
+    'filed into [done, not done] → open, unstamped',
+    partialMark.json.resolved === false && (await first.get(partial))?.status === 'open' && !partialMark.json.triage?.autoResolved,
+  );
+  const wholeMark = await first.mark(whole, { outcome: 'filed', tasks: [A] });
+  const wholeNow = await first.get(whole);
+  check(
+    'filed into a task already live → resolved as the mark lands, with reason and tasks',
+    wholeMark.json.resolved === true &&
+      wholeNow?.status === 'resolved' &&
+      wholeNow.triage?.autoResolved?.reason === 'filed' &&
+      JSON.stringify(wholeNow.triage.autoResolved.tasks) === JSON.stringify([A]) &&
+      JSON.stringify(wholeMark.json.triage?.autoResolved) === JSON.stringify(wholeNow.triage.autoResolved),
+    JSON.stringify(wholeNow?.triage),
+  );
+  const dismissedMark = await first.mark(dismissedId, { outcome: 'dismissed', note: 'not a report' });
+  const dismissedNow = await first.get(dismissedId);
+  check(
+    'dismissed → resolved at once',
+    dismissedMark.json.resolved === true &&
+      dismissedNow?.status === 'resolved' &&
+      dismissedNow.triage?.autoResolved?.reason === 'dismissed' &&
+      typeof dismissedNow.triage.autoResolved.at === 'string',
+  );
+  await first.mark(personal, { outcome: 'personal' });
+  await first.mark(review, { outcome: 'review' });
+  check(
+    'personal and review stay open',
+    (await first.get(personal))?.status === 'open' && (await first.get(review))?.status === 'open',
+  );
+  await first.mark(merged, { outcome: 'filed', tasks: [MERGED] });
+  check('filed into a task merged into one not done → open', (await first.get(merged))?.status === 'open');
+  const forgedMark = await first.mark(forged, {
+    outcome: 'filed',
+    tasks: [B],
+    autoResolved: { at: '2026-01-01T00:00:00.000Z', reason: 'filed', tasks: [B] },
+  });
+  check(
+    "a body's own autoResolved is ignored",
+    forgedMark.status === 200 && !forgedMark.json.triage?.autoResolved && !(await first.get(forged))?.triage?.autoResolved,
+  );
+
+  // B lands on main while this server runs: not live until the next boot.
+  task(B, 'done');
+  const again = await first.mark(partial, { outcome: 'filed', tasks: [A, B] });
+  check(
+    'a task done after boot is not live yet: the re-mark stays open',
+    again.json.resolved === false && (await first.get(partial))?.status === 'open',
+  );
+  first.stop();
+
+  const second = await boot();
+  const partialLive = await second.get(partial);
+  check(
+    'after the restart the report is resolved, reason filed, both tasks',
+    partialLive?.status === 'resolved' &&
+      partialLive.triage?.autoResolved?.reason === 'filed' &&
+      JSON.stringify(partialLive.triage.autoResolved.tasks) === JSON.stringify([A, B]),
+    JSON.stringify(partialLive),
+  );
+  check('…so is the one whose forged stamp was dropped', (await second.get(forged))?.status === 'resolved');
+  check(
+    '…and personal, review and the merged one still wait',
+    (await second.get(personal))?.status === 'open' &&
+      (await second.get(review))?.status === 'open' &&
+      (await second.get(merged))?.status === 'open',
+  );
+  check('the Feedback tab says what closed it', autoResolveLabel(partialLive!) === 'Resolved: fixed by 001, 002');
+  await second.setStatus(partial, 'open');
+  second.stop();
+
+  const third = await boot();
+  const reopened = await third.get(partial);
+  check(
+    'reopened after an automatic resolve, it stays open across a restart',
+    reopened?.status === 'open' && reopened.triage?.autoResolved?.reason === 'filed',
+  );
+  check(
+    'the reopen is noted on the stamp (the status route)',
+    typeof reopened?.triage?.autoResolved?.reopenedAt === 'string' &&
+      reopened.triage.autoResolved.at === partialLive?.triage?.autoResolved?.at,
+    JSON.stringify(reopened?.triage),
+  );
+  check(
+    'the Feedback tab says so',
+    autoResolveLabel(reopened!) === 'Reopened after the pipeline resolved it (fixed by 001, 002)',
+  );
+  const remark = await third.mark(partial, { outcome: 'filed', tasks: [A, B], note: 'still open, per Gabriel' });
+  check(
+    'a re-mark keeps the stamp, so it stays open',
+    remark.json.resolved === false &&
+      remark.json.triage?.autoResolved?.reason === 'filed' &&
+      remark.json.triage.note === 'still open, per Gabriel' &&
+      (await third.get(partial))?.status === 'open',
+  );
+  await third.setStatus(partial, 'resolved');
+  const byHand = await third.get(partial);
+  check(
+    'resolved again by hand: the stamp keeps its first reopen, and the tab no longer credits the pipeline',
+    byHand?.status === 'resolved' &&
+      byHand.triage?.autoResolved?.reopenedAt === reopened?.triage?.autoResolved?.reopenedAt &&
+      autoResolveLabel(byHand!) === null,
+  );
+  const cleared = await third.mark(partial, { clear: true });
+  check(
+    'clear drops the mark, stamp and all, and leaves a hand resolve alone (and says so)',
+    cleared.json.triage === null &&
+      cleared.json.resolved === false &&
+      cleared.json.reopened === false &&
+      cleared.json.status === 'resolved' &&
+      (await third.get(partial))?.triage === undefined &&
+      (await third.get(partial))?.status === 'resolved',
+    JSON.stringify(cleared.json),
+  );
+  const undone = await third.mark(dismissedId, { clear: true });
+  const undoneNow = await third.get(dismissedId);
+  check(
+    "clear undoes a pipeline resolve that still stands: the report reopens, unmarked, and it says so",
+    undone.json.triage === null &&
+      undone.json.reopened === true &&
+      undone.json.status === 'open' &&
+      undoneNow?.status === 'open' &&
+      undoneNow.triage === undefined,
+    JSON.stringify(undone.json),
+  );
+  const openClear = await third.mark(personal, { clear: true });
+  check(
+    'clear on an open report reopens nothing and says it is open',
+    openClear.json.reopened === false && openClear.json.status === 'open' && (await third.get(personal))?.status === 'open',
+    JSON.stringify(openClear.json),
+  );
+  const fresh = await third.mark(dismissedId, { outcome: 'dismissed', note: 'not a report, again' });
+  check(
+    'once cleared, the report is new to the pipeline: a fresh dismissal resolves it again',
+    fresh.json.resolved === true && (await third.get(dismissedId))?.status === 'resolved',
+  );
+  third.stop();
+}
+
 rmSync(tmp, { recursive: true, force: true });
 
 console.log(failures === 0 ? '\nfeedbackCheck: all passed' : `\nfeedbackCheck: ${failures} FAILED`);

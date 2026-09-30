@@ -47,6 +47,10 @@
 // Task 083: the instructor reads the robot's state through
 // RemoteRobotStatusStore (get and get(true)); a student gets 403.
 //
+// Task 086: a dismissed mark resolves the report on the server, and its
+// `autoResolved` stamp reaches the Feedback tab through the seam; a reopen
+// through the seam is noted on it, and a hand resolve after is not credited.
+//
 // Exits non-zero on the first tally of failures.
 
 // Type-only, so erased at runtime (verbatimModuleSyntax): it loads nothing and
@@ -83,6 +87,7 @@ const {
 } = await import('../src/storage/remoteStores');
 const { TOY_ACCOUNTS } = await import('../src/auth/accounts');
 const { sortAssignments } = await import('../src/assignments');
+const { autoResolveLabel } = await import('../src/instructor/feedbackViews');
 const {
   buildSampleAssignment,
   buildCorrectSubmission,
@@ -142,7 +147,8 @@ const app = createApp(
 const server = app.listen(0);
 await new Promise<void>((resolve) => server.on('listening', resolve));
 const address = server.address();
-api.setApiBase(`http://127.0.0.1:${typeof address === 'object' && address ? address.port : 0}`);
+const harnessOrigin = `http://127.0.0.1:${typeof address === 'object' && address ? address.port : 0}`;
+api.setApiBase(harnessOrigin);
 
 const student = TOY_ACCOUNTS.find((a) => a.role === 'student')!;
 const instructor = TOY_ACCOUNTS.find((a) => a.role === 'instructor')!;
@@ -688,6 +694,36 @@ check('…with no context when none is sent', filedByInstructor.context === unde
 const instructorFiled = (await remoteFeedbackStore.list()).find((f) => f.id === filedByInstructor.id);
 check('…and it lists in the queue tagged instructor, context-free',
   instructorFiled?.authorRole === 'instructor' && instructorFiled.context === undefined);
+
+// Task 086: the pipeline's mark (tasks/tools/feedback.mjs — the app never
+// sets one, so a raw PUT, no client function) closes a dismissed report on
+// the server (an in-memory one has no tasks/done/: dismissed still resolves),
+// and the stamp passes through the seam to the Feedback tab's label.
+const dismissedMark = await fetch(`${harnessOrigin}/api/feedback/${filedByInstructor.id}/triage`, {
+  method: 'PUT',
+  headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${iTok}` },
+  body: JSON.stringify({ outcome: 'dismissed', note: 'not a report' }),
+});
+const autoResolved = (await remoteFeedbackStore.list()).find((f) => f.id === filedByInstructor.id);
+check('a dismissed mark resolves the report, and the stamp comes through the seam',
+  dismissedMark.status === 200 &&
+    autoResolved?.status === 'resolved' &&
+    autoResolved.triage?.autoResolved?.reason === 'dismissed' &&
+    typeof autoResolved.triage.autoResolved.at === 'string');
+check('…labelled for the Feedback tab',
+  autoResolved !== undefined && autoResolveLabel(autoResolved) === 'Resolved: dismissed by the pipeline');
+// The tab's Reopen (the seam's setStatus) is noted on the stamp; resolved
+// again by hand, the tab no longer credits the pipeline.
+await remoteFeedbackStore.setStatus(filedByInstructor.id, 'open');
+const reopenedViaSeam = (await remoteFeedbackStore.list()).find((f) => f.id === filedByInstructor.id);
+check('…reopened through the seam: noted on the stamp, and the label says so',
+  reopenedViaSeam?.status === 'open' &&
+    typeof reopenedViaSeam.triage?.autoResolved?.reopenedAt === 'string' &&
+    autoResolveLabel(reopenedViaSeam) === 'Reopened after the pipeline resolved it (dismissed)');
+await remoteFeedbackStore.setStatus(filedByInstructor.id, 'resolved');
+const handResolved = (await remoteFeedbackStore.list()).find((f) => f.id === filedByInstructor.id);
+check('…resolved again by hand: no pipeline label',
+  handResolved?.status === 'resolved' && handResolved.triage?.autoResolved !== undefined && autoResolveLabel(handResolved) === null);
 
 // ── instructor notes (storage/remoteStores.ts RemoteNotesStore) ──
 api.setToken(iTok);

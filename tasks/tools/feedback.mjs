@@ -30,8 +30,15 @@
 //       keeps it: Gabriel reads it in /catch). `personal` = about the student,
 //       not the platform or a homework: left for the instructor, never filed.
 //       `review` = a student's feature request, bigger change or unclear
-//       report: Gabriel's call (task 029). Never marks a report resolved; that
-//       stays the instructor's act in the app.
+//       report: Gabriel's call (task 029). The server resolves a report the
+//       pipeline has closed (task 086): `dismissed` when the mark lands,
+//       `filed` once every task it names is done and live on the pilot (it
+//       reads its own tasks/done/ at each restart, so at the release after
+//       they land); `personal` and `review` stay open for Gabriel, and a
+//       report he reopens after the pipeline resolved it stays open.
+//       `clear` drops the mark and undoes the resolve it caused, if that
+//       still stands (the report reopens); a report the instructor resolved
+//       stays resolved, and pull fetches only open ones: it says which.
 //
 // Options: --env <file>  credentials (default <repo>/secrets/feedback.env)
 //          --out <dir>   the working copy (default ~/making-minds-private/feedback;
@@ -252,19 +259,31 @@ async function mark(opts, [id, outcome, ...args]) {
   }
 
   const env = readEnv(opts.env);
-  await withSession(env, async (token) => {
+  const reply = await withSession(env, async (token) => {
     const r = await call(env.base, 'PUT', `/feedback/${encodeURIComponent(id)}/triage`, { token, body });
     if (r.status === 404 && !r.json) {
       throw new Failure('The server has no triage endpoint — it predates task 018; release it first.');
     }
     if (r.status !== 200) throw new Failure(`Not marked (${r.status}): ${r.json?.error ?? 'unexpected reply'}.`);
+    return r.json ?? {};
   });
+  // This mark closed the report (task 086): the server stamped it resolved.
+  const resolved = reply.resolved === true && Boolean(reply.triage?.autoResolved);
   // A review mark keeps the working copy: Gabriel reads it in /catch.
   const dropped = outcome !== 'clear' && outcome !== 'review' && dropCached(opts.out, id);
-  console.log(
-    `${id}: ${outcome === 'clear' ? 'mark cleared — the next pull fetches it again' : `marked ${outcome}`}` +
-      `${dropped ? '; working copy dropped' : ''}.`,
-  );
+  console.log(`${id}: ${outcome === 'clear' ? cleared(reply) : `marked ${outcome}`}` +
+    `${resolved ? '; resolved' : ''}${dropped ? '; working copy dropped' : ''}.`);
+}
+
+/** What a clear did, as the server says (task 086): pull fetches only open
+ *  reports, so say whether this one is open now. A server before 086 sends
+ *  no `status`: the old words. */
+function cleared(reply) {
+  if (reply.reopened === true) return "mark cleared and the pipeline's resolve undone (reopened) — the next pull fetches it again";
+  if (reply.status === 'resolved') {
+    return 'mark cleared — it stays resolved (resolved in the Feedback tab), so pull skips it until it is reopened there';
+  }
+  return 'mark cleared — the next pull fetches it again';
 }
 
 // ── main ────────────────────────────────────────────────────────

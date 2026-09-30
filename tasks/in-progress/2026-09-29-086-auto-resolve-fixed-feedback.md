@@ -118,3 +118,84 @@ later, see Design):
   read).
 
 ## Progress log
+
+### 2026-09-29 — implemented (work loop)
+**Built.** The server now resolves a Feedback report once the task pipeline has closed it.
+A `dismissed` mark resolves the report when the mark lands. A `filed` mark resolves it once
+every task it names is done and live, meaning the task's file is in `tasks/done/` of the
+code the server runs. A `merged` task counts once the task it merged into is live, and the
+chain is followed safely even if it loops. `personal`, `review` and unmarked reports are
+never resolved automatically. The live set is read once per process, and a release
+restarts the server, so a task done on `main` but not yet released does not count.
+- `server/src/feedbackResolution.ts` (new, pure planner plus I/O). The planner is
+  `planAutoResolves`, alongside `isTaskLive`, `parseDoneTaskFile` and `reopenedMark`. The
+  I/O is `doneDirFor`, `readDoneTasks` and `autoResolveFeedback`.
+- `app.ts` runs one sweep at boot. The triage `PUT` resolves a dismissal, or a filing into
+  tasks that are already live, as the mark lands. Its reply adds `resolved`, `reopened` and
+  `status`.
+- The resolve is recorded inside the triage JSON as `autoResolved: {at, reason, tasks?,
+  reopenedAt?}`, so there is no schema change and no `db.ts` edit. Only the server sets
+  it: a re-mark keeps the stored stamp and ignores any stamp in the request body.
+- The status route records the instructor's first reopen on the stamp. The pipeline never
+  resolves a stamped report again, so a reopen sticks across restarts and re-marks.
+- `{clear:true}` undoes a pipeline resolve that still stands. It reopens the report first,
+  then drops the mark.
+- The Feedback tab shows `autoResolveLabel` (`app/src/instructor/feedbackViews.ts`, pure)
+  next to the triage tag. The label reads "Resolved: fixed by 085" or "Resolved: dismissed
+  by the pipeline" while the pipeline's resolve stands (`autoResolveStands`, types.ts). It
+  reads "Reopened after the pipeline resolved it (…)" while the report is open, and shows
+  nothing after a later hand resolve.
+- `feedback.mjs mark` now reports `; resolved` when a mark resolved the report, and says
+  what `clear` actually did.
+- Docs updated in place: the `feedback.mjs` header, `CATCHER.md` §3, `ROBOT-CATCH.md` and
+  the CLAUDE.md Server row (39992/40000 bytes).
+- Local mode is unchanged: `app/src/storage/` has no diff.
+
+**Pins.**
+- `server/tools/feedbackCheck.ts`:
+  - [resolver] covers every case listed under Verify, plus a missing done set, the reopen
+    rule (`reopenedMark`) and `autoResolveStands`.
+  - [labels] pins the exact wording of every label, including the reopen and re-mark cases.
+  - [auto-resolve] runs end to end on a file database over a temp `tasks/done/`, across
+    restarts. It covers filed-partial, filed-live, dismissed, personal/review,
+    merged-not-done, a task done after boot, a forged stamp, a reopen that survives a
+    restart and a re-mark, a hand resolve, and the three `clear` cases.
+  - [script] checks the `mark` / `clear` messages against a real server.
+- `app/tools/remoteStoreCheck.ts` checks that the stamp, a reopen and a hand resolve pass
+  through `RemoteFeedbackStore` with the matching labels.
+
+**Gates.** app-tsc=0, app-build=0, app-check=0, server-tsc=0, server-check=0;
+`check-budgets` ok.
+
+**Review.** 3 findings, all fixed, none skipped:
+1. The docs overstated the reopen rule. They now state the narrow rule.
+2. `clear` left a report the pipeline had resolved still resolved, but unmarked. It now
+   reopens it and says so.
+3. The label credited the pipeline after a hand resolve. Fixed with `reopenedAt` and
+   `autoResolveStands`.
+
+Nits left alone:
+- CLAUDE.md's Server row was trimmed of unrelated detail to fit the budget.
+- `server/README.md`'s `MM_REPO_DIR` row doesn't mention that it also picks the live
+  `tasks/done/`.
+
+**Owed.**
+- Browser check of the Feedback tab in REMOTE mode. This robot clone only has the local dev
+  server, which never shows the label. Recipe:
+  - Build a scratch `repo/tasks/done/` holding one `status: done` task file.
+  - Run a server with `MM_AUTH_MODE=dev`, `MM_REPO_DIR` pointing at the scratch repo and
+    `PORT=8199`, plus Vite with `VITE_API_BASE`.
+  - File 3 reports, then mark them filed into that task, dismissed, and review.
+  - The Resolved filter should show the two "Resolved: …" labels. Reopen one, restart, and
+    it should stay open showing "Reopened after…". Check at 375px as well.
+- Pilot, after release:
+  - The first boot bulk-resolves every open report already dismissed or filed into live
+    tasks, so the Open count drops. This is intended; tell Gabriel.
+  - Confirm that `fb-mun6lunz-z7k56e` shows "Resolved: fixed by NNN" once its task ships.
+- Optional, for Gabriel over ssh:
+  - `ls /srv/making-minds/repo/tasks/done | wc -l` should match `main` at the released
+    commit.
+  - `journalctl -u makingminds-api` should show the "feedback: auto-resolved N report(s)"
+    line and no "could not read tasks/done" warning.
+
+**Next step:** loop session: do the owed visual check, then land per PROFILE §5.
